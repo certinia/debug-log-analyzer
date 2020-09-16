@@ -1,0 +1,28 @@
+#dbScroller {
+	overflow: scroll;
+	flex: 1;
+}
+#dbContent {
+	height: 0;
+}
+.dbSection {
+	padding: 10px;
+}
+.dbTitle {
+	font-weight: bold;
+	font-size: 10pt;
+}
+.dbBlock {
+	margin-left: 10px;
+}
+.dbEntry {
+	display: flex;
+}
+.dbCount {
+	display: inline-block;
+	width: 90px;
+	min-width: 90px;
+}
+.dbName {
+	white-space: nowrap;
+}

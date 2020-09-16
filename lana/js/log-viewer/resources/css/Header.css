@@ -1,0 +1,12 @@
+.header {
+	display: flex;
+}
+.logArea {
+	flex-grow: 1;
+	margin-right: 10px;
+	display: inline-block;
+}
+#logPicker {
+	margin: 5px;
+	display: block;
+}

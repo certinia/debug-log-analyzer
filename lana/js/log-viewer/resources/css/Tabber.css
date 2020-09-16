@@ -1,0 +1,36 @@
+.tabHolder {
+	display: flex;
+	background-color: var(--vscode-editorGroupHeader-tabsBackground);
+}
+.tab {
+	display: inline-block;
+	border: 1px solid var(--vscode-tab-border);
+	background-color: var(--vscode-tab-background);
+	color: var(--vscode-tab-inactiveForeground);
+	padding: 5px 10px;
+	cursor: pointer;
+}
+.tab.selected {
+	border-bottom-width: 0;
+	border: 1px solid var(--vscode-tab-activeBorder);
+	background-color: var(--vscode-tab-activeBackground);
+	color: var(--vscode-tab-activeForeground);
+	cursor: default;
+}
+.tabPad {
+	flex-grow: 1;
+}
+.tabber {
+	border-top-width: 0;
+	padding-top: 10px;
+	flex: 1;
+	margin-bottom: 20px;
+}
+.tabItem {
+	display: none;
+	height: 100%;
+}
+.tabItem.selected {
+	display: flex;
+	flex-direction: column;
+}

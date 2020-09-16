@@ -1,0 +1,29 @@
+#timelineView {
+	position: relative;
+}
+#tooltip {
+	display: none;
+	position: absolute;
+	z-index: 1000;
+	padding: 5px;
+	background-color: var(--vscode-editor-background);
+	color: var(--vscode-editor-foreground);
+	word-break: break-word;
+	max-width: 1000px;
+}
+#timelineScroll {
+	z-index: 0;
+	overflow: auto;
+}
+#timeline {
+	z-index: 0;
+}
+#timelineKey {
+	margin-top: 5px;
+}
+#timelineKey .keyEntry {
+	display: inline-block;
+	font-size: 8pt;
+	padding: 4px;
+	margin-right: 5px;
+}

@@ -1,0 +1,38 @@
+.analysisSettings {
+	margin-bottom: 10px;
+	padding: 10px;
+}
+.analysisScroller {
+	overflow: scroll;
+	flex: 1;
+}
+#analysis {
+	height: 0;
+}
+.analysis .row {
+	display: flex;
+}
+.analysis .row span {
+	margin: 2px;
+}
+.analysis .row.data span {
+	background-color: var(--vscode-editorGroupHeader-tabsBackground);
+}
+.analysis .row .name {
+	flex-grow: 1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.analysis .row .count {
+	min-width: 50px;
+	text-align: right;
+}
+.analysis .row .duration {
+	min-width: 110px;
+	text-align: right;
+}
+.analysis .row .netDuration {
+	min-width: 110px;
+	text-align: right;
+}
