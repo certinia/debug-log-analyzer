@@ -1,3 +1,7 @@
+
+## [1.3.1]
+- Small changes to command labels
+
 ## [1.3]
 - When opening a source file, open at correct line.
 - Misc Visual tweaks

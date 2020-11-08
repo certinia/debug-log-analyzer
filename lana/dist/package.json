@@ -1,6 +1,6 @@
 {
   "name": "lana",
-  "displayName": "Log Analyser for Salesforce",
+  "displayName": "Apex Log Analyzer for Salesforce",
   "version": "1.3.0",
   "description": "Debug Log Profile Analyser",
   "scripts": {},
@@ -21,7 +21,7 @@
     "commands": [
       {
         "command": "lana.loadLogFile",
-        "title": "Log: Load Log For Analysis"
+        "title": "Log: Load Apex Log For Analysis"
       },
       {
         "command": "lana.showLogFile",

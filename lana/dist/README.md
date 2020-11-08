@@ -1,5 +1,5 @@
-Log Analyser for Salesforce
-===========================
+Apex Log Analyzer for Salesforce
+================================
 
 This extension provides a debug log analyser for Salesforce debug logs aimed at making performance analysis much 
 easier and quicker. You may also find it generally useful for quickly understanding how your code is executing as
@@ -7,12 +7,12 @@ well.
 
 The main view provides a flame graph for visualising code execution:
 
-# TODO (images/FlameGraph.png)
+![FlameGraph](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/blob/master/lana/dist/images/FlameGraph.png)
 
 Hovering over an element provides information on the item. If you click on an item it will take you to the call 
 navigatable stack view.
 
-# TODO (images/CallStack.png)
+![CallStack](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/blob/master/lana/dist/images/CallStack.png)
 
 Other views are available to show a sorted list of the methods invoked and the SOQL operations performed.
 
@@ -20,8 +20,8 @@ Quick Start
 ===========
 
 You can start the analysis either from a log you have already downloaded or by downloading a log from an org to view.
-To download run 'Log: Load Log for Analysis' from the command palette. To open an existing log file right click it and 
-select 'Log: Show Log Analysis'.On larger logs the analysis window make take a few seconds to appear.
+To download run 'Log: Load Apex Log for Analysis' from the command palette. To open an existing log file right click it 
+and select 'Log: Show Log Analysis'.On larger logs the analysis window make take a few seconds to appear.
 
 WARNING
 =======

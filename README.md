@@ -1,6 +1,6 @@
-# Lana
+# Apex Log Analyzer for Salesforce
 
-Lana is a vscode plugin for Salesforce debug log analysis.
+The Apex Log Analyzer if a vscode plugin for Salesforce debug log analysis.
 
 ## Getting Started
 
