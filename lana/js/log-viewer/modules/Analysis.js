@@ -142,7 +142,7 @@ export function renderAnalysis() {
 	});
 
 	analysisHeader.innerHTML = '';
-	analysisHeader.appendChild(renderAnalysisLine('Method Name', 'Count', 'Duration', 'Net duration', true));
+	analysisHeader.appendChild(renderAnalysisLine('Method Name', 'Count', 'Total Duration', 'Net duration', true));
 
 	analysisHolder.innerHTML = '';
 	let	totalCount = 0,
