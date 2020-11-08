@@ -340,89 +340,11 @@ function renderTreeNode(node, calledFrom) {
 	return mainNode;
 }
 
-function summarizeChild(map, children, child) {
-	const key = child.group || child.text;
-
-	let target = map[key];
-	if (target) {
-		target.duration += child.duration || 0;
-		target.netDuration += child.netDuration || 0;
-		target.containsDml = target.containsDml || child.containsDml;
-		target.containsSoql = target.containsSoql || child.containsSoql;
-		target.lineNumber = undefined;			// can't trust after grouping
-		if (target.children) {
-			target.children = [...target.children, ...child.children];
-		}
-		++target.summaryCount;
-	} else {
-		target = Object.assign(Object.create(Object.getPrototypeOf(child)), child);	// clone child
-		target.summaryCount = 1;
-		children.push(target);
-		map[key] = target;
-	}
-}
-
-function summarizeBlock(map, targetChildren, block) {
-	let children = block.children,
-		len = children.length;
-
-	// merge children into the target array
-	for (let i = 0; i < len; ++i) {
-		summarizeChild(map, targetChildren, children[i]);
-	}
-}
-
-function summarizeTree(node, needClone = true) {
-	const childMap = {},
-		blockMap = {};
-
-	if (needClone) {
-		node = Object.assign(Object.create(Object.getPrototypeOf(node)), node);	// clone node
-	}
-
-	let children = node.children,
-		len = children.length,
-		block;
-	node.children = [];
-	// merge children into a clean array
-	for (let i = 0; i < len; ++i) {
-		const child = children[i];
-
-		if (child.displayType === 'method') {
-			summarizeChild(childMap, node.children, child);
-		} else if (child.displayType === 'block') {
-			if (!block) {
-				block = {
-					displayType: 'block',
-					children: []
-				};
-				node.children.push(block);
-			}
-			summarizeBlock(blockMap, block.children, child);
-		}
-	}
-
-	children = node.children;
-	len = children.length;
-	// recurse
-	for (let i = 0; i < len; ++i) {
-		const child = children[i];
-
-		if (child.displayType === 'method') {
-			summarizeTree(child, false);
-		}
-	}
-
-	return node;
-}
-
 function renderTree() {
-	const treeContainer = document.getElementById('tree'),
-		summarize = document.getElementById('summarize').checked,
-		rootMethod = summarize ? summarizeTree(treeRoot) : treeRoot;
+	const treeContainer = document.getElementById('tree');
 
 	treeContainer.innerHTML = '';
-	treeContainer.appendChild(renderTreeNode(rootMethod, null));
+	treeContainer.appendChild(renderTreeNode(treeRoot, null));
 }
 
 export default function renderTreeView(rootMethod) {
@@ -503,24 +425,18 @@ function onHideFormula(evt) {
 	hideBySelector('.node.formula', evt.target.checked);
 }
 
-function onSummarize(evt) {
-	renderTree();
-}
-
 function onInitTree(evt) {
 	const expandAll = document.getElementById('expandAll'),
 		collapseAll = document.getElementById('collapseAll'),
 		hideDetails = document.getElementById('hideDetails'),
 		hideSystem = document.getElementById('hideSystem'),
-		hideFormula = document.getElementById('hideFormula'),
-		summarizeCheck = document.getElementById('summarize');
+		hideFormula = document.getElementById('hideFormula');
 
 	expandAll.addEventListener('click', onExpandAll);
 	collapseAll.addEventListener('click', onCollapseAll);
 	hideDetails.addEventListener('change', onHideDetails);
 	hideSystem.addEventListener('change', onHideSystem);
 	hideFormula.addEventListener('change', onHideFormula);
-	summarizeCheck.addEventListener('change', onSummarize);
 }
 
 window.addEventListener('DOMContentLoaded', onInitTree);

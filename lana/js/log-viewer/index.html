@@ -61,7 +61,6 @@
 					<div><label><input id="hideDetails" class="filterCheckbox" type="checkbox" checked>Hide details</label></div>
 					<div><label><input id="hideSystem" class="filterCheckbox" type="checkbox">Hide system calls</label></div>
 					<div><label><input id="hideFormula" class="filterCheckbox" type="checkbox">Hide formulas</label></div>
-					<div class="summarize"><label><input id="summarize" class="filterCheckbox" type="checkbox">Summarize</label></div>
 				</div>
 				<div id="treeScroll">
 					<div id='tree'></div>
@@ -120,9 +119,6 @@
 				<br>There are also filter checkboxes to "Hide system calls" and "Hide formulas".
 				<br>
 				<br> The prefix '(S)' is used to indicate callers of methods which perform SOQL and '(D)' is used to indicate callers of methods that perform DML.
-				<br>
-				<br>Additionally, there is a summarize checkbox which aggregates all the children of each node.
-				<br>This looses some order of execution information but can help analyse "noisy" methods - mostly making calls in loops.
 				<br>
 
 				<h3>The "Analysis" Tab</h3>

@@ -232,14 +232,9 @@ function onTabSelect(evt) {
 
 function onInit(evt) {
 	const
-		summarizeCheck = document.getElementById('summarize'),
-		urlParams = new URLSearchParams(window.location.search),
-		summarize = urlParams.get('summarize'),
-		internal = urlParams.get('internal'),
 		tabHolder = document.querySelector('.tabHolder');
 
 	tabHolder.querySelectorAll('.tab').forEach(t => t.addEventListener('click', onTabSelect));
-	summarizeCheck.checked = summarize != null && summarize !== 'false';	// if the url param is present and not-false
 
 	readLog();
 }

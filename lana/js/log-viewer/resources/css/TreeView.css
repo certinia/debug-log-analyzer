@@ -9,11 +9,6 @@
 	display: block;
 	margin: 5px;
 }
-.buttonContainer .summarize {
-	flex: 1;
-	text-align: right;
-	margin-right: 10px;
-}
 .filterCheckbox {
 	margin: 5px;
 }
