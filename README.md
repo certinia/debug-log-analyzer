@@ -1,8 +1,8 @@
 # Apex Log Analyzer for Salesforce
 
-The Apex Log Analyzer if a vscode plugin for Salesforce debug log analysis.
+The Apex Log Analyzer is a Visual Studio Code extension to aid with Salesforce Apex debug log analysis. This extension was originally built by FinancialForce and has subsequently been shared as an open source community project. Salesforce and FinancialForce will make a best-faith effort to triage & moderate issues. This is a community project we are committed to, but that is not a guarantee of ongoing support from either organization. If you are interested in contributing, keep reading to get started! See the Visual Studio Code extension listing for more details on features and usage.
 
-## Getting Started
+## Getting Started as a Contributor
 
 ### Prerequisites
 
