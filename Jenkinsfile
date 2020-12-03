@@ -13,7 +13,7 @@ pipeline {
             }
             steps {
                 withCredentials([string(credentialsId: 'LANA_VSCE_PAT', variable: 'LANA_VSCE_PAT')]) {
-                    sh "vsce publish -p ${LANA_VSCE_PAT} --packagePath --packagePath lana-${TAG_NAME}.vsix"
+                    sh "vsce publish -p ${LANA_VSCE_PAT} --packagePath lana-${TAG_NAME}.vsix"
                 }
             }
         }
