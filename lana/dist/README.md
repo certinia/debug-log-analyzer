@@ -2,8 +2,7 @@ Apex Log Analyzer for Salesforce
 ================================
 
 This extension provides a debug log analyser for Salesforce debug logs aimed at making performance analysis much 
-easier and quicker. You may also find it generally useful for quickly understanding how your code is executing as
-well.
+easier and quicker. You may also find it generally useful for quickly understanding how your code is executing.
 
 The main view provides a flame graph for visualising code execution:
 
@@ -28,7 +27,7 @@ WARNING
 
 The quality of data shown to you depends entirely on the data contained in the log files. Special care should be 
 taken when looking at log files that have been truncated as you are only seeing a part of the execution and that
-may lead ypu to misunderstand what is really happening.
+may lead you to misunderstand what is really happening.
 
 In general you should always set the APEX_CODE debug flag to be FINE or higher for a log to be used for analysis. 
 With a lower setting the log will likely not contain enough detail for meaningful analysis.
