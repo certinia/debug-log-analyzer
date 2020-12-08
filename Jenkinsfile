@@ -8,7 +8,6 @@ pipeline {
         }
         stage('Publish Release') {
             when {
-                environment name: 'GIT_BRANCH', value: 'main'
                 tag pattern: '^([0-9]+)\\.([0-9]+)\\.([0-9]+)$', comparator: 'REGEXP'
             }
             steps {
