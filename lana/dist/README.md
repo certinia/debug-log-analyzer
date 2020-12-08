@@ -1,7 +1,7 @@
 Apex Log Analyzer for Salesforce
 ================================
 
-This extension provides a debug log analyser for Salesforce debug logs aimed at making performance analysis much easier and quicker. You may also find it generally useful for quickly understanding how your code is executing
+This extension provides a debug log analyser for Salesforce debug logs aimed at making performance analysis much easier and quicker. You may also find it generally useful for quickly understanding how your code is executing.
 
 The main view provides a flame graph for visualising code execution:
 
