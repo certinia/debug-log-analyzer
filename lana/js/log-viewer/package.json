@@ -14,7 +14,7 @@
 		"jest": "^24.9.0",
 		"rollup": "^2.3.0",
 		"rollup-plugin-postcss": "^2.5.0",
-		"rollup-plugin-terser": "^5.3.0"
+		"rollup-plugin-terser": "^5.3.1"
 	},
 	"main": "server.js",
 	"author": "Jon Wilson"
