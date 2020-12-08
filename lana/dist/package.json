@@ -1,8 +1,8 @@
 {
   "name": "lana",
   "displayName": "Apex Log Analyzer for Salesforce",
-  "version": "1.3.0",
-  "description": "Debug Log Profile Analyser",
+  "version": "1.3.1",
+  "description": "Debug Log Profile Analyzer",
   "scripts": {},
   "main": "boot.js",
   "icon": "logo.png",
