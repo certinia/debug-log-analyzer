@@ -1,4 +1,8 @@
 # Release Changes
+## [1.3.2] - December 2020
+- Details for Visual Studio Code Marketplace listing
+- Improvements to READMEs
+
 ## [1.3.1] - December 2020
 - Small changes to command labels
 - Improvements to READMEs
