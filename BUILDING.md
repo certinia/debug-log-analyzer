@@ -1,4 +1,4 @@
-# Getting Started as a Contributor
+# Getting Started
 
 The extension source code is written in [Scala](https://www.scala-lang.org/). This is cross-compiled into Javascript as part of the build process using [Scala.js](https://www.scala-js.org/). To re-build from source install the prerequisites and then follow the building instructions. 
 

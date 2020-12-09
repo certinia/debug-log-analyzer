@@ -1,14 +1,19 @@
 {
   "name": "lana",
-  "displayName": "Apex Log Analyzer for Salesforce",
+  "displayName": "Apex Log Analyzer",
   "version": "1.3.1",
-  "description": "Debug Log Profile Analyzer",
+  "description": "Analyzer for Salesforce debug logs",
+  "keywords":[ "salesforce", "apex", "apexlog", "debuglog" ],
   "scripts": {},
   "main": "boot.js",
   "icon": "logo.png",
   "publisher": "FinancialForce",
   "author": "",
-  "license": "",
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/financialforcedev/debug-log-analyzer.git"
+  },
   "activationEvents": [
     "onCommand:lana.loadLogFile",
     "onCommand:lana.showLogFile"

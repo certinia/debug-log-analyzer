@@ -1,6 +1,6 @@
 # Apex Log Analyzer for Salesforce
 
-VSCode extension for debug log analysis for Salesforce debug logs aimed at making performance analysis much easier and quicker. You may also find it generally useful for quickly understanding how your code is executing.
+VSCode extension for analysis of Salesforce debug logs, aimed at making performance analysis much easier and quicker. You may also find it generally useful for quickly understanding how your code is executing.
 
 The main view provides a flame graph for visualising code execution:
 
