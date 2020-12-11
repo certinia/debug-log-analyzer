@@ -1,4 +1,7 @@
 # Release Changes
+## [1.3.4] - December 2020
+- Fix issue #4 with Windows paths
+
 ## [1.3.3] - December 2020
 - Synchronise versions
 

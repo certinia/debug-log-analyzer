@@ -57,7 +57,7 @@ class DiagnosticCollection extends Disposable {
 @js.native
 @JSImport("vscode", "Uri")
 class Uri extends js.Object {
-  val path: String = js.native
+  val fsPath: String = js.native
 }
 
 @js.native
