@@ -21,7 +21,7 @@ object ShowLogFile extends LogView {
   private def command(context: Context, uri: Uri): Future[WebviewPanel] = {
     val cmd =
       QuickPickWorkspace.pickOrReturn(context) flatMap { wsPath =>
-        val filePath = uri.path
+        val filePath = uri.fsPath
         val name = Path.parse(filePath).name.getOrElse("Unknown")
         val fileContents = Fs.readFileSync(filePath, "utf-8")
         Future.successful(createView(wsPath, context, name, filePath, fileContents))

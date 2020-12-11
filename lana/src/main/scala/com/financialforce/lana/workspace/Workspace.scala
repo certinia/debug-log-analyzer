@@ -7,7 +7,7 @@ import com.financialforce.lana.Display
 import com.financialforce.lana.runtime.vscode.WorkspaceFolder
 
 class Workspace(workspaceFolder: WorkspaceFolder, display: Display) {
-  val path: String = workspaceFolder.uri.path
+  val path: String = workspaceFolder.uri.fsPath
   val name: String = workspaceFolder.name
 }
 
