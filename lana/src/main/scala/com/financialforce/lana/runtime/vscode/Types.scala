@@ -229,7 +229,7 @@ class Disposable protected () extends js.Object {
 object workspace extends js.Object {
   val name: String = js.native
   val rootPath: String = js.native
-  val workspaceFolders: js.Array[WorkspaceFolder] = js.native
+  val workspaceFolders: js.UndefOr[js.Array[WorkspaceFolder]] = js.native
 
   def getConfiguration(section: String): WorkspaceConfiguration = js.native
 

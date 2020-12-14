@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
+ */
 package com.financialforce.lana
 
 import com.financialforce.lana.commands.{LoadLogFile, ShowLogFile}
@@ -5,17 +8,15 @@ import com.financialforce.lana.runtime.vscode.ExtensionContext
 import com.financialforce.lana.runtime.vscode.workspace.workspaceFolders
 import com.financialforce.lana.workspace.Workspace
 import com.nawforce.common.path.{PathFactory, PathLike}
-/*
- * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
- */
 
 import scala.concurrent.Future
 import scala.scalajs.concurrent.JSExecutionContext.Implicits.queue
+import scala.scalajs.js
 
 class Context(val context: ExtensionContext, val display: Display, val debugMode: Boolean) {
 
   val symbolFinder = new SymbolFinder()
-  val workspaces: Seq[Workspace] = workspaceFolders map (Workspace(_, display))
+  val workspaces: Seq[Workspace] = workspaceFolders.getOrElse(js.Array()) map (Workspace(_, display))
   val namespaces: Seq[String] = Seq()
 
   register()
