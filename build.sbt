@@ -2,7 +2,7 @@ import scala.sys.process._
 
 // Build-wide settings
 ThisBuild / organization := "com.financialforce"
-ThisBuild / version := "1.3.4"
+ThisBuild / version := "1.3.5"
 ThisBuild / scalaVersion := "2.12.6"
 ThisBuild / resolvers ++= Seq(
   Resolver.sonatypeRepo("releases"),

@@ -1,4 +1,8 @@
 # Release Changes
+## [1.3.5] - December 2020
+- Fix issue #7 Command 'lana.showLogFile' not found
+- Fix issue #3 Cannot read property 'path' of undefined
+
 ## [1.3.4] - December 2020
 - Fix issue #4 with Windows paths
 
