@@ -6,28 +6,25 @@ package com.financialforce.lana
 import com.financialforce.lana.commands.{LoadLogFile, ShowLogFile}
 import com.financialforce.lana.runtime.vscode.ExtensionContext
 import com.financialforce.lana.runtime.vscode.workspace.workspaceFolders
-import com.financialforce.lana.workspace.Workspace
-import com.nawforce.common.path.{PathFactory, PathLike}
+import com.financialforce.lana.workspace.VSWorkspace
 
-import scala.concurrent.Future
-import scala.scalajs.concurrent.JSExecutionContext.Implicits.queue
 import scala.scalajs.js
 
 class Context(val context: ExtensionContext, val display: Display, val debugMode: Boolean) {
 
   val symbolFinder = new SymbolFinder()
-  val workspaces: Seq[Workspace] = workspaceFolders.getOrElse(js.Array()) map (Workspace(_, display))
+  val workspaces: Seq[VSWorkspace] = workspaceFolders.getOrElse(js.Array()) map (VSWorkspace(_, display))
   val namespaces: Seq[String] = Seq()
 
   register()
 
-  def findSymbol(wsPath: String, symbol: String): Future[Option[PathLike]] = {
+  def findSymbol(wsPath: String, symbol: String): Option[String] = {
     try {
-      symbolFinder.findSymbol(wsPath, symbol).toFuture.map(f => Some(PathFactory(f)))
+      Some(symbolFinder.findSymbol(wsPath, symbol))
     } catch {
-      case ex: SymbolFinderError =>
+      case ex: Exception =>
         display.showErrorMessage(ex.getMessage)
-        Future.successful(None)
+        None
     }
   }
 

@@ -3,52 +3,32 @@
  */
 package com.financialforce.lana
 
-import com.nawforce.common.api.{Name, TypeName}
-import com.nawforce.common.diagnostics.CatchingLogger
-import com.nawforce.common.documents.DocumentIndex
-import com.nawforce.common.path.PathFactory
-import com.nawforce.common.sfdx.{MDAPIWorkspace, Project, SFDXWorkspace}
-
-import scala.collection.mutable
-import scala.concurrent.Future
-import scala.scalajs.concurrent.JSExecutionContext.Implicits.queue
 import scala.scalajs.js
-import scala.scalajs.js.JSConverters._
+import scala.scalajs.js.annotation.JSImport
+
+@js.native
+@JSImport("pkgforce", "Workspaces")
+object Workspaces extends js.Object {
+  def get(path: String): Workspace = js.native
+}
+
+@js.native
+@JSImport("pkgforce", "Workspace")
+class Workspace extends js.Object {
+  def findType(typeName: String): String = js.native
+}
 
 class SymbolFinderError(err: String) extends Exception(err)
 
 class SymbolFinder {
-  private val workspaceDocumentIndexes = new mutable.HashMap[String, DocumentIndex]()
 
-  def findSymbol(wsPath: String, symbol: String): js.Promise[String] = {
-    val index = getIndex(wsPath)
-    val typeName = TypeName(symbol.split('.').take(2).map(Name(_)).reverse)
-    val result = index.getByType(typeName) match {
+  def findSymbol(wsPath: String, symbol: String): String = {
+    val ws = Workspaces.get(wsPath)
+    Option(ws.findType(symbol)) match {
       case None =>
-        Future.failed(new SymbolFinderError(s"Symbol $symbol not found"))
-      case Some(metadataDocument) =>
-        Future.successful(metadataDocument.path.toString)
+        throw new SymbolFinderError(s"Symbol $symbol not found")
+      case Some(path) =>
+        path
     }
-    result.toJSPromise
-  }
-
-  def getIndex(wsPath: String): DocumentIndex = {
-    workspaceDocumentIndexes.getOrElseUpdate(
-      wsPath, {
-        val path = PathFactory(wsPath)
-        val ws =
-          if (path.join("sfdx-project.json").exists) {
-            Project(path) match {
-              case Left(err) =>
-                throw new SymbolFinderError(err)
-              case Right(project) =>
-                new SFDXWorkspace(path, project)
-            }
-          } else {
-            new MDAPIWorkspace(None, Seq(path))
-          }
-        val logger = new CatchingLogger()
-        new DocumentIndex(ws.namespace, ws.paths, logger, ws.forceIgnore)
-      })
   }
 }
