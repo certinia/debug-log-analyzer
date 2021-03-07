@@ -86,8 +86,8 @@ lazy val lana = project
     inConfig(Prod)(Seq(
       build := buildLana.value
     )),
-    libraryDependencies += "com.github.nawforce" %%% "pkgforce" % "1.0.0",
     npmPackageDirs ++= Seq(
+      baseDirectory.value / "dist",
       baseDirectory.value / "js/log-viewer"
     ),
     cleanFiles ++= Seq(
@@ -141,7 +141,7 @@ def buildVsixImpl(includeSFDX: Boolean) = Def.task {
 
   // SPAS
 
-  npmPackageDirs.value foreach {
+  Seq((baseDirectory.value / "js/log-viewer")) foreach {
     pkg =>
       val target = dist / "spa" / pkg.getName
       exec(Process("npm run build", pkg))

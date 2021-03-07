@@ -11,10 +11,9 @@ import scala.scalajs.concurrent.JSExecutionContext.Implicits.queue
 object OpenFileInPackage {
 
   def openFileForSymbol(wsPath: String, context: Context, name: String, line: Option[Int]): Unit = {
-    context.findSymbol(wsPath, name) foreach {
-      case None =>
-        context.display.showInformationMessage("No files found for types: " + name)
-      case Some(path) =>
+    context
+      .findSymbol(wsPath, name)
+      .foreach(path => {
         val uri = Uri.file(path.toString)
         workspace
           .openTextDocument(uri)
@@ -25,6 +24,6 @@ object OpenFileInPackage {
               editor.revealRange(new Range(position, position))
             })
           })
-    }
+      })
   }
 }
