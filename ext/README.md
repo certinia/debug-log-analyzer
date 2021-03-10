@@ -1,70 +1,32 @@
-# lana README
+Apex Log Analyzer for Salesforce
+================================
 
-This is the README for your extension "lana". After writing up a brief description, we recommend including the following sections.
+An analyzer for Salesforce debug logs aimed at making performance analysis much easier and quicker. You may also find it generally useful for quickly understanding how your code is executing.
 
-## Features
+The main view provides a flame graph for visualising code execution:
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
 
-For example if there is an image subfolder under your extension project workspace:
+![Another](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/FlameGraph.gif)
 
-\!\[feature X\]\(images/feature-x.png\)
+Hovering over an element provides information on the item. If you click on an item it will take you to the call 
+navigatable stack view.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+Other views are available to show a sorted list of the methods invoked and the SOQL operations performed.
 
-## Requirements
+Quick Start
+===========
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+You can start the analysis either from a log you have already downloaded or by downloading a log from an org to view.
+To download run 'Log: Load Apex Log for Analysis' from the command palette. To open an existing log file right click it 
+and select 'Log: Show Log Analysis'.On larger logs the analysis window make take a few seconds to appear.
 
-## Extension Settings
+WARNING
+=======
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+The quality of data shown to you depends entirely on the data contained in the log files. Special care should be 
+taken when looking at log files that have been truncated as you are only seeing a part of the execution and that
+may lead you to misunderstand what is really happening.
 
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: enable/disable this extension
-* `myExtension.thing`: set to `blah` to do something
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
------------------------------------------------------------------------------------------------------------
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-**Note:** You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux)
-* Toggle preview (`Shift+CMD+V` on macOS or `Shift+Ctrl+V` on Windows and Linux)
-* Press `Ctrl+Space` (Windows, Linux) or `Cmd+Space` (macOS) to see a list of Markdown snippets
-
-### For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+In general you should always set the APEX_CODE debug flag to be FINE or higher for a log to be used for analysis. 
+With a lower setting the log will likely not contain enough detail for meaningful analysis.
+   
