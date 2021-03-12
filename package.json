@@ -9,7 +9,7 @@
 		"apexlog",
 		"debuglog"
 	],
-	"main": "boot.js",
+	"main": "out/Main.js",
 	"icon": "logo.png",
 	"publisher": "FinancialForce",
 	"author": "",
@@ -62,11 +62,12 @@
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
-		"compile": "tsc -p ./",
+		"compile": "npm run log-viewer && tsc -p ./",
 		"watch": "tsc -watch -p ./",
 		"pretest": "npm run compile && npm run lint",
 		"lint": "eslint src --ext ts",
-		"test": "node ./out/test/runTest.js"
+		"test": "node ./out/test/runTest.js",
+		"log-viewer": "(cd log-viewer; npm ci && npm run build)"
 	},
 	"dependencies": {
 		"pkgforce": "1.3.0"
