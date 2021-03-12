@@ -66,13 +66,12 @@ export class LogView {
     logContents: string
   ): string {
     const namespaces = context.namespaces;
-    const spaRoot = path.join(
+    const logViewerRoot = path.join(
       context.context.extensionPath,
-      "spa",
       "log-viewer"
     );
-    const index = path.join(spaRoot, "index.html");
-    const bundle = path.join(spaRoot, "bundle.js");
+    const index = path.join(logViewerRoot, "index.html");
+    const bundle = path.join(logViewerRoot, "dist", "bundle.js");
     const indexSrc = LogView.string(fs.readFileSync(index));
     const bundleSrc = LogView.string(fs.readFileSync(bundle));
     const htmlWithLog = LogView.insertAtToken(

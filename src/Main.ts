@@ -20,7 +20,6 @@ export function activate(
   context = new Context(
     extensionContext,
     new Display(extensionContext),
-    config.debug
   );
 }
 

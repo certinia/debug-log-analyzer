@@ -18,7 +18,7 @@ export class Command {
 
   register(c: Context): Command {
     const fullName = Command.commandPrefix + this.name;
-    const command = commands.registerCommand(fullName, run);
+    const command = commands.registerCommand(fullName, this.run);
     c.context.subscriptions.push(command);
     return this;
   }

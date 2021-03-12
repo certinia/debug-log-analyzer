@@ -17,7 +17,7 @@ export class Context {
   workspaces: VSWorkspace[] = []
   namespaces: string[] = []
 
-  constructor(context: ExtensionContext, display: Display, debugMode: boolean) {
+  constructor(context: ExtensionContext, display: Display) {
     this.context = context;
     this.display = display;
 
