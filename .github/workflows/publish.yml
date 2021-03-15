@@ -17,6 +17,8 @@ jobs:
         node-version: '12'
     - name: Install vsce
       run: npm install --global vsce
+    - name: Dependencies
+      run: npm ci
     - name: Build
       run: vsce package
     - name: Publish to Marketplace
