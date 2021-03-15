@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { SFDX } from "../sfdx";
+import { SFDX } from "../SFDX";
 
 export class GetLogFile {
   static async apply(path: string, logId: string): Promise<string> {

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { SFDX, SFDXResponse } from "../sfdx";
+import { SFDX, SFDXResponse } from "../SFDX";
 
 export interface GetLogFilesResult {
   Id: String;
