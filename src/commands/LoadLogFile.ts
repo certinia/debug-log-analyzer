@@ -26,7 +26,7 @@ export class LoadLogFile {
     const ws = await QuickPickWorkspace.pickOrReturn(context);
     const logFiles = await GetLogFiles.apply(ws);
     if (logFiles.status != 0)
-      throw new Error("Failed to load availabe log files");
+      throw new Error("Failed to load available log files");
     const logFileId = await LoadLogFile.getLogFile(logFiles.result);
     const contents = await LoadLogFile.readLogFile(ws, logFileId);
     return LogView.createView(ws, context, logFileId, contents[0], contents[1]);
