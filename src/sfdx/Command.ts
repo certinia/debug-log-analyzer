@@ -54,6 +54,6 @@ export class Command {
     command: string[],
     handler: Handler
   ): ChildProcess {
-    return exec(command.join(" "), { cwd: path }, handler);
+    return exec(command.join(" "), { cwd: path, maxBuffer: 21*1024*1024 }, handler);
   }
 }
