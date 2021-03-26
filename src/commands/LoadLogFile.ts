@@ -16,23 +16,36 @@ import { Item, Options, QuickPick } from "../display/QuickPick";
 
 export class LoadLogFile {
   static apply(context: Context): void {
-    new Command("loadLogFile", () => LoadLogFile.command(context)).register(
+    new Command("loadLogFile", () => LoadLogFile.safeCommand(context)).register(
       context
     );
     context.display.output(`Registered command '${appName}: Load Log'`);
   }
 
-  private static async command(context: Context): Promise<WebviewPanel> {
+  private static async safeCommand(
+    context: Context
+  ): Promise<WebviewPanel | void> {
+    try {
+      return LoadLogFile.command(context);
+    } catch (err) {
+      context.display.showErrorMessage(`Error loading logfile: ${err.message}`);
+      return Promise.resolve();
+    }
+  }
+
+  private static async command(context: Context): Promise<WebviewPanel | void> {
     const ws = await QuickPickWorkspace.pickOrReturn(context);
     const logFiles = await GetLogFiles.apply(ws);
     if (logFiles.status != 0)
       throw new Error("Failed to load available log files");
     const logFileId = await LoadLogFile.getLogFile(logFiles.result);
-    const contents = await LoadLogFile.readLogFile(ws, logFileId);
-    return LogView.createView(ws, context, logFileId, contents[0], contents[1]);
+    if (logFileId) {
+      const contents = await LoadLogFile.readLogFile(ws, logFileId);
+      return LogView.createView(ws, context, logFileId, contents[0], contents[1]);
+    }
   }
 
-  private static async getLogFile(files: GetLogFilesResult[]) {
+  private static async getLogFile(files: GetLogFilesResult[]): Promise<string | null> {
     const items = files
       .sort((a, b) => {
         const aDate = Date.parse(a.StartTime);
@@ -52,8 +65,10 @@ export class LoadLogFile {
       });
 
     const picked = await QuickPick.pick(items, new Options("Select a logfile"));
-    if (picked.length == 1) return picked[0].detail.slice(0, 18);
-    throw Error("No logfile selected");
+    if (picked.length == 1) 
+      return picked[0].detail.slice(0, 18);
+    else
+      return null;
   }
 
   private static async readLogFile(

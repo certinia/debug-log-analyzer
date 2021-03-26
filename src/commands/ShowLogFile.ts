@@ -14,9 +14,18 @@ import { appName } from "../Main";
 export class ShowLogFile {
   static apply(context: Context): void {
     new Command("showLogFile", (uri: Uri) =>
-      ShowLogFile.command(context, uri)
+      ShowLogFile.safeCommand(context, uri)
     ).register(context);
     context.display.output(`Registered command '${appName}: Show Log'`);
+  }
+
+  private static async safeCommand(context: Context, uri: Uri): Promise<void> {
+    try {
+      return ShowLogFile.command(context, uri);
+    } catch (err) {
+      context.display.showErrorMessage(`Error showing logfile: ${err.message}`);
+      return Promise.resolve();
+    }
   }
 
   private static async command(context: Context, uri: Uri): Promise<void> {

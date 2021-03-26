@@ -35,7 +35,7 @@ export class Context {
     try {
         return this.symbolFinder.findSymbol(wsPath, symbol);
     } catch (err) {
-        this.display.showErrorMessage(err.getMessage)
+        this.display.showErrorMessage(err.message)
         return null
     }
   }

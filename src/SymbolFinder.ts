@@ -16,7 +16,7 @@ export class SymbolFinder {
   findSymbol(wsPath: string, symbol: string): string {
     const ws = Workspaces.get(wsPath);
     const path = ws.findType(symbol);
-    if (path == null) throw new SymbolFinderError(`Symbol ${symbol} not found`);
+    if (path == null) throw new SymbolFinderError(`Type '${symbol}' was not found in workspace`);
     return path;
   }
 }
