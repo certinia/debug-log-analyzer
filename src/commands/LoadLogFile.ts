@@ -51,8 +51,8 @@ export class LoadLogFile {
         const aDate = Date.parse(a.StartTime);
         const bDate = Date.parse(b.StartTime);
         if (aDate == bDate) return 0;
-        else if (aDate < bDate) return -1;
-        return 1;
+        else if (aDate < bDate) return 1;
+        return -1;
       })
       .map((r) => {
         return new Item(
