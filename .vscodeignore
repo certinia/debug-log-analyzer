@@ -1,0 +1,13 @@
+.vscode/
+.github/
+
+.gitignore
+BUILDING.md
+CHANGELOG.md
+README.md
+tsconfig.json
+
+log-viewer/
+!log-viewer/dist/
+!log-viewer/index.html
+src/
