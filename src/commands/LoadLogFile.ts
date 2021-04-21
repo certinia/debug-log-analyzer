@@ -6,7 +6,7 @@ import { Context } from "../Context";
 import { Command } from "./Command";
 import { LogView } from "./LogView";
 import { appName } from "../Main";
-import { WebviewPanel } from "vscode";
+import { WebviewPanel, window } from "vscode";
 import { QuickPickWorkspace } from "../display/QuickPickWorkspace";
 import { GetLogFiles, GetLogFilesResult } from "../sfdx/logs/GetLogFiles";
 import { GetLogFile } from "../sfdx/logs/GetLogFile";
@@ -35,6 +35,7 @@ export class LoadLogFile {
 
   private static async command(context: Context): Promise<WebviewPanel | void> {
     const ws = await QuickPickWorkspace.pickOrReturn(context);
+    await LoadLogFile.showLoadingPicker();
     const logFiles = await GetLogFiles.apply(ws);
     if (logFiles.status != 0)
       throw new Error("Failed to load available log files");
@@ -45,7 +46,14 @@ export class LoadLogFile {
     }
   }
 
-  private static async getLogFile(files: GetLogFilesResult[]): Promise<string | null> {
+  private static async showLoadingPicker(): Promise<QuickPick> {
+    const qp = window.createQuickPick();
+    qp.placeholder = "Select a logfile";
+    qp.busy = true;
+    qp.enabled = false;
+    qp.show();
+    return qp;
+  }
     const items = files
       .sort((a, b) => {
         const aDate = Date.parse(a.StartTime);
