@@ -12,6 +12,7 @@ import { GetLogFiles, GetLogFilesResult } from "../sfdx/logs/GetLogFiles";
 import { GetLogFile } from "../sfdx/logs/GetLogFile";
 import * as path from "path";
 import { promises as fsp } from "fs";
+import * as fs from "fs";
 import { Item, Options, QuickPick } from "../display/QuickPick";
 
 export class LoadLogFile {
@@ -94,9 +95,14 @@ export class LoadLogFile {
   ): Promise<[string, string]> {
     const logDirectory = path.join(ws, ".sfdx", "tools", "debug", "logs");
     const logFile = path.join(logDirectory, `${fileId}.log`);
-    const contents = await GetLogFile.apply(ws, fileId);
-    await fsp.mkdir(logDirectory, { recursive: true });
-    await fsp.writeFile(logFile, contents);
+    const logExists = fs.existsSync(logFile);
+    const contents = logExists
+      ? (await fsp.readFile(logFile)).toString("utf8")
+      : await GetLogFile.apply(ws, fileId);
+    if (!logExists) {
+      await fsp.mkdir(logDirectory, { recursive: true });
+      await fsp.writeFile(logFile, contents);
+    }
     return [logFile, contents];
   }
 }
