@@ -7,7 +7,7 @@ import { Context } from "../Context";
 import { OpenFileInPackage } from "../display/OpenFileInPackage";
 import { WebView } from "../display/WebView";
 import * as path from "path";
-import * as fs from "fs";
+import { promises as fs } from "fs";
 
 interface WebViewLogFileRequest {
   text: string | undefined;
@@ -24,21 +24,12 @@ export class LogFileException extends Error {
 }
 
 export class LogView {
-  static createView(
+  static async createView(
     wsPath: string,
     context: Context,
-    logName: string,
-    logPath: string,
-    logContents: string
-  ): WebviewPanel {
+    logName: string
+  ): Promise<WebviewPanel> {
     const panel = WebView.apply("logFile", "Log: " + logName, []);
-
-    panel.webview.html = LogView.getViewContent(
-      context,
-      logName,
-      logPath,
-      logContents
-    );
     panel.webview.onDidReceiveMessage(
       (msg: any) => {
         const request = msg as WebViewLogFileRequest;
@@ -59,12 +50,28 @@ export class LogView {
     return panel;
   }
 
-  private static getViewContent(
+  static async appendView(
+    view: WebviewPanel,
     context: Context,
     logName: string,
     logPath: string,
     logContents: string
-  ): string {
+  ): Promise<WebviewPanel> {
+    view.webview.html = await LogView.getViewContent(
+      context,
+      logName,
+      logPath,
+      logContents
+    );
+    return view;
+  }
+
+  private static async getViewContent(
+    context: Context,
+    logName: string,
+    logPath: string,
+    logContents: string
+  ): Promise<string> {
     const namespaces = context.namespaces;
     const logViewerRoot = path.join(
       context.context.extensionPath,
@@ -72,29 +79,30 @@ export class LogView {
     );
     const index = path.join(logViewerRoot, "index.html");
     const bundle = path.join(logViewerRoot, "dist", "bundle.js");
-    const indexSrc = LogView.string(fs.readFileSync(index));
-    const bundleSrc = LogView.string(fs.readFileSync(bundle));
-    const htmlWithLog = LogView.insertAtToken(
+    const indexSrc = (await fs.readFile(index)).toString("utf8");
+    const bundleSrc = (await fs.readFile(bundle)).toString("utf8");
+
+    const htmlWithLog = await LogView.insertAtToken(
       indexSrc,
       "@@logTxt",
       logContents
     );
-    const htmlWithLogName = LogView.insertAtToken(
+    const htmlWithLogName = await LogView.insertAtToken(
       htmlWithLog,
       "@@name",
       logName
     );
-    const htmlWithLogPath = LogView.insertAtToken(
+    const htmlWithLogPath = await LogView.insertAtToken(
       htmlWithLogName,
       "@@path",
       logPath
     );
-    const htmlWithNS = LogView.insertAtToken(
+    const htmlWithNS = await LogView.insertAtToken(
       htmlWithLogPath,
       "@@ns",
       namespaces.join(",")
     );
-    const htmlWithBundle = LogView.insertAtToken(
+    const htmlWithBundle = await LogView.insertAtToken(
       htmlWithNS,
       "@@bundle",
       bundleSrc
@@ -102,15 +110,11 @@ export class LogView {
     return htmlWithBundle;
   }
 
-  private static string(buf: Buffer): string {
-    return buf.toString("utf8", 0, buf.length);
-  }
-
-  private static insertAtToken(
+  private static async insertAtToken(
     str: string,
     token: string,
     insert: string
-  ): string {
+  ): Promise<string> {
     if (str.indexOf(token) > -1) {
       const splits = str.split(token);
       return splits[0] + insert + splits[1];
