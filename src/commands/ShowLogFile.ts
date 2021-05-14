@@ -6,7 +6,7 @@ import { Uri, window } from "vscode";
 import { Context } from "../Context";
 import { QuickPickWorkspace } from "../display/QuickPickWorkspace";
 import * as path from "path";
-import * as fs from "fs";
+import { promises as fs } from "fs";
 import { LogView } from "./LogView";
 import { Command } from "./Command";
 import { appName } from "../Main";
@@ -38,8 +38,9 @@ export class ShowLogFile {
     if (filePath) {
       const ws = await QuickPickWorkspace.pickOrReturn(context);
       const name = path.parse(filePath).name;
-      const fileContents = fs.readFileSync(filePath, "utf-8");
-      LogView.createView(ws, context, name, filePath, fileContents);
+      const view = await LogView.createView(ws, context, name);
+      const fileContents = (await fs.readFile(filePath)).toString("utf8");
+      await LogView.appendView(view, context, name, filePath, fileContents);
     } else {
       context.display.showErrorMessage(
         "No file selected to display log analysis"

@@ -23,7 +23,7 @@ export class Command {
         ) => {
           if (error == null) {
             const out = stdOut as Buffer;
-            resolve(out.toString("utf-8", 0, out.length));
+            resolve(out.toString("utf8"));
           } else {
             reject(Command.attemptErrorParse(error, stdOut as Buffer));
           }
@@ -36,7 +36,7 @@ export class Command {
     error: ExecException | null,
     stdOut: Buffer
   ): Error {
-    const out = stdOut.toString("utf-8", 0, stdOut.length);
+    const out = stdOut.toString("utf-8");
     if (out != null && out.length > 0) {
       // sometimes we get detailed message fields back on stdout in json objects
       try {
@@ -54,6 +54,10 @@ export class Command {
     command: string[],
     handler: Handler
   ): ChildProcess {
-    return exec(command.join(" "), { cwd: path, maxBuffer: 21*1024*1024 }, handler);
+    return exec(
+      command.join(" "),
+      { cwd: path, maxBuffer: 21 * 1024 * 1024 },
+      handler
+    );
   }
 }
