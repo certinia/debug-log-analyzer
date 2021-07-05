@@ -6,8 +6,11 @@ BUILDING.md
 CHANGELOG.md
 README.md
 tsconfig.json
+node_modules
+rollup.config.js
 
 log-viewer/
 !log-viewer/dist/
 !log-viewer/index.html
 src/
+
