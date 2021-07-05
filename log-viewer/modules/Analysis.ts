@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import formatDuration, {highlightText} from './Util.js';
+import formatDuration, {highlightText}  from './Util.js';
 import {totalDuration} from './LineParser.js';
 
 const nestedSort = {

@@ -9,12 +9,14 @@
 	"version": "0.1.0",
 	"devDependencies": {
 		"@babel/plugin-transform-modules-commonjs": "7.7.0",
+		"@rollup/plugin-typescript": "^8.2.1",
 		"babel-core": "^6.26.3",
 		"babel-plugin-rewire": "^1.2.0",
 		"jest": "^24.9.0",
 		"rollup": "^2.3.0",
 		"rollup-plugin-postcss": "^2.5.0",
-		"rollup-plugin-terser": "^5.3.1"
+		"rollup-plugin-terser": "^5.3.1",
+		"typescript": "^4.3.5"
 	},
 	"main": "server.js",
 	"author": "Jon Wilson"

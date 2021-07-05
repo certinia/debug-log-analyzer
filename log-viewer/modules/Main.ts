@@ -18,11 +18,25 @@ import "../resources/css/TimelineView.css";
 import "../resources/css/AnalysisView.css";
 import "../resources/css/DatabaseView.css";
 
+interface VSCodeAPI {
+	postMessage(message: any): void;
+}
+
+declare function acquireVsCodeApi(): VSCodeAPI;
+
+declare global {
+	interface Window {
+		// TODO: Type these
+		vscodeAPIInstance: VSCodeAPI
+		activeNamespaces: string[]
+	}
+}
+
 const settingsPattern = /\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+/;
 
-let logSize;
+let logSize: number
 
-function setStatus(name, path, status, color) {
+function setStatus(name: string, path: string, status:string, color: string) {
 	const statusHolder = document.getElementById('status'),
 		nameSpan = document.createElement('span'),
 		nameLink = document.createElement('a'),
@@ -43,9 +57,11 @@ function setStatus(name, path, status, color) {
 	statusSpan.innerText = status;
 	statusSpan.style.color = color;
 
+	if (statusHolder) {
 	statusHolder.innerHTML = '';
 	statusHolder.appendChild(nameSpan);
 	statusHolder.appendChild(statusSpan);
+	}
 
 	if (Array.isArray(truncated)) {
 		truncated.forEach(entry => {
@@ -59,21 +75,20 @@ function setStatus(name, path, status, color) {
 	}
 }
 
-function getLogSettings(log) {
+function getLogSettings(log: string): [string, string][] {
 	const match = log.match(settingsPattern);
 	if (!match) {
-		return null;
+		return [];
 	}
 
 	const settings = match[0],
 		settingStr = settings.substring(settings.indexOf(' ') + 1),
 		settingList = settingStr.split(';');
 
-	return settingList.reduce((acc, entry) => {
+	return settingList.map(entry => {
 		const parts = entry.split(',');
-		acc[parts[0]] = parts[1];
-		return acc;
-	}, {});
+		return [parts[0], parts[1]];
+	});
 }
 
 function markContainers(node, targetType, propertyName) {
@@ -93,7 +108,7 @@ function markContainers(node, targetType, propertyName) {
 	return node[propertyName];
 }
 
-function insertPackageWrappers(node) {
+function insertPackageWrappers(node: any) {
 	const children = node.children,
 		isParentDml = node.type === 'DML_BEGIN';
 
@@ -137,11 +152,11 @@ function insertPackageWrappers(node) {
 	}
 }
 
-let timerText,
-	startTime;
+let timerText: string,
+	startTime: number;
 
-function timer(text) {
-	const time = new Date();
+function timer(text: string) {
+	const time = Date.now();
 	if (timerText) {
 		console.debug(timerText + ' = ' + (time - startTime) + 'ms');
 	}
@@ -149,32 +164,34 @@ function timer(text) {
 	startTime = time;
 }
 
-function renderLogSettings(logSettings) {
+function renderLogSettings(logSettings: [string, string][]) {
 	const holder = document.getElementById('logSettings');
 
+	if (holder) {
 	holder.innerHTML = '';
+	}
 
-	for (const key in logSettings) {
-		const level = logSettings[key];
+	for (const logSetting of logSettings) {
+		const [name, level] = logSetting;
 
 		if (level !== 'NONE') {
 			const setting = document.createElement('div'),
 				title = document.createElement('span'),
 				value = document.createElement('span');
 
-			title.innerText = key + ':';
+			title.innerText = name + ':';
 			title.className = 'settingTitle';
 			value.innerText = level;
 			value.className = 'settingValue';
 			setting.className = 'setting';
 			setting.appendChild(title);
 			setting.appendChild(value);
-			holder.appendChild(setting);
+			holder?.appendChild(setting);
 		}
 	}
 }
 
-function displayLog(log, name, path) {
+function displayLog(log: string, name: string, path: string) {
 	logSize = log.length;
 	setStatus(name, path, 'Processing...', 'black');
 	setTimeout(() => {			// timeout required to display the status
@@ -215,26 +232,26 @@ function displayLog(log, name, path) {
 }
 
 function readLog() {
-    const name = document.getElementById("LOG_FILE_NAME").innerHTML;
-	const path = document.getElementById("LOG_FILE_PATH").innerHTML;
-    const src = document.getElementById("LOG_FILE_TXT").innerHTML;
-    const ns = document.getElementById("LOG_FILE_NS").innerHTML;
+    const name = document.getElementById("LOG_FILE_NAME")?.innerHTML;
+	const path = document.getElementById("LOG_FILE_PATH")?.innerHTML;
+    const src = document.getElementById("LOG_FILE_TXT")?.innerHTML;
+    const ns = document.getElementById("LOG_FILE_NS")?.innerHTML;
 
     // hacky I know
-    window.activeNamespaces = ns.split(",");
+    window.activeNamespaces = ns?.split(",") ?? [];
     window.vscodeAPIInstance = acquireVsCodeApi();
-    displayLog(src, name, path);
+    displayLog(src ?? "", name ?? "", path ?? "");
 }
 
-function onTabSelect(evt) {
+function onTabSelect(evt: any) {
 	showTab(evt.target.id);
 }
 
-function onInit(evt) {
+function onInit(evt: any) {
 	const
 		tabHolder = document.querySelector('.tabHolder');
 
-	tabHolder.querySelectorAll('.tab').forEach(t => t.addEventListener('click', onTabSelect));
+	tabHolder?.querySelectorAll('.tab').forEach(t => t.addEventListener('click', onTabSelect));
 
 	readLog();
 }

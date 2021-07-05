@@ -52,17 +52,17 @@ const defaultScaleX = 0.000001,
 		}
 	};
 
-let	scaleX,
-	scaleFont,
-	maxX,
-	maxY,
-	logicalWidth,
-	logicalHeight,
-	displayWidth,
-	displayHeight,
+let	scaleX: number,
+	scaleFont: string,
+	maxX: number,
+	maxY: number,
+	logicalWidth: number,
+	logicalHeight: number,
+	displayWidth: number,
+	displayHeight: number,
 	timelineRoot,
-	lastMouseX,
-	lastMouseY;
+	lastMouseX: number,
+	lastMouseY: number;
 
 function getMaxWidth(node) {
 	if (node.exitStamp) {
@@ -214,9 +214,11 @@ function renderTimelineKey() {
 	const keyHolder = document.getElementById('timelineKey'),
 		title = document.createElement('span');
 
-	keyHolder.innerHTML = '';
 	title.innerText = '';
+	if (keyHolder) {
+	keyHolder.innerHTML = '';
 	keyHolder.appendChild(title);
+	}
 
 	for (const keyName in keyMap) {
 		const keyMeta = keyMap[keyName],
