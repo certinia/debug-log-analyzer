@@ -819,7 +819,7 @@ function parseLine(line, lastEntry) {
 	return entry;
 }
 
-export default function parseLog(log) {
+export default async function parseLog(log) {
 	const start = log.indexOf('EXECUTION_STARTED');
 	const raw = log.substring(start, log.length);
 	let rawLines = raw.split('\n');

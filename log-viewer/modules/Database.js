@@ -39,7 +39,7 @@ function findDb(node, dmlMap, soqlMap) {
 	}
 }
 
-export default function analyseDb(rootMethod) {
+export default async function analyseDb(rootMethod) {
 	dmlMap = {};
 	soqlMap = {};
 
@@ -112,7 +112,7 @@ function renderSummary(title, entryMap) {
 	return mainNode;
 }
 
-export function renderDb() {
+export async function renderDb() {
 	const dbContainer = document.getElementById('dbContent');
 
 	dbContainer.innerHTML = '';
