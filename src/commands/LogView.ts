@@ -37,7 +37,9 @@ export class LogView {
         if (request.typeName) {
           const parts = request.typeName.split("-");
           let line;
-          if (parts.length > 1) line = parseInt(parts[1]);
+          if (parts.length > 1) {
+            line = parseInt(parts[1]);
+          }
           OpenFileInPackage.openFileForSymbol(wsPath, context, parts[0], line);
         } else if (request.path) {
           context.display.showFile(request.path);

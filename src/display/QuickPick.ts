@@ -49,8 +49,7 @@ export class QuickPick {
   ): Promise<T[]> {
     return QuickPick.showQuickPick(items, options).then((oneOrMany) => {
       if (oneOrMany) {
-        if (options.canPickMany) return oneOrMany as T[];
-        else return [oneOrMany as T];
+        return options.canPickMany ? (oneOrMany as T[]) : [oneOrMany as T];
       }
       return [];
     });

@@ -21,7 +21,7 @@ export class Command {
           stdOut: Buffer | String,
           stdErr: Buffer | String
         ) => {
-          if (error == null) {
+          if (error === null) {
             const out = stdOut as Buffer;
             resolve(out.toString("utf8"));
           } else {
@@ -37,7 +37,7 @@ export class Command {
     stdOut: Buffer
   ): Error {
     const out = stdOut.toString("utf-8");
-    if (out != null && out.length > 0) {
+    if (out !== null && out.length > 0) {
       // sometimes we get detailed message fields back on stdout in json objects
       try {
         const tryGenericError = JSON.parse(out) as Error;
