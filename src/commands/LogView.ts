@@ -81,8 +81,6 @@ export class LogView {
     );
     const index = path.join(logViewerRoot, "index.html");
     const bundle = path.join(logViewerRoot, "dist", "bundle.js");
-    const indexSrc = (await fs.readFile(index)).toString("utf8");
-    const bundleSrc = (await fs.readFile(bundle)).toString("utf8");
 
     const htmlWithLog = await LogView.insertAtToken(
       indexSrc,
@@ -111,6 +109,10 @@ export class LogView {
     );
     return htmlWithBundle;
   }
+    const [indexSrc, bundleSrc] = await Promise.all([
+      fs.readFile(index, "utf-8"),
+      fs.readFile(bundle, "utf-8"),
+    ]);
 
   private static async insertAtToken(
     str: string,
