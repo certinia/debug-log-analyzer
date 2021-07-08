@@ -87,7 +87,7 @@ async function markContainers(node, targetType, propertyName) {
 			node[propertyName] = true;
 		}
 		if (child.displayType === 'method') {
-			node[propertyName] |= markContainers(child, targetType, propertyName);
+			node[propertyName] |= await markContainers(child, targetType, propertyName);
 		}
 	}
 
@@ -122,7 +122,7 @@ async function insertPackageWrappers(node) {
 				lastPkg.exitStamp = child.exitStamp;	// move the end
 				recalculateDurations(lastPkg);
 				if (child.displayType === 'method') {
-					insertPackageWrappers(child);
+					await insertPackageWrappers(child);
 				}
 				continue;								// skip any more child processing (it's moved)
 			} else {
@@ -132,7 +132,7 @@ async function insertPackageWrappers(node) {
 			++i;
 		}
 		if (child.displayType === 'method') {
-			insertPackageWrappers(child);
+			await insertPackageWrappers(child);
 		}
 		lastPkg = childType === 'ENTERING_MANAGED_PKG' ? child : null;
 	}
@@ -177,33 +177,40 @@ async function renderLogSettings(logSettings) {
 
 async function displayLog(log, name, path) {
 	logSize = log.length;
-	await setStatus(name, path, 'Processing...', 'black');
-	timer('parseLog');
+	await setStatus(name, path, "Processing...", "black");
+	
+	timer("parseLog");
 	await Promise.all([
 		renderLogSettings(getLogSettings(log)), 
-		parseLog(log)]);
-	timer('getRootMethod');
+		parseLog(log)
+	]);
 
-	timer('analyse');
+	timer("getRootMethod");
 	const rootMethod = getRootMethod();
+
+	timer("analyse");
 	await Promise.all([
-		setNamespaces(rootMethod), 
-		markContainers(rootMethod, 'DML_BEGIN', 'containsDml'),
-		markContainers(rootMethod, 'SOQL_EXECUTE_BEGIN', 'containsSoql'),
-		insertPackageWrappers(rootMethod),
-		analyseMethods(rootMethod),
+		setNamespaces(rootMethod),
+		markContainers(rootMethod, "DML_BEGIN", "containsDml"),
+		markContainers(rootMethod, "SOQL_EXECUTE_BEGIN", "containsSoql")
+	]);
+	await insertPackageWrappers(rootMethod);
+	await Promise.all([
+		analyseMethods(rootMethod), 
 		analyseDb(rootMethod)
 	]);
 
-	await setStatus(name, path, 'Rendering...', 'black');
-	timer('renderViews');
+	await setStatus(name, path, "Rendering...", "black");
+
+	timer("renderViews");
 	await Promise.all([
 		renderTreeView(rootMethod),
 		renderTimeline(rootMethod),
 		renderAnalysis(),
 		renderDb()
 	]);
-	setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');
+	timer("");
+	setStatus(name, path, "Ready", truncated.length > 0 ? "red" : "green");
 }
 
 function timeout(ms) {
