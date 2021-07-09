@@ -36,20 +36,26 @@ export class LoadLogFile {
 
   private static async command(context: Context): Promise<WebviewPanel | void> {
     const ws = await QuickPickWorkspace.pickOrReturn(context);
-    await LoadLogFile.showLoadingPicker();
-    const logFiles = await GetLogFiles.apply(ws);
-    if (logFiles.status != 0)
+    const [loadingPicker, logFiles] = await Promise.all([
+      LoadLogFile.showLoadingPicker(),
+      GetLogFiles.apply(ws),
+    ]);
+
+    if (logFiles.status !== 0) {
       throw new Error("Failed to load available log files");
+    }
     const logFileId = await LoadLogFile.getLogFile(logFiles.result);
     if (logFileId) {
-      const view = await LogView.createView(ws, context, logFileId);
-      const contents = await LoadLogFile.readLogFile(ws, logFileId);
-      await LogView.appendView(
+      const [view, logFile] = await Promise.all([
+        LogView.createView(ws, context, logFileId),
+        LoadLogFile.readLogFile(ws, logFileId),
+      ]);
+      LogView.appendView(
         view,
         context,
         logFileId,
-        contents[0],
-        contents[1]
+        logFile.filePath,
+        logFile.contents
       );
     }
   }
@@ -70,8 +76,11 @@ export class LoadLogFile {
       .sort((a, b) => {
         const aDate = Date.parse(a.StartTime);
         const bDate = Date.parse(b.StartTime);
-        if (aDate == bDate) return 0;
-        else if (aDate < bDate) return 1;
+        if (aDate === bDate) {
+          return 0;
+        } else if (aDate < bDate) {
+          return 1;
+        }
         return -1;
       })
       .map((r) => {
@@ -85,24 +94,34 @@ export class LoadLogFile {
       });
 
     const picked = await QuickPick.pick(items, new Options("Select a logfile"));
-    if (picked.length == 1) return picked[0].detail.slice(0, 18);
-    else return null;
+    if (picked.length === 1) {
+      return picked[0].detail.slice(0, 18);
+    }
+    return null;
   }
 
   private static async readLogFile(
     ws: string,
     fileId: string
-  ): Promise<[string, string]> {
+  ): Promise<{ filePath: string; contents: string }> {
     const logDirectory = path.join(ws, ".sfdx", "tools", "debug", "logs");
-    const logFile = path.join(logDirectory, `${fileId}.log`);
-    const logExists = fs.existsSync(logFile);
+    const logFilePath = path.join(logDirectory, `${fileId}.log`);
+    const logExists = fs.existsSync(logFilePath);
     const contents = logExists
-      ? (await fsp.readFile(logFile)).toString("utf8")
+      ? await fsp.readFile(logFilePath, "utf-8")
       : await GetLogFile.apply(ws, fileId);
     if (!logExists) {
-      await fsp.mkdir(logDirectory, { recursive: true });
-      await fsp.writeFile(logFile, contents);
+      this.writeLogFile(logDirectory, logFilePath, contents);
     }
-    return [logFile, contents];
+    return { filePath: logFilePath, contents: contents };
+  }
+
+  private static async writeLogFile(
+    logDir: string,
+    logPath: string,
+    logContent: string
+  ) {
+    await fsp.mkdir(logDir, { recursive: true });
+    fsp.writeFile(logPath, logContent);
   }
 }

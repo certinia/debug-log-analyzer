@@ -22,7 +22,7 @@ const settingsPattern = /\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+/;
 
 let logSize;
 
-function setStatus(name, path, status, color) {
+async function setStatus(name, path, status, color) {
 	const statusHolder = document.getElementById('status'),
 		nameSpan = document.createElement('span'),
 		nameLink = document.createElement('a'),
@@ -57,6 +57,7 @@ function setStatus(name, path, status, color) {
 			statusHolder.appendChild(reasonSpan);
 		});
 	}
+	await timeout(10);
 }
 
 function getLogSettings(log) {
@@ -76,7 +77,7 @@ function getLogSettings(log) {
 	}, {});
 }
 
-function markContainers(node, targetType, propertyName) {
+async function markContainers(node, targetType, propertyName) {
 	const children = node.children,
 		len = children.length;
 
@@ -86,14 +87,14 @@ function markContainers(node, targetType, propertyName) {
 			node[propertyName] = true;
 		}
 		if (child.displayType === 'method') {
-			node[propertyName] |= markContainers(child, targetType, propertyName);
+			node[propertyName] |= await markContainers(child, targetType, propertyName);
 		}
 	}
 
 	return node[propertyName];
 }
 
-function insertPackageWrappers(node) {
+async function insertPackageWrappers(node) {
 	const children = node.children,
 		isParentDml = node.type === 'DML_BEGIN';
 
@@ -121,7 +122,7 @@ function insertPackageWrappers(node) {
 				lastPkg.exitStamp = child.exitStamp;	// move the end
 				recalculateDurations(lastPkg);
 				if (child.displayType === 'method') {
-					insertPackageWrappers(child);
+					await insertPackageWrappers(child);
 				}
 				continue;								// skip any more child processing (it's moved)
 			} else {
@@ -131,7 +132,7 @@ function insertPackageWrappers(node) {
 			++i;
 		}
 		if (child.displayType === 'method') {
-			insertPackageWrappers(child);
+			await insertPackageWrappers(child);
 		}
 		lastPkg = childType === 'ENTERING_MANAGED_PKG' ? child : null;
 	}
@@ -149,7 +150,7 @@ function timer(text) {
 	startTime = time;
 }
 
-function renderLogSettings(logSettings) {
+async function renderLogSettings(logSettings) {
 	const holder = document.getElementById('logSettings');
 
 	holder.innerHTML = '';
@@ -174,44 +175,46 @@ function renderLogSettings(logSettings) {
 	}
 }
 
-function displayLog(log, name, path) {
+async function displayLog(log, name, path) {
 	logSize = log.length;
-	setStatus(name, path, 'Processing...', 'black');
-	setTimeout(() => {			// timeout required to display the status
-		timer('renderLogSettings');
-		renderLogSettings(getLogSettings(log));
-		timer('parseLog');
-		parseLog(log);
-		timer('getRootMethod');
-		const rootMethod = getRootMethod();
+	await setStatus(name, path, "Processing...", "black");
+	
+	timer("parseLog");
+	await Promise.all([
+		renderLogSettings(getLogSettings(log)), 
+		parseLog(log)
+	]);
 
-		timer('setNamespaces');
-		setNamespaces(rootMethod);
-		timer('markContainers - DML');
-		markContainers(rootMethod, 'DML_BEGIN', 'containsDml');
-		timer('markContainers - SOQL');
-		markContainers(rootMethod, 'SOQL_EXECUTE_BEGIN', 'containsSoql');
-		timer('insertPackageWrappers');
-		insertPackageWrappers(rootMethod);
-		timer('analyseMethods');
-		analyseMethods(rootMethod);
-		timer('analyseDb');
-		analyseDb(rootMethod);
+	timer("getRootMethod");
+	const rootMethod = getRootMethod();
 
-		setStatus(name, path,'Rendering...', 'black');
-		setTimeout(() => {		// timeout required to display the status
-			timer('renderTreeView');
-			renderTreeView(rootMethod);
-			timer('renderTimeline');
-			renderTimeline(rootMethod);
-			timer('renderAnalysis');
-			renderAnalysis();
-			timer('renderDb');
-			renderDb();
-			timer('');
-			setStatus(name, path,'Ready', truncated.length > 0 ? 'red' : 'green');
-		}, 10);
-	}, 10);
+	timer("analyse");
+	await Promise.all([
+		setNamespaces(rootMethod),
+		markContainers(rootMethod, "DML_BEGIN", "containsDml"),
+		markContainers(rootMethod, "SOQL_EXECUTE_BEGIN", "containsSoql")
+	]);
+	await insertPackageWrappers(rootMethod);
+	await Promise.all([
+		analyseMethods(rootMethod), 
+		analyseDb(rootMethod)
+	]);
+
+	await setStatus(name, path, "Rendering...", "black");
+
+	timer("renderViews");
+	await Promise.all([
+		renderTreeView(rootMethod),
+		renderTimeline(rootMethod),
+		renderAnalysis(),
+		renderDb()
+	]);
+	timer("");
+	setStatus(name, path, "Ready", truncated.length > 0 ? "red" : "green");
+}
+
+function timeout(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function readLog() {
@@ -231,8 +234,7 @@ function onTabSelect(evt) {
 }
 
 function onInit(evt) {
-	const
-		tabHolder = document.querySelector('.tabHolder');
+	const tabHolder = document.querySelector('.tabHolder');
 
 	tabHolder.querySelectorAll('.tab').forEach(t => t.addEventListener('click', onTabSelect));
 

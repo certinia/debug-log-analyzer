@@ -41,7 +41,7 @@ function addNodeToMap(map, node, key) {
 	}
 }
 
-export default function analyseMethods(rootMethod) {
+export default async function analyseMethods(rootMethod) {
 	const methodMap = {};
 
 	addNodeToMap(methodMap, rootMethod);
@@ -128,7 +128,7 @@ function renderAnalysisLine(name, count, duration, netDuration, isBold) {
 	return analysisRow;
 }
 
-export function renderAnalysis() {
+export async function renderAnalysis() {
 	const sortFieldElm = document.getElementById('sortField'),
 		sortField = sortFieldElm.value,
 		sortAscendingElm = document.getElementById('sortAscending'),
