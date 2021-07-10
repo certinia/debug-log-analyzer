@@ -62,7 +62,7 @@
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
-		"compile": "npm run log-viewer && tsc -p ./",
+		"compile": "rm -rf out && npm run log-viewer && rollup -c rollup.config.js",
 		"watch": "tsc -watch -p ./",
 		"pretest": "npm run compile && npm run lint",
 		"lint": "eslint src --ext ts",
@@ -76,6 +76,11 @@
 		"@types/vscode": "^1.54.0",
 		"@types/node": "^12.11.7",
 		"eslint": "^7.19.0",
+		"rollup": "^2.3.0",
+		"@rollup/plugin-commonjs": "^19.0.0",
+		"@rollup/plugin-node-resolve": "^13.0.0",
+		"rollup-plugin-terser": "^5.3.1",
+		"rollup-plugin-typescript2": "^0.30.0",
 		"@typescript-eslint/eslint-plugin": "^4.14.1",
 		"@typescript-eslint/parser": "^4.14.1",
 		"typescript": "^4.1.3"

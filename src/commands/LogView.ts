@@ -37,7 +37,9 @@ export class LogView {
         if (request.typeName) {
           const parts = request.typeName.split("-");
           let line;
-          if (parts.length > 1) line = parseInt(parts[1]);
+          if (parts.length > 1) {
+            line = parseInt(parts[1]);
+          }
           OpenFileInPackage.openFileForSymbol(wsPath, context, parts[0], line);
         } else if (request.path) {
           context.display.showFile(request.path);
@@ -79,46 +81,25 @@ export class LogView {
     );
     const index = path.join(logViewerRoot, "index.html");
     const bundle = path.join(logViewerRoot, "dist", "bundle.js");
-    const indexSrc = (await fs.readFile(index)).toString("utf8");
-    const bundleSrc = (await fs.readFile(bundle)).toString("utf8");
 
-    const htmlWithLog = await LogView.insertAtToken(
-      indexSrc,
-      "@@logTxt",
-      logContents
-    );
-    const htmlWithLogName = await LogView.insertAtToken(
-      htmlWithLog,
-      "@@name",
-      logName
-    );
-    const htmlWithLogPath = await LogView.insertAtToken(
-      htmlWithLogName,
-      "@@path",
-      logPath
-    );
-    const htmlWithNS = await LogView.insertAtToken(
-      htmlWithLogPath,
-      "@@ns",
-      namespaces.join(",")
-    );
-    const htmlWithBundle = await LogView.insertAtToken(
-      htmlWithNS,
-      "@@bundle",
-      bundleSrc
-    );
-    return htmlWithBundle;
-  }
+    const [indexSrc, bundleSrc] = await Promise.all([
+      fs.readFile(index, "utf-8"),
+      fs.readFile(bundle, "utf-8"),
+    ]);
 
-  private static async insertAtToken(
-    str: string,
-    token: string,
-    insert: string
-  ): Promise<string> {
-    if (str.indexOf(token) > -1) {
-      const splits = str.split(token);
-      return splits[0] + insert + splits[1];
-    }
-    return str;
+    const toReplace: { [key: string]: string } = {
+      "@@logTxt": logContents,
+      "@@name": logName,
+      "@@path": logPath,
+      "@@ns": namespaces.join(","),
+      "@@bundle": bundleSrc,
+    };
+
+    return indexSrc.replace(
+      /@@logTxt|@@name|@@path|@@ns|@@bundle/gi,
+      function (matched) {
+        return toReplace[matched];
+      }
+    );
   }
 }

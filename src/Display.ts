@@ -11,7 +11,9 @@ export class Display {
   constructor(context: ExtensionContext) {}
 
   output(message: string, showChannel: boolean = false) {
-    if (showChannel) this.outputChannel.show(true);
+    if (showChannel) {
+      this.outputChannel.show(true);
+    }
     this.outputChannel.appendLine(message);
   }
 

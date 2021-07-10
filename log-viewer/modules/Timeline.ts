@@ -194,7 +194,7 @@ function calculateSizes(canvas) {
 	canvas.style.height = displayHeight + 'px';
 }
 
-export default function renderTimeline(rootMethod) {
+export default async function renderTimeline(rootMethod) {
 	const canvas = document.getElementById('timeline'),
 		ctx = canvas.getContext('2d');
 

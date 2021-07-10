@@ -347,7 +347,7 @@ function renderTree() {
 	treeContainer.appendChild(renderTreeNode(treeRoot, null));
 }
 
-export default function renderTreeView(rootMethod) {
+export default async function renderTreeView(rootMethod) {
 	treeRoot = rootMethod;
 	renderTree();
 }

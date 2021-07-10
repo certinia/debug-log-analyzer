@@ -30,7 +30,7 @@ function extractNamespace(namespaces, text) {
         return null    
 }
 
-function setNamespaces(node) {
+async function setNamespaces(node) {
     const namespaces = collectNamespaces(node)
     const children = node.children;
 	let i;

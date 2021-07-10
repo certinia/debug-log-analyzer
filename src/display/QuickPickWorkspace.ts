@@ -14,16 +14,17 @@ export class QuickPickWorkspace {
         context.workspaces.map((ws) => new Item(ws.name(), ws.path(), "")),
         new Options("Select a workspace:")
       );
-      if (workspace.length == 1) {
+
+      if (workspace.length === 1) {
         return workspace[0].description;
       } else {
         throw new Error("No workspace selected");
       }
-    } else if (context.workspaces.length == 1) {
+    } else if (context.workspaces.length === 1) {
       return context.workspaces[0].path();
     } else {
       if (window.activeTextEditor) {
-        return path.parse(window.activeTextEditor.document.uri.fsPath).dir;
+        return path.parse(window.activeTextEditor.document.fileName).dir;
       } else {
         throw new Error("No workspace selected");
       }
