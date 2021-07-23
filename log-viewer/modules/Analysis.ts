@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import formatDuration, {highlightText}  from './Util.js';
-import {totalDuration} from './LineParser.js';
+import {totalDuration} from './parsers/LineParser.js';
 
 const nestedSort = {
 		count: ['count', 'duration', 'name'],

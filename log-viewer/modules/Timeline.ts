@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import formatDuration, {showTab} from './Util.js';
-import {truncated} from './LineParser.js';
+import {truncated} from './parsers/LineParser.js';
 
 const defaultScaleX = 0.000001,
 	maxCanvasWidth = 32000,

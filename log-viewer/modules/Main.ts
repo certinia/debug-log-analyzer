@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import {showTab, recalculateDurations} from './Util.js';
-import parseLog, {truncated} from './LineParser.js';
+import parseLog, {truncated} from './parsers/LineParser.js';
 import renderTreeView, {getRootMethod} from './TreeView.js';
 import renderTimeline, {maxX} from './Timeline.js';
 import analyseMethods, {renderAnalysis} from './Analysis.js';

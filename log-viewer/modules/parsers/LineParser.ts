@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { decodeEntities } from "./Browser.js";
+import { threadId } from "worker_threads";
+import { decodeEntities } from "../Browser.js";
 
 const typePattern = /^[A-Z_]*$/,
   truncateColor: Map<string, string> = new Map([
@@ -10,15 +11,64 @@ const typePattern = /^[A-Z_]*$/,
     ["unexpected", "rgba(128, 128, 255, 0.2)"],
   ]);
 
-abstract class LogLine {
+  type lineNumber = number | string | null;
+  export abstract class LogLine {
   type: string = "";
   timestamp: number = 0;
   logLine: string = "";
   acceptsText: boolean = false;
   text: string = "";
+  displayType: string = "";
+  
   isExit: boolean = false;
+  discontinuity: boolean = false;
+  exitTypes: string[] | null = null;
+  children: LogLine[] | null = null;
+  exitStamp: number | null = null;
+  duration: number | null = null;
+  netDuration: number | null = null;
+  lineNumber: lineNumber = null;
+  rowCount: number | null = null;
+  classes: string | null = null;
+  summaryCount: number | null = null;
+  group: string | null = null;
+  truncated: boolean | null = null;
+  hideable: boolean | null = null;
+  containsDml: boolean | null = null;
+  containsSoql: boolean | null = null;
+  value: string | null = null;
+  suffix: string | null = null;
+  prefix: string | null = null;
+
+  onEnd(end: LogLine) {}
 
   after(next: LogLine) {}
+
+  addBlock(lines: LogLine[]): void {
+    if (lines.length > 0) {
+      if (this.children == null) this.children = [];
+      this.children.push(new BlockLines(lines));
+    }
+  }
+
+  addChild(line: LogLine): void {
+    if (this.children == null) this.children = [];
+
+    this.children.push(line);
+  }
+
+  setChildren(lines: LogLine[]): void {
+    this.children = lines;
+  }
+}
+
+export class BlockLines extends LogLine {
+  displayType = 'block'
+
+  constructor(children: LogLine[]) {
+    super();
+    this.children = children;
+  }
 }
 
 let logLines: LogLine[] = [],
@@ -82,7 +132,7 @@ function parseRows(text: string): number {
 
 /* Log line entry Parsers */
 
-type lineNumber = number | string | undefined;
+
 
 class ConstructorEntryLine extends LogLine {
   exitTypes = ["CONSTRUCTOR_EXIT"];
@@ -201,7 +251,6 @@ class CodeUnitStartedLine extends LogLine {
   classes = "node";
   cpuType: string;
   namespace: string | undefined;
-  group: string | undefined;
   declarative: boolean | undefined;
 
   constructor(parts: string[]) {
@@ -353,7 +402,6 @@ class SOQLExecuteBeginLine extends LogLine {
   timelineKey = "soql";
   group: string;
   lineNumber: lineNumber;
-  rowCount: number | undefined;
 
   constructor(parts: string[]) {
     super();
@@ -362,7 +410,7 @@ class SOQLExecuteBeginLine extends LogLine {
     this.text = "SOQL: " + parts[3] + " - " + parts[4];
   }
 
-  onEnd(end: EndLine) {
+  onEnd(end: LogLine) {
     this.rowCount = end.rowCount;
   }
 }
@@ -956,8 +1004,6 @@ class FatalErrorLine extends LogLine {
   hideable = false;
   discontinuity = true;
 
-  lineNumber: lineNumber;
-
   constructor(parts: string[]) {
     super();
     truncateLog(this.timestamp, "FATAL ERROR! cause=" + parts[2], "error");
@@ -1039,7 +1085,7 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["WF_FIELD_UPDATE", WFFieldUpdateLine],
   ["WF_RULE_EVAL_BEGIN", WFRuleEvalBeginLine],
   ["WF_RULE_EVAL_END", WFRuleEvalEndLine],
-  ["WF_RULE_EVAL_VALUE",WFRuleEvalValueLine],
+  ["WF_RULE_EVAL_VALUE", WFRuleEvalValueLine],
   ["WF_RULE_FILTER", WFRuleFilterLine],
   ["WF_RULE_NOT_EVALUATED", WFRuleNotEvaluatedLine],
   ["WF_CRITERIA_BEGIN", WFCriteriaBeginLine],
