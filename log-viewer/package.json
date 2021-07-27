@@ -19,7 +19,5 @@
 		"@babel/plugin-transform-modules-commonjs": "^7.7.0",
 		"babel-plugin-rewire": "^1.2.0",
 		"jest": "^27.0.6"
-	},
-	"main": "server.js",
-	"author": "Jon Wilson"
+	}
 }

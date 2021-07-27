@@ -75,12 +75,9 @@ export class LogView {
     logContents: string
   ): Promise<string> {
     const namespaces = context.namespaces;
-    const logViewerRoot = path.join(
-      context.context.extensionPath,
-      "log-viewer"
-    );
+    const logViewerRoot = path.join(context.context.extensionPath, "out");
     const index = path.join(logViewerRoot, "index.html");
-    const bundle = path.join(logViewerRoot, "dist", "bundle.js");
+    const bundle = path.join(logViewerRoot, "bundle.js");
 
     const [indexSrc, bundleSrc] = await Promise.all([
       fs.readFile(index, "utf-8"),

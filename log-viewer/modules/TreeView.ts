@@ -14,19 +14,19 @@ function onExpandCollapse(evt: Event) {
     childContainer = pe?.querySelector(".childContainer");
 
   if (toggle && childContainer) {
-  switch (toggle.textContent) {
-    case "+":
-      // expand
-      childContainer.setAttribute("style", "display = 'block'");
-      toggle.textContent = "-";
-      break;
-    case "-":
-      // collapse
-      childContainer.setAttribute("style", "display = 'none'");
-      toggle.textContent = "+";
-      break;
+    switch (toggle.textContent) {
+      case "+":
+        // expand
+        childContainer.setAttribute("style", "display = 'block'");
+        toggle.textContent = "-";
+        break;
+      case "-":
+        // collapse
+        childContainer.setAttribute("style", "display = 'none'");
+        toggle.textContent = "+";
+        break;
+    }
   }
-}
 }
 
 function describeMethod(node: LogLine, linkInfo: OpenInfo | null) {

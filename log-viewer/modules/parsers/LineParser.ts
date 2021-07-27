@@ -11,15 +11,15 @@ const typePattern = /^[A-Z_]*$/,
     ["unexpected", "rgba(128, 128, 255, 0.2)"],
   ]);
 
-  type lineNumber = number | string | null;
-  export abstract class LogLine {
+type lineNumber = number | string | null;
+export abstract class LogLine {
   type: string = "";
   timestamp: number = 0;
   logLine: string = "";
   acceptsText: boolean = false;
   text: string = "";
   displayType: string = "";
-  
+
   isExit: boolean = false;
   discontinuity: boolean = false;
   exitTypes: string[] | null = null;
@@ -34,11 +34,14 @@ const typePattern = /^[A-Z_]*$/,
   group: string | null = null;
   truncated: boolean | null = null;
   hideable: boolean | null = null;
-  containsDml: boolean | null = null;
-  containsSoql: boolean | null = null;
+  containsDml: boolean = false;
+  containsSoql: boolean = false;
   value: string | null = null;
   suffix: string | null = null;
   prefix: string | null = null;
+  namespace: string | null = null;
+  cpuType: string | null = null;
+  timelineKey: string | null = null;
 
   onEnd(end: LogLine) {}
 
@@ -63,7 +66,7 @@ const typePattern = /^[A-Z_]*$/,
 }
 
 export class BlockLines extends LogLine {
-  displayType = 'block'
+  displayType = "block";
 
   constructor(children: LogLine[]) {
     super();
@@ -131,8 +134,6 @@ function parseRows(text: string): number {
 }
 
 /* Log line entry Parsers */
-
-
 
 class ConstructorEntryLine extends LogLine {
   exitTypes = ["CONSTRUCTOR_EXIT"];
@@ -249,8 +250,6 @@ class CodeUnitStartedLine extends LogLine {
   suffix = " (entrypoint)";
   timelineKey = "codeUnit";
   classes = "node";
-  cpuType: string;
-  namespace: string | undefined;
   declarative: boolean | undefined;
 
   constructor(parts: string[]) {
