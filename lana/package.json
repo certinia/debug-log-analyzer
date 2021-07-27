@@ -19,7 +19,7 @@
 		"url": "https://github.com/financialforcedev/debug-log-analyzer.git"
 	},
 	"engines": {
-		"vscode": "^1.54.0"
+		"vscode": "^1.58.1"
 	},
 	"categories": [
 		"Other"
