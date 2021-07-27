@@ -18,8 +18,14 @@ jobs:
     - name: Install vsce
       run: npm install --global vsce
     - name: Dependencies
-      run: npm ci
+      run: 
+	cd lana
+	npm ci
     - name: Build
-      run: vsce package
+      run: 
+	cd lana
+	vsce package
     - name: Publish to Marketplace
-      run: vsce publish -p ${{ secrets.VSCE_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
+      run: 
+	cd lana
+	vsce publish -p ${{ secrets.VSCE_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
