@@ -73,7 +73,7 @@
 		"log-viewer-copy": "mkdir -p out; cp ../log-viewer/index.html out/. && cp ../log-viewer/bundle.js out/."
 	},
 	"dependencies": {
-		"pkgforce": "1.3.0"
+		"pkgforce": "2.0.0"
 	},
 	"devDependencies": {
 		"@types/vscode": "^1.58.1",
