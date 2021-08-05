@@ -17,12 +17,12 @@ function onExpandCollapse(evt: Event) {
     switch (toggle.textContent) {
       case "+":
         // expand
-        childContainer.setAttribute("style", "display = 'block'");
+        childContainer.setAttribute("style", "display:block");
         toggle.textContent = "-";
         break;
       case "-":
         // collapse
-        childContainer.setAttribute("style", "display = 'none'");
+        childContainer.setAttribute("style", "display:none");
         toggle.textContent = "+";
         break;
     }
@@ -245,7 +245,7 @@ function expand(elm: Element | null | undefined) {
     // can we toggle this block?
     const childContainer = elm.querySelector(".childContainer");
     if (childContainer) {
-      childContainer.setAttribute("style", "display = 'block'");
+      childContainer.setAttribute("style", "display:block");
       toggle.textContent = "-";
 
       let child = childContainer.firstElementChild;
@@ -266,7 +266,7 @@ function collapse(elm: Element | null | undefined) {
     // can we toggle this block?
     const childContainer = elm.querySelector(".childContainer");
     if (childContainer) {
-      childContainer.setAttribute("style", "display = 'none'");
+      childContainer.setAttribute("style", "display:none");
       toggle.textContent = "+";
 
       let child = childContainer.firstElementChild;
