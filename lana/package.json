@@ -19,7 +19,7 @@
 		"url": "https://github.com/financialforcedev/debug-log-analyzer.git"
 	},
 	"engines": {
-		"vscode": "^1.54.0"
+		"vscode": "^1.58.1"
 	},
 	"categories": [
 		"Other"
@@ -62,27 +62,30 @@
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
-		"compile": "rm -rf out && npm run log-viewer && rollup -c rollup.config.js",
+		"compile": "npm run local-compile && npm run log-viewer",
+		"local-compile": "rm -rf out && rollup -c rollup.config.js",
 		"watch": "tsc -watch -p ./",
 		"pretest": "npm run compile && npm run lint",
 		"lint": "eslint src --ext ts",
 		"test": "node ./out/test/runTest.js",
-		"log-viewer": "(cd log-viewer; npm ci && npm run build)"
+		"log-viewer": "npm run log-viewer-build && npm run log-viewer-copy",
+		"log-viewer-build": "(cd ../log-viewer; npm ci && npm run build)",
+		"log-viewer-copy": "mkdir -p out; cp ../log-viewer/index.html out/. && cp ../log-viewer/bundle.js out/."
 	},
 	"dependencies": {
 		"pkgforce": "2.0.0"
 	},
 	"devDependencies": {
-		"@types/vscode": "^1.54.0",
+		"@types/vscode": "^1.58.1",
 		"@types/node": "^12.11.7",
-		"eslint": "^7.19.0",
-		"rollup": "^2.3.0",
-		"@rollup/plugin-commonjs": "^19.0.0",
-		"@rollup/plugin-node-resolve": "^13.0.0",
-		"rollup-plugin-terser": "^5.3.1",
+		"eslint": "^7.31.0",
+		"rollup": "^2.54.0",
+		"@rollup/plugin-commonjs": "^19.0.2",
+		"@rollup/plugin-node-resolve": "^13.0.4",
+		"rollup-plugin-terser": "^7.0.2",
 		"rollup-plugin-typescript2": "^0.30.0",
-		"@typescript-eslint/eslint-plugin": "^4.14.1",
-		"@typescript-eslint/parser": "^4.14.1",
-		"typescript": "^4.1.3"
+		"@typescript-eslint/eslint-plugin": "^4.28.5",
+		"@typescript-eslint/parser": "^4.28.5",
+		"typescript": "^4.3.5"
 	}
 }

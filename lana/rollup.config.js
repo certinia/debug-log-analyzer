@@ -8,7 +8,7 @@ const plugins = [
   nodeResolve(),
   commonjs(),
   typescript(),
-  compact && terser(),
+  compact && terser()
 ];
 
 export default {

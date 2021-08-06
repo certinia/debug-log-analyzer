@@ -1,0 +1,1173 @@
+/*
+ * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
+ */
+import { threadId } from "worker_threads";
+import { decodeEntities } from "../Browser.js";
+
+const typePattern = /^[A-Z_]*$/,
+  truncateColor: Map<string, string> = new Map([
+    ["error", "rgba(255, 128, 128, 0.2)"],
+    ["skip", "rgba(128, 255, 128, 0.2)"],
+    ["unexpected", "rgba(128, 128, 255, 0.2)"],
+  ]);
+
+type lineNumber = number | string | null;
+export abstract class LogLine {
+  type: string = "";
+  timestamp: number = 0;
+  logLine: string = "";
+  acceptsText: boolean = false;
+  text: string = "";
+  displayType: string = "";
+
+  isExit: boolean = false;
+  discontinuity: boolean = false;
+  exitTypes: string[] | null = null;
+  children: LogLine[] | null = null;
+  exitStamp: number | null = null;
+  duration: number | null = null;
+  netDuration: number | null = null;
+  lineNumber: lineNumber = null;
+  rowCount: number | null = null;
+  classes: string | null = null;
+  summaryCount: number | null = null;
+  group: string | null = null;
+  truncated: boolean | null = null;
+  hideable: boolean | null = null;
+  containsDml: boolean = false;
+  containsSoql: boolean = false;
+  value: string | null = null;
+  suffix: string | null = null;
+  prefix: string | null = null;
+  namespace: string | null = null;
+  cpuType: string | null = null;
+  timelineKey: string | null = null;
+
+  onEnd(end: LogLine) {}
+
+  after(next: LogLine) {}
+
+  addBlock(lines: LogLine[]): void {
+    if (lines.length > 0) {
+      if (this.children == null) this.children = [];
+      this.children.push(new BlockLines(lines));
+    }
+  }
+
+  addChild(line: LogLine): void {
+    if (this.children == null) this.children = [];
+
+    this.children.push(line);
+  }
+
+  setChildren(lines: LogLine[]): void {
+    this.children = lines;
+  }
+}
+
+export class BlockLines extends LogLine {
+  displayType = "block";
+
+  constructor(children: LogLine[]) {
+    super();
+    this.children = children;
+  }
+}
+
+let logLines: LogLine[] = [],
+  totalDuration: number = 0,
+  truncated: [string, number, string | undefined][],
+  reasons: Set<string> = new Set<string>(),
+  cpuUsed: number = 0;
+
+export function truncateLog(timestamp: number, reason: string, color: string) {
+  if (!reasons.has(reason)) {
+    reasons.add(reason);
+    truncated.push([reason, timestamp, truncateColor.get(color)]);
+  }
+}
+
+function parseObjectNamespace(text: string): string {
+  const sep = text.indexOf("__");
+  if (sep < 0) {
+    return "unmanaged";
+  }
+  return text.substring(0, sep);
+}
+
+function parseVfNamespace(text: string): string {
+  const sep = text.indexOf("__");
+  if (sep < 0) {
+    return "unmanaged";
+  }
+  const firstSlash = text.indexOf("/");
+  if (firstSlash < 0) {
+    return "unmanaged";
+  }
+  const secondSlash = text.indexOf("/", firstSlash + 1);
+  if (secondSlash < 0) {
+    return "unmanaged";
+  }
+  return text.substring(secondSlash + 1, sep);
+}
+
+function parseTimestamp(text: string): number {
+  const timestamp = text.match(/.*\((\d+)\)/);
+  if (timestamp && timestamp.length > 1) return Number(timestamp[1]);
+  throw new Error(`Unable to parse timestamp: '${text}'`);
+}
+
+function parseLineNumber(text: string): string | number {
+  const matched = text.match(/\[(\w*)\]/);
+  if (matched) {
+    const lineNumber = Number(matched[1]);
+    if (isNaN(lineNumber)) return lineNumber;
+    else return matched[1];
+  }
+  throw new Error(`Unable to parse line number: '${text}'`);
+}
+
+function parseRows(text: string): number {
+  const rowCount = text.match(/Rows:(\d+)/);
+  if (rowCount && rowCount.length > 1) return Number(rowCount[1]);
+  throw new Error(`Unable to parse row count: '${text}'`);
+}
+
+/* Log line entry Parsers */
+
+class ConstructorEntryLine extends LogLine {
+  exitTypes = ["CONSTRUCTOR_EXIT"];
+  displayType = "method";
+  hasLineNumber = true;
+  cpuType = "method";
+  suffix = " (constructor)";
+  timelineKey = "method";
+  classes = "node";
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = decodeEntities(parts[5] + parts[4]);
+  }
+}
+class ConstructorExitLine extends LogLine {
+  isExit = true;
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
+class MethodEntryLine extends LogLine {
+  exitTypes = ["METHOD_EXIT"];
+  displayType = "method";
+  hasLineNumber = true;
+  cpuType = "method";
+  timelineKey = "method";
+  classes = "node";
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = decodeEntities(parts[4]) || this.type;
+    if (this.text === "System.Type.forName(String, String)") {
+      this.cpuType = "loading"; // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
+      // no namespace or it will get charged...
+    }
+  }
+}
+class MethodExitLine extends LogLine {
+  isExit = true;
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
+class SystemConstructorEntryLine extends LogLine {
+  exitTypes = ["SYSTEM_CONSTRUCTOR_EXIT"];
+  displayType = "method";
+  hasLineNumber = true;
+  cpuType = "method";
+  namespace = "system";
+  suffix = "(system constructor)";
+  timelineKey = "systemMethod";
+  classes = "node system";
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = decodeEntities(parts[3]);
+  }
+}
+class SystemConstructorExitLine extends LogLine {
+  isExit = true;
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+class SystemMethodEntryLine extends LogLine {
+  exitTypes = ["SYSTEM_METHOD_EXIT"];
+  displayType = "method";
+  hasLineNumber = true;
+  cpuType = "method";
+  namespace = "system";
+  timelineKey = "systemMethod";
+  classes = "node system";
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = decodeEntities(parts[3]);
+  }
+}
+
+class SystemMethodExitLine extends LogLine {
+  isExit = true;
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
+class CodeUnitStartedLine extends LogLine {
+  exitTypes = ["CODE_UNIT_FINISHED"];
+  displayType = "method";
+  hasLineNumber = false;
+  suffix = " (entrypoint)";
+  timelineKey = "codeUnit";
+  classes = "node";
+  declarative: boolean | undefined;
+
+  constructor(parts: string[]) {
+    super();
+    const subParts = parts[3].split(":"),
+      name = parts[4] || parts[3];
+
+    switch (subParts[0]) {
+      case "EventService":
+        this.cpuType = "method";
+        this.namespace = parseObjectNamespace(subParts[1]);
+        this.group = "EventService " + this.namespace;
+        this.text = parts[3];
+        break;
+      case "Validation":
+        this.cpuType = "custom";
+        this.declarative = true;
+        this.group = "Validation";
+        this.text = name || subParts[0] + ":" + subParts[1];
+        break;
+      case "Workflow":
+        this.cpuType = "custom";
+        this.declarative = true;
+        this.group = "Workflow";
+        this.text = name || subParts[0];
+        break;
+      default:
+        this.cpuType = "method";
+        if (name && name.startsWith("VF:"))
+          this.namespace = parseVfNamespace(name);
+        this.text = name || parts[3]; // ???
+        break;
+    }
+  }
+}
+class CodeUnitFinsihedLine extends LogLine {
+  isExit = true;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2];
+  }
+}
+
+class VFApexCallStartLine extends LogLine {
+  exitTypes = ["VF_APEX_CALL_END"];
+  displayType = "method";
+  hasLineNumber = true;
+  cpuType = "method";
+  suffix = " (VF APEX)";
+  classes = "node";
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
+class VFApexCallEndLine extends LogLine {
+  isExit = true;
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2];
+  }
+}
+
+class VFFormulaStartLine extends LogLine {
+  exitTypes = ["VF_EVALUATE_FORMULA_END"];
+  cpuType = "custom";
+  suffix = " (VF FORMULA)";
+  classes = "node formula";
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[3];
+    this.group = this.type;
+  }
+}
+
+class VFFormulaEndLine extends LogLine {
+  isExit = true;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2];
+  }
+}
+
+class VFSeralizeViewStateStartLine extends LogLine {
+  exitTypes = ["VF_SERIALIZE_VIEWSTATE_END"];
+  displayType = "method";
+  cpuType = "method";
+  namespace = "system";
+  timelineKey = "systemMethod";
+
+  constructor(parts: string[]) {
+    super();
+    this.text = this.type;
+  }
+}
+
+class VFSeralizeViewStateEndLine extends LogLine {
+  isExit = true;
+
+  constructor(parts: string[]) {
+    super();
+  }
+}
+
+class DMLBeginLine extends LogLine {
+  exitTypes = ["DML_END"];
+  displayType = "method";
+  hasLineNumber = true;
+  cpuType = "free";
+  timelineKey = "dml";
+  group = "DML";
+  lineNumber: lineNumber;
+  rowCount: number;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = "DML " + parts[3] + " " + parts[4];
+    this.rowCount = parseRows(parts[5]);
+  }
+}
+
+class DMLEndLine extends LogLine {
+  isExit = true;
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
+interface EndLine {
+  rowCount: number;
+}
+
+class SOQLExecuteBeginLine extends LogLine {
+  exitTypes = ["SOQL_EXECUTE_END"];
+  displayType = "method";
+  hasLineNumber = true;
+  cpuType = "free";
+  timelineKey = "soql";
+  group: string;
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.group = "SOQL";
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = "SOQL: " + parts[3] + " - " + parts[4];
+  }
+
+  onEnd(end: LogLine) {
+    this.rowCount = end.rowCount;
+  }
+}
+
+class SOQLExecuteEndLine extends LogLine {
+  isExit = true;
+  lineNumber: lineNumber;
+  rowCount: number;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.rowCount = parseRows(parts[3]);
+  }
+}
+
+class HeapAllocateLine extends LogLine {
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
+class StatementExecuteLine extends LogLine {
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
+class VariableScopeBeginLine extends LogLine {
+  prefix = "ASSIGN ";
+  classes = "node detail";
+  lineNumber: lineNumber;
+  group: string;
+  value: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = parts[3];
+    this.group = this.type;
+    this.value = parts[4];
+  }
+
+  onEnd(end: any) {
+    this.value = end.value;
+  }
+}
+
+class VariableAssignmentLine extends LogLine {
+  lineNumber: lineNumber;
+  group: string;
+  value: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = parts[3];
+    this.group = this.type;
+    this.value = parts[4];
+  }
+}
+class UserInfoLine extends LogLine {
+  lineNumber: lineNumber;
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = this.type + ":" + parts[3] + " " + parts[4];
+    this.group = this.type;
+  }
+}
+
+class UserDebugLine extends LogLine {
+  lineNumber: lineNumber;
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = this.type + ":" + parts[3] + " " + parts[4];
+    this.group = this.type;
+  }
+}
+
+class CumulativeLimitUsageLine extends LogLine {
+  exitTypes = ["CUMULATIVE_LIMIT_USAGE_END"];
+  displayType = "method";
+  cpuType = "system";
+  timelineKey = "systemMethod";
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = this.type;
+    this.group = this.type;
+  }
+}
+
+class CumulativeLimitUsageEndLine extends LogLine {
+  isExit = true;
+}
+class LimitUsageLine extends LogLine {
+  lineNumber: lineNumber;
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = parts[3] + " " + parts[4] + " out of " + parts[5];
+    this.group = this.type;
+  }
+}
+
+class LimitUsageForNSLine extends LogLine {
+  acceptsText = true;
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2];
+    this.group = this.type;
+  }
+
+  after(next: LogLine) {
+    const matched = this.text.match(/Maximum CPU time: (\d+)/),
+      cpuText = matched ? matched[1] : "0",
+      cpuTime = parseInt(cpuText, 10) * 1000000; // convert from milli-seconds to nano-seconds
+
+    if (!cpuUsed || cpuTime > cpuUsed) {
+      cpuUsed = cpuTime;
+    }
+  }
+}
+
+class TotalEmailRecipientsQueuedLine extends LogLine {
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2];
+  }
+}
+
+class StaticVariableListLine extends LogLine {}
+class SystemModeEnterLine extends LogLine {}
+class SystemModeExitLine extends LogLine {}
+class ExecutionStartedLine extends LogLine {}
+class ExecutionFinishedLine extends LogLine {}
+
+class EnteringManagedPackageLine extends LogLine {
+  displayType = "method";
+  cpuType = "pkg";
+  timelineKey = "method";
+  name: string;
+  namespace: string;
+  exitStamp: any;
+  duration: any;
+  netDuration: any;
+
+  constructor(parts: string[]) {
+    super();
+    const rawNs = parts[2],
+      lastDot = rawNs.lastIndexOf("."),
+      ns = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
+
+    this.text = this.namespace = ns;
+    this.name = this.type + ": " + parts[2];
+  }
+
+  after(next: LogLine) {
+    this.exitStamp = next.timestamp;
+    this.duration = this.netDuration = this.exitStamp - this.timestamp;
+  }
+}
+
+class EventSericePubBeginLine extends LogLine {
+  exitTypes = ["EVENT_SERVICE_PUB_END"];
+  displayType = "method";
+  cpuType = "custom";
+  timelineKey = "flow";
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.group = this.type;
+    this.text = parts[2];
+  }
+}
+
+class EventSericePubEndLine extends LogLine {
+  isExit = true;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2];
+  }
+}
+
+class EventSericePubDetailLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2] + " " + parts[3] + " " + parts[4];
+    this.group = this.type;
+  }
+}
+
+class SavePointSetLine extends LogLine {
+  lineNumber: lineNumber;
+
+  constructor(parts: string[]) {
+    super();
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = parts[3];
+  }
+}
+
+class FlowStartInterviewsBeginLine extends LogLine {
+  exitTypes = ["FLOW_START_INTERVIEWS_END"];
+  displayType = "method";
+  cpuType = "custom";
+  declarative = true;
+  timelineKey = "flow";
+  group = "FLOW_START_INTERVIEWS";
+
+  constructor(parts: string[]) {
+    super();
+    this.text = "FLOW_START_INTERVIEWS : " + parts[2];
+  }
+}
+
+class FlowStartInterviewsEndLine extends LogLine {
+  isExit = true;
+}
+
+class FlowStartInterviewBeginLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[3];
+    this.group = this.type;
+  }
+}
+
+class FlowStartInterviewEndLine extends LogLine {}
+
+class FlowStartInterviewLimitUsageLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2];
+    this.group = this.type;
+  }
+}
+
+class FlowCreateInterviewBeginLine extends LogLine {
+  text = "";
+
+  constructor(parts: string[]) {
+    super();
+  }
+}
+
+class FlowCreateInterviewEndLine extends LogLine {}
+
+class FlowElementBeginLine extends LogLine {
+  exitTypes = ["FLOW_ELEMENT_END"];
+  displayType = "method";
+  cpuType = "custom";
+  declarative = true;
+  timelineKey = "flow";
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.group = this.type;
+    this.text = this.type + " - " + parts[3] + " " + parts[4];
+  }
+}
+
+class FlowElementEndLine extends LogLine {
+  isExit = true;
+}
+
+class FlowElementDeferredLine extends LogLine {
+  declarative = true;
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2] + " " + parts[3];
+    this.group = this.type;
+  }
+}
+
+class FlowElementAssignmentLine extends LogLine {
+  declarative = true;
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[3] + " " + parts[4];
+    this.group = this.type;
+  }
+}
+
+class FlowInterviewFinishedLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[3];
+    this.group = this.type;
+  }
+}
+
+class FlowElementErrorLine extends LogLine {
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[1] + parts[2] + " " + parts[3] + " " + parts[4];
+  }
+}
+
+class FlowActionCallDetailLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text =
+      parts[3] + " : " + parts[4] + " : " + parts[5] + " : " + parts[6];
+    this.group = this.type;
+  }
+}
+
+class FlowAssignmentDetailLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[3] + " : " + parts[4] + " : " + parts[5];
+    this.group = this.type;
+  }
+}
+
+class FlowLoopDetailLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[3] + " : " + parts[4];
+    this.group = this.type;
+  }
+}
+
+class FlowRuleDetailLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[3] + " : " + parts[4];
+    this.group = this.type;
+  }
+}
+
+class FlowBulkElementBeginLine extends LogLine {
+  exitTypes = ["FLOW_BULK_ELEMENT_END"];
+  displayType = "method";
+  cpuType = "custom";
+  declarative = true;
+  timelineKey = "flow";
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = this.type + " - " + parts[2];
+    this.group = this.type;
+  }
+}
+
+class FlowBulkElementEndLine extends LogLine {
+  isExit = true;
+}
+
+class FlowBulkElementDetailLine extends LogLine {
+  declarative = true;
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2] + " : " + parts[3] + " : " + parts[4];
+    this.group = this.type;
+  }
+}
+
+class FlowBulkElementLimitUsage extends LogLine {
+  declarative = true;
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2];
+    this.group = this.type;
+  }
+}
+
+class ValidationRuleLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[3];
+    this.group = this.type;
+  }
+}
+
+class ValidationFormulaLine extends LogLine {
+  acceptsText = true;
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    const extra = parts.length > 3 ? " " + parts[3] : "";
+
+    this.text = parts[2] + extra;
+    this.group = this.type;
+  }
+}
+
+class ValidationPassLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[3];
+    this.group = this.type;
+  }
+}
+
+class WFFlowActionBeginLine extends LogLine {}
+
+class WFFlowActionEndLine extends LogLine {}
+
+class WFFlowActionErrorLine extends LogLine {
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[1] + " " + parts[4];
+  }
+}
+
+class WFFlowActionErrorDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[1] + " " + parts[2];
+  }
+}
+
+class WFFieldUpdateLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text =
+      " " +
+      parts[2] +
+      " " +
+      parts[3] +
+      " " +
+      parts[4] +
+      " " +
+      parts[5] +
+      " " +
+      parts[6];
+    this.group = this.type;
+  }
+}
+
+class WFRuleEvalBeginLine extends LogLine {
+  exitTypes = ["WF_RULE_EVAL_END"];
+  displayType = "method";
+  cpuType = "custom";
+  declarative = true;
+  timelineKey = "workflow";
+
+  constructor(parts: string[]) {
+    super();
+  }
+}
+
+class WFRuleEvalEndLine extends LogLine {
+  isExit = true;
+}
+
+class WFRuleEvalValueLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2];
+    this.group = this.type;
+  }
+}
+
+class WFRuleFilterLine extends LogLine {
+  acceptsText = true;
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2];
+    this.group = this.type;
+  }
+}
+
+class WFRuleNotEvaluatedLine extends LogLine {
+  isExit = true;
+}
+
+class WFCriteriaBeginLine extends LogLine {
+  exitTypes = ["WF_CRITERIA_END", "WF_RULE_NOT_EVALUATED"];
+  displayType = "method";
+  cpuType = "custom";
+  declarative = true;
+  timelineKey = "workflow";
+  group = "WF_CRITERIA";
+
+  constructor(parts: string[]) {
+    super();
+    this.text = "WF_CRITERIA : " + parts[5] + " : " + parts[3];
+  }
+}
+
+class WFCriteriaEndLine extends LogLine {
+  isExit = true;
+}
+
+class WFFormulaLine extends LogLine {
+  acceptsText = true;
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2] + " : " + parts[3];
+    this.group = this.type;
+  }
+}
+
+class WFActionLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    this.text = parts[2];
+    this.group = this.type;
+  }
+}
+
+class WFActionsEndLine extends LogLine {}
+
+class WFSpoolActionBeginLine extends LogLine {}
+
+class WFTimeTriggersBeginLine extends LogLine {}
+
+class ExceptionThrownLine extends LogLine {
+  discontinuity = true;
+  lineNumber: lineNumber;
+  group: string;
+
+  constructor(parts: string[]) {
+    super();
+    const text = parts[3];
+    if (text.indexOf("System.LimitException") >= 0) {
+      truncateLog(this.timestamp, text, "error");
+    }
+
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = text;
+    this.group = this.type;
+  }
+}
+
+class FatalErrorLine extends LogLine {
+  acceptsText = true;
+  hideable = false;
+  discontinuity = true;
+
+  constructor(parts: string[]) {
+    super();
+    truncateLog(this.timestamp, "FATAL ERROR! cause=" + parts[2], "error");
+
+    this.text = parts[2];
+  }
+}
+
+const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
+  ["CONSTRUCTOR_ENTRY", ConstructorEntryLine],
+  ["CONSTRUCTOR_EXIT", ConstructorExitLine],
+  ["METHOD_ENTRY", MethodEntryLine],
+  ["METHOD_EXIT", MethodExitLine],
+  ["SYSTEM_CONSTRUCTOR_ENTRY", SystemConstructorEntryLine],
+  ["SYSTEM_CONSTRUCTOR_EXIT", SystemConstructorExitLine],
+  ["SYSTEM_METHOD_ENTRY", SystemMethodEntryLine],
+  ["SYSTEM_METHOD_EXIT", SystemMethodExitLine],
+  ["CODE_UNIT_STARTED", CodeUnitStartedLine],
+  ["CODE_UNIT_FINISHED", CodeUnitFinsihedLine],
+  ["VF_APEX_CALL_START", VFApexCallStartLine],
+  ["VF_APEX_CALL_END", VFApexCallEndLine],
+  ["VF_EVALUATE_FORMULA_BEGIN", VFFormulaStartLine],
+  ["VF_EVALUATE_FORMULA_END", VFFormulaEndLine],
+  ["VF_SERIALIZE_VIEWSTATE_BEGIN", VFSeralizeViewStateStartLine],
+  ["VF_SERIALIZE_VIEWSTATE_END", VFSeralizeViewStateEndLine],
+  ["DML_BEGIN", DMLBeginLine],
+  ["DML_END", DMLEndLine],
+  ["SOQL_EXECUTE_BEGIN", SOQLExecuteBeginLine],
+  ["SOQL_EXECUTE_END", SOQLExecuteEndLine],
+  ["HEAP_ALLOCATE", HeapAllocateLine],
+  ["STATEMENT_EXECUTE", StatementExecuteLine],
+  ["VARIABLE_SCOPE_BEGIN", VariableScopeBeginLine],
+  ["VARIABLE_ASSIGNMENT", VariableAssignmentLine],
+  ["USER_INFO", UserInfoLine],
+  ["USER_DEBUG", UserDebugLine],
+  ["CUMULATIVE_LIMIT_USAGE", CumulativeLimitUsageLine],
+  ["CUMULATIVE_LIMIT_USAGE_END", CumulativeLimitUsageEndLine],
+  ["LIMIT_USAGE", LimitUsageLine],
+  ["LIMIT_USAGE_FOR_NS", LimitUsageForNSLine],
+  ["TOTAL_EMAIL_RECIPIENTS_QUEUED", TotalEmailRecipientsQueuedLine],
+  ["STATIC_VARIABLE_LIST", StaticVariableListLine],
+  ["SYSTEM_MODE_ENTER", SystemModeEnterLine],
+  ["SYSTEM_MODE_EXIT", SystemModeExitLine],
+  ["EXECUTION_STARTED", ExecutionStartedLine],
+  ["EXECUTION_FINISHED", ExecutionFinishedLine],
+  ["ENTERING_MANAGED_PKG", EnteringManagedPackageLine],
+  ["EVENT_SERVICE_PUB_BEGIN", EventSericePubBeginLine],
+  ["EVENT_SERVICE_PUB_END", EventSericePubEndLine],
+  ["EVENT_SERVICE_PUB_DETAIL", EventSericePubDetailLine],
+  ["SAVEPOINT_SET", SavePointSetLine],
+  ["FLOW_START_INTERVIEWS_BEGIN", FlowStartInterviewsBeginLine],
+  ["FLOW_START_INTERVIEWS_END", FlowStartInterviewsEndLine],
+  ["FLOW_START_INTERVIEW_BEGIN", FlowStartInterviewBeginLine],
+  ["FLOW_START_INTERVIEW_END", FlowStartInterviewEndLine],
+  ["FLOW_START_INTERVIEW_LIMIT_USAGE", FlowStartInterviewLimitUsageLine],
+  ["FLOW_CREATE_INTERVIEW_BEGIN", FlowCreateInterviewBeginLine],
+  ["FLOW_CREATE_INTERVIEW_END", FlowCreateInterviewEndLine],
+  ["FLOW_ELEMENT_BEGIN", FlowElementBeginLine],
+  ["FLOW_ELEMENT_END", FlowElementEndLine],
+  ["FLOW_ELEMENT_DEFERRED", FlowElementDeferredLine],
+  ["FLOW_VALUE_ASSIGNMENT", FlowElementAssignmentLine],
+  ["FLOW_INTERVIEW_FINISHED", FlowInterviewFinishedLine],
+  ["FLOW_ELEMENT_ERROR", FlowElementEndLine],
+  ["FLOW_ACTIONCALL_DETAIL", FlowActionCallDetailLine],
+  ["FLOW_ASSIGNMENT_DETAIL", FlowAssignmentDetailLine],
+  ["FLOW_LOOP_DETAIL", FlowLoopDetailLine],
+  ["FLOW_RULE_DETAIL", FlowRuleDetailLine],
+  ["FLOW_BULK_ELEMENT_BEGIN", FlowBulkElementBeginLine],
+  ["FLOW_BULK_ELEMENT_END", FlowBulkElementEndLine],
+  ["FLOW_BULK_ELEMENT_DETAIL", FlowBulkElementDetailLine],
+  ["FLOW_BULK_ELEMENT_LIMIT_USAGE", FlowBulkElementLimitUsage],
+  ["VALIDATION_RULE", ValidationRuleLine],
+  ["VALIDATION_FORMULA", ValidationFormulaLine],
+  ["VALIDATION_PASS", ValidationPassLine],
+  ["WF_FLOW_ACTION_BEGIN", WFFlowActionBeginLine],
+  ["WF_FLOW_ACTION_END", WFFlowActionEndLine],
+  ["WF_FLOW_ACTION_ERROR", WFFlowActionErrorLine],
+  ["WF_FLOW_ACTION_ERROR_DETAIL", WFFlowActionErrorDetailLine],
+  ["WF_FIELD_UPDATE", WFFieldUpdateLine],
+  ["WF_RULE_EVAL_BEGIN", WFRuleEvalBeginLine],
+  ["WF_RULE_EVAL_END", WFRuleEvalEndLine],
+  ["WF_RULE_EVAL_VALUE", WFRuleEvalValueLine],
+  ["WF_RULE_FILTER", WFRuleFilterLine],
+  ["WF_RULE_NOT_EVALUATED", WFRuleNotEvaluatedLine],
+  ["WF_CRITERIA_BEGIN", WFCriteriaBeginLine],
+  ["WF_CRITERIA_END", WFCriteriaEndLine],
+  ["WF_FORMULA", WFFormulaLine],
+  ["WF_ACTION", WFActionLine],
+  ["WF_ACTIONS_END", WFActionsEndLine],
+  ["WF_SPOOL_ACTION_BEGIN", WFSpoolActionBeginLine],
+  ["WF_TIME_TRIGGERS_BEGIN", WFTimeTriggersBeginLine],
+  ["EXCEPTION_THROWN", ExecutionStartedLine],
+  ["FATAL_ERROR", FatalErrorLine],
+]);
+
+function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
+  const parts = line.split("|"),
+    type = parts[1],
+    metaCtor = lineTypeMap.get(type);
+
+  if (!metaCtor) {
+    if (!typePattern.test(type) && lastEntry && lastEntry.acceptsText) {
+      // wrapped text from the previous entry?
+      lastEntry.text += " | " + line;
+      return null;
+    }
+    if (type) {
+      console.warn("Unknown log line: " + type);
+    } else {
+      if (lastEntry && line.startsWith("*** Skipped")) {
+        truncateLog(lastEntry.timestamp, "Skipped-Lines", "skip");
+      } else if (
+        lastEntry &&
+        line.indexOf("MAXIMUM DEBUG LOG SIZE REACHED") >= 0
+      ) {
+        truncateLog(lastEntry.timestamp, "Max-Size-reached", "skip");
+      } else {
+        console.warn("Bad log line: " + line);
+      }
+    }
+    return null;
+  } else {
+    const entry = new metaCtor(parts);
+    entry.type = type;
+    entry.logLine = line;
+    entry.timestamp = parseTimestamp(parts[0]);
+    if (lastEntry && lastEntry.after) {
+      lastEntry.after(entry);
+    }
+    return entry;
+  }
+}
+
+export default async function parseLog(log: string) {
+  const start = log.indexOf("EXECUTION_STARTED");
+  const raw = log.substring(start, log.length);
+  let rawLines = raw.split("\n");
+  rawLines = rawLines.slice(1, rawLines.length - 1); // strip the "EXECUTION_STARTED" and "EXECUTION_FINISHED" lines
+
+  // reset global variables to be captured durung parsing
+  logLines = [];
+  truncated = [];
+  reasons = new Set<string>();
+  cpuUsed = 0;
+
+  let lastEntry = null;
+  let len = rawLines.length;
+  for (let i = 0; i < len; ++i) {
+    const line = rawLines[i];
+    if (line) {
+      // ignore blank lines
+      const entry = parseLine(line, lastEntry);
+      if (entry) {
+        logLines.push(entry);
+        lastEntry = entry;
+      }
+    }
+  }
+
+  totalDuration =
+    logLines.length > 1
+      ? logLines[logLines.length - 1].timestamp - logLines[0].timestamp
+      : 0;
+
+  return logLines;
+}
+
+export { logLines, totalDuration, truncated, cpuUsed };

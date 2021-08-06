@@ -1,0 +1,149 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Log Viewer</title>
+		<script type="text" id="LOG_FILE_NAME">@@name</script>
+		<script type="text" id="LOG_FILE_PATH">@@path</script>
+		<script type="text" id="LOG_FILE_NS">@@ns</script>
+		<script type="text" id="LOG_FILE_TXT">
+		  @@logTxt
+        </script>
+		<script type="text/javascript">
+		  @@bundle
+		</script>
+		<style>
+			html {
+				width: 100%;
+				height: 100%;
+			}
+			body {
+				color: var(--vscode-editor-foreground);
+				font-family: monospace;
+				font-weight: normal;
+				font-size: var(--vscode-editor-font-size);
+				height: 100%;
+				display: flex;
+				flex-direction: column;
+			}
+		</style>
+	</head>
+
+	<body>
+		<div class="statusBar">
+			<div id="status">No log</div>
+			<div class="statusPad"></div>
+		</div>
+
+		<div id="logSettings"></div>
+
+		<div class="tabHolder">
+			<div class="tab selected" id="timelineTab" data-show="timelineView">Timeline</div>
+			<div class="tab" id="treeTab" data-show="treeView">Call Tree</div>
+			<div class="tab" id="analysisTab" data-show="analysisView">Analysis</div>
+			<div class="tab" id="databaseTab" data-show="dbView">Database</div>
+			<div class="tab" id="helpTab" data-show="helpPanel">Help</div>
+			<div class="tabPad"></div>
+		</div>
+		<div class="tabber">
+			<div id="timelineView" class="tabItem selected">
+				<div id="tooltip"></div>
+				<label>Shrink-to-fit: <input id="shrinkToFit" type="checkbox" checked></label>
+				<div id="timelineScroll">
+					<canvas id='timeline' width="10000" height="4000"></canvas>
+				</div>
+				<div id="timelineKey"></div>
+			</div>
+
+			<div id="treeView" class="tabItem">
+				<div class='buttonContainer'>
+					<button id="expandAll">Expand All</button>
+					<button id="collapseAll">Collapse All</button>
+					<div><label><input id="hideDetails" class="filterCheckbox" type="checkbox" checked>Hide details</label></div>
+					<div><label><input id="hideSystem" class="filterCheckbox" type="checkbox">Hide system calls</label></div>
+					<div><label><input id="hideFormula" class="filterCheckbox" type="checkbox">Hide formulas</label></div>
+				</div>
+				<div id="treeScroll">
+					<div id='tree'></div>
+				</div>
+			</div>
+
+			<div id="analysisView" class="tabItem">
+				<div class="analysisSettings">
+					<b>Analysis:</b>
+					<label>
+						Sort field:
+						<select id="sortField">
+							<option value="netDuration">Net duration</option>
+							<option value="duration">Total Duration</option>
+							<option value="count">Count</option>
+							<option value="name">Name</option>
+						</select>
+					</label>
+					<label><input id="sortAscending" type="checkbox">Sort ascending</label>
+				</div>
+				<div id='analysisHeader' class="analysis"></div>
+				<div class="analysisScroller">
+					<div id='analysis' class="analysis"></div>
+				</div>
+				<div id='analysisFooter' class="analysis"></div>
+			</div>
+
+			<div id="dbView" class="tabItem">
+				<div id="dbScroller">
+					<div id="dbContent"></div>
+				</div>
+			</div>
+
+			<div id="helpPanel" class="tabItem" >
+				<div style="display: block">
+				<h1>Log Viewer for Salesforce</h1>
+
+				<br>For best results we recommend setting Apex Code logging to FINE or better.
+
+				<h3>Overview</h3>
+
+				<h3>The "Timeline" Tab</h3>
+				This tab shows the call tree as a timeline graph. Time runs left-to-right and nested calls run bottom-to-top.
+				<br>The graph shows in "Shrinks-to-fit" mode by default, to view a scrollable graph disable "Shrink-to-fit" checkbox.
+				<br>A color key at the bottom of the graph shows the meaning of the colors used for types of call.
+				<br>Information about nodes on the graph is shown as a tooltip when hovering the mouse over a node.
+				<br>
+				<br>Clicking on a timeline node will take you to the entry in the "Call Tree".
+				<br>
+
+				<h3>The "Call Tree" Tab</h3>
+				This tab shows the call tree for the log execution.
+				<br>
+				<br>The tree can be expanded/collapsed with the +/- buttons on each method or with the "Expand All" / "Collapse All" buttons in the toolbar.
+				<br>To show other information (e.g. SOQL statements or variable assignments) in the tree, un-tick the hide details checkbox.
+				<br>There are also filter checkboxes to "Hide system calls" and "Hide formulas".
+				<br>
+				<br> The prefix '(S)' is used to indicate callers of methods which perform SOQL and '(D)' is used to indicate callers of methods that perform DML.
+				<br>
+
+				<h3>The "Analysis" Tab</h3>
+				This tab has aggregated times showing: <b>Count</b>, <b>Total Duration</b> and <b>Net duration</b> for each tree node.
+				<br>The toolbar controls sorting. The sort is multi-field and can be:
+				<ul>
+					<li>Total Duration (followed by count and then name)
+					<li>New duration (followed by count and then name)
+					<li>Count (followed by duration and then name)
+					<li>Name (followed by count and then duration)
+				</ul>
+				The sort order can also toggle between ascending and descending.
+
+				<h3>The "Database" Tab</h3>
+				This tab aggregates DML and SOQL statements by text, providing <b>Count</b> and <b>Row</b> totals for each.
+				<br>This helps identify the cause of <b>SOQL 101</b> exceptions - it is usually easy to see where a query is not bulkified.
+				<br>It may also show where we used our row limit if we run-out of DML.
+				<br>
+				<br>Be aware that totals may exceed the normal limits due to:
+				<ul>
+					<li>Unit tests - we get the extra setup limits outside <b>startTest</b> / <b>stopTest</b>.
+					<li>Multiple packages - some limits are per package.
+				</ul>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

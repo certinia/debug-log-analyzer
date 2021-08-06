@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "target": "es6",                          
+    "moduleResolution": "node",                     
+    "noEmitOnError": true,
+    "lib": ["es2017", "dom"],                            
+    "strict": true,  
+    "esModuleInterop": false,                 
+    "outDir": "out-tsc",
+    "rootDir": "./"
+  },
+  "include": ["./modules/**/*.ts"]
+}

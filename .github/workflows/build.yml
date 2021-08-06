@@ -20,6 +20,10 @@ jobs:
     - name: Install vsce
       run: npm install --global vsce
     - name: Dependencies
-      run: npm ci
+      run: |
+        cd lana
+        npm ci
     - name: Build
-      run: vsce package
+      run: | 
+        cd lana
+        vsce package
