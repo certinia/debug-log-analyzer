@@ -28,7 +28,7 @@ export class LoadLogFile {
   ): Promise<WebviewPanel | void> {
     try {
       return LoadLogFile.command(context);
-    } catch (err) {
+    } catch (err: any) {
       context.display.showErrorMessage(`Error loading logfile: ${err.message}`);
       return Promise.resolve();
     }
