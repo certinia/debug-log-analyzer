@@ -99,9 +99,9 @@ function renderSummary(title: string, entryMap: DatabaseMap) {
     totalRows += entry.rowCount;
     entryNode.className = "dbEntry";
     countNode.className = "dbCount";
-    countNode.innerText = "Count: x" + entry.count;
+    countNode.innerText = "Count: " + entry.count;
     rowsNode.className = "dbCount";
-    rowsNode.innerText = "Rows: x" + entry.rowCount;
+    rowsNode.innerText = "Rows: " + entry.rowCount;
     nameNode.className = "dbName";
     nameNode.innerText = key.substr(key.indexOf(" ") + 1);
     nameNode.title = key;
@@ -112,7 +112,7 @@ function renderSummary(title: string, entryMap: DatabaseMap) {
   });
 
   titleNode.innerText =
-    title + " (Count: x" + totalCount + ", Rows: x" + totalRows + ")";
+    title + " (Count: " + totalCount + ", Rows: " + totalRows + ")";
   titleNode.className = "dbTitle";
 
   mainNode.className = "dbSection";
