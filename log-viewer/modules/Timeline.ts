@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import formatDuration, { showTab } from "./Util.js";
+import formatDuration, { showTab, showTreeNode } from "./Util.js";
 import { truncated } from "./parsers/LineParser.js";
 import { RootNode } from "./parsers/TreeParser";
 import { LogLine } from "./parsers/LineParser";
@@ -375,39 +375,13 @@ function onMouseMove(evt: any) {
   }
 }
 
-function showNode(elm: HTMLElement, expand: boolean) {
-  if (expand) {
-    const toggle = elm.querySelector(".toggle"),
-      childContainer = elm.querySelector(".childContainer") as HTMLElement;
-
-    if (childContainer && toggle) {
-      childContainer.style.display = "block";
-      toggle.textContent = "-";
-    }
-  }
-
-  const parent = elm.parentElement;
-  if (parent && parent.id !== "tree") {
-    // stop at the root of the tree
-    showNode(parent, true);
-  }
-}
-
 function onClickCanvas(evt: any) {
   const x = (evt.offsetX / displayWidth) * maxX,
     depth = ~~(((displayHeight - evt.offsetY) / displayHeight) * maxY);
 
   const target = findByPosition(timelineRoot, 0, x, depth);
   if (target && target.timestamp) {
-    const methodElm = document.querySelector(
-        'div[data-enterstamp="' + target.timestamp + '"]'
-      ),
-      methodName = methodElm?.querySelector("span.name") || methodElm;
-
-    showTab("treeTab");
-    showNode(methodElm as HTMLElement, false);
-    methodElm?.scrollIntoView();
-    if (methodName) window.getSelection()?.selectAllChildren(methodName);
+    showTreeNode(target.timestamp);
   }
 }
 
