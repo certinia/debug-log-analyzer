@@ -8,6 +8,7 @@ import { OpenFileInPackage } from "../display/OpenFileInPackage";
 import { WebView } from "../display/WebView";
 import * as path from "path";
 import { promises as fs } from "fs";
+import * as vscode from "vscode";
 
 interface WebViewLogFileRequest {
   text: string | undefined;
@@ -29,7 +30,9 @@ export class LogView {
     context: Context,
     logName: string
   ): Promise<WebviewPanel> {
-    const panel = WebView.apply("logFile", "Log: " + logName, []);
+    const panel = WebView.apply("logFile", "Log: " + logName, [
+      vscode.Uri.file(path.join(context.context.extensionPath, "out")),
+    ]);
     panel.webview.onDidReceiveMessage(
       (msg: any) => {
         const request = msg as WebViewLogFileRequest;
@@ -60,6 +63,7 @@ export class LogView {
     logContents: string
   ): Promise<WebviewPanel> {
     view.webview.html = await LogView.getViewContent(
+      view,
       context,
       logName,
       logPath,
@@ -69,6 +73,7 @@ export class LogView {
   }
 
   private static async getViewContent(
+    view: WebviewPanel,
     context: Context,
     logName: string,
     logPath: string,
@@ -77,19 +82,17 @@ export class LogView {
     const namespaces = context.namespaces;
     const logViewerRoot = path.join(context.context.extensionPath, "out");
     const index = path.join(logViewerRoot, "index.html");
-    const bundle = path.join(logViewerRoot, "bundle.js");
+    const bundleUri = view.webview.asWebviewUri(
+      vscode.Uri.file(path.join(logViewerRoot, "bundle.js"))
+    );
 
-    const [indexSrc, bundleSrc] = await Promise.all([
-      fs.readFile(index, "utf-8"),
-      fs.readFile(bundle, "utf-8"),
-    ]);
-
+    const indexSrc = await fs.readFile(index, "utf-8");
     const toReplace: { [key: string]: string } = {
       "@@logTxt": logContents,
       "@@name": logName,
       "@@path": logPath,
       "@@ns": namespaces.join(","),
-      "@@bundle": bundleSrc,
+      "bundle.js": bundleUri.toString(true),
     };
 
     return indexSrc.replace(
