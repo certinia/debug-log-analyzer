@@ -5,7 +5,8 @@
 	"scripts": {
 		"test": "jest",
 		"build": "rollup -c rollup.config.js",
-		"run": "http-server"
+		"watch": "rollup -w -c rollup.config.js",
+		"debug": "concurrently \"http-server\" \"npm:watch\""
 	},
 	"version": "0.1.0",
 	"dependencies": {
@@ -18,6 +19,7 @@
 		"@rollup/plugin-node-resolve": "^13.0.4",
 		"@rollup/plugin-typescript": "^8.2.1",
 		"babel-plugin-rewire": "^1.2.0",
+		"concurrently": "^6.2.1",		
 		"http-server": "^13.0.2",
 		"jest": "^27.0.6",
 		"postcss": "^8.3.5",
