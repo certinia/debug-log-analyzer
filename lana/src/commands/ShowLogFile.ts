@@ -35,12 +35,8 @@ export class ShowLogFile {
       const name = path.parse(filePath).name;
       const ws = await QuickPickWorkspace.pickOrReturn(context);
 
-      const [view, fileContent] = await Promise.all([
-        LogView.createView(ws, context, name),
-        fs.readFile(filePath, "utf-8"),
-      ]);
-
-      LogView.appendView(view, context, name, filePath, fileContent);
+      const view = await LogView.createView(ws, context, filePath);
+      LogView.appendView(view, context, name, filePath);
     } else {
       context.display.showErrorMessage(
         "No file selected to display log analysis"

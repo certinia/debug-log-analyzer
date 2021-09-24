@@ -28,7 +28,7 @@ declare function acquireVsCodeApi(): VSCodeAPI;
 declare global {
   interface Window {
     // TODO: Type these
-    vscodeAPIInstance: VSCodeAPI;
+    vscodeAPIInstance: VSCodeAPI | null;
     activeNamespaces: string[];
   }
 }
@@ -58,7 +58,8 @@ async function setStatus(
   nameLink.setAttribute("href", "#");
   nameLink.appendChild(document.createTextNode(name));
   nameLink.addEventListener("click", () => {
-    window.vscodeAPIInstance.postMessage({ path: path });
+    if (window.vscodeAPIInstance)
+      window.vscodeAPIInstance.postMessage({ path: path });
   });
   nameSpan.appendChild(nameLink);
   nameSpan.appendChild(document.createTextNode(infoText + "\xA0-\xA0"));
@@ -227,7 +228,6 @@ async function displayLog(log: string, name: string, path: string) {
   await Promise.all([
     setNamespaces(rootMethod),
     markContainers(rootMethod),
-    markContainers(rootMethod),
   ]);
   await insertPackageWrappers(rootMethod);
   await Promise.all([analyseMethods(rootMethod), analyseDb(rootMethod)]);
@@ -252,13 +252,27 @@ function timeout(ms: number) {
 function readLog() {
   const name = document.getElementById("LOG_FILE_NAME")?.innerHTML;
   const path = document.getElementById("LOG_FILE_PATH")?.innerHTML;
-  const src = document.getElementById("LOG_FILE_TXT")?.innerHTML;
   const ns = document.getElementById("LOG_FILE_NS")?.innerHTML;
+  const logUri = document.getElementById("LOG_FILE_URI")?.innerHTML;
 
   // hacky I know
   window.activeNamespaces = ns?.split(",") ?? [];
-  window.vscodeAPIInstance = acquireVsCodeApi();
-  displayLog(src ?? "", name ?? "", path ?? "");
+
+  try {
+    window.vscodeAPIInstance = acquireVsCodeApi();
+  } catch (e) {
+    window.vscodeAPIInstance = null;
+  }
+
+  if (logUri) {
+    fetch(logUri)
+      .then((response) => {
+        return response.text();
+      })
+      .then((data) => {
+        displayLog(data ?? "", name ?? "", path ?? "");
+      });
+  }
 }
 
 function onTabSelect(evt: Event) {

@@ -28,10 +28,11 @@ export class LogView {
   static async createView(
     wsPath: string,
     context: Context,
-    logName: string
+    logPath: string
   ): Promise<WebviewPanel> {
-    const panel = WebView.apply("logFile", "Log: " + logName, [
+    const panel = WebView.apply("logFile", "Log: " + path.basename(logPath), [
       vscode.Uri.file(path.join(context.context.extensionPath, "out")),
+      vscode.Uri.file(path.dirname(logPath)),
     ]);
     panel.webview.onDidReceiveMessage(
       (msg: any) => {
@@ -59,15 +60,13 @@ export class LogView {
     view: WebviewPanel,
     context: Context,
     logName: string,
-    logPath: string,
-    logContents: string
+    logPath: string
   ): Promise<WebviewPanel> {
     view.webview.html = await LogView.getViewContent(
       view,
       context,
       logName,
-      logPath,
-      logContents
+      logPath
     );
     return view;
   }
@@ -76,8 +75,7 @@ export class LogView {
     view: WebviewPanel,
     context: Context,
     logName: string,
-    logPath: string,
-    logContents: string
+    logPath: string
   ): Promise<string> {
     const namespaces = context.namespaces;
     const logViewerRoot = path.join(context.context.extensionPath, "out");
@@ -85,18 +83,19 @@ export class LogView {
     const bundleUri = view.webview.asWebviewUri(
       vscode.Uri.file(path.join(logViewerRoot, "bundle.js"))
     );
+    const logPathUri = view.webview.asWebviewUri(vscode.Uri.file(logPath));
 
     const indexSrc = await fs.readFile(index, "utf-8");
     const toReplace: { [key: string]: string } = {
-      "@@logTxt": logContents,
       "@@name": logName,
       "@@path": logPath,
       "@@ns": namespaces.join(","),
       "bundle.js": bundleUri.toString(true),
+      "sample.log": logPathUri.toString(true),
     };
 
     return indexSrc.replace(
-      /@@logTxt|@@name|@@path|@@ns|@@bundle/gi,
+      /@@name|@@path|@@ns|bundle.js|sample.log/gi,
       function (matched) {
         return toReplace[matched];
       }

@@ -46,17 +46,11 @@ export class LoadLogFile {
     }
     const logFileId = await LoadLogFile.getLogFile(logFiles.result);
     if (logFileId) {
-      const [view, logFile] = await Promise.all([
+      const [view, logFilePath] = await Promise.all([
         LogView.createView(ws, context, logFileId),
-        LoadLogFile.readLogFile(ws, logFileId),
+        LoadLogFile.getLogFilePath(ws, logFileId),
       ]);
-      LogView.appendView(
-        view,
-        context,
-        logFileId,
-        logFile.filePath,
-        logFile.contents
-      );
+      LogView.appendView(view, context, logFileId, logFilePath);
     }
   }
 
@@ -100,20 +94,21 @@ export class LoadLogFile {
     return null;
   }
 
-  private static async readLogFile(
+  private static async getLogFilePath(
     ws: string,
     fileId: string
-  ): Promise<{ filePath: string; contents: string }> {
+  ): Promise<string> {
     const logDirectory = path.join(ws, ".sfdx", "tools", "debug", "logs");
     const logFilePath = path.join(logDirectory, `${fileId}.log`);
     const logExists = fs.existsSync(logFilePath);
-    const contents = logExists
-      ? await fsp.readFile(logFilePath, "utf-8")
-      : await GetLogFile.apply(ws, fileId);
     if (!logExists) {
-      this.writeLogFile(logDirectory, logFilePath, contents);
+      this.writeLogFile(
+        logDirectory,
+        logFilePath,
+        await GetLogFile.apply(ws, fileId)
+      );
     }
-    return { filePath: logFilePath, contents: contents };
+    return logFilePath;
   }
 
   private static async writeLogFile(

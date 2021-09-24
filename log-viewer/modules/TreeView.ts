@@ -127,7 +127,7 @@ type OpenInfo = {
 };
 
 function openMethodSource(info: OpenInfo) {
-  if (info) {
+  if (info && window.vscodeAPIInstance) {
     window.vscodeAPIInstance.postMessage(info);
   }
 }

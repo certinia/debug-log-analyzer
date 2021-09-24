@@ -4,7 +4,8 @@
 	"private": true,
 	"scripts": {
 		"test": "jest",
-		"build": "rollup -c rollup.config.js"
+		"build": "rollup -c rollup.config.js",
+		"run": "http-server"
 	},
 	"version": "0.1.0",
 	"dependencies": {
@@ -17,6 +18,7 @@
 		"@rollup/plugin-node-resolve": "^13.0.4",
 		"@rollup/plugin-typescript": "^8.2.1",
 		"babel-plugin-rewire": "^1.2.0",
+		"http-server": "^13.0.2",
 		"jest": "^27.0.6",
 		"postcss": "^8.3.5",
 		"rollup": "^2.52.7",
