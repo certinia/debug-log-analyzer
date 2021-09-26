@@ -82,14 +82,16 @@ function getMethod(lineIter: LineIterator, method: LogLine) {
       }
     }
 
-    if (line == null) {
+    if (line === null) {
       // truncated method - terminate at the end of the log
       method.exitStamp = lastTimestamp;
       method.duration = lastTimestamp - method.timestamp;
       truncateLog(lastTimestamp, "Unexpected-End", "unexpected");
     }
 
-    if (lines.length > 0) method.addBlock(lines);
+    if (lines.length > 0) {
+      method.addBlock(lines);
+    }
   }
   recalculateDurations(method);
 

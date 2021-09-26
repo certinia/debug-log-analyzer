@@ -138,10 +138,14 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
       node.type === "METHOD_ENTRY" || node.type === "CONSTRUCTOR_ENTRY",
     re = /^[0-9a-zA-Z_]+(\.[0-9a-zA-Z_]+)*\(.*\)$/;
 
-  if (!isMethod || !re.test(text)) return null;
+  if (!isMethod || !re.test(text)) {
+    return null;
+  }
 
   let lineNumber = "";
-  if (node.lineNumber) lineNumber = "-" + node.lineNumber;
+  if (node.lineNumber) {
+    lineNumber = "-" + node.lineNumber;
+  }
 
   let qname = text.substr(0, text.indexOf("("));
   if (node.type === "METHOD_ENTRY") {

@@ -58,8 +58,9 @@ async function setStatus(
   nameLink.setAttribute("href", "#");
   nameLink.appendChild(document.createTextNode(name));
   nameLink.addEventListener("click", () => {
-    if (window.vscodeAPIInstance)
+    if (window.vscodeAPIInstance) {
       window.vscodeAPIInstance.postMessage({ path: path });
+    }
   });
   nameSpan.appendChild(nameLink);
   nameSpan.appendChild(document.createTextNode(infoText + "\xA0-\xA0"));
@@ -79,8 +80,12 @@ async function setStatus(
 
       reasonSpan.innerText = entry[0];
       reasonSpan.className = "reason";
-      if (entry[2]) reasonSpan.style.backgroundColor = entry[2];
-      if (statusHolder) statusHolder.appendChild(reasonSpan);
+      if (entry[2]) {
+        reasonSpan.style.backgroundColor = entry[2];
+      }
+      if (statusHolder) {
+        statusHolder.appendChild(reasonSpan);
+      }
     });
   }
   await timeout(10);
@@ -151,7 +156,9 @@ async function insertPackageWrappers(node: LogLine) {
         ) {
           // move child DML / SOQL into the last package
           children.splice(i, 1); // remove moving child from parent
-          if (lastPkg.children) lastPkg.children.push(child); // move child into the pkg
+          if (lastPkg.children) {
+            lastPkg.children.push(child); // move child into the pkg
+          }
 
           lastPkg.containsDml = child.containsDml || childType === "DML_BEGIN";
           lastPkg.containsSoql =
@@ -225,10 +232,7 @@ async function displayLog(log: string, name: string, path: string) {
   const rootMethod = getRootMethod();
 
   timer("analyse");
-  await Promise.all([
-    setNamespaces(rootMethod),
-    markContainers(rootMethod),
-  ]);
+  await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
   await insertPackageWrappers(rootMethod);
   await Promise.all([analyseMethods(rootMethod), analyseDb(rootMethod)]);
 

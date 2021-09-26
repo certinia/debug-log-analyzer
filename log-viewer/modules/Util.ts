@@ -39,15 +39,18 @@ export function showTab(tabId: string) {
 }
 
 export function showTreeNode(timestamp: number) {
-  const methodElm = document.querySelector(`div[data-enterstamp="${timestamp}"]`) as HTMLElement,
-  methodName = methodElm?.querySelector("span.name") || methodElm;
+  const methodElm = document.querySelector(
+      `div[data-enterstamp="${timestamp}"]`
+    ) as HTMLElement,
+    methodName = methodElm?.querySelector("span.name") || methodElm;
 
   if (methodElm) {
-    showTab('treeTab');
+    showTab("treeTab");
     expandTreeNode(methodElm, false);
     methodElm?.scrollIntoView();
-    if (methodName) 
+    if (methodName) {
       window.getSelection()?.selectAllChildren(methodName);
+    }
   }
 }
 

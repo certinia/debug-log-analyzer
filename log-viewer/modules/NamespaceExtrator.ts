@@ -29,8 +29,11 @@ function collectNamespaces(node: RootNode): Set<string> {
 
 function extractNamespace(namespaces: Set<string>, text: string) {
   let parts = text.split(".");
-  if (namespaces.has(parts[0])) return parts[0];
-  else return null;
+  if (namespaces.has(parts[0])) {
+    return parts[0];
+  } else {
+    return null;
+  }
 }
 
 async function setNamespaces(node: RootNode) {
@@ -45,7 +48,7 @@ async function setNamespaces(node: RootNode) {
 
       if (
         childType === "CODE_UNIT_STARTED" &&
-        child.type == "method" &&
+        child.type === "method" &&
         !child.namespace
       ) {
         child.namespace = extractNamespace(namespaces, child.text);

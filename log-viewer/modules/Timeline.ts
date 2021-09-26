@@ -172,7 +172,9 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
       startTime = thisEntry[1],
       endTime = nextEntry ? nextEntry[1] : maxX;
 
-    if (thisEntry[2]) ctx.fillStyle = thisEntry[2];
+    if (thisEntry[2]) {
+      ctx.fillStyle = thisEntry[2];
+    }
     ctx.fillRect(
       startTime * scaleX,
       -logicalHeight,
@@ -248,7 +250,9 @@ function renderTimelineKey() {
     keyEntry.style.backgroundColor = keyMeta.fillColor;
     keyEntry.style.color = keyMeta.textColor;
     keyEntry.appendChild(title);
-    if (keyHolder) keyHolder.appendChild(keyEntry);
+    if (keyHolder) {
+      keyHolder.appendChild(keyEntry);
+    }
   }
 }
 
