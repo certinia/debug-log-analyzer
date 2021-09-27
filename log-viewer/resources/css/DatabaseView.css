@@ -15,21 +15,3 @@
 .dbBlock {
 	margin-left: 10px;
 }
-.dbEntry {
-	display: flex;
-}
-.dbCount {
-	display: inline-block;
-	width: 75px;
-	min-width: 75px;
-}
-.dbRows {
-	display: inline-block;
-	width: 90px;
-	min-width: 90px;
-}
-.stackEntry {
-	display: flex;
-	margin-left: 180px;
-}
-

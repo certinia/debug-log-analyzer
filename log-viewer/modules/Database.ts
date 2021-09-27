@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { html, render } from "lit-html";
+import { html, render } from "lit";
 import { RootNode } from "./parsers/TreeParser";
 import { LogLine } from "./parsers/LineParser";
 import { showTab, showTreeNode } from "./Util";
@@ -93,12 +93,7 @@ function getKeyList(entryMap: DatabaseMap) {
 }
 
 const rowTemplate = (key: string, entry: DatabaseEntry) =>
-  html`<div class="dbEntry">
-      <span class="dbCount">Count: ${entry.count}</span>
-      <span class="dbRows">Rows: ${entry.rowCount}</span>
-      <span class="dbName">${key.substr(key.indexOf(" ") + 1)}</span>
-    </div>
-    ${entry.callers.map((caller) => callerTemplate(caller))}`;
+  html`<query-row count=${entry.count} rowCount=${entry.rowCount} query=${key.substr(key.indexOf(" ") + 1)}/>`;
 
 const callerTemplate = (node: LogLine) =>
   html`<div

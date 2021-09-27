@@ -10,6 +10,8 @@ import analyseMethods, { renderAnalysis } from "./Analysis.js";
 import analyseDb, { renderDb } from "./Database.js";
 import { setNamespaces } from "./NamespaceExtrator.js";
 
+import "./components/QueryRow.ts";
+
 import "../resources/css/Status.css";
 import "../resources/css/Header.css";
 import "../resources/css/Settings.css";

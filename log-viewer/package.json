@@ -7,11 +7,12 @@
 		"build": "rollup -c rollup.config.js",
 		"lint": "eslint modules --ext ts",
 		"watch": "rollup -w -c rollup.config.js",
-		"debug": "concurrently \"http-server\" \"npm:watch\""
+		"web": "http-server",
+		"debug": "concurrently \"npm:web\" \"npm:watch\""
 	},
 	"version": "0.1.0",
 	"dependencies": {
-		"lit-element": "^3.0.0"
+		"lit": "^2.0.0"
 	},
 	"devDependencies": {
 		"@babel/core": "^7.14.6",

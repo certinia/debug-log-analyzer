@@ -8,7 +8,8 @@
     "strict": true,  
     "esModuleInterop": false,                 
     "outDir": "out",
-    "sourceMap": true
+    "sourceMap": true,
+    "experimentalDecorators": true
   },
   "include": ["./modules/**/*.ts"]
 }
