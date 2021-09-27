@@ -138,7 +138,7 @@ function parseLineNumber(text: string): string | number {
 
 function parseRows(text: string): number {
   const rowCount = text.match(/Rows:(\d+)/);
-  if (rowCount && rowCount.length > 1) {
+  if (rowCount?.length) {
     return Number(rowCount[1]);
   }
   throw new Error(`Unable to parse row count: '${text}'`);
