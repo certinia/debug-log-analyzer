@@ -89,7 +89,7 @@ function getMethod(lineIter: LineIterator, method: LogLine) {
       truncateLog(lastTimestamp, "Unexpected-End", "unexpected");
     }
 
-    if (lines.length > 0) {
+    if (lines.length) {
       method.addBlock(lines);
     }
   }
