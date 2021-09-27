@@ -289,7 +289,7 @@ class CodeUnitStartedLine extends LogLine {
         break;
       default:
         this.cpuType = "method";
-        if (name && name.startsWith("VF:")) {
+        if (name?.startsWith("VF:")) {
           this.namespace = parseVfNamespace(name);
         }
         this.text = name || parts[3]; // ???
