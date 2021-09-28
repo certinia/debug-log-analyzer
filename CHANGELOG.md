@@ -7,6 +7,10 @@
 - Issue #18 Open an empty log view whilst waiting for selected log to be downloaded, parsed and rendered
 - Issue #18 Log will be loaded from disk if previously downloaded
 
+### Fixed
+
+- Call tree not usable with long messages on status bar [#39](https://github.com/financialforcedev/debug-log-analyzer/issues/39)
+
 ## [1.3.5] - December 2020
 
 - Fix issue #7 Command 'lana.showLogFile' not found
