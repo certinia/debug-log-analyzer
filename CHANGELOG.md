@@ -7,6 +7,11 @@
 - Issue #18 Open an empty log view whilst waiting for selected log to be downloaded, parsed and rendered
 - Issue #18 Log will be loaded from disk if previously downloaded
 
+### Changed
+
+- Renamed the `Log: Show Log Analysis` command to `Log: Show Apex Log Analysis` [#48](https://github.com/financialforcedev/debug-log-analyzer/issues/48)
+    - For consistency with the `Log: Load Apex Log For Analysis` command
+
 ## [1.3.5] - December 2020
 
 - Fix issue #7 Command 'lana.showLogFile' not found
