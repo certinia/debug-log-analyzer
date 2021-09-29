@@ -47,17 +47,7 @@ function describeMethod(node: LogLine, linkInfo: OpenInfo | null) {
   }
 
   let desc = methodPrefix;
-  let desc2 = "";
-  if (node.summaryCount) {
-    if (node.group) {
-      desc += node.group;
-      link = null;
-    } else {
-      desc2 += text;
-    }
-  } else {
-    desc2 += text;
-  }
+  let desc2 = text;
   if (node.displayType === "method") {
     if (node.value) {
       desc2 += " = " + node.value;
@@ -73,6 +63,7 @@ function describeMethod(node: LogLine, linkInfo: OpenInfo | null) {
       desc2 += ", line: " + node.lineNumber;
     }
   }
+
   if (node.containsDml || node.containsSoql) {
     let prefix = "";
     if (node.containsDml) {
@@ -83,6 +74,7 @@ function describeMethod(node: LogLine, linkInfo: OpenInfo | null) {
     }
     desc = "(" + prefix + ") " + desc;
   }
+
   if (link) {
     return [
       document.createTextNode(desc),
@@ -100,17 +92,10 @@ function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
 
   for (let i = 0; i < len; ++i) {
     const line = lines[i],
-      txt = line.summaryCount ? line.group || line.text : line.text,
+      txt = line.text,
       lineNode = document.createElement("div");
 
     lineNode.className = line.hideable !== false ? "block detail" : "block";
-    if (line.summaryCount) {
-      const countElement = document.createElement("span");
-
-      countElement.innerText = "x" + line.summaryCount;
-      countElement.className = "count";
-      lineNode.appendChild(countElement);
-    }
     let text = txt && txt !== line.type ? line.type + " - " + txt : line.type;
     if (text.endsWith("\\")) {
       text = text.substring(0, text.length - 1);
@@ -201,13 +186,6 @@ function renderTreeNode(node: LogLine, calledFrom: string | null) {
   }
   mainNode.className = node.classes || "";
   mainNode.appendChild(toggle);
-  if (node.summaryCount) {
-    const countElement = document.createElement("span");
-
-    countElement.innerText = "x" + node.summaryCount;
-    countElement.className = "count";
-    mainNode.appendChild(countElement);
-  }
   mainNode.appendChild(titleElement);
   mainNode.appendChild(childContainer);
 
