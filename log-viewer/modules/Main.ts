@@ -224,11 +224,7 @@ async function displayLog(log: string, name: string, path: string) {
   const rootMethod = getRootMethod();
 
   timer("analyse");
-  await Promise.all([
-    setNamespaces(rootMethod),
-    markContainers(rootMethod),
-    markContainers(rootMethod),
-  ]);
+  await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
   await insertPackageWrappers(rootMethod);
   await Promise.all([analyseMethods(rootMethod), analyseDb(rootMethod)]);
 
