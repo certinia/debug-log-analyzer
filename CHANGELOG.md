@@ -11,6 +11,11 @@
 
 - Hide details, hide system calls and hide formulas on the call tree to work again [#45](https://github.com/financialforcedev/debug-log-analyzer/issues/45)
 
+### Changed
+
+- Renamed the `Log: Show Log Analysis` command to `Log: Show Apex Log Analysis` [#48](https://github.com/financialforcedev/debug-log-analyzer/issues/48)
+    - For consistency with the `Log: Load Apex Log For Analysis` command
+
 ## [1.3.5] - December 2020
 
 - Fix issue #7 Command 'lana.showLogFile' not found
