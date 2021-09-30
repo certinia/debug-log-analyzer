@@ -143,42 +143,44 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
   }
 }
 
-function renderTreeNode(node: LogLine, calledFrom: string | null) {
+function renderTreeNode(node: LogLine) {
   const mainNode = document.createElement("div"),
     toggle = document.createElement("span"),
     children = node.children || [],
-    toggleNode = document.createTextNode(children.length > 0 ? "+" : " "),
-    childContainer = document.createElement("div"),
-    titleElement = document.createElement("span"),
-    fileOpenInfo = deriveOpenInfo(node),
-    titleElements = describeMethod(node, fileOpenInfo);
+    fileOpenInfo = deriveOpenInfo(node);
+
+  const titleElement = document.createElement("span");
+  const titleElements = describeMethod(node, fileOpenInfo);
   for (let i = 0; i < titleElements.length; i++) {
     titleElement.appendChild(titleElements[i]);
   }
   titleElement.className = "name";
-  if (children.length > 0) {
-    toggle.className = "toggle";
-    toggle.addEventListener("click", onExpandCollapse);
-  } else {
-    toggle.className = "indent";
-  }
-  toggle.appendChild(toggleNode);
 
+  const childContainer = document.createElement("div");
   childContainer.className = "childContainer";
   childContainer.style.display = "none";
+
   const len = children.length;
   for (let i = 0; i < len; ++i) {
     const child = children[i];
     switch (child.displayType) {
       case "method":
-        childContainer.appendChild(
-          renderTreeNode(child, getClassName(node.text))
-        );
+        childContainer.appendChild(renderTreeNode(child));
         break;
       case "block":
         renderBlock(childContainer, child);
         break;
     }
+  }
+
+  if (len) {
+    const toggleNode = document.createTextNode("+");
+    toggle.appendChild(toggleNode);
+
+    toggle.className = "toggle";
+    toggle.addEventListener("click", onExpandCollapse);
+  } else {
+    toggle.className = "indent";
   }
 
   if (node.timestamp) {
@@ -192,22 +194,11 @@ function renderTreeNode(node: LogLine, calledFrom: string | null) {
   return mainNode;
 }
 
-function getClassName(methodName: string) {
-  const index = methodName.indexOf(".");
-
-  if (index >= 0) {
-    return methodName.substr(0, index) + ".cls";
-  }
-  return methodName.indexOf(" trigger ") >= 0
-    ? methodName.split(" ")[2] + ".trigger"
-    : null;
-}
-
 function renderTree() {
   const treeContainer = document.getElementById("tree");
   if (treeContainer) {
     treeContainer.innerHTML = "";
-    treeContainer.appendChild(renderTreeNode(treeRoot, null));
+    treeContainer.appendChild(renderTreeNode(treeRoot));
   }
 }
 
@@ -269,34 +260,28 @@ function onCollapseAll(evt: Event) {
 }
 
 function hideBySelector(selector: string, hide: boolean) {
-  const sheet = document.styleSheets[0],
-    rules = sheet.rules;
-
-  for (let i = 0; i < rules.length; ++i) {
-    const rule = rules[i];
-    if (!(rule instanceof CSSStyleRule)) {
-      continue;
+  const elements = document.querySelectorAll<HTMLElement>(selector);
+  const value = hide ? "none" : "block";
+  elements.forEach((elem) => {
+    if (elem.style.display !== value) {
+      elem.style.display = value;
     }
-    if (rule.selectorText === selector) {
-      rule.style.display = hide ? "none" : "block";
-      break;
-    }
-  }
+  });
 }
 
 function onHideDetails(evt: Event) {
   const input = evt.target as HTMLInputElement;
-  hideBySelector(".detail", input.checked);
+  hideBySelector("#tree .detail", input.checked);
 }
 
 function onHideSystem(evt: Event) {
   const input = evt.target as HTMLInputElement;
-  hideBySelector(".node.system", input.checked);
+  hideBySelector("#tree .node.system", input.checked);
 }
 
 function onHideFormula(evt: Event) {
   const input = evt.target as HTMLInputElement;
-  hideBySelector(".node.formula", input.checked);
+  hideBySelector("#tree .node.formula", input.checked);
 }
 
 function onInitTree(evt: Event) {
