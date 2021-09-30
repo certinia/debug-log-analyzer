@@ -76,7 +76,8 @@ function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
       lineNode = document.createElement("div");
 
     lineNode.className = line.hideable !== false ? "block detail" : "block";
-    let text = txt && txt !== line.type ? line.type + " - " + txt : line.type;
+    let text = line.type + (txt && txt !== line.type ? " - " + txt : "");
+    text = text.replace(/ \| /g, "\n");
     if (text.endsWith("\\")) {
       text = text.substring(0, text.length - 1);
     }
