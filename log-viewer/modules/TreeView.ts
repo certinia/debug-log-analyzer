@@ -33,57 +33,37 @@ function describeMethod(node: LogLine, linkInfo: OpenInfo | null) {
   const methodPrefix = node.prefix || "",
     methodSuffix = node.suffix || "";
 
-  let text = node.text;
-  let link = null;
+  const dbPrefix = (node.containsDml ? "D" : "") + (node.containsSoql ? "S" : "");
+  const linePrefix = (dbPrefix ? "(" + dbPrefix + ") " : "") + methodPrefix;
 
+  const text = node.text;
+  let logLineBody;
   if (linkInfo) {
-    link = document.createElement("a");
-    link.setAttribute("href", "#");
-    link.appendChild(document.createTextNode(text));
-    link.addEventListener("click", () => {
+    logLineBody = document.createElement("a");
+    logLineBody.setAttribute("href", "#");
+    logLineBody.appendChild(document.createTextNode(text));
+    logLineBody.addEventListener("click", () => {
       openMethodSource(linkInfo);
     });
-    text = "";
-  }
-
-  let desc = methodPrefix;
-  let desc2 = text;
-  if (node.displayType === "method") {
-    if (node.value) {
-      desc2 += " = " + node.value;
-    }
-    desc2 += methodSuffix + " - ";
-    desc2 += node.truncated
-      ? "TRUNCATED"
-      : formatDuration(node.duration || 0) +
-        " (" +
-        formatDuration(node.netDuration || 0) +
-        ")";
-    if (node.lineNumber) {
-      desc2 += ", line: " + node.lineNumber;
-    }
-  }
-
-  if (node.containsDml || node.containsSoql) {
-    let prefix = "";
-    if (node.containsDml) {
-      prefix = prefix + "D";
-    }
-    if (node.containsSoql) {
-      prefix = prefix + "S";
-    }
-    desc = "(" + prefix + ") " + desc;
-  }
-
-  if (link) {
-    return [
-      document.createTextNode(desc),
-      link,
-      document.createTextNode(desc2),
-    ];
   } else {
-    return [document.createTextNode(desc), document.createTextNode(desc2)];
+    logLineBody = document.createTextNode(text);
   }
+
+  let lineSuffix = "";
+  if (node.displayType === "method") {
+    lineSuffix += node.value ? " = " + node.value : "";
+    lineSuffix += methodSuffix + " - ";
+    if (node.truncated) {
+      lineSuffix += "TRUNCATED";
+    } else {
+      lineSuffix +=
+        formatDuration(node.duration || 0) + " (" + formatDuration(node.netDuration || 0) + ")";
+    }
+
+    lineSuffix += node.lineNumber ? ", line: " + node.lineNumber : "";
+  }
+
+  return [document.createTextNode(linePrefix), logLineBody, document.createTextNode(lineSuffix)];
 }
 
 function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
