@@ -4,7 +4,6 @@
   width: 100%;
   position: relative;
   white-space: nowrap;
-  justify-content: start;
 }
 #status {
   align-items: center;
@@ -24,13 +23,15 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .tooltip {
   visibility: hidden;
   padding: 5px;
   background-color: var(--vscode-editor-background);
   color: var(--vscode-editor-foreground);
+  word-break: break-word;
+  white-space: normal;
   position: absolute;
   z-index: 1;
   top: 100%;
