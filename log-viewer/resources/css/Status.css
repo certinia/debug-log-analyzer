@@ -1,45 +1,40 @@
 .statusBar {
   margin-top: 10px;
   display: flex;
+  width: 100%;
+  position: relative;
+  white-space: nowrap;
+  justify-content: start;
 }
 #status {
-  display: flex;
   align-items: center;
   font-size: 10pt;
   margin-bottom: 5px;
   margin-top: 5px;
-}
-.statusPad {
-  flex-grow: 1;
 }
 .helpIcon {
   width: 24px;
   height: 24px;
 }
 .reason {
-  display: inline-block;
   padding: 2px;
   padding-left: 4px;
   padding-right: 4px;
   margin-left: 5px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow-wrap: break-word;
 }
 .tooltip {
-  position: relative;
-  display: inline-block;
-}
-.tooltip .tooltiptext {
   visibility: hidden;
   padding: 5px;
   background-color: var(--vscode-editor-background);
   color: var(--vscode-editor-foreground);
-  word-break: break-word;
-  width: 75%;
   position: absolute;
   z-index: 1;
   top: 100%;
-  left: 50%;
-  transform: translate(-50%, 0px);
 }
-.tooltip:hover .tooltiptext {
+.reason:hover + .tooltip {
   visibility: visible;
 }

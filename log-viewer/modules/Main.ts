@@ -74,23 +74,22 @@ async function setStatus(
 
   if (Array.isArray(truncated)) {
     truncated.forEach((entry) => {
-      const tooltipSpan = document.createElement("span");
-      tooltipSpan.className = "tooltiptext";
-      tooltipSpan.innerText = entry[0];
+      const message = entry[0];
 
-      let message = entry[0];
-      message =
-        message.length > 80 ? message.substring(0, 80) + "..." : message;
       const reasonSpan = document.createElement("span");
-
       reasonSpan.innerText = message;
-      reasonSpan.className = "reason tooltip";
-      reasonSpan.appendChild(tooltipSpan);
+      reasonSpan.className = "reason";
       if (entry[2]) {
         reasonSpan.style.backgroundColor = entry[2];
       }
+
+      const tooltipSpan = document.createElement("span");
+      tooltipSpan.className = "tooltip";
+      tooltipSpan.innerText = message;
+
       if (statusHolder) {
         statusHolder.appendChild(reasonSpan);
+        statusHolder.appendChild(tooltipSpan);
       }
     });
   }
