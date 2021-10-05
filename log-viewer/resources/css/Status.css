@@ -20,10 +20,14 @@
   padding-left: 4px;
   padding-right: 4px;
   margin-left: 5px;
-  overflow: hidden;
-  white-space: nowrap;
+  min-width: 13ch;
   text-overflow: ellipsis;
+  white-space: normal;
   word-break: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 .tooltip {
   visibility: hidden;
