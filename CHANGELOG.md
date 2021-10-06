@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Timeline shows a tooltip for log events ([#52](https://github.com/financialforcedev/debug-log-analyzer/issues/52))
+  - Shown when hovering the red (errors), blue (unexpected-end) and green (skipped-lines) sections on tht timeline.
+
 ### Changed
 
 - Convert from scala to typescript ([#22](https://github.com/financialforcedev/debug-log-analyzer/issues/22) [#34](https://github.com/financialforcedev/debug-log-analyzer/issues/34))
@@ -25,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Renamed the `Log: Show Log Analysis` command to `Log: Show Apex Log Analysis` [#48](https://github.com/financialforcedev/debug-log-analyzer/issues/48)
-    - For consistency with the `Log: Load Apex Log For Analysis` command
+  - For consistency with the `Log: Load Apex Log For Analysis` command
 
 ## [1.3.5] - December 2020
 
