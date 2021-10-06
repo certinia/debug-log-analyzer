@@ -172,7 +172,9 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
       startTime = thisEntry[1],
       endTime = nextEntry ? nextEntry[1] : maxX;
 
-    if (thisEntry[2]) ctx.fillStyle = thisEntry[2];
+    if (thisEntry[2]) {
+      ctx.fillStyle = thisEntry[2];
+    }
     ctx.fillRect(
       startTime * scaleX,
       -logicalHeight,
@@ -296,52 +298,99 @@ function findByPosition(
 }
 
 function showTooltip(offsetX: number, offsetY: number) {
-  const timelineScroll = document.getElementById("timelineScroll"),
-    x =
-      ((offsetX + (timelineScroll ? timelineScroll.scrollLeft : 0)) /
-        displayWidth) *
-      maxX,
-    depth = ~~(((displayHeight - offsetY) / displayHeight) * maxY),
-    tooltip = document.getElementById("tooltip");
+  const timelineScroll = document.getElementById("timelineScroll");
+  const tooltip = document.getElementById("tooltip");
 
-  if (tooltip) {
-    const target = findByPosition(timelineRoot, 0, x, depth);
-    if (target && timelineScroll) {
-      let posLeft = offsetX + 10,
-        posTop = offsetY + 2,
-        text = target.type + "<br>" + target.text;
+  if (timelineScroll && tooltip) {
+    const x =
+      ((offsetX + (timelineScroll.scrollLeft || 0)) / displayWidth) * maxX;
+    const depth = ~~(((displayHeight - offsetY) / displayHeight) * maxY);
+    let tooltipText = findTimelineTooltip(x, depth);
 
-      if (target.timestamp && target.duration && target.netDuration) {
-        text += "<br>timestamp: " + target.timestamp;
-        if (target.exitStamp) {
-          text += " => " + target.exitStamp;
-          text += "<br>duration: " + formatDuration(target.duration);
-          if (target.cpuType && target.cpuType === "free") {
-            text += " (free)";
-          } else {
-            text +=
-              " (netDuration: " + formatDuration(target.netDuration) + ")";
-          }
-        }
-      }
-      tooltip.innerHTML = text;
-      tooltip.style.display = "block";
-
-      if (posLeft + tooltip.offsetWidth > timelineScroll.offsetWidth) {
-        posLeft = timelineScroll.offsetWidth - tooltip.offsetWidth;
-      }
-      tooltip.style.left = posLeft + timelineScroll.offsetLeft + "px";
-      if (posTop + tooltip.offsetHeight > timelineScroll.offsetHeight) {
-        posTop -= tooltip.offsetHeight + 4;
-        if (posTop < -100) {
-          posTop = -100;
-        }
-      }
-      tooltip.style.top = posTop + timelineScroll.offsetTop + "px";
-      // console.debug('Mouse at ' + offsetX + 'x' + offsetY + ' Tooltip at ' + posLeft + 'x' + posTop + ' to ' + (posLeft + w) + 'x' + (posTop + h));
-    } else {
-      tooltip.style.display = "none";
+    if (!tooltipText) {
+      const truncatedArray = findTruncatedTooltip(x) || [];
+      tooltipText = truncatedArray[0] || "";
     }
+
+    if (tooltipText) {
+      showTooltipWithText(
+        offsetX,
+        offsetY,
+        tooltipText,
+        tooltip,
+        timelineScroll
+      );
+    }
+  }
+}
+
+function findTimelineTooltip(x: number, depth: number): string | null {
+  const target = findByPosition(timelineRoot, 0, x, depth);
+  if (target) {
+    let text = target.type + "<br>" + target.text;
+    if (target.timestamp && target.duration && target.netDuration) {
+      text += "<br>timestamp: " + target.timestamp;
+      if (target.exitStamp) {
+        text += " => " + target.exitStamp;
+        text += "<br>duration: " + formatDuration(target.duration);
+        if (target.cpuType && target.cpuType === "free") {
+          text += " (free)";
+        } else {
+          text += " (netDuration: " + formatDuration(target.netDuration) + ")";
+        }
+      }
+    }
+    return text;
+  }
+  return null;
+}
+
+function findTruncatedTooltip(
+  x: number
+): [string, number, string | undefined] | null {
+  const len = truncated.length;
+  let i = 0;
+
+  while (i < len) {
+    const thisEntry = truncated[i++],
+      nextEntry = i < len ? truncated[i] : null,
+      startTime = thisEntry[1],
+      endTime = nextEntry ? nextEntry[1] : maxX;
+
+    if (x >= startTime && x <= endTime) {
+      return thisEntry;
+    }
+  }
+  return null; // target not found!
+}
+
+function showTooltipWithText(
+  offsetX: number,
+  offsetY: number,
+  tooltipText: string,
+  tooltip: HTMLElement,
+  timelineScroll: HTMLElement
+) {
+  if (tooltipText && tooltip && timelineScroll) {
+    let posLeft = offsetX + 10,
+      posTop = offsetY + 2;
+    tooltip.innerHTML = tooltipText;
+    tooltip.style.display = "block";
+
+    if (posLeft + tooltip.offsetWidth > timelineScroll.offsetWidth) {
+      posLeft = timelineScroll.offsetWidth - tooltip.offsetWidth;
+    }
+    tooltip.style.left = posLeft + timelineScroll.offsetLeft + "px";
+    if (posTop + tooltip.offsetHeight > timelineScroll.offsetHeight) {
+      posTop -= tooltip.offsetHeight + 4;
+      if (posTop < -100) {
+        posTop = -100;
+      }
+    }
+    tooltip.style.top = posTop + timelineScroll.offsetTop + "px";
+    // console.debug('Mouse at ' + offsetX + 'x' + offsetY + ' Tooltip at ' + posLeft + 'x' + posTop + ' to ' + (posLeft + w) + 'x' + (posTop + h));
+  } else {
+    tooltip.style.display = "none";
   }
 }
 
