@@ -7,10 +7,12 @@ import { getRootMethod } from "./parsers/TreeParser.js";
 import renderTreeView from "./TreeView.js";
 import renderTimeline, { maxX } from "./Timeline.js";
 import analyseMethods, { renderAnalysis } from "./Analysis.js";
-import analyseDb, { renderDb } from "./Database.js";
+import { DatabaseAccess, renderDb } from "./Database.js";
 import { setNamespaces } from "./NamespaceExtrator.js";
 
-import "./components/QueryRow.ts";
+import "./components/DatabaseSection.ts";
+import "./components/DatabaseRow.ts";
+import "./components/CallStack.ts";
 
 import "../resources/css/Status.css";
 import "../resources/css/Header.css";
@@ -236,7 +238,7 @@ async function displayLog(log: string, name: string, path: string) {
   timer("analyse");
   await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
   await insertPackageWrappers(rootMethod);
-  await Promise.all([analyseMethods(rootMethod), analyseDb(rootMethod)]);
+  await Promise.all([analyseMethods(rootMethod), DatabaseAccess.create(rootMethod)]);
 
   await setStatus(name, path, "Rendering...", "black");
 
