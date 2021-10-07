@@ -127,11 +127,7 @@ function parseLineNumber(text: string): string | number {
   const matched = text.match(/\[(\w*)\]/);
   if (matched) {
     const lineNumber = Number(matched[1]);
-     return isNaN(lineNumber) ? lineNumber : matched[1];
-      return lineNumber;
-    } else {
-      return matched[1];
-    }
+    return isNaN(lineNumber) ? lineNumber : matched[1];
   }
   throw new Error(`Unable to parse line number: '${text}'`);
 }
