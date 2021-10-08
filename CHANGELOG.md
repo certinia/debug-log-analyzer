@@ -18,13 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Load log shows loading feedback whilst waiting for logs to be retrieved ([#18](https://github.com/financialforcedev/debug-log-analyzer/issues/18))
 - Open an empty log view whilst waiting for selected log to be downloaded, parsed and rendered ([#18](https://github.com/financialforcedev/debug-log-analyzer/issues/18))
 - Log will be loaded from disk if previously downloaded ([#18](https://github.com/financialforcedev/debug-log-analyzer/issues/18))
+- Block text on call tree displayed on new lines rather than one line separated by a | character ([#50](https://github.com/financialforcedev/debug-log-analyzer/issues/50))
 
 ### Fixed
 
-- Call tree to show text for all log lines and not just time taken ([#42](https://github.com/financialforcedev/debug-log-analyzer/issues/42))
-
-### Fixed
-
+- Call tree will show text for all log lines and will not just show time taken on some ([#42](https://github.com/financialforcedev/debug-log-analyzer/issues/42))
 - Hide details, hide system calls and hide formulas on the call tree to work again [#45](https://github.com/financialforcedev/debug-log-analyzer/issues/45)
 
 ### Changed

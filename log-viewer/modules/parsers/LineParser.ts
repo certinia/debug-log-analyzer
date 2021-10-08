@@ -30,7 +30,6 @@ export abstract class LogLine {
   lineNumber: LineNumber = null;
   rowCount: number | null = null;
   classes: string | null = null;
-  summaryCount: number | null = null;
   group: string | null = null;
   truncated: boolean | null = null;
   hideable: boolean | null = null;

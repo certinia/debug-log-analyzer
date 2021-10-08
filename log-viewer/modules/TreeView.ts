@@ -33,65 +33,37 @@ function describeMethod(node: LogLine, linkInfo: OpenInfo | null) {
   const methodPrefix = node.prefix || "",
     methodSuffix = node.suffix || "";
 
-  let text = node.text;
-  let link = null;
+  const dbPrefix = (node.containsDml ? "D" : "") + (node.containsSoql ? "S" : "");
+  const linePrefix = (dbPrefix ? "(" + dbPrefix + ") " : "") + methodPrefix;
 
+  const text = node.text;
+  let logLineBody;
   if (linkInfo) {
-    link = document.createElement("a");
-    link.setAttribute("href", "#");
-    link.appendChild(document.createTextNode(text));
-    link.addEventListener("click", () => {
+    logLineBody = document.createElement("a");
+    logLineBody.setAttribute("href", "#");
+    logLineBody.appendChild(document.createTextNode(text));
+    logLineBody.addEventListener("click", () => {
       openMethodSource(linkInfo);
     });
-    text = "";
+  } else {
+    logLineBody = document.createTextNode(text);
   }
 
-  let desc = methodPrefix;
-  let desc2 = "";
-  if (node.summaryCount) {
-    if (node.group) {
-      desc += node.group;
-      link = null;
-    } else {
-      desc2 += text;
-    }
-  } else {
-    desc2 += text;
-  }
+  let lineSuffix = "";
   if (node.displayType === "method") {
-    if (node.value) {
-      desc2 += " = " + node.value;
+    lineSuffix += node.value ? " = " + node.value : "";
+    lineSuffix += methodSuffix + " - ";
+    if (node.truncated) {
+      lineSuffix += "TRUNCATED";
+    } else {
+      lineSuffix +=
+        formatDuration(node.duration || 0) + " (" + formatDuration(node.netDuration || 0) + ")";
     }
-    desc2 += methodSuffix + " - ";
-    desc2 += node.truncated
-      ? "TRUNCATED"
-      : formatDuration(node.duration || 0) +
-        " (" +
-        formatDuration(node.netDuration || 0) +
-        ")";
-    if (node.lineNumber) {
-      desc2 += ", line: " + node.lineNumber;
-    }
+
+    lineSuffix += node.lineNumber ? ", line: " + node.lineNumber : "";
   }
-  if (node.containsDml || node.containsSoql) {
-    let prefix = "";
-    if (node.containsDml) {
-      prefix = prefix + "D";
-    }
-    if (node.containsSoql) {
-      prefix = prefix + "S";
-    }
-    desc = "(" + prefix + ") " + desc;
-  }
-  if (link) {
-    return [
-      document.createTextNode(desc),
-      link,
-      document.createTextNode(desc2),
-    ];
-  } else {
-    return [document.createTextNode(desc), document.createTextNode(desc2)];
-  }
+
+  return [document.createTextNode(linePrefix), logLineBody, document.createTextNode(lineSuffix)];
 }
 
 function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
@@ -100,18 +72,12 @@ function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
 
   for (let i = 0; i < len; ++i) {
     const line = lines[i],
-      txt = line.summaryCount ? line.group || line.text : line.text,
+      txt = line.text,
       lineNode = document.createElement("div");
 
     lineNode.className = line.hideable !== false ? "block detail" : "block";
-    if (line.summaryCount) {
-      const countElement = document.createElement("span");
-
-      countElement.innerText = "x" + line.summaryCount;
-      countElement.className = "count";
-      lineNode.appendChild(countElement);
-    }
-    let text = txt && txt !== line.type ? line.type + " - " + txt : line.type;
+    let text = line.type + (txt && txt !== line.type ? " - " + txt : "");
+    text = text.replace(/ \| /g, "\n");
     if (text.endsWith("\\")) {
       text = text.substring(0, text.length - 1);
     }
@@ -207,13 +173,6 @@ function renderTreeNode(node: LogLine) {
   }
   mainNode.className = node.classes || "";
   mainNode.appendChild(toggle);
-  if (node.summaryCount) {
-    const countElement = document.createElement("span");
-
-    countElement.innerText = "x" + node.summaryCount;
-    countElement.className = "count";
-    mainNode.appendChild(countElement);
-  }
   mainNode.appendChild(titleElement);
   mainNode.appendChild(childContainer);
 
