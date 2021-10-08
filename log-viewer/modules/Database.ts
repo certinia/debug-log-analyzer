@@ -2,132 +2,105 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
+import { html, render } from "lit";
 import { RootNode } from "./parsers/TreeParser";
 import { LogLine } from "./parsers/LineParser";
 
-class DatabaseEntry {
-  count: number = 0;
-  rowCount: number = 0;
-}
+export class DatabaseEntry {
+  readonly count: number;
+  readonly rowCount: number;
+  readonly stacks: number[];
 
-type DatabaseMap = Record<string, DatabaseEntry>;
-
-let dmlMap: DatabaseMap, soqlMap: DatabaseMap;
-
-function updateEntry(map: Record<string, DatabaseEntry>, child: LogLine) {
-  let entry = map[child.text];
-
-  if (!entry) {
-    entry = map[child.text] = new DatabaseEntry();
+  constructor(count: number, rowCount: number, stacks: number[]) {
+    this.count = count;
+    this.rowCount = rowCount;
+    this.stacks = stacks;
   }
-  entry.count += 1;
-  entry.rowCount += child.rowCount || 0;
-}
 
-function findDb(node: LogLine, dmlMap: DatabaseMap, soqlMap: DatabaseMap) {
-  const children = node.children;
-
-  if (children) {
-    for (let i = 0; i < children.length; ++i) {
-      const child = children[i];
-
-      switch (child.type) {
-        case "DML_BEGIN":
-          updateEntry(dmlMap, child);
-          break;
-        case "SOQL_EXECUTE_BEGIN":
-          updateEntry(soqlMap, child);
-          break;
-      }
-
-      if (child.displayType === "method") {
-        findDb(child, dmlMap, soqlMap);
-      }
-    }
+  expand(count: number, rowCount: number, stackIndex: number): DatabaseEntry {
+    return new DatabaseEntry(
+      this.count + count,
+      this.rowCount + rowCount,
+      this.stacks.concat([stackIndex])
+    );
   }
 }
 
-export default async function analyseDb(rootMethod: RootNode) {
-  dmlMap = {};
-  soqlMap = {};
+export type Stack = LogLine[];
+export type DatabaseEntryMap = Map<string, DatabaseEntry>;
 
-  findDb(rootMethod, dmlMap, soqlMap);
-  return {
-    // return value for unit testing
-    dmlMap,
-    soqlMap,
-  };
-}
+export class DatabaseAccess {
+  private static _instance: DatabaseAccess | null = null;
 
-/**
- * entryMap: key => count
- * sort by descending count then ascending key
- */
-function getKeyList(entryMap: DatabaseMap) {
-  const keyList = Object.keys(entryMap);
-  keyList.sort((k1, k2) => {
-    const countDiff = entryMap[k2].count - entryMap[k1].count;
-    if (countDiff !== 0) {
-      return countDiff;
+  readonly dmlMap: DatabaseEntryMap = new Map<string, DatabaseEntry>();
+  readonly soqlMap: DatabaseEntryMap = new Map<string, DatabaseEntry>();
+  readonly stacks: Stack[] = [];
+
+  static async create(rootMethod: RootNode): Promise<DatabaseAccess> {
+    const databaseAccess = new DatabaseAccess();
+    DatabaseAccess.findDatabseLines(databaseAccess, rootMethod, []);
+    this._instance = databaseAccess;
+    return this._instance;
+  }
+
+  static instance(): DatabaseAccess | null {
+    return DatabaseAccess._instance;
+  }
+
+  private static findDatabseLines(
+    log: DatabaseAccess,
+    node: LogLine,
+    stack: LogLine[]
+  ) {
+    const children = node.children;
+
+    if (children) {
+      for (let i = 0; i < children.length; ++i) {
+        const child = children[i];
+        switch (child.type) {
+          case "DML_BEGIN":
+            log.upsert(log.dmlMap, child, stack);
+            break;
+          case "SOQL_EXECUTE_BEGIN":
+            log.upsert(log.soqlMap, child, stack);
+            break;
+        }
+
+        if (child.displayType === "method") {
+          stack.push(child);
+          DatabaseAccess.findDatabseLines(log, child, stack);
+          stack.pop();
+        }
+      }
     }
-    const rowDiff = entryMap[k2].rowCount - entryMap[k1].rowCount;
-    if (rowDiff !== 0) {
-      return rowDiff;
+  }
+
+  private upsert(map: Map<String, DatabaseEntry>, line: LogLine, stack: Stack) {
+    let stackIndex = this.internStack(stack);
+    let entry = map.get(line.text);
+    if (!entry) {
+      map.set(
+        line.text,
+        new DatabaseEntry(1, line.rowCount || 0, [stackIndex])
+      );
+    } else {
+      map.set(line.text, entry.expand(1, line.rowCount || 0, stackIndex));
     }
-    return k1.localeCompare(k2);
-  });
-  return keyList;
-}
+  }
 
-function renderSummary(title: string, entryMap: DatabaseMap) {
-  const mainNode = document.createElement("div"),
-    titleNode = document.createElement("div"),
-    block = document.createElement("div"),
-    keyList = getKeyList(entryMap);
-
-  block.className = "dbBlock";
-  let totalCount = 0,
-    totalRows = 0;
-  keyList.forEach((key) => {
-    const entryNode = document.createElement("div"),
-      countNode = document.createElement("span"),
-      rowsNode = document.createElement("span"),
-      nameNode = document.createElement("span"),
-      entry = entryMap[key];
-
-    totalCount += entry.count;
-    totalRows += entry.rowCount;
-    entryNode.className = "dbEntry";
-    countNode.className = "dbCount";
-    countNode.innerText = "Count: x" + entry.count;
-    rowsNode.className = "dbCount";
-    rowsNode.innerText = "Rows: x" + entry.rowCount;
-    nameNode.className = "dbName";
-    nameNode.innerText = key.substr(key.indexOf(" ") + 1);
-    nameNode.title = key;
-    entryNode.appendChild(countNode);
-    entryNode.appendChild(rowsNode);
-    entryNode.appendChild(nameNode);
-    block.appendChild(entryNode);
-  });
-
-  titleNode.innerText =
-    title + " (Count: x" + totalCount + ", Rows: x" + totalRows + ")";
-  titleNode.className = "dbTitle";
-
-  mainNode.className = "dbSection";
-  mainNode.appendChild(titleNode);
-  mainNode.appendChild(block);
-
-  return mainNode;
+  private internStack(stack: Stack): number {
+    this.stacks.push([...stack].reverse());
+    return this.stacks.length-1;
+  }
 }
 
 export async function renderDb() {
   const dbContainer = document.getElementById("dbContent");
-
   if (dbContainer) {
-    dbContainer.innerHTML = "";
-    dbContainer.appendChild(renderSummary("DML Statements", dmlMap));
-    dbContainer.appendChild(renderSummary("SOQL Statements", soqlMap));
+    const sections = [
+      html`<database-section type="dml" />`,
+      html`<database-section type="soql" />`,
+    ];
+    render(html`<div>${sections}</div>`, dbContainer);
   }
 }

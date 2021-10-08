@@ -7,8 +7,9 @@
     "lib": ["es2017", "dom"],                            
     "strict": true,  
     "esModuleInterop": false,                 
-    "outDir": "out-tsc",
-    "rootDir": "./"
+    "outDir": "out",
+    "sourceMap": true,
+    "experimentalDecorators": true
   },
   "include": ["./modules/**/*.ts"]
 }
