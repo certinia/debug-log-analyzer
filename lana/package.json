@@ -1,7 +1,7 @@
 {
 	"name": "lana",
 	"displayName": "Apex Log Analyzer",
-	"version": "1.3.6-1",
+	"version": "1.3.5",
 	"description": "Analyzer for Salesforce debug logs",
 	"keywords": [
 		"salesforce",
@@ -70,7 +70,7 @@
 		"test": "node ./out/test/runTest.js",
 		"log-viewer": "npm run log-viewer-build && npm run log-viewer-copy",
 		"log-viewer-build": "(cd ../log-viewer; npm ci && npm run build)",
-		"log-viewer-copy": "mkdir -p out; cp ../log-viewer/index.html out/. && cp ../log-viewer/bundle.js out/."
+		"log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/."
 	},
 	"dependencies": {
 		"pkgforce": "2.0.0"

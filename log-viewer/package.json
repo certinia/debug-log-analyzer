@@ -4,20 +4,33 @@
 	"private": true,
 	"scripts": {
 		"test": "jest",
-		"build": "rollup -c rollup.config.js"
+		"build": "rollup -c rollup.config.js",
+		"lint": "eslint modules --ext ts",
+		"watch": "rollup -w -c rollup.config.js",
+		"web": "http-server",
+		"debug": "concurrently \"npm:web\" \"npm:watch\""
 	},
 	"version": "0.1.0",
+	"dependencies": {
+		"lit": "^2.0.0"
+	},
 	"devDependencies": {
 		"@babel/core": "^7.14.6",
 		"@babel/plugin-transform-modules-commonjs": "^7.7.0",
+		"@rollup/plugin-commonjs": "^20.0.0",
+		"@rollup/plugin-node-resolve": "^13.0.4",
 		"@rollup/plugin-typescript": "^8.2.1",
 		"babel-plugin-rewire": "^1.2.0",
+		"concurrently": "^6.2.1",
+		"http-server": "^13.0.2",
 		"jest": "^27.0.6",
 		"postcss": "^8.3.5",
 		"rollup": "^2.52.7",
 		"rollup-plugin-postcss": "^4.0.0",
 		"rollup-plugin-terser": "^7.0.2",
 		"tslib": "^2.3.0",
+		"@typescript-eslint/eslint-plugin": "^4.28.5",
+		"@typescript-eslint/parser": "^4.28.5",		
 		"typescript": "^4.3.5"
 	}
 }

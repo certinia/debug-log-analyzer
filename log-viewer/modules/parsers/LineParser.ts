@@ -11,7 +11,7 @@ const typePattern = /^[A-Z_]*$/,
     ["unexpected", "rgba(128, 128, 255, 0.2)"],
   ]);
 
-type lineNumber = number | string | null;
+type LineNumber = number | string | null;
 export abstract class LogLine {
   type: string = "";
   timestamp: number = 0;
@@ -27,10 +27,9 @@ export abstract class LogLine {
   exitStamp: number | null = null;
   duration: number | null = null;
   netDuration: number | null = null;
-  lineNumber: lineNumber = null;
+  lineNumber: LineNumber = null;
   rowCount: number | null = null;
   classes: string | null = null;
-  summaryCount: number | null = null;
   group: string | null = null;
   truncated: boolean | null = null;
   hideable: boolean | null = null;
@@ -56,13 +55,17 @@ export abstract class LogLine {
 
   addBlock(lines: LogLine[]): void {
     if (lines.length > 0) {
-      if (this.children == null) this.children = [];
+      if (this.children === null) {
+        this.children = [];
+      }
       this.children.push(new BlockLines(lines));
     }
   }
 
   addChild(line: LogLine): void {
-    if (this.children == null) this.children = [];
+    if (this.children === null) {
+      this.children = [];
+    }
 
     this.children.push(line);
   }
@@ -120,7 +123,9 @@ function parseVfNamespace(text: string): string {
 
 function parseTimestamp(text: string): number {
   const timestamp = text.match(/.*\((\d+)\)/);
-  if (timestamp && timestamp.length > 1) return Number(timestamp[1]);
+  if (timestamp && timestamp.length > 1) {
+    return Number(timestamp[1]);
+  }
   throw new Error(`Unable to parse timestamp: '${text}'`);
 }
 
@@ -128,15 +133,16 @@ function parseLineNumber(text: string): string | number {
   const matched = text.match(/\[(\w*)\]/);
   if (matched) {
     const lineNumber = Number(matched[1]);
-    if (isNaN(lineNumber)) return lineNumber;
-    else return matched[1];
+    return isNaN(lineNumber) ? lineNumber : matched[1];
   }
   throw new Error(`Unable to parse line number: '${text}'`);
 }
 
 function parseRows(text: string): number {
   const rowCount = text.match(/Rows:(\d+)/);
-  if (rowCount && rowCount.length > 1) return Number(rowCount[1]);
+  if (rowCount?.length) {
+    return Number(rowCount[1]);
+  }
   throw new Error(`Unable to parse row count: '${text}'`);
 }
 
@@ -150,7 +156,7 @@ class ConstructorEntryLine extends LogLine {
   suffix = " (constructor)";
   timelineKey = "method";
   classes = "node";
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -160,7 +166,7 @@ class ConstructorEntryLine extends LogLine {
 }
 class ConstructorExitLine extends LogLine {
   isExit = true;
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -175,7 +181,7 @@ class MethodEntryLine extends LogLine {
   cpuType = "method";
   timelineKey = "method";
   classes = "node";
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -189,7 +195,7 @@ class MethodEntryLine extends LogLine {
 }
 class MethodExitLine extends LogLine {
   isExit = true;
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -206,7 +212,7 @@ class SystemConstructorEntryLine extends LogLine {
   suffix = "(system constructor)";
   timelineKey = "systemMethod";
   classes = "node system";
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -216,7 +222,7 @@ class SystemConstructorEntryLine extends LogLine {
 }
 class SystemConstructorExitLine extends LogLine {
   isExit = true;
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -231,7 +237,7 @@ class SystemMethodEntryLine extends LogLine {
   namespace = "system";
   timelineKey = "systemMethod";
   classes = "node system";
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -242,7 +248,7 @@ class SystemMethodEntryLine extends LogLine {
 
 class SystemMethodExitLine extends LogLine {
   isExit = true;
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -285,8 +291,9 @@ class CodeUnitStartedLine extends LogLine {
         break;
       default:
         this.cpuType = "method";
-        if (name && name.startsWith("VF:"))
+        if (name?.startsWith("VF:")) {
           this.namespace = parseVfNamespace(name);
+        }
         this.text = name || parts[3]; // ???
         break;
     }
@@ -308,7 +315,7 @@ class VFApexCallStartLine extends LogLine {
   cpuType = "method";
   suffix = " (VF APEX)";
   classes = "node";
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -375,7 +382,7 @@ class DMLBeginLine extends LogLine {
   cpuType = "free";
   timelineKey = "dml";
   group = "DML";
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
   rowCount: number;
 
   constructor(parts: string[]) {
@@ -388,7 +395,7 @@ class DMLBeginLine extends LogLine {
 
 class DMLEndLine extends LogLine {
   isExit = true;
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -407,7 +414,7 @@ class SOQLExecuteBeginLine extends LogLine {
   cpuType = "free";
   timelineKey = "soql";
   group: string;
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -423,7 +430,7 @@ class SOQLExecuteBeginLine extends LogLine {
 
 class SOQLExecuteEndLine extends LogLine {
   isExit = true;
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
   rowCount: number;
 
   constructor(parts: string[]) {
@@ -434,7 +441,7 @@ class SOQLExecuteEndLine extends LogLine {
 }
 
 class HeapAllocateLine extends LogLine {
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -443,7 +450,7 @@ class HeapAllocateLine extends LogLine {
 }
 
 class StatementExecuteLine extends LogLine {
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -454,7 +461,7 @@ class StatementExecuteLine extends LogLine {
 class VariableScopeBeginLine extends LogLine {
   prefix = "ASSIGN ";
   classes = "node detail";
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
   group: string;
   value: string;
 
@@ -472,7 +479,7 @@ class VariableScopeBeginLine extends LogLine {
 }
 
 class VariableAssignmentLine extends LogLine {
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
   group: string;
   value: string;
 
@@ -485,7 +492,7 @@ class VariableAssignmentLine extends LogLine {
   }
 }
 class UserInfoLine extends LogLine {
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
   group: string;
 
   constructor(parts: string[]) {
@@ -497,7 +504,7 @@ class UserInfoLine extends LogLine {
 }
 
 class UserDebugLine extends LogLine {
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
   group: string;
 
   constructor(parts: string[]) {
@@ -530,7 +537,7 @@ class CumulativeLimitUsageEndLine extends LogLine {
   }
 }
 class LimitUsageLine extends LogLine {
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
   group: string;
 
   constructor(parts: string[]) {
@@ -659,7 +666,7 @@ class EventSericePubDetailLine extends LogLine {
 }
 
 class SavePointSetLine extends LogLine {
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
 
   constructor(parts: string[]) {
     super(parts);
@@ -1070,7 +1077,7 @@ class WFTimeTriggersBeginLine extends LogLine {
 
 class ExceptionThrownLine extends LogLine {
   discontinuity = true;
-  lineNumber: lineNumber;
+  lineNumber: LineNumber;
   group: string;
 
   constructor(parts: string[]) {

@@ -38,6 +38,27 @@ tsc -p ./
 
 Once compiled you can launch the extension directly from VSCode using the 'Run Extension' launch configuration.
 
+# Local Development (lana extension)
+
+The extension can be debugged in VSCode, to do this:
+
+    cd lana
+    npm ci
+    npm run compile
+
+
+This will compile the extension. The you can use the "Run Extension' debug configuration to have VSCode launch another version of VSCode with the current extension enabled.  
+
+# Local Development (log-viewer)
+
+The log-viewer can be run in a web browser to speed development work. To do this:
+
+    cd log-viewer
+    npm ci
+    npm run debug
+
+This will start a web server that you can access from any browser alongside a watch process that will recompile when source files are changed. The URL for the server is shown on the console. Use the "Launch Chrome' debug configuration to have VSCode launch and attach to Chrome for debugging.  
+
 # Packaging
 
 You can package the extension using:

@@ -1,2 +1,4 @@
 node_modules/
-bundle.js
+out/bundle.js
+out/bundle.js.map
+out/sample.log

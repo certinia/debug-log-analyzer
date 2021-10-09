@@ -33,7 +33,7 @@ export class Context {
   findSymbol(wsPath: string, symbol: string): string | null {
     try {
       return this.symbolFinder.findSymbol(wsPath, symbol);
-    } catch (err) {
+    } catch (err: any) {
       this.display.showErrorMessage(err.message);
       return null;
     }
