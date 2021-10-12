@@ -99,7 +99,7 @@ async function setStatus(
       }
     });
   }
-  await timeout(10);
+  await waitForRender();
 }
 
 function getLogSettings(log: string): [string, string][] {
@@ -260,8 +260,10 @@ async function displayLog(log: string, name: string, path: string) {
   setStatus(name, path, "Ready", truncated.length > 0 ? "red" : "green");
 }
 
-function timeout(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+async function waitForRender() {
+  await new Promise((resolve) => window.requestAnimationFrame(resolve));
+  await new Promise((resolve) => window.requestAnimationFrame(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 1));
 }
 
 function readLog() {
