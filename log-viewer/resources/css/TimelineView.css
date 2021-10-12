@@ -27,3 +27,10 @@
 	padding: 4px;
 	margin-right: 5px;
 }
+#timelineView > .buttonContainer {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	padding: 5px;
+	margin-bottom: 10px;
+}

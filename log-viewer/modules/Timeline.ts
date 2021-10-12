@@ -266,6 +266,10 @@ function findByPosition(
   x: number,
   targetDepth: number
 ): LogLine | null {
+  if (!node) {
+    return null;
+  }
+
   if (node.duration) {
     // we can only test nodes with a duration
     if (node.exitStamp && (node.timestamp > x || node.exitStamp < x)) {

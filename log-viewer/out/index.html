@@ -37,8 +37,11 @@
 		</div>
 		<div class="tabber">
 			<div id="timelineView" class="tabItem selected">
+				<div class="buttonContainer">
+					<label for="shrinkToFit">Shrink-to-fit: </label>
+					<input id="shrinkToFit" type="checkbox" checked>
+				</div>
 				<div id="tooltip"></div>
-				<label>Shrink-to-fit: <input id="shrinkToFit" type="checkbox" checked></label>
 				<div id="timelineScroll">
 					<canvas id='timeline' width="10000" height="4000"></canvas>
 				</div>
@@ -49,9 +52,12 @@
 				<div class='buttonContainer'>
 					<button id="expandAll">Expand All</button>
 					<button id="collapseAll">Collapse All</button>
-					<div><label><input id="hideDetails" class="filterCheckbox" type="checkbox" checked>Hide details</label></div>
-					<div><label><input id="hideSystem" class="filterCheckbox" type="checkbox">Hide system calls</label></div>
-					<div><label><input id="hideFormula" class="filterCheckbox" type="checkbox">Hide formulas</label></div>
+					<input id="hideDetails" class="filterCheckbox" type="checkbox" checked>
+					<label for="hideDetails">Hide details</label>
+					<input id="hideSystem" class="filterCheckbox" type="checkbox">
+					<label for="hideSystem">Hide system calls</label>
+					<input id="hideFormula" class="filterCheckbox" type="checkbox">
+					<label for="hideFormula">Hide formulas</label>
 				</div>
 				<div id="treeScroll">
 					<div id='tree'></div>
@@ -59,18 +65,16 @@
 			</div>
 
 			<div id="analysisView" class="tabItem">
-				<div class="analysisSettings">
-					<b>Analysis:</b>
-					<label>
-						Sort field:
+				<div class="buttonContainer">
+					<label for="sortField">Sort field:</label>
 						<select id="sortField">
 							<option value="netDuration">Net duration</option>
 							<option value="duration">Total Duration</option>
 							<option value="count">Count</option>
 							<option value="name">Name</option>
 						</select>
-					</label>
-					<label><input id="sortAscending" type="checkbox">Sort ascending</label>
+					<input id="sortAscending" type="checkbox">
+					<label for="sortAscending">Sort ascending</label>
 				</div>
 				<div id='analysisHeader' class="analysis"></div>
 				<div class="analysisScroller">
