@@ -36,3 +36,9 @@
 	min-width: 110px;
 	text-align: right;
 }
+#analysisView > .buttonContainer {
+	align-items: center;
+	padding: 5px;
+	margin-bottom: 10px;
+	margin: 5px;
+}
