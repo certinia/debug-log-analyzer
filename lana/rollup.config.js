@@ -4,7 +4,12 @@ import typescript from "@rollup/plugin-typescript";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 
 const compact = !process.env.ROLLUP_WATCH;
-const plugins = [nodeResolve(), commonjs(), typescript(), compact && terser()];
+const plugins = [
+  nodeResolve(),
+  commonjs(),
+  typescript({ tsconfig: "./tsconfig.json" }),
+  compact && terser(),
+];
 
 export default {
   input: "src/Main.ts",
