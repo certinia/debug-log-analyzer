@@ -31,11 +31,10 @@ export class Context {
   }
 
   findSymbol(wsPath: string, symbol: string): string | null {
-    try {
-      return this.symbolFinder.findSymbol(wsPath, symbol);
-    } catch (err: any) {
-      this.display.showErrorMessage(err.message);
-      return null;
+    const path = this.symbolFinder.findSymbol(wsPath, symbol);
+    if (!path) {
+      this.display.showErrorMessage(`Type '${symbol}' was not found in workspace`);
     }
+    return path;
   }
 }
