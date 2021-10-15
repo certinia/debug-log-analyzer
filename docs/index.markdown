@@ -1,32 +1,34 @@
-Apex Log Analyzer for Salesforce
-================================
 
-An analyzer for Salesforce debug logs aimed at making performance analysis much easier and quicker. You may also find it generally useful for quickly understanding how your code is executing.
+For best results we recommend setting Apex Code logging to FINE or better.
 
-The main view provides a flame graph for visualising code execution:
+## Views
 
+### The "Timeline" Tab
+This tab shows the call tree as a timeline graph. Time runs left-to-right and nested calls run bottom-to-top. The graph shows in "Shrinks-to-fit" mode by default, to view a scrollable graph disable "Shrink-to-fit" checkbox. A color key at the bottom of the graph shows the meaning of the colors used for types of call. Information about nodes on the graph is shown as a tooltip when hovering the mouse over a node.
 
-![Another](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/FlameGraph.gif)
+Clicking on a timeline node will take you to the entry in the "Call Tree".
 
-Hovering over an element provides information on the item. If you click on an item it will take you to the call 
-navigatable stack view.
+### The "Call Tree" Tab
+This tab shows the call tree for the log execution.
 
-Other views are available to show a sorted list of the methods invoked and the SOQL operations performed.
+The tree can be expanded/collapsed with the +/- buttons on each method or with the "Expand All" / "Collapse All" buttons in the toolbar. To show other information (e.g. SOQL statements or variable assignments) in the tree, un-tick the hide details checkbox. There are also filter checkboxes to "Hide system calls" and "Hide formulas". The prefix '(S)' is used to indicate callers of methods which perform SOQL and '(D)' is used to indicate callers of methods that perform DML.
 
-Quick Start
-===========
+### The "Analysis" Tab
+This tab has aggregated times showing: *Count*, *Total Duration* and *Net duration* for each tree node. The toolbar controls sorting. The sort is multi-field and can be:
 
-You can start the analysis either from a log you have already downloaded or by downloading a log from an org to view.
-To download run 'Log: Load Apex Log for Analysis' from the command palette. To open an existing log file right click it 
-and select 'Log: Show Log Analysis'.On larger logs the analysis window make take a few seconds to appear.
+* Total Duration (followed by count and then name)
+* New duration (followed by count and then name)
+* Count (followed by duration and then name)
+* Name (followed by count and then duration)
 
-WARNING
-=======
+The sort order can also toggle between ascending and descending.
 
-The quality of data shown to you depends entirely on the data contained in the log files. Special care should be 
-taken when looking at log files that have been truncated as you are only seeing a part of the execution and that
-may lead you to misunderstand what is really happening.
+### The "Database" Tab
+This tab aggregates DML and SOQL statements by text, providing *Count* and *Row* totals for each. This helps identify the cause of *SOQL 101* exceptions - it is usually easy to see where a query is not bulkified.
 
-In general you should always set the APEX_CODE debug flag to be FINE or higher for a log to be used for analysis. 
-With a lower setting the log will likely not contain enough detail for meaningful analysis.
-   
+It may also show where we used our row limit if we run-out of DML.
+
+Be aware that totals may exceed the normal limits due to:
+
+* Unit tests - we get the extra setup limits outside *startTest* / *stopTest*.
+* Multiple packages - some limits are per package.
