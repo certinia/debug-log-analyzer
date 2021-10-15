@@ -4,6 +4,7 @@
 import { RootNode } from "./parsers/TreeParser.js";
 import { LogLine } from "./parsers/LineParser.js";
 import formatDuration from "./Util.js";
+import { hostService, OpenInfo } from "./services/VSCodeService.js";
 
 let treeRoot: RootNode;
 
@@ -33,7 +34,8 @@ function describeMethod(node: LogLine, linkInfo: OpenInfo | null) {
   const methodPrefix = node.prefix || "",
     methodSuffix = node.suffix || "";
 
-  const dbPrefix = (node.containsDml ? "D" : "") + (node.containsSoql ? "S" : "");
+  const dbPrefix =
+    (node.containsDml ? "D" : "") + (node.containsSoql ? "S" : "");
   const linePrefix = (dbPrefix ? "(" + dbPrefix + ") " : "") + methodPrefix;
 
   const text = node.text;
@@ -43,7 +45,7 @@ function describeMethod(node: LogLine, linkInfo: OpenInfo | null) {
     logLineBody.setAttribute("href", "#");
     logLineBody.appendChild(document.createTextNode(text));
     logLineBody.addEventListener("click", () => {
-      openMethodSource(linkInfo);
+      if (linkInfo) hostService().openType(linkInfo);
     });
   } else {
     logLineBody = document.createTextNode(text);
@@ -57,13 +59,20 @@ function describeMethod(node: LogLine, linkInfo: OpenInfo | null) {
       lineSuffix += "TRUNCATED";
     } else {
       lineSuffix +=
-        formatDuration(node.duration || 0) + " (" + formatDuration(node.netDuration || 0) + ")";
+        formatDuration(node.duration || 0) +
+        " (" +
+        formatDuration(node.netDuration || 0) +
+        ")";
     }
 
     lineSuffix += node.lineNumber ? ", line: " + node.lineNumber : "";
   }
 
-  return [document.createTextNode(linePrefix), logLineBody, document.createTextNode(lineSuffix)];
+  return [
+    document.createTextNode(linePrefix),
+    logLineBody,
+    document.createTextNode(lineSuffix),
+  ];
 }
 
 function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
@@ -84,17 +93,6 @@ function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
     const textNode = document.createTextNode(text);
     lineNode.appendChild(textNode);
     childContainer.appendChild(lineNode);
-  }
-}
-
-type OpenInfo = {
-  typeName: string;
-  text: string;
-};
-
-function openMethodSource(info: OpenInfo) {
-  if (info && window.vscodeAPIInstance) {
-    window.vscodeAPIInstance.postMessage(info);
   }
 }
 
