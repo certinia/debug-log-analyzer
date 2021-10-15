@@ -122,26 +122,26 @@ function parseVfNamespace(text: string): string {
 }
 
 function parseTimestamp(text: string): number {
-  const timestamp = text.match(/.*\((\d+)\)/);
-  if (timestamp && timestamp.length > 1) {
-    return Number(timestamp[1]);
+  const timestamp = text.slice(text.indexOf("(") + 1, -1);
+  if (timestamp) {
+    return Number(timestamp);
   }
   throw new Error(`Unable to parse timestamp: '${text}'`);
 }
 
 function parseLineNumber(text: string): string | number {
-  const matched = text.match(/\[(\w*)\]/);
-  if (matched) {
-    const lineNumber = Number(matched[1]);
-    return isNaN(lineNumber) ? lineNumber : matched[1];
+  const lineNumberStr = text.slice(1, -1);
+  if (lineNumberStr) {
+    const lineNumber = Number(lineNumberStr);
+    return isNaN(lineNumber) ? lineNumberStr : lineNumber;
   }
   throw new Error(`Unable to parse line number: '${text}'`);
 }
 
 function parseRows(text: string): number {
-  const rowCount = text.match(/Rows:(\d+)/);
-  if (rowCount?.length) {
-    return Number(rowCount[1]);
+  const rowCount = text.slice(text.indexOf("Rows:") + 5);
+  if (rowCount) {
+    return Number(rowCount);
   }
   throw new Error(`Unable to parse row count: '${text}'`);
 }
@@ -1193,6 +1193,7 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["FATAL_ERROR", FatalErrorLine],
 ]);
 
+// todo: perf parseline (gc), parsetimestamp(gc)
 function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
   const parts = line.split("|"),
     type = parts[1],
