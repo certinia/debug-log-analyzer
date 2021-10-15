@@ -12,7 +12,6 @@ export default {
     file: "out/bundle.js",
     sourcemap: true,
   },
-  
   plugins: [
     nodeResolve({ preferBuiltins: false }),
     commonjs(),

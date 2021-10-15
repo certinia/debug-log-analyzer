@@ -354,7 +354,7 @@ function findTimelineTooltip(x: number, depth: number): string | null {
 function findTruncatedTooltip(
   x: number
 ): [string, number, string | undefined] | null {
-  const len = truncated.length;
+  const len = truncated?.length;
   let i = 0;
 
   while (i < len) {
