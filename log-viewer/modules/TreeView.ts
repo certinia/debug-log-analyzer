@@ -8,8 +8,9 @@ import formatDuration from "./Util.js";
 let treeRoot: RootNode;
 
 function onExpandCollapse(evt: Event) {
-  const input = evt.target as HTMLElement,
-    pe = input.parentElement,
+  const input = evt.target as HTMLElement;
+  if (input.classList.contains("toggle")) {
+    const pe = input.parentElement,
     toggle = pe?.querySelector(".toggle"),
     childContainer = pe?.querySelector(".childContainer");
 
@@ -27,6 +28,7 @@ function onExpandCollapse(evt: Event) {
         break;
     }
   }
+}
 }
 
 function describeMethod(node: LogLine) {
@@ -165,9 +167,7 @@ function renderTreeNode(node: LogLine) {
   if (len) {
     const toggleNode = document.createTextNode("+");
     toggle.appendChild(toggleNode);
-
     toggle.className = "toggle";
-    toggle.addEventListener("click", onExpandCollapse);
   } else {
     toggle.className = "indent";
   }
@@ -186,6 +186,7 @@ function renderTreeNode(node: LogLine) {
 function renderTree() {
   const treeContainer = document.getElementById("tree");
   if (treeContainer) {
+    treeContainer.addEventListener("click", onExpandCollapse);
     treeContainer.addEventListener("click", goToFile);
 
     const callTreeNode = renderTreeNode(treeRoot);
