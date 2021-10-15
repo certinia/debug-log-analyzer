@@ -25,7 +25,7 @@ description: >- # this means to ignore newlines until "baseurl:"
   line in _config.yml. It will appear in your document head meta (for
   Google search results) and in your feed.xml site description.
 repository: financialforcedev/debug-log-analyzer
-baseurl: "https://financialforcedev.github.io/debug-log-analyzer/" # the subpath of your site, e.g. /blog
+baseurl: "debug-log-analyzer/" # the subpath of your site, e.g. /blog
 domain: "financialforcedev.github.io"
 url: "https://financialforcedev.github.io/debug-log-analyzer/" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: jekyllrb
