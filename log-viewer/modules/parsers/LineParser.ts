@@ -161,7 +161,8 @@ class ConstructorEntryLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = decodeEntities(parts[5] + parts[4]);
+    const args = parts[4];
+    this.text = parts[5] + args.substring(args.lastIndexOf("("));
   }
 }
 class ConstructorExitLine extends LogLine {
@@ -186,7 +187,7 @@ class MethodEntryLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = decodeEntities(parts[4]) || this.type;
+    this.text = parts[4] || this.type;
     if (this.text === "System.Type.forName(String, String)") {
       this.cpuType = "loading"; // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
       // no namespace or it will get charged...
@@ -217,7 +218,7 @@ class SystemConstructorEntryLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = decodeEntities(parts[3]);
+    this.text = parts[3];
   }
 }
 class SystemConstructorExitLine extends LogLine {
@@ -242,7 +243,7 @@ class SystemMethodEntryLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = decodeEntities(parts[3]);
+    this.text = parts[3];
   }
 }
 
