@@ -10,13 +10,12 @@ export function highlightText(unsafeText: string, isBold: boolean) {
 }
 
 export default function formatDuration(duration: number) {
-  const microSecs = ~~(duration / 1000), // convert from nano-seconds
-    text = String(microSecs),
-    textPadded = text.length < 4 ? "0000".substr(text.length) + text : text, // length min = 4
-    millis = textPadded.substring(0, textPadded.length - 3),
-    micros = textPadded.substr(textPadded.length - 3);
-
-  return millis + "." + micros + "ms";
+  const text = `${~~(duration / 1000)}`; // convert from nano-seconds to micro-seconds
+  const textPadded =
+    text.length < 4 ? "0000".substring(text.length) + text : text; // length min = 4
+  const millis = textPadded.slice(0, -3); // everything before last 3 chars
+  const micros = textPadded.slice(-3); // last 3 chars
+  return `${millis}.${micros}ms`;
 }
 
 export function showTab(tabId: string) {
