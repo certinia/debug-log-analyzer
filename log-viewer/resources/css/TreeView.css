@@ -35,6 +35,7 @@
 }
 .childContainer {
 	margin-left: 24px;
+	display: none;
 }
 .block {
 	margin-top: 2px;

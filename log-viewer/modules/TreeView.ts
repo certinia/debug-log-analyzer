@@ -6,6 +6,8 @@ import { LogLine } from "./parsers/LineParser.js";
 import formatDuration from "./Util.js";
 
 let treeRoot: RootNode;
+const divElem = document.createElement("div");
+const spanElem = document.createElement("span");
 
 function onExpandCollapse(evt: Event) {
   const input = evt.target as HTMLElement;
@@ -136,22 +138,36 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
 }
 
 function renderTreeNode(node: LogLine) {
-  const mainNode = document.createElement("div"),
-    toggle = document.createElement("span"),
-    children = node.children || [];
+  const children = node.children ?? [];
 
-  const titleElement = document.createElement("span");
-  const titleElements = describeMethod(node);
-  for (let i = 0; i < titleElements.length; i++) {
-    titleElement.appendChild(titleElements[i]);
+  const mainNode = divElem.cloneNode() as HTMLDivElement;
+  if (node.timestamp) {
+    mainNode.dataset.enterstamp = "" + node.timestamp;
   }
-  titleElement.className = "name";
-
-  const childContainer = document.createElement("div");
-  childContainer.className = "childContainer";
-  childContainer.style.display = "none";
+  mainNode.className = node.classes || "";
 
   const len = children.length;
+  if (len) {
+    const toggle = spanElem.cloneNode() as HTMLSpanElement;
+    toggle.textContent = "+";
+    toggle.className = "toggle";
+    mainNode.appendChild(toggle);
+  } else {
+    mainNode.classList.add("indent");
+  }
+
+  const titleSpan = spanElem.cloneNode() as HTMLSpanElement;
+  titleSpan.className = "name";
+  const titleElements = describeMethod(node);
+  const elemsLen = titleElements.length;
+  for (let i = 0; i < elemsLen; i++) {
+    titleSpan.appendChild(titleElements[i]);
+  }
+  mainNode.appendChild(titleSpan);
+
+  if (len) {
+    const childContainer = divElem.cloneNode() as HTMLDivElement;
+  childContainer.className = "childContainer";
   for (let i = 0; i < len; ++i) {
     const child = children[i];
     switch (child.displayType) {
@@ -163,22 +179,8 @@ function renderTreeNode(node: LogLine) {
         break;
     }
   }
-
-  if (len) {
-    const toggleNode = document.createTextNode("+");
-    toggle.appendChild(toggleNode);
-    toggle.className = "toggle";
-  } else {
-    toggle.className = "indent";
-  }
-
-  if (node.timestamp) {
-    mainNode.dataset.enterstamp = "" + node.timestamp;
-  }
-  mainNode.className = node.classes || "";
-  mainNode.appendChild(toggle);
-  mainNode.appendChild(titleElement);
   mainNode.appendChild(childContainer);
+  }
 
   return mainNode;
 }
