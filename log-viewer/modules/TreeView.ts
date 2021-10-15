@@ -76,22 +76,22 @@ function describeMethod(node: LogLine) {
 }
 
 function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
-  const lines = block.children || [],
+  const lines = block.children ?? [],
     len = lines.length;
 
   for (let i = 0; i < len; ++i) {
     const line = lines[i],
-      txt = line.text,
-      lineNode = document.createElement("div");
-
+      lineNode = divElem.cloneNode() as HTMLDivElement;
     lineNode.className = line.hideable !== false ? "block detail" : "block";
-    let text = line.type + (txt && txt !== line.type ? " - " + txt : "");
+
+    const value = line.text || "";
+    let text = line.type + (value && value !== line.type ? " - " + value : "");
     text = text.replace(/ \| /g, "\n");
     if (text.endsWith("\\")) {
-      text = text.substring(0, text.length - 1);
+      text = text.slice(0, -1);
     }
-    const textNode = document.createTextNode(text);
-    lineNode.appendChild(textNode);
+
+    lineNode.textContent = text;
     childContainer.appendChild(lineNode);
   }
 }
