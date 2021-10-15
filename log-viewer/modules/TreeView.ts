@@ -8,6 +8,7 @@ import formatDuration from "./Util.js";
 let treeRoot: RootNode;
 const divElem = document.createElement("div");
 const spanElem = document.createElement("span");
+const linkElem = document.createElement("a");
 
 function onExpandCollapse(evt: Event) {
   const input = evt.target as HTMLElement;
@@ -39,40 +40,35 @@ function describeMethod(node: LogLine) {
 
   const dbPrefix =
     (node.containsDml ? "D" : "") + (node.containsSoql ? "S" : "");
-  const linePrefix = (dbPrefix ? "(" + dbPrefix + ") " : "") + methodPrefix;
+  const linePrefix = (dbPrefix ? `(${dbPrefix}) ` : "") + methodPrefix;
+
+  let lineSuffix = "";
+  if (node.displayType === "method") {
+    const nodeValue = node.value ? ` = ${node.value}` : "";
+    const timeTaken = node.truncated
+      ? "TRUNCATED"
+      : `${formatDuration(node.duration || 0)} (${formatDuration(
+          node.netDuration || 0
+        )})`;
+    const lineNumber = node.lineNumber ? `, line: ${node.lineNumber}` : "";
+    lineSuffix = `${nodeValue}${methodSuffix} - ${timeTaken}${lineNumber}`;
+  }
 
   const text = node.text;
   let logLineBody;
   if (hasCodeText(node)) {
-    logLineBody = document.createElement("a");
+    logLineBody = linkElem.cloneNode() as HTMLAnchorElement;
     logLineBody.href = "#";
     logLineBody.textContent = text;
   } else {
-    logLineBody = document.createTextNode(text);
+    return [document.createTextNode(linePrefix + text + lineSuffix)];
   }
 
-  let lineSuffix = "";
-  if (node.displayType === "method") {
-    lineSuffix += node.value ? " = " + node.value : "";
-    lineSuffix += methodSuffix + " - ";
-    if (node.truncated) {
-      lineSuffix += "TRUNCATED";
-    } else {
-      lineSuffix +=
-        formatDuration(node.duration || 0) +
-        " (" +
-        formatDuration(node.netDuration || 0) +
-        ")";
-    }
-
-    lineSuffix += node.lineNumber ? ", line: " + node.lineNumber : "";
+  const nodeResults = [document.createTextNode(linePrefix), logLineBody];
+  if (lineSuffix) {
+    nodeResults.push(document.createTextNode(lineSuffix));
   }
-
-  return [
-    document.createTextNode(linePrefix),
-    logLineBody,
-    document.createTextNode(lineSuffix),
-  ];
+  return nodeResults;
 }
 
 function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
