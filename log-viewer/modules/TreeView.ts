@@ -29,22 +29,20 @@ function onExpandCollapse(evt: Event) {
   }
 }
 
-function describeMethod(node: LogLine, linkInfo: OpenInfo | null) {
+function describeMethod(node: LogLine) {
   const methodPrefix = node.prefix || "",
     methodSuffix = node.suffix || "";
 
-  const dbPrefix = (node.containsDml ? "D" : "") + (node.containsSoql ? "S" : "");
+  const dbPrefix =
+    (node.containsDml ? "D" : "") + (node.containsSoql ? "S" : "");
   const linePrefix = (dbPrefix ? "(" + dbPrefix + ") " : "") + methodPrefix;
 
   const text = node.text;
   let logLineBody;
-  if (linkInfo) {
+  if (hasCodeText(node)) {
     logLineBody = document.createElement("a");
-    logLineBody.setAttribute("href", "#");
-    logLineBody.appendChild(document.createTextNode(text));
-    logLineBody.addEventListener("click", () => {
-      openMethodSource(linkInfo);
-    });
+    logLineBody.href = "#";
+    logLineBody.textContent = text;
   } else {
     logLineBody = document.createTextNode(text);
   }
@@ -57,13 +55,20 @@ function describeMethod(node: LogLine, linkInfo: OpenInfo | null) {
       lineSuffix += "TRUNCATED";
     } else {
       lineSuffix +=
-        formatDuration(node.duration || 0) + " (" + formatDuration(node.netDuration || 0) + ")";
+        formatDuration(node.duration || 0) +
+        " (" +
+        formatDuration(node.netDuration || 0) +
+        ")";
     }
 
     lineSuffix += node.lineNumber ? ", line: " + node.lineNumber : "";
   }
 
-  return [document.createTextNode(linePrefix), logLineBody, document.createTextNode(lineSuffix)];
+  return [
+    document.createTextNode(linePrefix),
+    logLineBody,
+    document.createTextNode(lineSuffix),
+  ];
 }
 
 function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
@@ -92,22 +97,22 @@ type OpenInfo = {
   text: string;
 };
 
-function openMethodSource(info: OpenInfo) {
+function openMethodSource(info: OpenInfo | null) {
   if (info && window.vscodeAPIInstance) {
     window.vscodeAPIInstance.postMessage(info);
   }
 }
 
-function deriveOpenInfo(node: LogLine): OpenInfo | null {
-  const text = node.text,
-    isMethod =
-      node.type === "METHOD_ENTRY" || node.type === "CONSTRUCTOR_ENTRY",
-    re = /^[0-9a-zA-Z_]+(\.[0-9a-zA-Z_]+)*\(.*\)$/;
+function hasCodeText(node: LogLine): boolean {
+  return node.type === "METHOD_ENTRY" || node.type === "CONSTRUCTOR_ENTRY";
+}
 
-  if (!isMethod || !re.test(text)) {
+function deriveOpenInfo(node: LogLine): OpenInfo | null {
+  if (!hasCodeText(node)) {
     return null;
   }
 
+  const text = node.text;
   let lineNumber = "";
   if (node.lineNumber) {
     lineNumber = "-" + node.lineNumber;
@@ -131,11 +136,10 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
 function renderTreeNode(node: LogLine) {
   const mainNode = document.createElement("div"),
     toggle = document.createElement("span"),
-    children = node.children || [],
-    fileOpenInfo = deriveOpenInfo(node);
+    children = node.children || [];
 
   const titleElement = document.createElement("span");
-  const titleElements = describeMethod(node, fileOpenInfo);
+  const titleElements = describeMethod(node);
   for (let i = 0; i < titleElements.length; i++) {
     titleElement.appendChild(titleElements[i]);
   }
@@ -182,9 +186,44 @@ function renderTreeNode(node: LogLine) {
 function renderTree() {
   const treeContainer = document.getElementById("tree");
   if (treeContainer) {
+    treeContainer.addEventListener("click", goToFile);
+
+    const callTreeNode = renderTreeNode(treeRoot);
     treeContainer.innerHTML = "";
-    treeContainer.appendChild(renderTreeNode(treeRoot));
+    treeContainer.appendChild(callTreeNode);
   }
+}
+
+function goToFile(evt: Event) {
+  const elem = evt.target as HTMLElement;
+  const target = elem.matches("a") ? elem.parentElement?.parentElement : null;
+  const timeStamp = target?.dataset.enterstamp;
+  if (timeStamp) {
+    const node = findByTimeStamp(treeRoot, timeStamp);
+    if (node) {
+      const fileOpenInfo = deriveOpenInfo(node);
+      openMethodSource(fileOpenInfo);
+    }
+  }
+}
+
+function findByTimeStamp(node: LogLine, timeStamp: string): LogLine | null {
+  if (node) {
+    if (node.timestamp === parseInt(timeStamp)) {
+      return node;
+    }
+
+    if (node.children) {
+      const len = node.children.length;
+      for (let i = 0; i < len; ++i) {
+        const target = findByTimeStamp(node.children[i], timeStamp);
+        if (target) {
+          return target;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 export default async function renderTreeView(rootMethod: RootNode) {
