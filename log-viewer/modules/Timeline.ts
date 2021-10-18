@@ -311,12 +311,7 @@ function showTooltip(offsetX: number, offsetY: number) {
     const x =
       ((offsetX + (timelineScroll.scrollLeft || 0)) / displayWidth) * maxX;
     const depth = ~~(((displayHeight - offsetY) / displayHeight) * maxY);
-    let tooltipText = findTimelineTooltip(x, depth);
-
-    if (!tooltipText) {
-      const truncatedArray = findTruncatedTooltip(x) || [];
-      tooltipText = truncatedArray[0] || "";
-    }
+    let tooltipText = findTimelineTooltip(x, depth) || findTruncatedTooltip(x);
 
     if (tooltipText) {
       showTooltipWithText(
@@ -330,30 +325,46 @@ function showTooltip(offsetX: number, offsetY: number) {
   }
 }
 
-function findTimelineTooltip(x: number, depth: number): string | null {
+function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
   const target = findByPosition(timelineRoot, 0, x, depth);
   if (target) {
-    let text = target.type + "<br>" + target.text;
+    const toolTip = document.createElement("div");
+    const brElem = document.createElement("br");
+
+    toolTip.appendChild(document.createTextNode(target.type));
+    toolTip.appendChild(brElem.cloneNode());
+    toolTip.appendChild(document.createTextNode(target.text));
     if (target.timestamp && target.duration && target.netDuration) {
-      text += "<br>timestamp: " + target.timestamp;
+      toolTip.appendChild(brElem.cloneNode());
+      toolTip.appendChild(
+        document.createTextNode("timestamp: " + target.timestamp)
+      );
       if (target.exitStamp) {
-        text += " => " + target.exitStamp;
-        text += "<br>duration: " + formatDuration(target.duration);
-        if (target.cpuType && target.cpuType === "free") {
-          text += " (free)";
+        toolTip.appendChild(document.createTextNode(" => " + target.exitStamp));
+        toolTip.appendChild(brElem.cloneNode());
+        toolTip.appendChild(
+          document.createTextNode(
+            "duration: " + formatDuration(target.duration)
+          )
+        );
+        if (target.cpuType === "free") {
+          toolTip.appendChild(document.createTextNode(" (free)"));
         } else {
-          text += " (netDuration: " + formatDuration(target.netDuration) + ")";
+          toolTip.appendChild(
+            document.createTextNode(
+              " (netDuration: " + formatDuration(target.netDuration) + ")"
+            )
+          );
         }
       }
     }
-    return text;
+
+    return toolTip;
   }
   return null;
 }
 
-function findTruncatedTooltip(
-  x: number
-): [string, number, string | undefined] | null {
+function findTruncatedTooltip(x: number): HTMLDivElement | null {
   const len = truncated?.length;
   let i = 0;
 
@@ -364,7 +375,9 @@ function findTruncatedTooltip(
       endTime = nextEntry ? nextEntry[1] : maxX;
 
     if (x >= startTime && x <= endTime) {
-      return thisEntry;
+      const toolTip = document.createElement("div");
+      toolTip.textContent = thisEntry[0];
+      return toolTip;
     }
   }
   return null; // target not found!
@@ -373,28 +386,28 @@ function findTruncatedTooltip(
 function showTooltipWithText(
   offsetX: number,
   offsetY: number,
-  tooltipText: string,
+  tooltipText: HTMLDivElement,
   tooltip: HTMLElement,
   timelineScroll: HTMLElement
 ) {
   if (tooltipText && tooltip && timelineScroll) {
     let posLeft = offsetX + 10,
       posTop = offsetY + 2;
-    tooltip.innerHTML = tooltipText;
-    tooltip.style.display = "block";
 
     if (posLeft + tooltip.offsetWidth > timelineScroll.offsetWidth) {
       posLeft = timelineScroll.offsetWidth - tooltip.offsetWidth;
     }
-    tooltip.style.left = posLeft + timelineScroll.offsetLeft + "px";
     if (posTop + tooltip.offsetHeight > timelineScroll.offsetHeight) {
       posTop -= tooltip.offsetHeight + 4;
       if (posTop < -100) {
         posTop = -100;
       }
     }
+    tooltip.innerHTML = "";
+    tooltip.appendChild(tooltipText);
+    tooltip.style.left = posLeft + timelineScroll.offsetLeft + "px";
     tooltip.style.top = posTop + timelineScroll.offsetTop + "px";
-    // console.debug('Mouse at ' + offsetX + 'x' + offsetY + ' Tooltip at ' + posLeft + 'x' + posTop + ' to ' + (posLeft + w) + 'x' + (posTop + h));
+    tooltip.style.display = "block";
   } else {
     tooltip.style.display = "none";
   }
