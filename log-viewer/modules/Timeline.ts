@@ -9,48 +9,36 @@ import { LogLine } from "./parsers/LineParser";
 const defaultScaleX = 0.000001,
   maxCanvasWidth = 32000,
   scaleY = -15,
+  strokeColor = "#B0B0B0",
+  textColor = "#FFFFFF",
   keyMap: Record<string, Record<string, string>> = {
     codeUnit: {
       label: "Code Unit",
-      strokeColor: "#B0B0B0",
       fillColor: "#6BAD68",
-      textColor: "#FFFFFF",
     },
     soql: {
       label: "SOQL",
-      strokeColor: "#B0B0B0",
       fillColor: "#4B9D6E",
-      textColor: "#FFFFFF",
     },
     method: {
       label: "Method",
-      strokeColor: "#B0B0B0",
       fillColor: "#328C72",
-      textColor: "#FFFFFF",
     },
     flow: {
       label: "Flow",
-      strokeColor: "#B0B0B0",
       fillColor: "#237A72",
-      textColor: "#FFFFFF",
     },
     dml: {
       label: "DML",
-      strokeColor: "#B0B0B0",
       fillColor: "#22686D",
-      textColor: "#FFFFFF",
     },
     workflow: {
       label: "Workflow",
-      strokeColor: "#B0B0B0",
       fillColor: "#285663",
-      textColor: "#FFFFFF",
     },
     systemMethod: {
       label: "System Method",
-      strokeColor: "#B0B0B0",
       fillColor: "#2D4455",
-      textColor: "#FFFFFF",
     },
   };
 
@@ -108,58 +96,84 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.textBaseline = "top";
   ctx.textAlign = "left";
 
-  const xStep = 100000000, // 1/10th second
+  const xStep = 1000000000, // 1/10th second
     detailed = scaleX > 0.0000002, // threshHold for 1/10ths and text
     labeled = scaleX > 0.00000002; // threshHold for labels
-  for (let x = xStep, i = 1; x < maxX; x += xStep, ++i) {
-    const major = i % 10 === 0, // whole seconds
-      xPos = x * scaleX;
 
-    if (detailed || major) {
-      ctx.strokeStyle = major ? "#F88962" : "#E0E0E0";
-      ctx.beginPath();
-      ctx.moveTo(xPos, -logicalHeight);
-      ctx.lineTo(xPos, 0);
-      ctx.stroke();
+  const textHeight = -logicalHeight + 2;
+  const scaledXPosition = xStep * scaleX;
 
-      if (labeled) {
-        const seconds = x / 1000000000;
-        ctx.fillStyle = major ? "#F88962" : "#808080";
-        ctx.fillText(seconds.toFixed(1) + "s", xPos + 2, -logicalHeight + 2);
+  const wholeSeconds = ~~(maxX / 1000000000);
+  ctx.strokeStyle = "#F88962";
+  ctx.fillStyle = "#F88962";
+  ctx.beginPath();
+  for (let i = 0; i <= wholeSeconds; i++) {
+    const xPos = ~~(scaledXPosition * i);
+    ctx.moveTo(xPos, -logicalHeight);
+    ctx.lineTo(xPos, 0);
+
+    if (labeled) {
+      ctx.fillText(i.toFixed(1) + "s", xPos + 2, textHeight);
+    }
+  }
+  ctx.stroke();
+
+  if (detailed) {
+    ctx.strokeStyle = "#E0E0E0";
+    ctx.fillStyle = "#808080";
+    ctx.beginPath();
+    const tenthsOfSeconds = maxX / 100000000; // convert nano to tenths e.g 11 which would represent 1.1
+    for (let i = 1; i <= tenthsOfSeconds; i++) {
+      const wholeNumber = i % 10 === 0;
+      if (!wholeNumber) {
+        const xPos = ~~(100000000 * scaleX * i);
+        ctx.moveTo(xPos, -logicalHeight);
+        ctx.lineTo(xPos, 0);
+
+        if (labeled) {
+          ctx.fillText((i / 10).toFixed(1) + "s", xPos + 2, textHeight);
+        }
       }
     }
+    ctx.stroke();
   }
 }
 
+// todo: draw by color not depth
 function drawNodes(
   ctx: CanvasRenderingContext2D,
-  node: LogLine,
+  nodes: LogLine[],
   depth: number
 ) {
-  const tlKey = node.timelineKey;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1;
 
-  if (tlKey && node.duration) {
-    const tl = keyMap[tlKey],
-      x = node.timestamp * scaleX,
-      y = depth * scaleY,
-      w = node.duration * scaleX;
+  const children = [];
+  const len = nodes.length;
+  for (let c = 0; c < len; c++) {
+    const node = nodes[c];
+    const tlKey = node.timelineKey;
+    if (tlKey && node.duration) {
+      const tl = keyMap[tlKey],
+        x = ~~(node.timestamp * scaleX),
+        y = ~~(depth * scaleY),
+        w = ~~(node.duration * scaleX);
 
-    ctx.fillStyle = tl.fillColor;
-    ctx.fillRect(x, y, w, scaleY);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = tl.strokeColor;
-    ctx.strokeRect(x, y, w, scaleY);
+      ctx.fillStyle = tl.fillColor;
+      ctx.fillRect(x, y, w, scaleY);
+      ctx.strokeRect(x, y, w, scaleY);
+    }
+
+    if (node.children) {
+      children.push(...node.children);
+    }
   }
 
-  if (!node.children) {
+  if (!children.length) {
     return;
   }
 
-  const childDepth = node.duration ? depth + 1 : depth;
-  const len = node.children.length;
-  for (let c = 0; c < len; ++c) {
-    drawNodes(ctx, node.children[c], childDepth);
-  }
+  drawNodes(ctx, children, depth + 1);
 }
 
 function drawTruncation(ctx: CanvasRenderingContext2D) {
@@ -226,7 +240,7 @@ export default async function renderTimeline(rootMethod: RootNode) {
       drawTruncation(ctx);
     }
     drawScale(ctx);
-    drawNodes(ctx, timelineRoot, 0);
+    drawNodes(ctx, [timelineRoot], -1);
   }
 }
 
@@ -248,7 +262,7 @@ function renderTimelineKey() {
     title.innerText = keyMeta.label;
     keyEntry.className = "keyEntry";
     keyEntry.style.backgroundColor = keyMeta.fillColor;
-    keyEntry.style.color = keyMeta.textColor;
+    keyEntry.style.color = textColor;
     keyEntry.appendChild(title);
     if (keyHolder) {
       keyHolder.appendChild(keyEntry);

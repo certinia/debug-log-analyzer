@@ -75,7 +75,8 @@ export function recalculateDurations(node: LogLine) {
   if (node.exitStamp) {
     node.netDuration = node.duration = node.exitStamp - node.timestamp;
     if (node.children) {
-      for (let i = 0; i < node.children.length; ++i) {
+      const len = node.children.length;
+      for (let i = 0; i < len; ++i) {
         const duration = node.children[i].duration;
 
         if (duration) {
