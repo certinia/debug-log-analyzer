@@ -1194,20 +1194,24 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["FATAL_ERROR", FatalErrorLine],
 ]);
 
-// todo: perf parseline (gc), parsetimestamp(gc)
 function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
   const parts = line.split("|"),
     type = parts[1],
     metaCtor = lineTypeMap.get(type);
 
-  if (!metaCtor) {
-    if (!typePattern.test(type) && lastEntry && lastEntry.acceptsText) {
-      // wrapped text from the previous entry?
-      lastEntry.text += " | " + line;
-      return null;
+  if (metaCtor) {
+    const entry = new metaCtor(parts);
+    entry.logLine = line;
+    if (lastEntry?.after) {
+      lastEntry?.after(entry);
     }
-    if (type) {
-      console.warn("Unknown log line: " + type);
+    return entry;
+  } else {
+    if (!typePattern.test(type) && lastEntry?.acceptsText) {
+      // wrapped text from the previous entry?
+      lastEntry.text += ` | ${line}`;
+    } else if (type) {
+      console.warn(`Unknown log line: ${type}`);
     } else {
       if (lastEntry && line.startsWith("*** Skipped")) {
         truncateLog(lastEntry.timestamp, "Skipped-Lines", "skip");
@@ -1217,25 +1221,19 @@ function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
       ) {
         truncateLog(lastEntry.timestamp, "Max-Size-reached", "skip");
       } else {
-        console.warn("Bad log line: " + line);
+        console.warn(`Bad log line: ${line}`);
       }
     }
-    return null;
-  } else {
-    const entry = new metaCtor(parts);
-    entry.logLine = line;
-    if (lastEntry && lastEntry.after) {
-      lastEntry.after(entry);
-    }
-    return entry;
   }
+  return null;
 }
 
 export default async function parseLog(log: string) {
   const start = log.indexOf("EXECUTION_STARTED");
-  const raw = log.substring(start, log.length);
-  let rawLines = raw.split("\n");
-  rawLines = rawLines.slice(1, rawLines.length - 1); // strip the "EXECUTION_STARTED" and "EXECUTION_FINISHED" lines
+  const rawLines = log.substring(start).split("\n");
+  // strip the "EXECUTION_STARTED" and "EXECUTION_FINISHED" lines
+  rawLines.pop();
+  rawLines.shift();
 
   // reset global variables to be captured durung parsing
   logLines = [];
@@ -1244,7 +1242,7 @@ export default async function parseLog(log: string) {
   cpuUsed = 0;
 
   let lastEntry = null;
-  let len = rawLines.length;
+  const len = rawLines.length;
   for (let i = 0; i < len; ++i) {
     const line = rawLines[i];
     if (line) {
@@ -1257,11 +1255,10 @@ export default async function parseLog(log: string) {
     }
   }
 
-  totalDuration =
-    logLines.length > 1
-      ? logLines[logLines.length - 1].timestamp - logLines[0].timestamp
-      : 0;
-
+  const linLen = logLines.length;
+  const endTime = linLen ? logLines[logLines.length - 1].timestamp : 0;
+  const startTime = linLen ? logLines[0].timestamp : 0;
+  totalDuration = endTime - startTime;
   return logLines;
 }
 
