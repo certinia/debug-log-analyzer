@@ -5,7 +5,7 @@ import { LitElement, html, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { DatabaseAccess } from "../Database";
 import { LogLine } from "../parsers/LineParser";
-import { showTreeNode } from "../Util";
+import { showTreeNode } from "../TreeView";
 
 @customElement("call-stack")
 class CallStack extends LitElement {

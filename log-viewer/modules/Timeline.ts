@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import formatDuration, { showTab, showTreeNode } from "./Util.js";
+import { showTreeNode } from "./TreeView";
+import formatDuration from "./Util";
 import { truncated } from "./parsers/LineParser.js";
 import { RootNode } from "./parsers/TreeParser";
 import { LogLine } from "./parsers/LineParser";

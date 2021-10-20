@@ -3,7 +3,7 @@
  */
 import { RootNode } from "./parsers/TreeParser.js";
 import { LogLine } from "./parsers/LineParser.js";
-import formatDuration from "./Util.js";
+import formatDuration, { showTab } from "./Util.js";
 
 let treeRoot: RootNode;
 const divElem = document.createElement("div");
@@ -14,24 +14,58 @@ function onExpandCollapse(evt: Event) {
   const input = evt.target as HTMLElement;
   if (input.classList.contains("toggle")) {
     const pe = input.parentElement,
-    toggle = pe?.querySelector(".toggle"),
-    childContainer = pe?.querySelector(".childContainer");
+      toggle = pe?.querySelector(".toggle"),
+      childContainer = pe?.querySelector(".childContainer");
 
-  if (toggle && childContainer) {
-    switch (toggle.textContent) {
-      case "+":
-        // expand
-        childContainer.setAttribute("style", "display:block");
-        toggle.textContent = "-";
-        break;
-      case "-":
-        // collapse
-        childContainer.setAttribute("style", "display:none");
-        toggle.textContent = "+";
-        break;
+    if (toggle && childContainer) {
+      switch (toggle.textContent) {
+        case "+":
+          // expand
+          childContainer.setAttribute("style", "display:block");
+          toggle.textContent = "-";
+          break;
+        case "-":
+          // collapse
+          childContainer.setAttribute("style", "display:none");
+          toggle.textContent = "+";
+          break;
+      }
     }
   }
 }
+
+export function showTreeNode(timestamp: number) {
+  const methodElm = document.querySelector(
+      `div[data-enterstamp="${timestamp}"]`
+    ) as HTMLElement,
+    methodName = methodElm?.querySelector("span.name") || methodElm;
+
+  if (methodElm) {
+    showTab("treeTab");
+    expandTreeNode(methodElm, false);
+    methodElm?.scrollIntoView();
+    if (methodName) {
+      window.getSelection()?.selectAllChildren(methodName);
+    }
+  }
+}
+
+function expandTreeNode(elm: HTMLElement, expand: boolean) {
+  if (expand) {
+    const toggle = elm.querySelector(".toggle"),
+      childContainer = elm.querySelector(".childContainer") as HTMLElement;
+
+    if (childContainer.parentElement === elm && toggle) {
+      childContainer.style.display = "block";
+      toggle.textContent = "-";
+    }
+  }
+
+  const parent = elm.parentElement;
+  if (parent && parent.id !== "tree") {
+    // stop at the root of the tree
+    expandTreeNode(parent, true);
+  }
 }
 
 function describeMethod(node: LogLine) {
@@ -163,19 +197,19 @@ function renderTreeNode(node: LogLine) {
 
   if (len) {
     const childContainer = divElem.cloneNode() as HTMLDivElement;
-  childContainer.className = "childContainer";
-  for (let i = 0; i < len; ++i) {
-    const child = children[i];
-    switch (child.displayType) {
-      case "method":
-        childContainer.appendChild(renderTreeNode(child));
-        break;
-      case "block":
-        renderBlock(childContainer, child);
-        break;
+    childContainer.className = "childContainer";
+    for (let i = 0; i < len; ++i) {
+      const child = children[i];
+      switch (child.displayType) {
+        case "method":
+          childContainer.appendChild(renderTreeNode(child));
+          break;
+        case "block":
+          renderBlock(childContainer, child);
+          break;
+      }
     }
-  }
-  mainNode.appendChild(childContainer);
+    mainNode.appendChild(childContainer);
   }
 
   return mainNode;
