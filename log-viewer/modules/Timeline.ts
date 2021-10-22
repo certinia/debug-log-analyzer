@@ -104,12 +104,12 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   const textHeight = -logicalHeight + 2;
   const scaledXPosition = xStep * scaleX;
 
-  const wholeSeconds = ~~(maxX / 1000000000);
+  const wholeSeconds = ~~(0.5 + maxX / 1000000000);
   ctx.strokeStyle = "#F88962";
   ctx.fillStyle = "#F88962";
   ctx.beginPath();
   for (let i = 0; i <= wholeSeconds; i++) {
-    const xPos = ~~(scaledXPosition * i);
+    const xPos = ~~(0.5 + scaledXPosition * i);
     ctx.moveTo(xPos, -logicalHeight);
     ctx.lineTo(xPos, 0);
 
@@ -127,7 +127,7 @@ function drawScale(ctx: CanvasRenderingContext2D) {
     for (let i = 1; i <= tenthsOfSeconds; i++) {
       const wholeNumber = i % 10 === 0;
       if (!wholeNumber) {
-        const xPos = ~~(100000000 * scaleX * i);
+        const xPos = ~~(0.5 + 100000000 * scaleX * i);
         ctx.moveTo(xPos, -logicalHeight);
         ctx.lineTo(xPos, 0);
 
@@ -156,9 +156,9 @@ function drawNodes(
     const tlKey = node.timelineKey;
     if (tlKey && node.duration) {
       const tl = keyMap[tlKey],
-        x = ~~(node.timestamp * scaleX),
-        y = ~~(depth * scaleY),
-        w = ~~(node.duration * scaleX);
+        x = ~~(0.5 + node.timestamp * scaleX),
+        y = ~~(0.5 + depth * scaleY),
+        w = ~~(0.5 + node.duration * scaleX);
 
       ctx.fillStyle = tl.fillColor;
       ctx.fillRect(x, y, w, scaleY);
