@@ -37,7 +37,7 @@ declare global {
   }
 }
 
-const settingsPattern = /\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+/;
+const settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
 
 let logSize: number;
 
