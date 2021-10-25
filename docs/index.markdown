@@ -17,7 +17,7 @@ The tree can be expanded/collapsed with the +/- buttons on each method or with t
 This tab has aggregated times showing: *Count*, *Total Duration* and *Net duration* for each tree node. The toolbar controls sorting. The sort is multi-field and can be:
 
 * Total Duration (followed by count and then name)
-* New duration (followed by count and then name)
+* Net duration (followed by count and then name)
 * Count (followed by duration and then name)
 * Name (followed by count and then duration)
 
