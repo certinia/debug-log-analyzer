@@ -14,19 +14,32 @@ function onExpandCollapse(evt: Event) {
   const input = evt.target as HTMLElement;
   if (input.classList.contains("toggle")) {
     const pe = input.parentElement,
-      toggle = pe?.querySelector(".toggle"),
-      childContainer = pe?.querySelector(".childContainer");
+      toggle = pe?.querySelector(".toggle");
+    let childContainer = pe?.querySelector<HTMLElement>(".childContainer");
+
+    const timestamp = pe?.dataset.enterstamp;
+    if (!childContainer && timestamp) {
+      const node = findByTimeStamp(treeRoot, timestamp);
+      childContainer = node?.children
+        ? createChildNodes(node?.children, [node.timestamp])
+        : null;
+      if (childContainer) {
+        pe.appendChild(childContainer);
+      }
+
+      showHideDetails();
+    }
 
     if (toggle && childContainer) {
       switch (toggle.textContent) {
         case "+":
           // expand
-          childContainer.setAttribute("style", "display:block");
+          childContainer.classList.remove("hide");
           toggle.textContent = "-";
           break;
         case "-":
           // collapse
-          childContainer.setAttribute("style", "display:none");
+          childContainer.classList.add("hide");
           toggle.textContent = "+";
           break;
       }
@@ -35,36 +48,108 @@ function onExpandCollapse(evt: Event) {
 }
 
 export function showTreeNode(timestamp: number) {
-  const methodElm = document.querySelector(
-      `div[data-enterstamp="${timestamp}"]`
-    ) as HTMLElement,
-    methodName = methodElm?.querySelector("span.name") || methodElm;
-
+  const methodElm = renderCallStack(timestamp);
+  showHideDetails();
   if (methodElm) {
+    const methodName = methodElm?.querySelector("span.name") || methodElm;
     showTab("treeTab");
     expandTreeNode(methodElm, false);
-    methodElm?.scrollIntoView();
+    methodElm.scrollIntoView(false);
     if (methodName) {
-      window.getSelection()?.selectAllChildren(methodName);
+      document.getSelection()?.selectAllChildren(methodName);
     }
   }
 }
 
-function expandTreeNode(elm: HTMLElement, expand: boolean) {
-  if (expand) {
-    const toggle = elm.querySelector(".toggle"),
-      childContainer = elm.querySelector(".childContainer") as HTMLElement;
+function renderCallStack(timestamp: number) {
+  let methodElm = document.querySelector(
+    `div[data-enterstamp="${timestamp}"]`
+  ) as HTMLElement;
 
-    if (childContainer.parentElement === elm && toggle) {
-      childContainer.style.display = "block";
-      toggle.textContent = "-";
+  if (!methodElm) {
+    let nodeToAttachTo;
+    let nodeToStartAt;
+
+    const callstack = findCallstack(treeRoot, timestamp) || [];
+    const len = callstack.length;
+    for (let i = 0; i < len; i++) {
+      const node = callstack[i];
+      if (node) {
+        const isRendered = document.querySelector(
+          `div[data-enterstamp="${node.timestamp}"]`
+        ) as HTMLElement;
+        if (isRendered) {
+          nodeToAttachTo = isRendered;
+          nodeToStartAt = node;
+          continue;
+        }
+        break;
+      }
+    }
+
+    const timeStamps = callstack.map((node) => {
+      if (node?.timestamp) {
+        return node.timestamp;
+      }
+    }) as number[];
+
+    if (nodeToStartAt?.children && nodeToAttachTo) {
+      const childContainer = createChildNodes(
+        nodeToStartAt.children,
+        timeStamps
+      );
+      if (childContainer) {
+        nodeToAttachTo.appendChild(childContainer);
+      }
+
+      methodElm = document.querySelector(
+        `div[data-enterstamp="${timestamp}"]`
+      ) as HTMLElement;
     }
   }
+  return methodElm;
+}
 
-  const parent = elm.parentElement;
-  if (parent && parent.id !== "tree") {
-    // stop at the root of the tree
-    expandTreeNode(parent, true);
+function findCallstack(node: LogLine, timeStamp: number): LogLine[] | null {
+  if (node.timestamp === timeStamp) {
+    return [node];
+  }
+
+  const children = node?.children || [];
+  const len = children.length;
+  for (let i = 0; i < len; i++) {
+    const child = children[i];
+    const timeStamps = findCallstack(child, timeStamp);
+    if (timeStamps) {
+      timeStamps.unshift(child);
+      return timeStamps;
+    }
+  }
+  return null;
+}
+
+function expandTreeNode(elm: HTMLElement, expand: boolean) {
+  const elements = [];
+  let element: HTMLElement | null = expand ? elm : elm.parentElement;
+  while (element && element.id !== "tree") {
+    if (element.id) {
+      elements.push(element);
+    }
+    element = element.parentElement;
+  }
+
+  const len = elements.length;
+  for (let i = 0; i < len; i++) {
+    const elem = elements[i];
+    const toggle = elem.querySelector(`:scope > .toggle`),
+      childContainer = elem.querySelector(
+        `:scope > .childContainer`
+      ) as HTMLElement;
+
+    if (toggle) {
+      childContainer.classList.remove("hide");
+      toggle.textContent = "-";
+    }
   }
 }
 
@@ -112,7 +197,8 @@ function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
   for (let i = 0; i < len; ++i) {
     const line = lines[i],
       lineNode = divElem.cloneNode() as HTMLDivElement;
-    lineNode.className = line.hideable !== false ? "block detail" : "block";
+    lineNode.className =
+      line.hideable !== false ? "block detail hide" : "block";
 
     const value = line.text || "";
     let text = line.type + (value && value !== line.type ? " - " + value : "");
@@ -167,12 +253,13 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
   }
 }
 
-function renderTreeNode(node: LogLine) {
+function renderTreeNode(node: LogLine, timeStamps: number[]) {
   const children = node.children ?? [];
 
   const mainNode = divElem.cloneNode() as HTMLDivElement;
-  if (node.timestamp) {
+  if (node.timestamp >= 0) {
     mainNode.dataset.enterstamp = "" + node.timestamp;
+    mainNode.id = `calltree-${node.timestamp}`;
   }
   mainNode.className = node.classes || "";
 
@@ -195,24 +282,35 @@ function renderTreeNode(node: LogLine) {
   }
   mainNode.appendChild(titleSpan);
 
-  if (len) {
-    const childContainer = divElem.cloneNode() as HTMLDivElement;
-    childContainer.className = "childContainer";
-    for (let i = 0; i < len; ++i) {
-      const child = children[i];
-      switch (child.displayType) {
-        case "method":
-          childContainer.appendChild(renderTreeNode(child));
-          break;
-        case "block":
-          renderBlock(childContainer, child);
-          break;
-      }
+  if (len && (timeStamps.includes(node.timestamp) || timeStamps.includes(-1))) {
+    const childContainer = createChildNodes(children, timeStamps);
+    if (childContainer) {
+      mainNode.appendChild(childContainer);
     }
-    mainNode.appendChild(childContainer);
   }
 
   return mainNode;
+}
+
+function createChildNodes(children: LogLine[], timeStamps: number[]) {
+  const childContainer = divElem.cloneNode() as HTMLDivElement;
+  childContainer.className = "childContainer hide";
+  const len = children.length;
+  for (let i = 0; i < len; ++i) {
+    const child = children[i];
+    switch (child.displayType) {
+      case "method":
+        const container = renderTreeNode(child, timeStamps);
+        if (container) {
+          childContainer.appendChild(container);
+        }
+        break;
+      case "block":
+        renderBlock(childContainer, child);
+        break;
+    }
+  }
+  return childContainer;
 }
 
 function renderTree() {
@@ -221,9 +319,12 @@ function renderTree() {
     treeContainer.addEventListener("click", onExpandCollapse);
     treeContainer.addEventListener("click", goToFile);
 
-    const callTreeNode = renderTreeNode(treeRoot);
+    const callTreeNode = renderTreeNode(treeRoot, [0]);
     treeContainer.innerHTML = "";
-    treeContainer.appendChild(callTreeNode);
+    if (callTreeNode) {
+      treeContainer.appendChild(callTreeNode);
+      showHideDetails();
+    }
   }
 }
 
@@ -264,71 +365,106 @@ export default async function renderTreeView(rootMethod: RootNode) {
   renderTree();
 }
 
-function expand(elm: Element | null | undefined) {
-  const toggle = elm?.querySelector(".toggle");
+function expand(elm: HTMLElement) {
+  const toggles = elm.querySelectorAll(".toggle");
+  toggles.forEach((toggle) => {
+    toggle.textContent = "-";
+  });
 
-  if (elm && toggle && toggle.textContent !== " ") {
-    // can we toggle this block?
-    const childContainer = elm.querySelector(".childContainer");
-    if (childContainer) {
-      childContainer.setAttribute("style", "display:block");
-      toggle.textContent = "-";
+  const childContainers =
+    document.querySelectorAll<HTMLElement>(".childContainer");
+  childContainers.forEach((childContainer) => {
+    if (!childContainer.classList.contains("block")) {
+      childContainer.classList.remove("hide");
+    }
+  });
+}
 
-      let child = childContainer.firstElementChild;
-      while (child) {
-        if (!child.classList.contains("block")) {
-          expand(child);
-        }
-        child = child.nextElementSibling;
-      }
+function renderLowest(elm: HTMLElement) {
+  const toggle = elm.querySelector(`:scope > .toggle`),
+    childContainer = elm.querySelector(
+      `:scope > .childContainer`
+    ) as HTMLElement;
+
+  if (toggle && !childContainer && elm.dataset.enterstamp) {
+    const node = findByTimeStamp(treeRoot, elm.dataset.enterstamp || "");
+
+    if (node?.children) {
+      const childContainer = createChildNodes(node.children, [-1]);
+      elm.appendChild(childContainer);
+    }
+  } else if (elm.children) {
+    const len = elm.children.length;
+    for (let i = 0; i < len; ++i) {
+      renderLowest(elm.children[i] as HTMLElement);
     }
   }
 }
 
-function collapse(elm: Element | null | undefined) {
-  const toggle = elm?.querySelector(".toggle");
+function collapse(elm: HTMLElement) {
+  const toggles = document.querySelectorAll(".toggle");
+  toggles.forEach((toggle) => {
+    toggle.textContent = "+";
+  });
 
-  if (elm && toggle && toggle.textContent !== " ") {
-    // can we toggle this block?
-    const childContainer = elm.querySelector(".childContainer");
-    if (childContainer) {
-      childContainer.setAttribute("style", "display:none");
-      toggle.textContent = "+";
-
-      let child = childContainer.firstElementChild;
-      while (child) {
-        if (!child.classList.contains("block")) {
-          collapse(child);
-        }
-        child = child.nextElementSibling;
-      }
+  const childContainers = elm.querySelectorAll<HTMLElement>(".childContainer");
+  childContainers.forEach((childContainer) => {
+    if (!childContainer.classList.contains("block")) {
+      childContainer.classList.add("hide");
     }
-  }
+  });
 }
 
+let previouslyExpanded = false;
 function onExpandAll(evt: Event) {
   const treeContainer = document.getElementById("tree");
-  expand(treeContainer?.firstElementChild);
+  if (!previouslyExpanded) {
+    renderLowest(treeContainer as HTMLElement);
+    previouslyExpanded = true;
+  }
+  if (treeContainer) {
+    showHideDetails();
+    expand(treeContainer);
+  }
 }
 
 function onCollapseAll(evt: Event) {
   const treeContainer = document.getElementById("tree");
-  collapse(treeContainer?.firstElementChild);
+  if (treeContainer) {
+    collapse(treeContainer);
+  }
 }
 
 function hideBySelector(selector: string, hide: boolean) {
   const elements = document.querySelectorAll<HTMLElement>(selector);
-  const value = hide ? "none" : "block";
-  elements.forEach((elem) => {
-    if (elem.style.display !== value) {
-      elem.style.display = value;
-    }
-  });
+
+  const hideElm = function (elem: HTMLElement) {
+    elem.classList.add("hide");
+  };
+
+  const showElm = function (elem: HTMLElement) {
+    elem.classList.remove("hide");
+  };
+
+  const hideByFunc = hide ? hideElm : showElm;
+  elements.forEach(hideByFunc);
 }
 
 function onHideDetails(evt: Event) {
   const input = evt.target as HTMLInputElement;
   hideBySelector("#tree .detail", input.checked);
+}
+
+function showHideDetails() {
+  const hideDetails = document.getElementById(
+      "hideDetails"
+    ) as HTMLInputElement,
+    hideSystem = document.getElementById("hideSystem") as HTMLInputElement,
+    hideFormula = document.getElementById("hideFormula") as HTMLInputElement;
+
+  hideBySelector("#tree .detail", hideDetails?.checked);
+  hideBySelector("#tree .node.system", hideSystem?.checked);
+  hideBySelector("#tree .node.formula", hideFormula?.checked);
 }
 
 function onHideSystem(evt: Event) {

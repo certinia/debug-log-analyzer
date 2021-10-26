@@ -28,6 +28,7 @@ class LineIterator {
 export class RootNode extends BlockLines {
   text = "Log Root";
   type = "ROOT";
+  timestamp = 0;
 }
 
 function endMethod(method: LogLine, endLine: LogLine, lineIter: LineIterator) {
@@ -118,4 +119,3 @@ export function getRootMethod(): RootNode {
 
   return rootMethod;
 }
-
