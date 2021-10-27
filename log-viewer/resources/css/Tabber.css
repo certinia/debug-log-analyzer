@@ -34,3 +34,12 @@
 	display: flex;
 	flex-direction: column;
 }
+.helpLink {
+	display: inline-block;
+	border: 1px solid var(--vscode-tab-border);
+	background-color: var(--vscode-tab-background);
+	color: var(--vscode-tab-inactiveForeground);
+	padding: 5px 10px;
+	cursor: pointer;
+}
+
