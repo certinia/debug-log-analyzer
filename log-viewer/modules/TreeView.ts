@@ -4,6 +4,7 @@
 import { RootNode } from "./parsers/TreeParser.js";
 import { LogLine } from "./parsers/LineParser.js";
 import formatDuration, { showTab } from "./Util.js";
+import { hostService, OpenInfo } from "./services/VSCodeService.js";
 
 let treeRoot: RootNode;
 const divElem = document.createElement("div");
@@ -212,17 +213,6 @@ function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
   }
 }
 
-type OpenInfo = {
-  typeName: string;
-  text: string;
-};
-
-function openMethodSource(info: OpenInfo | null) {
-  if (info && window.vscodeAPIInstance) {
-    window.vscodeAPIInstance.postMessage(info);
-  }
-}
-
 function hasCodeText(node: LogLine): boolean {
   return node.type === "METHOD_ENTRY" || node.type === "CONSTRUCTOR_ENTRY";
 }
@@ -336,7 +326,9 @@ function goToFile(evt: Event) {
     const node = findByTimeStamp(treeRoot, timeStamp);
     if (node) {
       const fileOpenInfo = deriveOpenInfo(node);
-      openMethodSource(fileOpenInfo);
+      if (fileOpenInfo) {
+        hostService().openType(fileOpenInfo);
+      }
     }
   }
 }

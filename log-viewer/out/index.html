@@ -31,7 +31,7 @@
 			<div class="tab" id="treeTab" data-show="treeView">Call Tree</div>
 			<div class="tab" id="analysisTab" data-show="analysisView">Analysis</div>
 			<div class="tab" id="databaseTab" data-show="dbView">Database</div>
-			<div class="tab" id="helpTab" data-show="helpPanel">Help</div>
+			<a class="helpLink" id="helpButton">Help</a>
 			<div class="tabPad"></div>
 		</div>
 		<div class="tabber">
@@ -88,56 +88,6 @@
 				</div>
 			</div>
 
-			<div id="helpPanel" class="tabItem" >
-				<div style="display: block">
-				<h1>Log Viewer for Salesforce</h1>
-
-				<br>For best results we recommend setting Apex Code logging to FINE or better.
-
-				<h3>Overview</h3>
-
-				<h3>The "Timeline" Tab</h3>
-				This tab shows the call tree as a timeline graph. Time runs left-to-right and nested calls run bottom-to-top.
-				<br>The graph shows in "Shrinks-to-fit" mode by default, to view a scrollable graph disable "Shrink-to-fit" checkbox.
-				<br>A color key at the bottom of the graph shows the meaning of the colors used for types of call.
-				<br>Information about nodes on the graph is shown as a tooltip when hovering the mouse over a node.
-				<br>
-				<br>Clicking on a timeline node will take you to the entry in the "Call Tree".
-				<br>
-
-				<h3>The "Call Tree" Tab</h3>
-				This tab shows the call tree for the log execution.
-				<br>
-				<br>The tree can be expanded/collapsed with the +/- buttons on each method or with the "Expand All" / "Collapse All" buttons in the toolbar.
-				<br>To show other information (e.g. SOQL statements or variable assignments) in the tree, un-tick the hide details checkbox.
-				<br>There are also filter checkboxes to "Hide system calls" and "Hide formulas".
-				<br>
-				<br> The prefix '(S)' is used to indicate callers of methods which perform SOQL and '(D)' is used to indicate callers of methods that perform DML.
-				<br>
-
-				<h3>The "Analysis" Tab</h3>
-				This tab has aggregated times showing: <b>Count</b>, <b>Total Duration</b> and <b>Net duration</b> for each tree node.
-				<br>The toolbar controls sorting. The sort is multi-field and can be:
-				<ul>
-					<li>Total duration (followed by count and then name)
-					<li>Net duration (followed by count and then name)
-					<li>Count (followed by duration and then name)
-					<li>Name (followed by count and then duration)
-				</ul>
-				The sort order can also toggle between ascending and descending.
-
-				<h3>The "Database" Tab</h3>
-				This tab aggregates DML and SOQL statements by text, providing <b>Count</b> and <b>Row</b> totals for each.
-				<br>This helps identify the cause of <b>SOQL 101</b> exceptions - it is usually easy to see where a query is not bulkified.
-				<br>It may also show where we used our row limit if we run-out of DML.
-				<br>
-				<br>Be aware that totals may exceed the normal limits due to:
-				<ul>
-					<li>Unit tests - we get the extra setup limits outside <b>startTest</b> / <b>stopTest</b>.
-					<li>Multiple packages - some limits are per package.
-				</ul>
-				</div>
-			</div>
 		</div>
 		<script defer crossorigin="anonymous" src="bundle.js"></script>
 	</body>

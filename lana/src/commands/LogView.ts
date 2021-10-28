@@ -11,6 +11,7 @@ import { promises as fs } from "fs";
 import * as vscode from "vscode";
 
 interface WebViewLogFileRequest {
+  cmd: string;
   text: string | undefined;
   typeName: string | undefined;
   path: string | undefined;
@@ -25,6 +26,8 @@ export class LogFileException extends Error {
 }
 
 export class LogView {
+  private static HELP_URL = 'https://financialforcedev.github.io/debug-log-analyzer/';
+
   static async createView(
     wsPath: string,
     context: Context,
@@ -38,15 +41,34 @@ export class LogView {
       (msg: any) => {
         const request = msg as WebViewLogFileRequest;
 
-        if (request.typeName) {
-          const parts = request.typeName.split("-");
-          let line;
-          if (parts.length > 1) {
-            line = parseInt(parts[1]);
+        switch (request.cmd) {
+          case "openPath":
+            if (request.path) {
+              context.display.showFile(request.path);
+            }
+            break;
+
+          case "openType": {
+            if (request.typeName) {
+              const parts = request.typeName.split("-");
+              let line;
+              if (parts.length > 1) {
+                line = parseInt(parts[1]);
+              }
+              OpenFileInPackage.openFileForSymbol(
+                wsPath,
+                context,
+                parts[0],
+                line
+              );
+            }
+            break;
           }
-          OpenFileInPackage.openFileForSymbol(wsPath, context, parts[0], line);
-        } else if (request.path) {
-          context.display.showFile(request.path);
+
+          case "openHelp": {
+            vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(this.HELP_URL));
+            break;
+          }
         }
       },
       undefined,

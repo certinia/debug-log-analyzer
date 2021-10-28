@@ -22,17 +22,10 @@ import "../resources/css/TreeView.css";
 import "../resources/css/TimelineView.css";
 import "../resources/css/AnalysisView.css";
 import "../resources/css/DatabaseView.css";
-
-interface VSCodeAPI {
-  postMessage(message: any): void;
-}
-
-declare function acquireVsCodeApi(): VSCodeAPI;
+import { hostService } from "./services/VSCodeService.js";
 
 declare global {
   interface Window {
-    // TODO: Type these
-    vscodeAPIInstance: VSCodeAPI | null;
     activeNamespaces: string[];
   }
 }
@@ -61,11 +54,7 @@ async function setStatus(
 
   nameLink.setAttribute("href", "#");
   nameLink.appendChild(document.createTextNode(name));
-  nameLink.addEventListener("click", () => {
-    if (window.vscodeAPIInstance) {
-      window.vscodeAPIInstance.postMessage({ path: path });
-    }
-  });
+  nameLink.addEventListener("click", () => hostService().openPath(path));
   nameSpan.appendChild(nameLink);
   nameSpan.appendChild(document.createTextNode(infoText + "\xA0-\xA0"));
 
@@ -272,12 +261,6 @@ function readLog() {
   // hacky I know
   window.activeNamespaces = ns?.split(",") ?? [];
 
-  try {
-    window.vscodeAPIInstance = acquireVsCodeApi();
-  } catch (e) {
-    window.vscodeAPIInstance = null;
-  }
-
   if (logUri) {
     fetch(logUri)
       .then((response) => {
@@ -296,10 +279,14 @@ function onTabSelect(evt: Event) {
 
 function onInit(evt: Event) {
   const tabHolder = document.querySelector(".tabHolder");
-
   tabHolder
     ?.querySelectorAll(".tab")
     .forEach((t) => t.addEventListener("click", onTabSelect));
+
+  const helpButton = document.querySelector(".helpLink");
+  if (helpButton) {
+    helpButton.addEventListener("click", () => hostService().openHelp())
+  }
 
   readLog();
 }
