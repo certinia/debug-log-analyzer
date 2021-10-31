@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
     "module": "esnext",
-    "target": "es6",                          
-    "moduleResolution": "node",                     
+    "target": "es6",
+    "moduleResolution": "node",
     "noEmitOnError": true,
-    "lib": ["es2017", "dom"],                            
-    "strict": true,  
-    "esModuleInterop": false,                 
+    "lib": ["es2017", "dom"],
+    "strict": true,
+    "esModuleInterop": false,
     "outDir": "out",
     "sourceMap": true,
     "experimentalDecorators": true

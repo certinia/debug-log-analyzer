@@ -122,26 +122,26 @@ function parseVfNamespace(text: string): string {
 }
 
 function parseTimestamp(text: string): number {
-  const timestamp = text.match(/.*\((\d+)\)/);
-  if (timestamp && timestamp.length > 1) {
-    return Number(timestamp[1]);
+  const timestamp = text.slice(text.indexOf("(") + 1, -1);
+  if (timestamp) {
+    return Number(timestamp);
   }
   throw new Error(`Unable to parse timestamp: '${text}'`);
 }
 
 function parseLineNumber(text: string): string | number {
-  const matched = text.match(/\[(\w*)\]/);
-  if (matched) {
-    const lineNumber = Number(matched[1]);
-    return isNaN(lineNumber) ? lineNumber : matched[1];
+  const lineNumberStr = text.slice(1, -1);
+  if (lineNumberStr) {
+    const lineNumber = Number(lineNumberStr);
+    return isNaN(lineNumber) ? lineNumberStr : lineNumber;
   }
   throw new Error(`Unable to parse line number: '${text}'`);
 }
 
 function parseRows(text: string): number {
-  const rowCount = text.match(/Rows:(\d+)/);
-  if (rowCount?.length) {
-    return Number(rowCount[1]);
+  const rowCount = text.slice(text.indexOf("Rows:") + 5);
+  if (rowCount) {
+    return Number(rowCount);
   }
   throw new Error(`Unable to parse row count: '${text}'`);
 }
@@ -161,7 +161,8 @@ class ConstructorEntryLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = decodeEntities(parts[5] + parts[4]);
+    const args = parts[4];
+    this.text = parts[5] + args.substring(args.lastIndexOf("("));
   }
 }
 class ConstructorExitLine extends LogLine {
@@ -186,7 +187,7 @@ class MethodEntryLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = decodeEntities(parts[4]) || this.type;
+    this.text = parts[4] || this.type;
     if (this.text === "System.Type.forName(String, String)") {
       this.cpuType = "loading"; // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
       // no namespace or it will get charged...
@@ -217,7 +218,7 @@ class SystemConstructorEntryLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = decodeEntities(parts[3]);
+    this.text = parts[3];
   }
 }
 class SystemConstructorExitLine extends LogLine {
@@ -242,7 +243,7 @@ class SystemMethodEntryLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = decodeEntities(parts[3]);
+    this.text = parts[3];
   }
 }
 
@@ -1198,14 +1199,19 @@ function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
     type = parts[1],
     metaCtor = lineTypeMap.get(type);
 
-  if (!metaCtor) {
-    if (!typePattern.test(type) && lastEntry && lastEntry.acceptsText) {
-      // wrapped text from the previous entry?
-      lastEntry.text += " | " + line;
-      return null;
+  if (metaCtor) {
+    const entry = new metaCtor(parts);
+    entry.logLine = line;
+    if (lastEntry?.after) {
+      lastEntry?.after(entry);
     }
-    if (type) {
-      console.warn("Unknown log line: " + type);
+    return entry;
+  } else {
+    if (!typePattern.test(type) && lastEntry?.acceptsText) {
+      // wrapped text from the previous entry?
+      lastEntry.text += ` | ${line}`;
+    } else if (type) {
+      console.warn(`Unknown log line: ${type}`);
     } else {
       if (lastEntry && line.startsWith("*** Skipped")) {
         truncateLog(lastEntry.timestamp, "Skipped-Lines", "skip");
@@ -1215,25 +1221,19 @@ function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
       ) {
         truncateLog(lastEntry.timestamp, "Max-Size-reached", "skip");
       } else {
-        console.warn("Bad log line: " + line);
+        console.warn(`Bad log line: ${line}`);
       }
     }
-    return null;
-  } else {
-    const entry = new metaCtor(parts);
-    entry.logLine = line;
-    if (lastEntry && lastEntry.after) {
-      lastEntry.after(entry);
-    }
-    return entry;
   }
+  return null;
 }
 
 export default async function parseLog(log: string) {
   const start = log.indexOf("EXECUTION_STARTED");
-  const raw = log.substring(start, log.length);
-  let rawLines = raw.split("\n");
-  rawLines = rawLines.slice(1, rawLines.length - 1); // strip the "EXECUTION_STARTED" and "EXECUTION_FINISHED" lines
+  const rawLines = log.substring(start).split("\n");
+  // strip the "EXECUTION_STARTED" and "EXECUTION_FINISHED" lines
+  rawLines.pop();
+  rawLines.shift();
 
   // reset global variables to be captured durung parsing
   logLines = [];
@@ -1242,7 +1242,7 @@ export default async function parseLog(log: string) {
   cpuUsed = 0;
 
   let lastEntry = null;
-  let len = rawLines.length;
+  const len = rawLines.length;
   for (let i = 0; i < len; ++i) {
     const line = rawLines[i];
     if (line) {
@@ -1255,11 +1255,10 @@ export default async function parseLog(log: string) {
     }
   }
 
-  totalDuration =
-    logLines.length > 1
-      ? logLines[logLines.length - 1].timestamp - logLines[0].timestamp
-      : 0;
-
+  const linLen = logLines.length;
+  const endTime = linLen ? logLines[logLines.length - 1].timestamp : 0;
+  const startTime = linLen ? logLines[0].timestamp : 0;
+  totalDuration = endTime - startTime;
   return logLines;
 }
 

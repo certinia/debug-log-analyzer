@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { Position, Range, Uri, window, workspace } from "vscode";
+import { Position, Range, Selection, Uri, window, workspace } from "vscode";
 import { Context } from "../Context";
 
 export class OpenFileInPackage {
@@ -18,7 +18,9 @@ export class OpenFileInPackage {
       workspace.openTextDocument(uri).then((td) => {
         window.showTextDocument(td).then((editor) => {
           if (line) {
-            const position = new Position(line, 0);
+            const zeroBasedLine = line - 1;
+            const position = new Position(zeroBasedLine, 0);
+            editor.selection = new Selection(position, position);
             editor.revealRange(new Range(position, position));
           }
         });

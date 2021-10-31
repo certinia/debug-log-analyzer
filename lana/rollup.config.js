@@ -1,14 +1,14 @@
 import { terser } from "rollup-plugin-terser";
+import typescript from "@rollup/plugin-typescript";
 import commonjs from "@rollup/plugin-commonjs";
-import typescript from "rollup-plugin-typescript2";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 
 const compact = !process.env.ROLLUP_WATCH;
 const plugins = [
   nodeResolve(),
   commonjs(),
-  typescript(),
-  compact && terser()
+  typescript({ tsconfig: "./tsconfig.json" }),
+  compact && terser(),
 ];
 
 export default {

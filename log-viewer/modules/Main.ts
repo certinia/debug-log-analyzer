@@ -30,7 +30,7 @@ declare global {
   }
 }
 
-const settingsPattern = /\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+/;
+const settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
 
 let logSize: number;
 
@@ -88,7 +88,7 @@ async function setStatus(
       }
     });
   }
-  await timeout(10);
+  await waitForRender();
 }
 
 function getLogSettings(log: string): [string, string][] {
@@ -98,8 +98,7 @@ function getLogSettings(log: string): [string, string][] {
   }
 
   const settings = match[0],
-    settingStr = settings.substring(settings.indexOf(" ") + 1),
-    settingList = settingStr.split(";");
+    settingList = settings.substring(settings.indexOf(" ") + 1).split(";");
 
   return settingList.map((entry) => {
     const parts = entry.split(",");
@@ -111,13 +110,11 @@ async function markContainers(node: LogLine) {
   const children = node.children;
 
   if (children) {
-    for (let i = 0; i < children.length; ++i) {
+    const len = children.length;
+    for (let i = 0; i < len; ++i) {
       const child = children[i];
-      if (child.type === "DML_BEGIN") {
-        node.containsDml = true;
-      } else if (child.type === "SOQL_EXECUTE_BEGIN") {
-        node.containsSoql = true;
-      }
+      node.containsDml ||= child.type === "DML_BEGIN";
+      node.containsSoql ||= child.type === "SOQL_EXECUTE_BEGIN";
       if (child.displayType === "method") {
         await markContainers(child);
         node.containsDml ||= child.containsDml;
@@ -249,8 +246,10 @@ async function displayLog(log: string, name: string, path: string) {
   setStatus(name, path, "Ready", truncated.length > 0 ? "red" : "green");
 }
 
-function timeout(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+async function waitForRender() {
+  await new Promise((resolve) => window.requestAnimationFrame(resolve));
+  await new Promise((resolve) => window.requestAnimationFrame(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 1));
 }
 
 function readLog() {

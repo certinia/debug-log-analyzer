@@ -3,109 +3,226 @@
  */
 import { RootNode } from "./parsers/TreeParser.js";
 import { LogLine } from "./parsers/LineParser.js";
-import formatDuration from "./Util.js";
+import formatDuration, { showTab } from "./Util.js";
 import { hostService, OpenInfo } from "./services/VSCodeService.js";
 
 let treeRoot: RootNode;
+const divElem = document.createElement("div");
+const spanElem = document.createElement("span");
+const linkElem = document.createElement("a");
 
 function onExpandCollapse(evt: Event) {
-  const input = evt.target as HTMLElement,
-    pe = input.parentElement,
-    toggle = pe?.querySelector(".toggle"),
-    childContainer = pe?.querySelector(".childContainer");
+  const input = evt.target as HTMLElement;
+  if (input.classList.contains("toggle")) {
+    const pe = input.parentElement,
+      toggle = pe?.querySelector(".toggle");
+    let childContainer = pe?.querySelector<HTMLElement>(".childContainer");
 
-  if (toggle && childContainer) {
-    switch (toggle.textContent) {
-      case "+":
-        // expand
-        childContainer.setAttribute("style", "display:block");
-        toggle.textContent = "-";
-        break;
-      case "-":
-        // collapse
-        childContainer.setAttribute("style", "display:none");
-        toggle.textContent = "+";
-        break;
+    const timestamp = pe?.dataset.enterstamp;
+    if (!childContainer && timestamp) {
+      const node = findByTimeStamp(treeRoot, timestamp);
+      childContainer = node?.children
+        ? createChildNodes(node?.children, [node.timestamp])
+        : null;
+      if (childContainer) {
+        pe.appendChild(childContainer);
+      }
+
+      showHideDetails();
+    }
+
+    if (toggle && childContainer) {
+      switch (toggle.textContent) {
+        case "+":
+          // expand
+          childContainer.classList.remove("hide");
+          toggle.textContent = "-";
+          break;
+        case "-":
+          // collapse
+          childContainer.classList.add("hide");
+          toggle.textContent = "+";
+          break;
+      }
     }
   }
 }
 
-function describeMethod(node: LogLine, linkInfo: OpenInfo | null) {
+export function showTreeNode(timestamp: number) {
+  const methodElm = renderCallStack(timestamp);
+  showHideDetails();
+  if (methodElm) {
+    const methodName = methodElm?.querySelector("span.name") || methodElm;
+    showTab("treeTab");
+    expandTreeNode(methodElm, false);
+    methodElm.scrollIntoView(false);
+    if (methodName) {
+      document.getSelection()?.selectAllChildren(methodName);
+    }
+  }
+}
+
+function renderCallStack(timestamp: number) {
+  let methodElm = document.querySelector(
+    `div[data-enterstamp="${timestamp}"]`
+  ) as HTMLElement;
+
+  if (!methodElm) {
+    let nodeToAttachTo;
+    let nodeToStartAt;
+
+    const callstack = findCallstack(treeRoot, timestamp) || [];
+    const len = callstack.length;
+    for (let i = 0; i < len; i++) {
+      const node = callstack[i];
+      if (node) {
+        const isRendered = document.querySelector(
+          `div[data-enterstamp="${node.timestamp}"]`
+        ) as HTMLElement;
+        if (isRendered) {
+          nodeToAttachTo = isRendered;
+          nodeToStartAt = node;
+          continue;
+        }
+        break;
+      }
+    }
+
+    const timeStamps = callstack.map((node) => {
+      if (node?.timestamp) {
+        return node.timestamp;
+      }
+    }) as number[];
+
+    if (nodeToStartAt?.children && nodeToAttachTo) {
+      const childContainer = createChildNodes(
+        nodeToStartAt.children,
+        timeStamps
+      );
+      if (childContainer) {
+        nodeToAttachTo.appendChild(childContainer);
+      }
+
+      methodElm = document.querySelector(
+        `div[data-enterstamp="${timestamp}"]`
+      ) as HTMLElement;
+    }
+  }
+  return methodElm;
+}
+
+function findCallstack(node: LogLine, timeStamp: number): LogLine[] | null {
+  if (node.timestamp === timeStamp) {
+    return [node];
+  }
+
+  const children = node?.children || [];
+  const len = children.length;
+  for (let i = 0; i < len; i++) {
+    const child = children[i];
+    const timeStamps = findCallstack(child, timeStamp);
+    if (timeStamps) {
+      timeStamps.unshift(child);
+      return timeStamps;
+    }
+  }
+  return null;
+}
+
+function expandTreeNode(elm: HTMLElement, expand: boolean) {
+  const elements = [];
+  let element: HTMLElement | null = expand ? elm : elm.parentElement;
+  while (element && element.id !== "tree") {
+    if (element.id) {
+      elements.push(element);
+    }
+    element = element.parentElement;
+  }
+
+  const len = elements.length;
+  for (let i = 0; i < len; i++) {
+    const elem = elements[i];
+    const toggle = elem.querySelector(`:scope > .toggle`),
+      childContainer = elem.querySelector(
+        `:scope > .childContainer`
+      ) as HTMLElement;
+
+    if (toggle) {
+      childContainer.classList.remove("hide");
+      toggle.textContent = "-";
+    }
+  }
+}
+
+function describeMethod(node: LogLine) {
   const methodPrefix = node.prefix || "",
     methodSuffix = node.suffix || "";
 
   const dbPrefix =
     (node.containsDml ? "D" : "") + (node.containsSoql ? "S" : "");
-  const linePrefix = (dbPrefix ? "(" + dbPrefix + ") " : "") + methodPrefix;
-
-  const text = node.text;
-  let logLineBody;
-  if (linkInfo) {
-    logLineBody = document.createElement("a");
-    logLineBody.setAttribute("href", "#");
-    logLineBody.appendChild(document.createTextNode(text));
-    logLineBody.addEventListener("click", () => {
-      if (linkInfo) hostService().openType(linkInfo);
-    });
-  } else {
-    logLineBody = document.createTextNode(text);
-  }
+  const linePrefix = (dbPrefix ? `(${dbPrefix}) ` : "") + methodPrefix;
 
   let lineSuffix = "";
   if (node.displayType === "method") {
-    lineSuffix += node.value ? " = " + node.value : "";
-    lineSuffix += methodSuffix + " - ";
-    if (node.truncated) {
-      lineSuffix += "TRUNCATED";
-    } else {
-      lineSuffix +=
-        formatDuration(node.duration || 0) +
-        " (" +
-        formatDuration(node.netDuration || 0) +
-        ")";
-    }
-
-    lineSuffix += node.lineNumber ? ", line: " + node.lineNumber : "";
+    const nodeValue = node.value ? ` = ${node.value}` : "";
+    const timeTaken = node.truncated
+      ? "TRUNCATED"
+      : `${formatDuration(node.duration || 0)} (${formatDuration(
+          node.netDuration || 0
+        )})`;
+    const lineNumber = node.lineNumber ? `, line: ${node.lineNumber}` : "";
+    lineSuffix = `${nodeValue}${methodSuffix} - ${timeTaken}${lineNumber}`;
   }
 
-  return [
-    document.createTextNode(linePrefix),
-    logLineBody,
-    document.createTextNode(lineSuffix),
-  ];
+  const text = node.text;
+  let logLineBody;
+  if (hasCodeText(node)) {
+    logLineBody = linkElem.cloneNode() as HTMLAnchorElement;
+    logLineBody.href = "#";
+    logLineBody.textContent = text;
+  } else {
+    return [document.createTextNode(linePrefix + text + lineSuffix)];
+  }
+
+  const nodeResults = [document.createTextNode(linePrefix), logLineBody];
+  if (lineSuffix) {
+    nodeResults.push(document.createTextNode(lineSuffix));
+  }
+  return nodeResults;
 }
 
 function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
-  const lines = block.children || [],
+  const lines = block.children ?? [],
     len = lines.length;
 
   for (let i = 0; i < len; ++i) {
     const line = lines[i],
-      txt = line.text,
-      lineNode = document.createElement("div");
+      lineNode = divElem.cloneNode() as HTMLDivElement;
+    lineNode.className =
+      line.hideable !== false ? "block detail hide" : "block";
 
-    lineNode.className = line.hideable !== false ? "block detail" : "block";
-    let text = line.type + (txt && txt !== line.type ? " - " + txt : "");
+    const value = line.text || "";
+    let text = line.type + (value && value !== line.type ? " - " + value : "");
     text = text.replace(/ \| /g, "\n");
     if (text.endsWith("\\")) {
-      text = text.substring(0, text.length - 1);
+      text = text.slice(0, -1);
     }
-    const textNode = document.createTextNode(text);
-    lineNode.appendChild(textNode);
+
+    lineNode.textContent = text;
     childContainer.appendChild(lineNode);
   }
 }
 
-function deriveOpenInfo(node: LogLine): OpenInfo | null {
-  const text = node.text,
-    isMethod =
-      node.type === "METHOD_ENTRY" || node.type === "CONSTRUCTOR_ENTRY",
-    re = /^[0-9a-zA-Z_]+(\.[0-9a-zA-Z_]+)*\(.*\)$/;
+function hasCodeText(node: LogLine): boolean {
+  return node.type === "METHOD_ENTRY" || node.type === "CONSTRUCTOR_ENTRY";
+}
 
-  if (!isMethod || !re.test(text)) {
+function deriveOpenInfo(node: LogLine): OpenInfo | null {
+  if (!hasCodeText(node)) {
     return null;
   }
 
+  const text = node.text;
   let lineNumber = "";
   if (node.lineNumber) {
     lineNumber = "-" + node.lineNumber;
@@ -126,63 +243,113 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
   }
 }
 
-function renderTreeNode(node: LogLine) {
-  const mainNode = document.createElement("div"),
-    toggle = document.createElement("span"),
-    children = node.children || [],
-    fileOpenInfo = deriveOpenInfo(node);
+function renderTreeNode(node: LogLine, timeStamps: number[]) {
+  const children = node.children ?? [];
 
-  const titleElement = document.createElement("span");
-  const titleElements = describeMethod(node, fileOpenInfo);
-  for (let i = 0; i < titleElements.length; i++) {
-    titleElement.appendChild(titleElements[i]);
+  const mainNode = divElem.cloneNode() as HTMLDivElement;
+  if (node.timestamp >= 0) {
+    mainNode.dataset.enterstamp = "" + node.timestamp;
+    mainNode.id = `calltree-${node.timestamp}`;
   }
-  titleElement.className = "name";
+  mainNode.className = node.classes || "";
 
-  const childContainer = document.createElement("div");
-  childContainer.className = "childContainer";
-  childContainer.style.display = "none";
+  const len = children.length;
+  if (len) {
+    const toggle = spanElem.cloneNode() as HTMLSpanElement;
+    toggle.textContent = "+";
+    toggle.className = "toggle";
+    mainNode.appendChild(toggle);
+  } else {
+    mainNode.classList.add("indent");
+  }
 
+  const titleSpan = spanElem.cloneNode() as HTMLSpanElement;
+  titleSpan.className = "name";
+  const titleElements = describeMethod(node);
+  const elemsLen = titleElements.length;
+  for (let i = 0; i < elemsLen; i++) {
+    titleSpan.appendChild(titleElements[i]);
+  }
+  mainNode.appendChild(titleSpan);
+
+  if (len && (timeStamps.includes(node.timestamp) || timeStamps.includes(-1))) {
+    const childContainer = createChildNodes(children, timeStamps);
+    if (childContainer) {
+      mainNode.appendChild(childContainer);
+    }
+  }
+
+  return mainNode;
+}
+
+function createChildNodes(children: LogLine[], timeStamps: number[]) {
+  const childContainer = divElem.cloneNode() as HTMLDivElement;
+  childContainer.className = "childContainer hide";
   const len = children.length;
   for (let i = 0; i < len; ++i) {
     const child = children[i];
     switch (child.displayType) {
       case "method":
-        childContainer.appendChild(renderTreeNode(child));
+        const container = renderTreeNode(child, timeStamps);
+        if (container) {
+          childContainer.appendChild(container);
+        }
         break;
       case "block":
         renderBlock(childContainer, child);
         break;
     }
   }
-
-  if (len) {
-    const toggleNode = document.createTextNode("+");
-    toggle.appendChild(toggleNode);
-
-    toggle.className = "toggle";
-    toggle.addEventListener("click", onExpandCollapse);
-  } else {
-    toggle.className = "indent";
-  }
-
-  if (node.timestamp) {
-    mainNode.dataset.enterstamp = "" + node.timestamp;
-  }
-  mainNode.className = node.classes || "";
-  mainNode.appendChild(toggle);
-  mainNode.appendChild(titleElement);
-  mainNode.appendChild(childContainer);
-
-  return mainNode;
+  return childContainer;
 }
 
 function renderTree() {
   const treeContainer = document.getElementById("tree");
   if (treeContainer) {
+    treeContainer.addEventListener("click", onExpandCollapse);
+    treeContainer.addEventListener("click", goToFile);
+
+    const callTreeNode = renderTreeNode(treeRoot, [0]);
     treeContainer.innerHTML = "";
-    treeContainer.appendChild(renderTreeNode(treeRoot));
+    if (callTreeNode) {
+      treeContainer.appendChild(callTreeNode);
+      showHideDetails();
+    }
   }
+}
+
+function goToFile(evt: Event) {
+  const elem = evt.target as HTMLElement;
+  const target = elem.matches("a") ? elem.parentElement?.parentElement : null;
+  const timeStamp = target?.dataset.enterstamp;
+  if (timeStamp) {
+    const node = findByTimeStamp(treeRoot, timeStamp);
+    if (node) {
+      const fileOpenInfo = deriveOpenInfo(node);
+      if (fileOpenInfo) {
+        hostService().openType(fileOpenInfo);
+      }
+    }
+  }
+}
+
+function findByTimeStamp(node: LogLine, timeStamp: string): LogLine | null {
+  if (node) {
+    if (node.timestamp === parseInt(timeStamp)) {
+      return node;
+    }
+
+    if (node.children) {
+      const len = node.children.length;
+      for (let i = 0; i < len; ++i) {
+        const target = findByTimeStamp(node.children[i], timeStamp);
+        if (target) {
+          return target;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 export default async function renderTreeView(rootMethod: RootNode) {
@@ -190,71 +357,106 @@ export default async function renderTreeView(rootMethod: RootNode) {
   renderTree();
 }
 
-function expand(elm: Element | null | undefined) {
-  const toggle = elm?.querySelector(".toggle");
+function expand(elm: HTMLElement) {
+  const toggles = elm.querySelectorAll(".toggle");
+  toggles.forEach((toggle) => {
+    toggle.textContent = "-";
+  });
 
-  if (elm && toggle && toggle.textContent !== " ") {
-    // can we toggle this block?
-    const childContainer = elm.querySelector(".childContainer");
-    if (childContainer) {
-      childContainer.setAttribute("style", "display:block");
-      toggle.textContent = "-";
+  const childContainers =
+    document.querySelectorAll<HTMLElement>(".childContainer");
+  childContainers.forEach((childContainer) => {
+    if (!childContainer.classList.contains("block")) {
+      childContainer.classList.remove("hide");
+    }
+  });
+}
 
-      let child = childContainer.firstElementChild;
-      while (child) {
-        if (!child.classList.contains("block")) {
-          expand(child);
-        }
-        child = child.nextElementSibling;
-      }
+function renderLowest(elm: HTMLElement) {
+  const toggle = elm.querySelector(`:scope > .toggle`),
+    childContainer = elm.querySelector(
+      `:scope > .childContainer`
+    ) as HTMLElement;
+
+  if (toggle && !childContainer && elm.dataset.enterstamp) {
+    const node = findByTimeStamp(treeRoot, elm.dataset.enterstamp || "");
+
+    if (node?.children) {
+      const childContainer = createChildNodes(node.children, [-1]);
+      elm.appendChild(childContainer);
+    }
+  } else if (elm.children) {
+    const len = elm.children.length;
+    for (let i = 0; i < len; ++i) {
+      renderLowest(elm.children[i] as HTMLElement);
     }
   }
 }
 
-function collapse(elm: Element | null | undefined) {
-  const toggle = elm?.querySelector(".toggle");
+function collapse(elm: HTMLElement) {
+  const toggles = document.querySelectorAll(".toggle");
+  toggles.forEach((toggle) => {
+    toggle.textContent = "+";
+  });
 
-  if (elm && toggle && toggle.textContent !== " ") {
-    // can we toggle this block?
-    const childContainer = elm.querySelector(".childContainer");
-    if (childContainer) {
-      childContainer.setAttribute("style", "display:none");
-      toggle.textContent = "+";
-
-      let child = childContainer.firstElementChild;
-      while (child) {
-        if (!child.classList.contains("block")) {
-          collapse(child);
-        }
-        child = child.nextElementSibling;
-      }
+  const childContainers = elm.querySelectorAll<HTMLElement>(".childContainer");
+  childContainers.forEach((childContainer) => {
+    if (!childContainer.classList.contains("block")) {
+      childContainer.classList.add("hide");
     }
-  }
+  });
 }
 
+let previouslyExpanded = false;
 function onExpandAll(evt: Event) {
   const treeContainer = document.getElementById("tree");
-  expand(treeContainer?.firstElementChild);
+  if (!previouslyExpanded) {
+    renderLowest(treeContainer as HTMLElement);
+    previouslyExpanded = true;
+  }
+  if (treeContainer) {
+    showHideDetails();
+    expand(treeContainer);
+  }
 }
 
 function onCollapseAll(evt: Event) {
   const treeContainer = document.getElementById("tree");
-  collapse(treeContainer?.firstElementChild);
+  if (treeContainer) {
+    collapse(treeContainer);
+  }
 }
 
 function hideBySelector(selector: string, hide: boolean) {
   const elements = document.querySelectorAll<HTMLElement>(selector);
-  const value = hide ? "none" : "block";
-  elements.forEach((elem) => {
-    if (elem.style.display !== value) {
-      elem.style.display = value;
-    }
-  });
+
+  const hideElm = function (elem: HTMLElement) {
+    elem.classList.add("hide");
+  };
+
+  const showElm = function (elem: HTMLElement) {
+    elem.classList.remove("hide");
+  };
+
+  const hideByFunc = hide ? hideElm : showElm;
+  elements.forEach(hideByFunc);
 }
 
 function onHideDetails(evt: Event) {
   const input = evt.target as HTMLInputElement;
   hideBySelector("#tree .detail", input.checked);
+}
+
+function showHideDetails() {
+  const hideDetails = document.getElementById(
+      "hideDetails"
+    ) as HTMLInputElement,
+    hideSystem = document.getElementById("hideSystem") as HTMLInputElement,
+    hideFormula = document.getElementById("hideFormula") as HTMLInputElement;
+
+  hideBySelector("#tree .detail", hideDetails?.checked);
+  hideBySelector("#tree .node.system", hideSystem?.checked);
+  hideBySelector("#tree .node.formula", hideFormula?.checked);
 }
 
 function onHideSystem(evt: Event) {
