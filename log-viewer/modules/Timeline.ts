@@ -359,7 +359,7 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
         toolTip.appendChild(brElem.cloneNode());
         toolTip.appendChild(
           document.createTextNode(
-            "duration: " + formatDuration(target.duration)
+            `duration: ${formatDuration(target.duration)}`
           )
         );
         if (target.cpuType === "free") {
@@ -367,7 +367,7 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
         } else {
           toolTip.appendChild(
             document.createTextNode(
-              " (netDuration: " + formatDuration(target.netDuration) + ")"
+              ` (self ${formatDuration(target.netDuration)})`
             )
           );
         }
