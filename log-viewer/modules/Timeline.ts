@@ -7,9 +7,7 @@ import { truncated } from "./parsers/LineParser.js";
 import { RootNode } from "./parsers/TreeParser";
 import { LogLine } from "./parsers/LineParser";
 
-const defaultScaleX = 0.000001,
-  maxCanvasWidth = 32000,
-  scaleY = -15,
+const scaleY = -15,
   strokeColor = "#B0B0B0",
   textColor = "#FFFFFF",
   keyMap: Record<string, Record<string, string>> = {
@@ -43,14 +41,17 @@ const defaultScaleX = 0.000001,
     },
   };
 
+let centerOffset = 0;
+let initialZoom = 0;
+let canvas: HTMLCanvasElement;
+let ctx: CanvasRenderingContext2D | null;
+
 let scaleX: number,
   scaleFont: string,
   maxX: number,
   maxY: number,
-  logicalWidth: number,
-  logicalHeight: number,
-  displayWidth: number,
   displayHeight: number,
+  displayWidth: number,
   timelineRoot: RootNode,
   lastMouseX: number,
   lastMouseY: number;
@@ -64,7 +65,8 @@ function getMaxWidth(node: LogLine) {
   }
 
   let maxX = node.timestamp || 0;
-  for (let c = node.children.length - 1; c >= 0; --c) {
+  const len = node.children.length - 1;
+  for (let c = len; c >= 0; --c) {
     const max = getMaxWidth(node.children[c]);
     if (max && max > maxX) {
       maxX = max;
@@ -82,7 +84,8 @@ function getMaxDepth(node: LogLine, depth = 0) {
   const childDepth = node.duration ? depth + 1 : depth;
 
   let maxDepth = depth;
-  for (let c = node.children.length - 1; c >= 0; --c) {
+  const len = node.children.length - 1;
+  for (let c = len; c >= 0; --c) {
     const d = getMaxDepth(node.children[c], childDepth);
     if (d > maxDepth) {
       maxDepth = d;
@@ -140,7 +143,6 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   }
 }
 
-// todo: draw by color not depth
 function drawNodes(
   ctx: CanvasRenderingContext2D,
   nodes: LogLine[],
@@ -156,13 +158,17 @@ function drawNodes(
     const tlKey = node.timelineKey;
     if (tlKey && node.duration) {
       const tl = keyMap[tlKey],
-        x = ~~(0.5 + node.timestamp * scaleX),
-        y = ~~(0.5 + depth * scaleY),
-        w = ~~(0.5 + node.duration * scaleX);
+        x = node.timestamp * scaleX,
+        y = depth * scaleY;
 
-      ctx.fillStyle = tl.fillColor;
-      ctx.fillRect(x, y, w, scaleY);
-      ctx.strokeRect(x, y, w, scaleY);
+      // nanoseconds
+      const width = node.duration * scaleX;
+
+      if (width >= 0.25) {
+        ctx.fillStyle = tl.fillColor;
+        ctx.fillRect(x - centerOffset, y, width, scaleY);
+        ctx.strokeRect(x - centerOffset, y, width, scaleY);
+      }
     }
 
     if (node.children) {
@@ -179,22 +185,25 @@ function drawNodes(
 
 function drawTruncation(ctx: CanvasRenderingContext2D) {
   const len = truncated.length;
+  if (!len) {
+    return;
+  }
   let i = 0;
 
   while (i < len) {
     const thisEntry = truncated[i++],
-      nextEntry = i < len ? truncated[i] : null,
+      nextEntry = truncated[i] ?? [],
       startTime = thisEntry[1],
-      endTime = nextEntry ? nextEntry[1] : maxX;
+      endTime = nextEntry[1] ?? maxX;
 
     if (thisEntry[2]) {
       ctx.fillStyle = thisEntry[2];
     }
     ctx.fillRect(
-      startTime * scaleX,
-      -logicalHeight,
-      (endTime - startTime) * scaleX,
-      logicalHeight
+      startTime * scaleX - centerOffset,
+      -displayHeight,
+      endTime - startTime * scaleX,
+      displayHeight
     );
   }
 }
@@ -203,45 +212,46 @@ function calculateSizes(canvas: HTMLCanvasElement) {
   maxX = getMaxWidth(timelineRoot); // maximum display value in nano-seconds
   maxY = getMaxDepth(timelineRoot); // maximum nested call depth
 
-  const shrinkToFit = (
-    document.getElementById("shrinkToFit") as HTMLInputElement
-  ).checked;
-  if (shrinkToFit) {
-    const viewWidth = (
-      document.getElementById("timelineScroll") as HTMLDivElement
-    ).offsetWidth;
-    scaleX = viewWidth / maxX; // ok to use the default scale
-  } else if (defaultScaleX * maxX < maxCanvasWidth) {
-    // does the default scale fit our canvas?
-    scaleX = defaultScaleX; // ok to use the default scale
-  } else {
-    scaleX = maxCanvasWidth / maxX; // adjust the scale to avoid overflow
-  }
+  // todo: the default should be based on width of current log
+  const viewWidth = (
+    document.getElementById("timelineScroll") as HTMLDivElement
+  ).offsetWidth;
+  displayWidth = canvas.width = viewWidth;
+  displayHeight = canvas.height = -scaleY * maxY; // maximum scaled value to draw
+  initialZoom = viewWidth / maxX;
 
+  resetView();
+  recalculateSizes();
+}
+
+function resetView() {
+  scaleX = displayWidth / maxX;
+  centerOffset = 0;
+}
+
+function recalculateSizes() {
   scaleFont = scaleX > 0.0000004 ? "normal 16px serif" : "normal 8px serif";
-  logicalWidth = canvas.width = scaleX * maxX; // maximum scaled value to draw
-  displayWidth = logicalWidth; // canvas display width (1-to-1 with logical width)
-  canvas.style.width = displayWidth + "px";
-  logicalHeight = canvas.height = -scaleY * maxY; // maximum scaled value to draw
-  displayHeight = logicalHeight; // canvas display height (1-to-1 with logical height)
-  canvas.style.height = displayHeight + "px";
 }
 
 export default async function renderTimeline(rootMethod: RootNode) {
-  const canvas = document.getElementById("timeline") as HTMLCanvasElement,
-    ctx = canvas?.getContext("2d");
-
+  canvas = document.getElementById("timeline") as HTMLCanvasElement;
+  ctx = canvas.getContext("2d", { alpha: false });
   timelineRoot = rootMethod;
   calculateSizes(canvas);
-
   if (ctx) {
-    ctx.setTransform(1, 0, 0, 1, 0, logicalHeight); // shift y-axis down so that 0,0 is bottom-left
+    requestAnimationFrame(drawTimeLine);
+  }
+}
 
-    if (truncated.length > 0) {
-      drawTruncation(ctx);
-    }
+function drawTimeLine() {
+  if (ctx) {
+    recalculateSizes();
+    ctx.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-left
+    ctx.clearRect(0, -canvas.height, canvas.width, canvas.height);
+    drawTruncation(ctx);
     drawScale(ctx);
     drawNodes(ctx, [timelineRoot], -1);
+    requestAnimationFrame(drawTimeLine);
   }
 }
 
@@ -272,7 +282,7 @@ function renderTimelineKey() {
 }
 
 function onShrinkToFit(evt: any) {
-  renderTimeline(timelineRoot);
+  resetView();
 }
 
 function findByPosition(
@@ -287,7 +297,11 @@ function findByPosition(
 
   if (node.duration) {
     // we can only test nodes with a duration
-    if (node.exitStamp && (node.timestamp > x || node.exitStamp < x)) {
+    const starttime = node.timestamp * scaleX - centerOffset;
+    const width = node.duration * scaleX;
+    const endtime = starttime + width;
+
+    if (width < 0.25 || starttime > x || endtime < x) {
       return null; // x-axis miss (can't include us or children)
     }
 
@@ -323,10 +337,9 @@ function showTooltip(offsetX: number, offsetY: number) {
   const tooltip = document.getElementById("tooltip");
 
   if (timelineScroll && tooltip) {
-    const x =
-      ((offsetX + (timelineScroll.scrollLeft || 0)) / displayWidth) * maxX;
     const depth = ~~(((displayHeight - offsetY) / displayHeight) * maxY);
-    let tooltipText = findTimelineTooltip(x, depth) || findTruncatedTooltip(x);
+    let tooltipText =
+      findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
 
     if (tooltipText) {
       showTooltipWithText(
@@ -385,11 +398,14 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
 
   while (i < len) {
     const thisEntry = truncated[i++],
-      nextEntry = i < len ? truncated[i] : null,
+      nextEntry = truncated[i] ?? [],
       startTime = thisEntry[1],
-      endTime = nextEntry ? nextEntry[1] : maxX;
+      endTime = nextEntry[1] ?? maxX;
 
-    if (x >= startTime && x <= endTime) {
+    if (
+      x >= startTime * scaleX - centerOffset &&
+      x <= endTime * scaleX - centerOffset
+    ) {
       const toolTip = document.createElement("div");
       toolTip.textContent = thisEntry[0];
       return toolTip;
@@ -418,11 +434,11 @@ function showTooltipWithText(
         posTop = -100;
       }
     }
+    const tooltipX = posLeft + timelineScroll.offsetLeft;
+    const tooltipY = posTop + timelineScroll.offsetTop;
     tooltip.innerHTML = "";
     tooltip.appendChild(tooltipText);
-    tooltip.style.left = posLeft + timelineScroll.offsetLeft + "px";
-    tooltip.style.top = posTop + timelineScroll.offsetTop + "px";
-    tooltip.style.display = "block";
+    tooltip.style.cssText = `left:${tooltipX}px; top:${tooltipY}px; display: block;`;
   } else {
     tooltip.style.display = "none";
   }
@@ -444,25 +460,18 @@ function onMouseMove(evt: any) {
   const target = evt.target as HTMLElement;
 
   if (target && (target.id === "timeline" || target.id === "tooltip")) {
-    const timelineScroll = document.getElementById("timelineScroll"),
-      clRect = timelineScroll?.getClientRects()[0],
-      style = timelineScroll ? window.getComputedStyle(timelineScroll) : null,
-      borderLeft = style ? parseInt(style.borderLeftWidth, 10) : 0,
-      borderTop = style ? parseInt(style.borderTopWidth, 10) : 0;
-
+    const clRect = canvas.getBoundingClientRect();
     if (clRect) {
-      lastMouseX = evt.clientX - clRect.left - borderLeft;
-      lastMouseY = evt.clientY - clRect.top - borderTop;
+      lastMouseX = evt.clientX - clRect.left;
+      lastMouseY = evt.clientY - clRect.top;
       showTooltip(lastMouseX, lastMouseY);
     }
   }
 }
 
 function onClickCanvas(evt: any) {
-  const x = (evt.offsetX / displayWidth) * maxX,
-    depth = ~~(((displayHeight - evt.offsetY) / displayHeight) * maxY);
-
-  const target = findByPosition(timelineRoot, 0, x, depth);
+  const depth = ~~(((displayHeight - lastMouseY) / displayHeight) * maxY);
+  const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
   if (target && target.timestamp) {
     showTreeNode(target.timestamp);
   }
@@ -474,6 +483,31 @@ function onLeaveCanvas(evt: any) {
     if (tooltip) {
       tooltip.style.display = "none";
     }
+  }
+}
+
+function handleScroll(evt: WheelEvent) {
+  evt.stopPropagation();
+  const { deltaY, deltaX } = evt;
+
+  const oldZoom = scaleX;
+  let zoomDelta = (deltaY / 1000) * scaleX;
+  const updatedZoom = scaleX - zoomDelta;
+  zoomDelta = updatedZoom >= initialZoom ? zoomDelta : scaleX - initialZoom;
+  //TODO: work out a proper max zoom
+  // stop zooming at 0.0001 ms
+  zoomDelta = updatedZoom <= 0.3 ? zoomDelta : scaleX - 0.3;
+  if (zoomDelta !== 0) {
+    scaleX = scaleX - zoomDelta;
+    if (scaleX !== oldZoom) {
+      const timePosBefore = (lastMouseX + centerOffset) / oldZoom;
+      const newOffset = timePosBefore * scaleX - lastMouseX;
+      const maxWidth = scaleX * maxX - displayWidth;
+      centerOffset = Math.max(0, Math.min(maxWidth, newOffset));
+    }
+  } else {
+    const maxWidth = scaleX * maxX - displayWidth;
+    centerOffset = Math.max(0, Math.min(maxWidth, centerOffset + deltaX));
   }
 }
 
@@ -489,9 +523,11 @@ function onInitTimeline(evt: Event) {
   shrinkToFit?.addEventListener("click", onShrinkToFit);
   canvas?.addEventListener("click", onClickCanvas);
   canvas?.addEventListener("mouseout", onLeaveCanvas);
+  canvas?.addEventListener("wheel", handleScroll, { passive: true });
   timelineScroll?.addEventListener("scroll", onTimelineScroll);
 
-  document.addEventListener("mousemove", onMouseMove); // document seem to get all the events (regardless of which element we're over)
+  // document seem to get all the events (regardless of which element we're over)
+  document.addEventListener("mousemove", onMouseMove);
 
   renderTimelineKey();
 }

@@ -11,11 +11,8 @@
 	word-break: break-word;
 	max-width: 1000px;
 }
-#timelineScroll {
-	z-index: 0;
-	overflow: auto;
-}
 #timeline {
+	background-color: var(--vscode-editor-background);
 	z-index: 0;
 }
 #timelineKey {
