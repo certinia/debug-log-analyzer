@@ -100,49 +100,64 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.textBaseline = "top";
   ctx.textAlign = "left";
 
-  // 1ms = 0.001s
-  const xStep = 1000000000, // 1/10th second (0.1ms)
-    detailed = scaleX > 0.000002, // threshHold for 1/10 ths (100 ms)and text
-    labeled = scaleX > 0.0000002; // threshHold for labels
-
   const textHeight = -displayHeight + 2;
-  const scaledXPosition = xStep * scaleX;
+  // 1ms = 0.001s
+  const nanoSeconds = 1000000000; // 1/10th second (0.1ms
+  const nsWidth = nanoSeconds * scaleX;
 
-  const wholeSeconds = ~~(0.5 + maxX / 1000000000);
+  // Find the start time based on the LHS of visible area
+  const startTimeInNs = centerOffset / scaleX;
+  // Find the end time based on the start + width of visible area.
+  const endTimeInNs = startTimeInNs + displayWidth / scaleX;
+
+  const endTimeInS = Math.ceil(endTimeInNs / 1000000000);
+  const startTimeInS = Math.floor(startTimeInNs / 1000000000);
   ctx.strokeStyle = "#F88962";
   ctx.fillStyle = "#F88962";
   ctx.beginPath();
-  for (let i = 0; i <= wholeSeconds; i++) {
-    const xPos = ~~(0.5 + scaledXPosition * i - centerOffset);
+  for (let i = startTimeInS; i <= endTimeInS; i++) {
+    const xPos = ~~(0.5 + nsWidth * i - centerOffset);
     ctx.moveTo(xPos, -displayHeight);
     ctx.lineTo(xPos, 0);
 
-    if (labeled) {
-      ctx.fillText(i.toFixed(1) + "s", xPos + 2, textHeight);
-    }
+    ctx.fillText(i.toFixed(1) + "s", xPos + 2, textHeight);
   }
   ctx.stroke();
 
-  if (detailed) {
-    ctx.strokeStyle = "#E0E0E0";
-    ctx.fillStyle = "#808080";
-    ctx.beginPath();
-    // each 100 ms marker
-    const tenthsOfSeconds = maxX / 100000000; // convert nano to tenths e.g 11 which would represent 1.1
-    for (let i = 1; i <= tenthsOfSeconds; i++) {
-      const wholeNumber = i % 10 === 0;
-      if (!wholeNumber) {
-        const xPos = ~~(0.5 + 100000000 * scaleX * i - centerOffset);
-        ctx.moveTo(xPos, -displayHeight);
-        ctx.lineTo(xPos, 0);
+  // 1 microsecond = 0.001 milliseconds
+  // only show those where the gap is going to be more than 150 pixels
+  const microSecPixelGap = 150 / (1000 * scaleX);
+  // TODO: This is a bit brute force, but it works. maybe rework it?
+  // from 1 micro second to 1 second
+  const microSecsToShow = [
+    1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000,
+    100000, 200000, 500000, 1000000,
+  ];
+  const closestIncrement = microSecsToShow.reduce(function (prev, curr) {
+    return Math.abs(curr - microSecPixelGap) < Math.abs(prev - microSecPixelGap)
+      ? curr
+      : prev;
+  });
 
-        if (labeled) {
-          ctx.fillText((i / 10).toFixed(1) + "s", xPos + 2, textHeight);
-        }
-      }
+  ctx.strokeStyle = "#E0E0E0";
+  ctx.fillStyle = "#808080";
+  ctx.beginPath();
+
+  const microSecWidth = 1000 * scaleX;
+  const endTimeInMicroSecs = endTimeInNs / 1000;
+  const startTimeInMicroSecs = startTimeInNs / 1000;
+  let i = Math.floor(startTimeInMicroSecs / 1000000) * 1000000;
+  while (i < endTimeInMicroSecs) {
+    i = i + closestIncrement;
+    const wholeNumber = i % 1000000 === 0;
+    if (!wholeNumber && i >= startTimeInMicroSecs) {
+      const xPos = ~~(0.5 + microSecWidth * i - centerOffset);
+      ctx.moveTo(xPos, -displayHeight);
+      ctx.lineTo(xPos, 0);
+      ctx.fillText(i / 1000 + " ms", xPos + 2, textHeight);
     }
-    ctx.stroke();
   }
+  ctx.stroke();
 }
 
 function drawNodes(
