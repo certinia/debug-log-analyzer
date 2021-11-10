@@ -100,11 +100,12 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.textBaseline = "top";
   ctx.textAlign = "left";
 
-  const xStep = 1000000000, // 1/10th second
-    detailed = scaleX > 0.0000002, // threshHold for 1/10ths and text
-    labeled = scaleX > 0.00000002; // threshHold for labels
+  // 1ms = 0.001s
+  const xStep = 1000000000, // 1/10th second (0.1ms)
+    detailed = scaleX > 0.000002, // threshHold for 1/10 ths (100 ms)and text
+    labeled = scaleX > 0.0000002; // threshHold for labels
 
-  const textHeight = -logicalHeight + 2;
+  const textHeight = -displayHeight + 2;
   const scaledXPosition = xStep * scaleX;
 
   const wholeSeconds = ~~(0.5 + maxX / 1000000000);
@@ -112,8 +113,8 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#F88962";
   ctx.beginPath();
   for (let i = 0; i <= wholeSeconds; i++) {
-    const xPos = ~~(0.5 + scaledXPosition * i);
-    ctx.moveTo(xPos, -logicalHeight);
+    const xPos = ~~(0.5 + scaledXPosition * i - centerOffset);
+    ctx.moveTo(xPos, -displayHeight);
     ctx.lineTo(xPos, 0);
 
     if (labeled) {
@@ -126,12 +127,13 @@ function drawScale(ctx: CanvasRenderingContext2D) {
     ctx.strokeStyle = "#E0E0E0";
     ctx.fillStyle = "#808080";
     ctx.beginPath();
+    // each 100 ms marker
     const tenthsOfSeconds = maxX / 100000000; // convert nano to tenths e.g 11 which would represent 1.1
     for (let i = 1; i <= tenthsOfSeconds; i++) {
       const wholeNumber = i % 10 === 0;
       if (!wholeNumber) {
-        const xPos = ~~(0.5 + 100000000 * scaleX * i);
-        ctx.moveTo(xPos, -logicalHeight);
+        const xPos = ~~(0.5 + 100000000 * scaleX * i - centerOffset);
+        ctx.moveTo(xPos, -displayHeight);
         ctx.lineTo(xPos, 0);
 
         if (labeled) {
