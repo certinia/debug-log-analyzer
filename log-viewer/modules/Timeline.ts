@@ -41,8 +41,12 @@ const scaleY = -15,
     },
   };
 
+let tooltip: HTMLDivElement;
+let realHeight = 0;
 let centerOffset = 0;
+let verticalOffset = 0;
 let initialZoom = 0;
+let container: HTMLDivElement;
 let canvas: HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D | null;
 
@@ -183,8 +187,8 @@ function drawNodes(
 
       if (width >= 0.25) {
         ctx.fillStyle = tl.fillColor;
-        ctx.fillRect(x - centerOffset, y, width, scaleY);
-        ctx.strokeRect(x - centerOffset, y, width, scaleY);
+        ctx.fillRect(x - centerOffset, y - verticalOffset, width, scaleY);
+        ctx.strokeRect(x - centerOffset, y - verticalOffset, width, scaleY);
       }
     }
 
@@ -228,29 +232,31 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 function calculateSizes(canvas: HTMLCanvasElement) {
   maxX = getMaxWidth(timelineRoot); // maximum display value in nano-seconds
   maxY = getMaxDepth(timelineRoot); // maximum nested call depth
-
-  // todo: the default should be based on width of current log
-  const viewWidth = (
-    document.getElementById("timelineScroll") as HTMLDivElement
-  ).offsetWidth;
-  displayWidth = canvas.width = viewWidth;
-  displayHeight = canvas.height = -scaleY * maxY; // maximum scaled value to draw
-  initialZoom = viewWidth / maxX;
-
   resetView();
-  recalculateSizes();
 }
 
 function resetView() {
-  scaleX = displayWidth / maxX;
+  resize();
+  realHeight = -scaleY * maxY;
   centerOffset = 0;
+  verticalOffset = 0;
 }
 
-function recalculateSizes() {
+function resize() {
+  displayWidth = container.clientWidth;
+  displayHeight = container.clientHeight;
+  canvas.width = displayWidth;
+  canvas.height = displayHeight;
+  initialZoom = displayWidth / maxX;
+  scaleX = displayWidth / maxX;
+  resizeFont();
+}
+function resizeFont() {
   scaleFont = scaleX > 0.0000004 ? "normal 16px serif" : "normal 8px serif";
 }
 
 export default async function renderTimeline(rootMethod: RootNode) {
+  container = document.getElementById("timelineScroll") as HTMLDivElement;
   canvas = document.getElementById("timeline") as HTMLCanvasElement;
   ctx = canvas.getContext("2d", { alpha: false });
   timelineRoot = rootMethod;
@@ -262,7 +268,7 @@ export default async function renderTimeline(rootMethod: RootNode) {
 
 function drawTimeLine() {
   if (ctx) {
-    recalculateSizes();
+    resizeFont();
     ctx.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-left
     ctx.clearRect(0, -canvas.height, canvas.width, canvas.height);
     drawTruncation(ctx);
@@ -350,22 +356,27 @@ function findByPosition(
 }
 
 function showTooltip(offsetX: number, offsetY: number) {
-  const timelineScroll = document.getElementById("timelineScroll");
-  const tooltip = document.getElementById("tooltip");
+  if (!dragging) {
+    const timelineScroll = document.getElementById("timelineScroll");
+    const tooltip = document.getElementById("tooltip");
 
-  if (timelineScroll && tooltip) {
-    const depth = ~~(((displayHeight - offsetY) / displayHeight) * maxY);
-    let tooltipText =
-      findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
-
-    if (tooltipText) {
-      showTooltipWithText(
-        offsetX,
-        offsetY,
-        tooltipText,
-        tooltip,
-        timelineScroll
+    if (timelineScroll && tooltip) {
+      const depth = ~~(
+        ((displayHeight - offsetY - verticalOffset) / realHeight) *
+        maxY
       );
+      let tooltipText =
+        findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
+
+      if (tooltipText) {
+        showTooltipWithText(
+          offsetX,
+          offsetY,
+          tooltipText,
+          tooltip,
+          timelineScroll
+        );
+      }
     }
   }
 }
@@ -487,14 +498,20 @@ function onMouseMove(evt: any) {
 }
 
 function onClickCanvas(evt: any) {
-  const depth = ~~(((displayHeight - lastMouseY) / displayHeight) * maxY);
-  const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
-  if (target && target.timestamp) {
-    showTreeNode(target.timestamp);
+  if (!dragging && tooltip.style.display === "block") {
+    const depth = ~~(
+      ((displayHeight - lastMouseY - verticalOffset) / realHeight) *
+      maxY
+    );
+    const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
+    if (target && target.timestamp) {
+      showTreeNode(target.timestamp);
+    }
   }
 }
 
 function onLeaveCanvas(evt: any) {
+  dragging = false;
   if (!evt.relatedTarget || evt.relatedTarget.id !== "tooltip") {
     const tooltip = document.getElementById("tooltip");
     if (tooltip) {
@@ -503,28 +520,56 @@ function onLeaveCanvas(evt: any) {
   }
 }
 
-function handleScroll(evt: WheelEvent) {
-  evt.stopPropagation();
-  const { deltaY, deltaX } = evt;
+let dragging = false;
+function handleMouseDown(evt: MouseEvent) {
+  dragging = true;
+}
 
-  const oldZoom = scaleX;
-  let zoomDelta = (deltaY / 1000) * scaleX;
-  const updatedZoom = scaleX - zoomDelta;
-  zoomDelta = updatedZoom >= initialZoom ? zoomDelta : scaleX - initialZoom;
-  //TODO: work out a proper max zoom
-  // stop zooming at 0.0001 ms
-  zoomDelta = updatedZoom <= 0.3 ? zoomDelta : scaleX - 0.3;
-  if (zoomDelta !== 0) {
-    scaleX = scaleX - zoomDelta;
-    if (scaleX !== oldZoom) {
-      const timePosBefore = (lastMouseX + centerOffset) / oldZoom;
-      const newOffset = timePosBefore * scaleX - lastMouseX;
-      const maxWidth = scaleX * maxX - displayWidth;
-      centerOffset = Math.max(0, Math.min(maxWidth, newOffset));
-    }
-  } else {
+function handleMouseUp(evt: MouseEvent) {
+  dragging = false;
+}
+
+function handleMouseMove(evt: MouseEvent) {
+  if (dragging) {
+    tooltip.style.display = "none";
+    const { movementY, movementX } = evt;
     const maxWidth = scaleX * maxX - displayWidth;
-    centerOffset = Math.max(0, Math.min(maxWidth, centerOffset + deltaX));
+    centerOffset = Math.max(0, Math.min(maxWidth, centerOffset - movementX));
+
+    const realHeight = maxY * -scaleY;
+    const maxVertOffset = ~~(realHeight - displayHeight + displayHeight / 4);
+    verticalOffset = Math.min(
+      0,
+      Math.max(-maxVertOffset, verticalOffset - movementY)
+    );
+  }
+}
+
+function handleScroll(evt: WheelEvent) {
+  if (!dragging) {
+    tooltip.style.display = "none";
+    evt.stopPropagation();
+    const { deltaY, deltaX } = evt;
+
+    const oldZoom = scaleX;
+    let zoomDelta = (deltaY / 1000) * scaleX;
+    const updatedZoom = scaleX - zoomDelta;
+    zoomDelta = updatedZoom >= initialZoom ? zoomDelta : scaleX - initialZoom;
+    //TODO: work out a proper max zoom
+    // stop zooming at 0.0001 ms
+    zoomDelta = updatedZoom <= 0.3 ? zoomDelta : scaleX - 0.3;
+    if (zoomDelta !== 0) {
+      scaleX = scaleX - zoomDelta;
+      if (scaleX !== oldZoom) {
+        const timePosBefore = (lastMouseX + centerOffset) / oldZoom;
+        const newOffset = timePosBefore * scaleX - lastMouseX;
+        const maxWidth = scaleX * maxX - displayWidth;
+        centerOffset = Math.max(0, Math.min(maxWidth, newOffset));
+      }
+    } else {
+      const maxWidth = scaleX * maxX - displayWidth;
+      centerOffset = Math.max(0, Math.min(maxWidth, centerOffset + deltaX));
+    }
   }
 }
 
@@ -536,11 +581,15 @@ function onInitTimeline(evt: Event) {
   const canvas = document.getElementById("timeline") as HTMLCanvasElement,
     timelineScroll = document.getElementById("timelineScroll"),
     shrinkToFit = document.getElementById("shrinkToFit");
+  tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
   shrinkToFit?.addEventListener("click", onShrinkToFit);
-  canvas?.addEventListener("click", onClickCanvas);
   canvas?.addEventListener("mouseout", onLeaveCanvas);
   canvas?.addEventListener("wheel", handleScroll, { passive: true });
+  canvas?.addEventListener("mousedown", handleMouseDown);
+  canvas?.addEventListener("mouseup", handleMouseUp);
+  canvas?.addEventListener("mousemove", handleMouseMove, { passive: true });
+  canvas?.addEventListener("click", onClickCanvas);
   timelineScroll?.addEventListener("scroll", onTimelineScroll);
 
   // document seem to get all the events (regardless of which element we're over)
@@ -550,5 +599,6 @@ function onInitTimeline(evt: Event) {
 }
 
 window.addEventListener("DOMContentLoaded", onInitTimeline);
+window.addEventListener("resize", resize);
 
 export { maxX };

@@ -1,5 +1,6 @@
 #timelineView {
 	position: relative;
+	height: 75%;
 }
 #tooltip {
 	display: none;
@@ -17,6 +18,10 @@
 }
 #timelineKey {
 	margin-top: 5px;
+}
+#timelineScroll {
+	flex: 1;
+	overflow: hidden;
 }
 #timelineKey .keyEntry {
 	display: inline-block;
