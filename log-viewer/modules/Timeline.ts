@@ -304,10 +304,6 @@ function renderTimelineKey() {
   }
 }
 
-function onShrinkToFit(evt: any) {
-  resetView();
-}
-
 function findByPosition(
   node: LogLine,
   depth: number,
@@ -585,11 +581,9 @@ function onTimelineScroll() {
 
 function onInitTimeline(evt: Event) {
   const canvas = document.getElementById("timeline") as HTMLCanvasElement,
-    timelineScroll = document.getElementById("timelineScroll"),
-    shrinkToFit = document.getElementById("shrinkToFit");
+    timelineScroll = document.getElementById("timelineScroll");
   tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
-  shrinkToFit?.addEventListener("click", onShrinkToFit);
   canvas?.addEventListener("mouseout", onLeaveCanvas);
   canvas?.addEventListener("wheel", handleScroll, { passive: true });
   canvas?.addEventListener("mousedown", handleMouseDown);
