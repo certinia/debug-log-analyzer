@@ -43,7 +43,7 @@ const scaleY = -15,
 
 let tooltip: HTMLDivElement;
 let realHeight = 0;
-let centerOffset = 0;
+let horizontalOffset = 0;
 let verticalOffset = 0;
 let initialZoom = 0;
 let container: HTMLDivElement;
@@ -110,7 +110,7 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   const nsWidth = nanoSeconds * scaleX;
 
   // Find the start time based on the LHS of visible area
-  const startTimeInNs = centerOffset / scaleX;
+  const startTimeInNs = horizontalOffset / scaleX;
   // Find the end time based on the start + width of visible area.
   const endTimeInNs = startTimeInNs + displayWidth / scaleX;
 
@@ -120,7 +120,7 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#F88962";
   ctx.beginPath();
   for (let i = startTimeInS; i <= endTimeInS; i++) {
-    const xPos = ~~(0.5 + nsWidth * i - centerOffset);
+    const xPos = ~~(0.5 + nsWidth * i - horizontalOffset);
     ctx.moveTo(xPos, -displayHeight);
     ctx.lineTo(xPos, 0);
 
@@ -155,7 +155,7 @@ function drawScale(ctx: CanvasRenderingContext2D) {
     i = i + closestIncrement;
     const wholeNumber = i % 1000000 === 0;
     if (!wholeNumber && i >= startTimeInMicroSecs) {
-      const xPos = ~~(0.5 + microSecWidth * i - centerOffset);
+      const xPos = ~~(0.5 + microSecWidth * i - horizontalOffset);
       ctx.moveTo(xPos, -displayHeight);
       ctx.lineTo(xPos, 0);
       ctx.fillText(i / 1000 + " ms", xPos + 2, textHeight);
@@ -187,8 +187,8 @@ function drawNodes(
 
       if (width >= 0.25) {
         ctx.fillStyle = tl.fillColor;
-        ctx.fillRect(x - centerOffset, y - verticalOffset, width, scaleY);
-        ctx.strokeRect(x - centerOffset, y - verticalOffset, width, scaleY);
+        ctx.fillRect(x - horizontalOffset, y - verticalOffset, width, scaleY);
+        ctx.strokeRect(x - horizontalOffset, y - verticalOffset, width, scaleY);
       }
     }
 
@@ -221,7 +221,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
       ctx.fillStyle = thisEntry[2];
     }
     ctx.fillRect(
-      startTime * scaleX - centerOffset,
+      startTime * scaleX - horizontalOffset,
       -displayHeight,
       endTime - startTime * scaleX,
       displayHeight
@@ -238,7 +238,7 @@ function calculateSizes(canvas: HTMLCanvasElement) {
 function resetView() {
   resize();
   realHeight = -scaleY * maxY;
-  centerOffset = 0;
+  horizontalOffset = 0;
   verticalOffset = 0;
 }
 
@@ -320,7 +320,7 @@ function findByPosition(
 
   if (node.duration) {
     // we can only test nodes with a duration
-    const starttime = node.timestamp * scaleX - centerOffset;
+    const starttime = node.timestamp * scaleX - horizontalOffset;
     const width = node.duration * scaleX;
     const endtime = starttime + width;
 
@@ -431,8 +431,8 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
       endTime = nextEntry[1] ?? maxX;
 
     if (
-      x >= startTime * scaleX - centerOffset &&
-      x <= endTime * scaleX - centerOffset
+      x >= startTime * scaleX - horizontalOffset &&
+      x <= endTime * scaleX - horizontalOffset
     ) {
       const toolTip = document.createElement("div");
       toolTip.textContent = thisEntry[0];
@@ -534,7 +534,10 @@ function handleMouseMove(evt: MouseEvent) {
     tooltip.style.display = "none";
     const { movementY, movementX } = evt;
     const maxWidth = scaleX * maxX - displayWidth;
-    centerOffset = Math.max(0, Math.min(maxWidth, centerOffset - movementX));
+    horizontalOffset = Math.max(
+      0,
+      Math.min(maxWidth, horizontalOffset - movementX)
+    );
 
     const realHeight = maxY * -scaleY;
     const maxVertOffset = ~~(realHeight - displayHeight + displayHeight / 4);
@@ -561,14 +564,17 @@ function handleScroll(evt: WheelEvent) {
     if (zoomDelta !== 0) {
       scaleX = scaleX - zoomDelta;
       if (scaleX !== oldZoom) {
-        const timePosBefore = (lastMouseX + centerOffset) / oldZoom;
+        const timePosBefore = (lastMouseX + horizontalOffset) / oldZoom;
         const newOffset = timePosBefore * scaleX - lastMouseX;
         const maxWidth = scaleX * maxX - displayWidth;
-        centerOffset = Math.max(0, Math.min(maxWidth, newOffset));
+        horizontalOffset = Math.max(0, Math.min(maxWidth, newOffset));
       }
     } else {
       const maxWidth = scaleX * maxX - displayWidth;
-      centerOffset = Math.max(0, Math.min(maxWidth, centerOffset + deltaX));
+      horizontalOffset = Math.max(
+        0,
+        Math.min(maxWidth, horizontalOffset + deltaX)
+      );
     }
   }
 }
