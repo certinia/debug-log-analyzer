@@ -19,7 +19,7 @@
 #timelineKey {
 	margin-top: 5px;
 }
-#timelineScroll {
+#timelineWrapper {
 	flex: 1;
 	overflow: hidden;
 }

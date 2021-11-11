@@ -256,7 +256,7 @@ function resizeFont() {
 }
 
 export default async function renderTimeline(rootMethod: RootNode) {
-  container = document.getElementById("timelineScroll") as HTMLDivElement;
+  container = document.getElementById("timelineWrapper") as HTMLDivElement;
   canvas = document.getElementById("timeline") as HTMLCanvasElement;
   ctx = canvas.getContext("2d", { alpha: false });
   timelineRoot = rootMethod;
@@ -353,10 +353,10 @@ function findByPosition(
 
 function showTooltip(offsetX: number, offsetY: number) {
   if (!dragging) {
-    const timelineScroll = document.getElementById("timelineScroll");
+    const timelineWrapper = document.getElementById("timelineWrapper");
     const tooltip = document.getElementById("tooltip");
 
-    if (timelineScroll && tooltip) {
+    if (timelineWrapper && tooltip) {
       const depth = ~~(
         ((displayHeight - offsetY - verticalOffset) / realHeight) *
         maxY
@@ -370,7 +370,7 @@ function showTooltip(offsetX: number, offsetY: number) {
           offsetY,
           tooltipText,
           tooltip,
-          timelineScroll
+          timelineWrapper
         );
       }
     }
@@ -443,23 +443,23 @@ function showTooltipWithText(
   offsetY: number,
   tooltipText: HTMLDivElement,
   tooltip: HTMLElement,
-  timelineScroll: HTMLElement
+  timelineWrapper: HTMLElement
 ) {
-  if (tooltipText && tooltip && timelineScroll) {
+  if (tooltipText && tooltip && timelineWrapper) {
     let posLeft = offsetX + 10,
       posTop = offsetY + 2;
 
-    if (posLeft + tooltip.offsetWidth > timelineScroll.offsetWidth) {
-      posLeft = timelineScroll.offsetWidth - tooltip.offsetWidth;
+    if (posLeft + tooltip.offsetWidth > timelineWrapper.offsetWidth) {
+      posLeft = timelineWrapper.offsetWidth - tooltip.offsetWidth;
     }
-    if (posTop + tooltip.offsetHeight > timelineScroll.offsetHeight) {
+    if (posTop + tooltip.offsetHeight > timelineWrapper.offsetHeight) {
       posTop -= tooltip.offsetHeight + 4;
       if (posTop < -100) {
         posTop = -100;
       }
     }
-    const tooltipX = posLeft + timelineScroll.offsetLeft;
-    const tooltipY = posTop + timelineScroll.offsetTop;
+    const tooltipX = posLeft + timelineWrapper.offsetLeft;
+    const tooltipY = posTop + timelineWrapper.offsetTop;
     tooltip.innerHTML = "";
     tooltip.appendChild(tooltipText);
     tooltip.style.cssText = `left:${tooltipX}px; top:${tooltipY}px; display: block;`;
@@ -474,7 +474,7 @@ function showTooltipWithText(
  * +-TimelineView---------+		The timelineView is the positioning parent
  * | +-Tooltip-+          |		The tooltip is absolutely positioned
  * | +---------+          |
- * | +-TimelineScroll--+  |		The timelineScroller is staticly positioned
+ * | +-timelineWrapper--+  |		The timelineWrapperer is staticly positioned
  * | | +-Timeline-+    |  |		The timeline is statisly positioned
  * | | +----------+    |  |
  * | +-----------------+  |
@@ -575,13 +575,13 @@ function handleScroll(evt: WheelEvent) {
   }
 }
 
-function onTimelineScroll() {
+function onTimelineWrapper() {
   showTooltip(lastMouseX, lastMouseY);
 }
 
 function onInitTimeline(evt: Event) {
   const canvas = document.getElementById("timeline") as HTMLCanvasElement,
-    timelineScroll = document.getElementById("timelineScroll");
+    timelineWrapper = document.getElementById("timelineWrapper");
   tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
   canvas?.addEventListener("mouseout", onLeaveCanvas);
@@ -590,7 +590,7 @@ function onInitTimeline(evt: Event) {
   canvas?.addEventListener("mouseup", handleMouseUp);
   canvas?.addEventListener("mousemove", handleMouseMove, { passive: true });
   canvas?.addEventListener("click", onClickCanvas);
-  timelineScroll?.addEventListener("scroll", onTimelineScroll);
+  timelineWrapper?.addEventListener("scroll", onTimelineWrapper);
 
   // document seem to get all the events (regardless of which element we're over)
   document.addEventListener("mousemove", onMouseMove);
