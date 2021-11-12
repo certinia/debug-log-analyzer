@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zoom on timeline ([#33][#33])
   - zoom to an accuracy of 0.001ms, time markers are shown with a ms time value and white line e.g 9600.001 ms
   - scroll up and down on the mouse to zoom in and out
-  - zoom is based on position of mouse pointer, ensuring that postion is kept on screen when zoomed in or out
+  - zoom is based on position of mouse pointer, ensuring that position is kept on screen when zoomed in or out
   - scroll left and right on the mouse to move the time line left are right, when zoomed
   - click the mouse down and drag to move the timeline around both in the x and y direction, when zoomed
 
