@@ -120,11 +120,11 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#F88962";
   ctx.beginPath();
   for (let i = startTimeInS; i <= endTimeInS; i++) {
-    const xPos = ~~(0.5 + nsWidth * i - horizontalOffset);
+    const xPos = nsWidth * i - horizontalOffset;
     ctx.moveTo(xPos, -displayHeight);
     ctx.lineTo(xPos, 0);
 
-    ctx.fillText(i.toFixed(1) + "s", xPos + 2, textHeight);
+    ctx.fillText(`${i.toFixed(1)}s`, xPos + 2, textHeight);
   }
   ctx.stroke();
 
@@ -155,13 +155,24 @@ function drawScale(ctx: CanvasRenderingContext2D) {
     i = i + closestIncrement;
     const wholeNumber = i % 1000000 === 0;
     if (!wholeNumber && i >= startTimeInMicroSecs) {
-      const xPos = ~~(0.5 + microSecWidth * i - horizontalOffset);
+      const xPos = microSecWidth * i - horizontalOffset;
       ctx.moveTo(xPos, -displayHeight);
       ctx.lineTo(xPos, 0);
-      ctx.fillText(i / 1000 + " ms", xPos + 2, textHeight);
+      ctx.fillText(`${i / 1000} ms`, xPos + 2, textHeight);
     }
   }
   ctx.stroke();
+}
+
+function drawFlameNodes(
+  ctx: CanvasRenderingContext2D,
+  nodes: LogLine[],
+  depth: number
+) {
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1;
+  drawNodes(ctx, nodes, depth);
+  renderRectangles(ctx);
 }
 
 function drawNodes(
@@ -169,26 +180,19 @@ function drawNodes(
   nodes: LogLine[],
   depth: number
 ) {
-  ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = 1;
-
   const children = [];
   const len = nodes.length;
+  const y = depth * scaleY - verticalOffset;
   for (let c = 0; c < len; c++) {
     const node = nodes[c];
     const tlKey = node.timelineKey;
     if (tlKey && node.duration) {
-      const tl = keyMap[tlKey],
-        x = node.timestamp * scaleX,
-        y = depth * scaleY;
-
       // nanoseconds
       const width = node.duration * scaleX;
-
-      if (width >= 0.25) {
-        ctx.fillStyle = tl.fillColor;
-        ctx.fillRect(x - horizontalOffset, y - verticalOffset, width, scaleY);
-        ctx.strokeRect(x - horizontalOffset, y - verticalOffset, width, scaleY);
+      if (width >= 0.05) {
+        const tl = keyMap[tlKey],
+          x = node.timestamp * scaleX - horizontalOffset;
+        addToRectQueue(tl.fillColor, x, y, width);
       }
     }
 
@@ -202,6 +206,41 @@ function drawNodes(
   }
 
   drawNodes(ctx, children, depth + 1);
+}
+
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+}
+
+let rectRenderQueue = new Map<string, Rect[]>();
+
+function addToRectQueue(color: string, x: number, y: number, w: number) {
+  if (!rectRenderQueue.has(color)) {
+    rectRenderQueue.set(color, []);
+  }
+
+  const rect: Rect = {
+    x: x,
+    y: y,
+    w: w,
+  };
+  rectRenderQueue.get(color)?.push(rect);
+}
+
+function renderRectangles(ctx: CanvasRenderingContext2D) {
+  for (let [color, items] of rectRenderQueue) {
+    ctx.beginPath();
+    ctx.fillStyle = color;
+    items.forEach((item) => {
+      ctx.rect(item.x, item.y, item.w, scaleY);
+    });
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  rectRenderQueue = new Map<string, Rect[]>();
 }
 
 function drawTruncation(ctx: CanvasRenderingContext2D) {
@@ -220,10 +259,11 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
     if (thisEntry[2]) {
       ctx.fillStyle = thisEntry[2];
     }
+    const startX = startTime * scaleX;
     ctx.fillRect(
       startTime * scaleX - horizontalOffset,
       -displayHeight,
-      endTime - startTime * scaleX,
+      endTime - startX,
       displayHeight
     );
   }
@@ -273,7 +313,7 @@ function drawTimeLine() {
     ctx.clearRect(0, -canvas.height, canvas.width, canvas.height);
     drawTruncation(ctx);
     drawScale(ctx);
-    drawNodes(ctx, [timelineRoot], -1);
+    drawFlameNodes(ctx, [timelineRoot], -1);
     requestAnimationFrame(drawTimeLine);
   }
 }
@@ -320,7 +360,7 @@ function findByPosition(
     const width = node.duration * scaleX;
     const endtime = starttime + width;
 
-    if (width < 0.25 || starttime > x || endtime < x) {
+    if (width < 0.05 || starttime > x || endtime < x) {
       return null; // x-axis miss (can't include us or children)
     }
 
