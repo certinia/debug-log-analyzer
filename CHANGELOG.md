@@ -9,10 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Timeline shows a tooltip for log events ([#52][#52])
-  - Shown when hovering the red (errors), blue (unexpected-end) and green (skipped-lines) sections on the timeline.
 - Database tab shows the methods each SOQL or DML statement was made from ([#11][#11])
   - The method name can be clicked to navigate to it in the call tree
+- Timeline shows a tooltip for log events ([#52][#52])
+  - Shown when hovering the red (errors), blue (unexpected-end) and green (skipped-lines) sections on the timeline.
+- Zoom on timeline ([#33][#33])
+  - zoom to an accuracy of 0.001ms, time markers are shown with a ms time value and white line e.g 9600.001 ms
+  - scroll up and down on the mouse to zoom in and out
+  - zoom is based on position of mouse pointer, ensuring that postion is kept on screen when zoomed in or out
+  - scroll left and right on the mouse to move the time line left are right, when zoomed
+  - click the mouse down and drag to move the timeline around both in the x and y direction, when zoomed
 
 ### Changed
 
@@ -30,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Hide details, hide system calls and hide formulas on the call tree to work again [#45][#45]
+
+### Removed
+
+- Timeline Shrink-to-fit checkbox was replaced with zoom feature ([#33][#33])
 
 ## [1.3.5] - December 2020
 
@@ -64,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#11]: https://github.com/financialforcedev/debug-log-analyzer/issues/11
 [#18]: https://github.com/financialforcedev/debug-log-analyzer/issues/18
 [#22]: https://github.com/financialforcedev/debug-log-analyzer/issues/22
+[#33]: https://github.com/financialforcedev/debug-log-analyzer/issues/33
 [#34]: https://github.com/financialforcedev/debug-log-analyzer/issues/34
 [#42]: https://github.com/financialforcedev/debug-log-analyzer/issues/42
 [#45]: https://github.com/financialforcedev/debug-log-analyzer/issues/45
