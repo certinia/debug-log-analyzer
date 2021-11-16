@@ -167,7 +167,7 @@ function describeMethod(node: LogLine) {
     const nodeValue = node.value ? ` = ${node.value}` : "";
     const timeTaken = node.truncated
       ? "TRUNCATED"
-      : `${formatDuration(node.duration || 0)} (${formatDuration(
+      : `${formatDuration(node.duration || 0)} (self ${formatDuration(
           node.netDuration || 0
         )})`;
     const lineNumber = node.lineNumber ? `, line: ${node.lineNumber}` : "";
