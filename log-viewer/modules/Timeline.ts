@@ -418,10 +418,13 @@ function showTooltipWithText(
         posTop = -100;
       }
     }
+    posLeft = posLeft + timelineScroll.offsetLeft;
+    posTop = posTop + timelineScroll.offsetTop;
+
     tooltip.innerHTML = "";
     tooltip.appendChild(tooltipText);
-    tooltip.style.left = posLeft + timelineScroll.offsetLeft + "px";
-    tooltip.style.top = posTop + timelineScroll.offsetTop + "px";
+    tooltip.style.left = posLeft + "px";
+    tooltip.style.top = posTop + "px";
     tooltip.style.display = "block";
   } else {
     tooltip.style.display = "none";

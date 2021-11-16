@@ -8,7 +8,6 @@
 	padding: 5px;
 	background-color: var(--vscode-editor-background);
 	color: var(--vscode-editor-foreground);
-	word-break: break-word;
 	max-width: 1000px;
 }
 #timelineScroll {
