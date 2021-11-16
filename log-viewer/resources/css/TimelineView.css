@@ -1,5 +1,6 @@
 #timelineView {
 	position: relative;
+	height: 75%;
 }
 #tooltip {
 	display: none;
@@ -10,15 +11,16 @@
 	color: var(--vscode-editor-foreground);
 	max-width: 1000px;
 }
-#timelineScroll {
-	z-index: 0;
-	overflow: auto;
-}
 #timeline {
+	background-color: var(--vscode-editor-background);
 	z-index: 0;
 }
 #timelineKey {
 	margin-top: 5px;
+}
+#timelineWrapper {
+	flex: 1;
+	overflow: hidden;
 }
 #timelineKey .keyEntry {
 	display: inline-block;

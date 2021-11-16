@@ -7,9 +7,7 @@ import { truncated } from "./parsers/LineParser.js";
 import { RootNode } from "./parsers/TreeParser";
 import { LogLine } from "./parsers/LineParser";
 
-const defaultScaleX = 0.000001,
-  maxCanvasWidth = 32000,
-  scaleY = -15,
+const scaleY = -15,
   strokeColor = "#B0B0B0",
   textColor = "#FFFFFF",
   keyMap: Record<string, Record<string, string>> = {
@@ -43,14 +41,21 @@ const defaultScaleX = 0.000001,
     },
   };
 
+let tooltip: HTMLDivElement;
+let realHeight = 0;
+let horizontalOffset = 0;
+let verticalOffset = 0;
+let initialZoom = 0;
+let container: HTMLDivElement;
+let canvas: HTMLCanvasElement;
+let ctx: CanvasRenderingContext2D | null;
+
 let scaleX: number,
   scaleFont: string,
   maxX: number,
   maxY: number,
-  logicalWidth: number,
-  logicalHeight: number,
-  displayWidth: number,
   displayHeight: number,
+  displayWidth: number,
   timelineRoot: RootNode,
   lastMouseX: number,
   lastMouseY: number;
@@ -64,7 +69,8 @@ function getMaxWidth(node: LogLine) {
   }
 
   let maxX = node.timestamp || 0;
-  for (let c = node.children.length - 1; c >= 0; --c) {
+  const len = node.children.length - 1;
+  for (let c = len; c >= 0; --c) {
     const max = getMaxWidth(node.children[c]);
     if (max && max > maxX) {
       maxX = max;
@@ -82,7 +88,8 @@ function getMaxDepth(node: LogLine, depth = 0) {
   const childDepth = node.duration ? depth + 1 : depth;
 
   let maxDepth = depth;
-  for (let c = node.children.length - 1; c >= 0; --c) {
+  const len = node.children.length - 1;
+  for (let c = len; c >= 0; --c) {
     const d = getMaxDepth(node.children[c], childDepth);
     if (d > maxDepth) {
       maxDepth = d;
@@ -97,72 +104,96 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.textBaseline = "top";
   ctx.textAlign = "left";
 
-  const xStep = 1000000000, // 1/10th second
-    detailed = scaleX > 0.0000002, // threshHold for 1/10ths and text
-    labeled = scaleX > 0.00000002; // threshHold for labels
+  const textHeight = -displayHeight + 2;
+  // 1ms = 0.001s
+  const nanoSeconds = 1000000000; // 1/10th second (0.1ms
+  const nsWidth = nanoSeconds * scaleX;
 
-  const textHeight = -logicalHeight + 2;
-  const scaledXPosition = xStep * scaleX;
+  // Find the start time based on the LHS of visible area
+  const startTimeInNs = horizontalOffset / scaleX;
+  // Find the end time based on the start + width of visible area.
+  const endTimeInNs = startTimeInNs + displayWidth / scaleX;
 
-  const wholeSeconds = ~~(0.5 + maxX / 1000000000);
+  const endTimeInS = Math.ceil(endTimeInNs / 1000000000);
+  const startTimeInS = Math.floor(startTimeInNs / 1000000000);
   ctx.strokeStyle = "#F88962";
   ctx.fillStyle = "#F88962";
   ctx.beginPath();
-  for (let i = 0; i <= wholeSeconds; i++) {
-    const xPos = ~~(0.5 + scaledXPosition * i);
-    ctx.moveTo(xPos, -logicalHeight);
+  for (let i = startTimeInS; i <= endTimeInS; i++) {
+    const xPos = nsWidth * i - horizontalOffset;
+    ctx.moveTo(xPos, -displayHeight);
     ctx.lineTo(xPos, 0);
 
-    if (labeled) {
-      ctx.fillText(i.toFixed(1) + "s", xPos + 2, textHeight);
-    }
+    ctx.fillText(`${i.toFixed(1)}s`, xPos + 2, textHeight);
   }
   ctx.stroke();
 
-  if (detailed) {
-    ctx.strokeStyle = "#E0E0E0";
-    ctx.fillStyle = "#808080";
-    ctx.beginPath();
-    const tenthsOfSeconds = maxX / 100000000; // convert nano to tenths e.g 11 which would represent 1.1
-    for (let i = 1; i <= tenthsOfSeconds; i++) {
-      const wholeNumber = i % 10 === 0;
-      if (!wholeNumber) {
-        const xPos = ~~(0.5 + 100000000 * scaleX * i);
-        ctx.moveTo(xPos, -logicalHeight);
-        ctx.lineTo(xPos, 0);
+  // 1 microsecond = 0.001 milliseconds
+  // only show those where the gap is going to be more than 150 pixels
+  const microSecPixelGap = 150 / (1000 * scaleX);
+  // TODO: This is a bit brute force, but it works. maybe rework it?
+  // from 1 micro second to 1 second
+  const microSecsToShow = [
+    1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000,
+    100000, 200000, 500000, 1000000,
+  ];
+  const closestIncrement = microSecsToShow.reduce(function (prev, curr) {
+    return Math.abs(curr - microSecPixelGap) < Math.abs(prev - microSecPixelGap)
+      ? curr
+      : prev;
+  });
 
-        if (labeled) {
-          ctx.fillText((i / 10).toFixed(1) + "s", xPos + 2, textHeight);
-        }
-      }
+  ctx.strokeStyle = "#E0E0E0";
+  ctx.fillStyle = "#808080";
+  ctx.beginPath();
+
+  const microSecWidth = 1000 * scaleX;
+  const endTimeInMicroSecs = endTimeInNs / 1000;
+  const startTimeInMicroSecs = startTimeInNs / 1000;
+  let i = Math.floor(startTimeInMicroSecs / 1000000) * 1000000;
+  while (i < endTimeInMicroSecs) {
+    i = i + closestIncrement;
+    const wholeNumber = i % 1000000 === 0;
+    if (!wholeNumber && i >= startTimeInMicroSecs) {
+      const xPos = microSecWidth * i - horizontalOffset;
+      ctx.moveTo(xPos, -displayHeight);
+      ctx.lineTo(xPos, 0);
+      ctx.fillText(`${i / 1000} ms`, xPos + 2, textHeight);
     }
-    ctx.stroke();
   }
+  ctx.stroke();
 }
 
-// todo: draw by color not depth
-function drawNodes(
+function drawFlameNodes(
   ctx: CanvasRenderingContext2D,
   nodes: LogLine[],
   depth: number
 ) {
   ctx.strokeStyle = strokeColor;
   ctx.lineWidth = 1;
+  drawNodes(ctx, nodes, depth);
+  renderRectangles(ctx);
+}
 
+function drawNodes(
+  ctx: CanvasRenderingContext2D,
+  nodes: LogLine[],
+  depth: number
+) {
   const children = [];
   const len = nodes.length;
+  const y = depth * scaleY - verticalOffset;
   for (let c = 0; c < len; c++) {
     const node = nodes[c];
     const tlKey = node.timelineKey;
     if (tlKey && node.duration) {
-      const tl = keyMap[tlKey],
-        x = ~~(0.5 + node.timestamp * scaleX),
-        y = ~~(0.5 + depth * scaleY),
-        w = ~~(0.5 + node.duration * scaleX);
-
-      ctx.fillStyle = tl.fillColor;
-      ctx.fillRect(x, y, w, scaleY);
-      ctx.strokeRect(x, y, w, scaleY);
+      // nanoseconds
+      const width = node.duration * scaleX;
+      if (width >= 0.05) {
+        const tl = keyMap[tlKey],
+          x = node.timestamp * scaleX - horizontalOffset;
+        addToRectQueue(tl.fillColor, x, y, width);
+      }
     }
 
     if (node.children) {
@@ -177,24 +208,63 @@ function drawNodes(
   drawNodes(ctx, children, depth + 1);
 }
 
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+}
+
+let rectRenderQueue = new Map<string, Rect[]>();
+
+function addToRectQueue(color: string, x: number, y: number, w: number) {
+  if (!rectRenderQueue.has(color)) {
+    rectRenderQueue.set(color, []);
+  }
+
+  const rect: Rect = {
+    x: x,
+    y: y,
+    w: w,
+  };
+  rectRenderQueue.get(color)?.push(rect);
+}
+
+function renderRectangles(ctx: CanvasRenderingContext2D) {
+  for (let [color, items] of rectRenderQueue) {
+    ctx.beginPath();
+    ctx.fillStyle = color;
+    items.forEach((item) => {
+      ctx.rect(item.x, item.y, item.w, scaleY);
+    });
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  rectRenderQueue = new Map<string, Rect[]>();
+}
+
 function drawTruncation(ctx: CanvasRenderingContext2D) {
   const len = truncated.length;
+  if (!len) {
+    return;
+  }
   let i = 0;
 
   while (i < len) {
     const thisEntry = truncated[i++],
-      nextEntry = i < len ? truncated[i] : null,
+      nextEntry = truncated[i] ?? [],
       startTime = thisEntry[1],
-      endTime = nextEntry ? nextEntry[1] : maxX;
+      endTime = nextEntry[1] ?? maxX;
 
     if (thisEntry[2]) {
       ctx.fillStyle = thisEntry[2];
     }
+    const startX = startTime * scaleX;
     ctx.fillRect(
-      startTime * scaleX,
-      -logicalHeight,
-      (endTime - startTime) * scaleX,
-      logicalHeight
+      startTime * scaleX - horizontalOffset,
+      -displayHeight,
+      endTime - startX,
+      displayHeight
     );
   }
 }
@@ -202,46 +272,49 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 function calculateSizes(canvas: HTMLCanvasElement) {
   maxX = getMaxWidth(timelineRoot); // maximum display value in nano-seconds
   maxY = getMaxDepth(timelineRoot); // maximum nested call depth
+  resetView();
+}
 
-  const shrinkToFit = (
-    document.getElementById("shrinkToFit") as HTMLInputElement
-  ).checked;
-  if (shrinkToFit) {
-    const viewWidth = (
-      document.getElementById("timelineScroll") as HTMLDivElement
-    ).offsetWidth;
-    scaleX = viewWidth / maxX; // ok to use the default scale
-  } else if (defaultScaleX * maxX < maxCanvasWidth) {
-    // does the default scale fit our canvas?
-    scaleX = defaultScaleX; // ok to use the default scale
-  } else {
-    scaleX = maxCanvasWidth / maxX; // adjust the scale to avoid overflow
-  }
+function resetView() {
+  resize();
+  realHeight = -scaleY * maxY;
+  horizontalOffset = 0;
+  verticalOffset = 0;
+}
 
+function resize() {
+  displayWidth = container.clientWidth;
+  displayHeight = container.clientHeight;
+  canvas.width = displayWidth;
+  canvas.height = displayHeight;
+  initialZoom = displayWidth / maxX;
+  scaleX = displayWidth / maxX;
+  resizeFont();
+}
+function resizeFont() {
   scaleFont = scaleX > 0.0000004 ? "normal 16px serif" : "normal 8px serif";
-  logicalWidth = canvas.width = scaleX * maxX; // maximum scaled value to draw
-  displayWidth = logicalWidth; // canvas display width (1-to-1 with logical width)
-  canvas.style.width = displayWidth + "px";
-  logicalHeight = canvas.height = -scaleY * maxY; // maximum scaled value to draw
-  displayHeight = logicalHeight; // canvas display height (1-to-1 with logical height)
-  canvas.style.height = displayHeight + "px";
 }
 
 export default async function renderTimeline(rootMethod: RootNode) {
-  const canvas = document.getElementById("timeline") as HTMLCanvasElement,
-    ctx = canvas?.getContext("2d");
-
+  container = document.getElementById("timelineWrapper") as HTMLDivElement;
+  canvas = document.getElementById("timeline") as HTMLCanvasElement;
+  ctx = canvas.getContext("2d", { alpha: false });
   timelineRoot = rootMethod;
   calculateSizes(canvas);
-
   if (ctx) {
-    ctx.setTransform(1, 0, 0, 1, 0, logicalHeight); // shift y-axis down so that 0,0 is bottom-left
+    requestAnimationFrame(drawTimeLine);
+  }
+}
 
-    if (truncated.length > 0) {
-      drawTruncation(ctx);
-    }
+function drawTimeLine() {
+  if (ctx) {
+    resizeFont();
+    ctx.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-left
+    ctx.clearRect(0, -canvas.height, canvas.width, canvas.height);
+    drawTruncation(ctx);
     drawScale(ctx);
-    drawNodes(ctx, [timelineRoot], -1);
+    drawFlameNodes(ctx, [timelineRoot], -1);
+    requestAnimationFrame(drawTimeLine);
   }
 }
 
@@ -271,10 +344,6 @@ function renderTimelineKey() {
   }
 }
 
-function onShrinkToFit(evt: any) {
-  renderTimeline(timelineRoot);
-}
-
 function findByPosition(
   node: LogLine,
   depth: number,
@@ -287,7 +356,11 @@ function findByPosition(
 
   if (node.duration) {
     // we can only test nodes with a duration
-    if (node.exitStamp && (node.timestamp > x || node.exitStamp < x)) {
+    const starttime = node.timestamp * scaleX - horizontalOffset;
+    const width = node.duration * scaleX;
+    const endtime = starttime + width;
+
+    if (width < 0.05 || starttime > x || endtime < x) {
       return null; // x-axis miss (can't include us or children)
     }
 
@@ -319,23 +392,27 @@ function findByPosition(
 }
 
 function showTooltip(offsetX: number, offsetY: number) {
-  const timelineScroll = document.getElementById("timelineScroll");
-  const tooltip = document.getElementById("tooltip");
+  if (!dragging) {
+    const timelineWrapper = document.getElementById("timelineWrapper");
+    const tooltip = document.getElementById("tooltip");
 
-  if (timelineScroll && tooltip) {
-    const x =
-      ((offsetX + (timelineScroll.scrollLeft || 0)) / displayWidth) * maxX;
-    const depth = ~~(((displayHeight - offsetY) / displayHeight) * maxY);
-    let tooltipText = findTimelineTooltip(x, depth) || findTruncatedTooltip(x);
-
-    if (tooltipText) {
-      showTooltipWithText(
-        offsetX,
-        offsetY,
-        tooltipText,
-        tooltip,
-        timelineScroll
+    if (timelineWrapper && tooltip) {
+      const depth = ~~(
+        ((displayHeight - offsetY - verticalOffset) / realHeight) *
+        maxY
       );
+      let tooltipText =
+        findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
+
+      if (tooltipText) {
+        showTooltipWithText(
+          offsetX,
+          offsetY,
+          tooltipText,
+          tooltip,
+          timelineWrapper
+        );
+      }
     }
   }
 }
@@ -359,7 +436,7 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
         toolTip.appendChild(brElem.cloneNode());
         toolTip.appendChild(
           document.createTextNode(
-            "duration: " + formatDuration(target.duration)
+            `duration: ${formatDuration(target.duration)}`
           )
         );
         if (target.cpuType === "free") {
@@ -367,7 +444,7 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
         } else {
           toolTip.appendChild(
             document.createTextNode(
-              " (netDuration: " + formatDuration(target.netDuration) + ")"
+              ` (self ${formatDuration(target.netDuration)})`
             )
           );
         }
@@ -385,11 +462,14 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
 
   while (i < len) {
     const thisEntry = truncated[i++],
-      nextEntry = i < len ? truncated[i] : null,
+      nextEntry = truncated[i] ?? [],
       startTime = thisEntry[1],
-      endTime = nextEntry ? nextEntry[1] : maxX;
+      endTime = nextEntry[1] ?? maxX;
 
-    if (x >= startTime && x <= endTime) {
+    if (
+      x >= startTime * scaleX - horizontalOffset &&
+      x <= endTime * scaleX - horizontalOffset
+    ) {
       const toolTip = document.createElement("div");
       toolTip.textContent = thisEntry[0];
       return toolTip;
@@ -403,29 +483,26 @@ function showTooltipWithText(
   offsetY: number,
   tooltipText: HTMLDivElement,
   tooltip: HTMLElement,
-  timelineScroll: HTMLElement
+  timelineWrapper: HTMLElement
 ) {
-  if (tooltipText && tooltip && timelineScroll) {
+  if (tooltipText && tooltip && timelineWrapper) {
     let posLeft = offsetX + 10,
       posTop = offsetY + 2;
 
-    if (posLeft + tooltip.offsetWidth > timelineScroll.offsetWidth) {
-      posLeft = timelineScroll.offsetWidth - tooltip.offsetWidth;
+    if (posLeft + tooltip.offsetWidth > timelineWrapper.offsetWidth) {
+      posLeft = timelineWrapper.offsetWidth - tooltip.offsetWidth;
     }
-    if (posTop + tooltip.offsetHeight > timelineScroll.offsetHeight) {
+    if (posTop + tooltip.offsetHeight > timelineWrapper.offsetHeight) {
       posTop -= tooltip.offsetHeight + 4;
       if (posTop < -100) {
         posTop = -100;
       }
     }
-    posLeft = posLeft + timelineScroll.offsetLeft;
-    posTop = posTop + timelineScroll.offsetTop;
-
+    const tooltipX = posLeft + timelineWrapper.offsetLeft;
+    const tooltipY = posTop + timelineWrapper.offsetTop;
     tooltip.innerHTML = "";
     tooltip.appendChild(tooltipText);
-    tooltip.style.left = posLeft + "px";
-    tooltip.style.top = posTop + "px";
-    tooltip.style.display = "block";
+    tooltip.style.cssText = `left:${tooltipX}px; top:${tooltipY}px; display: block;`;
   } else {
     tooltip.style.display = "none";
   }
@@ -437,7 +514,7 @@ function showTooltipWithText(
  * +-TimelineView---------+		The timelineView is the positioning parent
  * | +-Tooltip-+          |		The tooltip is absolutely positioned
  * | +---------+          |
- * | +-TimelineScroll--+  |		The timelineScroller is staticly positioned
+ * | +-timelineWrapper--+  |		The timelineWrapperer is staticly positioned
  * | | +-Timeline-+    |  |		The timeline is statisly positioned
  * | | +----------+    |  |
  * | +-----------------+  |
@@ -447,31 +524,30 @@ function onMouseMove(evt: any) {
   const target = evt.target as HTMLElement;
 
   if (target && (target.id === "timeline" || target.id === "tooltip")) {
-    const timelineScroll = document.getElementById("timelineScroll"),
-      clRect = timelineScroll?.getClientRects()[0],
-      style = timelineScroll ? window.getComputedStyle(timelineScroll) : null,
-      borderLeft = style ? parseInt(style.borderLeftWidth, 10) : 0,
-      borderTop = style ? parseInt(style.borderTopWidth, 10) : 0;
-
+    const clRect = canvas.getBoundingClientRect();
     if (clRect) {
-      lastMouseX = evt.clientX - clRect.left - borderLeft;
-      lastMouseY = evt.clientY - clRect.top - borderTop;
+      lastMouseX = evt.clientX - clRect.left;
+      lastMouseY = evt.clientY - clRect.top;
       showTooltip(lastMouseX, lastMouseY);
     }
   }
 }
 
 function onClickCanvas(evt: any) {
-  const x = (evt.offsetX / displayWidth) * maxX,
-    depth = ~~(((displayHeight - evt.offsetY) / displayHeight) * maxY);
-
-  const target = findByPosition(timelineRoot, 0, x, depth);
-  if (target && target.timestamp) {
-    showTreeNode(target.timestamp);
+  if (!dragging && tooltip.style.display === "block") {
+    const depth = ~~(
+      ((displayHeight - lastMouseY - verticalOffset) / realHeight) *
+      maxY
+    );
+    const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
+    if (target && target.timestamp) {
+      showTreeNode(target.timestamp);
+    }
   }
 }
 
 function onLeaveCanvas(evt: any) {
+  dragging = false;
   if (!evt.relatedTarget || evt.relatedTarget.id !== "tooltip") {
     const tooltip = document.getElementById("tooltip");
     if (tooltip) {
@@ -480,25 +556,89 @@ function onLeaveCanvas(evt: any) {
   }
 }
 
-function onTimelineScroll() {
+let dragging = false;
+function handleMouseDown(evt: MouseEvent) {
+  dragging = true;
+}
+
+function handleMouseUp(evt: MouseEvent) {
+  dragging = false;
+}
+
+function handleMouseMove(evt: MouseEvent) {
+  if (dragging) {
+    tooltip.style.display = "none";
+    const { movementY, movementX } = evt;
+    const maxWidth = scaleX * maxX - displayWidth;
+    horizontalOffset = Math.max(
+      0,
+      Math.min(maxWidth, horizontalOffset - movementX)
+    );
+
+    const realHeight = maxY * -scaleY;
+    const maxVertOffset = ~~(realHeight - displayHeight + displayHeight / 4);
+    verticalOffset = Math.min(
+      0,
+      Math.max(-maxVertOffset, verticalOffset - movementY)
+    );
+  }
+}
+
+function handleScroll(evt: WheelEvent) {
+  if (!dragging) {
+    tooltip.style.display = "none";
+    evt.stopPropagation();
+    const { deltaY, deltaX } = evt;
+
+    const oldZoom = scaleX;
+    let zoomDelta = (deltaY / 1000) * scaleX;
+    const updatedZoom = scaleX - zoomDelta;
+    zoomDelta = updatedZoom >= initialZoom ? zoomDelta : scaleX - initialZoom;
+    //TODO: work out a proper max zoom
+    // stop zooming at 0.0001 ms
+    zoomDelta = updatedZoom <= 0.3 ? zoomDelta : scaleX - 0.3;
+    if (zoomDelta !== 0) {
+      scaleX = scaleX - zoomDelta;
+      if (scaleX !== oldZoom) {
+        const timePosBefore = (lastMouseX + horizontalOffset) / oldZoom;
+        const newOffset = timePosBefore * scaleX - lastMouseX;
+        const maxWidth = scaleX * maxX - displayWidth;
+        horizontalOffset = Math.max(0, Math.min(maxWidth, newOffset));
+      }
+    } else {
+      const maxWidth = scaleX * maxX - displayWidth;
+      horizontalOffset = Math.max(
+        0,
+        Math.min(maxWidth, horizontalOffset + deltaX)
+      );
+    }
+  }
+}
+
+function onTimelineWrapper() {
   showTooltip(lastMouseX, lastMouseY);
 }
 
 function onInitTimeline(evt: Event) {
   const canvas = document.getElementById("timeline") as HTMLCanvasElement,
-    timelineScroll = document.getElementById("timelineScroll"),
-    shrinkToFit = document.getElementById("shrinkToFit");
+    timelineWrapper = document.getElementById("timelineWrapper");
+  tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
-  shrinkToFit?.addEventListener("click", onShrinkToFit);
-  canvas?.addEventListener("click", onClickCanvas);
   canvas?.addEventListener("mouseout", onLeaveCanvas);
-  timelineScroll?.addEventListener("scroll", onTimelineScroll);
+  canvas?.addEventListener("wheel", handleScroll, { passive: true });
+  canvas?.addEventListener("mousedown", handleMouseDown);
+  canvas?.addEventListener("mouseup", handleMouseUp);
+  canvas?.addEventListener("mousemove", handleMouseMove, { passive: true });
+  canvas?.addEventListener("click", onClickCanvas);
+  timelineWrapper?.addEventListener("scroll", onTimelineWrapper);
 
-  document.addEventListener("mousemove", onMouseMove); // document seem to get all the events (regardless of which element we're over)
+  // document seem to get all the events (regardless of which element we're over)
+  document.addEventListener("mousemove", onMouseMove);
 
   renderTimelineKey();
 }
 
 window.addEventListener("DOMContentLoaded", onInitTimeline);
+window.addEventListener("resize", resize);
 
 export { maxX };
