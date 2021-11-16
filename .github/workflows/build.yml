@@ -2,28 +2,27 @@ name: Build
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Node
-      uses: actions/setup-node@v2-beta
-      with:
-        node-version: '12'
-    - name: Install vsce
-      run: npm install --global vsce
-    - name: Dependencies
-      run: |
-        cd lana
-        npm ci
-    - name: Build
-      run: | 
-        cd lana
-        vsce package
+      - uses: actions/checkout@v2
+      - name: Set up Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: "16"
+      - name: Install vsce
+        run: npm install --global vsce
+      - name: Dependencies
+        run: |
+          cd lana
+          npm ci
+      - name: Build
+        run: |
+          cd lana
+          vsce package
