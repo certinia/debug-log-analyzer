@@ -304,7 +304,7 @@ function createChildNodes(children: LogLine[], timeStamps: number[]) {
 }
 
 function renderTree() {
-  const treeContainer = document.getElementById("tree");
+  const treeContainer = document.getElementById("tree") as HTMLElement;
   if (treeContainer) {
     treeContainer.addEventListener("click", onExpandCollapse);
     treeContainer.addEventListener("click", goToFile);
@@ -313,6 +313,9 @@ function renderTree() {
     treeContainer.innerHTML = "";
     if (callTreeNode) {
       treeContainer.appendChild(callTreeNode);
+      const spacer = divElem.cloneNode() as HTMLDivElement;
+      spacer.style.height = `78vh`;
+      treeContainer.appendChild(spacer);
       showHideDetails();
     }
   }
