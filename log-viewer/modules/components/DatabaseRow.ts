@@ -38,8 +38,10 @@ class DatabaseRow extends LitElement {
     if (soqlMap && dmlMap) {
       let entry = soqlMap.get(this.key) || dmlMap.get(this.key);
       if (entry) {
-        const detail = this.key.substr(this.key.indexOf(" ") + 1);
-        const stacks = entry.stacks.map((stack) => html`<call-stack stack=${stack} />`);
+        const detail = this.key.substring(this.key.indexOf(" ") + 1);
+        const stacks = entry.stacks.map(
+          (stack) => html`<call-stack stack=${stack} />`
+        );
         return html`
           <div class="dbEntry">
             <span class="dbCount">Count: ${entry.count}</span>

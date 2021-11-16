@@ -25,6 +25,7 @@ class CallStack extends LitElement {
       .stackEntry {
         cursor: pointer;
         display: block;
+        padding-left: 1em;
       }
     `;
   }
