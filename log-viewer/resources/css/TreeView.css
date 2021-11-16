@@ -40,8 +40,8 @@
 	margin-top: 2px;
 	white-space: pre;
 	/* This is emulate the effect of hanging indent on text */
-	padding-left: 1em ;
-	text-indent: -1em ;
+	padding-left: 1em;
+	text-indent: -1em;
 }
 .detail {
 }

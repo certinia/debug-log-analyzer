@@ -285,7 +285,7 @@ function onInit(evt: Event) {
 
   const helpButton = document.querySelector(".helpLink");
   if (helpButton) {
-    helpButton.addEventListener("click", () => hostService().openHelp())
+    helpButton.addEventListener("click", () => hostService().openHelp());
   }
 
   readLog();
