@@ -9,6 +9,7 @@ import renderTimeline, { maxX } from "./Timeline";
 import analyseMethods, { renderAnalysis } from "./Analysis";
 import { DatabaseAccess, renderDb } from "./Database";
 import { setNamespaces } from "./NamespaceExtrator";
+import { hostService } from "./services/VSCodeService";
 
 import "./components/DatabaseSection.ts";
 import "./components/DatabaseRow.ts";
@@ -22,7 +23,6 @@ import "../resources/css/TreeView.css";
 import "../resources/css/TimelineView.css";
 import "../resources/css/AnalysisView.css";
 import "../resources/css/DatabaseView.css";
-import { hostService } from "./services/VSCodeService.js";
 
 declare global {
   interface Window {
@@ -91,7 +91,7 @@ async function setStatus(
   await waitForRender();
 }
 
-function getLogSettings(log: string): [string, string][] {
+export function getLogSettings(log: string): [string, string][] {
   const match = log.match(settingsPattern);
   if (!match) {
     return [];
@@ -231,7 +231,10 @@ async function displayLog(log: string, name: string, path: string) {
   timer("analyse");
   await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
   await insertPackageWrappers(rootMethod);
-  await Promise.all([analyseMethods(rootMethod), DatabaseAccess.create(rootMethod)]);
+  await Promise.all([
+    analyseMethods(rootMethod),
+    DatabaseAccess.create(rootMethod),
+  ]);
 
   await setStatus(name, path, "Rendering...", "black");
 
