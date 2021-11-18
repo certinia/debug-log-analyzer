@@ -15,7 +15,7 @@ const nestedSort: Record<string, string[]> = {
 
 let metricList: Metric[];
 
-class Metric {
+export class Metric {
   name: string;
   count: number;
   duration: number;

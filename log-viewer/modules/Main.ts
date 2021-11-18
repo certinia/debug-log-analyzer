@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import { showTab, recalculateDurations } from "./Util";
-import parseLog, { LogLine, truncated } from "./parsers/LineParser";
+import parseLog, { getLogSettings, LogLine, truncated } from "./parsers/LineParser";
 import { getRootMethod } from "./parsers/TreeParser";
 import renderTreeView from "./TreeView";
 import renderTimeline, { maxX } from "./Timeline";
@@ -29,8 +29,6 @@ declare global {
     activeNamespaces: string[];
   }
 }
-
-const settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
 
 let logSize: number;
 
@@ -89,21 +87,6 @@ async function setStatus(
     });
   }
   await waitForRender();
-}
-
-export function getLogSettings(log: string): [string, string][] {
-  const match = log.match(settingsPattern);
-  if (!match) {
-    return [];
-  }
-
-  const settings = match[0],
-    settingList = settings.substring(settings.indexOf(" ") + 1).split(";");
-
-  return settingList.map((entry) => {
-    const parts = entry.split(",");
-    return [parts[0], parts[1]];
-  });
 }
 
 async function markContainers(node: LogLine) {

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { getLogSettings } from "../Main";
+import { getLogSettings } from "../parsers/LineParser";
 
 describe("Log Settings tests", () => {
   const log =

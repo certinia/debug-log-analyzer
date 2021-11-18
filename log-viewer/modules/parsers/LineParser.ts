@@ -1266,4 +1266,21 @@ export default async function parseLog(log: string) {
   return logLines;
 }
 
+const settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
+
+export function getLogSettings(log: string): [string, string][] {
+  const match = log.match(settingsPattern);
+  if (!match) {
+    return [];
+  }
+
+  const settings = match[0],
+    settingList = settings.substring(settings.indexOf(" ") + 1).split(";");
+
+  return settingList.map((entry) => {
+    const parts = entry.split(",");
+    return [parts[0], parts[1]];
+  });
+}
+
 export { logLines, totalDuration, truncated, cpuUsed };

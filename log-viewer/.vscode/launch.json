@@ -19,7 +19,7 @@
             "program": "${workspaceRoot}/node_modules/jest/bin/jest.js",
             "args": [
                 "-i",
-                "LineParser.test.ts"
+                "TreeView.test.ts"
             ],
             "internalConsoleOptions": "openOnSessionStart",
             "outFiles": [
