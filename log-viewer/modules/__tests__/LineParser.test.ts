@@ -99,7 +99,7 @@ describe("parseLog tests", () => {
     expect(logLines.length).toEqual(3);
     expect(logLines[0]).toBeInstanceOf(CodeUnitStartedLine);
     expect(logLines[1]).toBeInstanceOf(CodeUnitFinishedLine);
-	expect(logLines[2]).toBeInstanceOf(ExecutionFinishedLine);
+    expect(logLines[2]).toBeInstanceOf(ExecutionFinishedLine);
   });
 
   it("Should handle partial logs", async () => {
@@ -113,104 +113,115 @@ describe("parseLog tests", () => {
     expect(logLines[0]).toBeInstanceOf(CodeUnitStartedLine);
   });
 
+  it("Should detect skipped log entries", async () => {
+    const log =
+      "09:18:22.6 (100)|EXECUTION_STARTED\n\n" +
+      "15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n" +
+      "*** Skipped 22606355 bytes of detailed log\n" +
+      "15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n" +
+      "09:19:13.82 (2000)|EXECUTION_FINISHED\n";
 
-	it('Should detect skipped log entries', async () => {
-		const log = '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
-			'15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
-			'*** Skipped 22606355 bytes of detailed log\n' +
-			'15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
-			'09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+    parseLog(log);
 
-		parseLog(log);
+    expect(truncated.length).toBe(1);
+    expect(truncated[0][0]).toBe("Skipped-Lines");
+  });
 
-		expect(truncated.length).toBe(1);
-		expect(truncated[0][0]).toBe('Skipped-Lines');
-	});
+  it("Should detect truncated logs", async () => {
+    const log =
+      "09:18:22.6 (100)|EXECUTION_STARTED\n\n" +
+      "15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n" +
+      "15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n" +
+      "*********** MAXIMUM DEBUG LOG SIZE REACHED ***********\n";
 
-	it('Should detect truncated logs', async () => {
-		const log = '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
-			'15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
-			'15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
-			'*********** MAXIMUM DEBUG LOG SIZE REACHED ***********\n';
+    parseLog(log);
 
-		parseLog(log);
+    expect(truncated.length).toBe(1);
+    expect(truncated[0][0]).toBe("Max-Size-reached");
+  });
 
-		expect(truncated.length).toBe(1);
-		expect(truncated[0][0]).toBe('Max-Size-reached');
-	});
+  it("Should detect exceptions", async () => {
+    const log =
+      "09:18:22.6 (100)|EXECUTION_STARTED\n\n" +
+      "15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n" +
+      "16:16:04.97 (1000)|EXCEPTION_THROWN|[60]|System.LimitException: c2g:Too many SOQL queries: 101\n" +
+      "09:19:13.82 (2000)|EXECUTION_FINISHED\n";
 
-	it('Should detect exceptions', async () => {
-		const log = '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
-			'15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
-			'16:16:04.97 (1000)|EXCEPTION_THROWN|[60]|System.LimitException: c2g:Too many SOQL queries: 101\n' +
-			'09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+    parseLog(log);
 
-		parseLog(log);
+    expect(truncated.length).toBe(1);
+    expect(truncated[0][0]).toBe(
+      "System.LimitException: c2g:Too many SOQL queries: 101"
+    );
+  });
+  it("Should detect fatal errors", async () => {
+    const log =
+      "09:18:22.6 (100)|EXECUTION_STARTED\n\n" +
+      "15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n" +
+      "16:16:04.97 (1000)|FATAL_ERROR|System.LimitException: c2g:Too many SOQL queries: 101\n" +
+      "09:19:13.82 (2000)|EXECUTION_FINISHED\n";
 
-		expect(truncated.length).toBe(1);
-		expect(truncated[0][0]).toBe('System.LimitException: c2g:Too many SOQL queries: 101');
-	});
-	it('Should detect fatal errors', async () => {
-		const log = '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
-			'15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
-			'16:16:04.97 (1000)|FATAL_ERROR|System.LimitException: c2g:Too many SOQL queries: 101\n' +
-			'09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+    parseLog(log);
 
-		parseLog(log);
+    expect(truncated.length).toBe(1);
+    expect(truncated[0][0]).toBe(
+      "FATAL ERROR! cause=System.LimitException: c2g:Too many SOQL queries: 101"
+    );
+  });
+  it("Should capture totalDuration", async () => {
+    const log =
+      "09:18:22.6 (100)|EXECUTION_STARTED\n\n" +
+      "15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n" +
+      "15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n" +
+      "09:19:13.82 (2000)|EXECUTION_FINISHED\n";
 
-		expect(truncated.length).toBe(1);
-		expect(truncated[0][0]).toBe('FATAL ERROR! cause=System.LimitException: c2g:Too many SOQL queries: 101');
-	});
-	it('Should capture totalDuration', async () => {
-		const log = '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
-			'15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
-			'15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
-			'09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+    parseLog(log);
+    expect(totalDuration).toBe(1800);
+  });
+  it("Methods should have line-numbers", async () => {
+    const log =
+      "09:18:22.6 (6574780)|EXECUTION_STARTED\n\n" +
+      "15:20:52.222 (4113741282)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n" +
+      "15:20:52.222 (4113760256)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n" +
+      "09:19:13.82 (51595120059)|EXECUTION_FINISHED\n";
 
-		parseLog(log);
-		expect(totalDuration).toBe(1800);
-	});
-	it('Methods should have line-numbers', async () => {
-		const log = '09:18:22.6 (6574780)|EXECUTION_STARTED\n\n' +
-			'15:20:52.222 (4113741282)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
-			'15:20:52.222 (4113760256)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
-			'09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
+    parseLog(log);
+    expect(logLines.length).toBe(3);
+    expect(logLines[0].lineNumber).toBe(185);
+  });
+  it("Packages should have a namespace", async () => {
+    const log =
+      "09:18:22.6 (6574780)|EXECUTION_STARTED\n" +
+      "11:52:06.13 (151717928)|ENTERING_MANAGED_PKG|appirio_core\n" +
+      "09:19:13.82 (51595120059)|EXECUTION_FINISHED\n";
 
-		parseLog(log);
-		expect(logLines.length).toBe(3);
-		expect(logLines[0].lineNumber).toBe(185);
-	});
-	it('Packages should have a namespace', async () => {
-		const log = '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
-			'11:52:06.13 (151717928)|ENTERING_MANAGED_PKG|appirio_core\n' +
-			'09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
+    parseLog(log);
+    expect(logLines.length).toBe(2);
+    expect(logLines[0].namespace).toBe("appirio_core");
+  });
+  it("Limit Usage for NS provides cpuUsed", async () => {
+    const log =
+      "09:18:22.6 (6574780)|EXECUTION_STARTED\n" +
+      "14:29:44.163 (40163621912)|CUMULATIVE_LIMIT_USAGE\n" +
+      "14:29:44.163 (40163621912)|LIMIT_USAGE_FOR_NS|(default)|\n" +
+      "  Number of SOQL queries: 8 out of 100\n" +
+      "  Number of query rows: 26 out of 50000\n" +
+      "  Number of SOSL queries: 0 out of 20\n" +
+      "  Number of DML statements: 8 out of 150\n" +
+      "  Number of DML rows: 26 out of 10000\n" +
+      "  Maximum CPU time: 4564 out of 10000\n" +
+      "  Maximum heap size: 0 out of 6000000\n" +
+      "  Number of callouts: 0 out of 100\n" +
+      "  Number of Email Invocations: 0 out of 10\n" +
+      "  Number of future calls: 0 out of 50\n" +
+      "  Number of queueable jobs added to the queue: 0 out of 50\n" +
+      "  Number of Mobile Apex push calls: 0 out of 10\n" +
+      "14:29:44.163 (40163621912)|CUMULATIVE_LIMIT_USAGE_END\n" +
+      "09:19:13.82 (51595120059)|EXECUTION_FINISHED\n";
 
-		parseLog(log);
-		expect(logLines.length).toBe(2);
-		expect(logLines[0].namespace).toBe('appirio_core');
-	});
-	it('Limit Usage for NS provides cpuUsed', async () => {
-		const log = '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
-			'14:29:44.163 (40163621912)|CUMULATIVE_LIMIT_USAGE\n' +
-			'14:29:44.163 (40163621912)|LIMIT_USAGE_FOR_NS|(default)|\n' +
-			'  Number of SOQL queries: 8 out of 100\n' +
-			'  Number of query rows: 26 out of 50000\n' +
-			'  Number of SOSL queries: 0 out of 20\n' +
-			'  Number of DML statements: 8 out of 150\n' +
-			'  Number of DML rows: 26 out of 10000\n' +
-			'  Maximum CPU time: 4564 out of 10000\n' +
-			'  Maximum heap size: 0 out of 6000000\n' +
-			'  Number of callouts: 0 out of 100\n' +
-			'  Number of Email Invocations: 0 out of 10\n' +
-			'  Number of future calls: 0 out of 50\n' +
-			'  Number of queueable jobs added to the queue: 0 out of 50\n' +
-			'  Number of Mobile Apex push calls: 0 out of 10\n' +
-			'14:29:44.163 (40163621912)|CUMULATIVE_LIMIT_USAGE_END\n' +
-			'09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
-
-		parseLog(log);
-		expect(logLines.length).toBe(4);
-		expect(logLines[1].type).toBe('LIMIT_USAGE_FOR_NS');
-		expect(cpuUsed).toBe(4564000000);
-	});
+    parseLog(log);
+    expect(logLines.length).toBe(4);
+    expect(logLines[1].type).toBe("LIMIT_USAGE_FOR_NS");
+    expect(cpuUsed).toBe(4564000000);
+  });
 });
