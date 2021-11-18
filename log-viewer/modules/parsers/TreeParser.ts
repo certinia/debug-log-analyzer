@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import formatDuration, { recalculateDurations } from "../Util.js";
-import { logLines, LogLine, BlockLines, truncateLog } from "./LineParser.js";
+import { recalculateDurations } from "../Util";
+import { logLines, LogLine, BlockLines, truncateLog } from "./LineParser";
 
 let lastTimestamp: number | null = null,
   discontinuity = false;

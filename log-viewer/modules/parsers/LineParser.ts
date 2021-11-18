@@ -1,9 +1,6 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { threadId } from "worker_threads";
-import { decodeEntities } from "../Browser.js";
-
 const typePattern = /^[A-Z_]*$/,
   truncateColor: Map<string, string> = new Map([
     ["error", "rgba(255, 128, 128, 0.2)"],
@@ -12,21 +9,26 @@ const typePattern = /^[A-Z_]*$/,
   ]);
 
 type LineNumber = number | string | null;
-export abstract class LogLine {
-  type: string = "";
+
+export abstract class TimeStampedNode {
   timestamp: number = 0;
+  exitStamp: number | null = null;
+  duration: number | null = null;
+  netDuration: number | null = null;
+  children: TimeStampedNode[] | null = null;
+}
+
+export abstract class LogLine extends TimeStampedNode {
+  type: string = "";
   logLine: string = "";
   acceptsText: boolean = false;
   text: string = "";
   displayType: string = "";
+  children: LogLine[] | null = null;
 
   isExit: boolean = false;
   discontinuity: boolean = false;
   exitTypes: string[] | null = null;
-  children: LogLine[] | null = null;
-  exitStamp: number | null = null;
-  duration: number | null = null;
-  netDuration: number | null = null;
   lineNumber: LineNumber = null;
   rowCount: number | null = null;
   classes: string | null = null;
@@ -43,6 +45,7 @@ export abstract class LogLine {
   timelineKey: string | null = null;
 
   constructor(parts?: string[]) {
+    super();
     if (parts) {
       this.type = parts[1];
       this.timestamp = parseTimestamp(parts[0]);
@@ -97,7 +100,7 @@ export function truncateLog(timestamp: number, reason: string, color: string) {
   }
 }
 
-function parseObjectNamespace(text: string): string {
+export function parseObjectNamespace(text: string): string {
   const sep = text.indexOf("__");
   if (sep < 0) {
     return "unmanaged";
@@ -105,7 +108,7 @@ function parseObjectNamespace(text: string): string {
   return text.substring(0, sep);
 }
 
-function parseVfNamespace(text: string): string {
+export function parseVfNamespace(text: string): string {
   const sep = text.indexOf("__");
   if (sep < 0) {
     return "unmanaged";
@@ -121,7 +124,7 @@ function parseVfNamespace(text: string): string {
   return text.substring(secondSlash + 1, sep);
 }
 
-function parseTimestamp(text: string): number {
+export function parseTimestamp(text: string): number {
   const timestamp = text.slice(text.indexOf("(") + 1, -1);
   if (timestamp) {
     return Number(timestamp);
@@ -129,7 +132,7 @@ function parseTimestamp(text: string): number {
   throw new Error(`Unable to parse timestamp: '${text}'`);
 }
 
-function parseLineNumber(text: string): string | number {
+export function parseLineNumber(text: string): string | number {
   const lineNumberStr = text.slice(1, -1);
   if (lineNumberStr) {
     const lineNumber = Number(lineNumberStr);
@@ -138,7 +141,7 @@ function parseLineNumber(text: string): string | number {
   throw new Error(`Unable to parse line number: '${text}'`);
 }
 
-function parseRows(text: string): number {
+export function parseRows(text: string): number {
   const rowCount = text.slice(text.indexOf("Rows:") + 5);
   if (rowCount) {
     return Number(rowCount);
@@ -175,7 +178,7 @@ class ConstructorExitLine extends LogLine {
   }
 }
 
-class MethodEntryLine extends LogLine {
+export class MethodEntryLine extends LogLine {
   exitTypes = ["METHOD_EXIT"];
   displayType = "method";
   hasLineNumber = true;
@@ -257,7 +260,7 @@ class SystemMethodExitLine extends LogLine {
   }
 }
 
-class CodeUnitStartedLine extends LogLine {
+export class CodeUnitStartedLine extends LogLine {
   exitTypes = ["CODE_UNIT_FINISHED"];
   displayType = "method";
   hasLineNumber = false;
@@ -300,7 +303,7 @@ class CodeUnitStartedLine extends LogLine {
     }
   }
 }
-class CodeUnitFinsihedLine extends LogLine {
+export class CodeUnitFinishedLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -595,13 +598,13 @@ class SystemModeExitLine extends LogLine {
   }
 }
 
-class ExecutionStartedLine extends LogLine {
+export class ExecutionStartedLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class ExecutionFinishedLine extends LogLine {
+export class ExecutionFinishedLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
@@ -1117,7 +1120,7 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["SYSTEM_METHOD_ENTRY", SystemMethodEntryLine],
   ["SYSTEM_METHOD_EXIT", SystemMethodExitLine],
   ["CODE_UNIT_STARTED", CodeUnitStartedLine],
-  ["CODE_UNIT_FINISHED", CodeUnitFinsihedLine],
+  ["CODE_UNIT_FINISHED", CodeUnitFinishedLine],
   ["VF_APEX_CALL_START", VFApexCallStartLine],
   ["VF_APEX_CALL_END", VFApexCallEndLine],
   ["VF_EVALUATE_FORMULA_BEGIN", VFFormulaStartLine],
@@ -1194,7 +1197,7 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["FATAL_ERROR", FatalErrorLine],
 ]);
 
-function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
+export function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
   const parts = line.split("|"),
     type = parts[1],
     metaCtor = lineTypeMap.get(type);
@@ -1211,7 +1214,8 @@ function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
       // wrapped text from the previous entry?
       lastEntry.text += ` | ${line}`;
     } else if (type) {
-      console.warn(`Unknown log line: ${type}`);
+      if (type !== 'DUMMY') /* Used by tests */
+        console.warn(`Unknown log line: ${type}`);
     } else {
       if (lastEntry && line.startsWith("*** Skipped")) {
         truncateLog(lastEntry.timestamp, "Skipped-Lines", "skip");

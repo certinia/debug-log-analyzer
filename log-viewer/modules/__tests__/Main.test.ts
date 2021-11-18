@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
+/*
 import Main from '../Main.js';
 
 const getLogSettings = Main.__get__('getLogSettings');
@@ -28,3 +29,4 @@ describe('Log Settings tests', () => {
 		});
 	});
 });
+*/

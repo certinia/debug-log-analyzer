@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
+/*
 describe('Detect Class-Loading tests', () => {
 	beforeEach(() => {
 		jest.resetModules();
@@ -70,3 +71,4 @@ describe('Detect Class-Loading tests', () => {
 		});
 	});
 });
+*/

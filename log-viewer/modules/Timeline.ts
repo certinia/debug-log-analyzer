@@ -3,7 +3,7 @@
  */
 import { showTreeNode } from "./TreeView";
 import formatDuration from "./Util";
-import { truncated } from "./parsers/LineParser.js";
+import { truncated } from "./parsers/LineParser";
 import { RootNode } from "./parsers/TreeParser";
 import { LogLine } from "./parsers/LineParser";
 

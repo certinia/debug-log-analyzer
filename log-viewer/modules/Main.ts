@@ -1,14 +1,14 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { showTab, recalculateDurations } from "./Util.js";
-import parseLog, { LogLine, truncated } from "./parsers/LineParser.js";
-import { getRootMethod } from "./parsers/TreeParser.js";
-import renderTreeView from "./TreeView.js";
-import renderTimeline, { maxX } from "./Timeline.js";
-import analyseMethods, { renderAnalysis } from "./Analysis.js";
-import { DatabaseAccess, renderDb } from "./Database.js";
-import { setNamespaces } from "./NamespaceExtrator.js";
+import { showTab, recalculateDurations } from "./Util";
+import parseLog, { LogLine, truncated } from "./parsers/LineParser";
+import { getRootMethod } from "./parsers/TreeParser";
+import renderTreeView from "./TreeView";
+import renderTimeline, { maxX } from "./Timeline";
+import analyseMethods, { renderAnalysis } from "./Analysis";
+import { DatabaseAccess, renderDb } from "./Database";
+import { setNamespaces } from "./NamespaceExtrator";
 
 import "./components/DatabaseSection.ts";
 import "./components/DatabaseRow.ts";

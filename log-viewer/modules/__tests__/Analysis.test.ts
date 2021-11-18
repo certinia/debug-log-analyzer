@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
+/*
 import analyseMethods from '../Analysis.js';
 
 describe('Analyse methods tests', () => {
@@ -120,3 +121,4 @@ describe('Analyse methods tests', () => {
 		}]);
 	});
 });
+*/

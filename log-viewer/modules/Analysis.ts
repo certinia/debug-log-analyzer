@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import formatDuration, { highlightText } from "./Util.js";
-import { totalDuration } from "./parsers/LineParser.js";
-import { RootNode } from "./parsers/TreeParser.js";
-import { LogLine } from "./parsers/LineParser.js";
+import formatDuration, { highlightText } from "./Util";
+import { totalDuration } from "./parsers/LineParser";
+import { RootNode } from "./parsers/TreeParser";
+import { LogLine } from "./parsers/LineParser";
 
 const nestedSort: Record<string, string[]> = {
   count: ["count", "duration", "name"],

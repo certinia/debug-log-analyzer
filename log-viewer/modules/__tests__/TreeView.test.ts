@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
+/*
 import parseLog, {truncated} from '../LineParser.js';
 import renderTreeView, {getRootMethod} from '../TreeView.js';
 
@@ -236,3 +237,4 @@ describe('Tree Parsing tests', () => {
 		expect(detail.children).toBe(undefined);
 	});
 });
+*/

@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
+/*
 import analyseCategories from '../Categories.js';
 
 document.body.innerHTML = '<input type="checkbox" id="categoryInternal">';
@@ -187,3 +188,4 @@ describe('Analyse categories tests', () => {
 		expect(result.pkgCpuByNamespace.aaa).toEqual(undefined);
 	});
 });
+*/

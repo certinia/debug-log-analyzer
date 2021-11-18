@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { encodeEntities } from "./Browser.js";
-import { LogLine } from "./parsers/LineParser.js";
+import { encodeEntities } from "./Browser";
+import { TimeStampedNode } from "./parsers/LineParser";
 
 export function highlightText(unsafeText: string, isBold: boolean) {
   const text = encodeEntities(unsafeText);
@@ -37,7 +37,7 @@ export function showTab(tabId: string) {
   }
 }
 
-export function recalculateDurations(node: LogLine) {
+export function recalculateDurations(node: TimeStampedNode) {
   if (node.exitStamp) {
     node.netDuration = node.duration = node.exitStamp - node.timestamp;
     if (node.children) {

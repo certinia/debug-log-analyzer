@@ -1,7 +1,9 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
+/*
 import analyseDb from '../Database.js';
+
 
 describe('Analyse database tests', () => {
 	it('Only DML and SOQL are collected', () => {
@@ -66,3 +68,4 @@ describe('Analyse database tests', () => {
 		});
 	});
 });
+*/
