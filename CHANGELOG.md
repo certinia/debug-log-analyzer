@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Faster log loading due to a change in how the JavaScript is loaded on the page ([#11][#11])
 - Faster log parsing and timeline rendering ([#63][#63])
 - Scroll on the calltree to allow scrolling content to top of screen instead of only the bottom ([#73][#73])
+- `FLOW_START_INTERVIEWS` log lines on the calltree and timeline will show either the Process Builder or Flow name after the chunk number ([#68][#68])
 
 ### Fixed
 
@@ -83,4 +84,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#50]: https://github.com/financialforcedev/debug-log-analyzer/issues/50
 [#52]: https://github.com/financialforcedev/debug-log-analyzer/issues/52
 [#63]: https://github.com/financialforcedev/debug-log-analyzer/issues/63
+[#68]: https://github.com/financialforcedev/debug-log-analyzer/issues/68
 [#73]: https://github.com/financialforcedev/debug-log-analyzer/issues/73
