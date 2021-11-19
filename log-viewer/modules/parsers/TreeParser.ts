@@ -68,7 +68,6 @@ function getMethod(lineIter: LineIterator, method: LogLine) {
         discontinuity = true; // start unwinding stack
       }
       if (line.isExit) {
-        endMethod(method, line, lineIter);
         break;
       }
 
@@ -92,6 +91,10 @@ function getMethod(lineIter: LineIterator, method: LogLine) {
 
     if (lines.length) {
       method.addBlock(lines);
+    }
+
+    if (line?.isExit) {
+      endMethod(method, line, lineIter);
     }
   }
   recalculateDurations(method);

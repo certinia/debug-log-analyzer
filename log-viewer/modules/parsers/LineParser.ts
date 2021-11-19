@@ -1,9 +1,6 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { threadId } from "worker_threads";
-import { decodeEntities } from "../Browser.js";
-
 const typePattern = /^[A-Z_]*$/,
   truncateColor: Map<string, string> = new Map([
     ["error", "rgba(255, 128, 128, 0.2)"],
@@ -688,6 +685,16 @@ class FlowStartInterviewsBeginLine extends LogLine {
     super(parts);
     this.text = "FLOW_START_INTERVIEWS : " + parts[2];
   }
+
+  onEnd(end: LogLine) {
+    if (this.children) {
+      let interviewBegin = this.children[0];
+      if (interviewBegin.displayType === "block" && interviewBegin.children) {
+        interviewBegin = interviewBegin.children[0];
+      }
+      this.text += " - " + interviewBegin.text;
+    }
+  }
 }
 
 class FlowStartInterviewsEndLine extends LogLine {
@@ -1235,7 +1242,7 @@ export default async function parseLog(log: string) {
   rawLines.pop();
   rawLines.shift();
 
-  // reset global variables to be captured durung parsing
+  // reset global variables to be captured during parsing
   logLines = [];
   truncated = [];
   reasons = new Set<string>();
