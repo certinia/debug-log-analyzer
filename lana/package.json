@@ -7,7 +7,9 @@
 		"salesforce",
 		"apex",
 		"apexlog",
-		"debuglog"
+		"debuglog",
+		"debug",
+		"log"
 	],
 	"main": "out/Main.js",
 	"icon": "logo.png",
