@@ -46,10 +46,9 @@ export class LoadLogFile {
     }
     const logFileId = await LoadLogFile.getLogFile(logFiles.result);
     if (logFileId) {
-      const [view, logFilePath] = await Promise.all([
-        LogView.createView(ws, context, logFileId),
-        LoadLogFile.getLogFilePath(ws, logFileId),
-      ]);
+      const logFilePath = this.getLogFilePath(ws, logFileId);
+      const view = await LogView.createView(ws, context, logFilePath);
+      await LoadLogFile.writeLogFile(ws, logFilePath);
       LogView.appendView(view, context, logFileId, logFilePath);
     }
   }
@@ -94,29 +93,22 @@ export class LoadLogFile {
     return null;
   }
 
-  private static async getLogFilePath(
-    ws: string,
-    fileId: string
-  ): Promise<string> {
+  private static getLogFilePath(ws: string, fileId: string): string {
     const logDirectory = path.join(ws, ".sfdx", "tools", "debug", "logs");
     const logFilePath = path.join(logDirectory, `${fileId}.log`);
-    const logExists = fs.existsSync(logFilePath);
-    if (!logExists) {
-      this.writeLogFile(
-        logDirectory,
-        logFilePath,
-        await GetLogFile.apply(ws, fileId)
-      );
-    }
     return logFilePath;
   }
 
-  private static async writeLogFile(
-    logDir: string,
-    logPath: string,
-    logContent: string
-  ) {
-    await fsp.mkdir(logDir, { recursive: true });
-    fsp.writeFile(logPath, logContent);
+  private static async writeLogFile(ws: string, logPath: string) {
+    const logExists = fs.existsSync(logPath);
+    if (!logExists) {
+      const log = path.parse(logPath);
+      const logDir = log.dir;
+      const logId = log.name;
+
+      const logContent = await GetLogFile.apply(ws, logId);
+      await fsp.mkdir(logDir, { recursive: true });
+      await fsp.writeFile(logPath, logContent);
+    }
   }
 }
