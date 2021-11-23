@@ -6,7 +6,7 @@
     "noEmitOnError": true,
     "lib": ["es2017", "dom"],
     "strict": true,
-    "esModuleInterop": false,
+    "esModuleInterop": true,
     "outDir": "out",
     "sourceMap": true,
     "experimentalDecorators": true

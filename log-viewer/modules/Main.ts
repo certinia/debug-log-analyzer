@@ -1,14 +1,15 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { showTab, recalculateDurations } from "./Util.js";
-import parseLog, { LogLine, truncated } from "./parsers/LineParser.js";
-import { getRootMethod } from "./parsers/TreeParser.js";
-import renderTreeView from "./TreeView.js";
-import renderTimeline, { maxX } from "./Timeline.js";
-import analyseMethods, { renderAnalysis } from "./Analysis.js";
-import { DatabaseAccess, renderDb } from "./Database.js";
-import { setNamespaces } from "./NamespaceExtrator.js";
+import { showTab, recalculateDurations } from "./Util";
+import parseLog, { getLogSettings, LogLine, truncated } from "./parsers/LineParser";
+import { getRootMethod } from "./parsers/TreeParser";
+import renderTreeView from "./TreeView";
+import renderTimeline, { maxX } from "./Timeline";
+import analyseMethods, { renderAnalysis } from "./Analysis";
+import { DatabaseAccess, renderDb } from "./Database";
+import { setNamespaces } from "./NamespaceExtrator";
+import { hostService } from "./services/VSCodeService";
 
 import "./components/DatabaseSection.ts";
 import "./components/DatabaseRow.ts";
@@ -22,15 +23,12 @@ import "../resources/css/TreeView.css";
 import "../resources/css/TimelineView.css";
 import "../resources/css/AnalysisView.css";
 import "../resources/css/DatabaseView.css";
-import { hostService } from "./services/VSCodeService.js";
 
 declare global {
   interface Window {
     activeNamespaces: string[];
   }
 }
-
-const settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
 
 let logSize: number;
 
@@ -89,21 +87,6 @@ async function setStatus(
     });
   }
   await waitForRender();
-}
-
-function getLogSettings(log: string): [string, string][] {
-  const match = log.match(settingsPattern);
-  if (!match) {
-    return [];
-  }
-
-  const settings = match[0],
-    settingList = settings.substring(settings.indexOf(" ") + 1).split(";");
-
-  return settingList.map((entry) => {
-    const parts = entry.split(",");
-    return [parts[0], parts[1]];
-  });
 }
 
 async function markContainers(node: LogLine) {
@@ -231,7 +214,10 @@ async function displayLog(log: string, name: string, path: string) {
   timer("analyse");
   await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
   await insertPackageWrappers(rootMethod);
-  await Promise.all([analyseMethods(rootMethod), DatabaseAccess.create(rootMethod)]);
+  await Promise.all([
+    analyseMethods(rootMethod),
+    DatabaseAccess.create(rootMethod),
+  ]);
 
   await setStatus(name, path, "Rendering...", "black");
 

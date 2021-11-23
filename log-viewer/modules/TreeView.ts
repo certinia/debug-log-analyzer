@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { RootNode } from "./parsers/TreeParser.js";
-import { LogLine } from "./parsers/LineParser.js";
-import formatDuration, { showTab } from "./Util.js";
-import { hostService, OpenInfo } from "./services/VSCodeService.js";
+import { RootNode } from "./parsers/TreeParser";
+import { LogLine } from "./parsers/LineParser";
+import formatDuration, { showTab } from "./Util";
+import { hostService, OpenInfo } from "./services/VSCodeService";
 
 let treeRoot: RootNode;
 const divElem = document.createElement("div");
