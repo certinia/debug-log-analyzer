@@ -501,8 +501,8 @@ function showTooltipWithText(
     const tooltipX = posLeft + timelineWrapper.offsetLeft;
     const tooltipY = posTop + timelineWrapper.offsetTop;
     tooltip.innerHTML = "";
-    tooltip.appendChild(tooltipText);
     tooltip.style.cssText = `left:${tooltipX}px; top:${tooltipY}px; display: block;`;
+    tooltip.appendChild(tooltipText);
   } else {
     tooltip.style.display = "none";
   }

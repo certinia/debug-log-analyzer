@@ -26,17 +26,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Load log shows loading feedback whilst waiting for logs to be retrieved ([#18][#18])
 - Open an empty log view whilst waiting for selected log to be downloaded, parsed and rendered ([#18][#18])
 - Log will be loaded from disk if previously downloaded ([#18][#18])
-- Renamed the `Log: Show Log Analysis` command to `Log: Show Apex Log Analysis` [#48][#48]
+- Renamed the `Log: Show Log Analysis` command to `Log: Show Apex Log Analysis` ([#48][#48])
   - For consistency with the `Log: Load Apex Log For Analysis` command
 - Block text on call tree displayed on new lines rather than one line separated by a | character ([#50][#50])
-- Call tree to show text for all log lines and not just time taken ([#42][#42])
+- Call tree shows text for all log lines and not just time taken ([#42][#42])
 - Faster log loading due to a change in how the JavaScript is loaded on the page ([#11][#11])
 - Faster log parsing and timeline rendering ([#63][#63])
 - Scroll on the calltree to allow scrolling content to top of screen instead of only the bottom ([#73][#73])
+- `FLOW_START_INTERVIEWS` log lines on the calltree and timeline will show either the Process Builder or Flow name after the chunk number ([#68][#68])
 
 ### Fixed
 
-- Hide details, hide system calls and hide formulas on the call tree to work again [#45][#45]
+- Hide details, hide system calls and hide formulas on the call tree to work again ([#45][#45])
 
 ### Removed
 
@@ -83,4 +84,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#50]: https://github.com/financialforcedev/debug-log-analyzer/issues/50
 [#52]: https://github.com/financialforcedev/debug-log-analyzer/issues/52
 [#63]: https://github.com/financialforcedev/debug-log-analyzer/issues/63
+[#68]: https://github.com/financialforcedev/debug-log-analyzer/issues/68
 [#73]: https://github.com/financialforcedev/debug-log-analyzer/issues/73

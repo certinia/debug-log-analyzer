@@ -691,6 +691,16 @@ class FlowStartInterviewsBeginLine extends LogLine {
     super(parts);
     this.text = "FLOW_START_INTERVIEWS : " + parts[2];
   }
+
+  onEnd(end: LogLine) {
+    if (this.children) {
+      let interviewBegin = this.children[0];
+      if (interviewBegin.displayType === "block" && interviewBegin.children) {
+        interviewBegin = interviewBegin.children[0];
+      }
+      this.text += " - " + interviewBegin.text;
+    }
+  }
 }
 
 class FlowStartInterviewsEndLine extends LogLine {
@@ -1239,7 +1249,7 @@ export default async function parseLog(log: string) {
   rawLines.pop();
   rawLines.shift();
 
-  // reset global variables to be captured durung parsing
+  // reset global variables to be captured during parsing
   logLines = [];
   truncated = [];
   reasons = new Set<string>();
