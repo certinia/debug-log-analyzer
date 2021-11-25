@@ -21,6 +21,7 @@ export interface HostService {
   openPath(path: string): void;
   openType(info: OpenInfo): void;
   openHelp(): void;
+  getConfig(): void;
 }
 
 export class VSCodeService implements HostService {
@@ -70,6 +71,14 @@ export class VSCodeService implements HostService {
       this.vscodeAPIInstance.postMessage({ cmd: "openHelp" });
     } else {
       console.log(`VSCodeService.open() with no VSCode instance.`);
+    }
+  }
+
+  getConfig() {
+    if (this.vscodeAPIInstance) {
+      this.vscodeAPIInstance.postMessage({ cmd: "getConfig" });
+    } else {
+      console.log(`VSCodeService.getConfig() with no VSCode instance.`);
     }
   }
 }
