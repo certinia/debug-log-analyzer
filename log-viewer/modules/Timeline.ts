@@ -6,7 +6,6 @@ import formatDuration from "./Util";
 import { truncated } from "./parsers/LineParser";
 import { RootNode } from "./parsers/TreeParser";
 import { LogLine } from "./parsers/LineParser";
-import { hostService } from "./services/VSCodeService";
 
 const scaleY = -15,
   strokeColor = "#B0B0B0",
@@ -297,6 +296,7 @@ function resizeFont() {
 }
 
 export default async function renderTimeline(rootMethod: RootNode) {
+  renderTimelineKey();
   container = document.getElementById("timelineWrapper") as HTMLDivElement;
   canvas = document.getElementById("timeline") as HTMLCanvasElement;
   ctx = canvas.getContext("2d", { alpha: false });
@@ -304,6 +304,17 @@ export default async function renderTimeline(rootMethod: RootNode) {
   calculateSizes(canvas);
   if (ctx) {
     requestAnimationFrame(drawTimeLine);
+  }
+}
+
+// todo: chnage to map? or use interface for timelineColors?
+export function setColors(timelineColors: any) {
+  for (const keyName in keyMap) {
+    const keyMeta = keyMap[keyName];
+    const newColor = timelineColors[keyMeta.label];
+    if (newColor) {
+      keyMeta.fillColor = newColor;
+    }
   }
 }
 
@@ -319,7 +330,7 @@ function drawTimeLine() {
   }
 }
 
-function renderTimelineKey() {
+export function renderTimelineKey() {
   const keyHolder = document.getElementById("timelineKey"),
     title = document.createElement("span");
 
@@ -616,19 +627,6 @@ function handleScroll(evt: WheelEvent) {
   }
 }
 
-function handleMessage(evt: MessageEvent) {
-  const message = evt.data;
-  switch (message.command) {
-    case "getConfig":
-      const timeLineColors = message.data.timeline.colors;
-      for (const keyName in keyMap) {
-        const keyMeta = keyMap[keyName];
-        keyMeta.fillColor = timeLineColors[keyMeta.label];
-      }
-      break;
-  }
-}
-
 function onTimelineWrapper() {
   showTooltip(lastMouseX, lastMouseY);
 }
@@ -648,12 +646,8 @@ function onInitTimeline(evt: Event) {
 
   // document seem to get all the events (regardless of which element we're over)
   document.addEventListener("mousemove", onMouseMove);
-
-  hostService().getConfig();
-  renderTimelineKey();
 }
 
 window.addEventListener("DOMContentLoaded", onInitTimeline);
 window.addEventListener("resize", resize);
-window.addEventListener("message", handleMessage);
 export { maxX };
