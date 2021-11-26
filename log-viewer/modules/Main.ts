@@ -16,7 +16,6 @@ import "./components/DatabaseRow.ts";
 import "./components/CallStack.ts";
 
 import "../resources/css/Status.css";
-import "../resources/css/Header.css";
 import "../resources/css/Settings.css";
 import "../resources/css/Tabber.css";
 import "../resources/css/TreeView.css";
