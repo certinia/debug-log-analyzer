@@ -296,6 +296,7 @@ function resizeFont() {
 }
 
 export default async function renderTimeline(rootMethod: RootNode) {
+  renderTimelineKey();
   container = document.getElementById("timelineWrapper") as HTMLDivElement;
   canvas = document.getElementById("timeline") as HTMLCanvasElement;
   ctx = canvas.getContext("2d", { alpha: false });
@@ -303,6 +304,17 @@ export default async function renderTimeline(rootMethod: RootNode) {
   calculateSizes(canvas);
   if (ctx) {
     requestAnimationFrame(drawTimeLine);
+  }
+}
+
+// todo: chnage to map? or use interface for timelineColors?
+export function setColors(timelineColors: any) {
+  for (const keyName in keyMap) {
+    const keyMeta = keyMap[keyName];
+    const newColor = timelineColors[keyMeta.label];
+    if (newColor) {
+      keyMeta.fillColor = newColor;
+    }
   }
 }
 
@@ -318,7 +330,7 @@ function drawTimeLine() {
   }
 }
 
-function renderTimelineKey() {
+export function renderTimelineKey() {
   const keyHolder = document.getElementById("timelineKey"),
     title = document.createElement("span");
 
@@ -634,11 +646,8 @@ function onInitTimeline(evt: Event) {
 
   // document seem to get all the events (regardless of which element we're over)
   document.addEventListener("mousemove", onMouseMove);
-
-  renderTimelineKey();
 }
 
 window.addEventListener("DOMContentLoaded", onInitTimeline);
 window.addEventListener("resize", resize);
-
 export { maxX };

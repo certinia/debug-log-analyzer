@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - zoom is based on position of mouse pointer, ensuring that position is kept on screen when zoomed in or out
   - scroll left and right on the mouse to move the time line left are right, when zoomed
   - click the mouse down and drag to move the timeline around both in the x and y direction, when zoomed
+- Specify custom timeline event colors in vscode preferences ([#66][#66]
 
 ### Changed
 
@@ -84,5 +85,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#50]: https://github.com/financialforcedev/debug-log-analyzer/issues/50
 [#52]: https://github.com/financialforcedev/debug-log-analyzer/issues/52
 [#63]: https://github.com/financialforcedev/debug-log-analyzer/issues/63
+[#66]: https://github.com/financialforcedev/debug-log-analyzer/issues/66
 [#68]: https://github.com/financialforcedev/debug-log-analyzer/issues/68
 [#73]: https://github.com/financialforcedev/debug-log-analyzer/issues/73

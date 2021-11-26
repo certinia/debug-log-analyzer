@@ -2,10 +2,14 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import { showTab, recalculateDurations } from "./Util";
-import parseLog, { getLogSettings, LogLine, truncated } from "./parsers/LineParser";
+import parseLog, {
+  getLogSettings,
+  LogLine,
+  truncated,
+} from "./parsers/LineParser";
 import { getRootMethod } from "./parsers/TreeParser";
 import renderTreeView from "./TreeView";
-import renderTimeline, { maxX } from "./Timeline";
+import renderTimeline, { maxX, setColors, renderTimelineKey } from "./Timeline";
 import analyseMethods, { renderAnalysis } from "./Analysis";
 import { DatabaseAccess, renderDb } from "./Database";
 import { setNamespaces } from "./NamespaceExtrator";
@@ -16,7 +20,6 @@ import "./components/DatabaseRow.ts";
 import "./components/CallStack.ts";
 
 import "../resources/css/Status.css";
-import "../resources/css/Header.css";
 import "../resources/css/Settings.css";
 import "../resources/css/Tabber.css";
 import "../resources/css/TreeView.css";
@@ -263,6 +266,16 @@ function onTabSelect(evt: Event) {
   showTab(input.id);
 }
 
+function handleMessage(evt: MessageEvent) {
+  const message = evt.data;
+  switch (message.command) {
+    case "getConfig":
+      setColors(message.data.timeline.colors);
+      renderTimelineKey();
+      break;
+  }
+}
+
 function onInit(evt: Event) {
   const tabHolder = document.querySelector(".tabHolder");
   tabHolder
@@ -274,7 +287,9 @@ function onInit(evt: Event) {
     helpButton.addEventListener("click", () => hostService().openHelp());
   }
 
+  hostService().getConfig();
   readLog();
 }
 
 window.addEventListener("DOMContentLoaded", onInit);
+window.addEventListener("message", handleMessage);

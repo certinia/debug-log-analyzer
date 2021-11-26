@@ -26,7 +26,8 @@ export class LogFileException extends Error {
 }
 
 export class LogView {
-  private static HELP_URL = 'https://financialforcedev.github.io/debug-log-analyzer/';
+  private static HELP_URL =
+    "https://financialforcedev.github.io/debug-log-analyzer/";
 
   static async createView(
     wsPath: string,
@@ -66,7 +67,18 @@ export class LogView {
           }
 
           case "openHelp": {
-            vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(this.HELP_URL));
+            vscode.commands.executeCommand(
+              "vscode.open",
+              vscode.Uri.parse(this.HELP_URL)
+            );
+            break;
+          }
+
+          case "getConfig": {
+            panel.webview.postMessage({
+              command: "getConfig",
+              data: vscode.workspace.getConfiguration("lana"),
+            });
             break;
           }
         }

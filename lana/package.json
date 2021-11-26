@@ -60,7 +60,37 @@
 					"when": "resourceExtname == '.log'"
 				}
 			]
-		}
+		},
+		"configuration":
+			{
+				"type": "object",
+				"title": "Apex Log Analyzer",
+				"properties": {
+					"lana.timeline.colors": {
+						"type": "object",
+						"default": {
+							"Code Unit" : "#6BAD68",
+							"SOQL" : "#4B9D6E",
+							"Method" : "#328C72",
+							"Flow" : "#237A72",
+							"DML" : "#22686D",
+							"Workflow" : "#285663",
+							"System Method" : "#2D4455"
+						},
+						"properties": {
+							"Code Unit" : {"type":"string", "default": "#6BAD68", "description": "Hex color for Code Unit timeline events."},
+							"SOQL" : {"type":"string", "default": "#4B9D6E", "description": "Hex color for SOQL timeline events."},
+							"Method" : {"type":"string", "default": "#328C72", "description": "Hex color for Method timeline events."},
+							"Flow" : {"type":"string", "default": "#237A72", "description": "Hex color for Flow timeline events."},
+							"DML" : {"type":"string", "default": "#22686D", "description": "Hex color for DML timeline events."},
+							"Workflow" : {"type":"string", "default": "#285663", "description": "Hex color for Workflow timeline events."},
+							"System Method" : {"type":"string", "default": "#2D4455", "description": "Hex color for System Method timeline events."}
+						},
+						"description": "Colors used for each event type on the Timeline",
+						"additionalProperties": false
+					}
+				}
+			}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
