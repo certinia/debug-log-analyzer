@@ -180,7 +180,7 @@ function drawNodes(
   nodes: LogLine[],
   depth: number
 ) {
-  const children = [];
+  const children: LogLine[] = [];
   const len = nodes.length;
   const y = depth * scaleY - verticalOffset;
   for (let c = 0; c < len; c++) {
@@ -196,9 +196,10 @@ function drawNodes(
       }
     }
 
-    if (node.children) {
-      children.push(...node.children);
-    }
+    // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
+    node.children?.forEach((child) => {
+      children.push(child);
+    });
   }
 
   if (!children.length) {
