@@ -154,7 +154,6 @@ export function parseRows(text: string): number {
 class ConstructorEntryLine extends LogLine {
   exitTypes = ["CONSTRUCTOR_EXIT"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "method";
   suffix = " (constructor)";
   timelineKey = "method";
@@ -181,7 +180,6 @@ class ConstructorExitLine extends LogLine {
 export class MethodEntryLine extends LogLine {
   exitTypes = ["METHOD_EXIT"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "method";
   timelineKey = "method";
   classes = "node";
@@ -210,7 +208,6 @@ class MethodExitLine extends LogLine {
 class SystemConstructorEntryLine extends LogLine {
   exitTypes = ["SYSTEM_CONSTRUCTOR_EXIT"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "method";
   namespace = "system";
   suffix = "(system constructor)";
@@ -236,7 +233,6 @@ class SystemConstructorExitLine extends LogLine {
 class SystemMethodEntryLine extends LogLine {
   exitTypes = ["SYSTEM_METHOD_EXIT"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "method";
   namespace = "system";
   timelineKey = "systemMethod";
@@ -263,7 +259,6 @@ class SystemMethodExitLine extends LogLine {
 export class CodeUnitStartedLine extends LogLine {
   exitTypes = ["CODE_UNIT_FINISHED"];
   displayType = "method";
-  hasLineNumber = false;
   suffix = " (entrypoint)";
   timelineKey = "codeUnit";
   classes = "node";
@@ -315,7 +310,6 @@ export class CodeUnitFinishedLine extends LogLine {
 class VFApexCallStartLine extends LogLine {
   exitTypes = ["VF_APEX_CALL_END"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "method";
   suffix = " (VF APEX)";
   classes = "node";
@@ -382,7 +376,6 @@ class VFSeralizeViewStateEndLine extends LogLine {
 class DMLBeginLine extends LogLine {
   exitTypes = ["DML_END"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "free";
   timelineKey = "dml";
   group = "DML";
@@ -414,7 +407,6 @@ interface EndLine {
 class SOQLExecuteBeginLine extends LogLine {
   exitTypes = ["SOQL_EXECUTE_END"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "free";
   timelineKey = "soql";
   group: string;
