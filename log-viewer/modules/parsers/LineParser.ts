@@ -510,6 +510,7 @@ class UserInfoLine extends LogLine {
 class UserDebugLine extends LogLine {
   lineNumber: LineNumber;
   group: string;
+  acceptsText = true;
 
   constructor(parts: string[]) {
     super(parts);
