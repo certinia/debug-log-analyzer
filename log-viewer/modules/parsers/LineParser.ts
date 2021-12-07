@@ -592,14 +592,21 @@ class SystemModeExitLine extends LogLine {
 }
 
 export class ExecutionStartedLine extends LogLine {
+  exitTypes = ["EXECUTION_FINISHED"];
+  displayType = "method";
+  timelineKey = "method";
+  classes = "node";
   constructor(parts: string[]) {
     super(parts);
+    this.text = this.type;
   }
 }
 
 export class ExecutionFinishedLine extends LogLine {
+  isExit = true;
   constructor(parts: string[]) {
     super(parts);
+    this.text = this.type;
   }
 }
 
@@ -1236,11 +1243,8 @@ export function parseLine(line: string, lastEntry: LogLine | null): LogLine | nu
 }
 
 export default async function parseLog(log: string) {
-  const start = log.indexOf("EXECUTION_STARTED");
+  const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || -1;
   const rawLines = log.substring(start).split("\n");
-  // strip the "EXECUTION_STARTED" and "EXECUTION_FINISHED" lines
-  rawLines.pop();
-  rawLines.shift();
 
   // reset global variables to be captured during parsing
   logLines = [];
