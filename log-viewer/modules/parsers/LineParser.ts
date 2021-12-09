@@ -1243,6 +1243,43 @@ class FlowBulkElementLimitUsageLine extends LogLine {
   }
 }
 
+class PNInvalidAppLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}.${parts[3]}`;
+  }
+}
+
+class PNInvalidCertificateLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}.${parts[3]}`;
+  }
+}
+class PNInvalidNotificationLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}.${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]} : ${parts[7]} : ${parts[8]}`;
+  }
+}
+class PNNoDevicesLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}.${parts[3]}`;
+  }
+}
+class PNNotEnabledLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+class PNSentLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}.${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]} : ${parts[7]}`;
+  }
+}
+
 class SLAEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
@@ -1782,6 +1819,12 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["FLOW_BULK_ELEMENT_DETAIL", FlowBulkElementDetailLine],
   ["FLOW_BULK_ELEMENT_LIMIT_USAGE", FlowBulkElementLimitUsageLine],
   ["FLOW_BULK_ELEMENT_NOT_SUPPORTED", FlowBulkElementNotSupportedLine],
+  ["PUSH_NOTIFICATION_INVALID_APP", PNInvalidAppLine],
+  ["PUSH_NOTIFICATION_INVALID_CERTIFICATE", PNInvalidCertificateLine],
+  ["PUSH_NOTIFICATION_INVALID_NOTIFICATION", PNInvalidNotificationLine],
+  ["PUSH_NOTIFICATION_NO_DEVICES", PNNoDevicesLine],
+  ["PUSH_NOTIFICATION_NOT_ENABLED", PNNotEnabledLine],
+  ["PUSH_NOTIFICATION_SENT", PNSentLine],
   ["SLA_END", SLAEndLine],
   ["SLA_EVAL_MILESTONE", SLAEvalMilestoneLine],
   ["SLA_NULL_START_DATE", SLANullStartDateLine],
