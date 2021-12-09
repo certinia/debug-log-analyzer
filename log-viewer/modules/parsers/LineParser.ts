@@ -826,6 +826,39 @@ class EventSericePubDetailLine extends LogLine {
   }
 }
 
+class EventSericeSubBeginLine extends LogLine {
+  exitTypes = ["EVENT_SERVICE_SUB_END"];
+  displayType = "method";
+  cpuType = "custom";
+  timelineKey = "flow";
+  group: string;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} ${parts[3]}`;
+    this.group = this.type;
+  }
+}
+
+class EventSericeSubEndLine extends LogLine {
+  isExit = true;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} ${parts[3]}`;
+  }
+}
+
+class EventSericeSubDetailLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} ${parts[3]} ${parts[4]} ${parts[6]} ${parts[6]}`;
+    this.group = this.type;
+  }
+}
+
 class SavePointSetLine extends LogLine {
   lineNumber: LineNumber;
 
@@ -868,6 +901,13 @@ class FlowStartInterviewsEndLine extends LogLine {
   }
 }
 
+class FlowStartInterviewsErrorLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} - ${parts[4]}`;
+  }
+}
+
 class FlowStartInterviewBeginLine extends LogLine {
   group: string;
 
@@ -894,6 +934,12 @@ class FlowStartInterviewLimitUsageLine extends LogLine {
   }
 }
 
+class FlowStartScheduledRecordsLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]}`;
+  }
+}
 class FlowCreateInterviewBeginLine extends LogLine {
   text = "";
 
@@ -905,6 +951,13 @@ class FlowCreateInterviewBeginLine extends LogLine {
 class FlowCreateInterviewEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
+  }
+}
+
+class FlowCreateInterviewErrorLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
@@ -953,6 +1006,34 @@ class FlowElementAssignmentLine extends LogLine {
   }
 }
 
+class FlowWaitEventResumingDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
+  }
+}
+
+class FlowWaitEventWaitingDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
+  }
+}
+
+class FlowWaitResumingDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class FlowWaitWaitingDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
+  }
+}
+
 class FlowInterviewFinishedLine extends LogLine {
   group: string;
 
@@ -963,10 +1044,52 @@ class FlowInterviewFinishedLine extends LogLine {
   }
 }
 
+class FlowInterviewResumedLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]}`;
+  }
+}
+
+class FlowInterviewPausedLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
 class FlowElementErrorLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[1] + parts[2] + " " + parts[3] + " " + parts[4];
+  }
+}
+
+class FlowElementFaultLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class FlowElementLimitUsageLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class FlowInterviewFinishedLimitUsageLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class FlowSubflowDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
@@ -1045,7 +1168,14 @@ class FlowBulkElementDetailLine extends LogLine {
   }
 }
 
-class FlowBulkElementLimitUsage extends LogLine {
+class FlowBulkElementNotSupportedLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class FlowBulkElementLimitUsageLine extends LogLine {
   declarative = true;
   group: string;
 
@@ -1053,6 +1183,33 @@ class FlowBulkElementLimitUsage extends LogLine {
     super(parts);
     this.text = parts[2];
     this.group = this.type;
+  }
+}
+
+class SLAEndLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
+  }
+}
+
+class SLAEvalMilestoneLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class SLANullStartDateLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
+class SLAProcessCaseLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
   }
 }
 
@@ -1252,6 +1409,173 @@ class WFActionLine extends LogLine {
 class WFActionsEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
+    this.text = parts[2];
+  }
+}
+
+class WFActionTaskLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]} : ${parts[7]}`;
+  }
+}
+
+class WFApprovalLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class WFApprovalRemoveLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class WFApprovalSubmitLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class WFApprovalSubmitterLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class WFAssignLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]}`;
+  }
+}
+
+class WFEmailAlertLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class WFEmailSentLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class WFEnqueueActionsLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class WFEscalationActionLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]}`;
+  }
+}
+
+class WFEscalationRuleLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
+class WFEvalEntryCriteriaLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class WFFlowActionDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    const optional = parts[5] ? ` :${parts[5]}` : "";
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}` + optional;
+  }
+}
+
+class WFHardRejectLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
+class WFNextApproverLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class WFNoProcessFoundLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
+class WFOutboundMsgLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
+  }
+}
+
+class WFProcessFoundLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]}`;
+  }
+}
+
+class WFReassignRecordLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]}`;
+  }
+}
+
+class WFResponseNotifyLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
+  }
+}
+
+class WFRuleEntryOrderLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class WFRuleInvocationLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class WFSoftRejectLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class WFTimeTriggerLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
@@ -1354,20 +1678,36 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["EVENT_SERVICE_PUB_BEGIN", EventSericePubBeginLine],
   ["EVENT_SERVICE_PUB_END", EventSericePubEndLine],
   ["EVENT_SERVICE_PUB_DETAIL", EventSericePubDetailLine],
+  ["EVENT_SERVICE_SUB_BEGIN", EventSericeSubBeginLine],
+  ["EVENT_SERVICE_SUB_DETAIL", EventSericeSubDetailLine],
+  ["EVENT_SERVICE_SUB_END", EventSericeSubEndLine],
   ["SAVEPOINT_SET", SavePointSetLine],
   ["FLOW_START_INTERVIEWS_BEGIN", FlowStartInterviewsBeginLine],
   ["FLOW_START_INTERVIEWS_END", FlowStartInterviewsEndLine],
+  ["FLOW_START_INTERVIEWS_ERROR", FlowStartInterviewsErrorLine],
   ["FLOW_START_INTERVIEW_BEGIN", FlowStartInterviewBeginLine],
   ["FLOW_START_INTERVIEW_END", FlowStartInterviewEndLine],
   ["FLOW_START_INTERVIEW_LIMIT_USAGE", FlowStartInterviewLimitUsageLine],
+  ["FLOW_START_SCHEDULED_RECORDS", FlowStartScheduledRecordsLine],
   ["FLOW_CREATE_INTERVIEW_BEGIN", FlowCreateInterviewBeginLine],
   ["FLOW_CREATE_INTERVIEW_END", FlowCreateInterviewEndLine],
+  ["FLOW_CREATE_INTERVIEW_ERROR", FlowCreateInterviewErrorLine],
   ["FLOW_ELEMENT_BEGIN", FlowElementBeginLine],
   ["FLOW_ELEMENT_END", FlowElementEndLine],
   ["FLOW_ELEMENT_DEFERRED", FlowElementDeferredLine],
-  ["FLOW_VALUE_ASSIGNMENT", FlowElementAssignmentLine],
-  ["FLOW_INTERVIEW_FINISHED", FlowInterviewFinishedLine],
   ["FLOW_ELEMENT_ERROR", FlowElementErrorLine],
+  ["FLOW_ELEMENT_FAULT", FlowElementFaultLine],
+  ["FLOW_ELEMENT_LIMIT_USAGE", FlowElementLimitUsageLine],
+  ["FLOW_INTERVIEW_FINISHED_LIMIT_USAGE", FlowInterviewFinishedLimitUsageLine],
+  ["FLOW_SUBFLOW_DETAIL", FlowSubflowDetailLine],
+  ["FLOW_VALUE_ASSIGNMENT", FlowElementAssignmentLine],
+  ["FLOW_WAIT_EVENT_RESUMING_DETAIL", FlowWaitEventResumingDetailLine],
+  ["FLOW_WAIT_EVENT_WAITING_DETAIL", FlowWaitEventWaitingDetailLine],
+  ["FLOW_WAIT_RESUMING_DETAIL", FlowWaitResumingDetailLine],
+  ["FLOW_WAIT_WAITING_DETAIL", FlowWaitWaitingDetailLine],
+  ["FLOW_INTERVIEW_FINISHED", FlowInterviewFinishedLine],
+  ["FLOW_INTERVIEW_PAUSED", FlowInterviewPausedLine],
+  ["FLOW_INTERVIEW_RESUMED", FlowInterviewResumedLine],
   ["FLOW_ACTIONCALL_DETAIL", FlowActionCallDetailLine],
   ["FLOW_ASSIGNMENT_DETAIL", FlowAssignmentDetailLine],
   ["FLOW_LOOP_DETAIL", FlowLoopDetailLine],
@@ -1375,7 +1715,12 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["FLOW_BULK_ELEMENT_BEGIN", FlowBulkElementBeginLine],
   ["FLOW_BULK_ELEMENT_END", FlowBulkElementEndLine],
   ["FLOW_BULK_ELEMENT_DETAIL", FlowBulkElementDetailLine],
-  ["FLOW_BULK_ELEMENT_LIMIT_USAGE", FlowBulkElementLimitUsage],
+  ["FLOW_BULK_ELEMENT_LIMIT_USAGE", FlowBulkElementLimitUsageLine],
+  ["FLOW_BULK_ELEMENT_NOT_SUPPORTED", FlowBulkElementNotSupportedLine],
+  ["SLA_END", SLAEndLine],
+  ["SLA_EVAL_MILESTONE", SLAEvalMilestoneLine],
+  ["SLA_NULL_START_DATE", SLANullStartDateLine],
+  ["SLA_PROCESS_CASE", SLAProcessCaseLine],
   ["TESTING_LIMITS", TestingLimitsLine],
   ["VALIDATION_ERROR", ValidationErrorLine],
   ["VALIDATION_FAIL", ValidationFailLine],
@@ -1397,7 +1742,31 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["WF_FORMULA", WFFormulaLine],
   ["WF_ACTION", WFActionLine],
   ["WF_ACTIONS_END", WFActionsEndLine],
+  ["WF_ACTION_TASK", WFActionTaskLine],
+  ["WF_APPROVAL", WFApprovalLine],
+  ["WF_APPROVAL_REMOVE", WFApprovalRemoveLine],
+  ["WF_APPROVAL_SUBMIT", WFApprovalSubmitLine],
+  ["WF_APPROVAL_SUBMITTER", WFApprovalSubmitterLine],
+  ["WF_ASSIGN", WFAssignLine],
+  ["WF_EMAIL_ALERT", WFEmailAlertLine],
+  ["WF_EMAIL_SENT", WFEmailSentLine],
+  ["WF_ENQUEUE_ACTIONS", WFEnqueueActionsLine],
+  ["WF_ESCALATION_ACTION", WFEscalationActionLine],
+  ["WF_ESCALATION_RULE", WFEscalationRuleLine],
+  ["WF_EVAL_ENTRY_CRITERIA", WFEvalEntryCriteriaLine],
+  ["WF_FLOW_ACTION_DETAIL", WFFlowActionDetailLine],
+  ["WF_HARD_REJECT", WFHardRejectLine],
+  ["WF_NEXT_APPROVER", WFNextApproverLine],
+  ["WF_NO_PROCESS_FOUND", WFNoProcessFoundLine],
+  ["WF_OUTBOUND_MSG", WFOutboundMsgLine],
+  ["WF_PROCESS_FOUND", WFProcessFoundLine],
+  ["WF_REASSIGN_RECORD", WFReassignRecordLine],
+  ["WF_RESPONSE_NOTIFY", WFResponseNotifyLine],
+  ["WF_RULE_ENTRY_ORDER", WFRuleEntryOrderLine],
+  ["WF_RULE_INVOCATION", WFRuleInvocationLine],
+  ["WF_SOFT_REJECT", WFSoftRejectLine],
   ["WF_SPOOL_ACTION_BEGIN", WFSpoolActionBeginLine],
+  ["WF_TIME_TRIGGER", WFTimeTriggerLine],
   ["WF_TIME_TRIGGERS_BEGIN", WFTimeTriggersBeginLine],
   ["EXCEPTION_THROWN", ExceptionThrownLine],
   ["FATAL_ERROR", FatalErrorLine],
