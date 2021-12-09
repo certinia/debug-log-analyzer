@@ -405,6 +405,15 @@ class DMLEndLine extends LogLine {
   }
 }
 
+class IdeasQueryExecuteLine extends LogLine {
+  lineNumber: LineNumber;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
 interface EndLine {
   rowCount: number;
 }
@@ -681,6 +690,24 @@ class QueryMoreIterationsLine extends LogLine {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = `line: ${this.lineNumber}, iterations:${parts[3]}`;
+  }
+}
+
+class SavepointRollbackLine extends LogLine {
+  lineNumber: LineNumber;
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `${parts[3]}, line: ${this.lineNumber}`;
+  }
+}
+
+class SavepointSetLine extends LogLine {
+  lineNumber: LineNumber;
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `${parts[3]}, line: ${this.lineNumber}`;
   }
 }
 
@@ -1277,6 +1304,7 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["VF_SERIALIZE_VIEWSTATE_END", VFSeralizeViewStateEndLine],
   ["DML_BEGIN", DMLBeginLine],
   ["DML_END", DMLEndLine],
+  ["IDEAS_QUERY_EXECUTE", IdeasQueryExecuteLine],
   ["SOQL_EXECUTE_BEGIN", SOQLExecuteBeginLine],
   ["SOQL_EXECUTE_END", SOQLExecuteEndLine],
   ["SOQL_EXECUTE_EXPLAIN", SOQLExecuteExplainLine],
@@ -1301,6 +1329,8 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["QUERY_MORE_END", QueryMoreEndLine],
   ["QUERY_MORE_ITERATIONS", QueryMoreIterationsLine],
   ["TOTAL_EMAIL_RECIPIENTS_QUEUED", TotalEmailRecipientsQueuedLine],
+  ["SAVEPOINT_ROLLBACK", SavepointRollbackLine],
+  ["SAVEPOINT_SET", SavepointSetLine],
   ["STACK_FRAME_VARIABLE_LIST", StackFrameVariableListLine],
   ["STATIC_VARIABLE_LIST", StaticVariableListLine],
   ["SYSTEM_MODE_ENTER", SystemModeEnterLine],
