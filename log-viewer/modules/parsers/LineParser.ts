@@ -350,6 +350,27 @@ class VFApexCallEndLine extends LogLine {
   }
 }
 
+class VFDeserializeViewstateBeginLine extends LogLine {
+  exitTypes = ["VF_DESERIALIZE_VIEWSTATE_END"];
+  displayType = "method";
+  cpuType = "method";
+  namespace = "system";
+  timelineKey = "systemMethod";
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = this.type;
+  }
+}
+
+class VFDeserializeViewstateEndLine extends LogLine {
+  isExit = true;
+
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
 class VFFormulaStartLine extends LogLine {
   exitTypes = ["VF_EVALUATE_FORMULA_END"];
   cpuType = "custom";
@@ -1674,6 +1695,8 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["CODE_UNIT_FINISHED", CodeUnitFinishedLine],
   ["VF_APEX_CALL_START", VFApexCallStartLine],
   ["VF_APEX_CALL_END", VFApexCallEndLine],
+  ["VF_DESERIALIZE_VIEWSTATE_BEGIN", VFDeserializeViewstateBeginLine],
+  ["VF_DESERIALIZE_VIEWSTATE_END", VFDeserializeViewstateEndLine],
   ["VF_EVALUATE_FORMULA_BEGIN", VFFormulaStartLine],
   ["VF_EVALUATE_FORMULA_END", VFFormulaEndLine],
   ["VF_SERIALIZE_VIEWSTATE_BEGIN", VFSeralizeViewStateStartLine],
