@@ -579,6 +579,29 @@ class CumulativeLimitUsageEndLine extends LogLine {
     super(parts);
   }
 }
+
+class CumulativeProfilingLine extends LogLine {
+  acceptsText = true;
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2] + " " + (parts[3] ?? "");
+  }
+}
+
+class CumulativeProfilingBeginLine extends LogLine {
+  exitTypes = ["CUMULATIVE_PROFILING_END"];
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
+class CumulativeProfilingEndLine extends LogLine {
+  isExit = true;
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
 class LimitUsageLine extends LogLine {
   lineNumber: LineNumber;
   group: string;
@@ -665,6 +688,13 @@ class TotalEmailRecipientsQueuedLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
+  }
+}
+
+class StackFrameVariableListLine extends LogLine {
+  acceptsText = true;
+  constructor(parts: string[]) {
+    super(parts);
   }
 }
 
@@ -998,6 +1028,14 @@ class FlowBulkElementLimitUsage extends LogLine {
   }
 }
 
+class TestingLimitsLine extends LogLine {
+  acceptsText = true;
+
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
 class ValidationRuleLine extends LogLine {
   group: string;
 
@@ -1251,6 +1289,9 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["USER_DEBUG", UserDebugLine],
   ["CUMULATIVE_LIMIT_USAGE", CumulativeLimitUsageLine],
   ["CUMULATIVE_LIMIT_USAGE_END", CumulativeLimitUsageEndLine],
+  ["CUMULATIVE_PROFILING", CumulativeProfilingLine],
+  ["CUMULATIVE_PROFILING_BEGIN", CumulativeProfilingBeginLine],
+  ["CUMULATIVE_PROFILING_END", CumulativeProfilingEndLine],
   ["LIMIT_USAGE", LimitUsageLine],
   ["LIMIT_USAGE_FOR_NS", LimitUsageForNSLine],
   ["POP_TRACE_FLAGS", PopTraceFlagsLine],
@@ -1259,6 +1300,7 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["QUERY_MORE_END", QueryMoreEndLine],
   ["QUERY_MORE_ITERATIONS", QueryMoreIterationsLine],
   ["TOTAL_EMAIL_RECIPIENTS_QUEUED", TotalEmailRecipientsQueuedLine],
+  ["STACK_FRAME_VARIABLE_LIST", StackFrameVariableListLine],
   ["STATIC_VARIABLE_LIST", StaticVariableListLine],
   ["SYSTEM_MODE_ENTER", SystemModeEnterLine],
   ["SYSTEM_MODE_EXIT", SystemModeExitLine],
@@ -1290,7 +1332,7 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["FLOW_BULK_ELEMENT_END", FlowBulkElementEndLine],
   ["FLOW_BULK_ELEMENT_DETAIL", FlowBulkElementDetailLine],
   ["FLOW_BULK_ELEMENT_LIMIT_USAGE", FlowBulkElementLimitUsage],
-  ["VALIDATION_RULE", ValidationRuleLine],
+  ["TESTING_LIMITS", TestingLimitsLine],
   ["VALIDATION_FORMULA", ValidationFormulaLine],
   ["VALIDATION_PASS", ValidationPassLine],
   ["WF_FLOW_ACTION_BEGIN", WFFlowActionBeginLine],
