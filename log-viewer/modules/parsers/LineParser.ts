@@ -1556,8 +1556,8 @@ class WFEvalEntryCriteriaLine extends LogLine {
 class WFFlowActionDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    const optional = parts[5] ? ` :${parts[5]}` : "";
-    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}` + optional;
+    const optional = parts[4] ? ` : ${parts[4]} :${parts[5]}` : "";
+    this.text = `${parts[2]} : ${parts[3]}` + optional;
   }
 }
 
