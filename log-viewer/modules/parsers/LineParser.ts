@@ -151,6 +151,13 @@ export function parseRows(text: string): number {
 
 /* Log line entry Parsers */
 
+class BulkHeapAllocateLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
 class ConstructorEntryLine extends LogLine {
   exitTypes = ["CONSTRUCTOR_EXIT"];
   displayType = "method";
@@ -167,10 +174,19 @@ class ConstructorEntryLine extends LogLine {
     this.text = parts[5] + args.substring(args.lastIndexOf("("));
   }
 }
+
 class ConstructorExitLine extends LogLine {
   isExit = true;
   lineNumber: LineNumber;
 
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
+class EmailQueueLine extends LogLine {
+  lineNumber: LineNumber;
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
@@ -378,6 +394,12 @@ class VFSeralizeViewStateEndLine extends LogLine {
   }
 }
 
+class VFPageMessageLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
 class DMLBeginLine extends LogLine {
   exitTypes = ["DML_END"];
   displayType = "method";
@@ -500,6 +522,15 @@ class HeapAllocateLine extends LogLine {
   }
 }
 
+class HeapDeallocateLine extends LogLine {
+  lineNumber: LineNumber;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
 class StatementExecuteLine extends LogLine {
   lineNumber: LineNumber;
 
@@ -529,6 +560,11 @@ class VariableScopeBeginLine extends LogLine {
   }
 }
 
+class VariableScopeEndLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
 class VariableAssignmentLine extends LogLine {
   lineNumber: LineNumber;
   group: string;
@@ -1582,6 +1618,7 @@ class WFTimeTriggerLine extends LogLine {
 class WFSpoolActionBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
+    this.text = parts[2];
   }
 }
 
@@ -1623,8 +1660,10 @@ class FatalErrorLine extends LogLine {
 }
 
 const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
+  ["BULK_HEAP_ALLOCATE", BulkHeapAllocateLine],
   ["CONSTRUCTOR_ENTRY", ConstructorEntryLine],
   ["CONSTRUCTOR_EXIT", ConstructorExitLine],
+  ["EMAIL_QUEUE", EmailQueueLine],
   ["METHOD_ENTRY", MethodEntryLine],
   ["METHOD_EXIT", MethodExitLine],
   ["SYSTEM_CONSTRUCTOR_ENTRY", SystemConstructorEntryLine],
@@ -1639,6 +1678,7 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["VF_EVALUATE_FORMULA_END", VFFormulaEndLine],
   ["VF_SERIALIZE_VIEWSTATE_BEGIN", VFSeralizeViewStateStartLine],
   ["VF_SERIALIZE_VIEWSTATE_END", VFSeralizeViewStateEndLine],
+  ["VF_PAGE_MESSAGE", VFPageMessageLine],
   ["DML_BEGIN", DMLBeginLine],
   ["DML_END", DMLEndLine],
   ["IDEAS_QUERY_EXECUTE", IdeasQueryExecuteLine],
@@ -1648,8 +1688,10 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["SOSL_EXECUTE_BEGIN", SOSLExecuteBeginLine],
   ["SOSL_EXECUTE_END", SOSLExecuteEndLine],
   ["HEAP_ALLOCATE", HeapAllocateLine],
+  ["HEAP_DEALLOCATE", HeapDeallocateLine],
   ["STATEMENT_EXECUTE", StatementExecuteLine],
   ["VARIABLE_SCOPE_BEGIN", VariableScopeBeginLine],
+  ["VARIABLE_SCOPE_END", VariableScopeEndLine],
   ["VARIABLE_ASSIGNMENT", VariableAssignmentLine],
   ["USER_INFO", UserInfoLine],
   ["USER_DEBUG", UserDebugLine],
