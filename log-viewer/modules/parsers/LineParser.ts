@@ -441,6 +441,47 @@ class SOQLExecuteEndLine extends LogLine {
   }
 }
 
+class SOQLExecuteExplainLine extends LogLine {
+  lineNumber: LineNumber;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `${parts[3]}, line:${this.lineNumber}`;
+  }
+}
+
+class SOSLExecuteBeginLine extends LogLine {
+  exitTypes = ["SOSL_EXECUTE_END"];
+  displayType = "method";
+  cpuType = "free";
+  timelineKey = "soql";
+  group = "SOQL";
+  lineNumber: LineNumber;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `SOSL: ${parts[3]}`;
+  }
+
+  onEnd(end: SOSLExecuteEndLine) {
+    this.rowCount = end.rowCount;
+  }
+}
+
+class SOSLExecuteEndLine extends LogLine {
+  isExit = true;
+  lineNumber: LineNumber;
+  rowCount: number;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.rowCount = parseRows(parts[3]);
+  }
+}
+
 class HeapAllocateLine extends LogLine {
   lineNumber: LineNumber;
 
@@ -590,6 +631,33 @@ class PopTraceFlagsLine extends LogLine {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[4] + ", line:" + this.lineNumber + " - " + parts[5];
+  }
+}
+
+class QueryMoreBeginLine extends LogLine {
+  lineNumber: LineNumber;
+  exitTypes = ["QUERY_MORE_END"];
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `line: ${this.lineNumber}`;
+  }
+}
+class QueryMoreEndLine extends LogLine {
+  lineNumber: LineNumber;
+  isExit = true;
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `line: ${this.lineNumber}`;
+  }
+}
+class QueryMoreIterationsLine extends LogLine {
+  lineNumber: LineNumber;
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `line: ${this.lineNumber}, iterations:${parts[3]}`;
   }
 }
 
@@ -1174,6 +1242,9 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["DML_END", DMLEndLine],
   ["SOQL_EXECUTE_BEGIN", SOQLExecuteBeginLine],
   ["SOQL_EXECUTE_END", SOQLExecuteEndLine],
+  ["SOQL_EXECUTE_EXPLAIN", SOQLExecuteExplainLine],
+  ["SOSL_EXECUTE_BEGIN", SOSLExecuteBeginLine],
+  ["SOSL_EXECUTE_END", SOSLExecuteEndLine],
   ["HEAP_ALLOCATE", HeapAllocateLine],
   ["STATEMENT_EXECUTE", StatementExecuteLine],
   ["VARIABLE_SCOPE_BEGIN", VariableScopeBeginLine],
@@ -1186,6 +1257,9 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["LIMIT_USAGE_FOR_NS", LimitUsageForNSLine],
   ["POP_TRACE_FLAGS", PopTraceFlagsLine],
   ["PUSH_TRACE_FLAGS", PushTraceFlagsLine],
+  ["QUERY_MORE_BEGIN", QueryMoreBeginLine],
+  ["QUERY_MORE_END", QueryMoreEndLine],
+  ["QUERY_MORE_ITERATIONS", QueryMoreIterationsLine],
   ["TOTAL_EMAIL_RECIPIENTS_QUEUED", TotalEmailRecipientsQueuedLine],
   ["STATIC_VARIABLE_LIST", StaticVariableListLine],
   ["SYSTEM_MODE_ENTER", SystemModeEnterLine],
