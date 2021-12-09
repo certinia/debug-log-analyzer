@@ -221,7 +221,10 @@ class SystemConstructorEntryLine extends LogLine {
     this.text = parts[3];
   }
 }
+
 class SystemConstructorExitLine extends LogLine {
+  namespace = "system";
+  timelineKey = "systemMethod";
   isExit = true;
   lineNumber: LineNumber;
 
@@ -247,6 +250,8 @@ class SystemMethodEntryLine extends LogLine {
 }
 
 class SystemMethodExitLine extends LogLine {
+  namespace = "system";
+  timelineKey = "systemMethod";
   isExit = true;
   lineNumber: LineNumber;
 
@@ -566,6 +571,28 @@ class LimitUsageForNSLine extends LogLine {
   }
 }
 
+class PushTraceFlagsLine extends LogLine {
+  namespace = "system";
+  timelineKey = "systemMethod";
+  lineNumber: LineNumber;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = parts[4] + ", line:" + this.lineNumber + " - " + parts[5];
+  }
+}
+
+class PopTraceFlagsLine extends LogLine {
+  namespace = "system";
+  timelineKey = "systemMethod";
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = parts[4] + ", line:" + this.lineNumber + " - " + parts[5];
+  }
+}
+
 class TotalEmailRecipientsQueuedLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
@@ -580,14 +607,20 @@ class StaticVariableListLine extends LogLine {
 }
 
 class SystemModeEnterLine extends LogLine {
+  namespace = "system";
+  timelineKey = "systemMethod";
   constructor(parts: string[]) {
     super(parts);
+    this.text = parts[2];
   }
 }
 
 class SystemModeExitLine extends LogLine {
+  namespace = "system";
+  timelineKey = "systemMethod";
   constructor(parts: string[]) {
     super(parts);
+    this.text = parts[2];
   }
 }
 
@@ -1151,6 +1184,8 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["CUMULATIVE_LIMIT_USAGE_END", CumulativeLimitUsageEndLine],
   ["LIMIT_USAGE", LimitUsageLine],
   ["LIMIT_USAGE_FOR_NS", LimitUsageForNSLine],
+  ["POP_TRACE_FLAGS", PopTraceFlagsLine],
+  ["PUSH_TRACE_FLAGS", PushTraceFlagsLine],
   ["TOTAL_EMAIL_RECIPIENTS_QUEUED", TotalEmailRecipientsQueuedLine],
   ["STATIC_VARIABLE_LIST", StaticVariableListLine],
   ["SYSTEM_MODE_ENTER", SystemModeEnterLine],
