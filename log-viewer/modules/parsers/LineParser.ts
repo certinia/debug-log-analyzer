@@ -699,6 +699,7 @@ class StackFrameVariableListLine extends LogLine {
 }
 
 class StaticVariableListLine extends LogLine {
+  acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
   }
