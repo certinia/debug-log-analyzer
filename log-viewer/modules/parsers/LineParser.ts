@@ -1074,6 +1074,19 @@ class ValidationRuleLine extends LogLine {
   }
 }
 
+class ValidationErrorLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class ValidationFailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
 class ValidationFormulaLine extends LogLine {
   acceptsText = true;
   group: string;
@@ -1364,8 +1377,11 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["FLOW_BULK_ELEMENT_DETAIL", FlowBulkElementDetailLine],
   ["FLOW_BULK_ELEMENT_LIMIT_USAGE", FlowBulkElementLimitUsage],
   ["TESTING_LIMITS", TestingLimitsLine],
+  ["VALIDATION_ERROR", ValidationErrorLine],
+  ["VALIDATION_FAIL", ValidationFailLine],
   ["VALIDATION_FORMULA", ValidationFormulaLine],
   ["VALIDATION_PASS", ValidationPassLine],
+  ["VALIDATION_RULE", ValidationRuleLine],
   ["WF_FLOW_ACTION_BEGIN", WFFlowActionBeginLine],
   ["WF_FLOW_ACTION_END", WFFlowActionEndLine],
   ["WF_FLOW_ACTION_ERROR", WFFlowActionErrorLine],
