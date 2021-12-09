@@ -715,7 +715,6 @@ class EnteringManagedPackageLine extends LogLine {
   displayType = "method";
   cpuType = "pkg";
   timelineKey = "method";
-  name: string;
   namespace: string;
   exitStamp: any;
   duration: any;
@@ -728,7 +727,6 @@ class EnteringManagedPackageLine extends LogLine {
       ns = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
 
     this.text = this.namespace = ns;
-    this.name = this.type + ": " + parts[2];
   }
 
   after(next: LogLine) {
