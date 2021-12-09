@@ -158,6 +158,40 @@ class BulkHeapAllocateLine extends LogLine {
   }
 }
 
+class CalloutRequestLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[3]} : ${parts[2]}`;
+  }
+}
+
+class CalloutResponseLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[3]} : ${parts[2]}`;
+  }
+}
+class NamedCredentialRequestLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
+  }
+}
+
+class NamedCredentialResponseLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class NamedCredentialResponseDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[3]} : ${parts[4]} ${parts[5]} : ${parts[6]} ${parts[7]}`;
+  }
+}
+
 class ConstructorEntryLine extends LogLine {
   exitTypes = ["CONSTRUCTOR_EXIT"];
   displayType = "method";
@@ -1717,8 +1751,40 @@ class FatalErrorLine extends LogLine {
   }
 }
 
+class XDSDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class XDSResponseLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
+  }
+}
+class XDSResponseDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class XDSResponseErrorLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
 const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["BULK_HEAP_ALLOCATE", BulkHeapAllocateLine],
+  ["CALLOUT_REQUEST", CalloutRequestLine],
+  ["CALLOUT_RESPONSE", CalloutResponseLine],
+  ["NAMED_CREDENTIAL_REQUEST", NamedCredentialRequestLine],
+  ["NAMED_CREDENTIAL_RESPONSE", NamedCredentialResponseLine],
+  ["NAMED_CREDENTIAL_RESPONSE_DETAIL", NamedCredentialResponseDetailLine],
   ["CONSTRUCTOR_ENTRY", ConstructorEntryLine],
   ["CONSTRUCTOR_EXIT", ConstructorExitLine],
   ["EMAIL_QUEUE", EmailQueueLine],
@@ -1878,6 +1944,10 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["WF_TIME_TRIGGERS_BEGIN", WFTimeTriggersBeginLine],
   ["EXCEPTION_THROWN", ExceptionThrownLine],
   ["FATAL_ERROR", FatalErrorLine],
+  ["XDS_DETAIL", XDSDetailLine],
+  ["XDS_RESPONSE", XDSResponseLine],
+  ["XDS_RESPONSE_DETAIL", XDSResponseDetailLine],
+  ["XDS_RESPONSE_ERROR", XDSResponseErrorLine],
 ]);
 
 export function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
