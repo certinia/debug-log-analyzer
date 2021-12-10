@@ -37,6 +37,7 @@ describe("LineIterator tests", () => {
     expect(iter.fetch()).toEqual(logLines[0]);
     expect(iter.fetch()).toEqual(logLines[1]);
     expect(iter.fetch()).toEqual(logLines[2]);
+    expect(iter.fetch()).toEqual(logLines[3]);
     expect(iter.fetch()).toEqual(null);
   });
 });
