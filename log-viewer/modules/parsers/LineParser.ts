@@ -14,7 +14,7 @@ export abstract class TimeStampedNode {
   timestamp: number = 0;
   exitStamp: number | null = null;
   duration: number | null = null;
-  netDuration: number | null = null;
+  selfTime: number | null = null;
   children: TimeStampedNode[] | null = null;
 }
 
@@ -867,7 +867,7 @@ class EnteringManagedPackageLine extends LogLine {
   namespace: string;
   exitStamp: any;
   duration: any;
-  netDuration: any;
+  selfTime: any;
 
   constructor(parts: string[]) {
     super(parts);
@@ -880,7 +880,7 @@ class EnteringManagedPackageLine extends LogLine {
 
   after(next: LogLine) {
     this.exitStamp = next.timestamp;
-    this.duration = this.netDuration = this.exitStamp - this.timestamp;
+    this.duration = this.selfTime = this.exitStamp - this.timestamp;
   }
 }
 

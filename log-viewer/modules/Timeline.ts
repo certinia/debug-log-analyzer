@@ -439,7 +439,7 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
     toolTip.appendChild(document.createTextNode(target.type));
     toolTip.appendChild(brElem.cloneNode());
     toolTip.appendChild(document.createTextNode(target.text));
-    if (target.timestamp && target.duration && target.netDuration) {
+    if (target.timestamp && target.duration && target.selfTime) {
       toolTip.appendChild(brElem.cloneNode());
       toolTip.appendChild(
         document.createTextNode("timestamp: " + target.timestamp)
@@ -457,7 +457,7 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
         } else {
           toolTip.appendChild(
             document.createTextNode(
-              ` (self ${formatDuration(target.netDuration)})`
+              ` (self ${formatDuration(target.selfTime)})`
             )
           );
         }

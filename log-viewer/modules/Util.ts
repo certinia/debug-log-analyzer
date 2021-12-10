@@ -39,14 +39,14 @@ export function showTab(tabId: string) {
 
 export function recalculateDurations(node: TimeStampedNode) {
   if (node.exitStamp) {
-    node.netDuration = node.duration = node.exitStamp - node.timestamp;
+    node.selfTime = node.duration = node.exitStamp - node.timestamp;
     if (node.children) {
       const len = node.children.length;
       for (let i = 0; i < len; ++i) {
         const duration = node.children[i].duration;
 
         if (duration) {
-          node.netDuration -= duration;
+          node.selfTime -= duration;
         }
       }
     }
