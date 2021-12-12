@@ -14,7 +14,7 @@ export abstract class TimeStampedNode {
   timestamp: number = 0;
   exitStamp: number | null = null;
   duration: number | null = null;
-  netDuration: number | null = null;
+  selfTime: number | null = null;
   children: TimeStampedNode[] | null = null;
 }
 
@@ -151,10 +151,50 @@ export function parseRows(text: string): number {
 
 /* Log line entry Parsers */
 
+class BulkHeapAllocateLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class CalloutRequestLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[3]} : ${parts[2]}`;
+  }
+}
+
+class CalloutResponseLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[3]} : ${parts[2]}`;
+  }
+}
+class NamedCredentialRequestLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
+  }
+}
+
+class NamedCredentialResponseLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class NamedCredentialResponseDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[3]} : ${parts[4]} ${parts[5]} : ${parts[6]} ${parts[7]}`;
+  }
+}
+
 class ConstructorEntryLine extends LogLine {
   exitTypes = ["CONSTRUCTOR_EXIT"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "method";
   suffix = " (constructor)";
   timelineKey = "method";
@@ -168,6 +208,7 @@ class ConstructorEntryLine extends LogLine {
     this.text = parts[5] + args.substring(args.lastIndexOf("("));
   }
 }
+
 class ConstructorExitLine extends LogLine {
   isExit = true;
   lineNumber: LineNumber;
@@ -178,10 +219,17 @@ class ConstructorExitLine extends LogLine {
   }
 }
 
+class EmailQueueLine extends LogLine {
+  lineNumber: LineNumber;
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
 export class MethodEntryLine extends LogLine {
   exitTypes = ["METHOD_EXIT"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "method";
   timelineKey = "method";
   classes = "node";
@@ -210,7 +258,6 @@ class MethodExitLine extends LogLine {
 class SystemConstructorEntryLine extends LogLine {
   exitTypes = ["SYSTEM_CONSTRUCTOR_EXIT"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "method";
   namespace = "system";
   suffix = "(system constructor)";
@@ -224,7 +271,10 @@ class SystemConstructorEntryLine extends LogLine {
     this.text = parts[3];
   }
 }
+
 class SystemConstructorExitLine extends LogLine {
+  namespace = "system";
+  timelineKey = "systemMethod";
   isExit = true;
   lineNumber: LineNumber;
 
@@ -236,7 +286,6 @@ class SystemConstructorExitLine extends LogLine {
 class SystemMethodEntryLine extends LogLine {
   exitTypes = ["SYSTEM_METHOD_EXIT"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "method";
   namespace = "system";
   timelineKey = "systemMethod";
@@ -251,6 +300,8 @@ class SystemMethodEntryLine extends LogLine {
 }
 
 class SystemMethodExitLine extends LogLine {
+  namespace = "system";
+  timelineKey = "systemMethod";
   isExit = true;
   lineNumber: LineNumber;
 
@@ -263,7 +314,6 @@ class SystemMethodExitLine extends LogLine {
 export class CodeUnitStartedLine extends LogLine {
   exitTypes = ["CODE_UNIT_FINISHED"];
   displayType = "method";
-  hasLineNumber = false;
   suffix = " (entrypoint)";
   timelineKey = "codeUnit";
   classes = "node";
@@ -315,7 +365,6 @@ export class CodeUnitFinishedLine extends LogLine {
 class VFApexCallStartLine extends LogLine {
   exitTypes = ["VF_APEX_CALL_END"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "method";
   suffix = " (VF APEX)";
   classes = "node";
@@ -332,6 +381,27 @@ class VFApexCallEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
+  }
+}
+
+class VFDeserializeViewstateBeginLine extends LogLine {
+  exitTypes = ["VF_DESERIALIZE_VIEWSTATE_END"];
+  displayType = "method";
+  cpuType = "method";
+  namespace = "system";
+  timelineKey = "systemMethod";
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = this.type;
+  }
+}
+
+class VFDeserializeViewstateEndLine extends LogLine {
+  isExit = true;
+
+  constructor(parts: string[]) {
+    super(parts);
   }
 }
 
@@ -379,10 +449,15 @@ class VFSeralizeViewStateEndLine extends LogLine {
   }
 }
 
+class VFPageMessageLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
 class DMLBeginLine extends LogLine {
   exitTypes = ["DML_END"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "free";
   timelineKey = "dml";
   group = "DML";
@@ -407,6 +482,15 @@ class DMLEndLine extends LogLine {
   }
 }
 
+class IdeasQueryExecuteLine extends LogLine {
+  lineNumber: LineNumber;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
 interface EndLine {
   rowCount: number;
 }
@@ -414,7 +498,6 @@ interface EndLine {
 class SOQLExecuteBeginLine extends LogLine {
   exitTypes = ["SOQL_EXECUTE_END"];
   displayType = "method";
-  hasLineNumber = true;
   cpuType = "free";
   timelineKey = "soql";
   group: string;
@@ -444,7 +527,57 @@ class SOQLExecuteEndLine extends LogLine {
   }
 }
 
+class SOQLExecuteExplainLine extends LogLine {
+  lineNumber: LineNumber;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `${parts[3]}, line:${this.lineNumber}`;
+  }
+}
+
+class SOSLExecuteBeginLine extends LogLine {
+  exitTypes = ["SOSL_EXECUTE_END"];
+  displayType = "method";
+  cpuType = "free";
+  timelineKey = "soql";
+  group = "SOQL";
+  lineNumber: LineNumber;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `SOSL: ${parts[3]}`;
+  }
+
+  onEnd(end: SOSLExecuteEndLine) {
+    this.rowCount = end.rowCount;
+  }
+}
+
+class SOSLExecuteEndLine extends LogLine {
+  isExit = true;
+  lineNumber: LineNumber;
+  rowCount: number;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.rowCount = parseRows(parts[3]);
+  }
+}
+
 class HeapAllocateLine extends LogLine {
+  lineNumber: LineNumber;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+  }
+}
+
+class HeapDeallocateLine extends LogLine {
   lineNumber: LineNumber;
 
   constructor(parts: string[]) {
@@ -482,6 +615,11 @@ class VariableScopeBeginLine extends LogLine {
   }
 }
 
+class VariableScopeEndLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
 class VariableAssignmentLine extends LogLine {
   lineNumber: LineNumber;
   group: string;
@@ -510,6 +648,7 @@ class UserInfoLine extends LogLine {
 class UserDebugLine extends LogLine {
   lineNumber: LineNumber;
   group: string;
+  acceptsText = true;
 
   constructor(parts: string[]) {
     super(parts);
@@ -540,6 +679,29 @@ class CumulativeLimitUsageEndLine extends LogLine {
     super(parts);
   }
 }
+
+class CumulativeProfilingLine extends LogLine {
+  acceptsText = true;
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2] + " " + (parts[3] ?? "");
+  }
+}
+
+class CumulativeProfilingBeginLine extends LogLine {
+  exitTypes = ["CUMULATIVE_PROFILING_END"];
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
+class CumulativeProfilingEndLine extends LogLine {
+  isExit = true;
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
 class LimitUsageLine extends LogLine {
   lineNumber: LineNumber;
   group: string;
@@ -573,6 +735,73 @@ class LimitUsageForNSLine extends LogLine {
   }
 }
 
+class PushTraceFlagsLine extends LogLine {
+  namespace = "system";
+  timelineKey = "systemMethod";
+  lineNumber: LineNumber;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = parts[4] + ", line:" + this.lineNumber + " - " + parts[5];
+  }
+}
+
+class PopTraceFlagsLine extends LogLine {
+  namespace = "system";
+  timelineKey = "systemMethod";
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = parts[4] + ", line:" + this.lineNumber + " - " + parts[5];
+  }
+}
+
+class QueryMoreBeginLine extends LogLine {
+  lineNumber: LineNumber;
+  exitTypes = ["QUERY_MORE_END"];
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `line: ${this.lineNumber}`;
+  }
+}
+class QueryMoreEndLine extends LogLine {
+  lineNumber: LineNumber;
+  isExit = true;
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `line: ${this.lineNumber}`;
+  }
+}
+class QueryMoreIterationsLine extends LogLine {
+  lineNumber: LineNumber;
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `line: ${this.lineNumber}, iterations:${parts[3]}`;
+  }
+}
+
+class SavepointRollbackLine extends LogLine {
+  lineNumber: LineNumber;
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `${parts[3]}, line: ${this.lineNumber}`;
+  }
+}
+
+class SavepointSetLine extends LogLine {
+  lineNumber: LineNumber;
+  constructor(parts: string[]) {
+    super(parts);
+    this.lineNumber = parseLineNumber(parts[2]);
+    this.text = `${parts[3]}, line: ${this.lineNumber}`;
+  }
+}
+
 class TotalEmailRecipientsQueuedLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
@@ -580,33 +809,54 @@ class TotalEmailRecipientsQueuedLine extends LogLine {
   }
 }
 
+class StackFrameVariableListLine extends LogLine {
+  acceptsText = true;
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
 class StaticVariableListLine extends LogLine {
+  acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
 class SystemModeEnterLine extends LogLine {
+  namespace = "system";
+  timelineKey = "systemMethod";
   constructor(parts: string[]) {
     super(parts);
+    this.text = parts[2];
   }
 }
 
 class SystemModeExitLine extends LogLine {
+  namespace = "system";
+  timelineKey = "systemMethod";
   constructor(parts: string[]) {
     super(parts);
+    this.text = parts[2];
   }
 }
 
 export class ExecutionStartedLine extends LogLine {
+  exitTypes = ["EXECUTION_FINISHED"];
+  displayType = "method";
+  timelineKey = "method";
+  classes = "node";
   constructor(parts: string[]) {
     super(parts);
+    this.text = this.type;
   }
 }
 
 export class ExecutionFinishedLine extends LogLine {
+  isExit = true;
   constructor(parts: string[]) {
     super(parts);
+    this.text = this.type;
   }
 }
 
@@ -614,11 +864,10 @@ class EnteringManagedPackageLine extends LogLine {
   displayType = "method";
   cpuType = "pkg";
   timelineKey = "method";
-  name: string;
   namespace: string;
   exitStamp: any;
   duration: any;
-  netDuration: any;
+  selfTime: any;
 
   constructor(parts: string[]) {
     super(parts);
@@ -627,12 +876,11 @@ class EnteringManagedPackageLine extends LogLine {
       ns = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
 
     this.text = this.namespace = ns;
-    this.name = this.type + ": " + parts[2];
   }
 
   after(next: LogLine) {
     this.exitStamp = next.timestamp;
-    this.duration = this.netDuration = this.exitStamp - this.timestamp;
+    this.duration = this.selfTime = this.exitStamp - this.timestamp;
   }
 }
 
@@ -665,6 +913,39 @@ class EventSericePubDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] + " " + parts[3] + " " + parts[4];
+    this.group = this.type;
+  }
+}
+
+class EventSericeSubBeginLine extends LogLine {
+  exitTypes = ["EVENT_SERVICE_SUB_END"];
+  displayType = "method";
+  cpuType = "custom";
+  timelineKey = "flow";
+  group: string;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} ${parts[3]}`;
+    this.group = this.type;
+  }
+}
+
+class EventSericeSubEndLine extends LogLine {
+  isExit = true;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} ${parts[3]}`;
+  }
+}
+
+class EventSericeSubDetailLine extends LogLine {
+  group: string;
+
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} ${parts[3]} ${parts[4]} ${parts[6]} ${parts[6]}`;
     this.group = this.type;
   }
 }
@@ -711,6 +992,13 @@ class FlowStartInterviewsEndLine extends LogLine {
   }
 }
 
+class FlowStartInterviewsErrorLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} - ${parts[4]}`;
+  }
+}
+
 class FlowStartInterviewBeginLine extends LogLine {
   group: string;
 
@@ -737,6 +1025,12 @@ class FlowStartInterviewLimitUsageLine extends LogLine {
   }
 }
 
+class FlowStartScheduledRecordsLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]}`;
+  }
+}
 class FlowCreateInterviewBeginLine extends LogLine {
   text = "";
 
@@ -748,6 +1042,13 @@ class FlowCreateInterviewBeginLine extends LogLine {
 class FlowCreateInterviewEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
+  }
+}
+
+class FlowCreateInterviewErrorLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
@@ -796,6 +1097,34 @@ class FlowElementAssignmentLine extends LogLine {
   }
 }
 
+class FlowWaitEventResumingDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
+  }
+}
+
+class FlowWaitEventWaitingDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
+  }
+}
+
+class FlowWaitResumingDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class FlowWaitWaitingDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
+  }
+}
+
 class FlowInterviewFinishedLine extends LogLine {
   group: string;
 
@@ -806,10 +1135,52 @@ class FlowInterviewFinishedLine extends LogLine {
   }
 }
 
+class FlowInterviewResumedLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]}`;
+  }
+}
+
+class FlowInterviewPausedLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
 class FlowElementErrorLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[1] + parts[2] + " " + parts[3] + " " + parts[4];
+  }
+}
+
+class FlowElementFaultLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class FlowElementLimitUsageLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class FlowInterviewFinishedLimitUsageLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class FlowSubflowDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
@@ -888,7 +1259,14 @@ class FlowBulkElementDetailLine extends LogLine {
   }
 }
 
-class FlowBulkElementLimitUsage extends LogLine {
+class FlowBulkElementNotSupportedLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class FlowBulkElementLimitUsageLine extends LogLine {
   declarative = true;
   group: string;
 
@@ -899,6 +1277,78 @@ class FlowBulkElementLimitUsage extends LogLine {
   }
 }
 
+class PNInvalidAppLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}.${parts[3]}`;
+  }
+}
+
+class PNInvalidCertificateLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}.${parts[3]}`;
+  }
+}
+class PNInvalidNotificationLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}.${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]} : ${parts[7]} : ${parts[8]}`;
+  }
+}
+class PNNoDevicesLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}.${parts[3]}`;
+  }
+}
+class PNNotEnabledLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+class PNSentLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}.${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]} : ${parts[7]}`;
+  }
+}
+
+class SLAEndLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
+  }
+}
+
+class SLAEvalMilestoneLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class SLANullStartDateLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
+class SLAProcessCaseLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class TestingLimitsLine extends LogLine {
+  acceptsText = true;
+
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
 class ValidationRuleLine extends LogLine {
   group: string;
 
@@ -906,6 +1356,19 @@ class ValidationRuleLine extends LogLine {
     super(parts);
     this.text = parts[3];
     this.group = this.type;
+  }
+}
+
+class ValidationErrorLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class ValidationFailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
   }
 }
 
@@ -1074,12 +1537,180 @@ class WFActionLine extends LogLine {
 class WFActionsEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
+    this.text = parts[2];
+  }
+}
+
+class WFActionTaskLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]} : ${parts[7]}`;
+  }
+}
+
+class WFApprovalLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class WFApprovalRemoveLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class WFApprovalSubmitLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]}`;
+  }
+}
+
+class WFApprovalSubmitterLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class WFAssignLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]}`;
+  }
+}
+
+class WFEmailAlertLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class WFEmailSentLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class WFEnqueueActionsLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class WFEscalationActionLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]}`;
+  }
+}
+
+class WFEscalationRuleLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
+class WFEvalEntryCriteriaLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class WFFlowActionDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    const optional = parts[4] ? ` : ${parts[4]} :${parts[5]}` : "";
+    this.text = `${parts[2]} : ${parts[3]}` + optional;
+  }
+}
+
+class WFHardRejectLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
+class WFNextApproverLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
+  }
+}
+
+class WFNoProcessFoundLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+
+class WFOutboundMsgLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
+  }
+}
+
+class WFProcessFoundLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]}`;
+  }
+}
+
+class WFReassignRecordLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]}`;
+  }
+}
+
+class WFResponseNotifyLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
+  }
+}
+
+class WFRuleEntryOrderLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class WFRuleInvocationLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class WFSoftRejectLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class WFTimeTriggerLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
 class WFSpoolActionBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
+    this.text = parts[2];
   }
 }
 
@@ -1120,9 +1751,43 @@ class FatalErrorLine extends LogLine {
   }
 }
 
+class XDSDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class XDSResponseLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
+  }
+}
+class XDSResponseDetailLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class XDSResponseErrorLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
 const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
+  ["BULK_HEAP_ALLOCATE", BulkHeapAllocateLine],
+  ["CALLOUT_REQUEST", CalloutRequestLine],
+  ["CALLOUT_RESPONSE", CalloutResponseLine],
+  ["NAMED_CREDENTIAL_REQUEST", NamedCredentialRequestLine],
+  ["NAMED_CREDENTIAL_RESPONSE", NamedCredentialResponseLine],
+  ["NAMED_CREDENTIAL_RESPONSE_DETAIL", NamedCredentialResponseDetailLine],
   ["CONSTRUCTOR_ENTRY", ConstructorEntryLine],
   ["CONSTRUCTOR_EXIT", ConstructorExitLine],
+  ["EMAIL_QUEUE", EmailQueueLine],
   ["METHOD_ENTRY", MethodEntryLine],
   ["METHOD_EXIT", MethodExitLine],
   ["SYSTEM_CONSTRUCTOR_ENTRY", SystemConstructorEntryLine],
@@ -1133,25 +1798,45 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["CODE_UNIT_FINISHED", CodeUnitFinishedLine],
   ["VF_APEX_CALL_START", VFApexCallStartLine],
   ["VF_APEX_CALL_END", VFApexCallEndLine],
+  ["VF_DESERIALIZE_VIEWSTATE_BEGIN", VFDeserializeViewstateBeginLine],
+  ["VF_DESERIALIZE_VIEWSTATE_END", VFDeserializeViewstateEndLine],
   ["VF_EVALUATE_FORMULA_BEGIN", VFFormulaStartLine],
   ["VF_EVALUATE_FORMULA_END", VFFormulaEndLine],
   ["VF_SERIALIZE_VIEWSTATE_BEGIN", VFSeralizeViewStateStartLine],
   ["VF_SERIALIZE_VIEWSTATE_END", VFSeralizeViewStateEndLine],
+  ["VF_PAGE_MESSAGE", VFPageMessageLine],
   ["DML_BEGIN", DMLBeginLine],
   ["DML_END", DMLEndLine],
+  ["IDEAS_QUERY_EXECUTE", IdeasQueryExecuteLine],
   ["SOQL_EXECUTE_BEGIN", SOQLExecuteBeginLine],
   ["SOQL_EXECUTE_END", SOQLExecuteEndLine],
+  ["SOQL_EXECUTE_EXPLAIN", SOQLExecuteExplainLine],
+  ["SOSL_EXECUTE_BEGIN", SOSLExecuteBeginLine],
+  ["SOSL_EXECUTE_END", SOSLExecuteEndLine],
   ["HEAP_ALLOCATE", HeapAllocateLine],
+  ["HEAP_DEALLOCATE", HeapDeallocateLine],
   ["STATEMENT_EXECUTE", StatementExecuteLine],
   ["VARIABLE_SCOPE_BEGIN", VariableScopeBeginLine],
+  ["VARIABLE_SCOPE_END", VariableScopeEndLine],
   ["VARIABLE_ASSIGNMENT", VariableAssignmentLine],
   ["USER_INFO", UserInfoLine],
   ["USER_DEBUG", UserDebugLine],
   ["CUMULATIVE_LIMIT_USAGE", CumulativeLimitUsageLine],
   ["CUMULATIVE_LIMIT_USAGE_END", CumulativeLimitUsageEndLine],
+  ["CUMULATIVE_PROFILING", CumulativeProfilingLine],
+  ["CUMULATIVE_PROFILING_BEGIN", CumulativeProfilingBeginLine],
+  ["CUMULATIVE_PROFILING_END", CumulativeProfilingEndLine],
   ["LIMIT_USAGE", LimitUsageLine],
   ["LIMIT_USAGE_FOR_NS", LimitUsageForNSLine],
+  ["POP_TRACE_FLAGS", PopTraceFlagsLine],
+  ["PUSH_TRACE_FLAGS", PushTraceFlagsLine],
+  ["QUERY_MORE_BEGIN", QueryMoreBeginLine],
+  ["QUERY_MORE_END", QueryMoreEndLine],
+  ["QUERY_MORE_ITERATIONS", QueryMoreIterationsLine],
   ["TOTAL_EMAIL_RECIPIENTS_QUEUED", TotalEmailRecipientsQueuedLine],
+  ["SAVEPOINT_ROLLBACK", SavepointRollbackLine],
+  ["SAVEPOINT_SET", SavepointSetLine],
+  ["STACK_FRAME_VARIABLE_LIST", StackFrameVariableListLine],
   ["STATIC_VARIABLE_LIST", StaticVariableListLine],
   ["SYSTEM_MODE_ENTER", SystemModeEnterLine],
   ["SYSTEM_MODE_EXIT", SystemModeExitLine],
@@ -1161,20 +1846,36 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["EVENT_SERVICE_PUB_BEGIN", EventSericePubBeginLine],
   ["EVENT_SERVICE_PUB_END", EventSericePubEndLine],
   ["EVENT_SERVICE_PUB_DETAIL", EventSericePubDetailLine],
+  ["EVENT_SERVICE_SUB_BEGIN", EventSericeSubBeginLine],
+  ["EVENT_SERVICE_SUB_DETAIL", EventSericeSubDetailLine],
+  ["EVENT_SERVICE_SUB_END", EventSericeSubEndLine],
   ["SAVEPOINT_SET", SavePointSetLine],
   ["FLOW_START_INTERVIEWS_BEGIN", FlowStartInterviewsBeginLine],
   ["FLOW_START_INTERVIEWS_END", FlowStartInterviewsEndLine],
+  ["FLOW_START_INTERVIEWS_ERROR", FlowStartInterviewsErrorLine],
   ["FLOW_START_INTERVIEW_BEGIN", FlowStartInterviewBeginLine],
   ["FLOW_START_INTERVIEW_END", FlowStartInterviewEndLine],
   ["FLOW_START_INTERVIEW_LIMIT_USAGE", FlowStartInterviewLimitUsageLine],
+  ["FLOW_START_SCHEDULED_RECORDS", FlowStartScheduledRecordsLine],
   ["FLOW_CREATE_INTERVIEW_BEGIN", FlowCreateInterviewBeginLine],
   ["FLOW_CREATE_INTERVIEW_END", FlowCreateInterviewEndLine],
+  ["FLOW_CREATE_INTERVIEW_ERROR", FlowCreateInterviewErrorLine],
   ["FLOW_ELEMENT_BEGIN", FlowElementBeginLine],
   ["FLOW_ELEMENT_END", FlowElementEndLine],
   ["FLOW_ELEMENT_DEFERRED", FlowElementDeferredLine],
-  ["FLOW_VALUE_ASSIGNMENT", FlowElementAssignmentLine],
-  ["FLOW_INTERVIEW_FINISHED", FlowInterviewFinishedLine],
   ["FLOW_ELEMENT_ERROR", FlowElementErrorLine],
+  ["FLOW_ELEMENT_FAULT", FlowElementFaultLine],
+  ["FLOW_ELEMENT_LIMIT_USAGE", FlowElementLimitUsageLine],
+  ["FLOW_INTERVIEW_FINISHED_LIMIT_USAGE", FlowInterviewFinishedLimitUsageLine],
+  ["FLOW_SUBFLOW_DETAIL", FlowSubflowDetailLine],
+  ["FLOW_VALUE_ASSIGNMENT", FlowElementAssignmentLine],
+  ["FLOW_WAIT_EVENT_RESUMING_DETAIL", FlowWaitEventResumingDetailLine],
+  ["FLOW_WAIT_EVENT_WAITING_DETAIL", FlowWaitEventWaitingDetailLine],
+  ["FLOW_WAIT_RESUMING_DETAIL", FlowWaitResumingDetailLine],
+  ["FLOW_WAIT_WAITING_DETAIL", FlowWaitWaitingDetailLine],
+  ["FLOW_INTERVIEW_FINISHED", FlowInterviewFinishedLine],
+  ["FLOW_INTERVIEW_PAUSED", FlowInterviewPausedLine],
+  ["FLOW_INTERVIEW_RESUMED", FlowInterviewResumedLine],
   ["FLOW_ACTIONCALL_DETAIL", FlowActionCallDetailLine],
   ["FLOW_ASSIGNMENT_DETAIL", FlowAssignmentDetailLine],
   ["FLOW_LOOP_DETAIL", FlowLoopDetailLine],
@@ -1182,10 +1883,24 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["FLOW_BULK_ELEMENT_BEGIN", FlowBulkElementBeginLine],
   ["FLOW_BULK_ELEMENT_END", FlowBulkElementEndLine],
   ["FLOW_BULK_ELEMENT_DETAIL", FlowBulkElementDetailLine],
-  ["FLOW_BULK_ELEMENT_LIMIT_USAGE", FlowBulkElementLimitUsage],
-  ["VALIDATION_RULE", ValidationRuleLine],
+  ["FLOW_BULK_ELEMENT_LIMIT_USAGE", FlowBulkElementLimitUsageLine],
+  ["FLOW_BULK_ELEMENT_NOT_SUPPORTED", FlowBulkElementNotSupportedLine],
+  ["PUSH_NOTIFICATION_INVALID_APP", PNInvalidAppLine],
+  ["PUSH_NOTIFICATION_INVALID_CERTIFICATE", PNInvalidCertificateLine],
+  ["PUSH_NOTIFICATION_INVALID_NOTIFICATION", PNInvalidNotificationLine],
+  ["PUSH_NOTIFICATION_NO_DEVICES", PNNoDevicesLine],
+  ["PUSH_NOTIFICATION_NOT_ENABLED", PNNotEnabledLine],
+  ["PUSH_NOTIFICATION_SENT", PNSentLine],
+  ["SLA_END", SLAEndLine],
+  ["SLA_EVAL_MILESTONE", SLAEvalMilestoneLine],
+  ["SLA_NULL_START_DATE", SLANullStartDateLine],
+  ["SLA_PROCESS_CASE", SLAProcessCaseLine],
+  ["TESTING_LIMITS", TestingLimitsLine],
+  ["VALIDATION_ERROR", ValidationErrorLine],
+  ["VALIDATION_FAIL", ValidationFailLine],
   ["VALIDATION_FORMULA", ValidationFormulaLine],
   ["VALIDATION_PASS", ValidationPassLine],
+  ["VALIDATION_RULE", ValidationRuleLine],
   ["WF_FLOW_ACTION_BEGIN", WFFlowActionBeginLine],
   ["WF_FLOW_ACTION_END", WFFlowActionEndLine],
   ["WF_FLOW_ACTION_ERROR", WFFlowActionErrorLine],
@@ -1201,10 +1916,38 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["WF_FORMULA", WFFormulaLine],
   ["WF_ACTION", WFActionLine],
   ["WF_ACTIONS_END", WFActionsEndLine],
+  ["WF_ACTION_TASK", WFActionTaskLine],
+  ["WF_APPROVAL", WFApprovalLine],
+  ["WF_APPROVAL_REMOVE", WFApprovalRemoveLine],
+  ["WF_APPROVAL_SUBMIT", WFApprovalSubmitLine],
+  ["WF_APPROVAL_SUBMITTER", WFApprovalSubmitterLine],
+  ["WF_ASSIGN", WFAssignLine],
+  ["WF_EMAIL_ALERT", WFEmailAlertLine],
+  ["WF_EMAIL_SENT", WFEmailSentLine],
+  ["WF_ENQUEUE_ACTIONS", WFEnqueueActionsLine],
+  ["WF_ESCALATION_ACTION", WFEscalationActionLine],
+  ["WF_ESCALATION_RULE", WFEscalationRuleLine],
+  ["WF_EVAL_ENTRY_CRITERIA", WFEvalEntryCriteriaLine],
+  ["WF_FLOW_ACTION_DETAIL", WFFlowActionDetailLine],
+  ["WF_HARD_REJECT", WFHardRejectLine],
+  ["WF_NEXT_APPROVER", WFNextApproverLine],
+  ["WF_NO_PROCESS_FOUND", WFNoProcessFoundLine],
+  ["WF_OUTBOUND_MSG", WFOutboundMsgLine],
+  ["WF_PROCESS_FOUND", WFProcessFoundLine],
+  ["WF_REASSIGN_RECORD", WFReassignRecordLine],
+  ["WF_RESPONSE_NOTIFY", WFResponseNotifyLine],
+  ["WF_RULE_ENTRY_ORDER", WFRuleEntryOrderLine],
+  ["WF_RULE_INVOCATION", WFRuleInvocationLine],
+  ["WF_SOFT_REJECT", WFSoftRejectLine],
   ["WF_SPOOL_ACTION_BEGIN", WFSpoolActionBeginLine],
+  ["WF_TIME_TRIGGER", WFTimeTriggerLine],
   ["WF_TIME_TRIGGERS_BEGIN", WFTimeTriggersBeginLine],
   ["EXCEPTION_THROWN", ExceptionThrownLine],
   ["FATAL_ERROR", FatalErrorLine],
+  ["XDS_DETAIL", XDSDetailLine],
+  ["XDS_RESPONSE", XDSResponseLine],
+  ["XDS_RESPONSE_DETAIL", XDSResponseDetailLine],
+  ["XDS_RESPONSE_ERROR", XDSResponseErrorLine],
 ]);
 
 export function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
@@ -1243,11 +1986,8 @@ export function parseLine(line: string, lastEntry: LogLine | null): LogLine | nu
 }
 
 export default async function parseLog(log: string) {
-  const start = log.indexOf("EXECUTION_STARTED");
+  const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || -1;
   const rawLines = log.substring(start).split("\n");
-  // strip the "EXECUTION_STARTED" and "EXECUTION_FINISHED" lines
-  rawLines.pop();
-  rawLines.shift();
 
   // reset global variables to be captured during parsing
   logLines = [];

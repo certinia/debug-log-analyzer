@@ -15,6 +15,7 @@ import {
   truncated,
   totalDuration,
   cpuUsed,
+  ExecutionStartedLine,
   ExecutionFinishedLine,
 } from "../parsers/LineParser";
 import parseLog from "../parsers/LineParser";
@@ -96,10 +97,11 @@ describe("parseLog tests", () => {
       "09:19:13.82 (51595120059)|EXECUTION_FINISHED\n";
 
     parseLog(log);
-    expect(logLines.length).toEqual(3);
-    expect(logLines[0]).toBeInstanceOf(CodeUnitStartedLine);
-    expect(logLines[1]).toBeInstanceOf(CodeUnitFinishedLine);
-    expect(logLines[2]).toBeInstanceOf(ExecutionFinishedLine);
+    expect(logLines.length).toEqual(4);
+    expect(logLines[0]).toBeInstanceOf(ExecutionStartedLine);
+    expect(logLines[1]).toBeInstanceOf(CodeUnitStartedLine);
+    expect(logLines[2]).toBeInstanceOf(CodeUnitFinishedLine);
+    expect(logLines[3]).toBeInstanceOf(ExecutionFinishedLine);
   });
 
   it("Should handle partial logs", async () => {
@@ -109,8 +111,9 @@ describe("parseLog tests", () => {
 
     parseLog(log);
 
-    expect(logLines.length).toBe(1);
-    expect(logLines[0]).toBeInstanceOf(CodeUnitStartedLine);
+    expect(logLines.length).toBe(2);
+    expect(logLines[0]).toBeInstanceOf(ExecutionStartedLine);
+    expect(logLines[1]).toBeInstanceOf(CodeUnitStartedLine);
   });
 
   it("Should detect skipped log entries", async () => {
@@ -176,7 +179,7 @@ describe("parseLog tests", () => {
       "09:19:13.82 (2000)|EXECUTION_FINISHED\n";
 
     parseLog(log);
-    expect(totalDuration).toBe(1800);
+    expect(totalDuration).toBe(1900);
   });
   it("Methods should have line-numbers", async () => {
     const log =
@@ -186,8 +189,8 @@ describe("parseLog tests", () => {
       "09:19:13.82 (51595120059)|EXECUTION_FINISHED\n";
 
     parseLog(log);
-    expect(logLines.length).toBe(3);
-    expect(logLines[0].lineNumber).toBe(185);
+    expect(logLines.length).toBe(4);
+    expect(logLines[1].lineNumber).toBe(185);
   });
   it("Packages should have a namespace", async () => {
     const log =
@@ -196,8 +199,8 @@ describe("parseLog tests", () => {
       "09:19:13.82 (51595120059)|EXECUTION_FINISHED\n";
 
     parseLog(log);
-    expect(logLines.length).toBe(2);
-    expect(logLines[0].namespace).toBe("appirio_core");
+    expect(logLines.length).toBe(3);
+    expect(logLines[1].namespace).toBe("appirio_core");
   });
   it("Limit Usage for NS provides cpuUsed", async () => {
     const log =
@@ -220,8 +223,8 @@ describe("parseLog tests", () => {
       "09:19:13.82 (51595120059)|EXECUTION_FINISHED\n";
 
     parseLog(log);
-    expect(logLines.length).toBe(4);
-    expect(logLines[1].type).toBe("LIMIT_USAGE_FOR_NS");
+    expect(logLines.length).toBe(5);
+    expect(logLines[2].type).toBe("LIMIT_USAGE_FOR_NS");
     expect(cpuUsed).toBe(4564000000);
   });
 });

@@ -9,7 +9,7 @@ import { LogLine } from "./parsers/LineParser";
 const nestedSort: Record<string, string[]> = {
   count: ["count", "duration", "name"],
   duration: ["duration", "count", "name"],
-  netDuration: ["netDuration", "count", "name"],
+  selfTime: ["selfTime", "count", "name"],
   name: ["name", "count", "duration"],
 };
 
@@ -19,18 +19,13 @@ export class Metric {
   name: string;
   count: number;
   duration: number;
-  netDuration: number;
+  selfTime: number;
 
-  constructor(
-    name: string,
-    count: number,
-    duration: number,
-    netDuration: number
-  ) {
+  constructor(name: string, count: number, duration: number, selfTime: number) {
     this.name = name;
     this.count = count;
     this.duration = duration;
-    this.netDuration = netDuration;
+    this.selfTime = selfTime;
   }
 }
 
@@ -47,10 +42,10 @@ function addNodeToMap(
       ++metric.count;
       if (node.duration) {
         metric.duration += node.duration;
-        metric.netDuration += node.netDuration || 0;
+        metric.selfTime += node.selfTime || 0;
       }
     } else {
-      map[key] = new Metric(key, 1, node.duration || 0, node.netDuration || 0);
+      map[key] = new Metric(key, 1, node.duration || 0, node.selfTime || 0);
     }
   }
 
@@ -87,9 +82,9 @@ function entrySort(
       x = a.duration;
       y = b.duration;
       break;
-    case "netDuration":
-      x = a.netDuration;
-      y = b.netDuration;
+    case "selfTime":
+      x = a.selfTime;
+      y = b.selfTime;
       break;
     default:
       x = a.name;
@@ -134,7 +129,7 @@ function renderAnalysisLine(
   name: string,
   count: string,
   duration: string,
-  netDuration: string,
+  selfTime: string,
   isBold: boolean = false
 ) {
   const analysisRow = document.createElement("div"),
@@ -144,8 +139,8 @@ function renderAnalysisLine(
     countCell = document.createElement("span"),
     durationText = highlightText(duration, isBold),
     durationCell = document.createElement("span"),
-    netDurationText = highlightText(netDuration, isBold),
-    netDurationCell = document.createElement("span");
+    selfTimeText = highlightText(selfTime, isBold),
+    selfTimeCell = document.createElement("span");
 
   nameCell.className = "name";
   nameCell.innerHTML = nameText;
@@ -154,14 +149,14 @@ function renderAnalysisLine(
   countCell.innerHTML = countText;
   durationCell.className = "duration";
   durationCell.innerHTML = durationText;
-  netDurationCell.className = "netDuration";
-  netDurationCell.innerHTML = netDurationText;
+  selfTimeCell.className = "selfTime";
+  selfTimeCell.innerHTML = selfTimeText;
 
   analysisRow.className = isBold ? "row" : "row data";
   analysisRow.appendChild(nameCell);
   analysisRow.appendChild(countCell);
   analysisRow.appendChild(durationCell);
-  analysisRow.appendChild(netDurationCell);
+  analysisRow.appendChild(selfTimeCell);
   return analysisRow;
 }
 
@@ -188,31 +183,24 @@ export async function renderAnalysis() {
       renderAnalysisLine(
         "Method Name",
         "Count",
-        "Total Duration",
-        "Net duration",
+        "Total Time",
+        "Self Time",
         true
       )
     );
 
     analysisHolder.innerHTML = "";
     let totalCount = 0,
-      totalNetDuration = 0;
+      totalSelfTime = 0;
     metricList.forEach(function (metric) {
       var duration = metric.duration ? formatDuration(metric.duration) : "-",
-        netDuration = metric.netDuration
-          ? formatDuration(metric.netDuration)
-          : "-";
+        selfTime = metric.selfTime ? formatDuration(metric.selfTime) : "-";
 
       analysisHolder.appendChild(
-        renderAnalysisLine(
-          metric.name,
-          "" + metric.count,
-          duration,
-          netDuration
-        )
+        renderAnalysisLine(metric.name, "" + metric.count, duration, selfTime)
       );
       totalCount += metric.count;
-      totalNetDuration += metric.netDuration;
+      totalSelfTime += metric.selfTime;
     });
 
     if (totalDuration) {
@@ -222,7 +210,7 @@ export async function renderAnalysis() {
           "Total",
           "" + totalCount,
           formatDuration(totalDuration),
-          formatDuration(totalNetDuration),
+          formatDuration(totalSelfTime),
           true
         )
       );

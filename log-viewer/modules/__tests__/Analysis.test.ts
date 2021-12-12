@@ -20,6 +20,7 @@ describe("Analyse methods tests", () => {
     const metricList = await analyseMethods(getRootMethod());
 
     expect(metricList).toEqual([
+      new Metric("EXECUTION_STARTED", 1, 51588545279, 2394092),
       new Metric(
         "pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)",
         1,
@@ -46,6 +47,7 @@ describe("Analyse methods tests", () => {
     const metricList = await analyseMethods(getRootMethod());
 
     expect(metricList).toEqual([
+      new Metric("EXECUTION_STARTED", 1, 51588545279, 2394092),
       new Metric(
         "pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)",
         1,

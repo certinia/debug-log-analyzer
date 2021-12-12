@@ -8,6 +8,13 @@ This tab shows the call tree as a timeline graph. Time runs left-to-right and ne
 
 Clicking on a timeline node will take you to the entry in the "Call Tree".
 
+#### Zoom on timeline
+
+- scroll up and down on the mouse to zoom in and out
+- zoom is based on position of mouse pointer, ensuring that position is kept on screen when zoomed in or out
+- scroll left and right on the mouse to move the time line left are right, when zoomed
+- click the mouse down and drag to move the timeline around both in the x and y direction, when zoomed
+
 ### The "Call Tree" Tab
 
 This tab shows the call tree for the log execution.
@@ -16,7 +23,7 @@ The tree can be expanded/collapsed with the +/- buttons on each method or with t
 
 ### The "Analysis" Tab
 
-This tab has aggregated times showing: _Count_, _Total Duration_ and _Net duration_ for each tree node. The toolbar controls sorting. The sort is multi-field and can be:
+This tab has aggregated times showing: _Count_, _Total Time and \_Self Time_ for each tree node. The toolbar controls sorting. The sort is multi-field and can be:
 
 - Total Duration (followed by count and then name)
 - Net duration (followed by count and then name)

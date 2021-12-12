@@ -19,7 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - zoom is based on position of mouse pointer, ensuring that position is kept on screen when zoomed in or out
   - scroll left and right on the mouse to move the time line left are right, when zoomed
   - click the mouse down and drag to move the timeline around both in the x and y direction, when zoomed
-- Specify custom timeline event colors in vscode preferences ([#66][#66]
+- Specify custom timeline event colors in vscode preferences ([#66][#66])
+- Support for all [known log event types](https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_debugging_system_log_console.htm) ([#81][#81])
+  - Includes events for `Database`, `Workflow`, `NBA`, `Validation`, `Callout`, `Apex Code`, `Apex Profiling`, `Visualforce` and `System` categories.
 
 ### Changed
 
@@ -88,3 +90,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#66]: https://github.com/financialforcedev/debug-log-analyzer/issues/66
 [#68]: https://github.com/financialforcedev/debug-log-analyzer/issues/68
 [#73]: https://github.com/financialforcedev/debug-log-analyzer/issues/73
+[#81]: https://github.com/financialforcedev/debug-log-analyzer/issues/81

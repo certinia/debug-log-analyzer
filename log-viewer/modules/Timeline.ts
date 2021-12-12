@@ -180,7 +180,7 @@ function drawNodes(
   nodes: LogLine[],
   depth: number
 ) {
-  const children = [];
+  const children: LogLine[] = [];
   const len = nodes.length;
   const y = depth * scaleY - verticalOffset;
   for (let c = 0; c < len; c++) {
@@ -196,9 +196,10 @@ function drawNodes(
       }
     }
 
-    if (node.children) {
-      children.push(...node.children);
-    }
+    // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
+    node.children?.forEach((child) => {
+      children.push(child);
+    });
   }
 
   if (!children.length) {
@@ -438,7 +439,7 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
     toolTip.appendChild(document.createTextNode(target.type));
     toolTip.appendChild(brElem.cloneNode());
     toolTip.appendChild(document.createTextNode(target.text));
-    if (target.timestamp && target.duration && target.netDuration) {
+    if (target.timestamp && target.duration && target.selfTime) {
       toolTip.appendChild(brElem.cloneNode());
       toolTip.appendChild(
         document.createTextNode("timestamp: " + target.timestamp)
@@ -456,7 +457,7 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
         } else {
           toolTip.appendChild(
             document.createTextNode(
-              ` (self ${formatDuration(target.netDuration)})`
+              ` (self ${formatDuration(target.selfTime)})`
             )
           );
         }

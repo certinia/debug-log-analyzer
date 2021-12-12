@@ -72,13 +72,13 @@ describe("Recalculate durations tests", () => {
       exitStamp: 3,
       children: [],
       duration: null,
-      netDuration: null,
+      selfTime: null,
     };
     recalculateDurations(node);
     expect(node.duration).toBe(2);
-    expect(node.netDuration).toBe(2);
+    expect(node.selfTime).toBe(2);
   });
-  it("Children are subtracted from net duration", () => {
+  it("Children are subtracted from self time", () => {
     let node: TimeStampedNode = {
       timestamp: 0,
       exitStamp: 100,
@@ -87,22 +87,22 @@ describe("Recalculate durations tests", () => {
           duration: 50,
           timestamp: 0,
           exitStamp: null,
-          netDuration: null,
+          selfTime: null,
           children: [],
         },
         {
           duration: 25,
           timestamp: 0,
           exitStamp: null,
-          netDuration: null,
+          selfTime: null,
           children: [],
         },
       ],
       duration: null,
-      netDuration: null,
+      selfTime: null,
     };
     recalculateDurations(node);
     expect(node.duration).toBe(100);
-    expect(node.netDuration).toBe(25);
+    expect(node.selfTime).toBe(25);
   });
 });
