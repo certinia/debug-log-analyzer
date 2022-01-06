@@ -24,3 +24,6 @@ sfdx/dist/lib/
 sfdx/dist/oclif.manifest.json
 *.tgz
 
+README.md
+CHANGELOG.md
+LICENSE.txt
