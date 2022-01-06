@@ -132,7 +132,7 @@
 		"log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/."
 	},
 	"dependencies": {
-		"pkgforce": "2.1.3"
+		"pkgforce": "^2.1.4"
 	},
 	"devDependencies": {
 		"@rollup/plugin-commonjs": "^19.0.2",
