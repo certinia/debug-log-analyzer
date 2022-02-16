@@ -405,11 +405,7 @@ function findByPosition(
 }
 
 function showTooltip(offsetX: number, offsetY: number) {
-  if (!dragging) {
-    const timelineWrapper = document.getElementById("timelineWrapper");
-    const tooltip = document.getElementById("tooltip");
-
-    if (timelineWrapper && tooltip) {
+  if (!dragging && container && tooltip) {
       const depth = ~~(
         ((displayHeight - offsetY - verticalOffset) / realHeight) *
         maxY
@@ -418,14 +414,7 @@ function showTooltip(offsetX: number, offsetY: number) {
         findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
 
       if (tooltipText) {
-        showTooltipWithText(
-          offsetX,
-          offsetY,
-          tooltipText,
-          tooltip,
-          timelineWrapper
-        );
-      }
+      showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
     }
   }
 }
@@ -502,20 +491,23 @@ function showTooltipWithText(
     let posLeft = offsetX + 10,
       posTop = offsetY + 2;
 
-    if (posLeft + tooltip.offsetWidth > timelineWrapper.offsetWidth) {
-      posLeft = timelineWrapper.offsetWidth - tooltip.offsetWidth;
-    }
-    if (posTop + tooltip.offsetHeight > timelineWrapper.offsetHeight) {
-      posTop -= tooltip.offsetHeight + 4;
-      if (posTop < -100) {
-        posTop = -100;
-      }
-    }
-    const tooltipX = posLeft + timelineWrapper.offsetLeft;
-    const tooltipY = posTop + timelineWrapper.offsetTop;
     tooltip.innerHTML = "";
-    tooltip.style.cssText = `left:${tooltipX}px; top:${tooltipY}px; display: block;`;
     tooltip.appendChild(tooltipText);
+    tooltip.style.cssText = `left:${posLeft}px; top:${posTop}px; display: block;`;
+
+    const xDelta = tooltip.offsetWidth - timelineWrapper.offsetWidth + posLeft;
+    if (xDelta > 0) {
+      posLeft -= xDelta - 4;
+    }
+
+    const yDelta = tooltip.offsetHeight - timelineWrapper.offsetHeight + posTop;
+    if (yDelta > 0) {
+      posTop -= tooltip.offsetHeight + 4;
+      }
+
+    if (xDelta > 0 || yDelta > 0) {
+      tooltip.style.cssText = `left:${posLeft}px; top:${posTop}px; display: block;`;
+    }
   } else {
     tooltip.style.display = "none";
   }
