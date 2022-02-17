@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Database tab shows the methods each SOQL or DML statement was made from ([#11][#11]
+- Database tab shows the methods each SOQL or DML statement was made from ([#11][#11])
   - The method name can be clicked to navigate to it in the call tree
 - Timeline shows a tooltip for log events ([#52][#52])
   - Shown when hovering the red (errors), blue (unexpected-end) and green (skipped-lines) sections on the timeline.
