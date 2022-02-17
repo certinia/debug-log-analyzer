@@ -284,14 +284,26 @@ function resetView() {
 }
 
 function resize() {
-  displayWidth = container.clientWidth;
-  displayHeight = container.clientHeight;
-  canvas.width = displayWidth;
-  canvas.height = displayHeight;
-  initialZoom = displayWidth / maxX;
-  scaleX = displayWidth / maxX;
+  const newWidth = container.clientWidth;
+  const newHeight = container.clientHeight;
+  if (newWidth != displayWidth || newHeight != displayHeight) {
+    canvas.width = displayWidth = newWidth;
+    canvas.height = displayHeight = newHeight;
+
+    const newInitialZoom = displayWidth / maxX;
+    scaleX ??= newInitialZoom;
+    initialZoom ??= newInitialZoom;
+
+    const newScaleX = scaleX - (initialZoom - newInitialZoom);
+    scaleX = Math.min(
+      newScaleX > newInitialZoom ? newScaleX : initialZoom,
+      0.3
+    );
+    initialZoom = newInitialZoom;
+  }
   resizeFont();
 }
+
 function resizeFont() {
   scaleFont = scaleX > 0.0000004 ? "normal 16px serif" : "normal 8px serif";
 }
@@ -321,7 +333,7 @@ export function setColors(timelineColors: any) {
 
 function drawTimeLine() {
   if (ctx) {
-    resizeFont();
+    resize();
     ctx.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-left
     ctx.clearRect(0, -canvas.height, canvas.width, canvas.height);
     drawTruncation(ctx);
@@ -650,5 +662,4 @@ function onInitTimeline(evt: Event) {
 }
 
 window.addEventListener("DOMContentLoaded", onInitTimeline);
-window.addEventListener("resize", resize);
 export { maxX };
