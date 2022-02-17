@@ -554,10 +554,7 @@ function onClickCanvas(evt: any) {
 function onLeaveCanvas(evt: any) {
   dragging = false;
   if (!evt.relatedTarget || evt.relatedTarget.id !== "tooltip") {
-    const tooltip = document.getElementById("tooltip");
-    if (tooltip) {
       tooltip.style.display = "none";
-    }
   }
 }
 
