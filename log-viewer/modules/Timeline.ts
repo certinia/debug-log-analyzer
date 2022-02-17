@@ -270,7 +270,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
   }
 }
 
-function calculateSizes(canvas: HTMLCanvasElement) {
+function calculateSizes() {
   maxX = getMaxWidth(timelineRoot); // maximum display value in nano-seconds
   maxY = getMaxDepth(timelineRoot); // maximum nested call depth
   resetView();
@@ -314,7 +314,7 @@ export default async function renderTimeline(rootMethod: RootNode) {
   canvas = document.getElementById("timeline") as HTMLCanvasElement;
   ctx = canvas.getContext("2d", { alpha: false });
   timelineRoot = rootMethod;
-  calculateSizes(canvas);
+  calculateSizes();
   if (ctx) {
     requestAnimationFrame(drawTimeLine);
   }
