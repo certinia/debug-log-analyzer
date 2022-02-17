@@ -244,6 +244,19 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
 }
 
 function renderTreeNode(node: LogLine, timeStamps: number[]) {
+
+  const hideUnder = document.getElementById("hideUnder") as HTMLInputElement;
+  if(hideUnder?.checked) {
+    const timeInMS = document.getElementById("timeInMS") as HTMLInputElement;
+    let timeFilter = (timeInMS.value ? parseInt(timeInMS.value) : 0 ) * 1000000;
+
+    let timetaken = node.duration || 0;
+
+    if(node.text !== "Log Root" && timetaken < timeFilter) {
+      return undefined;
+    }
+  }
+
   const children = node.children ?? [];
 
   const mainNode = divElem.cloneNode() as HTMLDivElement;
