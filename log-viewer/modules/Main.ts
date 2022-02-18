@@ -185,14 +185,13 @@ function timer(text: string) {
 
 async function renderLogSettings(logSettings: [string, string][]) {
   const holder = document.getElementById("logSettings");
-
-  if (holder) {
-  holder.innerHTML = "";
+  if (!holder) {
+    return;
   }
 
-  for (const logSetting of logSettings) {
-    const [name, level] = logSetting;
-
+  holder.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+  for (const [name, level] of logSettings) {
     if (level !== "NONE") {
       const setting = document.createElement("div"),
         title = document.createElement("span"),
@@ -205,9 +204,11 @@ async function renderLogSettings(logSettings: [string, string][]) {
       setting.className = "setting";
       setting.appendChild(title);
       setting.appendChild(value);
-      holder?.appendChild(setting);
+      fragment.appendChild(setting);
     }
   }
+
+  holder.appendChild(fragment);
 }
 
 async function displayLog(log: string, name: string, path: string) {
