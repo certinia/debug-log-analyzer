@@ -9,7 +9,11 @@ import parseLog, {
 } from "./parsers/LineParser";
 import { getRootMethod } from "./parsers/TreeParser";
 import renderTreeView from "./TreeView";
-import renderTimeline, { maxX, setColors, renderTimelineKey } from "./Timeline";
+import renderTimeline, {
+  totalDuration,
+  setColors,
+  renderTimelineKey,
+} from "./Timeline";
 import analyseMethods, { renderAnalysis } from "./Analysis";
 import { DatabaseAccess, renderDb } from "./Database";
 import { setNamespaces } from "./NamespaceExtrator";
@@ -46,7 +50,9 @@ async function setStatus(
     nameLink = document.createElement("a"),
     statusSpan = document.createElement("span"),
     sizeText = logSize ? (logSize / 1000000).toFixed(2) + " MB" : "",
-    elapsedText = maxX ? (maxX / 1000000000).toFixed(3) + " Sec" : "",
+    elapsedText = totalDuration
+      ? (totalDuration / 1000000000).toFixed(3) + " Sec"
+      : "",
     infoSep = sizeText && elapsedText ? ", " : "",
     infoText =
       sizeText || elapsedText
@@ -181,7 +187,7 @@ async function renderLogSettings(logSettings: [string, string][]) {
   const holder = document.getElementById("logSettings");
 
   if (holder) {
-    holder.innerHTML = "";
+  holder.innerHTML = "";
   }
 
   for (const logSetting of logSettings) {

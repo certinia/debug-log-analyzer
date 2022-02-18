@@ -52,7 +52,7 @@ let ctx: CanvasRenderingContext2D | null;
 
 let scaleX: number,
   scaleFont: string,
-  maxX: number,
+  totalDuration: number,
   maxY: number,
   displayHeight: number,
   displayWidth: number,
@@ -60,24 +60,12 @@ let scaleX: number,
   lastMouseX: number,
   lastMouseY: number;
 
-function getMaxWidth(node: LogLine) {
-  if (node.exitStamp) {
-    return node.exitStamp;
-  }
-  if (!node.children) {
+function getMaxWidth(rootNode: LogLine) {
+  if (!rootNode.children) {
     return 0;
   }
-
-  let maxX = node.timestamp || 0;
-  const len = node.children.length - 1;
-  for (let c = len; c >= 0; --c) {
-    const max = getMaxWidth(node.children[c]);
-    if (max && max > maxX) {
-      maxX = max;
-    }
-  }
-
-  return maxX;
+  // First child of the root node should be "EXECUTION_STARTED"
+  return rootNode.children[0].exitStamp || 0;
 }
 
 function getMaxDepth(node: LogLine, depth = 0) {
@@ -255,7 +243,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
     const thisEntry = truncated[i++],
       nextEntry = truncated[i] ?? [],
       startTime = thisEntry[1],
-      endTime = nextEntry[1] ?? maxX;
+      endTime = nextEntry[1] ?? totalDuration;
 
     if (thisEntry[2]) {
       ctx.fillStyle = thisEntry[2];
@@ -271,7 +259,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 }
 
 function calculateSizes(canvas: HTMLCanvasElement) {
-  maxX = getMaxWidth(timelineRoot); // maximum display value in nano-seconds
+  totalDuration = getMaxWidth(timelineRoot); // maximum display value in nano-seconds
   maxY = getMaxDepth(timelineRoot); // maximum nested call depth
   resetView();
 }
@@ -288,8 +276,8 @@ function resize() {
   displayHeight = container.clientHeight;
   canvas.width = displayWidth;
   canvas.height = displayHeight;
-  initialZoom = displayWidth / maxX;
-  scaleX = displayWidth / maxX;
+  initialZoom = displayWidth / totalDuration;
+  scaleX = displayWidth / totalDuration;
   resizeFont();
 }
 function resizeFont() {
@@ -319,6 +307,7 @@ export function setColors(timelineColors: any) {
   }
 }
 
+// todo: stop clearing on every iteration + only do it if a change event occurs (e.g we zoom, or scroll or resize)
 function drawTimeLine() {
   if (ctx) {
     resizeFont();
@@ -477,7 +466,7 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
     const thisEntry = truncated[i++],
       nextEntry = truncated[i] ?? [],
       startTime = thisEntry[1],
-      endTime = nextEntry[1] ?? maxX;
+      endTime = nextEntry[1] ?? totalDuration;
 
     if (
       x >= startTime * scaleX - horizontalOffset &&
@@ -582,7 +571,7 @@ function handleMouseMove(evt: MouseEvent) {
   if (dragging) {
     tooltip.style.display = "none";
     const { movementY, movementX } = evt;
-    const maxWidth = scaleX * maxX - displayWidth;
+    const maxWidth = scaleX * totalDuration - displayWidth;
     horizontalOffset = Math.max(
       0,
       Math.min(maxWidth, horizontalOffset - movementX)
@@ -615,11 +604,11 @@ function handleScroll(evt: WheelEvent) {
       if (scaleX !== oldZoom) {
         const timePosBefore = (lastMouseX + horizontalOffset) / oldZoom;
         const newOffset = timePosBefore * scaleX - lastMouseX;
-        const maxWidth = scaleX * maxX - displayWidth;
+        const maxWidth = scaleX * totalDuration - displayWidth;
         horizontalOffset = Math.max(0, Math.min(maxWidth, newOffset));
       }
     } else {
-      const maxWidth = scaleX * maxX - displayWidth;
+      const maxWidth = scaleX * totalDuration - displayWidth;
       horizontalOffset = Math.max(
         0,
         Math.min(maxWidth, horizontalOffset + deltaX)
@@ -651,4 +640,4 @@ function onInitTimeline(evt: Event) {
 
 window.addEventListener("DOMContentLoaded", onInitTimeline);
 window.addEventListener("resize", resize);
-export { maxX };
+export { totalDuration };

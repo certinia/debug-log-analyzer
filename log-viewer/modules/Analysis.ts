@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import formatDuration, { highlightText } from "./Util";
-import { totalDuration } from "./parsers/LineParser";
+import { totalDuration } from "./Timeline";
 import { RootNode } from "./parsers/TreeParser";
 import { LogLine } from "./parsers/LineParser";
 
