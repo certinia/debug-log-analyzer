@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Totaltime on status bar and analysis tab not always correct ([#95][#95])
+  - Now uses the time between `EXECUTION_STARTED` and `EXECUTION_FINISED` as the total time.
+
 ## [1.4.1] - January 2022
 
 ### Changed
@@ -101,3 +108,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#68]: https://github.com/financialforcedev/debug-log-analyzer/issues/68
 [#73]: https://github.com/financialforcedev/debug-log-analyzer/issues/73
 [#81]: https://github.com/financialforcedev/debug-log-analyzer/issues/81
+[#95]: https://github.com/financialforcedev/debug-log-analyzer/issues/95
