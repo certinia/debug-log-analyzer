@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Totaltime on status bar and analysis tab not always correct ([#95][#95])
+- Totaltime on status bar and analysis tab ([#95][#95])
   - Now uses the time between `EXECUTION_STARTED` and `EXECUTION_FINISED` as the total time.
 
 ## [1.4.1] - January 2022
