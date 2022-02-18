@@ -3,9 +3,8 @@
  */
 import { showTreeNode } from "./TreeView";
 import formatDuration from "./Util";
-import { truncated } from "./parsers/LineParser";
+import { LogLine, truncated } from "./parsers/LineParser";
 import { RootNode } from "./parsers/TreeParser";
-import { LogLine } from "./parsers/LineParser";
 
 const scaleY = -15,
   strokeColor = "#B0B0B0",
