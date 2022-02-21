@@ -13,7 +13,6 @@ import {
   CodeUnitStartedLine,
   CodeUnitFinishedLine,
   truncated,
-  totalDuration,
   cpuUsed,
   ExecutionStartedLine,
   ExecutionFinishedLine,
@@ -170,16 +169,6 @@ describe("parseLog tests", () => {
     expect(truncated[0][0]).toBe(
       "FATAL ERROR! cause=System.LimitException: c2g:Too many SOQL queries: 101"
     );
-  });
-  it("Should capture totalDuration", async () => {
-    const log =
-      "09:18:22.6 (100)|EXECUTION_STARTED\n\n" +
-      "15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n" +
-      "15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n" +
-      "09:19:13.82 (2000)|EXECUTION_FINISHED\n";
-
-    parseLog(log);
-    expect(totalDuration).toBe(1900);
   });
   it("Methods should have line-numbers", async () => {
     const log =

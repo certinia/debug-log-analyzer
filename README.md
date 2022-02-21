@@ -4,7 +4,7 @@ An analyzer for Salesforce debug logs aimed at making performance analysis much 
 
 The main view provides a flame graph for visualising code execution:
 
-![Another](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/FlameGraph.gif)
+![preview](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/lana-preview.gif)
 
 Hovering over an element provides information on the item. If you click on an item it will take you to the call
 navigatable stack view.
