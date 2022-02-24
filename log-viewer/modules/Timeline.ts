@@ -277,7 +277,7 @@ function resize() {
     canvas.width = displayWidth = newWidth;
     canvas.height = displayHeight = newHeight;
 
-    const newInitialZoom = displayWidth / maxX;
+    const newInitialZoom = displayWidth / totalDuration;
     scaleX ??= newInitialZoom;
     initialZoom ??= newInitialZoom;
 
