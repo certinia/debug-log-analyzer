@@ -3,9 +3,8 @@
  */
 import { showTreeNode } from "./TreeView";
 import formatDuration from "./Util";
-import { truncated } from "./parsers/LineParser";
+import { LogLine, truncated } from "./parsers/LineParser";
 import { RootNode } from "./parsers/TreeParser";
-import { LogLine } from "./parsers/LineParser";
 
 const scaleY = -15,
   strokeColor = "#B0B0B0",
@@ -52,7 +51,7 @@ let ctx: CanvasRenderingContext2D | null;
 
 let scaleX: number,
   scaleFont: string,
-  maxX: number,
+  totalDuration: number,
   maxY: number,
   displayHeight: number,
   displayWidth: number,
@@ -60,24 +59,12 @@ let scaleX: number,
   lastMouseX: number,
   lastMouseY: number;
 
-function getMaxWidth(node: LogLine) {
-  if (node.exitStamp) {
-    return node.exitStamp;
-  }
-  if (!node.children) {
+function getMaxWidth(rootNode: LogLine) {
+  if (!rootNode.children) {
     return 0;
   }
-
-  let maxX = node.timestamp || 0;
-  const len = node.children.length - 1;
-  for (let c = len; c >= 0; --c) {
-    const max = getMaxWidth(node.children[c]);
-    if (max && max > maxX) {
-      maxX = max;
-    }
-  }
-
-  return maxX;
+  // First child of the root node should be "EXECUTION_STARTED"
+  return rootNode.children[0].exitStamp || 0;
 }
 
 function getMaxDepth(node: LogLine, depth = 0) {
@@ -255,7 +242,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
     const thisEntry = truncated[i++],
       nextEntry = truncated[i] ?? [],
       startTime = thisEntry[1],
-      endTime = nextEntry[1] ?? maxX;
+      endTime = nextEntry[1] ?? totalDuration;
 
     if (thisEntry[2]) {
       ctx.fillStyle = thisEntry[2];
@@ -271,7 +258,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 }
 
 function calculateSizes() {
-  maxX = getMaxWidth(timelineRoot); // maximum display value in nano-seconds
+  totalDuration = getMaxWidth(timelineRoot); // maximum display value in nano-seconds
   maxY = getMaxDepth(timelineRoot); // maximum nested call depth
   resetView();
 }
@@ -331,6 +318,7 @@ export function setColors(timelineColors: any) {
   }
 }
 
+// todo: stop clearing on every iteration + only do it if a change event occurs (e.g we zoom, or scroll or resize)
 function drawTimeLine() {
   if (ctx) {
     resize();
@@ -417,27 +405,16 @@ function findByPosition(
 }
 
 function showTooltip(offsetX: number, offsetY: number) {
-  if (!dragging) {
-    const timelineWrapper = document.getElementById("timelineWrapper");
-    const tooltip = document.getElementById("tooltip");
+  if (!dragging && container && tooltip) {
+    const depth = ~~(
+      ((displayHeight - offsetY - verticalOffset) / realHeight) *
+      maxY
+    );
+    let tooltipText =
+      findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
 
-    if (timelineWrapper && tooltip) {
-      const depth = ~~(
-        ((displayHeight - offsetY - verticalOffset) / realHeight) *
-        maxY
-      );
-      let tooltipText =
-        findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
-
-      if (tooltipText) {
-        showTooltipWithText(
-          offsetX,
-          offsetY,
-          tooltipText,
-          tooltip,
-          timelineWrapper
-        );
-      }
+    if (tooltipText) {
+      showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
     }
   }
 }
@@ -489,7 +466,7 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
     const thisEntry = truncated[i++],
       nextEntry = truncated[i] ?? [],
       startTime = thisEntry[1],
-      endTime = nextEntry[1] ?? maxX;
+      endTime = nextEntry[1] ?? totalDuration;
 
     if (
       x >= startTime * scaleX - horizontalOffset &&
@@ -514,20 +491,23 @@ function showTooltipWithText(
     let posLeft = offsetX + 10,
       posTop = offsetY + 2;
 
-    if (posLeft + tooltip.offsetWidth > timelineWrapper.offsetWidth) {
-      posLeft = timelineWrapper.offsetWidth - tooltip.offsetWidth;
-    }
-    if (posTop + tooltip.offsetHeight > timelineWrapper.offsetHeight) {
-      posTop -= tooltip.offsetHeight + 4;
-      if (posTop < -100) {
-        posTop = -100;
-      }
-    }
-    const tooltipX = posLeft + timelineWrapper.offsetLeft;
-    const tooltipY = posTop + timelineWrapper.offsetTop;
     tooltip.innerHTML = "";
-    tooltip.style.cssText = `left:${tooltipX}px; top:${tooltipY}px; display: block;`;
     tooltip.appendChild(tooltipText);
+    tooltip.style.cssText = `left:${posLeft}px; top:${posTop}px; display: block;`;
+
+    const xDelta = tooltip.offsetWidth - timelineWrapper.offsetWidth + posLeft;
+    if (xDelta > 0) {
+      posLeft -= xDelta - 4;
+    }
+
+    const yDelta = tooltip.offsetHeight - timelineWrapper.offsetHeight + posTop;
+    if (yDelta > 0) {
+      posTop -= tooltip.offsetHeight + 4;
+    }
+
+    if (xDelta > 0 || yDelta > 0) {
+      tooltip.style.cssText = `left:${posLeft}px; top:${posTop}px; display: block;`;
+    }
   } else {
     tooltip.style.display = "none";
   }
@@ -574,10 +554,7 @@ function onClickCanvas(evt: any) {
 function onLeaveCanvas(evt: any) {
   dragging = false;
   if (!evt.relatedTarget || evt.relatedTarget.id !== "tooltip") {
-    const tooltip = document.getElementById("tooltip");
-    if (tooltip) {
-      tooltip.style.display = "none";
-    }
+    tooltip.style.display = "none";
   }
 }
 
@@ -594,7 +571,7 @@ function handleMouseMove(evt: MouseEvent) {
   if (dragging) {
     tooltip.style.display = "none";
     const { movementY, movementX } = evt;
-    const maxWidth = scaleX * maxX - displayWidth;
+    const maxWidth = scaleX * totalDuration - displayWidth;
     horizontalOffset = Math.max(
       0,
       Math.min(maxWidth, horizontalOffset - movementX)
@@ -627,11 +604,11 @@ function handleScroll(evt: WheelEvent) {
       if (scaleX !== oldZoom) {
         const timePosBefore = (lastMouseX + horizontalOffset) / oldZoom;
         const newOffset = timePosBefore * scaleX - lastMouseX;
-        const maxWidth = scaleX * maxX - displayWidth;
+        const maxWidth = scaleX * totalDuration - displayWidth;
         horizontalOffset = Math.max(0, Math.min(maxWidth, newOffset));
       }
     } else {
-      const maxWidth = scaleX * maxX - displayWidth;
+      const maxWidth = scaleX * totalDuration - displayWidth;
       horizontalOffset = Math.max(
         0,
         Math.min(maxWidth, horizontalOffset + deltaX)
@@ -662,4 +639,5 @@ function onInitTimeline(evt: Event) {
 }
 
 window.addEventListener("DOMContentLoaded", onInitTimeline);
-export { maxX };
+window.addEventListener("resize", resize);
+export { totalDuration };

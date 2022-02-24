@@ -88,7 +88,6 @@ export class BlockLines extends LogLine {
 }
 
 let logLines: LogLine[] = [],
-  totalDuration: number = 0,
   truncated: [string, number, string | undefined][],
   reasons: Set<string> = new Set<string>(),
   cpuUsed: number = 0;
@@ -1950,7 +1949,10 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["XDS_RESPONSE_ERROR", XDSResponseErrorLine],
 ]);
 
-export function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
+export function parseLine(
+  line: string,
+  lastEntry: LogLine | null
+): LogLine | null {
   const parts = line.split("|"),
     type = parts[1],
     metaCtor = lineTypeMap.get(type);
@@ -1967,7 +1969,8 @@ export function parseLine(line: string, lastEntry: LogLine | null): LogLine | nu
       // wrapped text from the previous entry?
       lastEntry.text += ` | ${line}`;
     } else if (type) {
-      if (type !== 'DUMMY') /* Used by tests */
+      if (type !== "DUMMY")
+        /* Used by tests */
         console.warn(`Unknown log line: ${type}`);
     } else {
       if (lastEntry && line.startsWith("*** Skipped")) {
@@ -2009,10 +2012,6 @@ export default async function parseLog(log: string) {
     }
   }
 
-  const linLen = logLines.length;
-  const endTime = linLen ? logLines[logLines.length - 1].timestamp : 0;
-  const startTime = linLen ? logLines[0].timestamp : 0;
-  totalDuration = endTime - startTime;
   return logLines;
 }
 
@@ -2033,4 +2032,4 @@ export function getLogSettings(log: string): [string, string][] {
   });
 }
 
-export { logLines, totalDuration, truncated, cpuUsed };
+export { logLines, truncated, cpuUsed };
