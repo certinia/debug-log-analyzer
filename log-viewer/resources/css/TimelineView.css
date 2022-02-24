@@ -1,37 +1,39 @@
 #timelineView {
-	position: relative;
-	height: 75%;
+  position: relative;
+  height: 75%;
 }
 #tooltip {
-	display: none;
-	position: absolute;
-	z-index: 1000;
-	padding: 5px;
-	background-color: var(--vscode-editor-background);
-	color: var(--vscode-editor-foreground);
-	max-width: 1000px;
+  display: none;
+  position: absolute;
+  z-index: 1000;
+  padding: 5px;
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  max-width: 1000px;
 }
 #timeline {
-	background-color: var(--vscode-editor-background);
-	z-index: 0;
+  background-color: var(--vscode-editor-background);
+  z-index: 0;
+  width: 100%;
+  height: auto;
 }
 #timelineKey {
-	margin-top: 5px;
+  margin-top: 5px;
 }
 #timelineWrapper {
-	flex: 1;
-	overflow: hidden;
+  flex: 1;
+  overflow: hidden;
 }
 #timelineKey .keyEntry {
-	display: inline-block;
-	font-size: 8pt;
-	padding: 4px;
-	margin-right: 5px;
+  display: inline-block;
+  font-size: 8pt;
+  padding: 4px;
+  margin-right: 5px;
 }
 #timelineView > .buttonContainer {
-	display: flex;
-	flex-direction: row;
-	align-items: center;
-	padding: 5px;
-	margin-bottom: 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 5px;
+  margin-bottom: 10px;
 }

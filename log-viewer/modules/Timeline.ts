@@ -257,7 +257,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
   }
 }
 
-function calculateSizes(canvas: HTMLCanvasElement) {
+function calculateSizes() {
   totalDuration = getMaxWidth(timelineRoot); // maximum display value in nano-seconds
   maxY = getMaxDepth(timelineRoot); // maximum nested call depth
   resetView();
@@ -271,14 +271,26 @@ function resetView() {
 }
 
 function resize() {
-  displayWidth = container.clientWidth;
-  displayHeight = container.clientHeight;
-  canvas.width = displayWidth;
-  canvas.height = displayHeight;
-  initialZoom = displayWidth / totalDuration;
-  scaleX = displayWidth / totalDuration;
+  const newWidth = container.clientWidth;
+  const newHeight = container.clientHeight;
+  if (newWidth != displayWidth || newHeight != displayHeight) {
+    canvas.width = displayWidth = newWidth;
+    canvas.height = displayHeight = newHeight;
+
+    const newInitialZoom = displayWidth / totalDuration;
+    scaleX ??= newInitialZoom;
+    initialZoom ??= newInitialZoom;
+
+    const newScaleX = scaleX - (initialZoom - newInitialZoom);
+    scaleX = Math.min(
+      newScaleX > newInitialZoom ? newScaleX : initialZoom,
+      0.3
+    );
+    initialZoom = newInitialZoom;
+  }
   resizeFont();
 }
+
 function resizeFont() {
   scaleFont = scaleX > 0.0000004 ? "normal 16px serif" : "normal 8px serif";
 }
@@ -289,7 +301,7 @@ export default async function renderTimeline(rootMethod: RootNode) {
   canvas = document.getElementById("timeline") as HTMLCanvasElement;
   ctx = canvas.getContext("2d", { alpha: false });
   timelineRoot = rootMethod;
-  calculateSizes(canvas);
+  calculateSizes();
   if (ctx) {
     requestAnimationFrame(drawTimeLine);
   }
@@ -309,7 +321,7 @@ export function setColors(timelineColors: any) {
 // todo: stop clearing on every iteration + only do it if a change event occurs (e.g we zoom, or scroll or resize)
 function drawTimeLine() {
   if (ctx) {
-    resizeFont();
+    resize();
     ctx.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-left
     ctx.clearRect(0, -canvas.height, canvas.width, canvas.height);
     drawTruncation(ctx);
@@ -394,14 +406,14 @@ function findByPosition(
 
 function showTooltip(offsetX: number, offsetY: number) {
   if (!dragging && container && tooltip) {
-      const depth = ~~(
-        ((displayHeight - offsetY - verticalOffset) / realHeight) *
-        maxY
-      );
-      let tooltipText =
-        findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
+    const depth = ~~(
+      ((displayHeight - offsetY - verticalOffset) / realHeight) *
+      maxY
+    );
+    let tooltipText =
+      findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
 
-      if (tooltipText) {
+    if (tooltipText) {
       showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
     }
   }
@@ -491,7 +503,7 @@ function showTooltipWithText(
     const yDelta = tooltip.offsetHeight - timelineWrapper.offsetHeight + posTop;
     if (yDelta > 0) {
       posTop -= tooltip.offsetHeight + 4;
-      }
+    }
 
     if (xDelta > 0 || yDelta > 0) {
       tooltip.style.cssText = `left:${posLeft}px; top:${posTop}px; display: block;`;
@@ -542,7 +554,7 @@ function onClickCanvas(evt: any) {
 function onLeaveCanvas(evt: any) {
   dragging = false;
   if (!evt.relatedTarget || evt.relatedTarget.id !== "tooltip") {
-      tooltip.style.display = "none";
+    tooltip.style.display = "none";
   }
 }
 

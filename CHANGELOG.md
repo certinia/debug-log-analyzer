@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Timeline content disappearing when switching tabs + resizing ([#99][#99])
 - Timeline flickering/resizing when tooltip moved to bottom right ([#87][#87])
-- Totaltime on status bar and analysis tab ([#95][#95])
+- Incorrect Totaltime on status bar and analysis tab ([#95][#95])
   - Now uses the time between `EXECUTION_STARTED` and `EXECUTION_FINISED` as the total time.
 
 ## [1.4.1] - January 2022
@@ -111,3 +112,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#81]: https://github.com/financialforcedev/debug-log-analyzer/issues/81
 [#87]: https://github.com/financialforcedev/debug-log-analyzer/issues/87
 [#95]: https://github.com/financialforcedev/debug-log-analyzer/issues/95
+[#99]: https://github.com/financialforcedev/debug-log-analyzer/issues/99
