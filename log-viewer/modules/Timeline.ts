@@ -265,19 +265,16 @@ function resetView() {
 function resize() {
   const newWidth = container.clientWidth;
   const newHeight = container.clientHeight;
-  if (newWidth != displayWidth || newHeight != displayHeight) {
+  if (newWidth !== displayWidth || newHeight !== displayHeight) {
     canvas.width = displayWidth = newWidth;
     canvas.height = displayHeight = newHeight;
 
-    const newInitialZoom = displayWidth / totalDuration;
-    scaleX ??= newInitialZoom;
-    initialZoom ??= newInitialZoom;
+    const newInitialZoom = newWidth / totalDuration;
+    // defaults if not set yet
+    initialZoom ||= scaleX ||= newInitialZoom;
 
     const newScaleX = scaleX - (initialZoom - newInitialZoom);
-    scaleX = Math.min(
-      newScaleX > newInitialZoom ? newScaleX : initialZoom,
-      0.3
-    );
+    scaleX = Math.min(newScaleX, 0.3);
     initialZoom = newInitialZoom;
   }
   resizeFont();
