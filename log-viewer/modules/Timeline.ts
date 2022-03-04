@@ -59,14 +59,6 @@ let scaleX: number,
   lastMouseX: number,
   lastMouseY: number;
 
-function getMaxWidth(rootNode: LogLine) {
-  if (!rootNode.children) {
-    return 0;
-  }
-  // First child of the root node should be "EXECUTION_STARTED"
-  return rootNode.children[0].exitStamp || 0;
-}
-
 function getMaxDepth(node: LogLine, depth = 0) {
   if (!node.children) {
     return depth;
@@ -258,7 +250,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 }
 
 function calculateSizes() {
-  totalDuration = getMaxWidth(timelineRoot); // maximum display value in nano-seconds
+  totalDuration = timelineRoot.exitStamp || 0; // maximum display value in nano-seconds
   maxY = getMaxDepth(timelineRoot); // maximum nested call depth
   resetView();
 }
