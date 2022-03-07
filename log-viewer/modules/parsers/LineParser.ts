@@ -27,6 +27,7 @@ export abstract class LogLine extends TimeStampedNode {
   children: LogLine[] | null = null;
 
   isExit: boolean = false;
+  hasValidSymbols: boolean = false;
   discontinuity: boolean = false;
   exitTypes: string[] | null = null;
   lineNumber: LineNumber = null;
@@ -193,6 +194,7 @@ class NamedCredentialResponseDetailLine extends LogLine {
 
 class ConstructorEntryLine extends LogLine {
   exitTypes = ["CONSTRUCTOR_EXIT"];
+  hasValidSymbols = true;
   displayType = "method";
   cpuType = "method";
   suffix = " (constructor)";
@@ -228,6 +230,7 @@ class EmailQueueLine extends LogLine {
 
 export class MethodEntryLine extends LogLine {
   exitTypes = ["METHOD_EXIT"];
+  hasValidSymbols = true;
   displayType = "method";
   cpuType = "method";
   timelineKey = "method";
@@ -362,16 +365,37 @@ export class CodeUnitFinishedLine extends LogLine {
 }
 
 class VFApexCallStartLine extends LogLine {
-  exitTypes = ["VF_APEX_CALL_END"];
-  displayType = "method";
-  cpuType = "method";
-  suffix = " (VF APEX)";
   classes = "node";
-  lineNumber: LineNumber;
+  cpuType = "method";
+  displayType = "method";
+  exitTypes = ["VF_APEX_CALL_END"];
+  suffix = " (VF APEX)";
+  timelineKey = "method";
 
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
+
+    const classText = parts[5] || parts[3];
+    let methodtext = parts[4] || "";
+    if (methodtext) {
+      this.hasValidSymbols = true;
+      // method call
+      const methodIndex = methodtext.indexOf("(");
+      const constructorIndex = methodtext.indexOf("<init>");
+      if (methodIndex > -1) {
+        // Method
+        methodtext =
+          "." + methodtext.substring(methodIndex).slice(1, -1) + "()";
+      } else if (constructorIndex > -1) {
+        // Constructor
+        methodtext = methodtext.substring(constructorIndex + 6) + "()";
+      } else {
+        // Property
+        methodtext = "." + methodtext;
+      }
+    }
+    this.text = classText + methodtext;
   }
 }
 
@@ -454,6 +478,7 @@ class VFPageMessageLine extends LogLine {
     this.text = parts[2];
   }
 }
+
 class DMLBeginLine extends LogLine {
   exitTypes = ["DML_END"];
   displayType = "method";
