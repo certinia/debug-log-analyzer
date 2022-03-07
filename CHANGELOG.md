@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Timeline content disappearing when switching tabs + resizing ([#99][#99])
 - Timeline flickering/resizing when tooltip moved to bottom right ([#87][#87])
-- Timeline not display `VF_APEX_CALL_START` log events ([#97][#97])
+- Timeline not displaying `VF_APEX_CALL_START` log events ([#97][#97])
 - Incorrect Totaltime on status bar and analysis tab ([#95][#95])
   - Now uses the time between `EXECUTION_STARTED` and `EXECUTION_FINISED` as the total time
 
