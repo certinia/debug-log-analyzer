@@ -407,9 +407,11 @@ class VFDeserializeViewstateEndLine extends LogLine {
 class VFFormulaStartLine extends LogLine {
   exitTypes = ["VF_EVALUATE_FORMULA_END"];
   cpuType = "custom";
+  displayType = "method";
   suffix = " (VF FORMULA)";
   classes = "node formula";
   group: string;
+  timelineKey = "systemMethod";
 
   constructor(parts: string[]) {
     super(parts);
