@@ -27,6 +27,7 @@ export abstract class LogLine extends TimeStampedNode {
   children: LogLine[] | null = null;
 
   isExit: boolean = false;
+  isValid: boolean = true;
   discontinuity: boolean = false;
   exitTypes: string[] | null = null;
   lineNumber: LineNumber = null;
@@ -362,16 +363,41 @@ export class CodeUnitFinishedLine extends LogLine {
 }
 
 class VFApexCallStartLine extends LogLine {
-  exitTypes = ["VF_APEX_CALL_END"];
-  displayType = "method";
-  cpuType = "method";
-  suffix = " (VF APEX)";
   classes = "node";
-  lineNumber: LineNumber;
+  cpuType = "method";
+  displayType = "method";
+  exitTypes = ["VF_APEX_CALL_END"];
+  suffix = " (VF APEX)";
+  timelineKey = "method";
 
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
+
+    const classText = parts[5] || parts[3];
+    let methodtext = parts[4] || "";
+    if (methodtext) {
+      // method call
+      const methodIndex = methodtext.indexOf("(");
+      const constructorIndex = methodtext.indexOf("<init>");
+      if (methodIndex > -1) {
+        // Method
+        methodtext =
+          "." + methodtext.substring(methodIndex).slice(1, -1) + "()";
+      } else if (constructorIndex > -1) {
+        // Constructor
+        methodtext = methodtext.substring(constructorIndex + 6) + "()";
+      } else {
+        // Property
+        methodtext = "." + methodtext;
+      }
+    } else {
+      // we have s system entry and they do not have exits
+      // e.g |VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagescomponentcontroller.apex <init>
+      // and they really mess with the logs so skip handling them.
+      this.isValid = false;
+    }
+    this.text = classText + methodtext;
   }
 }
 
