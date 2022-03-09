@@ -124,7 +124,6 @@ export function getRootMethod(): RootNode {
 }
 
 function getEndTime(rootNode: RootNode) {
-  const start = performance.now();
   if (!rootNode.children) {
     return 0;
   }

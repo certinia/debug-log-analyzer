@@ -263,9 +263,12 @@ function resetView() {
 }
 
 function resize() {
-  const newWidth = container.clientWidth;
-  const newHeight = container.clientHeight;
-  if (newWidth !== displayWidth || newHeight !== displayHeight) {
+  const { clientWidth: newWidth, clientHeight: newHeight } = container;
+  if (
+    newWidth &&
+    newHeight &&
+    (newWidth !== displayWidth || newHeight !== displayHeight)
+  ) {
     canvas.width = displayWidth = newWidth;
     canvas.height = displayHeight = newHeight;
 
