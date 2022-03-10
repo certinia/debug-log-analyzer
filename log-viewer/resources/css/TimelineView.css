@@ -9,7 +9,7 @@
   padding: 5px;
   background-color: var(--vscode-editor-background);
   color: var(--vscode-editor-foreground);
-  max-width: 1000px;
+  max-width: 90%;
 }
 #timeline {
   background-color: var(--vscode-editor-background);

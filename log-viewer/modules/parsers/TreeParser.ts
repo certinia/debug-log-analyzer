@@ -119,6 +119,33 @@ export function getRootMethod(): RootNode {
     }
   }
   rootMethod.addBlock(lines);
-
+  rootMethod.exitStamp = getEndTime(rootMethod);
   return rootMethod;
+}
+
+function getEndTime(rootNode: RootNode) {
+  if (!rootNode.children) {
+    return 0;
+  }
+
+  // We could have multiple "EXECUTION_STARTED" entries so loop backwards until we find one.
+  // We do not just want to use the last one because it is probably CUMULATIVE_USAGE which is not really part of the code execution time but does have a later time.
+  let endTime;
+  const len = rootNode.children.length - 1;
+  for (let i = len; i >= 0; i--) {
+    const child = rootNode.children[i];
+    const duration = child.exitStamp;
+
+    if (duration) {
+      // Get the latest time of the last node (with a time) to use as a default
+      // This helps to display something on the timeline if the log is malformed
+      // e.g does not contain `EXECUTION_STARTED` + `EXECUTION_FINISED`
+      endTime ??= duration;
+      if (child.type === "EXECUTION_STARTED") {
+        endTime = duration;
+        break;
+      }
+    }
+  }
+  return endTime || 0;
 }
