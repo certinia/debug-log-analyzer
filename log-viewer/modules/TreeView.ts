@@ -214,7 +214,7 @@ function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
 }
 
 function hasCodeText(node: LogLine): boolean {
-  return node.type === "METHOD_ENTRY" || node.type === "CONSTRUCTOR_ENTRY";
+  return node.hasValidSymbols;
 }
 
 function deriveOpenInfo(node: LogLine): OpenInfo | null {
@@ -228,11 +228,12 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
     lineNumber = "-" + node.lineNumber;
   }
 
-  let qname = text.substr(0, text.indexOf("("));
+  const bracketIndex = text.indexOf("(");
+  let qname = bracketIndex > -1 ? text.substring(0, bracketIndex) : text;
   if (node.type === "METHOD_ENTRY") {
     const lastDot = qname.lastIndexOf(".");
     return {
-      typeName: text.substr(0, lastDot) + lineNumber,
+      typeName: text.substring(0, lastDot) + lineNumber,
       text: text,
     };
   } else {

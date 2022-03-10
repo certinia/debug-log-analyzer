@@ -28,6 +28,7 @@ export abstract class LogLine extends TimeStampedNode {
 
   isExit: boolean = false;
   isValid: boolean = true;
+  hasValidSymbols: boolean = false;
   discontinuity: boolean = false;
   exitTypes: string[] | null = null;
   lineNumber: LineNumber = null;
@@ -194,6 +195,7 @@ class NamedCredentialResponseDetailLine extends LogLine {
 
 class ConstructorEntryLine extends LogLine {
   exitTypes = ["CONSTRUCTOR_EXIT"];
+  hasValidSymbols = true;
   displayType = "method";
   cpuType = "method";
   suffix = " (constructor)";
@@ -229,6 +231,7 @@ class EmailQueueLine extends LogLine {
 
 export class MethodEntryLine extends LogLine {
   exitTypes = ["METHOD_EXIT"];
+  hasValidSymbols = true;
   displayType = "method";
   cpuType = "method";
   timelineKey = "method";
@@ -377,6 +380,7 @@ class VFApexCallStartLine extends LogLine {
     const classText = parts[5] || parts[3];
     let methodtext = parts[4] || "";
     if (methodtext) {
+      this.hasValidSymbols = true;
       // method call
       const methodIndex = methodtext.indexOf("(");
       const constructorIndex = methodtext.indexOf("<init>");
@@ -482,6 +486,7 @@ class VFPageMessageLine extends LogLine {
     this.text = parts[2];
   }
 }
+
 class DMLBeginLine extends LogLine {
   exitTypes = ["DML_END"];
   displayType = "method";

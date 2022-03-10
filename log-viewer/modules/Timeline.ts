@@ -59,14 +59,6 @@ let scaleX: number,
   lastMouseX: number,
   lastMouseY: number;
 
-function getMaxWidth(rootNode: LogLine) {
-  if (!rootNode.children) {
-    return 0;
-  }
-  // First child of the root node should be "EXECUTION_STARTED"
-  return rootNode.children[0].exitStamp || 0;
-}
-
 function getMaxDepth(node: LogLine, depth = 0) {
   if (!node.children) {
     return depth;
@@ -258,7 +250,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 }
 
 function calculateSizes() {
-  totalDuration = getMaxWidth(timelineRoot); // maximum display value in nano-seconds
+  totalDuration = timelineRoot.exitStamp || 0; // maximum display value in nano-seconds
   maxY = getMaxDepth(timelineRoot); // maximum nested call depth
   resetView();
 }
@@ -271,21 +263,21 @@ function resetView() {
 }
 
 function resize() {
-  const newWidth = container.clientWidth;
-  const newHeight = container.clientHeight;
-  if (newWidth != displayWidth || newHeight != displayHeight) {
+  const { clientWidth: newWidth, clientHeight: newHeight } = container;
+  if (
+    newWidth &&
+    newHeight &&
+    (newWidth !== displayWidth || newHeight !== displayHeight)
+  ) {
     canvas.width = displayWidth = newWidth;
     canvas.height = displayHeight = newHeight;
 
-    const newInitialZoom = displayWidth / totalDuration;
-    scaleX ??= newInitialZoom;
-    initialZoom ??= newInitialZoom;
+    const newInitialZoom = newWidth / totalDuration;
+    // defaults if not set yet
+    initialZoom ||= scaleX ||= newInitialZoom;
 
     const newScaleX = scaleX - (initialZoom - newInitialZoom);
-    scaleX = Math.min(
-      newScaleX > newInitialZoom ? newScaleX : initialZoom,
-      0.3
-    );
+    scaleX = Math.min(newScaleX, 0.3);
     initialZoom = newInitialZoom;
   }
   resizeFont();
