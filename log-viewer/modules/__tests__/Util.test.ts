@@ -1,3 +1,6 @@
+/**
+ * @jest-environment jsdom
+ */
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
@@ -6,7 +9,7 @@ import formatDuration, {
   showTab,
   recalculateDurations,
 } from "../Util";
-import { LogLine, TimeStampedNode } from "../parsers/LineParser";
+import { TimeStampedNode } from "../parsers/LineParser";
 
 jest.mock("../Browser", () => ({
   decodeEntities: (text: string) => {
