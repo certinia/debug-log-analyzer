@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.2] - 2022-03-11
 
 ### Fixed
 
@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Incorrect Totaltime on status bar and analysis tab ([#95][#95])
   - Now uses the time between `EXECUTION_STARTED` and `EXECUTION_FINISED` as the total time
 
-## [1.4.1] - January 2022
+## [1.4.1] - 2022-01-06
 
 ### Changed
 
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Corrected README.md / CHANGELOG.md
 
-## [1.4.0] - January 2022
+## [1.4.0] - 2022-01-06
 
 ### Added
 
