@@ -103,6 +103,22 @@ describe("parseLog tests", () => {
     expect(logLines[3]).toBeInstanceOf(ExecutionFinishedLine);
   });
 
+  it("Should parse between EXECUTION_STARTED and EXECUTION_FINISHED for CRLF (\r\n)", async () => {
+    const log =
+      "09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|jwilson@57dev.financialforce.com|Greenwich Mean Time|GMT+01:00\r\n" +
+      "09:18:22.6 (6574780)|EXECUTION_STARTED\r\n" +
+      "09:18:22.6 (6586704)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\r\n" +
+      "09:19:13.82 (51592737891)|CODE_UNIT_FINISHED|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\r\n" +
+      "09:19:13.82 (51595120059)|EXECUTION_FINISHED\r\n";
+
+    parseLog(log);
+    expect(logLines.length).toEqual(4);
+    expect(logLines[0]).toBeInstanceOf(ExecutionStartedLine);
+    expect(logLines[1]).toBeInstanceOf(CodeUnitStartedLine);
+    expect(logLines[2]).toBeInstanceOf(CodeUnitFinishedLine);
+    expect(logLines[3]).toBeInstanceOf(ExecutionFinishedLine);
+  });
+
   it("Should handle partial logs", async () => {
     const log =
       "09:18:22.6 (6574780)|EXECUTION_STARTED\n" +

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Timeline not displaying `VF_APEX_CALL_START` log events ([#97][#97])
 - Incorrect Totaltime on status bar and analysis tab ([#95][#95])
   - Now uses the time between `EXECUTION_STARTED` and `EXECUTION_FINISED` as the total time
+- Log parsing not handling both CRLF and LF line endings ([#108][#108])
 
 ## [1.4.1] - 2022-01-06
 
@@ -115,3 +116,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#95]: https://github.com/financialforcedev/debug-log-analyzer/issues/95
 [#99]: https://github.com/financialforcedev/debug-log-analyzer/issues/97
 [#99]: https://github.com/financialforcedev/debug-log-analyzer/issues/99
+[#108]: https://github.com/financialforcedev/debug-log-analyzer/issues/108
