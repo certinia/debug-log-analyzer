@@ -1,3 +1,6 @@
+/**
+ * @jest-environment jsdom
+ */
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */

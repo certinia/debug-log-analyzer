@@ -2023,7 +2023,9 @@ export function parseLine(
 
 export default async function parseLog(log: string) {
   const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || -1;
-  const rawLines = log.substring(start).split("\n");
+  // Matches CRLF (\r\n) + LF (\n)
+  // the ? matches the previous token 0 or 1 times.
+  const rawLines = log.substring(start).split(/\r?\n/);
 
   // reset global variables to be captured during parsing
   logLines = [];
