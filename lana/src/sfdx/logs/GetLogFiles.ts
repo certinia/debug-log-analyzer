@@ -10,6 +10,13 @@ export interface GetLogFilesResult {
   DurationMilliseconds: number;
   Location: string;
   LogLength: number;
+  LogUser: {
+    attributes: {
+      type: string;
+      url: string;
+    };
+    Name: string;
+  };
   Operation: string;
   Request: string;
   StartTime: string;

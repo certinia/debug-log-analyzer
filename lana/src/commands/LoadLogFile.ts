@@ -88,14 +88,14 @@ export class LoadLogFile {
         return bDate - aDate;
       })
       .map((r) => {
-        return new DebugLogItem(
-          `${new Date(r.StartTime).toLocaleString()} ${r.Operation}`,
-          "",
-          `${r.Id} ${r.Status} ${r.DurationMilliseconds} ms ${(
-            r.LogLength / 1024
-          ).toFixed(2)} KB`,
-          r.Id
-        );
+        const name = `${r.LogUser.Name} - ${r.Operation}`;
+        const description = `${(r.LogLength / 1024).toFixed(2)} KB ${
+          r.DurationMilliseconds
+        } ms`;
+        const detail = `${new Date(r.StartTime).toLocaleString()} - ${
+          r.Status
+        } - ${r.Id}`;
+        return new DebugLogItem(name, description, detail, r.Id);
       });
 
     const picked = await QuickPick.pick(items, new Options("Select a logfile"));
