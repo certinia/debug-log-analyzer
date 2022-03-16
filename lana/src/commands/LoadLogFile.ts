@@ -69,12 +69,7 @@ export class LoadLogFile {
       .sort((a, b) => {
         const aDate = Date.parse(a.StartTime);
         const bDate = Date.parse(b.StartTime);
-        if (aDate === bDate) {
-          return 0;
-        } else if (aDate < bDate) {
-          return 1;
-        }
-        return -1;
+        return bDate - aDate;
       })
       .map((r) => {
         return new Item(
