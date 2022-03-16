@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Round the log size on the `Log: Load Apex Log For Analysis` command results to 2DP ([#91][#91])
+- Rounded the log size on the `Log: Load Apex Log For Analysis` command results to 2DP ([#91][#91])
 
 ## [1.4.2] - 2022-03-14
 
