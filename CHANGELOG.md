@@ -19,8 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Timeline flickering/resizing when tooltip moved to bottom right ([#87][#87])
 - Timeline not displaying `VF_APEX_CALL_START` log events ([#97][#97])
 - Incorrect Totaltime on status bar and analysis tab ([#95][#95])
-  - Now uses the timestamp of the last `EXECUTION_FINISED` event to determine total time
-  - If there are no `EXECUTION_FINISED` events the last event with a timestamp is used
+  - Now uses the timestamp of the last `EXECUTION_FINISHED` event to determine total time
+  - If there are no `EXECUTION_FINISHED` events the last event with a timestamp is used
 - Log parsing not handling both CRLF and LF line endings ([#108][#108])
 
 ## [1.4.1] - 2022-01-06
