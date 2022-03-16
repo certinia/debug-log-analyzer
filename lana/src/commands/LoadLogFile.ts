@@ -75,9 +75,9 @@ export class LoadLogFile {
         return new Item(
           `${new Date(r.StartTime).toLocaleString()} ${r.Operation}`,
           "",
-          `${r.Id} ${r.Status} ${r.DurationMilliseconds}ms ${
+          `${r.Id} ${r.Status} ${r.DurationMilliseconds} ms ${(
             r.LogLength / 1024
-          }kB`
+          ).toFixed(2)} KB`
         );
       });
 
