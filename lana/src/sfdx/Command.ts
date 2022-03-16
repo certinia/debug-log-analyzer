@@ -18,8 +18,8 @@ export class Command {
         command,
         (
           error: ExecException | null,
-          stdOut: Buffer | String,
-          stdErr: Buffer | String
+          stdOut: Buffer | string,
+          stdErr: Buffer | string
         ) => {
           if (error === null) {
             const out = stdOut as Buffer;
