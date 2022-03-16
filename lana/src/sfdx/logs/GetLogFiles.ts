@@ -5,7 +5,7 @@ import { SFDX, SFDXResponse } from "../SFDX";
 
 export interface GetLogFilesResult {
   /* eslint-disable @typescript-eslint/naming-convention */
-  Id: String;
+  Id: string;
   Application: string;
   DurationMilliseconds: number;
   Location: string;
