@@ -129,7 +129,8 @@ Cliking on the links will take you to where that SOQL/DML occured in the call tr
 
 ## Contributing
 
-Help us to make things better by [Contributing](.CONTRIBUTING.md)
+Help us to make things better by [Contributing](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/CONTRIBUTING.md)\
+Find out how to [Build](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/BUILDING.md) the extension
 
 ---
 
