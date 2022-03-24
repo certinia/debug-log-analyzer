@@ -1,151 +1,155 @@
 {
-	"name": "lana",
-	"displayName": "Apex Log Analyzer",
-	"version": "1.4.2",
-	"description": "Analyzer for Salesforce debug logs",
-	"keywords": [
-		"salesforce",
-		"apex",
-		"apexlog",
-		"debuglog",
-		"debug",
-		"log"
-	],
-	"main": "out/Main.js",
-	"icon": "logo.png",
-	"publisher": "FinancialForce",
-	"author": "",
-	"license": "SEE LICENSE IN LICENSE.txt",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/financialforcedev/debug-log-analyzer.git"
-	},
-	"engines": {
-		"vscode": "^1.58.1"
-	},
-	"categories": [
-		"Other"
-	],
-	"activationEvents": [
-		"onCommand:lana.loadLogFile",
-		"onCommand:lana.showLogFile"
-	],
-	"contributes": {
-		"commands": [
-			{
-				"command": "lana.loadLogFile",
-				"title": "Log: Load Apex Log For Analysis"
-			},
-			{
-				"command": "lana.showLogFile",
-				"title": "Log: Show Apex Log Analysis"
-			}
-		],
-		"menus": {
-			"commandPalette": [
-				{
-					"command": "lana.showLogFile",
-					"when": "resourceExtname == '.log'"
-				}
-			],
-			"editor/context": [
-				{
-					"command": "lana.showLogFile",
-					"when": "resourceExtname == '.log'"
-				}
-			],
-			"explorer/context": [
-				{
-					"command": "lana.showLogFile",
-					"when": "resourceExtname == '.log'"
-				}
-			]
-		},
-		"configuration": {
-			"type": "object",
-			"title": "Apex Log Analyzer",
-			"properties": {
-				"lana.timeline.colors": {
-					"type": "object",
-					"default": {
-						"Code Unit": "#6BAD68",
-						"SOQL": "#4B9D6E",
-						"Method": "#328C72",
-						"Flow": "#237A72",
-						"DML": "#22686D",
-						"Workflow": "#285663",
-						"System Method": "#2D4455"
-					},
-					"properties": {
-						"Code Unit": {
-							"type": "string",
-							"default": "#6BAD68",
-							"description": "Hex color for Code Unit timeline events."
-						},
-						"SOQL": {
-							"type": "string",
-							"default": "#4B9D6E",
-							"description": "Hex color for SOQL timeline events."
-						},
-						"Method": {
-							"type": "string",
-							"default": "#328C72",
-							"description": "Hex color for Method timeline events."
-						},
-						"Flow": {
-							"type": "string",
-							"default": "#237A72",
-							"description": "Hex color for Flow timeline events."
-						},
-						"DML": {
-							"type": "string",
-							"default": "#22686D",
-							"description": "Hex color for DML timeline events."
-						},
-						"Workflow": {
-							"type": "string",
-							"default": "#285663",
-							"description": "Hex color for Workflow timeline events."
-						},
-						"System Method": {
-							"type": "string",
-							"default": "#2D4455",
-							"description": "Hex color for System Method timeline events."
-						}
-					},
-					"description": "Colors used for each event type on the Timeline",
-					"additionalProperties": false
-				}
-			}
-		}
-	},
-	"scripts": {
-		"vscode:prepublish": "npm run compile",
-		"compile": "npm run local-compile && npm run log-viewer && cp ../README.md ../CHANGELOG.md ../LICENSE.txt .",
-		"local-compile": "rm -rf out && rollup -c rollup.config.js",
-		"watch": "tsc -watch -p ./",
-		"pretest": "npm run compile && npm run lint",
-		"lint": "eslint src --ext ts",
-		"test": "node ./out/test/runTest.js",
-		"log-viewer": "npm run log-viewer-build && npm run log-viewer-copy",
-		"log-viewer-build": "(cd ../log-viewer; npm ci && npm run build)",
-		"log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/."
-	},
-	"dependencies": {
-		"pkgforce": "^2.1.4"
-	},
-	"devDependencies": {
-		"@rollup/plugin-commonjs": "^19.0.2",
-		"@rollup/plugin-node-resolve": "^13.0.4",
-		"@rollup/plugin-typescript": "^8.2.5",
-		"@types/node": "^12.11.7",
-		"@types/vscode": "^1.58.1",
-		"@typescript-eslint/eslint-plugin": "^4.28.5",
-		"@typescript-eslint/parser": "^4.28.5",
-		"eslint": "^7.31.0",
-		"rollup": "^2.0.0",
-		"rollup-plugin-terser": "^7.0.2",
-		"tslib": "^2.0.0",
-		"typescript": "^4.0.0"
-	}
+  "name": "lana",
+  "displayName": "Apex Log Analyzer",
+  "version": "1.4.2",
+  "description": "Analyzer for Salesforce debug logs - Visualize code execution via a Flame graph and identify performance and SOQL/DML problems via Method and Database analysis",
+  "keywords": [
+    "salesforce",
+    "apex",
+    "apexlog",
+    "debuglog",
+    "debug",
+    "log"
+  ],
+  "main": "out/Main.js",
+  "icon": "logo.png",
+  "galleryBanner": {
+    "color": "#1e252b",
+    "theme": "dark"
+  },
+  "publisher": "FinancialForce",
+  "author": "",
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/financialforcedev/debug-log-analyzer.git"
+  },
+  "engines": {
+    "vscode": "^1.58.1"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:lana.loadLogFile",
+    "onCommand:lana.showLogFile"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "lana.loadLogFile",
+        "title": "Log: Load Apex Log For Analysis"
+      },
+      {
+        "command": "lana.showLogFile",
+        "title": "Log: Show Apex Log Analysis"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "lana.showLogFile",
+          "when": "resourceExtname == '.log'"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "lana.showLogFile",
+          "when": "resourceExtname == '.log'"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "lana.showLogFile",
+          "when": "resourceExtname == '.log'"
+        }
+      ]
+    },
+    "configuration": {
+      "type": "object",
+      "title": "Apex Log Analyzer",
+      "properties": {
+        "lana.timeline.colors": {
+          "type": "object",
+          "default": {
+            "Code Unit": "#6BAD68",
+            "SOQL": "#4B9D6E",
+            "Method": "#328C72",
+            "Flow": "#237A72",
+            "DML": "#22686D",
+            "Workflow": "#285663",
+            "System Method": "#2D4455"
+          },
+          "properties": {
+            "Code Unit": {
+              "type": "string",
+              "default": "#6BAD68",
+              "description": "Hex color for Code Unit timeline events."
+            },
+            "SOQL": {
+              "type": "string",
+              "default": "#4B9D6E",
+              "description": "Hex color for SOQL timeline events."
+            },
+            "Method": {
+              "type": "string",
+              "default": "#328C72",
+              "description": "Hex color for Method timeline events."
+            },
+            "Flow": {
+              "type": "string",
+              "default": "#237A72",
+              "description": "Hex color for Flow timeline events."
+            },
+            "DML": {
+              "type": "string",
+              "default": "#22686D",
+              "description": "Hex color for DML timeline events."
+            },
+            "Workflow": {
+              "type": "string",
+              "default": "#285663",
+              "description": "Hex color for Workflow timeline events."
+            },
+            "System Method": {
+              "type": "string",
+              "default": "#2D4455",
+              "description": "Hex color for System Method timeline events."
+            }
+          },
+          "description": "Colors used for each event type on the Timeline",
+          "additionalProperties": false
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "npm run local-compile && npm run log-viewer && cp ../README.md ../CHANGELOG.md ../LICENSE.txt .",
+    "local-compile": "rm -rf out && rollup -c rollup.config.js",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "log-viewer": "npm run log-viewer-build && npm run log-viewer-copy",
+    "log-viewer-build": "(cd ../log-viewer; npm ci && npm run build)",
+    "log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/."
+  },
+  "dependencies": {
+    "pkgforce": "^2.1.4"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^19.0.2",
+    "@rollup/plugin-node-resolve": "^13.0.4",
+    "@rollup/plugin-typescript": "^8.2.5",
+    "@types/node": "^12.11.7",
+    "@types/vscode": "^1.58.1",
+    "@typescript-eslint/eslint-plugin": "^4.28.5",
+    "@typescript-eslint/parser": "^4.28.5",
+    "eslint": "^7.31.0",
+    "rollup": "^2.0.0",
+    "rollup-plugin-terser": "^7.0.2",
+    "tslib": "^2.0.0",
+    "typescript": "^4.0.0"
+  }
 }
