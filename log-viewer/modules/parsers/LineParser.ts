@@ -27,6 +27,7 @@ export abstract class LogLine extends TimeStampedNode {
   children: LogLine[] | null = null;
 
   isExit: boolean = false;
+  isValid: boolean = true;
   hasValidSymbols: boolean = false;
   discontinuity: boolean = false;
   exitTypes: string[] | null = null;
@@ -394,6 +395,11 @@ class VFApexCallStartLine extends LogLine {
         // Property
         methodtext = "." + methodtext;
       }
+    } else {
+      // we have s system entry and they do not have exits
+      // e.g |VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagescomponentcontroller.apex <init>
+      // and they really mess with the logs so skip handling them.
+      this.isValid = false;
     }
     this.text = classText + methodtext;
   }
@@ -431,9 +437,11 @@ class VFDeserializeViewstateEndLine extends LogLine {
 class VFFormulaStartLine extends LogLine {
   exitTypes = ["VF_EVALUATE_FORMULA_END"];
   cpuType = "custom";
+  displayType = "method";
   suffix = " (VF FORMULA)";
   classes = "node formula";
   group: string;
+  timelineKey = "systemMethod";
 
   constructor(parts: string[]) {
     super(parts);
