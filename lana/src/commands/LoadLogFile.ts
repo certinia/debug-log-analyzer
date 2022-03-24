@@ -6,14 +6,30 @@ import { Context } from "../Context";
 import { Command } from "./Command";
 import { LogView } from "./LogView";
 import { appName } from "../Main";
-import { WebviewPanel, window } from "vscode";
+import { Item, Options, QuickPick } from "../display/QuickPick";
 import { QuickPickWorkspace } from "../display/QuickPickWorkspace";
 import { GetLogFiles, GetLogFilesResult } from "../sfdx/logs/GetLogFiles";
 import { GetLogFile } from "../sfdx/logs/GetLogFile";
-import * as path from "path";
 import { promises as fsp } from "fs";
 import * as fs from "fs";
-import { Item, Options, QuickPick } from "../display/QuickPick";
+import * as path from "path";
+import { WebviewPanel, window } from "vscode";
+
+class DebugLogItem extends Item {
+  logId: string;
+
+  constructor(
+    name: string,
+    desc: string,
+    details: string,
+    logId: string,
+    sticky: boolean = true,
+    selected: boolean = false
+  ) {
+    super(name, desc, details, sticky, selected);
+    this.logId = logId;
+  }
+}
 
 export class LoadLogFile {
   static apply(context: Context): void {
@@ -69,26 +85,22 @@ export class LoadLogFile {
       .sort((a, b) => {
         const aDate = Date.parse(a.StartTime);
         const bDate = Date.parse(b.StartTime);
-        if (aDate === bDate) {
-          return 0;
-        } else if (aDate < bDate) {
-          return 1;
-        }
-        return -1;
+        return bDate - aDate;
       })
       .map((r) => {
-        return new Item(
-          `${new Date(r.StartTime).toLocaleString()} ${r.Operation}`,
-          "",
-          `${r.Id} ${r.Status} ${r.DurationMilliseconds}ms ${
-            r.LogLength / 1024
-          }kB`
-        );
+        const name = `${r.LogUser.Name} - ${r.Operation}`;
+        const description = `${(r.LogLength / 1024).toFixed(2)} KB ${
+          r.DurationMilliseconds
+        } ms`;
+        const detail = `${new Date(r.StartTime).toLocaleString()} - ${
+          r.Status
+        } - ${r.Id}`;
+        return new DebugLogItem(name, description, detail, r.Id);
       });
 
     const picked = await QuickPick.pick(items, new Options("Select a logfile"));
     if (picked.length === 1) {
-      return picked[0].detail.slice(0, 18);
+      return picked[0].logId;
     }
     return null;
   }
