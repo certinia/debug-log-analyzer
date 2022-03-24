@@ -31,7 +31,22 @@ export class RootNode extends BlockLines {
   timestamp = 0;
 }
 
-function endMethod(method: LogLine, endLine: LogLine, lineIter: LineIterator) {
+function isMatchingEnd(method: LogLine, endLine: LogLine) {
+  return (
+    method.exitTypes &&
+    method.exitTypes.includes(endLine.type) &&
+    (!endLine.lineNumber ||
+      !method.lineNumber ||
+      endLine.lineNumber === method.lineNumber)
+  );
+}
+
+function endMethod(
+  method: LogLine,
+  endLine: LogLine,
+  lineIter: LineIterator,
+  stack: LogLine[]
+) {
   method.exitStamp = endLine.timestamp;
   if (method.onEnd) {
     // the method wants to see the exit line
@@ -39,27 +54,31 @@ function endMethod(method: LogLine, endLine: LogLine, lineIter: LineIterator) {
   }
 
   // is this a 'good' end line?
-  if (
-    method.exitTypes &&
-    method.exitTypes.includes(endLine.type) &&
-    (!method.lineNumber || endLine.lineNumber === method.lineNumber)
-  ) {
+  if (isMatchingEnd(method, endLine)) {
     discontinuity = false; // end stack unwinding
     lineIter.fetch(); // consume the line
+    return true; // success
+  } else if (discontinuity) {
+    return true; // exception - unwind
   } else {
-    if (!discontinuity) {
-      // discontinuities should have been reported already
-      truncateLog(endLine.timestamp, "Unexpected-Exit", "unexpected");
+    if (stack.some((m) => isMatchingEnd(m, endLine))) {
+      return true; // we match a method further down the stack - unwind
     }
+    // we found an exit event on its own e.g a `METHOD_EXIT` with an entry
+      truncateLog(endLine.timestamp, "Unexpected-Exit", "unexpected");
+    return false; // we have no matching method - ignore
   }
 }
 
-function getMethod(lineIter: LineIterator, method: LogLine) {
+function getMethod(lineIter: LineIterator, method: LogLine, stack: LogLine[]) {
   lastTimestamp = method.timestamp;
 
   if (method.exitTypes) {
+    const children = [];
     let lines: LogLine[] = [],
-      line: LogLine | null;
+      line;
+
+    stack.push(method);
 
     while ((line = lineIter.peek())) {
       // eslint-disable-line no-cond-assign
@@ -67,25 +86,28 @@ function getMethod(lineIter: LineIterator, method: LogLine) {
         // discontinuities are stack unwinding (caused by Exceptions)
         discontinuity = true; // start unwinding stack
       }
-      if (line.isExit) {
+
+      if (line.isExit && endMethod(method, line, lineIter, stack)) {
         break;
       }
 
       lineIter.fetch(); // it's a child - consume the line
       lastTimestamp = line.timestamp;
-      if (line.exitTypes || line.displayType === "method") {
+      if (line.isValid && (line.exitTypes || line.displayType === "method")) {
         method.addBlock(lines);
         lines = [];
-        method.addChild(getMethod(lineIter, line));
+        children.push(getMethod(lineIter, line, stack));
       } else {
         lines.push(line);
       }
     }
 
-    if (line === null) {
+    if (line == null) {
       // truncated method - terminate at the end of the log
       method.exitStamp = lastTimestamp;
       method.duration = lastTimestamp - method.timestamp;
+
+      // we found an entry event on its own e.g a `METHOD_ENTRY` without an exit )
       truncateLog(lastTimestamp, "Unexpected-End", "unexpected");
     }
 
@@ -93,10 +115,10 @@ function getMethod(lineIter: LineIterator, method: LogLine) {
       method.addBlock(lines);
     }
 
-    if (line?.isExit) {
-      endMethod(method, line, lineIter);
+    stack.pop();
+    method.children = children;
     }
-  }
+
   recalculateDurations(method);
 
   return method;
@@ -104,7 +126,8 @@ function getMethod(lineIter: LineIterator, method: LogLine) {
 
 export function getRootMethod(): RootNode {
   const lineIter = new LineIterator(logLines),
-    rootMethod = new RootNode([]);
+    rootMethod = new RootNode([]),
+    stack: LogLine[] = [];
   let lines: LogLine[] = [],
     line;
 
@@ -113,7 +136,7 @@ export function getRootMethod(): RootNode {
     if (line.exitTypes) {
       rootMethod.addBlock(lines);
       lines = [];
-      rootMethod.addChild(getMethod(lineIter, line));
+      rootMethod.addChild(getMethod(lineIter, line, stack));
     } else {
       lines.push(line);
     }
