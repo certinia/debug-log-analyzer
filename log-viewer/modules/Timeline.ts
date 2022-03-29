@@ -143,9 +143,7 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-// todo: add to rects first and draw from there
 // todo: Only redraw on zoom or drag
-// todo: Do not draw If not visible
 
 function nodesToRectangles(nodes: LogLine[], depth: number) {
   const children: LogLine[] = [];
@@ -207,8 +205,10 @@ const drawRect = (rect: Rect) => {
   const w = rect.w * scaleX;
   if (w >= 0.05) {
     const x = rect.x * scaleX - horizontalOffset;
-    const y = rect.y * scaleY - verticalOffset;
-    ctx.rect(x, y, w, scaleY);
+    if (x < displayWidth && x + w > 0) {
+      const y = rect.y * scaleY - verticalOffset;
+      ctx.rect(x, y, w, scaleY);
+    }
   }
 };
 
