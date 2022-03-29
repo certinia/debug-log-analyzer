@@ -239,13 +239,9 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
     if (thisEntry[2]) {
       ctx.fillStyle = thisEntry[2];
     }
-    const startX = startTime * scaleX;
-    ctx.fillRect(
-      startTime * scaleX - horizontalOffset,
-      -displayHeight,
-      endTime - startX,
-      displayHeight
-    );
+    const x = startTime * scaleX - horizontalOffset;
+    const w = (endTime - startTime) * scaleX;
+    ctx.fillRect(x, -displayHeight, w, displayHeight);
   }
 }
 
