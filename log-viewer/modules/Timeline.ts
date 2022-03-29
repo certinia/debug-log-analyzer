@@ -47,7 +47,7 @@ let verticalOffset = 0;
 let initialZoom = 0;
 let container: HTMLDivElement;
 let canvas: HTMLCanvasElement;
-let ctx: CanvasRenderingContext2D | null;
+let ctx: CanvasRenderingContext2D;
 
 let scaleX: number,
   scaleFont: string,
@@ -143,36 +143,19 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-function drawFlameNodes(
-  ctx: CanvasRenderingContext2D,
-  nodes: LogLine[],
-  depth: number
-) {
-  ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = 1;
-  drawNodes(ctx, nodes, depth);
-  renderRectangles(ctx);
-}
+// todo: add to rects first and draw from there
+// todo: Only redraw on zoom or drag
+// todo: Do not draw If not visible
 
-function drawNodes(
-  ctx: CanvasRenderingContext2D,
-  nodes: LogLine[],
-  depth: number
-) {
+function nodesToRectangles(nodes: LogLine[], depth: number) {
   const children: LogLine[] = [];
   const len = nodes.length;
-  const y = depth * scaleY - verticalOffset;
   for (let c = 0; c < len; c++) {
     const node = nodes[c];
     const tlKey = node.timelineKey;
     if (tlKey && node.duration) {
-      // nanoseconds
-      const width = node.duration * scaleX;
-      if (width >= 0.05) {
-        const tl = keyMap[tlKey],
-          x = node.timestamp * scaleX - horizontalOffset;
-        addToRectQueue(tl.fillColor, x, y, width);
-      }
+      const tl = keyMap[tlKey];
+      addToRectQueue(tl.fillColor, node.timestamp, depth, node.duration);
     }
 
     // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
@@ -185,7 +168,7 @@ function drawNodes(
     return;
   }
 
-  drawNodes(ctx, children, depth + 1);
+  nodesToRectangles(children, depth + 1);
 }
 
 interface Rect {
@@ -194,7 +177,7 @@ interface Rect {
   w: number;
 }
 
-let rectRenderQueue = new Map<string, Rect[]>();
+const rectRenderQueue = new Map<string, Rect[]>();
 
 function addToRectQueue(color: string, x: number, y: number, w: number) {
   if (!rectRenderQueue.has(color)) {
@@ -213,17 +196,24 @@ function renderRectangles(ctx: CanvasRenderingContext2D) {
   for (let [color, items] of rectRenderQueue) {
     ctx.beginPath();
     ctx.fillStyle = color;
-    items.forEach((item) => {
-      ctx.rect(item.x, item.y, item.w, scaleY);
-    });
+    items.forEach(drawRect);
     ctx.fill();
     ctx.stroke();
   }
-
-  rectRenderQueue = new Map<string, Rect[]>();
 }
 
+const drawRect = (rect: Rect) => {
+  // nanoseconds
+  const w = rect.w * scaleX;
+  if (w >= 0.05) {
+    const x = rect.x * scaleX - horizontalOffset;
+    const y = rect.y * scaleY - verticalOffset;
+    ctx.rect(x, y, w, scaleY);
+  }
+};
+
 function drawTruncation(ctx: CanvasRenderingContext2D) {
+  // TODO: Fix global event overlap / wobble when scolling left + right when zoomed in
   const len = truncated.length;
   if (!len) {
     return;
@@ -287,9 +277,10 @@ export default async function renderTimeline(rootMethod: RootNode) {
   renderTimelineKey();
   container = document.getElementById("timelineWrapper") as HTMLDivElement;
   canvas = document.getElementById("timeline") as HTMLCanvasElement;
-  ctx = canvas.getContext("2d", { alpha: false });
+  ctx = canvas.getContext("2d", { alpha: false })!; // can never be null since context (2d) is a supported type.
   timelineRoot = rootMethod;
   calculateSizes();
+  nodesToRectangles([timelineRoot], -1);
   if (ctx) {
     requestAnimationFrame(drawTimeLine);
   }
@@ -314,7 +305,9 @@ function drawTimeLine() {
     ctx.clearRect(0, -canvas.height, canvas.width, canvas.height);
     drawTruncation(ctx);
     drawScale(ctx);
-    drawFlameNodes(ctx, [timelineRoot], -1);
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 1;
+    renderRectangles(ctx);
     requestAnimationFrame(drawTimeLine);
   }
 }
@@ -587,6 +580,7 @@ function handleScroll(evt: WheelEvent) {
     //TODO: work out a proper max zoom
     // stop zooming at 0.0001 ms
     zoomDelta = updatedZoom <= 0.3 ? zoomDelta : scaleX - 0.3;
+    // movement when zooming
     if (zoomDelta !== 0) {
       scaleX = scaleX - zoomDelta;
       if (scaleX !== oldZoom) {
@@ -595,7 +589,9 @@ function handleScroll(evt: WheelEvent) {
         const maxWidth = scaleX * totalDuration - displayWidth;
         horizontalOffset = Math.max(0, Math.min(maxWidth, newOffset));
       }
-    } else {
+    }
+    // movement when zooming
+    else {
       const maxWidth = scaleX * totalDuration - displayWidth;
       horizontalOffset = Math.max(
         0,
