@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- Rounded the log size on the `Log: Load Apex Log For Analysis` command results to 2DP ([#91][#91])
+- Improved log parsing to tolerate false exits ([#88][#88])
+  - Checks for false exits before un-winding the call stack, by checking down the stack to see if the EXIT matches something already on the stack.
+
 ## [1.4.2] - 2022-03-14
 
 ### Fixed
@@ -13,8 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Timeline flickering/resizing when tooltip moved to bottom right ([#87][#87])
 - Timeline not displaying `VF_APEX_CALL_START` log events ([#97][#97])
 - Incorrect Totaltime on status bar and analysis tab ([#95][#95])
-  - Now uses the timestamp of the last `EXECUTION_FINISED` event to determine total time
-  - If there are no `EXECUTION_FINISED` events the last event with a timestamp is used
+  - Now uses the timestamp of the last `EXECUTION_FINISHED` event to determine total time
+  - If there are no `EXECUTION_FINISHED` events the last event with a timestamp is used
 - Log parsing not handling both CRLF and LF line endings ([#108][#108])
 
 ## [1.4.1] - 2022-01-06
@@ -118,3 +126,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#97]: https://github.com/financialforcedev/debug-log-analyzer/issues/97
 [#99]: https://github.com/financialforcedev/debug-log-analyzer/issues/99
 [#108]: https://github.com/financialforcedev/debug-log-analyzer/issues/108
+[#91]: https://github.com/financialforcedev/debug-log-analyzer/issues/91
+[#88]: https://github.com/financialforcedev/debug-log-analyzer/issues/88

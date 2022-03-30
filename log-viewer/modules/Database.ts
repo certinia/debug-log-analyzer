@@ -75,7 +75,7 @@ export class DatabaseAccess {
     }
   }
 
-  private upsert(map: Map<String, DatabaseEntry>, line: LogLine, stack: Stack) {
+  private upsert(map: Map<string, DatabaseEntry>, line: LogLine, stack: Stack) {
     let stackIndex = this.internStack(stack);
     let entry = map.get(line.text);
     if (!entry) {
@@ -90,7 +90,7 @@ export class DatabaseAccess {
 
   private internStack(stack: Stack): number {
     this.stacks.push([...stack].reverse());
-    return this.stacks.length-1;
+    return this.stacks.length - 1;
   }
 }
 

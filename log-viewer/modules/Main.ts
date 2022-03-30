@@ -107,7 +107,7 @@ async function markContainers(node: LogLine) {
       const child = children[i];
       node.containsDml ||= child.type === "DML_BEGIN";
       node.containsSoql ||= child.type === "SOQL_EXECUTE_BEGIN";
-      if (child.displayType === "method") {
+      if (child.children) {
         await markContainers(child);
         node.containsDml ||= child.containsDml;
         node.containsSoql ||= child.containsSoql;
