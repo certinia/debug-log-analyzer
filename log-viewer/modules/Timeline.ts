@@ -257,6 +257,7 @@ function resize() {
   ) {
     canvas.width = displayWidth = newWidth;
     canvas.height = displayHeight = newHeight;
+    ctx.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-lefts
 
     const newInitialZoom = newWidth / totalDuration;
     // defaults if not set yet
@@ -301,8 +302,7 @@ export function setColors(timelineColors: any) {
 function drawTimeLine() {
   if (ctx) {
     resize();
-    ctx.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-left
-    ctx.clearRect(0, -canvas.height, canvas.width, canvas.height);
+    ctx.clearRect(0, -displayHeight, displayWidth, displayHeight);
     drawTruncation(ctx);
     drawScale(ctx);
     ctx.strokeStyle = strokeColor;
