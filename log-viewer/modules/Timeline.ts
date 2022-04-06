@@ -205,8 +205,8 @@ const drawRect = (rect: Rect) => {
   const w = rect.w * scaleX;
   if (w >= 0.05) {
     const x = rect.x * scaleX - horizontalOffset;
-    if (x < displayWidth && x + w > 0) {
-      const y = rect.y * scaleY - verticalOffset;
+    const y = rect.y * scaleY - verticalOffset;
+    if (x < displayWidth && x + w > 0 && y > -displayHeight && y + scaleY < 0) {
       ctx.rect(x, y, w, scaleY);
     }
   }
