@@ -244,8 +244,7 @@ async function displayLog(log: string, name: string, path: string) {
 
 async function waitForRender() {
   await new Promise((resolve) => window.requestAnimationFrame(resolve));
-  await new Promise((resolve) => window.requestAnimationFrame(resolve));
-  await new Promise((resolve) => setTimeout(resolve, 1));
+  await new Promise((resolve) => setTimeout(resolve));
 }
 
 function readLog() {
