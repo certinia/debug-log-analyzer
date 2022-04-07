@@ -1,13 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { encodeEntities } from "./Browser";
 import { TimeStampedNode } from "./parsers/LineParser";
-
-export function highlightText(unsafeText: string, isBold: boolean) {
-  const text = encodeEntities(unsafeText);
-  return isBold ? "<b>" + text + "</b>" : text;
-}
 
 export default function formatDuration(duration: number) {
   const text = `${~~(duration / 1000)}`; // convert from nano-seconds to micro-seconds
