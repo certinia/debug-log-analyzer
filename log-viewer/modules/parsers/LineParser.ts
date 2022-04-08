@@ -128,7 +128,7 @@ export function parseVfNamespace(text: string): string {
 export function parseTimestamp(text: string): number {
   const timestamp = text.slice(text.indexOf("(") + 1, -1);
   if (timestamp) {
-    return Number(timestamp);
+    return +timestamp;
   }
   throw new Error(`Unable to parse timestamp: '${text}'`);
 }
@@ -136,8 +136,8 @@ export function parseTimestamp(text: string): number {
 export function parseLineNumber(text: string): string | number {
   const lineNumberStr = text.slice(1, -1);
   if (lineNumberStr) {
-    const lineNumber = Number(lineNumberStr);
-    return isNaN(lineNumber) ? lineNumberStr : lineNumber;
+    const lineNumber = +lineNumberStr;
+    return !isNaN(lineNumber) ? lineNumber : lineNumberStr;
   }
   throw new Error(`Unable to parse line number: '${text}'`);
 }
@@ -145,7 +145,7 @@ export function parseLineNumber(text: string): string | number {
 export function parseRows(text: string): number {
   const rowCount = text.slice(text.indexOf("Rows:") + 5);
   if (rowCount) {
-    return Number(rowCount);
+    return +rowCount;
   }
   throw new Error(`Unable to parse row count: '${text}'`);
 }
@@ -897,9 +897,6 @@ class EnteringManagedPackageLine extends LogLine {
   cpuType = "pkg";
   timelineKey = "method";
   namespace: string;
-  exitStamp: any;
-  duration: any;
-  selfTime: any;
 
   constructor(parts: string[]) {
     super(parts);
@@ -2021,11 +2018,12 @@ export function parseLine(
   return null;
 }
 
+// Matches CRLF (\r\n) + LF (\n)
+// the ? matches the previous token 0 or 1 times.
+const newlineRegex = /\r?\n/;
 export default async function parseLog(log: string) {
   const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || -1;
-  // Matches CRLF (\r\n) + LF (\n)
-  // the ? matches the previous token 0 or 1 times.
-  const rawLines = log.substring(start).split(/\r?\n/);
+  const rawLines = log.substring(start).split(newlineRegex);
 
   // reset global variables to be captured during parsing
   logLines = [];
@@ -2035,7 +2033,7 @@ export default async function parseLog(log: string) {
 
   let lastEntry = null;
   const len = rawLines.length;
-  for (let i = 0; i < len; ++i) {
+  for (let i = 0; i < len; i++) {
     const line = rawLines[i];
     if (line) {
       // ignore blank lines
