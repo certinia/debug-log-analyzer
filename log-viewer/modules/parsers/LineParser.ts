@@ -351,7 +351,7 @@ export class CodeUnitStartedLine extends LogLine {
         if (name?.startsWith("VF:")) {
           this.namespace = parseVfNamespace(name);
         }
-        this.text = name || parts[3]; // ???
+        this.text = name || parts[3];
         break;
     }
   }
