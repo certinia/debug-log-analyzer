@@ -40,6 +40,8 @@ const scaleY = -15,
     },
   };
 
+const state: { property: string } = { property: "foo" };
+
 let tooltip: HTMLDivElement;
 let realHeight = 0;
 let horizontalOffset = 0;
@@ -266,6 +268,11 @@ function resize() {
     const newScaleX = scaleX - (initialZoom - newInitialZoom);
     scaleX = Math.min(newScaleX, 0.3);
     initialZoom = newInitialZoom;
+
+    if (!shouldRedraw) {
+      shouldRedraw = true;
+      requestAnimationFrame(drawTimeLine);
+    }
   }
   resizeFont();
 }
@@ -298,17 +305,18 @@ export function setColors(timelineColors: any) {
   }
 }
 
-// todo: stop clearing on every iteration + only do it if a change event occurs (e.g we zoom, or scroll or resize)
 function drawTimeLine() {
   if (ctx) {
-    resize();
-    ctx.clearRect(0, -displayHeight, displayWidth, displayHeight);
-    drawTruncation(ctx);
-    drawScale(ctx);
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = 1;
-    renderRectangles(ctx);
-    requestAnimationFrame(drawTimeLine);
+    if (shouldRedraw) {
+      resize();
+      ctx.clearRect(0, -displayHeight, displayWidth, displayHeight);
+      drawTruncation(ctx);
+      drawScale(ctx);
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1;
+      renderRectangles(ctx);
+    }
+    shouldRedraw = false;
   }
 }
 
@@ -564,9 +572,14 @@ function handleMouseMove(evt: MouseEvent) {
       0,
       Math.max(-maxVertOffset, verticalOffset - movementY)
     );
+    if (!shouldRedraw) {
+      shouldRedraw = true;
+      requestAnimationFrame(drawTimeLine);
+    }
   }
 }
 
+let shouldRedraw = true;
 function handleScroll(evt: WheelEvent) {
   if (!dragging) {
     tooltip.style.display = "none";
@@ -597,6 +610,11 @@ function handleScroll(evt: WheelEvent) {
         0,
         Math.min(maxWidth, horizontalOffset + deltaX)
       );
+    }
+
+    if (!shouldRedraw) {
+      shouldRedraw = true;
+      requestAnimationFrame(drawTimeLine);
     }
   }
 }
