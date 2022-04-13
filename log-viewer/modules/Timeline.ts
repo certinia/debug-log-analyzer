@@ -40,19 +40,62 @@ const scaleY = -15,
     },
   };
 
-const state: { property: string } = { property: "foo" };
+class State {
+  public shouldRedraw = true;
+  public defaultZoom = 0;
+
+  private _zoom: number = 0;
+  private _offsetY: number = 0;
+  private _offsetX: number = 0;
+
+  public set zoom(zoom: number) {
+    this._zoom = zoom;
+    this.queueRedraw();
+  }
+
+  public get zoom() {
+    return this._zoom;
+  }
+
+  public set offsetY(offsetY: number) {
+    if (this._offsetY !== offsetY) {
+      this._offsetY = offsetY;
+      this.queueRedraw();
+    }
+  }
+
+  public get offsetY() {
+    return this._offsetY;
+  }
+
+  public set offsetX(offsetX: number) {
+    if (this._offsetX !== offsetX) {
+      this._offsetX = offsetX;
+      this.queueRedraw();
+    }
+  }
+
+  public get offsetX() {
+    return this._offsetX;
+  }
+
+  private queueRedraw() {
+    if (!this.shouldRedraw) {
+      this.shouldRedraw = true;
+      requestAnimationFrame(drawTimeLine);
+    }
+  }
+}
+
+const state = new State();
 
 let tooltip: HTMLDivElement;
-let realHeight = 0;
-let horizontalOffset = 0;
-let verticalOffset = 0;
-let initialZoom = 0;
 let container: HTMLDivElement;
 let canvas: HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D;
 
-let scaleX: number,
-  scaleFont: string,
+let realHeight = 0;
+let scaleFont: string,
   totalDuration: number,
   maxY: number,
   displayHeight: number,
@@ -88,12 +131,12 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   const textHeight = -displayHeight + 2;
   // 1ms = 0.001s
   const nanoSeconds = 1000000000; // 1/10th second (0.1ms
-  const nsWidth = nanoSeconds * scaleX;
+  const nsWidth = nanoSeconds * state.zoom;
 
   // Find the start time based on the LHS of visible area
-  const startTimeInNs = horizontalOffset / scaleX;
+  const startTimeInNs = state.offsetX / state.zoom;
   // Find the end time based on the start + width of visible area.
-  const endTimeInNs = startTimeInNs + displayWidth / scaleX;
+  const endTimeInNs = startTimeInNs + displayWidth / state.zoom;
 
   const endTimeInS = Math.ceil(endTimeInNs / 1000000000);
   const startTimeInS = Math.floor(startTimeInNs / 1000000000);
@@ -101,7 +144,7 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#F88962";
   ctx.beginPath();
   for (let i = startTimeInS; i <= endTimeInS; i++) {
-    const xPos = nsWidth * i - horizontalOffset;
+    const xPos = nsWidth * i - state.offsetX;
     ctx.moveTo(xPos, -displayHeight);
     ctx.lineTo(xPos, 0);
 
@@ -111,7 +154,7 @@ function drawScale(ctx: CanvasRenderingContext2D) {
 
   // 1 microsecond = 0.001 milliseconds
   // only show those where the gap is going to be more than 150 pixels
-  const microSecPixelGap = 150 / (1000 * scaleX);
+  const microSecPixelGap = 150 / (1000 * state.zoom);
   // TODO: This is a bit brute force, but it works. maybe rework it?
   // from 1 micro second to 1 second
   const microSecsToShow = [
@@ -128,7 +171,7 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "#808080";
   ctx.beginPath();
 
-  const microSecWidth = 1000 * scaleX;
+  const microSecWidth = 1000 * state.zoom;
   const endTimeInMicroSecs = endTimeInNs / 1000;
   const startTimeInMicroSecs = startTimeInNs / 1000;
   let i = Math.floor(startTimeInMicroSecs / 1000000) * 1000000;
@@ -136,7 +179,7 @@ function drawScale(ctx: CanvasRenderingContext2D) {
     i = i + closestIncrement;
     const wholeNumber = i % 1000000 === 0;
     if (!wholeNumber && i >= startTimeInMicroSecs) {
-      const xPos = microSecWidth * i - horizontalOffset;
+      const xPos = microSecWidth * i - state.offsetX;
       ctx.moveTo(xPos, -displayHeight);
       ctx.lineTo(xPos, 0);
       ctx.fillText(`${i / 1000} ms`, xPos + 2, textHeight);
@@ -204,10 +247,10 @@ function renderRectangles(ctx: CanvasRenderingContext2D) {
 
 const drawRect = (rect: Rect) => {
   // nanoseconds
-  const w = rect.w * scaleX;
+  const w = rect.w * state.zoom;
   if (w >= 0.05) {
-    const x = rect.x * scaleX - horizontalOffset;
-    const y = rect.y * scaleY - verticalOffset;
+    const x = rect.x * state.zoom - state.offsetX;
+    const y = rect.y * scaleY - state.offsetY;
     if (x < displayWidth && x + w > 0 && y > -displayHeight && y + scaleY < 0) {
       ctx.rect(x, y, w, scaleY);
     }
@@ -231,8 +274,8 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
     if (thisEntry[2]) {
       ctx.fillStyle = thisEntry[2];
     }
-    const x = startTime * scaleX - horizontalOffset;
-    const w = (endTime - startTime) * scaleX;
+    const x = startTime * state.zoom - state.offsetX;
+    const w = (endTime - startTime) * state.zoom;
     ctx.fillRect(x, -displayHeight, w, displayHeight);
   }
 }
@@ -246,8 +289,8 @@ function calculateSizes() {
 function resetView() {
   resize();
   realHeight = -scaleY * maxY;
-  horizontalOffset = 0;
-  verticalOffset = 0;
+  state.offsetX = 0;
+  state.offsetY = 0;
 }
 
 function resize() {
@@ -261,24 +304,19 @@ function resize() {
     canvas.height = displayHeight = newHeight;
     ctx.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-lefts
 
-    const newInitialZoom = newWidth / totalDuration;
+    const newDefaultZoom = newWidth / totalDuration;
     // defaults if not set yet
-    initialZoom ||= scaleX ||= newInitialZoom;
+    state.defaultZoom ||= state.zoom ||= newDefaultZoom;
 
-    const newScaleX = scaleX - (initialZoom - newInitialZoom);
-    scaleX = Math.min(newScaleX, 0.3);
-    initialZoom = newInitialZoom;
-
-    if (!shouldRedraw) {
-      shouldRedraw = true;
-      requestAnimationFrame(drawTimeLine);
-    }
+    const newScaleX = state.zoom - (state.defaultZoom - newDefaultZoom);
+    state.zoom = Math.min(newScaleX, 0.3);
+    state.defaultZoom = newDefaultZoom;
   }
   resizeFont();
 }
 
 function resizeFont() {
-  scaleFont = scaleX > 0.0000004 ? "normal 16px serif" : "normal 8px serif";
+  scaleFont = state.zoom > 0.0000004 ? "normal 16px serif" : "normal 8px serif";
 }
 
 export default async function renderTimeline(rootMethod: RootNode) {
@@ -307,17 +345,15 @@ export function setColors(timelineColors: any) {
 
 function drawTimeLine() {
   if (ctx) {
-    if (shouldRedraw) {
-      resize();
-      ctx.clearRect(0, -displayHeight, displayWidth, displayHeight);
-      drawTruncation(ctx);
-      drawScale(ctx);
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 1;
-      renderRectangles(ctx);
-    }
-    shouldRedraw = false;
+    resize();
+    ctx.clearRect(0, -displayHeight, displayWidth, displayHeight);
+    drawTruncation(ctx);
+    drawScale(ctx);
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 1;
+    renderRectangles(ctx);
   }
+  state.shouldRedraw = false;
 }
 
 export function renderTimelineKey() {
@@ -358,8 +394,8 @@ function findByPosition(
 
   if (node.duration) {
     // we can only test nodes with a duration
-    const starttime = node.timestamp * scaleX - horizontalOffset;
-    const width = node.duration * scaleX;
+    const starttime = node.timestamp * state.zoom - state.offsetX;
+    const width = node.duration * state.zoom;
     const endtime = starttime + width;
 
     if (width < 0.05 || starttime > x || endtime < x) {
@@ -396,7 +432,7 @@ function findByPosition(
 function showTooltip(offsetX: number, offsetY: number) {
   if (!dragging && container && tooltip) {
     const depth = ~~(
-      ((displayHeight - offsetY - verticalOffset) / realHeight) *
+      ((displayHeight - offsetY - state.offsetY) / realHeight) *
       maxY
     );
     let tooltipText =
@@ -458,8 +494,8 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
       endTime = nextEntry[1] ?? totalDuration;
 
     if (
-      x >= startTime * scaleX - horizontalOffset &&
-      x <= endTime * scaleX - horizontalOffset
+      x >= startTime * state.zoom - state.offsetX &&
+      x <= endTime * state.zoom - state.offsetX
     ) {
       const toolTip = document.createElement("div");
       toolTip.textContent = thisEntry[0];
@@ -530,7 +566,7 @@ function onMouseMove(evt: any) {
 function onClickCanvas(evt: any) {
   if (!dragging && tooltip.style.display === "block") {
     const depth = ~~(
-      ((displayHeight - lastMouseY - verticalOffset) / realHeight) *
+      ((displayHeight - lastMouseY - state.offsetY) / realHeight) *
       maxY
     );
     const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
@@ -560,22 +596,14 @@ function handleMouseMove(evt: MouseEvent) {
   if (dragging) {
     tooltip.style.display = "none";
     const { movementY, movementX } = evt;
-    const maxWidth = scaleX * totalDuration - displayWidth;
-    horizontalOffset = Math.max(
-      0,
-      Math.min(maxWidth, horizontalOffset - movementX)
-    );
+    const maxWidth = state.zoom * totalDuration - displayWidth;
+    state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX - movementX));
 
-    const realHeight = maxY * -scaleY;
     const maxVertOffset = ~~(realHeight - displayHeight + displayHeight / 4);
-    verticalOffset = Math.min(
+    state.offsetY = Math.min(
       0,
-      Math.max(-maxVertOffset, verticalOffset - movementY)
+      Math.max(-maxVertOffset, state.offsetY - movementY)
     );
-    if (!shouldRedraw) {
-      shouldRedraw = true;
-      requestAnimationFrame(drawTimeLine);
-    }
   }
 }
 
@@ -586,35 +614,30 @@ function handleScroll(evt: WheelEvent) {
     evt.stopPropagation();
     const { deltaY, deltaX } = evt;
 
-    const oldZoom = scaleX;
-    let zoomDelta = (deltaY / 1000) * scaleX;
-    const updatedZoom = scaleX - zoomDelta;
-    zoomDelta = updatedZoom >= initialZoom ? zoomDelta : scaleX - initialZoom;
+    const oldZoom = state.zoom;
+    let zoomDelta = (deltaY / 1000) * state.zoom;
+    const updatedZoom = state.zoom - zoomDelta;
+    zoomDelta =
+      updatedZoom >= state.defaultZoom
+        ? zoomDelta
+        : state.zoom - state.defaultZoom;
     //TODO: work out a proper max zoom
     // stop zooming at 0.0001 ms
-    zoomDelta = updatedZoom <= 0.3 ? zoomDelta : scaleX - 0.3;
+    zoomDelta = updatedZoom <= 0.3 ? zoomDelta : state.zoom - 0.3;
     // movement when zooming
     if (zoomDelta !== 0) {
-      scaleX = scaleX - zoomDelta;
-      if (scaleX !== oldZoom) {
-        const timePosBefore = (lastMouseX + horizontalOffset) / oldZoom;
-        const newOffset = timePosBefore * scaleX - lastMouseX;
-        const maxWidth = scaleX * totalDuration - displayWidth;
-        horizontalOffset = Math.max(0, Math.min(maxWidth, newOffset));
+      state.zoom = state.zoom - zoomDelta;
+      if (state.zoom !== oldZoom) {
+        const timePosBefore = (lastMouseX + state.offsetX) / oldZoom;
+        const newOffset = timePosBefore * state.zoom - lastMouseX;
+        const maxWidth = state.zoom * totalDuration - displayWidth;
+        state.offsetX = Math.max(0, Math.min(maxWidth, newOffset));
       }
     }
     // movement when zooming
     else {
-      const maxWidth = scaleX * totalDuration - displayWidth;
-      horizontalOffset = Math.max(
-        0,
-        Math.min(maxWidth, horizontalOffset + deltaX)
-      );
-    }
-
-    if (!shouldRedraw) {
-      shouldRedraw = true;
-      requestAnimationFrame(drawTimeLine);
+      const maxWidth = state.zoom * totalDuration - displayWidth;
+      state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX + deltaX));
     }
   }
 }
