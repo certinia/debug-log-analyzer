@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rounded the log size on the `Log: Load Apex Log For Analysis` command results to 2DP ([#91][#91])
 - Improved log parsing to tolerate false exits ([#88][#88])
   - Checks for false exits before un-winding the call stack, by checking down the stack to see if the EXIT matches something already on the stack.
+- Reduced CPU usage when Timeline is open but no changes are occuring ([#90][#90])
 
 ## [1.4.2] - 2022-03-14
 
@@ -128,3 +129,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#108]: https://github.com/financialforcedev/debug-log-analyzer/issues/108
 [#91]: https://github.com/financialforcedev/debug-log-analyzer/issues/91
 [#88]: https://github.com/financialforcedev/debug-log-analyzer/issues/88
+[#90]: https://github.com/financialforcedev/debug-log-analyzer/issues/90
