@@ -20,6 +20,9 @@
 				display: flex;
 				flex-direction: column;
 			}
+			#timeInMS {
+				width: 4rem;
+			}
 		</style>
 	</head>
 
@@ -53,6 +56,8 @@
 					<label for="hideSystem">Hide system calls</label>
 					<input id="hideFormula" class="filterCheckbox" type="checkbox">
 					<label for="hideFormula">Hide formulas</label>
+					<input id="hideUnder" class="filterCheckbox" type="checkbox">
+					<label for="hideUnder">Hide under <input id="timeInMS" type="number"> ms</label>
 				</div>
 				<div id="treeScroll">
 					<div id='tree'></div>
