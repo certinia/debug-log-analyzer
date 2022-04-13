@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## Added
+
+- Calltree filtering to hide nodes where total duration is less than a given time ([#112][#112])
+
 ### Changed
 
 - Rounded the log size on the `Log: Load Apex Log For Analysis` command results to 2DP ([#91][#91])
@@ -128,3 +132,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#108]: https://github.com/financialforcedev/debug-log-analyzer/issues/108
 [#91]: https://github.com/financialforcedev/debug-log-analyzer/issues/91
 [#88]: https://github.com/financialforcedev/debug-log-analyzer/issues/88
+[#112]: https://github.com/financialforcedev/debug-log-analyzer/issues/112
