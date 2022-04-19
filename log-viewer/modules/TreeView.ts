@@ -490,8 +490,10 @@ function hideByDuration() {
   );
 
   if (shouldHide) {
-    const timeInMS = document.getElementById("timeInMS") as HTMLInputElement;
-    const timeFilter = (timeInMS.value ? +timeInMS.value : 0) * 1000000;
+    const timeInMS = document.getElementById(
+      "hideUnder-time"
+    ) as HTMLInputElement;
+    const timeFilter = (timeInMS.value ? +timeInMS.value : 0) * 1000000; // convert to nanoseconds
 
     const elementsToShow = elements.filter(
       (el) => Number(el.dataset.totaltime) > timeFilter
