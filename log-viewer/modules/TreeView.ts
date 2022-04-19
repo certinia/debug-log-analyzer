@@ -247,28 +247,16 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
       text: text,
     };
   }
-}
 
 function renderTreeNode(node: LogLine, timeStamps: number[]) {
-
-  const hideUnder = document.getElementById("hideUnder") as HTMLInputElement;
-  if(hideUnder?.checked) {
-    const timeInMS = document.getElementById("timeInMS") as HTMLInputElement;
-    let timeFilter = (timeInMS.value ? parseInt(timeInMS.value) : 0 ) * 1000000;
-
-    let timetaken = node.duration || 0;
-
-    if(node.text !== "Log Root" && timetaken < timeFilter) {
-      return undefined;
-    }
-  }
-
   const children = node.children ?? [];
-
   const mainNode = divElem.cloneNode() as HTMLDivElement;
   if (node.timestamp >= 0) {
     mainNode.dataset.enterstamp = "" + node.timestamp;
     mainNode.id = `calltree-${node.timestamp}`;
+  }
+  if (node.duration) {
+    mainNode.dataset.totaltime = "" + node.duration;
   }
   mainNode.className = node.classes || "";
 
@@ -450,18 +438,22 @@ function onCollapseAll(evt: Event) {
 }
 
 function hideBySelector(selector: string, hide: boolean) {
-  const elements = document.querySelectorAll<HTMLElement>(selector);
+  const elements = Array.from(document.querySelectorAll<HTMLElement>(selector));
 
-  const hideElm = function (elem: HTMLElement) {
-    elem.classList.add("hide");
-  };
+  hideByElems(elements, hide);
+}
 
-  const showElm = function (elem: HTMLElement) {
-    elem.classList.remove("hide");
-  };
-
+function hideByElems(elems: Array<HTMLElement>, hide: boolean) {
   const hideByFunc = hide ? hideElm : showElm;
-  elements.forEach(hideByFunc);
+  elems.forEach(hideByFunc);
+}
+
+function hideElm(elem: HTMLElement) {
+    elem.classList.add("hide");
+}
+
+function showElm(elem: HTMLElement) {
+    elem.classList.remove("hide");
 }
 
 function onHideDetails(evt: Event) {
@@ -479,6 +471,7 @@ function showHideDetails() {
   hideBySelector("#tree .detail", hideDetails?.checked);
   hideBySelector("#tree .node.system", hideSystem?.checked);
   hideBySelector("#tree .node.formula", hideFormula?.checked);
+  hideByDuration();
 }
 
 function onHideSystem(evt: Event) {
@@ -491,18 +484,46 @@ function onHideFormula(evt: Event) {
   hideBySelector("#tree .node.formula", input.checked);
 }
 
+function hideByDuration() {
+  const hideUnder = document.getElementById("hideUnder") as HTMLInputElement;
+  const shouldHide = hideUnder?.checked;
+  const elements = Array.from(
+    document.querySelectorAll<HTMLElement>("#tree .node[data-totaltime]")
+  );
+
+  if (shouldHide) {
+    const timeInMS = document.getElementById("timeInMS") as HTMLInputElement;
+    const timeFilter = (timeInMS.value ? +timeInMS.value : 0) * 1000000;
+
+    const elementsToShow = elements.filter(
+      (el) => Number(el.dataset.totaltime) > timeFilter
+    );
+    const elementsToHide = elements.filter(
+      (el) => Number(el.dataset.totaltime) < timeFilter
+    );
+    elementsToShow.forEach(showElm);
+    elementsToHide.forEach(hideElm);
+  } else {
+    elements.forEach(showElm);
+  }
+}
+
 function onInitTree(evt: Event) {
   const expandAll = document.getElementById("expandAll"),
     collapseAll = document.getElementById("collapseAll"),
     hideDetails = document.getElementById("hideDetails"),
     hideSystem = document.getElementById("hideSystem"),
-    hideFormula = document.getElementById("hideFormula");
+    hideFormula = document.getElementById("hideFormula"),
+    hideDuration = document.getElementById("hideUnder"),
+    timeInMS = document.getElementById("timeInMS");
 
   expandAll?.addEventListener("click", onExpandAll);
   collapseAll?.addEventListener("click", onCollapseAll);
   hideDetails?.addEventListener("change", onHideDetails);
   hideSystem?.addEventListener("change", onHideSystem);
   hideFormula?.addEventListener("change", onHideFormula);
+  hideDuration?.addEventListener("change", hideByDuration);
+  timeInMS?.addEventListener("input", hideByDuration);
 }
 
 window.addEventListener("DOMContentLoaded", onInitTree);
