@@ -54,7 +54,7 @@ export function showTreeNode(timestamp: number) {
   if (methodElm) {
     const methodName = methodElm?.querySelector("span.name") || methodElm;
     showTab("treeTab");
-    expandTreeNode(methodElm, false);
+    expandTreeNode(methodElm);
     methodElm.scrollIntoView(false);
     if (methodName) {
       document.getSelection()?.selectAllChildren(methodName);
@@ -129,9 +129,9 @@ function findCallstack(node: LogLine, timeStamp: number): LogLine[] | null {
   return null;
 }
 
-function expandTreeNode(elm: HTMLElement, expand: boolean) {
+function expandTreeNode(elm: HTMLElement) {
   const elements = [];
-  let element: HTMLElement | null = expand ? elm : elm.parentElement;
+  let element: HTMLElement | null = elm.parentElement;
   while (element && element.id !== "tree") {
     if (element.id) {
       elements.push(element);
@@ -139,19 +139,24 @@ function expandTreeNode(elm: HTMLElement, expand: boolean) {
     element = element.parentElement;
   }
 
+  const elemsToShow: HTMLElement[] = [elm];
   const len = elements.length;
   for (let i = 0; i < len; i++) {
     const elem = elements[i];
+    elemsToShow.push(elem);
+
     const toggle = elem.querySelector(`:scope > .toggle`),
       childContainer = elem.querySelector(
         `:scope > .childContainer`
       ) as HTMLElement;
 
     if (toggle) {
-      childContainer.classList.remove("hide");
+      elemsToShow.push(childContainer);
       toggle.textContent = "-";
     }
   }
+
+  elemsToShow.forEach((e) => e.classList.remove("hide"));
 }
 
 function describeMethod(node: LogLine) {
@@ -352,7 +357,7 @@ function goToFile(evt: Event) {
 
 function findByTimeStamp(node: LogLine, timeStamp: string): LogLine | null {
   if (node) {
-    if (node.timestamp === parseInt(timeStamp)) {
+    if (node.timestamp === +timeStamp) {
       return node;
     }
 
