@@ -228,25 +228,23 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
   }
 
   const text = node.text;
-  let lineNumber = "";
-  if (node.lineNumber) {
-    lineNumber = "-" + node.lineNumber;
-  }
-
+  const lineNumber = node.lineNumber ? "-" + node.lineNumber : "";
   const bracketIndex = text.indexOf("(");
-  let qname = bracketIndex > -1 ? text.substring(0, bracketIndex) : text;
+  const qname = bracketIndex > -1 ? text.substring(0, bracketIndex) : text;
+
+  let typeName;
   if (node.type === "METHOD_ENTRY") {
     const lastDot = qname.lastIndexOf(".");
-    return {
-      typeName: text.substring(0, lastDot) + lineNumber,
-      text: text,
-    };
+    typeName = text.substring(0, lastDot) + lineNumber;
   } else {
-    return {
-      typeName: qname + lineNumber,
-      text: text,
-    };
+    typeName = qname + lineNumber;
   }
+
+  return {
+    typeName: typeName,
+    text: text,
+  };
+}
 
 function renderTreeNode(node: LogLine, timeStamps: number[]) {
   const children = node.children ?? [];
@@ -449,11 +447,11 @@ function hideByElems(elems: Array<HTMLElement>, hide: boolean) {
 }
 
 function hideElm(elem: HTMLElement) {
-    elem.classList.add("hide");
+  elem.classList.add("hide");
 }
 
 function showElm(elem: HTMLElement) {
-    elem.classList.remove("hide");
+  elem.classList.remove("hide");
 }
 
 function onHideDetails(evt: Event) {
