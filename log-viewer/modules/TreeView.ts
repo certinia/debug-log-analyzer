@@ -342,15 +342,27 @@ function goToFile(evt: Event) {
 }
 
 function findByTimeStamp(node: LogLine, timeStamp: string): LogLine | null {
+  return findByTime(node, parseInt(timeStamp));
+}
+
+function findByTime(node: LogLine, timeStamp: number): LogLine | null {
   if (node) {
-    if (node.timestamp === +timeStamp) {
+    if (node.timestamp === timeStamp) {
       return node;
+    }
+
+    // do not search children is the timestamp is outside of the parents timeframe
+    if (
+      node.exitStamp &&
+      !(timeStamp >= node.timestamp && timeStamp <= node.exitStamp)
+    ) {
+      return null;
     }
 
     if (node.children) {
       const len = node.children.length;
       for (let i = 0; i < len; ++i) {
-        const target = findByTimeStamp(node.children[i], timeStamp);
+        const target = findByTime(node.children[i], timeStamp);
         if (target) {
           return target;
         }
