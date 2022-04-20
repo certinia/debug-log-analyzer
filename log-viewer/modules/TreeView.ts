@@ -447,15 +447,8 @@ function onCollapseAll(evt: Event) {
   }
 }
 
-function hideBySelector(selector: string, hide: boolean) {
-  const elements = Array.from(document.querySelectorAll<HTMLElement>(selector));
-
-  hideByElems(elements, hide);
-}
-
-function hideByElems(elems: Array<HTMLElement>, hide: boolean) {
-  const hideByFunc = hide ? hideElm : showElm;
-  elems.forEach(hideByFunc);
+function hideBySelector(selector: string) {
+  document.querySelectorAll<HTMLElement>(selector).forEach(hideElm);
 }
 
 function hideElm(elem: HTMLElement) {
@@ -466,57 +459,46 @@ function showElm(elem: HTMLElement) {
   elem.classList.remove("hide");
 }
 
-function onHideDetails(evt: Event) {
-  const input = evt.target as HTMLInputElement;
-  hideBySelector("#tree .detail", input.checked);
-}
-
 function showHideDetails() {
+  //  TODO: move to be update via an event instead of requerying.
   const hideDetails = document.getElementById(
       "hideDetails"
     ) as HTMLInputElement,
     hideSystem = document.getElementById("hideSystem") as HTMLInputElement,
     hideFormula = document.getElementById("hideFormula") as HTMLInputElement;
 
-  hideBySelector("#tree .detail", hideDetails?.checked);
-  hideBySelector("#tree .node.system", hideSystem?.checked);
-  hideBySelector("#tree .node.formula", hideFormula?.checked);
-  hideByDuration();
-}
-
-function onHideSystem(evt: Event) {
-  const input = evt.target as HTMLInputElement;
-  hideBySelector("#tree .node.system", input.checked);
-}
-
-function onHideFormula(evt: Event) {
-  const input = evt.target as HTMLInputElement;
-  hideBySelector("#tree .node.formula", input.checked);
-}
-
-function hideByDuration() {
-  const hideUnder = document.getElementById("hideUnder") as HTMLInputElement;
-  const shouldHide = hideUnder?.checked;
   const elements = Array.from(
     document.querySelectorAll<HTMLElement>("#tree .node[data-totaltime]")
   );
+  elements.forEach(showElm);
+
+  hideByDuration(elements);
+  if (hideDetails?.checked) {
+    hideBySelector("#tree .detail");
+}
+  if (hideSystem?.checked) {
+    hideBySelector("#tree .node.system");
+}
+  if (hideFormula?.checked) {
+    hideBySelector("#tree .node.formula");
+  }
+}
+
+function hideByDuration(elements: Array<HTMLElement>) {
+  const hideUnder = document.getElementById("hideUnder") as HTMLInputElement;
+  const shouldHide = hideUnder?.checked;
 
   if (shouldHide) {
     const timeInMS = document.getElementById(
-      "hideUnder-time"
+      "hideUnderTime"
     ) as HTMLInputElement;
-    const timeFilter = (timeInMS.value ? +timeInMS.value : 0) * 1000000; // convert to nanoseconds
-
-    const elementsToShow = elements.filter(
-      (el) => Number(el.dataset.totaltime) > timeFilter
-    );
-    const elementsToHide = elements.filter(
-      (el) => Number(el.dataset.totaltime) < timeFilter
-    );
-    elementsToShow.forEach(showElm);
+    const timeFilter = +timeInMS.value * 1000000; // convert to nanoseconds
+    if (timeFilter) {
+      const elementsToHide = elements.filter((el) => {
+        return Number(el.dataset.totaltime) < timeFilter;
+      });
     elementsToHide.forEach(hideElm);
-  } else {
-    elements.forEach(showElm);
+    }
   }
 }
 
@@ -527,15 +509,15 @@ function onInitTree(evt: Event) {
     hideSystem = document.getElementById("hideSystem"),
     hideFormula = document.getElementById("hideFormula"),
     hideDuration = document.getElementById("hideUnder"),
-    timeInMS = document.getElementById("timeInMS");
+    timeInMS = document.getElementById("hideUnderTime");
 
   expandAll?.addEventListener("click", onExpandAll);
   collapseAll?.addEventListener("click", onCollapseAll);
-  hideDetails?.addEventListener("change", onHideDetails);
-  hideSystem?.addEventListener("change", onHideSystem);
-  hideFormula?.addEventListener("change", onHideFormula);
-  hideDuration?.addEventListener("change", hideByDuration);
-  timeInMS?.addEventListener("input", hideByDuration);
+  hideDetails?.addEventListener("change", showHideDetails);
+  hideSystem?.addEventListener("change", showHideDetails);
+  hideFormula?.addEventListener("change", showHideDetails);
+  hideDuration?.addEventListener("change", showHideDetails);
+  timeInMS?.addEventListener("input", showHideDetails);
 }
 
 window.addEventListener("DOMContentLoaded", onInitTree);
