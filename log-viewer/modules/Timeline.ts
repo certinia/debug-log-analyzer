@@ -41,7 +41,7 @@ const scaleY = -15,
   };
 
 class State {
-  public shouldRedraw = true;
+  public isRedrawQueued = true;
   public defaultZoom = 0;
 
   private _zoom: number = 0;
@@ -80,8 +80,8 @@ class State {
   }
 
   private queueRedraw() {
-    if (!this.shouldRedraw) {
-      this.shouldRedraw = true;
+    if (!this.isRedrawQueued) {
+      this.isRedrawQueued = true;
       requestAnimationFrame(drawTimeLine);
     }
   }
@@ -351,7 +351,7 @@ function drawTimeLine() {
     ctx.lineWidth = 1;
     renderRectangles(ctx);
   }
-  state.shouldRedraw = false;
+  state.isRedrawQueued = false;
 }
 
 export function renderTimelineKey() {
@@ -605,7 +605,6 @@ function handleMouseMove(evt: MouseEvent) {
   }
 }
 
-let shouldRedraw = true;
 function handleScroll(evt: WheelEvent) {
   if (!dragging) {
     tooltip.style.display = "none";
