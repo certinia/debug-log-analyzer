@@ -128,7 +128,7 @@ export function parseVfNamespace(text: string): string {
 export function parseTimestamp(text: string): number {
   const timestamp = text.slice(text.indexOf("(") + 1, -1);
   if (timestamp) {
-    return +timestamp;
+    return Number(timestamp);
   }
   throw new Error(`Unable to parse timestamp: '${text}'`);
 }
@@ -136,8 +136,8 @@ export function parseTimestamp(text: string): number {
 export function parseLineNumber(text: string): string | number {
   const lineNumberStr = text.slice(1, -1);
   if (lineNumberStr) {
-    const lineNumber = +lineNumberStr;
-    return !isNaN(lineNumber) ? lineNumber : lineNumberStr;
+    const lineNumber = Number(lineNumberStr);
+    return !Number.isNaN(lineNumber) ? lineNumber : lineNumberStr;
   }
   throw new Error(`Unable to parse line number: '${text}'`);
 }
@@ -145,7 +145,7 @@ export function parseLineNumber(text: string): string | number {
 export function parseRows(text: string): number {
   const rowCount = text.slice(text.indexOf("Rows:") + 5);
   if (rowCount) {
-    return +rowCount;
+    return Number(rowCount);
   }
   throw new Error(`Unable to parse row count: '${text}'`);
 }
