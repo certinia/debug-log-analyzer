@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import formatDuration, { highlightText } from "./Util";
+import formatDuration from "./Util";
 import { totalDuration } from "./Timeline";
 import { RootNode } from "./parsers/TreeParser";
 import { LogLine } from "./parsers/LineParser";
@@ -12,6 +12,9 @@ const nestedSort: Record<string, string[]> = {
   selfTime: ["selfTime", "count", "name"],
   name: ["name", "count", "duration"],
 };
+const div = document.createElement("div");
+const span = document.createElement("span");
+const boldElem = document.createElement("b");
 
 let metricList: Metric[];
 
@@ -132,32 +135,32 @@ function renderAnalysisLine(
   selfTime: string,
   isBold: boolean = false
 ) {
-  const analysisRow = document.createElement("div"),
-    nameText = highlightText(name, isBold),
-    nameCell = document.createElement("span"),
-    countText = highlightText(count, isBold),
-    countCell = document.createElement("span"),
-    durationText = highlightText(duration, isBold),
-    durationCell = document.createElement("span"),
-    selfTimeText = highlightText(selfTime, isBold),
-    selfTimeCell = document.createElement("span");
-
+  const nameCell = highlightTextNode(name, isBold) as HTMLElement;
   nameCell.className = "name";
-  nameCell.innerHTML = nameText;
-  nameCell.title = nameText;
-  countCell.className = "count";
-  countCell.innerHTML = countText;
-  durationCell.className = "duration";
-  durationCell.innerHTML = durationText;
-  selfTimeCell.className = "selfTime";
-  selfTimeCell.innerHTML = selfTimeText;
+  nameCell.title = name;
 
+  const countCell = highlightTextNode(count, isBold) as HTMLElement;
+  countCell.className = "count";
+
+  const durationCell = highlightTextNode(duration, isBold) as HTMLElement;
+  durationCell.className = "duration";
+
+  const selfTimeCell = highlightTextNode(selfTime, isBold) as HTMLElement;
+  selfTimeCell.className = "selfTime";
+
+  const analysisRow = div.cloneNode() as HTMLDivElement;
   analysisRow.className = isBold ? "row" : "row data";
   analysisRow.appendChild(nameCell);
   analysisRow.appendChild(countCell);
   analysisRow.appendChild(durationCell);
   analysisRow.appendChild(selfTimeCell);
   return analysisRow;
+}
+
+function highlightTextNode(text: string, isBold: boolean) {
+  const highlightNode = isBold ? boldElem.cloneNode() : span.cloneNode();
+  highlightNode.textContent = text;
+  return highlightNode;
 }
 
 export async function renderAnalysis() {

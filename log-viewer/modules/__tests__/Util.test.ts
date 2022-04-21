@@ -4,30 +4,14 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import formatDuration, {
-  highlightText,
-  showTab,
-  recalculateDurations,
-} from "../Util";
+import formatDuration, { showTab, recalculateDurations } from "../Util";
 import { TimeStampedNode } from "../parsers/LineParser";
 
 jest.mock("../Browser", () => ({
   decodeEntities: (text: string) => {
     return text.replace(/&amp;/gim, "&");
   },
-  encodeEntities: (text: string) => {
-    return text.replace(/&/gim, "&amp;");
-  },
 }));
-
-describe("Highlight tests", () => {
-  it("Text is escaped", () => {
-    expect(highlightText("M&S", false)).toBe("M&amp;S");
-  });
-  it("Text is bold", () => {
-    expect(highlightText("Text", true)).toBe("<b>Text</b>");
-  });
-});
 
 describe("Format duration tests", () => {
   it("Value converted from nanoseconds to milliseconds", () => {

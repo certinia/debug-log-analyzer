@@ -10,11 +10,3 @@ export function decodeEntities(text: string) {
   convertorDiv.innerHTML = text;
   return convertorDiv.innerText;
 }
-
-export function encodeEntities(unsafeText: string) {
-  if (!unsafeText) {
-    return unsafeText;
-  }
-  convertorDiv.innerText = unsafeText;
-  return convertorDiv.innerHTML;
-}

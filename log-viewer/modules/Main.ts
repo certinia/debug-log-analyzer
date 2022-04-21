@@ -123,7 +123,8 @@ async function insertPackageWrappers(node: LogLine) {
   let lastPkg,
     i = 0;
   if (children) {
-    while (i < children.length) {
+    const len = children.length;
+    while (i < len) {
       const child = children[i],
         childType = child.type;
 
@@ -244,8 +245,7 @@ async function displayLog(log: string, name: string, path: string) {
 
 async function waitForRender() {
   await new Promise((resolve) => window.requestAnimationFrame(resolve));
-  await new Promise((resolve) => window.requestAnimationFrame(resolve));
-  await new Promise((resolve) => setTimeout(resolve, 1));
+  await new Promise((resolve) => setTimeout(resolve));
 }
 
 function readLog() {
