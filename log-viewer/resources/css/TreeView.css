@@ -1,62 +1,65 @@
+#timeInMS {
+  width: 4rem;
+}
 .buttonContainer {
-	display: flex;
-	flex-direction: row;
-	align-items: center;
-	padding: 5px;
-	margin-bottom: 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 5px;
+  margin-bottom: 10px;
 }
 .buttonContainer button {
-	/* display: block; */
-	margin: 5px;
+  /* display: block; */
+  margin: 5px;
 }
-.filterCheckbox {
-	margin: 5px;
+.filterItem {
+  margin: 5px;
 }
 #treeScroll {
-	overflow: scroll;
-	white-space: nowrap;
-	flex: 1;
+  overflow: scroll;
+  white-space: nowrap;
+  flex: 1;
 }
 #tree {
-	white-space: nowrap;
-	height: 0;
+  white-space: nowrap;
+  height: 0;
 }
 #tree .count {
-	color: red;
-	margin-right: 5px;
+  color: red;
+  margin-right: 5px;
 }
 .node {
-	margin-top: 2px;
-	white-space: pre;
+  margin-top: 2px;
+  white-space: pre;
 }
 .node.system {
 }
 .node.formula {
 }
 .childContainer {
-	margin-left: 24px;
+  margin-left: 24px;
 }
 .block {
-	margin-top: 2px;
-	white-space: pre;
-	/* This is emulate the effect of hanging indent on text */
-	padding-left: 1em;
-	text-indent: -1em;
+  margin-top: 2px;
+  white-space: pre;
+  /* This is emulate the effect of hanging indent on text */
+  padding-left: 1em;
+  text-indent: -1em;
 }
 .detail {
 }
 .toggle {
-	cursor: pointer;
-	margin-right: 4px;
-	padding: 2px;
-	border: 1px solid silver;
-	display: inline-block;
-	width: 10px;
-	text-align: center;
-	line-height: 10px;
+  cursor: pointer;
+  margin-right: 4px;
+  padding: 2px;
+  border: 1px solid silver;
+  display: inline-block;
+  width: 10px;
+  text-align: center;
+  line-height: 10px;
 }
 .indent {
 }
-.hide{
-	display: none;
+.hide {
+  display: none;
 }

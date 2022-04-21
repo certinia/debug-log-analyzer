@@ -19,7 +19,7 @@ Clicking on a timeline node will take you to the entry in the "Call Tree".
 
 This tab shows the call tree for the log execution.
 
-The tree can be expanded/collapsed with the +/- buttons on each method or with the "Expand All" / "Collapse All" buttons in the toolbar. To show other information (e.g. SOQL statements or variable assignments) in the tree, un-tick the hide details checkbox. There are also filter checkboxes to "Hide system calls" and "Hide formulas". The prefix '(S)' is used to indicate callers of methods which perform SOQL and '(D)' is used to indicate callers of methods that perform DML.
+The tree can be expanded/collapsed with the +/- buttons on each method or with the "Expand All" / "Collapse All" buttons in the toolbar. To show other information (e.g. SOQL statements or variable assignments) in the tree, un-tick the hide details checkbox. There are also filter checkboxes to "Hide system calls", "Hide formulas" and "Hide under" a given duration. The prefix '(S)' is used to indicate callers of methods which perform SOQL and '(D)' is used to indicate callers of methods that perform DML.
 
 ### The "Analysis" Tab
 
