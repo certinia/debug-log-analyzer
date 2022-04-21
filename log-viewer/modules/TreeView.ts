@@ -54,7 +54,7 @@ export function showTreeNode(timestamp: number) {
   if (methodElm) {
     const methodName = methodElm?.querySelector("span.name") || methodElm;
     showTab("treeTab");
-    expandTreeNode(methodElm, false);
+    expandTreeNode(methodElm);
     methodElm.scrollIntoView(false);
     if (methodName) {
       document.getSelection()?.selectAllChildren(methodName);
@@ -129,9 +129,9 @@ function findCallstack(node: LogLine, timeStamp: number): LogLine[] | null {
   return null;
 }
 
-function expandTreeNode(elm: HTMLElement, expand: boolean) {
+function expandTreeNode(elm: HTMLElement) {
   const elements = [];
-  let element: HTMLElement | null = expand ? elm : elm.parentElement;
+  let element: HTMLElement | null = elm.parentElement;
   while (element && element.id !== "tree") {
     if (element.id) {
       elements.push(element);
@@ -139,19 +139,24 @@ function expandTreeNode(elm: HTMLElement, expand: boolean) {
     element = element.parentElement;
   }
 
+  const elemsToShow: HTMLElement[] = [elm];
   const len = elements.length;
   for (let i = 0; i < len; i++) {
     const elem = elements[i];
+    elemsToShow.push(elem);
+
     const toggle = elem.querySelector(`:scope > .toggle`),
       childContainer = elem.querySelector(
         `:scope > .childContainer`
       ) as HTMLElement;
 
     if (toggle) {
-      childContainer.classList.remove("hide");
+      elemsToShow.push(childContainer);
       toggle.textContent = "-";
     }
   }
+
+  elemsToShow.forEach((e) => e.classList.remove("hide"));
 }
 
 function describeMethod(node: LogLine) {
@@ -223,47 +228,33 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
   }
 
   const text = node.text;
-  let lineNumber = "";
-  if (node.lineNumber) {
-    lineNumber = "-" + node.lineNumber;
-  }
-
+  const lineNumber = node.lineNumber ? "-" + node.lineNumber : "";
   const bracketIndex = text.indexOf("(");
-  let qname = bracketIndex > -1 ? text.substring(0, bracketIndex) : text;
+  const qname = bracketIndex > -1 ? text.substring(0, bracketIndex) : text;
+
+  let typeName;
   if (node.type === "METHOD_ENTRY") {
     const lastDot = qname.lastIndexOf(".");
-    return {
-      typeName: text.substring(0, lastDot) + lineNumber,
-      text: text,
-    };
+    typeName = text.substring(0, lastDot) + lineNumber;
   } else {
-    return {
-      typeName: qname + lineNumber,
-      text: text,
-    };
+    typeName = qname + lineNumber;
   }
+
+  return {
+    typeName: typeName,
+    text: text,
+  };
 }
 
 function renderTreeNode(node: LogLine, timeStamps: number[]) {
-
-  const hideUnder = document.getElementById("hideUnder") as HTMLInputElement;
-  if(hideUnder?.checked) {
-    const timeInMS = document.getElementById("timeInMS") as HTMLInputElement;
-    let timeFilter = (timeInMS.value ? parseInt(timeInMS.value) : 0 ) * 1000000;
-
-    let timetaken = node.duration || 0;
-
-    if(node.text !== "Log Root" && timetaken < timeFilter) {
-      return undefined;
-    }
-  }
-
   const children = node.children ?? [];
-
   const mainNode = divElem.cloneNode() as HTMLDivElement;
   if (node.timestamp >= 0) {
     mainNode.dataset.enterstamp = "" + node.timestamp;
     mainNode.id = `calltree-${node.timestamp}`;
+  }
+  if (node.duration) {
+    mainNode.dataset.totaltime = "" + node.duration;
   }
   mainNode.className = node.classes || "";
 
@@ -351,15 +342,27 @@ function goToFile(evt: Event) {
 }
 
 function findByTimeStamp(node: LogLine, timeStamp: string): LogLine | null {
+  return findByTime(node, parseInt(timeStamp));
+}
+
+function findByTime(node: LogLine, timeStamp: number): LogLine | null {
   if (node) {
-    if (node.timestamp === parseInt(timeStamp)) {
+    if (node.timestamp === timeStamp) {
       return node;
+    }
+
+    // do not search children is the timestamp is outside of the parents timeframe
+    if (
+      node.exitStamp &&
+      !(timeStamp >= node.timestamp && timeStamp <= node.exitStamp)
+    ) {
+      return null;
     }
 
     if (node.children) {
       const len = node.children.length;
       for (let i = 0; i < len; ++i) {
-        const target = findByTimeStamp(node.children[i], timeStamp);
+        const target = findByTime(node.children[i], timeStamp);
         if (target) {
           return target;
         }
@@ -444,46 +447,59 @@ function onCollapseAll(evt: Event) {
   }
 }
 
-function hideBySelector(selector: string, hide: boolean) {
-  const elements = document.querySelectorAll<HTMLElement>(selector);
-
-  const hideElm = function (elem: HTMLElement) {
-    elem.classList.add("hide");
-  };
-
-  const showElm = function (elem: HTMLElement) {
-    elem.classList.remove("hide");
-  };
-
-  const hideByFunc = hide ? hideElm : showElm;
-  elements.forEach(hideByFunc);
+function hideBySelector(selector: string) {
+  document.querySelectorAll<HTMLElement>(selector).forEach(hideElm);
 }
 
-function onHideDetails(evt: Event) {
-  const input = evt.target as HTMLInputElement;
-  hideBySelector("#tree .detail", input.checked);
+function hideElm(elem: HTMLElement) {
+  elem.classList.add("hide");
+}
+
+function showElm(elem: HTMLElement) {
+  elem.classList.remove("hide");
 }
 
 function showHideDetails() {
+  //  TODO: move to be update via an event instead of requerying.
   const hideDetails = document.getElementById(
       "hideDetails"
     ) as HTMLInputElement,
     hideSystem = document.getElementById("hideSystem") as HTMLInputElement,
     hideFormula = document.getElementById("hideFormula") as HTMLInputElement;
 
-  hideBySelector("#tree .detail", hideDetails?.checked);
-  hideBySelector("#tree .node.system", hideSystem?.checked);
-  hideBySelector("#tree .node.formula", hideFormula?.checked);
+  const elements = Array.from(
+    document.querySelectorAll<HTMLElement>("#tree .node[data-totaltime]")
+  );
+  elements.forEach(showElm);
+
+  hideByDuration(elements);
+  if (hideDetails?.checked) {
+    hideBySelector("#tree .detail");
+}
+  if (hideSystem?.checked) {
+    hideBySelector("#tree .node.system");
+}
+  if (hideFormula?.checked) {
+    hideBySelector("#tree .node.formula");
+  }
 }
 
-function onHideSystem(evt: Event) {
-  const input = evt.target as HTMLInputElement;
-  hideBySelector("#tree .node.system", input.checked);
-}
+function hideByDuration(elements: Array<HTMLElement>) {
+  const hideUnder = document.getElementById("hideUnder") as HTMLInputElement;
+  const shouldHide = hideUnder?.checked;
 
-function onHideFormula(evt: Event) {
-  const input = evt.target as HTMLInputElement;
-  hideBySelector("#tree .node.formula", input.checked);
+  if (shouldHide) {
+    const timeInMS = document.getElementById(
+      "hideUnderTime"
+    ) as HTMLInputElement;
+    const timeFilter = +timeInMS.value * 1000000; // convert to nanoseconds
+    if (timeFilter) {
+      const elementsToHide = elements.filter((el) => {
+        return Number(el.dataset.totaltime) < timeFilter;
+      });
+    elementsToHide.forEach(hideElm);
+    }
+  }
 }
 
 function onInitTree(evt: Event) {
@@ -491,13 +507,17 @@ function onInitTree(evt: Event) {
     collapseAll = document.getElementById("collapseAll"),
     hideDetails = document.getElementById("hideDetails"),
     hideSystem = document.getElementById("hideSystem"),
-    hideFormula = document.getElementById("hideFormula");
+    hideFormula = document.getElementById("hideFormula"),
+    hideDuration = document.getElementById("hideUnder"),
+    timeInMS = document.getElementById("hideUnderTime");
 
   expandAll?.addEventListener("click", onExpandAll);
   collapseAll?.addEventListener("click", onCollapseAll);
-  hideDetails?.addEventListener("change", onHideDetails);
-  hideSystem?.addEventListener("change", onHideSystem);
-  hideFormula?.addEventListener("change", onHideFormula);
+  hideDetails?.addEventListener("change", showHideDetails);
+  hideSystem?.addEventListener("change", showHideDetails);
+  hideFormula?.addEventListener("change", showHideDetails);
+  hideDuration?.addEventListener("change", showHideDetails);
+  timeInMS?.addEventListener("input", showHideDetails);
 }
 
 window.addEventListener("DOMContentLoaded", onInitTree);

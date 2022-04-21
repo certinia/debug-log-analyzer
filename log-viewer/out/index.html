@@ -20,9 +20,6 @@
 				display: flex;
 				flex-direction: column;
 			}
-			#timeInMS {
-				width: 4rem;
-			}
 		</style>
 	</head>
 
@@ -50,14 +47,17 @@
 				<div class='buttonContainer'>
 					<button id="expandAll">Expand All</button>
 					<button id="collapseAll">Collapse All</button>
-					<input id="hideDetails" class="filterCheckbox" type="checkbox" checked>
+					<input id="hideDetails" class="filterItem" type="checkbox" checked />
 					<label for="hideDetails">Hide details</label>
-					<input id="hideSystem" class="filterCheckbox" type="checkbox">
+					<input id="hideSystem" class="filterItem" type="checkbox" />
 					<label for="hideSystem">Hide system calls</label>
-					<input id="hideFormula" class="filterCheckbox" type="checkbox">
+					<input id="hideFormula" class="filterItem" type="checkbox" />
 					<label for="hideFormula">Hide formulas</label>
-					<input id="hideUnder" class="filterCheckbox" type="checkbox">
-					<label for="hideUnder">Hide under <input id="timeInMS" type="number"> ms</label>
+          <input id="hideUnder" class="filterItem" type="checkbox" />
+          <label for="hideUnder">Hide under</label>
+          <input id="hideUnderTime" class="filterItem" type="number" min="0">
+            <span>ms</span>
+          </input>
 				</div>
 				<div id="treeScroll">
 					<div id='tree'></div>
