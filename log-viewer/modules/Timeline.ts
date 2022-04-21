@@ -188,8 +188,6 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-// todo: Only redraw on zoom or drag
-
 function nodesToRectangles(nodes: LogLine[], depth: number) {
   const children: LogLine[] = [];
   const len = nodes.length;
