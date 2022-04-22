@@ -123,8 +123,7 @@ async function insertPackageWrappers(node: LogLine) {
   let lastPkg,
     i = 0;
   if (children) {
-    const len = children.length;
-    while (i < len) {
+    while (i < children.length) {
       const child = children[i],
         childType = child.type;
 
