@@ -6,7 +6,6 @@ import { Uri, window } from "vscode";
 import { Context } from "../Context";
 import { QuickPickWorkspace } from "../display/QuickPickWorkspace";
 import * as path from "path";
-import { promises as fs } from "fs";
 import { LogView } from "./LogView";
 import { Command } from "./Command";
 import { appName } from "../Main";
