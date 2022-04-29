@@ -16,12 +16,12 @@ export class SymbolFinder {
   findSymbol(wsPath: string, symbol: string): string | null {
     const ws = Workspaces.get(wsPath);
     // The .d.ts entry is currently wrong, findType returns a string array
-    const paths = (ws.findType(symbol) as unknown) as string[];
-    if (paths.length == 0) {
-      const parts = symbol.split('.');
+    const paths = ws.findType(symbol) as unknown as string[];
+    if (paths.length === 0) {
+      const parts = symbol.split(".");
       if (parts.length > 1) {
-        parts.pop()
-        return this.findSymbol(wsPath, parts.join('.'))
+        parts.pop();
+        return this.findSymbol(wsPath, parts.join("."));
       } else {
         return null;
       }
