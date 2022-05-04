@@ -1,4 +1,6 @@
-node_modules/
-out/bundle.js
-out/bundle.js.map
-out/sample.log
+.DS_Store
+
+node_modules/*
+out/*
+!out/index.html
+
