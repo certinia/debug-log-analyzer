@@ -54,7 +54,7 @@ export abstract class LogLine extends TimeStampedNode {
     }
   }
 
-  onEnd(end: LogLine) {}
+  onEnd(end: LogLine, stack: LogLine[]) {}
 
   after(next: LogLine) {}
 
@@ -327,7 +327,8 @@ export class CodeUnitStartedLine extends LogLine {
     const subParts = parts[3].split(":"),
       name = parts[4] || parts[3];
 
-    switch (subParts[0]) {
+    const codeUnitType = subParts[0];
+    switch (codeUnitType) {
       case "EventService":
         this.cpuType = "method";
         this.namespace = parseObjectNamespace(subParts[1]);
@@ -338,13 +339,19 @@ export class CodeUnitStartedLine extends LogLine {
         this.cpuType = "custom";
         this.declarative = true;
         this.group = "Validation";
-        this.text = name || subParts[0] + ":" + subParts[1];
+        this.text = name || codeUnitType + ":" + subParts[1];
         break;
       case "Workflow":
         this.cpuType = "custom";
         this.declarative = true;
-        this.group = "Workflow";
-        this.text = name || subParts[0];
+        this.group = codeUnitType;
+        this.text = name || codeUnitType;
+        break;
+      case "Flow":
+        this.cpuType = "custom";
+        this.declarative = true;
+        this.group = codeUnitType;
+        this.text = name || codeUnitType;
         break;
       default:
         this.cpuType = "method";
@@ -386,8 +393,7 @@ class VFApexCallStartLine extends LogLine {
       const constructorIndex = methodtext.indexOf("<init>");
       if (methodIndex > -1) {
         // Method
-        methodtext =
-          "." + methodtext.substring(methodIndex).slice(1, -1) + "()";
+        methodtext = "." + methodtext.substring(methodIndex).slice(1, -1) + "()";
       } else if (constructorIndex > -1) {
         // Constructor
         methodtext = methodtext.substring(constructorIndex + 6) + "()";
@@ -542,7 +548,7 @@ class SOQLExecuteBeginLine extends LogLine {
     this.text = "SOQL: " + parts[3] + " - " + parts[4];
   }
 
-  onEnd(end: LogLine) {
+  onEnd(end: SOQLExecuteEndLine, stack: LogLine[]) {
     this.rowCount = end.rowCount;
   }
 }
@@ -583,7 +589,7 @@ class SOSLExecuteBeginLine extends LogLine {
     this.text = `SOSL: ${parts[3]}`;
   }
 
-  onEnd(end: SOSLExecuteEndLine) {
+  onEnd(end: SOSLExecuteEndLine, stack: LogLine[]) {
     this.rowCount = end.rowCount;
   }
 }
@@ -642,8 +648,11 @@ class VariableScopeBeginLine extends LogLine {
     this.value = parts[4];
   }
 
-  onEnd(end: any) {
-    this.value = end.value;
+  onEnd(end: LogLine, stack: LogLine[]) {
+    if (end.value) {
+      this.value = end.value;
+    }
+    console.debug("NEVER HIT?");
   }
 }
 
@@ -995,21 +1004,41 @@ class FlowStartInterviewsBeginLine extends LogLine {
   cpuType = "custom";
   declarative = true;
   timelineKey = "flow";
-  group = "FLOW_START_INTERVIEWS";
+  text = "FLOW_START_INTERVIEWS : ";
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = "FLOW_START_INTERVIEWS : " + parts[2];
   }
 
-  onEnd(end: LogLine) {
+  onEnd(end: FlowStartInterviewEndLine, stack: LogLine[]) {
+    const flowType = this.getFlowType(stack);
+    this.group = flowType;
+    this.suffix = ` (${flowType})`;
+    this.text += this.getFlowName();
+  }
+
+  getFlowType(stack: LogLine[]) {
+    let flowType;
+    const len = stack.length - 1;
+    for (let i = len; i >= 0; i--) {
+      const elem = stack[i];
+      if (elem.type == "CODE_UNIT_STARTED" && elem.group == "Flow") {
+        flowType = "Flow";
+        break;
+      }
+    }
+    return flowType || "Process Builder";
+  }
+
+  getFlowName() {
     if (this.children) {
       let interviewBegin = this.children[0];
       if (interviewBegin.displayType === "block" && interviewBegin.children) {
         interviewBegin = interviewBegin.children[0];
       }
-      this.text += " - " + interviewBegin.text;
+      return interviewBegin.text;
     }
+    return "";
   }
 }
 
@@ -1092,7 +1121,7 @@ class FlowElementBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.group = this.type;
-    this.text = this.type + " - " + parts[3] + " " + parts[4];
+    this.text = this.type + " : " + parts[3] + " " + parts[4];
   }
 }
 
@@ -1218,8 +1247,7 @@ class FlowActionCallDetailLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text =
-      parts[3] + " : " + parts[4] + " : " + parts[5] + " : " + parts[6];
+    this.text = parts[3] + " : " + parts[4] + " : " + parts[5] + " : " + parts[6];
     this.group = this.type;
   }
 }
@@ -1264,7 +1292,7 @@ class FlowBulkElementBeginLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = this.type + " - " + parts[2];
+    this.text = this.type + " : " + parts[2];
     this.group = this.type;
   }
 }
@@ -1455,17 +1483,7 @@ class WFFieldUpdateLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text =
-      " " +
-      parts[2] +
-      " " +
-      parts[3] +
-      " " +
-      parts[4] +
-      " " +
-      parts[5] +
-      " " +
-      parts[6];
+    this.text = " " + parts[2] + " " + parts[3] + " " + parts[4] + " " + parts[5] + " " + parts[6];
     this.group = this.type;
   }
 }
@@ -1479,7 +1497,7 @@ class WFRuleEvalBeginLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = this.type;
+    this.text = this.type + " : " + parts[2];
   }
 }
 
@@ -1979,10 +1997,7 @@ const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ["XDS_RESPONSE_ERROR", XDSResponseErrorLine],
 ]);
 
-export function parseLine(
-  line: string,
-  lastEntry: LogLine | null
-): LogLine | null {
+export function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
   const parts = line.split("|"),
     type = parts[1],
     metaCtor = lineTypeMap.get(type);
@@ -2005,10 +2020,7 @@ export function parseLine(
     } else {
       if (lastEntry && line.startsWith("*** Skipped")) {
         truncateLog(lastEntry.timestamp, "Skipped-Lines", "skip");
-      } else if (
-        lastEntry &&
-        line.indexOf("MAXIMUM DEBUG LOG SIZE REACHED") >= 0
-      ) {
+      } else if (lastEntry && line.indexOf("MAXIMUM DEBUG LOG SIZE REACHED") >= 0) {
         truncateLog(lastEntry.timestamp, "Max-Size-reached", "skip");
       } else {
         console.warn(`Bad log line: ${line}`);

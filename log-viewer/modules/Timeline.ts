@@ -158,13 +158,11 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   // TODO: This is a bit brute force, but it works. maybe rework it?
   // from 1 micro second to 1 second
   const microSecsToShow = [
-    1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000,
-    100000, 200000, 500000, 1000000,
+    1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000,
+    500000, 1000000,
   ];
   const closestIncrement = microSecsToShow.reduce(function (prev, curr) {
-    return Math.abs(curr - microSecPixelGap) < Math.abs(prev - microSecPixelGap)
-      ? curr
-      : prev;
+    return Math.abs(curr - microSecPixelGap) < Math.abs(prev - microSecPixelGap) ? curr : prev;
   });
 
   ctx.strokeStyle = "#E0E0E0";
@@ -293,11 +291,7 @@ function resetView() {
 
 function resize() {
   const { clientWidth: newWidth, clientHeight: newHeight } = container;
-  if (
-    newWidth &&
-    newHeight &&
-    (newWidth !== displayWidth || newHeight !== displayHeight)
-  ) {
+  if (newWidth && newHeight && (newWidth !== displayWidth || newHeight !== displayHeight)) {
     canvas.width = displayWidth = newWidth;
     canvas.height = displayHeight = newHeight;
     ctx.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-lefts
@@ -411,12 +405,7 @@ function findByPosition(
     if (targetDepth >= childDepth) {
       const len = node.children.length;
       for (let c = 0; c < len; ++c) {
-        const target = findByPosition(
-          node.children[c],
-          childDepth,
-          x,
-          targetDepth
-        );
+        const target = findByPosition(node.children[c], childDepth, x, targetDepth);
         if (target) {
           return target;
         }
@@ -429,12 +418,8 @@ function findByPosition(
 
 function showTooltip(offsetX: number, offsetY: number) {
   if (!dragging && container && tooltip) {
-    const depth = ~~(
-      ((displayHeight - offsetY - state.offsetY) / realHeight) *
-      maxY
-    );
-    let tooltipText =
-      findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
+    const depth = ~~(((displayHeight - offsetY - state.offsetY) / realHeight) * maxY);
+    let tooltipText = findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
 
     if (tooltipText) {
       showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
@@ -447,30 +432,28 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
   if (target) {
     const toolTip = document.createElement("div");
     const brElem = document.createElement("br");
+    let displayText = target.text;
+    if (target.suffix) {
+      displayText += target.suffix;
+    }
 
     toolTip.appendChild(document.createTextNode(target.type));
     toolTip.appendChild(brElem.cloneNode());
-    toolTip.appendChild(document.createTextNode(target.text));
+    toolTip.appendChild(document.createTextNode(displayText));
     if (target.timestamp && target.duration && target.selfTime) {
       toolTip.appendChild(brElem.cloneNode());
-      toolTip.appendChild(
-        document.createTextNode("timestamp: " + target.timestamp)
-      );
+      toolTip.appendChild(document.createTextNode("timestamp: " + target.timestamp));
       if (target.exitStamp) {
         toolTip.appendChild(document.createTextNode(" => " + target.exitStamp));
         toolTip.appendChild(brElem.cloneNode());
         toolTip.appendChild(
-          document.createTextNode(
-            `duration: ${formatDuration(target.duration)}`
-          )
+          document.createTextNode(`duration: ${formatDuration(target.duration)}`)
         );
         if (target.cpuType === "free") {
           toolTip.appendChild(document.createTextNode(" (free)"));
         } else {
           toolTip.appendChild(
-            document.createTextNode(
-              ` (self ${formatDuration(target.selfTime)})`
-            )
+            document.createTextNode(` (self ${formatDuration(target.selfTime)})`)
           );
         }
       }
@@ -491,10 +474,7 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
       startTime = thisEntry[1],
       endTime = nextEntry[1] ?? totalDuration;
 
-    if (
-      x >= startTime * state.zoom - state.offsetX &&
-      x <= endTime * state.zoom - state.offsetX
-    ) {
+    if (x >= startTime * state.zoom - state.offsetX && x <= endTime * state.zoom - state.offsetX) {
       const toolTip = document.createElement("div");
       toolTip.textContent = thisEntry[0];
       return toolTip;
@@ -563,10 +543,7 @@ function onMouseMove(evt: any) {
 
 function onClickCanvas(evt: any) {
   if (!dragging && tooltip.style.display === "block") {
-    const depth = ~~(
-      ((displayHeight - lastMouseY - state.offsetY) / realHeight) *
-      maxY
-    );
+    const depth = ~~(((displayHeight - lastMouseY - state.offsetY) / realHeight) * maxY);
     const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
     if (target && target.timestamp) {
       showTreeNode(target.timestamp);
@@ -598,10 +575,7 @@ function handleMouseMove(evt: MouseEvent) {
     state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX - movementX));
 
     const maxVertOffset = ~~(realHeight - displayHeight + displayHeight / 4);
-    state.offsetY = Math.min(
-      0,
-      Math.max(-maxVertOffset, state.offsetY - movementY)
-    );
+    state.offsetY = Math.min(0, Math.max(-maxVertOffset, state.offsetY - movementY));
   }
 }
 
@@ -614,10 +588,7 @@ function handleScroll(evt: WheelEvent) {
     const oldZoom = state.zoom;
     let zoomDelta = (deltaY / 1000) * state.zoom;
     const updatedZoom = state.zoom - zoomDelta;
-    zoomDelta =
-      updatedZoom >= state.defaultZoom
-        ? zoomDelta
-        : state.zoom - state.defaultZoom;
+    zoomDelta = updatedZoom >= state.defaultZoom ? zoomDelta : state.zoom - state.defaultZoom;
     //TODO: work out a proper max zoom
     // stop zooming at 0.0001 ms
     zoomDelta = updatedZoom <= 0.3 ? zoomDelta : state.zoom - 0.3;
