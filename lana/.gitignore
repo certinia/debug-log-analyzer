@@ -6,23 +6,13 @@
 *.ipr
 *.iws
 .idea/
+.DS_Store
+
+node_modules/*
 out/
+**/dist/*
 
-.tests/
-target/
-node_modules/
-**/dist/bundle.js
-**/dist/spa/
-**/dist/sfdx/
-**/dist/server.jar
-
-vsix/dist/config.json
-lana/dist/config.json
 *.vsix
-
-sfdx/dist/lib/
-sfdx/dist/oclif.manifest.json
-*.tgz
 
 README.md
 CHANGELOG.md
