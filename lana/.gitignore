@@ -2,6 +2,7 @@
 # Intellij
 # Ignoring all project files
 
+.DS_Store
 *.iml
 *.ipr
 *.iws

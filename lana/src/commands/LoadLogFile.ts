@@ -10,7 +10,6 @@ import { Item, Options, QuickPick } from "../display/QuickPick";
 import { QuickPickWorkspace } from "../display/QuickPickWorkspace";
 import { GetLogFiles, GetLogFilesResult } from "../sfdx/logs/GetLogFiles";
 import { GetLogFile } from "../sfdx/logs/GetLogFile";
-import { promises as fsp } from "fs";
 import * as fs from "fs";
 import * as path from "path";
 import { WebviewPanel, window } from "vscode";
@@ -63,8 +62,10 @@ export class LoadLogFile {
     const logFileId = await LoadLogFile.getLogFile(logFiles.result);
     if (logFileId) {
       const logFilePath = this.getLogFilePath(ws, logFileId);
-      const view = await LogView.createView(ws, context, logFilePath);
-      await LoadLogFile.writeLogFile(ws, logFilePath);
+      const [view] = await Promise.all([
+        LogView.createView(ws, context, logFilePath),
+        this.writeLogFile(ws, logFilePath),
+      ]);
       LogView.appendView(view, context, logFileId, logFilePath);
     }
   }
@@ -114,13 +115,10 @@ export class LoadLogFile {
   private static async writeLogFile(ws: string, logPath: string) {
     const logExists = fs.existsSync(logPath);
     if (!logExists) {
-      const log = path.parse(logPath);
-      const logDir = log.dir;
-      const logId = log.name;
+      const logfile = path.parse(logPath);
 
-      const logContent = await GetLogFile.apply(ws, logId);
-      await fsp.mkdir(logDir, { recursive: true });
-      await fsp.writeFile(logPath, logContent);
+      // TODO: Replace with @salesforce/apex-node https://github.com/financialforcedev/debug-log-analyzer/issues/122
+      await GetLogFile.apply(ws, logfile.dir, logfile.name);
     }
   }
 }

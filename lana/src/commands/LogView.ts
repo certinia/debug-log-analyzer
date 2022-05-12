@@ -7,7 +7,7 @@ import { Context } from "../Context";
 import { OpenFileInPackage } from "../display/OpenFileInPackage";
 import { WebView } from "../display/WebView";
 import * as path from "path";
-import { promises as fs } from "fs";
+import * as fs from "fs";
 import * as vscode from "vscode";
 
 interface WebViewLogFileRequest {
@@ -118,8 +118,6 @@ export class LogView {
       vscode.Uri.file(path.join(logViewerRoot, "bundle.js"))
     );
     const logPathUri = view.webview.asWebviewUri(vscode.Uri.file(logPath));
-
-    const indexSrc = await fs.readFile(index, "utf-8");
     const toReplace: { [key: string]: string } = {
       "@@name": logName,
       "@@path": logPath,
@@ -128,11 +126,28 @@ export class LogView {
       "sample.log": logPathUri.toString(true),
     };
 
+    const indexSrc = await this.getFile(index);
     return indexSrc.replace(
       /@@name|@@path|@@ns|bundle.js|sample.log/gi,
       function (matched) {
         return toReplace[matched];
       }
     );
+  }
+
+  private static async getFile(filePath: string): Promise<string> {
+    let data = "";
+    return new Promise((resolve, reject) => {
+      fs.createReadStream(filePath)
+        .on("error", (error) => {
+          reject(error);
+        })
+        .on("data", (row) => {
+          data += row;
+        })
+        .on("end", () => {
+          resolve(data);
+        });
+    });
   }
 }
