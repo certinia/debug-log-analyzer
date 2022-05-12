@@ -2,17 +2,16 @@
 # Intellij
 # Ignoring all project files
 
+.DS_Store
 *.iml
 *.ipr
 *.iws
 .idea/
-.DS_Store
-
-node_modules/*
-out/
-**/dist/*
 
 *.vsix
+
+out/
+node_modules/*
 
 README.md
 CHANGELOG.md

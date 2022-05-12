@@ -35,22 +35,15 @@ function isMatchingEnd(method: LogLine, endLine: LogLine) {
   return (
     method.exitTypes &&
     method.exitTypes.includes(endLine.type) &&
-    (!endLine.lineNumber ||
-      !method.lineNumber ||
-      endLine.lineNumber === method.lineNumber)
+    (!endLine.lineNumber || !method.lineNumber || endLine.lineNumber === method.lineNumber)
   );
 }
 
-function endMethod(
-  method: LogLine,
-  endLine: LogLine,
-  lineIter: LineIterator,
-  stack: LogLine[]
-) {
+function endMethod(method: LogLine, endLine: LogLine, lineIter: LineIterator, stack: LogLine[]) {
   method.exitStamp = endLine.timestamp;
   if (method.onEnd) {
     // the method wants to see the exit line
-    method.onEnd(endLine);
+    method.onEnd(endLine, stack);
   }
 
   // is this a 'good' end line?
@@ -65,7 +58,7 @@ function endMethod(
       return true; // we match a method further down the stack - unwind
     }
     // we found an exit event on its own e.g a `METHOD_EXIT` with an entry
-      truncateLog(endLine.timestamp, "Unexpected-Exit", "unexpected");
+    truncateLog(endLine.timestamp, "Unexpected-Exit", "unexpected");
     return false; // we have no matching method - ignore
   }
 }
@@ -117,7 +110,7 @@ function getMethod(lineIter: LineIterator, method: LogLine, stack: LogLine[]) {
 
     stack.pop();
     method.children = children;
-    }
+  }
 
   recalculateDurations(method);
 

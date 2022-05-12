@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Checks for false exits before un-winding the call stack, by checking down the stack to see if the EXIT matches something already on the stack.
 - Greatly reduced CPU usage when Timeline is open but no changes are occuring ([#90][#90])
 - Improved performance getting log file from an org when using the `Log: Load Apex Log For Analysis` command ([#123][#123])
+- More easily differentiate between "Flows" and "Process Builders" in the timeline and call tree ([#114][#114])
 
 ## [1.4.2] - 2022-03-14
 
@@ -137,3 +138,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#90]: https://github.com/financialforcedev/debug-log-analyzer/issues/90
 [#112]: https://github.com/financialforcedev/debug-log-analyzer/issues/112
 [#123]: https://github.com/financialforcedev/debug-log-analyzer/issues/123
+[#114]: https://github.com/financialforcedev/debug-log-analyzer/issues/114
