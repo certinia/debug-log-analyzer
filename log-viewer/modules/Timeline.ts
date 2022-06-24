@@ -607,10 +607,6 @@ function handleScroll(evt: WheelEvent) {
   }
 }
 
-function onTimelineWrapper() {
-  showTooltip(lastMouseX, lastMouseY);
-}
-
 function onInitTimeline(evt: Event) {
   const canvas = document.getElementById("timeline") as HTMLCanvasElement,
     timelineWrapper = document.getElementById("timelineWrapper");
@@ -624,12 +620,15 @@ function onInitTimeline(evt: Event) {
     canvas.addEventListener("mousemove", handleMouseMove, { passive: true });
     canvas.addEventListener("click", onClickCanvas);
   }
-  timelineWrapper?.addEventListener("scroll", onTimelineWrapper);
+
+  if (timelineWrapper) {
+    new ResizeObserver(resize).observe(timelineWrapper);
+  }
 
   // document seem to get all the events (regardless of which element we're over)
   document.addEventListener("mousemove", onMouseMove);
 }
 
 window.addEventListener("DOMContentLoaded", onInitTimeline);
-window.addEventListener("resize", resize);
+
 export { totalDuration };
