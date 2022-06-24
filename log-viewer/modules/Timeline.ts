@@ -616,12 +616,14 @@ function onInitTimeline(evt: Event) {
     timelineWrapper = document.getElementById("timelineWrapper");
   tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
-  canvas?.addEventListener("mouseout", onLeaveCanvas);
-  canvas?.addEventListener("wheel", handleScroll, { passive: true });
-  canvas?.addEventListener("mousedown", handleMouseDown);
-  canvas?.addEventListener("mouseup", handleMouseUp);
-  canvas?.addEventListener("mousemove", handleMouseMove, { passive: true });
-  canvas?.addEventListener("click", onClickCanvas);
+  if (canvas) {
+    canvas.addEventListener("mouseout", onLeaveCanvas);
+    canvas.addEventListener("wheel", handleScroll, { passive: true });
+    canvas.addEventListener("mousedown", handleMouseDown);
+    canvas.addEventListener("mouseup", handleMouseUp);
+    canvas.addEventListener("mousemove", handleMouseMove, { passive: true });
+    canvas.addEventListener("click", onClickCanvas);
+  }
   timelineWrapper?.addEventListener("scroll", onTimelineWrapper);
 
   // document seem to get all the events (regardless of which element we're over)
