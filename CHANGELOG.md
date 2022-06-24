@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved performance getting log file from an org when using the `Log: Load Apex Log For Analysis` command ([#123][#123])
 - More easily differentiate between "Flows" and "Process Builders" in the timeline and call tree ([#114][#114])
 
+### Fixed
+
+- Some detail lines not being shown on calltree ([#130][#130])
+
 ## [1.4.2] - 2022-03-14
 
 ### Fixed
@@ -139,3 +143,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#112]: https://github.com/financialforcedev/debug-log-analyzer/issues/112
 [#123]: https://github.com/financialforcedev/debug-log-analyzer/issues/123
 [#114]: https://github.com/financialforcedev/debug-log-analyzer/issues/114
+[#130]: https://github.com/financialforcedev/debug-log-analyzer/issues/130
