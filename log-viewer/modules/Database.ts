@@ -47,30 +47,24 @@ export class DatabaseAccess {
     return DatabaseAccess._instance;
   }
 
-  private static findDatabseLines(
-    log: DatabaseAccess,
-    node: LogLine,
-    stack: LogLine[]
-  ) {
+  private static findDatabseLines(log: DatabaseAccess, node: LogLine, stack: LogLine[]) {
     const children = node.children;
+    const len = children.length;
+    for (let i = 0; i < len; ++i) {
+      const child = children[i];
+      switch (child.type) {
+        case "DML_BEGIN":
+          log.upsert(log.dmlMap, child, stack);
+          break;
+        case "SOQL_EXECUTE_BEGIN":
+          log.upsert(log.soqlMap, child, stack);
+          break;
+      }
 
-    if (children) {
-      for (let i = 0; i < children.length; ++i) {
-        const child = children[i];
-        switch (child.type) {
-          case "DML_BEGIN":
-            log.upsert(log.dmlMap, child, stack);
-            break;
-          case "SOQL_EXECUTE_BEGIN":
-            log.upsert(log.soqlMap, child, stack);
-            break;
-        }
-
-        if (child.displayType === "method") {
-          stack.push(child);
-          DatabaseAccess.findDatabseLines(log, child, stack);
-          stack.pop();
-        }
+      if (child.displayType === "method") {
+        stack.push(child);
+        DatabaseAccess.findDatabseLines(log, child, stack);
+        stack.pop();
       }
     }
   }
@@ -79,10 +73,7 @@ export class DatabaseAccess {
     let stackIndex = this.internStack(stack);
     let entry = map.get(line.text);
     if (!entry) {
-      map.set(
-        line.text,
-        new DatabaseEntry(1, line.rowCount || 0, [stackIndex])
-      );
+      map.set(line.text, new DatabaseEntry(1, line.rowCount || 0, [stackIndex]));
     } else {
       map.set(line.text, entry.expand(1, line.rowCount || 0, stackIndex));
     }

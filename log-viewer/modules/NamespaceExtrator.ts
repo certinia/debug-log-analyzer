@@ -12,17 +12,15 @@ function collectNamespaces(node: RootNode): Set<string> {
     ++i;
   }
 
-  if (children) {
-    i = 0;
-    while (i < children.length) {
-      const child = children[i],
-        childType = child.type;
+  i = 0;
+  while (i < children.length) {
+    const child = children[i],
+      childType = child.type;
 
-      if (childType === "ENTERING_MANAGED_PKG") {
-        namespaces.add(child.text);
-      }
-      ++i;
+    if (childType === "ENTERING_MANAGED_PKG") {
+      namespaces.add(child.text);
     }
+    ++i;
   }
   return namespaces;
 }
@@ -40,27 +38,21 @@ async function setNamespaces(node: RootNode) {
   const namespaces = collectNamespaces(node);
   const children = node.children;
 
-  if (children) {
-    let i = 0;
-    while (i < children.length) {
-      const child = children[i],
-        childType = child.type;
+  let i = 0;
+  while (i < children.length) {
+    const child = children[i],
+      childType = child.type;
 
-      if (
-        childType === "CODE_UNIT_STARTED" &&
-        child.type === "method" &&
-        !child.namespace
-      ) {
-        child.namespace = extractNamespace(namespaces, child.text);
-      } else if (childType === "EXCEPTION_THROWN") {
-        child.namespace = extractNamespace(namespaces, child.text);
-      } else if (childType === "CONSTRUCTOR_ENTRY") {
-        child.namespace = extractNamespace(namespaces, child.text);
-      } else if (childType === "METHOD_ENTRY") {
-        child.namespace = extractNamespace(namespaces, child.text);
-      }
-      ++i;
+    if (childType === "CODE_UNIT_STARTED" && child.type === "method" && !child.namespace) {
+      child.namespace = extractNamespace(namespaces, child.text);
+    } else if (childType === "EXCEPTION_THROWN") {
+      child.namespace = extractNamespace(namespaces, child.text);
+    } else if (childType === "CONSTRUCTOR_ENTRY") {
+      child.namespace = extractNamespace(namespaces, child.text);
+    } else if (childType === "METHOD_ENTRY") {
+      child.namespace = extractNamespace(namespaces, child.text);
     }
+    ++i;
   }
   return namespaces;
 }

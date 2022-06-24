@@ -57,7 +57,7 @@ function endMethod(method: LogLine, endLine: LogLine, lineIter: LineIterator, st
     if (stack.some((m) => isMatchingEnd(m, endLine))) {
       return true; // we match a method further down the stack - unwind
     }
-    // we found an exit event on its own e.g a `METHOD_EXIT` with an entry
+    // we found an exit event on its own e.g a `METHOD_EXIT` without an entry
     truncateLog(endLine.timestamp, "Unexpected-Exit", "unexpected");
     return false; // we have no matching method - ignore
   }
@@ -67,7 +67,6 @@ function getMethod(lineIter: LineIterator, method: LogLine, stack: LogLine[]) {
   lastTimestamp = method.timestamp;
 
   if (method.exitTypes) {
-    const children = [];
     let lines: LogLine[] = [],
       line;
 
@@ -89,7 +88,7 @@ function getMethod(lineIter: LineIterator, method: LogLine, stack: LogLine[]) {
       if (line.isValid && (line.exitTypes || line.displayType === "method")) {
         method.addBlock(lines);
         lines = [];
-        children.push(getMethod(lineIter, line, stack));
+        method.children.push(getMethod(lineIter, line, stack));
       } else {
         lines.push(line);
       }
@@ -109,7 +108,6 @@ function getMethod(lineIter: LineIterator, method: LogLine, stack: LogLine[]) {
     }
 
     stack.pop();
-    method.children = children;
   }
 
   recalculateDurations(method);

@@ -105,7 +105,7 @@ let scaleFont: string,
   lastMouseY: number;
 
 function getMaxDepth(node: LogLine, depth = 0) {
-  if (!node.children) {
+  if (!node.children.length) {
     return depth;
   }
 
@@ -198,7 +198,7 @@ function nodesToRectangles(nodes: LogLine[], depth: number) {
     }
 
     // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
-    node.children?.forEach((child) => {
+    node.children.forEach((child) => {
       children.push(child);
     });
   }
@@ -399,7 +399,7 @@ function findByPosition(
     }
   }
 
-  if (node.children) {
+  if (node.children.length) {
     // search children
     const childDepth = node.duration ? depth + 1 : depth;
     if (targetDepth >= childDepth) {
