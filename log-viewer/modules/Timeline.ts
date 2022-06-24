@@ -420,12 +420,9 @@ function showTooltip(offsetX: number, offsetY: number) {
   if (!dragging && container && tooltip) {
     const depth = ~~(((displayHeight - offsetY - state.offsetY) / realHeight) * maxY);
     let tooltipText = findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
-
-    if (tooltipText) {
       showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
     }
   }
-}
 
 function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
   const target = findByPosition(timelineRoot, 0, x, depth);
@@ -486,7 +483,7 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
 function showTooltipWithText(
   offsetX: number,
   offsetY: number,
-  tooltipText: HTMLDivElement,
+  tooltipText: HTMLDivElement | null,
   tooltip: HTMLElement,
   timelineWrapper: HTMLElement
 ) {
