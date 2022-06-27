@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Tooltip not hiding when moving to a part of timeline where no tooltip should be shown ([#131][#131])
+- Tooltip not hiding when moving to a part of timeline where the tooltip should not be shown ([#131][#131])
 
 ## [1.4.2] - 2022-03-14
 
