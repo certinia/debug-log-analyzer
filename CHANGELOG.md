@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Some detail lines not being shown on calltree ([#130][#130])
 - Tooltip not hiding when moving to a part of timeline where the tooltip should not be shown ([#131][#131])
 
 ## [1.4.2] - 2022-03-14
@@ -143,4 +144,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#112]: https://github.com/financialforcedev/debug-log-analyzer/issues/112
 [#123]: https://github.com/financialforcedev/debug-log-analyzer/issues/123
 [#114]: https://github.com/financialforcedev/debug-log-analyzer/issues/114
+[#130]: https://github.com/financialforcedev/debug-log-analyzer/issues/130
 [#131]: https://github.com/financialforcedev/debug-log-analyzer/issues/131
