@@ -105,7 +105,7 @@ let scaleFont: string,
   lastMouseY: number;
 
 function getMaxDepth(node: LogLine, depth = 0) {
-  if (!node.children) {
+  if (!node.children.length) {
     return depth;
   }
 
@@ -198,7 +198,7 @@ function nodesToRectangles(nodes: LogLine[], depth: number) {
     }
 
     // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
-    node.children?.forEach((child) => {
+    node.children.forEach((child) => {
       children.push(child);
     });
   }
@@ -399,7 +399,7 @@ function findByPosition(
     }
   }
 
-  if (node.children) {
+  if (node.children.length) {
     // search children
     const childDepth = node.duration ? depth + 1 : depth;
     if (targetDepth >= childDepth) {
@@ -420,12 +420,9 @@ function showTooltip(offsetX: number, offsetY: number) {
   if (!dragging && container && tooltip) {
     const depth = ~~(((displayHeight - offsetY - state.offsetY) / realHeight) * maxY);
     let tooltipText = findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
-
-    if (tooltipText) {
       showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
     }
   }
-}
 
 function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
   const target = findByPosition(timelineRoot, 0, x, depth);
@@ -486,7 +483,7 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
 function showTooltipWithText(
   offsetX: number,
   offsetY: number,
-  tooltipText: HTMLDivElement,
+  tooltipText: HTMLDivElement | null,
   tooltip: HTMLElement,
   timelineWrapper: HTMLElement
 ) {
@@ -610,27 +607,28 @@ function handleScroll(evt: WheelEvent) {
   }
 }
 
-function onTimelineWrapper() {
-  showTooltip(lastMouseX, lastMouseY);
-}
-
 function onInitTimeline(evt: Event) {
   const canvas = document.getElementById("timeline") as HTMLCanvasElement,
     timelineWrapper = document.getElementById("timelineWrapper");
   tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
-  canvas?.addEventListener("mouseout", onLeaveCanvas);
-  canvas?.addEventListener("wheel", handleScroll, { passive: true });
-  canvas?.addEventListener("mousedown", handleMouseDown);
-  canvas?.addEventListener("mouseup", handleMouseUp);
-  canvas?.addEventListener("mousemove", handleMouseMove, { passive: true });
-  canvas?.addEventListener("click", onClickCanvas);
-  timelineWrapper?.addEventListener("scroll", onTimelineWrapper);
+  if (canvas) {
+    canvas.addEventListener("mouseout", onLeaveCanvas);
+    canvas.addEventListener("wheel", handleScroll, { passive: true });
+    canvas.addEventListener("mousedown", handleMouseDown);
+    canvas.addEventListener("mouseup", handleMouseUp);
+    canvas.addEventListener("mousemove", handleMouseMove, { passive: true });
+    canvas.addEventListener("click", onClickCanvas);
+  }
+
+  if (timelineWrapper) {
+    new ResizeObserver(resize).observe(timelineWrapper);
+  }
 
   // document seem to get all the events (regardless of which element we're over)
   document.addEventListener("mousemove", onMouseMove);
 }
 
 window.addEventListener("DOMContentLoaded", onInitTimeline);
-window.addEventListener("resize", resize);
+
 export { totalDuration };

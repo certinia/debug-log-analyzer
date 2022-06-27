@@ -2,18 +2,10 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import { showTab, recalculateDurations } from "./Util";
-import parseLog, {
-  getLogSettings,
-  LogLine,
-  truncated,
-} from "./parsers/LineParser";
+import parseLog, { getLogSettings, LogLine, truncated } from "./parsers/LineParser";
 import { getRootMethod } from "./parsers/TreeParser";
 import renderTreeView from "./TreeView";
-import renderTimeline, {
-  totalDuration,
-  setColors,
-  renderTimelineKey,
-} from "./Timeline";
+import renderTimeline, { totalDuration, setColors, renderTimelineKey } from "./Timeline";
 import analyseMethods, { renderAnalysis } from "./Analysis";
 import { DatabaseAccess, renderDb } from "./Database";
 import { setNamespaces } from "./NamespaceExtrator";
@@ -39,25 +31,15 @@ declare global {
 
 let logSize: number;
 
-async function setStatus(
-  name: string,
-  path: string,
-  status: string,
-  color: string
-) {
+async function setStatus(name: string, path: string, status: string, color: string) {
   const statusHolder = document.getElementById("status"),
     nameSpan = document.createElement("span"),
     nameLink = document.createElement("a"),
     statusSpan = document.createElement("span"),
     sizeText = logSize ? (logSize / 1000000).toFixed(2) + " MB" : "",
-    elapsedText = totalDuration
-      ? (totalDuration / 1000000000).toFixed(3) + " Sec"
-      : "",
+    elapsedText = totalDuration ? (totalDuration / 1000000000).toFixed(3) + " Sec" : "",
     infoSep = sizeText && elapsedText ? ", " : "",
-    infoText =
-      sizeText || elapsedText
-        ? "\xA0(" + sizeText + infoSep + elapsedText + ")"
-        : "";
+    infoText = sizeText || elapsedText ? "\xA0(" + sizeText + infoSep + elapsedText + ")" : "";
 
   nameLink.setAttribute("href", "#");
   nameLink.appendChild(document.createTextNode(name));
@@ -100,18 +82,15 @@ async function setStatus(
 
 async function markContainers(node: LogLine) {
   const children = node.children;
-
-  if (children) {
-    const len = children.length;
-    for (let i = 0; i < len; ++i) {
-      const child = children[i];
-      node.containsDml ||= child.type === "DML_BEGIN";
-      node.containsSoql ||= child.type === "SOQL_EXECUTE_BEGIN";
-      if (child.children) {
-        await markContainers(child);
-        node.containsDml ||= child.containsDml;
-        node.containsSoql ||= child.containsSoql;
-      }
+  const len = children.length;
+  for (let i = 0; i < len; ++i) {
+    const child = children[i];
+    node.containsDml ||= child.type === "DML_BEGIN";
+    node.containsSoql ||= child.type === "SOQL_EXECUTE_BEGIN";
+    if (child.children.length) {
+      await markContainers(child);
+      node.containsDml ||= child.containsDml;
+      node.containsSoql ||= child.containsSoql;
     }
   }
 }
@@ -122,53 +101,47 @@ async function insertPackageWrappers(node: LogLine) {
 
   let lastPkg,
     i = 0;
-  if (children) {
-    while (i < children.length) {
-      const child = children[i],
-        childType = child.type;
+  while (i < children.length) {
+    const child = children[i],
+      childType = child.type;
 
-      if (lastPkg) {
-        if (
-          childType === "ENTERING_MANAGED_PKG" &&
-          child.namespace === lastPkg.namespace
-        ) {
-          // combine adjacent (like) packages
-          children.splice(i, 1); // remove redundant child from parent
+    if (lastPkg) {
+      if (childType === "ENTERING_MANAGED_PKG" && child.namespace === lastPkg.namespace) {
+        // combine adjacent (like) packages
+        children.splice(i, 1); // remove redundant child from parent
 
-          lastPkg.exitStamp = child.exitStamp;
-          recalculateDurations(lastPkg);
-          continue; // skip any more child processing (it's gone)
-        } else if (
-          lastPkg &&
-          isParentDml &&
-          (childType === "DML_BEGIN" || childType === "SOQL_EXECUTE_BEGIN")
-        ) {
-          // move child DML / SOQL into the last package
-          children.splice(i, 1); // remove moving child from parent
-          if (lastPkg.children) {
-            lastPkg.children.push(child); // move child into the pkg
-          }
-
-          lastPkg.containsDml = child.containsDml || childType === "DML_BEGIN";
-          lastPkg.containsSoql =
-            child.containsSoql || childType === "SOQL_EXECUTE_BEGIN";
-          lastPkg.exitStamp = child.exitStamp; // move the end
-          recalculateDurations(lastPkg);
-          if (child.displayType === "method") {
-            await insertPackageWrappers(child);
-          }
-          continue; // skip any more child processing (it's moved)
-        } else {
-          ++i;
+        lastPkg.exitStamp = child.exitStamp;
+        recalculateDurations(lastPkg);
+        continue; // skip any more child processing (it's gone)
+      } else if (
+        lastPkg &&
+        isParentDml &&
+        (childType === "DML_BEGIN" || childType === "SOQL_EXECUTE_BEGIN")
+      ) {
+        // move child DML / SOQL into the last package
+        children.splice(i, 1); // remove moving child from parent
+        if (lastPkg.children) {
+          lastPkg.children.push(child); // move child into the pkg
         }
+
+        lastPkg.containsDml = child.containsDml || childType === "DML_BEGIN";
+        lastPkg.containsSoql = child.containsSoql || childType === "SOQL_EXECUTE_BEGIN";
+        lastPkg.exitStamp = child.exitStamp; // move the end
+        recalculateDurations(lastPkg);
+        if (child.displayType === "method") {
+          await insertPackageWrappers(child);
+        }
+        continue; // skip any more child processing (it's moved)
       } else {
         ++i;
       }
-      if (child.displayType === "method") {
-        await insertPackageWrappers(child);
-      }
-      lastPkg = childType === "ENTERING_MANAGED_PKG" ? child : null;
+    } else {
+      ++i;
     }
+    if (child.displayType === "method") {
+      await insertPackageWrappers(child);
+    }
+    lastPkg = childType === "ENTERING_MANAGED_PKG" ? child : null;
   }
 }
 
@@ -224,10 +197,7 @@ async function displayLog(log: string, name: string, path: string) {
   timer("analyse");
   await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
   await insertPackageWrappers(rootMethod);
-  await Promise.all([
-    analyseMethods(rootMethod),
-    DatabaseAccess.create(rootMethod),
-  ]);
+  await Promise.all([analyseMethods(rootMethod), DatabaseAccess.create(rootMethod)]);
 
   await setStatus(name, path, "Rendering...", "black");
 
@@ -284,9 +254,7 @@ function handleMessage(evt: MessageEvent) {
 
 function onInit(evt: Event) {
   const tabHolder = document.querySelector(".tabHolder");
-  tabHolder
-    ?.querySelectorAll(".tab")
-    .forEach((t) => t.addEventListener("click", onTabSelect));
+  tabHolder?.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", onTabSelect));
 
   const helpButton = document.querySelector(".helpLink");
   if (helpButton) {

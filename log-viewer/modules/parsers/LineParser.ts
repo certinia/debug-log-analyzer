@@ -15,7 +15,7 @@ export abstract class TimeStampedNode {
   exitStamp: number | null = null;
   duration: number | null = null;
   selfTime: number | null = null;
-  children: TimeStampedNode[] | null = null;
+  children: TimeStampedNode[] = [];
 }
 
 export abstract class LogLine extends TimeStampedNode {
@@ -24,7 +24,7 @@ export abstract class LogLine extends TimeStampedNode {
   acceptsText: boolean = false;
   text: string = "";
   displayType: string = "";
-  children: LogLine[] | null = null;
+  children: LogLine[] = [];
 
   isExit: boolean = false;
   isValid: boolean = true;
@@ -60,18 +60,11 @@ export abstract class LogLine extends TimeStampedNode {
 
   addBlock(lines: LogLine[]): void {
     if (lines.length > 0) {
-      if (this.children === null) {
-        this.children = [];
-      }
       this.children.push(new BlockLines(lines));
     }
   }
 
   addChild(line: LogLine): void {
-    if (this.children === null) {
-      this.children = [];
-    }
-
     this.children.push(line);
   }
 
@@ -386,7 +379,12 @@ class VFApexCallStartLine extends LogLine {
 
     const classText = parts[5] || parts[3];
     let methodtext = parts[4] || "";
-    if (methodtext) {
+    if (!methodtext && classText.toLowerCase().includes("pagemessagescomponentcontroller")) {
+      // we have s system entry and they do not have exits
+      // e.g |VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagescomponentcontroller.apex <init>
+      // and they really mess with the logs so skip handling them.
+      this.isValid = false;
+    } else if (methodtext) {
       this.hasValidSymbols = true;
       // method call
       const methodIndex = methodtext.indexOf("(");
@@ -402,10 +400,7 @@ class VFApexCallStartLine extends LogLine {
         methodtext = "." + methodtext;
       }
     } else {
-      // we have s system entry and they do not have exits
-      // e.g |VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagescomponentcontroller.apex <init>
-      // and they really mess with the logs so skip handling them.
-      this.isValid = false;
+      this.hasValidSymbols = true;
     }
     this.text = classText + methodtext;
   }
@@ -1031,7 +1026,7 @@ class FlowStartInterviewsBeginLine extends LogLine {
   }
 
   getFlowName() {
-    if (this.children) {
+    if (this.children.length) {
       let interviewBegin = this.children[0];
       if (interviewBegin.displayType === "block" && interviewBegin.children) {
         interviewBegin = interviewBegin.children[0];

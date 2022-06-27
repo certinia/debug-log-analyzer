@@ -21,9 +21,8 @@ function onExpandCollapse(evt: Event) {
     const timestamp = pe?.dataset.enterstamp;
     if (!childContainer && timestamp) {
       const node = findByTimeStamp(treeRoot, timestamp);
-      childContainer = node?.children
-        ? createChildNodes(node?.children, [node.timestamp])
-        : null;
+      const childLen = node?.children.length || 0;
+      childContainer = node && childLen ? createChildNodes(node.children, [node.timestamp]) : null;
       if (childContainer) {
         pe.appendChild(childContainer);
       }
@@ -63,9 +62,7 @@ export function showTreeNode(timestamp: number) {
 }
 
 function renderCallStack(timestamp: number) {
-  let methodElm = document.querySelector(
-    `div[data-enterstamp="${timestamp}"]`
-  ) as HTMLElement;
+  let methodElm = document.querySelector(`div[data-enterstamp="${timestamp}"]`) as HTMLElement;
 
   if (!methodElm) {
     let nodeToAttachTo;
@@ -94,18 +91,13 @@ function renderCallStack(timestamp: number) {
       }
     }) as number[];
 
-    if (nodeToStartAt?.children && nodeToAttachTo) {
-      const childContainer = createChildNodes(
-        nodeToStartAt.children,
-        timeStamps
-      );
+    if (nodeToStartAt?.children.length && nodeToAttachTo) {
+      const childContainer = createChildNodes(nodeToStartAt.children, timeStamps);
       if (childContainer) {
         nodeToAttachTo.appendChild(childContainer);
       }
 
-      methodElm = document.querySelector(
-        `div[data-enterstamp="${timestamp}"]`
-      ) as HTMLElement;
+      methodElm = document.querySelector(`div[data-enterstamp="${timestamp}"]`) as HTMLElement;
     }
   }
   return methodElm;
@@ -116,10 +108,9 @@ function findCallstack(node: LogLine, timeStamp: number): LogLine[] | null {
     return [node];
   }
 
-  const children = node?.children || [];
-  const len = children.length;
+  const len = node.children.length;
   for (let i = 0; i < len; i++) {
-    const child = children[i];
+    const child = node.children[i];
     const timeStamps = findCallstack(child, timeStamp);
     if (timeStamps) {
       timeStamps.unshift(child);
@@ -146,9 +137,7 @@ function expandTreeNode(elm: HTMLElement) {
     elemsToShow.push(elem);
 
     const toggle = elem.querySelector(`:scope > .toggle`),
-      childContainer = elem.querySelector(
-        `:scope > .childContainer`
-      ) as HTMLElement;
+      childContainer = elem.querySelector(`:scope > .childContainer`) as HTMLElement;
 
     if (toggle) {
       elemsToShow.push(childContainer);
@@ -163,8 +152,7 @@ function describeMethod(node: LogLine) {
   const methodPrefix = node.prefix || "",
     methodSuffix = node.suffix || "";
 
-  const dbPrefix =
-    (node.containsDml ? "D" : "") + (node.containsSoql ? "S" : "");
+  const dbPrefix = (node.containsDml ? "D" : "") + (node.containsSoql ? "S" : "");
   const linePrefix = (dbPrefix ? `(${dbPrefix}) ` : "") + methodPrefix;
 
   let lineSuffix = "";
@@ -172,9 +160,7 @@ function describeMethod(node: LogLine) {
     const nodeValue = node.value ? ` = ${node.value}` : "";
     const timeTaken = node.truncated
       ? "TRUNCATED"
-      : `${formatDuration(node.duration || 0)} (self ${formatDuration(
-          node.selfTime || 0
-        )})`;
+      : `${formatDuration(node.duration || 0)} (self ${formatDuration(node.selfTime || 0)})`;
     const lineNumber = node.lineNumber ? `, line: ${node.lineNumber}` : "";
     lineSuffix = `${nodeValue}${methodSuffix} - ${timeTaken}${lineNumber}`;
   }
@@ -197,14 +183,13 @@ function describeMethod(node: LogLine) {
 }
 
 function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
-  const lines = block.children ?? [],
+  const lines = block.children,
     len = lines.length;
 
   for (let i = 0; i < len; ++i) {
     const line = lines[i],
       lineNode = divElem.cloneNode() as HTMLDivElement;
-    lineNode.className =
-      line.hideable !== false ? "block detail hide" : "block";
+    lineNode.className = line.hideable !== false ? "block detail hide" : "block";
 
     const value = line.text || "";
     let text = line.type + (value && value !== line.type ? " - " + value : "");
@@ -247,7 +232,7 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
 }
 
 function renderTreeNode(node: LogLine, timeStamps: number[]) {
-  const children = node.children ?? [];
+  const children = node.children;
   const mainNode = divElem.cloneNode() as HTMLDivElement;
   if (node.timestamp >= 0) {
     mainNode.dataset.enterstamp = "" + node.timestamp;
@@ -352,20 +337,15 @@ function findByTime(node: LogLine, timeStamp: number): LogLine | null {
     }
 
     // do not search children is the timestamp is outside of the parents timeframe
-    if (
-      node.exitStamp &&
-      !(timeStamp >= node.timestamp && timeStamp <= node.exitStamp)
-    ) {
+    if (node.exitStamp && !(timeStamp >= node.timestamp && timeStamp <= node.exitStamp)) {
       return null;
     }
 
-    if (node.children) {
-      const len = node.children.length;
-      for (let i = 0; i < len; ++i) {
-        const target = findByTime(node.children[i], timeStamp);
-        if (target) {
-          return target;
-        }
+    const len = node.children.length;
+    for (let i = 0; i < len; ++i) {
+      const target = findByTime(node.children[i], timeStamp);
+      if (target) {
+        return target;
       }
     }
   }
@@ -383,8 +363,7 @@ function expand(elm: HTMLElement) {
     toggle.textContent = "-";
   });
 
-  const childContainers =
-    document.querySelectorAll<HTMLElement>(".childContainer");
+  const childContainers = document.querySelectorAll<HTMLElement>(".childContainer");
   childContainers.forEach((childContainer) => {
     if (!childContainer.classList.contains("block")) {
       childContainer.classList.remove("hide");
@@ -394,14 +373,12 @@ function expand(elm: HTMLElement) {
 
 function renderLowest(elm: HTMLElement) {
   const toggle = elm.querySelector(`:scope > .toggle`),
-    childContainer = elm.querySelector(
-      `:scope > .childContainer`
-    ) as HTMLElement;
+    childContainer = elm.querySelector(`:scope > .childContainer`) as HTMLElement;
 
   if (toggle && !childContainer && elm.dataset.enterstamp) {
     const node = findByTimeStamp(treeRoot, elm.dataset.enterstamp || "");
 
-    if (node?.children) {
+    if (node?.children.length) {
       const childContainer = createChildNodes(node.children, [-1]);
       elm.appendChild(childContainer);
     }
@@ -461,9 +438,7 @@ function showElm(elem: HTMLElement) {
 
 function showHideDetails() {
   //  TODO: move to be update via an event instead of requerying.
-  const hideDetails = document.getElementById(
-      "hideDetails"
-    ) as HTMLInputElement,
+  const hideDetails = document.getElementById("hideDetails") as HTMLInputElement,
     hideSystem = document.getElementById("hideSystem") as HTMLInputElement,
     hideFormula = document.getElementById("hideFormula") as HTMLInputElement;
 
@@ -475,10 +450,10 @@ function showHideDetails() {
   hideByDuration(elements);
   if (hideDetails?.checked) {
     hideBySelector("#tree .detail");
-}
+  }
   if (hideSystem?.checked) {
     hideBySelector("#tree .node.system");
-}
+  }
   if (hideFormula?.checked) {
     hideBySelector("#tree .node.formula");
   }
@@ -489,15 +464,13 @@ function hideByDuration(elements: Array<HTMLElement>) {
   const shouldHide = hideUnder?.checked;
 
   if (shouldHide) {
-    const timeInMS = document.getElementById(
-      "hideUnderTime"
-    ) as HTMLInputElement;
+    const timeInMS = document.getElementById("hideUnderTime") as HTMLInputElement;
     const timeFilter = +timeInMS.value * 1000000; // convert to nanoseconds
     if (timeFilter) {
       const elementsToHide = elements.filter((el) => {
         return Number(el.dataset.totaltime) < timeFilter;
       });
-    elementsToHide.forEach(hideElm);
+      elementsToHide.forEach(hideElm);
     }
   }
 }
