@@ -263,70 +263,6 @@ export class Detail extends LogLine {
 	}
 }
 
-// export abstract class LogLine extends TimeStampedNode {
-//   type: string = "";
-//   logLine: string = "";
-//   acceptsText: boolean = false;
-//   text: string = "";
-//   displayType: string = "";
-//   children: LogLine[] = [];
-
-//   isExit: boolean = false;
-//   isValid: boolean = true;
-//   hasValidSymbols: boolean = false;
-//   discontinuity: boolean = false;
-//   exitTypes: string[] | null = null;
-//   lineNumber: LineNumber = null;
-//   rowCount: number | null = null;
-//   classes: string | null = null;
-//   group: string | null = null;
-//   truncated: boolean | null = null;
-//   hideable: boolean | null = null;
-//   containsDml: boolean = false;
-//   containsSoql: boolean = false;
-//   value: string | null = null;
-//   suffix: string | null = null;
-//   prefix: string | null = null;
-//   namespace: string | null = null;
-//   cpuType: string | null = null;
-//   timelineKey: string | null = null;
-
-//   constructor(parts?: string[]) {
-//     super();
-//     if (parts) {
-//       this.type = parts[1];
-//       this.timestamp = parseTimestamp(parts[0]);
-//     }
-//   }
-
-//   onEnd(end: LogLine, stack: LogLine[]) {}
-
-//   after(next: LogLine) {}
-
-//   addBlock(lines: LogLine[]): void {
-//     if (lines.length > 0) {
-//       this.children.push(new BlockLines(lines));
-//     }
-//   }
-
-//   addChild(line: LogLine): void {
-//     this.children.push(line);
-//   }
-
-//   setChildren(lines: LogLine[]): void {
-//     this.children = lines;
-//   }
-// }
-
-// export class BlockLines extends LogLine {
-//   displayType = "block";
-
-//   constructor(children: LogLine[]) {
-//     super();
-//     this.children = children;
-//   }
-// }
-
 let logLines: LogLine[] = [],
   truncated: [string, number, string | undefined][],
   reasons: Set<string> = new Set<string>(),
@@ -1187,10 +1123,6 @@ class FlowStartInterviewsBeginLine extends Method {
   getFlowName() {
     if (this.children.length) {
       let interviewBegin = this.children[0];
-      // TODO: fix
-      // if (interviewBegin.displayType === "block" && interviewBegin.children) {
-      //   interviewBegin = interviewBegin.children[0];
-      // }
       return interviewBegin.text;
     }
     return "";

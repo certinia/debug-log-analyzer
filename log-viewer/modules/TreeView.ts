@@ -187,25 +187,19 @@ function describeMethod(node: Method) {
 	return desc;
 }
 
-function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
-  const lines = block.children,
-    len = lines.length;
+function renderBlock(line: LogLine) {
+  const lineNode = divElem.cloneNode() as HTMLDivElement;
+    lineNode.className = line instanceof Detail && line.hideable ? 'block name detail' : 'block name';
 
-  for (let i = 0; i < len; ++i) {
-    const line = lines[i],
-      lineNode = divElem.cloneNode() as HTMLDivElement;
-      lineNode.className = line instanceof Detail && line.hideable ? 'block name detail' : 'block name';
-
-    const value = line.text || "";
-    let text = line.type + (value && value !== line.type ? " - " + value : "");
-    text = text.replace(/ \| /g, "\n");
-    if (text.endsWith("\\")) {
-      text = text.slice(0, -1);
-    }
-
-    lineNode.textContent = text;
-    childContainer.appendChild(lineNode);
+  const value = line.text || "";
+  let text = line.type + (value && value !== line.type ? " - " + value : "");
+  text = text.replace(/ \| /g, "\n");
+  if (text.endsWith("\\")) {
+    text = text.slice(0, -1);
   }
+
+  lineNode.textContent = text;
+  return lineNode;
 }
 
 function hasCodeText(node: LogLine): boolean {
@@ -277,18 +271,13 @@ function renderMethod(node: Method, timeStamps: number[]) {
 function createChildNodes(children: LogLine[], timeStamps: number[]) {
   const childContainer = divElem.cloneNode() as HTMLDivElement;
   childContainer.className = "childContainer hide";
-  const len = children.length;
-  for (let i = 0; i < len; ++i) {
-    const child = children[i];
+  children.forEach(child => {
 		if (child instanceof Method) {
-      const container = renderMethod(child, timeStamps);
-      if (container) {
-        childContainer.appendChild(container);
-      }
+      childContainer.appendChild(renderMethod(child, timeStamps));
     } else {
-      renderBlock(childContainer, child);
+      childContainer.appendChild(renderBlock(child));
     }
-  }
+  });
   return childContainer;
 }
 
