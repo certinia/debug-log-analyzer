@@ -5,7 +5,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import parseLog, { logLines } from "../parsers/LineParser";
+import parseLog, { logLines } from "../parsers/TreeParser";
 import { LineIterator } from "../parsers/TreeParser";
 
 describe("LineIterator tests", () => {

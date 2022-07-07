@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { RootNode } from "./parsers/TreeParser";
-import { LogLine } from "./parsers/LineParser";
+import { LogLine, Method, Detail, RootNode, TimedNode } from "./parsers/TreeParser";
 import formatDuration, { showTab } from "./Util";
 import { hostService, OpenInfo } from "./services/VSCodeService";
 
@@ -148,38 +147,44 @@ function expandTreeNode(elm: HTMLElement) {
   elemsToShow.forEach((e) => e.classList.remove("hide"));
 }
 
-function describeMethod(node: LogLine) {
-  const methodPrefix = node.prefix || "",
-    methodSuffix = node.suffix || "";
+function describeMethod(node: Method) {
+	const methodPrefix = node.prefix || '',
+		methodSuffix = node.suffix || '';
 
-  const dbPrefix = (node.containsDml ? "D" : "") + (node.containsSoql ? "S" : "");
-  const linePrefix = (dbPrefix ? `(${dbPrefix}) ` : "") + methodPrefix;
+	let desc = methodPrefix;
+	if (node.summaryCount) {
+		desc += (node.group || node.text);
+	} else {
+		desc += node.text;
+	}
+	if (node instanceof Method && node.duration && node.selfTime) {
+		if (node.value) {
+			desc += (' = ' + node.value);
+		}
+		if (node.rowCount !== null) {
+			desc += ' Rows:' + node.rowCount;
+		}
+		desc += methodSuffix + ' - ';
+		desc += node.isTruncated ? 'TRUNCATED' : formatDuration(node.duration) + ' (' + formatDuration(node.selfTime) + ')';
+		if (node.lineNumber) {
+			desc += ', line: ' + node.lineNumber;
+		}
+	}
+	if (node.containsDml || node.containsSoql || node.containsThrown) {
+		let prefix = [];
+		if (node.containsDml) {
+			prefix.push('D' + node.containsDml);
+		}
+		if (node.containsSoql) {
+			prefix.push('S' + node.containsSoql);
+		}
+		if (node.containsThrown) {
+			prefix.push('T' + node.containsThrown);
+		}
+		desc = '(' + prefix.join(',') + ') ' + desc;
+	}
 
-  let lineSuffix = "";
-  if (node.displayType === "method") {
-    const nodeValue = node.value ? ` = ${node.value}` : "";
-    const timeTaken = node.truncated
-      ? "TRUNCATED"
-      : `${formatDuration(node.duration || 0)} (self ${formatDuration(node.selfTime || 0)})`;
-    const lineNumber = node.lineNumber ? `, line: ${node.lineNumber}` : "";
-    lineSuffix = `${nodeValue}${methodSuffix} - ${timeTaken}${lineNumber}`;
-  }
-
-  const text = node.text;
-  let logLineBody;
-  if (hasCodeText(node)) {
-    logLineBody = linkElem.cloneNode() as HTMLAnchorElement;
-    logLineBody.href = "#";
-    logLineBody.textContent = text;
-  } else {
-    return [document.createTextNode(linePrefix + text + lineSuffix)];
-  }
-
-  const nodeResults = [document.createTextNode(linePrefix), logLineBody];
-  if (lineSuffix) {
-    nodeResults.push(document.createTextNode(lineSuffix));
-  }
-  return nodeResults;
+	return desc;
 }
 
 function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
@@ -189,7 +194,7 @@ function renderBlock(childContainer: HTMLDivElement, block: LogLine) {
   for (let i = 0; i < len; ++i) {
     const line = lines[i],
       lineNode = divElem.cloneNode() as HTMLDivElement;
-    lineNode.className = line.hideable !== false ? "block detail hide" : "block";
+      lineNode.className = line instanceof Detail && line.hideable ? 'block name detail' : 'block name';
 
     const value = line.text || "";
     let text = line.type + (value && value !== line.type ? " - " + value : "");
@@ -231,7 +236,7 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
   };
 }
 
-function renderTreeNode(node: LogLine, timeStamps: number[]) {
+function renderMethod(node: Method, timeStamps: number[]) {
   const children = node.children;
   const mainNode = divElem.cloneNode() as HTMLDivElement;
   if (node.timestamp >= 0) {
@@ -255,11 +260,8 @@ function renderTreeNode(node: LogLine, timeStamps: number[]) {
 
   const titleSpan = spanElem.cloneNode() as HTMLSpanElement;
   titleSpan.className = "name";
-  const titleElements = describeMethod(node);
-  const elemsLen = titleElements.length;
-  for (let i = 0; i < elemsLen; i++) {
-    titleSpan.appendChild(titleElements[i]);
-  }
+  const titleText = describeMethod(node);
+  titleSpan.appendChild(document.createTextNode(titleText));
   mainNode.appendChild(titleSpan);
 
   if (len && (timeStamps.includes(node.timestamp) || timeStamps.includes(-1))) {
@@ -278,16 +280,13 @@ function createChildNodes(children: LogLine[], timeStamps: number[]) {
   const len = children.length;
   for (let i = 0; i < len; ++i) {
     const child = children[i];
-    switch (child.displayType) {
-      case "method":
-        const container = renderTreeNode(child, timeStamps);
-        if (container) {
-          childContainer.appendChild(container);
-        }
-        break;
-      case "block":
-        renderBlock(childContainer, child);
-        break;
+		if (child instanceof Method) {
+      const container = renderMethod(child, timeStamps);
+      if (container) {
+        childContainer.appendChild(container);
+      }
+    } else {
+      renderBlock(childContainer, child);
     }
   }
   return childContainer;
@@ -299,7 +298,7 @@ function renderTree() {
     treeContainer.addEventListener("click", onExpandCollapse);
     treeContainer.addEventListener("click", goToFile);
 
-    const callTreeNode = renderTreeNode(treeRoot, [0]);
+    const callTreeNode = renderMethod(treeRoot, [0]);
     treeContainer.innerHTML = "";
     if (callTreeNode) {
       treeContainer.appendChild(callTreeNode);
@@ -326,11 +325,11 @@ function goToFile(evt: Event) {
   }
 }
 
-function findByTimeStamp(node: LogLine, timeStamp: string): LogLine | null {
+function findByTimeStamp(node: TimedNode, timeStamp: string): LogLine | null {
   return findByTime(node, parseInt(timeStamp));
 }
 
-function findByTime(node: LogLine, timeStamp: number): LogLine | null {
+function findByTime(node: TimedNode, timeStamp: number): LogLine | null {
   if (node) {
     if (node.timestamp === timeStamp) {
       return node;
@@ -343,9 +342,12 @@ function findByTime(node: LogLine, timeStamp: number): LogLine | null {
 
     const len = node.children.length;
     for (let i = 0; i < len; ++i) {
-      const target = findByTime(node.children[i], timeStamp);
-      if (target) {
-        return target;
+      const child = node.children[i];
+      if (child instanceof TimedNode) {
+        const target = findByTime(child, timeStamp);
+        if (target) {
+          return target;
+        }
       }
     }
   }

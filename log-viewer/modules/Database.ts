@@ -3,8 +3,7 @@
  */
 
 import { html, render } from "lit";
-import { RootNode } from "./parsers/TreeParser";
-import { LogLine } from "./parsers/LineParser";
+import { LogLine, Method, RootNode } from "./parsers/TreeParser";
 
 export class DatabaseEntry {
   readonly count: number;
@@ -26,7 +25,7 @@ export class DatabaseEntry {
   }
 }
 
-export type Stack = LogLine[];
+export type Stack = Method[];
 export type DatabaseEntryMap = Map<string, DatabaseEntry>;
 
 export class DatabaseAccess {
@@ -38,7 +37,7 @@ export class DatabaseAccess {
 
   static async create(rootMethod: RootNode): Promise<DatabaseAccess> {
     const databaseAccess = new DatabaseAccess();
-    DatabaseAccess.findDatabseLines(databaseAccess, rootMethod, []);
+    DatabaseAccess.findDatabaseLines(databaseAccess, rootMethod, []);
     this._instance = databaseAccess;
     return this._instance;
   }
@@ -47,7 +46,7 @@ export class DatabaseAccess {
     return DatabaseAccess._instance;
   }
 
-  private static findDatabseLines(log: DatabaseAccess, node: LogLine, stack: LogLine[]) {
+  private static findDatabaseLines(log: DatabaseAccess, node: Method, stack: Stack) {
     const children = node.children;
     const len = children.length;
     for (let i = 0; i < len; ++i) {
@@ -61,9 +60,9 @@ export class DatabaseAccess {
           break;
       }
 
-      if (child.displayType === "method") {
+			if (child instanceof Method) {
         stack.push(child);
-        DatabaseAccess.findDatabseLines(log, child, stack);
+        DatabaseAccess.findDatabaseLines(log, child, stack);
         stack.pop();
       }
     }

@@ -5,7 +5,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import analyseMethods, { Metric } from "../Analysis";
-import parseLog from "../parsers/LineParser";
+import parseLog from "../parsers/TreeParser";
 import { getRootMethod } from "../parsers/TreeParser";
 
 describe("Analyse methods tests", () => {

@@ -2,9 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import formatDuration from "./Util";
-import { totalDuration } from "./Timeline";
-import { RootNode } from "./parsers/TreeParser";
-import { LogLine } from "./parsers/LineParser";
+import { TimedNode, RootNode, totalDuration } from "./parsers/TreeParser";
 
 const nestedSort: Record<string, string[]> = {
   count: ["count", "duration", "name"],
@@ -34,7 +32,7 @@ export class Metric {
 
 function addNodeToMap(
   map: Record<string, Metric>,
-  node: LogLine,
+  node: TimedNode,
   key?: string
 ) {
   const children = node.children;
@@ -54,7 +52,9 @@ function addNodeToMap(
 
   if (children) {
     children.forEach(function (child) {
-      addNodeToMap(map, child, child.group || child.text);
+      if (child instanceof TimedNode) {
+        addNodeToMap(map, child, child.group || child.text);
+      }
     });
   }
 }
