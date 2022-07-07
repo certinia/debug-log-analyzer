@@ -157,7 +157,7 @@ function describeMethod(node: Method) {
 	} else {
 		desc += node.text;
 	}
-	if (node instanceof Method && node.duration && node.selfTime) {
+	if (node.duration && node.selfTime) {
 		if (node.value) {
 			desc += (' = ' + node.value);
 		}
@@ -415,8 +415,29 @@ function onCollapseAll(evt: Event) {
   }
 }
 
-function hideBySelector(selector: string) {
-  document.querySelectorAll<HTMLElement>(selector).forEach(hideElm);
+function findStylesheetRule(ruleSelector: string): CSSStyleRule | null {
+  const len = document.styleSheets.length;
+  for (let i = 0; i < len; ++i) {
+    const sheet = document.styleSheets[i],
+      rules = sheet.cssRules,
+      len2 = rules.length;
+
+    for (let j = 0; j < len2; ++j) {
+      const rule = rules[j] as CSSStyleRule;
+
+      if (rule.selectorText === ruleSelector) {
+        return rule;
+      }
+    }
+  }
+  return null;
+}
+
+function hideBySelector(selector: string, hide: boolean) {
+  const rule = findStylesheetRule(selector);
+	if (rule) {
+		rule.style.display = hide ? 'none' : 'block';
+  }
 }
 
 function hideElm(elem: HTMLElement) {
@@ -433,21 +454,15 @@ function showHideDetails() {
     hideSystem = document.getElementById("hideSystem") as HTMLInputElement,
     hideFormula = document.getElementById("hideFormula") as HTMLInputElement;
 
-  const elements = Array.from(
-    document.querySelectorAll<HTMLElement>("#tree .node[data-totaltime]")
-  );
-  elements.forEach(showElm);
+  // const elements = Array.from(
+  //   document.querySelectorAll<HTMLElement>("#tree .node[data-totaltime]")
+  // );
+  // elements.forEach(showElm);
 
-  hideByDuration(elements);
-  if (hideDetails?.checked) {
-    hideBySelector("#tree .detail");
-  }
-  if (hideSystem?.checked) {
-    hideBySelector("#tree .node.system");
-  }
-  if (hideFormula?.checked) {
-    hideBySelector("#tree .node.formula");
-  }
+  // hideByDuration(elements);
+  hideBySelector(".detail", hideDetails?.checked);
+  hideBySelector(".node.system", hideSystem?.checked);
+  hideBySelector(".node.formula", hideFormula?.checked);
 }
 
 function hideByDuration(elements: Array<HTMLElement>) {

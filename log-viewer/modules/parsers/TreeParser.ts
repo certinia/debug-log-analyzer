@@ -28,14 +28,6 @@ export class LineIterator {
   }
 }
 
-// export abstract class TimeStampedNode {
-//   timestamp: number = 0;
-//   exitStamp: number | null = null;
-//   duration: number | null = null;
-//   selfTime: number | null = null;
-//   children: TimeStampedNode[] = [];
-// }
-
 export abstract class LogLine {
 	timestamp: number = 0;
 
