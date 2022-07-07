@@ -454,12 +454,12 @@ function showHideDetails() {
     hideSystem = document.getElementById("hideSystem") as HTMLInputElement,
     hideFormula = document.getElementById("hideFormula") as HTMLInputElement;
 
-  // const elements = Array.from(
-  //   document.querySelectorAll<HTMLElement>("#tree .node[data-totaltime]")
-  // );
-  // elements.forEach(showElm);
+  const elements = Array.from(
+    document.querySelectorAll<HTMLElement>("#tree .node[data-totaltime]")
+  );
+  elements.forEach(showElm);
 
-  // hideByDuration(elements);
+  hideByDuration(elements);
   hideBySelector(".detail", hideDetails?.checked);
   hideBySelector(".node.system", hideSystem?.checked);
   hideBySelector(".node.formula", hideFormula?.checked);
