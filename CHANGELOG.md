@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Added
 
 - Calltree filtering to hide nodes where total duration is less than a given time ([#112][#112])
+- An EXCEPTION_THROWN marker (T) to suppliment the DML_BEGIN (D) and SOQL_EXECUTE_BEGIN (S) markers on parent nodes
 
 ### Changed
 
@@ -19,11 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Greatly reduced CPU usage when Timeline is open but no changes are occuring ([#90][#90])
 - Improved performance getting log file from an org when using the `Log: Load Apex Log For Analysis` command ([#123][#123])
 - More easily differentiate between "Flows" and "Process Builders" in the timeline and call tree ([#114][#114])
+- Counts for T, D & S markers - to show how many of each statement type are decendants of a node
 
 ### Fixed
 
 - Some detail lines not being shown on calltree ([#130][#130])
 - Tooltip not hiding when moving to a part of timeline where the tooltip should not be shown ([#131][#131])
+- The TRUNCATED marker (for methods which were not complete at the end of the log) was not working
+- The hide checkboxes were not always un-hiding
+- Some (probably benign) NullPointers were fixed
 
 ## [1.4.2] - 2022-03-14
 
