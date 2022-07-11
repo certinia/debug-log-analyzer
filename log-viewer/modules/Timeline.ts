@@ -315,7 +315,7 @@ export default async function renderTimeline(rootMethod: RootNode) {
   renderTimelineKey();
   container = document.getElementById("timelineWrapper") as HTMLDivElement;
   canvas = document.getElementById("timeline") as HTMLCanvasElement;
-  ctx = canvas.getContext("2d", { alpha: false })!; // can never be null since context (2d) is a supported type.
+  ctx = canvas.getContext("2d")!; // can never be null since context (2d) is a supported type.
   timelineRoot = rootMethod;
   calculateSizes();
   nodesToRectangles([timelineRoot], -1);
@@ -420,9 +420,9 @@ function showTooltip(offsetX: number, offsetY: number) {
   if (!dragging && container && tooltip) {
     const depth = ~~(((displayHeight - offsetY - state.offsetY) / realHeight) * maxY);
     let tooltipText = findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
-      showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
-    }
+    showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
   }
+}
 
 function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
   const target = findByPosition(timelineRoot, 0, x, depth);
