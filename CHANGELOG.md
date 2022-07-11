@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Timeline background shown as black in some browsers ([#137][#137])
 - The TRUNCATED marker (for methods which were not complete at the end of the log) was not working
 - The hide checkboxes not always un-hiding ([#135][#135])
-- Some (probably benign) NullPointers were fixed
+- Some NullPointers ([#135][#135])
 
 ## [1.4.2] - 2022-03-14
 
