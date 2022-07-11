@@ -112,8 +112,8 @@ function getMaxDepth(node: Method, depth = 0) {
   let maxDepth = depth;
   const len = node.children.length - 1;
   for (let c = len; c >= 0; --c) {
-		const child = node.children[c];
-		if (child instanceof Method) {
+    const child = node.children[c];
+    if (child instanceof Method) {
       const d = getMaxDepth(child, childDepth);
       if (d > maxDepth) {
         maxDepth = d;
@@ -200,7 +200,7 @@ function nodesToRectangles(nodes: Method[], depth: number) {
 
     // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
     node.children.forEach((child) => {
-			if (child instanceof Method) {
+      if (child instanceof Method) {
         children.push(child);
       }
     });
@@ -537,7 +537,7 @@ function onMouseMove(evt: any) {
   const target = evt.target as HTMLElement;
 
   if (target && (target.id === "timeline" || target.id === "tooltip")) {
-    const clRect = canvas.getBoundingClientRect();
+    const clRect = canvas?.getBoundingClientRect();
     if (clRect) {
       lastMouseX = evt.clientX - clRect.left;
       lastMouseY = evt.clientY - clRect.top;
