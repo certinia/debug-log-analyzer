@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Some detail lines not being shown on calltree ([#130][#130])
 - Tooltip not hiding when moving to a part of timeline where the tooltip should not be shown ([#131][#131])
 - Timeline background shown as black in some browsers ([#137][#137])
-- The TRUNCATED marker (for methods which were not complete at the end of the log) was not working
+- The TRUNCATED marker (for methods which were not complete at the end of the log) not being shown ([#135][#135])
 - The hide checkboxes not always un-hiding ([#135][#135])
 - Some NullPointers ([#135][#135])
 
