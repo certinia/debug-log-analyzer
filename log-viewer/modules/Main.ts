@@ -1,11 +1,10 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { showTab, recalculateDurations } from "./Util";
-import parseLog, { getLogSettings, LogLine, truncated } from "./parsers/LineParser";
-import { getRootMethod } from "./parsers/TreeParser";
+import { showTab } from "./Util";
+import parseLog, { getLogSettings, LogLine, TimedNode, Method, truncated, totalDuration, getRootMethod } from "./parsers/TreeParser";
 import renderTreeView from "./TreeView";
-import renderTimeline, { totalDuration, setColors, renderTimelineKey } from "./Timeline";
+import renderTimeline, { setColors, renderTimelineKey } from "./Timeline";
 import analyseMethods, { renderAnalysis } from "./Analysis";
 import { DatabaseAccess, renderDb } from "./Database";
 import { setNamespaces } from "./NamespaceExtrator";
@@ -81,54 +80,63 @@ async function setStatus(name: string, path: string, status: string, color: stri
 }
 
 async function markContainers(node: LogLine) {
-  const children = node.children;
-  const len = children.length;
-  for (let i = 0; i < len; ++i) {
-    const child = children[i];
-    node.containsDml ||= child.type === "DML_BEGIN";
-    node.containsSoql ||= child.type === "SOQL_EXECUTE_BEGIN";
-    if (child.children.length) {
-      await markContainers(child);
-      node.containsDml ||= child.containsDml;
-      node.containsSoql ||= child.containsSoql;
-    }
-  }
-}
+	const children = node.children,
+		len = children.length;
 
-async function insertPackageWrappers(node: LogLine) {
+	node.containsDml = 0;
+	node.containsSoql = 0;
+	node.containsThrown = 0;
+
+	for (let i = 0; i < len; ++i) {
+		const child = children[i];
+		if (child.type === 'DML_BEGIN') {
+			++node.containsDml;
+    }
+		if (child.type === 'SOQL_EXECUTE_BEGIN') {
+			++node.containsSoql;
+    }
+		if (child.type === 'EXCEPTION_THROWN') {
+			++node.containsThrown;
+    }
+		if (child.children) {
+			markContainers(child);
+			node.containsDml += child.containsDml;
+			node.containsSoql += child.containsSoql;
+			node.containsThrown += child.containsThrown;
+		}
+	}}
+
+async function insertPackageWrappers(node: Method) {
   const children = node.children,
     isParentDml = node.type === "DML_BEGIN";
 
-  let lastPkg,
+  let lastPkg: TimedNode | null = null,
     i = 0;
   while (i < children.length) {
     const child = children[i],
       childType = child.type;
 
-    if (lastPkg) {
+    if (lastPkg && child instanceof TimedNode) {
       if (childType === "ENTERING_MANAGED_PKG" && child.namespace === lastPkg.namespace) {
         // combine adjacent (like) packages
         children.splice(i, 1); // remove redundant child from parent
 
         lastPkg.exitStamp = child.exitStamp;
-        recalculateDurations(lastPkg);
+				lastPkg.recalculateDurations();
         continue; // skip any more child processing (it's gone)
-      } else if (
-        lastPkg &&
-        isParentDml &&
-        (childType === "DML_BEGIN" || childType === "SOQL_EXECUTE_BEGIN")
-      ) {
+			} else if (isParentDml && (childType === 'DML_BEGIN' || childType === 'SOQL_EXECUTE_BEGIN') || childType === 'EXCEPTION_THROWN') {
         // move child DML / SOQL into the last package
         children.splice(i, 1); // remove moving child from parent
         if (lastPkg.children) {
           lastPkg.children.push(child); // move child into the pkg
         }
 
-        lastPkg.containsDml = child.containsDml || childType === "DML_BEGIN";
-        lastPkg.containsSoql = child.containsSoql || childType === "SOQL_EXECUTE_BEGIN";
+				lastPkg.containsDml = child.containsDml + ((childType === 'DML_BEGIN') ? 1 : 0);
+				lastPkg.containsSoql = child.containsSoql + ((childType === 'SOQL_EXECUTE_BEGIN') ? 1 : 0);
+				lastPkg.containsThrown = child.containsThrown + ((childType === 'EXCEPTION_THROWN') ? 1 : 0);
         lastPkg.exitStamp = child.exitStamp; // move the end
-        recalculateDurations(lastPkg);
-        if (child.displayType === "method") {
+				lastPkg.recalculateDurations();
+				if (child instanceof Method) {
           await insertPackageWrappers(child);
         }
         continue; // skip any more child processing (it's moved)
@@ -138,10 +146,10 @@ async function insertPackageWrappers(node: LogLine) {
     } else {
       ++i;
     }
-    if (child.displayType === "method") {
+		if (child instanceof Method) {
       await insertPackageWrappers(child);
     }
-    lastPkg = childType === "ENTERING_MANAGED_PKG" ? child : null;
+		lastPkg = childType === 'ENTERING_MANAGED_PKG' ? child as TimedNode : null;
   }
 }
 

@@ -1,13 +1,14 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import {
+import parseLog, {
   parseObjectNamespace,
   parseVfNamespace,
   parseTimestamp,
   parseLineNumber,
   parseRows,
   parseLine,
+  Method,
   MethodEntryLine,
   logLines,
   CodeUnitStartedLine,
@@ -16,8 +17,7 @@ import {
   cpuUsed,
   ExecutionStartedLine,
   ExecutionFinishedLine,
-} from "../parsers/LineParser";
-import parseLog from "../parsers/LineParser";
+} from "../parsers/TreeParser";
 
 describe("parseObjectNamespace tests", () => {
   it("Should consider no separator to be unmanaged", () => {
@@ -232,4 +232,28 @@ describe("parseLog tests", () => {
     expect(logLines[2].type).toBe("LIMIT_USAGE_FOR_NS");
     expect(cpuUsed).toBe(4564000000);
   });
+});
+
+describe('Recalculate durations tests', () => {
+	it('Recalculates parent node', () => {
+		const node = new Method(['14:32:07.563 (1)', 'DUMMY'], [], null, 'dummy', '');
+		node.exitStamp = 3;
+
+		node.recalculateDurations();
+		expect(node.duration).toBe(2);
+		expect(node.selfTime).toBe(2);
+	});
+	it('Children are subtracted from net duration', () => {
+		const node = new Method(['14:32:07.563 (0)', 'DUMMY'], [], null, 'dummy', ''),
+			child1 = new Method(['14:32:07.563 (10)', 'DUMMY'], [], null, 'dummy', ''),
+			child2 = new Method(['14:32:07.563 (70)', 'DUMMY'], [], null, 'dummy', '');
+		node.exitStamp = 100;
+		child1.duration = 50;
+		child2.duration = 25;
+		node.addChild(child1);
+		node.addChild(child2);
+		node.recalculateDurations();
+		expect(node.duration).toBe(100);
+		expect(node.selfTime).toBe(25);
+	});
 });

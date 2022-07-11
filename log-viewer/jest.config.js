@@ -10,6 +10,10 @@ module.exports = {
     // allow lit/@lit transformation
     "node_modules/(?!@?lit)",
   ],
+  testPathIgnorePatterns: [
+    "<rootDir>/node_modules/",
+    "<rootDir>/out/"
+  ],
   moduleNameMapper: {
     '^.+\\.(css|less)$': '<rootDir>/resources/css/stub.js'
   },

@@ -33,8 +33,10 @@
   white-space: pre;
 }
 .node.system {
+	display: block;
 }
 .node.formula {
+	display: inline-block;  /* make different to .node.system to stop rollup from combining them */
 }
 .childContainer {
   margin-left: 24px;
@@ -47,6 +49,7 @@
   text-indent: -1em;
 }
 .detail {
+	display: none;
 }
 .toggle {
   cursor: pointer;

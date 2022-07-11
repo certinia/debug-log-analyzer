@@ -4,8 +4,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import formatDuration, { showTab, recalculateDurations } from "../Util";
-import { TimeStampedNode } from "../parsers/LineParser";
+import formatDuration, { showTab } from "../Util";
 
 jest.mock("../Browser", () => ({
   decodeEntities: (text: string) => {
@@ -49,47 +48,5 @@ describe("Show Tab tests", () => {
     expect(
       document.getElementById("view2")?.classList.contains("selected")
     ).toBe(false);
-  });
-});
-
-describe("Recalculate durations tests", () => {
-  it("Recalculates parent node", () => {
-    let node: TimeStampedNode = {
-      timestamp: 1,
-      exitStamp: 3,
-      children: [],
-      duration: null,
-      selfTime: null,
-    };
-    recalculateDurations(node);
-    expect(node.duration).toBe(2);
-    expect(node.selfTime).toBe(2);
-  });
-  it("Children are subtracted from self time", () => {
-    let node: TimeStampedNode = {
-      timestamp: 0,
-      exitStamp: 100,
-      children: [
-        {
-          duration: 50,
-          timestamp: 0,
-          exitStamp: null,
-          selfTime: null,
-          children: [],
-        },
-        {
-          duration: 25,
-          timestamp: 0,
-          exitStamp: null,
-          selfTime: null,
-          children: [],
-        },
-      ],
-      duration: null,
-      selfTime: null,
-    };
-    recalculateDurations(node);
-    expect(node.duration).toBe(100);
-    expect(node.selfTime).toBe(25);
   });
 });

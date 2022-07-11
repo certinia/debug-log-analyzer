@@ -3,8 +3,7 @@
  */
 import { showTreeNode } from "./TreeView";
 import formatDuration from "./Util";
-import { LogLine, truncated } from "./parsers/LineParser";
-import { RootNode } from "./parsers/TreeParser";
+import { TimedNode, Method, RootNode, truncated, totalDuration } from "./parsers/TreeParser";
 
 const scaleY = -15,
   strokeColor = "#B0B0B0",
@@ -96,7 +95,6 @@ let ctx: CanvasRenderingContext2D;
 
 let realHeight = 0;
 let scaleFont: string,
-  totalDuration: number,
   maxY: number,
   displayHeight: number,
   displayWidth: number,
@@ -104,7 +102,7 @@ let scaleFont: string,
   lastMouseX: number,
   lastMouseY: number;
 
-function getMaxDepth(node: LogLine, depth = 0) {
+function getMaxDepth(node: Method, depth = 0) {
   if (!node.children.length) {
     return depth;
   }
@@ -114,9 +112,12 @@ function getMaxDepth(node: LogLine, depth = 0) {
   let maxDepth = depth;
   const len = node.children.length - 1;
   for (let c = len; c >= 0; --c) {
-    const d = getMaxDepth(node.children[c], childDepth);
-    if (d > maxDepth) {
-      maxDepth = d;
+		const child = node.children[c];
+		if (child instanceof Method) {
+      const d = getMaxDepth(child, childDepth);
+      if (d > maxDepth) {
+        maxDepth = d;
+      }
     }
   }
   return maxDepth;
@@ -186,8 +187,8 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-function nodesToRectangles(nodes: LogLine[], depth: number) {
-  const children: LogLine[] = [];
+function nodesToRectangles(nodes: Method[], depth: number) {
+  const children: Method[] = [];
   const len = nodes.length;
   for (let c = 0; c < len; c++) {
     const node = nodes[c];
@@ -199,7 +200,9 @@ function nodesToRectangles(nodes: LogLine[], depth: number) {
 
     // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
     node.children.forEach((child) => {
-      children.push(child);
+			if (child instanceof Method) {
+        children.push(child);
+      }
     });
   }
 
@@ -277,7 +280,6 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 }
 
 function calculateSizes() {
-  totalDuration = timelineRoot.exitStamp || 0; // maximum display value in nano-seconds
   maxY = getMaxDepth(timelineRoot); // maximum nested call depth
   resetView();
 }
@@ -290,6 +292,9 @@ function resetView() {
 }
 
 function resize() {
+  if (!container) {
+    return;
+  }
   const { clientWidth: newWidth, clientHeight: newHeight } = container;
   if (newWidth && newHeight && (newWidth !== displayWidth || newHeight !== displayHeight)) {
     canvas.width = displayWidth = newWidth;
@@ -375,11 +380,11 @@ export function renderTimelineKey() {
 }
 
 function findByPosition(
-  node: LogLine,
+  node: TimedNode,
   depth: number,
   x: number,
   targetDepth: number
-): LogLine | null {
+): TimedNode | null {
   if (!node) {
     return null;
   }
@@ -405,9 +410,12 @@ function findByPosition(
     if (targetDepth >= childDepth) {
       const len = node.children.length;
       for (let c = 0; c < len; ++c) {
-        const target = findByPosition(node.children[c], childDepth, x, targetDepth);
-        if (target) {
-          return target;
+        const child = node.children[c];
+        if (child instanceof TimedNode) {
+          const target = findByPosition(child, childDepth, x, targetDepth);
+          if (target) {
+            return target;
+          }
         }
       }
     }
@@ -630,5 +638,3 @@ function onInitTimeline(evt: Event) {
 }
 
 window.addEventListener("DOMContentLoaded", onInitTimeline);
-
-export { totalDuration };

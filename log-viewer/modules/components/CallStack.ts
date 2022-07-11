@@ -4,7 +4,7 @@
 import { LitElement, html, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { DatabaseAccess } from "../Database";
-import { LogLine } from "../parsers/LineParser";
+import { LogLine } from "../parsers/TreeParser";
 import { showTreeNode } from "../TreeView";
 
 @customElement("call-stack")

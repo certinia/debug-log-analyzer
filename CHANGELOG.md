@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Added
 
 - Calltree filtering to hide nodes where total duration is less than a given time ([#112][#112])
+- An EXCEPTION_THROWN marker (T) to supplement the DML_BEGIN (D) and SOQL_EXECUTE_BEGIN (S) markers on parent nodes ([#135][#135])
 
 ### Changed
 
@@ -19,12 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Greatly reduced CPU usage when Timeline is open but no changes are occuring ([#90][#90])
 - Improved performance getting log file from an org when using the `Log: Load Apex Log For Analysis` command ([#123][#123])
 - More easily differentiate between "Flows" and "Process Builders" in the timeline and call tree ([#114][#114])
+- Counts on Calltree for Throw (T), DML (D) & SOQL (S) markers, which shows how many of each statement type are descendants of a node ([#135][#135])
 
 ### Fixed
 
 - Some detail lines not being shown on calltree ([#130][#130])
 - Tooltip not hiding when moving to a part of timeline where the tooltip should not be shown ([#131][#131])
 - Timeline background shown as black in some browsers ([#137][#137])
+- The TRUNCATED marker (for methods which were not complete at the end of the log) not being shown ([#135][#135])
+- The hide checkboxes not always un-hiding ([#135][#135])
+- Some NullPointers ([#135][#135])
 
 ## [1.4.2] - 2022-03-14
 
@@ -148,3 +153,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#130]: https://github.com/financialforcedev/debug-log-analyzer/issues/130
 [#131]: https://github.com/financialforcedev/debug-log-analyzer/issues/131
 [#137]: https://github.com/financialforcedev/debug-log-analyzer/issues/137
+[#135]: https://github.com/financialforcedev/debug-log-analyzer/issues/135
