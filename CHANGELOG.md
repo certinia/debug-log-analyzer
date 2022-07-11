@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Some detail lines not being shown on calltree ([#130][#130])
 - Tooltip not hiding when moving to a part of timeline where the tooltip should not be shown ([#131][#131])
+- Timeline background shown as black in some browsers ([#137][#137])
 - The TRUNCATED marker (for methods which were not complete at the end of the log) was not working
 - The hide checkboxes were not always un-hiding
 - Some (probably benign) NullPointers were fixed
@@ -151,3 +152,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#114]: https://github.com/financialforcedev/debug-log-analyzer/issues/114
 [#130]: https://github.com/financialforcedev/debug-log-analyzer/issues/130
 [#131]: https://github.com/financialforcedev/debug-log-analyzer/issues/131
+[#137]: https://github.com/financialforcedev/debug-log-analyzer/issues/137
