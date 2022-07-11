@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Added
 
 - Calltree filtering to hide nodes where total duration is less than a given time ([#112][#112])
-- An EXCEPTION_THROWN marker (T) to suppliment the DML_BEGIN (D) and SOQL_EXECUTE_BEGIN (S) markers on parent nodes
+- An EXCEPTION_THROWN marker (T) to supplement the DML_BEGIN (D) and SOQL_EXECUTE_BEGIN (S) markers on parent nodes ([#135][#135])
 
 ### Changed
 
