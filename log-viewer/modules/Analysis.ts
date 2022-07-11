@@ -4,12 +4,14 @@
 import formatDuration from "./Util";
 import { TimedNode, RootNode, totalDuration } from "./parsers/TreeParser";
 
-const nestedSort: Record<string, string[]> = {
-  count: ["count", "duration", "name"],
-  duration: ["duration", "count", "name"],
-  selfTime: ["selfTime", "count", "name"],
-  name: ["name", "count", "duration"],
-};
+type SortKey = 'count' | 'duration' | 'selfTime' | 'name';
+
+const nestedSort: Map<SortKey, SortKey[]> = new Map([
+  ["count", ["count", "duration", "name"]],
+  ["duration", ["duration", "count", "name"]],
+  ["selfTime", ["selfTime", "count", "name"]],
+  ["name", ["name", "count", "duration"]],
+]);
 const div = document.createElement("div");
 const span = document.createElement("span");
 const boldElem = document.createElement("b");
@@ -31,14 +33,14 @@ export class Metric {
 }
 
 function addNodeToMap(
-  map: Record<string, Metric>,
+  map: Map<string, Metric>,
   node: TimedNode,
   key?: string
 ) {
   const children = node.children;
 
   if (key) {
-    let metric = map[key];
+    let metric = map.get(key);
     if (metric) {
       ++metric.count;
       if (node.duration) {
@@ -46,29 +48,27 @@ function addNodeToMap(
         metric.selfTime += node.selfTime || 0;
       }
     } else {
-      map[key] = new Metric(key, 1, node.duration || 0, node.selfTime || 0);
+      map.set(key, new Metric(key, 1, node.duration || 0, node.selfTime || 0));
     }
   }
 
-  if (children) {
-    children.forEach(function (child) {
-      if (child instanceof TimedNode) {
-        addNodeToMap(map, child, child.group || child.text);
-      }
-    });
-  }
+  children.forEach(function (child) {
+    if (child instanceof TimedNode) {
+      addNodeToMap(map, child, child.group || child.text);
+    }
+  });
 }
 
-export default async function analyseMethods(rootMethod: RootNode) {
-  const methodMap = {};
+export default function analyseMethods(rootMethod: RootNode) {
+	const methodMap: Map<string, Metric> = new Map();
 
   addNodeToMap(methodMap, rootMethod);
-  metricList = Object.values(methodMap);
+	metricList = [...methodMap.values()];
   return metricList; // return value for unit testing
 }
 
 function entrySort(
-  sortField: string,
+  sortField: SortKey,
   sortAscending: boolean,
   a: Metric,
   b: Metric
@@ -110,12 +110,12 @@ function entrySort(
 }
 
 function nestedSorter(
-  type: string,
+  type: SortKey,
   sortAscending: boolean,
   a: Metric,
   b: Metric
 ) {
-  const sortOrder = nestedSort[type];
+  const sortOrder = nestedSort.get(type)!;
 
   const len = sortOrder.length;
   for (let i = 0; i < len; ++i) {
@@ -167,7 +167,7 @@ export async function renderAnalysis() {
   const sortFieldElm = document.getElementById(
       "sortField"
     ) as HTMLSelectElement,
-    sortField = sortFieldElm?.value,
+    sortField = sortFieldElm.value as SortKey,
     sortAscendingElm = document.getElementById(
       "sortAscending"
     ) as HTMLInputElement,

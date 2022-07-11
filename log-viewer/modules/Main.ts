@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import { showTab } from "./Util";
-import parseLog, { getLogSettings, LogLine, TimedNode, Method, truncated, totalDuration, getRootMethod } from "./parsers/TreeParser";
+import parseLog, { getLogSettings, TimedNode, Method, LogSetting, truncated, totalDuration, getRootMethod } from "./parsers/TreeParser";
 import renderTreeView from "./TreeView";
 import renderTimeline, { setColors, renderTimelineKey } from "./Timeline";
 import analyseMethods, { renderAnalysis } from "./Analysis";
@@ -31,7 +31,7 @@ declare global {
 let logSize: number;
 
 async function setStatus(name: string, path: string, status: string, color: string) {
-  const statusHolder = document.getElementById("status"),
+  const statusHolder = document.getElementById("status") as HTMLDivElement,
     nameSpan = document.createElement("span"),
     nameLink = document.createElement("a"),
     statusSpan = document.createElement("span"),
@@ -49,37 +49,30 @@ async function setStatus(name: string, path: string, status: string, color: stri
   statusSpan.innerText = status;
   statusSpan.style.color = color;
 
-  if (statusHolder) {
-    statusHolder.innerHTML = "";
-    statusHolder.appendChild(nameSpan);
-    statusHolder.appendChild(statusSpan);
-  }
+  statusHolder.innerHTML = "";
+  statusHolder.appendChild(nameSpan);
+  statusHolder.appendChild(statusSpan);
 
   if (Array.isArray(truncated)) {
     truncated.forEach((entry) => {
-      const message = entry[0];
-
       const reasonSpan = document.createElement("span");
-      reasonSpan.innerText = message;
+
+      reasonSpan.innerText = entry.reason;
       reasonSpan.className = "reason";
-      if (entry[2]) {
-        reasonSpan.style.backgroundColor = entry[2];
-      }
+      reasonSpan.style.backgroundColor = entry.color;
 
       const tooltipSpan = document.createElement("span");
       tooltipSpan.className = "tooltip";
-      tooltipSpan.innerText = message;
+      tooltipSpan.innerText = entry.reason;
 
-      if (statusHolder) {
-        statusHolder.appendChild(reasonSpan);
-        statusHolder.appendChild(tooltipSpan);
-      }
+      statusHolder.appendChild(reasonSpan);
+      statusHolder.appendChild(tooltipSpan);
     });
   }
   await waitForRender();
 }
 
-async function markContainers(node: LogLine) {
+async function markContainers(node: TimedNode) {
 	const children = node.children,
 		len = children.length;
 
@@ -89,16 +82,17 @@ async function markContainers(node: LogLine) {
 
 	for (let i = 0; i < len; ++i) {
 		const child = children[i];
-		if (child.type === 'DML_BEGIN') {
-			++node.containsDml;
-    }
-		if (child.type === 'SOQL_EXECUTE_BEGIN') {
-			++node.containsSoql;
-    }
-		if (child.type === 'EXCEPTION_THROWN') {
-			++node.containsThrown;
-    }
-		if (child.children) {
+
+		if (child instanceof TimedNode) {
+      if (child.type === 'DML_BEGIN') {
+        ++node.containsDml;
+      }
+      if (child.type === 'SOQL_EXECUTE_BEGIN') {
+        ++node.containsSoql;
+      }
+      if (child.type === 'EXCEPTION_THROWN') {
+        ++node.containsThrown;
+      }
 			markContainers(child);
 			node.containsDml += child.containsDml;
 			node.containsSoql += child.containsSoql;
@@ -164,21 +158,18 @@ function timer(text: string) {
   startTime = time;
 }
 
-async function renderLogSettings(logSettings: [string, string][]) {
-  const holder = document.getElementById("logSettings");
-  if (!holder) {
-    return;
-  }
+async function renderLogSettings(logSettings: LogSetting[]) {
+  const holder = document.getElementById("logSettings") as HTMLDivElement;
 
   holder.innerHTML = "";
   const fragment = document.createDocumentFragment();
-  for (const [name, level] of logSettings) {
+  for (const {key, level} of logSettings) {
     if (level !== "NONE") {
       const setting = document.createElement("div"),
         title = document.createElement("span"),
         value = document.createElement("span");
 
-      title.innerText = name + ":";
+      title.innerText = key + ":";
       title.className = "settingTitle";
       value.innerText = level;
       value.className = "settingValue";

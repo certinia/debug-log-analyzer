@@ -3,41 +3,54 @@
  */
 import { showTreeNode } from "./TreeView";
 import formatDuration from "./Util";
-import { TimedNode, Method, RootNode, truncated, totalDuration } from "./parsers/TreeParser";
+import { TimedNode, Method, RootNode, TimelineKey, truncated, totalDuration } from "./parsers/TreeParser";
+
+interface TimelineGroup {
+	label: string;
+	// strokeColor: string;
+	fillColor: string;
+	//textColor: string;
+}
+
+interface Rect {
+	x: number;
+	y: number;
+	w: number;
+}
 
 const scaleY = -15,
   strokeColor = "#B0B0B0",
   textColor = "#FFFFFF",
-  keyMap: Record<string, Record<string, string>> = {
-    codeUnit: {
+	keyMap: Map<TimelineKey, TimelineGroup> = new Map([
+    ["codeUnit", {
       label: "Code Unit",
       fillColor: "#6BAD68",
-    },
-    soql: {
+    }],
+    ["soql", {
       label: "SOQL",
       fillColor: "#4B9D6E",
-    },
-    method: {
+    }],
+    ["method", {
       label: "Method",
       fillColor: "#328C72",
-    },
-    flow: {
+    }],
+    ["flow", {
       label: "Flow",
       fillColor: "#237A72",
-    },
-    dml: {
+    }],
+    ["dml", {
       label: "DML",
       fillColor: "#22686D",
-    },
-    workflow: {
+    }],
+    ["workflow", {
       label: "Workflow",
       fillColor: "#285663",
-    },
-    systemMethod: {
+    }],
+    ["systemMethod", {
       label: "System Method",
       fillColor: "#2D4455",
-    },
-  };
+    }],
+  ]);
 
 class State {
   public isRedrawQueued = true;
@@ -194,8 +207,8 @@ function nodesToRectangles(nodes: Method[], depth: number) {
     const node = nodes[c];
     const tlKey = node.timelineKey;
     if (tlKey && node.duration) {
-      const tl = keyMap[tlKey];
-      addToRectQueue(tl.fillColor, node.timestamp, depth, node.duration);
+      const tl = keyMap.get(tlKey)!;
+      addToRectQueue(node, depth);
     }
 
     // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
@@ -213,35 +226,35 @@ function nodesToRectangles(nodes: Method[], depth: number) {
   nodesToRectangles(children, depth + 1);
 }
 
-interface Rect {
-  x: number;
-  y: number;
-  w: number;
-}
+const rectRenderQueue = new Map<TimelineKey, Rect[]>();
 
-const rectRenderQueue = new Map<string, Rect[]>();
-
-function addToRectQueue(color: string, x: number, y: number, w: number) {
-  if (!rectRenderQueue.has(color)) {
-    rectRenderQueue.set(color, []);
-  }
-
-  const rect: Rect = {
-    x: x,
-    y: y,
-    w: w,
-  };
-  rectRenderQueue.get(color)?.push(rect);
+/**
+ * Create a rectangle for the node and add it to the correct render list for it's type.
+ * @param node The node to be rendered
+ * @param y The call depth of the node
+ */
+ function addToRectQueue(node: Method, y: number) {
+	const {timelineKey: tlKey, timestamp: x, duration} = node,
+    w = duration!,
+   rect: Rect = {x, y, w};
+	let list = rectRenderQueue.get(tlKey);
+	if (!list) {
+		rectRenderQueue.set(tlKey, list = []);
+	}
+	list.push(rect);
 }
 
 function renderRectangles(ctx: CanvasRenderingContext2D) {
-  for (let [color, items] of rectRenderQueue) {
-    ctx.beginPath();
-    ctx.fillStyle = color;
-    items.forEach(drawRect);
-    ctx.fill();
-    ctx.stroke();
-  }
+	ctx.lineWidth = 1;
+	for (let [tlKey, items] of rectRenderQueue) {
+		const tl: TimelineGroup = keyMap.get(tlKey)!;
+		ctx.beginPath();
+		// ctx.strokeStyle = tl.strokeColor;
+		ctx.fillStyle = tl.fillColor;
+		items.forEach(drawRect);
+		ctx.fill();
+		ctx.stroke();
+	}
 }
 
 const drawRect = (rect: Rect) => {
@@ -266,13 +279,11 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 
   while (i < len) {
     const thisEntry = truncated[i++],
-      nextEntry = truncated[i] ?? [],
-      startTime = thisEntry[1],
-      endTime = nextEntry[1] ?? totalDuration;
+      nextEntry = truncated[i] ?? {},
+      startTime = thisEntry.timestamp,
+			endTime = nextEntry.timestamp ?? totalDuration;
 
-    if (thisEntry[2]) {
-      ctx.fillStyle = thisEntry[2];
-    }
+    ctx.fillStyle = thisEntry.color;
     const x = startTime * state.zoom - state.offsetX;
     const w = (endTime - startTime) * state.zoom;
     ctx.fillRect(x, -displayHeight, w, displayHeight);
@@ -332,7 +343,7 @@ export default async function renderTimeline(rootMethod: RootNode) {
 // todo: chnage to map? or use interface for timelineColors?
 export function setColors(timelineColors: any) {
   for (const keyName in keyMap) {
-    const keyMeta = keyMap[keyName];
+    const keyMeta = keyMap.get(keyName as TimelineKey)!;
     const newColor = timelineColors[keyMeta.label];
     if (newColor) {
       keyMeta.fillColor = newColor;
@@ -354,7 +365,7 @@ function drawTimeLine() {
 }
 
 export function renderTimelineKey() {
-  const keyHolder = document.getElementById("timelineKey"),
+  const keyHolder = document.getElementById("timelineKey") as HTMLDivElement,
     title = document.createElement("span");
 
   title.innerText = "";
@@ -363,9 +374,8 @@ export function renderTimelineKey() {
     keyHolder.appendChild(title);
   }
 
-  for (const keyName in keyMap) {
-    const keyMeta = keyMap[keyName],
-      keyEntry = document.createElement("div"),
+	for (const [keyName, keyMeta] of keyMap) {
+    const keyEntry = document.createElement("div"),
       title = document.createElement("span");
 
     title.innerText = keyMeta.label;
@@ -373,9 +383,7 @@ export function renderTimelineKey() {
     keyEntry.style.backgroundColor = keyMeta.fillColor;
     keyEntry.style.color = textColor;
     keyEntry.appendChild(title);
-    if (keyHolder) {
-      keyHolder.appendChild(keyEntry);
-    }
+    keyHolder.appendChild(keyEntry);
   }
 }
 
@@ -475,13 +483,15 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
 
   while (i < len) {
     const thisEntry = truncated[i++],
-      nextEntry = truncated[i] ?? [],
-      startTime = thisEntry[1],
-      endTime = nextEntry[1] ?? totalDuration;
-
-    if (x >= startTime * state.zoom - state.offsetX && x <= endTime * state.zoom - state.offsetX) {
+  		nextEntry = truncated[i] ?? {},
+      startTime = thisEntry.timestamp,
+      endTime = nextEntry.timestamp ?? totalDuration,
+      startX = startTime * state.zoom - state.offsetX,
+      endX = endTime * state.zoom - state.offsetX;
+  
+    if (x >= startX && x <= endX) {
       const toolTip = document.createElement("div");
-      toolTip.textContent = thisEntry[0];
+      toolTip.textContent = thisEntry.reason;
       return toolTip;
     }
   }
