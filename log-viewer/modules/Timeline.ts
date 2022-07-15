@@ -6,22 +6,22 @@ import formatDuration from "./Util";
 import { TimedNode, Method, RootNode, TimelineKey, truncated, totalDuration } from "./parsers/TreeParser";
 
 interface TimelineGroup {
-	label: string;
-	// strokeColor: string;
-	fillColor: string;
-	//textColor: string;
+  label: string;
+  // strokeColor: string;
+  fillColor: string;
+  //textColor: string;
 }
 
 interface Rect {
-	x: number;
-	y: number;
-	w: number;
+  x: number;
+  y: number;
+  w: number;
 }
 
 const scaleY = -15,
   strokeColor = "#B0B0B0",
   textColor = "#FFFFFF",
-	keyMap: Map<TimelineKey, TimelineGroup> = new Map([
+  keyMap: Map<TimelineKey, TimelineGroup> = new Map([
     ["codeUnit", {
       label: "Code Unit",
       fillColor: "#6BAD68",
@@ -234,27 +234,27 @@ const rectRenderQueue = new Map<TimelineKey, Rect[]>();
  * @param y The call depth of the node
  */
  function addToRectQueue(node: Method, y: number) {
-	const {timelineKey: tlKey, timestamp: x, duration} = node,
+  const {timelineKey: tlKey, timestamp: x, duration} = node,
     w = duration!,
    rect: Rect = {x, y, w};
-	let list = rectRenderQueue.get(tlKey);
-	if (!list) {
-		rectRenderQueue.set(tlKey, list = []);
-	}
-	list.push(rect);
+  let list = rectRenderQueue.get(tlKey);
+  if (!list) {
+    rectRenderQueue.set(tlKey, list = []);
+  }
+  list.push(rect);
 }
 
 function renderRectangles(ctx: CanvasRenderingContext2D) {
-	ctx.lineWidth = 1;
-	for (let [tlKey, items] of rectRenderQueue) {
-		const tl: TimelineGroup = keyMap.get(tlKey)!;
-		ctx.beginPath();
-		// ctx.strokeStyle = tl.strokeColor;
-		ctx.fillStyle = tl.fillColor;
-		items.forEach(drawRect);
-		ctx.fill();
-		ctx.stroke();
-	}
+  ctx.lineWidth = 1;
+  for (let [tlKey, items] of rectRenderQueue) {
+    const tl: TimelineGroup = keyMap.get(tlKey)!;
+    ctx.beginPath();
+    // ctx.strokeStyle = tl.strokeColor;
+    ctx.fillStyle = tl.fillColor;
+    items.forEach(drawRect);
+    ctx.fill();
+    ctx.stroke();
+  }
 }
 
 const drawRect = (rect: Rect) => {
@@ -281,7 +281,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
     const thisEntry = truncated[i++],
       nextEntry = truncated[i] ?? {},
       startTime = thisEntry.timestamp,
-			endTime = nextEntry.timestamp ?? totalDuration;
+      endTime = nextEntry.timestamp ?? totalDuration;
 
     ctx.fillStyle = thisEntry.color;
     const x = startTime * state.zoom - state.offsetX;
@@ -374,7 +374,7 @@ export function renderTimelineKey() {
     keyHolder.appendChild(title);
   }
 
-	for (const [keyName, keyMeta] of keyMap) {
+  for (const [keyName, keyMeta] of keyMap) {
     const keyEntry = document.createElement("div"),
       title = document.createElement("span");
 
@@ -483,7 +483,7 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
 
   while (i < len) {
     const thisEntry = truncated[i++],
-  		nextEntry = truncated[i] ?? {},
+      nextEntry = truncated[i] ?? {},
       startTime = thisEntry.timestamp,
       endTime = nextEntry.timestamp ?? totalDuration,
       startX = startTime * state.zoom - state.offsetX,
@@ -537,7 +537,7 @@ function showTooltipWithText(
  * +-TimelineView---------+		The timelineView is the positioning parent
  * | +-Tooltip-+          |		The tooltip is absolutely positioned
  * | +---------+          |
- * | +-timelineWrapper--+  |		The timelineWrapperer is staticly positioned
+ * | +-timelineWrapper--+ |		The timelineWrapperer is staticly positioned
  * | | +-Timeline-+    |  |		The timeline is statisly positioned
  * | | +----------+    |  |
  * | +-----------------+  |

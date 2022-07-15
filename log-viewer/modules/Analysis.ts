@@ -60,10 +60,10 @@ function addNodeToMap(
 }
 
 export default function analyseMethods(rootMethod: RootNode) {
-	const methodMap: Map<string, Metric> = new Map();
+  const methodMap: Map<string, Metric> = new Map();
 
   addNodeToMap(methodMap, rootMethod);
-	metricList = [...methodMap.values()];
+  metricList = [...methodMap.values()];
   return metricList; // return value for unit testing
 }
 

@@ -60,7 +60,7 @@ export class DatabaseAccess {
           break;
       }
 
-			if (child instanceof Method) {
+      if (child instanceof Method) {
         stack.push(child);
         DatabaseAccess.findDatabaseLines(log, child, stack);
         stack.pop();

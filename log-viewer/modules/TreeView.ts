@@ -149,43 +149,43 @@ function expandTreeNode(elm: HTMLElement) {
 }
 
 function describeMethod(node: Method) {
-	const methodPrefix = node.prefix || '',
-		methodSuffix = node.suffix || '';
+  const methodPrefix = node.prefix || '',
+    methodSuffix = node.suffix || '';
 
-	let desc = methodPrefix;
-	if (node.summaryCount) {
-		desc += (node.group || node.text);
-	} else {
-		desc += node.text;
-	}
-	if (node.duration && node.selfTime) {
-		if (node.value) {
-			desc += (' = ' + node.value);
-		}
-		if (node.rowCount !== null) {
-			desc += ' Rows:' + node.rowCount;
-		}
-		desc += methodSuffix + ' - ';
-		desc += node.isTruncated ? 'TRUNCATED' : formatDuration(node.duration) + ' (' + formatDuration(node.selfTime) + ')';
-		if (node.lineNumber) {
-			desc += ', line: ' + node.lineNumber;
-		}
-	}
-	if (node.containsDml || node.containsSoql || node.containsThrown) {
-		let prefix = [];
-		if (node.containsDml) {
-			prefix.push('D' + node.containsDml);
-		}
-		if (node.containsSoql) {
-			prefix.push('S' + node.containsSoql);
-		}
-		if (node.containsThrown) {
-			prefix.push('T' + node.containsThrown);
-		}
-		desc = '(' + prefix.join(',') + ') ' + desc;
-	}
+  let desc = methodPrefix;
+  if (node.summaryCount) {
+    desc += (node.group || node.text);
+  } else {
+    desc += node.text;
+  }
+  if (node.duration && node.selfTime) {
+    if (node.value) {
+      desc += (' = ' + node.value);
+    }
+    if (node.rowCount !== null) {
+      desc += ' Rows:' + node.rowCount;
+    }
+    desc += methodSuffix + ' - ';
+    desc += node.isTruncated ? 'TRUNCATED' : formatDuration(node.duration) + ' (' + formatDuration(node.selfTime) + ')';
+    if (node.lineNumber) {
+      desc += ', line: ' + node.lineNumber;
+    }
+  }
+  if (node.containsDml || node.containsSoql || node.containsThrown) {
+    let prefix = [];
+    if (node.containsDml) {
+      prefix.push('D' + node.containsDml);
+    }
+    if (node.containsSoql) {
+      prefix.push('S' + node.containsSoql);
+    }
+    if (node.containsThrown) {
+      prefix.push('T' + node.containsThrown);
+    }
+    desc = '(' + prefix.join(',') + ') ' + desc;
+  }
 
-	return desc;
+  return desc;
 }
 
 function renderBlock(line: LogLine) {
@@ -273,7 +273,7 @@ function createChildNodes(children: LogLine[], timeStamps: number[]) {
   const childContainer = divElem.cloneNode() as HTMLDivElement;
   childContainer.className = "childContainer hide";
   children.forEach(child => {
-		if (child instanceof Method) {
+    if (child instanceof Method) {
       childContainer.appendChild(renderMethod(child, timeStamps));
     } else {
       childContainer.appendChild(renderBlock(child));
@@ -436,8 +436,8 @@ function findStylesheetRule(ruleSelector: string): CSSStyleRule | null {
 
 function hideBySelector(selector: string, hide: boolean) {
   const rule = findStylesheetRule(selector);
-	if (rule) {
-		rule.style.display = hide ? 'none' : 'block';
+  if (rule) {
+    rule.style.display = hide ? 'none' : 'block';
   }
 }
 

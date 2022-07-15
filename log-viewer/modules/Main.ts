@@ -73,17 +73,17 @@ async function setStatus(name: string, path: string, status: string, color: stri
 }
 
 async function markContainers(node: TimedNode) {
-	const children = node.children,
-		len = children.length;
+  const children = node.children,
+    len = children.length;
 
-	node.containsDml = 0;
-	node.containsSoql = 0;
-	node.containsThrown = 0;
+  node.containsDml = 0;
+  node.containsSoql = 0;
+  node.containsThrown = 0;
 
-	for (let i = 0; i < len; ++i) {
-		const child = children[i];
+  for (let i = 0; i < len; ++i) {
+    const child = children[i];
 
-		if (child instanceof TimedNode) {
+    if (child instanceof TimedNode) {
       if (child.type === 'DML_BEGIN') {
         ++node.containsDml;
       }
@@ -93,12 +93,12 @@ async function markContainers(node: TimedNode) {
       if (child.type === 'EXCEPTION_THROWN') {
         ++node.containsThrown;
       }
-			markContainers(child);
-			node.containsDml += child.containsDml;
-			node.containsSoql += child.containsSoql;
-			node.containsThrown += child.containsThrown;
-		}
-	}}
+      markContainers(child);
+      node.containsDml += child.containsDml;
+      node.containsSoql += child.containsSoql;
+      node.containsThrown += child.containsThrown;
+    }
+  }}
 
 async function insertPackageWrappers(node: Method) {
   const children = node.children,
@@ -116,21 +116,21 @@ async function insertPackageWrappers(node: Method) {
         children.splice(i, 1); // remove redundant child from parent
 
         lastPkg.exitStamp = child.exitStamp;
-				lastPkg.recalculateDurations();
+        lastPkg.recalculateDurations();
         continue; // skip any more child processing (it's gone)
-			} else if (isParentDml && (childType === 'DML_BEGIN' || childType === 'SOQL_EXECUTE_BEGIN') || childType === 'EXCEPTION_THROWN') {
+      } else if (isParentDml && (childType === 'DML_BEGIN' || childType === 'SOQL_EXECUTE_BEGIN') || childType === 'EXCEPTION_THROWN') {
         // move child DML / SOQL into the last package
         children.splice(i, 1); // remove moving child from parent
         if (lastPkg.children) {
           lastPkg.children.push(child); // move child into the pkg
         }
 
-				lastPkg.containsDml = child.containsDml + ((childType === 'DML_BEGIN') ? 1 : 0);
-				lastPkg.containsSoql = child.containsSoql + ((childType === 'SOQL_EXECUTE_BEGIN') ? 1 : 0);
-				lastPkg.containsThrown = child.containsThrown + ((childType === 'EXCEPTION_THROWN') ? 1 : 0);
+        lastPkg.containsDml = child.containsDml + ((childType === 'DML_BEGIN') ? 1 : 0);
+        lastPkg.containsSoql = child.containsSoql + ((childType === 'SOQL_EXECUTE_BEGIN') ? 1 : 0);
+        lastPkg.containsThrown = child.containsThrown + ((childType === 'EXCEPTION_THROWN') ? 1 : 0);
         lastPkg.exitStamp = child.exitStamp; // move the end
-				lastPkg.recalculateDurations();
-				if (child instanceof Method) {
+        lastPkg.recalculateDurations();
+        if (child instanceof Method) {
           await insertPackageWrappers(child);
         }
         continue; // skip any more child processing (it's moved)
@@ -140,10 +140,10 @@ async function insertPackageWrappers(node: Method) {
     } else {
       ++i;
     }
-		if (child instanceof Method) {
+    if (child instanceof Method) {
       await insertPackageWrappers(child);
     }
-		lastPkg = childType === 'ENTERING_MANAGED_PKG' ? child as TimedNode : null;
+    lastPkg = childType === 'ENTERING_MANAGED_PKG' ? child as TimedNode : null;
   }
 }
 
