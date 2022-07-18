@@ -28,6 +28,21 @@
   color: red;
   margin-right: 5px;
 }
+#breadcrumb {
+	background-color: aliceblue;
+	white-space: nowrap;
+    overflow-x: auto;
+}
+.crumb {
+	display: inline-block;
+	padding: 0 5px;
+	background-color: beige;
+	border: solid 1px blue;
+	border-radius: 10px;
+	margin: 4px 2px 10px 2px;
+	white-space: nowrap;
+	font-size: 10pt;
+}
 .node {
   margin-top: 2px;
   white-space: pre;
@@ -50,6 +65,9 @@
 }
 .detail {
 	display: none;
+}
+.marked {
+	border: dashed blue 2px;
 }
 .toggle {
   cursor: pointer;

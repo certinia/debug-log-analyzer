@@ -5,7 +5,8 @@ import { LogLine, Method, Detail, RootNode, TimedNode } from "./parsers/TreePars
 import formatDuration, { showTab } from "./Util";
 import { hostService, OpenInfo } from "./services/VSCodeService";
 
-let treeRoot: RootNode;
+let treeRoot: RootNode,
+  markedNode: HTMLElement;
 const divElem = document.createElement("div");
 const spanElem = document.createElement("span");
 
@@ -192,6 +193,9 @@ function renderBlock(line: LogLine) {
   const lineNode = divElem.cloneNode() as HTMLDivElement;
     lineNode.className = line instanceof Detail && line.hideable ? 'block name detail' : 'block name';
 
+  // @ts-ignore (custom dom property)
+  lineNode.line = line;
+
   const value = line.text || "";
   let text = line.type + (value && value !== line.type ? " - " + value : "");
   text = text.replace(/ \| /g, "\n");
@@ -234,6 +238,9 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
 function renderMethod(node: Method, timeStamps: number[]) {
   const children = node.children;
   const mainNode = divElem.cloneNode() as HTMLDivElement;
+  // @ts-ignore (custom dom property)
+  mainNode.line = node;
+
   if (node.timestamp >= 0) {
     mainNode.dataset.enterstamp = "" + node.timestamp;
     mainNode.id = `calltree-${node.timestamp}`;
@@ -300,16 +307,19 @@ function renderTree() {
   }
 }
 
-function goToFile(evt: Event) {
+function goToFile(evt: MouseEvent) {
   const elem = evt.target as HTMLElement;
   const target = elem.matches("a") ? elem.parentElement?.parentElement : null;
+  showBreadcrumb(elem);
   const timeStamp = target?.dataset.enterstamp;
   if (timeStamp) {
-    const node = findByTimeStamp(treeRoot, timeStamp);
-    if (node) {
-      const fileOpenInfo = deriveOpenInfo(node);
-      if (fileOpenInfo) {
-        hostService().openType(fileOpenInfo);
+    if (!evt.metaKey && !evt.altKey) {
+      const node = findByTimeStamp(treeRoot, timeStamp);
+      if (node) {
+        const fileOpenInfo = deriveOpenInfo(node);
+        if (fileOpenInfo) {
+          hostService().openType(fileOpenInfo);
+        }
       }
     }
   }
@@ -479,6 +489,62 @@ function hideByDuration(elements: Array<HTMLElement>) {
       });
       elementsToHide.forEach(hideElm);
     }
+  }
+}
+
+// Find the parent node of "elm" (or return null if we reach the root of the tree)
+function getParentNode(elm: Element | null) {
+  if (elm === null || elm.classList.contains('root')) {
+    return null;
+  }
+
+  let parent = elm.parentElement;
+  while (parent && !parent.classList.contains('node')) {
+    parent = parent.parentElement;
+  }
+
+  return parent;
+}
+
+function insertCrumb(container: Element, node: HTMLElement) {
+  // @ts-ignore (custom dom property)
+  const line = node.line as LogLine,
+    nameNode = node.querySelector<HTMLElement>('.name') || node,
+    crumb = document.createElement('div'),
+    textElm = document.createElement('div'),
+    textNode = document.createTextNode(line.type);
+
+  crumb.classList.add('crumb');
+  crumb.title = nameNode.textContent!;
+  crumb.appendChild(textElm);
+  crumb.addEventListener('click', evt => nameNode.focus());
+  textElm.appendChild(textNode);
+  container.insertAdjacentElement('afterbegin', crumb);
+}
+
+function showBreadcrumb(nameNode: HTMLElement | null) {
+  const container = document.getElementById('breadcrumb')!;
+  // empty the container
+  while (container.firstElementChild) {
+    container.removeChild(container.firstElementChild);
+  }
+
+  if (nameNode === null) {
+    return;
+  }
+
+  if (markedNode) {
+    markedNode.classList.remove('marked');
+  }
+  nameNode.classList.add('marked');
+  markedNode = nameNode;
+
+  // @ts-ignore (custom dom property)
+  let node = nameNode.line ? nameNode : getParentNode(nameNode);
+  // @ts-ignore (custom dom property)
+  while (node && node.line !== treeRoot) {
+    insertCrumb(container, node);
+    node = getParentNode(node);
   }
 }
 
