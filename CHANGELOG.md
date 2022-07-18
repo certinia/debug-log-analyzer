@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calltree filtering to hide nodes where total duration is less than a given time ([#112][#112])
 - An EXCEPTION_THROWN marker (T) to supplement the DML_BEGIN (D) and SOQL_EXECUTE_BEGIN (S) markers on parent nodes ([#135][#135])
 - Some missing line types: DUPLICATE_DETECTION_BEGIN, DUPLICATE_DETECTION_END and DUPLICATE_DETECTION_RULE_INVOCATION ([#139][#139])
+- A bread-crumb line above the call-tree, rendered on clicking a tree node ([#142][#142])
 
 ### Changed
 
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved performance getting log file from an org when using the `Log: Load Apex Log For Analysis` command ([#123][#123])
 - More easily differentiate between "Flows" and "Process Builders" in the timeline and call tree ([#114][#114])
 - Counts on Calltree for Throw (T), DML (D) & SOQL (S) markers, which shows how many of each statement type are descendants of a node ([#135][#135])
+- Only action "view source" when clicking without keyboard modifiers (ALT & CMD) so that we can render bread-crumbs without navigation ([#142][#142])
 
 ### Fixed
 
@@ -156,3 +158,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#137]: https://github.com/financialforcedev/debug-log-analyzer/issues/137
 [#135]: https://github.com/financialforcedev/debug-log-analyzer/issues/135
 [#139]: https://github.com/financialforcedev/debug-log-analyzer/issues/139
+[#142]: https://github.com/financialforcedev/debug-log-analyzer/issues/142
