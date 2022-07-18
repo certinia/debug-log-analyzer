@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Calltree filtering to hide nodes where total duration is less than a given time ([#112][#112])
 - An EXCEPTION_THROWN marker (T) to supplement the DML_BEGIN (D) and SOQL_EXECUTE_BEGIN (S) markers on parent nodes ([#135][#135])
+- Some missing line types: DUPLICATE_DETECTION_BEGIN, DUPLICATE_DETECTION_END and DUPLICATE_DETECTION_RULE_INVOCATION ([#139][#139])
 
 ### Changed
 
@@ -154,3 +155,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#131]: https://github.com/financialforcedev/debug-log-analyzer/issues/131
 [#137]: https://github.com/financialforcedev/debug-log-analyzer/issues/137
 [#135]: https://github.com/financialforcedev/debug-log-analyzer/issues/135
+[#139]: https://github.com/financialforcedev/debug-log-analyzer/issues/139

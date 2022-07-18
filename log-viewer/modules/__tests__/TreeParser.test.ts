@@ -8,6 +8,7 @@ import parseLog, {
   parseLineNumber,
   parseRows,
   parseLine,
+  getLogSettings,
   Method,
   MethodEntryLine,
   logLines,
@@ -142,7 +143,7 @@ describe("parseLog tests", () => {
     parseLog(log);
 
     expect(truncated.length).toBe(1);
-    expect(truncated[0][0]).toBe("Skipped-Lines");
+		expect(truncated[0].reason).toBe('Skipped-Lines');
   });
 
   it("Should detect truncated logs", async () => {
@@ -155,7 +156,7 @@ describe("parseLog tests", () => {
     parseLog(log);
 
     expect(truncated.length).toBe(1);
-    expect(truncated[0][0]).toBe("Max-Size-reached");
+    expect(truncated[0].reason).toBe("Max-Size-reached");
   });
 
   it("Should detect exceptions", async () => {
@@ -168,7 +169,7 @@ describe("parseLog tests", () => {
     parseLog(log);
 
     expect(truncated.length).toBe(1);
-    expect(truncated[0][0]).toBe(
+    expect(truncated[0].reason).toBe(
       "System.LimitException: c2g:Too many SOQL queries: 101"
     );
   });
@@ -182,7 +183,7 @@ describe("parseLog tests", () => {
     parseLog(log);
 
     expect(truncated.length).toBe(1);
-    expect(truncated[0][0]).toBe(
+    expect(truncated[0].reason).toBe(
       "FATAL ERROR! cause=System.LimitException: c2g:Too many SOQL queries: 101"
     );
   });
@@ -234,9 +235,34 @@ describe("parseLog tests", () => {
   });
 });
 
+describe("Log Settings tests", () => {
+  const log =
+    "43.0 APEX_CODE,FINE;APEX_PROFILING,NONE;CALLOUT,NONE;DB,INFO;NBA,NONE;SYSTEM,NONE;VALIDATION,INFO;VISUALFORCE,NONE;WAVE,NONE;WORKFLOW,INFO\n" +
+    "09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|partner.nisar.ahmed@philips.com.m2odryrun1|Greenwich Mean Time|GMTZ\n" +
+    "09:18:22.6 (6574780)|EXECUTION_STARTED";
+
+  it("The settings should be found", () => {
+    expect(getLogSettings(log)).not.toBe(null);
+  });
+  it("The settings should be as expected", () => {
+    expect(getLogSettings(log)).toEqual([
+			{key: 'APEX_CODE', level: 'FINE'},
+			{key: 'APEX_PROFILING', level: 'NONE'},
+			{key: 'CALLOUT', level: 'NONE'},
+			{key: 'DB', level: 'INFO'},
+			{key: 'NBA', level: 'NONE'},
+			{key: 'SYSTEM', level: 'NONE'},
+			{key: 'VALIDATION', level: 'INFO'},
+			{key: 'VISUALFORCE', level: 'NONE'},
+			{key: 'WAVE', level: 'NONE'},
+			{key: 'WORKFLOW', level: 'INFO'}
+    ]);
+  });
+});
+
 describe('Recalculate durations tests', () => {
 	it('Recalculates parent node', () => {
-		const node = new Method(['14:32:07.563 (1)', 'DUMMY'], [], null, 'dummy', '');
+		const node = new Method(['14:32:07.563 (1)', 'DUMMY'], [], null, 'method', '');
 		node.exitStamp = 3;
 
 		node.recalculateDurations();
@@ -244,9 +270,9 @@ describe('Recalculate durations tests', () => {
 		expect(node.selfTime).toBe(2);
 	});
 	it('Children are subtracted from net duration', () => {
-		const node = new Method(['14:32:07.563 (0)', 'DUMMY'], [], null, 'dummy', ''),
-			child1 = new Method(['14:32:07.563 (10)', 'DUMMY'], [], null, 'dummy', ''),
-			child2 = new Method(['14:32:07.563 (70)', 'DUMMY'], [], null, 'dummy', '');
+		const node = new Method(['14:32:07.563 (0)', 'DUMMY'], [], null, 'method', ''),
+			child1 = new Method(['14:32:07.563 (10)', 'DUMMY'], [], null, 'method', ''),
+			child2 = new Method(['14:32:07.563 (70)', 'DUMMY'], [], null, 'method', '');
 		node.exitStamp = 100;
 		child1.duration = 50;
 		child2.duration = 25;

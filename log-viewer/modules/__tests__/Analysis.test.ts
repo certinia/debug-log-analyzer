@@ -5,8 +5,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import analyseMethods, { Metric } from "../Analysis";
-import parseLog from "../parsers/TreeParser";
-import { getRootMethod } from "../parsers/TreeParser";
+import parseLog, { getRootMethod } from "../parsers/TreeParser";
 
 describe("Analyse methods tests", () => {
   it("Nodes should use group as key", async () => {
@@ -19,7 +18,7 @@ describe("Analyse methods tests", () => {
       "09:19:13.82 (51595120059)|EXECUTION_FINISHED\n";
 
     await parseLog(log);
-    const metricList = await analyseMethods(getRootMethod());
+    const metricList = analyseMethods(getRootMethod());
 
     expect(metricList).toEqual([
       new Metric("EXECUTION_STARTED", 1, 51588545279, 2394092),

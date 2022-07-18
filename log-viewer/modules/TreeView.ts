@@ -8,7 +8,6 @@ import { hostService, OpenInfo } from "./services/VSCodeService";
 let treeRoot: RootNode;
 const divElem = document.createElement("div");
 const spanElem = document.createElement("span");
-const linkElem = document.createElement("a");
 
 function onExpandCollapse(evt: Event) {
   const input = evt.target as HTMLElement;
@@ -20,10 +19,12 @@ function onExpandCollapse(evt: Event) {
     const timestamp = pe?.dataset.enterstamp;
     if (!childContainer && timestamp) {
       const node = findByTimeStamp(treeRoot, timestamp);
-      const childLen = node?.children.length || 0;
-      childContainer = node && childLen ? createChildNodes(node.children, [node.timestamp]) : null;
-      if (childContainer) {
-        pe.appendChild(childContainer);
+      if (node instanceof TimedNode) {
+        const childLen = node.children.length;
+        childContainer = childLen ? createChildNodes(node.children, [node.timestamp]) : null;
+        if (childContainer) {
+          pe.appendChild(childContainer);
+        }
       }
 
       showHideDetails();
@@ -90,11 +91,9 @@ function renderCallStack(timestamp: number) {
       }
     }) as number[];
 
-    if (nodeToStartAt?.children.length && nodeToAttachTo) {
+    if (nodeToStartAt instanceof TimedNode && nodeToStartAt.children.length && nodeToAttachTo) {
       const childContainer = createChildNodes(nodeToStartAt.children, timeStamps);
-      if (childContainer) {
-        nodeToAttachTo.appendChild(childContainer);
-      }
+      nodeToAttachTo.appendChild(childContainer);
 
       methodElm = document.querySelector(`div[data-enterstamp="${timestamp}"]`) as HTMLElement;
     }
@@ -102,7 +101,7 @@ function renderCallStack(timestamp: number) {
   return methodElm;
 }
 
-function findCallstack(node: LogLine, timeStamp: number): LogLine[] | null {
+function findCallstack(node: TimedNode, timeStamp: number): LogLine[] | null {
   if (node.timestamp === timeStamp) {
     return [node];
   }
@@ -110,10 +109,12 @@ function findCallstack(node: LogLine, timeStamp: number): LogLine[] | null {
   const len = node.children.length;
   for (let i = 0; i < len; i++) {
     const child = node.children[i];
-    const timeStamps = findCallstack(child, timeStamp);
-    if (timeStamps) {
-      timeStamps.unshift(child);
-      return timeStamps;
+    if (child instanceof TimedNode) {
+      const timeStamps = findCallstack(child, timeStamp);
+      if (timeStamps) {
+        timeStamps.unshift(child);
+        return timeStamps;
+      }
     }
   }
   return null;
@@ -148,43 +149,43 @@ function expandTreeNode(elm: HTMLElement) {
 }
 
 function describeMethod(node: Method) {
-	const methodPrefix = node.prefix || '',
-		methodSuffix = node.suffix || '';
+  const methodPrefix = node.prefix || '',
+    methodSuffix = node.suffix || '';
 
-	let desc = methodPrefix;
-	if (node.summaryCount) {
-		desc += (node.group || node.text);
-	} else {
-		desc += node.text;
-	}
-	if (node.duration && node.selfTime) {
-		if (node.value) {
-			desc += (' = ' + node.value);
-		}
-		if (node.rowCount !== null) {
-			desc += ' Rows:' + node.rowCount;
-		}
-		desc += methodSuffix + ' - ';
-		desc += node.isTruncated ? 'TRUNCATED' : formatDuration(node.duration) + ' (' + formatDuration(node.selfTime) + ')';
-		if (node.lineNumber) {
-			desc += ', line: ' + node.lineNumber;
-		}
-	}
-	if (node.containsDml || node.containsSoql || node.containsThrown) {
-		let prefix = [];
-		if (node.containsDml) {
-			prefix.push('D' + node.containsDml);
-		}
-		if (node.containsSoql) {
-			prefix.push('S' + node.containsSoql);
-		}
-		if (node.containsThrown) {
-			prefix.push('T' + node.containsThrown);
-		}
-		desc = '(' + prefix.join(',') + ') ' + desc;
-	}
+  let desc = methodPrefix;
+  if (node.summaryCount) {
+    desc += (node.group || node.text);
+  } else {
+    desc += node.text;
+  }
+  if (node.duration && node.selfTime) {
+    if (node.value) {
+      desc += (' = ' + node.value);
+    }
+    if (node.rowCount !== null) {
+      desc += ' Rows:' + node.rowCount;
+    }
+    desc += methodSuffix + ' - ';
+    desc += node.isTruncated ? 'TRUNCATED' : formatDuration(node.duration) + ' (' + formatDuration(node.selfTime) + ')';
+    if (node.lineNumber) {
+      desc += ', line: ' + node.lineNumber;
+    }
+  }
+  if (node.containsDml || node.containsSoql || node.containsThrown) {
+    let prefix = [];
+    if (node.containsDml) {
+      prefix.push('D' + node.containsDml);
+    }
+    if (node.containsSoql) {
+      prefix.push('S' + node.containsSoql);
+    }
+    if (node.containsThrown) {
+      prefix.push('T' + node.containsThrown);
+    }
+    desc = '(' + prefix.join(',') + ') ' + desc;
+  }
 
-	return desc;
+  return desc;
 }
 
 function renderBlock(line: LogLine) {
@@ -272,7 +273,7 @@ function createChildNodes(children: LogLine[], timeStamps: number[]) {
   const childContainer = divElem.cloneNode() as HTMLDivElement;
   childContainer.className = "childContainer hide";
   children.forEach(child => {
-		if (child instanceof Method) {
+    if (child instanceof Method) {
       childContainer.appendChild(renderMethod(child, timeStamps));
     } else {
       childContainer.appendChild(renderBlock(child));
@@ -369,7 +370,7 @@ function renderLowest(elm: HTMLElement) {
   if (toggle && !childContainer && elm.dataset.enterstamp) {
     const node = findByTimeStamp(treeRoot, elm.dataset.enterstamp || "");
 
-    if (node?.children.length) {
+    if (node instanceof TimedNode && node.children.length) {
       const childContainer = createChildNodes(node.children, [-1]);
       elm.appendChild(childContainer);
     }
@@ -435,8 +436,8 @@ function findStylesheetRule(ruleSelector: string): CSSStyleRule | null {
 
 function hideBySelector(selector: string, hide: boolean) {
   const rule = findStylesheetRule(selector);
-	if (rule) {
-		rule.style.display = hide ? 'none' : 'block';
+  if (rule) {
+    rule.style.display = hide ? 'none' : 'block';
   }
 }
 
