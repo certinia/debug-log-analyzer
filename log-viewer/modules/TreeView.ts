@@ -293,11 +293,11 @@ function renderTree() {
   const treeContainer = document.getElementById("tree") as HTMLElement;
   if (treeContainer) {
     treeContainer.addEventListener("click", onExpandCollapse);
-    treeContainer.addEventListener("click", goToFile);
 
     const callTreeNode = renderMethod(treeRoot, [0]);
     treeContainer.innerHTML = "";
     if (callTreeNode) {
+      callTreeNode.addEventListener("click", goToFile);
       treeContainer.appendChild(callTreeNode);
       const spacer = divElem.cloneNode() as HTMLDivElement;
       spacer.style.height = `78vh`;
@@ -528,13 +528,13 @@ function showBreadcrumb(nameNode: HTMLElement | null) {
   while (container.firstElementChild) {
     container.removeChild(container.firstElementChild);
   }
+  // remove old marker
+  if (markedNode) {
+    markedNode.classList.remove('marked');
+  }
 
   if (nameNode === null) {
     return;
-  }
-
-  if (markedNode) {
-    markedNode.classList.remove('marked');
   }
   nameNode.classList.add('marked');
   markedNode = nameNode;
