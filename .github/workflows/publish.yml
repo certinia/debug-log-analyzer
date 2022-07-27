@@ -28,4 +28,4 @@ jobs:
         run: |
           cd lana
           vsce publish -p ${{ secrets.VSCE_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
-          npx ovsx publish lana-${{ github.event.release.tag_name }}.vsix -p ${{ secrets.OVSX_TOKEN }}
+          ovsx publish lana-${{ github.event.release.tag_name }}.vsix -p ${{ secrets.OVSX_TOKEN }}
