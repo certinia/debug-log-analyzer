@@ -2,6 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import parseLog, {
+  getRootMethod,
   parseObjectNamespace,
   parseVfNamespace,
   parseTimestamp,
@@ -18,6 +19,7 @@ import parseLog, {
   cpuUsed,
   ExecutionStartedLine,
   ExecutionFinishedLine,
+  TimedNode,
 } from "../parsers/TreeParser";
 
 describe("parseObjectNamespace tests", () => {
@@ -25,9 +27,7 @@ describe("parseObjectNamespace tests", () => {
     expect(parseObjectNamespace("Account")).toEqual("unmanaged");
   });
   it("Should accept properly formatted namespaces", () => {
-    expect(parseObjectNamespace("key001__Upsell_Contract__e")).toEqual(
-      "key001"
-    );
+    expect(parseObjectNamespace("key001__Upsell_Contract__e")).toEqual("key001");
   });
 });
 
@@ -143,7 +143,7 @@ describe("parseLog tests", () => {
     parseLog(log);
 
     expect(truncated.length).toBe(1);
-		expect(truncated[0].reason).toBe('Skipped-Lines');
+    expect(truncated[0].reason).toBe("Skipped-Lines");
   });
 
   it("Should detect truncated logs", async () => {
@@ -169,9 +169,7 @@ describe("parseLog tests", () => {
     parseLog(log);
 
     expect(truncated.length).toBe(1);
-    expect(truncated[0].reason).toBe(
-      "System.LimitException: c2g:Too many SOQL queries: 101"
-    );
+    expect(truncated[0].reason).toBe("System.LimitException: c2g:Too many SOQL queries: 101");
   });
   it("Should detect fatal errors", async () => {
     const log =
@@ -235,6 +233,143 @@ describe("parseLog tests", () => {
   });
 });
 
+describe("getRootMethod tests", () => {
+  it("FlowStartInterviewsBeginLine should be a process builder", async () => {
+    const log =
+      "17:52:34.317 (1350000000)|EXECUTION_STARTED\n" +
+      "17:52:35.317 (1363038330)|CODE_UNIT_STARTED|[EXTERNAL]|Workflow:01Id0000000roIX\n" +
+      "17:52:35.370 (1370636436)|FLOW_START_INTERVIEWS_BEGIN|1\n" +
+      "17:52:35.370 (1370676724)|FLOW_START_INTERVIEW_BEGIN|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|Example Process Builder\n" +
+      "17:52:35.370 (1377009430)|FLOW_START_INTERVIEW_END|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|Example Process Builder\n" +
+      "17:52:35.370 (1497348059)|FLOW_START_INTERVIEWS_END|1\n" +
+      "17:52:35.317 (1499617717)|CODE_UNIT_FINISHED|Workflow:01Id0000000roIX\n" +
+      "17:52:36.317 (1500000000)|EXECUTION_FINISHED\n";
+
+    parseLog(log);
+    const rootMethod = getRootMethod();
+
+    const timedLogLines = rootMethod.children as TimedNode[];
+    expect(timedLogLines.length).toBe(1);
+    const startLine = timedLogLines[0];
+    expect(startLine.type).toBe("EXECUTION_STARTED");
+
+    expect(startLine.children.length).toBe(1);
+    const unitStart = startLine.children[0] as TimedNode;
+    expect(unitStart.type).toBe("CODE_UNIT_STARTED");
+    expect(unitStart.group).toBe("Workflow");
+
+    expect(unitStart.children.length).toBe(1);
+    const interViewsBegin = unitStart.children[0] as TimedNode;
+    expect(interViewsBegin.type).toBe("FLOW_START_INTERVIEWS_BEGIN");
+    expect(interViewsBegin.text).toBe("FLOW_START_INTERVIEWS : Example Process Builder");
+    expect(interViewsBegin.group).toBe("Process Builder");
+    expect(interViewsBegin.suffix).toBe(" (Process Builder)");
+
+    expect(interViewsBegin.children.length).toBe(2);
+    const interViewBegin = interViewsBegin.children[0];
+    expect(interViewBegin.type).toBe("FLOW_START_INTERVIEW_BEGIN");
+
+    const interViewEnd = interViewsBegin.children[1];
+    expect(interViewEnd.type).toBe("FLOW_START_INTERVIEW_END");
+  });
+
+  it("FlowStartInterviewsBeginLine should be a flow ", async () => {
+    const log =
+      "17:52:34.317 (1350000000)|EXECUTION_STARTED\n" +
+      "17:52:35.317 (1363038330)|CODE_UNIT_STARTED|[EXTERNAL]|Flow:01Id0000000roIX\n" +
+      "17:52:35.370 (1370636436)|FLOW_START_INTERVIEWS_BEGIN|1\n" +
+      "17:52:35.370 (1370676724)|FLOW_START_INTERVIEW_BEGIN|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|Example Flow\n" +
+      "17:52:35.370 (1377009430)|FLOW_START_INTERVIEW_END|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|Example Flow\n" +
+      "17:52:35.370 (1497348059)|FLOW_START_INTERVIEWS_END|1\n" +
+      "17:52:35.317 (1499617717)|CODE_UNIT_FINISHED|Flow:01Id0000000roIX\n" +
+      "17:52:36.317 (1500000000)|EXECUTION_FINISHED\n";
+
+    parseLog(log);
+    const rootMethod = getRootMethod();
+
+    const timedLogLines = rootMethod.children as TimedNode[];
+    expect(timedLogLines.length).toBe(1);
+    const startLine = timedLogLines[0];
+    expect(startLine.type).toBe("EXECUTION_STARTED");
+
+    expect(startLine.children.length).toBe(1);
+    const unitStart = startLine.children[0] as TimedNode;
+    expect(unitStart.type).toBe("CODE_UNIT_STARTED");
+    expect(unitStart.group).toBe("Flow");
+
+    expect(unitStart.children.length).toBe(1);
+    const interViewsBegin = unitStart.children[0] as TimedNode;
+    expect(interViewsBegin.type).toBe("FLOW_START_INTERVIEWS_BEGIN");
+    expect(interViewsBegin.text).toBe("FLOW_START_INTERVIEWS : Example Flow");
+    expect(interViewsBegin.group).toBe("Flow");
+    expect(interViewsBegin.suffix).toBe(" (Flow)");
+
+    expect(interViewsBegin.children.length).toBe(2);
+    const interViewBegin = interViewsBegin.children[0];
+    expect(interViewBegin.type).toBe("FLOW_START_INTERVIEW_BEGIN");
+
+    const interViewEnd = interViewsBegin.children[1];
+    expect(interViewEnd.type).toBe("FLOW_START_INTERVIEW_END");
+  });
+
+  it("FlowStartInterviewsBeginLine should be a flow called from a process builder", async () => {
+    const log =
+      "17:52:34.317 (1350000000)|EXECUTION_STARTED\n" +
+      "17:52:35.317 (1363038330)|CODE_UNIT_STARTED|[EXTERNAL]|Workflow:01Id0000000roIX\n" +
+      "17:52:35.370 (1363038331)|FLOW_START_INTERVIEWS_BEGIN|1\n" +
+      "17:52:35.370 (1363038332)|FLOW_START_INTERVIEW_BEGIN|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|Example Process Builder\n" +
+      "17:52:35.370 (1363038333)|FLOW_START_INTERVIEWS_BEGIN|1\n" +
+      "17:52:35.370 (1363038334)|FLOW_START_INTERVIEW_BEGIN|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|Example Flow\n" +
+      "17:52:35.370 (1363038335)|FLOW_START_INTERVIEW_END|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|Example Flow\n" +
+      "17:52:35.370 (1363038336)|FLOW_START_INTERVIEWS_END|1\n" +
+      "17:52:35.370 (1363038337)|FLOW_START_INTERVIEW_END|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|Example Process Builder\n" +
+      "17:52:35.370 (1363038338)|FLOW_START_INTERVIEWS_END|1\n" +
+      "17:52:35.317 (1363038339)|CODE_UNIT_FINISHED|Workflow:01Id0000000roIX\n" +
+      "17:52:36.317 (1500000000)|EXECUTION_FINISHED\n";
+
+    parseLog(log);
+    const rootMethod = getRootMethod();
+
+    const timedLogLines = rootMethod.children as TimedNode[];
+    expect(timedLogLines.length).toBe(1);
+    const startLine = timedLogLines[0];
+    expect(startLine.type).toBe("EXECUTION_STARTED");
+
+    expect(startLine.children.length).toBe(1);
+    const unitStart = startLine.children[0] as TimedNode;
+    expect(unitStart.type).toBe("CODE_UNIT_STARTED");
+    expect(unitStart.group).toBe("Workflow");
+
+    expect(unitStart.children.length).toBe(1);
+    const pbBegin = unitStart.children[0] as TimedNode;
+    expect(pbBegin.type).toBe("FLOW_START_INTERVIEWS_BEGIN");
+    expect(pbBegin.text).toBe("FLOW_START_INTERVIEWS : Example Process Builder");
+    expect(pbBegin.group).toBe("Process Builder");
+    expect(pbBegin.suffix).toBe(" (Process Builder)");
+
+    expect(pbBegin.children.length).toBe(3);
+    const pbDetail = pbBegin.children[0] as TimedNode;
+    expect(pbDetail.type).toBe("FLOW_START_INTERVIEW_BEGIN");
+    expect(pbDetail.text).toBe("Example Process Builder");
+
+    const interViewsBegin = pbBegin.children[1] as TimedNode;
+    expect(interViewsBegin.type).toBe("FLOW_START_INTERVIEWS_BEGIN");
+    expect(interViewsBegin.text).toBe("FLOW_START_INTERVIEWS : Example Flow");
+    expect(interViewsBegin.group).toBe("Flow");
+    expect(interViewsBegin.suffix).toBe(" (Flow)");
+
+    const pbDetailEnd = pbBegin.children[2] as TimedNode;
+    expect(pbDetailEnd.type).toBe("FLOW_START_INTERVIEW_END");
+
+    expect(interViewsBegin.children.length).toBe(2);
+    const interViewBegin = interViewsBegin.children[0];
+    expect(interViewBegin.type).toBe("FLOW_START_INTERVIEW_BEGIN");
+
+    const interViewEnd = interViewsBegin.children[1];
+    expect(interViewEnd.type).toBe("FLOW_START_INTERVIEW_END");
+  });
+});
+
 describe("Log Settings tests", () => {
   const log =
     "43.0 APEX_CODE,FINE;APEX_PROFILING,NONE;CALLOUT,NONE;DB,INFO;NBA,NONE;SYSTEM,NONE;VALIDATION,INFO;VISUALFORCE,NONE;WAVE,NONE;WORKFLOW,INFO\n" +
@@ -246,33 +381,33 @@ describe("Log Settings tests", () => {
   });
   it("The settings should be as expected", () => {
     expect(getLogSettings(log)).toEqual([
-			{key: 'APEX_CODE', level: 'FINE'},
-			{key: 'APEX_PROFILING', level: 'NONE'},
-			{key: 'CALLOUT', level: 'NONE'},
-			{key: 'DB', level: 'INFO'},
-			{key: 'NBA', level: 'NONE'},
-			{key: 'SYSTEM', level: 'NONE'},
-			{key: 'VALIDATION', level: 'INFO'},
-			{key: 'VISUALFORCE', level: 'NONE'},
-			{key: 'WAVE', level: 'NONE'},
-			{key: 'WORKFLOW', level: 'INFO'}
+      { key: "APEX_CODE", level: "FINE" },
+      { key: "APEX_PROFILING", level: "NONE" },
+      { key: "CALLOUT", level: "NONE" },
+      { key: "DB", level: "INFO" },
+      { key: "NBA", level: "NONE" },
+      { key: "SYSTEM", level: "NONE" },
+      { key: "VALIDATION", level: "INFO" },
+      { key: "VISUALFORCE", level: "NONE" },
+      { key: "WAVE", level: "NONE" },
+      { key: "WORKFLOW", level: "INFO" },
     ]);
   });
 });
 
-describe('Recalculate durations tests', () => {
-	it('Recalculates parent node', () => {
-		const node = new Method(['14:32:07.563 (1)', 'DUMMY'], [], null, 'method', '');
+describe("Recalculate durations tests", () => {
+  it("Recalculates parent node", () => {
+    const node = new Method(["14:32:07.563 (1)", "DUMMY"], [], null, "method", "");
 		node.exitStamp = 3;
 
 		node.recalculateDurations();
 		expect(node.duration).toBe(2);
 		expect(node.selfTime).toBe(2);
 	});
-	it('Children are subtracted from net duration', () => {
-		const node = new Method(['14:32:07.563 (0)', 'DUMMY'], [], null, 'method', ''),
-			child1 = new Method(['14:32:07.563 (10)', 'DUMMY'], [], null, 'method', ''),
-			child2 = new Method(['14:32:07.563 (70)', 'DUMMY'], [], null, 'method', '');
+  it("Children are subtracted from net duration", () => {
+    const node = new Method(["14:32:07.563 (0)", "DUMMY"], [], null, "method", ""),
+      child1 = new Method(["14:32:07.563 (10)", "DUMMY"], [], null, "method", ""),
+      child2 = new Method(["14:32:07.563 (70)", "DUMMY"], [], null, "method", "");
 		node.exitStamp = 100;
 		child1.duration = 50;
 		child2.duration = 25;
