@@ -1201,6 +1201,7 @@ class FlowElementDeferredLine extends Detail {
 
 class FlowElementAssignmentLine extends Detail {
   declarative = true;
+  acceptsText = true;
 
   constructor(parts: string[]) {
     super(parts);

@@ -231,6 +231,22 @@ describe("parseLog tests", () => {
     expect(logLines[2].type).toBe("LIMIT_USAGE_FOR_NS");
     expect(cpuUsed).toBe(4564000000);
   });
+  it("Flow Value Assignemnt can handle multiple lines", async () => {
+    const log =
+      "09:18:22.6 (6574780)|EXECUTION_STARTED\n" +
+      "09:18:22.670 (1372614277)|FLOW_VALUE_ASSIGNMENT|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|myVariable_old|{Id=a6U6T000001DypKUAS, OwnerId=005d0000003141tAAA, IsDeleted=false, Name=TR-001752, CurrencyIsoCode=USD, RecordTypeId=012d0000000T5CLAA0, CreatedDate=2022-05-06 11:40:47, CreatedById=005d0000003141tAAA, LastModifiedDate=2022-05-06 11:40:47, LastModifiedById=005d0000003141tAAA, SystemModstamp=2022-05-06 11:40:47, LastViewedDate=null, LastReferencedDate=null, SCMC__Carrier_Service__c=null, SCMC__Carrier__c=null, SCMC__Destination_Location__c=null, SCMC__Destination_Ownership__c=null, SCMC__Destination_Warehouse__c=a6Y6T000001Ib9ZUAS, SCMC__Notes__c=TVPs To Amazon Europe Spain, SCMC__Override_Ship_To_Address__c=null, SCMC__Pickup_Address__c=null, SCMC__Pickup_Required__c=false, SCMC__Reason_Code__c=a5i0W000001Ydw3QAC, SCMC__Requested_Delivery_Date__c=null, SCMC__Revision__c=0, SCMC__Ship_To_City__c=null, SCMC__Ship_To_Country__c=null, SCMC__Ship_To_Line_1__c=null, SCMC__Ship_To_Line_2__c=null, SCMC__Ship_To_Name__c=null, SCMC__Ship_To_State_Province__c=null, SCMC__Ship_To_Zip_Postal_Code__c=null, SCMC__Shipment_Date__c=null, SCMC__Shipment_Required__c=true, SCMC__Shipment_Status__c=Open, SCMC__Source_Location__c=null, SCMC__Source_Ownership__c=null, SCMC__Source_Warehouse__c=a6Y6T000001IS9fUAG, SCMC__Status__c=New, SCMC__Tracking_Number__c=null, SCMC__Number_Of_Transfer_Lines__c=0, Created_Date__c=2022-05-06 11:40:47, Shipment_Instructions__c=1Z V8F 767 681769 7682\n" +
+      "1Z V8F 767 68 3968 7204\n" +
+      "1Z VSF 767 68 0562 3292}\n" +
+      "09:19:13.82 (51595120059)|EXECUTION_FINISHED";
+
+    parseLog(log);
+    expect(logLines.length).toBe(3);
+    expect(logLines[1].type).toBe("FLOW_VALUE_ASSIGNMENT");
+    expect(logLines[1].text).toBe(
+      "myVariable_old {Id=a6U6T000001DypKUAS, OwnerId=005d0000003141tAAA, IsDeleted=false, Name=TR-001752, CurrencyIsoCode=USD, RecordTypeId=012d0000000T5CLAA0, CreatedDate=2022-05-06 11:40:47, CreatedById=005d0000003141tAAA, LastModifiedDate=2022-05-06 11:40:47, LastModifiedById=005d0000003141tAAA, SystemModstamp=2022-05-06 11:40:47, LastViewedDate=null, LastReferencedDate=null, SCMC__Carrier_Service__c=null, SCMC__Carrier__c=null, SCMC__Destination_Location__c=null, SCMC__Destination_Ownership__c=null, SCMC__Destination_Warehouse__c=a6Y6T000001Ib9ZUAS, SCMC__Notes__c=TVPs To Amazon Europe Spain, SCMC__Override_Ship_To_Address__c=null, SCMC__Pickup_Address__c=null, SCMC__Pickup_Required__c=false, SCMC__Reason_Code__c=a5i0W000001Ydw3QAC, SCMC__Requested_Delivery_Date__c=null, SCMC__Revision__c=0, SCMC__Ship_To_City__c=null, SCMC__Ship_To_Country__c=null, SCMC__Ship_To_Line_1__c=null, SCMC__Ship_To_Line_2__c=null, SCMC__Ship_To_Name__c=null, SCMC__Ship_To_State_Province__c=null, SCMC__Ship_To_Zip_Postal_Code__c=null, SCMC__Shipment_Date__c=null, SCMC__Shipment_Required__c=true, SCMC__Shipment_Status__c=Open, SCMC__Source_Location__c=null, SCMC__Source_Ownership__c=null, SCMC__Source_Warehouse__c=a6Y6T000001IS9fUAG, SCMC__Status__c=New, SCMC__Tracking_Number__c=null, SCMC__Number_Of_Transfer_Lines__c=0, Created_Date__c=2022-05-06 11:40:47, Shipment_Instructions__c=1Z V8F 767 681769 7682 | 1Z V8F 767 68 3968 7204 | 1Z VSF 767 68 0562 3292}"
+    );
+    expect(cpuUsed).toBe(0);
+  });
 });
 
 describe("getRootMethod tests", () => {
@@ -398,23 +414,23 @@ describe("Log Settings tests", () => {
 describe("Recalculate durations tests", () => {
   it("Recalculates parent node", () => {
     const node = new Method(["14:32:07.563 (1)", "DUMMY"], [], null, "method", "");
-		node.exitStamp = 3;
+    node.exitStamp = 3;
 
-		node.recalculateDurations();
-		expect(node.duration).toBe(2);
-		expect(node.selfTime).toBe(2);
-	});
+    node.recalculateDurations();
+    expect(node.duration).toBe(2);
+    expect(node.selfTime).toBe(2);
+  });
   it("Children are subtracted from net duration", () => {
     const node = new Method(["14:32:07.563 (0)", "DUMMY"], [], null, "method", ""),
       child1 = new Method(["14:32:07.563 (10)", "DUMMY"], [], null, "method", ""),
       child2 = new Method(["14:32:07.563 (70)", "DUMMY"], [], null, "method", "");
-		node.exitStamp = 100;
-		child1.duration = 50;
-		child2.duration = 25;
-		node.addChild(child1);
-		node.addChild(child2);
-		node.recalculateDurations();
-		expect(node.duration).toBe(100);
-		expect(node.selfTime).toBe(25);
-	});
+    node.exitStamp = 100;
+    child1.duration = 50;
+    child2.duration = 25;
+    node.addChild(child1);
+    node.addChild(child2);
+    node.recalculateDurations();
+    expect(node.duration).toBe(100);
+    expect(node.selfTime).toBe(25);
+  });
 });
