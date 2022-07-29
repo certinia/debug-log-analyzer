@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: "16"
       - name: Install vsce
-        run: npm install --global vsce
+        run: npm install --global vsce ovsx
       - name: Dependencies
         run: |
           cd lana
@@ -24,7 +24,8 @@ jobs:
         run: |
           cd lana
           vsce package
-      - name: Publish to Marketplace
+      - name: Publish to VS Code Marketplace + Open VSX Registry
         run: |
           cd lana
           vsce publish -p ${{ secrets.VSCE_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
+          ovsx publish lana-${{ github.event.release.tag_name }}.vsix -p ${{ secrets.OVSX_TOKEN }}

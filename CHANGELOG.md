@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved performance getting log file from an org when using the `Log: Load Apex Log For Analysis` command ([#123][#123])
 - More easily differentiate between "Flows" and "Process Builders" in the timeline and call tree ([#114][#114])
 - Counts on Calltree for Throw (T), DML (D) & SOQL (S) markers, which shows how many of each statement type are descendants of a node ([#135][#135])
+- Apex Log Analyzer to be published to the Open VSX Registry as well as the VSCode Marketplace ([#23][#23])
 
 ### Fixed
 
@@ -156,3 +157,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#137]: https://github.com/financialforcedev/debug-log-analyzer/issues/137
 [#135]: https://github.com/financialforcedev/debug-log-analyzer/issues/135
 [#139]: https://github.com/financialforcedev/debug-log-analyzer/issues/139
+[#23]: https://github.com/financialforcedev/debug-log-analyzer/issues/23
