@@ -86,9 +86,6 @@ export abstract class LogLine {
   discontinuity: boolean = false; // does this line cause a discontinuity in the call stack?
   rowCount: number | null = null; // the number of rows in a database operation
 
-  // derived information
-  summaryCount: number = 0; // the number of nodes collapsed into this entry
-
   constructor(parts: string[] | null) {
     if (parts) {
       this.type = parts[1];
@@ -207,7 +204,6 @@ export class Method extends TimedNode {
       stack.push(this);
 
       while ((line = lineIter.peek())) {
-        // eslint-disable-line no-cond-assign
         if (line.discontinuity) {
           // discontinuities are stack unwinding (caused by Exceptions)
           discontinuity = true; // start unwinding stack
@@ -229,7 +225,7 @@ export class Method extends TimedNode {
         this.addChild(line);
       }
 
-      if (line == null) {
+      if (!line) {
         // truncated method - terminate at the end of the log
         this.exitStamp = lastTimestamp;
 
@@ -2120,7 +2116,6 @@ export function getRootMethod() {
 
   lastTimestamp = null;
   while ((line = lineIter.fetch())) {
-    // eslint-disable-line no-cond-assign
     line.loadContent(lineIter, stack);
     rootMethod.addChild(line);
   }
