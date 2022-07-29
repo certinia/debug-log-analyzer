@@ -26,8 +26,7 @@ export class LogFileException extends Error {
 }
 
 export class LogView {
-  private static HELP_URL =
-    "https://financialforcedev.github.io/debug-log-analyzer/";
+  private static helpUrl = "https://financialforcedev.github.io/debug-log-analyzer/";
 
   static async createView(
     wsPath: string,
@@ -56,21 +55,13 @@ export class LogView {
               if (parts.length > 1) {
                 line = parseInt(parts[1]);
               }
-              OpenFileInPackage.openFileForSymbol(
-                wsPath,
-                context,
-                parts[0],
-                line
-              );
+              OpenFileInPackage.openFileForSymbol(wsPath, context, parts[0], line);
             }
             break;
           }
 
           case "openHelp": {
-            vscode.commands.executeCommand(
-              "vscode.open",
-              vscode.Uri.parse(this.HELP_URL)
-            );
+            vscode.commands.executeCommand("vscode.open", vscode.Uri.parse(this.helpUrl));
             break;
           }
 
@@ -96,12 +87,7 @@ export class LogView {
     logName: string,
     logPath: string
   ): Promise<WebviewPanel> {
-    view.webview.html = await LogView.getViewContent(
-      view,
-      context,
-      logName,
-      logPath
-    );
+    view.webview.html = await LogView.getViewContent(view, context, logName, logPath);
     return view;
   }
 
@@ -127,12 +113,9 @@ export class LogView {
     };
 
     const indexSrc = await this.getFile(index);
-    return indexSrc.replace(
-      /@@name|@@path|@@ns|bundle.js|sample.log/gi,
-      function (matched) {
-        return toReplace[matched];
-      }
-    );
+    return indexSrc.replace(/@@name|@@path|@@ns|bundle.js|sample.log/gi, function (matched) {
+      return toReplace[matched];
+    });
   }
 
   private static async getFile(filePath: string): Promise<string> {
