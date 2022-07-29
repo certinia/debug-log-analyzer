@@ -512,7 +512,7 @@ function insertCrumb(container: Element, node: HTMLElement) {
     nameNode = node.querySelector<HTMLElement>('.name') || node,
     crumb = document.createElement('div'),
     textElm = document.createElement('div'),
-    textNode = document.createTextNode(line.type);
+    textNode = document.createTextNode(line.getBreadcrumbText());
 
   crumb.classList.add('crumb');
   crumb.title = nameNode.textContent!;

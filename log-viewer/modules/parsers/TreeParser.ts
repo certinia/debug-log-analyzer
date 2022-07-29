@@ -93,6 +93,10 @@ export class TruncationEntry {
     return 0;
   }
 
+  getBreadcrumbText() {
+    return this.type;
+  }
+
   loadContent(lineIter: LineIterator, stack: Method[]) {}
 
   onEnd(end: LogLine, stack: LogLine[]) {}
@@ -120,6 +124,22 @@ export class TruncationEntry {
     super(parts);
     this.timelineKey = timelineKey;
     this.cpuType = cpuType;
+  }
+
+  getBreadcrumbText() {
+    let desc = this.text;
+
+    const brace = desc.indexOf('(');
+    if (brace >= 0) {
+      desc = desc.substring(0, brace);
+    }
+
+    const dot = desc.lastIndexOf('.');
+    if (dot >= 0) {
+      desc = desc.substring(dot + 1);
+    }
+
+    return desc;
   }
 
   addChild(line: LogLine) {
@@ -512,6 +532,10 @@ export class CodeUnitStartedLine extends Method {
     }
   }
 
+  getBreadcrumbText(): string {
+    return 'Code Unit';
+  }
+
   static getCpuType(parts: string[]) {
     const subParts = parts[3].split(':'),
       codeUnitType = subParts[0],
@@ -563,6 +587,10 @@ class VFApexCallStartLine extends Method {
     }
     this.text = classText + methodtext;
   }
+
+  getBreadcrumbText(): string {
+    return 'VF Apex';
+  }
 }
 
 class VFApexCallEndLine extends Detail {
@@ -578,6 +606,10 @@ class VFDeserializeViewstateBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['VF_DESERIALIZE_VIEWSTATE_END'], null, 'systemMethod', 'method');
     this.text = this.type;
+  }
+
+  getBreadcrumbText(): string {
+    return 'Viewstate';
   }
 }
 
@@ -597,6 +629,10 @@ class VFFormulaStartLine extends Method {
     this.text = parts[3];
     this.group = this.type;
   }
+
+  getBreadcrumbText(): string {
+    return 'VF Formula';
+  }
 }
 
 class VFFormulaEndLine extends Detail {
@@ -614,6 +650,10 @@ class VFSeralizeViewStateStartLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['VF_SERIALIZE_VIEWSTATE_END'], null, 'systemMethod', 'method');
     this.text = this.type;
+  }
+
+  getBreadcrumbText(): string {
+    return 'VF Serialize';
   }
 }
 
@@ -641,6 +681,10 @@ class DMLBeginLine extends Method {
     this.text = "DML " + parts[3] + " " + parts[4];
     this.rowCount = parseRows(parts[5]);
   }
+
+  getBreadcrumbText(): string {
+    return 'DML';
+  }
 }
 
 class DMLEndLine extends Detail {
@@ -666,6 +710,10 @@ class SOQLExecuteBeginLine extends Method {
     super(parts, ['SOQL_EXECUTE_END'], null, 'soql', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = "SOQL: " + parts[3] + " - " + parts[4];
+  }
+
+  getBreadcrumbText(): string {
+    return 'SOQL';
   }
 
   onEnd(end: SOQLExecuteEndLine, stack: LogLine[]) {
@@ -698,6 +746,10 @@ class SOSLExecuteBeginLine extends Method {
     super(parts, ['SOSL_EXECUTE_END'], null, 'soql', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = `SOSL: ${parts[3]}`;
+  }
+
+  getBreadcrumbText(): string {
+    return 'SOSL';
   }
 
   onEnd(end: SOSLExecuteEndLine, stack: Detail[]) {
@@ -796,6 +848,10 @@ class CumulativeLimitUsageLine extends Method {
     this.text = this.type;
     this.group = this.type;
   }
+
+  getBreadcrumbText(): string {
+    return 'Usage';
+  }
 }
 
 class CumulativeLimitUsageEndLine extends Detail {
@@ -818,6 +874,10 @@ class CumulativeProfilingLine extends Detail {
 class CumulativeProfilingBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['CUMULATIVE_PROFILING_END'], null, 'systemMethod', 'custom');
+  }
+
+  getBreadcrumbText(): string {
+    return 'Profiling';
   }
 }
 
@@ -884,7 +944,12 @@ class QueryMoreBeginLine extends Method {
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = `line: ${this.lineNumber}`;
   }
+
+  getBreadcrumbText(): string {
+    return 'Query More';
+  }
 }
+
 class QueryMoreEndLine extends Detail {
   isExit = true;
 
@@ -963,6 +1028,10 @@ export class ExecutionStartedLine extends Method {
     super(parts, ['EXECUTION_FINISHED'], null, 'method', 'method');
     this.text = this.type;
   }
+
+  getBreadcrumbText(): string {
+    return 'Started';
+  }
 }
 
 export class ExecutionFinishedLine extends Detail {
@@ -996,6 +1065,10 @@ class EventSericePubBeginLine extends Method {
     this.group = this.type;
     this.text = parts[2];
   }
+
+  getBreadcrumbText(): string {
+    return 'Pub Begin';
+  }
 }
 
 class EventSericePubEndLine extends Detail {
@@ -1020,6 +1093,10 @@ class EventSericeSubBeginLine extends Method {
     super(parts, ['EVENT_SERVICE_SUB_END'], null, 'flow', 'custom');
     this.text = `${parts[2]} ${parts[3]}`;
     this.group = this.type;
+  }
+
+  getBreadcrumbText(): string {
+    return 'Sub Begin';
   }
 }
 
@@ -1074,6 +1151,10 @@ class FlowStartInterviewsBeginLine extends Method {
       }
     }
     return flowType || "Process Builder";
+  }
+
+  getBreadcrumbText(): string {
+    return 'Flow';
   }
 
   getFlowName() {
@@ -1156,6 +1237,10 @@ class FlowElementBeginLine extends Method {
     super(parts, ['FLOW_ELEMENT_END'], null, 'flow', 'custom');
     this.group = this.type;
     this.text = this.type + " : " + parts[3] + " " + parts[4];
+  }
+
+  getBreadcrumbText(): string {
+    return 'Flow';
   }
 }
 
@@ -1313,6 +1398,10 @@ class FlowBulkElementBeginLine extends Method {
     super(parts, ['FLOW_BULK_ELEMENT_END'], null, 'flow', 'custom');
     this.text = this.type + " : " + parts[2];
     this.group = this.type;
+  }
+
+  getBreadcrumbText(): string {
+    return 'Flow';
   }
 }
 
@@ -1505,6 +1594,10 @@ class WFRuleEvalBeginLine extends Method {
     super(parts, ['WF_RULE_EVAL_END'], null, 'workflow', 'custom');
     this.text = this.type + " : " + parts[2];
   }
+
+  getBreadcrumbText(): string {
+    return 'WF Rule';
+  }
 }
 
 class WFRuleEvalEndLine extends Detail {
@@ -1548,6 +1641,10 @@ class WFCriteriaBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['WF_CRITERIA_END', 'WF_RULE_NOT_EVALUATED'], null, 'workflow', 'custom');
     this.text = "WF_CRITERIA : " + parts[5] + " : " + parts[3];
+  }
+
+  getBreadcrumbText(): string {
+    return 'WF Criteria';
   }
 }
 
@@ -1825,6 +1922,10 @@ class DuplicateDetectionBegin extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['DUPLICATE_DETECTION_END'], null, 'workflow', 'custom');
+  }
+
+  getBreadcrumbText(): string {
+    return 'Dup';
   }
 }
 
