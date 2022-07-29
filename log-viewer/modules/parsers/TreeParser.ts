@@ -226,7 +226,7 @@ export class Method extends TimedNode {
         this.addChild(line);
       }
 
-      if (line == null) {
+      if (!line) {
         // truncated method - terminate at the end of the log
         this.exitStamp = lastTimestamp;
 
@@ -2105,7 +2105,6 @@ export function getRootMethod() {
 
   lastTimestamp = null;
   while ((line = lineIter.fetch())) {
-    // eslint-disable-line no-cond-assign
     line.loadContent(lineIter, stack);
     rootMethod.addChild(line);
   }

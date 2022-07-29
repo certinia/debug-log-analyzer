@@ -29,7 +29,7 @@ export class VSCodeService implements HostService {
   private vscodeAPIInstance: VSCodeAPI | null = null;
 
   static instance(): VSCodeService {
-    if (this._instance == null) {
+    if (!this._instance) {
       this._instance = new VSCodeService();
     }
     return this._instance;
