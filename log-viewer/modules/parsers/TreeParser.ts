@@ -204,7 +204,6 @@ export class Method extends TimedNode {
       stack.push(this);
 
       while ((line = lineIter.peek())) {
-        // eslint-disable-line no-cond-assign
         if (line.discontinuity) {
           // discontinuities are stack unwinding (caused by Exceptions)
           discontinuity = true; // start unwinding stack
