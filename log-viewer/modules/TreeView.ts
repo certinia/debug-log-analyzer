@@ -9,6 +9,7 @@ let treeRoot: RootNode,
   markedNode: HTMLElement;
 const divElem = document.createElement("div");
 const spanElem = document.createElement("span");
+const linkElem = document.createElement("a");
 
 function onExpandCollapse(evt: Event) {
   const input = evt.target as HTMLElement;
@@ -149,49 +150,55 @@ function expandTreeNode(elm: HTMLElement) {
   elemsToShow.forEach((e) => e.classList.remove("hide"));
 }
 
-function describeMethod(node: Method) {
-  const methodPrefix = node.prefix || '',
-    methodSuffix = node.suffix || '';
+function describeMethod(node: Method): Node[] {
+  const methodPrefix = node.prefix || "",
+    methodSuffix = node.suffix || "";
 
-  let desc = methodPrefix;
-  if (node.summaryCount) {
-    desc += (node.group || node.text);
+  let prefix = [];
+  if (node.containsDml) {
+    prefix.push("D" + node.containsDml);
+  }
+  if (node.containsSoql) {
+    prefix.push("S" + node.containsSoql);
+  }
+  if (node.containsThrown) {
+    prefix.push("T" + node.containsThrown);
+  }
+
+  let dbPrefix = "";
+  if (prefix.length) {
+    dbPrefix = "(" + prefix.join(",") + ") ";
+  }
+  const linePrefix = dbPrefix + methodPrefix;
+
+  const nodeValue = node.value ? ` = ${node.value}` : "";
+  const rowCount = node.rowCount ? ` - Rows:${node.rowCount}` : "";
+  const timeTaken = node.isTruncated
+    ? "TRUNCATED"
+    : `${formatDuration(node.duration || 0)} (self ${formatDuration(node.selfTime || 0)})`;
+  const lineNumber = node.lineNumber ? `, line: ${node.lineNumber}` : "";
+  const lineSuffix = `${nodeValue}${methodSuffix}${rowCount} - ${timeTaken}${lineNumber}`;
+
+  const text = node.text;
+  let logLineBody;
+  if (hasCodeText(node)) {
+    logLineBody = linkElem.cloneNode() as HTMLAnchorElement;
+    logLineBody.href = "#";
+    logLineBody.textContent = text;
   } else {
-    desc += node.text;
-  }
-  if (node.duration && node.selfTime) {
-    if (node.value) {
-      desc += (' = ' + node.value);
-    }
-    if (node.rowCount !== null) {
-      desc += ' Rows:' + node.rowCount;
-    }
-    desc += methodSuffix + ' - ';
-    desc += node.isTruncated ? 'TRUNCATED' : formatDuration(node.duration) + ' (' + formatDuration(node.selfTime) + ')';
-    if (node.lineNumber) {
-      desc += ', line: ' + node.lineNumber;
-    }
-  }
-  if (node.containsDml || node.containsSoql || node.containsThrown) {
-    let prefix = [];
-    if (node.containsDml) {
-      prefix.push('D' + node.containsDml);
-    }
-    if (node.containsSoql) {
-      prefix.push('S' + node.containsSoql);
-    }
-    if (node.containsThrown) {
-      prefix.push('T' + node.containsThrown);
-    }
-    desc = '(' + prefix.join(',') + ') ' + desc;
+    return [document.createTextNode(linePrefix + text + lineSuffix)];
   }
 
-  return desc;
+  const nodeResults = [document.createTextNode(linePrefix), logLineBody];
+  if (lineSuffix) {
+    nodeResults.push(document.createTextNode(lineSuffix));
+  }
+  return nodeResults;
 }
 
 function renderBlock(line: LogLine) {
   const lineNode = divElem.cloneNode() as HTMLDivElement;
-    lineNode.className = line instanceof Detail && line.hideable ? 'block name detail' : 'block name';
+  lineNode.className = line instanceof Detail && line.hideable ? "block name detail" : "block name";
 
   // @ts-ignore (custom dom property)
   lineNode.line = line;
@@ -262,8 +269,11 @@ function renderMethod(node: Method, timeStamps: number[]) {
 
   const titleSpan = spanElem.cloneNode() as HTMLSpanElement;
   titleSpan.className = "name";
-  const titleText = describeMethod(node);
-  titleSpan.appendChild(document.createTextNode(titleText));
+  const titleElements = describeMethod(node);
+  const elemsLen = titleElements.length;
+  for (let i = 0; i < elemsLen; i++) {
+    titleSpan.appendChild(titleElements[i]);
+  }
   mainNode.appendChild(titleSpan);
 
   if (len && (timeStamps.includes(node.timestamp) || timeStamps.includes(-1))) {
@@ -279,7 +289,7 @@ function renderMethod(node: Method, timeStamps: number[]) {
 function createChildNodes(children: LogLine[], timeStamps: number[]) {
   const childContainer = divElem.cloneNode() as HTMLDivElement;
   childContainer.className = "childContainer hide";
-  children.forEach(child => {
+  children.forEach((child) => {
     if (child instanceof Method) {
       childContainer.appendChild(renderMethod(child, timeStamps));
     } else {
@@ -447,7 +457,7 @@ function findStylesheetRule(ruleSelector: string): CSSStyleRule | null {
 function hideBySelector(selector: string, hide: boolean) {
   const rule = findStylesheetRule(selector);
   if (rule) {
-    rule.style.display = hide ? 'none' : 'block';
+    rule.style.display = hide ? "none" : "block";
   }
 }
 
