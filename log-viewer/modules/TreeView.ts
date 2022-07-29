@@ -313,7 +313,7 @@ function goToFile(evt: MouseEvent) {
   showBreadcrumb(elem);
   const timeStamp = target?.dataset.enterstamp;
   if (timeStamp) {
-    if (!evt.metaKey && !evt.altKey) {
+    if (evt.metaKey && !evt.altKey && !evt.shiftKey) {
       const node = findByTimeStamp(treeRoot, timeStamp);
       if (node) {
         const fileOpenInfo = deriveOpenInfo(node);
