@@ -1060,7 +1060,7 @@ class SavePointSetLine extends Detail {
   }
 }
 
-class FlowStartInterviewsBeginLine extends Method {
+export class FlowStartInterviewsBeginLine extends Method {
   declarative = true;
   text = "FLOW_START_INTERVIEWS : ";
 
@@ -1068,7 +1068,7 @@ class FlowStartInterviewsBeginLine extends Method {
     super(parts, ["FLOW_START_INTERVIEWS_END"], null, "flow", "custom");
   }
 
-  onEnd(end: FlowStartInterviewEndLine, stack: LogLine[]) {
+  onEnd(end: FlowStartInterviewsEndLine, stack: LogLine[]) {
     const flowType = this.getFlowType(stack);
     this.group = flowType;
     this.suffix = ` (${flowType})`;
@@ -1077,15 +1077,21 @@ class FlowStartInterviewsBeginLine extends Method {
 
   getFlowType(stack: LogLine[]) {
     let flowType;
-    const len = stack.length - 1;
+    // ignore the last one on stack is it will be this FlowStartInterviewsBeginLine
+    const len = stack.length - 2;
     for (let i = len; i >= 0; i--) {
       const elem = stack[i];
-      if (elem.type === "CODE_UNIT_STARTED" && elem.group === "Flow") {
+      // type = "CODE_UNIT_STARTED" a flow or Processbuilder was started directly
+      // type = "FLOW_START_INTERVIEWS_BEGIN" a flow was started from a process builder
+      if (elem.type === "CODE_UNIT_STARTED") {
+        flowType = elem.group === "Flow" ? "Flow" : "Process Builder";
+        break;
+      } else if (elem.type === "FLOW_START_INTERVIEWS_BEGIN") {
         flowType = "Flow";
         break;
       }
     }
-    return flowType || "Process Builder";
+    return flowType || "";
   }
 
   getFlowName() {
@@ -1106,6 +1112,7 @@ class FlowStartInterviewsEndLine extends Detail {
 }
 
 class FlowStartInterviewsErrorLine extends Detail {
+  acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} - ${parts[4]}`;
@@ -1191,6 +1198,7 @@ class FlowElementDeferredLine extends Detail {
 
 class FlowElementAssignmentLine extends Detail {
   declarative = true;
+  acceptsText = true;
 
   constructor(parts: string[]) {
     super(parts);
@@ -1252,6 +1260,7 @@ class FlowInterviewPausedLine extends Detail {
 }
 
 class FlowElementErrorLine extends Detail {
+  acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[1] + parts[2] + " " + parts[3] + " " + parts[4];
@@ -1323,7 +1332,7 @@ class FlowBulkElementBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ["FLOW_BULK_ELEMENT_END"], null, "flow", "custom");
-    this.text = this.type + " : " + parts[2];
+    this.text = `${this.type} : ${parts[2]} - ${parts[3]}`;
     this.group = this.type;
   }
 }
@@ -1444,6 +1453,7 @@ class ValidationRuleLine extends Detail {
 }
 
 class ValidationErrorLine extends Detail {
+  acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
@@ -1489,6 +1499,7 @@ class WFFlowActionEndLine extends Detail {
 }
 
 class WFFlowActionErrorLine extends Detail {
+  acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[1] + " " + parts[4];
@@ -1496,6 +1507,7 @@ class WFFlowActionErrorLine extends Detail {
 }
 
 class WFFlowActionErrorDetailLine extends Detail {
+  acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[1] + " " + parts[2];
@@ -2068,7 +2080,7 @@ export function parseLine(line: string, lastEntry: LogLine | null): LogLine | nu
 
 // Matches CRLF (\r\n) + LF (\n)
 // the ? matches the previous token 0 or 1 times.
-export default async function parseLog(log: string) {
+export default async function parseLog(log: string): Promise<LogLine[]> {
   const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || -1;
   const rawLines = log.substring(start).split(newlineRegex);
 
