@@ -527,7 +527,10 @@ function insertCrumb(container: Element, node: HTMLElement) {
   crumb.classList.add('crumb');
   crumb.title = nameNode.textContent!;
   crumb.appendChild(textElm);
-  crumb.addEventListener('click', evt => nameNode.focus());
+  crumb.addEventListener('click', evt => {
+    nameNode.scrollIntoView();
+    showBreadcrumb(nameNode);
+  });
   textElm.appendChild(textNode);
   container.insertAdjacentElement('afterbegin', crumb);
 }
