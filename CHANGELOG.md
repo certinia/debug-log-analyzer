@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+## Added
+- A bread-crumb line above the call-tree, rendered on clicking a tree node ([#142][#142])
+
+### Changed
+- Only action "view source" when clicking with the CMD keyboard modifier so that we can render bread-crumbs without navigation ([#142][#142])
+
 ## [1.5.0] - 2022-08-01
 
 ## Added
@@ -14,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Some missing line types: DUPLICATE_DETECTION_BEGIN, DUPLICATE_DETECTION_END and DUPLICATE_DETECTION_RULE_INVOCATION ([#139][#139])
 - Salesforce Code Builder Support ([#23][#23])
   - Apex Log Analyzer to be published to the Open VSX Registry as well as the VSCode Marketplace
-- A bread-crumb line above the call-tree, rendered on clicking a tree node ([#142][#142])
 
 ### Changed
 
@@ -25,8 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved performance getting log file from an org when using the `Log: Load Apex Log For Analysis` command ([#123][#123])
 - More easily differentiate between "Flows" and "Process Builders" in the timeline and call tree ([#114][#114])
 - Counts on Calltree for Throw (T), DML (D) & SOQL (S) markers, which shows how many of each statement type are descendants of a node ([#135][#135])
-- Apex Log Analyzer to be published to the Open VSX Registry as well as the VSCode Marketplace ([#23][#23])
-- Only action "view source" when clicking without keyboard modifiers (ALT & CMD) so that we can render bread-crumbs without navigation ([#142][#142])
 
 ### Fixed
 
