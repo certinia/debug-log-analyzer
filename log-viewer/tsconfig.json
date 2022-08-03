@@ -1,15 +1,18 @@
 {
   "compilerOptions": {
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "lib": [
+      "es2021",
+      "dom"
+    ],
     "module": "esnext",
-    "target": "es6",
     "moduleResolution": "node",
     "noEmitOnError": true,
-    "lib": ["es2017", "dom"],
-    "strict": true,
-    "esModuleInterop": true,
     "outDir": "out",
     "sourceMap": true,
-    "experimentalDecorators": true
+    "strict": true,
+    "target": "es2021",
   },
   "include": [
     "./modules/**/*.ts"
