@@ -7,7 +7,13 @@ const compact = !process.env.ROLLUP_WATCH;
 const plugins = [
   nodeResolve(),
   commonjs(),
-  typescript({ tsconfig: "./tsconfig.json" }),
+  typescript({
+    tsconfig: "./tsconfig.json",
+    exclude: [
+      "node_modules",
+      "**/__tests__/**",
+    ]
+  }),
   compact && terser(),
 ];
 

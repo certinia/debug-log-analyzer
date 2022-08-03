@@ -11,5 +11,10 @@
     "sourceMap": true,
     "experimentalDecorators": true
   },
-  "include": ["./modules/**/*.ts"]
+  "include": [
+    "./modules/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

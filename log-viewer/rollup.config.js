@@ -15,7 +15,13 @@ export default {
   plugins: [
     nodeResolve({ preferBuiltins: false }),
     commonjs(),
-    typescript({ tsconfig: "./tsconfig.json" }),
+    typescript({
+      tsconfig: "./tsconfig.json",
+      exclude: [
+        "node_modules",
+        "**/__tests__/**",
+      ]
+    }),
     postcss({
       extensions: [".css"],
       minimize: true,

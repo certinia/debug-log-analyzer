@@ -1,8 +1,6 @@
-/**
- * @jest-environment jsdom
- */
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
+ * @jest-environment jsdom
  */
 import analyseMethods, { Metric } from "../Analysis";
 import parseLog, { getRootMethod } from "../parsers/TreeParser";
