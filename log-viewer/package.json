@@ -16,17 +16,12 @@
 		"lit": "^2.0.0"
 	},
 	"devDependencies": {
-		"@babel/core": "^7.14.6",
-		"@babel/plugin-transform-modules-commonjs": "^7.7.0",
-		"@babel/preset-env": "^7.16.4",
-		"@babel/preset-typescript": "^7.16.0",
 		"@rollup/plugin-commonjs": "^20.0.0",
 		"@rollup/plugin-node-resolve": "^13.0.4",
 		"@rollup/plugin-typescript": "^8.2.1",
 		"@types/jest": "^27.5.2",
 		"@typescript-eslint/eslint-plugin": "^4.28.5",
 		"@typescript-eslint/parser": "^4.28.5",
-		"babel-plugin-rewire": "^1.2.0",
 		"concurrently": "^6.2.1",
 		"http-server": "^13.0.2",
 		"jest": "^28.1.2",
