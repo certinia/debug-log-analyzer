@@ -1,23 +1,24 @@
 {
   "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "experimentalDecorators": true,
-    "lib": [
-      "es2021",
-      "dom"
-    ],
+    "forceConsistentCasingInFileNames": true,
+    "importHelpers": true,
+    "lib": ["es2021", "dom"],
     "module": "esnext",
     "moduleResolution": "node",
     "noEmitOnError": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "outDir": "out",
-    "sourceMap": true,
+    "removeComments": true,
+    "rootDir": "./modules",
+    "resolveJsonModule": true,
+    "sourceMap": false,
     "strict": true,
-    "target": "es2021",
+    "target": "es2021"
   },
-  "include": [
-    "./modules/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["./modules/**/*.ts"],
+  "exclude": ["node_modules"]
 }

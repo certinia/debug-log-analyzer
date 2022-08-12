@@ -1,21 +1,23 @@
 {
   "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "lib": [
-      "es2021"
-    ],
+    "experimentalDecorators": true,
+    "forceConsistentCasingInFileNames": true,
+    "importHelpers": true,
+    "lib": ["es2021"],
     "module": "esnext",
     "moduleResolution": "node",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "outDir": "out",
+    "removeComments": true,
+    "resolveJsonModule": true,
     "rootDir": "src",
-    "sourceMap": true,
+    "sourceMap": false,
     "strict": true,
-    "target": "es2021",
+    "target": "es2021"
   },
-  "include": [
-    "./src/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["./src/**/*.ts"],
+  "exclude": ["node_modules"]
 }
