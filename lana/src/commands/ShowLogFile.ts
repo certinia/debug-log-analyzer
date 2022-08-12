@@ -8,7 +8,7 @@ import { QuickPickWorkspace } from "../display/QuickPickWorkspace";
 import * as path from "path";
 import { LogView } from "./LogView";
 import { Command } from "./Command";
-import { appName } from "../Main";
+import { appName } from "../AppSettings";
 
 export class ShowLogFile {
   static apply(context: Context): void {

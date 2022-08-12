@@ -5,7 +5,7 @@
 import { Context } from "../Context";
 import { Command } from "./Command";
 import { LogView } from "./LogView";
-import { appName } from "../Main";
+import { appName } from "../AppSettings";
 import { Item, Options, QuickPick } from "../display/QuickPick";
 import { QuickPickWorkspace } from "../display/QuickPickWorkspace";
 import { GetLogFiles, GetLogFilesResult } from "../sfdx/logs/GetLogFiles";
@@ -90,12 +90,10 @@ export class LoadLogFile {
       })
       .map((r) => {
         const name = `${r.LogUser.Name} - ${r.Operation}`;
-        const description = `${(r.LogLength / 1024).toFixed(2)} KB ${
-          r.DurationMilliseconds
-        } ms`;
-        const detail = `${new Date(r.StartTime).toLocaleString()} - ${
-          r.Status
-        } - ${r.Id}`;
+        const description = `${(r.LogLength / 1024).toFixed(2)} KB ${r.DurationMilliseconds
+          } ms`;
+        const detail = `${new Date(r.StartTime).toLocaleString()} - ${r.Status
+          } - ${r.Id}`;
         return new DebugLogItem(name, description, detail, r.Id);
       });
 
