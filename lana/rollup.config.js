@@ -4,7 +4,6 @@ import { terser } from "rollup-plugin-terser";
 import typescript from "@rollup/plugin-typescript";
 
 const compact = !process.env.ROLLUP_WATCH;
-// const compact = !process.env.ROLLUP_WATCH;
 const plugins = [
   nodeResolve({ preferBuiltins: true, modulesOnly: false }),
   commonjs(),
