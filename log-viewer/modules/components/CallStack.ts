@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2021 FinancialForce.com, inc. All rights reserved.
  */
-import { LitElement, html, css } from "lit";
-import { customElement, property } from "lit/decorators.js";
-import { DatabaseAccess } from "../Database";
-import { LogLine } from "../parsers/TreeParser";
-import { showTreeNode } from "../TreeView";
+import { LitElement, html, css } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
+import { DatabaseAccess } from '../Database';
+import { LogLine } from '../parsers/TreeParser';
+import { showTreeNode } from '../TreeView';
 
-@customElement("call-stack")
+@customElement('call-stack')
 class CallStack extends LitElement {
   @property({ type: Number }) stack = -1;
 
@@ -35,9 +35,7 @@ class CallStack extends LitElement {
     if (stacks && this.stack >= 0 && this.stack < stacks.length) {
       const stack = stacks[this.stack];
       if (stack) {
-        let details = stack
-          .slice(1, 10)
-          .map((entry) => this.lineLink(entry, false));
+        let details = stack.slice(1, 10).map((entry) => this.lineLink(entry, false));
         return html`<details>
           <summary>${this.lineLink(stack[0], true)}</summary>
           ${details}
@@ -49,12 +47,9 @@ class CallStack extends LitElement {
   }
 
   private lineLink(line: LogLine, first: boolean) {
-    const style = first ? "stackEntryFirst" : "stackEntry";
+    const style = first ? 'stackEntryFirst' : 'stackEntry';
     return html`
-      <a
-        @click=${this.onCallerClick}
-        class=${style}
-        data-timestamp="${line.timestamp}"
+      <a @click=${this.onCallerClick} class=${style} data-timestamp="${line.timestamp}"
         >${line.text}</a
       >
     `;
@@ -62,7 +57,7 @@ class CallStack extends LitElement {
 
   private onCallerClick(evt: any) {
     const target = evt.target as HTMLElement;
-    const dataTimestamp = target.getAttribute("data-timestamp");
+    const dataTimestamp = target.getAttribute('data-timestamp');
     if (dataTimestamp) {
       showTreeNode(parseInt(dataTimestamp));
     }
