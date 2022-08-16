@@ -22,8 +22,8 @@ class DebugLogItem extends Item {
     desc: string,
     details: string,
     logId: string,
-    sticky: boolean = true,
-    selected: boolean = false
+    sticky = true,
+    selected = false
   ) {
     super(name, desc, details, sticky, selected);
     this.logId = logId;

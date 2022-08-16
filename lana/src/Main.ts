@@ -10,7 +10,7 @@ interface InitConfig {
   debug: boolean;
 }
 
-export const appName: string = 'Lana';
+export const appName = 'Lana';
 export let context: Context | null = null;
 
 export function activate(extensionContext: ExtensionContext, config: InitConfig) {

@@ -5,11 +5,11 @@
 import { Uri, WebviewPanel, WebviewPanelOptions, window } from 'vscode';
 
 export class WebViewOptions implements WebviewPanelOptions {
-  enableCommandUris: boolean = true;
-  enableScripts: boolean = true;
-  retainContextWhenHidden: boolean = true;
+  enableCommandUris = true;
+  enableScripts = true;
+  retainContextWhenHidden = true;
   localResourceRoots: Uri[];
-  enableFindWidget: boolean = true;
+  enableFindWidget = true;
 
   constructor(resourceRoots: Uri[]) {
     this.localResourceRoots = resourceRoots;

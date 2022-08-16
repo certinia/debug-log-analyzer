@@ -10,7 +10,7 @@ export class Display {
 
   constructor(context: ExtensionContext) {}
 
-  output(message: string, showChannel: boolean = false) {
+  output(message: string, showChannel = false) {
     if (showChannel) {
       this.outputChannel.show(true);
     }
