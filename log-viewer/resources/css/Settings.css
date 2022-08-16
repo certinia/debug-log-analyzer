@@ -1,20 +1,20 @@
 #logSettings {
-	padding: 10px 0;
-	min-height: 27px;
+  padding: 10px 0;
+  min-height: 27px;
 }
 .setting {
-	display: inline-block;
-	font-family: var(--vscode-editor-font-family);
-	background-color: var(--vscode-textBlockQuote-background);
-	font-size: 8pt;
-	padding: 5px;
-	margin-right: 5px;
-	margin-bottom: 5px;
+  display: inline-block;
+  font-family: var(--vscode-editor-font-family);
+  background-color: var(--vscode-textBlockQuote-background);
+  font-size: 8pt;
+  padding: 5px;
+  margin-right: 5px;
+  margin-bottom: 5px;
 }
 .settingTitle {
-	font-weight: bold;
-	margin-right: 2px;
+  font-weight: bold;
+  margin-right: 2px;
 }
 .settingValue {
-	color: #808080;
+  color: #808080;
 }
