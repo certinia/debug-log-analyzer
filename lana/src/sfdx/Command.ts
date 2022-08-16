@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { exec, ExecException, ChildProcess } from "child_process";
+import { exec, ExecException, ChildProcess } from 'child_process';
 
 type Handler = (
   error: ExecException | null,
@@ -16,14 +16,10 @@ export class Command {
       Command.run(
         path,
         command,
-        (
-          error: ExecException | null,
-          stdOut: Buffer | string,
-          stdErr: Buffer | string
-        ) => {
+        (error: ExecException | null, stdOut: Buffer | string, stdErr: Buffer | string) => {
           if (error === null) {
             const out = stdOut as Buffer;
-            resolve(out.toString("utf8"));
+            resolve(out.toString('utf8'));
           } else {
             reject(Command.attemptErrorParse(error, stdOut as Buffer));
           }
@@ -32,11 +28,8 @@ export class Command {
     });
   }
 
-  private static attemptErrorParse(
-    error: ExecException | null,
-    stdOut: Buffer
-  ): Error {
-    const out = stdOut.toString("utf-8");
+  private static attemptErrorParse(error: ExecException | null, stdOut: Buffer): Error {
+    const out = stdOut.toString('utf-8');
     if (out !== null && out.length > 0) {
       // sometimes we get detailed message fields back on stdout in json objects
       try {
@@ -49,15 +42,7 @@ export class Command {
     return new Error(error?.message);
   }
 
-  private static run(
-    path: string,
-    command: string[],
-    handler: Handler
-  ): ChildProcess {
-    return exec(
-      command.join(" "),
-      { cwd: path, maxBuffer: 21 * 1024 * 1024 },
-      handler
-    );
+  private static run(path: string, command: string[], handler: Handler): ChildProcess {
+    return exec(command.join(' '), { cwd: path, maxBuffer: 21 * 1024 * 1024 }, handler);
   }
 }

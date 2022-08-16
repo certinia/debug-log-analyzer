@@ -2,8 +2,8 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { ExtensionContext, Uri, window, workspace } from "vscode";
-import { appName } from "./Main";
+import { ExtensionContext, Uri, window, workspace } from 'vscode';
+import { appName } from './Main';
 
 export class Display {
   private outputChannel = window.createOutputChannel(appName);
@@ -26,8 +26,6 @@ export class Display {
   }
 
   showFile(path: string): void {
-    workspace
-      .openTextDocument(Uri.file(path))
-      .then((td) => window.showTextDocument(td));
+    workspace.openTextDocument(Uri.file(path)).then((td) => window.showTextDocument(td));
   }
 }
