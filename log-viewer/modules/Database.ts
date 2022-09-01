@@ -69,8 +69,8 @@ export class DatabaseAccess {
   }
 
   private upsert(map: Map<string, DatabaseEntry>, line: LogLine, stack: Stack) {
-    let stackIndex = this.internStack(stack);
-    let entry = map.get(line.text);
+    const stackIndex = this.internStack(stack);
+    const entry = map.get(line.text);
     if (!entry) {
       map.set(line.text, new DatabaseEntry(1, line.rowCount || 0, [stackIndex]));
     } else {

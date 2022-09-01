@@ -84,9 +84,9 @@ class State {
   public isRedrawQueued = true;
   public defaultZoom = 0;
 
-  private _zoom: number = 0;
-  private _offsetY: number = 0;
-  private _offsetX: number = 0;
+  private _zoom = 0;
+  private _offsetY = 0;
+  private _offsetX = 0;
 
   public set zoom(zoom: number) {
     this._zoom = zoom;
@@ -233,9 +233,8 @@ function nodesToRectangles(nodes: Method[], depth: number) {
   const len = nodes.length;
   for (let c = 0; c < len; c++) {
     const node = nodes[c];
-    const tlKey = node.timelineKey;
-    if (tlKey && node.duration) {
-      const tl = keyMap.get(tlKey)!;
+    const { timelineKey, duration } = node;
+    if (timelineKey && duration) {
       addToRectQueue(node, depth);
     }
 
@@ -262,9 +261,8 @@ const rectRenderQueue = new Map<TimelineKey, Rect[]>();
  * @param y The call depth of the node
  */
 function addToRectQueue(node: Method, y: number) {
-  const { timelineKey: tlKey, timestamp: x, duration } = node,
-    w = duration!,
-    rect: Rect = { x, y, w };
+  const { timelineKey: tlKey, timestamp: x, duration: w } = node;
+  const rect: Rect = { x, y, w };
   let list = rectRenderQueue.get(tlKey);
   if (!list) {
     rectRenderQueue.set(tlKey, (list = []));
@@ -274,7 +272,7 @@ function addToRectQueue(node: Method, y: number) {
 
 function renderRectangles(ctx: CanvasRenderingContext2D) {
   ctx.lineWidth = 1;
-  for (let [tlKey, items] of rectRenderQueue) {
+  for (const [tlKey, items] of rectRenderQueue) {
     const tl: TimelineGroup = keyMap.get(tlKey)!;
     ctx.beginPath();
     // ctx.strokeStyle = tl.strokeColor;
@@ -463,7 +461,7 @@ function findByPosition(
 function showTooltip(offsetX: number, offsetY: number) {
   if (!dragging && container && tooltip) {
     const depth = ~~(((displayHeight - offsetY - state.offsetY) / realHeight) * maxY);
-    let tooltipText = findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
+    const tooltipText = findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
     showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
   }
 }

@@ -36,7 +36,7 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
   const children = node.children;
 
   if (key) {
-    let metric = map.get(key);
+    const metric = map.get(key);
     if (metric) {
       ++metric.count;
       if (node.duration) {
@@ -65,7 +65,7 @@ export default function analyseMethods(rootMethod: RootNode) {
 
 function entrySort(sortField: SortKey, sortAscending: boolean, a: Metric, b: Metric) {
   let result;
-  let x: any, y: any;
+  let x: number | string, y: number | string;
 
   switch (sortField) {
     case 'count':
@@ -101,7 +101,7 @@ function entrySort(sortField: SortKey, sortAscending: boolean, a: Metric, b: Met
 }
 
 function nestedSorter(type: SortKey, sortAscending: boolean, a: Metric, b: Metric) {
-  const sortOrder = nestedSort.get(type)!;
+  const sortOrder = nestedSort.get(type) || [];
 
   const len = sortOrder.length;
   for (let i = 0; i < len; ++i) {
@@ -119,7 +119,7 @@ function renderAnalysisLine(
   count: string,
   duration: string,
   selfTime: string,
-  isBold: boolean = false
+  isBold = false
 ) {
   const nameCell = highlightTextNode(name, isBold) as HTMLElement;
   nameCell.className = 'name';
@@ -172,7 +172,7 @@ export async function renderAnalysis() {
     let totalCount = 0,
       totalSelfTime = 0;
     metricList.forEach(function (metric) {
-      var duration = metric.duration ? formatDuration(metric.duration) : '-',
+      const duration = metric.duration ? formatDuration(metric.duration) : '-',
         selfTime = metric.selfTime ? formatDuration(metric.selfTime) : '-';
 
       analysisHolder.appendChild(
@@ -197,11 +197,11 @@ export async function renderAnalysis() {
   }
 }
 
-function onSortChange(evt: Event) {
+function onSortChange(): void {
   renderAnalysis();
 }
 
-function onInitAnalysis(evt: Event) {
+function onInitAnalysis(): void {
   const sortField = document.getElementById('sortField'),
     sortAscending = document.getElementById('sortAscending');
 

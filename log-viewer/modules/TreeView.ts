@@ -153,7 +153,7 @@ function describeMethod(node: Method): Node[] {
   const methodPrefix = node.prefix || '',
     methodSuffix = node.suffix || '';
 
-  let prefix = [];
+  const prefix = [];
   if (node.containsDml) {
     prefix.push('D' + node.containsDml);
   }

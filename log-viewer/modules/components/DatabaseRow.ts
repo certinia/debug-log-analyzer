@@ -36,7 +36,7 @@ class DatabaseRow extends LitElement {
     const dmlMap = DatabaseAccess.instance()?.dmlMap;
 
     if (soqlMap && dmlMap) {
-      let entry = soqlMap.get(this.key) || dmlMap.get(this.key);
+      const entry = soqlMap.get(this.key) || dmlMap.get(this.key);
       if (entry) {
         const detail = this.key.substring(this.key.indexOf(' ') + 1);
         const stacks = entry.stacks.map((stack) => html`<call-stack stack=${stack} />`);

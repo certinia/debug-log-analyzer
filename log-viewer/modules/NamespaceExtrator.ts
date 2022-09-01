@@ -5,8 +5,8 @@ import { RootNode } from './parsers/TreeParser';
  */
 function collectNamespaces(node: RootNode): Set<string> {
   const children = node.children;
-  let namespaces = new Set<string>(),
-    i = 0;
+  const namespaces = new Set<string>();
+  let i = 0;
   while (i < window.activeNamespaces.length) {
     namespaces.add(window.activeNamespaces[i]);
     ++i;
@@ -26,7 +26,7 @@ function collectNamespaces(node: RootNode): Set<string> {
 }
 
 function extractNamespace(namespaces: Set<string>, text: string) {
-  let parts = text.split('.');
+  const parts = text.split('.');
   if (namespaces.has(parts[0])) {
     return parts[0];
   } else {

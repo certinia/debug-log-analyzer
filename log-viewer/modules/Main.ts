@@ -263,7 +263,7 @@ function handleMessage(evt: MessageEvent) {
   }
 }
 
-function onInit(evt: Event) {
+function onInit(): void {
   const tabHolder = document.querySelector('.tabHolder');
   tabHolder?.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', onTabSelect));
 

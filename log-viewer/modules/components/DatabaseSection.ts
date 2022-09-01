@@ -69,8 +69,8 @@ class DatabaseSection extends LitElement {
   private getKeyList(entryMap: DatabaseEntryMap): string[] {
     const keyList = Array.from(entryMap.keys());
     keyList.sort((k1, k2) => {
-      let e1 = entryMap.get(k1);
-      let e2 = entryMap.get(k2);
+      const e1 = entryMap.get(k1);
+      const e2 = entryMap.get(k2);
 
       if (e1 && e2) {
         const countDiff = e2.count - e1.count;

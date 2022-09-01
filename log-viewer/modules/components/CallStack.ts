@@ -35,7 +35,7 @@ class CallStack extends LitElement {
     if (stacks && this.stack >= 0 && this.stack < stacks.length) {
       const stack = stacks[this.stack];
       if (stack) {
-        let details = stack.slice(1, 10).map((entry) => this.lineLink(entry, false));
+        const details = stack.slice(1, 10).map((entry) => this.lineLink(entry, false));
         return html`<details>
           <summary>${this.lineLink(stack[0], true)}</summary>
           ${details}
