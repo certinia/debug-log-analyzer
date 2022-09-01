@@ -38,8 +38,8 @@ export class LogView {
       vscode.Uri.file(path.dirname(logPath)),
     ]);
     panel.webview.onDidReceiveMessage(
-      (msg: any) => {
-        const request = msg as WebViewLogFileRequest;
+      (msg: WebViewLogFileRequest) => {
+        const request = msg;
 
         switch (request.cmd) {
           case 'openPath':
@@ -105,11 +105,11 @@ export class LogView {
     );
     const logPathUri = view.webview.asWebviewUri(vscode.Uri.file(logPath));
     const toReplace: { [key: string]: string } = {
-      '@@name': logName,
-      '@@path': logPath,
-      '@@ns': namespaces.join(','),
-      'bundle.js': bundleUri.toString(true),
-      'sample.log': logPathUri.toString(true),
+      '@@name': logName, // eslint-disable-line @typescript-eslint/naming-convention
+      '@@path': logPath, // eslint-disable-line @typescript-eslint/naming-convention
+      '@@ns': namespaces.join(','), // eslint-disable-line @typescript-eslint/naming-convention
+      'bundle.js': bundleUri.toString(true), // eslint-disable-line @typescript-eslint/naming-convention
+      'sample.log': logPathUri.toString(true), // eslint-disable-line @typescript-eslint/naming-convention
     };
 
     const indexSrc = await this.getFile(index);

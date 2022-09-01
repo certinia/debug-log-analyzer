@@ -9,8 +9,10 @@ export class Command {
   private static commandPrefix = 'lana.';
 
   name: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   run: (...args: any[]) => any;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(name: string, run: (...args: any[]) => any) {
     this.name = name;
     this.run = run;

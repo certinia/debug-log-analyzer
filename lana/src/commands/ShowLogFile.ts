@@ -21,8 +21,9 @@ export class ShowLogFile {
   private static async safeCommand(context: Context, uri: Uri): Promise<void> {
     try {
       return ShowLogFile.command(context, uri);
-    } catch (err: any) {
-      context.display.showErrorMessage(`Error showing logfile: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      context.display.showErrorMessage(`Error showing logfile: ${msg}`);
       return Promise.resolve();
     }
   }

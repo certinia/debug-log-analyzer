@@ -2,13 +2,11 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { ExtensionContext, Uri, window, workspace } from 'vscode';
+import { Uri, window, workspace } from 'vscode';
 import { appName } from './Main';
 
 export class Display {
   private outputChannel = window.createOutputChannel(appName);
-
-  constructor(context: ExtensionContext) {}
 
   output(message: string, showChannel = false) {
     if (showChannel) {
