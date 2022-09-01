@@ -569,7 +569,7 @@ function showTooltipWithText(
  * | +-----------------+  |
  * +----------------------+
  */
-function onMouseMove(evt: any) {
+function onMouseMove(evt: MouseEvent) {
   const target = evt.target as HTMLElement;
 
   if (target && (target.id === 'timeline' || target.id === 'tooltip')) {
@@ -582,7 +582,7 @@ function onMouseMove(evt: any) {
   }
 }
 
-function onClickCanvas(evt: any) {
+function onClickCanvas(): void {
   if (!dragging && tooltip.style.display === 'block') {
     const depth = ~~(((displayHeight - lastMouseY - state.offsetY) / realHeight) * maxY);
     const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
@@ -592,19 +592,17 @@ function onClickCanvas(evt: any) {
   }
 }
 
-function onLeaveCanvas(evt: any) {
+function onLeaveCanvas() {
   dragging = false;
-  if (!evt.relatedTarget || evt.relatedTarget.id !== 'tooltip') {
-    tooltip.style.display = 'none';
-  }
+  tooltip.style.display = 'none';
 }
 
 let dragging = false;
-function handleMouseDown(evt: MouseEvent) {
+function handleMouseDown(): void {
   dragging = true;
 }
 
-function handleMouseUp(evt: MouseEvent) {
+function handleMouseUp(): void {
   dragging = false;
 }
 
@@ -651,7 +649,7 @@ function handleScroll(evt: WheelEvent) {
   }
 }
 
-function onInitTimeline(evt: Event) {
+function onInitTimeline(): void {
   const canvas = document.getElementById('timeline') as HTMLCanvasElement,
     timelineWrapper = document.getElementById('timelineWrapper');
   tooltip = document.getElementById('tooltip') as HTMLDivElement;

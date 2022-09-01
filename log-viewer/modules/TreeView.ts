@@ -407,7 +407,7 @@ function collapse(elm: HTMLElement) {
 }
 
 let previouslyExpanded = false;
-function onExpandAll(evt: Event) {
+function onExpandAll(): void {
   const treeContainer = document.getElementById('tree');
   if (!previouslyExpanded) {
     renderLowest(treeContainer as HTMLElement);
@@ -419,7 +419,7 @@ function onExpandAll(evt: Event) {
   }
 }
 
-function onCollapseAll(evt: Event) {
+function onCollapseAll(): void {
   const treeContainer = document.getElementById('tree');
   if (treeContainer) {
     collapse(treeContainer);
@@ -476,7 +476,7 @@ function showHideDetails() {
   hideBySelector('.node.formula', hideFormula?.checked);
 }
 
-function hideByDuration(elements: Array<HTMLElement>) {
+function hideByDuration(elements: Array<HTMLElement>): void {
   const hideUnder = document.getElementById('hideUnder') as HTMLInputElement;
   const shouldHide = hideUnder?.checked;
 
@@ -492,7 +492,7 @@ function hideByDuration(elements: Array<HTMLElement>) {
   }
 }
 
-function onInitTree(evt: Event) {
+function onInitTree(): void {
   const expandAll = document.getElementById('expandAll'),
     collapseAll = document.getElementById('collapseAll'),
     hideDetails = document.getElementById('hideDetails'),
