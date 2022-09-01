@@ -174,7 +174,7 @@ function describeMethod(node: Method): Node[] {
   const rowCount = node.rowCount ? ` - Rows:${node.rowCount}` : '';
   const timeTaken = node.isTruncated
     ? 'TRUNCATED'
-    : `${formatDuration(node.duration || 0)} (self ${formatDuration(node.selfTime || 0)})`;
+    : `${formatDuration(node.duration)} (self ${formatDuration(node.selfTime || 0)})`;
   const lineNumber = node.lineNumber ? `, line: ${node.lineNumber}` : '';
   const lineSuffix = `${nodeValue}${methodSuffix}${rowCount} - ${timeTaken}${lineNumber}`;
 

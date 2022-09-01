@@ -44,7 +44,7 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
         metric.selfTime += node.selfTime || 0;
       }
     } else {
-      map.set(key, new Metric(key, 1, node.duration || 0, node.selfTime || 0));
+      map.set(key, new Metric(key, 1, node.duration, node.selfTime || 0));
     }
   }
 

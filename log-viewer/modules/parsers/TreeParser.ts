@@ -66,6 +66,7 @@ export class TruncationEntry {
  */
 export abstract class LogLine {
   // common metadata (available for all lines)
+  duration = 0; // the time spent in the node
   timestamp = 0; // the timestamp of this log line
   type = ''; // the type of this log line
   logLine = ''; // the raw text of this log line
@@ -93,10 +94,6 @@ export abstract class LogLine {
     }
   }
 
-  getDuration() {
-    return 0;
-  }
-
   loadContent?(lineIter: LineIterator, stack: Method[]): void;
 
   onEnd?(end: LogLine, stack: LogLine[]): void;
@@ -110,7 +107,6 @@ export abstract class LogLine {
  */
 export class TimedNode extends LogLine {
   exitStamp: number | null = null; // the timestamp when the node finished
-  duration = 0; // the time spent in the node
   selfTime: number | null = null; // the net time spent in the node (when not inside children)
   children: LogLine[] = []; // our child nodes
 
@@ -130,16 +126,12 @@ export class TimedNode extends LogLine {
     this.children.push(line);
   }
 
-  getDuration() {
-    return this.duration || 0;
-  }
-
   recalculateDurations() {
     if (this.exitStamp) {
       this.selfTime = this.duration = this.exitStamp - this.timestamp;
 
       this.children.forEach((child) => {
-        this.selfTime! -= child.getDuration();
+        this.selfTime! -= child.duration;
       });
     }
   }
