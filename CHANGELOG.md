@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ## Added
-- A bread-crumb line above the call-tree, rendered on clicking a tree node ([#142][#142])
+- Breadcrumbs shown above the calltree when clicking a row ([#142][#142])
 
 ### Changed
 - Goto code from click to CMD/CTRL and click. Breadcrumbs are shown on click instead. ([#142][#142])
