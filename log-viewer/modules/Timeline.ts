@@ -141,7 +141,7 @@ const state = new State();
 let tooltip: HTMLDivElement;
 let container: HTMLDivElement;
 let canvas: HTMLCanvasElement;
-let ctx: CanvasRenderingContext2D;
+let ctx: CanvasRenderingContext2D | null;
 
 let realHeight = 0;
 let scaleFont: string,
@@ -282,7 +282,10 @@ function addToRectQueue(node: Method, y: number) {
 function renderRectangles(ctx: CanvasRenderingContext2D) {
   ctx.lineWidth = 1;
   for (const [tlKey, items] of rectRenderQueue) {
-    const tl: TimelineGroup = keyMap.get(tlKey)!;
+    const tl = keyMap.get(tlKey);
+    if (!tl) {
+      continue;
+    }
     ctx.beginPath();
     // ctx.strokeStyle = tl.strokeColor;
     ctx.fillStyle = tl.fillColor;
@@ -299,7 +302,7 @@ const drawRect = (rect: Rect) => {
     const x = rect.x * state.zoom - state.offsetX;
     const y = rect.y * scaleY - state.offsetY;
     if (x < displayWidth && x + w > 0 && y > -displayHeight && y + scaleY < 0) {
-      ctx.rect(x, y, w, scaleY);
+      ctx?.rect(x, y, w, scaleY);
     }
   }
 };
@@ -345,7 +348,7 @@ function resize() {
   if (newWidth && newHeight && (newWidth !== displayWidth || newHeight !== displayHeight)) {
     canvas.width = displayWidth = newWidth;
     canvas.height = displayHeight = newHeight;
-    ctx.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-lefts
+    ctx?.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-lefts
 
     const newDefaultZoom = newWidth / totalDuration;
     // defaults if not set yet
@@ -366,7 +369,7 @@ export default async function renderTimeline(rootMethod: RootNode) {
   renderTimelineKey();
   container = document.getElementById('timelineWrapper') as HTMLDivElement;
   canvas = document.getElementById('timeline') as HTMLCanvasElement;
-  ctx = canvas.getContext('2d')!; // can never be null since context (2d) is a supported type.
+  ctx = canvas.getContext('2d'); // can never be null since context (2d) is a supported type.
   timelineRoot = rootMethod;
   calculateSizes();
   nodesToRectangles([timelineRoot], -1);

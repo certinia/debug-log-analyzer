@@ -2,7 +2,6 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { html, render } from 'lit';
 import { LogLine, Method, RootNode } from './parsers/TreeParser';
 
 export class DatabaseEntry {
@@ -81,16 +80,5 @@ export class DatabaseAccess {
   private internStack(stack: Stack): number {
     this.stacks.push([...stack].reverse());
     return this.stacks.length - 1;
-  }
-}
-
-export async function renderDb() {
-  const dbContainer = document.getElementById('dbContent');
-  if (dbContainer) {
-    const sections = [
-      html`<database-section type="dml" />`,
-      html`<database-section type="soql" />`,
-    ];
-    render(html`<div>${sections}</div>`, dbContainer);
   }
 }
