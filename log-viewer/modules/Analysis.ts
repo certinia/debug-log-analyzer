@@ -41,10 +41,10 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
       ++metric.count;
       if (node.duration) {
         metric.duration += node.duration;
-        metric.selfTime += node.selfTime || 0;
+        metric.selfTime += node.selfTime;
       }
     } else {
-      map.set(key, new Metric(key, 1, node.duration, node.selfTime || 0));
+      map.set(key, new Metric(key, 1, node.duration, node.selfTime));
     }
   }
 

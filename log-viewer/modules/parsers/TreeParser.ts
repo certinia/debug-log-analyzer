@@ -112,11 +112,11 @@ export abstract class LogLine {
  */
 export class TimedNode extends LogLine {
   exitStamp: number | null = null; // the timestamp when the node finished
-  selfTime: number | null = null; // the net time spent in the node (when not inside children)
   children: LogLine[] = []; // our child nodes
 
   timelineKey: TimelineKey; // the formatting key for rendering this entry in the timeline
   cpuType: string; // the catagory key to collect our cpu usage
+  selfTime = 0; // the net time spent in the node (when not inside children)
   containsDml = 0; // the number of DML_BEGIN decendants in a node
   containsSoql = 0; // the number of SOQL_EXECUTE_BEGIN decendants in a node
   containsThrown = 0; // the number of EXCEPTION_THROWN decendants in a node
@@ -136,7 +136,7 @@ export class TimedNode extends LogLine {
       this.selfTime = this.duration = this.exitStamp - this.timestamp;
 
       this.children.forEach((child) => {
-        this.selfTime! -= child.duration;
+        this.selfTime -= child.duration;
       });
     }
   }
