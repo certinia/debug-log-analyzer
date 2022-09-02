@@ -11,13 +11,22 @@ import {
   truncated,
   totalDuration,
 } from './parsers/TreeParser';
-
 interface TimelineGroup {
   label: string;
-  // strokeColor: string;
   fillColor: string;
-  //textColor: string;
 }
+
+/* eslint-disable @typescript-eslint/naming-convention */
+interface TimelineColors {
+  'Code Unit': '#6BAD68';
+  DML: '#22686D';
+  Flow: '#237A72';
+  Method: '#328C72';
+  SOQL: '#4B9D6E';
+  'System Method': '#2D4455';
+  Workflow: '#285663';
+}
+/* eslint-enable @typescript-eslint/naming-convention */
 
 interface Rect {
   x: number;
@@ -366,11 +375,9 @@ export default async function renderTimeline(rootMethod: RootNode) {
   }
 }
 
-// todo: chnage to map? or use interface for timelineColors?
-export function setColors(timelineColors: any) {
-  for (const keyName in keyMap) {
-    const keyMeta = keyMap.get(keyName as TimelineKey)!;
-    const newColor = timelineColors[keyMeta.label];
+export function setColors(timelineColors: TimelineColors) {
+  for (const keyMeta of keyMap.values()) {
+    const newColor = timelineColors[keyMeta.label as keyof TimelineColors];
     if (newColor) {
       keyMeta.fillColor = newColor;
     }
@@ -400,7 +407,7 @@ export function renderTimelineKey() {
     keyHolder.appendChild(title);
   }
 
-  for (const [keyName, keyMeta] of keyMap) {
+  for (const keyMeta of keyMap.values()) {
     const keyEntry = document.createElement('div'),
       title = document.createElement('span');
 

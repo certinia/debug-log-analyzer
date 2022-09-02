@@ -14,11 +14,16 @@ export type TimelineKey =
   | 'flow'
   | 'workflow';
 
+enum TruncationColor {
+  error = 'rgba(255, 128, 128, 0.2)',
+  skip = 'rgba(128, 255, 128, 0.2)',
+  unexpected = 'rgba(128, 128, 255, 0.2)',
+}
 const typePattern = /^[A-Z_]*$/,
   truncateColor: Map<TruncateKey, RGBA> = new Map([
-    ['error', 'rgba(255, 128, 128, 0.2)'],
-    ['skip', 'rgba(128, 255, 128, 0.2)'],
-    ['unexpected', 'rgba(128, 128, 255, 0.2)'],
+    ['error', TruncationColor.error],
+    ['skip', TruncationColor.skip],
+    ['unexpected', TruncationColor.unexpected],
   ]),
   newlineRegex = /\r?\n/,
   settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
@@ -284,7 +289,9 @@ export class Detail extends LogLine {
 export function truncateLog(timestamp: number, reason: string, colorKey: TruncateKey) {
   if (!reasons.has(reason)) {
     reasons.add(reason);
-    truncated.push(new TruncationEntry(timestamp, reason, truncateColor.get(colorKey)!));
+    // default to error is probably the safest if we have no matching color for the type
+    const color = truncateColor.get(colorKey) || TruncationColor.error;
+    truncated.push(new TruncationEntry(timestamp, reason, color));
   }
 }
 
