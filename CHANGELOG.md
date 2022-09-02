@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A bread-crumb line above the call-tree, rendered on clicking a tree node ([#142][#142])
 
 ### Changed
-- Only action "view source" when clicking with the CMD keyboard modifier so that we can render bread-crumbs without navigation ([#142][#142])
+- Goto code from click to CMD/CTRL and click. Breadcrumbs are shown on click instead. ([#142][#142])
 
 ## [1.5.0] - 2022-08-08
 
