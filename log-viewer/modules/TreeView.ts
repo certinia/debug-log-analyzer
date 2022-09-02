@@ -5,8 +5,15 @@ import { LogLine, Method, Detail, RootNode, TimedNode } from "./parsers/TreePars
 import formatDuration, { showTab } from "./Util";
 import { hostService, OpenInfo } from "./services/VSCodeService";
 
+declare global {
+  interface HTMLElement {
+    line: LogLine;
+  }
+}
+
 let treeRoot: RootNode,
-  markedNode: HTMLElement;
+  markedNode: HTMLElement,
+  breadcrumbContainer: HTMLDivElement;
 const divElem = document.createElement("div");
 const spanElem = document.createElement("span");
 const linkElem = document.createElement("a");
@@ -503,7 +510,7 @@ function hideByDuration(elements: Array<HTMLElement>) {
 }
 
 // Find the parent node of "elm" (or return null if we reach the root of the tree)
-function getParentNode(elm: Element | null) {
+function getParentNode(elm: HTMLElement | null): HTMLElement | null {
   if (elm === null || elm.classList.contains('root')) {
     return null;
   }
@@ -520,8 +527,8 @@ function insertCrumb(container: Element, node: HTMLElement) {
   // @ts-ignore (custom dom property)
   const line = node.line as LogLine,
     nameNode = node.querySelector<HTMLElement>('.name') || node,
-    crumb = document.createElement('div'),
-    textElm = document.createElement('div'),
+    crumb = divElem.cloneNode() as HTMLDivElement,
+    textElm = divElem.cloneNode() as HTMLDivElement,
     textNode = document.createTextNode(line.getBreadcrumbText());
 
   crumb.classList.add('crumb');
@@ -536,11 +543,11 @@ function insertCrumb(container: Element, node: HTMLElement) {
 }
 
 function showBreadcrumb(nameNode: HTMLElement | null) {
-  const container = document.getElementById('breadcrumb')!;
-  // empty the container
-  while (container.firstElementChild) {
-    container.removeChild(container.firstElementChild);
-  }
+  const newContainer = divElem.cloneNode() as HTMLDivElement;
+  
+  breadcrumbContainer.replaceWith(newContainer);
+  breadcrumbContainer = newContainer;
+
   // remove old marker
   if (markedNode) {
     markedNode.classList.remove('marked');
@@ -552,11 +559,9 @@ function showBreadcrumb(nameNode: HTMLElement | null) {
   nameNode.classList.add('marked');
   markedNode = nameNode;
 
-  // @ts-ignore (custom dom property)
   let node = nameNode.line ? nameNode : getParentNode(nameNode);
-  // @ts-ignore (custom dom property)
   while (node && node.line !== treeRoot) {
-    insertCrumb(container, node);
+    insertCrumb(breadcrumbContainer, node);
     node = getParentNode(node);
   }
 }
@@ -569,6 +574,8 @@ function onInitTree(evt: Event) {
     hideFormula = document.getElementById("hideFormula"),
     hideDuration = document.getElementById("hideUnder"),
     timeInMS = document.getElementById("hideUnderTime");
+
+  breadcrumbContainer = document.getElementById('breadcrumb') as HTMLDivElement;
 
   expandAll?.addEventListener("click", onExpandAll);
   collapseAll?.addEventListener("click", onCollapseAll);

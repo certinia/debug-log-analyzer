@@ -29,29 +29,29 @@
   margin-right: 5px;
 }
 #breadcrumb {
-	background-color: aliceblue;
-	white-space: nowrap;
-    overflow-x: auto;
+  background-color: aliceblue;
+  white-space: nowrap;
+  overflow-x: auto;
 }
 .crumb {
-	display: inline-block;
-	padding: 0 5px;
-	background-color: beige;
-	border: solid 1px blue;
-	border-radius: 10px;
-	margin: 4px 2px 10px 2px;
-	white-space: nowrap;
-	font-size: 10pt;
+  display: inline-block;
+  padding: 0 5px;
+  background-color: beige;
+  border: solid 1px blue;
+  border-radius: 10px;
+  margin: 4px 2px 10px 2px;
+  white-space: nowrap;
+  font-size: 10pt;
 }
 .node {
   margin-top: 2px;
   white-space: pre;
 }
 .node.system {
-	display: block;
+  display: block;
 }
 .node.formula {
-	display: inline-block;  /* make different to .node.system to stop rollup from combining them */
+  display: inline-block;  /* make different to .node.system to stop rollup from combining them */
 }
 .childContainer {
   margin-left: 24px;
@@ -64,10 +64,10 @@
   text-indent: -1em;
 }
 .detail {
-	display: none;
+  display: none;
 }
 .marked {
-	border: dashed blue 2px;
+  border: dashed blue 2px;
 }
 .toggle {
   cursor: pointer;
