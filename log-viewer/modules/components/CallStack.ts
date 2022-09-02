@@ -8,7 +8,7 @@ import { LogLine } from '../parsers/TreeParser';
 import { showTreeNode } from '../TreeView';
 
 @customElement('call-stack')
-class CallStack extends LitElement {
+export class CallStack extends LitElement {
   @property({ type: Number }) stack = -1;
 
   static get styles() {
@@ -55,7 +55,7 @@ class CallStack extends LitElement {
     `;
   }
 
-  private onCallerClick(evt: any) {
+  private onCallerClick(evt: Event) {
     const target = evt.target as HTMLElement;
     const dataTimestamp = target.getAttribute('data-timestamp');
     if (dataTimestamp) {

@@ -14,13 +14,10 @@ import parseLog, {
 import renderTreeView from './TreeView';
 import renderTimeline, { setColors, renderTimelineKey } from './Timeline';
 import analyseMethods, { renderAnalysis } from './Analysis';
-import { DatabaseAccess, renderDb } from './Database';
+import { DatabaseAccess } from './Database';
 import { setNamespaces } from './NamespaceExtrator';
 import { hostService } from './services/VSCodeService';
-
-import './components/DatabaseSection.ts';
-import './components/DatabaseRow.ts';
-import './components/CallStack.ts';
+import { renderDb } from './components/Database';
 
 import '../resources/css/Status.css';
 import '../resources/css/Settings.css';

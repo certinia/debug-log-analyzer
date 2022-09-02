@@ -5,8 +5,10 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { DatabaseAccess, DatabaseEntryMap } from '../Database';
 
+import './DatabaseRow.ts';
+
 @customElement('database-section')
-class DatabaseSection extends LitElement {
+export class DatabaseSection extends LitElement {
   @property({ type: String }) type = '';
 
   static get styles() {
