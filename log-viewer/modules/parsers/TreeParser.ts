@@ -679,7 +679,7 @@ class SOQLExecuteBeginLine extends Method {
     this.text = 'SOQL: ' + parts[3] + ' - ' + parts[4];
   }
 
-  onEnd(end: SOQLExecuteEndLine, stack: LogLine[]) {
+  onEnd(end: SOQLExecuteEndLine, _stack: LogLine[]): void {
     this.rowCount = end.rowCount;
   }
 }
@@ -711,7 +711,7 @@ class SOSLExecuteBeginLine extends Method {
     this.text = `SOSL: ${parts[3]}`;
   }
 
-  onEnd(end: SOSLExecuteEndLine, stack: Detail[]) {
+  onEnd(end: SOSLExecuteEndLine, _stack: Detail[]): void {
     this.rowCount = end.rowCount;
   }
 }
@@ -759,7 +759,7 @@ class VariableScopeBeginLine extends Detail {
     this.value = parts[4];
   }
 
-  onEnd(end: LogLine, stack: LogLine[]) {
+  onEnd(end: LogLine, _stack: LogLine[]): void {
     if (end.value) {
       this.value = end.value;
     }
@@ -858,7 +858,7 @@ class LimitUsageForNSLine extends Detail {
     this.group = this.type;
   }
 
-  onAfter(next: LogLine) {
+  onAfter(_next: LogLine): void {
     const matched = this.text.match(/Maximum CPU time: (\d+)/),
       cpuText = matched ? matched[1] : '0',
       cpuTime = parseInt(cpuText, 10) * 1000000; // convert from milli-seconds to nano-seconds
