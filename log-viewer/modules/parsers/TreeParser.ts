@@ -921,7 +921,7 @@ class SavepointRollbackLine extends Detail {
   }
 }
 
-class SavepointSetLine extends Detail {
+class SavePointSetLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
@@ -1048,14 +1048,6 @@ class EventSericeSubDetailLine extends Detail {
     super(parts);
     this.text = `${parts[2]} ${parts[3]} ${parts[4]} ${parts[6]} ${parts[6]}`;
     this.group = this.type;
-  }
-}
-
-class SavePointSetLine extends Detail {
-  constructor(parts: string[]) {
-    super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3];
   }
 }
 
