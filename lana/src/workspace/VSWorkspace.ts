@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { WorkspaceFolder } from "vscode";
+import { WorkspaceFolder } from 'vscode';
 
 export class VSWorkspace {
   workspaceFolder: WorkspaceFolder;

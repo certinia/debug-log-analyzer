@@ -5,7 +5,7 @@
 declare function acquireVsCodeApi(): VSCodeAPI;
 
 interface VSCodeAPI {
-  postMessage(message: any): void;
+  postMessage(message: unknown): void;
 }
 
 export type OpenInfo = {
@@ -39,14 +39,14 @@ export class VSCodeService implements HostService {
     try {
       this.vscodeAPIInstance = acquireVsCodeApi();
     } catch (e) {
-      console.log("acquireVsCodeApi() exception: " + e);
+      console.log('acquireVsCodeApi() exception: ' + e);
     }
   }
 
   openPath(path: string) {
     if (this.vscodeAPIInstance) {
       this.vscodeAPIInstance.postMessage({
-        cmd: "openPath",
+        cmd: 'openPath',
         path: path,
       });
     } else {
@@ -57,7 +57,7 @@ export class VSCodeService implements HostService {
   openType(info: OpenInfo) {
     if (this.vscodeAPIInstance) {
       this.vscodeAPIInstance.postMessage({
-        cmd: "openType",
+        cmd: 'openType',
         typeName: info.typeName,
         text: info.text,
       });
@@ -68,7 +68,7 @@ export class VSCodeService implements HostService {
 
   openHelp() {
     if (this.vscodeAPIInstance) {
-      this.vscodeAPIInstance.postMessage({ cmd: "openHelp" });
+      this.vscodeAPIInstance.postMessage({ cmd: 'openHelp' });
     } else {
       console.log(`VSCodeService.open() with no VSCode instance.`);
     }
@@ -76,7 +76,7 @@ export class VSCodeService implements HostService {
 
   getConfig() {
     if (this.vscodeAPIInstance) {
-      this.vscodeAPIInstance.postMessage({ cmd: "getConfig" });
+      this.vscodeAPIInstance.postMessage({ cmd: 'getConfig' });
     } else {
       console.log(`VSCodeService.getConfig() with no VSCode instance.`);
     }

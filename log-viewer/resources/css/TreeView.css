@@ -51,7 +51,7 @@
   display: block;
 }
 .node.formula {
-  display: inline-block;  /* make different to .node.system to stop rollup from combining them */
+  display: inline-block; /* make different to .node.system to stop rollup from combining them */
 }
 .childContainer {
   margin-left: 24px;

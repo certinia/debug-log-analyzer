@@ -1,13 +1,15 @@
 /*
  * Copyright (c) 2021 FinancialForce.com, inc. All rights reserved.
  */
-import { LitElement, html, css } from "lit";
-import { customElement, property } from "lit/decorators.js";
-import { DatabaseAccess, DatabaseEntryMap } from "../Database";
+import { LitElement, html, css } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
+import { DatabaseAccess, DatabaseEntryMap } from '../Database';
 
-@customElement("database-section")
-class DatabaseSection extends LitElement {
-  @property({ type: String }) type = "";
+import './DatabaseRow.ts';
+
+@customElement('database-section')
+export class DatabaseSection extends LitElement {
+  @property({ type: String }) type = '';
 
   static get styles() {
     return css`
@@ -28,14 +30,14 @@ class DatabaseSection extends LitElement {
   render() {
     const instancce = DatabaseAccess.instance();
     let map: DatabaseEntryMap | null = null;
-    let title = "";
-    if (this.type === "soql" && instancce) {
+    let title = '';
+    if (this.type === 'soql' && instancce) {
       map = instancce.soqlMap;
-      title = "SOQL Statements";
+      title = 'SOQL Statements';
     }
-    if (this.type === "dml" && instancce) {
+    if (this.type === 'dml' && instancce) {
       map = instancce.dmlMap;
-      title = "DML Statements";
+      title = 'DML Statements';
     }
     if (map) {
       const keyList = this.getKeyList(map);
@@ -45,15 +47,15 @@ class DatabaseSection extends LitElement {
         totalCount += value.count;
         totalRows += value.rowCount;
       });
-      const rows = keyList.map((key) => {return html`<database-row key=${key} />`;});
+      const rows = keyList.map((key) => {
+        return html`<database-row key=${key} />`;
+      });
 
       return html`
         <div class="dbSection">
           <div class="dbTitle">
             ${title} (Count: ${totalCount}, Rows: ${totalRows})
-            <div class="dbBlock">
-                ${rows}
-            </div>
+            <div class="dbBlock">${rows}</div>
           </div>
         </div>
       `;
@@ -69,8 +71,8 @@ class DatabaseSection extends LitElement {
   private getKeyList(entryMap: DatabaseEntryMap): string[] {
     const keyList = Array.from(entryMap.keys());
     keyList.sort((k1, k2) => {
-      let e1 = entryMap.get(k1);
-      let e2 = entryMap.get(k2);
+      const e1 = entryMap.get(k1);
+      const e2 = entryMap.get(k2);
 
       if (e1 && e2) {
         const countDiff = e2.count - e1.count;

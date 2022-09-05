@@ -2,15 +2,13 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { ExtensionContext, Uri, window, workspace } from "vscode";
-import { appName } from "./Main";
+import { Uri, window, workspace } from 'vscode';
+import { appName } from './Main';
 
 export class Display {
   private outputChannel = window.createOutputChannel(appName);
 
-  constructor(context: ExtensionContext) {}
-
-  output(message: string, showChannel: boolean = false) {
+  output(message: string, showChannel = false) {
     if (showChannel) {
       this.outputChannel.show(true);
     }
@@ -26,8 +24,6 @@ export class Display {
   }
 
   showFile(path: string): void {
-    workspace
-      .openTextDocument(Uri.file(path))
-      .then((td) => window.showTextDocument(td));
+    workspace.openTextDocument(Uri.file(path)).then((td) => window.showTextDocument(td));
   }
 }

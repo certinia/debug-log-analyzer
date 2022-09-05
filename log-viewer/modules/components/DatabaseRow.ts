@@ -1,13 +1,15 @@
 /*
  * Copyright (c) 2021 FinancialForce.com, inc. All rights reserved.
  */
-import { LitElement, html, css } from "lit";
-import { customElement, property } from "lit/decorators.js";
-import { DatabaseAccess } from "../Database";
+import { LitElement, html, css } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
+import { DatabaseAccess } from '../Database';
 
-@customElement("database-row")
-class DatabaseRow extends LitElement {
-  @property({ type: String }) key = "";
+import './CallStack.ts';
+
+@customElement('database-row')
+export class DatabaseRow extends LitElement {
+  @property({ type: String }) key = '';
 
   static get styles() {
     return css`
@@ -36,12 +38,10 @@ class DatabaseRow extends LitElement {
     const dmlMap = DatabaseAccess.instance()?.dmlMap;
 
     if (soqlMap && dmlMap) {
-      let entry = soqlMap.get(this.key) || dmlMap.get(this.key);
+      const entry = soqlMap.get(this.key) || dmlMap.get(this.key);
       if (entry) {
-        const detail = this.key.substring(this.key.indexOf(" ") + 1);
-        const stacks = entry.stacks.map(
-          (stack) => html`<call-stack stack=${stack} />`
-        );
+        const detail = this.key.substring(this.key.indexOf(' ') + 1);
+        const stacks = entry.stacks.map((stack) => html`<call-stack stack=${stack}></call-stack>`);
         return html`
           <div class="dbEntry">
             <span class="dbCount">Count: ${entry.count}</span>
