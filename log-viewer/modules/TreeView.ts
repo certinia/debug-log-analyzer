@@ -11,9 +11,7 @@ declare global {
   }
 }
 
-let treeRoot: RootNode,
-  markedNode: HTMLElement,
-  breadcrumbContainer: HTMLDivElement;
+let treeRoot: RootNode, markedNode: HTMLElement, breadcrumbContainer: HTMLDivElement;
 const divElem = document.createElement('div');
 const spanElem = document.createElement('span');
 const linkElem = document.createElement('a');
@@ -532,7 +530,7 @@ function insertCrumb(container: Element, node: HTMLElement) {
   crumb.classList.add('crumb');
   crumb.title = nameNode.textContent!;
   crumb.appendChild(textElm);
-  crumb.addEventListener('click', evt => {
+  crumb.addEventListener('click', (evt) => {
     nameNode.scrollIntoView();
     showBreadcrumb(nameNode);
   });
@@ -542,7 +540,7 @@ function insertCrumb(container: Element, node: HTMLElement) {
 
 function showBreadcrumb(nameNode: HTMLElement | null) {
   const newContainer = divElem.cloneNode() as HTMLDivElement;
-  
+
   breadcrumbContainer.replaceWith(newContainer);
   breadcrumbContainer = newContainer;
 
@@ -565,13 +563,13 @@ function showBreadcrumb(nameNode: HTMLElement | null) {
 }
 
 function onInitTree(evt: Event) {
-  const expandAll = document.getElementById("expandAll"),
-    collapseAll = document.getElementById("collapseAll"),
-    hideDetails = document.getElementById("hideDetails"),
-    hideSystem = document.getElementById("hideSystem"),
-    hideFormula = document.getElementById("hideFormula"),
-    hideDuration = document.getElementById("hideUnder"),
-    timeInMS = document.getElementById("hideUnderTime");
+  const expandAll = document.getElementById('expandAll'),
+    collapseAll = document.getElementById('collapseAll'),
+    hideDetails = document.getElementById('hideDetails'),
+    hideSystem = document.getElementById('hideSystem'),
+    hideFormula = document.getElementById('hideFormula'),
+    hideDuration = document.getElementById('hideUnder'),
+    timeInMS = document.getElementById('hideUnderTime');
 
   breadcrumbContainer = document.getElementById('breadcrumb') as HTMLDivElement;
 

@@ -720,7 +720,7 @@ class SOQLExecuteBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['SOQL_EXECUTE_END'], null, 'soql', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = "SOQL: " + parts[3] + " - " + parts[4];
+    this.text = 'SOQL: ' + parts[3] + ' - ' + parts[4];
   }
 
   getBreadcrumbText(): string {
