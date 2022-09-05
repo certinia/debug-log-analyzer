@@ -207,7 +207,6 @@ function renderBlock(line: LogLine) {
   const lineNode = divElem.cloneNode() as HTMLDivElement;
   lineNode.className = line instanceof Detail && line.hideable ? 'block name detail' : 'block name';
 
-  // @ts-ignore (custom dom property)
   lineNode.line = line;
 
   const value = line.text || '';
@@ -252,7 +251,7 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
 function renderMethod(node: Method, timeStamps: number[]) {
   const children = node.children;
   const mainNode = divElem.cloneNode() as HTMLDivElement;
-  // @ts-ignore (custom dom property)
+
   mainNode.line = node;
 
   if (node.timestamp >= 0) {
@@ -524,7 +523,6 @@ function getParentNode(elm: HTMLElement | null): HTMLElement | null {
 }
 
 function insertCrumb(container: Element, node: HTMLElement) {
-  // @ts-ignore (custom dom property)
   const line = node.line as LogLine,
     nameNode = node.querySelector<HTMLElement>('.name') || node,
     crumb = divElem.cloneNode() as HTMLDivElement,
