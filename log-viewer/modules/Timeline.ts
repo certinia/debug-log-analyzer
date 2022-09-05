@@ -1,9 +1,16 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { showTreeNode } from "./TreeView";
-import formatDuration from "./Util";
-import { TimedNode, Method, RootNode, TimelineKey, truncated, totalDuration } from "./parsers/TreeParser";
+import { showTreeNode } from './TreeView';
+import formatDuration from './Util';
+import {
+  TimedNode,
+  Method,
+  RootNode,
+  TimelineKey,
+  truncated,
+  totalDuration,
+} from './parsers/TreeParser';
 
 interface TimelineGroup {
   label: string;
@@ -19,37 +26,58 @@ interface Rect {
 }
 
 const scaleY = -15,
-  strokeColor = "#B0B0B0",
-  textColor = "#FFFFFF",
+  strokeColor = '#B0B0B0',
+  textColor = '#FFFFFF',
   keyMap: Map<TimelineKey, TimelineGroup> = new Map([
-    ["codeUnit", {
-      label: "Code Unit",
-      fillColor: "#6BAD68",
-    }],
-    ["soql", {
-      label: "SOQL",
-      fillColor: "#4B9D6E",
-    }],
-    ["method", {
-      label: "Method",
-      fillColor: "#328C72",
-    }],
-    ["flow", {
-      label: "Flow",
-      fillColor: "#237A72",
-    }],
-    ["dml", {
-      label: "DML",
-      fillColor: "#22686D",
-    }],
-    ["workflow", {
-      label: "Workflow",
-      fillColor: "#285663",
-    }],
-    ["systemMethod", {
-      label: "System Method",
-      fillColor: "#2D4455",
-    }],
+    [
+      'codeUnit',
+      {
+        label: 'Code Unit',
+        fillColor: '#6BAD68',
+      },
+    ],
+    [
+      'soql',
+      {
+        label: 'SOQL',
+        fillColor: '#4B9D6E',
+      },
+    ],
+    [
+      'method',
+      {
+        label: 'Method',
+        fillColor: '#328C72',
+      },
+    ],
+    [
+      'flow',
+      {
+        label: 'Flow',
+        fillColor: '#237A72',
+      },
+    ],
+    [
+      'dml',
+      {
+        label: 'DML',
+        fillColor: '#22686D',
+      },
+    ],
+    [
+      'workflow',
+      {
+        label: 'Workflow',
+        fillColor: '#285663',
+      },
+    ],
+    [
+      'systemMethod',
+      {
+        label: 'System Method',
+        fillColor: '#2D4455',
+      },
+    ],
   ]);
 
 class State {
@@ -139,8 +167,8 @@ function getMaxDepth(node: Method, depth = 0) {
 function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.lineWidth = 1;
   ctx.font = scaleFont;
-  ctx.textBaseline = "top";
-  ctx.textAlign = "left";
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
 
   const textHeight = -displayHeight + 2;
   // 1ms = 0.001s
@@ -154,8 +182,8 @@ function drawScale(ctx: CanvasRenderingContext2D) {
 
   const endTimeInS = Math.ceil(endTimeInNs / 1000000000);
   const startTimeInS = Math.floor(startTimeInNs / 1000000000);
-  ctx.strokeStyle = "#F88962";
-  ctx.fillStyle = "#F88962";
+  ctx.strokeStyle = '#F88962';
+  ctx.fillStyle = '#F88962';
   ctx.beginPath();
   for (let i = startTimeInS; i <= endTimeInS; i++) {
     const xPos = nsWidth * i - state.offsetX;
@@ -179,8 +207,8 @@ function drawScale(ctx: CanvasRenderingContext2D) {
     return Math.abs(curr - microSecPixelGap) < Math.abs(prev - microSecPixelGap) ? curr : prev;
   });
 
-  ctx.strokeStyle = "#E0E0E0";
-  ctx.fillStyle = "#808080";
+  ctx.strokeStyle = '#E0E0E0';
+  ctx.fillStyle = '#808080';
   ctx.beginPath();
 
   const microSecWidth = 1000 * state.zoom;
@@ -233,13 +261,13 @@ const rectRenderQueue = new Map<TimelineKey, Rect[]>();
  * @param node The node to be rendered
  * @param y The call depth of the node
  */
- function addToRectQueue(node: Method, y: number) {
-  const {timelineKey: tlKey, timestamp: x, duration} = node,
+function addToRectQueue(node: Method, y: number) {
+  const { timelineKey: tlKey, timestamp: x, duration } = node,
     w = duration!,
-   rect: Rect = {x, y, w};
+    rect: Rect = { x, y, w };
   let list = rectRenderQueue.get(tlKey);
   if (!list) {
-    rectRenderQueue.set(tlKey, list = []);
+    rectRenderQueue.set(tlKey, (list = []));
   }
   list.push(rect);
 }
@@ -324,14 +352,14 @@ function resize() {
 }
 
 function resizeFont() {
-  scaleFont = state.zoom > 0.0000004 ? "normal 16px serif" : "normal 8px serif";
+  scaleFont = state.zoom > 0.0000004 ? 'normal 16px serif' : 'normal 8px serif';
 }
 
 export default async function renderTimeline(rootMethod: RootNode) {
   renderTimelineKey();
-  container = document.getElementById("timelineWrapper") as HTMLDivElement;
-  canvas = document.getElementById("timeline") as HTMLCanvasElement;
-  ctx = canvas.getContext("2d")!; // can never be null since context (2d) is a supported type.
+  container = document.getElementById('timelineWrapper') as HTMLDivElement;
+  canvas = document.getElementById('timeline') as HTMLCanvasElement;
+  ctx = canvas.getContext('2d')!; // can never be null since context (2d) is a supported type.
   timelineRoot = rootMethod;
   calculateSizes();
   nodesToRectangles([timelineRoot], -1);
@@ -365,21 +393,21 @@ function drawTimeLine() {
 }
 
 export function renderTimelineKey() {
-  const keyHolder = document.getElementById("timelineKey") as HTMLDivElement,
-    title = document.createElement("span");
+  const keyHolder = document.getElementById('timelineKey') as HTMLDivElement,
+    title = document.createElement('span');
 
-  title.innerText = "";
+  title.innerText = '';
   if (keyHolder) {
-    keyHolder.innerHTML = "";
+    keyHolder.innerHTML = '';
     keyHolder.appendChild(title);
   }
 
   for (const [keyName, keyMeta] of keyMap) {
-    const keyEntry = document.createElement("div"),
-      title = document.createElement("span");
+    const keyEntry = document.createElement('div'),
+      title = document.createElement('span');
 
     title.innerText = keyMeta.label;
-    keyEntry.className = "keyEntry";
+    keyEntry.className = 'keyEntry';
     keyEntry.style.backgroundColor = keyMeta.fillColor;
     keyEntry.style.color = textColor;
     keyEntry.appendChild(title);
@@ -443,8 +471,8 @@ function showTooltip(offsetX: number, offsetY: number) {
 function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
   const target = findByPosition(timelineRoot, 0, x, depth);
   if (target) {
-    const toolTip = document.createElement("div");
-    const brElem = document.createElement("br");
+    const toolTip = document.createElement('div');
+    const brElem = document.createElement('br');
     let displayText = target.text;
     if (target.suffix) {
       displayText += target.suffix;
@@ -455,15 +483,15 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
     toolTip.appendChild(document.createTextNode(displayText));
     if (target.timestamp && target.duration && target.selfTime) {
       toolTip.appendChild(brElem.cloneNode());
-      toolTip.appendChild(document.createTextNode("timestamp: " + target.timestamp));
+      toolTip.appendChild(document.createTextNode('timestamp: ' + target.timestamp));
       if (target.exitStamp) {
-        toolTip.appendChild(document.createTextNode(" => " + target.exitStamp));
+        toolTip.appendChild(document.createTextNode(' => ' + target.exitStamp));
         toolTip.appendChild(brElem.cloneNode());
         toolTip.appendChild(
           document.createTextNode(`duration: ${formatDuration(target.duration)}`)
         );
-        if (target.cpuType === "free") {
-          toolTip.appendChild(document.createTextNode(" (free)"));
+        if (target.cpuType === 'free') {
+          toolTip.appendChild(document.createTextNode(' (free)'));
         } else {
           toolTip.appendChild(
             document.createTextNode(` (self ${formatDuration(target.selfTime)})`)
@@ -488,9 +516,9 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
       endTime = nextEntry.timestamp ?? totalDuration,
       startX = startTime * state.zoom - state.offsetX,
       endX = endTime * state.zoom - state.offsetX;
-  
+
     if (x >= startX && x <= endX) {
-      const toolTip = document.createElement("div");
+      const toolTip = document.createElement('div');
       toolTip.textContent = thisEntry.reason;
       return toolTip;
     }
@@ -509,7 +537,7 @@ function showTooltipWithText(
     let posLeft = offsetX + 10,
       posTop = offsetY + 2;
 
-    tooltip.innerHTML = "";
+    tooltip.innerHTML = '';
     tooltip.appendChild(tooltipText);
     tooltip.style.cssText = `left:${posLeft}px; top:${posTop}px; display: block;`;
 
@@ -527,7 +555,7 @@ function showTooltipWithText(
       tooltip.style.cssText = `left:${posLeft}px; top:${posTop}px; display: block;`;
     }
   } else {
-    tooltip.style.display = "none";
+    tooltip.style.display = 'none';
   }
 }
 
@@ -546,7 +574,7 @@ function showTooltipWithText(
 function onMouseMove(evt: any) {
   const target = evt.target as HTMLElement;
 
-  if (target && (target.id === "timeline" || target.id === "tooltip")) {
+  if (target && (target.id === 'timeline' || target.id === 'tooltip')) {
     const clRect = canvas?.getBoundingClientRect();
     if (clRect) {
       lastMouseX = evt.clientX - clRect.left;
@@ -557,7 +585,7 @@ function onMouseMove(evt: any) {
 }
 
 function onClickCanvas(evt: any) {
-  if (!dragging && tooltip.style.display === "block") {
+  if (!dragging && tooltip.style.display === 'block') {
     const depth = ~~(((displayHeight - lastMouseY - state.offsetY) / realHeight) * maxY);
     const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
     if (target && target.timestamp) {
@@ -568,8 +596,8 @@ function onClickCanvas(evt: any) {
 
 function onLeaveCanvas(evt: any) {
   dragging = false;
-  if (!evt.relatedTarget || evt.relatedTarget.id !== "tooltip") {
-    tooltip.style.display = "none";
+  if (!evt.relatedTarget || evt.relatedTarget.id !== 'tooltip') {
+    tooltip.style.display = 'none';
   }
 }
 
@@ -584,7 +612,7 @@ function handleMouseUp(evt: MouseEvent) {
 
 function handleMouseMove(evt: MouseEvent) {
   if (dragging) {
-    tooltip.style.display = "none";
+    tooltip.style.display = 'none';
     const { movementY, movementX } = evt;
     const maxWidth = state.zoom * totalDuration - displayWidth;
     state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX - movementX));
@@ -596,7 +624,7 @@ function handleMouseMove(evt: MouseEvent) {
 
 function handleScroll(evt: WheelEvent) {
   if (!dragging) {
-    tooltip.style.display = "none";
+    tooltip.style.display = 'none';
     evt.stopPropagation();
     const { deltaY, deltaX } = evt;
 
@@ -626,17 +654,17 @@ function handleScroll(evt: WheelEvent) {
 }
 
 function onInitTimeline(evt: Event) {
-  const canvas = document.getElementById("timeline") as HTMLCanvasElement,
-    timelineWrapper = document.getElementById("timelineWrapper");
-  tooltip = document.getElementById("tooltip") as HTMLDivElement;
+  const canvas = document.getElementById('timeline') as HTMLCanvasElement,
+    timelineWrapper = document.getElementById('timelineWrapper');
+  tooltip = document.getElementById('tooltip') as HTMLDivElement;
 
   if (canvas) {
-    canvas.addEventListener("mouseout", onLeaveCanvas);
-    canvas.addEventListener("wheel", handleScroll, { passive: true });
-    canvas.addEventListener("mousedown", handleMouseDown);
-    canvas.addEventListener("mouseup", handleMouseUp);
-    canvas.addEventListener("mousemove", handleMouseMove, { passive: true });
-    canvas.addEventListener("click", onClickCanvas);
+    canvas.addEventListener('mouseout', onLeaveCanvas);
+    canvas.addEventListener('wheel', handleScroll, { passive: true });
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('mousemove', handleMouseMove, { passive: true });
+    canvas.addEventListener('click', onClickCanvas);
   }
 
   if (timelineWrapper) {
@@ -644,7 +672,7 @@ function onInitTimeline(evt: Event) {
   }
 
   // document seem to get all the events (regardless of which element we're over)
-  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener('mousemove', onMouseMove);
 }
 
-window.addEventListener("DOMContentLoaded", onInitTimeline);
+window.addEventListener('DOMContentLoaded', onInitTimeline);

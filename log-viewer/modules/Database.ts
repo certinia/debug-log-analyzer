@@ -2,8 +2,8 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { html, render } from "lit";
-import { LogLine, Method, RootNode } from "./parsers/TreeParser";
+import { html, render } from 'lit';
+import { LogLine, Method, RootNode } from './parsers/TreeParser';
 
 export class DatabaseEntry {
   readonly count: number;
@@ -52,10 +52,10 @@ export class DatabaseAccess {
     for (let i = 0; i < len; ++i) {
       const child = children[i];
       switch (child.type) {
-        case "DML_BEGIN":
+        case 'DML_BEGIN':
           log.upsert(log.dmlMap, child, stack);
           break;
-        case "SOQL_EXECUTE_BEGIN":
+        case 'SOQL_EXECUTE_BEGIN':
           log.upsert(log.soqlMap, child, stack);
           break;
       }
@@ -85,7 +85,7 @@ export class DatabaseAccess {
 }
 
 export async function renderDb() {
-  const dbContainer = document.getElementById("dbContent");
+  const dbContainer = document.getElementById('dbContent');
   if (dbContainer) {
     const sections = [
       html`<database-section type="dml" />`,

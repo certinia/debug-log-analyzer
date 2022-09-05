@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { QuickPickItem, QuickPickOptions, window } from "vscode";
+import { QuickPickItem, QuickPickOptions, window } from 'vscode';
 
 export class Item implements QuickPickItem {
   label: string;
@@ -31,11 +31,7 @@ export class Options implements QuickPickOptions {
   ignoreFocusOut: boolean;
   placeHolder: string;
 
-  constructor(
-    placeholder: string,
-    ignoreDefocus: boolean = false,
-    multiSelect: boolean = false
-  ) {
+  constructor(placeholder: string, ignoreDefocus: boolean = false, multiSelect: boolean = false) {
     this.placeHolder = placeholder;
     this.ignoreFocusOut = ignoreDefocus;
     this.canPickMany = multiSelect;
@@ -43,10 +39,7 @@ export class Options implements QuickPickOptions {
 }
 
 export class QuickPick {
-  static async pick<T extends Item, U extends Options>(
-    items: T[],
-    options: U
-  ): Promise<T[]> {
+  static async pick<T extends Item, U extends Options>(items: T[], options: U): Promise<T[]> {
     return QuickPick.showQuickPick(items, options).then((oneOrMany) => {
       if (oneOrMany) {
         return options.canPickMany ? (oneOrMany as T[]) : [oneOrMany as T];

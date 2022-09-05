@@ -2,11 +2,11 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { commands } from "vscode";
-import { Context } from "../Context";
+import { commands } from 'vscode';
+import { Context } from '../Context';
 
 export class Command {
-  private static commandPrefix = "lana.";
+  private static commandPrefix = 'lana.';
 
   name: string;
   run: (...args: any[]) => any;
