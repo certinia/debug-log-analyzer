@@ -5,8 +5,10 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { DatabaseAccess, DatabaseEntryMap } from '../Database';
 
+import './DatabaseRow.ts';
+
 @customElement('database-section')
-class DatabaseSection extends LitElement {
+export class DatabaseSection extends LitElement {
   @property({ type: String }) type = '';
 
   static get styles() {
@@ -69,8 +71,8 @@ class DatabaseSection extends LitElement {
   private getKeyList(entryMap: DatabaseEntryMap): string[] {
     const keyList = Array.from(entryMap.keys());
     keyList.sort((k1, k2) => {
-      let e1 = entryMap.get(k1);
-      let e2 = entryMap.get(k2);
+      const e1 = entryMap.get(k1);
+      const e2 = entryMap.get(k2);
 
       if (e1 && e2) {
         const countDiff = e2.count - e1.count;

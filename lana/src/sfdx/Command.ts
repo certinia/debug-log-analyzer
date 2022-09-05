@@ -13,18 +13,14 @@ type Handler = (
 export class Command {
   static async apply(path: string, command: string[]): Promise<string> {
     return new Promise<string>((resolve, reject) => {
-      Command.run(
-        path,
-        command,
-        (error: ExecException | null, stdOut: Buffer | string, stdErr: Buffer | string) => {
-          if (error === null) {
-            const out = stdOut as Buffer;
-            resolve(out.toString('utf8'));
-          } else {
-            reject(Command.attemptErrorParse(error, stdOut as Buffer));
-          }
+      Command.run(path, command, (error: ExecException | null, stdOut: Buffer | string) => {
+        if (error === null) {
+          const out = stdOut as Buffer;
+          resolve(out.toString('utf8'));
+        } else {
+          reject(Command.attemptErrorParse(error, stdOut as Buffer));
         }
-      );
+      });
     });
   }
 

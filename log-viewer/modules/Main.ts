@@ -14,13 +14,10 @@ import parseLog, {
 import renderTreeView from './TreeView';
 import renderTimeline, { setColors, renderTimelineKey } from './Timeline';
 import analyseMethods, { renderAnalysis } from './Analysis';
-import { DatabaseAccess, renderDb } from './Database';
+import { DatabaseAccess } from './Database';
 import { setNamespaces } from './NamespaceExtrator';
 import { hostService } from './services/VSCodeService';
-
-import './components/DatabaseSection.ts';
-import './components/DatabaseRow.ts';
-import './components/CallStack.ts';
+import { renderDb } from './components/Database';
 
 import '../resources/css/Status.css';
 import '../resources/css/Settings.css';
@@ -263,7 +260,7 @@ function handleMessage(evt: MessageEvent) {
   }
 }
 
-function onInit(evt: Event) {
+function onInit(): void {
   const tabHolder = document.querySelector('.tabHolder');
   tabHolder?.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', onTabSelect));
 

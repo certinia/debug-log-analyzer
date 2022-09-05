@@ -8,7 +8,7 @@ import { LogLine } from '../parsers/TreeParser';
 import { showTreeNode } from '../TreeView';
 
 @customElement('call-stack')
-class CallStack extends LitElement {
+export class CallStack extends LitElement {
   @property({ type: Number }) stack = -1;
 
   static get styles() {
@@ -35,7 +35,7 @@ class CallStack extends LitElement {
     if (stacks && this.stack >= 0 && this.stack < stacks.length) {
       const stack = stacks[this.stack];
       if (stack) {
-        let details = stack.slice(1, 10).map((entry) => this.lineLink(entry, false));
+        const details = stack.slice(1, 10).map((entry) => this.lineLink(entry, false));
         return html`<details>
           <summary>${this.lineLink(stack[0], true)}</summary>
           ${details}
@@ -55,7 +55,7 @@ class CallStack extends LitElement {
     `;
   }
 
-  private onCallerClick(evt: any) {
+  private onCallerClick(evt: Event) {
     const target = evt.target as HTMLElement;
     const dataTimestamp = target.getAttribute('data-timestamp');
     if (dataTimestamp) {

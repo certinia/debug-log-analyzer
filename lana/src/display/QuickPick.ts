@@ -11,13 +11,7 @@ export class Item implements QuickPickItem {
   picked: boolean;
   alwaysShow: boolean;
 
-  constructor(
-    name: string,
-    desc: string,
-    details: string,
-    sticky: boolean = true,
-    selected: boolean = false
-  ) {
+  constructor(name: string, desc: string, details: string, sticky = true, selected = false) {
     this.label = name;
     this.description = desc;
     this.detail = details;
@@ -31,7 +25,7 @@ export class Options implements QuickPickOptions {
   ignoreFocusOut: boolean;
   placeHolder: string;
 
-  constructor(placeholder: string, ignoreDefocus: boolean = false, multiSelect: boolean = false) {
+  constructor(placeholder: string, ignoreDefocus = false, multiSelect = false) {
     this.placeHolder = placeholder;
     this.ignoreFocusOut = ignoreDefocus;
     this.canPickMany = multiSelect;

@@ -5,7 +5,7 @@
 declare function acquireVsCodeApi(): VSCodeAPI;
 
 interface VSCodeAPI {
-  postMessage(message: any): void;
+  postMessage(message: unknown): void;
 }
 
 export type OpenInfo = {

@@ -22,8 +22,8 @@ class DebugLogItem extends Item {
     desc: string,
     details: string,
     logId: string,
-    sticky: boolean = true,
-    selected: boolean = false
+    sticky = true,
+    selected = false
   ) {
     super(name, desc, details, sticky, selected);
     this.logId = logId;
@@ -39,18 +39,16 @@ export class LoadLogFile {
   private static async safeCommand(context: Context): Promise<WebviewPanel | void> {
     try {
       return LoadLogFile.command(context);
-    } catch (err: any) {
-      context.display.showErrorMessage(`Error loading logfile: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      context.display.showErrorMessage(`Error loading logfile: ${msg}`);
       return Promise.resolve();
     }
   }
 
   private static async command(context: Context): Promise<WebviewPanel | void> {
     const ws = await QuickPickWorkspace.pickOrReturn(context);
-    const [loadingPicker, logFiles] = await Promise.all([
-      LoadLogFile.showLoadingPicker(),
-      GetLogFiles.apply(ws),
-    ]);
+    const [logFiles] = await Promise.all([GetLogFiles.apply(ws), LoadLogFile.showLoadingPicker()]);
 
     if (logFiles.status !== 0) {
       throw new Error('Failed to load available log files');

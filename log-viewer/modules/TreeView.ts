@@ -153,7 +153,7 @@ function describeMethod(node: Method): Node[] {
   const methodPrefix = node.prefix || '',
     methodSuffix = node.suffix || '';
 
-  let prefix = [];
+  const prefix = [];
   if (node.containsDml) {
     prefix.push('D' + node.containsDml);
   }
@@ -174,7 +174,7 @@ function describeMethod(node: Method): Node[] {
   const rowCount = node.rowCount ? ` - Rows:${node.rowCount}` : '';
   const timeTaken = node.isTruncated
     ? 'TRUNCATED'
-    : `${formatDuration(node.duration || 0)} (self ${formatDuration(node.selfTime || 0)})`;
+    : `${formatDuration(node.duration)} (self ${formatDuration(node.selfTime)})`;
   const lineNumber = node.lineNumber ? `, line: ${node.lineNumber}` : '';
   const lineSuffix = `${nodeValue}${methodSuffix}${rowCount} - ${timeTaken}${lineNumber}`;
 
@@ -407,7 +407,7 @@ function collapse(elm: HTMLElement) {
 }
 
 let previouslyExpanded = false;
-function onExpandAll(evt: Event) {
+function onExpandAll(): void {
   const treeContainer = document.getElementById('tree');
   if (!previouslyExpanded) {
     renderLowest(treeContainer as HTMLElement);
@@ -419,7 +419,7 @@ function onExpandAll(evt: Event) {
   }
 }
 
-function onCollapseAll(evt: Event) {
+function onCollapseAll(): void {
   const treeContainer = document.getElementById('tree');
   if (treeContainer) {
     collapse(treeContainer);
@@ -476,7 +476,7 @@ function showHideDetails() {
   hideBySelector('.node.formula', hideFormula?.checked);
 }
 
-function hideByDuration(elements: Array<HTMLElement>) {
+function hideByDuration(elements: Array<HTMLElement>): void {
   const hideUnder = document.getElementById('hideUnder') as HTMLInputElement;
   const shouldHide = hideUnder?.checked;
 
@@ -492,7 +492,7 @@ function hideByDuration(elements: Array<HTMLElement>) {
   }
 }
 
-function onInitTree(evt: Event) {
+function onInitTree(): void {
   const expandAll = document.getElementById('expandAll'),
     collapseAll = document.getElementById('collapseAll'),
     hideDetails = document.getElementById('hideDetails'),
