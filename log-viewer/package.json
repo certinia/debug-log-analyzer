@@ -9,7 +9,8 @@
     "lint": "eslint modules --ext ts",
     "watch": "rollup -w -c rollup.config.js",
     "web": "http-server",
-    "debug": "concurrently \"npm:web\" \"npm:watch\""
+    "debug": "concurrently \"npm:web\" \"npm:watch\"",
+    "prettier-format": "prettier --config .prettierrc 'modules/**/*.ts' --write"
   },
   "version": "0.1.0",
   "dependencies": {
@@ -23,10 +24,13 @@
     "@typescript-eslint/eslint-plugin": "^5.x.x",
     "@typescript-eslint/parser": "^5.x.x",
     "concurrently": "^7.x.x",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.2.1",
     "http-server": "^14.x.x",
     "jest": "^28.x.x",
     "jest-environment-jsdom": "^28.x.x",
     "postcss": "^8.0.0",
+    "prettier": "^2.7.1",
     "rollup": "^2.0.0",
     "rollup-plugin-postcss": "^4.0.0",
     "rollup-plugin-terser": "^7.0.0",

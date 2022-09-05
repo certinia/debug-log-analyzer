@@ -2,15 +2,17 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { commands } from "vscode";
-import { Context } from "../Context";
+import { commands } from 'vscode';
+import { Context } from '../Context';
 
 export class Command {
-  private static commandPrefix = "lana.";
+  private static commandPrefix = 'lana.';
 
   name: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   run: (...args: any[]) => any;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(name: string, run: (...args: any[]) => any) {
     this.name = name;
     this.run = run;

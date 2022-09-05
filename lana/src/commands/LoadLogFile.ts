@@ -2,17 +2,17 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { Context } from "../Context";
-import { Command } from "./Command";
-import { LogView } from "./LogView";
-import { appName } from "../AppSettings";
-import { Item, Options, QuickPick } from "../display/QuickPick";
-import { QuickPickWorkspace } from "../display/QuickPickWorkspace";
-import { GetLogFiles, GetLogFilesResult } from "../sfdx/logs/GetLogFiles";
-import { GetLogFile } from "../sfdx/logs/GetLogFile";
-import * as fs from "fs";
-import * as path from "path";
-import { WebviewPanel, window } from "vscode";
+import { Context } from '../Context';
+import { Command } from './Command';
+import { LogView } from './LogView';
+import { appName } from '../AppSettings';
+import { Item, Options, QuickPick } from '../display/QuickPick';
+import { QuickPickWorkspace } from '../display/QuickPickWorkspace';
+import { GetLogFiles, GetLogFilesResult } from '../sfdx/logs/GetLogFiles';
+import { GetLogFile } from '../sfdx/logs/GetLogFile';
+import * as fs from 'fs';
+import * as path from 'path';
+import { WebviewPanel, window } from 'vscode';
 
 class DebugLogItem extends Item {
   logId: string;
@@ -22,8 +22,8 @@ class DebugLogItem extends Item {
     desc: string,
     details: string,
     logId: string,
-    sticky: boolean = true,
-    selected: boolean = false
+    sticky = true,
+    selected = false
   ) {
     super(name, desc, details, sticky, selected);
     this.logId = logId;
@@ -32,32 +32,26 @@ class DebugLogItem extends Item {
 
 export class LoadLogFile {
   static apply(context: Context): void {
-    new Command("loadLogFile", () => LoadLogFile.safeCommand(context)).register(
-      context
-    );
+    new Command('loadLogFile', () => LoadLogFile.safeCommand(context)).register(context);
     context.display.output(`Registered command '${appName}: Load Log'`);
   }
 
-  private static async safeCommand(
-    context: Context
-  ): Promise<WebviewPanel | void> {
+  private static async safeCommand(context: Context): Promise<WebviewPanel | void> {
     try {
       return LoadLogFile.command(context);
-    } catch (err: any) {
-      context.display.showErrorMessage(`Error loading logfile: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      context.display.showErrorMessage(`Error loading logfile: ${msg}`);
       return Promise.resolve();
     }
   }
 
   private static async command(context: Context): Promise<WebviewPanel | void> {
     const ws = await QuickPickWorkspace.pickOrReturn(context);
-    const [loadingPicker, logFiles] = await Promise.all([
-      LoadLogFile.showLoadingPicker(),
-      GetLogFiles.apply(ws),
-    ]);
+    const [logFiles] = await Promise.all([GetLogFiles.apply(ws), LoadLogFile.showLoadingPicker()]);
 
     if (logFiles.status !== 0) {
-      throw new Error("Failed to load available log files");
+      throw new Error('Failed to load available log files');
     }
     const logFileId = await LoadLogFile.getLogFile(logFiles.result);
     if (logFileId) {
@@ -72,16 +66,14 @@ export class LoadLogFile {
 
   private static async showLoadingPicker(): Promise<QuickPick> {
     const qp = window.createQuickPick();
-    qp.placeholder = "Select a logfile";
+    qp.placeholder = 'Select a logfile';
     qp.busy = true;
     qp.enabled = false;
     qp.show();
     return qp;
   }
 
-  private static async getLogFile(
-    files: GetLogFilesResult[]
-  ): Promise<string | null> {
+  private static async getLogFile(files: GetLogFilesResult[]): Promise<string | null> {
     const items = files
       .sort((a, b) => {
         const aDate = Date.parse(a.StartTime);
@@ -90,14 +82,12 @@ export class LoadLogFile {
       })
       .map((r) => {
         const name = `${r.LogUser.Name} - ${r.Operation}`;
-        const description = `${(r.LogLength / 1024).toFixed(2)} KB ${r.DurationMilliseconds
-          } ms`;
-        const detail = `${new Date(r.StartTime).toLocaleString()} - ${r.Status
-          } - ${r.Id}`;
+        const description = `${(r.LogLength / 1024).toFixed(2)} KB ${r.DurationMilliseconds} ms`;
+        const detail = `${new Date(r.StartTime).toLocaleString()} - ${r.Status} - ${r.Id}`;
         return new DebugLogItem(name, description, detail, r.Id);
       });
 
-    const picked = await QuickPick.pick(items, new Options("Select a logfile"));
+    const picked = await QuickPick.pick(items, new Options('Select a logfile'));
     if (picked.length === 1) {
       return picked[0].logId;
     }
@@ -105,7 +95,7 @@ export class LoadLogFile {
   }
 
   private static getLogFilePath(ws: string, fileId: string): string {
-    const logDirectory = path.join(ws, ".sfdx", "tools", "debug", "logs");
+    const logDirectory = path.join(ws, '.sfdx', 'tools', 'debug', 'logs');
     const logFilePath = path.join(logDirectory, `${fileId}.log`);
     return logFilePath;
   }
