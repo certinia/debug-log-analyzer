@@ -5,7 +5,13 @@ import { LogLine, Method, Detail, RootNode, TimedNode } from './parsers/TreePars
 import formatDuration, { showTab } from './Util';
 import { hostService, OpenInfo } from './services/VSCodeService';
 
-let treeRoot: RootNode;
+declare global {
+  interface HTMLElement {
+    line: LogLine;
+  }
+}
+
+let treeRoot: RootNode, markedNode: HTMLElement, breadcrumbContainer: HTMLDivElement;
 const divElem = document.createElement('div');
 const spanElem = document.createElement('span');
 const linkElem = document.createElement('a');
@@ -199,6 +205,8 @@ function renderBlock(line: LogLine) {
   const lineNode = divElem.cloneNode() as HTMLDivElement;
   lineNode.className = line instanceof Detail && line.hideable ? 'block name detail' : 'block name';
 
+  lineNode.line = line;
+
   const value = line.text || '';
   let text = line.type + (value && value !== line.type ? ' - ' + value : '');
   text = text.replace(/ \| /g, '\n');
@@ -241,6 +249,9 @@ function deriveOpenInfo(node: LogLine): OpenInfo | null {
 function renderMethod(node: Method, timeStamps: number[]) {
   const children = node.children;
   const mainNode = divElem.cloneNode() as HTMLDivElement;
+
+  mainNode.line = node;
+
   if (node.timestamp >= 0) {
     mainNode.dataset.enterstamp = '' + node.timestamp;
     mainNode.id = `calltree-${node.timestamp}`;
@@ -310,16 +321,19 @@ function renderTree() {
   }
 }
 
-function goToFile(evt: Event) {
+function goToFile(evt: MouseEvent) {
   const elem = evt.target as HTMLElement;
   const target = elem.matches('a') ? elem.parentElement?.parentElement : null;
+  showBreadcrumb(elem);
   const timeStamp = target?.dataset.enterstamp;
   if (timeStamp) {
-    const node = findByTimeStamp(treeRoot, timeStamp);
-    if (node) {
-      const fileOpenInfo = deriveOpenInfo(node);
-      if (fileOpenInfo) {
-        hostService().openType(fileOpenInfo);
+    if ((evt.ctrlKey || evt.metaKey) && !evt.altKey && !evt.shiftKey) {
+      const node = findByTimeStamp(treeRoot, timeStamp);
+      if (node) {
+        const fileOpenInfo = deriveOpenInfo(node);
+        if (fileOpenInfo) {
+          hostService().openType(fileOpenInfo);
+        }
       }
     }
   }
@@ -492,7 +506,63 @@ function hideByDuration(elements: Array<HTMLElement>): void {
   }
 }
 
-function onInitTree(): void {
+// Find the parent node of "elm" (or return null if we reach the root of the tree)
+function getParentNode(elm: HTMLElement | null): HTMLElement | null {
+  if (elm === null || elm.classList.contains('root')) {
+    return null;
+  }
+
+  let parent = elm.parentElement;
+  while (parent && !parent.classList.contains('node')) {
+    parent = parent.parentElement;
+  }
+
+  return parent;
+}
+
+function insertCrumb(container: Element, node: HTMLElement) {
+  const line = node.line as LogLine,
+    nameNode = node.querySelector<HTMLElement>('.name') || node,
+    crumb = divElem.cloneNode() as HTMLDivElement,
+    textElm = divElem.cloneNode() as HTMLDivElement,
+    textNode = document.createTextNode(line.getBreadcrumbText());
+
+  crumb.classList.add('crumb');
+  crumb.title = nameNode.textContent!;
+  crumb.appendChild(textElm);
+  crumb.addEventListener('click', (evt) => {
+    nameNode.scrollIntoView();
+    showBreadcrumb(nameNode);
+  });
+  textElm.appendChild(textNode);
+  container.insertAdjacentElement('afterbegin', crumb);
+}
+
+function showBreadcrumb(nameNode: HTMLElement | null) {
+  const newContainer = divElem.cloneNode() as HTMLDivElement;
+
+  breadcrumbContainer.replaceWith(newContainer);
+  breadcrumbContainer = newContainer;
+
+  // remove old marker
+  if (markedNode) {
+    markedNode.classList.remove('marked');
+  }
+
+  if (nameNode === null) {
+    return;
+  }
+  nameNode.classList.add('marked');
+  markedNode = nameNode;
+
+  let node = nameNode.line ? nameNode : getParentNode(nameNode);
+  while (node && node.line !== treeRoot) {
+    insertCrumb(breadcrumbContainer, node);
+    node = getParentNode(node);
+  }
+}
+
+function onInitTree(evt: Event) {
   const expandAll = document.getElementById('expandAll'),
     collapseAll = document.getElementById('collapseAll'),
     hideDetails = document.getElementById('hideDetails'),
@@ -500,6 +570,8 @@ function onInitTree(): void {
     hideFormula = document.getElementById('hideFormula'),
     hideDuration = document.getElementById('hideUnder'),
     timeInMS = document.getElementById('hideUnderTime');
+
+  breadcrumbContainer = document.getElementById('breadcrumb') as HTMLDivElement;
 
   expandAll?.addEventListener('click', onExpandAll);
   collapseAll?.addEventListener('click', onCollapseAll);
