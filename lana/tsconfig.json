@@ -5,6 +5,7 @@
     "experimentalDecorators": true,
     "forceConsistentCasingInFileNames": true,
     "importHelpers": true,
+    "isolatedModules": true,
     "lib": ["es2021"],
     "module": "esnext",
     "moduleResolution": "node",
@@ -19,5 +20,5 @@
     "target": "es2021"
   },
   "include": ["./src/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["**/node_modules/**", "**/.*/"]
 }

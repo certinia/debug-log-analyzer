@@ -13,7 +13,7 @@ export default {
     sourcemap: false,
   },
   plugins: [
-    nodeResolve({ preferBuiltins: false }),
+    nodeResolve(),
     commonjs(),
     typescript({
       tsconfig: './tsconfig.json',
