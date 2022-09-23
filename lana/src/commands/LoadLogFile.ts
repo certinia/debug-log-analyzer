@@ -5,7 +5,7 @@
 import { Context } from '../Context';
 import { Command } from './Command';
 import { LogView } from './LogView';
-import { appName } from '../Main';
+import { appName } from '../AppSettings';
 import { Item, Options, QuickPick } from '../display/QuickPick';
 import { QuickPickWorkspace } from '../display/QuickPickWorkspace';
 import { GetLogFiles, GetLogFilesResult } from '../sfdx/logs/GetLogFiles';

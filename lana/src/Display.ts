@@ -3,7 +3,7 @@
  */
 
 import { Uri, window, workspace } from 'vscode';
-import { appName } from './Main';
+import { appName } from './AppSettings';
 
 export class Display {
   private outputChannel = window.createOutputChannel(appName);
