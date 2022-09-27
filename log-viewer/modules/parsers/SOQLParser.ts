@@ -22,7 +22,44 @@ export class SOQLTree {
     this._queryContext = queryContext;
   }
 
-  /* Return FROM clase SObject name, iff there is a single SObject */
+  /* Return true if SELECT list only contains field names, no functions, sub-queries or typeof */
+  isSimpleSelect(): boolean {
+    const selectList = this._queryContext.selectList();
+    const selectEntries = selectList.selectEntry();
+    return selectEntries.every((selectEntry) => selectEntry.fieldName() !== undefined);
+  }
+
+  /* Return true for queries only containing WHERE, ORDER BY & LIMIT clauses */
+  isTrivialQuery(): boolean {
+    return (
+      this._queryContext.usingScope() === undefined &&
+      this._queryContext.withClause() === undefined &&
+      this._queryContext.groupByClause() === undefined &&
+      this._queryContext.offsetClause() === undefined &&
+      this._queryContext.allRowsClause() === undefined &&
+      this._queryContext.forClauses().childCount === 0 &&
+      this._queryContext.updateList() === undefined
+    );
+  }
+
+  /* Return true if query has ORDER BY */
+  isOrdered(): boolean {
+    return this._queryContext.orderByClause() !== undefined;
+  }
+
+  /* Return limit value if defined, maybe a number or a bound expression */
+  limitValue(): number | string | undefined {
+    const limitClause = this._queryContext.limitClause();
+    if (limitClause === undefined) {
+      return undefined;
+    } else if (limitClause?.IntegerLiteral() !== undefined) {
+      return parseInt(limitClause?.IntegerLiteral()?.text as string);
+    } else {
+      return limitClause?.boundExpression()?.text as string;
+    }
+  }
+
+  /* Return FROM clase SObject name, if there is a single SObject */
   fromObject(): undefined | string {
     const fromContext = this._queryContext.fromNameList();
     const fieldNames = fromContext.fieldName();
