@@ -34,18 +34,6 @@ interface Rect {
   w: number;
 }
 
-/* eslint-disable @typescript-eslint/naming-convention */
-interface TimelineColors {
-  'Code Unit': '#6BAD68';
-  DML: '#22686D';
-  Flow: '#237A72';
-  Method: '#328C72';
-  SOQL: '#4B9D6E';
-  'System Method': '#2D4455';
-  Workflow: '#285663';
-}
-/* eslint-enable @typescript-eslint/naming-convention */
-
 const scaleY = -15,
   strokeColor = '#B0B0B0',
   textColor = '#FFFFFF',
