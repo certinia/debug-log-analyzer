@@ -6,11 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
 ## Added
+
 - Breadcrumbs shown above the calltree when clicking a row ([#142][#142])
 
 ### Changed
+
 - Goto code from click to CMD/CTRL and click. Breadcrumbs are shown on click instead. ([#142][#142])
+
+### Fixed
+
+- Custom timeline event color use from vscode preferences ([#163][#163])
 
 ## [1.5.0] - 2022-08-08
 
@@ -167,3 +174,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#139]: https://github.com/financialforcedev/debug-log-analyzer/issues/139
 [#23]: https://github.com/financialforcedev/debug-log-analyzer/issues/23
 [#142]: https://github.com/financialforcedev/debug-log-analyzer/issues/142
+[#163]: https://github.com/financialforcedev/debug-log-analyzer/issues/163
