@@ -2,16 +2,11 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { Position, Range, Selection, Uri, window, workspace } from "vscode";
-import { Context } from "../Context";
+import { Position, Range, Selection, Uri, window, workspace } from 'vscode';
+import { Context } from '../Context';
 
 export class OpenFileInPackage {
-  static openFileForSymbol(
-    wsPath: string,
-    context: Context,
-    name: string,
-    line?: number
-  ): void {
+  static openFileForSymbol(wsPath: string, context: Context, name: string, line?: number): void {
     const path = context.findSymbol(wsPath, name);
     if (path) {
       const uri = Uri.file(path);

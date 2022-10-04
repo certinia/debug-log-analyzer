@@ -2,12 +2,12 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { ExtensionContext, workspace } from "vscode";
-import { LoadLogFile } from "./commands/LoadLogFile";
-import { ShowLogFile } from "./commands/ShowLogFile";
-import { Display } from "./Display";
-import { SymbolFinder } from "./SymbolFinder";
-import { VSWorkspace } from "./workspace/VSWorkspace";
+import { ExtensionContext, workspace } from 'vscode';
+import { LoadLogFile } from './commands/LoadLogFile';
+import { ShowLogFile } from './commands/ShowLogFile';
+import { Display } from './Display';
+import { SymbolFinder } from './SymbolFinder';
+import { VSWorkspace } from './workspace/VSWorkspace';
 
 export class Context {
   symbolFinder = new SymbolFinder();

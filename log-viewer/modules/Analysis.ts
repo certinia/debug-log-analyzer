@@ -1,20 +1,20 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import formatDuration from "./Util";
-import { TimedNode, RootNode, totalDuration } from "./parsers/TreeParser";
+import formatDuration from './Util';
+import { TimedNode, RootNode, totalDuration } from './parsers/TreeParser';
 
 type SortKey = 'count' | 'duration' | 'selfTime' | 'name';
 
 const nestedSort: Map<SortKey, SortKey[]> = new Map([
-  ["count", ["count", "duration", "name"]],
-  ["duration", ["duration", "count", "name"]],
-  ["selfTime", ["selfTime", "count", "name"]],
-  ["name", ["name", "count", "duration"]],
+  ['count', ['count', 'duration', 'name']],
+  ['duration', ['duration', 'count', 'name']],
+  ['selfTime', ['selfTime', 'count', 'name']],
+  ['name', ['name', 'count', 'duration']],
 ]);
-const div = document.createElement("div");
-const span = document.createElement("span");
-const boldElem = document.createElement("b");
+const div = document.createElement('div');
+const span = document.createElement('span');
+const boldElem = document.createElement('b');
 
 let metricList: Metric[];
 
@@ -32,23 +32,19 @@ export class Metric {
   }
 }
 
-function addNodeToMap(
-  map: Map<string, Metric>,
-  node: TimedNode,
-  key?: string
-) {
+function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
   const children = node.children;
 
   if (key) {
-    let metric = map.get(key);
+    const metric = map.get(key);
     if (metric) {
       ++metric.count;
       if (node.duration) {
         metric.duration += node.duration;
-        metric.selfTime += node.selfTime || 0;
+        metric.selfTime += node.selfTime;
       }
     } else {
-      map.set(key, new Metric(key, 1, node.duration || 0, node.selfTime || 0));
+      map.set(key, new Metric(key, 1, node.duration, node.selfTime));
     }
   }
 
@@ -67,25 +63,20 @@ export default function analyseMethods(rootMethod: RootNode) {
   return metricList; // return value for unit testing
 }
 
-function entrySort(
-  sortField: SortKey,
-  sortAscending: boolean,
-  a: Metric,
-  b: Metric
-) {
+function entrySort(sortField: SortKey, sortAscending: boolean, a: Metric, b: Metric) {
   let result;
-  let x: any, y: any;
+  let x: number | string, y: number | string;
 
   switch (sortField) {
-    case "count":
+    case 'count':
       x = a.count;
       y = b.count;
       break;
-    case "duration":
+    case 'duration':
       x = a.duration;
       y = b.duration;
       break;
-    case "selfTime":
+    case 'selfTime':
       x = a.selfTime;
       y = b.selfTime;
       break;
@@ -109,13 +100,8 @@ function entrySort(
   return sortAscending ? result : -result;
 }
 
-function nestedSorter(
-  type: SortKey,
-  sortAscending: boolean,
-  a: Metric,
-  b: Metric
-) {
-  const sortOrder = nestedSort.get(type)!;
+function nestedSorter(type: SortKey, sortAscending: boolean, a: Metric, b: Metric) {
+  const sortOrder = nestedSort.get(type) || [];
 
   const len = sortOrder.length;
   for (let i = 0; i < len; ++i) {
@@ -133,23 +119,23 @@ function renderAnalysisLine(
   count: string,
   duration: string,
   selfTime: string,
-  isBold: boolean = false
+  isBold = false
 ) {
   const nameCell = highlightTextNode(name, isBold) as HTMLElement;
-  nameCell.className = "name";
+  nameCell.className = 'name';
   nameCell.title = name;
 
   const countCell = highlightTextNode(count, isBold) as HTMLElement;
-  countCell.className = "count";
+  countCell.className = 'count';
 
   const durationCell = highlightTextNode(duration, isBold) as HTMLElement;
-  durationCell.className = "duration";
+  durationCell.className = 'duration';
 
   const selfTimeCell = highlightTextNode(selfTime, isBold) as HTMLElement;
-  selfTimeCell.className = "selfTime";
+  selfTimeCell.className = 'selfTime';
 
   const analysisRow = div.cloneNode() as HTMLDivElement;
-  analysisRow.className = isBold ? "row" : "row data";
+  analysisRow.className = isBold ? 'row' : 'row data';
   analysisRow.appendChild(nameCell);
   analysisRow.appendChild(countCell);
   analysisRow.appendChild(durationCell);
@@ -164,54 +150,44 @@ function highlightTextNode(text: string, isBold: boolean) {
 }
 
 export async function renderAnalysis() {
-  const sortFieldElm = document.getElementById(
-      "sortField"
-    ) as HTMLSelectElement,
+  const sortFieldElm = document.getElementById('sortField') as HTMLSelectElement,
     sortField = sortFieldElm.value as SortKey,
-    sortAscendingElm = document.getElementById(
-      "sortAscending"
-    ) as HTMLInputElement,
+    sortAscendingElm = document.getElementById('sortAscending') as HTMLInputElement,
     sortAscending = sortAscendingElm?.checked,
-    analysisHeader = document.getElementById("analysisHeader"),
-    analysisHolder = document.getElementById("analysis"),
-    analysisFooter = document.getElementById("analysisFooter");
+    analysisHeader = document.getElementById('analysisHeader'),
+    analysisHolder = document.getElementById('analysis'),
+    analysisFooter = document.getElementById('analysisFooter');
 
   metricList.sort(function (a, b) {
     return nestedSorter(sortField, sortAscending, a, b);
   });
 
   if (analysisHeader && analysisFooter && analysisHolder) {
-    analysisHeader.innerHTML = "";
+    analysisHeader.innerHTML = '';
     analysisHeader.appendChild(
-      renderAnalysisLine(
-        "Method Name",
-        "Count",
-        "Total Time",
-        "Self Time",
-        true
-      )
+      renderAnalysisLine('Method Name', 'Count', 'Total Time', 'Self Time', true)
     );
 
-    analysisHolder.innerHTML = "";
+    analysisHolder.innerHTML = '';
     let totalCount = 0,
       totalSelfTime = 0;
     metricList.forEach(function (metric) {
-      var duration = metric.duration ? formatDuration(metric.duration) : "-",
-        selfTime = metric.selfTime ? formatDuration(metric.selfTime) : "-";
+      const duration = metric.duration ? formatDuration(metric.duration) : '-',
+        selfTime = metric.selfTime ? formatDuration(metric.selfTime) : '-';
 
       analysisHolder.appendChild(
-        renderAnalysisLine(metric.name, "" + metric.count, duration, selfTime)
+        renderAnalysisLine(metric.name, '' + metric.count, duration, selfTime)
       );
       totalCount += metric.count;
       totalSelfTime += metric.selfTime;
     });
 
     if (totalDuration) {
-      analysisFooter.innerHTML = "";
+      analysisFooter.innerHTML = '';
       analysisFooter.appendChild(
         renderAnalysisLine(
-          "Total",
-          "" + totalCount,
+          'Total',
+          '' + totalCount,
           formatDuration(totalDuration),
           formatDuration(totalSelfTime),
           true
@@ -221,16 +197,16 @@ export async function renderAnalysis() {
   }
 }
 
-function onSortChange(evt: Event) {
+function onSortChange(): void {
   renderAnalysis();
 }
 
-function onInitAnalysis(evt: Event) {
-  const sortField = document.getElementById("sortField"),
-    sortAscending = document.getElementById("sortAscending");
+function onInitAnalysis(): void {
+  const sortField = document.getElementById('sortField'),
+    sortAscending = document.getElementById('sortAscending');
 
-  sortField?.addEventListener("change", onSortChange);
-  sortAscending?.addEventListener("change", onSortChange);
+  sortField?.addEventListener('change', onSortChange);
+  sortAscending?.addEventListener('change', onSortChange);
 }
 
-window.addEventListener("DOMContentLoaded", onInitAnalysis);
+window.addEventListener('DOMContentLoaded', onInitAnalysis);

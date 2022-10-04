@@ -137,7 +137,8 @@
     "vscode:prepublish": "npm run compile",
     "compile": "npm run local-compile && npm run log-viewer && cp ../README.md ../CHANGELOG.md ../LICENSE.txt .",
     "local-compile": "rm -rf out && rollup -c rollup.config.js",
-    "watch": "tsc -watch -p ./",
+    "prettier-format": "prettier --config .prettierrc 'src/**/*.ts' --write",
+    "watch": "rollup -w -c rollup.config.js",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
@@ -146,19 +147,21 @@
     "log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/."
   },
   "dependencies": {
-    "pkgforce": "^2.1.4"
+    "pkgforce": "2.1.4"
   },
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^19.0.2",
-    "@rollup/plugin-node-resolve": "^13.0.4",
-    "@rollup/plugin-typescript": "^8.2.5",
-    "@types/node": "^12.11.7",
-    "@types/vscode": "^1.58.1",
-    "@typescript-eslint/eslint-plugin": "^4.28.5",
-    "@typescript-eslint/parser": "^4.28.5",
-    "eslint": "^7.31.0",
+    "@rollup/plugin-commonjs": "^22.0.0",
+    "@rollup/plugin-node-resolve": "^13.0.0",
+    "@rollup/plugin-typescript": "^8.0.0",
+    "@types/node": "^16.x.x",
+    "@types/vscode": "^1.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.33.0",
+    "@typescript-eslint/parser": "^5.33.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "prettier": "^2.7.1",
     "rollup": "^2.0.0",
-    "rollup-plugin-terser": "^7.0.2",
+    "rollup-plugin-terser": "^7.0.0",
     "tslib": "^2.0.0",
     "typescript": "^4.0.0"
   }

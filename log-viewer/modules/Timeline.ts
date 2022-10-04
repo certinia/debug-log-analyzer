@@ -1,16 +1,32 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-import { showTreeNode } from "./TreeView";
-import formatDuration from "./Util";
-import { TimedNode, Method, RootNode, TimelineKey, truncated, totalDuration } from "./parsers/TreeParser";
-
+import { showTreeNode } from './TreeView';
+import formatDuration from './Util';
+import {
+  TimedNode,
+  Method,
+  RootNode,
+  TimelineKey,
+  truncated,
+  totalDuration,
+} from './parsers/TreeParser';
 interface TimelineGroup {
   label: string;
-  // strokeColor: string;
   fillColor: string;
-  //textColor: string;
 }
+
+/* eslint-disable @typescript-eslint/naming-convention */
+interface TimelineColors {
+  'Code Unit': '#6BAD68';
+  DML: '#22686D';
+  Flow: '#237A72';
+  Method: '#328C72';
+  SOQL: '#4B9D6E';
+  'System Method': '#2D4455';
+  Workflow: '#285663';
+}
+/* eslint-enable @typescript-eslint/naming-convention */
 
 interface Rect {
   x: number;
@@ -31,46 +47,67 @@ interface TimelineColors {
 /* eslint-enable @typescript-eslint/naming-convention */
 
 const scaleY = -15,
-  strokeColor = "#B0B0B0",
-  textColor = "#FFFFFF",
+  strokeColor = '#B0B0B0',
+  textColor = '#FFFFFF',
   keyMap: Map<TimelineKey, TimelineGroup> = new Map([
-    ["codeUnit", {
-      label: "Code Unit",
-      fillColor: "#6BAD68",
-    }],
-    ["soql", {
-      label: "SOQL",
-      fillColor: "#4B9D6E",
-    }],
-    ["method", {
-      label: "Method",
-      fillColor: "#328C72",
-    }],
-    ["flow", {
-      label: "Flow",
-      fillColor: "#237A72",
-    }],
-    ["dml", {
-      label: "DML",
-      fillColor: "#22686D",
-    }],
-    ["workflow", {
-      label: "Workflow",
-      fillColor: "#285663",
-    }],
-    ["systemMethod", {
-      label: "System Method",
-      fillColor: "#2D4455",
-    }],
+    [
+      'codeUnit',
+      {
+        label: 'Code Unit',
+        fillColor: '#6BAD68',
+      },
+    ],
+    [
+      'soql',
+      {
+        label: 'SOQL',
+        fillColor: '#4B9D6E',
+      },
+    ],
+    [
+      'method',
+      {
+        label: 'Method',
+        fillColor: '#328C72',
+      },
+    ],
+    [
+      'flow',
+      {
+        label: 'Flow',
+        fillColor: '#237A72',
+      },
+    ],
+    [
+      'dml',
+      {
+        label: 'DML',
+        fillColor: '#22686D',
+      },
+    ],
+    [
+      'workflow',
+      {
+        label: 'Workflow',
+        fillColor: '#285663',
+      },
+    ],
+    [
+      'systemMethod',
+      {
+        label: 'System Method',
+        fillColor: '#2D4455',
+      },
+    ],
   ]);
 
 class State {
   public isRedrawQueued = true;
   public defaultZoom = 0;
 
-  private _zoom: number = 0;
-  private _offsetY: number = 0;
-  private _offsetX: number = 0;
+  private _zoom = 0;
+  private _offsetY = 0;
+  private _offsetX = 0;
 
   public set zoom(zoom: number) {
     this._zoom = zoom;
@@ -116,7 +153,7 @@ const state = new State();
 let tooltip: HTMLDivElement;
 let container: HTMLDivElement;
 let canvas: HTMLCanvasElement;
-let ctx: CanvasRenderingContext2D;
+let ctx: CanvasRenderingContext2D | null;
 
 let realHeight = 0;
 let scaleFont: string,
@@ -151,8 +188,8 @@ function getMaxDepth(node: Method, depth = 0) {
 function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.lineWidth = 1;
   ctx.font = scaleFont;
-  ctx.textBaseline = "top";
-  ctx.textAlign = "left";
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
 
   const textHeight = -displayHeight + 2;
   // 1ms = 0.001s
@@ -166,8 +203,8 @@ function drawScale(ctx: CanvasRenderingContext2D) {
 
   const endTimeInS = Math.ceil(endTimeInNs / 1000000000);
   const startTimeInS = Math.floor(startTimeInNs / 1000000000);
-  ctx.strokeStyle = "#F88962";
-  ctx.fillStyle = "#F88962";
+  ctx.strokeStyle = '#F88962';
+  ctx.fillStyle = '#F88962';
   ctx.beginPath();
   for (let i = startTimeInS; i <= endTimeInS; i++) {
     const xPos = nsWidth * i - state.offsetX;
@@ -191,8 +228,8 @@ function drawScale(ctx: CanvasRenderingContext2D) {
     return Math.abs(curr - microSecPixelGap) < Math.abs(prev - microSecPixelGap) ? curr : prev;
   });
 
-  ctx.strokeStyle = "#E0E0E0";
-  ctx.fillStyle = "#808080";
+  ctx.strokeStyle = '#E0E0E0';
+  ctx.fillStyle = '#808080';
   ctx.beginPath();
 
   const microSecWidth = 1000 * state.zoom;
@@ -217,9 +254,8 @@ function nodesToRectangles(nodes: Method[], depth: number) {
   const len = nodes.length;
   for (let c = 0; c < len; c++) {
     const node = nodes[c];
-    const tlKey = node.timelineKey;
-    if (tlKey && node.duration) {
-      const tl = keyMap.get(tlKey)!;
+    const { timelineKey, duration } = node;
+    if (timelineKey && duration) {
       addToRectQueue(node, depth);
     }
 
@@ -245,21 +281,23 @@ const rectRenderQueue = new Map<TimelineKey, Rect[]>();
  * @param node The node to be rendered
  * @param y The call depth of the node
  */
- function addToRectQueue(node: Method, y: number) {
-  const {timelineKey: tlKey, timestamp: x, duration} = node,
-    w = duration!,
-   rect: Rect = {x, y, w};
+function addToRectQueue(node: Method, y: number) {
+  const { timelineKey: tlKey, timestamp: x, duration: w } = node;
+  const rect: Rect = { x, y, w };
   let list = rectRenderQueue.get(tlKey);
   if (!list) {
-    rectRenderQueue.set(tlKey, list = []);
+    rectRenderQueue.set(tlKey, (list = []));
   }
   list.push(rect);
 }
 
 function renderRectangles(ctx: CanvasRenderingContext2D) {
   ctx.lineWidth = 1;
-  for (let [tlKey, items] of rectRenderQueue) {
-    const tl: TimelineGroup = keyMap.get(tlKey)!;
+  for (const [tlKey, items] of rectRenderQueue) {
+    const tl = keyMap.get(tlKey);
+    if (!tl) {
+      continue;
+    }
     ctx.beginPath();
     // ctx.strokeStyle = tl.strokeColor;
     ctx.fillStyle = tl.fillColor;
@@ -276,7 +314,7 @@ const drawRect = (rect: Rect) => {
     const x = rect.x * state.zoom - state.offsetX;
     const y = rect.y * scaleY - state.offsetY;
     if (x < displayWidth && x + w > 0 && y > -displayHeight && y + scaleY < 0) {
-      ctx.rect(x, y, w, scaleY);
+      ctx?.rect(x, y, w, scaleY);
     }
   }
 };
@@ -322,7 +360,7 @@ function resize() {
   if (newWidth && newHeight && (newWidth !== displayWidth || newHeight !== displayHeight)) {
     canvas.width = displayWidth = newWidth;
     canvas.height = displayHeight = newHeight;
-    ctx.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-lefts
+    ctx?.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-lefts
 
     const newDefaultZoom = newWidth / totalDuration;
     // defaults if not set yet
@@ -336,14 +374,14 @@ function resize() {
 }
 
 function resizeFont() {
-  scaleFont = state.zoom > 0.0000004 ? "normal 16px serif" : "normal 8px serif";
+  scaleFont = state.zoom > 0.0000004 ? 'normal 16px serif' : 'normal 8px serif';
 }
 
 export default async function renderTimeline(rootMethod: RootNode) {
   renderTimelineKey();
-  container = document.getElementById("timelineWrapper") as HTMLDivElement;
-  canvas = document.getElementById("timeline") as HTMLCanvasElement;
-  ctx = canvas.getContext("2d")!; // can never be null since context (2d) is a supported type.
+  container = document.getElementById('timelineWrapper') as HTMLDivElement;
+  canvas = document.getElementById('timeline') as HTMLCanvasElement;
+  ctx = canvas.getContext('2d'); // can never be null since context (2d) is a supported type.
   timelineRoot = rootMethod;
   calculateSizes();
   nodesToRectangles([timelineRoot], -1);
@@ -375,21 +413,21 @@ function drawTimeLine() {
 }
 
 export function renderTimelineKey() {
-  const keyHolder = document.getElementById("timelineKey") as HTMLDivElement,
-    title = document.createElement("span");
+  const keyHolder = document.getElementById('timelineKey') as HTMLDivElement,
+    title = document.createElement('span');
 
-  title.innerText = "";
+  title.innerText = '';
   if (keyHolder) {
-    keyHolder.innerHTML = "";
+    keyHolder.innerHTML = '';
     keyHolder.appendChild(title);
   }
 
-  for (const [keyName, keyMeta] of keyMap) {
-    const keyEntry = document.createElement("div"),
-      title = document.createElement("span");
+  for (const keyMeta of keyMap.values()) {
+    const keyEntry = document.createElement('div'),
+      title = document.createElement('span');
 
     title.innerText = keyMeta.label;
-    keyEntry.className = "keyEntry";
+    keyEntry.className = 'keyEntry';
     keyEntry.style.backgroundColor = keyMeta.fillColor;
     keyEntry.style.color = textColor;
     keyEntry.appendChild(title);
@@ -445,7 +483,7 @@ function findByPosition(
 function showTooltip(offsetX: number, offsetY: number) {
   if (!dragging && container && tooltip) {
     const depth = ~~(((displayHeight - offsetY - state.offsetY) / realHeight) * maxY);
-    let tooltipText = findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
+    const tooltipText = findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
     showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
   }
 }
@@ -453,8 +491,8 @@ function showTooltip(offsetX: number, offsetY: number) {
 function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
   const target = findByPosition(timelineRoot, 0, x, depth);
   if (target) {
-    const toolTip = document.createElement("div");
-    const brElem = document.createElement("br");
+    const toolTip = document.createElement('div');
+    const brElem = document.createElement('br');
     let displayText = target.text;
     if (target.suffix) {
       displayText += target.suffix;
@@ -465,15 +503,15 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
     toolTip.appendChild(document.createTextNode(displayText));
     if (target.timestamp && target.duration && target.selfTime) {
       toolTip.appendChild(brElem.cloneNode());
-      toolTip.appendChild(document.createTextNode("timestamp: " + target.timestamp));
+      toolTip.appendChild(document.createTextNode('timestamp: ' + target.timestamp));
       if (target.exitStamp) {
-        toolTip.appendChild(document.createTextNode(" => " + target.exitStamp));
+        toolTip.appendChild(document.createTextNode(' => ' + target.exitStamp));
         toolTip.appendChild(brElem.cloneNode());
         toolTip.appendChild(
           document.createTextNode(`duration: ${formatDuration(target.duration)}`)
         );
-        if (target.cpuType === "free") {
-          toolTip.appendChild(document.createTextNode(" (free)"));
+        if (target.cpuType === 'free') {
+          toolTip.appendChild(document.createTextNode(' (free)'));
         } else {
           toolTip.appendChild(
             document.createTextNode(` (self ${formatDuration(target.selfTime)})`)
@@ -498,9 +536,9 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
       endTime = nextEntry.timestamp ?? totalDuration,
       startX = startTime * state.zoom - state.offsetX,
       endX = endTime * state.zoom - state.offsetX;
-  
+
     if (x >= startX && x <= endX) {
-      const toolTip = document.createElement("div");
+      const toolTip = document.createElement('div');
       toolTip.textContent = thisEntry.reason;
       return toolTip;
     }
@@ -519,7 +557,7 @@ function showTooltipWithText(
     let posLeft = offsetX + 10,
       posTop = offsetY + 2;
 
-    tooltip.innerHTML = "";
+    tooltip.innerHTML = '';
     tooltip.appendChild(tooltipText);
     tooltip.style.cssText = `left:${posLeft}px; top:${posTop}px; display: block;`;
 
@@ -537,7 +575,7 @@ function showTooltipWithText(
       tooltip.style.cssText = `left:${posLeft}px; top:${posTop}px; display: block;`;
     }
   } else {
-    tooltip.style.display = "none";
+    tooltip.style.display = 'none';
   }
 }
 
@@ -553,10 +591,10 @@ function showTooltipWithText(
  * | +-----------------+  |
  * +----------------------+
  */
-function onMouseMove(evt: any) {
+function onMouseMove(evt: MouseEvent) {
   const target = evt.target as HTMLElement;
 
-  if (target && (target.id === "timeline" || target.id === "tooltip")) {
+  if (target && (target.id === 'timeline' || target.id === 'tooltip')) {
     const clRect = canvas?.getBoundingClientRect();
     if (clRect) {
       lastMouseX = evt.clientX - clRect.left;
@@ -566,8 +604,8 @@ function onMouseMove(evt: any) {
   }
 }
 
-function onClickCanvas(evt: any) {
-  if (!dragging && tooltip.style.display === "block") {
+function onClickCanvas(): void {
+  if (!dragging && tooltip.style.display === 'block') {
     const depth = ~~(((displayHeight - lastMouseY - state.offsetY) / realHeight) * maxY);
     const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
     if (target && target.timestamp) {
@@ -576,25 +614,23 @@ function onClickCanvas(evt: any) {
   }
 }
 
-function onLeaveCanvas(evt: any) {
+function onLeaveCanvas() {
   dragging = false;
-  if (!evt.relatedTarget || evt.relatedTarget.id !== "tooltip") {
-    tooltip.style.display = "none";
-  }
+  tooltip.style.display = 'none';
 }
 
 let dragging = false;
-function handleMouseDown(evt: MouseEvent) {
+function handleMouseDown(): void {
   dragging = true;
 }
 
-function handleMouseUp(evt: MouseEvent) {
+function handleMouseUp(): void {
   dragging = false;
 }
 
 function handleMouseMove(evt: MouseEvent) {
   if (dragging) {
-    tooltip.style.display = "none";
+    tooltip.style.display = 'none';
     const { movementY, movementX } = evt;
     const maxWidth = state.zoom * totalDuration - displayWidth;
     state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX - movementX));
@@ -606,7 +642,7 @@ function handleMouseMove(evt: MouseEvent) {
 
 function handleScroll(evt: WheelEvent) {
   if (!dragging) {
-    tooltip.style.display = "none";
+    tooltip.style.display = 'none';
     evt.stopPropagation();
     const { deltaY, deltaX } = evt;
 
@@ -635,18 +671,18 @@ function handleScroll(evt: WheelEvent) {
   }
 }
 
-function onInitTimeline(evt: Event) {
-  const canvas = document.getElementById("timeline") as HTMLCanvasElement,
-    timelineWrapper = document.getElementById("timelineWrapper");
-  tooltip = document.getElementById("tooltip") as HTMLDivElement;
+function onInitTimeline(): void {
+  const canvas = document.getElementById('timeline') as HTMLCanvasElement,
+    timelineWrapper = document.getElementById('timelineWrapper');
+  tooltip = document.getElementById('tooltip') as HTMLDivElement;
 
   if (canvas) {
-    canvas.addEventListener("mouseout", onLeaveCanvas);
-    canvas.addEventListener("wheel", handleScroll, { passive: true });
-    canvas.addEventListener("mousedown", handleMouseDown);
-    canvas.addEventListener("mouseup", handleMouseUp);
-    canvas.addEventListener("mousemove", handleMouseMove, { passive: true });
-    canvas.addEventListener("click", onClickCanvas);
+    canvas.addEventListener('mouseout', onLeaveCanvas);
+    canvas.addEventListener('wheel', handleScroll, { passive: true });
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('mousemove', handleMouseMove, { passive: true });
+    canvas.addEventListener('click', onClickCanvas);
   }
 
   if (timelineWrapper) {
@@ -654,7 +690,7 @@ function onInitTimeline(evt: Event) {
   }
 
   // document seem to get all the events (regardless of which element we're over)
-  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener('mousemove', onMouseMove);
 }
 
-window.addEventListener("DOMContentLoaded", onInitTimeline);
+window.addEventListener('DOMContentLoaded', onInitTimeline);
