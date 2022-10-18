@@ -1,0 +1,15 @@
+{
+  "name": "lana-ws",
+  "private": true,
+  "workspaces": [
+    "lana",
+    "log-viewer"
+  ],
+  "devDependencies": {
+    "rollup-plugin-copy": "^3.4.0"
+  },
+  "scripts": {
+    "build": "rollup -c rollup.config.js",
+    "watch": "rollup -w -c rollup.config.js"
+  }
+}
