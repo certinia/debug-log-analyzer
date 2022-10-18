@@ -134,7 +134,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run build --prefix ..",
     "compile": "npm run local-compile && npm run log-viewer && cp ../README.md ../CHANGELOG.md ../LICENSE.txt .",
     "local-compile": "rm -rf out && rollup -c rollup.config.js",
     "prettier-format": "prettier --config .prettierrc 'src/**/*.ts' --write",

@@ -18,12 +18,11 @@ jobs:
         run: npm install --global vsce ovsx
       - name: Dependencies
         run: |
-          cd lana
           npm ci
       - name: Build
         run: |
           cd lana
-          vsce package
+          vsce package -no-dependencies
       - name: Publish to VS Code Marketplace + Open VSX Registry
         run: |
           cd lana

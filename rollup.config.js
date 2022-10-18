@@ -21,6 +21,7 @@ export default [
       commonjs(),
       typescript({
         tsconfig: './lana/tsconfig.json',
+        exclude: ['node_modules', '**/__tests__/**'],
       }),
       compact && terser(),
     ],
@@ -38,6 +39,7 @@ export default [
       commonjs(),
       typescript({
         tsconfig: './log-viewer/tsconfig.json',
+        exclude: ['node_modules', '**/__tests__/**'],
       }),
       postcss({
         extensions: ['.css'],
