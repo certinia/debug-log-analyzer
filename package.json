@@ -9,7 +9,7 @@
     "rollup-plugin-copy": "^3.4.0"
   },
   "scripts": {
-    "build": "rollup -c rollup.config.js",
-    "watch": "rollup -w -c rollup.config.js"
+    "build": "rm -rf lana/out && rollup -c rollup.config.js",
+    "watch": "rm -rf lana/out && rollup -w -c rollup.config.js"
   }
 }
