@@ -6,7 +6,8 @@ import { terser } from 'rollup-plugin-terser';
 import typescript from '@rollup/plugin-typescript';
 import copy from 'rollup-plugin-copy';
 
-const compact = !process.env.ROLLUP_WATCH;
+const production = process.env.NODE_ENV == 'production';
+console.log('Package mode:', production ? 'production' : 'development');
 export default [
   {
     input: './lana/src/Main.ts',
@@ -20,10 +21,10 @@ export default [
       nodeResolve(),
       commonjs(),
       typescript({
-        tsconfig: './lana/tsconfig.json',
+        tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
         exclude: ['node_modules', '**/__tests__/**'],
       }),
-      compact && terser(),
+      production && terser(),
     ],
   },
   {
@@ -38,14 +39,14 @@ export default [
       nodeResolve(),
       commonjs(),
       typescript({
-        tsconfig: './log-viewer/tsconfig.json',
+        tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
         exclude: ['node_modules', '**/__tests__/**'],
       }),
       postcss({
         extensions: ['.css'],
         minimize: true,
       }),
-      compact && terser(),
+      production && terser(),
       copy({
         hook: 'writeBundle',
         targets: [
