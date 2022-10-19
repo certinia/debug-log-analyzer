@@ -257,6 +257,8 @@ function handleMessage(evt: MessageEvent) {
       setColors(message.data.timeline.colors);
       renderTimelineKey();
       break;
+    case 'streamLog':
+      displayLog(message.data, message.name, '');
   }
 }
 

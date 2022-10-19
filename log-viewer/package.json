@@ -14,7 +14,8 @@
   },
   "version": "0.1.0",
   "dependencies": {
-    "lit": "^2.0.0"
+    "lit": "^2.0.0",
+    "@apexdevtools/apex-parser": "^3.0.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^22.x.x",
