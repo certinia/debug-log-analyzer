@@ -36,8 +36,8 @@
 .crumb {
   display: inline-block;
   padding: 0 5px;
-  background-color: beige;
-  border: solid 1px blue;
+  border: solid 1px var(--vscode-inputOption-activeBorder, blue);
+  background-color: var(--vscode-inputOption-activeBackground);
   border-radius: 10px;
   margin: 4px 2px 10px 2px;
   white-space: nowrap;
@@ -67,7 +67,8 @@
   display: none;
 }
 .marked {
-  border: dashed blue 2px;
+  border: dashed 1px var(--vscode-inputOption-activeBorder, blue);
+  background-color: var(--vscode-inputOption-activeBackground);
 }
 .toggle {
   cursor: pointer;
