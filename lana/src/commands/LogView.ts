@@ -97,7 +97,6 @@ export class LogView {
     logName: string,
     logPath: string
   ): Promise<string> {
-    const namespaces = context.namespaces;
     const logViewerRoot = path.join(context.context.extensionPath, 'out');
     const index = path.join(logViewerRoot, 'index.html');
     const bundleUri = view.webview.asWebviewUri(
@@ -107,13 +106,12 @@ export class LogView {
     const toReplace: { [key: string]: string } = {
       '@@name': logName, // eslint-disable-line @typescript-eslint/naming-convention
       '@@path': logPath, // eslint-disable-line @typescript-eslint/naming-convention
-      '@@ns': namespaces.join(','), // eslint-disable-line @typescript-eslint/naming-convention
       'bundle.js': bundleUri.toString(true), // eslint-disable-line @typescript-eslint/naming-convention
       'sample.log': logPathUri.toString(true), // eslint-disable-line @typescript-eslint/naming-convention
     };
 
     const indexSrc = await this.getFile(index);
-    return indexSrc.replace(/@@name|@@path|@@ns|bundle.js|sample.log/gi, function (matched) {
+    return indexSrc.replace(/@@name|@@path|bundle.js|sample.log/gi, function (matched) {
       return toReplace[matched];
     });
   }
