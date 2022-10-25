@@ -2,26 +2,21 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { Workspaces } from '@apexdevtools/apex-ls';
-
-export class SymbolFinderError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.message = message;
-    this.name = 'SymbolFinderError';
-  }
-}
+import { Workspaces, Workspace } from '@apexdevtools/apex-ls';
 
 export class SymbolFinder {
   findSymbol(wsPath: string, symbol: string): string | null {
     const ws = Workspaces.get(wsPath);
-    // The .d.ts entry is currently wrong, findType returns a string array
+    return this.findInWorkspace(ws, symbol);
+  }
+
+  private findInWorkspace(ws: Workspace, symbol: string): string | null {
     const paths = ws.findType(symbol);
     if (paths.length === 0) {
       const parts = symbol.split('.');
       if (parts.length > 1) {
         parts.pop();
-        return this.findSymbol(wsPath, parts.join('.'));
+        return this.findInWorkspace(ws, parts.join('.'));
       } else {
         return null;
       }
