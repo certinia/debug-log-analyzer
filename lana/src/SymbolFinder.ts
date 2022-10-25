@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { Workspaces } from 'pkgforce';
+import { Workspaces } from '@apexdevtools/apex-ls';
 
 export class SymbolFinderError extends Error {
   constructor(message: string) {
@@ -16,7 +16,7 @@ export class SymbolFinder {
   findSymbol(wsPath: string, symbol: string): string | null {
     const ws = Workspaces.get(wsPath);
     // The .d.ts entry is currently wrong, findType returns a string array
-    const paths = ws.findType(symbol) as unknown as string[];
+    const paths = ws.findType(symbol);
     if (paths.length === 0) {
       const parts = symbol.split('.');
       if (parts.length > 1) {
