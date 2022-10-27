@@ -275,22 +275,16 @@ export class RootNode extends Method {
 
   setEndTime() {
     // We do not just want to use the very last exitStamp because it could be CUMULATIVE_USAGE which is not really part of the code execution time but does have a later time.
-    // we only want to deal with nodes that have a duration and exitStamp as no duration will not be show on the timeline.
     let endTime;
     const len = this.children.length - 1;
     for (let i = len; i >= 0; i--) {
       const child = this.children[i];
-      if (child instanceof TimedNode) {
-        // Get the latest time of the last node (with a time) to use as a default
-        // This helps to display something on the timeline if the log is malformed
-        // e.g does not contain `EXECUTION_STARTED` + `EXECUTION_FINISED`
-        endTime ??= child.exitStamp;
-        // If there is no duration on a node then it is not going to be shown on the timeline anyway
-        if (child.duration && child.exitStamp) {
-          endTime = child.exitStamp;
-          break;
-        }
+      // If there is no duration on a node then it is not going to be shown on the timeline anyway
+      if (child instanceof TimedNode && child.duration && child.exitStamp) {
+        endTime = child.exitStamp;
+        break;
       }
+      endTime ??= child.timestamp;
     }
     this.exitStamp = endTime || 0;
   }
