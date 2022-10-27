@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Goto code from click to CMD/CTRL and click. Breadcrumbs are shown on click instead. ([#142][#142])
 
+### Fixed
+
+- Timeline not showing events if the event occurs outside the `EXECUTION_STARTED` + `EXECUTION_FINISHED` events ([#180][#180])
+
 ## [1.5.1] - 2022-10-04
 
 ### Fixed
@@ -177,3 +181,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#23]: https://github.com/financialforcedev/debug-log-analyzer/issues/23
 [#142]: https://github.com/financialforcedev/debug-log-analyzer/issues/142
 [#163]: https://github.com/financialforcedev/debug-log-analyzer/issues/163
+[#180]: https://github.com/financialforcedev/debug-log-analyzer/issues/180
