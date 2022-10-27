@@ -121,9 +121,9 @@ export class TimedNode extends LogLine {
   timelineKey: TimelineKey; // the formatting key for rendering this entry in the timeline
   cpuType: string; // the catagory key to collect our cpu usage
   selfTime = 0; // the net time spent in the node (when not inside children)
-  containsDml = 0; // the number of DML_BEGIN decendants in a node
-  containsSoql = 0; // the number of SOQL_EXECUTE_BEGIN decendants in a node
-  containsThrown = 0; // the number of EXCEPTION_THROWN decendants in a node
+  totalDmlCount = 0; // the number of DML_BEGIN decendants in a node
+  totalSoqlCount = 0; // the number of SOQL_EXECUTE_BEGIN decendants in a node
+  totalThrownCount = 0; // the number of EXCEPTION_THROWN decendants in a node
 
   constructor(parts: string[] | null, timelineKey: TimelineKey, cpuType: string) {
     super(parts);

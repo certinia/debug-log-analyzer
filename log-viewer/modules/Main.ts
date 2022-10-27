@@ -81,27 +81,27 @@ async function markContainers(node: TimedNode) {
   const children = node.children,
     len = children.length;
 
-  node.containsDml = 0;
-  node.containsSoql = 0;
-  node.containsThrown = 0;
+  node.totalDmlCount = 0;
+  node.totalSoqlCount = 0;
+  node.totalThrownCount = 0;
 
   for (let i = 0; i < len; ++i) {
     const child = children[i];
 
     if (child instanceof TimedNode) {
       if (child.type === 'DML_BEGIN') {
-        ++node.containsDml;
+        ++node.totalDmlCount;
       }
       if (child.type === 'SOQL_EXECUTE_BEGIN') {
-        ++node.containsSoql;
+        ++node.totalSoqlCount;
       }
       if (child.type === 'EXCEPTION_THROWN') {
-        ++node.containsThrown;
+        ++node.totalThrownCount;
       }
       markContainers(child);
-      node.containsDml += child.containsDml;
-      node.containsSoql += child.containsSoql;
-      node.containsThrown += child.containsThrown;
+      node.totalDmlCount += child.totalDmlCount;
+      node.totalSoqlCount += child.totalSoqlCount;
+      node.totalThrownCount += child.totalThrownCount;
     }
   }
 }
@@ -134,9 +134,11 @@ async function insertPackageWrappers(node: Method) {
           lastPkg.children.push(child); // move child into the pkg
         }
 
-        lastPkg.containsDml = child.containsDml + (childType === 'DML_BEGIN' ? 1 : 0);
-        lastPkg.containsSoql = child.containsSoql + (childType === 'SOQL_EXECUTE_BEGIN' ? 1 : 0);
-        lastPkg.containsThrown = child.containsThrown + (childType === 'EXCEPTION_THROWN' ? 1 : 0);
+        lastPkg.totalDmlCount = child.totalDmlCount + (childType === 'DML_BEGIN' ? 1 : 0);
+        lastPkg.totalSoqlCount =
+          child.totalSoqlCount + (childType === 'SOQL_EXECUTE_BEGIN' ? 1 : 0);
+        lastPkg.totalThrownCount =
+          child.totalThrownCount + (childType === 'EXCEPTION_THROWN' ? 1 : 0);
         lastPkg.exitStamp = child.exitStamp; // move the end
         lastPkg.recalculateDurations();
         if (child instanceof Method) {
