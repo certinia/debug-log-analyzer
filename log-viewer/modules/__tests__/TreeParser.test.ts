@@ -384,6 +384,44 @@ describe('getRootMethod tests', () => {
     const interViewEnd = interViewsBegin.children[1];
     expect(interViewEnd.type).toBe('FLOW_START_INTERVIEW_END');
   });
+
+  it('Root exitStamp should match last line pair with a duration', async () => {
+    const log =
+      '17:52:34.317 (1350000000)|EXECUTION_STARTED\n' +
+      '17:52:35.317 (1363038330)|CODE_UNIT_STARTED|[EXTERNAL]|Workflow:01Id0000000roIX\n' +
+      '17:52:35.370 (1363038331)|FLOW_START_INTERVIEWS_BEGIN|1\n' +
+      '17:52:35.370 (1363038332)|FLOW_START_INTERVIEW_BEGIN|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|Example Process Builder\n' +
+      '17:52:35.370 (1363038333)|FLOW_START_INTERVIEWS_BEGIN|1\n' +
+      '17:52:35.370 (1363038334)|FLOW_START_INTERVIEW_BEGIN|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|Example Flow\n' +
+      '17:52:35.370 (1363038335)|FLOW_START_INTERVIEW_END|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|Example Flow\n' +
+      '17:52:35.370 (1363038336)|FLOW_START_INTERVIEWS_END|1\n' +
+      '17:52:35.370 (1363038337)|FLOW_START_INTERVIEW_END|91080693a3c13822bcdbdd838a5180aed7a0e-5f03|Example Process Builder\n' +
+      '17:52:35.370 (1363038338)|FLOW_START_INTERVIEWS_END|1\n' +
+      '17:52:35.317 (1363038339)|CODE_UNIT_FINISHED|Workflow:01Id0000000roIX\n' +
+      '17:52:36.317 (1500000000)|EXECUTION_FINISHED\n' +
+      '17:52:36.320 (1510000000)|FLOW_START_INTERVIEWS_BEGIN|2\n' +
+      '17:52:36.320 (1520000000)|FLOW_START_INTERVIEWS_END|2\n' +
+      '17:52:36.321 (1530000000)|FLOW_INTERVIEW_FINISHED_LIMIT_USAGE|SOQL queries: 0 out of 100';
+
+    parseLog(log);
+    const rootMethod = getRootMethod();
+    // This should match the last node with a duration
+    // The last log line is information only (duration is 0)
+    // The last `FLOW_START_INTERVIEW_BEGIN` + `FLOW_START_INTERVIEW_END` are the last pair that will result in a duration
+    expect(rootMethod.exitStamp).toBe(1520000000);
+  });
+
+  it('Root exitStamp should match last line timestamp if none of the line pairs have duration', async () => {
+    const log =
+      '17:52:36.321 (1500000000)|FLOW_INTERVIEW_FINISHED_LIMIT_USAGE|SOQL queries: 0 out of 100\n' +
+      '17:52:37.321 (1510000000)|FLOW_INTERVIEW_FINISHED_LIMIT_USAGE|SOQL queries: 1 out of 100\n' +
+      '17:52:38.321 (1520000000)|FLOW_INTERVIEW_FINISHED_LIMIT_USAGE|SOQL queries: 2 out of 100\n' +
+      '17:52:39.321 (1530000000)|FLOW_INTERVIEW_FINISHED_LIMIT_USAGE|SOQL queries: 3 out of 100\n';
+
+    parseLog(log);
+    const rootMethod = getRootMethod();
+    expect(rootMethod.exitStamp).toBe(1530000000);
+  });
 });
 
 describe('Log Settings tests', () => {
