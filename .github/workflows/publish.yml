@@ -9,23 +9,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up Node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
-          node-version: "16"
+          node-version: '16'
       - name: Install vsce
         run: npm install --global vsce ovsx
       - name: Dependencies
         run: |
-          cd lana
           npm ci
       - name: Build
         run: |
           cd lana
-          vsce package
+          vsce package -no-dependencies
       - name: Publish to VS Code Marketplace + Open VSX Registry
         run: |
           cd lana
           vsce publish -p ${{ secrets.VSCE_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
-          ovsx publish lana-${{ github.event.release.tag_name }}.vsix -p ${{ secrets.OVSX_TOKEN }}
+          osvx publish -p ${{ secrets.OVSX_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix

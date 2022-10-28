@@ -121,9 +121,9 @@ export class TimedNode extends LogLine {
   timelineKey: TimelineKey; // the formatting key for rendering this entry in the timeline
   cpuType: string; // the catagory key to collect our cpu usage
   selfTime = 0; // the net time spent in the node (when not inside children)
-  containsDml = 0; // the number of DML_BEGIN decendants in a node
-  containsSoql = 0; // the number of SOQL_EXECUTE_BEGIN decendants in a node
-  containsThrown = 0; // the number of EXCEPTION_THROWN decendants in a node
+  totalDmlCount = 0; // the number of DML_BEGIN decendants in a node
+  totalSoqlCount = 0; // the number of SOQL_EXECUTE_BEGIN decendants in a node
+  totalThrownCount = 0; // the number of EXCEPTION_THROWN decendants in a node
 
   constructor(parts: string[] | null, timelineKey: TimelineKey, cpuType: string) {
     super(parts);
@@ -274,22 +274,17 @@ export class RootNode extends Method {
   }
 
   setEndTime() {
-    // We could have multiple "EXECUTION_STARTED" entries so loop backwards until we find one.
-    // We do not just want to use the last one because it is probably CUMULATIVE_USAGE which is not really part of the code execution time but does have a later time.
+    // We do not just want to use the very last exitStamp because it could be CUMULATIVE_USAGE which is not really part of the code execution time but does have a later time.
     let endTime;
     const len = this.children.length - 1;
     for (let i = len; i >= 0; i--) {
       const child = this.children[i];
-      if (child instanceof TimedNode) {
-        // Get the latest time of the last node (with a time) to use as a default
-        // This helps to display something on the timeline if the log is malformed
-        // e.g does not contain `EXECUTION_STARTED` + `EXECUTION_FINISED`
-        endTime ??= child.exitStamp;
-        if (child.type === 'EXECUTION_STARTED') {
-          endTime = child.exitStamp;
-          break;
-        }
+      // If there is no duration on a node then it is not going to be shown on the timeline anyway
+      if (child instanceof TimedNode && child.duration && child.exitStamp) {
+        endTime = child.exitStamp;
+        break;
       }
+      endTime ??= child.timestamp;
     }
     this.exitStamp = endTime || 0;
   }

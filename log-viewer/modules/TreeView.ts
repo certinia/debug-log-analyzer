@@ -160,14 +160,14 @@ function describeMethod(node: Method): Node[] {
     methodSuffix = node.suffix || '';
 
   const prefix = [];
-  if (node.containsDml) {
-    prefix.push('D' + node.containsDml);
+  if (node.totalDmlCount) {
+    prefix.push('D' + node.totalDmlCount);
   }
-  if (node.containsSoql) {
-    prefix.push('S' + node.containsSoql);
+  if (node.totalSoqlCount) {
+    prefix.push('S' + node.totalSoqlCount);
   }
-  if (node.containsThrown) {
-    prefix.push('T' + node.containsThrown);
+  if (node.totalThrownCount) {
+    prefix.push('T' + node.totalThrownCount);
   }
 
   let dbPrefix = '';
@@ -549,13 +549,14 @@ function showBreadcrumb(nameNode: HTMLElement | null) {
     markedNode.classList.remove('marked');
   }
 
-  if (nameNode === null) {
+  const closestNameNode = <HTMLElement>nameNode?.closest('.name');
+  if (!closestNameNode || !closestNameNode.matches('.name')) {
     return;
   }
-  nameNode.classList.add('marked');
-  markedNode = nameNode;
+  closestNameNode.classList.add('marked');
+  markedNode = closestNameNode;
 
-  let node = nameNode.line ? nameNode : getParentNode(nameNode);
+  let node = closestNameNode.line ? nameNode : getParentNode(nameNode);
   while (node && node.line !== treeRoot) {
     insertCrumb(breadcrumbContainer, node);
     node = getParentNode(node);
