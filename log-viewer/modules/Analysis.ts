@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import formatDuration from './Util';
-import { TimedNode, RootNode, totalDuration } from './parsers/TreeParser';
+import { TimedNode, RootNode } from './parsers/TreeParser';
 
 type SortKey = 'count' | 'duration' | 'selfTime' | 'name';
 
@@ -15,6 +15,7 @@ const nestedSort: Map<SortKey, SortKey[]> = new Map([
 const div = document.createElement('div');
 const span = document.createElement('span');
 const boldElem = document.createElement('b');
+let totalDuration = 0;
 
 let metricList: Metric[];
 
@@ -58,6 +59,7 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
 export default function analyseMethods(rootMethod: RootNode) {
   const methodMap: Map<string, Metric> = new Map();
 
+  totalDuration = rootMethod.executionEndTime;
   addNodeToMap(methodMap, rootMethod);
   metricList = [...methodMap.values()];
   return metricList; // return value for unit testing

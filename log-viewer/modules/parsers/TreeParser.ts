@@ -39,18 +39,20 @@ let logLines: LogLine[] = [],
 export class LineIterator {
   lines: LogLine[];
   index: number;
+  length: number;
 
   constructor(lines: LogLine[]) {
     this.lines = lines;
     this.index = 0;
+    this.length = lines.length;
   }
 
   peek(): LogLine | null {
-    return this.index < this.lines.length ? this.lines[this.index] : null;
+    return this.index < this.length ? this.lines[this.index] : null;
   }
 
   fetch(): LogLine | null {
-    return this.index < this.lines.length ? this.lines[this.index++] : null;
+    return this.index < this.length ? this.lines[this.index++] : null;
   }
 }
 
@@ -95,6 +97,7 @@ export abstract class LogLine {
   constructor(parts: string[] | null) {
     if (parts) {
       this.type = parts[1];
+      this.text = this.type;
       this.timestamp = parseTimestamp(parts[0]);
     }
   }
@@ -268,6 +271,10 @@ export class RootNode extends Method {
   type = 'ROOT';
   timestamp = 0;
   exitStamp = 0;
+  /**
+   * The endtime with nodes of 0 duration excluded
+   */
+  executionEndTime = 0;
 
   constructor() {
     super(null, [], 'root', 'codeUnit', '');
@@ -280,9 +287,12 @@ export class RootNode extends Method {
     for (let i = len; i >= 0; i--) {
       const child = this.children[i];
       // If there is no duration on a node then it is not going to be shown on the timeline anyway
-      if (child instanceof TimedNode && child.duration && child.exitStamp) {
-        endTime = child.exitStamp;
-        break;
+      if (child instanceof TimedNode && child.exitStamp) {
+        endTime ??= child.exitStamp;
+        if (child.duration) {
+          this.executionEndTime = child.exitStamp;
+          break;
+        }
       }
       endTime ??= child.timestamp;
     }
