@@ -22,7 +22,6 @@
     "salesforce"
   ],
   "main": "out/Main.js",
-  "type": "module",
   "icon": "logo.png",
   "galleryBanner": {
     "color": "#1e252b",

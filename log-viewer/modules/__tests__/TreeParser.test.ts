@@ -408,7 +408,8 @@ describe('getRootMethod tests', () => {
     // This should match the last node with a duration
     // The last log line is information only (duration is 0)
     // The last `FLOW_START_INTERVIEW_BEGIN` + `FLOW_START_INTERVIEW_END` are the last pair that will result in a duration
-    expect(rootMethod.exitStamp).toBe(1520000000);
+    expect(rootMethod.exitStamp).toBe(1530000000);
+    expect(rootMethod.executionEndTime).toBe(1520000000);
   });
 
   it('Root exitStamp should match last line timestamp if none of the line pairs have duration', async () => {
@@ -421,6 +422,7 @@ describe('getRootMethod tests', () => {
     parseLog(log);
     const rootMethod = getRootMethod();
     expect(rootMethod.exitStamp).toBe(1530000000);
+    expect(rootMethod.executionEndTime).toBe(0);
   });
 });
 
