@@ -12,52 +12,67 @@ The lana directory contain the extension source code. The log-viewer directory c
 
 VSCE is only required to create .vsix files for distribution. It can be installed globally with
 
-```sh
+```zsh
 npm i -g vsce
 ```
 
-## Development
+## Local Development
 
-To build use:
+### Dependencies
 
-```sh
-cd lana
+First remember to install node dependencies
+
+```zsh
 npm ci
-npm run compile
 ```
 
-The compile run script (see package.xml) makes use of shell features that may not be availble on your OS. An alternative way to compile is:
+### Build and bundle
 
-```sh
-cd log-viewer
-npm ci
+Run the folloing command to do a quick build of the bundles. This will skip some of the typechecking.
+
+```zsh
+npm run build:dev
+```
+
+or to do a build with full typechecking of all `.d.ts` files, use:
+
+```zsh
 npm run build
-cd ../lana
-npm ci
-tsc -p ./
 ```
 
-Once compiled you can launch the extension directly from VSCode using the 'Run Extension' launch configuration.
+### Watch
 
-## Local Development (lana extension)
-
-The extension can be debugged in VSCode, to do this:
+During development run the watch command to make builds for changes quickly. execute the following command:
 
 ```zsh
-cd lana
-npm ci
-npm run compile
+npm run watch
 ```
 
-This will compile the extension. The you can use the "Run Extension' debug configuration to have VSCode launch another version of VSCode with the current extension enabled.
+This will do a full build of the bundles and then watch for file changes in the `lana` and `log-viewer` source, compiling those changes incrementally, for a fast dev experience.
 
-## Local Development (log-viewer)
+### Run the extension
 
-The log-viewer can be run in a web browser to speed development work. To do this:
+After the bundles have been created
+
+- Open the debugger view (cmd/ctr + shift + d) or click the bug icon on the side bar
+- Select "Run Extension" from the drop down then click the green play icon
+
+This will launch another version of VSCode (Extension host) with the current extension enabled.
+
+If watch is running simple refresh the extension host view with cmd/ctrl + r or by using the restart icon. If watch is not running first execute one of the build commands.
+
+## Local Development (`log-viewer` standalone)
+
+Only use the following if you do not want any of the VSCode specific features
+
+Alternatively the log-viewer can be run in a web browser to speed development work.
+This will not include the styles inherited from VSCode or include any VSCode functionality.
+The debug log file path will need to specified by manually editing the `sample.log` value in `index.html`
+To do this:
 
 ```zsh
+npm ci
 cd log-viewer
-npm ci
 npm run debug
 ```
 
@@ -67,9 +82,10 @@ This will start a web server that you can access from any browser alongside a wa
 
 You can package the extension using:
 
-```sh
+```zsh
+npm ci
 cd lana
-vsce package
+vsce package --no-dependencies
 ```
 
 This command will automatically build the extension

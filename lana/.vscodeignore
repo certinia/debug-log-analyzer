@@ -4,6 +4,7 @@
 .gitignore
 BUILDING.md
 tsconfig.json
+tsconfig-dev.json
 node_modules
 rollup.config.js
 
