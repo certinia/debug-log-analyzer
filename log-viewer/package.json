@@ -10,7 +10,7 @@
     "watch": "rollup -w -c rollup.config.js",
     "web": "http-server",
     "debug": "concurrently \"npm:web\" \"npm:watch\"",
-    "prettier-format": "prettier --config .prettierrc 'modules/**/*.ts' --write"
+    "prettier-format": "prettier 'modules/**/*.ts' --write"
   },
   "version": "0.1.0",
   "dependencies": {

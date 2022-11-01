@@ -137,7 +137,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "npm run build --prefix ..",
     "local-compile": "rm -rf out && rollup -c rollup.config.js",
-    "prettier-format": "prettier --config .prettierrc 'src/**/*.ts' --write",
+    "prettier-format": "prettier 'src/**/*.ts' --write",
     "watch": "rollup -w -c rollup.config.js",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
