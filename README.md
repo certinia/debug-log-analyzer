@@ -132,6 +132,16 @@ Cliking on the links will take you to where that SOQL/DML occured in the call tr
 Help us to make things better by [Contributing](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/CONTRIBUTING.md)\
 Find out how to [Build](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/BUILDING.md) the extension
 
+## Contributors &#10084; &#128591;
+
+Thanks to the everyone who has contributed
+
+<p align="center">
+  <a href="https://github.com/financialforcedev/debug-log-analyzer/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=financialforcedev/debug-log-analyzer&max=25" />
+  </a>
+</p>
+
 ---
 
 <p align="center">
