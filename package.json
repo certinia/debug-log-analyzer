@@ -6,11 +6,18 @@
     "log-viewer"
   ],
   "devDependencies": {
+    "husky": "^8.0.0",
+    "lint-staged": "^13.0.3",
+    "prettier": "^2.7.1",
     "rollup-plugin-copy": "^3.4.0"
   },
   "scripts": {
     "build": "NODE_ENV=production npm run build:dev",
     "build:dev": "rm -rf lana/out && rollup -c rollup.config.js",
-    "watch": "rm -rf lana/out && rollup -w -c rollup.config.js"
+    "watch": "rm -rf lana/out && rollup -w -c rollup.config.js",
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "*.{ts,css,md}": "prettier --write"
   }
 }
