@@ -528,9 +528,9 @@ function insertCrumb(container: Element, node: HTMLElement) {
     textNode = document.createTextNode(line.getBreadcrumbText());
 
   crumb.classList.add('crumb');
-  crumb.title = nameNode.textContent!;
+  crumb.title = nameNode.textContent || '';
   crumb.appendChild(textElm);
-  crumb.addEventListener('click', (evt) => {
+  crumb.addEventListener('click', () => {
     nameNode.scrollIntoView();
     showBreadcrumb(nameNode);
   });
@@ -563,7 +563,7 @@ function showBreadcrumb(nameNode: HTMLElement | null) {
   }
 }
 
-function onInitTree(evt: Event) {
+function onInitTree() {
   const expandAll = document.getElementById('expandAll'),
     collapseAll = document.getElementById('collapseAll'),
     hideDetails = document.getElementById('hideDetails'),
