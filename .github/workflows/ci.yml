@@ -9,26 +9,26 @@ on:
 
 jobs:
   verify_files:
-    name: Lint files
+    name: Verify Files
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Set up Node
       - uses: actions/setup-node@v3
         with:
-          node-version: '16'
+          node-version: '16.x'
       - name: Install Packages
-      run: npm ci
+        run: npm install
       - name: Lint Files
-      run: npm run lint
+        run: npm run lint
 
   tests:
-    name: Run Log-viewer tests
+    name: Run Log-viewer Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Set up Node
-      - uses: actions/setup-node@v3
+        uses: actions/setup-node@v3
         with:
           node-version: '16'
       - name: Tests
