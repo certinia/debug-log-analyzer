@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- Spaces not supported in output directory path when running `Log: Load Apex Log For Analysis` command ([#187][#187])
+
 ## [1.5.1] - 2022-10-04
 
 ### Fixed
@@ -16,8 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Added
 
 - Calltree filtering to hide nodes where total duration is less than a given time ([#112][#112])
-- An EXCEPTION_THROWN marker (T) to supplement the DML_BEGIN (D) and SOQL_EXECUTE_BEGIN (S) markers on parent nodes ([#135][#135])
-- Some missing line types: DUPLICATE_DETECTION_BEGIN, DUPLICATE_DETECTION_END and DUPLICATE_DETECTION_RULE_INVOCATION ([#139][#139])
+- An `EXCEPTION_THROWN` marker (T) to supplement the`DML_BEGIN` (D) and `SOQL_EXECUTE_BEGIN` (S) markers on parent nodes ([#135][#135])
+- Some missing line types: `DUPLICATE_DETECTION_BEGIN`, `DUPLICATE_DETECTION_END` and `DUPLICATE_DETECTION_RULE_INVOCATION` ([#139][#139])
 - Salesforce Code Builder Support ([#23][#23])
   - Apex Log Analyzer to be published to the Open VSX Registry as well as the VSCode Marketplace
 
@@ -166,3 +172,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#139]: https://github.com/financialforcedev/debug-log-analyzer/issues/139
 [#23]: https://github.com/financialforcedev/debug-log-analyzer/issues/23
 [#163]: https://github.com/financialforcedev/debug-log-analyzer/issues/163
+[#187]: https://github.com/financialforcedev/debug-log-analyzer/issues/187
