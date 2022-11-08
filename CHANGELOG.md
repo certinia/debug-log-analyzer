@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- Fixes `ENTERING_MANAGED_PKG` events not being displayed on timeline ([#188][#188])
+
 ## [1.5.1] - 2022-10-04
 
 ### Fixed
@@ -166,3 +172,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#139]: https://github.com/financialforcedev/debug-log-analyzer/issues/139
 [#23]: https://github.com/financialforcedev/debug-log-analyzer/issues/23
 [#163]: https://github.com/financialforcedev/debug-log-analyzer/issues/163
+[#188]: https://github.com/financialforcedev/debug-log-analyzer/issues/188
