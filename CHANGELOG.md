@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Timeline not showing events if the event occurs outside the `EXECUTION_STARTED` + `EXECUTION_FINISHED` events ([#180][#180])
 
+## [1.5.2] - 2022-11-08
+
+### Fixed
+
+- Spaces not supported in output directory path when running `Log: Load Apex Log For Analysis` command ([#187][#187])
+- Fixes `ENTERING_MANAGED_PKG` events not being displayed on timeline ([#188][#188])
+
 ## [1.5.1] - 2022-10-04
 
 ### Fixed
@@ -30,8 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Added
 
 - Calltree filtering to hide nodes where total duration is less than a given time ([#112][#112])
-- An EXCEPTION_THROWN marker (T) to supplement the DML_BEGIN (D) and SOQL_EXECUTE_BEGIN (S) markers on parent nodes ([#135][#135])
-- Some missing line types: DUPLICATE_DETECTION_BEGIN, DUPLICATE_DETECTION_END and DUPLICATE_DETECTION_RULE_INVOCATION ([#139][#139])
+- An `EXCEPTION_THROWN` marker (T) to supplement the`DML_BEGIN` (D) and `SOQL_EXECUTE_BEGIN` (S) markers on parent nodes ([#135][#135])
+- Some missing line types: `DUPLICATE_DETECTION_BEGIN`, `DUPLICATE_DETECTION_END` and `DUPLICATE_DETECTION_RULE_INVOCATION` ([#139][#139])
 - Salesforce Code Builder Support ([#23][#23])
   - Apex Log Analyzer to be published to the Open VSX Registry as well as the VSCode Marketplace
 
@@ -182,3 +189,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#142]: https://github.com/financialforcedev/debug-log-analyzer/issues/142
 [#163]: https://github.com/financialforcedev/debug-log-analyzer/issues/163
 [#180]: https://github.com/financialforcedev/debug-log-analyzer/issues/180
+[#163]: https://github.com/financialforcedev/debug-log-analyzer/issues/163
+[#187]: https://github.com/financialforcedev/debug-log-analyzer/issues/187
+[#188]: https://github.com/financialforcedev/debug-log-analyzer/issues/188
