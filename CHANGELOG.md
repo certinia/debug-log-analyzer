@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Spaces not supported in output directory path when running `Log: Load Apex Log For Analysis` command ([#187][#187])
+- Fixes `ENTERING_MANAGED_PKG` events not being displayed on timeline ([#188][#188])
 
 ## [1.5.1] - 2022-10-04
 
@@ -173,3 +174,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#23]: https://github.com/financialforcedev/debug-log-analyzer/issues/23
 [#163]: https://github.com/financialforcedev/debug-log-analyzer/issues/163
 [#187]: https://github.com/financialforcedev/debug-log-analyzer/issues/187
+[#188]: https://github.com/financialforcedev/debug-log-analyzer/issues/188
