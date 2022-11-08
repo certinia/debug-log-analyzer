@@ -189,6 +189,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#142]: https://github.com/financialforcedev/debug-log-analyzer/issues/142
 [#163]: https://github.com/financialforcedev/debug-log-analyzer/issues/163
 [#180]: https://github.com/financialforcedev/debug-log-analyzer/issues/180
-[#163]: https://github.com/financialforcedev/debug-log-analyzer/issues/163
 [#187]: https://github.com/financialforcedev/debug-log-analyzer/issues/187
 [#188]: https://github.com/financialforcedev/debug-log-analyzer/issues/188
