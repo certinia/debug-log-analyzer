@@ -14,17 +14,19 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '16'
-      - name: Install vsce
-        run: npm install --global vsce ovsx
+      - name: Install vsce + ovsx
+        run: |
+          npm install --global vsce
+          npm install --global ovsx
       - name: Dependencies
         run: |
           npm ci
-      - name: Build
+      - name: Build extension
         run: |
           cd lana
-          vsce package -no-dependencies
+          vsce package --no-dependencies
       - name: Publish to VS Code Marketplace + Open VSX Registry
         run: |
           cd lana
           vsce publish -p ${{ secrets.VSCE_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
-          osvx publish -p ${{ secrets.OVSX_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
+          ovsx publish -p ${{ secrets.OVSX_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
