@@ -2217,7 +2217,61 @@ export function getRootMethod() {
   }
   rootMethod.setEndTime();
   totalDuration = rootMethod.exitStamp || 0;
+
+  insertPackageWrappers(rootMethod);
   return rootMethod;
+}
+
+async function insertPackageWrappers(node: Method) {
+  const children = node.children,
+    isParentDml = node.type === 'DML_BEGIN';
+
+  let lastPkg: TimedNode | null = null,
+    i = 0;
+  while (i < children.length) {
+    const child = children[i],
+      childType = child.type;
+
+    if (lastPkg && child instanceof TimedNode) {
+      if (childType === 'ENTERING_MANAGED_PKG' && child.namespace === lastPkg.namespace) {
+        // combine adjacent (like) packages
+        children.splice(i, 1); // remove redundant child from parent
+
+        lastPkg.exitStamp = child.exitStamp;
+        lastPkg.recalculateDurations();
+        continue; // skip any more child processing (it's gone)
+      } else if (
+        (isParentDml && (childType === 'DML_BEGIN' || childType === 'SOQL_EXECUTE_BEGIN')) ||
+        childType === 'EXCEPTION_THROWN'
+      ) {
+        // move child DML / SOQL into the last package
+        children.splice(i, 1); // remove moving child from parent
+        if (lastPkg.children) {
+          lastPkg.children.push(child); // move child into the pkg
+        }
+
+        lastPkg.totalDmlCount = child.totalDmlCount + (childType === 'DML_BEGIN' ? 1 : 0);
+        lastPkg.totalSoqlCount =
+          child.totalSoqlCount + (childType === 'SOQL_EXECUTE_BEGIN' ? 1 : 0);
+        lastPkg.totalThrownCount =
+          child.totalThrownCount + (childType === 'EXCEPTION_THROWN' ? 1 : 0);
+        lastPkg.exitStamp = child.exitStamp; // move the end
+        lastPkg.recalculateDurations();
+        if (child instanceof Method) {
+          insertPackageWrappers(child);
+        }
+        continue; // skip any more child processing (it's moved)
+      } else {
+        ++i;
+      }
+    } else {
+      ++i;
+    }
+    if (child instanceof Method) {
+      insertPackageWrappers(child);
+    }
+    lastPkg = childType === 'ENTERING_MANAGED_PKG' ? (child as TimedNode) : null;
+  }
 }
 
 export class LogSetting {

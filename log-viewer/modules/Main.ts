@@ -206,7 +206,6 @@ async function displayLog(log: string, name: string, path: string) {
 
   timer('analyse');
   await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
-  await insertPackageWrappers(rootMethod);
   await Promise.all([analyseMethods(rootMethod), DatabaseAccess.create(rootMethod)]);
 
   await setStatus(name, path, 'Rendering...', 'black');
