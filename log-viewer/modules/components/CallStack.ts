@@ -34,7 +34,7 @@ export class CallStack extends LitElement {
     const stacks = DatabaseAccess.instance()?.stacks;
     if (stacks && this.stack >= 0 && this.stack < stacks.length) {
       const stack = stacks[this.stack];
-      if (stack) {
+      if (stack.length) {
         const details = stack.slice(1, 10).map((entry) => this.lineLink(entry, false));
         return html`<details>
           <summary>${this.lineLink(stack[0], true)}</summary>
