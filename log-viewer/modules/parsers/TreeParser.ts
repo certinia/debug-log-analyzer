@@ -2237,7 +2237,7 @@ function insertPackageWrappers(node: Method) {
     if (lastPkg && child instanceof TimedNode) {
       if (isPkgType && child.namespace === lastPkg.namespace) {
         // combine adjacent (like) packages
-        lastPkg.exitStamp = child.exitStamp;
+        lastPkg.exitStamp = child.exitStamp || child.timestamp;
         continue; // skip any more child processing (it's gone)
       } else if (!isPkgType) {
         // move child DML / SOQL into the last package
@@ -2250,7 +2250,7 @@ function insertPackageWrappers(node: Method) {
           child.totalSoqlCount + (childType === 'SOQL_EXECUTE_BEGIN' ? 1 : 0);
         lastPkg.totalThrownCount =
           child.totalThrownCount + (childType === 'EXCEPTION_THROWN' ? 1 : 0);
-        lastPkg.exitStamp = child.exitStamp; // move the end
+        lastPkg.exitStamp = child.exitStamp || child.timestamp; // move the end
 
         if (child instanceof Method) {
           insertPackageWrappers(child);

@@ -458,14 +458,14 @@ describe('getRootMethod tests', () => {
     expect(executionChildren[1].type).toBe('ENTERING_MANAGED_PKG');
     expect(executionChildren[1].namespace).toBe('ns');
     expect(executionChildren[1].timestamp).toBe(400);
-    expect(executionChildren[1].exitStamp).toBe(600);
+    expect(executionChildren[1].exitStamp).toBe(700);
 
     expect(executionChildren[2].type).toBe('ENTERING_MANAGED_PKG');
     expect(executionChildren[2].namespace).toBe('ns2');
     expect(executionChildren[2].timestamp).toBe(700);
     expect(executionChildren[2].exitStamp).toBe(1100);
     expect(executionChildren[2].children.length).toBe(1);
-    expect(executionChildren[2].children[0].type).toBe('ENTERING_MANAGED_PKG');
+    expect(executionChildren[2].children[0].type).toBe('DML_BEGIN');
   });
 });
 
