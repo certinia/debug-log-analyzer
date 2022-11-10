@@ -1061,9 +1061,9 @@ export class ExecutionFinishedLine extends Detail {
   }
 }
 
-class EnteringManagedPackageLine extends TimedNode {
+class EnteringManagedPackageLine extends Method {
   constructor(parts: string[]) {
-    super(parts, 'method', 'pkg');
+    super(parts, [], null, 'method', 'pkg');
     const rawNs = parts[2],
       lastDot = rawNs.lastIndexOf('.');
 
@@ -1071,9 +1071,8 @@ class EnteringManagedPackageLine extends TimedNode {
     this.text = this.type + ' : ' + this.namespace;
   }
 
-  after(next: LogLine) {
-    this.exitStamp = next.timestamp;
-    this.duration = this.selfTime = this.exitStamp - this.timestamp;
+  onAfter(end: LogLine): void {
+    this.exitStamp = end.timestamp;
   }
 }
 
