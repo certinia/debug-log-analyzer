@@ -1063,10 +1063,10 @@ class EnteringManagedPackageLine extends TimedNode {
   constructor(parts: string[]) {
     super(parts, 'method', 'pkg');
     const rawNs = parts[2],
-      lastDot = rawNs.lastIndexOf('.'),
-      ns = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
+      lastDot = rawNs.lastIndexOf('.');
 
-    this.text = this.namespace = ns;
+    this.namespace = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
+    this.text = this.type + ' : ' + this.namespace;
   }
 
   after(next: LogLine) {
@@ -2222,30 +2222,24 @@ export function getRootMethod() {
   return rootMethod;
 }
 
-async function insertPackageWrappers(node: Method) {
-  const children = node.children,
-    isParentDml = node.type === 'DML_BEGIN';
+function insertPackageWrappers(node: Method) {
+  const children = node.children;
+  let lastPkg: TimedNode | null = null;
 
-  let lastPkg: TimedNode | null = null,
-    i = 0;
-  while (i < children.length) {
+  const newChildren = [];
+  const len = children.length;
+  for (let i = 0; i < len; i++) {
     const child = children[i],
-      childType = child.type;
+      childType = child.type,
+      isPkgType = childType === 'ENTERING_MANAGED_PKG';
 
     if (lastPkg && child instanceof TimedNode) {
-      if (childType === 'ENTERING_MANAGED_PKG' && child.namespace === lastPkg.namespace) {
+      if (isPkgType && child.namespace === lastPkg.namespace) {
         // combine adjacent (like) packages
-        children.splice(i, 1); // remove redundant child from parent
-
         lastPkg.exitStamp = child.exitStamp;
-        lastPkg.recalculateDurations();
         continue; // skip any more child processing (it's gone)
-      } else if (
-        (isParentDml && (childType === 'DML_BEGIN' || childType === 'SOQL_EXECUTE_BEGIN')) ||
-        childType === 'EXCEPTION_THROWN'
-      ) {
+      } else if (!isPkgType) {
         // move child DML / SOQL into the last package
-        children.splice(i, 1); // remove moving child from parent
         if (lastPkg.children) {
           lastPkg.children.push(child); // move child into the pkg
         }
@@ -2256,22 +2250,28 @@ async function insertPackageWrappers(node: Method) {
         lastPkg.totalThrownCount =
           child.totalThrownCount + (childType === 'EXCEPTION_THROWN' ? 1 : 0);
         lastPkg.exitStamp = child.exitStamp; // move the end
-        lastPkg.recalculateDurations();
+
         if (child instanceof Method) {
           insertPackageWrappers(child);
         }
         continue; // skip any more child processing (it's moved)
-      } else {
-        ++i;
       }
-    } else {
-      ++i;
+
+      lastPkg.recalculateDurations();
     }
+
     if (child instanceof Method) {
       insertPackageWrappers(child);
     }
-    lastPkg = childType === 'ENTERING_MANAGED_PKG' ? (child as TimedNode) : null;
+
+    // It is a ENTERING_MANAGED_PKG line that does not match the last one
+    // or we have not come across a ENTERING_MANAGED_PKG line yet.
+    lastPkg = isPkgType ? (child as TimedNode) : lastPkg;
+    newChildren.push(child);
   }
+
+  lastPkg?.recalculateDurations();
+  node.children = newChildren;
 }
 
 export class LogSetting {
