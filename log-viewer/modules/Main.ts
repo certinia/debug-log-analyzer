@@ -5,7 +5,6 @@ import { showTab } from './Util';
 import parseLog, {
   getLogSettings,
   TimedNode,
-  Method,
   LogSetting,
   truncated,
   totalDuration,
