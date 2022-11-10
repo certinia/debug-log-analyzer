@@ -424,6 +424,49 @@ describe('getRootMethod tests', () => {
     expect(rootMethod.exitStamp).toBe(1530000000);
     expect(rootMethod.executionEndTime).toBe(0);
   });
+
+  it('Entering Managed Package events should be merged', async () => {
+    const log =
+      '11:52:06.13 (100)|EXECUTION_STARTED\n' +
+      '11:52:06.13 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|ns.MyClass.myMethod()\n' +
+      '11:52:06.13 (151717928)|ENTERING_MANAGED_PKG|ns\n' +
+      '11:52:06.13 (300)|METHOD_EXIT|[185]|01p4J00000FpS6t|ns.MyClass.myMethod()\n' +
+      '11:52:06.13 (400)|ENTERING_MANAGED_PKG|ns\n' +
+      '11:52:06.13 (500)|ENTERING_MANAGED_PKG|ns\n' +
+      '11:52:06.13 (600)|ENTERING_MANAGED_PKG|ns\n' +
+      '11:52:06.13 (700)|ENTERING_MANAGED_PKG|ns2\n' +
+      '11:52:06.13 (725)|DML_BEGIN|[194]|Op:Update|Type:ns2__MyObject__c|Rows:1\n' +
+      '11:52:06.13 (750)|DML_END|[194]\n' +
+      '11:52:06.13 (800)|ENTERING_MANAGED_PKG|ns2\n' +
+      '11:52:06.13 (900)|ENTERING_MANAGED_PKG|ns2\n' +
+      '11:52:06.13 (1000)|ENTERING_MANAGED_PKG|ns2\n' +
+      '11:52:06.13 (1100)|ENTERING_MANAGED_PKG|ns2\n';
+    parseLog(log);
+    const rootMethod = getRootMethod();
+    expect(rootMethod.children.length).toBe(1);
+    expect(rootMethod.exitStamp).toBe(1100);
+    expect(rootMethod.executionEndTime).toBe(1100);
+
+    const rootChildren = rootMethod.children as Method[];
+    //expect([]).toBe(rootChildren);
+    const executionChildren = rootChildren[0].children as Method[];
+    expect(executionChildren.length).toBe(3);
+    expect(executionChildren[0].type).toBe('METHOD_ENTRY');
+    expect(executionChildren[0].timestamp).toBe(200);
+    expect(executionChildren[0].exitStamp).toBe(300);
+
+    expect(executionChildren[1].type).toBe('ENTERING_MANAGED_PKG');
+    expect(executionChildren[1].namespace).toBe('ns');
+    expect(executionChildren[1].timestamp).toBe(400);
+    expect(executionChildren[1].exitStamp).toBe(600);
+
+    expect(executionChildren[2].type).toBe('ENTERING_MANAGED_PKG');
+    expect(executionChildren[2].namespace).toBe('ns2');
+    expect(executionChildren[2].timestamp).toBe(700);
+    expect(executionChildren[2].exitStamp).toBe(1100);
+    expect(executionChildren[2].children.length).toBe(1);
+    expect(executionChildren[2].children[0].type).toBe('ENTERING_MANAGED_PKG');
+  });
 });
 
 describe('Log Settings tests', () => {
