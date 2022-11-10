@@ -156,11 +156,13 @@ export class TimedNode extends LogLine {
 
   recalculateDurations() {
     if (this.exitStamp) {
-      this.selfTime = this.duration = this.exitStamp - this.timestamp;
+      this.duration = this.exitStamp - this.timestamp;
 
+      let childDuration = 0;
       this.children.forEach((child) => {
-        this.selfTime -= child.duration;
+        childDuration += child.duration;
       });
+      this.selfTime = this.duration - childDuration;
     }
   }
 }
