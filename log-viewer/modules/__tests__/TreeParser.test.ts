@@ -12,6 +12,8 @@ import parseLog, {
   getLogSettings,
   Method,
   MethodEntryLine,
+  LogLine,
+  lineTypeMap,
   logLines,
   CodeUnitStartedLine,
   CodeUnitFinishedLine,
@@ -466,6 +468,40 @@ describe('getRootMethod tests', () => {
     expect(executionChildren[2].exitStamp).toBe(1100);
     expect(executionChildren[2].children.length).toBe(1);
     expect(executionChildren[2].children[0].type).toBe('DML_BEGIN');
+  });
+});
+
+describe('lineTypeMap tests', () => {
+  it('Lines referenced by exitTypes should be exits', () => {
+    for (const [_keyName, cls] of lineTypeMap) {
+      const line = new cls([
+        '14:32:07.563 (17358806534)',
+        'DUMMY',
+        '[10]',
+        'Rows:3',
+        '',
+        'Rows:5',
+      ]) as LogLine;
+      if (line instanceof Method) {
+        expect(line.exitTypes).not.toBe(null);
+        expect(line.isExit).toBe(false);
+        line.exitTypes.forEach((exitType) => {
+          const exitCls = lineTypeMap.get(exitType);
+          expect(exitCls).not.toBe(null);
+          if (exitCls) {
+            const exitLine = new exitCls([
+              '14:32:07.563 (17358806534)',
+              'DUMMY',
+              '[10]',
+              'Rows:3',
+              '',
+              'Rows:5',
+            ]) as LogLine;
+            expect(exitLine.isExit).toBe(true);
+          }
+        });
+      }
+    }
   });
 });
 

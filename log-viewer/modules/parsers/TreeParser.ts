@@ -1966,7 +1966,7 @@ class DuplicateDetectionRule extends Detail {
   }
 }
 
-const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
+export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['BULK_HEAP_ALLOCATE', BulkHeapAllocateLine],
   ['CALLOUT_REQUEST', CalloutRequestLine],
   ['CALLOUT_RESPONSE', CalloutResponseLine],
