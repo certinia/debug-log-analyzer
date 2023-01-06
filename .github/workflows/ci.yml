@@ -35,5 +35,4 @@ jobs:
         run: npm ci
       - name: Tests
         run: |
-          cd log-viewer
           npm run test:ci
