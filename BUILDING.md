@@ -13,7 +13,7 @@ The lana directory contain the extension source code. The log-viewer directory c
 VSCE is only required to create .vsix files for distribution. It can be installed globally with
 
 ```zsh
-npm i -g vsce
+npm i -g @vscode/vsce
 ```
 
 ## Local Development
