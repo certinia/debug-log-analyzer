@@ -16,7 +16,7 @@ jobs:
           node-version: '16'
       - name: Install vsce + ovsx
         run: |
-          npm install --global vsce
+          npm install --global @vscode/vsce
           npm install --global ovsx
       - name: Dependencies
         run: |
