@@ -30,7 +30,7 @@ Apex Log Analyzer makes performance analysis of Salesforce debug logs much easie
 ### Command Pallette
 
 - Open command pallette (CMD/CTRL + Shift + P), paste `ext install financialforce.lana`, and press enter.
-- Clcik reload in the extensions tab.
+- Click reload in the extensions tab.
 
 ```sh
 ext install financialforce.lana
@@ -145,7 +145,7 @@ Thanks to the everyone who has contributed
 ---
 
 <p align="center">
-Copyright &copy; FinancialForce.com, inc. All rights reserved.  
+Copyright &copy; FinancialForce.com, inc. All rights reserved.
 </p>
 <p align="center">
   <a href="https://opensource.org/licenses/BSD-3-Clause">
