@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
- * @jest-environment jsdom
  */
 
 import parseLog, { logLines } from '../parsers/TreeParser';

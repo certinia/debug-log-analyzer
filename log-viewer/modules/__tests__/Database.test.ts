@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
- * @jest-environment jsdom
  */
 import { DatabaseAccess, DatabaseEntry } from '../Database';
 import parseLog from '../parsers/TreeParser';

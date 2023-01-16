@@ -3,8 +3,6 @@
   "name": "logviewer",
   "private": true,
   "scripts": {
-    "test": "jest",
-    "test:ci": "jest --runInBand",
     "build": "rollup -c rollup.config.js",
     "lint": "eslint modules --ext ts",
     "watch": "rollup -w -c rollup.config.js",
