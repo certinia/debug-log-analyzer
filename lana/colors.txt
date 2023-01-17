@@ -1,0 +1,39 @@
+// https://tristen.ca/hcl-picker/#/hlc/7/1.11/63AF64/284458
+
+
+
+Code Unit": "#63AF64",
+            "SOQL": "#3A9C6D",
+            "Method": "#148772",
+            "Flow": "#007271",
+            "DML": "#145D68",
+            "Workflow": "#234759",
+            "System Method": "#283346"
+
+
+//best
+"default": {
+            "Code Unit": "#5EAE67",
+            "SOQL": "#389769",
+            "Method": "#187F67",
+            "Flow": "#007271",
+            "DML": "#145D68",
+            "Workflow": "#234759",
+            "System Method": "#283346"
+          },
+
+//  better
+"default": {
+            "Code Unit": "#68A259",
+            "SOQL": "#419264",
+            "Method": "#22806B",
+            "Flow": "#156D6C",
+            "DML": "#1F5965",
+            "Workflow": "#2B4558",
+            "System Method": "#283346"
+          },
+
+
+
+
+#69AF61,#3F9A69,#1B846C,#036D68,#0E565F,#1A404F,#1E2B3B

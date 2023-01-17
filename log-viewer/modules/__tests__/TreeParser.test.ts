@@ -249,6 +249,40 @@ describe('parseLog tests', () => {
     );
     expect(cpuUsed).toBe(0);
   });
+
+  it('VF_APEX_CALL_START for ApexMessages calls should have no exittypes', async () => {
+    const log = `09:15:43.263 (263506132)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagescomponentcontroller.apex <init>
+    09:15:43.263 (263714319)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagescomponentcontroller.apex set(conEscape)
+    09:15:43.263 (263738292)|VF_APEX_CALL_START|[EXTERNAL]|PageMessagesComponentController set(conEscape)
+    09:15:43.263 (263756710)|VF_APEX_CALL_START|[EXTERNAL]|PageMessagesComponentController invoke(setconEscape)
+    09:15:43.263 (263912147)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagescomponentcontroller.apex get(severities)
+    09:15:43.263 (263933174)|VF_APEX_CALL_START|[EXTERNAL]|PageMessagesComponentController invoke(getseverities)
+    09:15:43.265 (265740249)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagecomponentcontroller.apex <init>
+    09:15:43.265 (265929451)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagescomponentcontroller.apex get(conEscape)
+    09:15:43.265 (265953893)|VF_APEX_CALL_START|[EXTERNAL]|PageMessagesComponentController invoke(getconEscape)
+    09:15:43.266 (266057615)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagecomponentcontroller.apex set(conEscape)
+    09:15:43.266 (266077465)|VF_APEX_CALL_START|[EXTERNAL]|pagemessagecomponentcontroller set(conEscape)
+    09:15:43.266 (266093105)|VF_APEX_CALL_START|[EXTERNAL]|pagemessagecomponentcontroller invoke(setconEscape)
+    09:15:43.266 (266182651)|VF_APEX_CALL_START|[EXTERNAL]|severity
+    09:15:43.334 (334702333)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagecomponentcontroller.apex set(conSeverity)
+    09:15:43.334 (334715923)|VF_APEX_CALL_START|[EXTERNAL]|pagemessagecomponentcontroller set(conSeverity)
+    09:15:43.334 (334762915)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagecomponentcontroller.apex set(conStrength)
+    09:15:43.334 (334774783)|VF_APEX_CALL_START|[EXTERNAL]|pagemessagecomponentcontroller set(conStrength)
+    09:15:43.334 (334880548)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagecomponentcontroller.apex get(styleClass)
+    09:15:43.334 (334897897)|VF_APEX_CALL_START|[EXTERNAL]|pagemessagecomponentcontroller invoke(getstyleClass)
+    09:15:43.335 (335434720)|VF_APEX_CALL_START|[EXTERNAL]|severityMessages invoke(getlabel)
+    09:15:43.335 (335739619)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagecomponentcontroller.apex get(conEscape)
+    09:15:43.335 (335765383)|VF_APEX_CALL_START|[EXTERNAL]|pagemessagecomponentcontroller invoke(getconEscape)
+    09:15:43.335 (335933546)|VF_APEX_CALL_START|[EXTERNAL]|isSingle
+    09:15:43.336 (336270391)|VF_APEX_CALL_START|[EXTERNAL]|messages`;
+
+    parseLog(log);
+    const methods = logLines as Method[];
+    expect(methods.length).toBe(24);
+    methods.forEach((line) => {
+      expect(line.exitTypes.length).toBe(0);
+    });
+  });
 });
 
 describe('getRootMethod tests', () => {
