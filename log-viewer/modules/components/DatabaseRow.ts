@@ -13,18 +13,22 @@ export class DatabaseRow extends LitElement {
 
   static get styles() {
     return css`
+      .dbDetail {
+        flex-grow: 1;
+      }
       .dbEntry {
         display: flex;
+        margin-bottom: 10px;
       }
       .dbCount {
-        display: inline-block;
         width: 75px;
         min-width: 75px;
+        text-align: right;
       }
       .dbRows {
-        display: inline-block;
         width: 90px;
         min-width: 90px;
+        text-align: right;
       }
       .stackEntry {
         display: flex;
@@ -44,9 +48,9 @@ export class DatabaseRow extends LitElement {
         const stacks = entry.stacks.map((stack) => html`<call-stack stack=${stack}></call-stack>`);
         return html`
           <div class="dbEntry">
+            <span class="dbDetail">${detail}${stacks}</span>
             <span class="dbCount">Count: ${entry.count}</span>
             <span class="dbRows">Rows: ${entry.rowCount}</span>
-            <span>${detail}${stacks}</span>
           </div>
         `;
       } else {
