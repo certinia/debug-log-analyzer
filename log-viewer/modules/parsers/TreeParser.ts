@@ -1825,6 +1825,13 @@ class WFProcessFoundLine extends Detail {
   }
 }
 
+class WFProcessNode extends Detail {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
 class WFReassignRecordLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
@@ -2121,6 +2128,7 @@ export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['WF_NO_PROCESS_FOUND', WFNoProcessFoundLine],
   ['WF_OUTBOUND_MSG', WFOutboundMsgLine],
   ['WF_PROCESS_FOUND', WFProcessFoundLine],
+  ['WF_PROCESS_NODE', WFProcessNode],
   ['WF_REASSIGN_RECORD', WFReassignRecordLine],
   ['WF_RESPONSE_NOTIFY', WFResponseNotifyLine],
   ['WF_RULE_ENTRY_ORDER', WFRuleEntryOrderLine],
