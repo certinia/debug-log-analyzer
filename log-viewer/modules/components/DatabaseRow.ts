@@ -15,6 +15,7 @@ export class DatabaseRow extends LitElement {
     return css`
       .dbDetail {
         flex-grow: 1;
+        word-break: break-word;
       }
       .dbEntry {
         display: flex;
