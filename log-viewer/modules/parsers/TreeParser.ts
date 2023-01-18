@@ -156,11 +156,13 @@ export class TimedNode extends LogLine {
 
   recalculateDurations() {
     if (this.exitStamp) {
-      this.selfTime = this.duration = this.exitStamp - this.timestamp;
+      this.duration = this.exitStamp - this.timestamp;
 
+      let childDuration = 0;
       this.children.forEach((child) => {
-        this.selfTime -= child.duration;
+        childDuration += child.duration;
       });
+      this.selfTime = this.duration - childDuration;
     }
   }
 }
@@ -1063,10 +1065,10 @@ class EnteringManagedPackageLine extends Method {
   constructor(parts: string[]) {
     super(parts, [], null, 'method', 'pkg');
     const rawNs = parts[2],
-      lastDot = rawNs.lastIndexOf('.'),
-      ns = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
+      lastDot = rawNs.lastIndexOf('.');
 
-    this.text = this.namespace = ns;
+    this.namespace = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
+    this.text = this.type + ' : ' + this.namespace;
   }
 
   onAfter(end: LogLine): void {
@@ -1964,7 +1966,7 @@ class DuplicateDetectionRule extends Detail {
   }
 }
 
-const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
+export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['BULK_HEAP_ALLOCATE', BulkHeapAllocateLine],
   ['CALLOUT_REQUEST', CalloutRequestLine],
   ['CALLOUT_RESPONSE', CalloutResponseLine],
@@ -2216,7 +2218,61 @@ export function getRootMethod() {
   }
   rootMethod.setEndTime();
   totalDuration = rootMethod.exitStamp || 0;
+
+  insertPackageWrappers(rootMethod);
   return rootMethod;
+}
+
+function insertPackageWrappers(node: Method) {
+  const children = node.children;
+  let lastPkg: TimedNode | null = null;
+
+  const newChildren = [];
+  const len = children.length;
+  for (let i = 0; i < len; i++) {
+    const child = children[i],
+      childType = child.type,
+      isPkgType = childType === 'ENTERING_MANAGED_PKG';
+
+    if (lastPkg && child instanceof TimedNode) {
+      if (isPkgType && child.namespace === lastPkg.namespace) {
+        // combine adjacent (like) packages
+        lastPkg.exitStamp = child.exitStamp || child.timestamp;
+        continue; // skip any more child processing (it's gone)
+      } else if (!isPkgType) {
+        // move child DML / SOQL into the last package
+        if (lastPkg.children) {
+          lastPkg.children.push(child); // move child into the pkg
+        }
+
+        lastPkg.totalDmlCount = child.totalDmlCount + (childType === 'DML_BEGIN' ? 1 : 0);
+        lastPkg.totalSoqlCount =
+          child.totalSoqlCount + (childType === 'SOQL_EXECUTE_BEGIN' ? 1 : 0);
+        lastPkg.totalThrownCount =
+          child.totalThrownCount + (childType === 'EXCEPTION_THROWN' ? 1 : 0);
+        lastPkg.exitStamp = child.exitStamp || child.timestamp; // move the end
+
+        if (child instanceof Method) {
+          insertPackageWrappers(child);
+        }
+        continue; // skip any more child processing (it's moved)
+      }
+
+      lastPkg.recalculateDurations();
+    }
+
+    if (child instanceof Method) {
+      insertPackageWrappers(child);
+    }
+
+    // It is a ENTERING_MANAGED_PKG line that does not match the last one
+    // or we have not come across a ENTERING_MANAGED_PKG line yet.
+    lastPkg = isPkgType ? (child as TimedNode) : lastPkg;
+    newChildren.push(child);
+  }
+
+  lastPkg?.recalculateDurations();
+  node.children = newChildren;
 }
 
 export class LogSetting {

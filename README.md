@@ -1,9 +1,9 @@
 # Apex Log Analyzer for Salesforce
 
-[![Version](https://vsmarketplacebadge.apphb.com/version-short/financialforce.lana.svg)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
-[![Download](https://vsmarketplacebadge.apphb.com/downloads-short/financialforce.lana.svg)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
-[![Installs](https://vsmarketplacebadge.apphb.com/installs-short/financialforce.lana.svg)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
-[![Ratings](https://vsmarketplacebadge.apphb.com/rating-short/financialforce.lana.svg)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
+[![Version](https://vsmarketplacebadges.dev/version-short/financialforce.lana.svg)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
+[![Download](https://vsmarketplacebadges.dev/downloads-short/financialforce.lana.svg)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
+[![Installs](https://vsmarketplacebadges.dev/installs-short/financialforce.lana.svg)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
+[![Ratings](https://vsmarketplacebadges.dev/rating-short/financialforce.lana.svg)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
 
 Apex Log Analyzer makes performance analysis of Salesforce debug logs much easier and quicker. It provides visualization of code execution via a Flamegraph and Calltree and helps identify performance and SOQL/DML problems via Method and Database Analysis.
 
