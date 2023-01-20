@@ -53,10 +53,8 @@ export class DatabaseSection extends LitElement {
 
       return html`
         <div class="dbSection">
-          <div class="dbTitle">
-            ${title} (Count: ${totalCount}, Rows: ${totalRows})
-            <div class="dbBlock">${rows}</div>
-          </div>
+          <span class="dbTitle">${title} (Count: ${totalCount}, Rows: ${totalRows})</span>
+          <div class="dbBlock">${rows}</div>
         </div>
       `;
     } else {
