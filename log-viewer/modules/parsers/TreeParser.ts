@@ -723,11 +723,17 @@ class IdeasQueryExecuteLine extends Detail {
 
 class SOQLExecuteBeginLine extends Method {
   group = 'SOQL';
+  aggregations = 0;
 
   constructor(parts: string[]) {
     super(parts, ['SOQL_EXECUTE_END'], null, 'soql', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = 'SOQL: ' + parts[3] + ' - ' + parts[4];
+
+    const [, , , aggregations, soqlString] = parts;
+
+    const aggregationIndex = aggregations.indexOf('Aggregations:');
+    this.aggregations = Number(aggregations.slice(aggregationIndex + 13));
+    this.text = soqlString;
   }
 
   getBreadcrumbText(): string {
@@ -2308,4 +2314,4 @@ export function getLogSettings(log: string) {
   });
 }
 
-export { logLines, totalDuration, truncated, cpuUsed };
+export { logLines, totalDuration, truncated, cpuUsed, SOQLExecuteBeginLine };
