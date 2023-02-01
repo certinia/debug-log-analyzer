@@ -35,7 +35,7 @@ declare global {
 
 let logSize: number;
 
-async function setStatus(name: string, path: string, status: string, color: string) {
+async function setStatus(name: string, path: string, status: string, color?: string) {
   const statusHolder = document.getElementById('status') as HTMLDivElement,
     nameSpan = document.createElement('span'),
     nameLink = document.createElement('a'),
@@ -52,7 +52,9 @@ async function setStatus(name: string, path: string, status: string, color: stri
   nameSpan.appendChild(document.createTextNode(infoText + '\xA0-\xA0'));
 
   statusSpan.innerText = status;
-  statusSpan.style.color = color;
+  if (color) {
+    statusSpan.style.color = color;
+  }
 
   statusHolder.innerHTML = '';
   statusHolder.appendChild(nameSpan);
@@ -144,7 +146,7 @@ async function renderLogSettings(logSettings: LogSetting[]) {
 
 async function displayLog(log: string, name: string, path: string) {
   logSize = log.length;
-  await setStatus(name, path, 'Processing...', 'black');
+  await setStatus(name, path, 'Processing...');
 
   timer('parseLog');
   await Promise.all([renderLogSettings(getLogSettings(log)), parseLog(log)]);
@@ -156,7 +158,7 @@ async function displayLog(log: string, name: string, path: string) {
   await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
   await Promise.all([analyseMethods(rootMethod), DatabaseAccess.create(rootMethod)]);
 
-  await setStatus(name, path, 'Rendering...', 'black');
+  await setStatus(name, path, 'Rendering...');
 
   timer('renderViews');
   await Promise.all([
