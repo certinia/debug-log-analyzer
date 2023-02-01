@@ -2347,4 +2347,4 @@ export function getLogSettings(log: string) {
 }
 
 export { logLines, totalDuration, truncated, cpuUsed };
-export { SOQLExecuteExplainLine, SOQLExecuteBeginLine };
+export { SOQLExecuteExplainLine, SOQLExecuteBeginLine, DMLBeginLine };

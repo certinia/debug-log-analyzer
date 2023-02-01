@@ -2,7 +2,13 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 
-import { LogLine, Method, RootNode } from './parsers/TreeParser';
+import {
+  DMLBeginLine,
+  LogLine,
+  Method,
+  RootNode,
+  SOQLExecuteBeginLine,
+} from './parsers/TreeParser';
 
 export class DatabaseEntry {
   readonly count: number;
@@ -29,6 +35,7 @@ export type DatabaseEntryMap = Map<string, DatabaseEntry>;
 
 export class DatabaseAccess {
   private static _instance: DatabaseAccess | null = null;
+  private static _treeRoot: RootNode;
 
   readonly dmlMap: DatabaseEntryMap = new Map<string, DatabaseEntry>();
   readonly soqlMap: DatabaseEntryMap = new Map<string, DatabaseEntry>();
@@ -37,12 +44,52 @@ export class DatabaseAccess {
   static async create(rootMethod: RootNode): Promise<DatabaseAccess> {
     const databaseAccess = new DatabaseAccess();
     DatabaseAccess.findDatabaseLines(databaseAccess, rootMethod, []);
+
+    this._treeRoot = rootMethod;
     this._instance = databaseAccess;
     return this._instance;
   }
 
   static instance(): DatabaseAccess | null {
     return DatabaseAccess._instance;
+  }
+
+  public getSOQLLines(line: Method = DatabaseAccess._treeRoot): SOQLExecuteBeginLine[] {
+    let results: SOQLExecuteBeginLine[] = [];
+
+    const children = line.children;
+    const len = children.length;
+    for (let i = 0; i < len; ++i) {
+      const child = children[i];
+      if (child instanceof SOQLExecuteBeginLine) {
+        results.push(child);
+      }
+
+      if (child instanceof Method) {
+        results = results.concat(this.getSOQLLines(child));
+      }
+    }
+
+    return results;
+  }
+
+  public getDMLLines(line: Method = DatabaseAccess._treeRoot): DMLBeginLine[] {
+    let results: DMLBeginLine[] = [];
+
+    const children = line.children;
+    const len = children.length;
+    for (let i = 0; i < len; ++i) {
+      const child = children[i];
+      if (child instanceof DMLBeginLine) {
+        results.push(child);
+      }
+
+      if (child instanceof Method) {
+        results = results.concat(this.getDMLLines(child));
+      }
+    }
+
+    return results;
   }
 
   private static findDatabaseLines(log: DatabaseAccess, node: Method, stack: Stack) {

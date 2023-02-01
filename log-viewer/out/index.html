@@ -20,7 +20,8 @@
 				flex-direction: column;
 			}
 		</style>
-    <script defer crossorigin="anonymous" src="bundle.js"></script>
+
+    <script type="module" defer crossorigin="anonymous" src="bundle.js"></script>
 	</head>
 
 	<body>
@@ -85,9 +86,10 @@
 			</div>
 
 			<div id="dbView" class="tabItem">
-				<div id="dbScroller">
-					<div id="dbContent"></div>
-				</div>
+          <div id="dbContent">
+            <div id="dbDmlTable"></div>
+            <div id="dbSoqlTable"></div>
+          </div>
 			</div>
 
 		</div>

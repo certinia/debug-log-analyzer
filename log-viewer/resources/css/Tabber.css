@@ -25,6 +25,7 @@
   padding-top: 10px;
   flex: 1;
   margin-bottom: 20px;
+  min-height: 0;
 }
 .tabItem {
   display: none;

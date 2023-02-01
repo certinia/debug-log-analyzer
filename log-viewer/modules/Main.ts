@@ -16,7 +16,9 @@ import analyseMethods, { renderAnalysis } from './Analysis';
 import { DatabaseAccess } from './Database';
 import { setNamespaces } from './NamespaceExtrator';
 import { hostService } from './services/VSCodeService';
-import { renderDb } from './components/Database';
+//import for originl view
+// import { renderDb } from './components/Database';
+import { renderDBGrid } from './components/DatabaseView';
 
 import '../resources/css/Status.css';
 import '../resources/css/Settings.css';
@@ -24,7 +26,6 @@ import '../resources/css/Tabber.css';
 import '../resources/css/TreeView.css';
 import '../resources/css/TimelineView.css';
 import '../resources/css/AnalysisView.css';
-import '../resources/css/DatabaseView.css';
 
 declare global {
   interface Window {
@@ -162,8 +163,9 @@ async function displayLog(log: string, name: string, path: string) {
     renderTreeView(rootMethod),
     renderTimeline(rootMethod),
     renderAnalysis(),
-    renderDb(),
+    // renderDb(),
   ]);
+
   timer('');
   setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');
 }
@@ -213,6 +215,11 @@ function handleMessage(evt: MessageEvent) {
 function onInit(): void {
   const tabHolder = document.querySelector('.tabHolder');
   tabHolder?.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', onTabSelect));
+
+  const dbTab = document.getElementById('databaseTab');
+  if (dbTab) {
+    dbTab.addEventListener('click', renderDBGrid, { once: true });
+  }
 
   const helpButton = document.querySelector('.helpLink');
   if (helpButton) {
