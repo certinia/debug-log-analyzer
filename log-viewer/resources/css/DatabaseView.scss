@@ -40,22 +40,31 @@ $footerSeparatorColor: transparent; //footer bottom separator color
 $footerActiveColor: #d00 !default; //footer bottom active text color
 @import '~tabulator-tables/src/scss/tabulator.scss';
 
-#dbScroller {
-  overflow: scroll;
-  flex: 1;
+.tabulator {
+  .tabulator-tableholder {
+    .tabulator-table {
+      display: unset !important;
+    }
+  }
 }
-#dbContent {
+
+.dbContent {
   height: 100%;
-  /* position: absolute; */
 }
 #dbDmlTable,
 #dbSoqlTable {
   width: 100%;
+
   margin-bottom: 1rem;
-  /* max-height: 50%; */
+  overflow: visible;
+  max-width: 100%;
+}
+#soqlDBDetailView {
+  border-bottom: 2px solid var(--vscode-editorHoverWidget-border);
+  padding: 10px;
+  background-color: var(--vscode-editorHoverWidget-background);
 }
 .tabulator-tooltip {
-  // color: #333;
   background: var(--vscode-editor-background);
   overflow-wrap: anywhere;
 }

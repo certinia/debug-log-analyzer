@@ -54,6 +54,31 @@ export class DatabaseAccess {
     return DatabaseAccess._instance;
   }
 
+  public getStack(
+    timestamp: number,
+    stack: Stack = [],
+    line: Method = DatabaseAccess._treeRoot
+  ): Stack {
+    const children = line.children;
+    const len = children.length;
+    for (let i = 0; i < len; ++i) {
+      const child = children[i];
+      if (child instanceof Method) {
+        stack.push(child);
+        if (child.timestamp === timestamp) {
+          return stack;
+        }
+
+        const childStack = this.getStack(timestamp, stack, child);
+        if (childStack.length > 0) {
+          return childStack;
+        }
+        stack.pop();
+      }
+    }
+    return [];
+  }
+
   public getSOQLLines(line: Method = DatabaseAccess._treeRoot): SOQLExecuteBeginLine[] {
     let results: SOQLExecuteBeginLine[] = [];
 

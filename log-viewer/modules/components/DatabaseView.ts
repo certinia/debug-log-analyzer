@@ -1,7 +1,13 @@
 import '../../resources/css/DatabaseView.scss';
-import { TabulatorFull as Tabulator } from 'tabulator-tables';
+import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
+import { html, render } from 'lit';
+
 import { DatabaseAccess } from '../Database';
-import { SOQLExecuteExplainLine } from '../parsers/TreeParser';
+import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
+import './CallStack.ts';
+
+let currentDetailRow: HTMLElement | null;
+// let currentDetailRow: RowComponent | null;
 
 export function renderDBGrid(): void {
   renderDMLTable();
@@ -48,6 +54,7 @@ function renderSOQLTable(): void {
     rowCount: number | null;
     timeTaken: number | null;
     aggregations: number;
+    timestamp: number;
   }
 
   // todo: move to a class to aggreagte multiple sources for selevtivity
@@ -63,16 +70,17 @@ function renderSOQLTable(): void {
         rowCount: soql.rowCount,
         timeTaken: Math.round(soql.duration / 1000000 / 100) * 100,
         aggregations: soql.aggregations,
+        timestamp: soql.timestamp,
       });
-      // data.push({ soql: soql.text, count: value., rowCount: value.rowCount });
     }
   }
 
-  new Tabulator('#dbSoqlTable', {
+  const soqlTable = new Tabulator('#dbSoqlTable', {
     data: soqlData, //set initial table data
     layout: 'fitColumns',
     columnCalcs: 'table',
     selectable: 1,
+    columnDefaults: { title: 'default', resizable: true },
     columns: [
       {
         title: 'Selective',
@@ -146,4 +154,37 @@ function renderSOQLTable(): void {
       },
     ],
   });
+
+  soqlTable.on('rowSelected', function (row: RowComponent) {
+    //e - the click event object
+    //row - row component
+    showDetailView(row);
+  });
+
+  soqlTable.on('rowDeselected', function (_row: RowComponent) {
+    if (currentDetailRow) {
+      currentDetailRow.remove();
+      currentDetailRow = null;
+    }
+  });
+}
+
+function showDetailView(row: RowComponent) {
+  const timestamp = (row?.getData() as SOQLExecuteBeginLine)?.timestamp;
+  if (timestamp) {
+    if (currentDetailRow) {
+      currentDetailRow.remove();
+      currentDetailRow = null;
+    }
+
+    const detailContainer = document.createElement('div');
+    detailContainer.id = 'soqlDBDetailView';
+    currentDetailRow = detailContainer;
+
+    const stackContainer = document.createElement('div');
+    detailContainer.appendChild(stackContainer);
+    render(html`<call-stack timestamp=${timestamp}></call-stack>`, stackContainer);
+    const rowElem = row.getElement();
+    rowElem.parentNode?.insertBefore(detailContainer, rowElem.nextSibling);
+  }
 }
