@@ -6,8 +6,8 @@ import { DatabaseAccess } from '../Database';
 import { SOQLExecuteExplainLine } from '../parsers/TreeParser';
 import './CallStack.ts';
 
-// let detailContainer: HTMLElement | null;
-let currentDetailRow: RowComponent | null;
+let soqlDetailPanel: RowComponent | null;
+let dmlDetailPanel: RowComponent | null;
 
 export function renderDBGrid(): void {
   renderDMLTable();
@@ -22,15 +22,24 @@ function renderDMLTable(): void {
         dml: dml.text,
         rowCount: dml.rowCount,
         timeTaken: Math.round((dml.duration / 1000000) * 100) / 100,
+        timestamp: dml.timestamp,
+        _children: [{}],
       });
     }
   }
 
-  new Tabulator('#dbDmlTable', {
+  const dmlTable = new Tabulator('#dbDmlTable', {
     data: dmlData, //set initial table data
     layout: 'fitColumns',
     columnCalcs: 'table',
-    selectable: 1,
+    selectable: true,
+    dataTree: true,
+    dataTreeExpandElement: '<span></span>',
+    dataTreeCollapseElement: '<span></span>',
+    dataTreeBranchElement: false,
+    selectableCheck: function (row) {
+      return row.getData().dml;
+    },
     columns: [
       { title: 'DML', field: 'dml', sorter: 'string', tooltip: true },
       { title: 'Row Count', field: 'rowCount', sorter: 'number', width: 110, bottomCalc: 'sum' },
@@ -44,6 +53,31 @@ function renderDMLTable(): void {
         bottomCalcParams: { precision: 2 },
       },
     ],
+    rowFormatter: function (row) {
+      const parent = row.getTreeParent();
+      if (parent) {
+        const rowData = parent.getData();
+        const detailContainer = createDetailPanel(rowData.timestamp);
+        row.getElement().replaceChildren(detailContainer);
+      }
+    },
+  });
+
+  dmlTable.on('rowSelected', function (row: RowComponent) {
+    dmlTable.blockRedraw();
+    if (dmlDetailPanel) {
+      dmlDetailPanel.deselect();
+    }
+    row.treeExpand();
+    dmlDetailPanel = row;
+    dmlTable.restoreRedraw();
+  });
+
+  dmlTable.on('rowDeselected', function (row: RowComponent) {
+    if (row === dmlDetailPanel) {
+      row.treeCollapse();
+      dmlDetailPanel = null;
+    }
   });
 }
 
@@ -170,18 +204,18 @@ function renderSOQLTable(): void {
 
   soqlTable.on('rowSelected', function (row: RowComponent) {
     soqlTable.blockRedraw();
-    if (currentDetailRow) {
-      currentDetailRow.deselect();
+    if (soqlDetailPanel) {
+      soqlDetailPanel.deselect();
     }
     row.treeExpand();
-    currentDetailRow = row;
+    soqlDetailPanel = row;
     soqlTable.restoreRedraw();
   });
 
   soqlTable.on('rowDeselected', function (row: RowComponent) {
-    if (row === currentDetailRow) {
+    if (row === soqlDetailPanel) {
       row.treeCollapse();
-      currentDetailRow = null;
+      soqlDetailPanel = null;
     }
   });
 }
