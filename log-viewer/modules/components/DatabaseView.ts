@@ -3,11 +3,11 @@ import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 import { html, render } from 'lit';
 
 import { DatabaseAccess } from '../Database';
-import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
+import { SOQLExecuteExplainLine } from '../parsers/TreeParser';
 import './CallStack.ts';
 
-let currentDetailRow: HTMLElement | null;
-// let currentDetailRow: RowComponent | null;
+// let detailContainer: HTMLElement | null;
+let currentDetailRow: RowComponent | null;
 
 export function renderDBGrid(): void {
   renderDMLTable();
@@ -21,7 +21,7 @@ function renderDMLTable(): void {
       dmlData.push({
         dml: dml.text,
         rowCount: dml.rowCount,
-        timeTaken: (dml.duration / 1000000).toFixed(2),
+        timeTaken: Math.round((dml.duration / 1000000) * 100) / 100,
       });
     }
   }
@@ -40,7 +40,8 @@ function renderDMLTable(): void {
         sorter: 'number',
         width: 110,
         bottomCalc: 'sum',
-        bottomCalcFormatterParams: { precision: 2 },
+        // @ts-ignore
+        bottomCalcParams: { precision: 2 },
       },
     ],
   });
@@ -59,7 +60,7 @@ function renderSOQLTable(): void {
 
   // todo: move to a class to aggreagte multiple sources for selevtivity
   const soqlLines = DatabaseAccess.instance()?.getSOQLLines();
-  const soqlData: GridSOQLData[] = [];
+  const soqlData = [];
   if (soqlLines) {
     for (const soql of soqlLines) {
       const explainLine = soql.children[0] as SOQLExecuteExplainLine;
@@ -68,18 +69,26 @@ function renderSOQLTable(): void {
         relativeCost: explainLine?.relativeCost,
         soql: soql.text,
         rowCount: soql.rowCount,
-        timeTaken: Math.round(soql.duration / 1000000 / 100) * 100,
+        timeTaken: Math.round((soql.duration / 1000000) * 100) / 100,
         aggregations: soql.aggregations,
         timestamp: soql.timestamp,
+        _children: [{}],
       });
     }
   }
 
   const soqlTable = new Tabulator('#dbSoqlTable', {
-    data: soqlData, //set initial table data
+    data: soqlData,
     layout: 'fitColumns',
     columnCalcs: 'table',
-    selectable: 1,
+    selectable: true,
+    dataTree: true,
+    dataTreeExpandElement: '<span></span>',
+    dataTreeCollapseElement: '<span></span>',
+    dataTreeBranchElement: false,
+    selectableCheck: function (row) {
+      return row.getData().soql;
+    },
     columnDefaults: { title: 'default', resizable: true },
     columns: [
       {
@@ -93,12 +102,6 @@ function renderSOQLTable(): void {
         hozAlign: 'center',
         vertAlign: 'middle',
         sorter: function (a, b, aRow, bRow, _column, dir, _sorterParams) {
-          //a, b - the two values being compared
-          //aRow, bRow - the row components for the values being compared (useful if you need to access additional fields in the row data for the sort)
-          //column - the column component for the column being sorted
-          //dir - the direction of the sort ("asc" or "desc")
-          //sorterParams - sorterParams object from column definition array
-
           // Always Sort null values to the bottom (when we do not have selectivity)
           if (a === null) {
             return dir === 'asc' ? 1 : -1;
@@ -106,19 +109,12 @@ function renderSOQLTable(): void {
             return dir === 'asc' ? -1 : 1;
           }
 
-          const aRowData = aRow.getData() as GridSOQLData;
-          const bRowData = bRow.getData() as GridSOQLData;
+          const aRowData = aRow.getData();
+          const bRowData = bRow.getData();
 
           return (aRowData.relativeCost || 0) - (bRowData.relativeCost || 0);
         },
         tooltip: function (e, cell, _onRendered) {
-          //e - mouseover event
-          //cell - cell component
-          //onRendered - onRendered callback registration function
-
-          // var el = document.createElement('div');
-          // el.style.backgroundColor = 'red';
-          // el.innerText = cell.getColumn().getField() + ' - ' + cell.getValue(); //return cells "field - value";
           const { isSelective, relativeCost } = cell.getData() as GridSOQLData;
           let title;
           if (isSelective === null) {
@@ -136,14 +132,23 @@ function renderSOQLTable(): void {
         },
       },
       { title: 'SOQL', field: 'soql', sorter: 'string', tooltip: true },
-      { title: 'Row Count', field: 'rowCount', sorter: 'number', width: 110, bottomCalc: 'sum' },
+      {
+        title: 'Row Count',
+        field: 'rowCount',
+        sorter: 'number',
+        width: 110,
+        bottomCalc: 'sum',
+        // @ts-ignore
+        bottomCalcParams: { precision: 2 },
+      },
       {
         title: 'Time Taken (ms)',
         field: 'timeTaken',
         sorter: 'number',
         width: 110,
         bottomCalc: 'sum',
-        bottomCalcFormatterParams: { precision: 2 },
+        // @ts-ignore
+        bottomCalcParams: { precision: 2 },
       },
       {
         title: 'Aggregations',
@@ -153,38 +158,39 @@ function renderSOQLTable(): void {
         bottomCalc: 'sum',
       },
     ],
+    rowFormatter: function (row) {
+      const parent = row.getTreeParent();
+      if (parent) {
+        const rowData = parent.getData();
+        const detailContainer = createDetailPanel(rowData.timestamp);
+        row.getElement().replaceChildren(detailContainer);
+      }
+    },
   });
 
   soqlTable.on('rowSelected', function (row: RowComponent) {
-    //e - the click event object
-    //row - row component
-    showDetailView(row);
+    soqlTable.blockRedraw();
+    if (currentDetailRow) {
+      currentDetailRow.deselect();
+    }
+    row.treeExpand();
+    currentDetailRow = row;
+    soqlTable.restoreRedraw();
   });
 
-  soqlTable.on('rowDeselected', function (_row: RowComponent) {
-    if (currentDetailRow) {
-      currentDetailRow.remove();
+  soqlTable.on('rowDeselected', function (row: RowComponent) {
+    if (row === currentDetailRow) {
+      row.treeCollapse();
       currentDetailRow = null;
     }
   });
 }
 
-function showDetailView(row: RowComponent) {
-  const timestamp = (row?.getData() as SOQLExecuteBeginLine)?.timestamp;
-  if (timestamp) {
-    if (currentDetailRow) {
-      currentDetailRow.remove();
-      currentDetailRow = null;
-    }
-
-    const detailContainer = document.createElement('div');
-    detailContainer.id = 'soqlDBDetailView';
-    currentDetailRow = detailContainer;
-
-    const stackContainer = document.createElement('div');
-    detailContainer.appendChild(stackContainer);
-    render(html`<call-stack timestamp=${timestamp}></call-stack>`, stackContainer);
-    const rowElem = row.getElement();
-    rowElem.parentNode?.insertBefore(detailContainer, rowElem.nextSibling);
-  }
+function createDetailPanel(timestamp: number) {
+  const stackContainer = document.createElement('div');
+  render(html`<call-stack timestamp=${timestamp}></call-stack>`, stackContainer);
+  const detailContainer = document.createElement('div');
+  detailContainer.id = 'soqlDBDetailView';
+  detailContainer.appendChild(stackContainer);
+  return detailContainer;
 }
