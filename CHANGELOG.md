@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Added
 
 - Breadcrumbs shown above the calltree when clicking a row ([#142][#142])
+- Redesigned Database tab ([#219][#219])
+  - All columns are sortable ascending /descending by clicking the header
+  - Added columns DML/ SOQL, Row Count, Total Time
+  - Added specific columns for SOQL Selectivity + Aggregations
+  - Added detail panel which is shown by clicking a row which shows the call stack for the specific DML / SOQL, clicking a link will go to the main call tree tab
+  - Totals shown at the bottom of each column
 
 ### Changed
 
@@ -191,3 +197,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#180]: https://github.com/financialforcedev/debug-log-analyzer/issues/180
 [#187]: https://github.com/financialforcedev/debug-log-analyzer/issues/187
 [#188]: https://github.com/financialforcedev/debug-log-analyzer/issues/188
+[#219]: https://github.com/financialforcedev/debug-log-analyzer/issues/219
