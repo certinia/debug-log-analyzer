@@ -122,10 +122,13 @@ Show analysis on method calls. The table can be sorted ascending or descending b
 
 ### Database
 
-![database](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/db-lana.png)
+![database](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/db-lana.png)
 
-Shows the SOQL and DML that occured as well as the number of times each SOQL/DML occured and the number of rows returned.
-Cliking on the links will take you to where that SOQL/DML occured in the call tree.
+Shows the SOQL and DML that occured the number of rows returned, the time taken and for SOQL the selectivity and number of aggregations.
+Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occured in the call tree.
+The tables can be sorted ascending or descending by DML/SOQL, Row Count and Time Taken and by Selectivity and Aggregations on the SOQL table.
+
+The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determine. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
 
 ## Contributing
 
