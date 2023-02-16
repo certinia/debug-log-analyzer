@@ -6,16 +6,16 @@ import { DatabaseAccess } from '../Database';
 import { SOQLExecuteExplainLine } from '../parsers/TreeParser';
 import './CallStack.ts';
 
-let soqlDetailPanel: RowComponent | null;
-let dmlDetailPanel: RowComponent | null;
-
-export function renderDBGrid(): void {
+export function renderDBGrid() {
   renderDMLTable();
   renderSOQLTable();
 }
-function renderDMLTable(): void {
+
+function renderDMLTable() {
+  let dmlDetailPanel: RowComponent | null;
+
   const dmlLines = DatabaseAccess.instance()?.getDMLLines();
-  const dmlData = [];
+  const dmlData: unknown[] = [];
   if (dmlLines) {
     for (const dml of dmlLines) {
       dmlData.push({
@@ -23,25 +23,29 @@ function renderDMLTable(): void {
         rowCount: dml.rowCount,
         timeTaken: Math.round((dml.duration / 1000000) * 100) / 100,
         timestamp: dml.timestamp,
-        _children: [{}],
       });
     }
+    dmlData.push({ isDetail: true, hide: true });
   }
 
   const dmlTable = new Tabulator('#dbDmlTable', {
     data: dmlData, //set initial table data
     layout: 'fitColumns',
     columnCalcs: 'table',
-    selectable: true,
-    dataTree: true,
-    dataTreeExpandElement: '<span></span>',
-    dataTreeCollapseElement: '<span></span>',
-    dataTreeBranchElement: false,
+    selectable: 1,
     selectableCheck: function (row) {
-      return row.getData().dml;
+      return !row.getData().isDetail;
     },
     columns: [
-      { title: 'DML', field: 'dml', sorter: 'string', tooltip: true },
+      {
+        title: 'DML',
+        field: 'dml',
+        sorter: 'string',
+        tooltip: true,
+        bottomCalc: () => {
+          return 'Total';
+        },
+      },
       { title: 'Row Count', field: 'rowCount', sorter: 'number', width: 110, bottomCalc: 'sum' },
       {
         title: 'Time Taken (ms)',
@@ -49,39 +53,49 @@ function renderDMLTable(): void {
         sorter: 'number',
         width: 110,
         bottomCalc: 'sum',
-        // @ts-ignore
         bottomCalcParams: { precision: 2 },
       },
     ],
     rowFormatter: function (row) {
-      const parent = row.getTreeParent();
-      if (parent) {
-        const rowData = parent.getData();
-        const detailContainer = createDetailPanel(rowData.timestamp);
-        row.getElement().replaceChildren(detailContainer);
+      const data = row.getData();
+      if (data.isDetail) {
+        const rowElem = row.getElement();
+        if (data.hide) {
+          rowElem.innerHTML = '';
+        } else if (data.timestamp) {
+          const detailContainer = createDetailPanel(data.timestamp);
+          rowElem.replaceChildren(detailContainer);
+        }
       }
     },
   });
 
-  dmlTable.on('rowSelected', function (row: RowComponent) {
+  dmlTable.on('rowSelected', (row: RowComponent) => {
+    dmlDetailPanel?.update({ timestamp: row.getData().timestamp, hide: false }).then(() => {
+      if (dmlDetailPanel) {
+        dmlDetailPanel?.move(row, false);
+        const nextRow = dmlDetailPanel.getNextRow() || dmlDetailPanel;
+        nextRow.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+      }
+    });
+  });
+
+  dmlTable.on('rowDeselected', () => {
     dmlTable.blockRedraw();
-    if (dmlDetailPanel) {
-      dmlDetailPanel.deselect();
-    }
-    row.treeExpand();
-    dmlDetailPanel = row;
+    dmlDetailPanel?.update({ hide: true });
+  });
+
+  dmlTable.on('dataChanged', () => {
     dmlTable.restoreRedraw();
   });
 
-  dmlTable.on('rowDeselected', function (row: RowComponent) {
-    if (row === dmlDetailPanel) {
-      row.treeCollapse();
-      dmlDetailPanel = null;
-    }
+  dmlTable.on('tableBuilt', function () {
+    dmlDetailPanel = dmlTable.searchRows('isDetail', '=', true)[0];
   });
 }
 
-function renderSOQLTable(): void {
+function renderSOQLTable() {
+  let soqlDetailPanel: RowComponent | null;
   interface GridSOQLData {
     isSelective: boolean | null;
     relativeCost: number | null;
@@ -92,9 +106,8 @@ function renderSOQLTable(): void {
     timestamp: number;
   }
 
-  // todo: move to a class to aggreagte multiple sources for selevtivity
   const soqlLines = DatabaseAccess.instance()?.getSOQLLines();
-  const soqlData = [];
+  const soqlData: unknown[] = [];
   if (soqlLines) {
     for (const soql of soqlLines) {
       const explainLine = soql.children[0] as SOQLExecuteExplainLine;
@@ -106,22 +119,18 @@ function renderSOQLTable(): void {
         timeTaken: Math.round((soql.duration / 1000000) * 100) / 100,
         aggregations: soql.aggregations,
         timestamp: soql.timestamp,
-        _children: [{}],
       });
     }
+    soqlData.push({ isDetail: true, hide: true });
   }
 
   const soqlTable = new Tabulator('#dbSoqlTable', {
     data: soqlData,
     layout: 'fitColumns',
     columnCalcs: 'table',
-    selectable: true,
-    dataTree: true,
-    dataTreeExpandElement: '<span></span>',
-    dataTreeCollapseElement: '<span></span>',
-    dataTreeBranchElement: false,
+    selectable: 1,
     selectableCheck: function (row) {
-      return row.getData().soql;
+      return !row.getData().isDetail;
     },
     columnDefaults: { title: 'default', resizable: true },
     columns: [
@@ -160,19 +169,26 @@ function renderSOQLTable(): void {
           }
 
           if (relativeCost) {
-            title += `\nRelative cost: ${relativeCost}`;
+            title += `<br>Relative cost: ${relativeCost}`;
           }
           return title;
         },
       },
-      { title: 'SOQL', field: 'soql', sorter: 'string', tooltip: true },
+      {
+        title: 'SOQL',
+        field: 'soql',
+        sorter: 'string',
+        tooltip: true,
+        bottomCalc: () => {
+          return 'Total';
+        },
+      },
       {
         title: 'Row Count',
         field: 'rowCount',
         sorter: 'number',
         width: 110,
         bottomCalc: 'sum',
-        // @ts-ignore
         bottomCalcParams: { precision: 2 },
       },
       {
@@ -181,7 +197,6 @@ function renderSOQLTable(): void {
         sorter: 'number',
         width: 110,
         bottomCalc: 'sum',
-        // @ts-ignore
         bottomCalcParams: { precision: 2 },
       },
       {
@@ -193,30 +208,40 @@ function renderSOQLTable(): void {
       },
     ],
     rowFormatter: function (row) {
-      const parent = row.getTreeParent();
-      if (parent) {
-        const rowData = parent.getData();
-        const detailContainer = createDetailPanel(rowData.timestamp);
-        row.getElement().replaceChildren(detailContainer);
+      const data = row.getData();
+      if (data.isDetail) {
+        const rowElem = row.getElement();
+        if (data.hide) {
+          rowElem.innerHTML = '';
+        } else if (data.timestamp) {
+          const detailContainer = createDetailPanel(data.timestamp);
+          rowElem.replaceChildren(detailContainer);
+        }
       }
     },
   });
 
-  soqlTable.on('rowSelected', function (row: RowComponent) {
+  soqlTable.on('rowSelected', (row: RowComponent) => {
+    soqlDetailPanel?.update({ timestamp: row.getData().timestamp, hide: false }).then(() => {
+      if (soqlDetailPanel) {
+        soqlDetailPanel?.move(row, false);
+        const nextRow = soqlDetailPanel.getNextRow() || soqlDetailPanel;
+        nextRow.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+      }
+    });
+  });
+
+  soqlTable.on('rowDeselected', () => {
     soqlTable.blockRedraw();
-    if (soqlDetailPanel) {
-      soqlDetailPanel.deselect();
-    }
-    row.treeExpand();
-    soqlDetailPanel = row;
+    soqlDetailPanel?.update({ hide: true });
+  });
+
+  soqlTable.on('dataChanged', () => {
     soqlTable.restoreRedraw();
   });
 
-  soqlTable.on('rowDeselected', function (row: RowComponent) {
-    if (row === soqlDetailPanel) {
-      row.treeCollapse();
-      soqlDetailPanel = null;
-    }
+  soqlTable.on('tableBuilt', () => {
+    soqlDetailPanel = soqlTable.searchRows('isDetail', '=', true)[0];
   });
 }
 
@@ -224,7 +249,8 @@ function createDetailPanel(timestamp: number) {
   const stackContainer = document.createElement('div');
   render(html`<call-stack timestamp=${timestamp}></call-stack>`, stackContainer);
   const detailContainer = document.createElement('div');
-  detailContainer.id = 'soqlDBDetailView';
+  detailContainer.className = 'soqlDBDetailView';
   detailContainer.appendChild(stackContainer);
+
   return detailContainer;
 }

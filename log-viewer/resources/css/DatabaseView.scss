@@ -43,8 +43,16 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
 .tabulator {
   .tabulator-tableholder {
     .tabulator-table {
-      display: unset !important;
+      display: unset;
+      background-color: unset;
     }
+  }
+}
+
+.tabulator-row {
+  background-color: unset;
+  .tabulator-row-even {
+    background-color: unset;
   }
 }
 
