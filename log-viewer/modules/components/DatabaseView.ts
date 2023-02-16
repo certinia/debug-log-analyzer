@@ -189,7 +189,6 @@ function renderSOQLTable() {
         sorter: 'number',
         width: 110,
         bottomCalc: 'sum',
-        bottomCalcParams: { precision: 2 },
       },
       {
         title: 'Time Taken (ms)',

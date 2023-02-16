@@ -67,10 +67,11 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
   overflow: visible;
   max-width: 100%;
 }
-#soqlDBDetailView {
+.soqlDBDetailView {
   border-bottom: 2px solid var(--vscode-editorHoverWidget-border);
   padding: 10px;
   background-color: var(--vscode-editorHoverWidget-background);
+  max-width: 100%;
 }
 .tabulator-tooltip {
   background: var(--vscode-editor-background);
