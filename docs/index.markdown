@@ -34,11 +34,22 @@ The sort order can also toggle between ascending and descending.
 
 ### The "Database" Tab
 
-This tab aggregates DML and SOQL statements by text, providing _Count_ and _Row_ totals for each. This helps identify the cause of _SOQL 101_ exceptions - it is usually easy to see where a query is not bulkified.
+This tab lists the DML and SOQL statements, providing _Row Count_ and _Time Taken_ columns for each, with totals at the bottom. The SOQL table additionally has a _Selectivity_ and _Aggregations column_. All columns can be sorted ascending or descending.
 
+This information helps identify the cause of _SOQL 101_ exceptions - it is usually easy to see where a query is not bulkified.
 It may also show where we used our row limit if we run-out of DML.
 
 Be aware that totals may exceed the normal limits due to:
 
 - Unit tests - we get the extra setup limits outside _startTest_ / _stopTest_.
 - Multiple packages - some limits are per package.
+
+#### Selectivity
+
+The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determine. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
+
+#### Detail
+
+Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occured in the call tree.
+The tables can be sorted ascending or descending by DML/SOQL, Row Count and Time Taken.
+The SOQL table can additionally be sorted by selectivity and aggregations.
