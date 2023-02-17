@@ -53,6 +53,7 @@ function renderDMLTable() {
         sorter: 'number',
         width: 110,
         bottomCalc: 'sum',
+        // @ts-ignore waiting for types defintion update https://github.com/DefinitelyTyped/DefinitelyTyped/pull/64309
         bottomCalcParams: { precision: 2 },
       },
     ],
@@ -196,6 +197,7 @@ function renderSOQLTable() {
         sorter: 'number',
         width: 110,
         bottomCalc: 'sum',
+        // @ts-ignore waiting for types defintion update https://github.com/DefinitelyTyped/DefinitelyTyped/pull/64309
         bottomCalcParams: { precision: 2 },
       },
       {
