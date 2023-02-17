@@ -21,7 +21,6 @@ export class CallStack extends LitElement {
 
       .stackEntry {
         cursor: pointer;
-        padding-left: 1em;
         overflow: hidden;
         text-overflow: ellipsis;
         display: inline;
