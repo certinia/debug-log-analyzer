@@ -19,7 +19,7 @@ $sortArrowActive: #666 !default;
 $sortArrowInactive: #bbb !default;
 
 //row theming
-$rowBackgroundColor: transparent; //table row background color
+$rowBackgroundColor: $backgroundColor; //table row background color
 $rowAltBackgroundColor: transparent; //table row background color
 $rowBorderColor: transparent; //table border color
 $rowTextColor: var(--vscode-editor-foreground); //table text color
@@ -54,6 +54,20 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
   .tabulator-row-even {
     background-color: unset;
   }
+
+  &.tabulator-group {
+    background: unset;
+    border-bottom: unset;
+    border-right: unset;
+    border-top: unset;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    &:hover {
+      background-color: $rowHoverBackground;
+    }
+  }
 }
 
 .dbContent {
@@ -79,4 +93,13 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
 }
 .tabulator-row.tabulator-selected {
   color: var(--vscode-list-activeSelectionForeground);
+}
+.groupText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+input[type='checkbox'] {
+  vertical-align: middle;
 }

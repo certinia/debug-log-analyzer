@@ -16,8 +16,10 @@ function renderDMLTable() {
 
   const dmlLines = DatabaseAccess.instance()?.getDMLLines();
   const dmlData: unknown[] = [];
+  let dmlText: string[] = [];
   if (dmlLines) {
     for (const dml of dmlLines) {
+      dmlText.push(dml.text);
       dmlData.push({
         dml: dml.text,
         rowCount: dml.rowCount,
@@ -26,12 +28,26 @@ function renderDMLTable() {
       });
     }
     dmlData.push({ isDetail: true, hide: true });
+
+    dmlText = sortByFrequency(dmlText);
   }
 
   const dmlTable = new Tabulator('#dbDmlTable', {
     data: dmlData, //set initial table data
     layout: 'fitColumns',
-    columnCalcs: 'table',
+    columnCalcs: 'both',
+    groupClosedShowCalcs: true,
+    groupStartOpen: false,
+    groupValues: [dmlText],
+    groupHeader(value, count, data: any[], group) {
+      const hasDetail = data.some((d) => {
+        return d.isDetail;
+      });
+
+      const newCount = hasDetail ? count - 1 : count;
+      return '<div class="groupText">' + value + '</div>' + `<span>(${newCount} DML)</span>`;
+    },
+    groupToggleElement: 'header',
     selectable: 1,
     selectableCheck: function (row) {
       return !row.getData().isDetail;
@@ -47,6 +63,25 @@ function renderDMLTable() {
         bottomCalc: () => {
           return 'Total';
         },
+        headerMenu: [
+          {
+            label: (component): string => {
+              const columnName = component.getField();
+              const groupFields = dmlTable.getGroups().map((g) => g.getField());
+              const checked = groupFields.includes(columnName) ? 'checked' : '';
+              return `<input type="checkbox" ${checked}
+                        <label>Group by ${component.getDefinition().title}</label>
+                      </input>`;
+            },
+            action: (_e, component) => {
+              if (dmlTable.getGroups().length) {
+                dmlTable.setGroupBy('');
+              } else {
+                dmlTable.setGroupBy(component.getField());
+              }
+            },
+          },
+        ],
       },
       { title: 'Row Count', field: 'rowCount', sorter: 'number', width: 110, bottomCalc: 'sum' },
       {
@@ -111,8 +146,11 @@ function renderSOQLTable() {
 
   const soqlLines = DatabaseAccess.instance()?.getSOQLLines();
   const soqlData: unknown[] = [];
+  let soqlText: string[] = [];
   if (soqlLines) {
     for (const soql of soqlLines) {
+      soqlText.push(soql.text);
+
       const explainLine = soql.children[0] as SOQLExecuteExplainLine;
       soqlData.push({
         isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
@@ -125,12 +163,30 @@ function renderSOQLTable() {
       });
     }
     soqlData.push({ isDetail: true, hide: true });
+    soqlText = sortByFrequency(soqlText);
   }
 
   const soqlTable = new Tabulator('#dbSoqlTable', {
     data: soqlData,
     layout: 'fitColumns',
-    columnCalcs: 'table',
+    columnCalcs: 'both',
+    groupClosedShowCalcs: true,
+    groupStartOpen: false,
+    groupValues: [soqlText],
+    groupHeader(value, count, data: any[], _group) {
+      const hasDetail = data.some((d) => {
+        return d.isDetail;
+      });
+
+      const newCount = hasDetail ? count - 1 : count;
+      return (
+        '<div class="groupText">' +
+        value +
+        '</div>' +
+        `<span>(${newCount} ${newCount > 1 ? 'Queries' : 'Query'})</span>`
+      );
+    },
+    groupToggleElement: 'header',
     selectable: 1,
     selectableCheck: function (row) {
       return !row.getData().isDetail;
@@ -186,6 +242,25 @@ function renderSOQLTable() {
         bottomCalc: () => {
           return 'Total';
         },
+        headerMenu: [
+          {
+            label: (component): string => {
+              const columnName = component.getField();
+              const groupFields = soqlTable.getGroups().map((g) => g.getField());
+              const checked = groupFields.includes(columnName) ? 'checked' : '';
+              return `<input type="checkbox" ${checked}
+                        <label>Group by ${component.getDefinition().title}</label>
+                      </input>`;
+            },
+            action: (_e, component) => {
+              if (soqlTable.getGroups().length) {
+                soqlTable.setGroupBy('');
+              } else {
+                soqlTable.setGroupBy(component.getField());
+              }
+            },
+          },
+        ],
       },
       {
         title: 'Row Count',
@@ -257,4 +332,13 @@ function createDetailPanel(timestamp: number) {
   detailContainer.appendChild(stackContainer);
 
   return detailContainer;
+}
+
+function sortByFrequency(dataArray: string[]) {
+  const map = new Map<string, number>();
+  dataArray.forEach((val) => {
+    map.set(val, (map.get(val) || 0) + 1);
+  });
+  const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
+  return [...newMap.keys()];
 }
