@@ -36,6 +36,7 @@ function renderDMLTable() {
     selectableCheck: function (row) {
       return !row.getData().isDetail;
     },
+    initialSort: [{ column: 'rowCount', dir: 'desc' }],
     columns: [
       {
         title: 'DML',
@@ -134,6 +135,7 @@ function renderSOQLTable() {
       return !row.getData().isDetail;
     },
     columnDefaults: { title: 'default', resizable: true },
+    initialSort: [{ column: 'rowCount', dir: 'desc' }],
     columns: [
       {
         title: 'Selective',
