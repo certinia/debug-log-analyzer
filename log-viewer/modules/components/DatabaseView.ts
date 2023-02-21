@@ -38,14 +38,15 @@ function renderDMLTable() {
     columnCalcs: 'both',
     groupClosedShowCalcs: true,
     groupStartOpen: false,
+    groupBy: 'dml',
     groupValues: [dmlText],
-    groupHeader(value, count, data: any[], group) {
+    groupHeader(value, count, data: any[], _group) {
       const hasDetail = data.some((d) => {
         return d.isDetail;
       });
 
       const newCount = hasDetail ? count - 1 : count;
-      return '<div class="groupText">' + value + '</div>' + `<span>(${newCount} DML)</span>`;
+      return '<div class="db-group-title">' + value + '</div>' + `<span>(${newCount} DML)</span>`;
     },
     groupToggleElement: 'header',
     selectable: 1,
@@ -177,6 +178,7 @@ function renderSOQLTable() {
     columnCalcs: 'both',
     groupClosedShowCalcs: true,
     groupStartOpen: false,
+    groupBy: 'soql',
     groupValues: [soqlText],
     groupHeader(value, count, data: any[], _group) {
       const hasDetail = data.some((d) => {
@@ -185,7 +187,7 @@ function renderSOQLTable() {
 
       const newCount = hasDetail ? count - 1 : count;
       return (
-        '<div class="groupText">' +
+        '<div class="db-group-title">' +
         value +
         '</div>' +
         `<span>(${newCount} ${newCount > 1 ? 'Queries' : 'Query'})</span>`
