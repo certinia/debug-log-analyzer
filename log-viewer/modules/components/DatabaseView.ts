@@ -52,7 +52,12 @@ function renderDMLTable() {
     selectableCheck: function (row) {
       return !row.getData().isDetail;
     },
-    columnDefaults: { title: 'default', resizable: true, headerSortStartingDir: 'desc' },
+    columnDefaults: {
+      title: 'default',
+      resizable: true,
+      headerSortStartingDir: 'desc',
+      headerTooltip: true,
+    },
     initialSort: [{ column: 'rowCount', dir: 'desc' }],
     columns: [
       {
@@ -191,7 +196,12 @@ function renderSOQLTable() {
     selectableCheck: function (row) {
       return !row.getData().isDetail;
     },
-    columnDefaults: { title: 'default', resizable: true, headerSortStartingDir: 'desc' },
+    columnDefaults: {
+      title: 'default',
+      resizable: true,
+      headerSortStartingDir: 'desc',
+      headerTooltip: true,
+    },
     initialSort: [{ column: 'rowCount', dir: 'desc' }],
     columns: [
       {
