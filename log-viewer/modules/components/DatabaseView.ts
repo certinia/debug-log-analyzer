@@ -12,7 +12,7 @@ export function renderDBGrid() {
 }
 
 function renderDMLTable() {
-  let dmlDetailPanel: RowComponent | null;
+  let currentSelectedRow: RowComponent | null;
 
   const dmlLines = DatabaseAccess.instance()?.getDMLLines();
   const dmlData: unknown[] = [];
@@ -25,9 +25,9 @@ function renderDMLTable() {
         rowCount: dml.rowCount,
         timeTaken: Math.round((dml.duration / 1000000) * 100) / 100,
         timestamp: dml.timestamp,
+        _children: [{ timestamp: dml.timestamp, isDetail: true }],
       });
     }
-    dmlData.push({ isDetail: true, hide: true });
 
     dmlText = sortByFrequency(dmlText);
   }
@@ -53,6 +53,10 @@ function renderDMLTable() {
     selectableCheck: function (row) {
       return !row.getData().isDetail;
     },
+    dataTree: true,
+    dataTreeBranchElement: '<span></span>',
+    dataTreeCollapseElement: '<span></span>',
+    dataTreeExpandElement: '<span></span>',
     columnDefaults: {
       title: 'default',
       resizable: true,
@@ -102,44 +106,49 @@ function renderDMLTable() {
     ],
     rowFormatter: function (row) {
       const data = row.getData();
-      if (data.isDetail) {
-        const rowElem = row.getElement();
-        if (data.hide) {
-          rowElem.innerHTML = '';
-        } else if (data.timestamp) {
-          const detailContainer = createDetailPanel(data.timestamp);
-          rowElem.replaceChildren(detailContainer);
-        }
+      if (data.isDetail && data.timestamp) {
+        const detailContainer = createDetailPanel(data.timestamp);
+        row.getElement().replaceChildren(detailContainer);
       }
     },
   });
 
-  dmlTable.on('rowSelected', (row: RowComponent) => {
-    dmlDetailPanel?.update({ timestamp: row.getData().timestamp, hide: false }).then(() => {
-      if (dmlDetailPanel) {
-        dmlDetailPanel?.move(row, false);
-        const nextRow = dmlDetailPanel.getNextRow() || dmlDetailPanel;
-        nextRow.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+  dmlTable.on('rowClick', function (e, row) {
+    const data = row.getData();
+    if (!(data.timestamp && data.dml)) {
+      return;
+    }
+    const oldRow = currentSelectedRow;
+    const table = row.getTable();
+    table.blockRedraw();
+    if (oldRow) {
+      oldRow.treeCollapse();
+      currentSelectedRow = null;
+    }
+
+    if (oldRow !== row) {
+      row.treeExpand();
+      currentSelectedRow = row;
+    }
+    table.restoreRedraw();
+
+    const goTo = function () {
+      if (currentSelectedRow) {
+        const nextRow = currentSelectedRow.getNextRow() || currentSelectedRow.getTreeChildren()[0];
+        nextRow &&
+          nextRow
+            .getElement()
+            .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
       }
+    };
+    requestAnimationFrame(() => {
+      setTimeout(goTo);
     });
-  });
-
-  dmlTable.on('rowDeselected', () => {
-    dmlTable.blockRedraw();
-    dmlDetailPanel?.update({ hide: true });
-  });
-
-  dmlTable.on('dataChanged', () => {
-    dmlTable.restoreRedraw();
-  });
-
-  dmlTable.on('tableBuilt', function () {
-    dmlDetailPanel = dmlTable.searchRows('isDetail', '=', true)[0];
   });
 }
 
 function renderSOQLTable() {
-  let soqlDetailPanel: RowComponent | null;
+  let currentSelectedRow: RowComponent | null;
   interface GridSOQLData {
     isSelective: boolean | null;
     relativeCost: number | null;
@@ -166,9 +175,10 @@ function renderSOQLTable() {
         timeTaken: Math.round((soql.duration / 1000000) * 100) / 100,
         aggregations: soql.aggregations,
         timestamp: soql.timestamp,
+        _children: [{ timestamp: soql.timestamp, isDetail: true }],
       });
     }
-    soqlData.push({ isDetail: true, hide: true });
+
     soqlText = sortByFrequency(soqlText);
   }
 
@@ -198,6 +208,10 @@ function renderSOQLTable() {
     selectableCheck: function (row) {
       return !row.getData().isDetail;
     },
+    dataTree: true,
+    dataTreeBranchElement: '<span></span>',
+    dataTreeCollapseElement: '<span></span>',
+    dataTreeExpandElement: '<span></span>',
     columnDefaults: {
       title: 'default',
       resizable: true,
@@ -300,39 +314,44 @@ function renderSOQLTable() {
     ],
     rowFormatter: function (row) {
       const data = row.getData();
-      if (data.isDetail) {
-        const rowElem = row.getElement();
-        if (data.hide) {
-          rowElem.innerHTML = '';
-        } else if (data.timestamp) {
-          const detailContainer = createDetailPanel(data.timestamp);
-          rowElem.replaceChildren(detailContainer);
-        }
+      if (data.isDetail && data.timestamp) {
+        const detailContainer = createDetailPanel(data.timestamp);
+        row.getElement().replaceChildren(detailContainer);
       }
     },
   });
 
-  soqlTable.on('rowSelected', (row: RowComponent) => {
-    soqlDetailPanel?.update({ timestamp: row.getData().timestamp, hide: false }).then(() => {
-      if (soqlDetailPanel) {
-        soqlDetailPanel?.move(row, false);
-        const nextRow = soqlDetailPanel.getNextRow() || soqlDetailPanel;
-        nextRow.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+  soqlTable.on('rowClick', function (e, row) {
+    const data = row.getData();
+    if (!(data.timestamp && data.soql)) {
+      return;
+    }
+    const oldRow = currentSelectedRow;
+    const table = row.getTable();
+    table.blockRedraw();
+    if (oldRow) {
+      oldRow.treeCollapse();
+      currentSelectedRow = null;
+    }
+
+    if (oldRow !== row) {
+      row.treeExpand();
+      currentSelectedRow = row;
+    }
+    table.restoreRedraw();
+
+    const goTo = function () {
+      if (currentSelectedRow) {
+        const nextRow = currentSelectedRow.getNextRow() || currentSelectedRow.getTreeChildren()[0];
+        nextRow &&
+          nextRow
+            .getElement()
+            .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
       }
+    };
+    requestAnimationFrame(() => {
+      setTimeout(goTo);
     });
-  });
-
-  soqlTable.on('rowDeselected', () => {
-    soqlTable.blockRedraw();
-    soqlDetailPanel?.update({ hide: true });
-  });
-
-  soqlTable.on('dataChanged', () => {
-    soqlTable.restoreRedraw();
-  });
-
-  soqlTable.on('tableBuilt', () => {
-    soqlDetailPanel = soqlTable.searchRows('isDetail', '=', true)[0];
   });
 }
 
