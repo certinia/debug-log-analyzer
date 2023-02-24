@@ -11,10 +11,14 @@ import { Command } from './Command';
 import { appName } from '../AppSettings';
 
 export class ShowLogFile {
-  static apply(context: Context): void {
-    new Command('showLogFile', (uri: Uri) => ShowLogFile.safeCommand(context, uri)).register(
-      context
+  static getCommand(context: Context): Command {
+    return new Command('showLogFile', 'Log: Show Apex Log Analysis', (uri: Uri) =>
+      ShowLogFile.safeCommand(context, uri)
     );
+  }
+
+  static apply(context: Context): void {
+    ShowLogFile.getCommand(context).register(context);
     context.display.output(`Registered command '${appName}: Show Log'`);
   }
 

@@ -40,10 +40,7 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onCommand:lana.loadLogFile",
-    "onCommand:lana.showLogFile"
-  ],
+  "activationEvents": [],
   "contributes": {
     "commands": [
       {
@@ -55,23 +52,37 @@
         "title": "Log: Show Apex Log Analysis"
       }
     ],
+    "languages": [
+      {
+        "id": "apexlog",
+        "aliases": [
+          "ApexLog",
+          "DebugLog"
+        ],
+        "extensions": [
+          ".log",
+          ".txt"
+        ],
+        "firstLine": "^\\d\\d.\\d.+?APEX_CODE,\\w.+$"
+      }
+    ],
     "menus": {
       "commandPalette": [
         {
           "command": "lana.showLogFile",
-          "when": "resourceExtname == '.log'"
+          "when": "resourceLangId == apexlog"
         }
       ],
       "editor/context": [
         {
           "command": "lana.showLogFile",
-          "when": "resourceExtname == '.log'"
+          "when": "resourceLangId == apexlog"
         }
       ],
       "explorer/context": [
         {
           "command": "lana.showLogFile",
-          "when": "resourceExtname == '.log'"
+          "when": "resourceLangId == apexlog"
         }
       ]
     },

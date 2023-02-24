@@ -15,6 +15,7 @@ import parseLog, {
   LogLine,
   lineTypeMap,
   logLines,
+  lineTypeMap,
   CodeUnitStartedLine,
   CodeUnitFinishedLine,
   truncated,
@@ -585,5 +586,37 @@ describe('Recalculate durations tests', () => {
     node.recalculateDurations();
     expect(node.duration).toBe(100);
     expect(node.selfTime).toBe(25);
+  });
+});
+
+describe('lineTypeMap tests', () => {
+  it('Lines referenced by exitTypes should be exits', () => {
+    for (const lineType of lineTypeMap.values()) {
+      const line = new lineType([
+        '14:32:07.563 (17358806534)',
+        'DUMMY',
+        '[10]',
+        'Rows:3',
+        '',
+        'Rows:5',
+      ]) as LogLine;
+      if (line instanceof Method) {
+        expect(line.exitTypes).not.toBe(null);
+        expect(line.isExit).toBe(false);
+        line.exitTypes.forEach((exitType) => {
+          const exitCls = lineTypeMap.get(exitType);
+          expect(exitCls).not.toBe(null);
+          const exitLine = new exitCls!([
+            '14:32:07.563 (17358806534)',
+            'DUMMY',
+            '[10]',
+            'Rows:3',
+            '',
+            'Rows:5',
+          ]) as LogLine;
+          expect(exitLine.isExit).toBe(true);
+        });
+      }
+    }
   });
 });
