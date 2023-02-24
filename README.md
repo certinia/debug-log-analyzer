@@ -51,6 +51,9 @@ With the `.log` file open in VSCode.
 
 1. Open command pallette (CMD/CTRL + Shift + P) -> 'Log: Show Apex Log Analysis'\
    or
+1. Click the 'Log: Show Apex Log Analysis' code lens at the top of the file\
+   ![show analysis lens](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/showanalysis-lens.png)\
+   or
 1. Right click -> 'Log: Show Apex Log Analysis'
 
 ### Download a log
