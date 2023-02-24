@@ -5,6 +5,7 @@
 import { ExtensionContext, workspace } from 'vscode';
 import { LoadLogFile } from './commands/LoadLogFile';
 import { ShowLogFile } from './commands/ShowLogFile';
+import ShowAnalysisCodeLens from './codelenses/ShowAnalysisCodeLens';
 import { Display } from './Display';
 import { SymbolFinder } from './SymbolFinder';
 import { VSWorkspace } from './workspace/VSWorkspace';
@@ -27,6 +28,7 @@ export class Context {
 
     LoadLogFile.apply(this);
     ShowLogFile.apply(this);
+    ShowAnalysisCodeLens.apply(this);
   }
 
   findSymbol(wsPath: string, symbol: string): string | null {

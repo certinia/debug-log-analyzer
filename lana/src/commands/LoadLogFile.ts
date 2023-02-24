@@ -32,7 +32,9 @@ class DebugLogItem extends Item {
 
 export class LoadLogFile {
   static apply(context: Context): void {
-    new Command('loadLogFile', () => LoadLogFile.safeCommand(context)).register(context);
+    new Command('loadLogFile', 'Log: Load Apex Log For Analysis', () =>
+      LoadLogFile.safeCommand(context)
+    ).register(context);
     context.display.output(`Registered command '${appName}: Load Log'`);
   }
 

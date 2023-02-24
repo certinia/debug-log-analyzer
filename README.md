@@ -30,7 +30,7 @@ Apex Log Analyzer makes performance analysis of Salesforce debug logs much easie
 ### Command Pallette
 
 - Open command pallette (CMD/CTRL + Shift + P), paste `ext install financialforce.lana`, and press enter.
-- Clcik reload in the extensions tab.
+- Click reload in the extensions tab.
 
 ```sh
 ext install financialforce.lana
@@ -50,6 +50,9 @@ On larger logs the analysis window make take a few seconds to appear.
 With the `.log` file open in VSCode.
 
 1. Open command pallette (CMD/CTRL + Shift + P) -> 'Log: Show Apex Log Analysis'\
+   or
+1. Click the 'Log: Show Apex Log Analysis' code lens at the top of the file\
+   ![show analysis lens](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/showanalysis-lens.png)\
    or
 1. Right click -> 'Log: Show Apex Log Analysis'
 
@@ -150,7 +153,7 @@ Thanks to the everyone who has contributed
 ---
 
 <p align="center">
-Copyright &copy; FinancialForce.com, inc. All rights reserved.  
+Copyright &copy; FinancialForce.com, inc. All rights reserved.
 </p>
 <p align="center">
   <a href="https://opensource.org/licenses/BSD-3-Clause">

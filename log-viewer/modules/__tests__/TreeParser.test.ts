@@ -15,6 +15,7 @@ import parseLog, {
   LogLine,
   lineTypeMap,
   logLines,
+  lineTypeMap,
   CodeUnitStartedLine,
   CodeUnitFinishedLine,
   truncated,
@@ -251,6 +252,40 @@ describe('parseLog tests', () => {
       'myVariable_old {Id=a6U6T000001DypKUAS, OwnerId=005d0000003141tAAA, IsDeleted=false, Name=TR-001752, CurrencyIsoCode=USD, RecordTypeId=012d0000000T5CLAA0, CreatedDate=2022-05-06 11:40:47, CreatedById=005d0000003141tAAA, LastModifiedDate=2022-05-06 11:40:47, LastModifiedById=005d0000003141tAAA, SystemModstamp=2022-05-06 11:40:47, LastViewedDate=null, LastReferencedDate=null, SCMC__Carrier_Service__c=null, SCMC__Carrier__c=null, SCMC__Destination_Location__c=null, SCMC__Destination_Ownership__c=null, SCMC__Destination_Warehouse__c=a6Y6T000001Ib9ZUAS, SCMC__Notes__c=TVPs To Amazon Europe Spain, SCMC__Override_Ship_To_Address__c=null, SCMC__Pickup_Address__c=null, SCMC__Pickup_Required__c=false, SCMC__Reason_Code__c=a5i0W000001Ydw3QAC, SCMC__Requested_Delivery_Date__c=null, SCMC__Revision__c=0, SCMC__Ship_To_City__c=null, SCMC__Ship_To_Country__c=null, SCMC__Ship_To_Line_1__c=null, SCMC__Ship_To_Line_2__c=null, SCMC__Ship_To_Name__c=null, SCMC__Ship_To_State_Province__c=null, SCMC__Ship_To_Zip_Postal_Code__c=null, SCMC__Shipment_Date__c=null, SCMC__Shipment_Required__c=true, SCMC__Shipment_Status__c=Open, SCMC__Source_Location__c=null, SCMC__Source_Ownership__c=null, SCMC__Source_Warehouse__c=a6Y6T000001IS9fUAG, SCMC__Status__c=New, SCMC__Tracking_Number__c=null, SCMC__Number_Of_Transfer_Lines__c=0, Created_Date__c=2022-05-06 11:40:47, Shipment_Instructions__c=1Z V8F 767 681769 7682 | 1Z V8F 767 68 3968 7204 | 1Z VSF 767 68 0562 3292}'
     );
     expect(cpuUsed).toBe(0);
+  });
+
+  it('VF_APEX_CALL_START for ApexMessages calls should have no exittypes', async () => {
+    const log = `09:15:43.263 (263506132)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagescomponentcontroller.apex <init>
+    09:15:43.263 (263714319)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagescomponentcontroller.apex set(conEscape)
+    09:15:43.263 (263738292)|VF_APEX_CALL_START|[EXTERNAL]|PageMessagesComponentController set(conEscape)
+    09:15:43.263 (263756710)|VF_APEX_CALL_START|[EXTERNAL]|PageMessagesComponentController invoke(setconEscape)
+    09:15:43.263 (263912147)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagescomponentcontroller.apex get(severities)
+    09:15:43.263 (263933174)|VF_APEX_CALL_START|[EXTERNAL]|PageMessagesComponentController invoke(getseverities)
+    09:15:43.265 (265740249)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagecomponentcontroller.apex <init>
+    09:15:43.265 (265929451)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagescomponentcontroller.apex get(conEscape)
+    09:15:43.265 (265953893)|VF_APEX_CALL_START|[EXTERNAL]|PageMessagesComponentController invoke(getconEscape)
+    09:15:43.266 (266057615)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagecomponentcontroller.apex set(conEscape)
+    09:15:43.266 (266077465)|VF_APEX_CALL_START|[EXTERNAL]|pagemessagecomponentcontroller set(conEscape)
+    09:15:43.266 (266093105)|VF_APEX_CALL_START|[EXTERNAL]|pagemessagecomponentcontroller invoke(setconEscape)
+    09:15:43.266 (266182651)|VF_APEX_CALL_START|[EXTERNAL]|severity
+    09:15:43.334 (334702333)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagecomponentcontroller.apex set(conSeverity)
+    09:15:43.334 (334715923)|VF_APEX_CALL_START|[EXTERNAL]|pagemessagecomponentcontroller set(conSeverity)
+    09:15:43.334 (334762915)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagecomponentcontroller.apex set(conStrength)
+    09:15:43.334 (334774783)|VF_APEX_CALL_START|[EXTERNAL]|pagemessagecomponentcontroller set(conStrength)
+    09:15:43.334 (334880548)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagecomponentcontroller.apex get(styleClass)
+    09:15:43.334 (334897897)|VF_APEX_CALL_START|[EXTERNAL]|pagemessagecomponentcontroller invoke(getstyleClass)
+    09:15:43.335 (335434720)|VF_APEX_CALL_START|[EXTERNAL]|severityMessages invoke(getlabel)
+    09:15:43.335 (335739619)|VF_APEX_CALL_START|[EXTERNAL]|/apexpage/pagemessagecomponentcontroller.apex get(conEscape)
+    09:15:43.335 (335765383)|VF_APEX_CALL_START|[EXTERNAL]|pagemessagecomponentcontroller invoke(getconEscape)
+    09:15:43.335 (335933546)|VF_APEX_CALL_START|[EXTERNAL]|isSingle
+    09:15:43.336 (336270391)|VF_APEX_CALL_START|[EXTERNAL]|messages`;
+
+    parseLog(log);
+    const methods = logLines as Method[];
+    expect(methods.length).toBe(24);
+    methods.forEach((line) => {
+      expect(line.exitTypes.length).toBe(0);
+    });
   });
 
   it('should parse SOQL lines', async () => {
@@ -589,6 +624,36 @@ describe('Recalculate durations tests', () => {
 });
 
 describe('Line Type Tests', () => {
+  it('Lines referenced by exitTypes should be exits', () => {
+    for (const lineType of lineTypeMap.values()) {
+      const line = new lineType([
+        '14:32:07.563 (17358806534)',
+        'DUMMY',
+        '[10]',
+        'Rows:3',
+        '',
+        'Rows:5',
+      ]) as LogLine;
+      if (line instanceof Method) {
+        expect(line.exitTypes).not.toBe(null);
+        expect(line.isExit).toBe(false);
+        line.exitTypes.forEach((exitType) => {
+          const exitCls = lineTypeMap.get(exitType);
+          expect(exitCls).not.toBe(null);
+          const exitLine = new exitCls!([
+            '14:32:07.563 (17358806534)',
+            'DUMMY',
+            '[10]',
+            'Rows:3',
+            '',
+            'Rows:5',
+          ]) as LogLine;
+          expect(exitLine.isExit).toBe(true);
+        });
+      }
+    }
+  });
+
   it('SOQL Explain null when no plan available ', () => {
     const qp = new SOQLExecuteExplainLine([
       '6:22:36.91 (2106345473)',
