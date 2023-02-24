@@ -4,12 +4,6 @@
  */
 import formatDuration, { showTab } from '../Util';
 
-jest.mock('../Browser', () => ({
-  decodeEntities: (text: string) => {
-    return text.replace(/&amp;/gim, '&');
-  },
-}));
-
 describe('Format duration tests', () => {
   it('Value converted from nanoseconds to milliseconds', () => {
     expect(formatDuration(1000)).toBe('0.001ms');
