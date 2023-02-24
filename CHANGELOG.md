@@ -10,10 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Added
 
 - Breadcrumbs shown above the calltree when clicking a row ([#142][#142])
+- `Log: Show Apex Log Analysis` code lens to the top of the currently open log file ([#199][#199])
+  - This is a faster way to open the analysis
 
 ### Changed
 
-- Goto code from click to CMD/CTRL and click. Breadcrumbs are shown on click instead. ([#142][#142])
+- Goto code from click to CMD/CTRL and click. Breadcrumbs are shown on click instead ([#142][#142])
+- Support more file types when showing the analysis ([#199][#199])
+  - The analysis can now be shown for any `.log` or `.txt` file that starts with the Apex debug log header
+  - e.g `57.0 APEX_CODE,FINE;APEX_PROFILING,FINE;CALLOUT,NONE;DB,FINEST;NBA,INFO;SYSTEM,DEBUG;VALIDATION,INFO;VISUALFORCE,FINE;WAVE,INFO;WORKFLOW,INFO`
 
 ### Fixed
 
@@ -191,3 +196,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#180]: https://github.com/financialforcedev/debug-log-analyzer/issues/180
 [#187]: https://github.com/financialforcedev/debug-log-analyzer/issues/187
 [#188]: https://github.com/financialforcedev/debug-log-analyzer/issues/188
+[#199]: https://github.com/financialforcedev/debug-log-analyzer/issues/199
