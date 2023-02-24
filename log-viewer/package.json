@@ -12,14 +12,16 @@
   },
   "version": "0.1.0",
   "dependencies": {
+    "@apexdevtools/apex-parser": "^3.0.0",
     "lit": "^2.0.0",
-    "@apexdevtools/apex-parser": "^3.0.0"
+    "tabulator-tables": "^5.4.3"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^22.x.x",
     "@rollup/plugin-node-resolve": "^13.0.0",
     "@rollup/plugin-typescript": "^8.0.0",
     "@types/jest": "^28.x.x",
+    "@types/tabulator-tables": "^5.4.3",
     "@typescript-eslint/eslint-plugin": "^5.x.x",
     "@typescript-eslint/parser": "^5.x.x",
     "concurrently": "^7.x.x",
@@ -28,6 +30,7 @@
     "http-server": "^14.x.x",
     "jest": "^28.x.x",
     "jest-environment-jsdom": "^28.x.x",
+    "node-sass": "^8.0.0",
     "postcss": "^8.0.0",
     "prettier": "^2.7.1",
     "rollup": "^2.0.0",

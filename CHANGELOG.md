@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Breadcrumbs shown above the calltree when clicking a row ([#142][#142])
 - `Log: Show Apex Log Analysis` code lens to the top of the currently open log file ([#199][#199])
   - This is a faster way to open the analysis
+- Redesigned Database tab ([#219][#219])
+  - All columns are sortable ascending /descending by clicking the header
+  - Added columns DML/ SOQL, Row Count, Total Time
+  - Added specific columns for SOQL Selectivity + Aggregations
+  - Added detail panel which is shown by clicking a row which shows the call stack for the specific DML / SOQL, clicking a link will go to the main call tree tab
+  - Totals shown at the bottom of each column
 
 ### Changed
 
@@ -199,3 +205,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#188]: https://github.com/financialforcedev/debug-log-analyzer/issues/188
 [#212]: https://github.com/financialforcedev/debug-log-analyzer/issues/212
 [#199]: https://github.com/financialforcedev/debug-log-analyzer/issues/199
+[#219]: https://github.com/financialforcedev/debug-log-analyzer/issues/219

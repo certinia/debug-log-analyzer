@@ -22,7 +22,9 @@ import parseLog, {
   cpuUsed,
   ExecutionStartedLine,
   ExecutionFinishedLine,
+  SOQLExecuteBeginLine,
   TimedNode,
+  SOQLExecuteExplainLine,
 } from '../parsers/TreeParser';
 
 describe('parseObjectNamespace tests', () => {
@@ -234,6 +236,7 @@ describe('parseLog tests', () => {
     expect(logLines[2].type).toBe('LIMIT_USAGE_FOR_NS');
     expect(cpuUsed).toBe(4564000000);
   });
+
   it('Flow Value Assignemnt can handle multiple lines', async () => {
     const log =
       '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
@@ -283,6 +286,37 @@ describe('parseLog tests', () => {
     methods.forEach((line) => {
       expect(line.exitTypes.length).toBe(0);
     });
+  });
+
+  it('should parse SOQL lines', async () => {
+    const log =
+      '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|jwilson@57dev.financialforce.com|Greenwich Mean Time|GMT+01:00\r\n' +
+      '09:18:22.6 (6574780)|EXECUTION_STARTED\r\n' +
+      '06:22:49.429 (15821966627)|SOQL_EXECUTE_BEGIN|[895]|Aggregations:2|SELECT Id FROM MySObject__c WHERE Id = :recordId\n' +
+      '06:22:49.429 (15861642580)|SOQL_EXECUTE_EXPLAIN|[895]|TableScan on MySObject__c : [MyField__c, AnotherField__c], cardinality: 2, sobjectCardinality: 2, relativeCost 1.3\n' +
+      '06:22:49.429 (15861665431)|SOQL_EXECUTE_END|[895]|Rows:50\n' +
+      '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
+
+    parseLog(log);
+    expect(logLines.length).toEqual(5);
+    expect(logLines[0]).toBeInstanceOf(ExecutionStartedLine);
+
+    const soqlLine = logLines[1] as SOQLExecuteBeginLine;
+    expect(soqlLine.type).toEqual('SOQL_EXECUTE_BEGIN');
+    expect(soqlLine.aggregations).toEqual(2);
+    expect(logLines[2].type).toEqual('SOQL_EXECUTE_EXPLAIN');
+    expect(logLines[3].type).toEqual('SOQL_EXECUTE_END');
+    expect(logLines[3].rowCount).toEqual(50);
+    expect(logLines[4]).toBeInstanceOf(ExecutionFinishedLine);
+
+    const soqlExplain = logLines[2] as SOQLExecuteExplainLine;
+    expect(soqlExplain.type).toEqual('SOQL_EXECUTE_EXPLAIN');
+    expect(soqlExplain.cardinality).toEqual(2);
+    expect(soqlExplain.fields).toEqual(['MyField__c', 'AnotherField__c']);
+    expect(soqlExplain.leadingOperationType).toEqual('TableScan');
+    expect(soqlExplain.relativeCost).toEqual(1.3);
+    expect(soqlExplain.sObjectCardinality).toEqual(2);
+    expect(soqlExplain.sObjectType).toEqual('MySObject__c');
   });
 });
 
@@ -589,7 +623,7 @@ describe('Recalculate durations tests', () => {
   });
 });
 
-describe('lineTypeMap tests', () => {
+describe('Line Type Tests', () => {
   it('Lines referenced by exitTypes should be exits', () => {
     for (const lineType of lineTypeMap.values()) {
       const line = new lineType([
@@ -618,5 +652,21 @@ describe('lineTypeMap tests', () => {
         });
       }
     }
+  });
+
+  it('SOQL Explain null when no plan available ', () => {
+    const qp = new SOQLExecuteExplainLine([
+      '6:22:36.91 (2106345473)',
+      'SOQL_EXECUTE_EXPLAIN',
+      '[19]',
+      'No explain plan is available',
+    ]);
+
+    expect(qp.cardinality).toBe(null);
+    expect(qp.fields).toBe(null);
+    expect(qp.leadingOperationType).toBe(null);
+    expect(qp.relativeCost).toBe(null);
+    expect(qp.sObjectCardinality).toBe(null);
+    expect(qp.sObjectType).toBe(null);
   });
 });

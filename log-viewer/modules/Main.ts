@@ -16,7 +16,9 @@ import analyseMethods, { renderAnalysis } from './Analysis';
 import { DatabaseAccess } from './Database';
 import { setNamespaces } from './NamespaceExtrator';
 import { hostService } from './services/VSCodeService';
-import { renderDb } from './components/Database';
+//import for originl view
+// import { renderDb } from './components/Database';
+import { renderDBGrid } from './components/DatabaseView';
 
 import '../resources/css/Status.css';
 import '../resources/css/Settings.css';
@@ -24,7 +26,6 @@ import '../resources/css/Tabber.css';
 import '../resources/css/TreeView.css';
 import '../resources/css/TimelineView.css';
 import '../resources/css/AnalysisView.css';
-import '../resources/css/DatabaseView.css';
 
 declare global {
   interface Window {
@@ -34,7 +35,7 @@ declare global {
 
 let logSize: number;
 
-async function setStatus(name: string, path: string, status: string, color: string) {
+async function setStatus(name: string, path: string, status: string, color?: string) {
   const statusHolder = document.getElementById('status') as HTMLDivElement,
     nameSpan = document.createElement('span'),
     nameLink = document.createElement('a'),
@@ -51,7 +52,9 @@ async function setStatus(name: string, path: string, status: string, color: stri
   nameSpan.appendChild(document.createTextNode(infoText + '\xA0-\xA0'));
 
   statusSpan.innerText = status;
-  statusSpan.style.color = color;
+  if (color) {
+    statusSpan.style.color = color;
+  }
 
   statusHolder.innerHTML = '';
   statusHolder.appendChild(nameSpan);
@@ -143,7 +146,7 @@ async function renderLogSettings(logSettings: LogSetting[]) {
 
 async function displayLog(log: string, name: string, path: string) {
   logSize = log.length;
-  await setStatus(name, path, 'Processing...', 'black');
+  await setStatus(name, path, 'Processing...');
 
   timer('parseLog');
   await Promise.all([renderLogSettings(getLogSettings(log)), parseLog(log)]);
@@ -155,15 +158,16 @@ async function displayLog(log: string, name: string, path: string) {
   await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
   await Promise.all([analyseMethods(rootMethod), DatabaseAccess.create(rootMethod)]);
 
-  await setStatus(name, path, 'Rendering...', 'black');
+  await setStatus(name, path, 'Rendering...');
 
   timer('renderViews');
   await Promise.all([
     renderTreeView(rootMethod),
     renderTimeline(rootMethod),
     renderAnalysis(),
-    renderDb(),
+    // renderDb(),
   ]);
+
   timer('');
   setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');
 }
@@ -213,6 +217,11 @@ function handleMessage(evt: MessageEvent) {
 function onInit(): void {
   const tabHolder = document.querySelector('.tabHolder');
   tabHolder?.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', onTabSelect));
+
+  const dbTab = document.getElementById('databaseTab');
+  if (dbTab) {
+    dbTab.addEventListener('click', renderDBGrid, { once: true });
+  }
 
   const helpButton = document.querySelector('.helpLink');
   if (helpButton) {

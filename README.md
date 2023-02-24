@@ -7,7 +7,7 @@
 
 Apex Log Analyzer makes performance analysis of Salesforce debug logs much easier and quicker. It provides visualization of code execution via a Flamegraph and Calltree and helps identify performance and SOQL/DML problems via Method and Database Analysis.
 
-![preview](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/lana-preview.gif)
+![preview](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/v1.6/images/lana-preview.gif)
 
 ## WARNING
 
@@ -125,10 +125,15 @@ Show analysis on method calls. The table can be sorted ascending or descending b
 
 ### Database
 
-![database](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/db-lana.png)
+![database](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/db-lana.png)
 
-Shows the SOQL and DML that occured as well as the number of times each SOQL/DML occured and the number of rows returned.
-Cliking on the links will take you to where that SOQL/DML occured in the call tree.
+Shows the SOQL and DML that occured the number of rows returned, the time taken and for SOQL the selectivity and number of aggregations.
+Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occured in the call tree.
+The tables can be sorted ascending or descending by DML/SOQL, Row Count and Time Taken and by Selectivity and Aggregations on the SOQL table.
+
+The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determine. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
+
+By default rows are grouped by the SOQL/ DML text, grouping can be removed and the rows shows as a flat list using the _Group by_ item in the header menu.
 
 ## Contributing
 

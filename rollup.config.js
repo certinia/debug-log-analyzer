@@ -31,12 +31,13 @@ export default [
     input: './log-viewer/modules/Main.ts',
     output: [
       {
+        format: 'es',
         file: './log-viewer/out/bundle.js',
         sourcemap: false,
       },
     ],
     plugins: [
-      nodeResolve(),
+      nodeResolve({ browser: true }),
       commonjs(),
       typescript({
         tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',

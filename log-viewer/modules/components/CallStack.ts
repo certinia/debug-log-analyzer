@@ -9,7 +9,8 @@ import { showTreeNode } from '../TreeView';
 
 @customElement('call-stack')
 export class CallStack extends LitElement {
-  @property({ type: Number }) stack = -1;
+  @property({ type: Number })
+  timestamp = -1;
 
   static get styles() {
     return css`
@@ -18,41 +19,35 @@ export class CallStack extends LitElement {
         text-decoration: underline;
       }
 
-      .stackEntryFirst {
-        cursor: pointer;
-      }
-
       .stackEntry {
         cursor: pointer;
-        display: block;
-        padding-left: 1em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: inline;
+      }
+
+      .dbLinkContainer {
+        display: flex;
       }
     `;
   }
 
   render() {
-    const stacks = DatabaseAccess.instance()?.stacks;
-    if (stacks && this.stack >= 0 && this.stack < stacks.length) {
-      const stack = stacks[this.stack];
-      if (stack.length) {
-        const details = stack.slice(1, 10).map((entry) => this.lineLink(entry, false));
-        return html`<details>
-          <summary>${this.lineLink(stack[0], true)}</summary>
-          ${details}
-        </details>`;
-      } else {
-        return html`<div class="stackEntry">No call stack available</div>`;
-      }
+    const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() || [];
+    if (stack.length) {
+      const details = stack.map((entry) => this.lineLink(entry));
+      return html`${details}`;
+    } else {
+      return html`<div class="stackEntry">No call stack available</div>`;
     }
   }
 
-  private lineLink(line: LogLine, first: boolean) {
-    const style = first ? 'stackEntryFirst' : 'stackEntry';
-    return html`
-      <a @click=${this.onCallerClick} class=${style} data-timestamp="${line.timestamp}"
+  private lineLink(line: LogLine) {
+    return html`<div class="dbLinkContainer">
+      <a @click=${this.onCallerClick} class="stackEntry" data-timestamp="${line.timestamp}"
         >${line.text}</a
       >
-    `;
+    </div> `;
   }
 
   private onCallerClick(evt: Event) {

@@ -1,7 +1,0 @@
-#dbScroller {
-  overflow: scroll;
-  flex: 1;
-}
-#dbContent {
-  height: 0;
-}

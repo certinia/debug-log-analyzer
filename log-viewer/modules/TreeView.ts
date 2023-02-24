@@ -61,7 +61,7 @@ export function showTreeNode(timestamp: number) {
     const methodName = methodElm?.querySelector('span.name') || methodElm;
     showTab('treeTab');
     expandTreeNode(methodElm);
-    methodElm.scrollIntoView(false);
+    methodElm.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'center' });
     if (methodName) {
       document.getSelection()?.selectAllChildren(methodName);
     }

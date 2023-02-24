@@ -731,11 +731,17 @@ class IdeasQueryExecuteLine extends Detail {
 
 class SOQLExecuteBeginLine extends Method {
   group = 'SOQL';
+  aggregations = 0;
 
   constructor(parts: string[]) {
     super(parts, ['SOQL_EXECUTE_END'], null, 'soql', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = 'SOQL: ' + parts[3] + ' - ' + parts[4];
+
+    const [, , , aggregations, soqlString] = parts;
+
+    const aggregationIndex = aggregations.indexOf('Aggregations:');
+    this.aggregations = Number(aggregations.slice(aggregationIndex + 13));
+    this.text = soqlString;
   }
 
   getBreadcrumbText(): string {
@@ -758,10 +764,42 @@ class SOQLExecuteEndLine extends Detail {
 }
 
 class SOQLExecuteExplainLine extends Detail {
+  cardinality: number | null = null; // The estimated number of records that the leading operation type would return
+  fields: string[] | null = null; //The indexed field(s) used by the Query Optimizer. If the leading operation type is Index, the fields value is Index. Otherwise, the fields value is null.
+  leadingOperationType: string | null = null; // The primary operation type that Salesforce will use to optimize the query.
+  relativeCost: number | null = null; // The cost of the query compared to the Force.com Query Optimizer’s selectivity threshold. Values above 1 mean that the query won’t be selective.
+  sObjectCardinality: number | null = null; // The approximate record count for the queried object.
+  sObjectType: string | null = null; //T he name of the queried SObject
+
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = `${parts[3]}, line:${this.lineNumber}`;
+
+    const queryplanParts = parts[3].split('],');
+    if (queryplanParts.length > 1) {
+      const planExplain = queryplanParts[0];
+      const [cardinalityText, sobjCardinalityText, costText] = queryplanParts[1].split(',');
+
+      const onIndex = planExplain.indexOf(' on');
+      this.leadingOperationType = planExplain.slice(0, onIndex);
+
+      const colonIndex = planExplain.indexOf(' :');
+      this.sObjectType = planExplain.slice(onIndex + 4, colonIndex);
+
+      // remove whitespace if there is any. we could have [ field1__c, field2__c ]
+      // I am not 100% sure of format when we have multiple fields so this is safer
+      const fieldsAsString = planExplain.slice(planExplain.indexOf('[') + 1).replace(/\s+/g, '');
+      this.fields = fieldsAsString === '' ? [] : fieldsAsString.split(',');
+
+      this.cardinality = Number(
+        cardinalityText.slice(cardinalityText.indexOf('cardinality: ') + 13)
+      );
+      this.sObjectCardinality = Number(
+        sobjCardinalityText.slice(sobjCardinalityText.indexOf('sobjectCardinality: ') + 20)
+      );
+      this.relativeCost = Number(costText.slice(costText.indexOf('relativeCost ') + 13));
+    }
   }
 }
 
@@ -1833,6 +1871,13 @@ class WFProcessFoundLine extends Detail {
   }
 }
 
+class WFProcessNode extends Detail {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
 class WFReassignRecordLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
@@ -2129,6 +2174,7 @@ export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['WF_NO_PROCESS_FOUND', WFNoProcessFoundLine],
   ['WF_OUTBOUND_MSG', WFOutboundMsgLine],
   ['WF_PROCESS_FOUND', WFProcessFoundLine],
+  ['WF_PROCESS_NODE', WFProcessNode],
   ['WF_REASSIGN_RECORD', WFReassignRecordLine],
   ['WF_RESPONSE_NOTIFY', WFResponseNotifyLine],
   ['WF_RULE_ENTRY_ORDER', WFRuleEntryOrderLine],
@@ -2309,3 +2355,4 @@ export function getLogSettings(log: string) {
 }
 
 export { logLines, totalDuration, truncated, cpuUsed };
+export { SOQLExecuteExplainLine, SOQLExecuteBeginLine, DMLBeginLine };

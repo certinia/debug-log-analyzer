@@ -27,9 +27,7 @@ describe('Analyse database tests', () => {
     );
 
     expect(result.soqlMap).toEqual(
-      new Map<string, DatabaseEntry>([
-        ['SOQL: Aggregations:0 - SELECT Id FROM Account', new DatabaseEntry(1, 3, [0])],
-      ])
+      new Map<string, DatabaseEntry>([['SELECT Id FROM Account', new DatabaseEntry(1, 3, [0])]])
     );
   });
 
@@ -57,9 +55,7 @@ describe('Analyse database tests', () => {
     );
 
     expect(result.soqlMap).toEqual(
-      new Map<string, DatabaseEntry>([
-        ['SOQL: Aggregations:0 - SELECT Id FROM Account', new DatabaseEntry(2, 11, [1, 3])],
-      ])
+      new Map<string, DatabaseEntry>([['SELECT Id FROM Account', new DatabaseEntry(2, 11, [1, 3])]])
     );
   });
 });

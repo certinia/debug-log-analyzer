@@ -22,6 +22,8 @@
 				flex-direction: column;
 			}
 		</style>
+
+    <script type="module" defer crossorigin="anonymous" src="bundle.js"></script>
 	</head>
 
 	<body>
@@ -58,7 +60,7 @@
 					<label for="hideUnder">Hide under</label>
 					<input id="hideUnderTime" class="filterItem" type="number" min="0">
 						<span>ms</span>
-		  			</input>
+          </input>
 				</div>
 				<div id="breadcrumb"></div>
 				<div id="treeScroll">
@@ -86,12 +88,12 @@
 			</div>
 
 			<div id="dbView" class="tabItem">
-				<div id="dbScroller">
-					<div id="dbContent"></div>
-				</div>
+           <div class="dbContent">
+            <div id="dbDmlTable"></div>
+            <div id="dbSoqlTable"></div>
+          </div>
 			</div>
 
 		</div>
-		<script defer crossorigin="anonymous" src="bundle.js"></script>
 	</body>
 </html>
