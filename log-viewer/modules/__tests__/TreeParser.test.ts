@@ -557,8 +557,8 @@ describe('Recalculate durations tests', () => {
 
 describe('lineTypeMap tests', () => {
   it('Lines referenced by exitTypes should be exits', () => {
-    for (const [keyName, cls] of lineTypeMap) {
-      const line = new cls([
+    for (const lineType of lineTypeMap.values()) {
+      const line = new lineType([
         '14:32:07.563 (17358806534)',
         'DUMMY',
         '[10]',

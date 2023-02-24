@@ -8,7 +8,7 @@ class ShowAnalysisCodeLens implements CodeLensProvider {
     this.context = context;
   }
   // Each provider requires a provideCodeLenses function which will give the various documents the code lenses
-  async provideCodeLenses(document: TextDocument): Promise<CodeLens[]> {
+  async provideCodeLenses(_document: TextDocument): Promise<CodeLens[]> {
     // Define where the CodeLens will exist
     const topOfDocument = new Range(0, 0, 0, 0);
 
