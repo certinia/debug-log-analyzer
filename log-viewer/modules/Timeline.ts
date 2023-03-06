@@ -491,12 +491,18 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
         toolTip.appendChild(
           document.createTextNode(`duration: ${formatDuration(target.duration)}`)
         );
+
         if (target.cpuType === 'free') {
           toolTip.appendChild(document.createTextNode(' (free)'));
         } else {
           toolTip.appendChild(
             document.createTextNode(` (self ${formatDuration(target.selfTime)})`)
           );
+        }
+
+        if (target.rowCount !== null) {
+          toolTip.appendChild(brElem.cloneNode());
+          toolTip.appendChild(document.createTextNode(`rows: ${target.rowCount}`));
         }
       }
     }
