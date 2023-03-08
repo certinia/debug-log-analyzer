@@ -21,10 +21,10 @@ jobs:
         with:
           node-version: '16'
           cache: 'pnpm'
+      - name: Dependencies
+        run: pnpm install --frozen-lockfile
       - name: Install vsce
         run: pnpm add --global @vscode/vsce
-      - name: Dependencies
-        - run: pnpm install --frozen-lockfile
       - name: Build
         run: |
           cd lana
