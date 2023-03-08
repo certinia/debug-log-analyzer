@@ -35,6 +35,7 @@ function renderDMLTable() {
   const dmlTable = new Tabulator('#dbDmlTable', {
     data: dmlData, //set initial table data
     layout: 'fitColumns',
+    placeholder: 'No DML statements found',
     columnCalcs: 'both',
     groupClosedShowCalcs: true,
     groupStartOpen: false,
@@ -185,6 +186,7 @@ function renderSOQLTable() {
   const soqlTable = new Tabulator('#dbSoqlTable', {
     data: soqlData,
     layout: 'fitColumns',
+    placeholder: 'No SOQL queries found',
     columnCalcs: 'both',
     groupClosedShowCalcs: true,
     groupStartOpen: false,
