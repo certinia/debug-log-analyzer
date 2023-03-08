@@ -17,10 +17,11 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '16.x'
+          cache: 'pnpm'
       - name: Install Packages
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Lint Files
-        run: npm run lint
+        run: pnpm lint
 
   tests:
     name: Run Log-viewer Tests
@@ -31,8 +32,8 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '16'
+          cache: 'pnpm'
       - name: Install Packages
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Tests
-        run: |
-          npm run test:ci
+        run: pnpm test:ci

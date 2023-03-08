@@ -13,15 +13,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
       - name: Set up Node
         uses: actions/setup-node@v3
         with:
           node-version: '16'
+          cache: 'pnpm'
       - name: Install vsce
         run: npm install --global @vscode/vsce
       - name: Dependencies
-        run: |
-          npm ci
+        - run: pnpm install --frozen-lockfile
       - name: Build
         run: |
           cd lana

@@ -10,6 +10,7 @@ const production = process.env.NODE_ENV == 'production';
 console.log('Package mode:', production ? 'production' : 'development');
 export default [
   {
+    preserveSymlinks: true,
     input: './lana/src/Main.ts',
     output: {
       format: 'cjs',
@@ -28,6 +29,7 @@ export default [
     ],
   },
   {
+    preserveSymlinks: true,
     input: './log-viewer/modules/Main.ts',
     output: [
       {
