@@ -14,14 +14,14 @@
   "dependencies": {
     "@apexdevtools/apex-parser": "^3.0.0",
     "lit": "^2.0.0",
-    "tabulator-tables": "^5.4.3"
+    "tabulator-tables": "^5.4.4"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^22.x.x",
     "@rollup/plugin-node-resolve": "^13.0.0",
     "@rollup/plugin-typescript": "^8.0.0",
     "@types/jest": "^28.x.x",
-    "@types/tabulator-tables": "^5.4.3",
+    "@types/tabulator-tables": "^5.4.5",
     "@typescript-eslint/eslint-plugin": "^5.x.x",
     "@typescript-eslint/parser": "^5.x.x",
     "concurrently": "^7.x.x",
