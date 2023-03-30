@@ -162,6 +162,7 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^22.0.0",
     "@rollup/plugin-node-resolve": "^13.0.0",
+    "@rollup/plugin-terser": "^0.4.0",
     "@rollup/plugin-typescript": "^8.0.0",
     "@types/node": "^16.x.x",
     "@types/vscode": "^1.0.0",
@@ -171,7 +172,6 @@
     "eslint-plugin-prettier": "^4.2.1",
     "prettier": "^2.7.1",
     "rollup": "^2.0.0",
-    "rollup-plugin-terser": "^7.0.0",
     "tslib": "^2.0.0",
     "typescript": "^4.0.0"
   }
