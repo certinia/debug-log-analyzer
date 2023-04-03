@@ -3,6 +3,10 @@ import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 import { html, render } from 'lit';
 
 import { DatabaseAccess } from '../Database';
+import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
+
+import './CallStack';
+import './DatabaseSOQLDetailPanel';
 import { SOQLExecuteExplainLine } from '../parsers/TreeParser';
 import './CallStack.ts';
 
@@ -148,6 +152,7 @@ function renderDMLTable() {
 }
 
 function renderSOQLTable() {
+  const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
   let currentSelectedRow: RowComponent | null;
   interface GridSOQLData {
     isSelective: boolean | null;
@@ -160,6 +165,10 @@ function renderSOQLTable() {
   }
 
   const soqlLines = DatabaseAccess.instance()?.getSOQLLines();
+  soqlLines?.forEach((line) => {
+    timestampToSOQl.set(line.timestamp, line);
+  });
+
   const soqlData: unknown[] = [];
   let soqlText: string[] = [];
   if (soqlLines) {
@@ -312,7 +321,7 @@ function renderSOQLTable() {
     rowFormatter: function (row) {
       const data = row.getData();
       if (data.isDetail && data.timestamp) {
-        const detailContainer = createDetailPanel(data.timestamp);
+        const detailContainer = createSOQLDetailPanel(data.timestamp, timestampToSOQl);
         row.getElement().replaceChildren(detailContainer);
       }
     },
@@ -353,11 +362,28 @@ function renderSOQLTable() {
 }
 
 function createDetailPanel(timestamp: number) {
-  const stackContainer = document.createElement('div');
-  render(html`<call-stack timestamp=${timestamp}></call-stack>`, stackContainer);
   const detailContainer = document.createElement('div');
   detailContainer.className = 'soqlDBDetailView';
-  detailContainer.appendChild(stackContainer);
+  render(html`<call-stack timestamp=${timestamp}></call-stack>`, detailContainer);
+
+  return detailContainer;
+}
+
+function createSOQLDetailPanel(
+  timestamp: number,
+  timestampToSOQl: Map<number, SOQLExecuteBeginLine>
+) {
+  const detailContainer = document.createElement('div');
+  detailContainer.className = 'soqlDBDetailView';
+
+  const soqlLine = timestampToSOQl.get(timestamp);
+  render(
+    html`<db-soql-detail-panel
+      timestamp=${timestamp}
+      soql=${soqlLine?.text}
+    ></db-soql-detail-panel>`,
+    detailContainer
+  );
 
   return detailContainer;
 }
