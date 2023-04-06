@@ -3,22 +3,23 @@
  */
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { DatabaseAccess, DatabaseEntryMap } from '../Database';
-
-import './DatabaseRow.ts';
+import { Method } from '../parsers/TreeParser';
 
 @customElement('database-section')
 export class DatabaseSection extends LitElement {
-  @property({ type: String }) type = '';
+  @property({ type: String })
+  title = '';
+  @property({ type: Object, attribute: false })
+  dbLines: Method[] = [];
 
   static get styles() {
     return css`
       .dbSection {
-        padding: 10px;
+        padding: 10px 5px 5px 5px;
       }
       .dbTitle {
         font-weight: bold;
-        font-size: 10pt;
+        font-size: 1.2em;
       }
       .dbBlock {
         margin-left: 10px;
@@ -28,62 +29,16 @@ export class DatabaseSection extends LitElement {
   }
 
   render() {
-    const instancce = DatabaseAccess.instance();
-    let map: DatabaseEntryMap | null = null;
-    let title = '';
-    if (this.type === 'soql' && instancce) {
-      map = instancce.soqlMap;
-      title = 'SOQL Statements';
-    }
-    if (this.type === 'dml' && instancce) {
-      map = instancce.dmlMap;
-      title = 'DML Statements';
-    }
-    if (map) {
-      const keyList = this.getKeyList(map);
-      let totalCount = 0;
-      let totalRows = 0;
-      map.forEach((value) => {
-        totalCount += value.count;
-        totalRows += value.rowCount;
-      });
-      const rows = keyList.map((key) => {
-        return html`<database-row key=${key} />`;
-      });
-
-      return html`
-        <div class="dbSection">
-          <span class="dbTitle">${title} (Count: ${totalCount}, Rows: ${totalRows})</span>
-          <div class="dbBlock">${rows}</div>
-        </div>
-      `;
-    } else {
-      return html`<p>No map found for type ${this.type}</p>`;
-    }
-  }
-
-  /**
-   * entryMap: key => count
-   * sort by descending count or rowCount then ascending key
-   */
-  private getKeyList(entryMap: DatabaseEntryMap): string[] {
-    const keyList = Array.from(entryMap.keys());
-    keyList.sort((k1, k2) => {
-      const e1 = entryMap.get(k1);
-      const e2 = entryMap.get(k2);
-
-      if (e1 && e2) {
-        const countDiff = e2.count - e1.count;
-        if (countDiff !== 0) {
-          return countDiff;
-        }
-        const rowDiff = e2.rowCount - e1.rowCount;
-        if (rowDiff !== 0) {
-          return rowDiff;
-        }
-      }
-      return k1.localeCompare(k2);
+    const totalCount = this.dbLines.length;
+    let totalRows = 0;
+    this.dbLines.forEach((value) => {
+      totalRows += value.rowCount || 0;
     });
-    return keyList;
+
+    return html`
+      <div class="dbSection">
+        <span class="dbTitle">${this.title} (Count: ${totalCount}, Rows: ${totalRows})</span>
+      </div>
+    `;
   }
 }

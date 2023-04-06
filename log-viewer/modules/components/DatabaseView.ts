@@ -7,16 +7,29 @@ import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreePar
 
 import './CallStack';
 import './DatabaseSOQLDetailPanel';
+import './DatabaseSection';
 
 export function renderDBGrid() {
-  renderDMLTable();
-  renderSOQLTable();
+  const dbContainer = document.getElementById('dbContainer');
+  if (dbContainer) {
+    renderDMLTable(dbContainer);
+    renderSOQLTable(dbContainer);
+  }
 }
 
-function renderDMLTable() {
+function renderDMLTable(dbContainer: HTMLElement) {
+  const dmlLines = DatabaseAccess.instance()?.getDMLLines();
+  const dbDmlCounts = document.createElement('div');
+  render(
+    html`<database-section title="DML Statements" .dbLines=${dmlLines}></database-section>`,
+    dbDmlCounts
+  );
+  const dbDmlTable = document.createElement('div');
+  dbContainer.appendChild(dbDmlCounts);
+  dbContainer.appendChild(dbDmlTable);
+
   let currentSelectedRow: RowComponent | null;
 
-  const dmlLines = DatabaseAccess.instance()?.getDMLLines();
   const dmlData: unknown[] = [];
   let dmlText: string[] = [];
   if (dmlLines) {
@@ -34,7 +47,7 @@ function renderDMLTable() {
     dmlText = sortByFrequency(dmlText);
   }
 
-  const dmlTable = new Tabulator('#dbDmlTable', {
+  const dmlTable = new Tabulator(dbDmlTable, {
     data: dmlData, //set initial table data
     layout: 'fitColumns',
     columnCalcs: 'both',
@@ -149,7 +162,17 @@ function renderDMLTable() {
   });
 }
 
-function renderSOQLTable() {
+function renderSOQLTable(dbContainer: HTMLElement) {
+  const soqlLines = DatabaseAccess.instance()?.getSOQLLines();
+  const dbSoqlCounts = document.createElement('div');
+  render(
+    html`<database-section title="SOQL Statements" .dbLines=${soqlLines}></database-section>`,
+    dbSoqlCounts
+  );
+  const dbSoqlTable = document.createElement('div');
+  dbContainer.appendChild(dbSoqlCounts);
+  dbContainer.appendChild(dbSoqlTable);
+
   const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
   let currentSelectedRow: RowComponent | null;
   interface GridSOQLData {
@@ -162,7 +185,6 @@ function renderSOQLTable() {
     timestamp: number;
   }
 
-  const soqlLines = DatabaseAccess.instance()?.getSOQLLines();
   soqlLines?.forEach((line) => {
     timestampToSOQl.set(line.timestamp, line);
   });
@@ -189,7 +211,7 @@ function renderSOQLTable() {
     soqlText = sortByFrequency(soqlText);
   }
 
-  const soqlTable = new Tabulator('#dbSoqlTable', {
+  const soqlTable = new Tabulator(dbSoqlTable, {
     data: soqlData,
     layout: 'fitColumns',
     columnCalcs: 'both',
