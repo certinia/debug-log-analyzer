@@ -7,8 +7,6 @@ import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreePar
 
 import './CallStack';
 import './DatabaseSOQLDetailPanel';
-import { SOQLExecuteExplainLine } from '../parsers/TreeParser';
-import './CallStack.ts';
 
 export function renderDBGrid() {
   renderDMLTable();

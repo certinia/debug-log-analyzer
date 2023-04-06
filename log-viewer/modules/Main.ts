@@ -16,8 +16,6 @@ import analyseMethods, { renderAnalysis } from './Analysis';
 import { DatabaseAccess } from './Database';
 import { setNamespaces } from './NamespaceExtrator';
 import { hostService } from './services/VSCodeService';
-//import for originl view
-// import { renderDb } from './components/Database';
 import { renderDBGrid } from './components/DatabaseView';
 
 import '../resources/css/Status.css';
