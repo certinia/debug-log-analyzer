@@ -5,6 +5,7 @@ import postcss from 'rollup-plugin-postcss';
 import { terser } from 'rollup-plugin-terser';
 import typescript from '@rollup/plugin-typescript';
 import copy from 'rollup-plugin-copy';
+import nodePolyfills from 'rollup-plugin-polyfill-node';
 
 const production = process.env.NODE_ENV == 'production';
 console.log('Package mode:', production ? 'production' : 'development');
@@ -37,8 +38,9 @@ export default [
       },
     ],
     plugins: [
-      nodeResolve({ browser: true }),
+      nodeResolve({ browser: true, preferBuiltins: false }),
       commonjs(),
+      nodePolyfills(),
       typescript({
         tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
         exclude: ['node_modules', '**/__tests__/**'],
