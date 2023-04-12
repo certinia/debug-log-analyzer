@@ -17,9 +17,10 @@ export class SOQLLinterIssues extends LitElement {
   static get styles() {
     return css`
       :host {
-        min-width: 0;
+        min-width: 0%;
         border-left: 2px solid var(--vscode-editorHoverWidget-border);
         padding: 0px 5px 0px 5px;
+        flex: 1 0 0px;
       }
       .issue-detail {
         overflow: hidden;

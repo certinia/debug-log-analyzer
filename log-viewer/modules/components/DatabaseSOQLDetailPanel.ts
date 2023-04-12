@@ -19,6 +19,7 @@ export class DatabaseSOQLDetailPanel extends LitElement {
       :host {
         display: flex;
         overflow: hidden;
+        width: 100%;
       }
     `;
   }

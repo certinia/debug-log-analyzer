@@ -15,9 +15,9 @@ export class CallStack extends LitElement {
   static get styles() {
     return css`
       :host {
-        min-width: 50%;
-        padding: 0px 5px 0px 5px;
         flex: 1 0 0px;
+        min-width: 0%;
+        padding: 0px 5px 0px 5px;
       }
       a {
         color: var(--vscode-textLink-foreground);
