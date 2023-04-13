@@ -82,10 +82,11 @@ class NegativeFilterOperatorRule implements SOQLLinterRule {
     const qryCtxt = soqlTree._queryContext;
     const whereClause = qryCtxt.whereClause();
     if (whereClause) {
-      const hasNegativeOp = whereClause
-        .logicalExpression()
-        .conditionalExpression()
-        .find((exp) => {
+      const exp = whereClause.logicalExpression();
+
+      const hasNegativeOp =
+        exp.NOT() ||
+        exp.conditionalExpression().find((exp) => {
           const operator = exp.fieldExpression()?.comparisonOperator();
 
           if (
