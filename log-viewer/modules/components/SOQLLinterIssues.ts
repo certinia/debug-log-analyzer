@@ -4,7 +4,7 @@
 import { LitElement, html, css, PropertyValues, TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { SOQLLinter } from '../soql/SOQLLinter';
+import { SOQLLinter, SOQLLinterRule } from '../soql/SOQLLinter';
 
 @customElement('soql-issues')
 export class SOQLLinterIssues extends LitElement {
@@ -12,7 +12,7 @@ export class SOQLLinterIssues extends LitElement {
   soql = '';
 
   @state()
-  issues: string[] = [];
+  issues: SOQLLinterRule[] = [];
 
   static get styles() {
     return css`
@@ -45,10 +45,12 @@ export class SOQLLinterIssues extends LitElement {
 
     if (this.issues.length) {
       this.issues.forEach((issue) => {
-        htmlText.push(html`<div class="issue-detail" title="${issue}">${issue}</div>`);
+        htmlText.push(
+          html`<div class="issue-detail" title="${issue.summary}">${issue.summary}</div>`
+        );
       });
     } else {
-      htmlText.push(html`<div class="stackEntry">No SOQL issues 👍</div>`);
+      htmlText.push(html`<div class="issue-detail">No SOQL issues 👍</div>`);
     }
 
     return htmlText;
