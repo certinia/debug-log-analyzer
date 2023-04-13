@@ -42,6 +42,9 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
 
 .tabulator {
   .tabulator-tableholder {
+    height: 100% !important;
+    max-height: 100%;
+
     .tabulator-table {
       display: unset;
       background-color: unset;
@@ -71,14 +74,15 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
 }
 
 #dbContent {
-  height: 100%;
+  max-width: 100%;
 }
 #dbDmlTable,
 #dbSoqlTable {
-  width: 100%;
+  // width: 100%;
   margin-bottom: 1rem;
   overflow: visible;
   max-width: 100%;
+  max-height: 100%;
 }
 .soqlDBDetailView {
   border-bottom: 2px solid var(--vscode-editorHoverWidget-border);

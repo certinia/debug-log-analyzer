@@ -25,6 +25,7 @@ function renderDMLTable(dbContainer: HTMLElement) {
     dbDmlCounts
   );
   const dbDmlTable = document.createElement('div');
+  dbDmlTable.id = 'dbDmlTable';
   dbContainer.appendChild(dbDmlCounts);
   dbContainer.appendChild(dbDmlTable);
 
@@ -170,6 +171,7 @@ function renderSOQLTable(dbContainer: HTMLElement) {
     dbSoqlCounts
   );
   const dbSoqlTable = document.createElement('div');
+  dbSoqlTable.id = 'dbSoqlTable';
   dbContainer.appendChild(dbSoqlCounts);
   dbContainer.appendChild(dbSoqlTable);
 

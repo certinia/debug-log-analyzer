@@ -17,17 +17,19 @@ export class SOQLLinterIssues extends LitElement {
   static get styles() {
     return css`
       :host {
-        min-width: 0%;
+        flex: 1;
+        max-height: 30vh;
+        overflow-y: scroll;
         border-left: 2px solid var(--vscode-editorHoverWidget-border);
         padding: 0px 5px 0px 5px;
-        flex: 1 0 0px;
-      }
-      .issue-detail {
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
       .title {
         font-weight: bold;
+      }
+      details {
+        margin-bottom: 1rem;
+        overflow-wrap: anywhere;
+        white-space: normal;
       }
     `;
   }
@@ -46,7 +48,12 @@ export class SOQLLinterIssues extends LitElement {
     if (this.issues.length) {
       this.issues.forEach((issue) => {
         htmlText.push(
-          html`<div class="issue-detail" title="${issue.summary}">${issue.summary}</div>`
+          html`
+            <details>
+              <summary title="${issue.summary}">${issue.summary}</summary>
+              <p>${issue.message}</p>
+            </details>
+          `
         );
       });
     } else {
