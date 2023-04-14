@@ -4,7 +4,7 @@
 import { SOQLLinter } from '../../soql/SOQLLinter';
 
 describe('SOQL Linter rule tests', () => {
-  it('No where clause should return rule', async () => {
+  it('No where clause should return rule', () => {
     const soql = 'SELECT Id FROM ANOBJECT__c';
 
     const results = new SOQLLinter().lint(soql);
@@ -17,7 +17,7 @@ describe('SOQL Linter rule tests', () => {
     expect(results).toEqual([undoundedSoqlRule]);
   });
 
-  it('Leading % wildcard should return rule', async () => {
+  it('Leading % wildcard should return rule', () => {
     const soql = "SELECT Id FROM ANOBJECT__c WHERE Name LIKE '%SomeName'";
 
     const results = new SOQLLinter().lint(soql);
@@ -31,6 +31,39 @@ describe('SOQL Linter rule tests', () => {
   });
 });
 
+describe('LastModifiedDate Index Rule', () => {
+  const lastModifiedDateIndexRule = {
+    summary:
+      'Index on SystemModStamp can not be used for LastModifiedDate when LastModifiedDate < 2023-01-01T00:00:00Z.',
+    message:
+      'Under the hood, the SystemModStamp is indexed, but LastModifiedDate is not. The Salesforce query optimizer will intelligently attempt to use the index on SystemModStamp even when the SOQL query filters on LastModifiedDate. However, the query optimizer cannot use the index if the SOQL query filter uses LastModifiedDate to determine the upper boundary of a date range because SystemModStamp can be greater (i.e. a later date) than LastModifiedDate. This is to avoid missing records that fall in between the two timestamps. The same logic applies when using date literals.',
+  };
+
+  it('< on LastModifiedDate should return rule', () => {
+    const soql = 'SELECT Id FROM Obj__c WHERE LastModifiedDate < TODAY';
+
+    const results = new SOQLLinter().lint(soql);
+
+    expect(results).toEqual([lastModifiedDateIndexRule]);
+  });
+
+  it('> on LastModifiedDate should not return rule', () => {
+    const soql = 'SELECT Id FROM Obj__c WHERE LastModifiedDate > TODAY';
+
+    const results = new SOQLLinter().lint(soql);
+
+    expect(results).toEqual([]);
+  });
+
+  it('= on LastModifiedDate should not return rule', () => {
+    const soql = 'SELECT Id FROM Obj__c WHERE LastModifiedDate = TODAY';
+
+    const results = new SOQLLinter().lint(soql);
+
+    expect(results).toEqual([]);
+  });
+});
+
 describe('Negative Filter Operator Rule tests', () => {
   const negativeFilterRule = {
     summary:
@@ -39,7 +72,7 @@ describe('Negative Filter Operator Rule tests', () => {
       "The index can not be used when using one of the negative filter operators e.g !=, <>, NOT, EXCLUDES or when comparing with an empty value ( name != ''). Use the positive filter operators instead e.g status = 'Open, Cancelled' instead of status != 'Closed'.",
   };
 
-  it('!= : should return rule', async () => {
+  it('!= : should return rule', () => {
     const soql = "SELECT Id FROM ANOBJECT__c WHERE Name != 'A Name'";
 
     const results = new SOQLLinter().lint(soql);
@@ -47,7 +80,7 @@ describe('Negative Filter Operator Rule tests', () => {
     expect(results).toEqual([negativeFilterRule]);
   });
 
-  it('<> : should return rule', async () => {
+  it('<> : should return rule', () => {
     const soql = "SELECT Id FROM ANOBJECT__c WHERE Name <> 'A Name'";
 
     const results = new SOQLLinter().lint(soql);
@@ -55,7 +88,7 @@ describe('Negative Filter Operator Rule tests', () => {
     expect(results).toEqual([negativeFilterRule]);
   });
 
-  it('EXCLUDES : should return rule', async () => {
+  it('EXCLUDES : should return rule', () => {
     const soql = "SELECT Id FROM ANOBJECT__c WHERE Name EXCLUDES ('A Name')";
 
     const results = new SOQLLinter().lint(soql);
@@ -63,7 +96,7 @@ describe('Negative Filter Operator Rule tests', () => {
     expect(results).toEqual([negativeFilterRule]);
   });
 
-  it('NOT : should return rule', async () => {
+  it('NOT : should return rule', () => {
     const soql = "SELECT Id FROM ANOBJECT__c WHERE NOT Name = 'A Name'";
 
     const results = new SOQLLinter().lint(soql);
@@ -71,7 +104,7 @@ describe('Negative Filter Operator Rule tests', () => {
     expect(results).toEqual([negativeFilterRule]);
   });
 
-  it('NOT IN : should return rule', async () => {
+  it('NOT IN : should return rule', () => {
     const soql = "SELECT Id FROM ANOBJECT__c WHERE Id NOT IN ('a0000000000aaaa')";
 
     const results = new SOQLLinter().lint(soql);
@@ -88,7 +121,7 @@ describe('Order By Without Limit Rule tests', () => {
       "An ORDER BY clause doesn't have anything to do with selectivity. Selectivity is determined by available indexes that align with filter conditions (WHERE clause) and record visibility (sharing rules, etc.). Once the optimizer determines which rows to return, it applies the ORDER BY logic to sort the records in the return set. However an ORDER BY and LIMIT can sometimes be optimizable.",
   };
 
-  it('Order by only should return rule', async () => {
+  it('Order by only should return rule', () => {
     const soql = "SELECT Id FROM AnObject__c WHERE Status__c = 'Open' ORDER BY AField__c";
 
     const results = new SOQLLinter().lint(soql);
@@ -96,7 +129,7 @@ describe('Order By Without Limit Rule tests', () => {
     expect(results).toEqual([orderByWithoutLimit]);
   });
 
-  it('Order by with limit should not return rule', async () => {
+  it('Order by with limit should not return rule', () => {
     const soql = 'SELECT Id FROM AnObject__c ORDER BY AField__c LIMIT 1000';
 
     const results = new SOQLLinter().lint(soql);

@@ -9,6 +9,7 @@ export class SOQLLinter {
       new LeadingPercentWildcardRule(),
       new NegativeFilterOperatorRule(),
       new OrderByWithoutLimitRule(),
+      new LastModifiedDateSystemModStampIndexRule(),
     ];
 
     rules.forEach((rule) => {
@@ -118,5 +119,35 @@ class OrderByWithoutLimitRule implements SOQLLinterRule {
     const limitClause = qryCtxt.limitClause();
 
     return !!orderByClause && !limitClause;
+  }
+}
+
+class LastModifiedDateSystemModStampIndexRule implements SOQLLinterRule {
+  summary =
+    'Index on SystemModStamp can not be used for LastModifiedDate when LastModifiedDate < 2023-01-01T00:00:00Z.';
+  message =
+    'Under the hood, the SystemModStamp is indexed, but LastModifiedDate is not. The Salesforce query optimizer will intelligently attempt to use the index on SystemModStamp even when the SOQL query filters on LastModifiedDate. However, the query optimizer cannot use the index if the SOQL query filter uses LastModifiedDate to determine the upper boundary of a date range because SystemModStamp can be greater (i.e. a later date) than LastModifiedDate. This is to avoid missing records that fall in between the two timestamps. The same logic applies when using date literals.';
+
+  test(soqlTree: SOQLTree): boolean {
+    const qryCtxt = soqlTree._queryContext;
+    const whereClause = qryCtxt.whereClause();
+    if (whereClause) {
+      const result = whereClause
+        .logicalExpression()
+        .conditionalExpression()
+        .find((exp) => {
+          const fieldExp = exp.fieldExpression();
+          if (
+            fieldExp?.fieldName()?.text.toLowerCase().endsWith('lastmodifieddate') &&
+            fieldExp.comparisonOperator().LT()
+          ) {
+            return exp;
+          }
+        });
+
+      return !!result;
+    }
+
+    return false;
   }
 }
