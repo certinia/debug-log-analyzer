@@ -16,6 +16,7 @@ export class CallStack extends LitElement {
     return css`
       :host {
         flex: 1;
+        overflow-y: scroll;
         min-width: 0%;
         max-height: 30vh;
         padding: 0px 5px 0px 5px;
@@ -29,7 +30,6 @@ export class CallStack extends LitElement {
         cursor: pointer;
         overflow: hidden;
         text-overflow: ellipsis;
-        display: inline;
       }
 
       .dbLinkContainer {
