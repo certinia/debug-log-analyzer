@@ -137,3 +137,43 @@ describe('Order By Without Limit Rule tests', () => {
     expect(results).toEqual([]);
   });
 });
+
+import { Method } from '../../parsers/TreeParser';
+describe('SOQL in Trigger Rule tests', () => {
+  const triggerNonSelective = {
+    summary: 'Ensure SOQL in trigger is selective.',
+    message:
+      'An exception will occur when a non-selective query in a trigger executes against an object that contains more than 1 million records. To avoid this error, ensure that the query is selective',
+  };
+
+  it('soql in trigger should return rule', () => {
+    const soql = 'SELECT Id FROM AnObject__c WHERE value__c > 0';
+    const mockTriggerLine = new Method(
+      [
+        '04:16:39.166 (1166781977)',
+        'CODE_UNIT_STARTED',
+        '[EXTERNAL]',
+        'a0000000000aaaa',
+        'Account on Account trigger event AfterInsert',
+        '__sfdc_trigger/Account',
+      ],
+      ['CODE_UNIT_FINISHED'],
+      null,
+      'codeUnit',
+      'method'
+    );
+    mockTriggerLine.text = 'Account on Account trigger event AfterInsert';
+
+    const results = new SOQLLinter().lint(soql, [mockTriggerLine]);
+
+    expect(results).toEqual([triggerNonSelective]);
+  });
+
+  it('soql outside trigger should not return rule', () => {
+    const soql = 'SELECT Id FROM AnObject__c WHERE value__c > 0';
+
+    const results = new SOQLLinter().lint(soql);
+
+    expect(results).toEqual([]);
+  });
+});

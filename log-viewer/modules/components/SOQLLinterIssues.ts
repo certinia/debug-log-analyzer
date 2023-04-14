@@ -5,11 +5,15 @@ import { LitElement, html, css, PropertyValues, TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { SOQLLinter, SOQLLinterRule } from '../soql/SOQLLinter';
+import { DatabaseAccess } from '../Database';
 
 @customElement('soql-issues')
 export class SOQLLinterIssues extends LitElement {
   @property({ type: String })
   soql = '';
+
+  @property({ type: Number })
+  timestamp = 0;
 
   @state()
   issues: SOQLLinterRule[] = [];
@@ -36,7 +40,8 @@ export class SOQLLinterIssues extends LitElement {
 
   updated(changedProperties: PropertyValues): void {
     if (changedProperties.has('soql')) {
-      this.issues = new SOQLLinter().lint(this.soql);
+      const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() || [];
+      this.issues = new SOQLLinter().lint(this.soql, stack);
     }
   }
 

@@ -27,7 +27,7 @@ export class DatabaseSOQLDetailPanel extends LitElement {
   render() {
     return html`
       <call-stack timestamp=${this.timestamp}></call-stack>
-      <soql-issues soql=${this.soql}></soql-issues>
+      <soql-issues timestamp=${this.timestamp} soql=${this.soql}></soql-issues>
     `;
   }
 }
