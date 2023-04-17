@@ -24,7 +24,6 @@ export class SOQLLinterIssues extends LitElement {
         flex: 1;
         max-height: 30vh;
         overflow-y: scroll;
-        border-left: 2px solid var(--vscode-editorHoverWidget-border);
         padding: 0px 5px 0px 5px;
       }
       .title {
