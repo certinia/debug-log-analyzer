@@ -1,11 +1,11 @@
 // Rollup plugins
 import commonjs from '@rollup/plugin-commonjs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
-import postcss from 'rollup-plugin-postcss';
-import { terser } from 'rollup-plugin-terser';
+import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
 import copy from 'rollup-plugin-copy';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
+import postcss from 'rollup-plugin-postcss';
 
 const production = process.env.NODE_ENV == 'production';
 console.log('Package mode:', production ? 'production' : 'development');
