@@ -1,9 +1,9 @@
 // Rollup plugins
 import commonjs from '@rollup/plugin-commonjs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
-import postcss from 'rollup-plugin-postcss';
-import { terser } from 'rollup-plugin-terser';
+import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
+import postcss from 'rollup-plugin-postcss';
 
 const compact = !process.env.ROLLUP_WATCH;
 export default {
