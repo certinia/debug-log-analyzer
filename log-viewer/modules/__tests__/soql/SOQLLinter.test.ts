@@ -12,6 +12,7 @@ describe('SOQL Linter rule tests', () => {
       summary: 'SOQL is unbounded. Add a WHERE or LIMIT clause or both.',
       message:
         'As well as potentially taking a long time to execute or even timing out, unbounded SOQL queries can cause the SOQL row and heap limits to be exceeded.',
+      severity: 'Warning',
     };
 
     expect(results).toEqual([undoundedSoqlRule]);
@@ -25,6 +26,7 @@ describe('SOQL Linter rule tests', () => {
       summary:
         'Avoid a leading "%" wildcard when using a LIKE clause. This will impact query performance.',
       message: 'The index can not be used when using a leading "%" wildcard with a LIKE clause',
+      severity: 'Warning',
     };
 
     expect(results).toEqual([leadingWildcardRule]);
@@ -37,6 +39,7 @@ describe('LastModifiedDate Index Rule', () => {
       'Index on SystemModStamp can not be used for LastModifiedDate when LastModifiedDate < 2023-01-01T00:00:00Z.',
     message:
       'Under the hood, the SystemModStamp is indexed, but LastModifiedDate is not. The Salesforce query optimizer will intelligently attempt to use the index on SystemModStamp even when the SOQL query filters on LastModifiedDate. However, the query optimizer cannot use the index if the SOQL query filter uses LastModifiedDate to determine the upper boundary of a date range because SystemModStamp can be greater (i.e. a later date) than LastModifiedDate. This is to avoid missing records that fall in between the two timestamps. The same logic applies when using date literals.',
+    severity: 'Info',
   };
 
   it('< on LastModifiedDate should return rule', () => {
@@ -70,6 +73,7 @@ describe('Negative Filter Operator Rule tests', () => {
       'Avoid negative filter operators, the index can not be used and this will impact query performance.',
     message:
       "The index can not be used when using one of the negative filter operators e.g !=, <>, NOT, EXCLUDES or when comparing with an empty value ( name != ''). Use the positive filter operators instead e.g status = 'Open, Cancelled' instead of status != 'Closed'.",
+    severity: 'Warning',
   };
 
   it('!= : should return rule', () => {
@@ -119,6 +123,7 @@ describe('Order By Without Limit Rule tests', () => {
       'Avoid ORDER BY unless the result set needs to be ordered, it can increase query time.',
     message:
       "An ORDER BY clause doesn't have anything to do with selectivity. Selectivity is determined by available indexes that align with filter conditions (WHERE clause) and record visibility (sharing rules, etc.). Once the optimizer determines which rows to return, it applies the ORDER BY logic to sort the records in the return set. However an ORDER BY and LIMIT can sometimes be optimizable.",
+    severity: 'Info',
   };
 
   it('Order by only should return rule', () => {
@@ -144,6 +149,7 @@ describe('SOQL in Trigger Rule tests', () => {
     summary: 'Ensure SOQL in trigger is selective.',
     message:
       'An exception will occur when a non-selective query in a trigger executes against an object that contains more than 1 million records. To avoid this error, ensure that the query is selective',
+    severity: 'Warning',
   };
 
   it('soql in trigger should return rule', () => {
