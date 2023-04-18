@@ -6,6 +6,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import { SOQLLinter, SOQLLinterRule } from '../soql/SOQLLinter';
 import { DatabaseAccess } from '../Database';
+import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
 
 @customElement('soql-issues')
 export class SOQLLinterIssues extends LitElement {
@@ -40,7 +41,9 @@ export class SOQLLinterIssues extends LitElement {
   updated(changedProperties: PropertyValues): void {
     if (changedProperties.has('soql')) {
       const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() || [];
-      this.issues = new SOQLLinter().lint(this.soql, stack);
+      const soqlLine = stack[0] as SOQLExecuteBeginLine;
+      this.issues = this.getIssuesFromSOQLLine(soqlLine);
+      this.issues = this.issues.concat(new SOQLLinter().lint(this.soql, stack));
     }
   }
 
@@ -65,5 +68,24 @@ export class SOQLLinterIssues extends LitElement {
     }
 
     return htmlText;
+  }
+
+  getIssuesFromSOQLLine(soqlLine: SOQLExecuteBeginLine | null): SOQLLinterRule[] {
+    const soqlIssues = [];
+    if (soqlLine) {
+      const explain = soqlLine.children[0] as SOQLExecuteExplainLine;
+      if (explain.relativeCost && explain.relativeCost > 1) {
+        soqlIssues.push(new ExplainLineSelectivityRule(explain.relativeCost));
+      }
+    }
+    return soqlIssues;
+  }
+}
+
+class ExplainLineSelectivityRule implements SOQLLinterRule {
+  message = '';
+  summary = 'Query is not selective.';
+  constructor(relativeCost: number) {
+    this.message = `The relative cost of the query is ${relativeCost}.`;
   }
 }

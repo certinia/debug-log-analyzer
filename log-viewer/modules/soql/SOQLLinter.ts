@@ -33,7 +33,7 @@ export interface SOQLLinterRule {
   summary: string;
 
   // returns true if the rule applies e.g SOQL does not have a where clause
-  test(soqlTree: SOQLTree, stack: Stack): boolean;
+  test?(soqlTree: SOQLTree, stack: Stack): boolean;
 }
 
 class UnboundedSOQLRule implements SOQLLinterRule {
