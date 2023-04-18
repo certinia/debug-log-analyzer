@@ -4,7 +4,7 @@
 import { LitElement, html, css, PropertyValues, TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { SOQLLinter, SOQLLinterRule } from '../soql/SOQLLinter';
+import { SOQLLinter, SOQLLinterRule, Severity, SEVERITY_TYPES } from '../soql/SOQLLinter';
 import { DatabaseAccess } from '../Database';
 import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
 
@@ -31,7 +31,7 @@ export class SOQLLinterIssues extends LitElement {
         font-weight: bold;
       }
       details {
-        margin-bottom: 1rem;
+        margin-bottom: 0.25em;
         overflow-wrap: anywhere;
         white-space: normal;
       }
@@ -44,6 +44,9 @@ export class SOQLLinterIssues extends LitElement {
       const soqlLine = stack[0] as SOQLExecuteBeginLine;
       this.issues = this.getIssuesFromSOQLLine(soqlLine);
       this.issues = this.issues.concat(new SOQLLinter().lint(this.soql, stack));
+      this.issues.sort((a, b) => {
+        return SEVERITY_TYPES.indexOf(a.severity) - SEVERITY_TYPES.indexOf(b.severity);
+      });
     }
   }
 
@@ -53,11 +56,23 @@ export class SOQLLinterIssues extends LitElement {
     ];
 
     if (this.issues.length) {
+      const severityToEmoji = new Map<string, string>(
+        Object.entries({
+          error: '❌',
+          warning: '⚠️',
+          info: 'ℹ️',
+        })
+      );
       this.issues.forEach((issue) => {
         htmlText.push(
           html`
             <details>
-              <summary title="${issue.summary}">${issue.summary}</summary>
+              <summary title="${issue.summary}">
+                <span title="${issue.severity}"
+                  >${severityToEmoji.get(issue.severity.toLowerCase())}
+                </span>
+                ${issue.summary}
+              </summary>
               <p>${issue.message}</p>
             </details>
           `
@@ -84,6 +99,7 @@ export class SOQLLinterIssues extends LitElement {
 
 class ExplainLineSelectivityRule implements SOQLLinterRule {
   message = '';
+  severity: Severity = 'Error';
   summary = 'Query is not selective.';
   constructor(relativeCost: number) {
     this.message = `The relative cost of the query is ${relativeCost}.`;
