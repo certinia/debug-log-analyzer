@@ -35,6 +35,7 @@ function renderDMLTable() {
   const dmlTable = new Tabulator('#dbDmlTable', {
     data: dmlData, //set initial table data
     layout: 'fitColumns',
+    placeholder: 'No DML statements found',
     columnCalcs: 'both',
     groupClosedShowCalcs: true,
     groupStartOpen: false,
@@ -100,7 +101,6 @@ function renderDMLTable() {
         sorter: 'number',
         width: 110,
         bottomCalc: 'sum',
-        // @ts-expect-error: waiting for types defintion update https://github.com/DefinitelyTyped/DefinitelyTyped/pull/64309
         bottomCalcParams: { precision: 2 },
       },
     ],
@@ -185,6 +185,7 @@ function renderSOQLTable() {
   const soqlTable = new Tabulator('#dbSoqlTable', {
     data: soqlData,
     layout: 'fitColumns',
+    placeholder: 'No SOQL queries found',
     columnCalcs: 'both',
     groupClosedShowCalcs: true,
     groupStartOpen: false,
@@ -301,7 +302,6 @@ function renderSOQLTable() {
         sorter: 'number',
         width: 110,
         bottomCalc: 'sum',
-        // @ts-expect-error: waiting for types defintion update https://github.com/DefinitelyTyped/DefinitelyTyped/pull/64309
         bottomCalcParams: { precision: 2 },
       },
       {

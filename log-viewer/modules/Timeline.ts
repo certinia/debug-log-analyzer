@@ -11,13 +11,13 @@ interface TimelineGroup {
 
 /* eslint-disable @typescript-eslint/naming-convention */
 interface TimelineColors {
-  'Code Unit': '#6BAD68';
-  DML: '#22686D';
-  Flow: '#237A72';
-  Method: '#328C72';
-  SOQL: '#4B9D6E';
-  'System Method': '#2D4455';
-  Workflow: '#285663';
+  'Code Unit': '#88AE58';
+  Workflow: '#51A16E';
+  Method: '#2B8F81';
+  Flow: '#337986';
+  DML: '#285663';
+  SOQL: '#5D4963';
+  'System Method': '#5C3444';
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -28,56 +28,56 @@ interface Rect {
 }
 
 const scaleY = -15,
-  strokeColor = '#B0B0B0',
+  strokeColor = '#D3D3D3',
   textColor = '#FFFFFF',
   keyMap: Map<TimelineKey, TimelineGroup> = new Map([
     [
       'codeUnit',
       {
         label: 'Code Unit',
-        fillColor: '#6BAD68',
-      },
-    ],
-    [
-      'soql',
-      {
-        label: 'SOQL',
-        fillColor: '#4B9D6E',
-      },
-    ],
-    [
-      'method',
-      {
-        label: 'Method',
-        fillColor: '#328C72',
-      },
-    ],
-    [
-      'flow',
-      {
-        label: 'Flow',
-        fillColor: '#237A72',
-      },
-    ],
-    [
-      'dml',
-      {
-        label: 'DML',
-        fillColor: '#22686D',
+        fillColor: '#88AE58',
       },
     ],
     [
       'workflow',
       {
         label: 'Workflow',
+        fillColor: '#51A16E',
+      },
+    ],
+    [
+      'method',
+      {
+        label: 'Method',
+        fillColor: '#2B8F81',
+      },
+    ],
+    [
+      'flow',
+      {
+        label: 'Flow',
+        fillColor: '#337986',
+      },
+    ],
+    [
+      'dml',
+      {
+        label: 'DML',
         fillColor: '#285663',
+      },
+    ],
+    [
+      'soql',
+      {
+        label: 'SOQL',
+        fillColor: '#5D4963',
       },
     ],
     [
       'systemMethod',
       {
         label: 'System Method',
-        fillColor: '#2D4455',
+        fillColor: '#5C3444',
       },
     ],
   ]);
