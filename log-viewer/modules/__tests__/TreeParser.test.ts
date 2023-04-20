@@ -15,7 +15,6 @@ import parseLog, {
   LogLine,
   lineTypeMap,
   logLines,
-  lineTypeMap,
   CodeUnitStartedLine,
   CodeUnitFinishedLine,
   truncated,
