@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Timeline not showing events if the event occurs outside the `EXECUTION_STARTED` + `EXECUTION_FINISHED` events ([#180][#180])
 - Timeline incorrectly showing some `VF_APEX_CALL_START` events when dealing with ApexPage messages ([#212][#212])
+- Font sizes not correctly scaling in some places ([#238][#238])
 
 ## [1.5.2] - 2022-11-08
 
@@ -208,3 +209,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#199]: https://github.com/financialforcedev/debug-log-analyzer/issues/199
 [#219]: https://github.com/financialforcedev/debug-log-analyzer/issues/219
 [#129]: https://github.com/financialforcedev/debug-log-analyzer/issues/129
+[#238]: https://github.com/financialforcedev/debug-log-analyzer/issues/238

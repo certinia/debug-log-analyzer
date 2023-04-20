@@ -6,7 +6,7 @@
   display: inline-block;
   font-family: var(--vscode-editor-font-family);
   background-color: var(--vscode-textBlockQuote-background);
-  font-size: 8pt;
+  font-size: 0.9em;
   padding: 5px;
   margin-right: 5px;
   margin-bottom: 5px;
