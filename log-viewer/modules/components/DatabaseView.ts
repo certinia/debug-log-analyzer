@@ -10,14 +10,15 @@ import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
 
 export function renderDBGrid() {
-  const dbContainer = document.getElementById('dbContainer');
-  if (dbContainer) {
-    renderDMLTable(dbContainer);
-    renderSOQLTable(dbContainer);
-  }
+  renderDMLTable();
+  renderSOQLTable();
 }
 
-function renderDMLTable(dbContainer: HTMLElement) {
+function renderDMLTable() {
+  const dmlContainer = document.getElementById('dmlTableContainer');
+  if (!dmlContainer) {
+    return;
+  }
   const dmlLines = DatabaseAccess.instance()?.getDMLLines();
   const dbDmlCounts = document.createElement('div');
   render(
@@ -26,8 +27,8 @@ function renderDMLTable(dbContainer: HTMLElement) {
   );
   const dbDmlTable = document.createElement('div');
   dbDmlTable.id = 'dbDmlTable';
-  dbContainer.appendChild(dbDmlCounts);
-  dbContainer.appendChild(dbDmlTable);
+  dmlContainer.appendChild(dbDmlCounts);
+  dmlContainer.appendChild(dbDmlTable);
 
   let currentSelectedRow: RowComponent | null;
 
@@ -163,7 +164,11 @@ function renderDMLTable(dbContainer: HTMLElement) {
   });
 }
 
-function renderSOQLTable(dbContainer: HTMLElement) {
+function renderSOQLTable() {
+  const soqlContainer = document.getElementById('soqlTableContainer');
+  if (!soqlContainer) {
+    return;
+  }
   const soqlLines = DatabaseAccess.instance()?.getSOQLLines();
   const dbSoqlCounts = document.createElement('div');
   render(
@@ -172,8 +177,8 @@ function renderSOQLTable(dbContainer: HTMLElement) {
   );
   const dbSoqlTable = document.createElement('div');
   dbSoqlTable.id = 'dbSoqlTable';
-  dbContainer.appendChild(dbSoqlCounts);
-  dbContainer.appendChild(dbSoqlTable);
+  soqlContainer.appendChild(dbSoqlCounts);
+  soqlContainer.appendChild(dbSoqlTable);
 
   const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
   let currentSelectedRow: RowComponent | null;
