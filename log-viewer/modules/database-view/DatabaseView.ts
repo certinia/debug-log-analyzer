@@ -5,7 +5,7 @@ import { html, render } from 'lit';
 import { DatabaseAccess } from '../Database';
 import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
 
-import './CallStack';
+import '../components/CallStack';
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
 
@@ -22,7 +22,14 @@ function renderDMLTable() {
   const dmlLines = DatabaseAccess.instance()?.getDMLLines();
   const dbDmlCounts = document.createElement('div');
   render(
-    html`<database-section title="DML Statements" .dbLines=${dmlLines}></database-section>`,
+    html`<database-section title="DML Statements" .dbLines=${dmlLines}></database-section>
+      <div>
+        <strong>Group by</strong>
+        <div>
+          <input id="dbdml-groupBy" type="checkbox" checked />
+          <label for="dbdml-groupBy">DML</label>
+        </div>
+      </div>`,
     dbDmlCounts
   );
   const dbDmlTable = document.createElement('div');
@@ -91,25 +98,6 @@ function renderDMLTable() {
         bottomCalc: () => {
           return 'Total';
         },
-        headerMenu: [
-          {
-            label: (component): string => {
-              const columnName = component.getField();
-              const groupFields = dmlTable.getGroups().map((g) => g.getField());
-              const checked = groupFields.includes(columnName) ? 'checked' : '';
-              return `<input type="checkbox" ${checked}
-                        <label>Group by ${component.getDefinition().title}</label>
-                      </input>`;
-            },
-            action: (_e, component) => {
-              if (dmlTable.getGroups().length) {
-                dmlTable.setGroupBy('');
-              } else {
-                dmlTable.setGroupBy(component.getField());
-              }
-            },
-          },
-        ],
       },
       { title: 'Row Count', field: 'rowCount', sorter: 'number', width: 110, bottomCalc: 'sum' },
       {
@@ -162,6 +150,17 @@ function renderDMLTable() {
       setTimeout(goTo);
     });
   });
+
+  // todo: move to a lit element
+  document.getElementById('dbdml-groupBy')?.addEventListener('change', (event) => {
+    const checkBox = event.currentTarget as HTMLInputElement;
+
+    if (!checkBox.checked) {
+      dmlTable.setGroupBy('');
+    } else {
+      dmlTable.setGroupBy('DML');
+    }
+  });
 }
 
 function renderSOQLTable() {
@@ -172,7 +171,16 @@ function renderSOQLTable() {
   const soqlLines = DatabaseAccess.instance()?.getSOQLLines();
   const dbSoqlCounts = document.createElement('div');
   render(
-    html`<database-section title="SOQL Statements" .dbLines=${soqlLines}></database-section>`,
+    html`
+      <database-section title="SOQL Statements" .dbLines=${soqlLines}></database-section>
+      <div>
+        <strong>Group by</strong>
+        <div>
+          <input id="dbsoql-groupBy" type="checkbox" checked />
+          <label for="dbsoql-groupBy">SOQL</label>
+        </div>
+      </div>
+    `,
     dbSoqlCounts
   );
   const dbSoqlTable = document.createElement('div');
@@ -302,25 +310,6 @@ function renderSOQLTable() {
         bottomCalc: () => {
           return 'Total';
         },
-        headerMenu: [
-          {
-            label: (component): string => {
-              const columnName = component.getField();
-              const groupFields = soqlTable.getGroups().map((g) => g.getField());
-              const checked = groupFields.includes(columnName) ? 'checked' : '';
-              return `<input type="checkbox" ${checked}
-                        <label>Group by ${component.getDefinition().title}</label>
-                      </input>`;
-            },
-            action: (_e, component) => {
-              if (soqlTable.getGroups().length) {
-                soqlTable.setGroupBy('');
-              } else {
-                soqlTable.setGroupBy(component.getField());
-              }
-            },
-          },
-        ],
       },
       {
         title: 'Row Count',
@@ -385,6 +374,17 @@ function renderSOQLTable() {
     requestAnimationFrame(() => {
       setTimeout(goTo);
     });
+  });
+
+  // todo: move to a lit element
+  document.getElementById('dbsoql-groupBy')?.addEventListener('change', (event) => {
+    const groupBySOQL = event.currentTarget as HTMLInputElement;
+
+    if (!groupBySOQL.checked) {
+      soqlTable.setGroupBy('');
+    } else {
+      soqlTable.setGroupBy('SOQL');
+    }
   });
 }
 

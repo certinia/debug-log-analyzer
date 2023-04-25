@@ -15,7 +15,7 @@ export class DatabaseSection extends LitElement {
   static get styles() {
     return css`
       .dbSection {
-        padding: 10px 5px 5px 5px;
+        padding: 10px 5px 5px 0px;
       }
       .dbTitle {
         font-weight: bold;
