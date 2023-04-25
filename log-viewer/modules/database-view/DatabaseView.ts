@@ -153,13 +153,8 @@ function renderDMLTable() {
 
   // todo: move to a lit element
   document.getElementById('dbdml-groupBy')?.addEventListener('change', (event) => {
-    const checkBox = event.currentTarget as HTMLInputElement;
-
-    if (!checkBox.checked) {
-      dmlTable.setGroupBy('');
-    } else {
-      dmlTable.setGroupBy('DML');
-    }
+    const checkBox = event.target as HTMLInputElement;
+    dmlTable.setGroupBy(checkBox.checked ? 'dml' : '');
   });
 }
 
@@ -378,13 +373,8 @@ function renderSOQLTable() {
 
   // todo: move to a lit element
   document.getElementById('dbsoql-groupBy')?.addEventListener('change', (event) => {
-    const groupBySOQL = event.currentTarget as HTMLInputElement;
-
-    if (!groupBySOQL.checked) {
-      soqlTable.setGroupBy('');
-    } else {
-      soqlTable.setGroupBy('SOQL');
-    }
+    const checkBox = event.target as HTMLInputElement;
+    soqlTable.setGroupBy(checkBox.checked ? 'soql' : '');
   });
 }
 
