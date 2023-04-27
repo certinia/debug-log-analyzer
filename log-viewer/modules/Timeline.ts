@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import { showTreeNode } from './TreeView';
-import formatDuration from './Util';
+import formatDuration, { debounce } from './Util';
 import { TimedNode, Method, RootNode, TimelineKey, truncated } from './parsers/TreeParser';
 interface TimelineGroup {
   label: string;
@@ -586,7 +586,7 @@ function onMouseMove(evt: MouseEvent) {
     if (clRect) {
       lastMouseX = evt.clientX - clRect.left;
       lastMouseY = evt.clientY - clRect.top;
-      showTooltip(lastMouseX, lastMouseY);
+      debounce(showTooltip(lastMouseX, lastMouseY));
     }
   }
 }
@@ -612,6 +612,7 @@ function handleMouseDown(): void {
 }
 
 function handleMouseUp(): void {
+  debounce(showTooltip(lastMouseX, lastMouseY));
   dragging = false;
 }
 
@@ -629,7 +630,6 @@ function handleMouseMove(evt: MouseEvent) {
 
 function handleScroll(evt: WheelEvent) {
   if (!dragging) {
-    tooltip.style.display = 'none';
     evt.stopPropagation();
     const { deltaY, deltaX } = evt;
 
@@ -655,6 +655,7 @@ function handleScroll(evt: WheelEvent) {
       const maxWidth = state.zoom * timelineRoot.executionEndTime - displayWidth;
       state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX + deltaX));
     }
+    debounce(showTooltip(lastMouseX, lastMouseY));
   }
 }
 
