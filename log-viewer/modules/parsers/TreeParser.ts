@@ -835,6 +835,7 @@ class HeapAllocateLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
+    this.text = this.type + parts[3];
   }
 }
 
@@ -901,7 +902,8 @@ class UserDebugLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = this.type + ':' + parts[3] + ' ' + parts[4];
+    this.text = this.type + ' : ' + parts[3];
+    this.value = parts[4];
     this.group = this.type;
   }
 }
