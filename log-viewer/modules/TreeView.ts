@@ -204,11 +204,13 @@ function describeMethod(node: Method): Node[] {
 function renderBlock(line: LogLine) {
   const lineNode = divElem.cloneNode() as HTMLDivElement;
   lineNode.className = line instanceof Detail && line.hideable ? 'block name detail' : 'block name';
-
   lineNode.line = line;
 
-  const value = line.text || '';
-  let text = line.type + (value && value !== line.type ? ' - ' + value : '');
+  const eventText = line.text || '';
+  let text =
+    line.type +
+    (eventText && eventText !== line.type ? ' - ' + eventText : '') +
+    (line.value ? ` - ${line.value}` : '');
   text = text.replace(/ \| /g, '\n');
   if (text.endsWith('\\')) {
     text = text.slice(0, -1);
