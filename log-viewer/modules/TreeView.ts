@@ -206,18 +206,37 @@ function renderBlock(line: LogLine) {
   lineNode.className = line instanceof Detail && line.hideable ? 'block name detail' : 'block name';
   lineNode.line = line;
 
+  let valueElem;
+  if (line.value) {
+    const jsonString = toJsonString(line.value);
+    valueElem = document.createElement('code');
+    valueElem.textContent = jsonString ? JSON.stringify(jsonString, null, 2) : line.value;
+  }
+
   const eventText = line.text || '';
-  let text =
-    line.type +
-    (eventText && eventText !== line.type ? ' - ' + eventText : '') +
-    (line.value ? ` - ${line.value}` : '');
+  let text = line.type + (eventText && eventText !== line.type ? ' - ' + eventText : '');
   text = text.replace(/ \| /g, '\n');
   if (text.endsWith('\\')) {
     text = text.slice(0, -1);
   }
 
-  lineNode.textContent = text;
+  lineNode.textContent = valueElem ? text + ' - ' : text;
+  if (valueElem) {
+    lineNode.appendChild(valueElem);
+  }
   return lineNode;
+}
+
+function toJsonString(str: string): string | null {
+  let jsonStr;
+  if (str.length) {
+    try {
+      jsonStr = JSON.parse(str);
+    } catch (e) {
+      return null;
+    }
+  }
+  return jsonStr;
 }
 
 function hasCodeText(node: LogLine): boolean {
