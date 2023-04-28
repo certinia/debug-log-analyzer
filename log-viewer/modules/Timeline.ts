@@ -592,7 +592,8 @@ function onMouseMove(evt: MouseEvent) {
 }
 
 function onClickCanvas(): void {
-  if (!dragging && tooltip.style.display === 'block') {
+  const isClick = mouseDownPosition.x === lastMouseX && mouseDownPosition.y === lastMouseY;
+  if (!dragging && isClick) {
     const depth = ~~(((displayHeight - lastMouseY - state.offsetY) / realHeight) * maxY);
     const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
     if (target && target.timestamp) {
@@ -607,18 +608,23 @@ function onLeaveCanvas() {
 }
 
 let dragging = false;
+let mouseDownPosition: { x: number; y: number };
 function handleMouseDown(): void {
   dragging = true;
+  tooltip.style.display = 'none';
+  mouseDownPosition = {
+    x: lastMouseX,
+    y: lastMouseY,
+  };
 }
 
 function handleMouseUp(): void {
-  debounce(showTooltip(lastMouseX, lastMouseY));
   dragging = false;
+  debounce(showTooltip(lastMouseX, lastMouseY));
 }
 
 function handleMouseMove(evt: MouseEvent) {
   if (dragging) {
-    tooltip.style.display = 'none';
     const { movementY, movementX } = evt;
     const maxWidth = state.zoom * timelineRoot.executionEndTime - displayWidth;
     state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX - movementX));
