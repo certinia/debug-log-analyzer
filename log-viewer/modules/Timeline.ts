@@ -2,7 +2,7 @@
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
 import { showTreeNode } from './TreeView';
-import formatDuration from './Util';
+import formatDuration, { debounce } from './Util';
 import { TimedNode, Method, RootNode, TimelineKey, truncated } from './parsers/TreeParser';
 interface TimelineGroup {
   label: string;
@@ -586,13 +586,14 @@ function onMouseMove(evt: MouseEvent) {
     if (clRect) {
       lastMouseX = evt.clientX - clRect.left;
       lastMouseY = evt.clientY - clRect.top;
-      showTooltip(lastMouseX, lastMouseY);
+      debounce(showTooltip(lastMouseX, lastMouseY));
     }
   }
 }
 
 function onClickCanvas(): void {
-  if (!dragging && tooltip.style.display === 'block') {
+  const isClick = mouseDownPosition.x === lastMouseX && mouseDownPosition.y === lastMouseY;
+  if (!dragging && isClick) {
     const depth = ~~(((displayHeight - lastMouseY - state.offsetY) / realHeight) * maxY);
     const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
     if (target && target.timestamp) {
@@ -607,17 +608,23 @@ function onLeaveCanvas() {
 }
 
 let dragging = false;
+let mouseDownPosition: { x: number; y: number };
 function handleMouseDown(): void {
   dragging = true;
+  tooltip.style.display = 'none';
+  mouseDownPosition = {
+    x: lastMouseX,
+    y: lastMouseY,
+  };
 }
 
 function handleMouseUp(): void {
   dragging = false;
+  debounce(showTooltip(lastMouseX, lastMouseY));
 }
 
 function handleMouseMove(evt: MouseEvent) {
   if (dragging) {
-    tooltip.style.display = 'none';
     const { movementY, movementX } = evt;
     const maxWidth = state.zoom * timelineRoot.executionEndTime - displayWidth;
     state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX - movementX));
@@ -629,7 +636,6 @@ function handleMouseMove(evt: MouseEvent) {
 
 function handleScroll(evt: WheelEvent) {
   if (!dragging) {
-    tooltip.style.display = 'none';
     evt.stopPropagation();
     const { deltaY, deltaX } = evt;
 
@@ -655,6 +661,7 @@ function handleScroll(evt: WheelEvent) {
       const maxWidth = state.zoom * timelineRoot.executionEndTime - displayWidth;
       state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX + deltaX));
     }
+    debounce(showTooltip(lastMouseX, lastMouseY));
   }
 }
 

@@ -1,6 +1,8 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
+let requestId: number;
+
 export default function formatDuration(duration: number) {
   const text = `${~~(duration / 1000)}`; // convert from nano-seconds to micro-seconds
   const textPadded = text.length < 4 ? '0000'.substring(text.length) + text : text; // length min = 4
@@ -22,4 +24,14 @@ export function showTab(tabId: string) {
   if (tabItem) {
     tabItem.classList.add('selected');
   }
+}
+
+export function debounce(callBack: void) {
+  if (requestId) {
+    window.cancelAnimationFrame(requestId);
+  }
+
+  requestId = window.requestAnimationFrame(() => {
+    callBack;
+  });
 }
