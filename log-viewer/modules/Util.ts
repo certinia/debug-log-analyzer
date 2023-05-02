@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
  */
-let timeout: number;
+let requestId: number;
 
 export default function formatDuration(duration: number) {
   const text = `${~~(duration / 1000)}`; // convert from nano-seconds to micro-seconds
@@ -27,11 +27,11 @@ export function showTab(tabId: string) {
 }
 
 export function debounce(callBack: void) {
-  if (timeout) {
-    window.cancelAnimationFrame(timeout);
+  if (requestId) {
+    window.cancelAnimationFrame(requestId);
   }
 
-  timeout = window.requestAnimationFrame(() => {
+  requestId = window.requestAnimationFrame(() => {
     callBack;
   });
 }
