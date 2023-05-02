@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added detail panel which is shown by clicking a row which shows the call stack for the specific DML / SOQL, clicking a link will go to the main call tree tab
   - Totals shown at the bottom of each column
 - The row count to the timeline tooltip for events which have one e.g `SOQL_EXECUTE_BEGIN`, `DML_BEGIN`, `SOSL_EXECUTE_BEGIN` ([#129][#129])
+- Calltree - displaying variable value as well as variable names for `VARIABLE_ASSIGNMENT` events ([#235][#235])
+- Calltree - pretty formatting of JSON in `VARIABLE_ASSIGNMENT` events ([#235][#235])
 
 ### Changed
 
@@ -210,3 +212,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#219]: https://github.com/financialforcedev/debug-log-analyzer/issues/219
 [#129]: https://github.com/financialforcedev/debug-log-analyzer/issues/129
 [#238]: https://github.com/financialforcedev/debug-log-analyzer/issues/238
+[#235]: https://github.com/financialforcedev/debug-log-analyzer/issues/235
