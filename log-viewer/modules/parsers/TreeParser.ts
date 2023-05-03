@@ -839,7 +839,7 @@ class HeapAllocateLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = this.type + parts[3];
+    this.text = parts[3];
   }
 }
 
