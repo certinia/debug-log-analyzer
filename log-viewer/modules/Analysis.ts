@@ -59,7 +59,7 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
 export default function analyseMethods(rootMethod: RootNode) {
   const methodMap: Map<string, Metric> = new Map();
 
-  totalDuration = rootMethod.executionEndTime;
+  totalDuration = rootMethod.executionEndTime - rootMethod.timestamp;
   addNodeToMap(methodMap, rootMethod);
   metricList = [...methodMap.values()];
   return metricList; // return value for unit testing

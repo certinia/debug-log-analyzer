@@ -30,6 +30,7 @@ const typePattern = /^[A-Z_]*$/,
 
 let logLines: LogLine[] = [],
   truncated: TruncationEntry[],
+  maxSizeTimestamp: number | null = null,
   reasons: Set<string> = new Set<string>(),
   cpuUsed = 0,
   lastTimestamp = null,
@@ -278,11 +279,15 @@ export class RootNode extends Method {
     super(null, [], 'root', 'codeUnit', '');
   }
 
-  setEndTime() {
+  setTimes() {
+    this.timestamp =
+      this.children.find((child) => {
+        return child.timestamp;
+      })?.timestamp || 0;
     // We do not just want to use the very last exitStamp because it could be CUMULATIVE_USAGE which is not really part of the code execution time but does have a later time.
     let endTime;
-    const len = this.children.length - 1;
-    for (let i = len; i >= 0; i--) {
+    const reverseLen = this.children.length - 1;
+    for (let i = reverseLen; i >= 0; i--) {
       const child = this.children[i];
       // If there is no duration on a node then it is not going to be shown on the timeline anyway
       if (child instanceof TimedNode && child.exitStamp) {
@@ -593,7 +598,6 @@ class VFApexCallStartLine extends Method {
       // and they really mess with the logs so skip handling them.
       this.exitTypes = [];
     } else if (methodtext) {
-      // console.debug('hasMethod', classText, methodtext);
       this.hasValidSymbols = true;
       // method call
       const methodIndex = methodtext.indexOf('(');
@@ -2272,8 +2276,8 @@ export function getRootMethod() {
     line.loadContent?.(lineIter, stack);
     rootMethod.addChild(line);
   }
-  rootMethod.setEndTime();
-  totalDuration = rootMethod.exitStamp || 0;
+  rootMethod.setTimes();
+  totalDuration = rootMethod.exitStamp - rootMethod.timestamp;
 
   insertPackageWrappers(rootMethod);
   return rootMethod;
