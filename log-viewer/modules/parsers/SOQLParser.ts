@@ -8,8 +8,14 @@ import {
   CaseInsensitiveInputStream,
   QueryContext,
 } from '@apexdevtools/apex-parser';
-import { CharStreams, CommonTokenStream } from 'antlr4ts';
-import { ANTLRErrorListener, RecognitionException, Recognizer, Token } from 'antlr4ts';
+import {
+  ANTLRErrorListener,
+  CharStreams,
+  CommonTokenStream,
+  RecognitionException,
+  Recognizer,
+  Token,
+} from 'antlr4ts';
 
 // To understand the parser AST see https://github.com/nawforce/apex-parser/blob/master/antlr/ApexParser.g4
 // Start with the 'query' rule at ~532
