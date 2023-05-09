@@ -1966,6 +1966,7 @@ class WFTimeTriggersBeginLine extends Detail {
 
 class ExceptionThrownLine extends Detail {
   discontinuity = true;
+  acceptsText = true;
 
   constructor(parts: string[]) {
     super(parts);
