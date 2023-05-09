@@ -290,18 +290,28 @@ function renderRectangles(ctx: CanvasRenderingContext2D) {
 
 const drawRect = (rect: Rect) => {
   // nanoseconds
-  const w = rect.w * state.zoom;
+  let w = rect.w * state.zoom;
   if (w >= 0.05) {
-    const x = rect.x * state.zoom - state.offsetX;
+    let x = rect.x * state.zoom - state.offsetX;
     const y = rect.y * scaleY - state.offsetY;
     if (x < displayWidth && x + w > 0 && y > -displayHeight && y + scaleY < 0) {
+      // start of shape is outside the screen (remove from start and the end to compensate)
+      if (x < 0) {
+        w = w + x;
+        x = 0;
+      }
+      // end of shape is outside the screen (remove from end so we are not showing anything that is offscreen)
+      const widthOffScreen = x + w - displayWidth;
+      if (widthOffScreen > 0) {
+        w = w - widthOffScreen;
+      }
+
       ctx?.rect(x, y, w, scaleY);
     }
   }
 };
 
 function drawTruncation(ctx: CanvasRenderingContext2D) {
-  // TODO: Fix global event overlap / wobble when scolling left + right when zoomed in
   const len = truncated.length;
   if (!len) {
     return;
@@ -312,11 +322,23 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
     const thisEntry = truncated[i++],
       nextEntry = truncated[i] ?? {},
       startTime = thisEntry.timestamp,
-      endTime = nextEntry.timestamp ?? timelineRoot.executionEndTime;
+      endTime = nextEntry.timestamp ?? timelineRoot.exitStamp;
+
+    let x = startTime * state.zoom - state.offsetX;
+    let w = (endTime - startTime) * state.zoom;
+
+    // start of shape is outside the screen (remove from start and the end to compensate)
+    if (x < 0) {
+      w = w + x;
+      x = 0;
+    }
+    // end of shape is outside the screen (remove from end so we are not showing anything that is offscreen)
+    const widthOffScreen = x + w - displayWidth;
+    if (widthOffScreen > 0) {
+      w = w - widthOffScreen;
+    }
 
     ctx.fillStyle = thisEntry.color;
-    const x = startTime * state.zoom - state.offsetX;
-    const w = (endTime - startTime) * state.zoom;
     ctx.fillRect(x, -displayHeight, w, displayHeight);
   }
 }
@@ -343,7 +365,7 @@ function resize() {
     canvas.height = displayHeight = newHeight;
     ctx?.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-lefts
 
-    const newDefaultZoom = newWidth / timelineRoot.executionEndTime;
+    const newDefaultZoom = newWidth / timelineRoot.exitStamp;
     // defaults if not set yet
     state.defaultZoom ||= state.zoom ||= newDefaultZoom;
 
@@ -520,7 +542,7 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
     const thisEntry = truncated[i++],
       nextEntry = truncated[i] ?? {},
       startTime = thisEntry.timestamp,
-      endTime = nextEntry.timestamp ?? timelineRoot.executionEndTime,
+      endTime = nextEntry.timestamp ?? timelineRoot.exitStamp,
       startX = startTime * state.zoom - state.offsetX,
       endX = endTime * state.zoom - state.offsetX;
 
@@ -626,10 +648,10 @@ function handleMouseUp(): void {
 function handleMouseMove(evt: MouseEvent) {
   if (dragging) {
     const { movementY, movementX } = evt;
-    const maxWidth = state.zoom * timelineRoot.executionEndTime - displayWidth;
+    const maxWidth = state.zoom * timelineRoot.exitStamp - displayWidth;
     state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX - movementX));
 
-    const maxVertOffset = ~~(realHeight - displayHeight + displayHeight / 4);
+    const maxVertOffset = realHeight - displayHeight + displayHeight / 4;
     state.offsetY = Math.min(0, Math.max(-maxVertOffset, state.offsetY - movementY));
   }
 }
@@ -652,13 +674,13 @@ function handleScroll(evt: WheelEvent) {
       if (state.zoom !== oldZoom) {
         const timePosBefore = (lastMouseX + state.offsetX) / oldZoom;
         const newOffset = timePosBefore * state.zoom - lastMouseX;
-        const maxWidth = state.zoom * timelineRoot.executionEndTime - displayWidth;
+        const maxWidth = state.zoom * timelineRoot.exitStamp - displayWidth;
         state.offsetX = Math.max(0, Math.min(maxWidth, newOffset));
       }
     }
     // movement when zooming
     else {
-      const maxWidth = state.zoom * timelineRoot.executionEndTime - displayWidth;
+      const maxWidth = state.zoom * timelineRoot.exitStamp - displayWidth;
       state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX + deltaX));
     }
     debounce(showTooltip(lastMouseX, lastMouseY));
