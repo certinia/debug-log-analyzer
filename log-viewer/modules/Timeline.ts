@@ -312,7 +312,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
     const thisEntry = truncated[i++],
       nextEntry = truncated[i] ?? {},
       startTime = thisEntry.timestamp,
-      endTime = nextEntry.timestamp ?? timelineRoot.executionEndTime;
+      endTime = nextEntry.timestamp ?? timelineRoot.exitStamp;
 
     ctx.fillStyle = thisEntry.color;
     const x = startTime * state.zoom - state.offsetX;
@@ -343,7 +343,7 @@ function resize() {
     canvas.height = displayHeight = newHeight;
     ctx?.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-lefts
 
-    const newDefaultZoom = newWidth / timelineRoot.executionEndTime;
+    const newDefaultZoom = newWidth / timelineRoot.exitStamp;
     // defaults if not set yet
     state.defaultZoom ||= state.zoom ||= newDefaultZoom;
 
@@ -520,7 +520,7 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
     const thisEntry = truncated[i++],
       nextEntry = truncated[i] ?? {},
       startTime = thisEntry.timestamp,
-      endTime = nextEntry.timestamp ?? timelineRoot.executionEndTime,
+      endTime = nextEntry.timestamp ?? timelineRoot.exitStamp,
       startX = startTime * state.zoom - state.offsetX,
       endX = endTime * state.zoom - state.offsetX;
 
@@ -626,7 +626,7 @@ function handleMouseUp(): void {
 function handleMouseMove(evt: MouseEvent) {
   if (dragging) {
     const { movementY, movementX } = evt;
-    const maxWidth = state.zoom * timelineRoot.executionEndTime - displayWidth;
+    const maxWidth = state.zoom * timelineRoot.exitStamp - displayWidth;
     state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX - movementX));
 
     const maxVertOffset = ~~(realHeight - displayHeight + displayHeight / 4);
@@ -652,13 +652,13 @@ function handleScroll(evt: WheelEvent) {
       if (state.zoom !== oldZoom) {
         const timePosBefore = (lastMouseX + state.offsetX) / oldZoom;
         const newOffset = timePosBefore * state.zoom - lastMouseX;
-        const maxWidth = state.zoom * timelineRoot.executionEndTime - displayWidth;
+        const maxWidth = state.zoom * timelineRoot.exitStamp - displayWidth;
         state.offsetX = Math.max(0, Math.min(maxWidth, newOffset));
       }
     }
     // movement when zooming
     else {
-      const maxWidth = state.zoom * timelineRoot.executionEndTime - displayWidth;
+      const maxWidth = state.zoom * timelineRoot.exitStamp - displayWidth;
       state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX + deltaX));
     }
     debounce(showTooltip(lastMouseX, lastMouseY));
