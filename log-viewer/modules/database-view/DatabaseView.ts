@@ -3,8 +3,11 @@ import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 import { html, render } from 'lit';
 
 import { DatabaseAccess } from '../Database';
-import { SOQLExecuteExplainLine } from '../parsers/TreeParser';
-import './CallStack.ts';
+import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
+
+import '../components/CallStack';
+import './DatabaseSOQLDetailPanel';
+import './DatabaseSection';
 
 export function renderDBGrid() {
   renderDMLTable();
@@ -12,9 +15,30 @@ export function renderDBGrid() {
 }
 
 function renderDMLTable() {
+  const dmlContainer = document.getElementById('dmlTableContainer');
+  if (!dmlContainer) {
+    return;
+  }
+  const dmlLines = DatabaseAccess.instance()?.getDMLLines();
+  const dbDmlCounts = document.createElement('div');
+  render(
+    html`<database-section title="DML Statements" .dbLines=${dmlLines}></database-section>
+      <div>
+        <strong>Group by</strong>
+        <div>
+          <input id="dbdml-groupBy" type="checkbox" checked />
+          <label for="dbdml-groupBy">DML</label>
+        </div>
+      </div>`,
+    dbDmlCounts
+  );
+  const dbDmlTable = document.createElement('div');
+  dbDmlTable.id = 'dbDmlTable';
+  dmlContainer.appendChild(dbDmlCounts);
+  dmlContainer.appendChild(dbDmlTable);
+
   let currentSelectedRow: RowComponent | null;
 
-  const dmlLines = DatabaseAccess.instance()?.getDMLLines();
   const dmlData: unknown[] = [];
   let dmlText: string[] = [];
   if (dmlLines) {
@@ -32,7 +56,7 @@ function renderDMLTable() {
     dmlText = sortByFrequency(dmlText);
   }
 
-  const dmlTable = new Tabulator('#dbDmlTable', {
+  const dmlTable = new Tabulator(dbDmlTable, {
     data: dmlData, //set initial table data
     layout: 'fitColumns',
     placeholder: 'No DML statements found',
@@ -47,7 +71,7 @@ function renderDMLTable() {
       });
 
       const newCount = hasDetail ? count - 1 : count;
-      return '<div class="db-group-title">' + value + '</div>' + `<span>(${newCount} DML)</span>`;
+      return `<div class="db-group-title" title="${value}">${value}</div><span>(${newCount} DML)</span>`;
     },
     groupToggleElement: 'header',
     selectable: 1,
@@ -74,25 +98,6 @@ function renderDMLTable() {
         bottomCalc: () => {
           return 'Total';
         },
-        headerMenu: [
-          {
-            label: (component): string => {
-              const columnName = component.getField();
-              const groupFields = dmlTable.getGroups().map((g) => g.getField());
-              const checked = groupFields.includes(columnName) ? 'checked' : '';
-              return `<input type="checkbox" ${checked}
-                        <label>Group by ${component.getDefinition().title}</label>
-                      </input>`;
-            },
-            action: (_e, component) => {
-              if (dmlTable.getGroups().length) {
-                dmlTable.setGroupBy('');
-              } else {
-                dmlTable.setGroupBy(component.getField());
-              }
-            },
-          },
-        ],
       },
       { title: 'Row Count', field: 'rowCount', sorter: 'number', width: 110, bottomCalc: 'sum' },
       {
@@ -145,9 +150,40 @@ function renderDMLTable() {
       setTimeout(goTo);
     });
   });
+
+  // todo: move to a lit element
+  document.getElementById('dbdml-groupBy')?.addEventListener('change', (event) => {
+    const checkBox = event.target as HTMLInputElement;
+    dmlTable.setGroupBy(checkBox.checked ? 'dml' : '');
+  });
 }
 
 function renderSOQLTable() {
+  const soqlContainer = document.getElementById('soqlTableContainer');
+  if (!soqlContainer) {
+    return;
+  }
+  const soqlLines = DatabaseAccess.instance()?.getSOQLLines();
+  const dbSoqlCounts = document.createElement('div');
+  render(
+    html`
+      <database-section title="SOQL Statements" .dbLines=${soqlLines}></database-section>
+      <div>
+        <strong>Group by</strong>
+        <div>
+          <input id="dbsoql-groupBy" type="checkbox" checked />
+          <label for="dbsoql-groupBy">SOQL</label>
+        </div>
+      </div>
+    `,
+    dbSoqlCounts
+  );
+  const dbSoqlTable = document.createElement('div');
+  dbSoqlTable.id = 'dbSoqlTable';
+  soqlContainer.appendChild(dbSoqlCounts);
+  soqlContainer.appendChild(dbSoqlTable);
+
+  const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
   let currentSelectedRow: RowComponent | null;
   interface GridSOQLData {
     isSelective: boolean | null;
@@ -159,7 +195,10 @@ function renderSOQLTable() {
     timestamp: number;
   }
 
-  const soqlLines = DatabaseAccess.instance()?.getSOQLLines();
+  soqlLines?.forEach((line) => {
+    timestampToSOQl.set(line.timestamp, line);
+  });
+
   const soqlData: unknown[] = [];
   let soqlText: string[] = [];
   if (soqlLines) {
@@ -182,7 +221,7 @@ function renderSOQLTable() {
     soqlText = sortByFrequency(soqlText);
   }
 
-  const soqlTable = new Tabulator('#dbSoqlTable', {
+  const soqlTable = new Tabulator(dbSoqlTable, {
     data: soqlData,
     layout: 'fitColumns',
     placeholder: 'No SOQL queries found',
@@ -197,12 +236,9 @@ function renderSOQLTable() {
       });
 
       const newCount = hasDetail ? count - 1 : count;
-      return (
-        '<div class="db-group-title">' +
-        value +
-        '</div>' +
-        `<span>(${newCount} ${newCount > 1 ? 'Queries' : 'Query'})</span>`
-      );
+      return `<div class="db-group-title" title="${value}">${value}</div><span>(${newCount} ${
+        newCount > 1 ? 'Queries' : 'Query'
+      })</span>`;
     },
     groupToggleElement: 'header',
     selectable: 1,
@@ -269,25 +305,6 @@ function renderSOQLTable() {
         bottomCalc: () => {
           return 'Total';
         },
-        headerMenu: [
-          {
-            label: (component): string => {
-              const columnName = component.getField();
-              const groupFields = soqlTable.getGroups().map((g) => g.getField());
-              const checked = groupFields.includes(columnName) ? 'checked' : '';
-              return `<input type="checkbox" ${checked}
-                        <label>Group by ${component.getDefinition().title}</label>
-                      </input>`;
-            },
-            action: (_e, component) => {
-              if (soqlTable.getGroups().length) {
-                soqlTable.setGroupBy('');
-              } else {
-                soqlTable.setGroupBy(component.getField());
-              }
-            },
-          },
-        ],
       },
       {
         title: 'Row Count',
@@ -315,7 +332,7 @@ function renderSOQLTable() {
     rowFormatter: function (row) {
       const data = row.getData();
       if (data.isDetail && data.timestamp) {
-        const detailContainer = createDetailPanel(data.timestamp);
+        const detailContainer = createSOQLDetailPanel(data.timestamp, timestampToSOQl);
         row.getElement().replaceChildren(detailContainer);
       }
     },
@@ -353,14 +370,37 @@ function renderSOQLTable() {
       setTimeout(goTo);
     });
   });
+
+  // todo: move to a lit element
+  document.getElementById('dbsoql-groupBy')?.addEventListener('change', (event) => {
+    const checkBox = event.target as HTMLInputElement;
+    soqlTable.setGroupBy(checkBox.checked ? 'soql' : '');
+  });
 }
 
 function createDetailPanel(timestamp: number) {
-  const stackContainer = document.createElement('div');
-  render(html`<call-stack timestamp=${timestamp}></call-stack>`, stackContainer);
   const detailContainer = document.createElement('div');
   detailContainer.className = 'soqlDBDetailView';
-  detailContainer.appendChild(stackContainer);
+  render(html`<call-stack timestamp=${timestamp}></call-stack>`, detailContainer);
+
+  return detailContainer;
+}
+
+function createSOQLDetailPanel(
+  timestamp: number,
+  timestampToSOQl: Map<number, SOQLExecuteBeginLine>
+) {
+  const detailContainer = document.createElement('div');
+  detailContainer.className = 'soqlDBDetailView';
+
+  const soqlLine = timestampToSOQl.get(timestamp);
+  render(
+    html`<db-soql-detail-panel
+      timestamp=${timestamp}
+      soql=${soqlLine?.text}
+    ></db-soql-detail-panel>`,
+    detailContainer
+  );
 
   return detailContainer;
 }
