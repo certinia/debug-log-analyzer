@@ -224,7 +224,6 @@ export class Method extends TimedNode {
       let line;
 
       stack.push(this);
-
       while ((line = lineIter.peek())) {
         if (line.discontinuity) {
           // discontinuities are stack unwinding (caused by Exceptions)
@@ -239,18 +238,26 @@ export class Method extends TimedNode {
           break;
         }
 
+        if (maxSizeTimestamp && discontinuity && line.timestamp > maxSizeTimestamp) {
+          this.isTruncated = true;
+          break;
+        }
+
         lineIter.fetch(); // it's a child - consume the line
         lastTimestamp = line.timestamp;
         line.loadContent?.(lineIter, stack);
         this.addChild(line);
       }
 
-      if (!line) {
+      if (!line || this.isTruncated) {
         // truncated method - terminate at the end of the log
         this.exitStamp = lastTimestamp;
 
-        // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT`
+        // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
         truncateLog(lastTimestamp, 'Unexpected-End', 'unexpected');
+        if (this.isTruncated) {
+          updateTruncated(lastTimestamp, 'Max-Size-reached', 'skip');
+        }
         this.isTruncated = true;
       }
 
@@ -320,7 +327,25 @@ export function truncateLog(timestamp: number, reason: string, colorKey: Truncat
     // default to error is probably the safest if we have no matching color for the type
     const color = truncateColor.get(colorKey) || TruncationColor.error;
     truncated.push(new TruncationEntry(timestamp, reason, color));
+
+    if (reason === 'Max-Size-reached') {
+      maxSizeTimestamp = timestamp;
+    }
+
+    truncated.sort((a, b) => a.timestamp - b.timestamp);
   }
+}
+
+function updateTruncated(timestamp: number, reason: string, colorKey: TruncateKey) {
+  const elem = truncated.findIndex((item) => {
+    return item.reason === reason;
+  });
+  if (elem > -1) {
+    truncated.splice(elem, 1);
+  }
+  reasons.delete(reason);
+
+  truncateLog(timestamp, reason, colorKey);
 }
 
 export function parseObjectNamespace(text: string): string {
