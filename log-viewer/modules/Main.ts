@@ -161,12 +161,7 @@ async function displayLog(log: string, name: string, path: string) {
   await setStatus(name, path, 'Rendering...');
 
   timer('renderViews');
-  await Promise.all([
-    renderTreeView(rootMethod),
-    renderTimeline(rootMethod),
-    renderAnalysis(),
-    // renderDb(),
-  ]);
+  await Promise.all([renderTreeView(rootMethod), renderTimeline(rootMethod), renderAnalysis()]);
 
   timer('');
   setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');
