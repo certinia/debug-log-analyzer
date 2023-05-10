@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
+ * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import parseLog, {
   getRootMethod,
@@ -94,7 +94,7 @@ describe('parseLine tests', () => {
 describe('parseLog tests', () => {
   it('Should parse between EXECUTION_STARTED and EXECUTION_FINISHED and return an iterator', async () => {
     const log =
-      '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|jwilson@57dev.financialforce.com|Greenwich Mean Time|GMT+01:00\n' +
+      '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|user@example.com|Greenwich Mean Time|GMT+01:00\n' +
       '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
       '09:18:22.6 (6586704)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\n' +
       '09:19:13.82 (51592737891)|CODE_UNIT_FINISHED|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\n' +
@@ -110,7 +110,7 @@ describe('parseLog tests', () => {
 
   it('Should parse between EXECUTION_STARTED and EXECUTION_FINISHED for CRLF (\r\n)', async () => {
     const log =
-      '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|jwilson@57dev.financialforce.com|Greenwich Mean Time|GMT+01:00\r\n' +
+      '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|user@example.com|Greenwich Mean Time|GMT+01:00\r\n' +
       '09:18:22.6 (6574780)|EXECUTION_STARTED\r\n' +
       '09:18:22.6 (6586704)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\r\n' +
       '09:19:13.82 (51592737891)|CODE_UNIT_FINISHED|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\r\n' +
@@ -289,7 +289,7 @@ describe('parseLog tests', () => {
 
   it('should parse SOQL lines', async () => {
     const log =
-      '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|jwilson@57dev.financialforce.com|Greenwich Mean Time|GMT+01:00\r\n' +
+      '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|user@example.com|Greenwich Mean Time|GMT+01:00\r\n' +
       '09:18:22.6 (6574780)|EXECUTION_STARTED\r\n' +
       '06:22:49.429 (15821966627)|SOQL_EXECUTE_BEGIN|[895]|Aggregations:2|SELECT Id FROM MySObject__c WHERE Id = :recordId\n' +
       '06:22:49.429 (15861642580)|SOQL_EXECUTE_EXPLAIN|[895]|TableScan on MySObject__c : [MyField__c, AnotherField__c], cardinality: 2, sobjectCardinality: 2, relativeCost 1.3\n' +
