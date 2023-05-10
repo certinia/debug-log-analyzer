@@ -153,7 +153,7 @@ Thanks to the everyone who has contributed
 ---
 
 <p align="center">
-Copyright &copy; FinancialForce.com, inc. All rights reserved.
+Copyright &copy; Certinia Inc. All rights reserved.
 </p>
 <p align="center">
   <a href="https://opensource.org/licenses/BSD-3-Clause">
