@@ -7,7 +7,7 @@ import parseLog, { getRootMethod } from '../parsers/TreeParser';
 describe('Analyse database tests', () => {
   it('Only DML and SOQL are collected', async () => {
     const log =
-      '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|jwilson@57dev.financialforce.com|Greenwich Mean Time|GMT+01:00\n' +
+      '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|user@example.com|Greenwich Mean Time|GMT+01:00\n' +
       '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
       '09:18:22.6 (6586704)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\n' +
       '17:33:36.2 (1672655920)|SOQL_EXECUTE_BEGIN|[198]|Aggregations:0|SELECT Id FROM Account\n' +
