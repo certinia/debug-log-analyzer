@@ -5,7 +5,7 @@
 [![Installs](https://vsmarketplacebadges.dev/installs-short/financialforce.lana.svg)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
 [![Ratings](https://vsmarketplacebadges.dev/rating-short/financialforce.lana.svg)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
 
-Apex Log Analyzer makes performance analysis of Salesforce debug logs much easier and quicker. It provides visualization of code execution via a Flamegraph and Calltree and helps identify performance and SOQL/DML problems via Method and Database Analysis.
+Apex Log Analyzer makes performance analysis of Salesforce debug logs much easier and quicker. It provides visualization of code execution via a Flame chart and Calltree and helps identify performance and SOQL/DML problems via Method and Database Analysis.
 
 ![preview](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/lana-preview.gif)
 
@@ -62,7 +62,7 @@ With the `.log` file open in VSCode.
 
 ## Features
 
-### Timeline / Flame graph
+### Timeline / Flame chart
 
 ![timeline](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/timeline-lana.png)
 
