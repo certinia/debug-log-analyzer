@@ -9,27 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Added
 
-- Breadcrumbs shown above the calltree when clicking a row ([#142][#142])
-- `Log: Show Apex Log Analysis` code lens to the top of the currently open log file ([#199][#199])
-  - This is a faster way to open the analysis
-- Support for more file types when showing the analysis ([#199][#199])
-  - The analysis can now be shown for any `.log` or `.txt` file that starts with the Apex debug log header
-  - e.g `57.0 APEX_CODE,FINE;APEX_PROFILING,FINE;CALLOUT,NONE;DB,FINEST;NBA,INFO;SYSTEM,DEBUG;VALIDATION,INFO;VISUALFORCE,FINE;WAVE,INFO;WORKFLOW,INFO`
 - Redesigned Database tab ([#219][#219])
   - All columns are sortable ascending /descending by clicking the header
   - Added columns DML/ SOQL, Row Count, Total Time
   - Added specific columns for SOQL Selectivity + Aggregations
   - Added detail panel which is shown by clicking a row which shows the call stack for the specific DML / SOQL, clicking a link will go to the main call tree tab
+  - The detail panel also shows a list of potential SOQL performance issues
   - Totals shown at the bottom of each column
+  - SOQL/ DML is grouped by name by default, grouping can be removed to show the SOQL/ DML as a flat list
+- `Log: Show Apex Log Analysis` code lens to the top of the currently open log file ([#199][#199])
+  - This is a faster way to open the analysis
+- Support for more file types when opening the analysis ([#199][#199])
+  - The analysis can now be shown for any `.log` or `.txt` file that starts with the Apex debug log header
+  - e.g `57.0 APEX_CODE,FINE;APEX_PROFILING,FINE;CALLOUT,NONE;DB,FINEST;NBA,INFO;SYSTEM,DEBUG;VALIDATION,INFO;VISUALFORCE,FINE;WAVE,INFO;WORKFLOW,INFO`
 - The row count to the timeline tooltip for events which have one e.g `SOQL_EXECUTE_BEGIN`, `DML_BEGIN`, `SOSL_EXECUTE_BEGIN` ([#129][#129])
+- Calltree - Breadcrumbs shown at the top when clicking a row ([#142][#142])
 - Calltree - displaying variable value as well as variable names for `VARIABLE_ASSIGNMENT` events ([#235][#235])
 - Calltree - pretty formatting of JSON in `VARIABLE_ASSIGNMENT` events ([#235][#235])
 
 ### Changed
 
 - Goto code from click to CMD/CTRL and click. Breadcrumbs are shown on click instead ([#142][#142])
-- End time of events that have a start before `MAXIMUM DEBUG LOG SIZE REACHED` but no end event, will now have their duration end before the `MAXIMUM DEBUG LOG SIZE REACHED` instead of extending to the very end of the log ([#264][#264])
-  - This provides a more accurate view of what is happening in these cases since we can not know what occured in the `MAXIMUM DEBUG LOG SIZE REACHED` gap.
+- End time of events that start before `MAXIMUM DEBUG LOG SIZE REACHED` but have no matching end event, will now have their duration end before the `MAXIMUM DEBUG LOG SIZE REACHED` instead of extending to the very end of the log ([#264][#264])
+  - This provides more accurate durations overall since we can not know what occured duration the `MAXIMUM DEBUG LOG SIZE REACHED` gap.
 
 ### Fixed
 
