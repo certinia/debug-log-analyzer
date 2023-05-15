@@ -28,13 +28,13 @@ npm ci
 
 ### Build and bundle
 
-Run the folloing command to do a quick build of the bundles. This will skip some of the typechecking.
+Run the following command to do a quick build of the bundles. This will skip the minfication step.
 
 ```zsh
 npm run build:dev
 ```
 
-or to do a build with full typechecking of all `.d.ts` files, use:
+or to do a production ready build, use:
 
 ```zsh
 npm run build
