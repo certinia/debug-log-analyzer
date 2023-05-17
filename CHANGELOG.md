@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Goto code from click to CMD/CTRL and click. Breadcrumbs are shown on click instead ([#142][#142])
 - End time of events that start before `MAXIMUM DEBUG LOG SIZE REACHED` but have no matching end event, will now have their duration end before the `MAXIMUM DEBUG LOG SIZE REACHED` instead of extending to the very end of the log ([#264][#264])
-  - This provides more accurate durations overall since we can not know what occured duration the `MAXIMUM DEBUG LOG SIZE REACHED` gap.
+  - This provides more accurate durations overall because we can not know what occured during the `MAXIMUM DEBUG LOG SIZE REACHED` gap.
 
 ### Fixed
 
