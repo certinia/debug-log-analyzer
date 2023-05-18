@@ -17,8 +17,8 @@
   },
   "scripts": {
     "build": "NODE_ENV=production npm run build:dev",
-    "build:dev": "rm -rf lana/out && rollup -c rollup.config.js",
-    "watch": "rm -rf lana/out && rollup -w -c rollup.config.js",
+    "build:dev": "rm -rf lana/out && rollup -c rollup.config.mjs",
+    "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",
     "prepare": "husky install",
     "lint": "eslint . --ext ts",
     "test": "jest",

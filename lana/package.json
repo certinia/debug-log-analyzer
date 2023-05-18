@@ -147,9 +147,9 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "npm run build --prefix ..",
-    "local-compile": "rm -rf out && rollup -c rollup.config.js",
+    "local-compile": "rm -rf out && rollup -c rollup.config.mjs",
     "prettier-format": "prettier 'src/**/*.ts' --write",
-    "watch": "rollup -w -c rollup.config.js",
+    "watch": "rollup -w -c rollup.config.mjs",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "log-viewer": "npm run log-viewer-build && npm run log-viewer-copy",
