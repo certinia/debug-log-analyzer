@@ -1,17 +1,8 @@
-/** @type {import('ts-jest/dist/types').InitialOptionsTsJest} */
+/** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
   projects: [
     {
       displayName: 'log-viewer',
-      globals: {
-        'ts-jest': {
-          isolatedModules: true,
-          tsconfig: {
-            // allow js in typescript
-            allowJs: true,
-          },
-        },
-      },
       moduleNameMapper: {
         '^.+\\.(css|less)$': '<rootDir>/resources/css/stub.js',
       },
@@ -20,7 +11,16 @@ module.exports = {
       preset: 'ts-jest',
       transform: {
         // transform files with ts-jest
-        '^.+\\.(ts|js)?$': 'ts-jest',
+        '^.+\\.(ts|js)?$': [
+          'ts-jest',
+          {
+            isolatedModules: true,
+            tsconfig: {
+              // allow js in typescript
+              allowJs: true,
+            },
+          },
+        ],
       },
       transformIgnorePatterns: [
         // allow lit/@lit transformation

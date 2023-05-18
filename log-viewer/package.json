@@ -21,7 +21,6 @@
     "@rollup/plugin-node-resolve": "^15.0.2",
     "@rollup/plugin-terser": "^0.4.0",
     "@rollup/plugin-typescript": "^11.1.1",
-    "@types/jest": "^28.x.x",
     "@types/tabulator-tables": "^5.4.5",
     "@typescript-eslint/eslint-plugin": "^5.x.x",
     "@typescript-eslint/parser": "^5.x.x",
@@ -29,15 +28,12 @@
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-prettier": "^4.2.1",
     "http-server": "^14.x.x",
-    "jest": "^28.x.x",
-    "jest-environment-jsdom": "^28.x.x",
     "node-sass": "^8.0.0",
     "postcss": "^8.0.0",
     "prettier": "^2.7.1",
     "rollup": "^3.22.0",
     "rollup-plugin-polyfill-node": "^0.12.0",
     "rollup-plugin-postcss": "^4.0.0",
-    "ts-jest": "^28.0.0",
     "tslib": "^2.0.0",
     "typescript": "^4.0.0"
   }
