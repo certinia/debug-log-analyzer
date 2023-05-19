@@ -99,13 +99,13 @@ settings.json
 
 ```json
 "lana.timeline.colors": {
-  "Code Unit": "#6BAD68",
-  "SOQL": "#4B9D6E",
-  "Method": "#328C72",
-  "Flow": "#237A72",
-  "DML": "#22686D",
-  "Workflow": "#285663",
-  "System Method": "#2D4455"
+  "Code Unit": "#88AE58",
+  "Workflow": "#51A16E",
+  "Method": "#2B8F81",
+  "Flow": "#337986",
+  "DML": "#285663",
+  "SOQL": "#5D4963",
+  "System Method": "#5C3444"
 }
 ```
 
