@@ -1,4 +1,3 @@
-/** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
   projects: [
     {
@@ -8,25 +7,16 @@ module.exports = {
       },
       rootDir: '<rootDir>/log-viewer',
       testEnvironment: 'node',
-      preset: 'ts-jest',
       transform: {
         // transform files with ts-jest
-        '^.+\\.(ts|js)?$': [
-          'ts-jest',
-          {
-            isolatedModules: true,
-            tsconfig: {
-              // allow js in typescript
-              allowJs: true,
-            },
-          },
-        ],
+        '^.+\\.(ts|js)?$': '@swc/jest',
       },
       transformIgnorePatterns: [
         // allow lit/@lit transformation
         '<rootDir>/node_modules/(?!@?lit)',
       ],
       testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/out/'],
+      extensionsToTreatAsEsm: ['.ts', '.tsx'],
     },
   ],
 };
