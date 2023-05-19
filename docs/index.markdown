@@ -4,7 +4,7 @@ For best results we recommend setting Apex Code logging to FINE or better.
 
 ### The "Timeline" Tab
 
-This tab shows the call tree as a timeline graph. Time runs left-to-right and nested calls run bottom-to-top. A color key at the bottom of the graph shows the meaning of the colors used for types of call. Information about nodes on the graph is shown as a tooltip when hovering the mouse over a node.
+This tab shows the call tree as a timeline chart. Time runs left-to-right and nested calls run bottom-to-top. A color key at the bottom of the chart shows the meaning of the colors used for types of call. Information about nodes on the chart is shown as a tooltip when hovering the mouse over a node.
 
 Clicking on a timeline node will take you to the entry in the "Call Tree".
 

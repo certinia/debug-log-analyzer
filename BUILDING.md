@@ -2,7 +2,7 @@
 
 The extension source code is written in [TypeScript](https://www.typescriptlang.org/). This is compiled into Javascript as part of the build process. To re-build from source install the prerequisites and then follow the building instructions.
 
-The lana directory contain the extension source code. The log-viewer directory contains the source code for the webview displayed by the extension. This includes the code to parse log files and display data such as the flamegraph.
+The lana directory contain the extension source code. The log-viewer directory contains the source code for the webview displayed by the extension. This includes the code to parse log files and display data such as the flame chart.
 
 ## Prerequisites
 

@@ -22,9 +22,9 @@
     "salesforce"
   ],
   "main": "out/Main.js",
-  "icon": "logo.png",
+  "icon": "certinia-icon-color.png",
   "galleryBanner": {
-    "color": "#1e252b",
+    "color": "#000000",
     "theme": "dark"
   },
   "publisher": "FinancialForce",
