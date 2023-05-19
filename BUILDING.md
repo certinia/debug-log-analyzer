@@ -2,7 +2,7 @@
 
 The extension source code is written in [TypeScript](https://www.typescriptlang.org/). This is compiled into Javascript as part of the build process. To re-build from source install the prerequisites and then follow the building instructions.
 
-The lana directory contain the extension source code. The log-viewer directory contains the source code for the webview displayed by the extension. This includes the code to parse log files and display data such as the flamegraph.
+The lana directory contain the extension source code. The log-viewer directory contains the source code for the webview displayed by the extension. This includes the code to parse log files and display data such as the flame chart.
 
 ## Prerequisites
 
@@ -28,13 +28,13 @@ npm ci
 
 ### Build and bundle
 
-Run the folloing command to do a quick build of the bundles. This will skip some of the typechecking.
+Run the following command to do a quick build of the bundles. This will skip the minfication step.
 
 ```zsh
 npm run build:dev
 ```
 
-or to do a build with full typechecking of all `.d.ts` files, use:
+or to do a production ready build, use:
 
 ```zsh
 npm run build

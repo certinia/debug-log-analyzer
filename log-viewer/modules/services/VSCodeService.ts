@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 FinancialForce.com, inc. All rights reserved.
+ * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
 
 declare function acquireVsCodeApi(): VSCodeAPI;

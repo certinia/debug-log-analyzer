@@ -1,7 +1,7 @@
 {
   "name": "lana",
   "displayName": "Apex Log Analyzer",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "description": "Analyzer for Salesforce debug logs - Visualize code execution via a Flame graph and identify performance and SOQL/DML problems via Method and Database analysis",
   "keywords": [
     "apex",
@@ -22,9 +22,9 @@
     "salesforce"
   ],
   "main": "out/Main.js",
-  "icon": "logo.png",
+  "icon": "certinia-icon-color.png",
   "galleryBanner": {
-    "color": "#1e252b",
+    "color": "#000000",
     "theme": "dark"
   },
   "publisher": "FinancialForce",
@@ -104,37 +104,37 @@
           "properties": {
             "Code Unit": {
               "type": "string",
-              "default": "#6BAD68",
+              "default": "#88AE58",
               "description": "Hex color for Code Unit timeline events."
             },
-            "SOQL": {
+            "Workflow": {
               "type": "string",
-              "default": "#4B9D6E",
-              "description": "Hex color for SOQL timeline events."
+              "default": "#51A16E",
+              "description": "Hex color for Workflow timeline events."
             },
             "Method": {
               "type": "string",
-              "default": "#328C72",
+              "default": "#2B8F81",
               "description": "Hex color for Method timeline events."
             },
             "Flow": {
               "type": "string",
-              "default": "#237A72",
+              "default": "#337986",
               "description": "Hex color for Flow timeline events."
             },
             "DML": {
               "type": "string",
-              "default": "#22686D",
+              "default": "#285663",
               "description": "Hex color for DML timeline events."
             },
-            "Workflow": {
+            "SOQL": {
               "type": "string",
-              "default": "#285663",
-              "description": "Hex color for Workflow timeline events."
+              "default": "#5D4963",
+              "description": "Hex color for SOQL timeline events."
             },
             "System Method": {
               "type": "string",
-              "default": "#2D4455",
+              "default": "#5C3444",
               "description": "Hex color for System Method timeline events."
             }
           },
