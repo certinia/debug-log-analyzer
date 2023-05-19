@@ -64,7 +64,7 @@ With the `.log` file open in VSCode.
 
 ### Timeline / Flame chart
 
-![timeline](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/v1.6/timeline-lana.png)
+![timeline](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/timeline-lana.png)
 
 The Timeline shows a visualization of code execution during a request’s execution. Each color represents a different Salesforce event type e.g DB, Method, SOQL etc. The length of a bar relates to realtime taken e.g a longer bar means that method took longer.
 
@@ -73,7 +73,7 @@ The Timeline shows a visualization of code execution during a request’s execut
 - Scroll left and right on the mouse to move the time line left are right, when zoomed
 - Click the mouse down and drag to move the timeline around both in the x and y direction, when zoomed
 
-![tooltip](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/v1.6/tooltip-lana.png)
+![tooltip](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/tooltip-lana.png)
 
 Hovering over an element provides information on the item. If you click on an item it will take you to the call
 navigatable stack view.
