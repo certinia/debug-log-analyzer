@@ -27,7 +27,7 @@ export class SOQLLinter {
 }
 
 export const SEVERITY_TYPES = ['Error', 'Warning', 'Info']; // needs to ordered from highest tp lowest priority
-export type Severity = typeof SEVERITY_TYPES[number];
+export type Severity = (typeof SEVERITY_TYPES)[number];
 // TODO: add categories (ORDER BY, fieldlist, WHERE etc)
 export interface SOQLLinterRule {
   message: string;
