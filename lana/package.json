@@ -2,7 +2,7 @@
   "name": "lana",
   "displayName": "Apex Log Analyzer",
   "version": "1.5.2",
-  "description": "Analyzer for Salesforce debug logs - Visualize code execution via a Flame graph and identify performance and SOQL/DML problems via Method and Database analysis",
+  "description": "Analyzer for Salesforce debug logs - Visualize code execution via a Flame chart and identify performance and SOQL/DML problems via Method and Database analysis",
   "keywords": [
     "apex",
     "apexlog",
@@ -22,9 +22,9 @@
     "salesforce"
   ],
   "main": "out/Main.js",
-  "icon": "logo.png",
+  "icon": "certinia-icon-color.png",
   "galleryBanner": {
-    "color": "#1e252b",
+    "color": "#000000",
     "theme": "dark"
   },
   "publisher": "FinancialForce",
