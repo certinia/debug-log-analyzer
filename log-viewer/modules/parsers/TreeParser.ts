@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
+ * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
 type TruncateKey = 'unexpected' | 'error' | 'skip';

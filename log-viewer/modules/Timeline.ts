@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 FinancialForce.com, inc. All rights reserved.
+ * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import { showTreeNode } from './TreeView';
 import formatDuration, { debounce } from './Util';

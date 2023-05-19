@@ -5,7 +5,7 @@
 [![Installs](https://vsmarketplacebadges.dev/installs-short/financialforce.lana.svg)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
 [![Ratings](https://vsmarketplacebadges.dev/rating-short/financialforce.lana.svg)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
 
-Apex Log Analyzer makes performance analysis of Salesforce debug logs much easier and quicker. It provides visualization of code execution via a Flamegraph and Calltree and helps identify performance and SOQL/DML problems via Method and Database Analysis.
+Apex Log Analyzer makes performance analysis of Salesforce debug logs much easier and quicker. It provides visualization of code execution via a Flame chart and Calltree and helps identify performance and SOQL/DML problems via Method and Database Analysis.
 
 ![preview](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/lana-preview.gif)
 
@@ -62,9 +62,9 @@ With the `.log` file open in VSCode.
 
 ## Features
 
-### Timeline / Flame graph
+### Timeline / Flame chart
 
-![timeline](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/timeline-lana.png)
+![timeline](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/timeline-lana.png)
 
 The Timeline shows a visualization of code execution during a request’s execution. Each color represents a different Salesforce event type e.g DB, Method, SOQL etc. The length of a bar relates to realtime taken e.g a longer bar means that method took longer.
 
@@ -73,7 +73,7 @@ The Timeline shows a visualization of code execution during a request’s execut
 - Scroll left and right on the mouse to move the time line left are right, when zoomed
 - Click the mouse down and drag to move the timeline around both in the x and y direction, when zoomed
 
-![tooltip](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/tooltip-lana.png)
+![tooltip](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/tooltip-lana.png)
 
 Hovering over an element provides information on the item. If you click on an item it will take you to the call
 navigatable stack view.
@@ -99,13 +99,13 @@ settings.json
 
 ```json
 "lana.timeline.colors": {
-  "Code Unit": "#6BAD68",
-  "SOQL": "#4B9D6E",
-  "Method": "#328C72",
-  "Flow": "#237A72",
-  "DML": "#22686D",
-  "Workflow": "#285663",
-  "System Method": "#2D4455"
+  "Code Unit": "#88AE58",
+  "Workflow": "#51A16E",
+  "Method": "#2B8F81",
+  "Flow": "#337986",
+  "DML": "#285663",
+  "SOQL": "#5D4963",
+  "System Method": "#5C3444"
 }
 ```
 
@@ -153,7 +153,7 @@ Thanks to the everyone who has contributed
 ---
 
 <p align="center">
-Copyright &copy; FinancialForce.com, inc. All rights reserved.
+Copyright &copy; Certinia Inc. All rights reserved.
 </p>
 <p align="center">
   <a href="https://opensource.org/licenses/BSD-3-Clause">
