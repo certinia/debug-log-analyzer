@@ -7,7 +7,7 @@
 
 Apex Log Analyzer makes performance analysis of Salesforce debug logs much easier and quicker. It provides visualization of code execution via a Flame chart and Calltree and helps identify performance and SOQL/DML problems via Method and Database Analysis.
 
-![preview](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/lana-preview.gif)
+![preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/lana-preview.gif)
 
 ## WARNING
 
@@ -22,7 +22,7 @@ Apex Log Analyzer makes performance analysis of Salesforce debug logs much easie
 
 ## Installation
 
-![install](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/install-lana.png)
+![install](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/install-lana.png)
 
 - Search for `Apex Log Analyzer` in extensions.
 - Click install + then reload VSCode.
@@ -52,7 +52,7 @@ With the `.log` file open in VSCode.
 1. Open command pallette (CMD/CTRL + Shift + P) -> 'Log: Show Apex Log Analysis'\
    or
 1. Click the 'Log: Show Apex Log Analysis' code lens at the top of the file\
-   ![show analysis lens](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/showanalysis-lens.png)\
+   ![show analysis lens](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/showanalysis-lens.png)\
    or
 1. Right click -> 'Log: Show Apex Log Analysis'
 
@@ -64,7 +64,7 @@ With the `.log` file open in VSCode.
 
 ### Timeline / Flame chart
 
-![timeline](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/timeline-lana.png)
+![timeline](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/timeline-lana.png)
 
 The Timeline shows a visualization of code execution during a request’s execution. Each color represents a different Salesforce event type e.g DB, Method, SOQL etc. The length of a bar relates to realtime taken e.g a longer bar means that method took longer.
 
@@ -73,7 +73,7 @@ The Timeline shows a visualization of code execution during a request’s execut
 - Scroll left and right on the mouse to move the time line left are right, when zoomed
 - Click the mouse down and drag to move the timeline around both in the x and y direction, when zoomed
 
-![tooltip](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/tooltip-lana.png)
+![tooltip](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/tooltip-lana.png)
 
 Hovering over an element provides information on the item. If you click on an item it will take you to the call
 navigatable stack view.
@@ -91,7 +91,7 @@ The tooltip provides the following information.\
 The default colors shown on the timeline can be changed in the VSCode settings.\
 Either in the UI `preferences -> extensions -> Apex Log Analyzer`
 
-![color settings](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/settings-color-lana.png)
+![color settings](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/settings-color-lana.png)
 
 or
 
@@ -111,7 +111,7 @@ settings.json
 
 ### Calltree
 
-![calltree](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/calltree-lana.png)
+![calltree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/calltree-lana.png)
 
 Shows the call stack which can be expanded and collapsed. Clicking on a link will take you to that line in the class if it can be found in the current open project.
 
@@ -119,13 +119,13 @@ Each row shows event type, details such as method signature, self and total time
 
 ### Analysis
 
-![analysis](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/images/analysis-lana.png)
+![analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/analysis-lana.png)
 
 Show analysis on method calls. The table can be sorted ascending or descending by Self Time, Total Time, Count (number of times a method was called) and name.
 
 ### Database
 
-![database](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/dist/v1.6/db-lana.png)
+![database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/db-lana.png)
 
 Shows the SOQL and DML that occured the number of rows returned, the time taken and for SOQL the selectivity and number of aggregations.
 Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occured in the call tree.
@@ -137,16 +137,16 @@ By default rows are grouped by the SOQL/ DML text, grouping can be removed and t
 
 ## Contributing
 
-Help us to make things better by [Contributing](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/CONTRIBUTING.md)\
-Find out how to [Build](https://raw.githubusercontent.com/financialforcedev/debug-log-analyzer/main/lana/BUILDING.md) the extension
+Help us to make things better by [Contributing](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/CONTRIBUTING.md)\
+Find out how to [Build](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/BUILDING.md) the extension
 
 ## Contributors &#10084; &#128591;
 
 Thanks to the everyone who has contributed
 
 <p align="center">
-  <a href="https://github.com/financialforcedev/debug-log-analyzer/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=financialforcedev/debug-log-analyzer&max=25" />
+  <a href="https://github.com/certinia/debug-log-analyzer/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=certinia/debug-log-analyzer&max=25" />
   </a>
 </p>
 
