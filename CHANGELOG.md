@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## Changed
+
+- Update minimum supported vscode version to v1.74.0 ([#280][#280])
+
 ## [1.6.0] - 2023-05-19
 
 ## Added
@@ -175,48 +181,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add explorer menu item
 - Provide more information when selecting log to download
 
-[#11]: https://github.com/financialforcedev/debug-log-analyzer/issues/11
-[#18]: https://github.com/financialforcedev/debug-log-analyzer/issues/18
-[#22]: https://github.com/financialforcedev/debug-log-analyzer/issues/22
-[#33]: https://github.com/financialforcedev/debug-log-analyzer/issues/33
-[#34]: https://github.com/financialforcedev/debug-log-analyzer/issues/34
-[#42]: https://github.com/financialforcedev/debug-log-analyzer/issues/42
-[#45]: https://github.com/financialforcedev/debug-log-analyzer/issues/45
-[#48]: https://github.com/financialforcedev/debug-log-analyzer/issues/48
-[#50]: https://github.com/financialforcedev/debug-log-analyzer/issues/50
-[#52]: https://github.com/financialforcedev/debug-log-analyzer/issues/52
-[#63]: https://github.com/financialforcedev/debug-log-analyzer/issues/63
-[#66]: https://github.com/financialforcedev/debug-log-analyzer/issues/66
-[#68]: https://github.com/financialforcedev/debug-log-analyzer/issues/68
-[#73]: https://github.com/financialforcedev/debug-log-analyzer/issues/73
-[#81]: https://github.com/financialforcedev/debug-log-analyzer/issues/81
-[#87]: https://github.com/financialforcedev/debug-log-analyzer/issues/87
-[#95]: https://github.com/financialforcedev/debug-log-analyzer/issues/95
-[#97]: https://github.com/financialforcedev/debug-log-analyzer/issues/97
-[#99]: https://github.com/financialforcedev/debug-log-analyzer/issues/99
-[#108]: https://github.com/financialforcedev/debug-log-analyzer/issues/108
-[#91]: https://github.com/financialforcedev/debug-log-analyzer/issues/91
-[#88]: https://github.com/financialforcedev/debug-log-analyzer/issues/88
-[#90]: https://github.com/financialforcedev/debug-log-analyzer/issues/90
-[#112]: https://github.com/financialforcedev/debug-log-analyzer/issues/112
-[#123]: https://github.com/financialforcedev/debug-log-analyzer/issues/123
-[#114]: https://github.com/financialforcedev/debug-log-analyzer/issues/114
-[#130]: https://github.com/financialforcedev/debug-log-analyzer/issues/130
-[#131]: https://github.com/financialforcedev/debug-log-analyzer/issues/131
-[#137]: https://github.com/financialforcedev/debug-log-analyzer/issues/137
-[#135]: https://github.com/financialforcedev/debug-log-analyzer/issues/135
-[#139]: https://github.com/financialforcedev/debug-log-analyzer/issues/139
-[#23]: https://github.com/financialforcedev/debug-log-analyzer/issues/23
-[#142]: https://github.com/financialforcedev/debug-log-analyzer/issues/142
-[#163]: https://github.com/financialforcedev/debug-log-analyzer/issues/163
-[#180]: https://github.com/financialforcedev/debug-log-analyzer/issues/180
-[#187]: https://github.com/financialforcedev/debug-log-analyzer/issues/187
-[#188]: https://github.com/financialforcedev/debug-log-analyzer/issues/188
-[#212]: https://github.com/financialforcedev/debug-log-analyzer/issues/212
-[#199]: https://github.com/financialforcedev/debug-log-analyzer/issues/199
-[#219]: https://github.com/financialforcedev/debug-log-analyzer/issues/219
-[#129]: https://github.com/financialforcedev/debug-log-analyzer/issues/129
-[#238]: https://github.com/financialforcedev/debug-log-analyzer/issues/238
-[#242]: https://github.com/financialforcedev/debug-log-analyzer/issues/242
-[#235]: https://github.com/financialforcedev/debug-log-analyzer/issues/235
-[#264]: https://github.com/financialforcedev/debug-log-analyzer/issues/264
+[#11]: https://github.com/certinia/debug-log-analyzer/issues/11
+[#18]: https://github.com/certinia/debug-log-analyzer/issues/18
+[#22]: https://github.com/certinia/debug-log-analyzer/issues/22
+[#33]: https://github.com/certinia/debug-log-analyzer/issues/33
+[#34]: https://github.com/certinia/debug-log-analyzer/issues/34
+[#42]: https://github.com/certinia/debug-log-analyzer/issues/42
+[#45]: https://github.com/certinia/debug-log-analyzer/issues/45
+[#48]: https://github.com/certinia/debug-log-analyzer/issues/48
+[#50]: https://github.com/certinia/debug-log-analyzer/issues/50
+[#52]: https://github.com/certinia/debug-log-analyzer/issues/52
+[#63]: https://github.com/certinia/debug-log-analyzer/issues/63
+[#66]: https://github.com/certinia/debug-log-analyzer/issues/66
+[#68]: https://github.com/certinia/debug-log-analyzer/issues/68
+[#73]: https://github.com/certinia/debug-log-analyzer/issues/73
+[#81]: https://github.com/certinia/debug-log-analyzer/issues/81
+[#87]: https://github.com/certinia/debug-log-analyzer/issues/87
+[#95]: https://github.com/certinia/debug-log-analyzer/issues/95
+[#97]: https://github.com/certinia/debug-log-analyzer/issues/97
+[#99]: https://github.com/certinia/debug-log-analyzer/issues/99
+[#108]: https://github.com/certinia/debug-log-analyzer/issues/108
+[#91]: https://github.com/certinia/debug-log-analyzer/issues/91
+[#88]: https://github.com/certinia/debug-log-analyzer/issues/88
+[#90]: https://github.com/certinia/debug-log-analyzer/issues/90
+[#112]: https://github.com/certinia/debug-log-analyzer/issues/112
+[#123]: https://github.com/certinia/debug-log-analyzer/issues/123
+[#114]: https://github.com/certinia/debug-log-analyzer/issues/114
+[#130]: https://github.com/certinia/debug-log-analyzer/issues/130
+[#131]: https://github.com/certinia/debug-log-analyzer/issues/131
+[#137]: https://github.com/certinia/debug-log-analyzer/issues/137
+[#135]: https://github.com/certinia/debug-log-analyzer/issues/135
+[#139]: https://github.com/certinia/debug-log-analyzer/issues/139
+[#23]: https://github.com/certinia/debug-log-analyzer/issues/23
+[#142]: https://github.com/certinia/debug-log-analyzer/issues/142
+[#163]: https://github.com/certinia/debug-log-analyzer/issues/163
+[#180]: https://github.com/certinia/debug-log-analyzer/issues/180
+[#187]: https://github.com/certinia/debug-log-analyzer/issues/187
+[#188]: https://github.com/certinia/debug-log-analyzer/issues/188
+[#212]: https://github.com/certinia/debug-log-analyzer/issues/212
+[#199]: https://github.com/certinia/debug-log-analyzer/issues/199
+[#219]: https://github.com/certinia/debug-log-analyzer/issues/219
+[#129]: https://github.com/certinia/debug-log-analyzer/issues/129
+[#238]: https://github.com/certinia/debug-log-analyzer/issues/238
+[#242]: https://github.com/certinia/debug-log-analyzer/issues/242
+[#235]: https://github.com/certinia/debug-log-analyzer/issues/235
+[#264]: https://github.com/certinia/debug-log-analyzer/issues/264
+[#280]: https://github.com/certinia/debug-log-analyzer/issues/280
