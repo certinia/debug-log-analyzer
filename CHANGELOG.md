@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## Changed
+
+- Update minimum supported vscode version to v1.74.0 ([#280][#280])
+
 ## [1.6.0] - 2023-05-19
 
 ## Added
@@ -220,3 +226,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#242]: https://github.com/certinia/debug-log-analyzer/issues/242
 [#235]: https://github.com/certinia/debug-log-analyzer/issues/235
 [#264]: https://github.com/certinia/debug-log-analyzer/issues/264
+[#280]: https://github.com/certinia/debug-log-analyzer/issues/280
