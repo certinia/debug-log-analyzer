@@ -32,7 +32,7 @@
   "license": "SEE LICENSE IN LICENSE.txt",
   "repository": {
     "type": "git",
-    "url": "https://github.com/financialforcedev/debug-log-analyzer.git"
+    "url": "https://github.com/certinia/debug-log-analyzer.git"
   },
   "engines": {
     "vscode": "^1.74.0"

@@ -107,7 +107,7 @@ export class LoadLogFile {
     if (!logExists) {
       const logfile = path.parse(logPath);
 
-      // TODO: Replace with @salesforce/apex-node https://github.com/financialforcedev/debug-log-analyzer/issues/122
+      // TODO: Replace with @salesforce/apex-node https://github.com/certinia/debug-log-analyzer/issues/122
       await GetLogFile.apply(ws, logfile.dir, logfile.name);
     }
   }
