@@ -26,7 +26,7 @@ export class LogFileException extends Error {
 }
 
 export class LogView {
-  private static helpUrl = 'https://financialforcedev.github.io/debug-log-analyzer/';
+  private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
 
   static async createView(
     wsPath: string,
