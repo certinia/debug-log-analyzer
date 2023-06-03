@@ -12,7 +12,7 @@
   },
   "version": "0.1.0",
   "dependencies": {
-    "@apexdevtools/apex-parser": "^3.0.0",
+    "@apexdevtools/apex-parser": "^3.3.0",
     "lit": "^2.0.0",
     "tabulator-tables": "^5.4.4"
   },
