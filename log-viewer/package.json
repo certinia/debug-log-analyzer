@@ -28,13 +28,13 @@
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-prettier": "^4.2.1",
     "http-server": "^14.x.x",
-    "node-sass": "^8.0.0",
+    "node-sass": "^9.0.0",
     "postcss": "^8.0.0",
     "prettier": "^2.7.1",
     "rollup": "^3.22.0",
     "rollup-plugin-polyfill-node": "^0.12.0",
     "rollup-plugin-postcss": "^4.0.0",
-    "tslib": "^2.0.0",
+    "tslib": "^2.5.3",
     "typescript": "^5.0.4"
   }
 }
