@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "build": "rollup -c rollup.config.mjs",
-    "lint": "eslint modules --ext ts",
+    "lint": "concurrently 'eslint modules --ext ts' 'npm run tsc:lint'",
     "watch": "rollup -w -c rollup.config.mjs",
     "web": "http-server",
-    "debug": "concurrently \"npm:web\" \"npm:watch\"",
-    "prettier-format": "prettier 'modules/**/*.ts' --write"
+    "debug": "concurrently 'npm:web' 'npm:watch'",
+    "prettier-format": "prettier 'modules/**/*.ts' --write",
+    "tsc:lint": "tsc --noemit --skipLibCheck"
   },
   "version": "0.1.0",
   "dependencies": {
