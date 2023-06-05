@@ -17,10 +17,9 @@ export class SymbolFinder {
       if (parts.length > 1) {
         parts.pop();
         return this.findInWorkspace(ws, parts.join('.'));
-      } else {
-        return null;
       }
+      return null;
     }
-    return paths[0];
+    return paths.find((path) => path.endsWith('.cls')) || null;
   }
 }

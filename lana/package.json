@@ -157,7 +157,7 @@
     "log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/."
   },
   "dependencies": {
-    "@apexdevtools/apex-ls": "^3.1.0"
+    "@apexdevtools/apex-ls": "^4.2.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.0",
@@ -173,6 +173,6 @@
     "prettier": "^2.7.1",
     "rollup": "^3.22.0",
     "tslib": "^2.0.0",
-    "typescript": "^4.0.0"
+    "typescript": "^5.0.4"
   }
 }
