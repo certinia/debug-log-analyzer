@@ -13,28 +13,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
       - name: Set up Node
         uses: actions/setup-node@v3
         with:
           node-version: '16.x'
-          cache: 'npm'
+          cache: 'pnpm'
       - name: Install Packages
-        run: npm ci
+        run: pnpm install
       - name: Lint Files
-        run: npm run lint
+        run: pnpm run lint
 
   tests:
     name: Run Log-viewer Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
       - name: Set up Node
         uses: actions/setup-node@v3
         with:
           node-version: '16'
-          cache: 'npm'
+          cache: 'pnpm'
       - name: Install Packages
-        run: npm ci
+        run: pnpm install
       - name: Tests
         run: |
-          npm run test:ci
+          pnpm run test:ci
