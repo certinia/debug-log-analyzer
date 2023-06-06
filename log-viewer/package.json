@@ -7,7 +7,7 @@
     "lint": "eslint modules --ext ts",
     "watch": "rollup -w -c rollup.config.mjs",
     "web": "http-server",
-    "debug": "concurrently \"npm:web\" \"npm:watch\"",
+    "debug": "concurrently 'pnpm:web' 'pnpm:watch'",
     "prettier-format": "prettier 'modules/**/*.ts' --write"
   },
   "version": "0.1.0",
