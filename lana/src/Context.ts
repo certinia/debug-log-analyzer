@@ -3,7 +3,7 @@
  */
 
 import { ExtensionContext, workspace } from 'vscode';
-import { LoadLogFile } from './commands/LoadLogFile';
+import { RetrieveLogFile } from './commands/RetrieveLogFile';
 import { ShowLogFile } from './commands/ShowLogFile';
 import ShowAnalysisCodeLens from './codelenses/ShowAnalysisCodeLens';
 import { Display } from './Display';
@@ -26,7 +26,7 @@ export class Context {
       });
     }
 
-    LoadLogFile.apply(this);
+    RetrieveLogFile.apply(this);
     ShowLogFile.apply(this);
     ShowAnalysisCodeLens.apply(this);
   }

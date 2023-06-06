@@ -30,17 +30,17 @@ class DebugLogItem extends Item {
   }
 }
 
-export class LoadLogFile {
+export class RetrieveLogFile {
   static apply(context: Context): void {
-    new Command('loadLogFile', 'Log: Load Apex Log For Analysis', () =>
-      LoadLogFile.safeCommand(context)
+    new Command('retrieveLogFile', 'Log: Retrieve Apex Log And Show Analysis', () =>
+      RetrieveLogFile.safeCommand(context)
     ).register(context);
-    context.display.output(`Registered command '${appName}: Load Log'`);
+    context.display.output(`Registered command '${appName}: Retrieve Log'`);
   }
 
   private static async safeCommand(context: Context): Promise<WebviewPanel | void> {
     try {
-      return LoadLogFile.command(context);
+      return RetrieveLogFile.command(context);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       context.display.showErrorMessage(`Error loading logfile: ${msg}`);
@@ -50,12 +50,15 @@ export class LoadLogFile {
 
   private static async command(context: Context): Promise<WebviewPanel | void> {
     const ws = await QuickPickWorkspace.pickOrReturn(context);
-    const [logFiles] = await Promise.all([GetLogFiles.apply(ws), LoadLogFile.showLoadingPicker()]);
+    const [logFiles] = await Promise.all([
+      GetLogFiles.apply(ws),
+      RetrieveLogFile.showLoadingPicker(),
+    ]);
 
     if (logFiles.status !== 0) {
       throw new Error('Failed to load available log files');
     }
-    const logFileId = await LoadLogFile.getLogFile(logFiles.result);
+    const logFileId = await RetrieveLogFile.getLogFile(logFiles.result);
     if (logFileId) {
       const logFilePath = this.getLogFilePath(ws, logFileId);
       const [view] = await Promise.all([

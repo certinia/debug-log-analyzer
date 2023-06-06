@@ -44,8 +44,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "lana.loadLogFile",
-        "title": "Log: Load Apex Log For Analysis"
+        "command": "lana.retrieveLogFile",
+        "title": "Log: Retrieve Apex Log And Show Analysis"
       },
       {
         "command": "lana.showLogFile",

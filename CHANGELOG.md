@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Changed
 
+- Renamed `Log: Load Apex Log For Analysis` to `Log: Retrieve Apex Log And Show Analysis` ([#288][#288])
 - Update minimum supported vscode version to v1.74.0 ([#280][#280])
 
 ## [1.6.0] - 2023-05-19
@@ -227,3 +228,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#235]: https://github.com/certinia/debug-log-analyzer/issues/235
 [#264]: https://github.com/certinia/debug-log-analyzer/issues/264
 [#280]: https://github.com/certinia/debug-log-analyzer/issues/280
+[#288]: https://github.com/certinia/debug-log-analyzer/issues/288
