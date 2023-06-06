@@ -22,7 +22,7 @@ jobs:
           node-version: '16.x'
           cache: 'pnpm'
       - name: Install Packages
-        run: pnpm install
+        run: HUSKY=0 pnpm install
       - name: Lint Files
         run: pnpm run lint
 
@@ -40,7 +40,7 @@ jobs:
           node-version: '16'
           cache: 'pnpm'
       - name: Install Packages
-        run: pnpm install
+        run: HUSKY=0 pnpm install
       - name: Tests
         run: |
           pnpm run test:ci

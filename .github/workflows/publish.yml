@@ -24,7 +24,7 @@ jobs:
           pnpm add --global ovsx
       - name: Dependencies
         run: |
-          pnpm install
+          HUSKY=0 pnpm install
       - name: Build extension
         run: |
           cd lana
