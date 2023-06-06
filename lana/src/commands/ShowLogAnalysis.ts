@@ -10,21 +10,21 @@ import { LogView } from './LogView';
 import { Command } from './Command';
 import { appName } from '../AppSettings';
 
-export class ShowLogFile {
+export class ShowLogAnalysis {
   static getCommand(context: Context): Command {
-    return new Command('showLogFile', 'Log: Show Apex Log Analysis', (uri: Uri) =>
-      ShowLogFile.safeCommand(context, uri)
+    return new Command('showLogAnalysis', 'Log: Show Apex Log Analysis', (uri: Uri) =>
+      ShowLogAnalysis.safeCommand(context, uri)
     );
   }
 
   static apply(context: Context): void {
-    ShowLogFile.getCommand(context).register(context);
+    ShowLogAnalysis.getCommand(context).register(context);
     context.display.output(`Registered command '${appName}: Show Log'`);
   }
 
   private static async safeCommand(context: Context, uri: Uri): Promise<void> {
     try {
-      return ShowLogFile.command(context, uri);
+      return ShowLogAnalysis.command(context, uri);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       context.display.showErrorMessage(`Error showing logfile: ${msg}`);

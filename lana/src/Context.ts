@@ -4,7 +4,7 @@
 
 import { ExtensionContext, workspace } from 'vscode';
 import { RetrieveLogFile } from './commands/RetrieveLogFile';
-import { ShowLogFile } from './commands/ShowLogFile';
+import { ShowLogAnalysis } from './commands/ShowLogAnalysis';
 import ShowAnalysisCodeLens from './codelenses/ShowAnalysisCodeLens';
 import { Display } from './Display';
 import { SymbolFinder } from './SymbolFinder';
@@ -27,7 +27,7 @@ export class Context {
     }
 
     RetrieveLogFile.apply(this);
-    ShowLogFile.apply(this);
+    ShowLogAnalysis.apply(this);
     ShowAnalysisCodeLens.apply(this);
   }
 

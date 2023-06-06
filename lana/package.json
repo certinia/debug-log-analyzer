@@ -48,7 +48,7 @@
         "title": "Log: Retrieve Apex Log And Show Analysis"
       },
       {
-        "command": "lana.showLogFile",
+        "command": "lana.showLogAnalysis",
         "title": "Log: Show Apex Log Analysis"
       }
     ],
@@ -69,19 +69,19 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "lana.showLogFile",
+          "command": "lana.showLogAnalysis",
           "when": "resourceLangId == apexlog"
         }
       ],
       "editor/context": [
         {
-          "command": "lana.showLogFile",
+          "command": "lana.showLogAnalysis",
           "when": "resourceLangId == apexlog"
         }
       ],
       "explorer/context": [
         {
-          "command": "lana.showLogFile",
+          "command": "lana.showLogAnalysis",
           "when": "resourceLangId == apexlog"
         }
       ]
