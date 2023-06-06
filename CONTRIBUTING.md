@@ -17,26 +17,28 @@ If there is not, open an issue before contributing, it allows us to provide help
 
 ### Dependencies
 
+Make sure you have [`pnpm` installed](https://pnpm.io/installation)
+
 From a terminal, where you have cloned the repository, execute the following command to install the required dependencies:
 
 ```zsh
-npm ci
+pnpm i
 ```
 
 ### Build
 
 ```zsh
-npm run build
+pnpm run build
 ```
 
-> NOTE: This will rebuild the whole project, to do a quick build (skipping minification) run `npm run build:dev`
+> NOTE: This will rebuild the whole project, to do a quick build (skipping minification) run `pnpm run build:dev`
 
 ### Watch
 
 During development run the watch command to make builds for changes quickly. execute the following command:
 
 ```zsh
-npm run watch
+pnpm run watch
 ```
 
 This will do a full build of the bundles and then watch for file changes in the `lana` and `log-viewer` source, compiling those changes incrementally, for a fast dev experience.
@@ -44,7 +46,7 @@ This will do a full build of the bundles and then watch for file changes in the 
 ## Tests
 
 ```zsh
-npm run test
+pnpm run test
 ```
 
 ## Package
