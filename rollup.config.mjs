@@ -3,6 +3,7 @@ import commonjs from '@rollup/plugin-commonjs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
+import json from '@rollup/plugin-json';
 import copy from 'rollup-plugin-copy';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
@@ -19,12 +20,13 @@ export default [
     },
     external: ['vscode'],
     plugins: [
-      nodeResolve(),
+      nodeResolve({ preferBuiltins: true }),
       commonjs(),
       typescript({
         tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
         exclude: ['node_modules', '**/__tests__/**'],
       }),
+      json(),
       production && terser(),
     ],
   },
