@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "forceConsistentCasingInFileNames": true,
+    "importHelpers": true,
+    "isolatedModules": true,
+    "moduleResolution": "node",
+    "noEmitOnError": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "removeComments": true,
+    "resolveJsonModule": true,
+    "sourceMap": false,
+    "strict": true
+  },
+  "exclude": ["node_modules/", ".*/"]
+}
