@@ -58,7 +58,7 @@ With the `.log` file open in VSCode.
 
 ### Download a log
 
-1. Open command pallette (CMD/CTRL + Shift + P) -> 'Log: Load Apex Log for Analysis'
+1. Open command pallette (CMD/CTRL + Shift + P) -> 'Log: Retrieve Apex Log And Show Analysis
 
 ## Features
 
