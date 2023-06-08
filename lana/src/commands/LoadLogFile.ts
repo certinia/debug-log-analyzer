@@ -103,10 +103,8 @@ export class LoadLogFile {
   private static async writeLogFile(ws: string, logPath: string) {
     const logExists = fs.existsSync(logPath);
     if (!logExists) {
-      const logfile = path.parse(logPath);
-
-      // TODO: Replace with @salesforce/apex-node https://github.com/certinia/debug-log-analyzer/issues/122
-      await GetLogFile.apply(ws, logfile.dir, logfile.name);
+      const logfilePath = path.parse(logPath);
+      await GetLogFile.apply(ws, logfilePath.dir, logfilePath.name);
     }
   }
 }
