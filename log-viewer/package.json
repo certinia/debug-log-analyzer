@@ -1,6 +1,6 @@
 {
   "description": "LogViewer",
-  "name": "logviewer",
+  "name": "log-viewer",
   "private": true,
   "scripts": {
     "build": "rollup -c rollup.config.mjs",
