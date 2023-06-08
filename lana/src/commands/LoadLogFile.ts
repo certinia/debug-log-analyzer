@@ -8,11 +8,12 @@ import { LogView } from './LogView';
 import { appName } from '../AppSettings';
 import { Item, Options, QuickPick } from '../display/QuickPick';
 import { QuickPickWorkspace } from '../display/QuickPickWorkspace';
-import { GetLogFiles, GetLogFilesResult } from '../sfdx/logs/GetLogFiles';
+import { GetLogFiles } from '../sfdx/logs/GetLogFiles';
 import { GetLogFile } from '../sfdx/logs/GetLogFile';
 import * as fs from 'fs';
 import * as path from 'path';
 import { WebviewPanel, window } from 'vscode';
+import { LogRecord } from '@salesforce/apex-node';
 
 class DebugLogItem extends Item {
   logId: string;
@@ -52,10 +53,7 @@ export class LoadLogFile {
     const ws = await QuickPickWorkspace.pickOrReturn(context);
     const [logFiles] = await Promise.all([GetLogFiles.apply(ws), LoadLogFile.showLoadingPicker()]);
 
-    if (logFiles.status !== 0) {
-      throw new Error('Failed to load available log files');
-    }
-    const logFileId = await LoadLogFile.getLogFile(logFiles.result);
+    const logFileId = await LoadLogFile.getLogFile(logFiles);
     if (logFileId) {
       const logFilePath = this.getLogFilePath(ws, logFileId);
       const [view] = await Promise.all([
@@ -75,7 +73,7 @@ export class LoadLogFile {
     return qp;
   }
 
-  private static async getLogFile(files: GetLogFilesResult[]): Promise<string | null> {
+  private static async getLogFile(files: LogRecord[]): Promise<string | null> {
     const items = files
       .sort((a, b) => {
         const aDate = Date.parse(a.StartTime);
