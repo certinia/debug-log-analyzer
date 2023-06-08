@@ -29,7 +29,7 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "build": "NODE_ENV=production pnpm run build:dev",
-    "build:dev": "concurrently 'rm -rf lana/out && rollup -c rollup.config.mjs' 'pnpm run tsc:lint -w log-viewer' 'pnpm run tsc:lint -w lana'",
+    "build:dev": "concurrently 'rm -rf lana/out && rollup -c rollup.config.mjs' 'pnpm --filter log-viewer tsc:lint' 'pnpm --filter lana tsc:lint'",
     "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",
     "prepare": "husky install",
     "lint": "eslint . --ext ts",
