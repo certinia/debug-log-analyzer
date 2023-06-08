@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "build": "rollup -c rollup.config.mjs",
-    "lint": "eslint modules --ext ts",
+    "lint": "concurrently 'eslint modules --ext ts' 'npm run tsc:lint'",
     "watch": "rollup -w -c rollup.config.mjs",
     "web": "http-server",
     "debug": "concurrently 'pnpm:web' 'pnpm:watch'",
-    "prettier-format": "prettier 'modules/**/*.ts' --write"
+    "prettier-format": "prettier 'modules/**/*.ts' --write",
+    "tsc:lint": "tsc --noemit --skipLibCheck"
   },
   "version": "0.1.0",
   "dependencies": {
@@ -19,8 +20,6 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-node-resolve": "^15.0.2",
-    "@rollup/plugin-terser": "^0.4.0",
-    "@rollup/plugin-typescript": "^11.1.1",
     "@types/tabulator-tables": "^5.4.5",
     "concurrently": "^8.0.1",
     "http-server": "^14.x.x",

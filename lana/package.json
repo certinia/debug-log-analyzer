@@ -44,11 +44,11 @@
   "contributes": {
     "commands": [
       {
-        "command": "lana.loadLogFile",
-        "title": "Log: Load Apex Log For Analysis"
+        "command": "lana.retrieveLogFile",
+        "title": "Log: Retrieve Apex Log And Show Analysis"
       },
       {
-        "command": "lana.showLogFile",
+        "command": "lana.showLogAnalysis",
         "title": "Log: Show Apex Log Analysis"
       }
     ],
@@ -69,19 +69,19 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "lana.showLogFile",
+          "command": "lana.showLogAnalysis",
           "when": "resourceLangId == apexlog"
         }
       ],
       "editor/context": [
         {
-          "command": "lana.showLogFile",
+          "command": "lana.showLogAnalysis",
           "when": "resourceLangId == apexlog"
         }
       ],
       "explorer/context": [
         {
-          "command": "lana.showLogFile",
+          "command": "lana.showLogAnalysis",
           "when": "resourceLangId == apexlog"
         }
       ]
@@ -151,10 +151,11 @@
     "prettier-format": "prettier 'src/**/*.ts' --write",
     "watch": "rollup -w -c rollup.config.mjs",
     "pretest": "pnpm run compile && pnpm run lint",
-    "lint": "eslint src --ext ts",
+    "lint": "concurrently 'eslint src --ext ts' 'npm run tsc:lint'",
     "log-viewer": "pnpm run log-viewer-build && pnpm run log-viewer-copy",
     "log-viewer-build": "(cd ../log-viewer; pnpm ci && pnpm run build)",
-    "log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/."
+    "log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/.",
+    "tsc:lint": "tsc --noemit --skipLibCheck"
   },
   "dependencies": {
     "@apexdevtools/apex-ls": "^4.2.0"
@@ -162,8 +163,6 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-node-resolve": "^15.0.2",
-    "@rollup/plugin-terser": "^0.4.0",
-    "@rollup/plugin-typescript": "^11.1.1",
     "@types/node": "^16.x.x",
     "@types/vscode": "^1.74.0",
     "prettier": "^2.7.1",

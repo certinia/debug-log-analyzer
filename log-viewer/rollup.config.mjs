@@ -1,11 +1,17 @@
 // Rollup plugins
 import commonjs from '@rollup/plugin-commonjs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
-import terser from '@rollup/plugin-terser';
-import typescript from '@rollup/plugin-typescript';
-import postcss from 'rollup-plugin-postcss';
 
-const compact = !process.env.ROLLUP_WATCH;
+import nodePolyfills from 'rollup-plugin-polyfill-node';
+import postcss from 'rollup-plugin-postcss';
+import {
+  defineRollupSwcOption,
+  swc,
+  minify,
+  defineRollupSwcMinifyOption,
+} from 'rollup-plugin-swc3';
+
+const production = !process.env.ROLLUP_WATCH;
 export default {
   input: 'modules/Main.ts',
   output: {
@@ -13,16 +19,27 @@ export default {
     sourcemap: false,
   },
   plugins: [
-    nodeResolve(),
+    nodeResolve({ browser: true, preferBuiltins: false }),
     commonjs(),
-    typescript({
-      tsconfig: './tsconfig.json',
-      exclude: ['node_modules', '**/__tests__/**'],
-    }),
+    nodePolyfills(),
+    swc(
+      defineRollupSwcOption({
+        exclude: 'node_modules',
+        tsconfig: production ? 'tsconfig.json' : 'tsconfig-dev.json',
+        jsc: {},
+      })
+    ),
     postcss({
       extensions: ['.css'],
       minimize: true,
     }),
-    compact && terser(),
+    production &&
+      minify(
+        defineRollupSwcMinifyOption({
+          // swc's minify option here
+          mangle: true,
+          compress: true,
+        })
+      ),
   ],
 };
