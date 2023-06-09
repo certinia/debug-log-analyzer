@@ -2,24 +2,29 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 
-import { Position, Range, Selection, Uri, window, workspace } from 'vscode';
+import { Position, Selection, Uri, TextDocumentShowOptions, commands, ViewColumn } from 'vscode';
 import { Context } from '../Context';
 
 export class OpenFileInPackage {
-  static openFileForSymbol(wsPath: string, context: Context, name: string, line?: number): void {
+  static openFileForSymbol(
+    wsPath: string,
+    context: Context,
+    name: string,
+    lineNumber?: number
+  ): void {
     const path = context.findSymbol(wsPath, name);
-    if (path) {
-      const uri = Uri.file(path);
-      workspace.openTextDocument(uri).then((td) => {
-        window.showTextDocument(td).then((editor) => {
-          if (line) {
-            const zeroBasedLine = line - 1;
-            const position = new Position(zeroBasedLine, 0);
-            editor.selection = new Selection(position, position);
-            editor.revealRange(new Range(position, position));
-          }
-        });
-      });
+    if (path && lineNumber) {
+      const zeroBasedLine = lineNumber - 1;
+      const linePosition = new Position(zeroBasedLine, 0);
+
+      const options: TextDocumentShowOptions = {
+        preserveFocus: false,
+        preview: false,
+        viewColumn: ViewColumn.Active,
+        selection: new Selection(linePosition, linePosition),
+      };
+
+      commands.executeCommand('vscode.open', Uri.file(path), options);
     }
   }
 }
