@@ -9,10 +9,11 @@ import parseLog, {
   truncated,
   totalDuration,
   getRootMethod,
+  RootNode,
 } from './parsers/TreeParser';
 import renderTreeView from './TreeView';
 import renderTimeline, { setColors, renderTimelineKey } from './Timeline';
-import analyseMethods, { renderAnalysis } from './Analysis';
+import { renderAnalysis } from './analysis-view/AnalysisView';
 import { DatabaseAccess } from './Database';
 import { setNamespaces } from './NamespaceExtrator';
 import { hostService } from './services/VSCodeService';
@@ -32,6 +33,7 @@ declare global {
 }
 
 let logSize: number;
+let rootMethod: RootNode;
 
 async function setStatus(name: string, path: string, status: string, color?: string) {
   const statusHolder = document.getElementById('status') as HTMLDivElement,
@@ -150,16 +152,16 @@ async function displayLog(log: string, name: string, path: string) {
   await Promise.all([renderLogSettings(getLogSettings(log)), parseLog(log)]);
 
   timer('getRootMethod');
-  const rootMethod = getRootMethod();
+  rootMethod = getRootMethod();
 
   timer('analyse');
   await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
-  await Promise.all([analyseMethods(rootMethod), DatabaseAccess.create(rootMethod)]);
+  await Promise.all([DatabaseAccess.create(rootMethod)]);
 
   await setStatus(name, path, 'Rendering...');
 
   timer('renderViews');
-  await Promise.all([renderTreeView(rootMethod), renderTimeline(rootMethod), renderAnalysis()]);
+  await Promise.all([renderTreeView(rootMethod), renderTimeline(rootMethod)]);
 
   timer('');
   setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');
@@ -214,6 +216,11 @@ function onInit(): void {
   const dbTab = document.getElementById('databaseTab');
   if (dbTab) {
     dbTab.addEventListener('click', renderDBGrid, { once: true });
+  }
+
+  const analysisTab = document.getElementById('analysisTab');
+  if (analysisTab) {
+    analysisTab.addEventListener('click', () => renderAnalysis(rootMethod), { once: true });
   }
 
   const helpButton = document.querySelector('.helpLink');
