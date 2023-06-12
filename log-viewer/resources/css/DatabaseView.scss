@@ -46,7 +46,7 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
     // max-height: 100%;
 
     .tabulator-table {
-      display: unset;
+      display: block;
       background-color: unset;
     }
   }
@@ -92,6 +92,10 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
 }
 .tabulator-row.tabulator-selected {
   color: var(--vscode-list-activeSelectionForeground);
+}
+.db-group-wrapper {
+  display: flex;
+  min-width: 0;
 }
 .db-group-title {
   white-space: nowrap;

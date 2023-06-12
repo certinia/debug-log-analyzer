@@ -71,7 +71,11 @@ function renderDMLTable() {
       });
 
       const newCount = hasDetail ? count - 1 : count;
-      return `<div class="db-group-title" title="${value}">${value}</div><span>(${newCount} DML)</span>`;
+      return `
+      <div class="db-group-wrapper">
+        <div class="db-group-title" title="${value}">${value}</div><span>(${newCount} DML)</span>
+      </div>
+        `;
     },
     groupToggleElement: 'header',
     selectable: 1,
@@ -236,9 +240,12 @@ function renderSOQLTable() {
       });
 
       const newCount = hasDetail ? count - 1 : count;
-      return `<div class="db-group-title" title="${value}">${value}</div><span>(${newCount} ${
+      return `
+      <div class="db-group-wrapper">
+        <div class="db-group-title" title="${value}">${value}</div><span>(${newCount} ${
         newCount > 1 ? 'Queries' : 'Query'
-      })</span>`;
+      })</span>
+      </div>`;
     },
     groupToggleElement: 'header',
     selectable: 1,
