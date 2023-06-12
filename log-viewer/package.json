@@ -15,7 +15,7 @@
   "dependencies": {
     "@apexdevtools/apex-parser": "^3.3.0",
     "lit": "^2.0.0",
-    "tabulator-tables": "^5.4.4"
+    "tabulator-tables": "^5.5.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.0",
