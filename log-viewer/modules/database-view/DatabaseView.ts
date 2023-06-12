@@ -271,7 +271,7 @@ function renderSOQLTable() {
         formatterParams: {
           allowEmpty: true,
         },
-        width: 25,
+        width: 40,
         hozAlign: 'center',
         vertAlign: 'middle',
         sorter: function (a, b, aRow, bRow, _column, dir, _sorterParams) {
@@ -307,6 +307,7 @@ function renderSOQLTable() {
       {
         title: 'SOQL',
         field: 'soql',
+        headerSortStartingDir: 'asc',
         sorter: 'string',
         tooltip: true,
         bottomCalc: () => {
@@ -317,13 +318,18 @@ function renderSOQLTable() {
         title: 'Row Count',
         field: 'rowCount',
         sorter: 'number',
-        width: 110,
+        width: 100,
+        hozAlign: 'right',
+        headerHozAlign: 'right',
         bottomCalc: 'sum',
       },
       {
         title: 'Time Taken (ms)',
         field: 'timeTaken',
         sorter: 'number',
+        width: 120,
+        hozAlign: 'right',
+        headerHozAlign: 'right',
         formatter: 'money',
         formatterParams: {
           thousand: false,
@@ -336,7 +342,9 @@ function renderSOQLTable() {
         title: 'Aggregations',
         field: 'aggregations',
         sorter: 'number',
-        width: 110,
+        width: 100,
+        hozAlign: 'right',
+        headerHozAlign: 'right',
         bottomCalc: 'sum',
       },
     ],
