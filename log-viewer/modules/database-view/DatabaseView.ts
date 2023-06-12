@@ -324,7 +324,11 @@ function renderSOQLTable() {
         title: 'Time Taken (ms)',
         field: 'timeTaken',
         sorter: 'number',
-        width: 110,
+        formatter: 'money',
+        formatterParams: {
+          thousand: false,
+          precision: 2,
+        },
         bottomCalc: 'sum',
         bottomCalcParams: { precision: 2 },
       },
