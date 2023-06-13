@@ -9,12 +9,15 @@ export async function renderAnalysis(rootMethod: RootNode) {
   addNodeToMap(methodMap, rootMethod);
   const metricList = [...methodMap.values()];
 
-  new Tabulator('#analysisTable', {
+  const analysisTable = new Tabulator('#analysisTable', {
     data: metricList,
     layout: 'fitColumns',
     placeholder: 'No Analysis Available',
     columnCalcs: 'both',
     height: '100%',
+    groupClosedShowCalcs: true,
+    groupStartOpen: false,
+    groupToggleElement: 'header',
     columnDefaults: {
       title: 'default',
       resizable: true,
@@ -87,6 +90,11 @@ export async function renderAnalysis(rootMethod: RootNode) {
         },
       },
     ],
+  });
+
+  document.getElementById('analysis-groupBy')?.addEventListener('change', (event) => {
+    const checkBox = event.target as HTMLInputElement;
+    analysisTable.setGroupBy(checkBox.checked ? 'type' : '');
   });
 }
 
