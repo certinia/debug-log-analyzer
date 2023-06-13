@@ -63,6 +63,12 @@ export async function renderAnalysis(rootMethod: RootNode) {
           thousand: false,
           precision: 3,
         },
+        bottomCalc: () => {
+          const toMs =
+            Math.round(((rootMethod.executionEndTime - rootMethod.timestamp) / 1000000) * 1000) /
+            1000;
+          return toMs;
+        },
         bottomCalcParams: { precision: 3 },
       },
       {
