@@ -3,7 +3,6 @@ import { TabulatorFull as Tabulator } from 'tabulator-tables';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
 
 // todo: Group on type
-// todo: Prettify type e.g "System Method" instead of "SYSTEM_METHOD_ENTRY"
 export async function renderAnalysis(rootMethod: RootNode) {
   const methodMap: Map<string, Metric> = new Map();
 
@@ -11,7 +10,6 @@ export async function renderAnalysis(rootMethod: RootNode) {
   const metricList = [...methodMap.values()];
 
   new Tabulator('#analysisTable', {
-    //set initial table data
     data: metricList,
     layout: 'fitColumns',
     placeholder: 'No Analysis Available',
@@ -24,7 +22,6 @@ export async function renderAnalysis(rootMethod: RootNode) {
       headerTooltip: true,
     },
     initialSort: [{ column: 'selfTime', dir: 'desc' }],
-    renderVerticalBuffer: 1500,
     columns: [
       {
         title: 'Name',
@@ -41,6 +38,7 @@ export async function renderAnalysis(rootMethod: RootNode) {
         title: 'Type',
         field: 'type',
         headerSortStartingDir: 'asc',
+        width: 150,
         sorter: 'string',
         tooltip: true,
       },
@@ -48,7 +46,7 @@ export async function renderAnalysis(rootMethod: RootNode) {
         title: 'Count',
         field: 'count',
         sorter: 'number',
-        width: 100,
+        width: 65,
         hozAlign: 'right',
         headerHozAlign: 'right',
         bottomCalc: 'sum',
@@ -63,10 +61,9 @@ export async function renderAnalysis(rootMethod: RootNode) {
         formatter: 'money',
         formatterParams: {
           thousand: false,
-          precision: 2,
+          precision: 3,
         },
-        bottomCalc: 'max',
-        bottomCalcParams: { precision: 2 },
+        bottomCalcParams: { precision: 3 },
       },
       {
         title: 'Self Time (ms)',
@@ -76,7 +73,12 @@ export async function renderAnalysis(rootMethod: RootNode) {
         hozAlign: 'right',
         headerHozAlign: 'right',
         bottomCalc: 'sum',
-        bottomCalcParams: { precision: 2 },
+        bottomCalcParams: { precision: 3 },
+        formatter: 'money',
+        formatterParams: {
+          thousand: false,
+          precision: 3,
+        },
       },
     ],
   });
@@ -108,8 +110,8 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
     if (metric) {
       ++metric.count;
       if (totalTime) {
-        metric.totalTime = Math.round((metric.totalTime + totalTime) * 100) / 100;
-        metric.selfTime = Math.round((metric.selfTime + selfTime) * 100) / 100;
+        metric.totalTime = Math.round((metric.totalTime + totalTime) * 1000) / 1000;
+        metric.selfTime = Math.round((metric.selfTime + selfTime) * 1000) / 1000;
       }
     } else {
       map.set(
@@ -117,8 +119,8 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
         new Metric(
           key,
           1,
-          Math.round(totalTime * 100) / 100,
-          Math.round(selfTime * 100) / 100,
+          Math.round(totalTime * 1000) / 1000,
+          Math.round(selfTime * 1000) / 1000,
           node
         )
       );

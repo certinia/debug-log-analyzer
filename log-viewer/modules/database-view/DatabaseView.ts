@@ -47,7 +47,7 @@ function renderDMLTable() {
       dmlData.push({
         dml: dml.text,
         rowCount: dml.rowCount,
-        timeTaken: Math.round((dml.duration / 1000000) * 100) / 100,
+        timeTaken: Math.round((dml.duration / 1000000) * 1000) / 1000,
         timestamp: dml.timestamp,
         _children: [{ timestamp: dml.timestamp, isDetail: true }],
       });
@@ -103,14 +103,14 @@ function renderDMLTable() {
           return 'Total';
         },
       },
-      { title: 'Row Count', field: 'rowCount', sorter: 'number', width: 110, bottomCalc: 'sum' },
+      { title: 'Row Count', field: 'rowCount', sorter: 'number', width: 90, bottomCalc: 'sum' },
       {
         title: 'Time Taken (ms)',
         field: 'timeTaken',
         sorter: 'number',
         width: 110,
         bottomCalc: 'sum',
-        bottomCalcParams: { precision: 2 },
+        bottomCalcParams: { precision: 3 },
       },
     ],
     rowFormatter: function (row) {
@@ -215,7 +215,7 @@ function renderSOQLTable() {
         relativeCost: explainLine?.relativeCost,
         soql: soql.text,
         rowCount: soql.rowCount,
-        timeTaken: Math.round((soql.duration / 1000000) * 100) / 100,
+        timeTaken: Math.round((soql.duration / 1000000) * 1000) / 1000,
         aggregations: soql.aggregations,
         timestamp: soql.timestamp,
         _children: [{ timestamp: soql.timestamp, isDetail: true }],
@@ -333,10 +333,10 @@ function renderSOQLTable() {
         formatter: 'money',
         formatterParams: {
           thousand: false,
-          precision: 2,
+          precision: 3,
         },
         bottomCalc: 'sum',
-        bottomCalcParams: { precision: 2 },
+        bottomCalcParams: { precision: 3 },
       },
       {
         title: 'Aggregations',
