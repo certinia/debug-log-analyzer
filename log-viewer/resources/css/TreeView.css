@@ -84,3 +84,10 @@
 .hide {
   display: none;
 }
+#calltreeContainer {
+  height: 100%;
+  display: contents;
+  max-height: 100%;
+  box-sizing: border-box;
+  width: 100%;
+}
