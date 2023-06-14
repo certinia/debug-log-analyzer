@@ -11,7 +11,7 @@ import parseLog, {
   getRootMethod,
   RootNode,
 } from './parsers/TreeParser';
-import renderTreeView from './TreeView';
+import { renderCallTree } from './calltree-view/CalltreeView';
 import renderTimeline, { setColors, renderTimelineKey } from './Timeline';
 import { renderAnalysis } from './analysis-view/AnalysisView';
 import { DatabaseAccess } from './Database';
@@ -161,7 +161,7 @@ async function displayLog(log: string, name: string, path: string) {
   await setStatus(name, path, 'Rendering...');
 
   timer('renderViews');
-  await Promise.all([renderTreeView(rootMethod), renderTimeline(rootMethod)]);
+  await renderTimeline(rootMethod);
 
   timer('');
   setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');
@@ -221,6 +221,11 @@ function onInit(): void {
   const analysisTab = document.getElementById('analysisTab');
   if (analysisTab) {
     analysisTab.addEventListener('click', () => renderAnalysis(rootMethod), { once: true });
+  }
+
+  const calltreeTab = document.getElementById('treeTab');
+  if (calltreeTab) {
+    calltreeTab.addEventListener('click', () => renderCallTree(rootMethod), { once: true });
   }
 
   const helpButton = document.querySelector('.helpLink');

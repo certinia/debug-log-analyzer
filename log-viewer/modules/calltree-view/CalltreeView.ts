@@ -3,6 +3,7 @@ import '../../resources/css/TreeView.css';
 
 import { TabulatorFull as Tabulator } from 'tabulator-tables';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
+import { hostService } from '../services/VSCodeService';
 
 export async function renderCallTree(rootMethod: RootNode) {
   new Tabulator('#calltreeTable', {
@@ -24,11 +25,49 @@ export async function renderCallTree(rootMethod: RootNode) {
       {
         title: 'Name',
         field: 'text',
-        // variableHeight: true,
         headerSortTristate: true,
         tooltip: true,
         bottomCalc: () => {
           return 'Total';
+        },
+        formatter: function (cell, _formatterParams, _onRendered) {
+          const node = (cell.getData() as CalltreeRow).originalData;
+          const text = node.text + (node.lineNumber ? ` Line:${node.lineNumber}` : '');
+          if (node.hasValidSymbols) {
+            const logLineBody = document.createElement('a');
+            logLineBody.href = '#';
+            logLineBody.textContent = text;
+            return logLineBody;
+          }
+          const textWrapper = document.createElement('span');
+          textWrapper.appendChild(document.createTextNode(text));
+          return textWrapper;
+        },
+        cellClick: (e, cell) => {
+          if (!(e.target as HTMLElement).matches('a')) {
+            return;
+          }
+          const node = (cell.getData() as CalltreeRow).originalData;
+          if (node.hasValidSymbols) {
+            const text = node.text;
+            const lineNumber = node.lineNumber ? '-' + node.lineNumber : '';
+            const bracketIndex = text.indexOf('(');
+            const qname = bracketIndex > -1 ? text.substring(0, bracketIndex) : text;
+
+            let typeName;
+            if (node.type === 'METHOD_ENTRY') {
+              const lastDot = qname.lastIndexOf('.');
+              typeName = text.substring(0, lastDot) + lineNumber;
+            } else {
+              typeName = qname + lineNumber;
+            }
+
+            const fileOpenInfo = {
+              typeName: typeName,
+              text: text,
+            };
+            hostService().openType(fileOpenInfo);
+          }
         },
         widthGrow: 5,
       },
