@@ -1,8 +1,8 @@
 import '../../resources/css/DatabaseView.scss';
 import { TabulatorFull as Tabulator } from 'tabulator-tables';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
+import { __values } from 'tslib';
 
-// todo: Group on type
 export async function renderAnalysis(rootMethod: RootNode) {
   const methodMap: Map<string, Metric> = new Map();
 
@@ -66,12 +66,7 @@ export async function renderAnalysis(rootMethod: RootNode) {
           thousand: false,
           precision: 3,
         },
-        bottomCalc: () => {
-          const toMs =
-            Math.round(((rootMethod.executionEndTime - rootMethod.timestamp) / 1000000) * 1000) /
-            1000;
-          return toMs;
-        },
+        bottomCalc: 'sum',
         bottomCalcParams: { precision: 3 },
       },
       {
