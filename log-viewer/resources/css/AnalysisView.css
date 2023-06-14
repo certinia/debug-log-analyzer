@@ -4,10 +4,3 @@
   max-height: 100%;
   box-sizing: border-box;
 }
-
-#analysisView > .buttonContainer {
-  align-items: center;
-  padding: 5px;
-  margin-bottom: 10px;
-  margin: 5px;
-}
