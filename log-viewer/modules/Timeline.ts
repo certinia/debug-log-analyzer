@@ -4,6 +4,7 @@
 import { showTreeNode } from './TreeView';
 import formatDuration, { debounce } from './Util';
 import { TimedNode, Method, RootNode, TimelineKey, truncated } from './parsers/TreeParser';
+import { goToRow } from './calltree-view/CalltreeView';
 interface TimelineGroup {
   label: string;
   fillColor: string;
@@ -619,7 +620,7 @@ function onClickCanvas(): void {
     const depth = ~~(((displayHeight - lastMouseY - state.offsetY) / realHeight) * maxY);
     const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
     if (target && target.timestamp) {
-      showTreeNode(target.timestamp);
+      goToRow(target.timestamp);
     }
   }
 }

@@ -74,6 +74,7 @@ export class TruncationEntry {
  */
 export abstract class LogLine {
   // common metadata (available for all lines)
+  selfTime = 0; // the net time spent in the node (when not inside children)
   duration = 0; // the time spent in the node
   timestamp = 0; // the timestamp of this log line
   type = ''; // the type of this log line
@@ -123,7 +124,6 @@ export class TimedNode extends LogLine {
 
   timelineKey: TimelineKey; // the formatting key for rendering this entry in the timeline
   cpuType: string; // the catagory key to collect our cpu usage
-  selfTime = 0; // the net time spent in the node (when not inside children)
   totalDmlCount = 0; // the number of DML_BEGIN decendants in a node
   totalSoqlCount = 0; // the number of SOQL_EXECUTE_BEGIN decendants in a node
   totalThrownCount = 0; // the number of EXCEPTION_THROWN decendants in a node

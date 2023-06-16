@@ -33,7 +33,7 @@ declare global {
 }
 
 let logSize: number;
-let rootMethod: RootNode;
+export let rootMethod: RootNode;
 
 async function setStatus(name: string, path: string, status: string, color?: string) {
   const statusHolder = document.getElementById('status') as HTMLDivElement,

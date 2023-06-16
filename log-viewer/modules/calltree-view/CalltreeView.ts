@@ -1,12 +1,20 @@
 import '../../resources/css/DatabaseView.scss';
 import '../../resources/css/TreeView.css';
 
-import { TabulatorFull as Tabulator } from 'tabulator-tables';
+import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
+import { showTab } from '../Util';
+import { rootMethod } from '../Main';
 
-export async function renderCallTree(rootMethod: RootNode) {
-  new Tabulator('#calltreeTable', {
+let calltreeTable: Tabulator;
+
+export async function renderCallTree(rootMethod: RootNode): Promise<void> {
+  if (calltreeTable) {
+    return Promise.resolve();
+  }
+
+  calltreeTable = new Tabulator('#calltreeTable', {
     data: toCallTree(rootMethod.children),
     layout: 'fitColumns',
     placeholder: 'No Calltree Available',
@@ -15,6 +23,7 @@ export async function renderCallTree(rootMethod: RootNode) {
     maxHeight: '100%',
     dataTree: true,
     dataTreeBranchElement: '<span/>',
+    selectable: 1,
     columnDefaults: {
       title: 'default',
       resizable: true,
@@ -142,6 +151,12 @@ export async function renderCallTree(rootMethod: RootNode) {
       },
     ],
   });
+
+  return new Promise((resolve) => {
+    calltreeTable.on('tableBuilt', () => {
+      resolve();
+    });
+  });
 }
 
 function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
@@ -175,6 +190,76 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
     results.push(data);
   }
   return results;
+}
+
+export async function goToRow(timestamp: number) {
+  showTab('treeTab');
+  await renderCallTree(rootMethod);
+
+  let treeRow: RowComponent | null = null;
+
+  const rows = calltreeTable.getRows();
+  const len = rows.length;
+  for (let i = 0; i < len; i++) {
+    const row = rows[i];
+    treeRow = findByTime(row, timestamp);
+    if (treeRow) {
+      break;
+    }
+  }
+
+  if (treeRow) {
+    const rowsToExpand = [];
+    let parent = treeRow.getTreeParent();
+    while (parent && !parent.isTreeExpanded()) {
+      rowsToExpand.push(parent);
+      parent = parent.getTreeParent();
+    }
+
+    calltreeTable.blockRedraw();
+    if (rowsToExpand.length) {
+      const len = rowsToExpand.length;
+      for (let i = 0; i < len; i++) {
+        const row = rowsToExpand[i];
+        row.treeExpand();
+      }
+    }
+
+    calltreeTable.getSelectedRows().map((row) => {
+      row.deselect();
+    });
+
+    treeRow.select();
+    calltreeTable.restoreRedraw();
+    calltreeTable.scrollToRow(treeRow, 'center');
+  }
+}
+
+function findByTime(row: RowComponent, timeStamp: number): RowComponent | null {
+  if (timeStamp) {
+    const node = (row.getData() as CalltreeRow).originalData;
+    if (node.timestamp === timeStamp) {
+      return row;
+    }
+    if (node instanceof TimedNode) {
+      // do not search children is the timestamp is outside of the parents timeframe
+      if (node.exitStamp && !(timeStamp >= node.timestamp && timeStamp <= node.exitStamp)) {
+        return null;
+      }
+
+      const treeChildren = row.getTreeChildren();
+      const len = treeChildren.length;
+      for (let i = 0; i < len; ++i) {
+        const child = treeChildren[i];
+
+        const target = findByTime(child, timeStamp);
+        if (target) {
+          return target;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 interface CalltreeRow {
