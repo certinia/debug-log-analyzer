@@ -121,6 +121,15 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
         bottomCalc: 'sum',
       },
       {
+        title: 'Rows',
+        field: 'rows',
+        sorter: 'number',
+        width: 60,
+        hozAlign: 'right',
+        headerHozAlign: 'right',
+        bottomCalc: 'sum',
+      },
+      {
         title: 'Total Time (ms)',
         field: 'duration',
         sorter: 'number',
@@ -191,6 +200,7 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
       totalDmlCount: 0,
       totalSoqlCount: 0,
       totalThrownCount: 0,
+      rows: node.rowCount || 0,
       originalData: node,
     };
 
@@ -284,4 +294,5 @@ interface CalltreeRow {
   totalDmlCount: number;
   totalSoqlCount: number;
   totalThrownCount: number;
+  rows: number;
 }
