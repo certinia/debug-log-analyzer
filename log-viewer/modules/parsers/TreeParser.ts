@@ -2240,7 +2240,7 @@ export function parseLine(line: string, lastEntry: LogLine | null): LogLine | nu
 
   if (!typePattern.test(type) && lastEntry?.acceptsText) {
     // wrapped text from the previous entry?
-    lastEntry.text += ` | ${line}`;
+    lastEntry.text += `\n${line}`;
   } else if (type) {
     if (type !== 'DUMMY') {
       /* Used by tests */

@@ -39,19 +39,32 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
         bottomCalc: () => {
           return 'Total';
         },
-        formatter: function (cell, _formatterParams, _onRendered) {
+        formatter: (cell, _formatterParams, _onRendered) => {
+          const cellElem = cell.getElement();
+          cellElem.classList.add('data-grid-textarea');
+
+          const row = cell.getRow();
+          // @ts-expect-error: _row is private. This is temporary and I will patch the text wrap behaviour in the library.
+          const treeLevel = row._row.modules.dataTree.index;
+          const indent = row.getTable().options.dataTreeChildIndent || 0;
+          const levelIndent = treeLevel * indent;
+          cellElem.style.paddingLeft = `${levelIndent + 4}px`;
+          cellElem.style.textIndent = `-${levelIndent}px`;
+
           const node = (cell.getData() as CalltreeRow).originalData;
-          const text = node.text + (node.lineNumber ? ` Line:${node.lineNumber}` : '');
+          const text = node.text + (node.lineNumber ? `:${node.lineNumber}` : '');
           if (node.hasValidSymbols) {
             const logLineBody = document.createElement('a');
             logLineBody.href = '#';
             logLineBody.textContent = text;
             return logLineBody;
           }
+
           const textWrapper = document.createElement('span');
           textWrapper.appendChild(document.createTextNode(text));
           return textWrapper;
         },
+        variableHeight: true,
         cellClick: (e, cell) => {
           if (!(e.target as HTMLElement).matches('a')) {
             return;
