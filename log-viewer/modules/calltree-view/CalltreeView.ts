@@ -22,6 +22,8 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
     height: '100%',
     maxHeight: '100%',
     dataTree: true,
+    // @ts-expect-error: needs to be added to type definition.
+    dataTreeChildColumnCalcs: true,
     dataTreeBranchElement: '<span/>',
     selectable: 1,
     columnDefaults: {
@@ -181,6 +183,18 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
     });
   });
 
+  document.getElementById('ct-expand')?.addEventListener('click', () => {
+    calltreeTable.blockRedraw();
+    expandAll(calltreeTable.getRows());
+    calltreeTable.restoreRedraw();
+  });
+
+  document.getElementById('ct-collapse')?.addEventListener('click', () => {
+    calltreeTable.blockRedraw();
+    collapseAll(calltreeTable.getRows());
+    calltreeTable.restoreRedraw();
+  });
+
   return new Promise((resolve) => {
     calltreeTable.on('tableBuilt', () => {
       resolve();
@@ -189,6 +203,26 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
       });
     });
   });
+}
+
+function expandAll(rows: RowComponent[]) {
+  const len = rows.length;
+  for (let i = 0; i < len; i++) {
+    const row = rows[i];
+    row.treeExpand();
+
+    expandAll(row.getTreeChildren());
+  }
+}
+
+function collapseAll(rows: RowComponent[]) {
+  const len = rows.length;
+  for (let i = 0; i < len; i++) {
+    const row = rows[i];
+    row.treeCollapse();
+
+    collapseAll(row.getTreeChildren());
+  }
 }
 
 function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
