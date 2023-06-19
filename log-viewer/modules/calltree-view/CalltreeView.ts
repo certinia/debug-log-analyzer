@@ -174,9 +174,19 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
     ],
   });
 
+  document.getElementById('calltree-show-details')?.addEventListener('change', (event) => {
+    const showDetails = event.target as HTMLInputElement;
+    calltreeTable.setFilter((data, _filterParams) => {
+      return showDetails.checked || !data.originalData.hideable;
+    });
+  });
+
   return new Promise((resolve) => {
     calltreeTable.on('tableBuilt', () => {
       resolve();
+      calltreeTable.setFilter((data, _filterParams) => {
+        return !data.originalData.hideable;
+      });
     });
   });
 }
