@@ -24,7 +24,7 @@ export class OpenFileInPackage {
         selection: new Selection(linePosition, linePosition),
       };
 
-      commands.executeCommand('vscode.open', Uri.file(path), options);
+      commands.executeCommand('vscode.open', Uri.file(path.trim()), options);
     }
   }
 }

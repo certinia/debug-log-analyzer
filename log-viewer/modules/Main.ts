@@ -145,6 +145,8 @@ async function renderLogSettings(logSettings: LogSetting[]) {
 }
 
 async function displayLog(log: string, name: string, path: string) {
+  name = name.trim();
+  path = path.trim();
   logSize = log.length;
   await setStatus(name, path, 'Processing...');
 

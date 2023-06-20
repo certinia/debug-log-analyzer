@@ -24,6 +24,6 @@ export class Display {
   }
 
   showFile(path: string): void {
-    commands.executeCommand('vscode.open', Uri.file(path));
+    commands.executeCommand('vscode.open', Uri.file(path.trim()));
   }
 }
