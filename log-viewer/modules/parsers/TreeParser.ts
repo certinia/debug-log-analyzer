@@ -87,7 +87,6 @@ export abstract class LogLine {
   isExit = false; // is a method exit line?
   lineNumber: LineNumber = null; // this log entry has a line number
   namespace: string | null = null; // the namespace of this log line
-  group: string | null = null; // analysis group
   value: string | null = null; // a variable value
   hasValidSymbols = false; // can we open source for this node?
   suffix: string | null = null; // extra description context
@@ -535,37 +534,37 @@ const cpuMap: Map<string, string> = new Map([
 
 export class CodeUnitStartedLine extends Method {
   suffix = ' (entrypoint)';
+  codeUnitType = '';
 
   constructor(parts: string[]) {
     super(parts, ['CODE_UNIT_FINISHED'], null, 'codeUnit', CodeUnitStartedLine.getCpuType(parts));
+
     const subParts = parts[3].split(':'),
       name = parts[4] || parts[3];
 
-    const codeUnitType = subParts[0];
-    switch (codeUnitType) {
+    this.codeUnitType = subParts[0] || parts[4].split('/')[0];
+    switch (this.codeUnitType) {
       case 'EventService':
         this.cpuType = 'method';
         this.namespace = parseObjectNamespace(subParts[1]);
-        this.group = 'EventService ' + this.namespace;
+
         this.text = parts[3];
         break;
       case 'Validation':
         this.cpuType = 'custom';
         this.declarative = true;
-        this.group = 'Validation';
-        this.text = name || codeUnitType + ':' + subParts[1];
+
+        this.text = name || this.codeUnitType + ':' + subParts[1];
         break;
       case 'Workflow':
         this.cpuType = 'custom';
         this.declarative = true;
-        this.group = codeUnitType;
-        this.text = name || codeUnitType;
+        this.text = name || this.codeUnitType;
         break;
       case 'Flow':
         this.cpuType = 'custom';
         this.declarative = true;
-        this.group = codeUnitType;
-        this.text = name || codeUnitType;
+        this.text = name || this.codeUnitType;
         break;
       default:
         this.cpuType = 'method';
@@ -683,7 +682,6 @@ class VFFormulaStartLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['VF_EVALUATE_FORMULA_END'], 'formula', 'systemMethod', 'custom');
     this.text = parts[3];
-    this.group = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -730,8 +728,6 @@ class VFPageMessageLine extends Detail {
 }
 
 class DMLBeginLine extends Method {
-  group = 'DML';
-
   constructor(parts: string[]) {
     super(parts, ['DML_END'], null, 'dml', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
@@ -761,7 +757,6 @@ class IdeasQueryExecuteLine extends Detail {
 }
 
 class SOQLExecuteBeginLine extends Method {
-  group = 'SOQL';
   aggregations = 0;
 
   constructor(parts: string[]) {
@@ -835,8 +830,6 @@ class SOQLExecuteExplainLine extends Detail {
 }
 
 class SOSLExecuteBeginLine extends Method {
-  group = 'SOQL';
-
   constructor(parts: string[]) {
     super(parts, ['SOSL_EXECUTE_END'], null, 'soql', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
@@ -892,7 +885,6 @@ class VariableScopeBeginLine extends Detail {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[3];
-    this.group = this.type;
     this.value = parts[4];
   }
 
@@ -914,7 +906,6 @@ class VariableAssignmentLine extends Detail {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[3];
-    this.group = this.type;
     this.value = parts[4];
   }
 }
@@ -923,7 +914,6 @@ class UserInfoLine extends Detail {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = this.type + ':' + parts[3] + ' ' + parts[4];
-    this.group = this.type;
   }
 }
 
@@ -935,7 +925,6 @@ class UserDebugLine extends Detail {
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[3];
     this.value = parts[4];
-    this.group = this.type;
   }
 }
 
@@ -943,7 +932,6 @@ class CumulativeLimitUsageLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['CUMULATIVE_LIMIT_USAGE_END'], null, 'systemMethod', 'system');
     this.text = this.type;
-    this.group = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -991,7 +979,6 @@ class LimitUsageLine extends Detail {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[3] + ' ' + parts[4] + ' out of ' + parts[5];
-    this.group = this.type;
   }
 }
 
@@ -1001,7 +988,6 @@ class LimitUsageForNSLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
-    this.group = this.type;
   }
 
   onAfter(_next: LogLine): void {
@@ -1158,7 +1144,6 @@ class EnteringManagedPackageLine extends Method {
 class EventSericePubBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['EVENT_SERVICE_PUB_END'], null, 'flow', 'custom');
-    this.group = this.type;
     this.text = parts[2];
   }
 
@@ -1180,7 +1165,6 @@ class EventSericePubDetailLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] + ' ' + parts[3] + ' ' + parts[4];
-    this.group = this.type;
   }
 }
 
@@ -1188,7 +1172,6 @@ class EventSericeSubBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['EVENT_SERVICE_SUB_END'], null, 'flow', 'custom');
     this.text = `${parts[2]} ${parts[3]}`;
-    this.group = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -1209,7 +1192,6 @@ class EventSericeSubDetailLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} ${parts[3]} ${parts[4]} ${parts[6]} ${parts[6]}`;
-    this.group = this.type;
   }
 }
 
@@ -1223,7 +1205,6 @@ export class FlowStartInterviewsBeginLine extends Method {
 
   onEnd(end: FlowStartInterviewsEndLine, stack: LogLine[]) {
     const flowType = this.getFlowType(stack);
-    this.group = flowType;
     this.suffix = ` (${flowType})`;
     this.text += this.getFlowName();
   }
@@ -1279,7 +1260,6 @@ class FlowStartInterviewBeginLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3];
-    this.group = this.type;
   }
 }
 
@@ -1293,7 +1273,6 @@ class FlowStartInterviewLimitUsageLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
-    this.group = this.type;
   }
 }
 
@@ -1329,7 +1308,6 @@ class FlowElementBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['FLOW_ELEMENT_END'], null, 'flow', 'custom');
-    this.group = this.type;
     this.text = this.type + ' : ' + parts[3] + ' ' + parts[4];
   }
 
@@ -1352,7 +1330,6 @@ class FlowElementDeferredLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] + ' ' + parts[3];
-    this.group = this.type;
   }
 }
 
@@ -1363,7 +1340,6 @@ class FlowElementAssignmentLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3] + ' ' + parts[4];
-    this.group = this.type;
   }
 }
 
@@ -1396,12 +1372,9 @@ class FlowWaitWaitingDetailLine extends Detail {
 }
 
 class FlowInterviewFinishedLine extends Detail {
-  group: string;
-
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3];
-    this.group = this.type;
   }
 }
 
@@ -1459,7 +1432,6 @@ class FlowActionCallDetailLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3] + ' : ' + parts[4] + ' : ' + parts[5] + ' : ' + parts[6];
-    this.group = this.type;
   }
 }
 
@@ -1467,7 +1439,6 @@ class FlowAssignmentDetailLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3] + ' : ' + parts[4] + ' : ' + parts[5];
-    this.group = this.type;
   }
 }
 
@@ -1475,7 +1446,6 @@ class FlowLoopDetailLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3] + ' : ' + parts[4];
-    this.group = this.type;
   }
 }
 
@@ -1483,7 +1453,6 @@ class FlowRuleDetailLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3] + ' : ' + parts[4];
-    this.group = this.type;
   }
 }
 
@@ -1493,7 +1462,6 @@ class FlowBulkElementBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['FLOW_BULK_ELEMENT_END'], null, 'flow', 'custom');
     this.text = `${this.type} : ${parts[2]} - ${parts[3]}`;
-    this.group = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -1515,7 +1483,6 @@ class FlowBulkElementDetailLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] + ' : ' + parts[3] + ' : ' + parts[4];
-    this.group = this.type;
   }
 }
 
@@ -1532,7 +1499,6 @@ class FlowBulkElementLimitUsageLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
-    this.group = this.type;
   }
 }
 
@@ -1612,7 +1578,6 @@ class ValidationRuleLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3];
-    this.group = this.type;
   }
 }
 
@@ -1638,7 +1603,6 @@ class ValidationFormulaLine extends Detail {
     const extra = parts.length > 3 ? ' ' + parts[3] : '';
 
     this.text = parts[2] + extra;
-    this.group = this.type;
   }
 }
 
@@ -1646,7 +1610,6 @@ class ValidationPassLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3];
-    this.group = this.type;
   }
 }
 
@@ -1682,7 +1645,6 @@ class WFFieldUpdateLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = ' ' + parts[2] + ' ' + parts[3] + ' ' + parts[4] + ' ' + parts[5] + ' ' + parts[6];
-    this.group = this.type;
   }
 }
 
@@ -1711,7 +1673,6 @@ class WFRuleEvalValueLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
-    this.group = this.type;
   }
 }
 
@@ -1721,7 +1682,6 @@ class WFRuleFilterLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
-    this.group = this.type;
   }
 }
 
@@ -1735,7 +1695,6 @@ class WFRuleNotEvaluatedLine extends Detail {
 
 class WFCriteriaBeginLine extends Method {
   declarative = true;
-  group = 'WF_CRITERIA';
 
   constructor(parts: string[]) {
     super(parts, ['WF_CRITERIA_END', 'WF_RULE_NOT_EVALUATED'], null, 'workflow', 'custom');
@@ -1761,7 +1720,6 @@ class WFFormulaLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] + ' : ' + parts[3];
-    this.group = this.type;
   }
 }
 
@@ -1769,7 +1727,6 @@ class WFActionLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
-    this.group = this.type;
   }
 }
 
@@ -1979,7 +1936,6 @@ class ExceptionThrownLine extends Detail {
 
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = text;
-    this.group = this.type;
   }
 }
 
