@@ -462,6 +462,7 @@ class ConstructorExitLine extends Detail {
 }
 
 class EmailQueueLine extends Detail {
+  acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
