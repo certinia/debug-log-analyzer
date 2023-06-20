@@ -660,7 +660,6 @@ class VFApexCallEndLine extends Detail {
 class VFDeserializeViewstateBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['VF_DESERIALIZE_VIEWSTATE_END'], null, 'systemMethod', 'method');
-    this.text = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -703,7 +702,6 @@ class VFSeralizeViewStateStartLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['VF_SERIALIZE_VIEWSTATE_END'], null, 'systemMethod', 'method');
-    this.text = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -931,7 +929,6 @@ class UserDebugLine extends Detail {
 class CumulativeLimitUsageLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['CUMULATIVE_LIMIT_USAGE_END'], null, 'systemMethod', 'system');
-    this.text = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -1109,7 +1106,6 @@ class SystemModeExitLine extends Detail {
 export class ExecutionStartedLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['EXECUTION_FINISHED'], null, 'method', 'method');
-    this.text = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -1122,7 +1118,6 @@ export class ExecutionFinishedLine extends Detail {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = this.type;
   }
 }
 
