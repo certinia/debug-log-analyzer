@@ -1201,8 +1201,8 @@ export class FlowStartInterviewsBeginLine extends Method {
       const elem = stack[i];
       // type = "CODE_UNIT_STARTED" a flow or Processbuilder was started directly
       // type = "FLOW_START_INTERVIEWS_BEGIN" a flow was started from a process builder
-      if (elem.type === 'CODE_UNIT_STARTED') {
-        flowType = elem.group === 'Flow' ? 'Flow' : 'Process Builder';
+      if (elem instanceof CodeUnitStartedLine) {
+        flowType = elem.codeUnitType === 'Flow' ? 'Flow' : 'Process Builder';
         break;
       } else if (elem.type === 'FLOW_START_INTERVIEWS_BEGIN') {
         flowType = 'Flow';
