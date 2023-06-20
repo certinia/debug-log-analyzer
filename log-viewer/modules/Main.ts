@@ -25,12 +25,6 @@ import '../resources/css/TreeView.css';
 import '../resources/css/TimelineView.css';
 import '../resources/css/AnalysisView.css';
 
-declare global {
-  interface Window {
-    activeNamespaces: string[];
-  }
-}
-
 let logSize: number;
 
 async function setStatus(name: string, path: string, status: string, color?: string) {
@@ -173,11 +167,7 @@ async function waitForRender() {
 function readLog() {
   const name = document.getElementById('LOG_FILE_NAME')?.innerHTML;
   const path = document.getElementById('LOG_FILE_PATH')?.innerHTML;
-  const ns = document.getElementById('LOG_FILE_NS')?.innerHTML;
   const logUri = document.getElementById('LOG_FILE_URI')?.innerHTML;
-
-  // hacky I know
-  window.activeNamespaces = ns?.split(',') ?? [];
 
   if (logUri) {
     fetch(logUri)
