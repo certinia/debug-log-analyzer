@@ -721,6 +721,7 @@ class VFSeralizeViewStateEndLine extends Detail {
 }
 
 class VFPageMessageLine extends Detail {
+  acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
