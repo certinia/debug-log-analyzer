@@ -203,7 +203,7 @@ function describeMethod(node: Method): Node[] {
 
 function renderBlock(line: LogLine) {
   const lineNode = divElem.cloneNode() as HTMLDivElement;
-  lineNode.className = line instanceof Detail && line.hideable ? 'block name detail' : 'block name';
+  lineNode.className = !line.duration ? 'block name detail' : 'block name';
   lineNode.line = line;
 
   let valueElem;

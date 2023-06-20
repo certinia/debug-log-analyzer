@@ -1,3 +1,11 @@
+//todo: add keybindings (up, down, left, right)
+//todo: add filter close to the originals (min, max filters)
+
+//todo: future
+//todo: add class to locate current tree for current log
+//todo: add filter on line type
+//todo: add filter on log level (fine, finer etc)
+
 import '../../resources/css/DatabaseView.scss';
 import '../../resources/css/TreeView.css';
 
@@ -179,7 +187,7 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
   document.getElementById('calltree-show-details')?.addEventListener('change', (event) => {
     const showDetails = event.target as HTMLInputElement;
     calltreeTable.setFilter((data, _filterParams) => {
-      return showDetails.checked || !data.originalData.hideable;
+      return showDetails.checked || data.originalData.duration || data.originalData.discontinuity;
     });
   });
 
@@ -199,7 +207,7 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
     calltreeTable.on('tableBuilt', () => {
       resolve();
       calltreeTable.setFilter((data, _filterParams) => {
-        return !data.originalData.hideable;
+        return data.originalData.duration || data.originalData.discontinuity;
       });
     });
   });
