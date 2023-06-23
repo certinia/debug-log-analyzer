@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## Added
+
+- Redesigned Call tree ([#297][#297])
+  - All columns are sortable ascending or descending by clicking the header
+  - Child rows will be sorted within their parent
+  - The name column has 3 states call order, ascending or descending
+  - Columns for DML Count, SOQL Count, Throws Count, Rows Count, Total Time and Self Time.
+  - Keyboard navigation to move between selected rows. Use the up and down arrows for up and down and left and right to collapse or expand the tree.
+  - Virtualised rows means much better performance
+
 ## Changed
 
 - Increase the supported log size for the go to log hyperlink to larger than 50MB ([#254][#254])
@@ -231,3 +241,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#280]: https://github.com/certinia/debug-log-analyzer/issues/280
 [#288]: https://github.com/certinia/debug-log-analyzer/issues/288
 [#254]: https://github.com/certinia/debug-log-analyzer/issues/254
+[#297]: https://github.com/certinia/debug-log-analyzer/issues/297
