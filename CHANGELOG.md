@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## Added
+### Added
 
 - Redesigned Call tree ([#297][#297])
   - All columns are sortable ascending or descending by clicking the header
@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Keyboard navigation to move between selected rows. Use the up and down arrows for up and down and left and right to collapse or expand the tree.
   - Virtualised rows means much better performance
 
-## Changed
+### Changed
 
 - Increase the supported log size for the go to log hyperlink to larger than 50MB ([#254][#254])
 - Renamed `Log: Load Apex Log For Analysis` to `Log: Retrieve Apex Log And Show Analysis` ([#288][#288])
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.6.0] - 2023-05-19
 
-## Added
+### Added
 
 - Redesigned Database tab ([#219][#219])
   - All columns are sortable ascending /descending by clicking the header
@@ -73,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.0] - 2022-08-08
 
-## Added
+### Added
 
 - Calltree filtering to hide nodes where total duration is less than a given time ([#112][#112])
 - An `EXCEPTION_THROWN` marker (T) to supplement the`DML_BEGIN` (D) and `SOQL_EXECUTE_BEGIN` (S) markers on parent nodes ([#135][#135])
