@@ -1267,8 +1267,6 @@ class FlowStartScheduledRecordsLine extends LogLine {
   }
 }
 class FlowCreateInterviewBeginLine extends LogLine {
-  text = '';
-
   constructor(parts: string[]) {
     super(parts);
   }
