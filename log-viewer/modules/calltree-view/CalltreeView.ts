@@ -22,6 +22,82 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
     return Promise.resolve();
   }
 
+  type Module = { [key: string]: unknown };
+  const rowNavKeyBindings: Module = {
+    previousRow: function () {
+      const table = this.table as Tabulator;
+      const row = table.getSelectedRows()[0];
+      const previousRow = row?.getPrevRow();
+      if (previousRow) {
+        table.blockRedraw();
+        row.deselect();
+        previousRow.select();
+        table.restoreRedraw();
+        previousRow.getElement().scrollIntoView({ block: 'nearest' });
+      }
+    },
+    nextRow: function () {
+      const table = this.table as Tabulator;
+      const row = table.getSelectedRows()[0];
+      const nextRow = row?.getNextRow();
+      if (nextRow) {
+        table.blockRedraw();
+        row.deselect();
+        nextRow.select();
+        table.restoreRedraw();
+        nextRow.getElement().scrollIntoView({ block: 'nearest' });
+      }
+    },
+    expandRow: function () {
+      const table = this.table as Tabulator;
+      const row = table.getSelectedRows()[0];
+      if (!row) {
+        return;
+      }
+
+      if (row.isTreeExpanded()) {
+        const nextRow = row?.getNextRow();
+        if (nextRow && nextRow.getTreeParent() === row) {
+          table.blockRedraw();
+          row.deselect();
+          nextRow.select();
+          table.restoreRedraw();
+          nextRow.getElement().scrollIntoView({ block: 'nearest' });
+        }
+      } else {
+        row.treeExpand();
+      }
+    },
+    collapseRow: function () {
+      const table = this.table as Tabulator;
+      const row = table.getSelectedRows()[0];
+      if (!row) {
+        return;
+      }
+
+      if (!row.isTreeExpanded()) {
+        const prevRow = row?.getTreeParent();
+        if (prevRow) {
+          table.blockRedraw();
+          row.deselect();
+          prevRow.select();
+          table.restoreRedraw();
+          prevRow.getElement().scrollIntoView({ block: 'nearest' });
+        }
+      } else {
+        row.treeCollapse();
+      }
+    },
+  };
+
+  Tabulator.extendModule('keybindings', 'actions', rowNavKeyBindings);
+  Tabulator.extendModule('keybindings', 'bindings', {
+    previousRow: '38',
+    nextRow: '40',
+    expandRow: '39',
+    collapseRow: '37',
+  });
+
   calltreeTable = new Tabulator('#calltreeTable', {
     data: toCallTree(rootMethod.children),
     layout: 'fitColumns',
@@ -183,6 +259,30 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
       },
     ],
   });
+
+  calltreeTable.on('dataTreeRowExpanded', (row, _level) => {
+    const selectedRow = row.getTable().getSelectedRows()[0];
+    if (!selectedRow) {
+      row.select();
+    }
+  });
+
+  calltreeTable.on('dataTreeRowCollapsed', (row, _level) => {
+    const selectedRow = row.getTable().getSelectedRows()[0];
+    if (!selectedRow) {
+      row.select();
+    }
+  });
+
+  document.getElementById('calltreeTable')?.addEventListener(
+    'keydown',
+    function (e) {
+      if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Space'].indexOf(e.key) > -1) {
+        e.preventDefault();
+      }
+    },
+    false
+  );
 
   document.getElementById('calltree-show-details')?.addEventListener('change', (event) => {
     const showDetails = event.target as HTMLInputElement;
