@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { LogService, LogRecord } from '@salesforce/apex-node';
 import { AuthHelper } from '@apexdevtools/sfdx-auth-helper';
+import { LogRecord, LogService } from '@salesforce/apex-node';
 
 export class GetLogFiles {
   static async apply(wsPath: string): Promise<LogRecord[]> {

@@ -3,9 +3,8 @@
  */
 // todo: jsforce need to be fixed for bundling
 // todo: https://github.com/forcedotcom/node-bunyan needs requires with concat fixing e.g require('mv'+'') to just mv
-
-import { LogService } from '@salesforce/apex-node';
 import { AuthHelper } from '@apexdevtools/sfdx-auth-helper';
+import { LogService } from '@salesforce/apex-node';
 import { createWriteStream, mkdirSync } from 'fs';
 import { join as pathJoin } from 'path';
 
