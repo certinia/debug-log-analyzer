@@ -2,7 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import formatDuration from './Util';
-import { TimedNode, RootNode } from './parsers/TreeParser';
+import { RootNode, TimedNode } from './parsers/TreeParser';
 
 type SortKey = 'count' | 'duration' | 'selfTime' | 'name';
 

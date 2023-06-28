@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
-import { Workspaces, Workspace } from '@apexdevtools/apex-ls';
+import { Workspace, Workspaces } from '@apexdevtools/apex-ls';
 
 export class SymbolFinder {
   findSymbol(wsPath: string, symbol: string): string | null {

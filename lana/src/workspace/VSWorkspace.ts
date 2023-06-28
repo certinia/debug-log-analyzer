@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
 import { WorkspaceFolder } from 'vscode';
 
 export class VSWorkspace {
