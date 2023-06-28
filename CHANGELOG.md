@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Columns for DML Count, SOQL Count, Throws Count, Rows Count, Total Time and Self Time.
   - Keyboard navigation to move between selected rows. Use the up and down arrows for up and down and left and right to collapse or expand the tree.
   - Virtualised rows means much better performance
+- Redesigned Analysis view ([#294][#294])
+  - All columns are sortable ascending or descending by clicking the header
+  - Columns for to show Event Type, Aggregated Total Time and Aggregated Self Time.
+  - Virtualised row rendered to greatly improve performance
+  - Group by Event Type to show aggregated totals for each type e.g See the Total Time for all `METHOD_ENTRY` events
 
 ### Changed
 
@@ -242,3 +247,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#288]: https://github.com/certinia/debug-log-analyzer/issues/288
 [#254]: https://github.com/certinia/debug-log-analyzer/issues/254
 [#297]: https://github.com/certinia/debug-log-analyzer/issues/297
+[#294]: https://github.com/certinia/debug-log-analyzer/issues/294

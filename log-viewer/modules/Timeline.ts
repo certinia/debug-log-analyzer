@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { showTreeNode } from './TreeView';
 import formatDuration, { debounce } from './Util';
-import { TimedNode, Method, RootNode, TimelineKey, truncated } from './parsers/TreeParser';
 import { goToRow } from './calltree-view/CalltreeView';
+import { Method, RootNode, TimedNode, TimelineKey, truncated } from './parsers/TreeParser';
+
 interface TimelineGroup {
   label: string;
   fillColor: string;

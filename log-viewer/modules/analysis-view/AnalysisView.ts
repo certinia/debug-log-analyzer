@@ -1,7 +1,8 @@
-import '../../resources/css/DatabaseView.scss';
 import { TabulatorFull as Tabulator } from 'tabulator-tables';
+
+import '../../resources/css/DatabaseView.scss';
+import Number from '../datagrid/format/Number';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
-import { __values } from 'tslib';
 
 export async function renderAnalysis(rootMethod: RootNode) {
   const methodMap: Map<string, Metric> = new Map();
@@ -61,13 +62,14 @@ export async function renderAnalysis(rootMethod: RootNode) {
         width: 100,
         hozAlign: 'right',
         headerHozAlign: 'right',
-        formatter: 'money',
+        formatter: Number,
         formatterParams: {
           thousand: false,
           precision: 3,
         },
+        bottomCalcFormatter: Number,
         bottomCalc: 'sum',
-        bottomCalcParams: { precision: 3 },
+        bottomCalcFormatterParams: { precision: 3 },
       },
       {
         title: 'Self Time (ms)',
@@ -77,12 +79,13 @@ export async function renderAnalysis(rootMethod: RootNode) {
         hozAlign: 'right',
         headerHozAlign: 'right',
         bottomCalc: 'sum',
-        bottomCalcParams: { precision: 3 },
-        formatter: 'money',
+        bottomCalcFormatterParams: { precision: 3 },
+        formatter: Number,
         formatterParams: {
           thousand: false,
           precision: 3,
         },
+        bottomCalcFormatter: Number,
       },
     ],
   });
@@ -96,15 +99,12 @@ export async function renderAnalysis(rootMethod: RootNode) {
 export class Metric {
   name: string;
   type: string;
-  count: number;
-  totalTime: number;
-  selfTime: number;
+  count = 0;
+  totalTime = 0;
+  selfTime = 0;
 
-  constructor(name: string, count: number, totalTime: number, selfTime: number, node: TimedNode) {
+  constructor(name: string, node: TimedNode) {
     this.name = name;
-    this.count = count;
-    this.totalTime = totalTime;
-    this.selfTime = selfTime;
     this.type = node.type;
   }
 }
@@ -113,27 +113,17 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
   const children = node.children;
 
   if (key) {
-    const totalTime = node.duration / 1000000;
-    const selfTime = node.selfTime / 1000000;
-    const metric = map.get(key);
-    if (metric) {
-      ++metric.count;
-      if (totalTime) {
-        metric.totalTime = Math.round((metric.totalTime + totalTime) * 1000) / 1000;
-        metric.selfTime = Math.round((metric.selfTime + selfTime) * 1000) / 1000;
-      }
-    } else {
-      map.set(
-        key,
-        new Metric(
-          key,
-          1,
-          Math.round(totalTime * 1000) / 1000,
-          Math.round(selfTime * 1000) / 1000,
-          node
-        )
-      );
+    const totalTime = node.duration;
+    const selfTime = node.selfTime;
+    let metric = map.get(key);
+    if (!metric) {
+      metric = new Metric(key, node);
+      map.set(key, metric);
     }
+
+    ++metric.count;
+    metric.totalTime += totalTime;
+    metric.selfTime += selfTime;
   }
 
   children.forEach(function (child) {

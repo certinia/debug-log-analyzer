@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
 import { QuickPickItem, QuickPickOptions, window } from 'vscode';
 
 export class Item implements QuickPickItem {

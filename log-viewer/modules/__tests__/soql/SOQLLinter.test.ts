@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
+import { Method } from '../../parsers/TreeParser';
 import { SOQLLinter } from '../../soql/SOQLLinter';
 
 describe('SOQL Linter rule tests', () => {
@@ -143,7 +144,6 @@ describe('Order By Without Limit Rule tests', () => {
   });
 });
 
-import { Method } from '../../parsers/TreeParser';
 describe('SOQL in Trigger Rule tests', () => {
   const triggerNonSelective = {
     summary: 'Ensure SOQL in trigger is selective.',

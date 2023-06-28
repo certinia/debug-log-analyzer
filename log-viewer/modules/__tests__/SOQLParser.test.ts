@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
 import { SOQLParser, SyntaxException } from '../parsers/SOQLParser';
 
 describe('Analyse database tests', () => {

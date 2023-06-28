@@ -1,18 +1,18 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
-import { Context } from '../Context';
-import { Command } from './Command';
-import { LogView } from './LogView';
-import { appName } from '../AppSettings';
-import { Item, Options, QuickPick } from '../display/QuickPick';
-import { QuickPickWorkspace } from '../display/QuickPickWorkspace';
-import { GetLogFiles, GetLogFilesResult } from '../sfdx/logs/GetLogFiles';
-import { GetLogFile } from '../sfdx/logs/GetLogFile';
 import * as fs from 'fs';
 import * as path from 'path';
 import { WebviewPanel, window } from 'vscode';
+
+import { appName } from '../AppSettings';
+import { Context } from '../Context';
+import { Item, Options, QuickPick } from '../display/QuickPick';
+import { QuickPickWorkspace } from '../display/QuickPickWorkspace';
+import { GetLogFile } from '../sfdx/logs/GetLogFile';
+import { GetLogFiles, GetLogFilesResult } from '../sfdx/logs/GetLogFiles';
+import { Command } from './Command';
+import { LogView } from './LogView';
 
 class DebugLogItem extends Item {
   logId: string;
