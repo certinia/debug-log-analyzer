@@ -827,7 +827,7 @@ class SOSLExecuteBeginLine extends Method {
     return 'SOSL';
   }
 
-  onEnd(end: SOSLExecuteEndLine, _stack: Detail[]): void {
+  onEnd(end: SOSLExecuteEndLine, _stack: LogLine[]): void {
     this.rowCount = end.rowCount;
   }
 }

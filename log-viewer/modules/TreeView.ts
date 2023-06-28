@@ -2,7 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import formatDuration, { showTab } from './Util';
-import { Detail, LogLine, Method, RootNode, TimedNode } from './parsers/TreeParser';
+import { LogLine, Method, RootNode, TimedNode } from './parsers/TreeParser';
 import { OpenInfo, hostService } from './services/VSCodeService';
 
 declare global {
