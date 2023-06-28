@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { LitElement, html, css } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+
 import { Method } from '../parsers/TreeParser';
 
 @customElement('database-section')

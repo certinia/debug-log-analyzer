@@ -4,15 +4,9 @@ import { RootNode } from './parsers/TreeParser';
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 function collectNamespaces(node: RootNode): Set<string> {
-  const children = node.children;
   const namespaces = new Set<string>();
   let i = 0;
-  while (i < window.activeNamespaces.length) {
-    namespaces.add(window.activeNamespaces[i]);
-    ++i;
-  }
-
-  i = 0;
+  const children = node.children;
   while (i < children.length) {
     const child = children[i],
       childType = child.type;

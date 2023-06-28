@@ -7,13 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## Changed
+### Added
 
+- Redesigned Analysis view ([#294][#294])
+  - All columns are sortable ascending or descending by clicking the header
+  - Columns for to show Event Type, Aggregated Total Time and Aggregated Self Time.
+  - Virtualised row rendered to greatly improve performance
+  - Group by Event Type to show aggregated totals for each type e.g See the Total Time for all `METHOD_ENTRY` events
+
+### Changed
+
+- Increase the supported log size for the go to log hyperlink to larger than 50MB ([#254][#254])
+- Renamed `Log: Load Apex Log For Analysis` to `Log: Retrieve Apex Log And Show Analysis` ([#288][#288])
 - Update minimum supported vscode version to v1.74.0 ([#280][#280])
 
 ## [1.6.0] - 2023-05-19
 
-## Added
+### Added
 
 - Redesigned Database tab ([#219][#219])
   - All columns are sortable ascending /descending by clicking the header
@@ -61,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.0] - 2022-08-08
 
-## Added
+### Added
 
 - Calltree filtering to hide nodes where total duration is less than a given time ([#112][#112])
 - An `EXCEPTION_THROWN` marker (T) to supplement the`DML_BEGIN` (D) and `SOQL_EXECUTE_BEGIN` (S) markers on parent nodes ([#135][#135])
@@ -227,3 +237,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#235]: https://github.com/certinia/debug-log-analyzer/issues/235
 [#264]: https://github.com/certinia/debug-log-analyzer/issues/264
 [#280]: https://github.com/certinia/debug-log-analyzer/issues/280
+[#288]: https://github.com/certinia/debug-log-analyzer/issues/288
+[#254]: https://github.com/certinia/debug-log-analyzer/issues/254
+[#294]: https://github.com/certinia/debug-log-analyzer/issues/294

@@ -1,37 +1,32 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { showTab } from './Util';
-import parseLog, {
-  getLogSettings,
-  TimedNode,
-  LogSetting,
-  truncated,
-  totalDuration,
-  getRootMethod,
-} from './parsers/TreeParser';
-import renderTreeView from './TreeView';
-import renderTimeline, { setColors, renderTimelineKey } from './Timeline';
-import analyseMethods, { renderAnalysis } from './Analysis';
+import '../resources/css/AnalysisView.css';
+import '../resources/css/Settings.css';
+import '../resources/css/Status.css';
+import '../resources/css/Tabber.css';
+import '../resources/css/TimelineView.css';
+import '../resources/css/TreeView.css';
 import { DatabaseAccess } from './Database';
 import { setNamespaces } from './NamespaceExtrator';
-import { hostService } from './services/VSCodeService';
+import renderTimeline, { renderTimelineKey, setColors } from './Timeline';
+import renderTreeView from './TreeView';
+import { showTab } from './Util';
+import { renderAnalysis } from './analysis-view/AnalysisView';
 import { renderDBGrid } from './database-view/DatabaseView';
-
-import '../resources/css/Status.css';
-import '../resources/css/Settings.css';
-import '../resources/css/Tabber.css';
-import '../resources/css/TreeView.css';
-import '../resources/css/TimelineView.css';
-import '../resources/css/AnalysisView.css';
-
-declare global {
-  interface Window {
-    activeNamespaces: string[];
-  }
-}
+import parseLog, {
+  LogSetting,
+  RootNode,
+  TimedNode,
+  getLogSettings,
+  getRootMethod,
+  totalDuration,
+  truncated,
+} from './parsers/TreeParser';
+import { hostService } from './services/VSCodeService';
 
 let logSize: number;
+let rootMethod: RootNode;
 
 async function setStatus(name: string, path: string, status: string, color?: string) {
   const statusHolder = document.getElementById('status') as HTMLDivElement,
@@ -150,16 +145,16 @@ async function displayLog(log: string, name: string, path: string) {
   await Promise.all([renderLogSettings(getLogSettings(log)), parseLog(log)]);
 
   timer('getRootMethod');
-  const rootMethod = getRootMethod();
+  rootMethod = getRootMethod();
 
   timer('analyse');
   await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
-  await Promise.all([analyseMethods(rootMethod), DatabaseAccess.create(rootMethod)]);
+  await Promise.all([DatabaseAccess.create(rootMethod)]);
 
   await setStatus(name, path, 'Rendering...');
 
   timer('renderViews');
-  await Promise.all([renderTreeView(rootMethod), renderTimeline(rootMethod), renderAnalysis()]);
+  await Promise.all([renderTreeView(rootMethod), renderTimeline(rootMethod)]);
 
   timer('');
   setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');
@@ -173,11 +168,7 @@ async function waitForRender() {
 function readLog() {
   const name = document.getElementById('LOG_FILE_NAME')?.innerHTML;
   const path = document.getElementById('LOG_FILE_PATH')?.innerHTML;
-  const ns = document.getElementById('LOG_FILE_NS')?.innerHTML;
   const logUri = document.getElementById('LOG_FILE_URI')?.innerHTML;
-
-  // hacky I know
-  window.activeNamespaces = ns?.split(',') ?? [];
 
   if (logUri) {
     fetch(logUri)
@@ -214,6 +205,11 @@ function onInit(): void {
   const dbTab = document.getElementById('databaseTab');
   if (dbTab) {
     dbTab.addEventListener('click', renderDBGrid, { once: true });
+  }
+
+  const analysisTab = document.getElementById('analysisTab');
+  if (analysisTab) {
+    analysisTab.addEventListener('click', () => renderAnalysis(rootMethod), { once: true });
   }
 
   const helpButton = document.querySelector('.helpLink');

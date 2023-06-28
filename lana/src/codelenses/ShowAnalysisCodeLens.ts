@@ -1,6 +1,7 @@
-import { CodeLensProvider, TextDocument, CodeLens, Range, languages } from 'vscode';
-import { ShowLogFile } from '../commands/ShowLogFile';
+import { CodeLens, CodeLensProvider, Range, TextDocument, languages } from 'vscode';
+
 import { Context } from '../Context';
+import { ShowLogAnalysis } from '../commands/ShowLogAnalysis';
 
 class ShowAnalysisCodeLens implements CodeLensProvider {
   context: Context;
@@ -13,7 +14,7 @@ class ShowAnalysisCodeLens implements CodeLensProvider {
     const topOfDocument = new Range(0, 0, 0, 0);
 
     // Define what command we want to trigger when activating the CodeLens
-    const command = ShowLogFile.getCommand(this.context);
+    const command = ShowLogAnalysis.getCommand(this.context);
     const codeLens = new CodeLens(topOfDocument, {
       command: command.fullName,
       title: command.title,

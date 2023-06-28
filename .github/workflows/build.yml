@@ -13,16 +13,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
       - name: Set up Node
         uses: actions/setup-node@v3
         with:
           node-version: '16'
-          cache: 'npm'
+          cache: 'pnpm'
       - name: Install vsce
-        run: npm install --global @vscode/vsce
+        run: pnpm add --global @vscode/vsce
       - name: Dependencies
         run: |
-          npm ci
+          HUSKY=0 pnpm install
       - name: Build
         run: |
           cd lana

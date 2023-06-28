@@ -44,11 +44,11 @@
   "contributes": {
     "commands": [
       {
-        "command": "lana.loadLogFile",
-        "title": "Log: Load Apex Log For Analysis"
+        "command": "lana.retrieveLogFile",
+        "title": "Log: Retrieve Apex Log And Show Analysis"
       },
       {
-        "command": "lana.showLogFile",
+        "command": "lana.showLogAnalysis",
         "title": "Log: Show Apex Log Analysis"
       }
     ],
@@ -69,19 +69,19 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "lana.showLogFile",
+          "command": "lana.showLogAnalysis",
           "when": "resourceLangId == apexlog"
         }
       ],
       "editor/context": [
         {
-          "command": "lana.showLogFile",
+          "command": "lana.showLogAnalysis",
           "when": "resourceLangId == apexlog"
         }
       ],
       "explorer/context": [
         {
-          "command": "lana.showLogFile",
+          "command": "lana.showLogAnalysis",
           "when": "resourceLangId == apexlog"
         }
       ]
@@ -145,16 +145,17 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "npm run build --prefix ..",
+    "vscode:prepublish": "pnpm run compile",
+    "compile": "pnpm -w run build",
     "local-compile": "rm -rf out && rollup -c rollup.config.mjs",
     "prettier-format": "prettier 'src/**/*.ts' --write",
     "watch": "rollup -w -c rollup.config.mjs",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src --ext ts",
-    "log-viewer": "npm run log-viewer-build && npm run log-viewer-copy",
-    "log-viewer-build": "(cd ../log-viewer; npm ci && npm run build)",
-    "log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/."
+    "pretest": "pnpm run compile && pnpm run lint",
+    "lint": "concurrently 'eslint src --ext ts' 'npm run tsc:lint'",
+    "log-viewer": "pnpm run log-viewer-build && pnpm run log-viewer-copy",
+    "log-viewer-build": "(cd ../log-viewer; pnpm ci && pnpm run build)",
+    "log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/.",
+    "tsc:lint": "tsc --noemit --skipLibCheck"
   },
   "dependencies": {
     "@apexdevtools/apex-ls": "^4.2.0",
@@ -165,14 +166,8 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-node-resolve": "^15.0.2",
-    "@rollup/plugin-terser": "^0.4.0",
-    "@rollup/plugin-typescript": "^11.1.1",
     "@types/node": "^16.x.x",
     "@types/vscode": "^1.74.0",
-    "@typescript-eslint/eslint-plugin": "^5.33.0",
-    "@typescript-eslint/parser": "^5.33.0",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-plugin-prettier": "^4.2.1",
     "prettier": "^2.7.1",
     "rollup": "^3.22.0",
     "typescript": "^5.0.4"

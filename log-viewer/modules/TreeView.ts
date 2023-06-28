@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { LogLine, Method, Detail, RootNode, TimedNode } from './parsers/TreeParser';
 import formatDuration, { showTab } from './Util';
-import { hostService, OpenInfo } from './services/VSCodeService';
+import { Detail, LogLine, Method, RootNode, TimedNode } from './parsers/TreeParser';
+import { OpenInfo, hostService } from './services/VSCodeService';
 
 declare global {
   interface HTMLElement {

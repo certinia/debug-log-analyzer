@@ -1,11 +1,10 @@
-import '../../resources/css/DatabaseView.scss';
-import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 import { html, render } from 'lit';
+import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
+import '../../resources/css/DatabaseView.scss';
 import { DatabaseAccess } from '../Database';
-import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
-
 import '../components/CallStack';
+import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
 
@@ -47,7 +46,7 @@ function renderDMLTable() {
       dmlData.push({
         dml: dml.text,
         rowCount: dml.rowCount,
-        timeTaken: Math.round((dml.duration / 1000000) * 100) / 100,
+        timeTaken: Math.round((dml.duration / 1000000) * 1000) / 1000,
         timestamp: dml.timestamp,
         _children: [{ timestamp: dml.timestamp, isDetail: true }],
       });
@@ -71,7 +70,11 @@ function renderDMLTable() {
       });
 
       const newCount = hasDetail ? count - 1 : count;
-      return `<div class="db-group-title" title="${value}">${value}</div><span>(${newCount} DML)</span>`;
+      return `
+      <div class="db-group-wrapper">
+        <div class="db-group-title" title="${value}">${value}</div><span>(${newCount} DML)</span>
+      </div>
+        `;
     },
     groupToggleElement: 'header',
     selectable: 1,
@@ -99,14 +102,14 @@ function renderDMLTable() {
           return 'Total';
         },
       },
-      { title: 'Row Count', field: 'rowCount', sorter: 'number', width: 110, bottomCalc: 'sum' },
+      { title: 'Row Count', field: 'rowCount', sorter: 'number', width: 90, bottomCalc: 'sum' },
       {
         title: 'Time Taken (ms)',
         field: 'timeTaken',
         sorter: 'number',
         width: 110,
         bottomCalc: 'sum',
-        bottomCalcParams: { precision: 2 },
+        bottomCalcParams: { precision: 3 },
       },
     ],
     rowFormatter: function (row) {
@@ -211,7 +214,7 @@ function renderSOQLTable() {
         relativeCost: explainLine?.relativeCost,
         soql: soql.text,
         rowCount: soql.rowCount,
-        timeTaken: Math.round((soql.duration / 1000000) * 100) / 100,
+        timeTaken: Math.round((soql.duration / 1000000) * 1000) / 1000,
         aggregations: soql.aggregations,
         timestamp: soql.timestamp,
         _children: [{ timestamp: soql.timestamp, isDetail: true }],
@@ -236,9 +239,12 @@ function renderSOQLTable() {
       });
 
       const newCount = hasDetail ? count - 1 : count;
-      return `<div class="db-group-title" title="${value}">${value}</div><span>(${newCount} ${
+      return `
+      <div class="db-group-wrapper">
+        <div class="db-group-title" title="${value}">${value}</div><span>(${newCount} ${
         newCount > 1 ? 'Queries' : 'Query'
-      })</span>`;
+      })</span>
+      </div>`;
     },
     groupToggleElement: 'header',
     selectable: 1,
@@ -264,7 +270,7 @@ function renderSOQLTable() {
         formatterParams: {
           allowEmpty: true,
         },
-        width: 25,
+        width: 40,
         hozAlign: 'center',
         vertAlign: 'middle',
         sorter: function (a, b, aRow, bRow, _column, dir, _sorterParams) {
@@ -300,6 +306,7 @@ function renderSOQLTable() {
       {
         title: 'SOQL',
         field: 'soql',
+        headerSortStartingDir: 'asc',
         sorter: 'string',
         tooltip: true,
         bottomCalc: () => {
@@ -310,22 +317,33 @@ function renderSOQLTable() {
         title: 'Row Count',
         field: 'rowCount',
         sorter: 'number',
-        width: 110,
+        width: 100,
+        hozAlign: 'right',
+        headerHozAlign: 'right',
         bottomCalc: 'sum',
       },
       {
         title: 'Time Taken (ms)',
         field: 'timeTaken',
         sorter: 'number',
-        width: 110,
+        width: 120,
+        hozAlign: 'right',
+        headerHozAlign: 'right',
+        formatter: 'money',
+        formatterParams: {
+          thousand: false,
+          precision: 3,
+        },
         bottomCalc: 'sum',
-        bottomCalcParams: { precision: 2 },
+        bottomCalcParams: { precision: 3 },
       },
       {
         title: 'Aggregations',
         field: 'aggregations',
         sorter: 'number',
-        width: 110,
+        width: 100,
+        hozAlign: 'right',
+        headerHozAlign: 'right',
         bottomCalc: 'sum',
       },
     ],

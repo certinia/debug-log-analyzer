@@ -13,7 +13,7 @@ The lana directory contain the extension source code. The log-viewer directory c
 VSCE is only required to create .vsix files for distribution. It can be installed globally with
 
 ```zsh
-npm i -g @vscode/vsce
+pnpm add -g @vscode/vsce
 ```
 
 ## Local Development
@@ -23,7 +23,7 @@ npm i -g @vscode/vsce
 First remember to install node dependencies
 
 ```zsh
-npm ci
+pnpm i
 ```
 
 ### Build and bundle
@@ -31,13 +31,13 @@ npm ci
 Run the following command to do a quick build of the bundles. This will skip the minfication step.
 
 ```zsh
-npm run build:dev
+pnpm run build:dev
 ```
 
 or to do a production ready build, use:
 
 ```zsh
-npm run build
+pnpm run build
 ```
 
 ### Watch
@@ -45,7 +45,7 @@ npm run build
 During development run the watch command to make builds for changes quickly. execute the following command:
 
 ```zsh
-npm run watch
+pnpm run watch
 ```
 
 This will do a full build of the bundles and then watch for file changes in the `lana` and `log-viewer` source, compiling those changes incrementally, for a fast dev experience.
@@ -71,9 +71,9 @@ The debug log file path will need to specified by manually editing the `sample.l
 To do this:
 
 ```zsh
-npm ci
+pnpm i
 cd log-viewer
-npm run debug
+pnpm run debug
 ```
 
 This will start a web server that you can access from any browser alongside a watch process that will recompile when source files are changed. The URL for the server is shown on the console. Use the "Launch Chrome' debug configuration to have VSCode launch and attach to Chrome for debugging.
@@ -83,7 +83,7 @@ This will start a web server that you can access from any browser alongside a wa
 You can package the extension using:
 
 ```zsh
-npm ci
+pnpm install
 cd lana
 vsce package --no-dependencies
 ```

@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
 import { Uri, WebviewPanel, WebviewPanelOptions, window } from 'vscode';
 
 export class WebViewOptions implements WebviewPanelOptions {

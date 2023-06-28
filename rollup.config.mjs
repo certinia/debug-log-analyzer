@@ -1,12 +1,16 @@
 // Rollup plugins
 import commonjs from '@rollup/plugin-commonjs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
-import terser from '@rollup/plugin-terser';
-import typescript from '@rollup/plugin-typescript';
 import json from '@rollup/plugin-json';
 import copy from 'rollup-plugin-copy';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
+import {
+  defineRollupSwcOption,
+  swc,
+  minify,
+  defineRollupSwcMinifyOption,
+} from 'rollup-plugin-swc3';
 
 const production = process.env.NODE_ENV == 'production';
 console.log('Package mode:', production ? 'production' : 'development');
@@ -22,12 +26,23 @@ export default [
     plugins: [
       nodeResolve({ preferBuiltins: true }),
       commonjs(),
-      typescript({
-        tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
-        exclude: ['node_modules', '**/__tests__/**'],
-      }),
       json(),
-      production && terser(),
+      swc(
+        defineRollupSwcOption({
+          include: /\.[mc]?[jt]sx?$/,
+          exclude: 'node_modules',
+          tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
+          jsc: {},
+        })
+      ),
+      production &&
+        minify(
+          defineRollupSwcMinifyOption({
+            // swc's minify option here
+            mangle: true,
+            compress: true,
+          })
+        ),
     ],
   },
   {
@@ -43,15 +58,27 @@ export default [
       nodeResolve({ browser: true, preferBuiltins: false }),
       commonjs(),
       nodePolyfills(),
-      typescript({
-        tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
-        exclude: ['node_modules', '**/__tests__/**'],
-      }),
+      swc(
+        defineRollupSwcOption({
+          // All options are optional
+          include: /\.[mc]?[jt]sx?$/,
+          exclude: 'node_modules',
+          tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
+          jsc: {},
+        })
+      ),
       postcss({
         extensions: ['.css'],
         minimize: true,
       }),
-      production && terser(),
+      production &&
+        minify(
+          defineRollupSwcMinifyOption({
+            // swc's minify option here
+            mangle: true,
+            compress: true,
+          })
+        ),
       copy({
         hook: 'writeBundle',
         targets: [

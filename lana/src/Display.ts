@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
+import { Uri, commands, window } from 'vscode';
 
-import { Uri, window, workspace } from 'vscode';
 import { appName } from './AppSettings';
 
 export class Display {
@@ -24,6 +24,6 @@ export class Display {
   }
 
   showFile(path: string): void {
-    workspace.openTextDocument(Uri.file(path)).then((td) => window.showTextDocument(td));
+    commands.executeCommand('vscode.open', Uri.file(path));
   }
 }
