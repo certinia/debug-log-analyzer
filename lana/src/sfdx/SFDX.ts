@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
 import { Command } from './Command';
 
 export interface SFDXResponse<T> {

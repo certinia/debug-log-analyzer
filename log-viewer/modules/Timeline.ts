@@ -3,7 +3,8 @@
  */
 import { showTreeNode } from './TreeView';
 import formatDuration, { debounce } from './Util';
-import { TimedNode, Method, RootNode, TimelineKey, truncated } from './parsers/TreeParser';
+import { Method, RootNode, TimedNode, TimelineKey, truncated } from './parsers/TreeParser';
+
 interface TimelineGroup {
   label: string;
   fillColor: string;

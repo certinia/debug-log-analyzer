@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
-import { window } from 'vscode';
-import { Context } from '../Context';
 import * as path from 'path';
+import { window } from 'vscode';
+
+import { Context } from '../Context';
 import { Item, Options, QuickPick } from './QuickPick';
 
 export class QuickPickWorkspace {

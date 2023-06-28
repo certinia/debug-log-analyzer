@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
+import { Uri, commands, window } from 'vscode';
 
-import { Uri, window, commands } from 'vscode';
 import { appName } from './AppSettings';
 
 export class Display {

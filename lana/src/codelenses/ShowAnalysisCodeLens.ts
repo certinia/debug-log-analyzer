@@ -1,6 +1,7 @@
-import { CodeLensProvider, TextDocument, CodeLens, Range, languages } from 'vscode';
-import { ShowLogAnalysis } from '../commands/ShowLogAnalysis';
+import { CodeLens, CodeLensProvider, Range, TextDocument, languages } from 'vscode';
+
 import { Context } from '../Context';
+import { ShowLogAnalysis } from '../commands/ShowLogAnalysis';
 
 class ShowAnalysisCodeLens implements CodeLensProvider {
   context: Context;

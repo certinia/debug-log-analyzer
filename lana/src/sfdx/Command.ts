@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
-import { exec, ExecException, ChildProcess } from 'child_process';
+import { ChildProcess, ExecException, exec } from 'child_process';
 
 type Handler = (
   error: ExecException | null,

@@ -1,5 +1,5 @@
-import { SOQLParser, SOQLTree } from '../parsers/SOQLParser';
 import { Stack } from '../Database';
+import { SOQLParser, SOQLTree } from '../parsers/SOQLParser';
 
 //todo : need a general concept of stack (to pull out linter)
 export class SOQLLinter {
