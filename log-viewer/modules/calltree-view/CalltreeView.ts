@@ -1,19 +1,17 @@
 //todo: add keybindings (up, down, left, right)
 //todo: add filter close to the originals (min, max filters)
-
 //todo: future
 //todo: add class to locate current tree for current log
 //todo: add filter on line type
 //todo: add filter on log level (fine, finer etc)
+import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
 import '../../resources/css/DatabaseView.scss';
 import '../../resources/css/TreeView.css';
-
-import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
+import { rootMethod } from '../Main';
+import { showTab } from '../Util';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
-import { showTab } from '../Util';
-import { rootMethod } from '../Main';
 
 let calltreeTable: Tabulator;
 
