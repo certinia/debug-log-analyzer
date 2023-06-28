@@ -1,7 +1,8 @@
-import '../../resources/css/DatabaseView.scss';
 import { TabulatorFull as Tabulator } from 'tabulator-tables';
-import { RootNode, TimedNode } from '../parsers/TreeParser';
+
+import '../../resources/css/DatabaseView.scss';
 import Number from '../datagrid/format/Number';
+import { RootNode, TimedNode } from '../parsers/TreeParser';
 
 export async function renderAnalysis(rootMethod: RootNode) {
   const methodMap: Map<string, Metric> = new Map();
