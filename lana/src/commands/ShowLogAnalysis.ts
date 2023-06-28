@@ -1,14 +1,14 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
+import * as path from 'path';
 import { Uri, window } from 'vscode';
+
+import { appName } from '../AppSettings';
 import { Context } from '../Context';
 import { QuickPickWorkspace } from '../display/QuickPickWorkspace';
-import * as path from 'path';
-import { LogView } from './LogView';
 import { Command } from './Command';
-import { appName } from '../AppSettings';
+import { LogView } from './LogView';
 
 export class ShowLogAnalysis {
   static getCommand(context: Context): Command {

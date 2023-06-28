@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
+import { Position, Selection, TextDocumentShowOptions, Uri, ViewColumn, commands } from 'vscode';
 
-import { Position, Selection, Uri, TextDocumentShowOptions, commands, ViewColumn } from 'vscode';
 import { Context } from '../Context';
 
 export class OpenFileInPackage {

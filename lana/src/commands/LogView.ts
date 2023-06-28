@@ -1,14 +1,14 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
+import * as fs from 'fs';
+import * as path from 'path';
 import { WebviewPanel } from 'vscode';
+import * as vscode from 'vscode';
+
 import { Context } from '../Context';
 import { OpenFileInPackage } from '../display/OpenFileInPackage';
 import { WebView } from '../display/WebView';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as vscode from 'vscode';
 
 interface WebViewLogFileRequest {
   cmd: string;

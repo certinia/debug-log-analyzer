@@ -1,11 +1,10 @@
-import '../../resources/css/DatabaseView.scss';
-import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 import { html, render } from 'lit';
+import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
+import '../../resources/css/DatabaseView.scss';
 import { DatabaseAccess } from '../Database';
-import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
-
 import '../components/CallStack';
+import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
 

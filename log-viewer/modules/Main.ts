@@ -1,36 +1,29 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { showTab } from './Util';
-import parseLog, {
-  getLogSettings,
-  TimedNode,
-  LogSetting,
-  truncated,
-  totalDuration,
-  getRootMethod,
-  RootNode,
-} from './parsers/TreeParser';
-import renderTreeView from './TreeView';
-import renderTimeline, { setColors, renderTimelineKey } from './Timeline';
-import { renderAnalysis } from './analysis-view/AnalysisView';
+import '../resources/css/AnalysisView.css';
+import '../resources/css/Settings.css';
+import '../resources/css/Status.css';
+import '../resources/css/Tabber.css';
+import '../resources/css/TimelineView.css';
+import '../resources/css/TreeView.css';
 import { DatabaseAccess } from './Database';
 import { setNamespaces } from './NamespaceExtrator';
-import { hostService } from './services/VSCodeService';
+import renderTimeline, { renderTimelineKey, setColors } from './Timeline';
+import renderTreeView from './TreeView';
+import { showTab } from './Util';
+import { renderAnalysis } from './analysis-view/AnalysisView';
 import { renderDBGrid } from './database-view/DatabaseView';
-
-import '../resources/css/Status.css';
-import '../resources/css/Settings.css';
-import '../resources/css/Tabber.css';
-import '../resources/css/TreeView.css';
-import '../resources/css/TimelineView.css';
-import '../resources/css/AnalysisView.css';
-
-declare global {
-  interface Window {
-    activeNamespaces: string[];
-  }
-}
+import parseLog, {
+  LogSetting,
+  RootNode,
+  TimedNode,
+  getLogSettings,
+  getRootMethod,
+  totalDuration,
+  truncated,
+} from './parsers/TreeParser';
+import { hostService } from './services/VSCodeService';
 
 let logSize: number;
 let rootMethod: RootNode;
@@ -175,11 +168,7 @@ async function waitForRender() {
 function readLog() {
   const name = document.getElementById('LOG_FILE_NAME')?.innerHTML;
   const path = document.getElementById('LOG_FILE_PATH')?.innerHTML;
-  const ns = document.getElementById('LOG_FILE_NS')?.innerHTML;
   const logUri = document.getElementById('LOG_FILE_URI')?.innerHTML;
-
-  // hacky I know
-  window.activeNamespaces = ns?.split(',') ?? [];
 
   if (logUri) {
     fetch(logUri)

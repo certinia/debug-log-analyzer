@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
 import { DMLBeginLine, Method, RootNode, SOQLExecuteBeginLine } from './parsers/TreeParser';
 
 export type Stack = Method[];

@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-
 import { commands } from 'vscode';
+
 import { Context } from '../Context';
 
 export class Command {
