@@ -70,22 +70,16 @@
 			</div>
 
 			<div id="analysisView" class="tabItem">
-				<div class="buttonContainer">
-					<label for="sortField">Sort field:</label>
-					<select id="sortField">
-						<option value="selfTime">Self Time</option>
-						<option value="duration">Total Time</option>
-						<option value="count">Count</option>
-						<option value="name">Name</option>
-					</select>
-					<input id="sortAscending" type="checkbox">
-					<label for="sortAscending">Sort ascending</label>
-				</div>
-				<div id='analysisHeader' class="analysis"></div>
-				<div class="analysisScroller">
-					<div id='analysis' class="analysis"></div>
-				</div>
-				<div id='analysisFooter' class="analysis"></div>
+        <div>
+          <strong>Group by</strong>
+          <div>
+            <input id="analysis-groupBy" type="checkbox" />
+            <label for="analysis-groupBy">Type</label>
+          </div>
+        </div>
+        <div id="analysisContainer">
+          <div id="analysisTable"></div>
+        </div>
 			</div>
 
 			<div id="dbView" class="tabItem">
