@@ -56,10 +56,7 @@ export class RetrieveLogFile {
       RetrieveLogFile.showLoadingPicker(),
     ]);
 
-    if (logFiles.status !== 0) {
-      throw new Error('Failed to load available log files');
-    }
-    const logFileId = await RetrieveLogFile.getLogFile(logFiles.result);
+    const logFileId = await RetrieveLogFile.getLogFile(logFiles);
     if (logFileId) {
       const logFilePath = this.getLogFilePath(ws, logFileId);
       const [view] = await Promise.all([
