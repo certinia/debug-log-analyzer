@@ -34,7 +34,7 @@
     "build:dev": "concurrently -r -g 'rm -rf lana/out && rollup -c rollup.config.mjs' 'pnpm --filter log-viewer tsc:lint' 'pnpm --filter lana tsc:lint'",
     "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",
     "prepare": "husky install",
-    "lint": "concurrently -r -g 'eslint . --ext ts' 'pnpm --filter 'log-viewer' tsc:lint' 'pnpm --filter lana tsc:lint'",
+    "lint": "concurrently -r -g 'eslint . --ext ts' 'cd log-viewer; tsc --noemit --skipLibCheck' 'cd lana; tsc --noemit --skipLibCheck'",
     "test": "jest",
     "test:ci": "jest --runInBand"
   },
