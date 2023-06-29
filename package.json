@@ -2,8 +2,8 @@
   "name": "lana-ws",
   "private": true,
   "devDependencies": {
-    "@rollup/plugin-json": "^6.0.0",
     "@rollup/plugin-commonjs": "^25.0.0",
+    "@rollup/plugin-json": "^6.0.0",
     "@rollup/plugin-node-resolve": "^15.1.0",
     "@rollup/plugin-terser": "^0.4.3",
     "@rollup/plugin-typescript": "^11.1.1",
@@ -40,5 +40,10 @@
   },
   "lint-staged": {
     "*.{ts,css,md}": "prettier --write"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@salesforce/bunyan@2.0.0": "patches/@salesforce__bunyan@2.0.0.patch"
+    }
   }
 }

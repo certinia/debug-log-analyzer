@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@salesforce/bunyan@2.0.0':
+    hash: xi2svmuxjritrimpigh77w3puy
+    path: patches/@salesforce__bunyan@2.0.0.patch
+
 importers:
 
   .:
@@ -1223,7 +1228,7 @@ packages:
       - supports-color
     dev: false
 
-  /@salesforce/bunyan@2.0.0:
+  /@salesforce/bunyan@2.0.0(patch_hash=xi2svmuxjritrimpigh77w3puy):
     resolution: {integrity: sha512-5hq+HWQSeymuygl3i9ehlQo3XWrlBE+A+QzmpDaoK37op4u9M+SBUbXfOW0IABOQCg+JmfQPocSMV74hRoqU9w==}
     engines: {node: '>=10.5.0'}
     hasBin: true
@@ -1235,11 +1240,12 @@ packages:
       mv: 2.1.1
       safe-json-stringify: 1.2.0
     dev: false
+    patched: true
 
   /@salesforce/core@3.36.2:
     resolution: {integrity: sha512-IS1rR6Y0tMJYx/+TOAUQ9Gs+Vtum0MHLGfodT7ZJMQZQHEp1S4o0BJ8676uq5sASAnVL64GA+Et/LWCCOWWEuw==}
     dependencies:
-      '@salesforce/bunyan': 2.0.0
+      '@salesforce/bunyan': 2.0.0(patch_hash=xi2svmuxjritrimpigh77w3puy)
       '@salesforce/kit': 1.9.2
       '@salesforce/schemas': 1.6.0
       '@salesforce/ts-types': 1.7.3
@@ -1263,7 +1269,7 @@ packages:
     resolution: {integrity: sha512-YXHhxY7x/7XvzJIuUl0U4NZXxjr74NS5/DY2+vriDcChwbBvmUqRGBVUbfEP5/p+xQrbaZZd5rKEiMLd+Xqnvw==}
     engines: {node: '>=16.0.0'}
     dependencies:
-      '@salesforce/bunyan': 2.0.0
+      '@salesforce/bunyan': 2.0.0(patch_hash=xi2svmuxjritrimpigh77w3puy)
       '@salesforce/kit': 3.0.3
       '@salesforce/schemas': 1.6.0
       '@salesforce/ts-types': 2.0.3
