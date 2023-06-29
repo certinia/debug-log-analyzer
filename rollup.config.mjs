@@ -1,15 +1,15 @@
 // Rollup plugins
 import commonjs from '@rollup/plugin-commonjs';
-import { nodeResolve } from '@rollup/plugin-node-resolve';
 import json from '@rollup/plugin-json';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
 import copy from 'rollup-plugin-copy';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
 import {
-  defineRollupSwcOption,
-  swc,
-  minify,
   defineRollupSwcMinifyOption,
+  defineRollupSwcOption,
+  minify,
+  swc,
 } from 'rollup-plugin-swc3';
 
 const production = process.env.NODE_ENV == 'production';
@@ -24,7 +24,7 @@ export default [
     },
     external: ['vscode'],
     plugins: [
-      nodeResolve({ preferBuiltins: true }),
+      nodeResolve({ preferBuiltins: true, dedupe: ['@salesforce/core'] }),
       commonjs(),
       json(),
       swc(
