@@ -10,8 +10,7 @@ export class GetLogFiles {
     const connection = await ah.connect(await ah.getDefaultUsername());
 
     if (connection) {
-      const logService = new LogService(connection);
-      return logService.getLogRecords();
+      return new LogService(connection).getLogRecords();
     }
     return [];
   }
