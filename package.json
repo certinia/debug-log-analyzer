@@ -44,6 +44,11 @@
   "pnpm": {
     "patchedDependencies": {
       "@salesforce/bunyan@2.0.0": "patches/@salesforce__bunyan@2.0.0.patch"
+    },
+    "overrides": {
+      "@salesforce/core>jsforce": "^2.0.0-beta.24",
+      "@apexdevtools/sfdx-auth-helper>@salesforce/core": "^4.0.1",
+      "@apexdevtools/sfdx-auth-helper>jsforce": "^2.0.0-beta.24"
     }
   }
 }
