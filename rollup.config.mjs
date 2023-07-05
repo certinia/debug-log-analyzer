@@ -2,14 +2,17 @@
 import commonjs from '@rollup/plugin-commonjs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import copy from 'rollup-plugin-copy';
+import pkgMinifyHTML from 'rollup-plugin-minify-html-literals';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
 import {
-  defineRollupSwcOption,
-  swc,
-  minify,
   defineRollupSwcMinifyOption,
+  defineRollupSwcOption,
+  minify,
+  swc,
 } from 'rollup-plugin-swc3';
+
+const minifyHTML = pkgMinifyHTML.default;
 
 const production = process.env.NODE_ENV == 'production';
 console.log('Package mode:', production ? 'production' : 'development');
@@ -56,6 +59,7 @@ export default [
       nodeResolve({ browser: true, preferBuiltins: false }),
       commonjs(),
       nodePolyfills(),
+      minifyHTML(),
       swc(
         defineRollupSwcOption({
           // All options are optional
@@ -69,6 +73,7 @@ export default [
         extensions: ['.css'],
         minimize: true,
       }),
+
       production &&
         minify(
           defineRollupSwcMinifyOption({

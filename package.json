@@ -39,5 +39,8 @@
   },
   "lint-staged": {
     "*.{ts,css,md}": "prettier --write"
+  },
+  "dependencies": {
+    "rollup-plugin-minify-html-literals": "^1.2.6"
   }
 }
