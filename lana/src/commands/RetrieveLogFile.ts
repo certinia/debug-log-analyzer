@@ -2,8 +2,8 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import { LogRecord } from '@salesforce/apex-node';
-import * as fs from 'fs';
-import * as path from 'path';
+import { existsSync } from 'fs';
+import { join, parse } from 'path';
 import { WebviewPanel, window } from 'vscode';
 
 import { appName } from '../AppSettings';
@@ -98,15 +98,15 @@ export class RetrieveLogFile {
   }
 
   private static getLogFilePath(ws: string, fileId: string): string {
-    const logDirectory = path.join(ws, '.sfdx', 'tools', 'debug', 'logs');
-    const logFilePath = path.join(logDirectory, `${fileId}.log`);
+    const logDirectory = join(ws, '.sfdx', 'tools', 'debug', 'logs');
+    const logFilePath = join(logDirectory, `${fileId}.log`);
     return logFilePath;
   }
 
   private static async writeLogFile(ws: string, logPath: string) {
-    const logExists = fs.existsSync(logPath);
+    const logExists = existsSync(logPath);
     if (!logExists) {
-      const logfilePath = path.parse(logPath);
+      const logfilePath = parse(logPath);
       await GetLogFile.apply(ws, logfilePath.dir, logfilePath.name);
     }
   }
