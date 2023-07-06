@@ -60,7 +60,7 @@ export default [
       nodeResolve({ browser: true, preferBuiltins: false }),
       commonjs(),
       nodePolyfills(),
-      minifyHTMLTemplates(),
+      production && minifyHTMLTemplates(),
       swc(
         defineRollupSwcOption({
           // All options are optional
