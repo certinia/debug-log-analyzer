@@ -18,10 +18,12 @@ export class RowNavigation extends Module {
   constructor(table: Tabulator) {
     super(table);
     this.localTable = table;
+    // @ts-expect-error registerTableOption() needs adding to tabulator types
     this.registerTableOption(rowNavOptionName, false);
   }
 
   initialize() {
+    // @ts-expect-error options() needs adding to tabulator types
     if (this.options(rowNavOptionName)) {
       this.localTable.element.addEventListener(
         'keydown',
@@ -131,5 +133,7 @@ const bindings = {
 };
 RowNavigation.moduleName = 'rowNavigation';
 Tabulator.registerModule(KeybindingsModule);
+// @ts-expect-error moduleName needs adding to tabulator types
 Tabulator.extendModule(KeybindingsModule.moduleName, 'actions', rowNavActions);
+// @ts-expect-error moduleName needs adding to tabulator types
 Tabulator.extendModule(KeybindingsModule.moduleName, 'bindings', bindings);
