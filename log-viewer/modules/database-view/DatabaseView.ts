@@ -4,7 +4,6 @@ import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 import '../../resources/css/DatabaseView.scss';
 import { DatabaseAccess } from '../Database';
 import '../components/CallStack';
-import { RowNavigation } from '../datagrid/module/RowNavigation';
 import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
@@ -12,7 +11,6 @@ import './DatabaseSection';
 // todo: use the formatter to convert number to ms
 
 export function renderDBGrid() {
-  Tabulator.registerModule(RowNavigation);
   renderDMLTable();
   renderSOQLTable();
 }
