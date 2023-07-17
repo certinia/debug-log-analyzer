@@ -1,6 +1,9 @@
-//todo: add keybindings (up, down, left, right)
 //todo: add filter close to the originals (min, max filters)
-//todo: future
+//fix: goto row resize issue
+// todo: aggregate rows
+//
+//todo: ** future **
+//todo: show total and self as percentage of total? + do the same on the analysis view?
 //todo: add class to locate current tree for current log
 //todo: add filter on line type
 //todo: add filter on log level (fine, finer etc)
@@ -34,6 +37,7 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
     dataTreeChildColumnCalcs: true,
     dataTreeBranchElement: '<span/>',
     selectable: 1,
+    rowKeyboardNavigation: true,
     columnDefaults: {
       title: 'default',
       resizable: true,
@@ -197,21 +201,6 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
       row.select();
     }
   });
-
-  //todo: move to my custom keybindings module
-  document.querySelector('#calltreeTable')?.addEventListener(
-    'keydown',
-    function (e) {
-      const targetElem = e.target as HTMLElement;
-      if (
-        targetElem.classList.contains('tabulator-tableholder') &&
-        ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Space'].indexOf(e.key) > -1
-      ) {
-        e.preventDefault();
-      }
-    },
-    false
-  );
 
   document.getElementById('calltree-show-details')?.addEventListener('change', (event) => {
     const showDetails = event.target as HTMLInputElement;

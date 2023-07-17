@@ -2,7 +2,10 @@ import { KeybindingsModule, Module, Tabulator } from 'tabulator-tables';
 
 // todo: work out how to self register so the imprt alone will handle things.
 // todo: work out how to disable + enable on individual tables
-//todo: make this generic and support opening grouped rows too then use on DB view.
+// todo: make this generic and support opening grouped rows too then use on DB view.
+// todo: remove the '@ts-expect-error' + fix the types file
+
+const rowNavOptionName = 'rowKeyboardNavigation' as const;
 /**
  * Enable RowNavigation by importing the class and calling
  * Tabulator.registerModule(RowNavigation); before the first instantiation of the table.
@@ -11,20 +14,16 @@ import { KeybindingsModule, Module, Tabulator } from 'tabulator-tables';
  * in keybings e.g  keybindings: { previousRow: false },
  */
 export class RowNavigation extends Module {
+  localTable: Tabulator;
   constructor(table: Tabulator) {
     super(table);
+    this.localTable = table;
+    this.registerTableOption(rowNavOptionName, false);
   }
 
   initialize() {
-    console.debug('e', this.keyRowNavigation, this.table.options.keyRowNavigation);
-    const localTable = this.table as Tabulator;
-    const keyRowNavigation = localTable.options.keyRowNavigation;
-    if (keyRowNavigation !== false) {
-      Tabulator.registerModule(KeybindingsModule);
-      Tabulator.extendModule(KeybindingsModule.moduleName, 'actions', rowNavActions);
-      Tabulator.extendModule(KeybindingsModule.moduleName, 'bindings', bindings);
-
-      localTable.element.addEventListener(
+    if (this.options(rowNavOptionName)) {
+      this.localTable.element.addEventListener(
         'keydown',
         function (e) {
           const targetElem = e.target as HTMLElement;
@@ -41,11 +40,13 @@ export class RowNavigation extends Module {
   }
 }
 
-RowNavigation.moduleName = 'rowNavigation';
-RowNavigation.moduleInitOrder = -1;
-
-export const rowNavActions: { [key: string]: unknown } = {
+const rowNavActions: { [key: string]: unknown } = {
   previousRow: function () {
+    // @ts-expect-error see types todo
+    if (!this.options(rowNavOptionName)) {
+      return;
+    }
+
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
     const previousRow = row?.getPrevRow();
@@ -58,10 +59,13 @@ export const rowNavActions: { [key: string]: unknown } = {
     }
   },
   nextRow: function () {
+    // @ts-expect-error see types todo
+    if (!this.options(rowNavOptionName)) {
+      return;
+    }
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
     const nextRow = row?.getNextRow();
-    console.debug('next row', row, nextRow);
     if (nextRow) {
       table.blockRedraw();
       row.deselect();
@@ -71,6 +75,10 @@ export const rowNavActions: { [key: string]: unknown } = {
     }
   },
   expandRow: function () {
+    // @ts-expect-error see types todo
+    if (!this.options(rowNavOptionName)) {
+      return;
+    }
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
     if (!row) {
@@ -91,6 +99,10 @@ export const rowNavActions: { [key: string]: unknown } = {
     }
   },
   collapseRow: function () {
+    // @ts-expect-error see types todo
+    if (!this.options(rowNavOptionName)) {
+      return;
+    }
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
     if (!row) {
@@ -111,9 +123,13 @@ export const rowNavActions: { [key: string]: unknown } = {
     }
   },
 };
-export const bindings = {
+const bindings = {
   previousRow: '38',
   nextRow: '40',
   expandRow: '39',
   collapseRow: '37',
 };
+RowNavigation.moduleName = 'rowNavigation';
+Tabulator.registerModule(KeybindingsModule);
+Tabulator.extendModule(KeybindingsModule.moduleName, 'actions', rowNavActions);
+Tabulator.extendModule(KeybindingsModule.moduleName, 'bindings', bindings);
