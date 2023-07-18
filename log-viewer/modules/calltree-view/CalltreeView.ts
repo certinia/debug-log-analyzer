@@ -22,12 +22,12 @@ let calltreeTable: Tabulator;
 
 export async function renderCallTree(rootMethod: RootNode): Promise<void> {
   if (calltreeTable) {
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       const visibilityObserver = new IntersectionObserver((entries, observer) => {
         const visible = entries[0].isIntersecting && entries[0].intersectionRatio > 0;
         if (visible) {
+          resolve(true);
           observer.disconnect();
-          resolve();
         } else {
           reject();
         }
@@ -35,205 +35,208 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
 
       visibilityObserver.observe(calltreeTable.element);
     });
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    return Promise.resolve();
   }
-  Tabulator.registerModule([RowKeyboardNavigation, RowNavigation]);
-  calltreeTable = new Tabulator('#calltreeTable', {
-    data: toCallTree(rootMethod.children),
-    layout: 'fitColumns',
-    placeholder: 'No Calltree Available',
-    columnCalcs: 'both',
-    height: '100%',
-    maxHeight: '100%',
-    dataTree: true,
-    // @ts-expect-error: needs to be added to type definition.
-    dataTreeChildColumnCalcs: true,
-    dataTreeBranchElement: '<span/>',
-    selectable: 1,
-    rowKeyboardNavigation: true,
-    columnDefaults: {
-      title: 'default',
-      resizable: true,
-      headerSortStartingDir: 'desc',
-      headerTooltip: true,
-    },
-    columns: [
-      {
-        title: 'Name',
-        field: 'text',
-        headerSortTristate: true,
-        tooltip: true,
-        bottomCalc: () => {
-          return 'Total';
-        },
-        formatter: (cell, _formatterParams, _onRendered) => {
-          const cellElem = cell.getElement();
-          cellElem.classList.add('datagrid-textarea');
-
-          const row = cell.getRow();
-          // @ts-expect-error: _row is private. This is temporary and I will patch the text wrap behaviour in the library.
-          const treeLevel = row._row.modules.dataTree.index;
-          const indent = row.getTable().options.dataTreeChildIndent || 0;
-          const levelIndent = treeLevel * indent;
-          cellElem.style.paddingLeft = `${levelIndent + 4}px`;
-          cellElem.style.textIndent = `-${levelIndent}px`;
-
-          const node = (cell.getData() as CalltreeRow).originalData;
-          const text = node.text + (node.lineNumber ? `:${node.lineNumber}` : '');
-          if (node.hasValidSymbols) {
-            const logLineBody = document.createElement('a');
-            logLineBody.href = '#';
-            logLineBody.textContent = text;
-            return logLineBody;
-          }
-
-          const textWrapper = document.createElement('span');
-          textWrapper.appendChild(document.createTextNode(text));
-          return textWrapper;
-        },
-        variableHeight: true,
-        cellClick: (e, cell) => {
-          if (!(e.target as HTMLElement).matches('a')) {
-            return;
-          }
-          const node = (cell.getData() as CalltreeRow).originalData;
-          if (node.hasValidSymbols) {
-            const text = node.text;
-            const lineNumber = node.lineNumber ? '-' + node.lineNumber : '';
-            const bracketIndex = text.indexOf('(');
-            const qname = bracketIndex > -1 ? text.substring(0, bracketIndex) : text;
-
-            let typeName;
-            if (node.type === 'METHOD_ENTRY') {
-              const lastDot = qname.lastIndexOf('.');
-              typeName = text.substring(0, lastDot) + lineNumber;
-            } else {
-              typeName = qname + lineNumber;
-            }
-
-            const fileOpenInfo = {
-              typeName: typeName,
-              text: text,
-            };
-            hostService().openType(fileOpenInfo);
-          }
-        },
-        widthGrow: 5,
-      },
-      {
-        title: 'DML Count',
-        field: 'totalDmlCount',
-        sorter: 'number',
-        width: 60,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
-      {
-        title: 'SOQL Count',
-        field: 'totalSoqlCount',
-        sorter: 'number',
-        width: 60,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
-      {
-        title: 'Throws Count',
-        field: 'totalThrownCount',
-        sorter: 'number',
-        width: 60,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
-      {
-        title: 'Rows',
-        field: 'rows',
-        sorter: 'number',
-        width: 60,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
-      {
-        title: 'Total Time (ms)',
-        field: 'duration',
-        sorter: 'number',
-        headerSortTristate: true,
-        width: 100,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        formatter: (cell, _formatterParams, _onRendered) => {
-          return '' + Math.round(((cell.getValue() || 0) / 1000000) * 1000) / 1000;
-        },
-        formatterParams: {
-          thousand: false,
-          precision: 3,
-        },
-        bottomCalcFormatter: (cell, _formatterParams, _onRendered) => {
-          return '' + Math.round(((cell.getValue() || 0) / 1000000) * 1000) / 1000;
-        },
-        bottomCalc: 'sum',
-        bottomCalcParams: { precision: 3 },
-      },
-      {
-        title: 'Self Time (ms)',
-        field: 'selfTime',
-        sorter: 'number',
-        headerSortTristate: true,
-        width: 100,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-        bottomCalcParams: { precision: 3 },
-        bottomCalcFormatter: (cell, _formatterParams, _onRendered) => {
-          return '' + Math.round(((cell.getValue() || 0) / 1000000) * 1000) / 1000;
-        },
-        formatter: (cell, _formatterParams, _onRendered) => {
-          return '' + Math.round(((cell.getValue() || 0) / 1000000) * 1000) / 1000;
-        },
-        formatterParams: {
-          thousand: false,
-          precision: 3,
-        },
-      },
-    ],
-  });
-
-  calltreeTable.on('dataTreeRowExpanded', (row, _level) => {
-    const selectedRow = row.getTable().getSelectedRows()[0];
-    if (!selectedRow) {
-      row.select();
-    }
-  });
-
-  calltreeTable.on('dataTreeRowCollapsed', (row, _level) => {
-    const selectedRow = row.getTable().getSelectedRows()[0];
-    if (!selectedRow) {
-      row.select();
-    }
-  });
-
-  document.getElementById('calltree-show-details')?.addEventListener('change', (event) => {
-    const showDetails = event.target as HTMLInputElement;
-    calltreeTable.setFilter((data, _filterParams) => {
-      return showDetails.checked || data.originalData.duration || data.originalData.discontinuity;
-    });
-  });
-
-  document.getElementById('ct-expand')?.addEventListener('click', () => {
-    calltreeTable.blockRedraw();
-    expandAll(calltreeTable.getRows());
-    calltreeTable.restoreRedraw();
-  });
-
-  document.getElementById('ct-collapse')?.addEventListener('click', () => {
-    calltreeTable.blockRedraw();
-    collapseAll(calltreeTable.getRows());
-    calltreeTable.restoreRedraw();
-  });
 
   return new Promise((resolve) => {
+    Tabulator.registerModule([RowKeyboardNavigation, RowNavigation]);
+    calltreeTable = new Tabulator('#calltreeTable', {
+      data: toCallTree(rootMethod.children),
+      layout: 'fitColumns',
+      placeholder: 'No Calltree Available',
+      columnCalcs: 'both',
+      height: '100%',
+      maxHeight: '100%',
+      dataTree: true,
+      // @ts-expect-error: needs to be added to type definition.
+      dataTreeChildColumnCalcs: true,
+      dataTreeBranchElement: '<span/>',
+      selectable: 1,
+      rowKeyboardNavigation: true,
+      columnDefaults: {
+        title: 'default',
+        resizable: true,
+        headerSortStartingDir: 'desc',
+        headerTooltip: true,
+      },
+      columns: [
+        {
+          title: 'Name',
+          field: 'text',
+          headerSortTristate: true,
+          tooltip: true,
+          bottomCalc: () => {
+            return 'Total';
+          },
+          formatter: (cell, _formatterParams, _onRendered) => {
+            const cellElem = cell.getElement();
+            cellElem.classList.add('datagrid-textarea');
+
+            const row = cell.getRow();
+            // @ts-expect-error: _row is private. This is temporary and I will patch the text wrap behaviour in the library.
+            const treeLevel = row._row.modules.dataTree.index;
+            const indent = row.getTable().options.dataTreeChildIndent || 0;
+            const levelIndent = treeLevel * indent;
+            cellElem.style.paddingLeft = `${levelIndent + 4}px`;
+            cellElem.style.textIndent = `-${levelIndent}px`;
+
+            const node = (cell.getData() as CalltreeRow).originalData;
+            const text = node.text + (node.lineNumber ? `:${node.lineNumber}` : '');
+            if (node.hasValidSymbols) {
+              const logLineBody = document.createElement('a');
+              logLineBody.href = '#';
+              logLineBody.textContent = text;
+              return logLineBody;
+            }
+
+            const textWrapper = document.createElement('span');
+            textWrapper.appendChild(document.createTextNode(text));
+            return textWrapper;
+          },
+          variableHeight: true,
+          cellClick: (e, cell) => {
+            if (!(e.target as HTMLElement).matches('a')) {
+              return;
+            }
+            const node = (cell.getData() as CalltreeRow).originalData;
+            if (node.hasValidSymbols) {
+              const text = node.text;
+              const lineNumber = node.lineNumber ? '-' + node.lineNumber : '';
+              const bracketIndex = text.indexOf('(');
+              const qname = bracketIndex > -1 ? text.substring(0, bracketIndex) : text;
+
+              let typeName;
+              if (node.type === 'METHOD_ENTRY') {
+                const lastDot = qname.lastIndexOf('.');
+                typeName = text.substring(0, lastDot) + lineNumber;
+              } else {
+                typeName = qname + lineNumber;
+              }
+
+              const fileOpenInfo = {
+                typeName: typeName,
+                text: text,
+              };
+              hostService().openType(fileOpenInfo);
+            }
+          },
+          widthGrow: 5,
+        },
+        {
+          title: 'DML Count',
+          field: 'totalDmlCount',
+          sorter: 'number',
+          width: 60,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          bottomCalc: 'sum',
+        },
+        {
+          title: 'SOQL Count',
+          field: 'totalSoqlCount',
+          sorter: 'number',
+          width: 60,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          bottomCalc: 'sum',
+        },
+        {
+          title: 'Throws Count',
+          field: 'totalThrownCount',
+          sorter: 'number',
+          width: 60,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          bottomCalc: 'sum',
+        },
+        {
+          title: 'Rows',
+          field: 'rows',
+          sorter: 'number',
+          width: 60,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          bottomCalc: 'sum',
+        },
+        {
+          title: 'Total Time (ms)',
+          field: 'duration',
+          sorter: 'number',
+          headerSortTristate: true,
+          width: 100,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          formatter: (cell, _formatterParams, _onRendered) => {
+            return '' + Math.round(((cell.getValue() || 0) / 1000000) * 1000) / 1000;
+          },
+          formatterParams: {
+            thousand: false,
+            precision: 3,
+          },
+          bottomCalcFormatter: (cell, _formatterParams, _onRendered) => {
+            return '' + Math.round(((cell.getValue() || 0) / 1000000) * 1000) / 1000;
+          },
+          bottomCalc: 'sum',
+          bottomCalcParams: { precision: 3 },
+        },
+        {
+          title: 'Self Time (ms)',
+          field: 'selfTime',
+          sorter: 'number',
+          headerSortTristate: true,
+          width: 100,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          bottomCalc: 'sum',
+          bottomCalcParams: { precision: 3 },
+          bottomCalcFormatter: (cell, _formatterParams, _onRendered) => {
+            return '' + Math.round(((cell.getValue() || 0) / 1000000) * 1000) / 1000;
+          },
+          formatter: (cell, _formatterParams, _onRendered) => {
+            return '' + Math.round(((cell.getValue() || 0) / 1000000) * 1000) / 1000;
+          },
+          formatterParams: {
+            thousand: false,
+            precision: 3,
+          },
+        },
+      ],
+    });
+
+    calltreeTable.on('dataTreeRowExpanded', (row, _level) => {
+      const selectedRow = row.getTable().getSelectedRows()[0];
+      if (!selectedRow) {
+        row.select();
+      }
+    });
+
+    calltreeTable.on('dataTreeRowCollapsed', (row, _level) => {
+      const selectedRow = row.getTable().getSelectedRows()[0];
+      if (!selectedRow) {
+        row.select();
+      }
+    });
+
+    document.getElementById('calltree-show-details')?.addEventListener('change', (event) => {
+      const showDetails = event.target as HTMLInputElement;
+      calltreeTable.setFilter((data, _filterParams) => {
+        return showDetails.checked || data.originalData.duration || data.originalData.discontinuity;
+      });
+    });
+
+    document.getElementById('ct-expand')?.addEventListener('click', () => {
+      calltreeTable.blockRedraw();
+      expandAll(calltreeTable.getRows());
+      calltreeTable.restoreRedraw();
+    });
+
+    document.getElementById('ct-collapse')?.addEventListener('click', () => {
+      calltreeTable.blockRedraw();
+      collapseAll(calltreeTable.getRows());
+      calltreeTable.restoreRedraw();
+    });
+
     calltreeTable.on('tableBuilt', () => {
       resolve();
       calltreeTable.setFilter((data, _filterParams) => {
