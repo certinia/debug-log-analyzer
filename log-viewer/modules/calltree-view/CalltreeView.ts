@@ -14,6 +14,7 @@ import '../../resources/css/TreeView.css';
 import { rootMethod } from '../Main';
 import { showTab } from '../Util';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
+import { RowNavigation } from '../datagrid/module/RowNavigation';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 
@@ -35,7 +36,7 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
       visibilityObserver.observe(calltreeTable.element);
     });
   }
-  Tabulator.registerModule(RowKeyboardNavigation);
+  Tabulator.registerModule([RowKeyboardNavigation, RowNavigation]);
   calltreeTable = new Tabulator('#calltreeTable', {
     data: toCallTree(rootMethod.children),
     layout: 'fitColumns',
@@ -301,7 +302,6 @@ export async function goToRow(timestamp: number) {
   await renderCallTree(rootMethod);
 
   let treeRow: RowComponent | null = null;
-
   const rows = calltreeTable.getRows();
   const len = rows.length;
   for (let i = 0; i < len; i++) {
@@ -311,32 +311,8 @@ export async function goToRow(timestamp: number) {
       break;
     }
   }
-
-  if (treeRow) {
-    const rowsToExpand = [];
-    let parent = treeRow.getTreeParent();
-    while (parent && !parent.isTreeExpanded()) {
-      rowsToExpand.push(parent);
-      parent = parent.getTreeParent();
-    }
-
-    calltreeTable.blockRedraw();
-    if (rowsToExpand.length) {
-      const len = rowsToExpand.length;
-      for (let i = 0; i < len; i++) {
-        const row = rowsToExpand[i];
-        row.treeExpand();
-      }
-    }
-
-    calltreeTable.getSelectedRows().map((row) => {
-      row.deselect();
-    });
-
-    treeRow.select();
-    calltreeTable.restoreRedraw();
-    calltreeTable.scrollToRow(treeRow, 'center');
-  }
+  //@ts-expect-error This is a custom function added in by RowNavigation custom module
+  calltreeTable.goToRow(treeRow);
 }
 
 function findByTime(row: RowComponent, timeStamp: number): RowComponent | null {
