@@ -13,7 +13,7 @@ import '../../resources/css/DatabaseView.scss';
 import '../../resources/css/TreeView.css';
 import { rootMethod } from '../Main';
 import { showTab } from '../Util';
-import { RowNavigation } from '../datagrid/module/RowNavigation';
+import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 
@@ -35,7 +35,7 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
       visibilityObserver.observe(calltreeTable.element);
     });
   }
-  Tabulator.registerModule(RowNavigation);
+  Tabulator.registerModule(RowKeyboardNavigation);
   calltreeTable = new Tabulator('#calltreeTable', {
     data: toCallTree(rootMethod.children),
     layout: 'fitColumns',

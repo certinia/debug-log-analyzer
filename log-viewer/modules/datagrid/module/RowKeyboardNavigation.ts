@@ -13,7 +13,7 @@ const rowNavOptionName = 'rowKeyboardNavigation' as const;
  * To disbale individual key binings set previousRow, nextRow,expandRow, collapseRow to false
  * in keybings e.g  keybindings: { previousRow: false },
  */
-export class RowNavigation extends Module {
+export class RowKeyboardNavigation extends Module {
   localTable: Tabulator;
   constructor(table: Tabulator) {
     super(table);
@@ -131,7 +131,7 @@ const bindings = {
   expandRow: '39',
   collapseRow: '37',
 };
-RowNavigation.moduleName = 'rowNavigation';
+RowKeyboardNavigation.moduleName = 'rowNavigation';
 Tabulator.registerModule(KeybindingsModule);
 // @ts-expect-error moduleName needs adding to tabulator types
 Tabulator.extendModule(KeybindingsModule.moduleName, 'actions', rowNavActions);
