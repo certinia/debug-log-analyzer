@@ -21,9 +21,20 @@ let calltreeTable: Tabulator;
 
 export async function renderCallTree(rootMethod: RootNode): Promise<void> {
   if (calltreeTable) {
-    return Promise.resolve();
-  }
+    return new Promise((resolve, reject) => {
+      const visibilityObserver = new IntersectionObserver((entries, observer) => {
+        const visible = entries[0].isIntersecting && entries[0].intersectionRatio > 0;
+        if (visible) {
+          observer.disconnect();
+          resolve();
+        } else {
+          reject();
+        }
+      });
 
+      visibilityObserver.observe(calltreeTable.element);
+    });
+  }
   Tabulator.registerModule(RowNavigation);
   calltreeTable = new Tabulator('#calltreeTable', {
     data: toCallTree(rootMethod.children),
