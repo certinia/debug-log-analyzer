@@ -43,9 +43,13 @@ export class RowKeyboardNavigation extends Module {
 }
 
 const rowNavActions: { [key: string]: unknown } = {
-  previousRow: function () {
+  previousRow: function (e: KeyboardEvent) {
     // @ts-expect-error see types todo
     if (!this.options(rowNavOptionName)) {
+      return;
+    }
+    const targetElem = e.target as HTMLElement;
+    if (!targetElem.classList.contains('tabulator-tableholder')) {
       return;
     }
 
@@ -60,11 +64,16 @@ const rowNavActions: { [key: string]: unknown } = {
       previousRow.getElement().scrollIntoView({ block: 'nearest' });
     }
   },
-  nextRow: function () {
+  nextRow: function (e: KeyboardEvent) {
     // @ts-expect-error see types todo
     if (!this.options(rowNavOptionName)) {
       return;
     }
+    const targetElem = e.target as HTMLElement;
+    if (!targetElem.classList.contains('tabulator-tableholder')) {
+      return;
+    }
+
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
     const nextRow = row?.getNextRow();
@@ -76,11 +85,16 @@ const rowNavActions: { [key: string]: unknown } = {
       nextRow.getElement().scrollIntoView({ block: 'nearest' });
     }
   },
-  expandRow: function () {
+  expandRow: function (e: KeyboardEvent) {
     // @ts-expect-error see types todo
     if (!this.options(rowNavOptionName)) {
       return;
     }
+    const targetElem = e.target as HTMLElement;
+    if (!targetElem.classList.contains('tabulator-tableholder')) {
+      return;
+    }
+
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
     if (!row) {
@@ -100,11 +114,16 @@ const rowNavActions: { [key: string]: unknown } = {
       row.treeExpand();
     }
   },
-  collapseRow: function () {
+  collapseRow: function (e: KeyboardEvent) {
     // @ts-expect-error see types todo
     if (!this.options(rowNavOptionName)) {
       return;
     }
+    const targetElem = e.target as HTMLElement;
+    if (!targetElem.classList.contains('tabulator-tableholder')) {
+      return;
+    }
+
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
     if (!row) {
