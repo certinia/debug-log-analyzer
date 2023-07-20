@@ -1,6 +1,4 @@
-//todo: add filter close to the originals (min, max filters)
-//fix: goto row resize issue
-// todo: aggregate rows
+// todo: aggregate rows column
 //
 //todo: ** future **
 //todo: show total and self as percentage of total? + do the same on the analysis view?
@@ -14,7 +12,7 @@ import '../../resources/css/TreeView.css';
 import { rootMethod } from '../Main';
 import { showTab } from '../Util';
 import MinMaxEditor from '../datagrid/editors/MinMax';
-import MinMaxFilter, { MinMaxFilterModule } from '../datagrid/filters/MinMax';
+import MinMaxFilter from '../datagrid/filters/MinMax';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
 import { RowNavigation } from '../datagrid/module/RowNavigation';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
@@ -42,7 +40,10 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
   }
 
   return new Promise((resolve) => {
-    Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, MinMaxFilterModule]);
+    Tabulator.registerModule([RowKeyboardNavigation, RowNavigation]);
+
+    const selfTimeFilterCache = new Map<string, boolean>();
+    const totalTimeFilterCache = new Map<string, boolean>();
     calltreeTable = new Tabulator('#calltreeTable', {
       data: toCallTree(rootMethod.children),
       layout: 'fitColumns',
@@ -182,7 +183,7 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
           bottomCalcParams: { precision: 3 },
           headerFilter: MinMaxEditor,
           headerFilterFunc: MinMaxFilter,
-          headerFilterFuncParams: { columnName: 'duration' },
+          headerFilterFuncParams: { columnName: 'duration', filterCache: totalTimeFilterCache },
           headerFilterLiveFilter: false,
         },
         {
@@ -207,7 +208,7 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
           },
           headerFilter: MinMaxEditor,
           headerFilterFunc: MinMaxFilter,
-          headerFilterFuncParams: { columnName: 'selfTime' },
+          headerFilterFuncParams: { columnName: 'selfTime', filterCache: selfTimeFilterCache },
           headerFilterLiveFilter: false,
         },
       ],
@@ -225,6 +226,10 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
       if (!selectedRow) {
         row.select();
       }
+    });
+    calltreeTable.on('dataFiltered', () => {
+      totalTimeFilterCache.clear();
+      selfTimeFilterCache.clear();
     });
 
     document.getElementById('calltree-show-details')?.addEventListener('change', (event) => {
