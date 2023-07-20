@@ -13,12 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All columns are sortable ascending or descending by clicking the header
   - Child rows will be sorted within their parent
   - The name column has 3 states call order, ascending or descending
-  - Columns for DML Count, SOQL Count, Throws Count, Rows Count, Total Time and Self Time.
-  - Keyboard navigation to move between selected rows. Use the up and down arrows for up and down and left and right to collapse or expand the tree.
+  - Columns for DML Count, SOQL Count, Throws Count, Rows Count, Total Time and Self Time
+  - Range filtering with min and max values for the Total Time and Self Time columns
+  - Keyboard navigation to move between selected rows. Use the up and down arrows for up and down and left and right to collapse or expand the tree
   - Virtualised rows means much better performance
 - Redesigned Analysis view ([#294][#294])
   - All columns are sortable ascending or descending by clicking the header
-  - Columns for to show Event Type, Aggregated Total Time and Aggregated Self Time.
+  - Columns to show Event Type, Aggregated Total Time and Aggregated Self Time
   - Virtualised row rendered to greatly improve performance
   - Group by Event Type to show aggregated totals for each type e.g See the Total Time for all `METHOD_ENTRY` events
 
