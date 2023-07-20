@@ -1,7 +1,5 @@
 import { KeybindingsModule, Module, Tabulator } from 'tabulator-tables';
 
-// todo: work out how to self register so the imprt alone will handle things.
-// todo: work out how to disable + enable on individual tables
 // todo: make this generic and support opening grouped rows too then use on DB view.
 // todo: remove the '@ts-expect-error' + fix the types file
 
