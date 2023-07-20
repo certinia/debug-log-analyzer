@@ -13,6 +13,8 @@ import '../../resources/css/DatabaseView.scss';
 import '../../resources/css/TreeView.css';
 import { rootMethod } from '../Main';
 import { showTab } from '../Util';
+import MinMaxEditor from '../datagrid/editors/MinMax';
+import MinMaxFilter, { MinMaxFilterModule } from '../datagrid/filters/MinMax';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
 import { RowNavigation } from '../datagrid/module/RowNavigation';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
@@ -40,7 +42,7 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
   }
 
   return new Promise((resolve) => {
-    Tabulator.registerModule([RowKeyboardNavigation, RowNavigation]);
+    Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, MinMaxFilterModule]);
     calltreeTable = new Tabulator('#calltreeTable', {
       data: toCallTree(rootMethod.children),
       layout: 'fitColumns',
@@ -113,7 +115,6 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
               } else {
                 typeName = qname + lineNumber;
               }
-
               const fileOpenInfo = {
                 typeName: typeName,
                 text: text,
@@ -179,6 +180,10 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
           },
           bottomCalc: 'sum',
           bottomCalcParams: { precision: 3 },
+          headerFilter: MinMaxEditor,
+          headerFilterFunc: MinMaxFilter,
+          headerFilterFuncParams: { columnName: 'duration' },
+          headerFilterLiveFilter: false,
         },
         {
           title: 'Self Time (ms)',
@@ -200,6 +205,10 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
             thousand: false,
             precision: 3,
           },
+          headerFilter: MinMaxEditor,
+          headerFilterFunc: MinMaxFilter,
+          headerFilterFuncParams: { columnName: 'selfTime' },
+          headerFilterLiveFilter: false,
         },
       ],
     });
@@ -278,6 +287,7 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
     const isTimedNode = node instanceof TimedNode;
     const children = isTimedNode ? toCallTree(node.children) : null;
     const data: CalltreeRow = {
+      id: node.timestamp,
       text: node.text,
       duration: node.duration,
       selfTime: node.selfTime,
@@ -346,6 +356,7 @@ function findByTime(row: RowComponent, timeStamp: number): RowComponent | null {
 }
 
 interface CalltreeRow {
+  id: number;
   originalData: LogLine;
   text: string;
   duration: number;

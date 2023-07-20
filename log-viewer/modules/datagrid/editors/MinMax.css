@@ -1,0 +1,6 @@
+.minMax-input {
+  color: var(--vscode-settings-numberInputForeground);
+  padding: 4px;
+  width: 50%;
+  box-sizing: border-box;
+}
