@@ -24,6 +24,7 @@
     "rollup": "^3.24.0",
     "rollup-plugin-copy": "^3.4.0",
     "rollup-plugin-minify-html": "^1.0.0",
+    "rollup-plugin-minify-html-literals": "^1.2.6",
     "rollup-plugin-polyfill-node": "^0.12.0",
     "rollup-plugin-postcss": "^4.0.2",
     "rollup-plugin-swc3": "^0.8.2"
@@ -40,8 +41,5 @@
   },
   "lint-staged": {
     "*.{ts,css,md}": "prettier --write"
-  },
-  "dependencies": {
-    "rollup-plugin-minify-html-literals": "^1.2.6"
   }
 }
