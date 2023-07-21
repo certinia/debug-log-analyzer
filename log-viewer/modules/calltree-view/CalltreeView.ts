@@ -69,7 +69,6 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
           title: 'Name',
           field: 'text',
           headerSortTristate: true,
-          tooltip: true,
           bottomCalc: () => {
             return 'Total';
           },
