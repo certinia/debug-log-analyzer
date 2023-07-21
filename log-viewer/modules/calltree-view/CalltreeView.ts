@@ -1,4 +1,5 @@
 // todo: aggregate rows column
+// todo: add breakcrumbs back?
 //
 //todo: ** future **
 //todo: show total and self as percentage of total? + do the same on the analysis view?
