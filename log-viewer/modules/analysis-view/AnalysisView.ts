@@ -15,6 +15,10 @@ export async function renderAnalysis(rootMethod: RootNode) {
     layout: 'fitColumns',
     placeholder: 'No Analysis Available',
     columnCalcs: 'both',
+    clipboard: true,
+    //@ts-expect-error types need update array is valid
+    keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
+    clipboardCopyRowRange: 'active',
     height: '100%',
     groupClosedShowCalcs: true,
     groupStartOpen: false,
