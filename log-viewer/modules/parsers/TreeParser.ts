@@ -1013,6 +1013,58 @@ class LimitUsageForNSLine extends Detail {
   }
 }
 
+class NBANodeBegin extends Method {
+  constructor(parts: string[]) {
+    super(parts, ['NBA_NODE_END'], null, 'systemMethod', 'method');
+    this.text = parts.slice(2, -1).join(' | ');
+  }
+}
+
+class NBANodeDetail extends Detail {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts.slice(2, -1).join(' | ');
+  }
+}
+class NBANodeEnd extends Detail {
+  isExit = true;
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts.slice(2, -1).join(' | ');
+  }
+}
+class NBANodeError extends Detail {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts.slice(2, -1).join(' | ');
+  }
+}
+class NBAOfferInvalid extends Detail {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts.slice(2, -1).join(' | ');
+  }
+}
+class NBAStrategyBegin extends Method {
+  constructor(parts: string[]) {
+    super(parts, ['NBA_STRATEGY_END'], null, 'systemMethod', 'method');
+    this.text = parts.slice(2, -1).join(' | ');
+  }
+}
+class NBAStrategyEnd extends Detail {
+  isExit = true;
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts.slice(2, -1).join(' | ');
+  }
+}
+class NBAStrategyError extends Detail {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts.slice(2, -1).join(' | ');
+  }
+}
+
 class PushTraceFlagsLine extends Detail {
   namespace = 'system';
 
@@ -2101,6 +2153,14 @@ export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['CUMULATIVE_PROFILING_END', CumulativeProfilingEndLine],
   ['LIMIT_USAGE', LimitUsageLine],
   ['LIMIT_USAGE_FOR_NS', LimitUsageForNSLine],
+  ['NBA_NODE_BEGIN', NBANodeBegin],
+  ['NBA_NODE_DETAIL', NBANodeDetail],
+  ['NBA_NODE_END', NBANodeEnd],
+  ['NBA_NODE_ERROR', NBANodeError],
+  ['NBA_OFFER_INVALID', NBAOfferInvalid],
+  ['NBA_STRATEGY_BEGIN', NBAStrategyBegin],
+  ['NBA_STRATEGY_END', NBAStrategyEnd],
+  ['NBA_STRATEGY_ERROR', NBAStrategyError],
   ['POP_TRACE_FLAGS', PopTraceFlagsLine],
   ['PUSH_TRACE_FLAGS', PushTraceFlagsLine],
   ['QUERY_MORE_BEGIN', QueryMoreBeginLine],
