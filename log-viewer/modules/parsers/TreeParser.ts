@@ -2323,6 +2323,7 @@ class SessionCacheGetBegin extends Method {
 }
 
 class SessionCacheGetEnd extends Detail {
+  isExit = true;
   constructor(parts: string[]) {
     super(parts);
   }
