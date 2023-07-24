@@ -14,6 +14,7 @@ import { rootMethod } from '../Main';
 import { showTab } from '../Util';
 import MinMaxEditor from '../datagrid/editors/MinMax';
 import MinMaxFilter from '../datagrid/filters/MinMax';
+import NumberFormat from '../datagrid/format/Number';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
 import { RowNavigation } from '../datagrid/module/RowNavigation';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
@@ -169,16 +170,12 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
           width: 100,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          formatter: (cell, _formatterParams, _onRendered) => {
-            return '' + Math.round(((cell.getValue() || 0) / 1000000) * 1000) / 1000;
-          },
+          formatter: NumberFormat,
           formatterParams: {
             thousand: false,
             precision: 3,
           },
-          bottomCalcFormatter: (cell, _formatterParams, _onRendered) => {
-            return '' + Math.round(((cell.getValue() || 0) / 1000000) * 1000) / 1000;
-          },
+          bottomCalcFormatter: NumberFormat,
           bottomCalc: 'sum',
           bottomCalcParams: { precision: 3 },
           headerFilter: MinMaxEditor,
@@ -196,12 +193,8 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
           headerHozAlign: 'right',
           bottomCalc: 'sum',
           bottomCalcParams: { precision: 3 },
-          bottomCalcFormatter: (cell, _formatterParams, _onRendered) => {
-            return '' + Math.round(((cell.getValue() || 0) / 1000000) * 1000) / 1000;
-          },
-          formatter: (cell, _formatterParams, _onRendered) => {
-            return '' + Math.round(((cell.getValue() || 0) / 1000000) * 1000) / 1000;
-          },
+          bottomCalcFormatter: NumberFormat,
+          formatter: NumberFormat,
           formatterParams: {
             thousand: false,
             precision: 3,
