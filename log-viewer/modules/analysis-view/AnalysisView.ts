@@ -1,6 +1,7 @@
 import { ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
 import '../../resources/css/DatabaseView.scss';
+import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
@@ -97,6 +98,7 @@ export async function renderAnalysis(rootMethod: RootNode) {
           thousand: false,
           precision: 3,
         },
+        accessorDownload: NumberAccessor,
         bottomCalcFormatter: Number,
         bottomCalc: 'sum',
         bottomCalcFormatterParams: { precision: 3 },
@@ -115,6 +117,7 @@ export async function renderAnalysis(rootMethod: RootNode) {
           thousand: false,
           precision: 3,
         },
+        accessorDownload: NumberAccessor,
         bottomCalcFormatter: Number,
       },
     ],
