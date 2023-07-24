@@ -51,7 +51,7 @@ importers:
         specifier: ^4.2.1
         version: 4.2.1(eslint-config-prettier@8.8.0)(eslint@8.42.0)(prettier@2.8.8)
       husky:
-        specifier: ^8.0.3
+        specifier: ^8.0.0
         version: 8.0.3
       jest:
         specifier: ^29.5.0
