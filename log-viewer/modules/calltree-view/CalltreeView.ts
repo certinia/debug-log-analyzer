@@ -290,18 +290,12 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
       duration: node.duration,
       selfTime: node.selfTime,
       _children: children,
-      totalDmlCount: 0,
-      totalSoqlCount: 0,
-      totalThrownCount: 0,
+      totalDmlCount: node.totalDmlCount,
+      totalSoqlCount: node.totalSoqlCount,
+      totalThrownCount: node.totalThrownCount,
       rows: node.rowCount || 0,
       originalData: node,
     };
-
-    if (isTimedNode) {
-      data.totalDmlCount = node.totalDmlCount;
-      data.totalSoqlCount = node.totalSoqlCount;
-      data.totalThrownCount = node.totalThrownCount;
-    }
 
     results.push(data);
   }

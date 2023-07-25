@@ -92,7 +92,10 @@ export abstract class LogLine {
   suffix: string | null = null; // extra description context
   prefix: string | null = null; // extra description context
   discontinuity = false; // does this line cause a discontinuity in the call stack?
-  rowCount: number | null = null; // the number of rows in a database operation
+  rowCount = 0; // the number of rows in a database operation
+  totalDmlCount = 0; // the number of DML_BEGIN decendants in a node
+  totalSoqlCount = 0; // the number of SOQL_EXECUTE_BEGIN decendants in a node
+  totalThrownCount = 0; // the number of EXCEPTION_THROWN decendants in a node
 
   constructor(parts: string[] | null) {
     if (parts) {
@@ -123,9 +126,6 @@ export class TimedNode extends LogLine {
 
   timelineKey: TimelineKey; // the formatting key for rendering this entry in the timeline
   cpuType: string; // the catagory key to collect our cpu usage
-  totalDmlCount = 0; // the number of DML_BEGIN decendants in a node
-  totalSoqlCount = 0; // the number of SOQL_EXECUTE_BEGIN decendants in a node
-  totalThrownCount = 0; // the number of EXCEPTION_THROWN decendants in a node
 
   constructor(parts: string[] | null, timelineKey: TimelineKey, cpuType: string) {
     super(parts);
@@ -715,6 +715,7 @@ class VFPageMessageLine extends LogLine {
 }
 
 class DMLBeginLine extends Method {
+  totalDmlCount = 1;
   constructor(parts: string[]) {
     super(parts, ['DML_END'], null, 'dml', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
@@ -745,6 +746,7 @@ class IdeasQueryExecuteLine extends LogLine {
 
 class SOQLExecuteBeginLine extends Method {
   aggregations = 0;
+  totalSoqlCount = 1;
 
   constructor(parts: string[]) {
     super(parts, ['SOQL_EXECUTE_END'], null, 'soql', 'free');
@@ -787,7 +789,7 @@ class SOQLExecuteExplainLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = `${parts[3]}, line:${this.lineNumber}`;
+    this.text = parts[3];
 
     const queryplanParts = parts[3].split('],');
     if (queryplanParts.length > 1) {
@@ -1908,6 +1910,7 @@ class WFTimeTriggersBeginLine extends LogLine {
 class ExceptionThrownLine extends LogLine {
   discontinuity = true;
   acceptsText = true;
+  totalThrownCount = 1;
 
   constructor(parts: string[]) {
     super(parts);
@@ -2267,15 +2270,7 @@ function insertPackageWrappers(node: Method) {
         continue; // skip any more child processing (it's gone)
       } else if (!isPkgType) {
         // move child DML / SOQL into the last package
-        if (lastPkg.children) {
-          lastPkg.children.push(child); // move child into the pkg
-        }
-
-        lastPkg.totalDmlCount = child.totalDmlCount + (childType === 'DML_BEGIN' ? 1 : 0);
-        lastPkg.totalSoqlCount =
-          child.totalSoqlCount + (childType === 'SOQL_EXECUTE_BEGIN' ? 1 : 0);
-        lastPkg.totalThrownCount =
-          child.totalThrownCount + (childType === 'EXCEPTION_THROWN' ? 1 : 0);
+        lastPkg.children.push(child); // move child into the pkg
         lastPkg.exitStamp = child.exitStamp || child.timestamp; // move the end
 
         if (child instanceof Method) {
