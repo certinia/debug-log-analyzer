@@ -159,18 +159,19 @@ function renderDMLTable() {
     }
     table.restoreRedraw();
 
-    const goTo = function () {
-      if (currentSelectedRow) {
-        const nextRow = currentSelectedRow.getNextRow() || currentSelectedRow.getTreeChildren()[0];
-        nextRow &&
+    if (currentSelectedRow) {
+      const nextRow = currentSelectedRow.getNextRow() || currentSelectedRow.getTreeChildren()[0];
+      if (nextRow) {
+        // @ts-expect-error it has 2 params
+        nextRow.scrollTo('center', true).then(() => {
+          //NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
+          // This needs fixing in main tabulator lib
           nextRow
             .getElement()
             .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+        });
       }
-    };
-    requestAnimationFrame(() => {
-      setTimeout(goTo);
-    });
+    }
   });
 
   // todo: move to a lit element
@@ -395,18 +396,19 @@ function renderSOQLTable() {
     }
     table.restoreRedraw();
 
-    const goTo = function () {
-      if (currentSelectedRow) {
-        const nextRow = currentSelectedRow.getNextRow() || currentSelectedRow.getTreeChildren()[0];
-        nextRow &&
+    if (currentSelectedRow) {
+      const nextRow = currentSelectedRow.getNextRow() || currentSelectedRow.getTreeChildren()[0];
+      if (nextRow) {
+        // @ts-expect-error it has 2 params
+        nextRow.scrollTo('center', true).then(() => {
+          //NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
+          // This needs fixing in main tabulator lib
           nextRow
             .getElement()
             .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+        });
       }
-    };
-    requestAnimationFrame(() => {
-      setTimeout(goTo);
-    });
+    }
   });
 
   // todo: move to a lit element
