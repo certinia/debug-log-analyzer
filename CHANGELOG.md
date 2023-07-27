@@ -9,11 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Redesigned Analysis view ([#294][#294])
+- Analysis: Redesigned view ([#294][#294])
   - All columns are sortable ascending or descending by clicking the header
-  - Columns for to show Event Type, Aggregated Total Time and Aggregated Self Time.
+  - Columns for to show Event Type, Aggregated Total Time and Aggregated Self Time
   - Virtualised row rendered to greatly improve performance
   - Group by Event Type to show aggregated totals for each type e.g See the Total Time for all `METHOD_ENTRY` events
+- Analysis: Export data ([#25][#25])
+  - Copy data to clipboard directly from Analysis grid by focusing on the grid and using `ctrl + c` or `cmd + c`
+  - Export to CSV file using the `Export to CSV` action in the grid header menu
 
 ### Changed
 
@@ -240,3 +243,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#288]: https://github.com/certinia/debug-log-analyzer/issues/288
 [#254]: https://github.com/certinia/debug-log-analyzer/issues/254
 [#294]: https://github.com/certinia/debug-log-analyzer/issues/294
+[#25]: https://github.com/certinia/debug-log-analyzer/issues/25
