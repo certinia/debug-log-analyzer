@@ -60,6 +60,7 @@ export default [
     ],
     plugins: [
       nodeResolve({ browser: true, preferBuiltins: false }),
+      commonjs(),
       nodePolyfills(),
       swc(
         defineRollupSwcOption({
