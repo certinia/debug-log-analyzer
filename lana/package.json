@@ -161,7 +161,7 @@
     "@apexdevtools/apex-ls": "^4.2.0",
     "@apexdevtools/sfdx-auth-helper": "^2.0.0",
     "@salesforce/apex-node": "^1.6.2",
-    "@salesforce/core": "^4.2.0"
+    "@salesforce/core": "^4.3.11"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.0",
