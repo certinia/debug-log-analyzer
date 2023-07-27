@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { showTreeNode } from './TreeView';
 import formatDuration, { debounce } from './Util';
+import { goToRow } from './calltree-view/CalltreeView';
 import { Method, RootNode, TimedNode, TimelineKey, truncated } from './parsers/TreeParser';
 
 interface TimelineGroup {
@@ -620,7 +620,7 @@ function onClickCanvas(): void {
     const depth = ~~(((displayHeight - lastMouseY - state.offsetY) / realHeight) * maxY);
     const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
     if (target && target.timestamp) {
-      showTreeNode(target.timestamp);
+      goToRow(target.timestamp);
     }
   }
 }

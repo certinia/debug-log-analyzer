@@ -103,3 +103,8 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
 input[type='checkbox'] {
   vertical-align: middle;
 }
+
+.tabulator-cell.datagrid-textarea {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}

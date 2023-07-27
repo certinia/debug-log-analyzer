@@ -2,7 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import formatDuration, { showTab } from './Util';
-import { Detail, LogLine, Method, RootNode, TimedNode } from './parsers/TreeParser';
+import { LogLine, Method, RootNode, TimedNode } from './parsers/TreeParser';
 import { OpenInfo, hostService } from './services/VSCodeService';
 
 declare global {
@@ -203,7 +203,7 @@ function describeMethod(node: Method): Node[] {
 
 function renderBlock(line: LogLine) {
   const lineNode = divElem.cloneNode() as HTMLDivElement;
-  lineNode.className = line instanceof Detail && line.hideable ? 'block name detail' : 'block name';
+  lineNode.className = !line.duration ? 'block name detail' : 'block name';
   lineNode.line = line;
 
   let valueElem;

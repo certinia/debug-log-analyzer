@@ -74,6 +74,7 @@ export class TruncationEntry {
  */
 export abstract class LogLine {
   // common metadata (available for all lines)
+  selfTime = 0; // the net time spent in the node (when not inside children)
   duration = 0; // the time spent in the node
   timestamp = 0; // the timestamp of this log line
   type = ''; // the type of this log line
@@ -86,13 +87,15 @@ export abstract class LogLine {
   isExit = false; // is a method exit line?
   lineNumber: LineNumber = null; // this log entry has a line number
   namespace: string | null = null; // the namespace of this log line
-  group: string | null = null; // analysis group
   value: string | null = null; // a variable value
   hasValidSymbols = false; // can we open source for this node?
   suffix: string | null = null; // extra description context
   prefix: string | null = null; // extra description context
   discontinuity = false; // does this line cause a discontinuity in the call stack?
-  rowCount: number | null = null; // the number of rows in a database operation
+  rowCount = 0; // the number of rows in a database operation
+  totalDmlCount = 0; // the number of DML_BEGIN decendants in a node
+  totalSoqlCount = 0; // the number of SOQL_EXECUTE_BEGIN decendants in a node
+  totalThrownCount = 0; // the number of EXCEPTION_THROWN decendants in a node
 
   constructor(parts: string[] | null) {
     if (parts) {
@@ -123,10 +126,6 @@ export class TimedNode extends LogLine {
 
   timelineKey: TimelineKey; // the formatting key for rendering this entry in the timeline
   cpuType: string; // the catagory key to collect our cpu usage
-  selfTime = 0; // the net time spent in the node (when not inside children)
-  totalDmlCount = 0; // the number of DML_BEGIN decendants in a node
-  totalSoqlCount = 0; // the number of SOQL_EXECUTE_BEGIN decendants in a node
-  totalThrownCount = 0; // the number of EXCEPTION_THROWN decendants in a node
 
   constructor(parts: string[] | null, timelineKey: TimelineKey, cpuType: string) {
     super(parts);
@@ -310,17 +309,6 @@ export class RootNode extends Method {
   }
 }
 
-/**
- * Log lines extend this class if they have no duration.
- */
-export class Detail extends LogLine {
-  hideable = true; // should this node respond to "hide details"?
-
-  constructor(parts: string[] | null) {
-    super(parts);
-  }
-}
-
 export function truncateLog(timestamp: number, reason: string, colorKey: TruncateKey) {
   if (!reasons.has(reason)) {
     reasons.add(reason);
@@ -399,41 +387,41 @@ export function parseRows(text: string): number {
 
 /* Log line entry Parsers */
 
-class BulkHeapAllocateLine extends Detail {
+class BulkHeapAllocateLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
   }
 }
 
-class CalloutRequestLine extends Detail {
+class CalloutRequestLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[3]} : ${parts[2]}`;
   }
 }
 
-class CalloutResponseLine extends Detail {
+class CalloutResponseLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[3]} : ${parts[2]}`;
   }
 }
-class NamedCredentialRequestLine extends Detail {
+class NamedCredentialRequestLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
   }
 }
 
-class NamedCredentialResponseLine extends Detail {
+class NamedCredentialResponseLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]}`;
   }
 }
 
-class NamedCredentialResponseDetailLine extends Detail {
+class NamedCredentialResponseDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[3]} : ${parts[4]} ${parts[5]} : ${parts[6]} ${parts[7]}`;
@@ -452,7 +440,7 @@ class ConstructorEntryLine extends Method {
   }
 }
 
-class ConstructorExitLine extends Detail {
+class ConstructorExitLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -461,7 +449,8 @@ class ConstructorExitLine extends Detail {
   }
 }
 
-class EmailQueueLine extends Detail {
+class EmailQueueLine extends LogLine {
+  acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
@@ -481,7 +470,7 @@ export class MethodEntryLine extends Method {
     }
   }
 }
-class MethodExitLine extends Detail {
+class MethodExitLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -500,7 +489,7 @@ class SystemConstructorEntryLine extends Method {
   }
 }
 
-class SystemConstructorExitLine extends Detail {
+class SystemConstructorExitLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -516,7 +505,7 @@ class SystemMethodEntryLine extends Method {
   }
 }
 
-class SystemMethodExitLine extends Detail {
+class SystemMethodExitLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -534,37 +523,37 @@ const cpuMap: Map<string, string> = new Map([
 
 export class CodeUnitStartedLine extends Method {
   suffix = ' (entrypoint)';
+  codeUnitType = '';
 
   constructor(parts: string[]) {
     super(parts, ['CODE_UNIT_FINISHED'], null, 'codeUnit', CodeUnitStartedLine.getCpuType(parts));
+
     const subParts = parts[3].split(':'),
       name = parts[4] || parts[3];
 
-    const codeUnitType = subParts[0];
-    switch (codeUnitType) {
+    this.codeUnitType = subParts[0] || parts[4].split('/')[0];
+    switch (this.codeUnitType) {
       case 'EventService':
         this.cpuType = 'method';
         this.namespace = parseObjectNamespace(subParts[1]);
-        this.group = 'EventService ' + this.namespace;
+
         this.text = parts[3];
         break;
       case 'Validation':
         this.cpuType = 'custom';
         this.declarative = true;
-        this.group = 'Validation';
-        this.text = name || codeUnitType + ':' + subParts[1];
+
+        this.text = name || this.codeUnitType + ':' + subParts[1];
         break;
       case 'Workflow':
         this.cpuType = 'custom';
         this.declarative = true;
-        this.group = codeUnitType;
-        this.text = name || codeUnitType;
+        this.text = name || this.codeUnitType;
         break;
       case 'Flow':
         this.cpuType = 'custom';
         this.declarative = true;
-        this.group = codeUnitType;
-        this.text = name || codeUnitType;
+        this.text = name || this.codeUnitType;
         break;
       default:
         this.cpuType = 'method';
@@ -588,7 +577,7 @@ export class CodeUnitStartedLine extends Method {
     return cpuType ?? 'method';
   }
 }
-export class CodeUnitFinishedLine extends Detail {
+export class CodeUnitFinishedLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -648,7 +637,7 @@ class VFApexCallStartLine extends Method {
   }
 }
 
-class VFApexCallEndLine extends Detail {
+class VFApexCallEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -660,7 +649,6 @@ class VFApexCallEndLine extends Detail {
 class VFDeserializeViewstateBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['VF_DESERIALIZE_VIEWSTATE_END'], null, 'systemMethod', 'method');
-    this.text = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -668,7 +656,7 @@ class VFDeserializeViewstateBeginLine extends Method {
   }
 }
 
-class VFDeserializeViewstateEndLine extends Detail {
+class VFDeserializeViewstateEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -682,7 +670,6 @@ class VFFormulaStartLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['VF_EVALUATE_FORMULA_END'], 'formula', 'systemMethod', 'custom');
     this.text = parts[3];
-    this.group = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -690,7 +677,7 @@ class VFFormulaStartLine extends Method {
   }
 }
 
-class VFFormulaEndLine extends Detail {
+class VFFormulaEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -704,7 +691,6 @@ class VFSeralizeViewStateStartLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['VF_SERIALIZE_VIEWSTATE_END'], null, 'systemMethod', 'method');
-    this.text = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -712,7 +698,7 @@ class VFSeralizeViewStateStartLine extends Method {
   }
 }
 
-class VFSeralizeViewStateEndLine extends Detail {
+class VFSeralizeViewStateEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -720,7 +706,8 @@ class VFSeralizeViewStateEndLine extends Detail {
   }
 }
 
-class VFPageMessageLine extends Detail {
+class VFPageMessageLine extends LogLine {
+  acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
@@ -728,8 +715,7 @@ class VFPageMessageLine extends Detail {
 }
 
 class DMLBeginLine extends Method {
-  group = 'DML';
-
+  totalDmlCount = 1;
   constructor(parts: string[]) {
     super(parts, ['DML_END'], null, 'dml', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
@@ -742,7 +728,7 @@ class DMLBeginLine extends Method {
   }
 }
 
-class DMLEndLine extends Detail {
+class DMLEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -751,7 +737,7 @@ class DMLEndLine extends Detail {
   }
 }
 
-class IdeasQueryExecuteLine extends Detail {
+class IdeasQueryExecuteLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
@@ -759,8 +745,8 @@ class IdeasQueryExecuteLine extends Detail {
 }
 
 class SOQLExecuteBeginLine extends Method {
-  group = 'SOQL';
   aggregations = 0;
+  totalSoqlCount = 1;
 
   constructor(parts: string[]) {
     super(parts, ['SOQL_EXECUTE_END'], null, 'soql', 'free');
@@ -782,7 +768,7 @@ class SOQLExecuteBeginLine extends Method {
   }
 }
 
-class SOQLExecuteEndLine extends Detail {
+class SOQLExecuteEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -792,7 +778,7 @@ class SOQLExecuteEndLine extends Detail {
   }
 }
 
-class SOQLExecuteExplainLine extends Detail {
+class SOQLExecuteExplainLine extends LogLine {
   cardinality: number | null = null; // The estimated number of records that the leading operation type would return
   fields: string[] | null = null; //The indexed field(s) used by the Query Optimizer. If the leading operation type is Index, the fields value is Index. Otherwise, the fields value is null.
   leadingOperationType: string | null = null; // The primary operation type that Salesforce will use to optimize the query.
@@ -803,7 +789,7 @@ class SOQLExecuteExplainLine extends Detail {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = `${parts[3]}, line:${this.lineNumber}`;
+    this.text = parts[3];
 
     const queryplanParts = parts[3].split('],');
     if (queryplanParts.length > 1) {
@@ -833,8 +819,6 @@ class SOQLExecuteExplainLine extends Detail {
 }
 
 class SOSLExecuteBeginLine extends Method {
-  group = 'SOQL';
-
   constructor(parts: string[]) {
     super(parts, ['SOSL_EXECUTE_END'], null, 'soql', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
@@ -845,12 +829,12 @@ class SOSLExecuteBeginLine extends Method {
     return 'SOSL';
   }
 
-  onEnd(end: SOSLExecuteEndLine, _stack: Detail[]): void {
+  onEnd(end: SOSLExecuteEndLine, _stack: LogLine[]): void {
     this.rowCount = end.rowCount;
   }
 }
 
-class SOSLExecuteEndLine extends Detail {
+class SOSLExecuteEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -860,7 +844,7 @@ class SOSLExecuteEndLine extends Detail {
   }
 }
 
-class HeapAllocateLine extends Detail {
+class HeapAllocateLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
@@ -868,21 +852,21 @@ class HeapAllocateLine extends Detail {
   }
 }
 
-class HeapDeallocateLine extends Detail {
+class HeapDeallocateLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
   }
 }
 
-class StatementExecuteLine extends Detail {
+class StatementExecuteLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
   }
 }
 
-class VariableScopeBeginLine extends Detail {
+class VariableScopeBeginLine extends LogLine {
   prefix = 'ASSIGN ';
   classes = 'node detail';
 
@@ -890,7 +874,6 @@ class VariableScopeBeginLine extends Detail {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[3];
-    this.group = this.type;
     this.value = parts[4];
   }
 
@@ -902,30 +885,28 @@ class VariableScopeBeginLine extends Detail {
   }
 }
 
-class VariableScopeEndLine extends Detail {
+class VariableScopeEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
-class VariableAssignmentLine extends Detail {
+class VariableAssignmentLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[3];
-    this.group = this.type;
     this.value = parts[4];
   }
 }
-class UserInfoLine extends Detail {
+class UserInfoLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = this.type + ':' + parts[3] + ' ' + parts[4];
-    this.group = this.type;
   }
 }
 
-class UserDebugLine extends Detail {
+class UserDebugLine extends LogLine {
   acceptsText = true;
 
   constructor(parts: string[]) {
@@ -933,15 +914,12 @@ class UserDebugLine extends Detail {
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[3];
     this.value = parts[4];
-    this.group = this.type;
   }
 }
 
 class CumulativeLimitUsageLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['CUMULATIVE_LIMIT_USAGE_END'], null, 'systemMethod', 'system');
-    this.text = this.type;
-    this.group = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -949,7 +927,7 @@ class CumulativeLimitUsageLine extends Method {
   }
 }
 
-class CumulativeLimitUsageEndLine extends Detail {
+class CumulativeLimitUsageEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -957,7 +935,7 @@ class CumulativeLimitUsageEndLine extends Detail {
   }
 }
 
-class CumulativeProfilingLine extends Detail {
+class CumulativeProfilingLine extends LogLine {
   acceptsText = true;
 
   constructor(parts: string[]) {
@@ -976,7 +954,7 @@ class CumulativeProfilingBeginLine extends Method {
   }
 }
 
-class CumulativeProfilingEndLine extends Detail {
+class CumulativeProfilingEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -984,22 +962,20 @@ class CumulativeProfilingEndLine extends Detail {
   }
 }
 
-class LimitUsageLine extends Detail {
+class LimitUsageLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[3] + ' ' + parts[4] + ' out of ' + parts[5];
-    this.group = this.type;
   }
 }
 
-class LimitUsageForNSLine extends Detail {
+class LimitUsageForNSLine extends LogLine {
   acceptsText = true;
 
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
-    this.group = this.type;
   }
 
   onAfter(_next: LogLine): void {
@@ -1020,26 +996,26 @@ class NBANodeBegin extends Method {
   }
 }
 
-class NBANodeDetail extends Detail {
+class NBANodeDetail extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts.slice(2, -1).join(' | ');
   }
 }
-class NBANodeEnd extends Detail {
+class NBANodeEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
     this.text = parts.slice(2, -1).join(' | ');
   }
 }
-class NBANodeError extends Detail {
+class NBANodeError extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts.slice(2, -1).join(' | ');
   }
 }
-class NBAOfferInvalid extends Detail {
+class NBAOfferInvalid extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts.slice(2, -1).join(' | ');
@@ -1051,21 +1027,21 @@ class NBAStrategyBegin extends Method {
     this.text = parts.slice(2, -1).join(' | ');
   }
 }
-class NBAStrategyEnd extends Detail {
+class NBAStrategyEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
     this.text = parts.slice(2, -1).join(' | ');
   }
 }
-class NBAStrategyError extends Detail {
+class NBAStrategyError extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts.slice(2, -1).join(' | ');
   }
 }
 
-class PushTraceFlagsLine extends Detail {
+class PushTraceFlagsLine extends LogLine {
   namespace = 'system';
 
   constructor(parts: string[]) {
@@ -1075,7 +1051,7 @@ class PushTraceFlagsLine extends Detail {
   }
 }
 
-class PopTraceFlagsLine extends Detail {
+class PopTraceFlagsLine extends LogLine {
   namespace = 'system';
 
   constructor(parts: string[]) {
@@ -1097,7 +1073,7 @@ class QueryMoreBeginLine extends Method {
   }
 }
 
-class QueryMoreEndLine extends Detail {
+class QueryMoreEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -1106,7 +1082,7 @@ class QueryMoreEndLine extends Detail {
     this.text = `line: ${this.lineNumber}`;
   }
 }
-class QueryMoreIterationsLine extends Detail {
+class QueryMoreIterationsLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
@@ -1114,7 +1090,7 @@ class QueryMoreIterationsLine extends Detail {
   }
 }
 
-class SavepointRollbackLine extends Detail {
+class SavepointRollbackLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
@@ -1122,7 +1098,7 @@ class SavepointRollbackLine extends Detail {
   }
 }
 
-class SavePointSetLine extends Detail {
+class SavePointSetLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
@@ -1130,14 +1106,14 @@ class SavePointSetLine extends Detail {
   }
 }
 
-class TotalEmailRecipientsQueuedLine extends Detail {
+class TotalEmailRecipientsQueuedLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
   }
 }
 
-class StackFrameVariableListLine extends Detail {
+class StackFrameVariableListLine extends LogLine {
   acceptsText = true;
 
   constructor(parts: string[]) {
@@ -1145,7 +1121,7 @@ class StackFrameVariableListLine extends Detail {
   }
 }
 
-class StaticVariableListLine extends Detail {
+class StaticVariableListLine extends LogLine {
   acceptsText = true;
 
   constructor(parts: string[]) {
@@ -1154,7 +1130,7 @@ class StaticVariableListLine extends Detail {
 }
 
 // This looks like a method, but the exit line is often missing...
-class SystemModeEnterLine extends Detail {
+class SystemModeEnterLine extends LogLine {
   // namespace = "system";
 
   constructor(parts: string[]) {
@@ -1163,7 +1139,7 @@ class SystemModeEnterLine extends Detail {
   }
 }
 
-class SystemModeExitLine extends Detail {
+class SystemModeExitLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
@@ -1173,7 +1149,6 @@ class SystemModeExitLine extends Detail {
 export class ExecutionStartedLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['EXECUTION_FINISHED'], null, 'method', 'method');
-    this.text = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -1181,12 +1156,11 @@ export class ExecutionStartedLine extends Method {
   }
 }
 
-export class ExecutionFinishedLine extends Detail {
+export class ExecutionFinishedLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = this.type;
   }
 }
 
@@ -1208,7 +1182,6 @@ class EnteringManagedPackageLine extends Method {
 class EventSericePubBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['EVENT_SERVICE_PUB_END'], null, 'flow', 'custom');
-    this.group = this.type;
     this.text = parts[2];
   }
 
@@ -1217,7 +1190,7 @@ class EventSericePubBeginLine extends Method {
   }
 }
 
-class EventSericePubEndLine extends Detail {
+class EventSericePubEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -1226,11 +1199,10 @@ class EventSericePubEndLine extends Detail {
   }
 }
 
-class EventSericePubDetailLine extends Detail {
+class EventSericePubDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] + ' ' + parts[3] + ' ' + parts[4];
-    this.group = this.type;
   }
 }
 
@@ -1238,7 +1210,6 @@ class EventSericeSubBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['EVENT_SERVICE_SUB_END'], null, 'flow', 'custom');
     this.text = `${parts[2]} ${parts[3]}`;
-    this.group = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -1246,7 +1217,7 @@ class EventSericeSubBeginLine extends Method {
   }
 }
 
-class EventSericeSubEndLine extends Detail {
+class EventSericeSubEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -1255,11 +1226,10 @@ class EventSericeSubEndLine extends Detail {
   }
 }
 
-class EventSericeSubDetailLine extends Detail {
+class EventSericeSubDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} ${parts[3]} ${parts[4]} ${parts[6]} ${parts[6]}`;
-    this.group = this.type;
   }
 }
 
@@ -1273,7 +1243,6 @@ export class FlowStartInterviewsBeginLine extends Method {
 
   onEnd(end: FlowStartInterviewsEndLine, stack: LogLine[]) {
     const flowType = this.getFlowType(stack);
-    this.group = flowType;
     this.suffix = ` (${flowType})`;
     this.text += this.getFlowName();
   }
@@ -1286,8 +1255,8 @@ export class FlowStartInterviewsBeginLine extends Method {
       const elem = stack[i];
       // type = "CODE_UNIT_STARTED" a flow or Processbuilder was started directly
       // type = "FLOW_START_INTERVIEWS_BEGIN" a flow was started from a process builder
-      if (elem.type === 'CODE_UNIT_STARTED') {
-        flowType = elem.group === 'Flow' ? 'Flow' : 'Process Builder';
+      if (elem instanceof CodeUnitStartedLine) {
+        flowType = elem.codeUnitType === 'Flow' ? 'Flow' : 'Process Builder';
         break;
       } else if (elem.type === 'FLOW_START_INTERVIEWS_BEGIN') {
         flowType = 'Flow';
@@ -1309,7 +1278,7 @@ export class FlowStartInterviewsBeginLine extends Method {
   }
 }
 
-class FlowStartInterviewsEndLine extends Detail {
+class FlowStartInterviewsEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -1317,7 +1286,7 @@ class FlowStartInterviewsEndLine extends Detail {
   }
 }
 
-class FlowStartInterviewsErrorLine extends Detail {
+class FlowStartInterviewsErrorLine extends LogLine {
   acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
@@ -1325,49 +1294,45 @@ class FlowStartInterviewsErrorLine extends Detail {
   }
 }
 
-class FlowStartInterviewBeginLine extends Detail {
+class FlowStartInterviewBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3];
-    this.group = this.type;
   }
 }
 
-class FlowStartInterviewEndLine extends Detail {
+class FlowStartInterviewEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class FlowStartInterviewLimitUsageLine extends Detail {
+class FlowStartInterviewLimitUsageLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
-    this.group = this.type;
   }
 }
 
-class FlowStartScheduledRecordsLine extends Detail {
+class FlowStartScheduledRecordsLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
-class FlowCreateInterviewBeginLine extends Detail {
-  text = '';
-
+class FlowCreateInterviewBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class FlowCreateInterviewEndLine extends Detail {
+class FlowCreateInterviewEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class FlowCreateInterviewErrorLine extends Detail {
+class FlowCreateInterviewErrorLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
@@ -1379,7 +1344,6 @@ class FlowElementBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['FLOW_ELEMENT_END'], null, 'flow', 'custom');
-    this.group = this.type;
     this.text = this.type + ' : ' + parts[3] + ' ' + parts[4];
   }
 
@@ -1388,7 +1352,7 @@ class FlowElementBeginLine extends Method {
   }
 }
 
-class FlowElementEndLine extends Detail {
+class FlowElementEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -1396,80 +1360,75 @@ class FlowElementEndLine extends Detail {
   }
 }
 
-class FlowElementDeferredLine extends Detail {
+class FlowElementDeferredLine extends LogLine {
   declarative = true;
 
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] + ' ' + parts[3];
-    this.group = this.type;
   }
 }
 
-class FlowElementAssignmentLine extends Detail {
+class FlowElementAssignmentLine extends LogLine {
   declarative = true;
   acceptsText = true;
 
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3] + ' ' + parts[4];
-    this.group = this.type;
   }
 }
 
-class FlowWaitEventResumingDetailLine extends Detail {
+class FlowWaitEventResumingDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
-class FlowWaitEventWaitingDetailLine extends Detail {
+class FlowWaitEventWaitingDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
   }
 }
 
-class FlowWaitResumingDetailLine extends Detail {
+class FlowWaitResumingDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
 
-class FlowWaitWaitingDetailLine extends Detail {
+class FlowWaitWaitingDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
-class FlowInterviewFinishedLine extends Detail {
-  group: string;
-
+class FlowInterviewFinishedLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3];
-    this.group = this.type;
   }
 }
 
-class FlowInterviewResumedLine extends Detail {
+class FlowInterviewResumedLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
 
-class FlowInterviewPausedLine extends Detail {
+class FlowInterviewPausedLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
 
-class FlowElementErrorLine extends Detail {
+class FlowElementErrorLine extends LogLine {
   acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
@@ -1477,63 +1436,59 @@ class FlowElementErrorLine extends Detail {
   }
 }
 
-class FlowElementFaultLine extends Detail {
+class FlowElementFaultLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
 
-class FlowElementLimitUsageLine extends Detail {
+class FlowElementLimitUsageLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]}`;
   }
 }
 
-class FlowInterviewFinishedLimitUsageLine extends Detail {
+class FlowInterviewFinishedLimitUsageLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]}`;
   }
 }
 
-class FlowSubflowDetailLine extends Detail {
+class FlowSubflowDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
-class FlowActionCallDetailLine extends Detail {
+class FlowActionCallDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3] + ' : ' + parts[4] + ' : ' + parts[5] + ' : ' + parts[6];
-    this.group = this.type;
   }
 }
 
-class FlowAssignmentDetailLine extends Detail {
+class FlowAssignmentDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3] + ' : ' + parts[4] + ' : ' + parts[5];
-    this.group = this.type;
   }
 }
 
-class FlowLoopDetailLine extends Detail {
+class FlowLoopDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3] + ' : ' + parts[4];
-    this.group = this.type;
   }
 }
 
-class FlowRuleDetailLine extends Detail {
+class FlowRuleDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3] + ' : ' + parts[4];
-    this.group = this.type;
   }
 }
 
@@ -1543,7 +1498,6 @@ class FlowBulkElementBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['FLOW_BULK_ELEMENT_END'], null, 'flow', 'custom');
     this.text = `${this.type} : ${parts[2]} - ${parts[3]}`;
-    this.group = this.type;
   }
 
   getBreadcrumbText(): string {
@@ -1551,7 +1505,7 @@ class FlowBulkElementBeginLine extends Method {
   }
 }
 
-class FlowBulkElementEndLine extends Detail {
+class FlowBulkElementEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -1559,98 +1513,96 @@ class FlowBulkElementEndLine extends Detail {
   }
 }
 
-class FlowBulkElementDetailLine extends Detail {
+class FlowBulkElementDetailLine extends LogLine {
   declarative = true;
 
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] + ' : ' + parts[3] + ' : ' + parts[4];
-    this.group = this.type;
   }
 }
 
-class FlowBulkElementNotSupportedLine extends Detail {
+class FlowBulkElementNotSupportedLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
 
-class FlowBulkElementLimitUsageLine extends Detail {
+class FlowBulkElementLimitUsageLine extends LogLine {
   declarative = true;
 
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
-    this.group = this.type;
   }
 }
 
-class PNInvalidAppLine extends Detail {
+class PNInvalidAppLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]}.${parts[3]}`;
   }
 }
 
-class PNInvalidCertificateLine extends Detail {
+class PNInvalidCertificateLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]}.${parts[3]}`;
   }
 }
-class PNInvalidNotificationLine extends Detail {
+class PNInvalidNotificationLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]}.${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]} : ${parts[7]} : ${parts[8]}`;
   }
 }
-class PNNoDevicesLine extends Detail {
+class PNNoDevicesLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]}.${parts[3]}`;
   }
 }
-class PNNotEnabledLine extends Detail {
+class PNNotEnabledLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
-class PNSentLine extends Detail {
+class PNSentLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]}.${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]} : ${parts[7]}`;
   }
 }
 
-class SLAEndLine extends Detail {
+class SLAEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
   }
 }
 
-class SLAEvalMilestoneLine extends Detail {
+class SLAEvalMilestoneLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]}`;
   }
 }
 
-class SLANullStartDateLine extends Detail {
+class SLANullStartDateLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class SLAProcessCaseLine extends Detail {
+class SLAProcessCaseLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]}`;
   }
 }
 
-class TestingLimitsLine extends Detail {
+class TestingLimitsLine extends LogLine {
   acceptsText = true;
 
   constructor(parts: string[]) {
@@ -1658,15 +1610,14 @@ class TestingLimitsLine extends Detail {
   }
 }
 
-class ValidationRuleLine extends Detail {
+class ValidationRuleLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3];
-    this.group = this.type;
   }
 }
 
-class ValidationErrorLine extends Detail {
+class ValidationErrorLine extends LogLine {
   acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
@@ -1674,13 +1625,13 @@ class ValidationErrorLine extends Detail {
   }
 }
 
-class ValidationFailLine extends Detail {
+class ValidationFailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class ValidationFormulaLine extends Detail {
+class ValidationFormulaLine extends LogLine {
   acceptsText = true;
 
   constructor(parts: string[]) {
@@ -1688,31 +1639,29 @@ class ValidationFormulaLine extends Detail {
     const extra = parts.length > 3 ? ' ' + parts[3] : '';
 
     this.text = parts[2] + extra;
-    this.group = this.type;
   }
 }
 
-class ValidationPassLine extends Detail {
+class ValidationPassLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[3];
-    this.group = this.type;
   }
 }
 
-class WFFlowActionBeginLine extends Detail {
+class WFFlowActionBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class WFFlowActionEndLine extends Detail {
+class WFFlowActionEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class WFFlowActionErrorLine extends Detail {
+class WFFlowActionErrorLine extends LogLine {
   acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
@@ -1720,7 +1669,7 @@ class WFFlowActionErrorLine extends Detail {
   }
 }
 
-class WFFlowActionErrorDetailLine extends Detail {
+class WFFlowActionErrorDetailLine extends LogLine {
   acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
@@ -1728,11 +1677,10 @@ class WFFlowActionErrorDetailLine extends Detail {
   }
 }
 
-class WFFieldUpdateLine extends Detail {
+class WFFieldUpdateLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = ' ' + parts[2] + ' ' + parts[3] + ' ' + parts[4] + ' ' + parts[5] + ' ' + parts[6];
-    this.group = this.type;
   }
 }
 
@@ -1749,7 +1697,7 @@ class WFRuleEvalBeginLine extends Method {
   }
 }
 
-class WFRuleEvalEndLine extends Detail {
+class WFRuleEvalEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -1757,25 +1705,23 @@ class WFRuleEvalEndLine extends Detail {
   }
 }
 
-class WFRuleEvalValueLine extends Detail {
+class WFRuleEvalValueLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
-    this.group = this.type;
   }
 }
 
-class WFRuleFilterLine extends Detail {
+class WFRuleFilterLine extends LogLine {
   acceptsText = true;
 
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
-    this.group = this.type;
   }
 }
 
-class WFRuleNotEvaluatedLine extends Detail {
+class WFRuleNotEvaluatedLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -1785,7 +1731,6 @@ class WFRuleNotEvaluatedLine extends Detail {
 
 class WFCriteriaBeginLine extends Method {
   declarative = true;
-  group = 'WF_CRITERIA';
 
   constructor(parts: string[]) {
     super(parts, ['WF_CRITERIA_END', 'WF_RULE_NOT_EVALUATED'], null, 'workflow', 'custom');
@@ -1797,7 +1742,7 @@ class WFCriteriaBeginLine extends Method {
   }
 }
 
-class WFCriteriaEndLine extends Detail {
+class WFCriteriaEndLine extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -1805,115 +1750,113 @@ class WFCriteriaEndLine extends Detail {
   }
 }
 
-class WFFormulaLine extends Detail {
+class WFFormulaLine extends LogLine {
   acceptsText = true;
 
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] + ' : ' + parts[3];
-    this.group = this.type;
   }
 }
 
-class WFActionLine extends Detail {
-  constructor(parts: string[]) {
-    super(parts);
-    this.text = parts[2];
-    this.group = this.type;
-  }
-}
-
-class WFActionsEndLine extends Detail {
+class WFActionLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
   }
 }
 
-class WFActionTaskLine extends Detail {
+class WFActionsEndLine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+    this.text = parts[2];
+  }
+}
+
+class WFActionTaskLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]} : ${parts[7]}`;
   }
 }
 
-class WFApprovalLine extends Detail {
+class WFApprovalLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
 
-class WFApprovalRemoveLine extends Detail {
+class WFApprovalRemoveLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]}`;
   }
 }
 
-class WFApprovalSubmitLine extends Detail {
+class WFApprovalSubmitLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]}`;
   }
 }
 
-class WFApprovalSubmitterLine extends Detail {
+class WFApprovalSubmitterLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
 
-class WFAssignLine extends Detail {
+class WFAssignLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
 
-class WFEmailAlertLine extends Detail {
+class WFEmailAlertLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
 
-class WFEmailSentLine extends Detail {
+class WFEmailSentLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
 
-class WFEnqueueActionsLine extends Detail {
+class WFEnqueueActionsLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
   }
 }
 
-class WFEscalationActionLine extends Detail {
+class WFEscalationActionLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
 
-class WFEscalationRuleLine extends Detail {
+class WFEscalationRuleLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class WFEvalEntryCriteriaLine extends Detail {
+class WFEvalEntryCriteriaLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
 
-class WFFlowActionDetailLine extends Detail {
+class WFFlowActionDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     const optional = parts[4] ? ` : ${parts[4]} :${parts[5]}` : '';
@@ -1921,104 +1864,105 @@ class WFFlowActionDetailLine extends Detail {
   }
 }
 
-class WFHardRejectLine extends Detail {
+class WFHardRejectLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class WFNextApproverLine extends Detail {
+class WFNextApproverLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
 
-class WFNoProcessFoundLine extends Detail {
+class WFNoProcessFoundLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class WFOutboundMsgLine extends Detail {
+class WFOutboundMsgLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
-class WFProcessFoundLine extends Detail {
+class WFProcessFoundLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
 
-class WFProcessNode extends Detail {
+class WFProcessNode extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
   }
 }
 
-class WFReassignRecordLine extends Detail {
+class WFReassignRecordLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
 
-class WFResponseNotifyLine extends Detail {
+class WFResponseNotifyLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
-class WFRuleEntryOrderLine extends Detail {
+class WFRuleEntryOrderLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
   }
 }
 
-class WFRuleInvocationLine extends Detail {
+class WFRuleInvocationLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
   }
 }
 
-class WFSoftRejectLine extends Detail {
+class WFSoftRejectLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
   }
 }
 
-class WFTimeTriggerLine extends Detail {
+class WFTimeTriggerLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
-class WFSpoolActionBeginLine extends Detail {
+class WFSpoolActionBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
   }
 }
 
-class WFTimeTriggersBeginLine extends Detail {
+class WFTimeTriggersBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class ExceptionThrownLine extends Detail {
+class ExceptionThrownLine extends LogLine {
   discontinuity = true;
   acceptsText = true;
+  totalThrownCount = 1;
 
   constructor(parts: string[]) {
     super(parts);
@@ -2029,11 +1973,10 @@ class ExceptionThrownLine extends Detail {
 
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = text;
-    this.group = this.type;
   }
 }
 
-class FatalErrorLine extends Detail {
+class FatalErrorLine extends LogLine {
   acceptsText = true;
   hideable = false;
   discontinuity = true;
@@ -2046,27 +1989,27 @@ class FatalErrorLine extends Detail {
   }
 }
 
-class XDSDetailLine extends Detail {
+class XDSDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
   }
 }
 
-class XDSResponseLine extends Detail {
+class XDSResponseLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
   }
 }
-class XDSResponseDetailLine extends Detail {
+class XDSResponseDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
   }
 }
 
-class XDSResponseErrorLine extends Detail {
+class XDSResponseErrorLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
@@ -2087,7 +2030,7 @@ class DuplicateDetectionBegin extends Method {
 }
 
 // e.g. "09:45:31.888 (38909459101)|DUPLICATE_DETECTION_END"
-class DuplicateDetectionEnd extends Detail {
+class DuplicateDetectionEnd extends LogLine {
   isExit = true;
 
   constructor(parts: string[]) {
@@ -2096,7 +2039,7 @@ class DuplicateDetectionEnd extends Detail {
 }
 
 // e.g. "09:45:31.888 (38889067408)|DUPLICATE_DETECTION_RULE_INVOCATION|DuplicateRuleId:0Bm20000000CaSP|DuplicateRuleName:Duplicate Account|DmlType:UPDATE"
-class DuplicateDetectionRule extends Detail {
+class DuplicateDetectionRule extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[3]} - ${parts[4]}`;
@@ -2107,7 +2050,7 @@ class DuplicateDetectionRule extends Detail {
  * NOTE: These can be found in the org on the create new debug level page but are not found in the docs here
  * https://help.salesforce.com/s/articleView?id=sf.code_setting_debug_log_levels.htm
  */
-class BulkDMLEntry extends Detail {
+class BulkDMLEntry extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2];
@@ -2117,7 +2060,7 @@ class BulkDMLEntry extends Detail {
 /**
  * DUPLICATE_DETECTION_MATCH_INVOCATION_DETAILS|EntityType:Account|ActionTaken:Allow_[Alert,Report]|DuplicateRecordIds:
  */
-class DuplicateDetectionDetails extends Detail {
+class DuplicateDetectionDetails extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts.slice(2, -1).join(' | ');
@@ -2127,180 +2070,180 @@ class DuplicateDetectionDetails extends Detail {
 /**
  * DUPLICATE_DETECTION_MATCH_INVOCATION_SUMMARY|EntityType:Account|NumRecordsToBeSaved:200|NumRecordsToBeSavedWithDuplicates:0|NumDuplicateRecordsFound:0
  */
-class DuplicateDetectionSummary extends Detail {
+class DuplicateDetectionSummary extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = parts.slice(2, -1).join(' | ');
   }
 }
 
-class WFKnowledgeAction extends Detail {
+class WFKnowledgeAction extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class WFSendAction extends Detail {
+class WFSendAction extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class WFQuickCreate extends Detail {
+class WFQuickCreate extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class WFApexAction extends Detail {
+class WFApexAction extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class InvocableActionDetail extends Detail {
+class InvocableActionDetail extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
-class InvocableActionError extends Detail {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
-class FlowCollectionProcessDetail extends Detail {
+class InvocableActionError extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class FlowScheduledPathQueued extends Detail {
+class FlowCollectionProcessDetail extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class RouteWorkAction extends Detail {
+class FlowScheduledPathQueued extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class AddSkillRequirementAction extends Detail {
+class RouteWorkAction extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class AddScreenPopAction extends Detail {
+class AddSkillRequirementAction extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class CalloutRequestPrepare extends Detail {
+class AddScreenPopAction extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class CalloutRequestFinalize extends Detail {
+class CalloutRequestPrepare extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class FunctionInvocationRequest extends Detail {
+class CalloutRequestFinalize extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class FunctionInvocationResponse extends Detail {
+class FunctionInvocationRequest extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class XDSRequestDetail extends Detail {
+class FunctionInvocationResponse extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class ExternalServiceRequest extends Detail {
+class XDSRequestDetail extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class ExternalServiceResponse extends Detail {
+class ExternalServiceRequest extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class BulkCountableStatementExecute extends Detail {
+class ExternalServiceResponse extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class DataWeaveUserDebug extends Detail {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class UserDebugFinest extends Detail {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class UserDebugFiner extends Detail {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class UserDebugFine extends Detail {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class UserDebugDebug extends Detail {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class UserDebugInfo extends Detail {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class UserDebugWarn extends Detail {
+class BulkCountableStatementExecute extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class UserDebugError extends Detail {
+class DataWeaveUserDebug extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+class UserDebugFinest extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+class UserDebugFiner extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+class UserDebugFine extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+class UserDebugDebug extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+class UserDebugInfo extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+class UserDebugWarn extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class VFApexCall extends Detail {
+class UserDebugError extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class HeapDump extends Detail {
+class VFApexCall extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
-class ScriptExecution extends Detail {
+
+class HeapDump extends LogLine {
+  constructor(parts: string[]) {
+    super(parts);
+  }
+}
+class ScriptExecution extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
@@ -2310,7 +2253,7 @@ class SessionCachePutBegin extends Method {
     super(parts, ['SESSION_CACHE_PUT_END'], null, 'method', 'method');
   }
 }
-class SessionCachePutEnd extends Detail {
+class SessionCachePutEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
@@ -2322,14 +2265,14 @@ class SessionCacheGetBegin extends Method {
   }
 }
 
-class SessionCacheGetEnd extends Detail {
+class SessionCacheGetEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class SessionCacheMemoryUsage extends Detail {
+class SessionCacheMemoryUsage extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
@@ -2341,7 +2284,7 @@ class SessionCacheRemoveBegin extends Method {
   }
 }
 
-class SessionCacheRemoveEnd extends Detail {
+class SessionCacheRemoveEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
@@ -2353,7 +2296,7 @@ class OrgCachePutBegin extends Method {
     super(parts, ['ORG_CACHE_PUT_END'], null, 'method', 'method');
   }
 }
-class OrgCachePutEnd extends Detail {
+class OrgCachePutEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
@@ -2365,14 +2308,14 @@ class OrgCacheGetBegin extends Method {
   }
 }
 
-class OrgCacheGetEnd extends Detail {
+class OrgCacheGetEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class OrgCacheMemoryUsage extends Detail {
+class OrgCacheMemoryUsage extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
@@ -2384,20 +2327,20 @@ class OrgCacheRemoveBegin extends Method {
   }
 }
 
-class OrgCacheRemoveEnd extends Detail {
+class OrgCacheRemoveEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class AEPersistValidation extends Detail {
+class AEPersistValidation extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class ReferencedObjectList extends Detail {
+class ReferencedObjectList extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
@@ -2409,7 +2352,7 @@ class VFSerializeContinuationStateBegin extends Method {
   }
 }
 
-class VFSerializeContinuationStateEnd extends Detail {
+class VFSerializeContinuationStateEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
@@ -2422,26 +2365,26 @@ class VFDeserializeContinuationStateBegin extends Method {
   }
 }
 
-class VFDeserializeContinuationStateEnd extends Detail {
+class VFDeserializeContinuationStateEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class DuplicateRuleFilter extends Detail {
+class DuplicateRuleFilter extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class DuplicateRuleFilterResult extends Detail {
+class DuplicateRuleFilterResult extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class DuplicateRuleFilterValue extends Detail {
+class DuplicateRuleFilterValue extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
@@ -2453,80 +2396,80 @@ class MatchEngineBegin extends Method {
   }
 }
 
-class MatchEngineInvocation extends Detail {
+class MatchEngineInvocation extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class MatchEngineEnd extends Detail {
+class MatchEngineEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class TemplateProcessingError extends Detail {
+class TemplateProcessingError extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class WaveAppLifecycle extends Detail {
+class WaveAppLifecycle extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class AppContainerInitiated extends Detail {
+class AppContainerInitiated extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class TemplatedAsset extends Detail {
+class TemplatedAsset extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class TransformationSummary extends Detail {
+class TransformationSummary extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class RulesExecutionSummary extends Detail {
+class RulesExecutionSummary extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class AssetDiffSummary extends Detail {
+class AssetDiffSummary extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class AssetDiffDetail extends Detail {
+class AssetDiffDetail extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class RulesExecutionDetail extends Detail {
+class RulesExecutionDetail extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class JsonDiffSummary extends Detail {
+class JsonDiffSummary extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
 }
 
-class JsonDiffDetail extends Detail {
+class JsonDiffDetail extends LogLine {
   constructor(parts: string[]) {
     super(parts);
   }
@@ -2799,7 +2742,7 @@ export function parseLine(line: string, lastEntry: LogLine | null): LogLine | nu
 
   if (!typePattern.test(type) && lastEntry?.acceptsText) {
     // wrapped text from the previous entry?
-    lastEntry.text += ` | ${line}`;
+    lastEntry.text += `\n${line}`;
   } else if (type) {
     if (type !== 'DUMMY') {
       /* Used by tests */
@@ -2886,15 +2829,7 @@ function insertPackageWrappers(node: Method) {
         continue; // skip any more child processing (it's gone)
       } else if (!isPkgType) {
         // move child DML / SOQL into the last package
-        if (lastPkg.children) {
-          lastPkg.children.push(child); // move child into the pkg
-        }
-
-        lastPkg.totalDmlCount = child.totalDmlCount + (childType === 'DML_BEGIN' ? 1 : 0);
-        lastPkg.totalSoqlCount =
-          child.totalSoqlCount + (childType === 'SOQL_EXECUTE_BEGIN' ? 1 : 0);
-        lastPkg.totalThrownCount =
-          child.totalThrownCount + (childType === 'EXCEPTION_THROWN' ? 1 : 0);
+        lastPkg.children.push(child); // move child into the pkg
         lastPkg.exitStamp = child.exitStamp || child.timestamp; // move the end
 
         if (child instanceof Method) {

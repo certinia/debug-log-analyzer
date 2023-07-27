@@ -1,75 +1,74 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html lang="en">
-	<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Log Viewer</title>
-    <meta name="description" content="Analyzer for Salesforce debug logs - Visualize code execution via a Flame chart and identify performance and SOQL/DML problems via Method and Database analysis">
-		<script type="text" id="LOG_FILE_NAME">@@name</script>
-		<script type="text" id="LOG_FILE_PATH">@@path</script>
-		<script type="text" id="LOG_FILE_URI">sample.log</script>
-		<style>
-			html {
-				width: 100%;
-				height: 100%;
-			}
-			body {
-				color: var(--vscode-editor-foreground);
-				font-family: monospace;
-				font-weight: normal;
-				font-size: var(--vscode-editor-font-size);
-				height: 100%;
-				display: flex;
-				flex-direction: column;
-			}
-		</style>
+    <meta
+      name="description"
+      content="Analyzer for Salesforce debug logs - Visualize code execution via a Flame chart and identify performance and SOQL/DML problems via Method and Database analysis"
+    />
+    <!-- prettier-ignore -->
+    <script type="text" id="LOG_FILE_NAME">@@name</script>
+    <!-- prettier-ignore -->
+    <script type="text" id="LOG_FILE_PATH">@@path</script>
+    <!-- prettier-ignore -->
+    <script type="text" id="LOG_FILE_URI">sample.log</script>
+    <style>
+      html {
+        width: 100%;
+        height: 100%;
+      }
+      body {
+        color: var(--vscode-editor-foreground);
+        font-family: monospace;
+        font-weight: normal;
+        font-size: var(--vscode-editor-font-size);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+    </style>
 
     <script type="module" defer crossorigin="anonymous" src="bundle.js"></script>
-	</head>
+  </head>
 
-	<body>
-		<div id="status" class="statusBar">No log</div>
-		<div id="logSettings"></div>
-		<div class="tabHolder">
-			<div class="tab selected" id="timelineTab" data-show="timelineView">Timeline</div>
-			<div class="tab" id="treeTab" data-show="treeView">Call Tree</div>
-			<div class="tab" id="analysisTab" data-show="analysisView">Analysis</div>
-			<div class="tab" id="databaseTab" data-show="dbView">Database</div>
-			<a class="helpLink" id="helpButton">Help</a>
-			<div class="tabPad"></div>
-		</div>
-		<div class="tabber">
-			<div id="timelineView" class="tabItem selected">
-				<div id="tooltip"></div>
-				<div id="timelineWrapper">
-					<canvas id='timeline'></canvas>
-				</div>
-				<div id="timelineKey"></div>
-			</div>
+  <body>
+    <div id="status" class="statusBar">No log</div>
+    <div id="logSettings"></div>
+    <div class="tabHolder">
+      <div class="tab selected" id="timelineTab" data-show="timelineView">Timeline</div>
+      <div class="tab" id="treeTab" data-show="treeView">Call Tree</div>
+      <div class="tab" id="analysisTab" data-show="analysisView">Analysis</div>
+      <div class="tab" id="databaseTab" data-show="dbView">Database</div>
+      <a class="helpLink" id="helpButton">Help</a>
+      <div class="tabPad"></div>
+    </div>
+    <div class="tabber">
+      <div id="timelineView" class="tabItem selected">
+        <div id="tooltip"></div>
+        <div id="timelineWrapper">
+          <canvas id="timeline"></canvas>
+        </div>
+        <div id="timelineKey"></div>
+      </div>
 
-			<div id="treeView" class="tabItem">
-				<div class='buttonContainer'>
-					<button id="expandAll">Expand All</button>
-					<button id="collapseAll">Collapse All</button>
-					<input id="hideDetails" class="filterItem" type="checkbox" checked />
-					<label for="hideDetails">Hide details</label>
-					<input id="hideSystem" class="filterItem" type="checkbox" />
-					<label for="hideSystem">Hide system calls</label>
-					<input id="hideFormula" class="filterItem" type="checkbox" />
-					<label for="hideFormula">Hide formulas</label>
-					<input id="hideUnder" class="filterItem" type="checkbox" />
-					<label for="hideUnder">Hide under</label>
-					<input id="hideUnderTime" class="filterItem" type="number" min="0">
-						<span>ms</span>
-          </input>
-				</div>
-				<div id="breadcrumb"></div>
-				<div id="treeScroll">
-					<div id='tree'></div>
-				</div>
-			</div>
+      <div id="treeView" class="tabItem">
+        <div>
+          <strong>Filter</strong>
+          <div>
+            <input type="button" id="ct-expand" value="Expand" />
+            <input type="button" id="ct-collapse" value="Collapse" />
+            <input id="calltree-show-details" type="checkbox" />
+            <label for="calltree-show-details">Show Details</label>
+          </div>
+        </div>
+        <div id="calltreeContainer">
+          <div id="calltreeTable"></div>
+        </div>
+      </div>
 
-			<div id="analysisView" class="tabItem">
+      <div id="analysisView" class="tabItem">
         <div>
           <strong>Group by</strong>
           <div>
@@ -80,15 +79,14 @@
         <div id="analysisContainer">
           <div id="analysisTable"></div>
         </div>
-			</div>
+      </div>
 
-			<div id="dbView" class="tabItem">
+      <div id="dbView" class="tabItem">
         <div id="dbContainer">
           <div id="dmlTableContainer"></div>
           <div id="soqlTableContainer"></div>
         </div>
-			</div>
-
-		</div>
-	</body>
+      </div>
+    </div>
+  </body>
 </html>
