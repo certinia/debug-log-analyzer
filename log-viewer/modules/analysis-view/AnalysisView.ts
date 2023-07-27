@@ -1,20 +1,64 @@
-import { TabulatorFull as Tabulator } from 'tabulator-tables';
+import { ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
 import '../../resources/css/DatabaseView.scss';
+import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
+import { hostService } from '../services/VSCodeService';
 
-export async function renderAnalysis(rootMethod: RootNode) {
+export function initAnalysisRender(rootMethod: RootNode) {
+  const analysisTab = document.getElementById('analysisView');
+  if (analysisTab) {
+    const analysisObserver = new IntersectionObserver((entries, observer) => {
+      const visible = entries[0].isIntersecting;
+      if (visible) {
+        renderAnalysis(rootMethod);
+        observer.disconnect();
+      }
+    });
+    analysisObserver.observe(analysisTab);
+  }
+}
+
+async function renderAnalysis(rootMethod: RootNode) {
   const methodMap: Map<string, Metric> = new Map();
 
   addNodeToMap(methodMap, rootMethod);
   const metricList = [...methodMap.values()];
+
+  const headerMenu = [
+    {
+      label: 'Export to CSV',
+      action: function (_e: PointerEvent, column: ColumnComponent) {
+        const table = column.getTable();
+        const host = hostService();
+        if (host && table.getGroups().length) {
+          host.showError('Can not export to CSV when a group is applied.');
+        } else {
+          table.download('csv', 'analysis.csv', { bom: true, delimiter: ',' });
+        }
+      },
+    },
+  ];
 
   const analysisTable = new Tabulator('#analysisTable', {
     data: metricList,
     layout: 'fitColumns',
     placeholder: 'No Analysis Available',
     columnCalcs: 'both',
+    clipboard: true,
+    downloadEncoder: function (fileContents: string, mimeType) {
+      const vscodeHost = hostService();
+      if (vscodeHost) {
+        vscodeHost.saveFile({ fileContent: fileContents, defaultFilename: 'analysis.csv' });
+        return false;
+      }
+
+      return new Blob([fileContents], { type: mimeType });
+    },
+    //@ts-expect-error types need update array is valid
+    keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
+    clipboardCopyRowRange: 'active',
     height: '100%',
     groupClosedShowCalcs: true,
     groupStartOpen: false,
@@ -24,6 +68,7 @@ export async function renderAnalysis(rootMethod: RootNode) {
       resizable: true,
       headerSortStartingDir: 'desc',
       headerTooltip: true,
+      headerMenu: headerMenu,
     },
     initialSort: [{ column: 'selfTime', dir: 'desc' }],
     columns: [
@@ -67,6 +112,7 @@ export async function renderAnalysis(rootMethod: RootNode) {
           thousand: false,
           precision: 3,
         },
+        accessorDownload: NumberAccessor,
         bottomCalcFormatter: Number,
         bottomCalc: 'sum',
         bottomCalcFormatterParams: { precision: 3 },
@@ -85,6 +131,7 @@ export async function renderAnalysis(rootMethod: RootNode) {
           thousand: false,
           precision: 3,
         },
+        accessorDownload: NumberAccessor,
         bottomCalcFormatter: Number,
       },
     ],

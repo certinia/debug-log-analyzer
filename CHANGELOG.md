@@ -9,17 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Redesigned Analysis view ([#294][#294])
+- Call tree: Redesigned view ([#297][#297])
   - All columns are sortable ascending or descending by clicking the header
-  - Columns for to show Event Type, Aggregated Total Time and Aggregated Self Time.
+  - Child rows will be sorted within their parent
+  - The name column has 3 states call order, ascending or descending
+  - Columns for DML Count, SOQL Count, Throws Count, Rows Count, Total Time and Self Time
+  - Range filtering with min and max values for the Total Time and Self Time columns
+  - Keyboard navigation to move between selected rows. Use the up and down arrows for up and down and left and right to collapse or expand the tree
+  - Virtualised rows means much better performance
+- Analysis: Redesigned view ([#294][#294])
+  - All columns are sortable ascending or descending by clicking the header
+  - Columns to show Event Type, Aggregated Total Time and Aggregated Self Time
   - Virtualised row rendered to greatly improve performance
   - Group by Event Type to show aggregated totals for each type e.g See the Total Time for all `METHOD_ENTRY` events
+- Analysis: Export data ([#25][#25])
+  - Copy data to clipboard directly from Analysis grid by focusing on the grid and using `ctrl + c` or `cmd + c`
+  - Export to CSV file using the `Export to CSV` action in the grid header menu
 
 ### Changed
 
 - Increase the supported log size for the go to log hyperlink to larger than 50MB ([#254][#254])
 - Renamed `Log: Load Apex Log For Analysis` to `Log: Retrieve Apex Log And Show Analysis` ([#288][#288])
 - Update minimum supported vscode version to v1.74.0 ([#280][#280])
+- Support for more undocumented log events such as `NBA_*`, `ORG_CACHE_*`, `SESSION_CACHE_*`, `FUNCTION_INVOCATION_*` and more ([#246][#246])
 
 ## [1.6.0] - 2023-05-19
 
@@ -239,4 +251,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#280]: https://github.com/certinia/debug-log-analyzer/issues/280
 [#288]: https://github.com/certinia/debug-log-analyzer/issues/288
 [#254]: https://github.com/certinia/debug-log-analyzer/issues/254
+[#297]: https://github.com/certinia/debug-log-analyzer/issues/297
 [#294]: https://github.com/certinia/debug-log-analyzer/issues/294
+[#246]: https://github.com/certinia/debug-log-analyzer/issues/246
+[#25]: https://github.com/certinia/debug-log-analyzer/issues/25

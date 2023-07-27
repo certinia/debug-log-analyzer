@@ -7,26 +7,24 @@ import '../resources/css/Status.css';
 import '../resources/css/Tabber.css';
 import '../resources/css/TimelineView.css';
 import '../resources/css/TreeView.css';
-import { DatabaseAccess } from './Database';
-import { setNamespaces } from './NamespaceExtrator';
 import renderTimeline, { renderTimelineKey, setColors } from './Timeline';
-import renderTreeView from './TreeView';
 import { showTab } from './Util';
-import { renderAnalysis } from './analysis-view/AnalysisView';
-import { renderDBGrid } from './database-view/DatabaseView';
+import { initAnalysisRender } from './analysis-view/AnalysisView';
+import { initCalltree } from './calltree-view/CalltreeView';
+import { initDBRender } from './database-view/DatabaseView';
 import parseLog, {
   LogSetting,
   RootNode,
-  TimedNode,
   getLogSettings,
   getRootMethod,
   totalDuration,
+  truncateLog,
   truncated,
 } from './parsers/TreeParser';
 import { hostService } from './services/VSCodeService';
 
 let logSize: number;
-let rootMethod: RootNode;
+export let rootMethod: RootNode;
 
 async function setStatus(name: string, path: string, status: string, color?: string) {
   const statusHolder = document.getElementById('status') as HTMLDivElement,
@@ -72,35 +70,6 @@ async function setStatus(name: string, path: string, status: string, color?: str
   await waitForRender();
 }
 
-async function markContainers(node: TimedNode) {
-  const children = node.children,
-    len = children.length;
-
-  node.totalDmlCount = 0;
-  node.totalSoqlCount = 0;
-  node.totalThrownCount = 0;
-
-  for (let i = 0; i < len; ++i) {
-    const child = children[i];
-
-    if (child instanceof TimedNode) {
-      if (child.type === 'DML_BEGIN') {
-        ++node.totalDmlCount;
-      }
-      if (child.type === 'SOQL_EXECUTE_BEGIN') {
-        ++node.totalSoqlCount;
-      }
-      if (child.type === 'EXCEPTION_THROWN') {
-        ++node.totalThrownCount;
-      }
-      markContainers(child);
-      node.totalDmlCount += child.totalDmlCount;
-      node.totalSoqlCount += child.totalSoqlCount;
-      node.totalThrownCount += child.totalThrownCount;
-    }
-  }
-}
-
 let timerText: string, startTime: number;
 
 function timer(text: string) {
@@ -138,6 +107,8 @@ async function renderLogSettings(logSettings: LogSetting[]) {
 }
 
 async function displayLog(log: string, name: string, path: string) {
+  name = name.trim();
+  path = path.trim();
   logSize = log.length;
   await setStatus(name, path, 'Processing...');
 
@@ -147,14 +118,13 @@ async function displayLog(log: string, name: string, path: string) {
   timer('getRootMethod');
   rootMethod = getRootMethod();
 
-  timer('analyse');
-  await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
-  await Promise.all([DatabaseAccess.create(rootMethod)]);
-
-  await setStatus(name, path, 'Rendering...');
+  initDBRender(rootMethod);
+  initAnalysisRender(rootMethod);
+  initCalltree(rootMethod);
 
   timer('renderViews');
-  await Promise.all([renderTreeView(rootMethod), renderTimeline(rootMethod)]);
+  await setStatus(name, path, 'Rendering...');
+  await renderTimeline(rootMethod);
 
   timer('');
   setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');
@@ -173,10 +143,26 @@ function readLog() {
   if (logUri) {
     fetch(logUri)
       .then((response) => {
-        return response.text();
+        if (response.ok) {
+          return response.text();
+        } else {
+          throw Error(response.statusText);
+        }
       })
       .then((data) => {
         displayLog(data ?? '', name ?? '', path ?? '');
+      })
+      .catch((err: unknown) => {
+        let msg;
+        if (err instanceof Error) {
+          msg = err.name === 'TypeError' ? name : err.message;
+        } else {
+          msg = String(err);
+        }
+        msg = `Could not read log: ${msg}`;
+
+        truncateLog(0, msg, 'error');
+        setStatus(name || '', path || '', 'Ready', 'red');
       });
   }
 }
@@ -201,16 +187,6 @@ function handleMessage(evt: MessageEvent) {
 function onInit(): void {
   const tabHolder = document.querySelector('.tabHolder');
   tabHolder?.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', onTabSelect));
-
-  const dbTab = document.getElementById('databaseTab');
-  if (dbTab) {
-    dbTab.addEventListener('click', renderDBGrid, { once: true });
-  }
-
-  const analysisTab = document.getElementById('analysisTab');
-  if (analysisTab) {
-    analysisTab.addEventListener('click', () => renderAnalysis(rootMethod), { once: true });
-  }
 
   const helpButton = document.querySelector('.helpLink');
   if (helpButton) {
