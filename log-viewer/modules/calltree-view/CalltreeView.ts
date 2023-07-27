@@ -21,6 +21,20 @@ import { hostService } from '../services/VSCodeService';
 
 let calltreeTable: Tabulator;
 
+export function initCalltree(rootMethod: RootNode) {
+  const callTreeView = document.getElementById('treeView');
+  if (callTreeView) {
+    const analysisObserver = new IntersectionObserver((entries, observer) => {
+      const visible = entries[0].isIntersecting;
+      if (visible) {
+        renderCallTree(rootMethod);
+        observer.disconnect();
+      }
+    });
+    analysisObserver.observe(callTreeView);
+  }
+}
+
 export async function renderCallTree(rootMethod: RootNode): Promise<void> {
   if (calltreeTable) {
     await new Promise((resolve, reject) => {

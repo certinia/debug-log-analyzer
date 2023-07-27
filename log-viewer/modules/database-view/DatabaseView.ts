@@ -5,15 +5,24 @@ import '../../resources/css/DatabaseView.scss';
 import { DatabaseAccess } from '../Database';
 import '../components/CallStack';
 import Number from '../datagrid/format/Number';
-import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
+import { RootNode, SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
 
-// todo: use the formatter to convert number to ms
-
-export function renderDBGrid() {
-  renderDMLTable();
-  renderSOQLTable();
+export async function initDBRender(rootMethod: RootNode) {
+  await DatabaseAccess.create(rootMethod);
+  const dbView = document.getElementById('dbView');
+  if (dbView) {
+    const dbObserver = new IntersectionObserver((entries, observer) => {
+      const visible = entries[0].isIntersecting;
+      if (visible) {
+        observer.disconnect();
+        renderDMLTable();
+        renderSOQLTable();
+      }
+    });
+    dbObserver.observe(dbView);
+  }
 }
 
 function renderDMLTable() {

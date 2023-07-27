@@ -7,17 +7,14 @@ import '../resources/css/Status.css';
 import '../resources/css/Tabber.css';
 import '../resources/css/TimelineView.css';
 import '../resources/css/TreeView.css';
-import { DatabaseAccess } from './Database';
-import { setNamespaces } from './NamespaceExtrator';
 import renderTimeline, { renderTimelineKey, setColors } from './Timeline';
 import { showTab } from './Util';
-import { renderAnalysis } from './analysis-view/AnalysisView';
-import { renderCallTree } from './calltree-view/CalltreeView';
-import { renderDBGrid } from './database-view/DatabaseView';
+import { initAnalysisRender } from './analysis-view/AnalysisView';
+import { initCalltree } from './calltree-view/CalltreeView';
+import { initDBRender } from './database-view/DatabaseView';
 import parseLog, {
   LogSetting,
   RootNode,
-  TimedNode,
   getLogSettings,
   getRootMethod,
   totalDuration,
@@ -73,22 +70,6 @@ async function setStatus(name: string, path: string, status: string, color?: str
   await waitForRender();
 }
 
-async function aggregateTotals(node: TimedNode) {
-  const children = node.children,
-    len = children.length;
-
-  for (let i = 0; i < len; ++i) {
-    const child = children[i];
-    if (child instanceof TimedNode) {
-      await aggregateTotals(child);
-    }
-    node.totalDmlCount += child.totalDmlCount;
-    node.totalSoqlCount += child.totalSoqlCount;
-    node.totalThrownCount += child.totalThrownCount;
-    node.rowCount += child.rowCount;
-  }
-}
-
 let timerText: string, startTime: number;
 
 function timer(text: string) {
@@ -137,13 +118,12 @@ async function displayLog(log: string, name: string, path: string) {
   timer('getRootMethod');
   rootMethod = getRootMethod();
 
-  timer('analyse');
-  await Promise.all([setNamespaces(rootMethod), aggregateTotals(rootMethod)]);
-  await Promise.all([DatabaseAccess.create(rootMethod)]);
-
-  await setStatus(name, path, 'Rendering...');
+  initDBRender(rootMethod);
+  initAnalysisRender(rootMethod);
+  initCalltree(rootMethod);
 
   timer('renderViews');
+  await setStatus(name, path, 'Rendering...');
   await renderTimeline(rootMethod);
 
   timer('');
@@ -207,21 +187,6 @@ function handleMessage(evt: MessageEvent) {
 function onInit(): void {
   const tabHolder = document.querySelector('.tabHolder');
   tabHolder?.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', onTabSelect));
-
-  const dbTab = document.getElementById('databaseTab');
-  if (dbTab) {
-    dbTab.addEventListener('click', renderDBGrid, { once: true });
-  }
-
-  const analysisTab = document.getElementById('analysisTab');
-  if (analysisTab) {
-    analysisTab.addEventListener('click', () => renderAnalysis(rootMethod), { once: true });
-  }
-
-  const calltreeTab = document.getElementById('treeTab');
-  if (calltreeTab) {
-    calltreeTab.addEventListener('click', () => renderCallTree(rootMethod), { once: true });
-  }
 
   const helpButton = document.querySelector('.helpLink');
   if (helpButton) {

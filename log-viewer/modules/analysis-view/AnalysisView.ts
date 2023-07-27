@@ -6,7 +6,21 @@ import Number from '../datagrid/format/Number';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 
-export async function renderAnalysis(rootMethod: RootNode) {
+export function initAnalysisRender(rootMethod: RootNode) {
+  const analysisTab = document.getElementById('analysisView');
+  if (analysisTab) {
+    const analysisObserver = new IntersectionObserver((entries, observer) => {
+      const visible = entries[0].isIntersecting;
+      if (visible) {
+        renderAnalysis(rootMethod);
+        observer.disconnect();
+      }
+    });
+    analysisObserver.observe(analysisTab);
+  }
+}
+
+async function renderAnalysis(rootMethod: RootNode) {
   const methodMap: Map<string, Metric> = new Map();
 
   addNodeToMap(methodMap, rootMethod);

@@ -42,8 +42,12 @@ export class ShowLogAnalysis {
       const view = await LogView.createView(ws, context, filePath);
       LogView.appendView(view, context, name, filePath);
     } else {
-      context.display.showErrorMessage('No file selected to display log analysis');
-      throw new Error('No file selected to display log analysis');
+      context.display.showErrorMessage(
+        'No file selected or the file is too large. Try again using the file explorer or text editor command.'
+      );
+      throw new Error(
+        'No file selected or the file is too large. Try again using the file explorer or text editor command.'
+      );
     }
   }
 }
