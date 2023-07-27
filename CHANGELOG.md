@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Redesigned Call tree ([#297][#297])
+- Call tree: Redesigned view ([#297][#297])
   - All columns are sortable ascending or descending by clicking the header
   - Child rows will be sorted within their parent
   - The name column has 3 states call order, ascending or descending
@@ -17,11 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Range filtering with min and max values for the Total Time and Self Time columns
   - Keyboard navigation to move between selected rows. Use the up and down arrows for up and down and left and right to collapse or expand the tree
   - Virtualised rows means much better performance
-- Redesigned Analysis view ([#294][#294])
+- Analysis: Redesigned view ([#294][#294])
   - All columns are sortable ascending or descending by clicking the header
   - Columns to show Event Type, Aggregated Total Time and Aggregated Self Time
   - Virtualised row rendered to greatly improve performance
   - Group by Event Type to show aggregated totals for each type e.g See the Total Time for all `METHOD_ENTRY` events
+- Analysis: Export data ([#25][#25])
+  - Copy data to clipboard directly from Analysis grid by focusing on the grid and using `ctrl + c` or `cmd + c`
+  - Export to CSV file using the `Export to CSV` action in the grid header menu
 
 ### Changed
 
@@ -249,3 +252,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#254]: https://github.com/certinia/debug-log-analyzer/issues/254
 [#297]: https://github.com/certinia/debug-log-analyzer/issues/297
 [#294]: https://github.com/certinia/debug-log-analyzer/issues/294
+[#25]: https://github.com/certinia/debug-log-analyzer/issues/25

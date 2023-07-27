@@ -3,7 +3,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { WebviewPanel } from 'vscode';
+import { Uri, WebviewPanel } from 'vscode';
 import * as vscode from 'vscode';
 
 import { Context } from '../Context';
@@ -15,6 +15,7 @@ interface WebViewLogFileRequest {
   text: string | undefined;
   typeName: string | undefined;
   path: string | undefined;
+  options?: Record<string, never>;
 }
 
 export class LogFileException extends Error {
@@ -70,6 +71,29 @@ export class LogView {
               command: 'getConfig',
               data: vscode.workspace.getConfiguration('lana'),
             });
+            break;
+          }
+
+          case 'saveFile': {
+            if (request.text && request.options?.defaultUri) {
+              vscode.window
+                .showSaveDialog({ defaultUri: Uri.file(request.options.defaultUri) })
+                .then((fileInfos) => {
+                  if (fileInfos && request.text) {
+                    fs.promises.writeFile(fileInfos.path, request.text).catch((error) => {
+                      const msg = error instanceof Error ? error.message : String(error);
+                      vscode.window.showErrorMessage(`Unable to save file: ${msg}`);
+                    });
+                  }
+                });
+            }
+            break;
+          }
+
+          case 'showError': {
+            if (request.text) {
+              vscode.window.showErrorMessage(request.text);
+            }
             break;
           }
         }
