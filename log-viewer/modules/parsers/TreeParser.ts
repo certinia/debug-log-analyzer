@@ -29,7 +29,7 @@ const typePattern = /^[A-Z_]*$/,
   settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
 
 let logLines: LogLine[] = [],
-  truncated: TruncationEntry[],
+  truncated: TruncationEntry[] = [],
   maxSizeTimestamp: number | null = null,
   reasons: Set<string> = new Set<string>(),
   cpuUsed = 0,

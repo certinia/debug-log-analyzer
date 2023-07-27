@@ -19,9 +19,11 @@ export function hostService(): HostService {
 
 export interface HostService {
   openPath(path: string): void;
+  saveFile(request: { fileContent: string; defaultFilename: string }): void;
   openType(info: OpenInfo): void;
   openHelp(): void;
   getConfig(): void;
+  showError(text: string): void;
 }
 
 export class VSCodeService implements HostService {
@@ -79,6 +81,29 @@ export class VSCodeService implements HostService {
       this.vscodeAPIInstance.postMessage({ cmd: 'getConfig' });
     } else {
       console.log(`VSCodeService.getConfig() with no VSCode instance.`);
+    }
+  }
+
+  saveFile(request: { fileContent: string; defaultFilename: string }) {
+    if (this.vscodeAPIInstance) {
+      this.vscodeAPIInstance.postMessage({
+        cmd: 'saveFile',
+        text: request.fileContent,
+        options: { defaultUri: request.defaultFilename },
+      });
+    } else {
+      console.log(`VSCodeService.saveFile() with no VSCode instance.`);
+    }
+  }
+
+  showError(text: string) {
+    if (this.vscodeAPIInstance) {
+      this.vscodeAPIInstance.postMessage({
+        cmd: 'showError',
+        text: text,
+      });
+    } else {
+      console.log(`VSCodeService.showError() with no VSCode instance.`);
     }
   }
 }
