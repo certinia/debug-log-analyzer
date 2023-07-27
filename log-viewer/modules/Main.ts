@@ -21,6 +21,7 @@ import parseLog, {
   getLogSettings,
   getRootMethod,
   totalDuration,
+  truncateLog,
   truncated,
 } from './parsers/TreeParser';
 import { hostService } from './services/VSCodeService';
@@ -173,10 +174,26 @@ function readLog() {
   if (logUri) {
     fetch(logUri)
       .then((response) => {
-        return response.text();
+        if (response.ok) {
+          return response.text();
+        } else {
+          throw Error(response.statusText);
+        }
       })
       .then((data) => {
         displayLog(data ?? '', name ?? '', path ?? '');
+      })
+      .catch((err: unknown) => {
+        let msg;
+        if (err instanceof Error) {
+          msg = err.name === 'TypeError' ? name : err.message;
+        } else {
+          msg = String(err);
+        }
+        msg = `Could not read log: ${msg}`;
+
+        truncateLog(0, msg, 'error');
+        setStatus(name || '', path || '', 'Ready', 'red');
       });
   }
 }
