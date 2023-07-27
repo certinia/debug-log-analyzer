@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Increase the supported log size for the go to log hyperlink to larger than 50MB ([#254][#254])
 - Renamed `Log: Load Apex Log For Analysis` to `Log: Retrieve Apex Log And Show Analysis` ([#288][#288])
 - Update minimum supported vscode version to v1.74.0 ([#280][#280])
+- Support for more undocumented log events such as `NBA_*`, `ORG_CACHE_*`, `SESSION_CACHE_*`, `FUNCTION_INVOCATION_*` and more ([#246][#246])
 
 ## [1.6.0] - 2023-05-19
 
@@ -240,3 +241,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#288]: https://github.com/certinia/debug-log-analyzer/issues/288
 [#254]: https://github.com/certinia/debug-log-analyzer/issues/254
 [#294]: https://github.com/certinia/debug-log-analyzer/issues/294
+[#246]: https://github.com/certinia/debug-log-analyzer/issues/246
