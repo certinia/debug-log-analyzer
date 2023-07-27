@@ -12,7 +12,7 @@ import { setNamespaces } from './NamespaceExtrator';
 import renderTimeline, { renderTimelineKey, setColors } from './Timeline';
 import { showTab } from './Util';
 import { initAnalysisRender } from './analysis-view/AnalysisView';
-import { renderCallTree } from './calltree-view/CalltreeView';
+import { initCalltree } from './calltree-view/CalltreeView';
 import { initDBRender } from './database-view/DatabaseView';
 import parseLog, {
   LogSetting,
@@ -148,6 +148,7 @@ async function displayLog(log: string, name: string, path: string) {
 
   initDBRender();
   initAnalysisRender(rootMethod);
+  initCalltree(rootMethod);
 
   timer('');
   setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');
@@ -210,11 +211,6 @@ function handleMessage(evt: MessageEvent) {
 function onInit(): void {
   const tabHolder = document.querySelector('.tabHolder');
   tabHolder?.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', onTabSelect));
-
-  const calltreeTab = document.getElementById('treeTab');
-  if (calltreeTab) {
-    calltreeTab.addEventListener('click', () => renderCallTree(rootMethod), { once: true });
-  }
 
   const helpButton = document.querySelector('.helpLink');
   if (helpButton) {
