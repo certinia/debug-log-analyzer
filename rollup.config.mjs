@@ -60,9 +60,7 @@ export default [
     ],
     plugins: [
       nodeResolve({ browser: true, preferBuiltins: false }),
-      commonjs(),
       nodePolyfills(),
-      production && minifyHTMLTemplates(),
       swc(
         defineRollupSwcOption({
           // All options are optional
@@ -76,7 +74,7 @@ export default [
         extensions: ['.css'],
         minimize: true,
       }),
-
+      production && minifyHTMLTemplates(),
       production &&
         minify(
           defineRollupSwcMinifyOption({
