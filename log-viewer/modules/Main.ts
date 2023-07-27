@@ -7,7 +7,6 @@ import '../resources/css/Status.css';
 import '../resources/css/Tabber.css';
 import '../resources/css/TimelineView.css';
 import '../resources/css/TreeView.css';
-import { DatabaseAccess } from './Database';
 import renderTimeline, { renderTimelineKey, setColors } from './Timeline';
 import { showTab } from './Util';
 import { initAnalysisRender } from './analysis-view/AnalysisView';
@@ -16,7 +15,6 @@ import { initDBRender } from './database-view/DatabaseView';
 import parseLog, {
   LogSetting,
   RootNode,
-  TimedNode,
   getLogSettings,
   getRootMethod,
   totalDuration,
