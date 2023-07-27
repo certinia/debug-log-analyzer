@@ -4,6 +4,7 @@ import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 import '../../resources/css/DatabaseView.scss';
 import { DatabaseAccess } from '../Database';
 import '../components/CallStack';
+import Number from '../datagrid/format/Number';
 import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
@@ -56,7 +57,7 @@ function renderDMLTable() {
       dmlData.push({
         dml: dml.text,
         rowCount: dml.rowCount,
-        timeTaken: Math.round((dml.duration / 1000000) * 1000) / 1000,
+        timeTaken: dml.duration,
         timestamp: dml.timestamp,
         _children: [{ timestamp: dml.timestamp, isDetail: true }],
       });
@@ -112,14 +113,30 @@ function renderDMLTable() {
           return 'Total';
         },
       },
-      { title: 'Row Count', field: 'rowCount', sorter: 'number', width: 90, bottomCalc: 'sum' },
+      {
+        title: 'Row Count',
+        field: 'rowCount',
+        sorter: 'number',
+        width: 90,
+        bottomCalc: 'sum',
+        hozAlign: 'right',
+        headerHozAlign: 'right',
+      },
       {
         title: 'Time Taken (ms)',
         field: 'timeTaken',
         sorter: 'number',
         width: 110,
+        hozAlign: 'right',
+        headerHozAlign: 'right',
+        formatter: Number,
+        formatterParams: {
+          thousand: false,
+          precision: 3,
+        },
+        bottomCalcFormatter: Number,
         bottomCalc: 'sum',
-        bottomCalcParams: { precision: 3 },
+        bottomCalcFormatterParams: { precision: 3 },
       },
     ],
     rowFormatter: function (row) {
@@ -150,18 +167,19 @@ function renderDMLTable() {
     }
     table.restoreRedraw();
 
-    const goTo = function () {
-      if (currentSelectedRow) {
-        const nextRow = currentSelectedRow.getNextRow() || currentSelectedRow.getTreeChildren()[0];
-        nextRow &&
+    if (currentSelectedRow) {
+      const nextRow = currentSelectedRow.getNextRow() || currentSelectedRow.getTreeChildren()[0];
+      if (nextRow) {
+        // @ts-expect-error it has 2 params
+        nextRow.scrollTo('center', true).then(() => {
+          //NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
+          // This needs fixing in main tabulator lib
           nextRow
             .getElement()
             .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+        });
       }
-    };
-    requestAnimationFrame(() => {
-      setTimeout(goTo);
-    });
+    }
   });
 
   // todo: move to a lit element
@@ -224,7 +242,7 @@ function renderSOQLTable() {
         relativeCost: explainLine?.relativeCost,
         soql: soql.text,
         rowCount: soql.rowCount,
-        timeTaken: Math.round((soql.duration / 1000000) * 1000) / 1000,
+        timeTaken: soql.duration,
         aggregations: soql.aggregations,
         timestamp: soql.timestamp,
         _children: [{ timestamp: soql.timestamp, isDetail: true }],
@@ -339,13 +357,14 @@ function renderSOQLTable() {
         width: 120,
         hozAlign: 'right',
         headerHozAlign: 'right',
-        formatter: 'money',
+        formatter: Number,
         formatterParams: {
           thousand: false,
           precision: 3,
         },
+        bottomCalcFormatter: Number,
         bottomCalc: 'sum',
-        bottomCalcParams: { precision: 3 },
+        bottomCalcFormatterParams: { precision: 3 },
       },
       {
         title: 'Aggregations',
@@ -385,18 +404,19 @@ function renderSOQLTable() {
     }
     table.restoreRedraw();
 
-    const goTo = function () {
-      if (currentSelectedRow) {
-        const nextRow = currentSelectedRow.getNextRow() || currentSelectedRow.getTreeChildren()[0];
-        nextRow &&
+    if (currentSelectedRow) {
+      const nextRow = currentSelectedRow.getNextRow() || currentSelectedRow.getTreeChildren()[0];
+      if (nextRow) {
+        // @ts-expect-error it has 2 params
+        nextRow.scrollTo('center', true).then(() => {
+          //NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
+          // This needs fixing in main tabulator lib
           nextRow
             .getElement()
             .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+        });
       }
-    };
-    requestAnimationFrame(() => {
-      setTimeout(goTo);
-    });
+    }
   });
 
   // todo: move to a lit element

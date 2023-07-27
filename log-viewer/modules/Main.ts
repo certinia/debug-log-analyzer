@@ -10,9 +10,9 @@ import '../resources/css/TreeView.css';
 import { DatabaseAccess } from './Database';
 import { setNamespaces } from './NamespaceExtrator';
 import renderTimeline, { renderTimelineKey, setColors } from './Timeline';
-import renderTreeView from './TreeView';
 import { showTab } from './Util';
 import { initAnalysisRender } from './analysis-view/AnalysisView';
+import { renderCallTree } from './calltree-view/CalltreeView';
 import { initDBRender } from './database-view/DatabaseView';
 import parseLog, {
   LogSetting,
@@ -21,12 +21,13 @@ import parseLog, {
   getLogSettings,
   getRootMethod,
   totalDuration,
+  truncateLog,
   truncated,
 } from './parsers/TreeParser';
 import { hostService } from './services/VSCodeService';
 
 let logSize: number;
-let rootMethod: RootNode;
+export let rootMethod: RootNode;
 
 async function setStatus(name: string, path: string, status: string, color?: string) {
   const statusHolder = document.getElementById('status') as HTMLDivElement,
@@ -72,32 +73,19 @@ async function setStatus(name: string, path: string, status: string, color?: str
   await waitForRender();
 }
 
-async function markContainers(node: TimedNode) {
+async function aggregateTotals(node: TimedNode) {
   const children = node.children,
     len = children.length;
 
-  node.totalDmlCount = 0;
-  node.totalSoqlCount = 0;
-  node.totalThrownCount = 0;
-
   for (let i = 0; i < len; ++i) {
     const child = children[i];
-
     if (child instanceof TimedNode) {
-      if (child.type === 'DML_BEGIN') {
-        ++node.totalDmlCount;
-      }
-      if (child.type === 'SOQL_EXECUTE_BEGIN') {
-        ++node.totalSoqlCount;
-      }
-      if (child.type === 'EXCEPTION_THROWN') {
-        ++node.totalThrownCount;
-      }
-      markContainers(child);
-      node.totalDmlCount += child.totalDmlCount;
-      node.totalSoqlCount += child.totalSoqlCount;
-      node.totalThrownCount += child.totalThrownCount;
+      await aggregateTotals(child);
     }
+    node.totalDmlCount += child.totalDmlCount;
+    node.totalSoqlCount += child.totalSoqlCount;
+    node.totalThrownCount += child.totalThrownCount;
+    node.rowCount += child.rowCount;
   }
 }
 
@@ -138,6 +126,8 @@ async function renderLogSettings(logSettings: LogSetting[]) {
 }
 
 async function displayLog(log: string, name: string, path: string) {
+  name = name.trim();
+  path = path.trim();
   logSize = log.length;
   await setStatus(name, path, 'Processing...');
 
@@ -148,13 +138,13 @@ async function displayLog(log: string, name: string, path: string) {
   rootMethod = getRootMethod();
 
   timer('analyse');
-  await Promise.all([setNamespaces(rootMethod), markContainers(rootMethod)]);
+  await Promise.all([setNamespaces(rootMethod), aggregateTotals(rootMethod)]);
   await Promise.all([DatabaseAccess.create(rootMethod)]);
 
   await setStatus(name, path, 'Rendering...');
 
   timer('renderViews');
-  await Promise.all([renderTreeView(rootMethod), renderTimeline(rootMethod)]);
+  await renderTimeline(rootMethod);
 
   initDBRender();
   initAnalysisRender(rootMethod);
@@ -176,10 +166,26 @@ function readLog() {
   if (logUri) {
     fetch(logUri)
       .then((response) => {
-        return response.text();
+        if (response.ok) {
+          return response.text();
+        } else {
+          throw Error(response.statusText);
+        }
       })
       .then((data) => {
         displayLog(data ?? '', name ?? '', path ?? '');
+      })
+      .catch((err: unknown) => {
+        let msg;
+        if (err instanceof Error) {
+          msg = err.name === 'TypeError' ? name : err.message;
+        } else {
+          msg = String(err);
+        }
+        msg = `Could not read log: ${msg}`;
+
+        truncateLog(0, msg, 'error');
+        setStatus(name || '', path || '', 'Ready', 'red');
       });
   }
 }
@@ -204,6 +210,11 @@ function handleMessage(evt: MessageEvent) {
 function onInit(): void {
   const tabHolder = document.querySelector('.tabHolder');
   tabHolder?.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', onTabSelect));
+
+  const calltreeTab = document.getElementById('treeTab');
+  if (calltreeTab) {
+    calltreeTab.addEventListener('click', () => renderCallTree(rootMethod), { once: true });
+  }
 
   const helpButton = document.querySelector('.helpLink');
   if (helpButton) {

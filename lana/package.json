@@ -165,7 +165,6 @@
     "@rollup/plugin-node-resolve": "^15.0.2",
     "@types/node": "^16.x.x",
     "@types/vscode": "^1.74.0",
-    "prettier": "^2.7.1",
     "rollup": "^3.22.0",
     "tslib": "^2.0.0",
     "typescript": "^5.0.4"
