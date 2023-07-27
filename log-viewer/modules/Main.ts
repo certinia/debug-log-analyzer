@@ -8,7 +8,6 @@ import '../resources/css/Tabber.css';
 import '../resources/css/TimelineView.css';
 import '../resources/css/TreeView.css';
 import { DatabaseAccess } from './Database';
-import { setNamespaces } from './NamespaceExtrator';
 import renderTimeline, { renderTimelineKey, setColors } from './Timeline';
 import { showTab } from './Util';
 import { initAnalysisRender } from './analysis-view/AnalysisView';
@@ -73,22 +72,6 @@ async function setStatus(name: string, path: string, status: string, color?: str
   await waitForRender();
 }
 
-async function aggregateTotals(node: TimedNode) {
-  const children = node.children,
-    len = children.length;
-
-  for (let i = 0; i < len; ++i) {
-    const child = children[i];
-    if (child instanceof TimedNode) {
-      await aggregateTotals(child);
-    }
-    node.totalDmlCount += child.totalDmlCount;
-    node.totalSoqlCount += child.totalSoqlCount;
-    node.totalThrownCount += child.totalThrownCount;
-    node.rowCount += child.rowCount;
-  }
-}
-
 let timerText: string, startTime: number;
 
 function timer(text: string) {
@@ -137,18 +120,13 @@ async function displayLog(log: string, name: string, path: string) {
   timer('getRootMethod');
   rootMethod = getRootMethod();
 
-  timer('analyse');
-  await Promise.all([setNamespaces(rootMethod), aggregateTotals(rootMethod)]);
-  await Promise.all([DatabaseAccess.create(rootMethod)]);
-
-  await setStatus(name, path, 'Rendering...');
-
-  timer('renderViews');
-  await renderTimeline(rootMethod);
-
-  initDBRender();
+  initDBRender(rootMethod);
   initAnalysisRender(rootMethod);
   initCalltree(rootMethod);
+
+  timer('renderViews');
+  await setStatus(name, path, 'Rendering...');
+  await renderTimeline(rootMethod);
 
   timer('');
   setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');

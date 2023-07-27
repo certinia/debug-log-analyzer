@@ -1,6 +1,8 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
+import { setNamespaces } from '../NamespaceExtrator';
+
 type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
 type TruncateKey = 'unexpected' | 'error' | 'skip';
 type RGBA = `rgba(${number}, ${number}, ${number}, ${number})`;
@@ -2808,7 +2810,25 @@ export function getRootMethod() {
   totalDuration = rootMethod.exitStamp - rootMethod.timestamp;
 
   insertPackageWrappers(rootMethod);
+  setNamespaces(rootMethod);
+  aggregateTotals(rootMethod);
   return rootMethod;
+}
+
+function aggregateTotals(node: TimedNode) {
+  const children = node.children,
+    len = children.length;
+
+  for (let i = 0; i < len; ++i) {
+    const child = children[i];
+    if (child instanceof TimedNode) {
+      aggregateTotals(child);
+    }
+    node.totalDmlCount += child.totalDmlCount;
+    node.totalSoqlCount += child.totalSoqlCount;
+    node.totalThrownCount += child.totalThrownCount;
+    node.rowCount += child.rowCount;
+  }
 }
 
 function insertPackageWrappers(node: Method) {
