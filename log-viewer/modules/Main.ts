@@ -15,7 +15,6 @@ import { renderAnalysis } from './analysis-view/AnalysisView';
 import { renderCallTree } from './calltree-view/CalltreeView';
 import { renderDBGrid } from './database-view/DatabaseView';
 import parseLog, {
-  LogLine,
   LogSetting,
   RootNode,
   TimedNode,
