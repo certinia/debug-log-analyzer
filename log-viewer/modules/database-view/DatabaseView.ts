@@ -8,9 +8,19 @@ import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreePar
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
 
-export function renderDBGrid() {
-  renderDMLTable();
-  renderSOQLTable();
+export async function initDBRender() {
+  const dbView = document.getElementById('dbView');
+  if (dbView) {
+    const dbObserver = new IntersectionObserver((entries, observer) => {
+      const visible = entries[0].isIntersecting;
+      if (visible) {
+        observer.disconnect();
+        renderDMLTable();
+        renderSOQLTable();
+      }
+    });
+    dbObserver.observe(dbView);
+  }
 }
 
 function renderDMLTable() {

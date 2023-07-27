@@ -12,8 +12,8 @@ import { setNamespaces } from './NamespaceExtrator';
 import renderTimeline, { renderTimelineKey, setColors } from './Timeline';
 import renderTreeView from './TreeView';
 import { showTab } from './Util';
-import { renderAnalysis } from './analysis-view/AnalysisView';
-import { renderDBGrid } from './database-view/DatabaseView';
+import { initAnalysisRender } from './analysis-view/AnalysisView';
+import { initDBRender } from './database-view/DatabaseView';
 import parseLog, {
   LogSetting,
   RootNode,
@@ -156,6 +156,9 @@ async function displayLog(log: string, name: string, path: string) {
   timer('renderViews');
   await Promise.all([renderTreeView(rootMethod), renderTimeline(rootMethod)]);
 
+  initDBRender();
+  initAnalysisRender(rootMethod);
+
   timer('');
   setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');
 }
@@ -201,16 +204,6 @@ function handleMessage(evt: MessageEvent) {
 function onInit(): void {
   const tabHolder = document.querySelector('.tabHolder');
   tabHolder?.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', onTabSelect));
-
-  const dbTab = document.getElementById('databaseTab');
-  if (dbTab) {
-    dbTab.addEventListener('click', renderDBGrid, { once: true });
-  }
-
-  const analysisTab = document.getElementById('analysisTab');
-  if (analysisTab) {
-    analysisTab.addEventListener('click', () => renderAnalysis(rootMethod), { once: true });
-  }
 
   const helpButton = document.querySelector('.helpLink');
   if (helpButton) {
