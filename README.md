@@ -20,6 +20,13 @@ Apex Log Analyzer makes performance analysis of Salesforce debug logs much easie
 > Higher log levels result in higher reported execution time than would be seen with logging off.\
 > This is due to the over head associated with logging method entry and exit.
 
+[Installation](#installation 'Go to Installation') |
+[Usage](#usage 'Go to Usage') |
+[Features](#features 'Go to Features') |
+[Contributing](#contributing 'Go to Contributing') |
+[Contributors](#contributors 'Go to Contributors') |
+[License](#license 'Go to License')
+
 ## Installation
 
 ![install](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/install-lana.png)
@@ -140,9 +147,9 @@ By default rows are grouped by the SOQL/ DML text, grouping can be removed and t
 Help us to make things better by [Contributing](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/CONTRIBUTING.md)\
 Find out how to [Build](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/BUILDING.md) the extension
 
-## Contributors &#10084; &#128591;
+## Contributors
 
-Thanks to the everyone who has contributed
+Thanks to the everyone who has contributed &#10084; &#128591;
 
 <p align="center">
   <a href="https://github.com/certinia/debug-log-analyzer/graphs/contributors">
@@ -150,7 +157,7 @@ Thanks to the everyone who has contributed
   </a>
 </p>
 
----
+## License
 
 <p align="center">
 Copyright &copy; Certinia Inc. All rights reserved.
