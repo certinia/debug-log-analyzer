@@ -1,4 +1,4 @@
-import { KeybindingsModule, Module, Tabulator } from 'tabulator-tables';
+import { KeybindingsModule, Module, RowComponent, Tabulator } from 'tabulator-tables';
 
 // todo: make this generic and support opening grouped rows too then use on DB view.
 // todo: remove the '@ts-expect-error' + fix the types file
@@ -13,6 +13,7 @@ const rowNavOptionName = 'rowKeyboardNavigation' as const;
  */
 export class RowKeyboardNavigation extends Module {
   localTable: Tabulator;
+  tableHolder: HTMLElement | null = null;
   constructor(table: Tabulator) {
     super(table);
     this.localTable = table;
@@ -21,22 +22,20 @@ export class RowKeyboardNavigation extends Module {
   }
 
   initialize() {
-    // @ts-expect-error options() needs adding to tabulator types
-    if (this.options(rowNavOptionName)) {
-      this.localTable.element.addEventListener(
-        'keydown',
-        function (e) {
-          const targetElem = e.target as HTMLElement;
-          if (
-            targetElem.classList.contains('tabulator-tableholder') &&
-            ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Space'].indexOf(e.key) > -1
-          ) {
-            e.preventDefault();
-          }
-        },
-        false
-      );
-    }
+    this.localTable.on('dataTreeRowExpanded', (row, _level) => {
+      this.rowExpandedToggled(row, _level);
+    });
+    this.localTable.on('dataTreeRowCollapsed', (row, _level) => {
+      this.rowExpandedToggled(row, _level);
+    });
+  }
+  rowExpandedToggled(row: RowComponent, _level: number) {
+    const table = row.getTable();
+    this.tableHolder ??= table.element.querySelector('.tabulator-tableholder') as HTMLElement;
+
+    const selectedRow = table.getSelectedRows()[0];
+    !selectedRow && row.select();
+    this.tableHolder?.focus();
   }
 }
 
@@ -50,7 +49,7 @@ const rowNavActions: { [key: string]: unknown } = {
     if (!targetElem.classList.contains('tabulator-tableholder')) {
       return;
     }
-
+    e.preventDefault();
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
     const previousRow = row?.getPrevRow();
@@ -67,10 +66,12 @@ const rowNavActions: { [key: string]: unknown } = {
     if (!this.options(rowNavOptionName)) {
       return;
     }
+
     const targetElem = e.target as HTMLElement;
     if (!targetElem.classList.contains('tabulator-tableholder')) {
       return;
     }
+    e.preventDefault();
 
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
@@ -88,6 +89,7 @@ const rowNavActions: { [key: string]: unknown } = {
     if (!this.options(rowNavOptionName)) {
       return;
     }
+
     const targetElem = e.target as HTMLElement;
     if (!targetElem.classList.contains('tabulator-tableholder')) {
       return;
@@ -98,6 +100,7 @@ const rowNavActions: { [key: string]: unknown } = {
     if (!row) {
       return;
     }
+    e.preventDefault();
 
     if (row.isTreeExpanded()) {
       const nextRow = row?.getNextRow();
@@ -117,6 +120,7 @@ const rowNavActions: { [key: string]: unknown } = {
     if (!this.options(rowNavOptionName)) {
       return;
     }
+
     const targetElem = e.target as HTMLElement;
     if (!targetElem.classList.contains('tabulator-tableholder')) {
       return;
@@ -127,6 +131,7 @@ const rowNavActions: { [key: string]: unknown } = {
     if (!row) {
       return;
     }
+    e.preventDefault();
 
     if (!row.isTreeExpanded()) {
       const prevRow = row?.getTreeParent();
