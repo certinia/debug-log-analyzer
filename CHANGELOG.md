@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update minimum supported vscode version to v1.74.0 ([#280][#280])
 - Support for more undocumented log events such as `NBA_*`, `ORG_CACHE_*`, `SESSION_CACHE_*`, `FUNCTION_INVOCATION_*` and more ([#246][#246])
 
+### Fixed
+
+- `ENTERING_MANAGED_PKG` events would wrongly have other events rollup into them ([#320][#320])
+  - Note: This now means some events will no longer be rolled up into `ENTERING_MANAGED_PKG`
+  - e.g `SOQL_BEGIN` will be between two `ENTERING_MANAGED_PKG` events instead of nested inside one
+
 ## [1.6.0] - 2023-05-19
 
 ### Added
@@ -255,3 +261,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#294]: https://github.com/certinia/debug-log-analyzer/issues/294
 [#246]: https://github.com/certinia/debug-log-analyzer/issues/246
 [#25]: https://github.com/certinia/debug-log-analyzer/issues/25
+[#320]: https://github.com/certinia/debug-log-analyzer/issues/320

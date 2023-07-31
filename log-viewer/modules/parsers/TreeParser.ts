@@ -2848,17 +2848,10 @@ function insertPackageWrappers(node: Method) {
         lastPkg.exitStamp = child.exitStamp || child.timestamp;
         continue; // skip any more child processing (it's gone)
       } else if (!isPkgType) {
-        // move child DML / SOQL into the last package
-        lastPkg.children.push(child); // move child into the pkg
-        lastPkg.exitStamp = child.exitStamp || child.timestamp; // move the end
-
-        if (child instanceof Method) {
-          insertPackageWrappers(child);
-        }
-        continue; // skip any more child processing (it's moved)
+        // we are done merging adjacent `ENTERING_MANAGED_PKG` of the same namesapce
+        lastPkg.recalculateDurations();
+        lastPkg = null;
       }
-
-      lastPkg.recalculateDurations();
     }
 
     if (child instanceof Method) {
@@ -2867,7 +2860,10 @@ function insertPackageWrappers(node: Method) {
 
     // It is a ENTERING_MANAGED_PKG line that does not match the last one
     // or we have not come across a ENTERING_MANAGED_PKG line yet.
-    lastPkg = isPkgType ? (child as TimedNode) : lastPkg;
+    if (isPkgType) {
+      lastPkg?.recalculateDurations();
+      lastPkg = child as TimedNode;
+    }
     newChildren.push(child);
   }
 
