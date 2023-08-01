@@ -307,7 +307,8 @@ describe('parseLog tests', () => {
     expect(soqlLine.aggregations).toEqual(2);
     expect(logLines[2].type).toEqual('SOQL_EXECUTE_EXPLAIN');
     expect(logLines[3].type).toEqual('SOQL_EXECUTE_END');
-    expect(logLines[3].rowCount).toEqual(50);
+    expect(logLines[3].selfRowCount).toEqual(50);
+    expect(logLines[3].totalRowCount).toEqual(50);
     expect(logLines[4]).toBeInstanceOf(ExecutionFinishedLine);
 
     const soqlExplain = logLines[2] as SOQLExecuteExplainLine;
@@ -516,12 +517,15 @@ describe('getRootMethod tests', () => {
     expect(rootMethod.executionEndTime).toBe(1100);
 
     const rootChildren = rootMethod.children as Method[];
-    //expect([]).toBe(rootChildren);
+
     const executionChildren = rootChildren[0].children as Method[];
-    expect(executionChildren.length).toBe(3);
+    expect(executionChildren.length).toBe(5);
     expect(executionChildren[0].type).toBe('METHOD_ENTRY');
     expect(executionChildren[0].timestamp).toBe(200);
     expect(executionChildren[0].exitStamp).toBe(300);
+    expect(executionChildren[0].children.length).toBe(1);
+    expect(executionChildren[0].children[0].type).toBe('ENTERING_MANAGED_PKG');
+    expect(executionChildren[0].children[0].namespace).toBe('ns');
 
     expect(executionChildren[1].type).toBe('ENTERING_MANAGED_PKG');
     expect(executionChildren[1].namespace).toBe('ns');
@@ -531,9 +535,17 @@ describe('getRootMethod tests', () => {
     expect(executionChildren[2].type).toBe('ENTERING_MANAGED_PKG');
     expect(executionChildren[2].namespace).toBe('ns2');
     expect(executionChildren[2].timestamp).toBe(700);
-    expect(executionChildren[2].exitStamp).toBe(1100);
-    expect(executionChildren[2].children.length).toBe(1);
-    expect(executionChildren[2].children[0].type).toBe('DML_BEGIN');
+    expect(executionChildren[2].exitStamp).toBe(725);
+
+    expect(executionChildren[3].type).toBe('DML_BEGIN');
+    expect(executionChildren[3].timestamp).toBe(725);
+    expect(executionChildren[3].exitStamp).toBe(750);
+
+    expect(executionChildren[4].type).toBe('ENTERING_MANAGED_PKG');
+    expect(executionChildren[4].namespace).toBe('ns2');
+    expect(executionChildren[4].timestamp).toBe(800);
+    expect(executionChildren[4].exitStamp).toBe(1100);
+    expect(executionChildren[4].children.length).toBe(0);
   });
 });
 

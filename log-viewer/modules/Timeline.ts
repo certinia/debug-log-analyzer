@@ -523,9 +523,11 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
           );
         }
 
-        if (target.rowCount !== null) {
+        if (target.totalRowCount !== null) {
           toolTip.appendChild(brElem.cloneNode());
-          toolTip.appendChild(document.createTextNode(`rows: ${target.rowCount}`));
+          toolTip.appendChild(
+            document.createTextNode(`rows: ${target.totalRowCount} (self ${target.selfRowCount})`)
+          );
         }
       }
     }

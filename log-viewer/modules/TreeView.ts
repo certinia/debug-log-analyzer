@@ -177,7 +177,7 @@ function describeMethod(node: Method): Node[] {
   const linePrefix = dbPrefix + methodPrefix;
 
   const nodeValue = node.value ? ` = ${node.value}` : '';
-  const rowCount = node.rowCount ? ` - Rows:${node.rowCount}` : '';
+  const rowCount = node.totalRowCount ? ` - Rows:${node.selfRowCount}` : '';
   const timeTaken = node.isTruncated
     ? 'TRUNCATED'
     : `${formatDuration(node.duration)} (self ${formatDuration(node.selfTime)})`;
