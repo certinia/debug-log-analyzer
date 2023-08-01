@@ -57,7 +57,7 @@ function renderDMLTable() {
       dmlText.push(dml.text);
       dmlData.push({
         dml: dml.text,
-        rowCount: dml.rowCount,
+        rowCount: dml.selfRowCount,
         timeTaken: dml.duration,
         timestamp: dml.timestamp,
         _children: [{ timestamp: dml.timestamp, isDetail: true }],
@@ -242,7 +242,7 @@ function renderSOQLTable() {
         isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
         relativeCost: explainLine?.relativeCost,
         soql: soql.text,
-        rowCount: soql.rowCount,
+        rowCount: soql.selfRowCount,
         timeTaken: soql.duration,
         aggregations: soql.aggregations,
         timestamp: soql.timestamp,
