@@ -23,6 +23,7 @@ Apex Log Analyzer makes performance analysis of Salesforce debug logs much easie
 [Installation](#installation 'Go to Installation') |
 [Usage](#usage 'Go to Usage') |
 [Features](#features 'Go to Features') |
+[Settings](#settings 'Go to Settings') |
 [Contributing](#contributing 'Go to Contributing') |
 [Contributors](#contributors 'Go to Contributors') |
 [License](#license 'Go to License')
@@ -69,11 +70,16 @@ With the `.log` file open in VSCode.
 
 ## Features
 
+- [**Timeline / Flame chart**](#timeline--flame-chart) - Gain a deep understanding of code execution over time via a timeline flame chart and tooltips to show additional information about events.
+- [**Calltree**](#calltree) - View the execution path in a tree view with aggregated DML Count, SOQL Count, Throws Count, Row Count, Self Time and Total Time. Apply filters to filter the events.
+- [**Analysis**](#analysis) - Quickly identify which methods took the most time in aggregate.
+- [**Database**](#database) - Identify which SOQL + DML executed the most, returned the most rows and took the most time.
+
 ### Timeline / Flame chart
 
-![timeline](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/timeline-lana.png)
+The Timeline shows a visualization of code execution during a request’s execution. Each color represents a different Salesforce event type e.g DB, Method, SOQL etc. The length of a bar relates to realtime taken, a longer bar means that method took longer.
 
-The Timeline shows a visualization of code execution during a request’s execution. Each color represents a different Salesforce event type e.g DB, Method, SOQL etc. The length of a bar relates to realtime taken e.g a longer bar means that method took longer.
+![timeline](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/timeline-lana.png)
 
 - Scroll up and down on the mouse to zoom in and out to an accuracy of 0.001ms, time markers are shown with a ms time value and white line e.g 9600.001 ms.
 - When zooming the mouse pointer position is kept on screen.
@@ -82,18 +88,45 @@ The Timeline shows a visualization of code execution during a request’s execut
 
 ![tooltip](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/tooltip-lana.png)
 
-Hovering over an element provides information on the item. If you click on an item it will take you to the call
-navigatable stack view.
+Hovering over an element provides information on the item. If you click on an item it will take you to the call navigatable stack view.
 
 The tooltip provides the following information.\
-**Event Name** e.g `METHOD_ENTRY`, `EXECUTION_STARTED`, `SOQL_EXECUTION_BEGIN` etc\
-**Event Description** Addtional information about the event such as method name or SOQL query executed.\
-**Timestamp** is the start and end timestamp for the given event which can crossreferenced in the log file.\
-**Duration** is made up of **Total Time** and **Self Time**.\
-**Self Time** represents the time directly spent in that event.\
-**Total Time** represents the time spent in that event or any of its children.
+**Event Name** - e.g `METHOD_ENTRY`, `EXECUTION_STARTED`, `SOQL_EXECUTION_BEGIN` etc\
+**Event Description** - Addtional information about the event such as method name or SOQL query executed.\
+**Timestamp** - Is the start and end timestamp for the given event which can crossreferenced in the log file.\
+**Duration** - Is made up of **Total Time** (time spent in that event and its children) and **Self Time** (time directly spent in that event).\
+**Rows** - Shows **Total Rows** (rows from that event and its children) and **Self Rows** (rows directly from that event).
 
-#### Color settings
+### Calltree
+
+![calltree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/calltree-lana.png)
+
+Shows the call stack which can be expanded and collapsed. Clicking on a link will take you to that line in the class if it can be found in the current open project.
+
+Each row shows event type, details such as method signature, self and total time as well as aggreagted DML, SOQL, Throws and Row counts.
+Each column can be sorted by clicking the column header, this will sorted the data within the tree e.g sorting by self time will sort the children within a parent with the largest self time to the top, within that parent.
+
+### Analysis
+
+![analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/analysis-lana.png)
+
+Show analysis of method calls by showing Self Time, Total Time, Count (number of times a method was called) and name. Each column can be sorted ascending or descending by clicking the column header.
+
+### Database
+
+![database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/db-lana.png)
+
+Shows the SOQL and DML that occured the number of rows returned, the time taken and for SOQL the selectivity and number of aggregations.
+Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occured in the call tree.
+The tables can be sorted ascending or descending by DML/SOQL, Row Count and Time Taken and by Selectivity and Aggregations on the SOQL table.
+
+The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determine. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
+
+By default rows are grouped by the SOQL/ DML text, grouping can be removed and the rows shows as a flat list using the _Group by_ item in the header menu.
+
+## Settings
+
+### Timeline color settings
 
 The default colors shown on the timeline can be changed in the VSCode settings.\
 Either in the UI `preferences -> extensions -> Apex Log Analyzer`
@@ -115,32 +148,6 @@ settings.json
   "System Method": "#5C3444"
 }
 ```
-
-### Calltree
-
-![calltree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/calltree-lana.png)
-
-Shows the call stack which can be expanded and collapsed. Clicking on a link will take you to that line in the class if it can be found in the current open project.
-
-Each row shows event type, details such as method signature, self and total time as well as line number.
-
-### Analysis
-
-![analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/analysis-lana.png)
-
-Show analysis on method calls. The table can be sorted ascending or descending by Self Time, Total Time, Count (number of times a method was called) and name.
-
-### Database
-
-![database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/db-lana.png)
-
-Shows the SOQL and DML that occured the number of rows returned, the time taken and for SOQL the selectivity and number of aggregations.
-Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occured in the call tree.
-The tables can be sorted ascending or descending by DML/SOQL, Row Count and Time Taken and by Selectivity and Aggregations on the SOQL table.
-
-The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determine. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
-
-By default rows are grouped by the SOQL/ DML text, grouping can be removed and the rows shows as a flat list using the _Group by_ item in the header menu.
 
 ## Contributing
 
