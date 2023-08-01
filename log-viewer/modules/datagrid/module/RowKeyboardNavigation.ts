@@ -95,7 +95,7 @@ const rowNavActions: { [key: string]: unknown } = {
 
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
-    if (!row) {
+    if (!row || !table.options.dataTree) {
       return;
     }
 
@@ -124,7 +124,7 @@ const rowNavActions: { [key: string]: unknown } = {
 
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
-    if (!row) {
+    if (!row || !table.options.dataTree) {
       return;
     }
 
