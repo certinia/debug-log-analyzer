@@ -293,7 +293,7 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
       totalDmlCount: node.totalDmlCount,
       totalSoqlCount: node.totalSoqlCount,
       totalThrownCount: node.totalThrownCount,
-      rows: node.rowCount || 0,
+      rows: node.totalRowCount || 0,
       originalData: node,
     };
 

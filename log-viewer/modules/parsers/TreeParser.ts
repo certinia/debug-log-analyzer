@@ -94,7 +94,8 @@ export abstract class LogLine {
   suffix: string | null = null; // extra description context
   prefix: string | null = null; // extra description context
   discontinuity = false; // does this line cause a discontinuity in the call stack?
-  rowCount = 0; // the number of rows in a database operation
+  totalRowCount = 0; // the number of rows in a database operation
+  selfRowCount = 0;
   totalDmlCount = 0; // the number of DML_BEGIN decendants in a node
   totalSoqlCount = 0; // the number of SOQL_EXECUTE_BEGIN decendants in a node
   totalThrownCount = 0; // the number of EXCEPTION_THROWN decendants in a node
@@ -722,7 +723,7 @@ class DMLBeginLine extends Method {
     super(parts, ['DML_END'], null, 'dml', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = 'DML ' + parts[3] + ' ' + parts[4];
-    this.rowCount = parseRows(parts[5]);
+    this.totalRowCount = this.selfRowCount = parseRows(parts[5]);
   }
 
   getBreadcrumbText(): string {
@@ -766,7 +767,7 @@ class SOQLExecuteBeginLine extends Method {
   }
 
   onEnd(end: SOQLExecuteEndLine, _stack: LogLine[]): void {
-    this.rowCount = end.rowCount;
+    this.totalRowCount = this.selfRowCount = end.totalRowCount;
   }
 }
 
@@ -776,7 +777,7 @@ class SOQLExecuteEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.rowCount = parseRows(parts[3]);
+    this.totalRowCount = this.selfRowCount = parseRows(parts[3]);
   }
 }
 
@@ -832,7 +833,7 @@ class SOSLExecuteBeginLine extends Method {
   }
 
   onEnd(end: SOSLExecuteEndLine, _stack: LogLine[]): void {
-    this.rowCount = end.rowCount;
+    this.totalRowCount = this.selfRowCount = end.totalRowCount;
   }
 }
 
@@ -842,7 +843,7 @@ class SOSLExecuteEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.rowCount = parseRows(parts[3]);
+    this.totalRowCount = this.selfRowCount = parseRows(parts[3]);
   }
 }
 
@@ -2827,7 +2828,7 @@ function aggregateTotals(node: TimedNode) {
     node.totalDmlCount += child.totalDmlCount;
     node.totalSoqlCount += child.totalSoqlCount;
     node.totalThrownCount += child.totalThrownCount;
-    node.rowCount += child.rowCount;
+    node.totalRowCount += child.totalRowCount;
   }
 }
 

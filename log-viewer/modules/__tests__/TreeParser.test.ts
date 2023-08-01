@@ -307,7 +307,8 @@ describe('parseLog tests', () => {
     expect(soqlLine.aggregations).toEqual(2);
     expect(logLines[2].type).toEqual('SOQL_EXECUTE_EXPLAIN');
     expect(logLines[3].type).toEqual('SOQL_EXECUTE_END');
-    expect(logLines[3].rowCount).toEqual(50);
+    expect(logLines[3].selfRowCount).toEqual(50);
+    expect(logLines[3].totalRowCount).toEqual(50);
     expect(logLines[4]).toBeInstanceOf(ExecutionFinishedLine);
 
     const soqlExplain = logLines[2] as SOQLExecuteExplainLine;
