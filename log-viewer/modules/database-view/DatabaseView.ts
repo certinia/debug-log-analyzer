@@ -1,11 +1,17 @@
 import { html, render } from 'lit';
-import { ColumnComponent, RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
+import {
+  ColumnComponent,
+  GroupComponent,
+  RowComponent,
+  TabulatorFull as Tabulator,
+} from 'tabulator-tables';
 
 import '../../resources/css/DatabaseView.scss';
 import { DatabaseAccess } from '../Database';
 import '../components/CallStack';
 import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
+import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
 import { RootNode, SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 import './DatabaseSOQLDetailPanel';
@@ -19,6 +25,7 @@ export async function initDBRender(rootMethod: RootNode) {
       const visible = entries[0].isIntersecting;
       if (visible) {
         observer.disconnect();
+        Tabulator.registerModule([RowKeyboardNavigation]);
         renderDMLTable();
         renderSOQLTable();
       }
@@ -59,7 +66,7 @@ function renderDMLTable() {
       dmlText.push(dml.text);
       dmlData.push({
         dml: dml.text,
-        rowCount: dml.rowCount,
+        rowCount: dml.selfRowCount,
         timeTaken: dml.duration,
         timestamp: dml.timestamp,
         _children: [{ timestamp: dml.timestamp, isDetail: true }],
@@ -83,6 +90,7 @@ function renderDMLTable() {
     //@ts-expect-error types need update array is valid
     keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
     clipboardCopyRowRange: 'all',
+    rowKeyboardNavigation: true,
     data: dmlData, //set initial table data
     layout: 'fitColumns',
     placeholder: 'No DML statements found',
@@ -167,6 +175,11 @@ function renderDMLTable() {
 
   dmlTable.on('tableBuilt', () => {
     dmlTable.setGroupBy('dml');
+  });
+
+  dmlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
+    //@ts-expect-error types field needs update
+    group.isVisible && group.scrollTo('nearest', true);
   });
 
   dmlTable.on('rowClick', function (e, row) {
@@ -262,7 +275,7 @@ function renderSOQLTable() {
         isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
         relativeCost: explainLine?.relativeCost,
         soql: soql.text,
-        rowCount: soql.rowCount,
+        rowCount: soql.selfRowCount,
         timeTaken: soql.duration,
         aggregations: soql.aggregations,
         timestamp: soql.timestamp,
@@ -274,6 +287,7 @@ function renderSOQLTable() {
   }
 
   const soqlTable = new Tabulator(dbSoqlTable, {
+    rowKeyboardNavigation: true,
     data: soqlData,
     layout: 'fitColumns',
     placeholder: 'No SOQL queries found',
@@ -442,6 +456,11 @@ function renderSOQLTable() {
 
   soqlTable.on('tableBuilt', () => {
     soqlTable.setGroupBy('soql');
+  });
+
+  soqlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
+    //@ts-expect-error types field needs update
+    group.isVisible && group.scrollTo('nearest', true);
   });
 
   soqlTable.on('rowClick', function (e, row) {

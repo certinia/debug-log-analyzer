@@ -3,6 +3,7 @@ import { ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 import '../../resources/css/DatabaseView.scss';
 import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
+import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 
@@ -35,7 +36,10 @@ async function renderAnalysis(rootMethod: RootNode) {
     },
   ];
 
+  Tabulator.registerModule(RowKeyboardNavigation);
   const analysisTable = new Tabulator('#analysisTable', {
+    rowKeyboardNavigation: true,
+    selectable: 1,
     data: metricList,
     layout: 'fitColumns',
     placeholder: 'No Analysis Available',

@@ -220,19 +220,6 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
       ],
     });
 
-    calltreeTable.on('dataTreeRowExpanded', (row, _level) => {
-      const selectedRow = row.getTable().getSelectedRows()[0];
-      if (!selectedRow) {
-        row.select();
-      }
-    });
-
-    calltreeTable.on('dataTreeRowCollapsed', (row, _level) => {
-      const selectedRow = row.getTable().getSelectedRows()[0];
-      if (!selectedRow) {
-        row.select();
-      }
-    });
     calltreeTable.on('dataFiltered', () => {
       totalTimeFilterCache.clear();
       selfTimeFilterCache.clear();
@@ -306,7 +293,7 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
       totalDmlCount: node.totalDmlCount,
       totalSoqlCount: node.totalSoqlCount,
       totalThrownCount: node.totalThrownCount,
-      rows: node.rowCount || 0,
+      rows: node.totalRowCount || 0,
       originalData: node,
     };
 
