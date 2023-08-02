@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Analysis: Export data ([#25][#25])
   - Copy data to clipboard directly from Analysis grid by focusing on the grid and using `ctrl + c` or `cmd + c`
   - Export to CSV file using the `Export to CSV` action in the grid header menu
+- Database: Export data ([#25][#25])
+  - Copy data to clipboard directly from either the DML or SOQL grid by focusing on the grid and using `ctrl + c` or `cmd + c`
+  - Export to CSV file using the `Export to CSV` action in the grid header menu
 - Database: keyboard navigation ([#294][#294])
   - Keyboard navigation to move between selected rows. Use the up and down arrows for up and down. Left and right arrows will hide / show the detail panel,
 
@@ -60,15 +63,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The analysis can now be shown for any `.log` or `.txt` file that starts with the Apex debug log header
   - e.g `57.0 APEX_CODE,FINE;APEX_PROFILING,FINE;CALLOUT,NONE;DB,FINEST;NBA,INFO;SYSTEM,DEBUG;VALIDATION,INFO;VISUALFORCE,FINE;WAVE,INFO;WORKFLOW,INFO`
 - The row count to the timeline tooltip for events which have one e.g `SOQL_EXECUTE_BEGIN`, `DML_BEGIN`, `SOSL_EXECUTE_BEGIN` ([#129][#129])
-- Calltree - Breadcrumbs shown at the top when clicking a row ([#142][#142])
-- Calltree - displaying variable value as well as variable names for `VARIABLE_ASSIGNMENT` events ([#235][#235])
-- Calltree - pretty formatting of JSON in `VARIABLE_ASSIGNMENT` events ([#235][#235])
+- Call Tree - Breadcrumbs shown at the top when clicking a row ([#142][#142])
+- Call Tree - displaying variable value as well as variable names for `VARIABLE_ASSIGNMENT` events ([#235][#235])
+- Call Tree - pretty formatting of JSON in `VARIABLE_ASSIGNMENT` events ([#235][#235])
 
 ### Changed
 
 - Goto code from click to CMD/CTRL and click. Breadcrumbs are shown on click instead ([#142][#142])
 - End time of events that start before `MAXIMUM DEBUG LOG SIZE REACHED` but have no matching end event, will now have their duration end before the `MAXIMUM DEBUG LOG SIZE REACHED` instead of extending to the very end of the log ([#264][#264])
-  - This provides more accurate durations overall because we can not know what occured during the `MAXIMUM DEBUG LOG SIZE REACHED` gap.
+  - This provides more accurate durations overall because we can not know what occurred during the `MAXIMUM DEBUG LOG SIZE REACHED` gap.
 
 ### Fixed
 
@@ -94,7 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Calltree filtering to hide nodes where total duration is less than a given time ([#112][#112])
+- Call Tree filtering to hide nodes where total duration is less than a given time ([#112][#112])
 - An `EXCEPTION_THROWN` marker (T) to supplement the`DML_BEGIN` (D) and `SOQL_EXECUTE_BEGIN` (S) markers on parent nodes ([#135][#135])
 - Some missing line types: `DUPLICATE_DETECTION_BEGIN`, `DUPLICATE_DETECTION_END` and `DUPLICATE_DETECTION_RULE_INVOCATION` ([#139][#139])
 - Salesforce Code Builder Support ([#23][#23])
@@ -108,11 +111,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Greatly reduced CPU usage when Timeline is open but no changes are occurring ([#90][#90])
 - Improved performance getting log file from an org when using the `Log: Load Apex Log For Analysis` command ([#123][#123])
 - More easily differentiate between "Flows" and "Process Builders" in the timeline and call tree ([#114][#114])
-- Counts on Calltree for Throw (T), DML (D) & SOQL (S) markers, which shows how many of each statement type are descendants of a node ([#135][#135])
+- Counts on Call Tree for Throw (T), DML (D) & SOQL (S) markers, which shows how many of each statement type are descendants of a node ([#135][#135])
 
 ### Fixed
 
-- Some detail lines not being shown on calltree ([#130][#130])
+- Some detail lines not being shown on Call Tree ([#130][#130])
 - Tooltip not hiding when moving to a part of timeline where the tooltip should not be shown ([#131][#131])
 - Timeline background shown as black in some browsers ([#137][#137])
 - The TRUNCATED marker (for methods which were not complete at the end of the log) not being shown ([#135][#135])
@@ -126,7 +129,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Timeline content disappearing when switching tabs + resizing ([#99][#99])
 - Timeline flickering/resizing when tooltip moved to bottom right ([#87][#87])
 - Timeline not displaying `VF_APEX_CALL_START` log events ([#97][#97])
-- Incorrect Totaltime on status bar and analysis tab ([#95][#95])
+- Incorrect Total Time on status bar and analysis tab ([#95][#95])
   - Now uses the timestamp of the last `EXECUTION_FINISHED` event to determine total time
   - If there are no `EXECUTION_FINISHED` events the last event with a timestamp is used
 - Log parsing not handling both CRLF and LF line endings ([#108][#108])
@@ -171,8 +174,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Call tree shows text for all log lines and not just time taken ([#42][#42])
 - Faster log loading due to a change in how the JavaScript is loaded on the page ([#11][#11])
 - Faster log parsing and timeline rendering ([#63][#63])
-- Scroll on the calltree to allow scrolling content to top of screen instead of only the bottom ([#73][#73])
-- `FLOW_START_INTERVIEWS` log lines on the calltree and timeline will show either the Process Builder or Flow name after the chunk number ([#68][#68])
+- Scroll on the Call Tree to allow scrolling content to top of screen instead of only the bottom ([#73][#73])
+- `FLOW_START_INTERVIEWS` log lines on the Call Tree and timeline will show either the Process Builder or Flow name after the chunk number ([#68][#68])
 
 ### Fixed
 

@@ -2,8 +2,8 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import * as fs from 'fs';
-import * as path from 'path';
-import { Uri, WebviewPanel } from 'vscode';
+import { basename, dirname, join } from 'path';
+import { Uri, WebviewPanel, workspace } from 'vscode';
 import * as vscode from 'vscode';
 
 import { Context } from '../Context';
@@ -34,9 +34,9 @@ export class LogView {
     context: Context,
     logPath: string
   ): Promise<WebviewPanel> {
-    const panel = WebView.apply('logFile', 'Log: ' + path.basename(logPath), [
-      vscode.Uri.file(path.join(context.context.extensionPath, 'out')),
-      vscode.Uri.file(path.dirname(logPath)),
+    const panel = WebView.apply('logFile', 'Log: ' + basename(logPath), [
+      vscode.Uri.file(join(context.context.extensionPath, 'out')),
+      vscode.Uri.file(dirname(logPath)),
     ]);
     panel.webview.onDidReceiveMessage(
       (msg: WebViewLogFileRequest) => {
@@ -76,8 +76,11 @@ export class LogView {
 
           case 'saveFile': {
             if (request.text && request.options?.defaultUri) {
+              const defaultDir = (workspace.workspaceFolders || [])[0].uri.path;
               vscode.window
-                .showSaveDialog({ defaultUri: Uri.file(request.options.defaultUri) })
+                .showSaveDialog({
+                  defaultUri: Uri.file(join(defaultDir, request.options.defaultUri)),
+                })
                 .then((fileInfos) => {
                   if (fileInfos && request.text) {
                     fs.promises.writeFile(fileInfos.path, request.text).catch((error) => {
@@ -121,11 +124,9 @@ export class LogView {
     logName: string,
     logPath: string
   ): Promise<string> {
-    const logViewerRoot = path.join(context.context.extensionPath, 'out');
-    const index = path.join(logViewerRoot, 'index.html');
-    const bundleUri = view.webview.asWebviewUri(
-      vscode.Uri.file(path.join(logViewerRoot, 'bundle.js'))
-    );
+    const logViewerRoot = join(context.context.extensionPath, 'out');
+    const index = join(logViewerRoot, 'index.html');
+    const bundleUri = view.webview.asWebviewUri(vscode.Uri.file(join(logViewerRoot, 'bundle.js')));
     const logPathUri = view.webview.asWebviewUri(vscode.Uri.file(logPath));
     const toReplace: { [key: string]: string } = {
       '@@name': logName, // eslint-disable-line @typescript-eslint/naming-convention
