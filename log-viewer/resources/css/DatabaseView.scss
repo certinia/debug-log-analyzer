@@ -42,6 +42,7 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
 
 .tabulator {
   .tabulator-tableholder {
+    overflow-x: hidden;
     .tabulator-table {
       display: block;
       background-color: unset;
@@ -77,9 +78,6 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
 #dbSoqlTable {
   margin-bottom: 1rem;
   height: 100%;
-}
-.tabulator-tableholder {
-  overflow-x: hidden;
 }
 .soqlDBDetailView {
   border-bottom: 2px solid var(--vscode-editorHoverWidget-border);
