@@ -5,7 +5,7 @@
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/financialforce.lana)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
 [![Ratings](https://img.shields.io/visual-studio-marketplace/r/financialforce.lana)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
 
-Apex Log Analyzer makes performance analysis of Salesforce debug logs much easier and quicker. It provides visualization of code execution via a Flame chart and Calltree and helps identify performance and SOQL/DML problems via Method and Database Analysis.
+Apex Log Analyzer makes performance analysis of Salesforce debug logs much easier and quicker. It provides visualization of code execution via a Flame chart and Call Tree and helps identify performance and SOQL/DML problems via Method and Database Analysis.
 
 ![preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/lana-preview.gif)
 
@@ -71,7 +71,7 @@ With the `.log` file open in VSCode.
 ## Features
 
 - [**Timeline / Flame chart**](#timeline--flame-chart) - Gain a deep understanding of code execution over time via a timeline flame chart and tooltips to show additional information about events.
-- [**Calltree**](#calltree) - View the execution path in a tree view with aggregated DML Count, SOQL Count, Throws Count, Row Count, Self Time and Total Time. Apply filters to filter the events.
+- [**Call Tree**](#call-tree) - View the execution path in a tree view with aggregated DML Count, SOQL Count, Throws Count, Row Count, Self Time and Total Time. Apply filters to filter the events.
 - [**Analysis**](#analysis) - Quickly identify which methods took the most time in aggregate.
 - [**Database**](#database) - Identify which SOQL + DML executed the most, returned the most rows and took the most time.
 
@@ -97,7 +97,7 @@ The tooltip provides the following information.\
 **Duration** - Is made up of **Total Time** (time spent in that event and its children) and **Self Time** (time directly spent in that event).\
 **Rows** - Shows **Total Rows** (rows from that event and its children) and **Self Rows** (rows directly from that event).
 
-### Calltree
+### Call Tree
 
 Shows the call stack which can be expanded and collapsed. Clicking on a link will take you to that line in the class if it can be found in the current open project.
 ![calltree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/calltree-lana.png)
