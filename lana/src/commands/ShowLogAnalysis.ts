@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import * as path from 'path';
+import { parse } from 'path';
 import { Uri, window } from 'vscode';
 
 import { appName } from '../AppSettings';
@@ -36,7 +36,7 @@ export class ShowLogAnalysis {
     const filePath = uri?.fsPath || window?.activeTextEditor?.document.fileName;
 
     if (filePath) {
-      const name = path.parse(filePath).name;
+      const name = parse(filePath).name;
       const ws = await QuickPickWorkspace.pickOrReturn(context);
 
       const view = await LogView.createView(ws, context, filePath);

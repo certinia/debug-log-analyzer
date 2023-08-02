@@ -9,7 +9,7 @@
       "name": "Run Extension",
       "type": "extensionHost",
       "request": "launch",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}/lana"],
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/lana", "--disable-extensions"],
       "outFiles": ["${workspaceFolder}/lana/out/**/*.js"],
       "localRoot": "${workspaceFolder}/lana"
     },

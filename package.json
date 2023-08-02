@@ -3,6 +3,7 @@
   "private": true,
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.0",
+    "@rollup/plugin-json": "^6.0.0",
     "@rollup/plugin-node-resolve": "^15.1.0",
     "@rollup/plugin-terser": "^0.4.3",
     "@rollup/plugin-typescript": "^11.1.1",
@@ -21,7 +22,7 @@
     "jest-environment-jsdom": "^29.5.0",
     "lint-staged": "^13.2.2",
     "prettier": "^2.8.8",
-    "rollup": "^3.24.0",
+    "rollup": "^3.26.3",
     "rollup-plugin-copy": "^3.4.0",
     "rollup-plugin-minify-html": "^1.0.0",
     "rollup-plugin-minify-html-literals": "^1.2.6",
@@ -32,14 +33,25 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "build": "NODE_ENV=production pnpm run build:dev",
-    "build:dev": "concurrently 'rm -rf lana/out && rollup -c rollup.config.mjs' 'pnpm --filter log-viewer tsc:lint' 'pnpm --filter lana tsc:lint'",
+    "build:dev": "concurrently -r -g 'rm -rf lana/out && rollup -c rollup.config.mjs' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",
     "prepare": "husky install",
-    "lint": "concurrently 'eslint . --ext ts' 'pnpm --filter 'log-viewer' tsc:lint' 'pnpm --filter lana tsc:lint'",
+    "lint": "concurrently -r -g 'eslint . --ext ts' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "test": "jest",
     "test:ci": "jest --runInBand"
   },
   "lint-staged": {
     "*.{ts,css,md}": "prettier --write"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@salesforce/bunyan@2.0.0": "patches/@salesforce__bunyan@2.0.0.patch"
+    },
+    "overrides": {
+      "@salesforce/core>jsforce": "^2.0.0-beta.27",
+      "@salesforce/apex-node>@salesforce/core": "^4.3.11",
+      "@apexdevtools/sfdx-auth-helper>jsforce": "^2.0.0-beta.27",
+      "@apexdevtools/sfdx-auth-helper>@salesforce/core": "^4.3.11"
+    }
   }
 }

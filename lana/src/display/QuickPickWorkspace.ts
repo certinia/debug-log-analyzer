@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import * as path from 'path';
+import { parse } from 'path';
 import { window } from 'vscode';
 
 import { Context } from '../Context';
@@ -24,7 +24,7 @@ export class QuickPickWorkspace {
       return context.workspaces[0].path();
     } else {
       if (window.activeTextEditor) {
-        return path.parse(window.activeTextEditor.document.fileName).dir;
+        return parse(window.activeTextEditor.document.fileName).dir;
       } else {
         throw new Error('No workspace selected');
       }

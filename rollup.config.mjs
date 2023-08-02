@@ -1,5 +1,6 @@
 // Rollup plugins
 import commonjs from '@rollup/plugin-commonjs';
+import json from '@rollup/plugin-json';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import copy from 'rollup-plugin-copy';
 import { minifyHTML } from 'rollup-plugin-minify-html';
@@ -27,8 +28,9 @@ export default [
     },
     external: ['vscode'],
     plugins: [
-      nodeResolve(),
+      nodeResolve({ preferBuiltins: true, dedupe: ['@salesforce/core'] }),
       commonjs(),
+      json(),
       swc(
         defineRollupSwcOption({
           include: /\.[mc]?[jt]sx?$/,
@@ -60,7 +62,6 @@ export default [
       nodeResolve({ browser: true, preferBuiltins: false }),
       commonjs(),
       nodePolyfills(),
-      production && minifyHTMLTemplates(),
       swc(
         defineRollupSwcOption({
           // All options are optional
@@ -74,7 +75,7 @@ export default [
         extensions: ['.css'],
         minimize: true,
       }),
-
+      production && minifyHTMLTemplates(),
       production &&
         minify(
           defineRollupSwcMinifyOption({

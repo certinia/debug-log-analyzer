@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import * as fs from 'fs';
-import * as path from 'path';
+import { LogRecord } from '@salesforce/apex-node';
+import { existsSync } from 'fs';
+import { join, parse } from 'path';
 import { WebviewPanel, window } from 'vscode';
 
 import { appName } from '../AppSettings';
@@ -10,7 +11,7 @@ import { Context } from '../Context';
 import { Item, Options, QuickPick } from '../display/QuickPick';
 import { QuickPickWorkspace } from '../display/QuickPickWorkspace';
 import { GetLogFile } from '../sfdx/logs/GetLogFile';
-import { GetLogFiles, GetLogFilesResult } from '../sfdx/logs/GetLogFiles';
+import { GetLogFiles } from '../sfdx/logs/GetLogFiles';
 import { Command } from './Command';
 import { LogView } from './LogView';
 
@@ -55,10 +56,7 @@ export class RetrieveLogFile {
       RetrieveLogFile.showLoadingPicker(),
     ]);
 
-    if (logFiles.status !== 0) {
-      throw new Error('Failed to load available log files');
-    }
-    const logFileId = await RetrieveLogFile.getLogFile(logFiles.result);
+    const logFileId = await RetrieveLogFile.getLogFile(logFiles);
     if (logFileId) {
       const logFilePath = this.getLogFilePath(ws, logFileId);
       const [view] = await Promise.all([
@@ -78,7 +76,7 @@ export class RetrieveLogFile {
     return qp;
   }
 
-  private static async getLogFile(files: GetLogFilesResult[]): Promise<string | null> {
+  private static async getLogFile(files: LogRecord[]): Promise<string | null> {
     const items = files
       .sort((a, b) => {
         const aDate = Date.parse(a.StartTime);
@@ -100,18 +98,16 @@ export class RetrieveLogFile {
   }
 
   private static getLogFilePath(ws: string, fileId: string): string {
-    const logDirectory = path.join(ws, '.sfdx', 'tools', 'debug', 'logs');
-    const logFilePath = path.join(logDirectory, `${fileId}.log`);
+    const logDirectory = join(ws, '.sfdx', 'tools', 'debug', 'logs');
+    const logFilePath = join(logDirectory, `${fileId}.log`);
     return logFilePath;
   }
 
   private static async writeLogFile(ws: string, logPath: string) {
-    const logExists = fs.existsSync(logPath);
+    const logExists = existsSync(logPath);
     if (!logExists) {
-      const logfile = path.parse(logPath);
-
-      // TODO: Replace with @salesforce/apex-node https://github.com/certinia/debug-log-analyzer/issues/122
-      await GetLogFile.apply(ws, logfile.dir, logfile.name);
+      const logfilePath = parse(logPath);
+      await GetLogFile.apply(ws, logfilePath.dir, logfilePath.name);
     }
   }
 }

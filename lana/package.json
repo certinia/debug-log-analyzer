@@ -151,22 +151,23 @@
     "prettier-format": "prettier 'src/**/*.ts' --write",
     "watch": "rollup -w -c rollup.config.mjs",
     "pretest": "pnpm run compile && pnpm run lint",
-    "lint": "concurrently 'eslint src --ext ts' 'npm run tsc:lint'",
+    "lint": "concurrently 'eslint src --ext ts' 'pnpm run tsc:lint'",
     "log-viewer": "pnpm run log-viewer-build && pnpm run log-viewer-copy",
     "log-viewer-build": "(cd ../log-viewer; pnpm ci && pnpm run build)",
     "log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/.",
     "tsc:lint": "tsc --noemit --skipLibCheck"
   },
   "dependencies": {
-    "@apexdevtools/apex-ls": "^4.2.0"
+    "@apexdevtools/apex-ls": "^4.2.0",
+    "@apexdevtools/sfdx-auth-helper": "^2.0.0",
+    "@salesforce/apex-node": "^1.6.2"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-node-resolve": "^15.0.2",
     "@types/node": "^16.x.x",
     "@types/vscode": "^1.74.0",
-    "rollup": "^3.22.0",
-    "tslib": "^2.0.0",
+    "rollup": "^3.26.3",
     "typescript": "^5.0.4"
   }
 }
