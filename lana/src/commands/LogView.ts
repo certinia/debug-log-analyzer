@@ -77,8 +77,11 @@ export class LogView {
 
           case 'saveFile': {
             if (request.text && request.options?.defaultUri) {
+              const defaultDir = (workspace.workspaceFolders || [])[0].uri.path;
               vscWindow
-                .showSaveDialog({ defaultUri: Uri.file(request.options.defaultUri) })
+                .showSaveDialog({
+                  defaultUri: Uri.file(join(defaultDir, request.options.defaultUri)),
+                })
                 .then((fileInfos) => {
                   if (fileInfos && request.text) {
                     writeFile(fileInfos.path, request.text).catch((error) => {

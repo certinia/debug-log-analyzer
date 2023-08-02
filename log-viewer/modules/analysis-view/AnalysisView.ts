@@ -3,6 +3,7 @@ import { ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 import '../../resources/css/DatabaseView.scss';
 import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
+import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 
@@ -30,18 +31,15 @@ async function renderAnalysis(rootMethod: RootNode) {
     {
       label: 'Export to CSV',
       action: function (_e: PointerEvent, column: ColumnComponent) {
-        const table = column.getTable();
-        const host = hostService();
-        if (host && table.getGroups().length) {
-          host.showError('Can not export to CSV when a group is applied.');
-        } else {
-          table.download('csv', 'analysis.csv', { bom: true, delimiter: ',' });
-        }
+        column.getTable().download('csv', 'analysis.csv', { bom: true, delimiter: ',' });
       },
     },
   ];
 
+  Tabulator.registerModule(RowKeyboardNavigation);
   const analysisTable = new Tabulator('#analysisTable', {
+    rowKeyboardNavigation: true,
+    selectable: 1,
     data: metricList,
     layout: 'fitColumns',
     placeholder: 'No Analysis Available',
@@ -56,9 +54,17 @@ async function renderAnalysis(rootMethod: RootNode) {
 
       return new Blob([fileContents], { type: mimeType });
     },
+    downloadRowRange: 'all',
+    downloadConfig: {
+      columnHeaders: true,
+      columnGroups: true,
+      rowGroups: true,
+      columnCalcs: false,
+      dataTree: true,
+    },
     //@ts-expect-error types need update array is valid
     keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
-    clipboardCopyRowRange: 'active',
+    clipboardCopyRowRange: 'all',
     height: '100%',
     groupClosedShowCalcs: true,
     groupStartOpen: false,

@@ -1,11 +1,19 @@
 import { html, render } from 'lit';
-import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
+import {
+  ColumnComponent,
+  GroupComponent,
+  RowComponent,
+  TabulatorFull as Tabulator,
+} from 'tabulator-tables';
 
 import '../../resources/css/DatabaseView.scss';
 import { DatabaseAccess } from '../Database';
 import '../components/CallStack';
+import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
+import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
 import { RootNode, SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
+import { hostService } from '../services/VSCodeService';
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
 
@@ -17,6 +25,7 @@ export async function initDBRender(rootMethod: RootNode) {
       const visible = entries[0].isIntersecting;
       if (visible) {
         observer.disconnect();
+        Tabulator.registerModule([RowKeyboardNavigation]);
         renderDMLTable();
         renderSOQLTable();
       }
@@ -57,7 +66,7 @@ function renderDMLTable() {
       dmlText.push(dml.text);
       dmlData.push({
         dml: dml.text,
-        rowCount: dml.rowCount,
+        rowCount: dml.selfRowCount,
         timeTaken: dml.duration,
         timestamp: dml.timestamp,
         _children: [{ timestamp: dml.timestamp, isDetail: true }],
@@ -68,13 +77,26 @@ function renderDMLTable() {
   }
 
   const dmlTable = new Tabulator(dbDmlTable, {
+    clipboard: true,
+    downloadEncoder: downlodEncoder('dml.csv'),
+    downloadRowRange: 'all',
+    downloadConfig: {
+      columnHeaders: true,
+      columnGroups: true,
+      rowGroups: true,
+      columnCalcs: false,
+      dataTree: true,
+    },
+    //@ts-expect-error types need update array is valid
+    keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
+    clipboardCopyRowRange: 'all',
+    rowKeyboardNavigation: true,
     data: dmlData, //set initial table data
     layout: 'fitColumns',
     placeholder: 'No DML statements found',
     columnCalcs: 'both',
     groupClosedShowCalcs: true,
     groupStartOpen: false,
-    groupBy: 'dml',
     groupValues: [dmlText],
     groupHeader(value, count, data: any[], _group) {
       const hasDetail = data.some((d) => {
@@ -102,6 +124,7 @@ function renderDMLTable() {
       resizable: true,
       headerSortStartingDir: 'desc',
       headerTooltip: true,
+      headerMenu: csvheaderMenu('dml.csv'),
     },
     initialSort: [{ column: 'rowCount', dir: 'desc' }],
     columns: [
@@ -135,6 +158,7 @@ function renderDMLTable() {
           thousand: false,
           precision: 3,
         },
+        accessorDownload: NumberAccessor,
         bottomCalcFormatter: Number,
         bottomCalc: 'sum',
         bottomCalcFormatterParams: { precision: 3 },
@@ -147,6 +171,15 @@ function renderDMLTable() {
         row.getElement().replaceChildren(detailContainer);
       }
     },
+  });
+
+  dmlTable.on('tableBuilt', () => {
+    dmlTable.setGroupBy('dml');
+  });
+
+  dmlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
+    //@ts-expect-error types field needs update
+    group.isVisible && group.scrollTo('nearest', true);
   });
 
   dmlTable.on('rowClick', function (e, row) {
@@ -242,7 +275,7 @@ function renderSOQLTable() {
         isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
         relativeCost: explainLine?.relativeCost,
         soql: soql.text,
-        rowCount: soql.rowCount,
+        rowCount: soql.selfRowCount,
         timeTaken: soql.duration,
         aggregations: soql.aggregations,
         timestamp: soql.timestamp,
@@ -254,13 +287,26 @@ function renderSOQLTable() {
   }
 
   const soqlTable = new Tabulator(dbSoqlTable, {
+    rowKeyboardNavigation: true,
     data: soqlData,
     layout: 'fitColumns',
     placeholder: 'No SOQL queries found',
     columnCalcs: 'both',
+    clipboard: true,
+    downloadEncoder: downlodEncoder('soql.csv'),
+    downloadRowRange: 'all',
+    downloadConfig: {
+      columnHeaders: true,
+      columnGroups: true,
+      rowGroups: true,
+      columnCalcs: false,
+      dataTree: true,
+    },
+    //@ts-expect-error types need update array is valid
+    keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
+    clipboardCopyRowRange: 'all',
     groupClosedShowCalcs: true,
     groupStartOpen: false,
-    groupBy: 'soql',
     groupValues: [soqlText],
     groupHeader(value, count, data: any[], _group) {
       const hasDetail = data.some((d) => {
@@ -289,6 +335,7 @@ function renderSOQLTable() {
       resizable: true,
       headerSortStartingDir: 'desc',
       headerTooltip: true,
+      headerMenu: csvheaderMenu('soql.csv'),
     },
     initialSort: [{ column: 'rowCount', dir: 'desc' }],
     columns: [
@@ -331,6 +378,26 @@ function renderSOQLTable() {
           }
           return title;
         },
+        accessorDownload: function (
+          _value: any,
+          data: any,
+          _type: 'data' | 'download' | 'clipboard',
+          _accessorParams: any,
+          _column?: ColumnComponent,
+          _row?: RowComponent
+        ): any {
+          return data.relativeCost;
+        },
+        accessorClipboard: function (
+          _value: any,
+          data: any,
+          _type: 'data' | 'download' | 'clipboard',
+          _accessorParams: any,
+          _column?: ColumnComponent,
+          _row?: RowComponent
+        ): any {
+          return data.relativeCost;
+        },
       },
       {
         title: 'SOQL',
@@ -363,6 +430,7 @@ function renderSOQLTable() {
           thousand: false,
           precision: 3,
         },
+        accessorDownload: NumberAccessor,
         bottomCalcFormatter: Number,
         bottomCalc: 'sum',
         bottomCalcFormatterParams: { precision: 3 },
@@ -384,6 +452,15 @@ function renderSOQLTable() {
         row.getElement().replaceChildren(detailContainer);
       }
     },
+  });
+
+  soqlTable.on('tableBuilt', () => {
+    soqlTable.setGroupBy('soql');
+  });
+
+  soqlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
+    //@ts-expect-error types field needs update
+    group.isVisible && group.scrollTo('nearest', true);
   });
 
   soqlTable.on('rowClick', function (e, row) {
@@ -461,4 +538,27 @@ function sortByFrequency(dataArray: string[]) {
   });
   const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
   return [...newMap.keys()];
+}
+
+function csvheaderMenu(csvFileName: string) {
+  return [
+    {
+      label: 'Export to CSV',
+      action: function (_e: PointerEvent, column: ColumnComponent) {
+        column.getTable().download('csv', csvFileName, { bom: true, delimiter: ',' });
+      },
+    },
+  ];
+}
+
+function downlodEncoder(defaultFileName: string) {
+  return function (fileContents: string, mimeType: string) {
+    const vscodeHost = hostService();
+    if (vscodeHost) {
+      vscodeHost.saveFile({ fileContent: fileContents, defaultFilename: defaultFileName });
+      return false;
+    }
+
+    return new Blob([fileContents], { type: mimeType });
+  };
 }
