@@ -81,10 +81,18 @@ The Timeline shows a visualization of code execution during a request’s execut
 
 ![timeline](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-timeline.png)
 
-- Scroll up and down on the mouse to zoom in and out to an accuracy of 0.001ms, time markers are shown with a ms time value and white line e.g 9600.001 ms.
+#### Zoom + pan
+
+- Scroll up and down with the mouse to zoom in and out to an accuracy of 0.001ms, time markers are shown with a ms time value and white line e.g 9600.001 ms.
 - When zooming the mouse pointer position is kept on screen.
 - Scroll left and right on the mouse to move the time line left are right, when zoomed
 - Click the mouse down and drag to move the timeline around both in the x and y direction, when zoomed
+
+#### Go to Call Tree
+
+Clicking an event in the Timeline will go to and select that event in the Call Tree.
+
+#### Tooltip
 
 ![tooltip](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-tooltip.png)
 
@@ -100,28 +108,80 @@ The tooltip provides the following information.\
 ### Call Tree
 
 Shows the call stack which can be expanded and collapsed. Clicking on a link will take you to that line in the class if it can be found in the current open project.
+
 ![calltree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-calltree.png)
 
 Each row shows event type, details such as method signature, self and total time as well as aggreagted DML, SOQL, Throws and Row counts.
-Each column can be sorted by clicking the column header, this will sorted the data within the tree e.g sorting by self time will sort the children within a parent with the largest self time to the top, within that parent.
+
+#### Go to Code
+
+Clicking the link in the event column will open the corresponding file and line, if that file exists in the current workspace.
+
+#### Sort
+
+Each column can be sorted by clicking the column header, this will sort the rows within the tree structure e.g sorting by self time will sort the children within a parent with the largest self time to the top but only within that parent.
+
+#### Filtering
+
+Details (events with 0 time) are hidden by default but can be shown/ hidden.
+Min and Max filtering can be done on the _Total Time_ and _Self Time_ columns.
+
+#### Keyboard Navigation
+
+The Call Tree can be navigated with the keyboard. The up and down keys will move between rows, the left and right keys will expand and collapse a parent within the tree.
 
 ### Analysis
 
-Show analysis of method calls by showing Self Time, Total Time, Count (number of times a method was called) and name. Each column can be sorted ascending or descending by clicking the column header.
+Show analysis of method calls by showing Self Time, Total Time, Count (number of times a method was called), name and type. Each column can be sorted ascending or descending by clicking the column header.
 
 ![analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-analysis.png)
+
+#### Sort
+
+By default the Analysis table is sorted with the events that took the longest by Self Time at the top.
+Each column can be sorted by clicking the column header, this will sort the rows ascending or descending.
+
+#### Group
+
+The rows can be grouped by Type which will show the rows aggregated by their event type e.g `METHOD_ENTRY`, `DML_ENTRY`
+
+#### Export to CSV + copy to clipboard
+
+Click the header menu,`⋮`, and use `Export to CSV` to save the table content to a file.
+Focus the Analysis table and use `CMD / CTRL + c` to copy the table content to clipboard. This can then be pasted into a spreadsheet or other file.
 
 ### Database
 
 Shows the SOQL and DML that occured the number of rows returned, the time taken and for SOQL the selectivity and number of aggregations.
-![database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-database.png)
 
-Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occured in the call tree.
-The tables can be sorted ascending or descending by DML/SOQL, Row Count and Time Taken and by Selectivity and Aggregations on the SOQL table.
+![database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-database.png)
 
 The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determine. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
 
-By default rows are grouped by the SOQL/ DML text, grouping can be removed and the rows shows as a flat list using the _Group by_ item in the header menu.
+#### Sort
+
+The rows can be sorted ascending or descending by DML/SOQL, Row Count and Time Taken and by Selectivity and Aggregations on the SOQL table.
+By default the rows within each group are sorted descending with the rows that have the highest row count at the top.
+Row within each group can be sorted by clicking the column header, this will sort the rows ascending or descending.
+
+If the grouping is removed the sorting applies the same but across all rows instead of within each group.
+
+#### Group
+
+By default rows are grouped by the SOQL/ DML text, grouping can be removed and the rows shows as a flat list using the _Group by_ item in the header menu. The groups are default sorted with the groups with the most items at the top.
+
+#### DML / SOQL Call Stack
+
+Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occured in the call tree.
+
+#### SOQL Analysis
+
+For SOQL rows, to the right of the Call Stack is SOQL Analysis which shows information about SOQL performance for the given query and how to improve it.
+
+#### Export to CSV + copy to clipboard
+
+Click the header menu,`⋮`, and use `Export to CSV` to save the table content to a file.
+Focus the Analysis table and use `CMD / CTRL + c` to copy the table content to clipboard. This can then be pasted into a spreadsheet or other file.
 
 ## Settings
 
