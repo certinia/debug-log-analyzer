@@ -6,8 +6,9 @@ settings:
 
 overrides:
   '@salesforce/core>jsforce': ^2.0.0-beta.27
-  '@apexdevtools/sfdx-auth-helper>@salesforce/core': ^4.3.11
+  '@salesforce/apex-node>@salesforce/core': ^4.3.11
   '@apexdevtools/sfdx-auth-helper>jsforce': ^2.0.0-beta.27
+  '@apexdevtools/sfdx-auth-helper>@salesforce/core': ^4.3.11
 
 patchedDependencies:
   '@salesforce/bunyan@2.0.0':
