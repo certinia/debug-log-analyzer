@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ENTERING_MANAGED_PKG` events would wrongly have other events rollup into them ([#320][#320])
   - Note: This now means some events will no longer be rolled up into `ENTERING_MANAGED_PKG`
   - e.g `SOQL_BEGIN` will be between two `ENTERING_MANAGED_PKG` events instead of nested inside one
+- Database page scrolls up when a grouped row neat bottom of grid is clicked ([#312][#312])
 
 ## [1.6.0] - 2023-05-19
 
@@ -268,3 +269,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#246]: https://github.com/certinia/debug-log-analyzer/issues/246
 [#25]: https://github.com/certinia/debug-log-analyzer/issues/25
 [#320]: https://github.com/certinia/debug-log-analyzer/issues/320
+[#312]: https://github.com/certinia/debug-log-analyzer/issues/312
