@@ -33,10 +33,10 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "build": "NODE_ENV=production pnpm run build:dev",
-    "build:dev": "concurrently -r -g 'rm -rf lana/out && rollup -c rollup.config.mjs' 'pnpm --filter log-viewer tsc:lint' 'pnpm --filter lana tsc:lint'",
+    "build:dev": "concurrently -r -g 'rm -rf lana/out && rollup -c rollup.config.mjs' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",
     "prepare": "husky install",
-    "lint": "concurrently -r -g 'eslint . --ext ts' 'pnpm --filter 'log-viewer' tsc:lint' 'pnpm --filter lana tsc:lint'",
+    "lint": "concurrently -r -g 'eslint . --ext ts' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "test": "jest",
     "test:ci": "jest --runInBand"
   },
