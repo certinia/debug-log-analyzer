@@ -79,14 +79,14 @@ With the `.log` file open in VSCode.
 
 The Timeline shows a visualization of code execution during a request’s execution. Each color represents a different Salesforce event type e.g DB, Method, SOQL etc. The length of a bar relates to realtime taken, a longer bar means that method took longer.
 
-![timeline](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/timeline-lana.png)
+![timeline](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-timeline.png)
 
 - Scroll up and down on the mouse to zoom in and out to an accuracy of 0.001ms, time markers are shown with a ms time value and white line e.g 9600.001 ms.
 - When zooming the mouse pointer position is kept on screen.
 - Scroll left and right on the mouse to move the time line left are right, when zoomed
 - Click the mouse down and drag to move the timeline around both in the x and y direction, when zoomed
 
-![tooltip](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/tooltip-lana.png | width = 40)
+![tooltip](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-tooltip.png)
 
 Hovering over an element provides information on the item. If you click on an item it will take you to the call navigatable stack view.
 
@@ -100,21 +100,21 @@ The tooltip provides the following information.\
 ### Call Tree
 
 Shows the call stack which can be expanded and collapsed. Clicking on a link will take you to that line in the class if it can be found in the current open project.
-![calltree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/calltree-lana.png)
+![calltree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-calltree.png)
 
 Each row shows event type, details such as method signature, self and total time as well as aggreagted DML, SOQL, Throws and Row counts.
 Each column can be sorted by clicking the column header, this will sorted the data within the tree e.g sorting by self time will sort the children within a parent with the largest self time to the top, within that parent.
 
 ### Analysis
 
-![analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/analysis-lana.png)
-
 Show analysis of method calls by showing Self Time, Total Time, Count (number of times a method was called) and name. Each column can be sorted ascending or descending by clicking the column header.
+
+![analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-analysis.png)
 
 ### Database
 
 Shows the SOQL and DML that occured the number of rows returned, the time taken and for SOQL the selectivity and number of aggregations.
-![database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.6/db-lana.png)
+![database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-database.png)
 
 Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occured in the call tree.
 The tables can be sorted ascending or descending by DML/SOQL, Row Count and Time Taken and by Selectivity and Aggregations on the SOQL table.
