@@ -96,22 +96,22 @@ Clicking an event in the Timeline will go to and select that event in the Call T
 
 ![tooltip](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-tooltip.png)
 
-Hovering over an element provides information on the item. If you click on an item it will take you to the call navigatable stack view.
+Hovering over an element provides information on the item. If you click on an item it will take you to that row in the Call Tree.
 
 The tooltip provides the following information.\
 **Event Name** - e.g `METHOD_ENTRY`, `EXECUTION_STARTED`, `SOQL_EXECUTION_BEGIN` etc\
-**Event Description** - Addtional information about the event such as method name or SOQL query executed.\
-**Timestamp** - Is the start and end timestamp for the given event which can crossreferenced in the log file.\
-**Duration** - Is made up of **Total Time** (time spent in that event and its children) and **Self Time** (time directly spent in that event).\
+**Event Description** - Additional information about the event such as method name or SOQL query executed.\
+**Timestamp** - The start and end timestamp for the given event which can be cross referenced in the log file.\
+**Duration** - Made up of **Total Time** (time spent in that event and its children) and **Self Time** (time directly spent in that event).\
 **Rows** - Shows **Total Rows** (rows from that event and its children) and **Self Rows** (rows directly from that event).
 
 ### Call Tree
 
 Shows the call stack which can be expanded and collapsed. Clicking on a link will take you to that line in the class if it can be found in the current open project.
 
-![calltree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-calltree.png)
+![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-calltree.png)
 
-Each row shows event type, details such as method signature, self and total time as well as aggreagted DML, SOQL, Throws and Row counts.
+Each row shows event type, details such as method signature, self and total time as well as aggregated DML, SOQL, Throws and Row counts.
 
 #### Go to Code
 
@@ -152,7 +152,7 @@ Focus the Analysis table and use `CMD / CTRL + c` to copy the table content to c
 
 ### Database
 
-Shows the SOQL and DML that occured the number of rows returned, the time taken and for SOQL the selectivity and number of aggregations.
+Shows the SOQL and DML that occurred the number of rows returned, the time taken and for SOQL the selectivity and number of aggregations.
 
 ![database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.7/lana-database.png)
 
@@ -172,7 +172,7 @@ By default rows are grouped by the SOQL/ DML text, grouping can be removed and t
 
 #### DML / SOQL Call Stack
 
-Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occured in the call tree.
+Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occurred in the call tree.
 
 #### SOQL Analysis
 
