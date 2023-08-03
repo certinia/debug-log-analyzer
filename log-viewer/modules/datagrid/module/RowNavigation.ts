@@ -27,17 +27,20 @@ export class RowNavigation extends Module {
         row.treeExpand();
       }
 
-      table.getSelectedRows().map((rowToDeselect) => {
+      table.getSelectedRows().forEach((rowToDeselect) => {
         rowToDeselect.deselect();
       });
-      table.restoreRedraw();
       row.select();
 
+      table.restoreRedraw();
       // @ts-expect-error it has 2 params
       row.scrollTo('center', true).then(() => {
-        //NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
+        // row.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+        // NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
         // This needs fixing in main tabulator lib
-        row.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+        window.requestAnimationFrame(() => {
+          row.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+        });
       });
     }
   }
