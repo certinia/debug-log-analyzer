@@ -1,6 +1,4 @@
 #analysisContainer {
-  height: 100%;
   display: contents;
-  max-height: 100%;
-  box-sizing: border-box;
+  height: 100%;
 }
