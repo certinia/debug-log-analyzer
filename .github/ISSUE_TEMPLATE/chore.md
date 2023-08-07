@@ -1,5 +1,5 @@
 ---
-name: Chore
+name: 🔧 Chore
 about: Something other than a bug/ feature.
 title: 'chore: <title>'
 labels: ['chore']
