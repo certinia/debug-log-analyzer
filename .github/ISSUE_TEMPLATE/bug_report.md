@@ -1,9 +1,9 @@
 ---
-name: Bug report
+name: 🐛 Bug report
 about: Create a report to help us improve
-title: "bug: <title>"
-labels: '["bug"]'
-assignees: ""
+title: 'bug: <title>'
+labels: ['bug', 'needs-triage']
+assignees: ''
 ---
 
 <!--
@@ -14,7 +14,7 @@ NOTICE: This is a community project. We do our best to triage issues in a timely
 
 _Short summary of what is going on or to provide context_.
 
-### Steps To Reproduce:
+### Steps To Reproduce
 
 1.  This is step 1.
 1.  This is step 2. All steps should start with '1.'

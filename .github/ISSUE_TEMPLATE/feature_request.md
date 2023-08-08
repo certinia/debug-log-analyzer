@@ -1,9 +1,9 @@
 ---
-name: Feature request
+name: ✨ Feature request
 about: Suggest an idea for this project
-title: "feat: <title>"
-labels: '["feature"]'
-assignees: ""
+title: 'feat: <title>'
+labels: ['enhancement', 'needs-triage']
+assignees: ''
 ---
 
 ### Is your feature request related to a problem?
