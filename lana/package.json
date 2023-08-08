@@ -40,7 +40,9 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:apexlog"
+  ],
   "contributes": {
     "commands": [
       {
