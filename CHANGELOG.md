@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Go to Call Tree from SOQL detail Call Stack on the Database View ([#346][#346])
+
 ## [1.7.0] - 2023-08-04
 
 ### Added
@@ -36,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Increase the supported log size for the go to log hyperlink to larger than 50MB ([#254][#254])
 - Renamed `Log: Load Apex Log For Analysis` to `Log: Retrieve Apex Log And Show Analysis` ([#288][#288])
+- Improve performance of `Log: Retrieve Apex Log And Show Analysis` ([#255][#255])
 - Update minimum supported vscode version to v1.74.0 ([#280][#280])
 - Support for more undocumented log events such as `NBA_*`, `ORG_CACHE_*`, `SESSION_CACHE_*`, `FUNCTION_INVOCATION_*` and more ([#246][#246])
 
@@ -216,6 +223,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add explorer menu item
 - Provide more information when selecting log to download
 
+<!-- v1.7.1 -->
+
+[#346]: https://github.com/certinia/debug-log-analyzer/issues/346
+
+<!-- v1.7.0 -->
+
+[#280]: https://github.com/certinia/debug-log-analyzer/issues/280
+[#288]: https://github.com/certinia/debug-log-analyzer/issues/288
+[#254]: https://github.com/certinia/debug-log-analyzer/issues/254
+[#297]: https://github.com/certinia/debug-log-analyzer/issues/297
+[#294]: https://github.com/certinia/debug-log-analyzer/issues/294
+[#246]: https://github.com/certinia/debug-log-analyzer/issues/246
+[#25]: https://github.com/certinia/debug-log-analyzer/issues/25
+[#320]: https://github.com/certinia/debug-log-analyzer/issues/320
+[#312]: https://github.com/certinia/debug-log-analyzer/issues/312
+[#255]: https://github.com/certinia/debug-log-analyzer/issues/255
+
+<!-- Older versions -->
+
 [#11]: https://github.com/certinia/debug-log-analyzer/issues/11
 [#18]: https://github.com/certinia/debug-log-analyzer/issues/18
 [#22]: https://github.com/certinia/debug-log-analyzer/issues/22
@@ -261,12 +287,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#242]: https://github.com/certinia/debug-log-analyzer/issues/242
 [#235]: https://github.com/certinia/debug-log-analyzer/issues/235
 [#264]: https://github.com/certinia/debug-log-analyzer/issues/264
-[#280]: https://github.com/certinia/debug-log-analyzer/issues/280
-[#288]: https://github.com/certinia/debug-log-analyzer/issues/288
-[#254]: https://github.com/certinia/debug-log-analyzer/issues/254
-[#297]: https://github.com/certinia/debug-log-analyzer/issues/297
-[#294]: https://github.com/certinia/debug-log-analyzer/issues/294
-[#246]: https://github.com/certinia/debug-log-analyzer/issues/246
-[#25]: https://github.com/certinia/debug-log-analyzer/issues/25
-[#320]: https://github.com/certinia/debug-log-analyzer/issues/320
-[#312]: https://github.com/certinia/debug-log-analyzer/issues/312
