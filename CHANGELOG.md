@@ -5,11 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.7.1] - 2023-08-08
 
 ### Fixed
 
 - `Log: Show Apex Log Analysis` code lense not showing until another command is used first ([#340][#340])
+- Go to Call Tree from SOQL detail Call Stack on the Database View ([#346][#346])
 
 ## [1.7.0] - 2023-08-04
 
@@ -223,9 +224,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add explorer menu item
 - Provide more information when selecting log to download
 
-<!-- v1.10.0 -->
+<!-- v1.7.1 -->
 
 [#340]: https://github.com/certinia/debug-log-analyzer/issues/340
+[#346]: https://github.com/certinia/debug-log-analyzer/issues/346
 
 <!-- v1.7.0 -->
 

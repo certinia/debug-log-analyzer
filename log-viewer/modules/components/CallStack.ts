@@ -5,7 +5,7 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { DatabaseAccess } from '../Database';
-import { showTreeNode } from '../TreeView';
+import { goToRow } from '../calltree-view/CalltreeView';
 import { LogLine } from '../parsers/TreeParser';
 
 @customElement('call-stack')
@@ -67,7 +67,7 @@ export class CallStack extends LitElement {
     const target = evt.target as HTMLElement;
     const dataTimestamp = target.getAttribute('data-timestamp');
     if (dataTimestamp) {
-      showTreeNode(parseInt(dataTimestamp));
+      goToRow(parseInt(dataTimestamp));
     }
   }
 }
