@@ -21,10 +21,10 @@
 
 ## Related Tickets & Documents
 
-- Related Issue #
-- fixes #
-- resolves #
-- closes #
+Related Issue #
+fixes #
+resolves #
+closes #
 
 ## Added tests?
 
