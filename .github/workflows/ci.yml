@@ -44,3 +44,26 @@ jobs:
       - name: Tests
         run: |
           pnpm run test:ci
+
+  build:
+    name: Verify VSCode Package Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'pnpm'
+      - name: Install vsce
+        run: pnpm add --global @vscode/vsce
+      - name: Install Dependencies
+        run: |
+          HUSKY=0 pnpm install
+      - name: Build VSCode Package
+        run: |
+          cd lana
+          vsce package --no-dependencies
