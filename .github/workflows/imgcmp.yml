@@ -1,4 +1,4 @@
-name: imgcmp
+name: Optimize Images
 on:
   push:
     branches:
