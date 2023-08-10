@@ -21,6 +21,6 @@ const newpackageJSON =
       version: version,
     },
     null,
-    '\t'
+    2
   ) + '\n';
 fs.writeFileSync('./lana/package.json', newpackageJSON);
