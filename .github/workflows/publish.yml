@@ -32,8 +32,12 @@ jobs:
       - name: Publish to VS Code Marketplace + Open VSX Registry
         run: |
           cd lana
+          echo "Verify vsce token has not expired"
           vsce verify-pat -p ${{ secrets.VSCE_TOKEN }}
+          echo "Verify ovsx token has not expired"
           ovsx verify-pat -p ${{ secrets.OVSX_TOKEN }}
 
+          echo "Publish to vsce"
           vsce publish -p ${{ secrets.VSCE_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
+          echo "Publish to ovsx"
           ovsx publish -p ${{ secrets.OVSX_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
