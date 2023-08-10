@@ -610,7 +610,7 @@ describe('Log Settings tests', () => {
 
 describe('Recalculate durations tests', () => {
   it('Recalculates parent node', () => {
-    const node = new Method(['14:32:07.563 (1)', 'DUMMY'], [], null, 'method', '');
+    const node = new Method(['14:32:07.563 (1)', 'DUMMY'], [], 'method', '');
     node.exitStamp = 3;
 
     node.recalculateDurations();
@@ -618,9 +618,9 @@ describe('Recalculate durations tests', () => {
     expect(node.selfTime).toBe(2);
   });
   it('Children are subtracted from net duration', () => {
-    const node = new Method(['14:32:07.563 (0)', 'DUMMY'], [], null, 'method', ''),
-      child1 = new Method(['14:32:07.563 (10)', 'DUMMY'], [], null, 'method', ''),
-      child2 = new Method(['14:32:07.563 (70)', 'DUMMY'], [], null, 'method', '');
+    const node = new Method(['14:32:07.563 (0)', 'DUMMY'], [], 'method', ''),
+      child1 = new Method(['14:32:07.563 (10)', 'DUMMY'], [], 'method', ''),
+      child2 = new Method(['14:32:07.563 (70)', 'DUMMY'], [], 'method', '');
     node.exitStamp = 100;
     child1.duration = 50;
     child2.duration = 25;

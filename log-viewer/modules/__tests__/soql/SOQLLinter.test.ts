@@ -164,7 +164,6 @@ describe('SOQL in Trigger Rule tests', () => {
         '__sfdc_trigger/Account',
       ],
       ['CODE_UNIT_FINISHED'],
-      null,
       'codeUnit',
       'method'
     );
