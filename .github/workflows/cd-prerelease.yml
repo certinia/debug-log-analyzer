@@ -21,13 +21,18 @@ jobs:
         run: |
           echo "Checking if Log Analyzer Pre Release can be published"
           headSHA=$(git rev-parse HEAD)
-          echo "$headSHA"
-          preSHA=$(git rev-parse --verify -q "pre^{commit}")
-          echo "$preSHA"
+          echo "head: $headSHA"
+
+          if [ $(git tag -l pre) ]; then
+              preSHA=$(git rev-parse --verify -q "pre")
+          fi
+          echo "pre: $preSHA"
+
+
           stableTag=$(git tag '*.*.*' --list --sort=-version:refname | head -n1 )
-          echo "$stableTag"
+          echo "stable: $stableTag"
           stableSHA=$(git rev-parse $stableTag)
-          echo "$stableSHA"
+          echo "stable: $stableSHA"
 
           echo "HEAD
           $(git show $headSHA -s --format="commit: %h\nDate: %ad")
