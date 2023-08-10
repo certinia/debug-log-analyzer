@@ -45,7 +45,6 @@ jobs:
               exit 0
           fi
           echo "exitstatus=continue" >> "$GITHUB_OUTPUT"
-          echo "$GITHUB_OUTPUT"
 
   publish:
     name: Publish pre-release
@@ -55,6 +54,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
       - name: Set up Node
         uses: actions/setup-node@v3
         with:
