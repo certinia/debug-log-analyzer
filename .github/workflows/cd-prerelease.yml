@@ -1,0 +1,92 @@
+name: Publish pre-release
+
+on:
+  schedule:
+    - cron: '0 10 * * 2' # every tuesday at 10am UTC
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Check for pre release changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      exitstatus: ${{ steps.earlyexit.exitstatus }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - id: earlyexit
+        name: Should publish pre release
+        run: |
+          bold=$(tput bold)
+          normal=$(tput sgr0)
+
+          headSHA=$(git rev-parse HEAD)
+          preSHA=$(git rev-parse --verify -q "pre^{commit}")
+          stableTag=$(git tag '*.*.*' --list --sort=-version:refname | head -n1 )
+          stableSHA=$(git rev-parse $stableTag)
+
+          echo "
+          ${bold}Checking if Log Analyzer Pre Release can be published
+          HEAD
+          ${normal}$(git show $headSHA --format="commit: %h\nDate: %ad")
+
+          ${bold}Pre release
+          ${normal}$(git show $preSHA --format="commit: %h\nDate: %ad")
+
+          ${bold}Stable release ($stableTag)
+          ${normal}$(git show $stableSHA --format="commit: %h\nDate: %ad")"
+
+          if [ "$headSHA" = "$preSHA" ] || [ "$headSHA" = "$stableSHA" ]; then
+              echo "\n${bold}No pre-release needed, No changes since last pre-release or stable version. Exiting."
+              echo "exitstatus=exit" >> "$GITHUB_OUTPUT"
+              exit 0
+          fi
+          echo "exitstatus=continue" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Publish pre-release
+    needs: check
+    runs-on: ubuntu-latest
+    if: needs.check.outputs.exitstatus == 'continue'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'pnpm'
+      - name: Install vsce + ovsx
+        run: |
+          pnpm add --global @vscode/vsce
+          pnpm add --global ovsx
+      - name: Dependencies
+        run: |
+          HUSKY=0 pnpm install
+      - name: update pre-release version
+        run: |
+          echo "\n$(tput bold)Updating pre-release version"
+          pnpm run bump-prerelease;
+      - name: Package the extension
+        run: |
+          cd lana
+          vsce package --pre-release --no-dependencies
+      - name: Publish to VS Code Marketplace + Open VSX Registry
+        run: |
+          cd lana
+          vsce verify-pat -p ${{ secrets.VSCE_TOKEN }}
+          ovsx verify-pat -p ${{ secrets.OVSX_TOKEN }}
+
+          pkgPath=$(cat package.json | jq -r '.version')
+          pkgPath=lana-${versionNum}.vsix
+          vsce publish --pre-release -p ${{ secrets.VSCE_TOKEN }} --packagePath ${pkgPath}
+          ovsx publish --pre-release -p ${{ secrets.OVSX_TOKEN }} --packagePath ${pkgPath}
+      - name: Update pre-release tag
+        run: |
+          echo "\n$(tput bold)Updating pre release tag"
+          git tag -f pre
+          git push origin pre
