@@ -19,14 +19,17 @@ jobs:
       - id: earlyexit
         name: Should publish pre release
         run: |
+          echo "Checking if Log Analyzer Pre Release can be published"
           headSHA=$(git rev-parse HEAD)
+          echo "$headSHA"
           preSHA=$(git rev-parse --verify -q "pre^{commit}")
+          echo "$preSHA"
           stableTag=$(git tag '*.*.*' --list --sort=-version:refname | head -n1 )
+          echo "$stableTag"
           stableSHA=$(git rev-parse $stableTag)
+          echo "$stableSHA"
 
-          echo "
-          Checking if Log Analyzer Pre Release can be published
-          HEAD
+          echo "HEAD
           $(git show $headSHA -s --format="commit: %h\nDate: %ad")
 
           Pre release
@@ -35,11 +38,13 @@ jobs:
           Stable release ($stableTag)
           $(git show $stableSHA -s --format="commit: %h\nDate: %ad")"
 
+          echo "start if"
           if [ "$headSHA" = "$preSHA" ] || [ "$headSHA" = "$stableSHA" ]; then
               echo "\nNo pre-release needed, No changes since last pre-release or stable version. Exiting."
               echo "exitstatus=exit" >> "$GITHUB_OUTPUT"
               exit 0
           fi
+          echo "end if"
           echo "exitstatus=continue" >> "$GITHUB_OUTPUT"
 
   publish:
