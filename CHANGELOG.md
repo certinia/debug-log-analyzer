@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The Log Analyzer will be published as a pre-release extension weekly ([#300][#300])
+  - Click `Switch to Pre-Release Version` on the banner to get bleeding edge changes and help us to resolve bugs before the stable release.
+
 ## [1.7.1] - 2023-08-10
 
 ### Fixed
@@ -223,6 +230,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Misc Visual tweaks
 - Add explorer menu item
 - Provide more information when selecting log to download
+
+<!-- Unreleased -->
+
+[#300]: https://github.com/certinia/debug-log-analyzer/issues/300
 
 <!-- v1.7.1 -->
 
