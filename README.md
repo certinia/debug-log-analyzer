@@ -36,6 +36,10 @@ Apex Log Analyzer makes performance analysis of Salesforce debug logs much easie
 - Search for `Apex Log Analyzer` in extensions.
 - Click install + then reload VSCode.
 
+### Pre-Release
+
+Click `Switch to Pre-Release Version` on the banner to get bleeding edge changes and help us to resolve bugs before the stable release.
+
 ### Command Pallette
 
 - Open command pallette (CMD/CTRL + Shift + P), paste `ext install financialforce.lana`, and press enter.

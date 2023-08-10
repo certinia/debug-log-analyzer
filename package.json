@@ -31,6 +31,7 @@
     "rollup-plugin-swc3": "^0.8.2"
   },
   "scripts": {
+    "bump-prerelease": "node ./scripts/pre-release.js",
     "preinstall": "npx only-allow pnpm",
     "build": "NODE_ENV=production pnpm run build:dev",
     "build:dev": "concurrently -r -g 'rm -rf lana/out && rollup -c rollup.config.mjs' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
