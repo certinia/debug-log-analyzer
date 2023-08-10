@@ -11,8 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    outputs:
-      exitstatus: ${{ steps.earlyexit.exitstatus }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -21,27 +19,24 @@ jobs:
       - id: earlyexit
         name: Should publish pre release
         run: |
-          bold="\033[1m"
-          normal="\033[0m"
-
           headSHA=$(git rev-parse HEAD)
           preSHA=$(git rev-parse --verify -q "pre^{commit}")
           stableTag=$(git tag '*.*.*' --list --sort=-version:refname | head -n1 )
           stableSHA=$(git rev-parse $stableTag)
 
           echo "
-          ${bold}Checking if Log Analyzer Pre Release can be published
+          Checking if Log Analyzer Pre Release can be published
           HEAD
-          ${normal}$(git show $headSHA -s --format="commit: %h\nDate: %ad")
+          $(git show $headSHA -s --format="commit: %h\nDate: %ad")
 
-          ${bold}Pre release
-          ${normal}$(git show $preSHA -s --format="commit: %h\nDate: %ad")
+          Pre release
+          $(git show $preSHA -s --format="commit: %h\nDate: %ad")
 
-          ${bold}Stable release ($stableTag)
-          ${normal}$(git show $stableSHA -s --format="commit: %h\nDate: %ad")"
+          Stable release ($stableTag)
+          $(git show $stableSHA -s --format="commit: %h\nDate: %ad")"
 
           if [ "$headSHA" = "$preSHA" ] || [ "$headSHA" = "$stableSHA" ]; then
-              echo "\n${bold}No pre-release needed, No changes since last pre-release or stable version. Exiting."
+              echo "\nNo pre-release needed, No changes since last pre-release or stable version. Exiting."
               echo "exitstatus=exit" >> "$GITHUB_OUTPUT"
               exit 0
           fi
