@@ -32,5 +32,8 @@ jobs:
       - name: Publish to VS Code Marketplace + Open VSX Registry
         run: |
           cd lana
+          vsce verify-pat -p ${{ secrets.VSCE_TOKEN }}
+          ovsx verify-pat -p ${{ secrets.OVSX_TOKEN }}
+
           vsce publish -p ${{ secrets.VSCE_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
           ovsx publish -p ${{ secrets.OVSX_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
