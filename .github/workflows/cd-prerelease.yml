@@ -21,8 +21,8 @@ jobs:
       - id: earlyexit
         name: Should publish pre release
         run: |
-          bold=$(tput bold)
-          normal=$(tput sgr0)
+          bold="\033[1m"
+          normal="\033[0m"
 
           headSHA=$(git rev-parse HEAD)
           preSHA=$(git rev-parse --verify -q "pre^{commit}")
@@ -32,13 +32,13 @@ jobs:
           echo "
           ${bold}Checking if Log Analyzer Pre Release can be published
           HEAD
-          ${normal}$(git show $headSHA --format="commit: %h\nDate: %ad")
+          ${normal}$(git show $headSHA -s --format="commit: %h\nDate: %ad")
 
           ${bold}Pre release
-          ${normal}$(git show $preSHA --format="commit: %h\nDate: %ad")
+          ${normal}$(git show $preSHA -s --format="commit: %h\nDate: %ad")
 
           ${bold}Stable release ($stableTag)
-          ${normal}$(git show $stableSHA --format="commit: %h\nDate: %ad")"
+          ${normal}$(git show $stableSHA -s --format="commit: %h\nDate: %ad")"
 
           if [ "$headSHA" = "$preSHA" ] || [ "$headSHA" = "$stableSHA" ]; then
               echo "\n${bold}No pre-release needed, No changes since last pre-release or stable version. Exiting."
@@ -69,7 +69,7 @@ jobs:
           HUSKY=0 pnpm install
       - name: update pre-release version
         run: |
-          echo "\n$(tput bold)Updating pre-release version"
+          echo "\n\033[1mUpdating pre-release version"
           pnpm run bump-prerelease;
       - name: Package the extension
         run: |
@@ -87,6 +87,6 @@ jobs:
           ovsx publish --pre-release -p ${{ secrets.OVSX_TOKEN }} --packagePath ${pkgPath}
       - name: Update pre-release tag
         run: |
-          echo "\n$(tput bold)Updating pre release tag"
+          echo "\n\033[1mUpdating pre release tag"
           git tag -f pre
           git push origin pre
