@@ -11,9 +11,9 @@ const preReleaseTag = `${today.getFullYear()}${String(today.getMonth() + 1).padS
 
 // eslint-disable-next-line
 const packageJSON = require('../lana/package.json');
-const patchVersionIndex = packageJSON.version.lastIndexOf('.');
-let version = packageJSON.version.slice(0, patchVersionIndex);
-version = `${version}.${preReleaseTag}`;
+const versionParts = packageJSON.version.split('.');
+// The minor number (major.minor.patch) will always be even for stable so +1 will move to the next odd for pre release.
+const version = `${versionParts[0]}.${Number(versionParts[1]) + 1}.${preReleaseTag}`;
 const newpackageJSON =
   JSON.stringify(
     {
