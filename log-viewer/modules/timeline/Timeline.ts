@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import formatDuration, { debounce } from './Util';
-import { goToRow } from './calltree-view/CalltreeView';
-import { Method, RootNode, TimedNode, TimelineKey, truncated } from './parsers/TreeParser';
+import formatDuration, { debounce } from '../Util';
+import { goToRow } from '../calltree-view/CalltreeView';
+import { Method, RootNode, TimedNode, TimelineKey, truncated } from '../parsers/TreeParser';
 
 interface TimelineGroup {
   label: string;

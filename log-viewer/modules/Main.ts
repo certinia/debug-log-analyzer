@@ -7,7 +7,6 @@ import '../resources/css/Status.css';
 import '../resources/css/Tabber.css';
 import '../resources/css/TimelineView.css';
 import '../resources/css/TreeView.css';
-import renderTimeline, { renderTimelineKey, setColors } from './Timeline';
 import { showTab } from './Util';
 import { initAnalysisRender } from './analysis-view/AnalysisView';
 import { initCalltree } from './calltree-view/CalltreeView';
@@ -22,6 +21,7 @@ import parseLog, {
   truncated,
 } from './parsers/TreeParser';
 import { hostService } from './services/VSCodeService';
+import renderTimeline, { renderTimelineKey, setColors } from './timeline/Timeline';
 
 let logSize: number;
 export let rootMethod: RootNode;
