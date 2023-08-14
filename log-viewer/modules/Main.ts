@@ -1,12 +1,9 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import '../resources/css/AnalysisView.css';
 import '../resources/css/Settings.css';
 import '../resources/css/Status.css';
 import '../resources/css/Tabber.css';
-import '../resources/css/TimelineView.css';
-import '../resources/css/TreeView.css';
 import { showTab } from './Util';
 import { initAnalysisRender } from './analysis-view/AnalysisView';
 import { initCalltree } from './calltree-view/CalltreeView';

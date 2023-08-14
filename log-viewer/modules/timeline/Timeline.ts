@@ -4,6 +4,7 @@
 import formatDuration, { debounce } from '../Util';
 import { goToRow } from '../calltree-view/CalltreeView';
 import { Method, RootNode, TimedNode, TimelineKey, truncated } from '../parsers/TreeParser';
+import './TimelineView.css';
 
 interface TimelineGroup {
   label: string;

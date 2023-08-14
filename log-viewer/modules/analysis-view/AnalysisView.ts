@@ -1,11 +1,12 @@
 import { ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
-import '../../resources/css/DatabaseView.scss';
+import '../database-view/DatabaseView.scss';
 import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
+import './AnalysisView.css';
 
 export function initAnalysisRender(rootMethod: RootNode) {
   const analysisTab = document.getElementById('analysisView');

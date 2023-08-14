@@ -6,7 +6,6 @@ import {
   TabulatorFull as Tabulator,
 } from 'tabulator-tables';
 
-import '../../resources/css/DatabaseView.scss';
 import { DatabaseAccess } from '../Database';
 import '../components/CallStack';
 import NumberAccessor from '../datagrid/dataaccessor/Number';
@@ -16,6 +15,7 @@ import { RootNode, SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parse
 import { hostService } from '../services/VSCodeService';
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
+import './DatabaseView.scss';
 
 export async function initDBRender(rootMethod: RootNode) {
   await DatabaseAccess.create(rootMethod);
