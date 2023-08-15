@@ -2,7 +2,7 @@ name: Publish pre-release
 
 on:
   schedule:
-    - cron: '0 10 * * 2' # every tuesday at 10am UTC
+    - cron: '15 4 * * 2' # every tuesday at 4:15AM UTC
   workflow_dispatch:
 
 jobs:
@@ -72,7 +72,7 @@ jobs:
           HUSKY=0 pnpm install
       - name: update pre-release version
         run: |
-          echo "\n\033[1mUpdating pre-release version"
+          echo "\nUpdating pre-release version"
           pnpm run bump-prerelease;
       - name: Package the extension
         run: |
@@ -84,19 +84,19 @@ jobs:
           echo "Verify vsce token has not expired"
           vsce verify-pat -p ${{ secrets.VSCE_TOKEN }}
 
-          echo "Verify ovsx token has not expired"
+          echo "\nVerify ovsx token has not expired"
           ovsx verify-pat -p ${{ secrets.OVSX_TOKEN }}
 
           versionNum=$(cat package.json | jq -r '.version')
           pkgPath=lana-${versionNum}.vsix
 
-          echo "Publish to vsce"
+          echo "\nPublish to vsce"
           echo "vsix name: $pkgPath"
           vsce publish --pre-release -p ${{ secrets.VSCE_TOKEN }} --packagePath ${pkgPath}
-          echo "Publish to ovsx"
+          echo "\nPublish to ovsx"
           ovsx publish --pre-release -p ${{ secrets.OVSX_TOKEN }} --packagePath ${pkgPath}
       - name: Update pre-release tag
         run: |
-          echo "\n\033[1mUpdating pre release tag"
+          echo "Updating pre release tag"
           git tag -f pre
           git push origin pre
