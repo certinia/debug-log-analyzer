@@ -19,14 +19,6 @@ interface WebViewLogFileRequest {
   options?: Record<string, never>;
 }
 
-export class LogFileException extends Error {
-  constructor(message: string) {
-    super(message);
-    this.message = message;
-    this.name = 'LogFileException';
-  }
-}
-
 export class LogView {
   private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
 
