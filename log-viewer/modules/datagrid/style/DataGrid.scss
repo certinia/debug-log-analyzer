@@ -1,0 +1,81 @@
+// I prefer the table with no borders but if we want to add one I think this works best
+// var(--vscode-sideBar-border)
+
+//Main Theme Variables
+$backgroundColor: var(--vscode-editor-background); //background color of tabulator
+$borderColor: transparent; //border to tabulator
+$textSize: var(--vscode-editor-font-size); //table text size
+
+//header theming
+$headerBackgroundColor: transparent; //border to tabulator
+$headerTextColor: var(--vscode-editor-foreground); //header text color
+$headerBorderColor: transparent; //header border color
+$headerSeparatorColor: transparent; //header bottom separator color
+$headerMargin: 4px !default; //padding round header
+
+//column header arrows
+$sortArrowHover: #555 !default;
+$sortArrowActive: #666 !default;
+$sortArrowInactive: #bbb !default;
+
+//row theming
+$rowBackgroundColor: $backgroundColor; //table row background color
+$rowAltBackgroundColor: transparent; //table row background color
+$rowBorderColor: transparent; //table border color
+$rowTextColor: var(--vscode-editor-foreground); //table text color
+$rowHoverBackground: var(--vscode-list-hoverBackground); //row background color on hover
+//row background color when selected
+$rowSelectedBackground: var(--vscode-list-activeSelectionBackground);
+//row background color when selected and hovered
+$rowSelectedBackgroundHover: var(--vscode-list-activeSelectionBackground);
+
+$editBoxColor: #1d68cd !default; //border color for edit boxes
+$errorColor: #dd0000 !default; //error indication
+
+//footer theming
+$footerBackgroundColor: transparent; //border to tabulator
+$footerTextColor: var(--vscode-editor-foreground); //footer text color
+$footerBorderColor: transparent; //footer border color
+$footerSeparatorColor: transparent; //footer bottom separator color
+$footerActiveColor: #d00 !default; //footer bottom active text color
+@import '~tabulator-tables/src/scss/tabulator.scss';
+
+.tabulator {
+  .tabulator-tableholder {
+    overflow-x: hidden;
+    .tabulator-table {
+      display: block;
+      background-color: unset;
+    }
+  }
+}
+
+.tabulator-row {
+  background-color: unset;
+  .tabulator-row-even {
+    background-color: unset;
+  }
+
+  &.tabulator-group {
+    background: unset;
+    border-bottom: unset;
+    border-right: unset;
+    border-top: unset;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    &:hover {
+      background-color: $rowHoverBackground;
+    }
+  }
+}
+
+input[type='checkbox'] {
+  vertical-align: middle;
+}
+
+.tabulator-cell.datagrid-textarea {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}

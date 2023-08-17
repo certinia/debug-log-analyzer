@@ -9,7 +9,6 @@ import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
 import { rootMethod } from '../Main';
 import { showTab } from '../Util';
-import '../database-view/DatabaseView.scss';
 import MinMaxEditor from '../datagrid/editors/MinMax';
 import MinMaxFilter from '../datagrid/filters/MinMax';
 import NumberFormat from '../datagrid/format/Number';
@@ -17,7 +16,7 @@ import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation'
 import { RowNavigation } from '../datagrid/module/RowNavigation';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
-import './TreeView.css';
+import './TreeView.scss';
 
 let calltreeTable: Tabulator;
 
