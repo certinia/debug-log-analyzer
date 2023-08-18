@@ -35,11 +35,15 @@
   display: flex;
   flex-direction: column;
 }
-.helpLink {
+.help__link {
   display: inline-block;
   border: 1px solid var(--vscode-tab-border);
   background-color: var(--vscode-tab-background);
   color: var(--vscode-tab-inactiveForeground);
   padding: 5px 10px;
   cursor: pointer;
+}
+.help__icon {
+  width: 24px;
+  height: 24px;
 }

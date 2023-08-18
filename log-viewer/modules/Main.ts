@@ -53,11 +53,11 @@ async function setStatus(name: string, path: string, status: string, color?: str
       const reasonSpan = document.createElement('span');
 
       reasonSpan.innerText = entry.reason;
-      reasonSpan.className = 'reason';
+      reasonSpan.className = 'status__reason';
       reasonSpan.style.backgroundColor = entry.color;
 
       const tooltipSpan = document.createElement('span');
-      tooltipSpan.className = 'tooltip';
+      tooltipSpan.className = 'status__tooltip';
       tooltipSpan.innerText = entry.reason;
 
       statusHolder.appendChild(reasonSpan);
@@ -79,7 +79,7 @@ function timer(text: string) {
 }
 
 async function renderLogSettings(logSettings: LogSetting[]) {
-  const holder = document.getElementById('logSettings') as HTMLDivElement;
+  const holder = document.getElementById('log-settings') as HTMLDivElement;
 
   holder.innerHTML = '';
   const fragment = document.createDocumentFragment();
@@ -89,11 +89,12 @@ async function renderLogSettings(logSettings: LogSetting[]) {
         title = document.createElement('span'),
         value = document.createElement('span');
 
-      title.innerText = key + ':';
-      title.className = 'settingTitle';
-      value.innerText = level;
-      value.className = 'settingValue';
       setting.className = 'setting';
+      title.innerText = key + ':';
+      title.className = 'setting__title';
+      value.innerText = level;
+      value.className = 'setting__level';
+
       setting.appendChild(title);
       setting.appendChild(value);
       fragment.appendChild(setting);
@@ -182,10 +183,10 @@ function handleMessage(evt: MessageEvent) {
 }
 
 function onInit(): void {
-  const tabHolder = document.querySelector('.tabHolder');
+  const tabHolder = document.querySelector('.tab-holder');
   tabHolder?.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', onTabSelect));
 
-  const helpButton = document.querySelector('.helpLink');
+  const helpButton = document.querySelector('.help__link');
   if (helpButton) {
     helpButton.addEventListener('click', () => hostService().openHelp());
   }
