@@ -1,4 +1,4 @@
-.minMax-input {
+.min-max__input {
   background-color: var(--vscode-settings-numberInputBackground);
   color: var(--vscode-settings-numberInputForeground);
   border: 1px solid var(--vscode-settings-numberInputBorder, transparent);
@@ -12,13 +12,13 @@
   appearance: textfield !important;
 }
 
-.minMax-input::-webkit-outer-spin-button,
-.minMax-input::-webkit-inner-spin-button {
+.min-max__input::-webkit-outer-spin-button,
+.min-max__input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-.minMax-input:focus {
+.min-max__input:focus {
   outline-width: 1px;
   outline-style: solid;
   outline-offset: -1px;

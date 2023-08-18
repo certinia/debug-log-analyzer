@@ -1,21 +1,17 @@
-.statusBar {
-  margin-top: 10px;
-  display: flex;
-  width: 100%;
-  position: relative;
-  white-space: nowrap;
-}
 #status {
   align-items: center;
   font-size: 1.1em;
   margin-bottom: 5px;
   margin-top: 5px;
 }
-.helpIcon {
-  width: 24px;
-  height: 24px;
+.status__bar {
+  margin-top: 10px;
+  display: flex;
+  width: 100%;
+  position: relative;
+  white-space: nowrap;
 }
-.reason {
+.status__reason {
   padding: 2px;
   padding-left: 4px;
   padding-right: 4px;
@@ -29,7 +25,7 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
-.tooltip {
+.status__tooltip {
   visibility: hidden;
   padding: 5px;
   background-color: var(--vscode-editor-background);
@@ -40,6 +36,6 @@
   z-index: 1;
   top: 100%;
 }
-.reason:hover + .tooltip {
+.status__reason:hover + .status__tooltip {
   visibility: visible;
 }

@@ -120,7 +120,7 @@ export default [
         ],
       }),
       copy({
-        hook: 'writeBundle',
+        hook: 'closeBundle',
         targets: [
           { src: 'log-viewer/out/*', dest: 'lana/out' },
           { src: ['CHANGELOG.md', 'LICENSE.txt', 'README.md'], dest: 'lana' },

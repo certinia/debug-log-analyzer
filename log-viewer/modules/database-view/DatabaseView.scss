@@ -1,0 +1,24 @@
+@import '../datagrid/style/DataGrid.scss';
+
+#db-container {
+  overflow: scroll;
+}
+#db-dml-table,
+#db-soql-table {
+  margin-bottom: 1rem;
+  height: 100%;
+}
+.row__details-container {
+  border-bottom: 2px solid var(--vscode-editorHoverWidget-border);
+  padding: 5px 0px 5px 0px;
+  background-color: var(--vscode-editorHoverWidget-background);
+}
+.group-row {
+  display: flex;
+  min-width: 0;
+}
+.group-row__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

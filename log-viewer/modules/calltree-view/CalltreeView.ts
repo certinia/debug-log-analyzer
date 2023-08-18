@@ -7,8 +7,6 @@
 //todo: add filter on log level (fine, finer etc)
 import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
-import '../../resources/css/DatabaseView.scss';
-import '../../resources/css/TreeView.css';
 import { rootMethod } from '../Main';
 import { showTab } from '../Util';
 import MinMaxEditor from '../datagrid/editors/MinMax';
@@ -18,11 +16,12 @@ import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation'
 import { RowNavigation } from '../datagrid/module/RowNavigation';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
+import './TreeView.scss';
 
 let calltreeTable: Tabulator;
 
 export function initCalltree(rootMethod: RootNode) {
-  const callTreeView = document.getElementById('treeView');
+  const callTreeView = document.getElementById('call-tree-view');
   if (callTreeView) {
     const analysisObserver = new IntersectionObserver((entries, observer) => {
       const visible = entries[0].isIntersecting;
@@ -59,10 +58,10 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
 
     const selfTimeFilterCache = new Map<string, boolean>();
     const totalTimeFilterCache = new Map<string, boolean>();
-    calltreeTable = new Tabulator('#calltreeTable', {
+    calltreeTable = new Tabulator('#call-tree-table', {
       data: toCallTree(rootMethod.children),
       layout: 'fitColumns',
-      placeholder: 'No Calltree Available',
+      placeholder: 'No Call Tree Available',
       columnCalcs: 'both',
       height: '100%',
       maxHeight: '100%',
@@ -232,13 +231,13 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
       });
     });
 
-    document.getElementById('ct-expand')?.addEventListener('click', () => {
+    document.getElementById('call-tree-expand-btn')?.addEventListener('click', () => {
       calltreeTable.blockRedraw();
       expandAll(calltreeTable.getRows());
       calltreeTable.restoreRedraw();
     });
 
-    document.getElementById('ct-collapse')?.addEventListener('click', () => {
+    document.getElementById('call-tree-collapse-btn')?.addEventListener('click', () => {
       calltreeTable.blockRedraw();
       collapseAll(calltreeTable.getRows());
       calltreeTable.restoreRedraw();
@@ -303,7 +302,7 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
 }
 
 export async function goToRow(timestamp: number) {
-  showTab('treeTab');
+  showTab('tree-tab');
   await renderCallTree(rootMethod);
 
   let treeRow: RowComponent | null = null;

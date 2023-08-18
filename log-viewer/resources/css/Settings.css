@@ -1,4 +1,4 @@
-#logSettings {
+#log-settings {
   padding: 10px 0;
   min-height: 27px;
 }
@@ -11,10 +11,10 @@
   margin-right: 5px;
   margin-bottom: 5px;
 }
-.settingTitle {
+.setting__title {
   font-weight: bold;
   margin-right: 2px;
 }
-.settingValue {
+.setting__level {
   color: #808080;
 }

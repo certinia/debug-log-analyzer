@@ -71,19 +71,6 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
   }
 }
 
-#dbContainer {
-  overflow: scroll;
-}
-#dbDmlTable,
-#dbSoqlTable {
-  margin-bottom: 1rem;
-  height: 100%;
-}
-.soqlDBDetailView {
-  border-bottom: 2px solid var(--vscode-editorHoverWidget-border);
-  padding: 5px 0px 5px 0px;
-  background-color: var(--vscode-editorHoverWidget-background);
-}
 .tabulator-tooltip {
   background: var(--vscode-editor-background);
   overflow-wrap: anywhere;
@@ -91,21 +78,12 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
 .tabulator-row.tabulator-selected {
   color: var(--vscode-list-activeSelectionForeground);
 }
-.db-group-wrapper {
-  display: flex;
-  min-width: 0;
-}
-.db-group-title {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-input[type='checkbox'] {
-  vertical-align: middle;
-}
 
 .tabulator-cell.datagrid-textarea {
   white-space: pre-wrap;
   overflow-wrap: break-word;
+}
+
+input[type='checkbox'] {
+  vertical-align: middle;
 }

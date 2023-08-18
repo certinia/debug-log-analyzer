@@ -6,7 +6,6 @@ import {
   TabulatorFull as Tabulator,
 } from 'tabulator-tables';
 
-import '../../resources/css/DatabaseView.scss';
 import { DatabaseAccess } from '../Database';
 import '../components/CallStack';
 import NumberAccessor from '../datagrid/dataaccessor/Number';
@@ -16,10 +15,11 @@ import { RootNode, SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parse
 import { hostService } from '../services/VSCodeService';
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
+import './DatabaseView.scss';
 
 export async function initDBRender(rootMethod: RootNode) {
   await DatabaseAccess.create(rootMethod);
-  const dbView = document.getElementById('dbView');
+  const dbView = document.getElementById('db-view');
   if (dbView) {
     const dbObserver = new IntersectionObserver((entries, observer) => {
       const visible = entries[0].isIntersecting;
@@ -35,27 +35,22 @@ export async function initDBRender(rootMethod: RootNode) {
 }
 
 function renderDMLTable() {
-  const dmlContainer = document.getElementById('dmlTableContainer');
-  if (!dmlContainer) {
+  const dbDmlCounts = document.getElementById('db-dml-counts');
+  if (!dbDmlCounts) {
     return;
   }
   const dmlLines = DatabaseAccess.instance()?.getDMLLines();
-  const dbDmlCounts = document.createElement('div');
   render(
     html`<database-section title="DML Statements" .dbLines=${dmlLines}></database-section>
       <div>
         <strong>Group by</strong>
         <div>
-          <input id="dbdml-groupBy" type="checkbox" checked />
-          <label for="dbdml-groupBy">DML</label>
+          <input id="db-dml-groupby-checkbox" type="checkbox" checked />
+          <label for="db-dml-groupby-checkbox">DML</label>
         </div>
       </div>`,
     dbDmlCounts
   );
-  const dbDmlTable = document.createElement('div');
-  dbDmlTable.id = 'dbDmlTable';
-  dmlContainer.appendChild(dbDmlCounts);
-  dmlContainer.appendChild(dbDmlTable);
 
   let currentSelectedRow: RowComponent | null;
 
@@ -76,7 +71,7 @@ function renderDMLTable() {
     dmlText = sortByFrequency(dmlText);
   }
 
-  const dmlTable = new Tabulator(dbDmlTable, {
+  const dmlTable = new Tabulator('#db-dml-table', {
     clipboard: true,
     downloadEncoder: downlodEncoder('dml.csv'),
     downloadRowRange: 'all',
@@ -105,8 +100,8 @@ function renderDMLTable() {
 
       const newCount = hasDetail ? count - 1 : count;
       return `
-      <div class="db-group-wrapper">
-        <div class="db-group-title" title="${value}">${value}</div><span>(${newCount} DML)</span>
+      <div class="group-row">
+        <div class="group-row__title" title="${value}">${value}</div><span>(${newCount} DML)</span>
       </div>
         `;
     },
@@ -217,36 +212,31 @@ function renderDMLTable() {
   });
 
   // todo: move to a lit element
-  document.getElementById('dbdml-groupBy')?.addEventListener('change', (event) => {
+  document.getElementById('db-dml-groupby-checkbox')?.addEventListener('change', (event) => {
     const checkBox = event.target as HTMLInputElement;
     dmlTable.setGroupBy(checkBox.checked ? 'dml' : '');
   });
 }
 
 function renderSOQLTable() {
-  const soqlContainer = document.getElementById('soqlTableContainer');
-  if (!soqlContainer) {
+  const dbSoqlCounts = document.getElementById('db-soql-counts');
+  if (!dbSoqlCounts) {
     return;
   }
   const soqlLines = DatabaseAccess.instance()?.getSOQLLines();
-  const dbSoqlCounts = document.createElement('div');
   render(
     html`
       <database-section title="SOQL Statements" .dbLines=${soqlLines}></database-section>
       <div>
         <strong>Group by</strong>
         <div>
-          <input id="dbsoql-groupBy" type="checkbox" checked />
-          <label for="dbsoql-groupBy">SOQL</label>
+          <input id="db-soql-groupby-checkbox" type="checkbox" checked />
+          <label for="db-soql-groupby-checkbox">SOQL</label>
         </div>
       </div>
     `,
     dbSoqlCounts
   );
-  const dbSoqlTable = document.createElement('div');
-  dbSoqlTable.id = 'dbSoqlTable';
-  soqlContainer.appendChild(dbSoqlCounts);
-  soqlContainer.appendChild(dbSoqlTable);
 
   const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
   let currentSelectedRow: RowComponent | null;
@@ -286,7 +276,7 @@ function renderSOQLTable() {
     soqlText = sortByFrequency(soqlText);
   }
 
-  const soqlTable = new Tabulator(dbSoqlTable, {
+  const soqlTable = new Tabulator('#db-soql-table', {
     rowKeyboardNavigation: true,
     data: soqlData,
     layout: 'fitColumns',
@@ -498,7 +488,7 @@ function renderSOQLTable() {
   });
 
   // todo: move to a lit element
-  document.getElementById('dbsoql-groupBy')?.addEventListener('change', (event) => {
+  document.getElementById('db-soql-groupby-checkbox')?.addEventListener('change', (event) => {
     const checkBox = event.target as HTMLInputElement;
     soqlTable.setGroupBy(checkBox.checked ? 'soql' : '');
   });
@@ -506,7 +496,7 @@ function renderSOQLTable() {
 
 function createDetailPanel(timestamp: number) {
   const detailContainer = document.createElement('div');
-  detailContainer.className = 'soqlDBDetailView';
+  detailContainer.className = 'row__details-container';
   render(html`<call-stack timestamp=${timestamp}></call-stack>`, detailContainer);
 
   return detailContainer;
@@ -517,7 +507,7 @@ function createSOQLDetailPanel(
   timestampToSOQl: Map<number, SOQLExecuteBeginLine>
 ) {
   const detailContainer = document.createElement('div');
-  detailContainer.className = 'soqlDBDetailView';
+  detailContainer.className = 'row__details-container';
 
   const soqlLine = timestampToSOQl.get(timestamp);
   render(

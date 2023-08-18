@@ -12,17 +12,20 @@ export default function formatDuration(duration: number) {
 }
 
 export function showTab(tabId: string) {
-  const tabHolder = document.querySelector('.tabHolder'),
+  const tabHolder = document.querySelector('.tab-holder'),
     tab = document.getElementById(tabId),
     tabber = document.querySelector('.tabber'),
     show = tab?.dataset.show,
     tabItem = show ? document.getElementById(show) : null;
 
-  tabHolder?.querySelectorAll('.tab').forEach((t) => t.classList.remove('selected'));
-  tab?.classList.add('selected');
-  tabber?.querySelectorAll('.tabItem').forEach((t) => t.classList.remove('selected'));
+  // remove selected from all tabs + select new one
+  tabHolder?.querySelectorAll('.tab').forEach((t) => t.classList.remove('tab--selected'));
+  tab?.classList.add('tab--selected');
+
+  // remove selected from all tab items + select new one
+  tabber?.querySelectorAll('.tab__item').forEach((t) => t.classList.remove('tab__item--selected'));
   if (tabItem) {
-    tabItem.classList.add('selected');
+    tabItem.classList.add('tab__item--selected');
   }
 }
 

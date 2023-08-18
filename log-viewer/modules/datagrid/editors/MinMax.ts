@@ -20,7 +20,7 @@ export default function (
   const start = document.createElement('input');
   start.min = '0';
   start.type = 'number';
-  start.className = 'minMax-input input';
+  start.className = 'min-max__input input';
   start.placeholder = 'Min';
 
   const end = start.cloneNode() as HTMLInputElement;
