@@ -8,7 +8,7 @@ import { hostService } from '../services/VSCodeService';
 import './AnalysisView.scss';
 
 export function initAnalysisRender(rootMethod: RootNode) {
-  const analysisTab = document.getElementById('analysisView');
+  const analysisTab = document.getElementById('analysis-view');
   if (analysisTab) {
     const analysisObserver = new IntersectionObserver((entries, observer) => {
       const visible = entries[0].isIntersecting;
@@ -37,7 +37,7 @@ async function renderAnalysis(rootMethod: RootNode) {
   ];
 
   Tabulator.registerModule(RowKeyboardNavigation);
-  const analysisTable = new Tabulator('#analysisTable', {
+  const analysisTable = new Tabulator('#analysis-table', {
     rowKeyboardNavigation: true,
     selectable: 1,
     data: metricList,
@@ -143,7 +143,7 @@ async function renderAnalysis(rootMethod: RootNode) {
     ],
   });
 
-  document.getElementById('analysis-groupBy')?.addEventListener('change', (event) => {
+  document.getElementById('analysis-groupby-checkbox')?.addEventListener('change', (event) => {
     const checkBox = event.target as HTMLInputElement;
     analysisTable.setGroupBy(checkBox.checked ? 'type' : '');
   });

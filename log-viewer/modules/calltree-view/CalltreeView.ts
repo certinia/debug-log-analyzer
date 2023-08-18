@@ -21,7 +21,9 @@ import './TreeView.scss';
 let calltreeTable: Tabulator;
 
 export function initCalltree(rootMethod: RootNode) {
-  const callTreeView = document.getElementById('treeView');
+  console.debug('init c');
+  const callTreeView = document.getElementById('call-tree-view');
+  console.debug('c', calltreeTable);
   if (callTreeView) {
     const analysisObserver = new IntersectionObserver((entries, observer) => {
       const visible = entries[0].isIntersecting;
@@ -58,10 +60,10 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
 
     const selfTimeFilterCache = new Map<string, boolean>();
     const totalTimeFilterCache = new Map<string, boolean>();
-    calltreeTable = new Tabulator('#calltreeTable', {
+    calltreeTable = new Tabulator('#call-tree-table', {
       data: toCallTree(rootMethod.children),
       layout: 'fitColumns',
-      placeholder: 'No Calltree Available',
+      placeholder: 'No Call Tree Available',
       columnCalcs: 'both',
       height: '100%',
       maxHeight: '100%',
@@ -302,7 +304,7 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
 }
 
 export async function goToRow(timestamp: number) {
-  showTab('treeTab');
+  showTab('tree-tab');
   await renderCallTree(rootMethod);
 
   let treeRow: RowComponent | null = null;

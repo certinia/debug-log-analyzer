@@ -1,16 +1,16 @@
 @import '../datagrid/style/DataGrid.scss';
 
-#calltreeContainer {
-  min-height: 0;
-}
-
-#calltreeTable {
-  height: 100%;
-}
-
-#treeViewContainer {
+#call-tree-container {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
+
+  #call-tree-table-container {
+    min-height: 0;
+  }
+
+  #call-tree-table {
+    height: 100%;
+  }
 }

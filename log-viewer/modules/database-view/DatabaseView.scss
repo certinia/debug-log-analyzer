@@ -1,30 +1,23 @@
 @import '../datagrid/style/DataGrid.scss';
 
-#dbContainer {
+#db-container {
   overflow: scroll;
 }
-#dbDmlTable,
-#dbSoqlTable {
+#db-dml-table,
+#db-soql-table {
   margin-bottom: 1rem;
   height: 100%;
 }
-.soqlDBDetailView {
+.row__details-container {
   border-bottom: 2px solid var(--vscode-editorHoverWidget-border);
   padding: 5px 0px 5px 0px;
   background-color: var(--vscode-editorHoverWidget-background);
 }
-.tabulator-tooltip {
-  background: var(--vscode-editor-background);
-  overflow-wrap: anywhere;
-}
-.tabulator-row.tabulator-selected {
-  color: var(--vscode-list-activeSelectionForeground);
-}
-.db-group-wrapper {
+.group-row {
   display: flex;
   min-width: 0;
 }
-.db-group-title {
+.group-row__title {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

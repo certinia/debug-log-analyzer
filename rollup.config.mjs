@@ -120,7 +120,6 @@ export default [
         ],
       }),
       copy({
-        copyOnce: true,
         hook: 'closeBundle',
         targets: [
           { src: 'log-viewer/out/*', dest: 'lana/out' },

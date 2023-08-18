@@ -37,15 +37,16 @@
     <div id="status" class="statusBar">No log</div>
     <div id="logSettings"></div>
     <div class="tabHolder">
-      <div class="tab selected" id="timelineTab" data-show="timelineView">Timeline</div>
-      <div class="tab" id="treeTab" data-show="treeView">Call Tree</div>
-      <div class="tab" id="analysisTab" data-show="analysisView">Analysis</div>
-      <div class="tab" id="databaseTab" data-show="dbView">Database</div>
+      <div class="tab selected" id="timeline-tab" data-show="timeline-view">Timeline</div>
+      <div class="tab" id="tree-tab" data-show="call-tree-view">Call Tree</div>
+      <div class="tab" id="analysis-tab" data-show="analysis-view">Analysis</div>
+      <div class="tab" id="database-tab" data-show="db-view">Database</div>
       <a class="helpLink" id="helpButton">Help</a>
       <div class="tabPad"></div>
     </div>
+
     <div class="tabber">
-      <div id="timelineView" class="tabItem selected">
+      <div id="timeline-view" class="tabItem selected">
         <div id="tooltip"></div>
         <div id="timelineWrapper">
           <canvas id="timeline"></canvas>
@@ -53,8 +54,8 @@
         <div id="timelineKey"></div>
       </div>
 
-      <div id="treeView" class="tabItem">
-        <div id="treeViewContainer">
+      <div id="call-tree-view" class="tabItem">
+        <div id="call-tree-container">
           <div>
             <strong>Filter</strong>
             <div>
@@ -64,29 +65,35 @@
               <label for="calltree-show-details">Show Details</label>
             </div>
           </div>
-          <div id="calltreeContainer">
-            <div id="calltreeTable"></div>
+          <div id="call-tree-table-container">
+            <div id="call-tree-table"></div>
           </div>
         </div>
       </div>
 
-      <div id="analysisView" class="tabItem">
+      <div id="analysis-view" class="tabItem">
         <div>
           <strong>Group by</strong>
           <div>
-            <input id="analysis-groupBy" type="checkbox" />
-            <label for="analysis-groupBy">Type</label>
+            <input id="analysis-groupby-checkbox" type="checkbox" />
+            <label for="analysis-groupby-checkbox">Type</label>
           </div>
         </div>
-        <div id="analysisContainer">
-          <div id="analysisTable"></div>
+        <div id="analysis-table-container">
+          <div id="analysis-table"></div>
         </div>
       </div>
 
-      <div id="dbView" class="tabItem">
-        <div id="dbContainer">
-          <div id="dmlTableContainer"></div>
-          <div id="soqlTableContainer"></div>
+      <div id="db-view" class="tabItem">
+        <div id="db-container">
+          <div>
+            <div id="db-dml-counts"></div>
+            <div id="db-dml-table"></div>
+          </div>
+          <div>
+            <div id="db-soql-counts"></div>
+            <div id="db-soql-table"></div>
+          </div>
         </div>
       </div>
     </div>
