@@ -694,7 +694,7 @@ function handleScroll(evt: WheelEvent) {
 function onInitTimeline(): void {
   const canvas = document.getElementById('timeline') as HTMLCanvasElement,
     timelineWrapper = document.getElementById('timeline-container');
-  tooltip = document.getElementById('tooltip') as HTMLDivElement;
+  tooltip = document.getElementById('timeline-tooltip') as HTMLDivElement;
 
   if (canvas) {
     canvas.addEventListener('mouseout', onLeaveCanvas);

@@ -21,9 +21,7 @@ import './TreeView.scss';
 let calltreeTable: Tabulator;
 
 export function initCalltree(rootMethod: RootNode) {
-  console.debug('init c');
   const callTreeView = document.getElementById('call-tree-view');
-  console.debug('c', calltreeTable);
   if (callTreeView) {
     const analysisObserver = new IntersectionObserver((entries, observer) => {
       const visible = entries[0].isIntersecting;
@@ -233,13 +231,13 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
       });
     });
 
-    document.getElementById('ct-expand')?.addEventListener('click', () => {
+    document.getElementById('call-tree-expand-btn')?.addEventListener('click', () => {
       calltreeTable.blockRedraw();
       expandAll(calltreeTable.getRows());
       calltreeTable.restoreRedraw();
     });
 
-    document.getElementById('ct-collapse')?.addEventListener('click', () => {
+    document.getElementById('call-tree-collapse-btn')?.addEventListener('click', () => {
       calltreeTable.blockRedraw();
       collapseAll(calltreeTable.getRows());
       calltreeTable.restoreRedraw();
