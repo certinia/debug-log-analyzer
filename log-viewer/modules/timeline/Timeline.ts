@@ -384,7 +384,7 @@ function resizeFont() {
 
 export default async function renderTimeline(rootMethod: RootNode) {
   renderTimelineKey();
-  container = document.getElementById('timelineWrapper') as HTMLDivElement;
+  container = document.getElementById('timeline-container') as HTMLDivElement;
   canvas = document.getElementById('timeline') as HTMLCanvasElement;
   ctx = canvas.getContext('2d'); // can never be null since context (2d) is a supported type.
   timelineRoot = rootMethod;
@@ -418,7 +418,7 @@ function drawTimeLine() {
 }
 
 export function renderTimelineKey() {
-  const keyHolder = document.getElementById('timelineKey') as HTMLDivElement,
+  const keyHolder = document.getElementById('timeline-key') as HTMLDivElement,
     title = document.createElement('span');
 
   title.innerText = '';
@@ -432,7 +432,7 @@ export function renderTimelineKey() {
       title = document.createElement('span');
 
     title.innerText = keyMeta.label;
-    keyEntry.className = 'keyEntry';
+    keyEntry.className = 'timeline-key__entry';
     keyEntry.style.backgroundColor = keyMeta.fillColor;
     keyEntry.style.color = textColor;
     keyEntry.appendChild(title);
@@ -693,7 +693,7 @@ function handleScroll(evt: WheelEvent) {
 
 function onInitTimeline(): void {
   const canvas = document.getElementById('timeline') as HTMLCanvasElement,
-    timelineWrapper = document.getElementById('timelineWrapper');
+    timelineWrapper = document.getElementById('timeline-container');
   tooltip = document.getElementById('tooltip') as HTMLDivElement;
 
   if (canvas) {
