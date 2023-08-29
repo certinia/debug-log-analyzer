@@ -52,7 +52,7 @@ jobs:
     name: Publish pre-release
     needs: check
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'certinia'&& needs.check.outputs.exitstatus == 'continue'
+    if: github.repository_owner == 'certinia' && needs.check.outputs.exitstatus == 'continue'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
