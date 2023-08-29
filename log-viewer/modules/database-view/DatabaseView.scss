@@ -13,11 +13,11 @@
   padding: 5px 0px 5px 0px;
   background-color: var(--vscode-editorHoverWidget-background);
 }
-.group-row {
+.db-group-row {
   display: flex;
   min-width: 0;
 }
-.group-row__title {
+.db-group-row__title {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
