@@ -6,6 +6,7 @@ on:
 jobs:
   imgcmp:
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'certinia'
     permissions:
       contents: write
       pull-requests: write
