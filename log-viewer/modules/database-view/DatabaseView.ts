@@ -100,8 +100,8 @@ function renderDMLTable() {
 
       const newCount = hasDetail ? count - 1 : count;
       return `
-      <div class="group-row">
-        <div class="group-row__title" title="${value}">${value}</div><span>(${newCount} DML)</span>
+      <div class="db-group-row">
+        <div class="db-group-row__title" title="${value}">${value}</div><span>(${newCount} DML)</span>
       </div>
         `;
     },
@@ -305,8 +305,8 @@ function renderSOQLTable() {
 
       const newCount = hasDetail ? count - 1 : count;
       return `
-      <div class="db-group-wrapper">
-        <div class="db-group-title" title="${value}">${value}</div><span>(${newCount} ${
+      <div class="db-group-row">
+        <div class="db-group-row__title" title="${value}">${value}</div><span>(${newCount} ${
         newCount > 1 ? 'Queries' : 'Query'
       })</span>
       </div>`;
