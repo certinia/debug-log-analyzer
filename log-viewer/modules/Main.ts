@@ -67,17 +67,6 @@ async function setStatus(name: string, path: string, status: string, color?: str
   await waitForRender();
 }
 
-let timerText: string, startTime: number;
-
-function timer(text: string) {
-  const time = Date.now();
-  if (timerText) {
-    console.debug(timerText + ' = ' + (time - startTime) + 'ms');
-  }
-  timerText = text;
-  startTime = time;
-}
-
 async function renderLogSettings(logSettings: LogSetting[]) {
   const holder = document.getElementById('log-settings') as HTMLDivElement;
 
@@ -109,22 +98,14 @@ async function displayLog(log: string, name: string, path: string) {
   path = path.trim();
   logSize = log.length;
   await setStatus(name, path, 'Processing...');
-
-  timer('parseLog');
   await Promise.all([renderLogSettings(getLogSettings(log)), parseLog(log)]);
-
-  timer('getRootMethod');
   rootMethod = getRootMethod();
 
+  await Promise.all([setStatus(name, path, 'Rendering...'), renderTimeline(rootMethod)]);
   initDBRender(rootMethod);
   initAnalysisRender(rootMethod);
   initCalltree(rootMethod);
 
-  timer('renderViews');
-  await setStatus(name, path, 'Rendering...');
-  await renderTimeline(rootMethod);
-
-  timer('');
   setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');
 }
 
