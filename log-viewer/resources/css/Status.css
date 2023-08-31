@@ -39,3 +39,18 @@
 .status__reason:hover + .status__tooltip {
   visibility: visible;
 }
+.header {
+  background-color: var(--vscode-tab-activeBackground);
+  box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1) var(--vscode-panelSectionHeader-background);
+}
+.navbar {
+  display: flex;
+  gap: 10px;
+}
+.navbar--right {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  align-items: center;
+  display: flex;
+}
