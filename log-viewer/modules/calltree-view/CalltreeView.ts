@@ -302,7 +302,7 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
 }
 
 export async function goToRow(timestamp: number) {
-  showTab('tree-tab');
+  document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
   await renderCallTree(rootMethod);
 
   let treeRow: RowComponent | null = null;
