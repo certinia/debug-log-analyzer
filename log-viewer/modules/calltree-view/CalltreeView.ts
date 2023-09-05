@@ -8,7 +8,6 @@
 import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
 import { rootMethod } from '../Main';
-import { showTab } from '../Util';
 import MinMaxEditor from '../datagrid/editors/MinMax';
 import MinMaxFilter from '../datagrid/filters/MinMax';
 import NumberFormat from '../datagrid/format/Number';
