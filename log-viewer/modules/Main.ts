@@ -4,14 +4,11 @@
 import { html, render } from 'lit';
 
 import '../modules/app-header/AppHeader';
-import '../resources/css/Settings.css';
-import '../resources/css/Status.css';
 import '../resources/css/Tabber.css';
 import { initAnalysisRender } from './analysis-view/AnalysisView';
 import { initCalltree } from './calltree-view/CalltreeView';
 import { initDBRender } from './database-view/DatabaseView';
 import parseLog, {
-  LogSetting,
   RootNode,
   getLogSettings,
   getRootMethod,
@@ -39,18 +36,13 @@ async function displayLog(log: string, name: string, path: string) {
       detail: { logSettings: getLogSettings(log) },
     })
   );
-
   dispatchLogContextUpdate('Processing...');
 
-  // await waitForRender();
   await Promise.all([waitForRender(), parseLog(log)]);
   rootMethod = getRootMethod();
-
   dispatchLogContextUpdate('Processing...');
 
-  // await waitForRender();
   await Promise.all([waitForRender(), renderTimeline(rootMethod)]);
-  // await renderTimeline(rootMethod);
   initDBRender(rootMethod);
   initAnalysisRender(rootMethod);
   initCalltree(rootMethod);

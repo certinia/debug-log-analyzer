@@ -1,24 +1,3 @@
-.tab-holder {
-  display: flex;
-}
-.tab {
-  display: inline-block;
-  box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1) var(--vscode-panelSectionHeader-background);
-  background-color: var(--vscode-tab-background);
-  color: var(--vscode-tab-inactiveForeground);
-  padding: 5px 10px;
-  cursor: pointer;
-}
-.tab.tab--selected {
-  border-bottom-width: 0;
-  box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1) var(--vscode-panelTitle-activeBorder);
-  background-color: var(--vscode-tab-activeBackground);
-  color: var(--vscode-tab-activeForeground);
-  cursor: default;
-}
-.tab--pad {
-  flex-grow: 1;
-}
 .tabber {
   border-top-width: 0;
   padding-top: 10px;
@@ -33,8 +12,4 @@
 .tab__item.tab__item--selected {
   display: flex;
   flex-direction: column;
-}
-.help__icon {
-  width: 24px;
-  height: 24px;
 }
