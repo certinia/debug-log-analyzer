@@ -20,15 +20,13 @@ import { hostService } from './services/VSCodeService';
 import renderTimeline, { renderTimelineKey, setColors } from './timeline/Timeline';
 
 export let rootMethod: RootNode;
-let name = '',
-  path: string,
-  logSize: number,
-  logUri: string;
+
+let logName: string, logPath: string, logSize: number, logUri: string;
 
 // todo: move to a lit component + remove need for event dispatching
 async function displayLog(log: string, name: string, path: string) {
-  name = name.trim();
-  path = path.trim();
+  logName = name.trim();
+  logPath = path.trim();
   logSize = log.length;
 
   document.dispatchEvent(
@@ -56,8 +54,8 @@ async function waitForRender() {
 }
 
 function readLog() {
-  name = document.getElementById('LOG_FILE_NAME')?.innerHTML || '';
-  path = document.getElementById('LOG_FILE_PATH')?.innerHTML || '';
+  logName = document.getElementById('LOG_FILE_NAME')?.innerHTML || '';
+  logPath = document.getElementById('LOG_FILE_PATH')?.innerHTML || '';
   logUri = document.getElementById('LOG_FILE_URI')?.innerHTML || '';
 
   dispatchLogContextUpdate('Processing...');
@@ -72,7 +70,7 @@ function readLog() {
         }
       })
       .then((data) => {
-        displayLog(data ?? '', name ?? '', path ?? '');
+        displayLog(data ?? '', logName ?? '', logPath ?? '');
       })
       .catch((err: unknown) => {
         let msg;
@@ -112,8 +110,8 @@ function dispatchLogContextUpdate(status: string): void {
   document.dispatchEvent(
     new CustomEvent('logcontext', {
       detail: {
-        name: name,
-        path: path,
+        name: logName,
+        path: logPath,
         uri: logUri,
         size: logSize,
         duration: totalDuration,
