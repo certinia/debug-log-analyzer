@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2022 Certinia Inc. All rights reserved.
+ */
 import { ColumnComponent, RowComponent } from 'tabulator-tables';
 
 export default function (

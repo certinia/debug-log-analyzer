@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2022 Certinia Inc. All rights reserved.
+ */
 import { KeybindingsModule, Module, RowComponent, Tabulator } from 'tabulator-tables';
 
 // todo: make this generic and support opening grouped rows too then use on DB view.

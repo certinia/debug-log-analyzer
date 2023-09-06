@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2022 Certinia Inc. All rights reserved.
+ */
 import { html, render } from 'lit';
 import {
   ColumnComponent,

@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2022 Certinia Inc. All rights reserved.
+ */
 // todo: add breakcrumbs back? - I will do this but in a later PR + better
 //
 //todo: ** future **
@@ -8,7 +11,6 @@
 import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
 import { rootMethod } from '../Main';
-import { showTab } from '../Util';
 import MinMaxEditor from '../datagrid/editors/MinMax';
 import MinMaxFilter from '../datagrid/filters/MinMax';
 import NumberFormat from '../datagrid/format/Number';
@@ -302,7 +304,7 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
 }
 
 export async function goToRow(timestamp: number) {
-  showTab('tree-tab');
+  document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
   await renderCallTree(rootMethod);
 
   let treeRow: RowComponent | null = null;

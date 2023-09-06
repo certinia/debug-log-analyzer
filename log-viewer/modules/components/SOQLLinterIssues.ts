@@ -19,24 +19,22 @@ export class SOQLLinterIssues extends LitElement {
   @state()
   issues: SOQLLinterRule[] = [];
 
-  static get styles() {
-    return css`
-      :host {
-        flex: 1;
-        max-height: 30vh;
-        overflow-y: scroll;
-        padding: 0px 5px 0px 5px;
-      }
-      .title {
-        font-weight: bold;
-      }
-      details {
-        margin-bottom: 0.25em;
-        overflow-wrap: anywhere;
-        white-space: normal;
-      }
-    `;
-  }
+  static styles = css`
+    :host {
+      flex: 1;
+      max-height: 30vh;
+      overflow-y: scroll;
+      padding: 0px 5px 0px 5px;
+    }
+    .title {
+      font-weight: bold;
+    }
+    details {
+      margin-bottom: 0.25em;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+  `;
 
   updated(changedProperties: PropertyValues): void {
     if (changedProperties.has('soql')) {

@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2022 Certinia Inc. All rights reserved.
+ */
 import { Stack } from '../Database';
 import { SOQLParser, SOQLTree } from '../parsers/SOQLParser';
 

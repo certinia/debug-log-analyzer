@@ -13,35 +13,33 @@ export class CallStack extends LitElement {
   @property({ type: Number })
   timestamp = -1;
 
-  static get styles() {
-    return css`
-      :host {
-        flex: 1;
-        overflow-y: scroll;
-        min-width: 0%;
-        max-height: 30vh;
-        padding: 0px 5px 0px 5px;
-      }
-      a {
-        color: var(--vscode-textLink-foreground);
-        text-decoration: underline;
-      }
+  static styles = css`
+    :host {
+      flex: 1;
+      overflow-y: scroll;
+      min-width: 0%;
+      max-height: 30vh;
+      padding: 0px 5px 0px 5px;
+    }
+    a {
+      color: var(--vscode-textLink-foreground);
+      text-decoration: underline;
+    }
 
-      .stackEntry {
-        cursor: pointer;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
+    .stackEntry {
+      cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
 
-      .dbLinkContainer {
-        display: flex;
-      }
+    .dbLinkContainer {
+      display: flex;
+    }
 
-      .title {
-        font-weight: bold;
-      }
-    `;
-  }
+    .title {
+      font-weight: bold;
+    }
+  `;
 
   render() {
     const htmlTitle = html`<span class="title">Callstack</span>`;

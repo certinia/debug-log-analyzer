@@ -1,15 +1,14 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import '../resources/css/Settings.css';
-import '../resources/css/Status.css';
+import { html, render } from 'lit';
+
+import '../modules/app-header/AppHeader';
 import '../resources/css/Tabber.css';
-import { showTab } from './Util';
 import { initAnalysisRender } from './analysis-view/AnalysisView';
 import { initCalltree } from './calltree-view/CalltreeView';
 import { initDBRender } from './database-view/DatabaseView';
 import parseLog, {
-  LogSetting,
   RootNode,
   getLogSettings,
   getRootMethod,
@@ -20,112 +19,33 @@ import parseLog, {
 import { hostService } from './services/VSCodeService';
 import renderTimeline, { renderTimelineKey, setColors } from './timeline/Timeline';
 
-let logSize: number;
 export let rootMethod: RootNode;
 
-async function setStatus(name: string, path: string, status: string, color?: string) {
-  const statusHolder = document.getElementById('status') as HTMLDivElement,
-    nameSpan = document.createElement('span'),
-    nameLink = document.createElement('a'),
-    statusSpan = document.createElement('span'),
-    sizeText = logSize ? (logSize / 1000000).toFixed(2) + ' MB' : '',
-    elapsedText = totalDuration ? (totalDuration / 1000000000).toFixed(3) + ' Sec' : '',
-    infoSep = sizeText && elapsedText ? ', ' : '',
-    infoText = sizeText || elapsedText ? '\xA0(' + sizeText + infoSep + elapsedText + ')' : '';
+let logName: string, logPath: string, logSize: number, logUri: string;
 
-  nameLink.setAttribute('href', '#');
-  nameLink.appendChild(document.createTextNode(name));
-  nameLink.addEventListener('click', () => hostService().openPath(path));
-  nameSpan.appendChild(nameLink);
-  nameSpan.appendChild(document.createTextNode(infoText + '\xA0-\xA0'));
-
-  statusSpan.innerText = status;
-  if (color) {
-    statusSpan.style.color = color;
-  }
-
-  statusHolder.innerHTML = '';
-  statusHolder.appendChild(nameSpan);
-  statusHolder.appendChild(statusSpan);
-
-  if (Array.isArray(truncated)) {
-    truncated.forEach((entry) => {
-      const reasonSpan = document.createElement('span');
-
-      reasonSpan.innerText = entry.reason;
-      reasonSpan.className = 'status__reason';
-      reasonSpan.style.backgroundColor = entry.color;
-
-      const tooltipSpan = document.createElement('span');
-      tooltipSpan.className = 'status__tooltip';
-      tooltipSpan.innerText = entry.reason;
-
-      statusHolder.appendChild(reasonSpan);
-      statusHolder.appendChild(tooltipSpan);
-    });
-  }
-  await waitForRender();
-}
-
-let timerText: string, startTime: number;
-
-function timer(text: string) {
-  const time = Date.now();
-  if (timerText) {
-    console.debug(timerText + ' = ' + (time - startTime) + 'ms');
-  }
-  timerText = text;
-  startTime = time;
-}
-
-async function renderLogSettings(logSettings: LogSetting[]) {
-  const holder = document.getElementById('log-settings') as HTMLDivElement;
-
-  holder.innerHTML = '';
-  const fragment = document.createDocumentFragment();
-  for (const { key, level } of logSettings) {
-    if (level !== 'NONE') {
-      const setting = document.createElement('div'),
-        title = document.createElement('span'),
-        value = document.createElement('span');
-
-      setting.className = 'setting';
-      title.innerText = key + ':';
-      title.className = 'setting__title';
-      value.innerText = level;
-      value.className = 'setting__level';
-
-      setting.appendChild(title);
-      setting.appendChild(value);
-      fragment.appendChild(setting);
-    }
-  }
-
-  holder.appendChild(fragment);
-}
-
+// todo: move to a lit component + remove need for event dispatching
 async function displayLog(log: string, name: string, path: string) {
-  name = name.trim();
-  path = path.trim();
+  logName = name.trim();
+  logPath = path.trim();
   logSize = log.length;
-  await setStatus(name, path, 'Processing...');
 
-  timer('parseLog');
-  await Promise.all([renderLogSettings(getLogSettings(log)), parseLog(log)]);
+  document.dispatchEvent(
+    new CustomEvent('logsettings', {
+      detail: { logSettings: getLogSettings(log) },
+    })
+  );
+  dispatchLogContextUpdate('Processing...');
 
-  timer('getRootMethod');
+  await Promise.all([waitForRender(), parseLog(log)]);
   rootMethod = getRootMethod();
+  dispatchLogContextUpdate('Processing...');
 
+  await Promise.all([waitForRender(), renderTimeline(rootMethod)]);
   initDBRender(rootMethod);
   initAnalysisRender(rootMethod);
   initCalltree(rootMethod);
 
-  timer('renderViews');
-  await setStatus(name, path, 'Rendering...');
-  await renderTimeline(rootMethod);
-
-  timer('');
-  setStatus(name, path, 'Ready', truncated.length > 0 ? 'red' : 'green');
+  dispatchLogContextUpdate('Ready');
 }
 
 async function waitForRender() {
@@ -134,9 +54,11 @@ async function waitForRender() {
 }
 
 function readLog() {
-  const name = document.getElementById('LOG_FILE_NAME')?.innerHTML;
-  const path = document.getElementById('LOG_FILE_PATH')?.innerHTML;
-  const logUri = document.getElementById('LOG_FILE_URI')?.innerHTML;
+  logName = document.getElementById('LOG_FILE_NAME')?.innerHTML || '';
+  logPath = document.getElementById('LOG_FILE_PATH')?.innerHTML || '';
+  logUri = document.getElementById('LOG_FILE_URI')?.innerHTML || '';
+
+  dispatchLogContextUpdate('Processing...');
 
   if (logUri) {
     fetch(logUri)
@@ -148,7 +70,7 @@ function readLog() {
         }
       })
       .then((data) => {
-        displayLog(data ?? '', name ?? '', path ?? '');
+        displayLog(data ?? '', logName ?? '', logPath ?? '');
       })
       .catch((err: unknown) => {
         let msg;
@@ -160,14 +82,8 @@ function readLog() {
         msg = `Could not read log: ${msg}`;
 
         truncateLog(0, msg, 'error');
-        setStatus(name || '', path || '', 'Ready', 'red');
       });
   }
-}
-
-function onTabSelect(evt: Event) {
-  const input = evt.target as HTMLElement;
-  showTab(input.id);
 }
 
 function handleMessage(evt: MessageEvent) {
@@ -183,16 +99,27 @@ function handleMessage(evt: MessageEvent) {
 }
 
 function onInit(): void {
-  const tabHolder = document.querySelector('.tab-holder');
-  tabHolder?.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', onTabSelect));
-
-  const helpButton = document.querySelector('.help__link');
-  if (helpButton) {
-    helpButton.addEventListener('click', () => hostService().openHelp());
-  }
+  const headerWrapper = document.getElementById('header-wrapper');
+  headerWrapper && render(html`<app-header></app-header>`, headerWrapper);
 
   hostService().getConfig();
   readLog();
+}
+
+function dispatchLogContextUpdate(status: string): void {
+  document.dispatchEvent(
+    new CustomEvent('logcontext', {
+      detail: {
+        name: logName,
+        path: logPath,
+        uri: logUri,
+        size: logSize,
+        duration: totalDuration,
+        status: status,
+        truncated: truncated,
+      },
+    })
+  );
 }
 
 window.addEventListener('DOMContentLoaded', onInit);
