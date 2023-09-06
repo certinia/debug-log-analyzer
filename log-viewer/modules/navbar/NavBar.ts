@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 Certinia Inc. All rights reserved.
+ * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
 import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-toolkit';
 import { LitElement, TemplateResult, css, html } from 'lit';

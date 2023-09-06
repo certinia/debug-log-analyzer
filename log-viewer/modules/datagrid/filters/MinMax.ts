@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2022 Certinia Inc. All rights reserved.
+ */
+
 export default function (
   filterVal: any,
   rowVal: any,

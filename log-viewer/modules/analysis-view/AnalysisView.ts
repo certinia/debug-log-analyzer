@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2022 Certinia Inc. All rights reserved.
+ */
 import { ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
 import NumberAccessor from '../datagrid/dataaccessor/Number';
