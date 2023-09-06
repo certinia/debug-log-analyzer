@@ -1,3 +1,5 @@
+<!-- DO NOT REMOVE: this makes the title from config work correctly. -->
+
 ## WARNING
 
 > In general set the `APEX_CODE` debug flag to be `FINE` or higher, with a lower level the log will likely not contain enough detail for meaningful analysis.
