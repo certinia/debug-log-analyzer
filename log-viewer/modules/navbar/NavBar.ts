@@ -30,70 +30,69 @@ export class NavBar extends LitElement {
   @property()
   truncated: TruncationEntry[] = [];
 
-  static get styles() {
-    return css`
-      :host {
-      }
+  static styles = css`
+    :host {
+    }
 
-      .navbar {
-        display: flex;
-        gap: 10px;
-      }
-      .navbar--right {
-        display: flex;
-        flex: 1 1 auto;
-        justify-content: flex-end;
-        align-items: center;
-        display: flex;
-      }
+    .navbar {
+      display: flex;
+      gap: 10px;
+    }
+    .navbar--right {
+      display: flex;
+      flex: 1 1 auto;
+      justify-content: flex-end;
+      align-items: center;
+      display: flex;
+    }
 
-      #status {
-        align-items: center;
-        font-size: 1.1em;
-        margin-bottom: 5px;
-        margin-top: 5px;
-      }
-      .status__bar {
-        margin-top: 10px;
-        display: flex;
-        width: 100%;
-        position: relative;
-        white-space: nowrap;
-      }
-      .status__reason {
-        padding: 2px;
-        padding-left: 4px;
-        padding-right: 4px;
-        margin-left: 5px;
-        min-width: 13ch;
-        text-overflow: ellipsis;
-        white-space: normal;
-        word-break: break-word;
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-      }
-      .status__tooltip {
-        visibility: hidden;
-        padding: 5px;
-        background-color: var(--vscode-editor-background);
-        color: var(--vscode-editor-foreground);
-        word-break: break-word;
-        white-space: normal;
-        position: absolute;
-        z-index: 1;
-        top: 100%;
-      }
-      .status__reason:hover + .status__tooltip {
-        visibility: visible;
-      }
-      a {
-        color: var(--vscode-textLink-foreground);
-        text-decoration: underline;
-      }
-    `;
-  }
+    #status {
+      align-items: center;
+      font-size: 1.1em;
+      margin-bottom: 5px;
+      margin-top: 5px;
+    }
+    .status__bar {
+      margin-top: 10px;
+      display: flex;
+      width: 100%;
+      position: relative;
+      white-space: nowrap;
+    }
+    .status__reason {
+      padding: 2px;
+      padding-left: 4px;
+      padding-right: 4px;
+      margin-left: 5px;
+      min-width: 13ch;
+      text-overflow: ellipsis;
+      white-space: normal;
+      word-break: break-word;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+    }
+    .status__tooltip {
+      visibility: hidden;
+      padding: 5px;
+      background-color: var(--vscode-editor-background);
+      color: var(--vscode-editor-foreground);
+      word-break: break-word;
+      white-space: normal;
+      position: absolute;
+      z-index: 1;
+      top: 100%;
+    }
+    .status__reason:hover + .status__tooltip {
+      visibility: visible;
+    }
+    a {
+      color: var(--vscode-textLink-foreground);
+      text-decoration: underline;
+    }
+  `;
+
   render() {
     const sizeText = this.logSize ? (this.logSize / 1000000).toFixed(2) + ' MB' : '',
       elapsedText = this.logDuration ? (this.logDuration / 1000000000).toFixed(3) + ' Sec' : '',

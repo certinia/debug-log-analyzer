@@ -18,30 +18,29 @@ export class LogLevels extends LitElement {
     });
   }
 
-  static get styles() {
-    return css`
-      :host {
-        padding: 10px 0;
-        min-height: 27px;
-      }
-      .setting {
-        display: inline-block;
-        font-family: var(--vscode-editor-font-family);
-        background-color: var(--vscode-textBlockQuote-background);
-        font-size: 0.9em;
-        padding: 5px;
-        margin-right: 5px;
-        margin-bottom: 5px;
-      }
-      .setting__title {
-        font-weight: bold;
-        margin-right: 2px;
-      }
-      .setting__level {
-        color: #808080;
-      }
-    `;
-  }
+  static styles = css`
+    :host {
+      padding: 10px 0;
+      min-height: 27px;
+    }
+    .setting {
+      display: inline-block;
+      font-family: var(--vscode-editor-font-family);
+      background-color: var(--vscode-textBlockQuote-background);
+      font-size: 0.9em;
+      padding: 5px;
+      margin-right: 5px;
+      margin-bottom: 5px;
+    }
+    .setting__title {
+      font-weight: bold;
+      margin-right: 2px;
+    }
+    .setting__level {
+      color: #808080;
+    }
+  `;
+
   render() {
     const logLevels = [];
     for (const { key, level } of this.logSettings) {
