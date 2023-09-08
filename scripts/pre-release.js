@@ -7,7 +7,7 @@ const today = new Date();
 const preReleaseTag = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(
   2,
   '0'
-)}${today.getDate()}`;
+)}${String(today.getDate()).padStart(2, '0')}`;
 
 // eslint-disable-next-line
 const packageJSON = require('../lana/package.json');
