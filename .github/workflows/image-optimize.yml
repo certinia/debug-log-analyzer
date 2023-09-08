@@ -1,16 +1,16 @@
 name: Optimize Images
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - '**.jpg'
       - '**.jpeg'
       - '**.png'
       - '**.webp'
+  workflow_dispatch:
+
 jobs:
-  build:
-    name: calibreapp/image-actions
+  image-actions:
     if: github.repository_owner == 'certinia'
     runs-on: ubuntu-latest
     steps:
