@@ -48,42 +48,48 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
       background-color: unset;
     }
   }
-}
 
-.tabulator-row {
-  background-color: unset;
-  .tabulator-row-even {
+  .tabulator-row {
     background-color: unset;
-  }
+    .tabulator-row-even {
+      background-color: unset;
+    }
 
-  &.tabulator-group {
-    background: unset;
-    border-bottom: unset;
-    border-right: unset;
-    border-top: unset;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: flex;
-    &:hover {
-      background-color: $rowHoverBackground;
+    &.tabulator-group {
+      background: unset;
+      border-bottom: unset;
+      border-right: unset;
+      border-top: unset;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      &:hover {
+        background-color: $rowHoverBackground;
+      }
     }
   }
-}
 
-.tabulator-tooltip {
-  background: var(--vscode-editor-background);
-  overflow-wrap: anywhere;
-}
-.tabulator-row.tabulator-selected {
-  color: var(--vscode-list-activeSelectionForeground);
-}
+  .datagrid-code-text {
+    font-family: monospace;
+    font-weight: var(--vscode-font-weight, normal);
+    font-size: var(--vscode-editor-font-size, 0.9em);
+  }
 
-.tabulator-cell.datagrid-textarea {
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-}
+  .tabulator-tooltip {
+    background: var(--vscode-editor-background);
+    overflow-wrap: anywhere;
+  }
+  .tabulator-row.tabulator-selected {
+    color: var(--vscode-list-activeSelectionForeground);
+  }
 
-input[type='checkbox'] {
-  vertical-align: middle;
+  .tabulator-cell.datagrid-textarea {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+
+  input[type='checkbox'] {
+    vertical-align: middle;
+  }
 }

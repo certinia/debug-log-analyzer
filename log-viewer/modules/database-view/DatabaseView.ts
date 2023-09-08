@@ -134,6 +134,7 @@ function renderDMLTable() {
         bottomCalc: () => {
           return 'Total';
         },
+        cssClass: 'datagrid-code-text',
       },
       {
         title: 'Row Count',
@@ -401,6 +402,7 @@ function renderSOQLTable() {
         bottomCalc: () => {
           return 'Total';
         },
+        cssClass: 'datagrid-code-text',
       },
       {
         title: 'Row Count',
