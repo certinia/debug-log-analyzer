@@ -21,9 +21,21 @@ export class CallStack extends LitElement {
       max-height: 30vh;
       padding: 0px 5px 0px 5px;
     }
+
     a {
       color: var(--vscode-textLink-foreground);
-      text-decoration: underline;
+      text-decoration: none;
+      cursor: pointer;
+
+      :hover {
+        color: var(--vscode-textLink-activeForeground);
+        text-decoration: underline;
+      }
+
+      :active {
+        background: transparent;
+        color: var(--vscode-textLink-activeForeground);
+      }
     }
 
     .stackEntry {
@@ -38,6 +50,12 @@ export class CallStack extends LitElement {
 
     .title {
       font-weight: bold;
+    }
+
+    .code-text {
+      font-family: monospace;
+      font-weight: var(--vscode-font-weight, normal);
+      font-size: var(--vscode-editor-font-size, 0.9em);
     }
   `;
 
@@ -55,7 +73,10 @@ export class CallStack extends LitElement {
 
   private lineLink(line: LogLine) {
     return html`<div class="dbLinkContainer" title="${line.text}">
-      <a @click=${this.onCallerClick} class="stackEntry" data-timestamp="${line.timestamp}"
+      <a
+        @click=${this.onCallerClick}
+        class="stackEntry code-text"
+        data-timestamp="${line.timestamp}"
         >${line.text}</a
       >
     </div> `;

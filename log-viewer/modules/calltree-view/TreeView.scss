@@ -13,4 +13,20 @@
   #call-tree-table {
     height: 100%;
   }
+
+  a {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--vscode-textLink-activeForeground);
+      text-decoration: underline;
+    }
+
+    &:active {
+      background: transparent;
+      color: var(--vscode-textLink-activeForeground);
+    }
+  }
 }

@@ -87,10 +87,9 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
           bottomCalc: () => {
             return 'Total';
           },
+          cssClass: 'datagrid-textarea datagrid-code-text',
           formatter: (cell, _formatterParams, _onRendered) => {
             const cellElem = cell.getElement();
-            cellElem.classList.add('datagrid-textarea');
-
             const row = cell.getRow();
             // @ts-expect-error: _row is private. This is temporary and I will patch the text wrap behaviour in the library.
             const treeLevel = row._row.modules.dataTree.index;

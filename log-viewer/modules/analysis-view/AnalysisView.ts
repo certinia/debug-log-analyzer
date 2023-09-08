@@ -87,6 +87,7 @@ async function renderAnalysis(rootMethod: RootNode) {
         headerSortStartingDir: 'asc',
         sorter: 'string',
         tooltip: true,
+        cssClass: 'datagrid-code-text',
         bottomCalc: () => {
           return 'Total';
         },
@@ -99,6 +100,7 @@ async function renderAnalysis(rootMethod: RootNode) {
         width: 150,
         sorter: 'string',
         tooltip: true,
+        cssClass: 'datagrid-code-text',
       },
       {
         title: 'Count',

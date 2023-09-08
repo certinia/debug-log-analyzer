@@ -1,14 +1,14 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-toolkit';
+import { provideVSCodeDesignSystem, vsCodeButton, vsCodeLink } from '@vscode/webview-ui-toolkit';
 import { LitElement, TemplateResult, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { TruncationEntry } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 
-provideVSCodeDesignSystem().register(vsCodeButton());
+provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeLink());
 
 @customElement('nav-bar')
 export class NavBar extends LitElement {
@@ -87,9 +87,21 @@ export class NavBar extends LitElement {
     .status__reason:hover + .status__tooltip {
       visibility: visible;
     }
+
     a {
       color: var(--vscode-textLink-foreground);
-      text-decoration: underline;
+      text-decoration: none;
+      cursor: pointer;
+
+      &:hover {
+        color: var(--vscode-textLink-activeForeground);
+        text-decoration: underline;
+      }
+
+      &:active {
+        background: transparent;
+        color: var(--vscode-textLink-activeForeground);
+      }
     }
   `;
 
@@ -113,7 +125,7 @@ export class NavBar extends LitElement {
       <div class="navbar">
         <div class="navbar--left">
           <div id="status" class="status__bar">
-            <span><a href="#" @click="${this._goToLog}">${this.logName}</a></span>
+            <a href="#" @click="${this._goToLog}">${this.logName}</a>
             <span>&nbsp${infoText}</span>
             <span>&nbsp- <span style="color:${statusColor}">${this.logStatus}</span></span>
             ${html`${messages}`}
