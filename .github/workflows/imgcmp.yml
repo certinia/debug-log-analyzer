@@ -1,0 +1,17 @@
+name: Optimize Images
+on:
+  push:
+    branches:
+      - main
+jobs:
+  imgcmp:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'certinia'
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: 9sako6/imgcmp@v2.0.4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          paths-ignore-regexp: 'node_modules/.*'
