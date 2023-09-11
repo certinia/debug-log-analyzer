@@ -31,6 +31,7 @@ export class LogTitle extends LitElement {
       background: var(--button-icon-background, rgba(90, 93, 94, 0.31));
       border-radius: var(--button-icon-corner-radius, 5px);
       font-weight: var(--text-weight-semibold, 600);
+      font-size: 1.1em;
     }
     a {
       color: inherit;
