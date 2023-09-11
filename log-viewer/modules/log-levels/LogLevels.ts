@@ -34,7 +34,6 @@ export class LogLevels extends LitElement {
     }
     .setting__title {
       font-weight: bold;
-      margin-right: 2px;
     }
     .setting__level {
       color: #808080;
