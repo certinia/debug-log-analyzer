@@ -24,6 +24,7 @@ export class LogTitle extends LitElement {
       --text-weight-semibold: 600;
       display: flex;
       align-items: center;
+      min-width: 0;
     }
     .title-item {
       padding-block: 6px;
@@ -32,6 +33,8 @@ export class LogTitle extends LitElement {
       border-radius: var(--button-icon-corner-radius, 5px);
       font-weight: var(--text-weight-semibold, 600);
       font-size: 1.1rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     a {
       color: inherit;
