@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-toolkit';
+import { provideVSCodeDesignSystem, vsCodeButton, vsCodeTag } from '@vscode/webview-ui-toolkit';
 import { LitElement, TemplateResult, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
@@ -9,7 +9,7 @@ import '../components/LogTitle';
 import { TruncationEntry } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 
-provideVSCodeDesignSystem().register(vsCodeButton());
+provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeTag());
 
 @customElement('nav-bar')
 export class NavBar extends LitElement {
@@ -57,9 +57,10 @@ export class NavBar extends LitElement {
 
     #status {
       align-items: center;
-      font-size: 1.1em;
+      font-size: 1rem;
       margin-bottom: 5px;
       margin-top: 5px;
+      gap: 5px;
     }
     .status__bar {
       display: flex;
@@ -80,6 +81,7 @@ export class NavBar extends LitElement {
       display: -webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
+      min-width: 0;
     }
     .status__tooltip {
       visibility: hidden;
@@ -111,13 +113,33 @@ export class NavBar extends LitElement {
         color: var(--vscode-textLink-activeForeground);
       }
     }
+
+    .status-tag {
+      font-family: monospace;
+      font-size: inherit;
+    }
+
+    .status-tag::part(control) {
+      background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
+      text-transform: inherit;
+    }
+
+    .success-tag::part(control) {
+      background-color: rgba(128, 255, 128, 0.2);
+    }
+
+    .failure-tag::part(control) {
+      background-color: rgba(255, 128, 128, 0.2);
+    }
+
+    .error-list {
+      display: flex;
+    }
   `;
 
   render() {
     const sizeText = this.logSize ? (this.logSize / 1000000).toFixed(2) + ' MB' : '',
-      elapsedText = this.logDuration ? (this.logDuration / 1000000000).toFixed(3) + ' Sec' : '',
-      infoSep = sizeText && elapsedText ? ', ' : '',
-      infoText = sizeText || elapsedText ? '(' + sizeText + infoSep + elapsedText + ')' : '';
+      elapsedText = this._toDuration(this.logDuration);
 
     const messages: TemplateResult[] = [];
     this.truncated.forEach((item) => {
@@ -126,17 +148,22 @@ export class NavBar extends LitElement {
         ><span class="status__tooltip">${item.reason}</span>`);
     });
 
-    const statusColor =
-      this.truncated.length > 0 ? 'red' : this.logStatus !== 'Processing...' ? 'green' : '';
+    const statusClass =
+      this.truncated.length > 0
+        ? 'failure-tag'
+        : this.logStatus !== 'Processing...'
+        ? 'success-tag'
+        : '';
 
     return html`
       <div class="navbar">
         <div class="navbar--left">
-          <log-title logName="${this.logName}" logPath="${this.logPath}"></log-title>
           <div id="status" class="status__bar">
-            <span>&nbsp${infoText}</span>
-            <span>&nbsp- <span style="color:${statusColor}">${this.logStatus}</span></span>
-            ${html`${messages}`}
+            <log-title logName="${this.logName}" logPath="${this.logPath}"></log-title>
+            <vscode-tag class="status-tag">${sizeText}</vscode-tag>
+            <vscode-tag class="status-tag">${elapsedText}</vscode-tag>
+            <vscode-tag class="status-tag ${statusClass}">${this.logStatus}</vscode-tag>
+            <div class="error-list">${html`${messages}`}</div>
           </div>
         </div>
         <div class="navbar--right">
@@ -171,5 +198,13 @@ export class NavBar extends LitElement {
 
   _goToLog() {
     hostService().openPath(this.logPath);
+  }
+
+  _toDuration(duration: number | null) {
+    if (!duration && duration !== 0) {
+      return '';
+    }
+
+    return (duration / 1_000_000_000).toFixed(3) + 's';
   }
 }

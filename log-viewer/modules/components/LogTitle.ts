@@ -24,6 +24,7 @@ export class LogTitle extends LitElement {
       --text-weight-semibold: 600;
       display: flex;
       align-items: center;
+      min-width: 0;
     }
     .title-item {
       padding-block: 6px;
@@ -31,7 +32,9 @@ export class LogTitle extends LitElement {
       background: var(--button-icon-background, rgba(90, 93, 94, 0.31));
       border-radius: var(--button-icon-corner-radius, 5px);
       font-weight: var(--text-weight-semibold, 600);
-      font-size: 1.1em;
+      font-size: 1.1rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     a {
       color: inherit;
@@ -49,7 +52,9 @@ export class LogTitle extends LitElement {
   `;
 
   render() {
-    return html`<a class="title-item" href="#" @click="${this._goToLog}">${this.logName}</a>`;
+    return html`<a class="title-item" href="#" @click="${this._goToLog}" title="${this.logPath}"
+      >${this.logName}</a
+    >`;
   }
 
   _goToLog() {
