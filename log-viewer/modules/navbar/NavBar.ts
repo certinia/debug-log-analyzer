@@ -200,7 +200,6 @@ export class NavBar extends LitElement {
       return '';
     }
 
-    const secondText = (duration / 1000000000).toFixed(3);
-    return secondText.replace('.', 's ') + 'ms';
+    return (duration / 1_000_000_000).toFixed(3) + 's';
   }
 }
