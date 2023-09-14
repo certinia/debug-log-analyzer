@@ -32,16 +32,16 @@ export class NotificationPanel extends LitElement {
     }
     .container {
       position: absolute;
-      min-height: 300px;
       background-color: var(--vscode-editor-background);
-      max-width: 30%;
-      width: 30%;
+      max-height: 540px;
+      width: 320px;
       z-index: 999;
       right: 12px;
       padding: 8px 5px 8px 5px;
       border: calc(var(--border-width) * 1px) solid var(--vscode-panel-border);
       box-shadow: rgba(0, 0, 0, 0.5) 0px 4px 20px;
-      border-radius: 12px;
+      border-radius: 4px;
+      overflow: scroll;
     }
 
     .closed {
@@ -49,29 +49,7 @@ export class NotificationPanel extends LitElement {
     }
     .status__reason {
       padding: 4px;
-      min-width: 13ch;
-      text-overflow: ellipsis;
-      white-space: normal;
-      word-break: break-word;
-      overflow: hidden;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      min-width: 0;
-    }
-    .status__tooltip {
-      visibility: hidden;
-      padding: 5px;
-      background-color: var(--vscode-editor-background);
-      color: var(--vscode-editor-foreground);
-      word-break: break-word;
-      white-space: normal;
-      position: absolute;
-      z-index: 1;
-      top: 100%;
-    }
-    .status__reason:hover + .status__tooltip {
-      visibility: visible;
+      overflow-wrap: anywhere;
     }
     .error-list {
       display: flex;
@@ -106,7 +84,6 @@ export class NotificationPanel extends LitElement {
 
     .no-messages {
       display: flex;
-
       justify-content: center;
     }
   `;
@@ -161,7 +138,6 @@ export class NotificationPanel extends LitElement {
   }
 
   _toggleNotifications() {
-    console.debug('cc', this.open, !!this.open);
     this.open = !this.open;
   }
 }
