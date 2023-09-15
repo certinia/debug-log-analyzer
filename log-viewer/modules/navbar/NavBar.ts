@@ -39,7 +39,7 @@ export class NavBar extends LitElement {
     }
 
     .navbar {
-      margin-top: 10px;
+      padding-top: 4px;
       display: flex;
       gap: 10px;
     }
@@ -60,8 +60,7 @@ export class NavBar extends LitElement {
     #status {
       align-items: center;
       font-size: 1rem;
-      margin-bottom: 5px;
-      margin-top: 5px;
+      padding: 4px 0px 4px 0px;
       gap: 5px;
     }
     .status__bar {

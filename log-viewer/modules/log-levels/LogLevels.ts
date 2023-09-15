@@ -20,7 +20,11 @@ export class LogLevels extends LitElement {
 
   static styles = css`
     :host {
-      padding: 10px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+      padding: 4px 0;
       min-height: 27px;
     }
     .setting {
@@ -29,8 +33,6 @@ export class LogLevels extends LitElement {
       background-color: var(--vscode-textBlockQuote-background);
       font-size: 0.9em;
       padding: 5px;
-      margin-right: 5px;
-      margin-bottom: 5px;
     }
     .setting__title {
       font-weight: bold;
