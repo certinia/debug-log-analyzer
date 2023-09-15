@@ -37,16 +37,18 @@ export class LogTitle extends LitElement {
       text-overflow: ellipsis;
     }
     a {
-      color: inherit;
+      color: var(--vscode-textLink-foreground);
       text-decoration: none;
       cursor: pointer;
 
       &:hover {
         background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
+        text-decoration: underline;
       }
 
       &:active {
         background: transparent;
+        text-decoration: underline;
       }
     }
   `;
