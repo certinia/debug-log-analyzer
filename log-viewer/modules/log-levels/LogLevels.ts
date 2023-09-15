@@ -43,13 +43,11 @@ export class LogLevels extends LitElement {
   render() {
     const logLevels = [];
     for (const { key, level } of this.logSettings) {
-      if (level !== 'NONE') {
-        const levelHtml = html`<div class="setting">
-          <span class="setting__title">${key}:</span>
-          <span class="setting__level">${level}</span>
-        </div>`;
-        logLevels.push(levelHtml);
-      }
+      const levelHtml = html`<div class="setting">
+        <span class="setting__title">${key}:</span>
+        <span class="setting__level">${level}</span>
+      </div>`;
+      logLevels.push(levelHtml);
     }
     return html`${logLevels}`;
   }
