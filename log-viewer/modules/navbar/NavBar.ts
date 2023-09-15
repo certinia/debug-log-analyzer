@@ -2,11 +2,13 @@
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
 import { provideVSCodeDesignSystem, vsCodeButton, vsCodeTag } from '@vscode/webview-ui-toolkit';
-import { LitElement, TemplateResult, css, html } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import '../components/LogTitle';
-import { TruncationEntry } from '../parsers/TreeParser';
+import '../notifications/NotificationPanel';
+import { Notification } from '../notifications/NotificationPanel';
+import '../notifications/NotificationTag';
 import { hostService } from '../services/VSCodeService';
 
 provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeTag());
@@ -29,7 +31,7 @@ export class NavBar extends LitElement {
   logStatus = 'Processing...';
 
   @property()
-  truncated: TruncationEntry[] = [];
+  notifications: Notification[] = [];
 
   static styles = css`
     :host {
@@ -68,35 +70,6 @@ export class NavBar extends LitElement {
       position: relative;
       white-space: nowrap;
     }
-    .status__reason {
-      padding: 2px;
-      padding-left: 4px;
-      padding-right: 4px;
-      margin-left: 5px;
-      min-width: 13ch;
-      text-overflow: ellipsis;
-      white-space: normal;
-      word-break: break-word;
-      overflow: hidden;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      min-width: 0;
-    }
-    .status__tooltip {
-      visibility: hidden;
-      padding: 5px;
-      background-color: var(--vscode-editor-background);
-      color: var(--vscode-editor-foreground);
-      word-break: break-word;
-      white-space: normal;
-      position: absolute;
-      z-index: 1;
-      top: 100%;
-    }
-    .status__reason:hover + .status__tooltip {
-      visibility: visible;
-    }
 
     a {
       color: var(--vscode-textLink-foreground);
@@ -120,8 +93,10 @@ export class NavBar extends LitElement {
     }
 
     .status-tag::part(control) {
+      color: var(--vscode-editor-foreground);
       background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
       text-transform: inherit;
+      border: none;
     }
 
     .success-tag::part(control) {
@@ -129,11 +104,16 @@ export class NavBar extends LitElement {
     }
 
     .failure-tag::part(control) {
-      background-color: rgba(255, 128, 128, 0.2);
+      background-color: var(--notification-error-background);
     }
 
-    .error-list {
-      display: flex;
+    .icon {
+      width: 32px;
+      height: 32px;
+    }
+    .icon-svg {
+      width: 20px;
+      height: 20px;
     }
   `;
 
@@ -141,15 +121,8 @@ export class NavBar extends LitElement {
     const sizeText = this.logSize ? (this.logSize / 1000000).toFixed(2) + ' MB' : '',
       elapsedText = this._toDuration(this.logDuration);
 
-    const messages: TemplateResult[] = [];
-    this.truncated.forEach((item) => {
-      messages.push(html`<span class="status__reason" style="background-color:${item.color}"
-          >${item.reason}</span
-        ><span class="status__tooltip">${item.reason}</span>`);
-    });
-
     const statusClass =
-      this.truncated.length > 0
+      this.notifications.length > 0
         ? 'failure-tag'
         : this.logStatus !== 'Processing...'
         ? 'success-tag'
@@ -163,7 +136,7 @@ export class NavBar extends LitElement {
             <vscode-tag class="status-tag">${sizeText}</vscode-tag>
             <vscode-tag class="status-tag">${elapsedText}</vscode-tag>
             <vscode-tag class="status-tag ${statusClass}">${this.logStatus}</vscode-tag>
-            <div class="error-list">${html`${messages}`}</div>
+            <notification-tag .notifications="${this.notifications}"></notification-tag>
           </div>
         </div>
         <div class="navbar--right">
@@ -171,14 +144,13 @@ export class NavBar extends LitElement {
             appearance="icon"
             aria-label="Help"
             title="Help"
-            class="help__icon"
+            class="icon"
             @click=${() => {
               hostService().openHelp();
             }}
           >
             <svg
-              width="24"
-              height="24"
+              class="icon-svg"
               viewBox="0 0 15 15"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"

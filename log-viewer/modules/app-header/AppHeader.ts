@@ -6,6 +6,8 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import '../log-levels/LogLevels';
 import '../navbar/NavBar';
+import { Notification } from '../notifications/NotificationPanel';
+import { TruncationColor, TruncationEntry } from '../parsers/TreeParser';
 
 @customElement('app-header')
 export class AppHeader extends LitElement {
@@ -20,7 +22,7 @@ export class AppHeader extends LitElement {
   @property()
   logStatus = 'Processing...';
   @property()
-  truncated = [];
+  notifications: Notification[] = [];
 
   @state()
   _selectedTab = 'timeline-tab';
@@ -84,7 +86,7 @@ export class AppHeader extends LitElement {
         .logSize=${this.logSize}
         .logDuration=${this.logDuration}
         .logStatus=${this.logStatus}
-        .truncated=${this.truncated}
+        .notifications=${this.notifications}
       ></nav-bar>
       <log-levels></log-levels>
 
@@ -162,11 +164,23 @@ export class AppHeader extends LitElement {
       path: this.logPath,
       size: this.logSize,
       duration: this.logDuration,
-      truncated: this.truncated,
     } = logContext);
 
     if (logContext.status) {
       this.logStatus = logContext.status;
+    }
+
+    const truncated = logContext.truncated as TruncationEntry[];
+    if (truncated.length) {
+      this.notifications = [];
+      truncated.forEach((element) => {
+        const severity = element.color === TruncationColor.error ? 'Error' : 'Warning';
+
+        const logMessage = new Notification();
+        logMessage.message = element.reason;
+        logMessage.severity = severity;
+        this.notifications.push(logMessage);
+      });
     }
   }
 }

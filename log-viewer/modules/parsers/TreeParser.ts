@@ -16,7 +16,7 @@ export type TimelineKey =
   | 'flow'
   | 'workflow';
 
-enum TruncationColor {
+export enum TruncationColor {
   error = 'rgba(255, 128, 128, 0.2)',
   skip = 'rgba(128, 255, 128, 0.2)',
   unexpected = 'rgba(128, 128, 255, 0.2)',

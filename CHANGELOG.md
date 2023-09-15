@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tabs now look and feel like vscode tabs
   - Log title re styled
   - Log Duration + Log Size changed to tags
+  - Log issues show when the issues count tag is clicked on the navigation bar
 - The Log Analyzer will be published as a pre-release extension weekly ([#300][#300])
   - Click `Switch to Pre-Release Version` on the banner to get bleeding edge changes and help us to resolve bugs before the stable release.
 
