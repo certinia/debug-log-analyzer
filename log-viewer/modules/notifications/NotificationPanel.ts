@@ -79,10 +79,6 @@ export class NotificationPanel extends LitElement {
   `;
 
   render() {
-    if (this.notifications.length < 1) {
-      return html`<div class="no-messages"><h3>No Messages!</h3></div>`;
-    }
-
     const sortOrder = new Map([
       ['Error', 0],
       ['Warning', 1],
@@ -94,6 +90,7 @@ export class NotificationPanel extends LitElement {
     });
 
     const messages: TemplateResult[] = [];
+
     const lastIndex = this.notifications.length - 1;
     this.notifications.forEach((item, index) => {
       const colorStyle = this.colorStyles.get(item.severity) || '';
@@ -104,6 +101,10 @@ export class NotificationPanel extends LitElement {
         messages.push(html`<vscode-divider role="separator"></vscode-divider>`);
       }
     });
+
+    if (this.notifications.length < 1) {
+      messages.push(html`<div class="no-messages"><h3>No Messages!</h3></div>`);
+    }
 
     return html` <div class="container ${this.open ? '' : 'closed'}">
       <div class="error-list">${html`${messages}`}</div>
