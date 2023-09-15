@@ -7,7 +7,8 @@ import { customElement, property } from 'lit/decorators.js';
 
 import '../components/LogTitle';
 import '../notifications/NotificationPanel';
-import { TruncationEntry } from '../parsers/TreeParser';
+import { Notification } from '../notifications/NotificationPanel';
+import '../notifications/NotificationTag';
 import { hostService } from '../services/VSCodeService';
 
 provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeTag());
@@ -30,7 +31,7 @@ export class NavBar extends LitElement {
   logStatus = 'Processing...';
 
   @property()
-  truncated: TruncationEntry[] = [];
+  notifications: Notification[] = [];
 
   static styles = css`
     :host {
@@ -95,6 +96,7 @@ export class NavBar extends LitElement {
       color: var(--vscode-editor-foreground);
       background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
       text-transform: inherit;
+      border: none;
     }
 
     .success-tag::part(control) {
@@ -102,7 +104,7 @@ export class NavBar extends LitElement {
     }
 
     .failure-tag::part(control) {
-      background-color: rgba(255, 128, 128, 0.2);
+      background-color: var(--notification-error-background);
     }
 
     .icon {
@@ -120,7 +122,7 @@ export class NavBar extends LitElement {
       elapsedText = this._toDuration(this.logDuration);
 
     const statusClass =
-      this.truncated.length > 0
+      this.notifications.length > 0
         ? 'failure-tag'
         : this.logStatus !== 'Processing...'
         ? 'success-tag'
@@ -134,10 +136,10 @@ export class NavBar extends LitElement {
             <vscode-tag class="status-tag">${sizeText}</vscode-tag>
             <vscode-tag class="status-tag">${elapsedText}</vscode-tag>
             <vscode-tag class="status-tag ${statusClass}">${this.logStatus}</vscode-tag>
+            <notification-tag .notifications="${this.notifications}"></notification-tag>
           </div>
         </div>
         <div class="navbar--right">
-          <notification-panel .truncated="${this.truncated}"></notification-panel>
           <vscode-button
             appearance="icon"
             aria-label="Help"
