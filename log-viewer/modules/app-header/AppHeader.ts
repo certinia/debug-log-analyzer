@@ -1,6 +1,12 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
+import {
+  provideVSCodeDesignSystem,
+  vsCodePanelTab,
+  vsCodePanelView,
+  vsCodePanels,
+} from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
@@ -8,6 +14,8 @@ import '../log-levels/LogLevels';
 import '../navbar/NavBar';
 import { Notification } from '../notifications/NotificationPanel';
 import { TruncationColor, TruncationEntry } from '../parsers/TreeParser';
+
+provideVSCodeDesignSystem().register(vsCodePanelTab(), vsCodePanelView(), vsCodePanels());
 
 @customElement('app-header')
 export class AppHeader extends LitElement {
@@ -89,42 +97,30 @@ export class AppHeader extends LitElement {
         .notifications=${this.notifications}
       ></nav-bar>
       <log-levels></log-levels>
-
-      <div class="tab-holder">
-        <div
-          class="tab ${this._selectedTab === 'timeline-tab' ? 'tab--selected' : ''}"
+      <vscode-panels>
+        <vscode-panel-tab
           id="timeline-tab"
           data-show="timeline-view"
           @click="${this._showTabHTMLElem}"
+          >Timeline</vscode-panel-tab
         >
-          Timeline
-        </div>
-        <div
-          class="tab ${this._selectedTab === 'tree-tab' ? 'tab--selected' : ''}"
-          id="tree-tab"
-          data-show="call-tree-view"
-          @click="${this._showTabHTMLElem}"
+        <vscode-panel-tab id="tree-tab" data-show="call-tree-view" @click="${this._showTabHTMLElem}"
+          >Call Tree</vscode-panel-tab
         >
-          Call Tree
-        </div>
-        <div
-          class="tab ${this._selectedTab === 'analysis-tab' ? 'tab--selected' : ''}"
+        <vscode-panel-tab
           id="analysis-tab"
           data-show="analysis-view"
           @click="${this._showTabHTMLElem}"
+          >Analysis</vscode-panel-tab
         >
-          Analysis
-        </div>
-        <div
-          class="tab ${this._selectedTab === 'database-tab' ? 'tab--selected' : ''}"
-          id="database-tab"
-          data-show="db-view"
-          @click="${this._showTabHTMLElem}"
+        <vscode-panel-tab id="database-tab" data-show="db-view" @click="${this._showTabHTMLElem}"
+          >Database</vscode-panel-tab
         >
-          Database
-        </div>
-        <div class="tab--pad"></div>
-      </div>
+        <vscode-panel-view id="view1"></vscode-panel-view>
+        <vscode-panel-view id="view2"></vscode-panel-view>
+        <vscode-panel-view id="view3"></vscode-panel-view>
+        <vscode-panel-view id="view4"></vscode-panel-view>
+      </vscode-panels>
     `;
   }
 
