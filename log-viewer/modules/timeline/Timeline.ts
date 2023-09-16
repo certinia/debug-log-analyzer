@@ -31,58 +31,58 @@ interface Rect {
 
 const scaleY = -15,
   strokeColor = '#D3D3D3',
-  textColor = '#FFFFFF',
-  keyMap: Map<TimelineKey, TimelineGroup> = new Map([
-    [
-      'codeUnit',
-      {
-        label: 'Code Unit',
-        fillColor: '#88AE58',
-      },
-    ],
-    [
-      'workflow',
-      {
-        label: 'Workflow',
-        fillColor: '#51A16E',
-      },
-    ],
-    [
-      'method',
-      {
-        label: 'Method',
-        fillColor: '#2B8F81',
-      },
-    ],
-    [
-      'flow',
-      {
-        label: 'Flow',
-        fillColor: '#337986',
-      },
-    ],
-    [
-      'dml',
-      {
-        label: 'DML',
-        fillColor: '#285663',
-      },
-    ],
-    [
-      'soql',
-      {
-        label: 'SOQL',
-        fillColor: '#5D4963',
-      },
-    ],
-    [
-      'systemMethod',
-      {
-        label: 'System Method',
-        fillColor: '#5C3444',
-      },
-    ],
-  ]);
+  textColor = '#FFFFFF';
+export const keyMap: Map<TimelineKey, TimelineGroup> = new Map([
+  [
+    'codeUnit',
+    {
+      label: 'Code Unit',
+      fillColor: '#88AE58',
+    },
+  ],
+  [
+    'workflow',
+    {
+      label: 'Workflow',
+      fillColor: '#51A16E',
+    },
+  ],
+  [
+    'method',
+    {
+      label: 'Method',
+      fillColor: '#2B8F81',
+    },
+  ],
+  [
+    'flow',
+    {
+      label: 'Flow',
+      fillColor: '#337986',
+    },
+  ],
+  [
+    'dml',
+    {
+      label: 'DML',
+      fillColor: '#285663',
+    },
+  ],
+  [
+    'soql',
+    {
+      label: 'SOQL',
+      fillColor: '#5D4963',
+    },
+  ],
+  [
+    'systemMethod',
+    {
+      label: 'System Method',
+      fillColor: '#5C3444',
+    },
+  ],
+]);
 
 class State {
   public isRedrawQueued = true;
