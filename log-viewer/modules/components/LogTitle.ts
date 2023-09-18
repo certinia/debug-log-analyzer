@@ -24,7 +24,7 @@ export class LogTitle extends LitElement {
       --text-weight-semibold: 600;
       display: flex;
       align-items: center;
-      min-width: 0;
+      min-width: 4ch;
     }
     .title-item {
       padding-block: 6px;
