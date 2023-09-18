@@ -14,6 +14,8 @@ import '../log-levels/LogLevels';
 import '../navbar/NavBar';
 import { Notification } from '../notifications/NotificationPanel';
 import { TruncationColor, TruncationEntry } from '../parsers/TreeParser';
+import { RootNode } from '../timeline/Timeline';
+import '../timeline/TimelineView';
 
 provideVSCodeDesignSystem().register(vsCodePanelTab(), vsCodePanelView(), vsCodePanels());
 
@@ -31,6 +33,8 @@ export class AppHeader extends LitElement {
   logStatus = 'Processing...';
   @property()
   notifications: Notification[] = [];
+  @property()
+  timelineRoot: RootNode | null = null;
 
   @state()
   _selectedTab = 'timeline-tab';
@@ -52,6 +56,7 @@ export class AppHeader extends LitElement {
       box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1) var(--vscode-panelSectionHeader-background);
       display: flex;
       flex-direction: column;
+      height: 100%;
     }
 
     .header {
@@ -83,6 +88,13 @@ export class AppHeader extends LitElement {
     }
     .tab--pad {
       flex-grow: 1;
+    }
+    vscode-panels {
+      height: 100%;
+    }
+
+    vscode-panel-view {
+      height: 100%;
     }
   `;
 
@@ -116,7 +128,9 @@ export class AppHeader extends LitElement {
         <vscode-panel-tab id="database-tab" data-show="db-view" @click="${this._showTabHTMLElem}"
           >Database</vscode-panel-tab
         >
-        <vscode-panel-view id="view1"></vscode-panel-view>
+        <vscode-panel-view id="view1"
+          ><timeline-view .timelineRoot="${this.timelineRoot}"></timeline-view
+        ></vscode-panel-view>
         <vscode-panel-view id="view2"></vscode-panel-view>
         <vscode-panel-view id="view3"></vscode-panel-view>
         <vscode-panel-view id="view4"></vscode-panel-view>
@@ -178,5 +192,7 @@ export class AppHeader extends LitElement {
         this.notifications.push(logMessage);
       });
     }
+
+    this.timelineRoot = logContext.timelineRoot;
   }
 }

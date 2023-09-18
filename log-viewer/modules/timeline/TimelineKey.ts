@@ -1,15 +1,23 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
+// todo: update the key colors when we get a message from the vscode webview side
 import { LitElement, css, html } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, state } from 'lit/decorators.js';
 
-import { keyMap } from './Timeline';
+import { TimelineGroup, keyMap } from './Timeline';
 
 @customElement('timeline-key')
 export class Timelinekey extends LitElement {
+  @state()
+  timlineKeys: TimelineGroup[] = Array.from(keyMap.values());
+
   constructor() {
     super();
+
+    window.addEventListener('message', (e: MessageEvent) => {
+      this.handleMessage(e);
+    });
   }
 
   static styles = css`
@@ -28,7 +36,7 @@ export class Timelinekey extends LitElement {
 
   render() {
     const keyParts = [];
-    for (const keyMeta of keyMap.values()) {
+    for (const keyMeta of this.timlineKeys) {
       keyParts.push(
         html`<div class="timeline-key__entry" style="background-color:${keyMeta.fillColor}">
           <span>${keyMeta.label}</span>
@@ -37,5 +45,14 @@ export class Timelinekey extends LitElement {
     }
 
     return keyParts;
+  }
+
+  private handleMessage(evt: MessageEvent) {
+    const message = evt.data;
+    switch (message.command) {
+      case 'getConfig':
+        this.timlineKeys = Array.from(keyMap.values());
+        break;
+    }
   }
 }

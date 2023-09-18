@@ -21,7 +21,6 @@ export class NotificationButton extends LitElement {
     super();
     document.addEventListener('click', (event) => {
       if (!event.composedPath().includes(this)) {
-        console.debug('o event', this.open, event.composedPath());
         this.open = false;
       }
     });

@@ -17,7 +17,7 @@ import parseLog, {
   truncated,
 } from './parsers/TreeParser';
 import { hostService } from './services/VSCodeService';
-import renderTimeline, { renderTimelineKey, setColors } from './timeline/Timeline';
+import renderTimeline, { setColors } from './timeline/Timeline';
 
 export let rootMethod: RootNode;
 
@@ -40,7 +40,7 @@ async function displayLog(log: string, name: string, path: string) {
   rootMethod = getRootMethod();
   dispatchLogContextUpdate('Processing...');
 
-  await Promise.all([waitForRender(), renderTimeline(rootMethod)]);
+  // await Promise.all([waitForRender()]);
   initDBRender(rootMethod);
   initAnalysisRender(rootMethod);
   initCalltree(rootMethod);
@@ -91,7 +91,7 @@ function handleMessage(evt: MessageEvent) {
   switch (message.command) {
     case 'getConfig':
       setColors(message.data.timeline.colors);
-      renderTimelineKey();
+      // renderTimelineKey();
       break;
     case 'streamLog':
       displayLog(message.data, message.name, '');
@@ -117,6 +117,7 @@ function dispatchLogContextUpdate(status: string): void {
         duration: totalDuration,
         status: status,
         truncated: truncated,
+        timelineRoot: rootMethod,
       },
     })
   );

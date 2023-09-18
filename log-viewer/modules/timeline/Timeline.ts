@@ -1,12 +1,15 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
+//TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import formatDuration, { debounce } from '../Util';
 import { goToRow } from '../calltree-view/CalltreeView';
 import { Method, RootNode, TimedNode, TimelineKey, truncated } from '../parsers/TreeParser';
 import './TimelineView.css';
 
-interface TimelineGroup {
+export { RootNode };
+
+export interface TimelineGroup {
   label: string;
   fillColor: string;
 }
@@ -94,7 +97,7 @@ class State {
 
   public set zoom(zoom: number) {
     this._zoom = zoom;
-    this.queueRedraw();
+    this.requestRedraw();
   }
 
   public get zoom() {
@@ -104,7 +107,7 @@ class State {
   public set offsetY(offsetY: number) {
     if (this._offsetY !== offsetY) {
       this._offsetY = offsetY;
-      this.queueRedraw();
+      this.requestRedraw();
     }
   }
 
@@ -115,7 +118,7 @@ class State {
   public set offsetX(offsetX: number) {
     if (this._offsetX !== offsetX) {
       this._offsetX = offsetX;
-      this.queueRedraw();
+      this.requestRedraw();
     }
   }
 
@@ -123,7 +126,7 @@ class State {
     return this._offsetX;
   }
 
-  private queueRedraw() {
+  public requestRedraw() {
     if (!this.isRedrawQueued) {
       this.isRedrawQueued = true;
       requestAnimationFrame(drawTimeLine);
@@ -382,12 +385,26 @@ function resizeFont() {
   scaleFont = state.zoom > 0.0000004 ? 'normal 16px serif' : 'normal 8px serif';
 }
 
-export default async function renderTimeline(rootMethod: RootNode) {
+async function renderTimeline(rootMethod: RootNode) {
   renderTimelineKey();
   container = document.getElementById('timeline-container') as HTMLDivElement;
   canvas = document.getElementById('timeline') as HTMLCanvasElement;
   ctx = canvas.getContext('2d'); // can never be null since context (2d) is a supported type.
   timelineRoot = rootMethod;
+  calculateSizes();
+  nodesToRectangles([timelineRoot], -1);
+  if (ctx) {
+    requestAnimationFrame(drawTimeLine);
+  }
+}
+
+export function init(timelineContainer: HTMLDivElement, rootMethod: RootNode) {
+  container = timelineContainer;
+  canvas = timelineContainer.querySelector('#timeline') as HTMLCanvasElement;
+  ctx = canvas.getContext('2d'); // can never be null since context (2d) is a supported type.
+  timelineRoot = rootMethod;
+  onInitTimeline();
+
   calculateSizes();
   nodesToRectangles([timelineRoot], -1);
   if (ctx) {
@@ -402,6 +419,7 @@ export function setColors(timelineColors: TimelineColors) {
       keyMeta.fillColor = newColor;
     }
   }
+  state.requestRedraw();
 }
 
 function drawTimeLine() {
@@ -692,9 +710,9 @@ function handleScroll(evt: WheelEvent) {
 }
 
 function onInitTimeline(): void {
-  const canvas = document.getElementById('timeline') as HTMLCanvasElement,
-    timelineWrapper = document.getElementById('timeline-container');
-  tooltip = document.getElementById('timeline-tooltip') as HTMLDivElement;
+  tooltip = document.createElement('div');
+  tooltip.id = 'timeline-tooltip';
+  container.appendChild(tooltip);
 
   if (canvas) {
     canvas.addEventListener('mouseout', onLeaveCanvas);
@@ -705,12 +723,6 @@ function onInitTimeline(): void {
     canvas.addEventListener('click', onClickCanvas);
   }
 
-  if (timelineWrapper) {
-    new ResizeObserver(resize).observe(timelineWrapper);
-  }
-
-  // document seem to get all the events (regardless of which element we're over)
-  document.addEventListener('mousemove', onMouseMove);
+  new ResizeObserver(resize).observe(container);
+  container.addEventListener('mousemove', onMouseMove);
 }
-
-window.addEventListener('DOMContentLoaded', onInitTimeline);
