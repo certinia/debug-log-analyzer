@@ -385,19 +385,6 @@ function resizeFont() {
   scaleFont = state.zoom > 0.0000004 ? 'normal 16px serif' : 'normal 8px serif';
 }
 
-async function renderTimeline(rootMethod: RootNode) {
-  renderTimelineKey();
-  container = document.getElementById('timeline-container') as HTMLDivElement;
-  canvas = document.getElementById('timeline') as HTMLCanvasElement;
-  ctx = canvas.getContext('2d'); // can never be null since context (2d) is a supported type.
-  timelineRoot = rootMethod;
-  calculateSizes();
-  nodesToRectangles([timelineRoot], -1);
-  if (ctx) {
-    requestAnimationFrame(drawTimeLine);
-  }
-}
-
 export function init(timelineContainer: HTMLDivElement, rootMethod: RootNode) {
   container = timelineContainer;
   canvas = timelineContainer.querySelector('#timeline') as HTMLCanvasElement;
@@ -433,29 +420,6 @@ function drawTimeLine() {
     renderRectangles(ctx);
   }
   state.isRedrawQueued = false;
-}
-
-export function renderTimelineKey() {
-  const keyHolder = document.getElementById('timeline-key') as HTMLDivElement,
-    title = document.createElement('span');
-
-  title.innerText = '';
-  if (keyHolder) {
-    keyHolder.innerHTML = '';
-    keyHolder.appendChild(title);
-  }
-
-  for (const keyMeta of keyMap.values()) {
-    const keyEntry = document.createElement('div'),
-      title = document.createElement('span');
-
-    title.innerText = keyMeta.label;
-    keyEntry.className = 'timeline-key__entry';
-    keyEntry.style.backgroundColor = keyMeta.fillColor;
-    keyEntry.style.color = textColor;
-    keyEntry.appendChild(title);
-    keyHolder.appendChild(keyEntry);
-  }
 }
 
 function findByPosition(

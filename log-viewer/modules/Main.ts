@@ -17,7 +17,7 @@ import parseLog, {
   truncated,
 } from './parsers/TreeParser';
 import { hostService } from './services/VSCodeService';
-import renderTimeline, { setColors } from './timeline/Timeline';
+import { setColors } from './timeline/Timeline';
 
 export let rootMethod: RootNode;
 
@@ -91,7 +91,6 @@ function handleMessage(evt: MessageEvent) {
   switch (message.command) {
     case 'getConfig':
       setColors(message.data.timeline.colors);
-      // renderTimelineKey();
       break;
     case 'streamLog':
       displayLog(message.data, message.name, '');
