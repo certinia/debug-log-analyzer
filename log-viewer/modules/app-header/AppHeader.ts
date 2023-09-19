@@ -10,6 +10,8 @@ import {
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
+import '../analysis-view/AnalysisView';
+import '../calltree-view/CalltreeView';
 import '../log-levels/LogLevels';
 import '../navbar/NavBar';
 import { Notification } from '../notifications/NotificationPanel';
@@ -138,7 +140,9 @@ export class AppHeader extends LitElement {
         <vscode-panel-view id="view2"
           ><call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view
         ></vscode-panel-view>
-        <vscode-panel-view id="view3"></vscode-panel-view>
+        <vscode-panel-view id="view3">
+          <analysis-view .timelineRoot="${this.timelineRoot}"> </analysis-view>
+        </vscode-panel-view>
         <vscode-panel-view id="view4"></vscode-panel-view>
       </vscode-panels>
     `;

@@ -40,7 +40,7 @@ async function displayLog(log: string, name: string, path: string) {
   dispatchLogContextUpdate('Processing...');
 
   initDBRender(rootMethod);
-  initAnalysisRender(rootMethod);
+  // initAnalysisRender(rootMethod);
 
   dispatchLogContextUpdate('Ready');
 }
