@@ -7,5 +7,5 @@
     "rootDir": "./modules",
     "target": "es2021"
   },
-  "include": ["./modules/**/*.ts"]
+  "include": ["./modules/**/*.ts", "declarations.d.ts"]
 }

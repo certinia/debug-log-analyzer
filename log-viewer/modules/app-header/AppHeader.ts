@@ -93,6 +93,10 @@ export class AppHeader extends LitElement {
       height: 100%;
     }
 
+    vscode-panels::part(tabpanel) {
+      overflow: auto;
+    }
+
     vscode-panel-view {
       height: 100%;
     }
@@ -131,7 +135,9 @@ export class AppHeader extends LitElement {
         <vscode-panel-view id="view1"
           ><timeline-view .timelineRoot="${this.timelineRoot}"></timeline-view
         ></vscode-panel-view>
-        <vscode-panel-view id="view2"></vscode-panel-view>
+        <vscode-panel-view id="view2"
+          ><call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view
+        ></vscode-panel-view>
         <vscode-panel-view id="view3"></vscode-panel-view>
         <vscode-panel-view id="view4"></vscode-panel-view>
       </vscode-panels>

@@ -8,6 +8,8 @@
 //todo: add class to locate current tree for current log
 //todo: add filter on line type
 //todo: add filter on log level (fine, finer etc)
+import { LitElement, PropertyValues, css, html, unsafeCSS } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
 import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
 import { rootMethod } from '../Main';
@@ -19,16 +21,123 @@ import { RowNavigation } from '../datagrid/module/RowNavigation';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 import './TreeView.scss';
+import treeViewStyles from './Treeview.scss';
 
 let calltreeTable: Tabulator;
+let tableContainer: HTMLDivElement;
 
-export function initCalltree(rootMethod: RootNode) {
-  const callTreeView = document.getElementById('call-tree-view');
+@customElement('call-tree-view')
+export class CalltreeView extends LitElement {
+  @property()
+  timelineRoot: RootNode | null = null;
+
+  constructor() {
+    super();
+  }
+
+  updated(changedProperties: PropertyValues): void {
+    const timlineRoot = changedProperties.has('timelineRoot');
+    if (this.timelineRoot && timlineRoot) {
+      const calltreeContainer = this.shadowRoot?.getElementById(
+        'call-tree-table-container'
+      ) as HTMLDivElement;
+
+      tableContainer = this.shadowRoot?.getElementById('call-tree-table') as HTMLDivElement;
+
+      if (calltreeContainer) {
+        initCalltree(calltreeContainer, tableContainer, this.timelineRoot);
+      }
+    }
+  }
+
+  static styles = [
+    unsafeCSS(treeViewStyles),
+    css`
+      :host {
+        height: 100%;
+        width: 100%;
+        display: flex;
+        flex: 1;
+      }
+
+      #call-tree-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0%;
+        min-width: 0%;
+        flex: 1;
+      }
+
+      #call-tree-table-container {
+        min-height: 0px;
+      }
+    `,
+  ];
+
+  render() {
+    return html`
+      <div id="call-tree-container">
+        <div>
+          <strong>Filter</strong>
+          <div>
+            <input
+              type="button"
+              id="call-tree-expand-btn"
+              value="Expand"
+              @click="${this._expandButtonClick}"
+            />
+            <input
+              type="button"
+              id="call-tree-collapse-btn"
+              value="Collapse"
+              @click="${this._collapseButtonClick}"
+            />
+            <input
+              id="calltree-show-details"
+              type="checkbox"
+              @change="${this._handleShowDetailsChange}"
+            />
+            <label for="calltree-show-details">Show Details</label>
+          </div>
+        </div>
+        <div id="call-tree-table-container">
+          <div id="call-tree-table"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  _handleShowDetailsChange(event: Event) {
+    const showDetails = event.target as HTMLInputElement;
+    calltreeTable.setFilter((data, _filterParams) => {
+      return showDetails.checked || data.originalData.duration || data.originalData.discontinuity;
+    });
+  }
+
+  _expandButtonClick() {
+    calltreeTable.blockRedraw();
+    expandAll(calltreeTable.getRows());
+    calltreeTable.restoreRedraw();
+  }
+
+  _collapseButtonClick() {
+    calltreeTable.blockRedraw();
+    collapseAll(calltreeTable.getRows());
+    calltreeTable.restoreRedraw();
+  }
+}
+
+export function initCalltree(
+  callTreeView: HTMLDivElement,
+  callTreeTable: HTMLDivElement,
+  rootMethod: RootNode
+) {
   if (callTreeView) {
     const analysisObserver = new IntersectionObserver((entries, observer) => {
       const visible = entries[0].isIntersecting;
       if (visible) {
-        renderCallTree(rootMethod);
+        renderCallTree(callTreeTable, rootMethod);
         observer.disconnect();
       }
     });
@@ -36,7 +145,10 @@ export function initCalltree(rootMethod: RootNode) {
   }
 }
 
-export async function renderCallTree(rootMethod: RootNode): Promise<void> {
+export async function renderCallTree(
+  callTreeTableContainer: HTMLDivElement,
+  rootMethod: RootNode
+): Promise<void> {
   if (calltreeTable) {
     await new Promise((resolve, reject) => {
       const visibilityObserver = new IntersectionObserver((entries, observer) => {
@@ -49,7 +161,7 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
         }
       });
 
-      visibilityObserver.observe(calltreeTable.element);
+      visibilityObserver.observe(callTreeTableContainer);
     });
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
     return Promise.resolve();
@@ -60,7 +172,7 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
 
     const selfTimeFilterCache = new Map<string, boolean>();
     const totalTimeFilterCache = new Map<string, boolean>();
-    calltreeTable = new Tabulator('#call-tree-table', {
+    calltreeTable = new Tabulator(callTreeTableContainer, {
       data: toCallTree(rootMethod.children),
       layout: 'fitColumns',
       placeholder: 'No Call Tree Available',
@@ -225,25 +337,6 @@ export async function renderCallTree(rootMethod: RootNode): Promise<void> {
       selfTimeFilterCache.clear();
     });
 
-    document.getElementById('calltree-show-details')?.addEventListener('change', (event) => {
-      const showDetails = event.target as HTMLInputElement;
-      calltreeTable.setFilter((data, _filterParams) => {
-        return showDetails.checked || data.originalData.duration || data.originalData.discontinuity;
-      });
-    });
-
-    document.getElementById('call-tree-expand-btn')?.addEventListener('click', () => {
-      calltreeTable.blockRedraw();
-      expandAll(calltreeTable.getRows());
-      calltreeTable.restoreRedraw();
-    });
-
-    document.getElementById('call-tree-collapse-btn')?.addEventListener('click', () => {
-      calltreeTable.blockRedraw();
-      collapseAll(calltreeTable.getRows());
-      calltreeTable.restoreRedraw();
-    });
-
     calltreeTable.on('tableBuilt', () => {
       resolve();
       calltreeTable.setFilter((data, _filterParams) => {
@@ -304,7 +397,7 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
 
 export async function goToRow(timestamp: number) {
   document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
-  await renderCallTree(rootMethod);
+  await renderCallTree(tableContainer, rootMethod);
 
   let treeRow: RowComponent | null = null;
   const rows = calltreeTable.getRows();

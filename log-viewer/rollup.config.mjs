@@ -1,14 +1,13 @@
 // Rollup plugins
 import commonjs from '@rollup/plugin-commonjs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
-
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
 import {
-  defineRollupSwcOption,
-  swc,
-  minify,
   defineRollupSwcMinifyOption,
+  defineRollupSwcOption,
+  minify,
+  swc,
 } from 'rollup-plugin-swc3';
 
 const production = !process.env.ROLLUP_WATCH;
@@ -30,7 +29,7 @@ export default {
       })
     ),
     postcss({
-      extensions: ['.css'],
+      extensions: ['.css', '.scss'],
       minimize: true,
     }),
     production &&

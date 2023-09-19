@@ -6,7 +6,6 @@ import { html, render } from 'lit';
 import '../modules/app-header/AppHeader';
 import '../resources/css/Tabber.css';
 import { initAnalysisRender } from './analysis-view/AnalysisView';
-import { initCalltree } from './calltree-view/CalltreeView';
 import { initDBRender } from './database-view/DatabaseView';
 import parseLog, {
   RootNode,
@@ -40,10 +39,8 @@ async function displayLog(log: string, name: string, path: string) {
   rootMethod = getRootMethod();
   dispatchLogContextUpdate('Processing...');
 
-  // await Promise.all([waitForRender()]);
   initDBRender(rootMethod);
   initAnalysisRender(rootMethod);
-  initCalltree(rootMethod);
 
   dispatchLogContextUpdate('Ready');
 }

@@ -73,7 +73,7 @@ export default [
       ),
       // ts({ tsconfig: './log-viewer/tsconfig.json' }),
       postcss({
-        extensions: ['.css'],
+        extensions: ['.css', '.scss'],
         minimize: true,
       }),
       production && minifyHTMLTemplates(),

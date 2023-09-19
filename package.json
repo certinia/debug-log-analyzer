@@ -41,7 +41,7 @@
     "test:ci": "jest --runInBand"
   },
   "lint-staged": {
-    "*.{ts,css,md}": "prettier --write"
+    "*.{ts,css,md,scss}": "prettier --write"
   },
   "pnpm": {
     "patchedDependencies": {
