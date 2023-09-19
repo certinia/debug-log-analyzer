@@ -51,8 +51,13 @@ export class TimelineView extends LitElement {
       font-size: 1rem;
     }
     #timeline-container {
-      flex: 1;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0%;
+      min-width: 0%;
+      flex: 1;
     }
     #timeline {
       background-color: var(--vscode-editor-background);
