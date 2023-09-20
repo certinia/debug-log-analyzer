@@ -64,6 +64,9 @@ export class AppHeader extends LitElement {
         display: flex;
         flex-direction: column;
         height: 100%;
+
+        --panel-tab-active-foreground: var(--vscode-panelTitle-activeBorder);
+        --panel-tab-selected-text: var(--vscode-panelTitle-activeForeground, #e7e7e7);
       }
 
       .header {
@@ -104,10 +107,20 @@ export class AppHeader extends LitElement {
 
       vscode-panels::part(tabpanel) {
         overflow: auto;
+        box-shadow: inset 0 calc(max(1px, 0.0625rem) * 1)
+          var(--vscode-panelSectionHeader-background);
       }
 
       vscode-panel-view {
         height: 100%;
+      }
+
+      vscode-panel-tab[aria-selected='true'] {
+        color: var(--panel-tab-selected-text);
+      }
+
+      vscode-panel-tab:hover {
+        color: var(--panel-tab-selected-text);
       }
     `,
   ];
