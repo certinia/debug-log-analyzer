@@ -109,26 +109,33 @@ export class AppHeader extends LitElement {
           id="timeline-tab"
           data-show="timeline-view"
           @click="${this._showTabHTMLElem}"
-          >Timeline</vscode-panel-tab
         >
-        <vscode-panel-tab id="tree-tab" data-show="call-tree-view" @click="${this._showTabHTMLElem}"
-          >Call Tree</vscode-panel-tab
+          Timeline
+        </vscode-panel-tab>
+        <vscode-panel-tab
+          id="tree-tab"
+          data-show="call-tree-view"
+          @click="${this._showTabHTMLElem}"
         >
+          Call Tree
+        </vscode-panel-tab>
         <vscode-panel-tab
           id="analysis-tab"
           data-show="analysis-view"
           @click="${this._showTabHTMLElem}"
-          >Analysis</vscode-panel-tab
         >
-        <vscode-panel-tab id="database-tab" data-show="db-view" @click="${this._showTabHTMLElem}"
-          >Database</vscode-panel-tab
-        >
-        <vscode-panel-view id="view1"
-          ><timeline-view .timelineRoot="${this.timelineRoot}"></timeline-view
-        ></vscode-panel-view>
-        <vscode-panel-view id="view2"
-          ><call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view
-        ></vscode-panel-view>
+          Analysis
+        </vscode-panel-tab>
+        <vscode-panel-tab id="database-tab" data-show="db-view" @click="${this._showTabHTMLElem}">
+          Database
+        </vscode-panel-tab>
+
+        <vscode-panel-view id="view1">
+          <timeline-view .timelineRoot="${this.timelineRoot}"></timeline-view>
+        </vscode-panel-view>
+        <vscode-panel-view id="view2">
+          <call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view>
+        </vscode-panel-view>
         <vscode-panel-view id="view3">
           <analysis-view .timelineRoot="${this.timelineRoot}"> </analysis-view>
         </vscode-panel-view>
