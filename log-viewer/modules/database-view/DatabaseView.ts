@@ -102,6 +102,7 @@ export class DatabaseView extends LitElement {
       .db-group-row {
         display: inline-flex;
         min-width: 0;
+        font-family: monospace;
       }
       .db-group-row__title {
         white-space: nowrap;
@@ -175,7 +176,6 @@ export async function initDBRender(
     const dbObserver = new IntersectionObserver((entries, observer) => {
       const visible = entries[0].isIntersecting;
       if (visible) {
-        console.debug('render');
         observer.disconnect();
         Tabulator.registerModule([RowKeyboardNavigation]);
         renderDMLTable(dmlTable, dmlLines);
