@@ -12,7 +12,6 @@ import dataGridStyles from '../datagrid/style/DataGrid.scss';
 import { globalStyles } from '../global.styles';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
-import './AnalysisView.scss';
 
 let analysisTable: Tabulator;
 let tableContainer: HTMLDivElement;
