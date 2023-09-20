@@ -7,7 +7,7 @@ import {
   vsCodePanelView,
   vsCodePanels,
 } from '@vscode/webview-ui-toolkit';
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import '../analysis-view/AnalysisView';
@@ -55,7 +55,7 @@ export class AppHeader extends LitElement {
   }
 
   static styles = [
-    unsafeCSS(globalStyles),
+    globalStyles,
     css`
       :host {
         background-color: var(--vscode-tab-activeBackground);
@@ -69,38 +69,6 @@ export class AppHeader extends LitElement {
         --panel-tab-selected-text: var(--vscode-panelTitle-activeForeground, #e7e7e7);
       }
 
-      .header {
-        background-color: var(--vscode-tab-activeBackground);
-        box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1)
-          var(--vscode-panelSectionHeader-background);
-      }
-
-      .tab-holder {
-        display: flex;
-      }
-      .tab-holder {
-        display: flex;
-      }
-
-      .tab {
-        display: inline-block;
-        box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1)
-          var(--vscode-panelSectionHeader-background);
-        background-color: var(--vscode-tab-background);
-        color: var(--vscode-tab-inactiveForeground);
-        padding: 5px 10px;
-        cursor: pointer;
-      }
-      .tab.tab--selected {
-        border-bottom-width: 0;
-        box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1) var(--vscode-panelTitle-activeBorder);
-        background-color: var(--vscode-tab-activeBackground);
-        color: var(--vscode-tab-activeForeground);
-        cursor: default;
-      }
-      .tab--pad {
-        flex-grow: 1;
-      }
       vscode-panels {
         height: 100%;
       }
@@ -173,30 +141,17 @@ export class AppHeader extends LitElement {
 
   _showTabHTMLElem(e: Event) {
     const input = e.target as HTMLElement;
-    this._showTab(input);
+    this._showTab(input.id);
   }
 
   _showTabEvent(e: Event) {
     const tabId = (e as CustomEvent).detail.tabid;
-    const tab = this.renderRoot?.querySelector(`#${tabId}`) as HTMLElement;
-    this._showTab(tab);
+    this._showTab(tabId);
   }
 
-  _showTab(elem: HTMLElement) {
-    if (this._selectedTab !== elem.id) {
-      this._selectedTab = elem.id;
-
-      const tabber = document.querySelector('.tabber'),
-        show = elem?.dataset.show,
-        tabItem = show ? document.getElementById(show) : null;
-
-      // remove selected from all tab items + select new one
-      tabber
-        ?.querySelectorAll('.tab__item')
-        .forEach((t) => t.classList.remove('tab__item--selected'));
-      if (tabItem) {
-        tabItem.classList.add('tab__item--selected');
-      }
+  _showTab(tabId: string) {
+    if (this._selectedTab !== tabId) {
+      this._selectedTab = tabId;
     }
   }
 
