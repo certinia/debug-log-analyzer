@@ -1,10 +1,11 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { LitElement, PropertyValues, TemplateResult, css, html } from 'lit';
+import { LitElement, PropertyValues, TemplateResult, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { DatabaseAccess } from '../Database';
+import { globalStyles } from '../global.styles';
 import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
 import { SEVERITY_TYPES, SOQLLinter, SOQLLinterRule, Severity } from '../soql/SOQLLinter';
 
@@ -19,22 +20,25 @@ export class SOQLLinterIssues extends LitElement {
   @state()
   issues: SOQLLinterRule[] = [];
 
-  static styles = css`
-    :host {
-      flex: 1;
-      max-height: 30vh;
-      overflow-y: scroll;
-      padding: 0px 5px 0px 5px;
-    }
-    .title {
-      font-weight: bold;
-    }
-    details {
-      margin-bottom: 0.25em;
-      overflow-wrap: anywhere;
-      white-space: normal;
-    }
-  `;
+  static styles = [
+    unsafeCSS(globalStyles),
+    css`
+      :host {
+        flex: 1;
+        max-height: 30vh;
+        overflow-y: scroll;
+        padding: 0px 5px 0px 5px;
+      }
+      .title {
+        font-weight: bold;
+      }
+      details {
+        margin-bottom: 0.25em;
+        overflow-wrap: anywhere;
+        white-space: normal;
+      }
+    `,
+  ];
 
   updated(changedProperties: PropertyValues): void {
     if (changedProperties.has('soql')) {

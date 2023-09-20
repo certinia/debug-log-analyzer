@@ -18,6 +18,7 @@ import MinMaxFilter from '../datagrid/filters/MinMax';
 import NumberFormat from '../datagrid/format/Number';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
 import { RowNavigation } from '../datagrid/module/RowNavigation';
+import { globalStyles } from '../global.styles';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 import './TreeView.scss';
@@ -52,6 +53,7 @@ export class CalltreeView extends LitElement {
 
   static styles = [
     unsafeCSS(treeViewStyles),
+    unsafeCSS(globalStyles),
     css`
       :host {
         height: 100%;
@@ -64,6 +66,7 @@ export class CalltreeView extends LitElement {
         display: flex;
         flex-direction: column;
         height: 100%;
+        width: 100%;
         min-height: 0%;
         min-width: 0%;
         flex: 1;

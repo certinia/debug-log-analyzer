@@ -7,11 +7,13 @@ import {
   vsCodePanelView,
   vsCodePanels,
 } from '@vscode/webview-ui-toolkit';
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import '../analysis-view/AnalysisView';
 import '../calltree-view/CalltreeView';
+import '../database-view/DatabaseView';
+import { globalStyles } from '../global.styles';
 import '../log-levels/LogLevels';
 import '../navbar/NavBar';
 import { Notification } from '../notifications/NotificationPanel';
@@ -52,57 +54,63 @@ export class AppHeader extends LitElement {
     });
   }
 
-  static styles = css`
-    :host {
-      background-color: var(--vscode-tab-activeBackground);
-      box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1) var(--vscode-panelSectionHeader-background);
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
+  static styles = [
+    unsafeCSS(globalStyles),
+    css`
+      :host {
+        background-color: var(--vscode-tab-activeBackground);
+        box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1)
+          var(--vscode-panelSectionHeader-background);
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
 
-    .header {
-      background-color: var(--vscode-tab-activeBackground);
-      box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1) var(--vscode-panelSectionHeader-background);
-    }
+      .header {
+        background-color: var(--vscode-tab-activeBackground);
+        box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1)
+          var(--vscode-panelSectionHeader-background);
+      }
 
-    .tab-holder {
-      display: flex;
-    }
-    .tab-holder {
-      display: flex;
-    }
+      .tab-holder {
+        display: flex;
+      }
+      .tab-holder {
+        display: flex;
+      }
 
-    .tab {
-      display: inline-block;
-      box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1) var(--vscode-panelSectionHeader-background);
-      background-color: var(--vscode-tab-background);
-      color: var(--vscode-tab-inactiveForeground);
-      padding: 5px 10px;
-      cursor: pointer;
-    }
-    .tab.tab--selected {
-      border-bottom-width: 0;
-      box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1) var(--vscode-panelTitle-activeBorder);
-      background-color: var(--vscode-tab-activeBackground);
-      color: var(--vscode-tab-activeForeground);
-      cursor: default;
-    }
-    .tab--pad {
-      flex-grow: 1;
-    }
-    vscode-panels {
-      height: 100%;
-    }
+      .tab {
+        display: inline-block;
+        box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1)
+          var(--vscode-panelSectionHeader-background);
+        background-color: var(--vscode-tab-background);
+        color: var(--vscode-tab-inactiveForeground);
+        padding: 5px 10px;
+        cursor: pointer;
+      }
+      .tab.tab--selected {
+        border-bottom-width: 0;
+        box-shadow: inset 0 calc(max(1px, 0.0625rem) * -1) var(--vscode-panelTitle-activeBorder);
+        background-color: var(--vscode-tab-activeBackground);
+        color: var(--vscode-tab-activeForeground);
+        cursor: default;
+      }
+      .tab--pad {
+        flex-grow: 1;
+      }
+      vscode-panels {
+        height: 100%;
+      }
 
-    vscode-panels::part(tabpanel) {
-      overflow: auto;
-    }
+      vscode-panels::part(tabpanel) {
+        overflow: auto;
+      }
 
-    vscode-panel-view {
-      height: 100%;
-    }
-  `;
+      vscode-panel-view {
+        height: 100%;
+      }
+    `,
+  ];
 
   render() {
     return html`
@@ -143,7 +151,9 @@ export class AppHeader extends LitElement {
         <vscode-panel-view id="view3">
           <analysis-view .timelineRoot="${this.timelineRoot}"> </analysis-view>
         </vscode-panel-view>
-        <vscode-panel-view id="view4"></vscode-panel-view>
+        <vscode-panel-view id="view4">
+          <database-view .timelineRoot="${this.timelineRoot}"></database-view>
+        </vscode-panel-view>
       </vscode-panels>
     `;
   }

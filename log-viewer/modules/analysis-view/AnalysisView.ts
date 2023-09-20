@@ -9,6 +9,7 @@ import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
 import dataGridStyles from '../datagrid/style/DataGrid.scss';
+import { globalStyles } from '../global.styles';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 import './AnalysisView.scss';
@@ -36,6 +37,7 @@ export class AnalysisView extends LitElement {
 
   static styles = [
     unsafeCSS(dataGridStyles),
+    unsafeCSS(globalStyles),
     css`
       :host {
         height: 100%;

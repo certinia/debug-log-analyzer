@@ -6,6 +6,7 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import '../components/LogTitle';
+import { globalStyles } from '../global.styles';
 import '../notifications/NotificationPanel';
 import { Notification } from '../notifications/NotificationPanel';
 import '../notifications/NotificationTag';
@@ -33,88 +34,75 @@ export class NavBar extends LitElement {
   @property()
   notifications: Notification[] = [];
 
-  static styles = css`
-    :host {
-      color: var(--vscode-editor-foreground);
-    }
-
-    .navbar {
-      padding-top: 4px;
-      display: flex;
-      gap: 10px;
-    }
-    .navbar--left {
-      display: flex;
-      width: 100%;
-      position: relative;
-      align-items: center;
-    }
-    .navbar--right {
-      display: flex;
-      flex: 1 1 auto;
-      justify-content: flex-end;
-      align-items: center;
-      display: flex;
-    }
-
-    #status {
-      align-items: center;
-      font-size: 1rem;
-      padding: 4px 0px 4px 0px;
-      gap: 5px;
-    }
-    .status__bar {
-      display: flex;
-      width: 100%;
-      position: relative;
-      white-space: nowrap;
-    }
-
-    a {
-      color: var(--vscode-textLink-foreground);
-      text-decoration: none;
-      cursor: pointer;
-
-      &:hover {
-        color: var(--vscode-textLink-activeForeground);
-        text-decoration: underline;
+  static styles = [
+    globalStyles,
+    css`
+      :host {
+        color: var(--vscode-editor-foreground);
       }
 
-      &:active {
-        background: transparent;
-        color: var(--vscode-textLink-activeForeground);
+      .navbar {
+        padding-top: 4px;
+        display: flex;
+        gap: 10px;
       }
-    }
+      .navbar--left {
+        display: flex;
+        width: 100%;
+        position: relative;
+        align-items: center;
+      }
+      .navbar--right {
+        display: flex;
+        flex: 1 1 auto;
+        justify-content: flex-end;
+        align-items: center;
+        display: flex;
+      }
 
-    .status-tag {
-      font-family: monospace;
-      font-size: inherit;
-    }
+      #status {
+        align-items: center;
+        font-size: 1rem;
+        padding: 4px 0px 4px 0px;
+        gap: 5px;
+      }
+      .status__bar {
+        display: flex;
+        width: 100%;
+        position: relative;
+        white-space: nowrap;
+      }
 
-    .status-tag::part(control) {
-      color: var(--vscode-editor-foreground);
-      background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
-      text-transform: inherit;
-      border: none;
-    }
+      .status-tag {
+        font-family: monospace;
+        font-size: inherit;
+      }
 
-    .success-tag::part(control) {
-      background-color: rgba(128, 255, 128, 0.2);
-    }
+      .status-tag::part(control) {
+        color: var(--vscode-editor-foreground);
+        background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
+        text-transform: inherit;
+        border: none;
+      }
 
-    .failure-tag::part(control) {
-      background-color: var(--notification-error-background);
-    }
+      .success-tag::part(control) {
+        background-color: rgba(128, 255, 128, 0.2);
+      }
 
-    .icon {
-      width: 32px;
-      height: 32px;
-    }
-    .icon-svg {
-      width: 20px;
-      height: 20px;
-    }
-  `;
+      .failure-tag::part(control) {
+        background-color: var(--notification-error-background);
+      }
+
+      .icon {
+        width: 32px;
+        height: 32px;
+      }
+      .icon-svg {
+        width: 20px;
+        height: 20px;
+      }
+    `,
+  ];
 
   render() {
     const sizeText = this.logSize ? (this.logSize / 1000000).toFixed(2) + ' MB' : '',
