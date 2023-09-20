@@ -38,10 +38,6 @@ async function displayLog(log: string, name: string, path: string) {
   await Promise.all([waitForRender(), parseLog(log)]);
   rootMethod = getRootMethod();
   dispatchLogContextUpdate('Processing...');
-
-  initDBRender(rootMethod);
-  // initAnalysisRender(rootMethod);
-
   dispatchLogContextUpdate('Ready');
 }
 

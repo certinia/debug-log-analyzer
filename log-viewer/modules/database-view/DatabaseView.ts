@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { html, render } from 'lit';
+import { LitElement, PropertyValues, css, html, render, unsafeCSS } from 'lit';
+import { customElement, property, state } from 'lit/decorators.js';
 import {
   ColumnComponent,
   GroupComponent,
@@ -14,47 +15,178 @@ import '../components/CallStack';
 import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
-import { RootNode, SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
+import dataGridStyles from '../datagrid/style/DataGrid.scss';
+import { globalStyles } from '../global.styles';
+import {
+  DMLBeginLine,
+  RootNode,
+  SOQLExecuteBeginLine,
+  SOQLExecuteExplainLine,
+} from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
 import './DatabaseView.scss';
 
-export async function initDBRender(rootMethod: RootNode) {
-  await DatabaseAccess.create(rootMethod);
-  const dbView = document.getElementById('db-view');
-  if (dbView) {
-    const dbObserver = new IntersectionObserver((entries, observer) => {
-      const visible = entries[0].isIntersecting;
-      if (visible) {
-        observer.disconnect();
-        Tabulator.registerModule([RowKeyboardNavigation]);
-        renderDMLTable();
-        renderSOQLTable();
+let soqlTable: Tabulator;
+let dmlTable: Tabulator;
+let dmlTableContainer: HTMLDivElement;
+let soqlTableContainer: HTMLDivElement;
+@customElement('database-view')
+export class DatabaseView extends LitElement {
+  @property()
+  timelineRoot: RootNode | null = null;
+
+  @state()
+  dmlLines: DMLBeginLine[] = [];
+
+  @state()
+  soqlLines: SOQLExecuteBeginLine[] = [];
+
+  constructor() {
+    super();
+  }
+
+  async updated(changedProperties: PropertyValues): Promise<void> {
+    const timlineRoot = changedProperties.has('timelineRoot');
+    if (this.timelineRoot && timlineRoot) {
+      DatabaseAccess.create(this.timelineRoot);
+      this.dmlLines = DatabaseAccess.instance()?.getDMLLines() || [];
+      this.soqlLines = DatabaseAccess.instance()?.getSOQLLines() || [];
+
+      dmlTableContainer = this.shadowRoot?.getElementById('db-dml-table') as HTMLDivElement;
+      soqlTableContainer = this.shadowRoot?.getElementById('db-soql-table') as HTMLDivElement;
+      if (dmlTableContainer) {
+        initDBRender(dmlTableContainer, soqlTableContainer, this.dmlLines, this.soqlLines);
       }
-    });
-    dbObserver.observe(dbView);
+    }
+  }
+
+  static styles = [
+    unsafeCSS(dataGridStyles),
+    unsafeCSS(globalStyles),
+    css`
+      :host {
+        height: 100%;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+      }
+
+      #db-container {
+        overflow-y: scroll;
+        overflow-x: hidden;
+        height: 100%;
+        width: 100%;
+      }
+      #dml-table-container,
+      #soql-table-container {
+        height: 100%;
+        width: 100%;
+      }
+      #db-dml-table,
+      #db-soql-table {
+        overflow: hidden;
+        table-layout: fixed;
+        height: 100%;
+        width: 100%;
+        min-height: 0%;
+        min-width: 0%;
+      }
+      .row__details-container {
+        border-bottom: 2px solid var(--vscode-editorHoverWidget-border);
+        padding: 5px 0px 5px 0px;
+        background-color: var(--vscode-editorHoverWidget-background);
+      }
+      .db-group-row {
+        display: inline-flex;
+        min-width: 0;
+      }
+      .db-group-row__title {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    `,
+  ];
+
+  render() {
+    return html`
+      <div id="db-container">
+        <div>
+          <database-section title="DML Statements" .dbLines="${this.dmlLines}"></database-section>
+          <div>
+            <strong>Group by</strong>
+            <div>
+              <input
+                id="db-dml-groupby-checkbox"
+                type="checkbox"
+                checked
+                @change=${this._dmlGroupBy}
+              />
+              <label for="db-dml-groupby-checkbox">DML</label>
+            </div>
+          </div>
+          <div id="dml-table-container">
+            <div id="db-dml-table"></div>
+          </div>
+        </div>
+        <div>
+          <database-section title="SOQL Statements" .dbLines="${this.soqlLines}"></database-section>
+          <div>
+            <strong>Group by</strong>
+            <div>
+              <input
+                id="db-soql-groupby-checkbox"
+                type="checkbox"
+                checked
+                @change=${this.soqlGroupBy}
+              />
+              <label for="db-soql-groupby-checkbox">SOQL</label>
+            </div>
+          </div>
+          <div id="soql-table-container">
+            <div id="db-soql-table"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  _dmlGroupBy(event: Event) {
+    const checkBox = event.target as HTMLInputElement;
+    dmlTable.setGroupBy(checkBox.checked ? 'dml' : '');
+  }
+
+  soqlGroupBy(event: Event) {
+    const checkBox = event.target as HTMLInputElement;
+    soqlTable.setGroupBy(checkBox.checked ? 'soql' : '');
   }
 }
 
-function renderDMLTable() {
-  const dbDmlCounts = document.getElementById('db-dml-counts');
-  if (!dbDmlCounts) {
-    return;
+export async function initDBRender(
+  dmlTable: HTMLElement,
+  soqlTable: HTMLElement,
+  dmlLines: DMLBeginLine[],
+  soqlLines: SOQLExecuteBeginLine[]
+) {
+  if (dmlTable) {
+    const dbObserver = new IntersectionObserver((entries, observer) => {
+      const visible = entries[0].isIntersecting;
+      if (visible) {
+        console.debug('render');
+        observer.disconnect();
+        Tabulator.registerModule([RowKeyboardNavigation]);
+        renderDMLTable(dmlTable, dmlLines);
+        renderSOQLTable(soqlTable, soqlLines);
+      }
+    });
+    dbObserver.observe(dmlTable);
   }
-  const dmlLines = DatabaseAccess.instance()?.getDMLLines();
-  render(
-    html`<database-section title="DML Statements" .dbLines=${dmlLines}></database-section>
-      <div>
-        <strong>Group by</strong>
-        <div>
-          <input id="db-dml-groupby-checkbox" type="checkbox" checked />
-          <label for="db-dml-groupby-checkbox">DML</label>
-        </div>
-      </div>`,
-    dbDmlCounts
-  );
+}
 
+function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
   let currentSelectedRow: RowComponent | null;
 
   const dmlData: unknown[] = [];
@@ -74,7 +206,8 @@ function renderDMLTable() {
     dmlText = sortByFrequency(dmlText);
   }
 
-  const dmlTable = new Tabulator('#db-dml-table', {
+  dmlTable = new Tabulator(dmlTableContainer, {
+    height: '100%',
     clipboard: true,
     downloadEncoder: downlodEncoder('dml.csv'),
     downloadRowRange: 'all',
@@ -214,34 +347,9 @@ function renderDMLTable() {
       }
     }
   });
-
-  // todo: move to a lit element
-  document.getElementById('db-dml-groupby-checkbox')?.addEventListener('change', (event) => {
-    const checkBox = event.target as HTMLInputElement;
-    dmlTable.setGroupBy(checkBox.checked ? 'dml' : '');
-  });
 }
 
-function renderSOQLTable() {
-  const dbSoqlCounts = document.getElementById('db-soql-counts');
-  if (!dbSoqlCounts) {
-    return;
-  }
-  const soqlLines = DatabaseAccess.instance()?.getSOQLLines();
-  render(
-    html`
-      <database-section title="SOQL Statements" .dbLines=${soqlLines}></database-section>
-      <div>
-        <strong>Group by</strong>
-        <div>
-          <input id="db-soql-groupby-checkbox" type="checkbox" checked />
-          <label for="db-soql-groupby-checkbox">SOQL</label>
-        </div>
-      </div>
-    `,
-    dbSoqlCounts
-  );
-
+function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
   const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
   let currentSelectedRow: RowComponent | null;
   interface GridSOQLData {
@@ -280,7 +388,8 @@ function renderSOQLTable() {
     soqlText = sortByFrequency(soqlText);
   }
 
-  const soqlTable = new Tabulator('#db-soql-table', {
+  soqlTable = new Tabulator(soqlTableContainer, {
+    height: '100%',
     rowKeyboardNavigation: true,
     data: soqlData,
     layout: 'fitColumns',
@@ -490,12 +599,6 @@ function renderSOQLTable() {
         });
       }
     }
-  });
-
-  // todo: move to a lit element
-  document.getElementById('db-soql-groupby-checkbox')?.addEventListener('change', (event) => {
-    const checkBox = event.target as HTMLInputElement;
-    soqlTable.setGroupBy(checkBox.checked ? 'soql' : '');
   });
 }
 
