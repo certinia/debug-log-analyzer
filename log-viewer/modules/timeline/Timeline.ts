@@ -5,7 +5,6 @@
 import formatDuration, { debounce } from '../Util';
 import { goToRow } from '../calltree-view/CalltreeView';
 import { Method, RootNode, TimedNode, TimelineKey, truncated } from '../parsers/TreeParser';
-import './TimelineView.css';
 
 export { RootNode };
 
@@ -33,8 +32,7 @@ interface Rect {
 }
 
 const scaleY = -15,
-  strokeColor = '#D3D3D3',
-  textColor = '#FFFFFF';
+  strokeColor = '#D3D3D3';
 export const keyMap: Map<TimelineKey, TimelineGroup> = new Map([
   [
     'codeUnit',
