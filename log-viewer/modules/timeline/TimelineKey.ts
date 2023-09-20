@@ -5,6 +5,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
+import { globalStyles } from '../global.styles';
 import { TimelineGroup, keyMap } from './Timeline';
 
 @customElement('timeline-key')
@@ -20,19 +21,22 @@ export class Timelinekey extends LitElement {
     });
   }
 
-  static styles = css`
-    :host {
-      margin-top: 5px;
-    }
-    .timeline-key__entry {
-      display: inline-block;
-      font-size: 0.9rem;
-      padding: 4px;
-      margin-right: 5px;
-      color: #ffffff;
-      font-family: monospace;
-    }
-  `;
+  static styles = [
+    globalStyles,
+    css`
+      :host {
+        margin-top: 5px;
+      }
+      .timeline-key__entry {
+        display: inline-block;
+        font-size: 0.9rem;
+        padding: 4px;
+        margin-right: 5px;
+        color: #ffffff;
+        font-family: monospace;
+      }
+    `,
+  ];
 
   render() {
     const keyParts = [];

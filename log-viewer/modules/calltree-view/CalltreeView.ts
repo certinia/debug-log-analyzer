@@ -53,7 +53,7 @@ export class CalltreeView extends LitElement {
 
   static styles = [
     unsafeCSS(treeViewStyles),
-    unsafeCSS(globalStyles),
+    globalStyles,
     css`
       :host {
         height: 100%;

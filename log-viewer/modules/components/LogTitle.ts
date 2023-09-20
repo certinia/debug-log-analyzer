@@ -2,7 +2,7 @@
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
 import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-toolkit';
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { globalStyles } from '../global.styles';
@@ -21,7 +21,7 @@ export class LogTitle extends LitElement {
    * --button-icon styles come from @vscode/webview-ui-toolkit as they are hardcoded in vscode at the moment. @vscode/webview-ui-toolkit needs to be in use for these to work.
    */
   static styles = [
-    unsafeCSS(globalStyles),
+    globalStyles,
     css`
       :host {
         --text-weight-semibold: 600;

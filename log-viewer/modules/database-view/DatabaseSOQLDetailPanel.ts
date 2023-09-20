@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import '../components/CallStack';
@@ -16,7 +16,7 @@ export class DatabaseSOQLDetailPanel extends LitElement {
   timestamp = null;
 
   static styles = [
-    unsafeCSS(globalStyles),
+    globalStyles,
     css`
       :host {
         display: flex;

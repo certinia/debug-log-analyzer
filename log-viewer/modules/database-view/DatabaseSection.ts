@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { globalStyles } from '../global.styles';
@@ -15,7 +15,7 @@ export class DatabaseSection extends LitElement {
   dbLines: Method[] = [];
 
   static styles = [
-    unsafeCSS(globalStyles),
+    globalStyles,
     css`
       .dbSection {
         padding: 10px 5px 5px 0px;

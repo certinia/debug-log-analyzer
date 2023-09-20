@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { LitElement, PropertyValues, TemplateResult, css, html, unsafeCSS } from 'lit';
+import { LitElement, PropertyValues, TemplateResult, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { DatabaseAccess } from '../Database';
@@ -21,7 +21,7 @@ export class SOQLLinterIssues extends LitElement {
   issues: SOQLLinterRule[] = [];
 
   static styles = [
-    unsafeCSS(globalStyles),
+    globalStyles,
     css`
       :host {
         flex: 1;

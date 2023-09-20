@@ -5,6 +5,7 @@ import { provideVSCodeDesignSystem, vsCodeButton, vsCodeTag } from '@vscode/webv
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
+import { globalStyles } from '../global.styles';
 import './NotificationPanel';
 
 provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeTag());
@@ -26,68 +27,71 @@ export class NotificationTag extends LitElement {
     });
   }
 
-  static styles = css`
-    :host {
-    }
+  static styles = [
+    globalStyles,
+    css`
+      :host {
+      }
 
-    .icon {
-      position: relative;
-      width: 32px;
-      height: 32px;
-    }
-    .icon-svg {
-      width: 20px;
-      height: 20px;
-    }
+      .icon {
+        position: relative;
+        width: 32px;
+        height: 32px;
+      }
+      .icon-svg {
+        width: 20px;
+        height: 20px;
+      }
 
-    .badge-indicator {
-      color: rgb(255, 255, 255);
-      background-color: rgb(0, 120, 212);
-      position: absolute;
-      bottom: 18px;
-      left: 18px;
-      font-size: 9px;
-      font-weight: 600;
-      min-width: 8px;
-      height: 16px;
-      line-height: 16px;
-      padding: 0px 4px;
-      border-radius: 20px;
-      text-align: center;
-    }
+      .badge-indicator {
+        color: rgb(255, 255, 255);
+        background-color: rgb(0, 120, 212);
+        position: absolute;
+        bottom: 18px;
+        left: 18px;
+        font-size: 9px;
+        font-weight: 600;
+        min-width: 8px;
+        height: 16px;
+        line-height: 16px;
+        padding: 0px 4px;
+        border-radius: 20px;
+        text-align: center;
+      }
 
-    .status-tag {
-      position: relative;
-      font-family: monospace;
-      font-size: inherit;
-    }
+      .status-tag {
+        position: relative;
+        font-family: monospace;
+        font-size: inherit;
+      }
 
-    .status-tag::part(control) {
-      color: var(--vscode-editor-foreground);
-      background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
-      text-transform: inherit;
-      border: none;
-    }
+      .status-tag::part(control) {
+        color: var(--vscode-editor-foreground);
+        background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
+        text-transform: inherit;
+        border: none;
+      }
 
-    .success-tag::part(control) {
-      background-color: rgba(128, 255, 128, 0.2);
-    }
+      .success-tag::part(control) {
+        background-color: rgba(128, 255, 128, 0.2);
+      }
 
-    .failure-tag::part(control) {
-      background-color: rgba(255, 128, 128, 0.2);
-    }
+      .failure-tag::part(control) {
+        background-color: rgba(255, 128, 128, 0.2);
+      }
 
-    .tag-panel {
-      position: absolute;
-      top: calc(100% + 10px);
-      left: 50%;
-      transform: translateX(-50%);
-    }
+      .tag-panel {
+        position: absolute;
+        top: calc(100% + 10px);
+        left: 50%;
+        transform: translateX(-50%);
+      }
 
-    .menu-container {
-      position: relative;
-    }
-  `;
+      .menu-container {
+        position: relative;
+      }
+    `,
+  ];
 
   render() {
     const issueColor = this.notifications.length > 0 ? 'failure-tag' : 'success-tag';

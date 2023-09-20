@@ -5,6 +5,7 @@ import { provideVSCodeDesignSystem, vsCodeButton, vsCodeDivider } from '@vscode/
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
+import { globalStyles } from '../global.styles';
 import './NotificationPanel';
 
 provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider());
@@ -26,48 +27,51 @@ export class NotificationButton extends LitElement {
     });
   }
 
-  static styles = css`
-    :host {
-      top: 32px;
-      right: 0px;
-    }
+  static styles = [
+    globalStyles,
+    css`
+      :host {
+        top: 32px;
+        right: 0px;
+      }
 
-    .icon {
-      position: relative;
-      width: 32px;
-      height: 32px;
-    }
-    .icon-svg {
-      width: 20px;
-      height: 20px;
-    }
+      .icon {
+        position: relative;
+        width: 32px;
+        height: 32px;
+      }
+      .icon-svg {
+        width: 20px;
+        height: 20px;
+      }
 
-    .badge-indicator {
-      color: rgb(255, 255, 255);
-      background-color: rgb(0, 120, 212);
-      position: absolute;
-      bottom: 18px;
-      left: 18px;
-      font-size: 9px;
-      font-weight: 600;
-      min-width: 8px;
-      height: 16px;
-      line-height: 16px;
-      padding: 0px 4px;
-      border-radius: 20px;
-      text-align: center;
-    }
+      .badge-indicator {
+        color: rgb(255, 255, 255);
+        background-color: rgb(0, 120, 212);
+        position: absolute;
+        bottom: 18px;
+        left: 18px;
+        font-size: 9px;
+        font-weight: 600;
+        min-width: 8px;
+        height: 16px;
+        line-height: 16px;
+        padding: 0px 4px;
+        border-radius: 20px;
+        text-align: center;
+      }
 
-    .notification-panel {
-      position: absolute;
-      top: calc(100% + 10px);
-      right: 0px;
-    }
+      .notification-panel {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0px;
+      }
 
-    .menu-container {
-      position: relative;
-    }
-  `;
+      .menu-container {
+        position: relative;
+      }
+    `,
+  ];
 
   render() {
     const indicator =

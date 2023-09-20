@@ -4,6 +4,7 @@
 import { LitElement, PropertyValues, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import { globalStyles } from '../global.styles';
 import { RootNode, init as timelineInit } from './Timeline';
 import './TimelineKey';
 
@@ -29,43 +30,46 @@ export class TimelineView extends LitElement {
     }
   }
 
-  static styles = css`
-    :host {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      position: relative;
-      height: 75%;
-    }
+  static styles = [
+    globalStyles,
+    css`
+      :host {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        position: relative;
+        height: 75%;
+      }
 
-    #timeline-tooltip {
-      display: none;
-      position: absolute;
-      max-width: 90%;
-      z-index: 1000;
-      padding: 5px;
-      border-radius: 4px;
-      background-color: var(--vscode-editor-background);
-      color: var(--vscode-editor-foreground);
-      font-family: monospace;
-      font-size: 1rem;
-    }
-    #timeline-container {
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      min-height: 0%;
-      min-width: 0%;
-      flex: 1;
-    }
-    #timeline {
-      background-color: var(--vscode-editor-background);
-      z-index: 0;
-      width: 100%;
-      height: 100%;
-    }
-  `;
+      #timeline-tooltip {
+        display: none;
+        position: absolute;
+        max-width: 90%;
+        z-index: 1000;
+        padding: 5px;
+        border-radius: 4px;
+        background-color: var(--vscode-editor-background);
+        color: var(--vscode-editor-foreground);
+        font-family: monospace;
+        font-size: 1rem;
+      }
+      #timeline-container {
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0%;
+        min-width: 0%;
+        flex: 1;
+      }
+      #timeline {
+        background-color: var(--vscode-editor-background);
+        z-index: 0;
+        width: 100%;
+        height: 100%;
+      }
+    `,
+  ];
 
   render() {
     return html`

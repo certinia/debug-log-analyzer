@@ -37,7 +37,7 @@ export class AnalysisView extends LitElement {
 
   static styles = [
     unsafeCSS(dataGridStyles),
-    unsafeCSS(globalStyles),
+    globalStyles,
     css`
       :host {
         height: 100%;
