@@ -4,9 +4,6 @@
 import { html, render } from 'lit';
 
 import '../modules/app-header/AppHeader';
-import '../resources/css/Tabber.css';
-import { initAnalysisRender } from './analysis-view/AnalysisView';
-import { initDBRender } from './database-view/DatabaseView';
 import parseLog, {
   RootNode,
   getLogSettings,
