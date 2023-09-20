@@ -2,9 +2,6 @@ module.exports = {
   projects: [
     {
       displayName: 'log-viewer',
-      moduleNameMapper: {
-        '^.+\\.(css|less)$': '<rootDir>/resources/css/stub.js',
-      },
       rootDir: '<rootDir>/log-viewer',
       testEnvironment: 'node',
       transform: {

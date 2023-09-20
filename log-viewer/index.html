@@ -29,6 +29,9 @@
         display: flex;
         flex-direction: column;
       }
+      #header-wrapper {
+        height: 100%;
+      }
     </style>
 
     <script type="module" defer crossorigin="anonymous" src="bundle.js"></script>
@@ -36,58 +39,5 @@
 
   <body>
     <div id="header-wrapper"></div>
-
-    <div class="tabber">
-      <div id="timeline-view" class="tab__item tab__item--selected">
-        <div id="timeline-tooltip"></div>
-        <div id="timeline-container">
-          <canvas id="timeline"></canvas>
-        </div>
-        <div id="timeline-key"></div>
-      </div>
-
-      <div id="call-tree-view" class="tab__item">
-        <div id="call-tree-container">
-          <div>
-            <strong>Filter</strong>
-            <div>
-              <input type="button" id="call-tree-expand-btn" value="Expand" />
-              <input type="button" id="call-tree-collapse-btn" value="Collapse" />
-              <input id="calltree-show-details" type="checkbox" />
-              <label for="calltree-show-details">Show Details</label>
-            </div>
-          </div>
-          <div id="call-tree-table-container">
-            <div id="call-tree-table"></div>
-          </div>
-        </div>
-      </div>
-
-      <div id="analysis-view" class="tab__item">
-        <div>
-          <strong>Group by</strong>
-          <div>
-            <input id="analysis-groupby-checkbox" type="checkbox" />
-            <label for="analysis-groupby-checkbox">Type</label>
-          </div>
-        </div>
-        <div id="analysis-table-container">
-          <div id="analysis-table"></div>
-        </div>
-      </div>
-
-      <div id="db-view" class="tab__item">
-        <div id="db-container">
-          <div>
-            <div id="db-dml-counts"></div>
-            <div id="db-dml-table"></div>
-          </div>
-          <div>
-            <div id="db-soql-counts"></div>
-            <div id="db-soql-table"></div>
-          </div>
-        </div>
-      </div>
-    </div>
   </body>
 </html>

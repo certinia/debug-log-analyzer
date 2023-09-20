@@ -4,10 +4,6 @@
 import { html, render } from 'lit';
 
 import '../modules/app-header/AppHeader';
-import '../resources/css/Tabber.css';
-import { initAnalysisRender } from './analysis-view/AnalysisView';
-import { initCalltree } from './calltree-view/CalltreeView';
-import { initDBRender } from './database-view/DatabaseView';
 import parseLog, {
   RootNode,
   getLogSettings,
@@ -17,7 +13,7 @@ import parseLog, {
   truncated,
 } from './parsers/TreeParser';
 import { hostService } from './services/VSCodeService';
-import renderTimeline, { renderTimelineKey, setColors } from './timeline/Timeline';
+import { setColors } from './timeline/Timeline';
 
 export let rootMethod: RootNode;
 
@@ -39,12 +35,6 @@ async function displayLog(log: string, name: string, path: string) {
   await Promise.all([waitForRender(), parseLog(log)]);
   rootMethod = getRootMethod();
   dispatchLogContextUpdate('Processing...');
-
-  await Promise.all([waitForRender(), renderTimeline(rootMethod)]);
-  initDBRender(rootMethod);
-  initAnalysisRender(rootMethod);
-  initCalltree(rootMethod);
-
   dispatchLogContextUpdate('Ready');
 }
 
@@ -91,7 +81,6 @@ function handleMessage(evt: MessageEvent) {
   switch (message.command) {
     case 'getConfig':
       setColors(message.data.timeline.colors);
-      renderTimelineKey();
       break;
     case 'streamLog':
       displayLog(message.data, message.name, '');
@@ -117,6 +106,7 @@ function dispatchLogContextUpdate(status: string): void {
         duration: totalDuration,
         status: status,
         truncated: truncated,
+        timelineRoot: rootMethod,
       },
     })
   );

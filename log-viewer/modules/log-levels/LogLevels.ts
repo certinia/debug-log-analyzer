@@ -4,6 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
+import { globalStyles } from '../global.styles';
 import { LogSetting } from '../parsers/TreeParser';
 
 @customElement('log-levels')
@@ -18,27 +19,32 @@ export class LogLevels extends LitElement {
     });
   }
 
-  static styles = css`
-    :host {
-      padding: 10px 0;
-      min-height: 27px;
-    }
-    .setting {
-      display: inline-block;
-      font-family: var(--vscode-editor-font-family);
-      background-color: var(--vscode-textBlockQuote-background);
-      font-size: 0.9em;
-      padding: 5px;
-      margin-right: 5px;
-      margin-bottom: 5px;
-    }
-    .setting__title {
-      font-weight: bold;
-    }
-    .setting__level {
-      color: #808080;
-    }
-  `;
+  static styles = [
+    globalStyles,
+    css`
+      :host {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        align-items: center;
+        padding: 4px 0;
+        min-height: 27px;
+      }
+      .setting {
+        display: inline-block;
+        font-family: var(--vscode-editor-font-family);
+        background-color: var(--vscode-textBlockQuote-background);
+        font-size: 0.9em;
+        padding: 5px;
+      }
+      .setting__title {
+        font-weight: bold;
+      }
+      .setting__level {
+        color: #808080;
+      }
+    `,
+  ];
 
   render() {
     const logLevels = [];

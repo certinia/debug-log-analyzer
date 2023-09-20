@@ -4,7 +4,6 @@ import json from '@rollup/plugin-json';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import copy from 'rollup-plugin-copy';
 import { minifyHTML } from 'rollup-plugin-minify-html';
-import pkgMinifyHTML from 'rollup-plugin-minify-html-literals';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
 import {
@@ -14,9 +13,7 @@ import {
   swc,
 } from 'rollup-plugin-swc3';
 
-const minifyHTMLTemplates = pkgMinifyHTML.default;
-
-const production = process.env.NODE_ENV == 'production';
+const production = process.env.NODE_ENV === 'production';
 console.log('Package mode:', production ? 'production' : 'development');
 export default [
   {
@@ -71,12 +68,10 @@ export default [
           jsc: { transform: { useDefineForClassFields: false } },
         })
       ),
-      // ts({ tsconfig: './log-viewer/tsconfig.json' }),
       postcss({
-        extensions: ['.css'],
+        extensions: ['.css', '.scss'],
         minimize: true,
       }),
-      production && minifyHTMLTemplates(),
       production &&
         minify(
           defineRollupSwcMinifyOption({

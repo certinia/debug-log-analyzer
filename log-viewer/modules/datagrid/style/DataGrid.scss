@@ -39,23 +39,25 @@ $footerBorderColor: transparent; //footer border color
 $footerSeparatorColor: transparent; //footer bottom separator color
 $footerActiveColor: #d00 !default; //footer bottom active text color
 @import '~tabulator-tables/src/scss/tabulator.scss';
+@import '../editors/MinMax';
 
 .tabulator {
   .tabulator-tableholder {
     overflow-x: hidden;
     .tabulator-table {
       display: block;
-      background-color: unset;
+      background-color: default;
     }
   }
 
   .tabulator-row {
-    background-color: unset;
+    background-color: default;
     .tabulator-row-even {
-      background-color: unset;
+      background-color: default;
     }
 
     &.tabulator-group {
+      font-family: monospace;
       background: unset;
       border-bottom: unset;
       border-right: unset;

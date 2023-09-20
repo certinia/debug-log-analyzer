@@ -4,6 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import { globalStyles } from '../global.styles';
 import { Method } from '../parsers/TreeParser';
 
 @customElement('database-section')
@@ -13,19 +14,22 @@ export class DatabaseSection extends LitElement {
   @property({ type: Object, attribute: false })
   dbLines: Method[] = [];
 
-  static styles = css`
-    .dbSection {
-      padding: 10px 5px 5px 0px;
-    }
-    .dbTitle {
-      font-weight: bold;
-      font-size: 1.2em;
-    }
-    .dbBlock {
-      margin-left: 10px;
-      font-weight: normal;
-    }
-  `;
+  static styles = [
+    globalStyles,
+    css`
+      .dbSection {
+        padding: 10px 5px 5px 0px;
+      }
+      .dbTitle {
+        font-weight: bold;
+        font-size: 1.2em;
+      }
+      .dbBlock {
+        margin-left: 10px;
+        font-weight: normal;
+      }
+    `,
+  ];
 
   render() {
     const totalCount = this.dbLines.length;

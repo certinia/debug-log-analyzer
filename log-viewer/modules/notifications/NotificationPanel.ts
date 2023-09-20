@@ -5,7 +5,8 @@ import { provideVSCodeDesignSystem, vsCodeButton, vsCodeDivider } from '@vscode/
 import { LitElement, TemplateResult, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import '../notification.styles.css';
+import { globalStyles } from '../global.styles';
+import { notificationStyles } from '../notification.styles';
 
 provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider());
 
@@ -23,60 +24,64 @@ export class NotificationPanel extends LitElement {
     ['Info', 'info'],
   ]);
 
-  static styles = css`
-    :host {
-      z-index: 999;
-    }
-    .container {
-      background-color: var(--vscode-editor-background);
-      max-height: 540px;
-      width: 320px;
-      padding: 8px 4px 8px 4px;
-      border: calc(var(--border-width) * 1px) solid var(--divider-background);
-      box-shadow: rgba(0, 0, 0, 0.5) 0px 4px 20px;
-      border-radius: 4px;
-      overflow: scroll;
-    }
+  static styles = [
+    globalStyles,
+    css`
+      :host {
+        z-index: 999;
+        ${notificationStyles}
+      }
+      .container {
+        background-color: var(--vscode-editor-background);
+        max-height: 540px;
+        width: 320px;
+        padding: 8px 4px 8px 4px;
+        border: calc(var(--border-width) * 1px) solid var(--divider-background);
+        box-shadow: rgba(0, 0, 0, 0.5) 0px 4px 20px;
+        border-radius: 4px;
+        overflow: scroll;
+      }
 
-    .closed {
-      display: none;
-    }
-    .notification {
-      padding: 8px 16px;
-      overflow-wrap: anywhere;
-      text-wrap: wrap;
-      display: flex;
-      gap: 8px;
-      border-radius: 4px;
-    }
-    .error-list {
-      display: flex;
-      flex-direction: column;
-    }
+      .closed {
+        display: none;
+      }
+      .notification {
+        padding: 8px 16px;
+        overflow-wrap: anywhere;
+        text-wrap: wrap;
+        display: flex;
+        gap: 8px;
+        border-radius: 4px;
+      }
+      .error-list {
+        display: flex;
+        flex-direction: column;
+      }
 
-    .notification-icon {
-      justify-content: center;
-      display: flex;
-      flex-direction: column;
-    }
+      .notification-icon {
+        justify-content: center;
+        display: flex;
+        flex-direction: column;
+      }
 
-    .no-messages {
-      display: flex;
-      justify-content: center;
-    }
+      .no-messages {
+        display: flex;
+        justify-content: center;
+      }
 
-    .error {
-      background-color: var(--notification-error-background);
-    }
+      .error {
+        background-color: var(--notification-error-background);
+      }
 
-    .warning {
-      background-color: var(--notification-warning-background);
-    }
+      .warning {
+        background-color: var(--notification-warning-background);
+      }
 
-    .info {
-      background-color: var(--notification-info-background);
-    }
-  `;
+      .info {
+        background-color: var(--notification-info-background);
+      }
+    `,
+  ];
 
   render() {
     const sortOrder = new Map([

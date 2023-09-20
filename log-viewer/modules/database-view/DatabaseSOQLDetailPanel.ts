@@ -6,6 +6,7 @@ import { customElement, property } from 'lit/decorators.js';
 
 import '../components/CallStack';
 import '../components/SOQLLinterIssues';
+import { globalStyles } from '../global.styles';
 
 @customElement('db-soql-detail-panel')
 export class DatabaseSOQLDetailPanel extends LitElement {
@@ -14,16 +15,19 @@ export class DatabaseSOQLDetailPanel extends LitElement {
   @property({ type: Number })
   timestamp = null;
 
-  static styles = css`
-    :host {
-      display: flex;
-      overflow: hidden;
-      width: 100%;
-    }
-    call-stack {
-      border-right: 2px solid var(--vscode-editorHoverWidget-border);
-    }
-  `;
+  static styles = [
+    globalStyles,
+    css`
+      :host {
+        display: flex;
+        overflow: hidden;
+        width: 100%;
+      }
+      call-stack {
+        border-right: 2px solid var(--vscode-editorHoverWidget-border);
+      }
+    `,
+  ];
 
   render() {
     return html`

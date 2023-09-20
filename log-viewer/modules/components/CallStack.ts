@@ -6,6 +6,7 @@ import { customElement, property } from 'lit/decorators.js';
 
 import { DatabaseAccess } from '../Database';
 import { goToRow } from '../calltree-view/CalltreeView';
+import { globalStyles } from '../global.styles';
 import { LogLine } from '../parsers/TreeParser';
 
 @customElement('call-stack')
@@ -13,51 +14,38 @@ export class CallStack extends LitElement {
   @property({ type: Number })
   timestamp = -1;
 
-  static styles = css`
-    :host {
-      flex: 1;
-      overflow-y: scroll;
-      min-width: 0%;
-      max-height: 30vh;
-      padding: 0px 5px 0px 5px;
-    }
-
-    a {
-      color: var(--vscode-textLink-foreground);
-      text-decoration: none;
-      cursor: pointer;
-
-      :hover {
-        color: var(--vscode-textLink-activeForeground);
-        text-decoration: underline;
+  static styles = [
+    globalStyles,
+    css`
+      :host {
+        flex: 1;
+        overflow-y: scroll;
+        min-width: 0%;
+        max-height: 30vh;
+        padding: 0px 5px 0px 5px;
       }
 
-      :active {
-        background: transparent;
-        color: var(--vscode-textLink-activeForeground);
+      .stackEntry {
+        cursor: pointer;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
-    }
 
-    .stackEntry {
-      cursor: pointer;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+      .dbLinkContainer {
+        display: flex;
+      }
 
-    .dbLinkContainer {
-      display: flex;
-    }
+      .title {
+        font-weight: bold;
+      }
 
-    .title {
-      font-weight: bold;
-    }
-
-    .code-text {
-      font-family: monospace;
-      font-weight: var(--vscode-font-weight, normal);
-      font-size: var(--vscode-editor-font-size, 0.9em);
-    }
-  `;
+      .code-text {
+        font-family: monospace;
+        font-weight: var(--vscode-font-weight, normal);
+        font-size: var(--vscode-editor-font-size, 0.9em);
+      }
+    `,
+  ];
 
   render() {
     const htmlTitle = html`<span class="title">Callstack</span>`;

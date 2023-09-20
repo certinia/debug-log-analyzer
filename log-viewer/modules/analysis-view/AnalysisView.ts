@@ -1,18 +1,81 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
+import { LitElement, PropertyValues, css, html, unsafeCSS } from 'lit';
+import { customElement, property } from 'lit/decorators.js';
 import { ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
 import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
+import dataGridStyles from '../datagrid/style/DataGrid.scss';
+import { globalStyles } from '../global.styles';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
-import './AnalysisView.scss';
 
-export function initAnalysisRender(rootMethod: RootNode) {
-  const analysisTab = document.getElementById('analysis-view');
-  if (analysisTab) {
+let analysisTable: Tabulator;
+let tableContainer: HTMLDivElement;
+@customElement('analysis-view')
+export class AnalysisView extends LitElement {
+  @property()
+  timelineRoot: RootNode | null = null;
+
+  constructor() {
+    super();
+  }
+
+  updated(changedProperties: PropertyValues): void {
+    const timlineRoot = changedProperties.has('timelineRoot');
+    if (this.timelineRoot && timlineRoot) {
+      tableContainer = this.shadowRoot?.getElementById('analysis-table') as HTMLDivElement;
+      if (tableContainer) {
+        initAnalysisRender(tableContainer, this.timelineRoot);
+      }
+    }
+  }
+
+  static styles = [
+    unsafeCSS(dataGridStyles),
+    globalStyles,
+    css`
+      :host {
+        height: 100%;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+      }
+
+      #analysis-table-container {
+        display: contents;
+        height: 100%;
+      }
+    `,
+  ];
+
+  render() {
+    return html`
+      <div>
+        <strong>Group by</strong>
+        <div>
+          <input id="analysis-groupby-checkbox" type="checkbox" @change="${this._groupBy}" />
+          <label for="analysis-groupby-checkbox">Type</label>
+        </div>
+      </div>
+      <div id="analysis-table-container">
+        <div id="analysis-table"></div>
+      </div>
+    `;
+  }
+
+  _groupBy(event: Event) {
+    const checkBox = event.target as HTMLInputElement;
+    analysisTable.setGroupBy(checkBox.checked ? 'type' : '');
+  }
+}
+
+export function initAnalysisRender(analysisRoot: HTMLElement, rootMethod: RootNode) {
+  if (analysisRoot) {
     const analysisObserver = new IntersectionObserver((entries, observer) => {
       const visible = entries[0].isIntersecting;
       if (visible) {
@@ -20,7 +83,7 @@ export function initAnalysisRender(rootMethod: RootNode) {
         observer.disconnect();
       }
     });
-    analysisObserver.observe(analysisTab);
+    analysisObserver.observe(analysisRoot);
   }
 }
 
@@ -40,7 +103,7 @@ async function renderAnalysis(rootMethod: RootNode) {
   ];
 
   Tabulator.registerModule(RowKeyboardNavigation);
-  const analysisTable = new Tabulator('#analysis-table', {
+  analysisTable = new Tabulator(tableContainer, {
     rowKeyboardNavigation: true,
     selectable: 1,
     data: metricList,
@@ -146,11 +209,6 @@ async function renderAnalysis(rootMethod: RootNode) {
         bottomCalcFormatter: Number,
       },
     ],
-  });
-
-  document.getElementById('analysis-groupby-checkbox')?.addEventListener('change', (event) => {
-    const checkBox = event.target as HTMLInputElement;
-    analysisTable.setGroupBy(checkBox.checked ? 'type' : '');
   });
 }
 
