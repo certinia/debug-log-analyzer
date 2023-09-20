@@ -21,8 +21,7 @@ import { RowNavigation } from '../datagrid/module/RowNavigation';
 import { globalStyles } from '../global.styles';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
-import './TreeView.scss';
-import treeViewStyles from './Treeview.scss';
+import treeViewStyles from './TreeView.scss';
 
 let calltreeTable: Tabulator;
 let tableContainer: HTMLDivElement;
