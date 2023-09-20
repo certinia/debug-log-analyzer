@@ -7,6 +7,7 @@ import { customElement, property } from 'lit/decorators.js';
 
 import '../components/LogTitle';
 import { globalStyles } from '../global.styles';
+import { notificationStyles } from '../notification.styles';
 import '../notifications/NotificationPanel';
 import { Notification } from '../notifications/NotificationPanel';
 import '../notifications/NotificationTag';
@@ -39,6 +40,7 @@ export class NavBar extends LitElement {
     css`
       :host {
         color: var(--vscode-editor-foreground);
+        ${notificationStyles}
       }
 
       .navbar {

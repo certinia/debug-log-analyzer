@@ -26,10 +26,10 @@ export class NotificationPanel extends LitElement {
 
   static styles = [
     globalStyles,
-    notificationStyles,
     css`
       :host {
         z-index: 999;
+        ${notificationStyles}
       }
       .container {
         background-color: var(--vscode-editor-background);
