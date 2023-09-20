@@ -15,7 +15,6 @@ import '../components/CallStack';
 import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
-import dataGridStyles from '../datagrid/style/DataGrid.scss';
 import { globalStyles } from '../global.styles';
 import {
   DMLBeginLine,
@@ -26,7 +25,7 @@ import {
 import { hostService } from '../services/VSCodeService';
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
-import './DatabaseView.scss';
+import databaseViewStyles from './DatabaseView.scss';
 
 let soqlTable: Tabulator;
 let dmlTable: Tabulator;
@@ -63,7 +62,7 @@ export class DatabaseView extends LitElement {
   }
 
   static styles = [
-    unsafeCSS(dataGridStyles),
+    unsafeCSS(databaseViewStyles),
     globalStyles,
     css`
       :host {
@@ -93,21 +92,6 @@ export class DatabaseView extends LitElement {
         width: 100%;
         min-height: 0%;
         min-width: 0%;
-      }
-      .row__details-container {
-        border-bottom: 2px solid var(--vscode-editorHoverWidget-border);
-        padding: 5px 0px 5px 0px;
-        background-color: var(--vscode-editorHoverWidget-background);
-      }
-      .db-group-row {
-        display: inline-flex;
-        min-width: 0;
-        font-family: monospace;
-      }
-      .db-group-row__title {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
     `,
   ];

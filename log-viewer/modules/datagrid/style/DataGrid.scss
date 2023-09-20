@@ -57,6 +57,7 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
     }
 
     &.tabulator-group {
+      font-family: monospace;
       background: unset;
       border-bottom: unset;
       border-right: unset;

@@ -80,7 +80,6 @@ export function initAnalysisRender(analysisRoot: HTMLElement, rootMethod: RootNo
     const analysisObserver = new IntersectionObserver((entries, observer) => {
       const visible = entries[0].isIntersecting;
       if (visible) {
-        console.debug('render');
         renderAnalysis(rootMethod);
         observer.disconnect();
       }

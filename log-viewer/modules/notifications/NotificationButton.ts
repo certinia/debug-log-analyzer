@@ -148,7 +148,6 @@ export class NotificationButton extends LitElement {
   }
 
   _toggleNotifications() {
-    console.debug('o3', this.open);
     this.open = !this.open;
   }
 }
