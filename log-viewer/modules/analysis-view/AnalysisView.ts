@@ -14,23 +14,23 @@ import { RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 
 let analysisTable: Tabulator;
-let tableContainer: HTMLDivElement;
+let tableContainer: HTMLDivElement | null;
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
   @property()
   timelineRoot: RootNode | null = null;
+
+  get _tableWrapper(): HTMLDivElement | null {
+    return (tableContainer = this.renderRoot?.querySelector('#analysis-table') ?? null);
+  }
 
   constructor() {
     super();
   }
 
   updated(changedProperties: PropertyValues): void {
-    const timlineRoot = changedProperties.has('timelineRoot');
-    if (this.timelineRoot && timlineRoot) {
-      tableContainer = this.shadowRoot?.getElementById('analysis-table') as HTMLDivElement;
-      if (tableContainer) {
-        initAnalysisRender(tableContainer, this.timelineRoot);
-      }
+    if (this.timelineRoot && changedProperties.has('timelineRoot')) {
+      this._appendTableWhenVisible();
     }
   }
 
@@ -72,22 +72,27 @@ export class AnalysisView extends LitElement {
     const checkBox = event.target as HTMLInputElement;
     analysisTable.setGroupBy(checkBox.checked ? 'type' : '');
   }
-}
 
-export function initAnalysisRender(analysisRoot: HTMLElement, rootMethod: RootNode) {
-  if (analysisRoot) {
-    const analysisObserver = new IntersectionObserver((entries, observer) => {
-      const visible = entries[0].isIntersecting;
-      if (visible) {
-        renderAnalysis(rootMethod);
-        observer.disconnect();
-      }
-    });
-    analysisObserver.observe(analysisRoot);
+  _appendTableWhenVisible() {
+    const rootMethod = this.timelineRoot;
+    const tableWrapper = this._tableWrapper;
+    if (tableWrapper && rootMethod) {
+      const analysisObserver = new IntersectionObserver((entries, observer) => {
+        const visible = entries[0].isIntersecting;
+        if (visible) {
+          renderAnalysis(rootMethod);
+          observer.disconnect();
+        }
+      });
+      analysisObserver.observe(tableWrapper);
+    }
   }
 }
 
 async function renderAnalysis(rootMethod: RootNode) {
+  if (!tableContainer) {
+    return;
+  }
   const methodMap: Map<string, Metric> = new Map();
 
   addNodeToMap(methodMap, rootMethod);
