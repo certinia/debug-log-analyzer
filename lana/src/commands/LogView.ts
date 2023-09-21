@@ -3,6 +3,7 @@
  */
 import { createReadStream } from 'fs';
 import { writeFile } from 'fs/promises';
+import { homedir } from 'os';
 import { basename, dirname, join } from 'path';
 import { WebviewPanel, window as vscWindow } from 'vscode';
 import { Uri, commands, workspace } from 'vscode';
@@ -69,7 +70,8 @@ export class LogView {
 
           case 'saveFile': {
             if (request.text && request.options?.defaultUri) {
-              const defaultDir = (workspace.workspaceFolders || [])[0].uri.path;
+              const defaultWorkspace = (workspace.workspaceFolders || [])[0];
+              const defaultDir = defaultWorkspace?.uri.path || homedir();
               vscWindow
                 .showSaveDialog({
                   defaultUri: Uri.file(join(defaultDir, request.options.defaultUri)),

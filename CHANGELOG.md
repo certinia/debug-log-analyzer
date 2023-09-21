@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Hyperlink styling to align with VSCode ([#248][#248])
 
+### Fixed
+
+- `Export to CSV` not working when a log was opened in a new VSCode window and not associated to a workspace ([#363][#363])
+
 ## [1.7.1] - 2023-08-10
 
 ### Fixed
@@ -243,6 +247,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Unreleased -->
 
+[#363]: https://github.com/certinia/debug-log-analyzer/issues/363
 [#248]: https://github.com/certinia/debug-log-analyzer/issues/248
 [#249]: https://github.com/certinia/debug-log-analyzer/issues/249
 [#300]: https://github.com/certinia/debug-log-analyzer/issues/300
