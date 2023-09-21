@@ -29,8 +29,7 @@ import databaseViewStyles from './DatabaseView.scss';
 
 let soqlTable: Tabulator;
 let dmlTable: Tabulator;
-let dmlTableContainer: HTMLDivElement;
-let soqlTableContainer: HTMLDivElement;
+
 @customElement('database-view')
 export class DatabaseView extends LitElement {
   @property()
@@ -42,22 +41,21 @@ export class DatabaseView extends LitElement {
   @state()
   soqlLines: SOQLExecuteBeginLine[] = [];
 
+  get _dmlTableWrapper(): HTMLDivElement | null {
+    return this.renderRoot?.querySelector('#db-dml-table') ?? null;
+  }
+
+  get _soqlTableWrapper(): HTMLDivElement | null {
+    return this.renderRoot?.querySelector('#db-soql-table') ?? null;
+  }
+
   constructor() {
     super();
   }
 
-  async updated(changedProperties: PropertyValues): Promise<void> {
-    const timlineRoot = changedProperties.has('timelineRoot');
-    if (this.timelineRoot && timlineRoot) {
-      DatabaseAccess.create(this.timelineRoot);
-      this.dmlLines = DatabaseAccess.instance()?.getDMLLines() || [];
-      this.soqlLines = DatabaseAccess.instance()?.getSOQLLines() || [];
-
-      dmlTableContainer = this.shadowRoot?.getElementById('db-dml-table') as HTMLDivElement;
-      soqlTableContainer = this.shadowRoot?.getElementById('db-soql-table') as HTMLDivElement;
-      if (dmlTableContainer) {
-        initDBRender(dmlTableContainer, soqlTableContainer, this.dmlLines, this.soqlLines);
-      }
+  updated(changedProperties: PropertyValues): void {
+    if (this.timelineRoot && changedProperties.has('timelineRoot')) {
+      this._appendTableWhenVisible();
     }
   }
 
@@ -126,7 +124,7 @@ export class DatabaseView extends LitElement {
                 id="db-soql-groupby-checkbox"
                 type="checkbox"
                 checked
-                @change=${this.soqlGroupBy}
+                @change=${this._soqlGroupBy}
               />
               <label for="db-soql-groupby-checkbox">SOQL</label>
             </div>
@@ -144,29 +142,32 @@ export class DatabaseView extends LitElement {
     dmlTable.setGroupBy(checkBox.checked ? 'dml' : '');
   }
 
-  soqlGroupBy(event: Event) {
+  _soqlGroupBy(event: Event) {
     const checkBox = event.target as HTMLInputElement;
     soqlTable.setGroupBy(checkBox.checked ? 'soql' : '');
   }
-}
 
-export async function initDBRender(
-  dmlTable: HTMLElement,
-  soqlTable: HTMLElement,
-  dmlLines: DMLBeginLine[],
-  soqlLines: SOQLExecuteBeginLine[]
-) {
-  if (dmlTable) {
-    const dbObserver = new IntersectionObserver((entries, observer) => {
-      const visible = entries[0].isIntersecting;
-      if (visible) {
-        observer.disconnect();
-        Tabulator.registerModule([RowKeyboardNavigation]);
-        renderDMLTable(dmlTable, dmlLines);
-        renderSOQLTable(soqlTable, soqlLines);
-      }
-    });
-    dbObserver.observe(dmlTable);
+  async _appendTableWhenVisible() {
+    const dmlTableWrapper = this._dmlTableWrapper;
+    const soqlTableWrapper = this._soqlTableWrapper;
+    const treeRoot = this.timelineRoot;
+    if (dmlTableWrapper && soqlTableWrapper && treeRoot) {
+      const dbObserver = new IntersectionObserver(async (entries, observer) => {
+        const visible = entries[0].isIntersecting;
+        if (visible) {
+          observer.disconnect();
+
+          const dbAccess = await DatabaseAccess.create(treeRoot);
+          this.dmlLines = dbAccess.getDMLLines() || [];
+          this.soqlLines = dbAccess.getSOQLLines() || [];
+
+          Tabulator.registerModule([RowKeyboardNavigation]);
+          renderDMLTable(dmlTableWrapper, this.dmlLines);
+          renderSOQLTable(soqlTableWrapper, this.soqlLines);
+        }
+      });
+      dbObserver.observe(dmlTableWrapper);
+    }
   }
 }
 

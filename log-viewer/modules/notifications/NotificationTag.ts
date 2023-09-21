@@ -1,14 +1,15 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeButton, vsCodeTag } from '@vscode/webview-ui-toolkit';
+import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
+import '../components/BadgeBase';
 import { globalStyles } from '../global.styles';
 import './NotificationPanel';
 
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeTag());
+provideVSCodeDesignSystem().register(vsCodeButton());
 
 @customElement('notification-tag')
 export class NotificationTag extends LitElement {
@@ -59,27 +60,6 @@ export class NotificationTag extends LitElement {
         text-align: center;
       }
 
-      .status-tag {
-        position: relative;
-        font-family: monospace;
-        font-size: inherit;
-      }
-
-      .status-tag::part(control) {
-        color: var(--vscode-editor-foreground);
-        background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
-        text-transform: inherit;
-        border: none;
-      }
-
-      .success-tag::part(control) {
-        background-color: rgba(128, 255, 128, 0.2);
-      }
-
-      .failure-tag::part(control) {
-        background-color: rgba(255, 128, 128, 0.2);
-      }
-
       .tag-panel {
         position: absolute;
         top: calc(100% + 10px);
@@ -94,13 +74,13 @@ export class NotificationTag extends LitElement {
   ];
 
   render() {
-    const issueColor = this.notifications.length > 0 ? 'failure-tag' : 'success-tag';
+    const status = this.notifications.length > 0 ? 'failure' : 'success';
 
     return html`<div class="menu-container">
       <vscode-button appearance="icon">
-        <vscode-tag class="status-tag ${issueColor}" @click="${this._toggleNotifications}"
+        <badge-base status="${status}" @click="${this._toggleNotifications}"
           >${this.notifications.length} issues
-        </vscode-tag>
+        </badge-base>
       </vscode-button>
       <notification-panel
         class="tag-panel"

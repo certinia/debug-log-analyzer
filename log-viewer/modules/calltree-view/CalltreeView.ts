@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-// todo: add breakcrumbs back? - I will do this but in a later PR + better
+// todo: add breadcrumbs back? - I will do this but in a later PR + better
 //
 //todo: ** future **
 //todo: show total and self as percentage of total? + do the same on the analysis view?
@@ -24,29 +24,24 @@ import { hostService } from '../services/VSCodeService';
 import treeViewStyles from './TreeView.scss';
 
 let calltreeTable: Tabulator;
-let tableContainer: HTMLDivElement;
+let tableContainer: HTMLDivElement | null;
 
 @customElement('call-tree-view')
 export class CalltreeView extends LitElement {
   @property()
   timelineRoot: RootNode | null = null;
 
+  get _callTreeTableWrapper(): HTMLDivElement | null {
+    return (tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
+  }
+
   constructor() {
     super();
   }
 
   updated(changedProperties: PropertyValues): void {
-    const timlineRoot = changedProperties.has('timelineRoot');
-    if (this.timelineRoot && timlineRoot) {
-      const calltreeContainer = this.shadowRoot?.getElementById(
-        'call-tree-table-container'
-      ) as HTMLDivElement;
-
-      tableContainer = this.shadowRoot?.getElementById('call-tree-table') as HTMLDivElement;
-
-      if (calltreeContainer) {
-        initCalltree(calltreeContainer, tableContainer, this.timelineRoot);
-      }
+    if (this.timelineRoot && changedProperties.has('timelineRoot')) {
+      this._appendTableWhenVisible();
     }
   }
 
@@ -128,22 +123,20 @@ export class CalltreeView extends LitElement {
     collapseAll(calltreeTable.getRows());
     calltreeTable.restoreRedraw();
   }
-}
 
-export function initCalltree(
-  callTreeView: HTMLDivElement,
-  callTreeTable: HTMLDivElement,
-  rootMethod: RootNode
-) {
-  if (callTreeView) {
-    const analysisObserver = new IntersectionObserver((entries, observer) => {
-      const visible = entries[0].isIntersecting;
-      if (visible) {
-        renderCallTree(callTreeTable, rootMethod);
-        observer.disconnect();
-      }
-    });
-    analysisObserver.observe(callTreeView);
+  _appendTableWhenVisible() {
+    const callTreeWrapper = this._callTreeTableWrapper;
+    const rootMethod = this.timelineRoot;
+    if (callTreeWrapper && rootMethod) {
+      const analysisObserver = new IntersectionObserver((entries, observer) => {
+        const visible = entries[0].isIntersecting;
+        if (visible) {
+          renderCallTree(callTreeWrapper, rootMethod);
+          observer.disconnect();
+        }
+      });
+      analysisObserver.observe(callTreeWrapper);
+    }
   }
 }
 
@@ -152,6 +145,8 @@ export async function renderCallTree(
   rootMethod: RootNode
 ): Promise<void> {
   if (calltreeTable) {
+    // Ensure the table is fully visible before attempting to do things e.g go to rows.
+    // Otherwise there are visible rendering issues.
     await new Promise((resolve, reject) => {
       const visibilityObserver = new IntersectionObserver((entries, observer) => {
         const visible = entries[0].isIntersecting && entries[0].intersectionRatio > 0;
@@ -398,6 +393,10 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
 }
 
 export async function goToRow(timestamp: number) {
+  if (!tableContainer) {
+    return;
+  }
+
   document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
   await renderCallTree(tableContainer, rootMethod);
 

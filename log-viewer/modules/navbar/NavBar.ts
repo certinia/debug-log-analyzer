@@ -5,6 +5,7 @@ import { provideVSCodeDesignSystem, vsCodeButton, vsCodeTag } from '@vscode/webv
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import '../components/BadgeBase';
 import '../components/LogTitle';
 import { globalStyles } from '../global.styles';
 import { notificationStyles } from '../notification.styles';
@@ -110,11 +111,11 @@ export class NavBar extends LitElement {
     const sizeText = this.logSize ? (this.logSize / 1000000).toFixed(2) + ' MB' : '',
       elapsedText = this._toDuration(this.logDuration);
 
-    const statusClass =
+    const status =
       this.notifications.length > 0
-        ? 'failure-tag'
+        ? 'failure'
         : this.logStatus !== 'Processing...'
-        ? 'success-tag'
+        ? 'success'
         : '';
 
     return html`
@@ -122,9 +123,9 @@ export class NavBar extends LitElement {
         <div class="navbar--left">
           <div id="status" class="status__bar">
             <log-title logName="${this.logName}" logPath="${this.logPath}"></log-title>
-            <vscode-tag class="status-tag">${sizeText}</vscode-tag>
-            <vscode-tag class="status-tag">${elapsedText}</vscode-tag>
-            <vscode-tag class="status-tag ${statusClass}">${this.logStatus}</vscode-tag>
+            <badge-base>${sizeText}</badge-base>
+            <badge-base>${elapsedText}</badge-base>
+            <badge-base status="${status}">${this.logStatus}</badge-base>
             <notification-tag .notifications="${this.notifications}"></notification-tag>
           </div>
         </div>

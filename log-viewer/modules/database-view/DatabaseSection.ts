@@ -4,6 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import '../components/BadgeBase';
 import { globalStyles } from '../global.styles';
 import { Method } from '../parsers/TreeParser';
 
@@ -40,7 +41,9 @@ export class DatabaseSection extends LitElement {
 
     return html`
       <div class="dbSection">
-        <span class="dbTitle">${this.title} (Count: ${totalCount}, Rows: ${totalRows})</span>
+        <span class="dbTitle">${this.title}</span>
+        <badge-base>Count: ${totalCount}</badge-base>
+        <badge-base>Rows: ${totalRows}</badge-base>
       </div>
     `;
   }
