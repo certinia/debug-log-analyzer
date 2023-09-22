@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Log title redesigned for a more modern feel
   - Log Duration + Log Size now displayed as badges
   - Log issues show in a separate dialog when the issues count tag is clicked on the navigation bar
-- Display Ui outline while waiting for other actions for both `Log: Retrieve Apex Log And Show Analysis` and `Log: Show Apex Log Analysis`
+- Display Ui outline while waiting for other actions for both `Log: Retrieve Apex Log And Show Analysis` and `Log: Show Apex Log Analysis` ([#252][#252])
   - This could be waiting for the log to download from the org or to be parsed and processed.
 - The Log Analyzer will be published as a pre-release extension weekly ([#300][#300])
   - Click `Switch to Pre-Release Version` on the banner to get bleeding edge changes and help us to resolve bugs before the stable release.
@@ -249,6 +249,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Unreleased -->
 
+[#252]: https://github.com/certinia/debug-log-analyzer/issues/252
 [#363]: https://github.com/certinia/debug-log-analyzer/issues/363
 [#248]: https://github.com/certinia/debug-log-analyzer/issues/248
 [#249]: https://github.com/certinia/debug-log-analyzer/issues/249
