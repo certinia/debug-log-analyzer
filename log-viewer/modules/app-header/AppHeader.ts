@@ -48,10 +48,6 @@ export class AppHeader extends LitElement {
     document.addEventListener('show-tab', (e: Event) => {
       this._showTabEvent(e);
     });
-
-    document.addEventListener('logcontext', (e: Event) => {
-      this._updateLogContext(e);
-    });
   }
 
   static styles = [
@@ -160,34 +156,5 @@ export class AppHeader extends LitElement {
     if (this._selectedTab !== tabId) {
       this._selectedTab = tabId;
     }
-  }
-
-  _updateLogContext(e: Event) {
-    const logContext = (e as CustomEvent).detail;
-    ({
-      name: this.logName,
-      path: this.logPath,
-      size: this.logSize,
-      duration: this.logDuration,
-    } = logContext);
-
-    if (logContext.status) {
-      this.logStatus = logContext.status;
-    }
-
-    const truncated = logContext.truncated as TruncationEntry[];
-    if (truncated.length) {
-      this.notifications = [];
-      truncated.forEach((element) => {
-        const severity = element.color === TruncationColor.error ? 'Error' : 'Warning';
-
-        const logMessage = new Notification();
-        logMessage.message = element.reason;
-        logMessage.severity = severity;
-        this.notifications.push(logMessage);
-      });
-    }
-
-    this.timelineRoot = logContext.timelineRoot;
   }
 }

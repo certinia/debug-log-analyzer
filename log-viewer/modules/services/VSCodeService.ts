@@ -18,6 +18,7 @@ export function hostService(): HostService {
 }
 
 export interface HostService {
+  fetchLog(): void;
   openPath(path: string): void;
   saveFile(request: { fileContent: string; defaultFilename: string }): void;
   openType(info: OpenInfo): void;
@@ -42,6 +43,16 @@ export class VSCodeService implements HostService {
       this.vscodeAPIInstance = acquireVsCodeApi();
     } catch (e) {
       console.log('acquireVsCodeApi() exception: ' + e);
+    }
+  }
+
+  fetchLog() {
+    if (this.vscodeAPIInstance) {
+      this.vscodeAPIInstance.postMessage({
+        cmd: 'fetchLog',
+      });
+    } else {
+      console.log(`VSCodeService.fetchLog() with no VSCode instance.`);
     }
   }
 

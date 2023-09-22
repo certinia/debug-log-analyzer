@@ -20,23 +20,41 @@ interface WebViewLogFileRequest {
   options?: Record<string, never>;
 }
 
+export interface FetchLogCallBack {
+  (panel: WebviewPanel): void;
+}
+
 export class LogView {
   private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
 
   static async createView(
     wsPath: string,
     context: Context,
-    logPath: string
+    logName: string,
+    logPath: string,
+    callback: FetchLogCallBack
   ): Promise<WebviewPanel> {
     const panel = WebView.apply('logFile', 'Log: ' + basename(logPath), [
       Uri.file(join(context.context.extensionPath, 'out')),
       Uri.file(dirname(logPath)),
     ]);
+
+    const logViewerRoot = join(context.context.extensionPath, 'out');
+    const index = join(logViewerRoot, 'index.html');
+    const bundleUri = panel.webview.asWebviewUri(Uri.file(join(logViewerRoot, 'bundle.js')));
+    const indexSrc = await this.getFile(index);
+    panel.webview.html = indexSrc.replace('bundle.js', bundleUri.toString(true));
+
     panel.webview.onDidReceiveMessage(
       (msg: WebViewLogFileRequest) => {
         const request = msg;
 
         switch (request.cmd) {
+          case 'fetchLog': {
+            callback(panel);
+            break;
+          }
+
           case 'openPath':
             if (request.path) {
               context.display.showFile(request.path);
@@ -101,39 +119,6 @@ export class LogView {
     );
 
     return panel;
-  }
-
-  static async appendView(
-    view: WebviewPanel,
-    context: Context,
-    logName: string,
-    logPath: string
-  ): Promise<WebviewPanel> {
-    view.webview.html = await LogView.getViewContent(view, context, logName, logPath);
-    return view;
-  }
-
-  private static async getViewContent(
-    view: WebviewPanel,
-    context: Context,
-    logName: string,
-    logPath: string
-  ): Promise<string> {
-    const logViewerRoot = join(context.context.extensionPath, 'out');
-    const index = join(logViewerRoot, 'index.html');
-    const bundleUri = view.webview.asWebviewUri(Uri.file(join(logViewerRoot, 'bundle.js')));
-    const logPathUri = view.webview.asWebviewUri(Uri.file(logPath));
-    const toReplace: { [key: string]: string } = {
-      '@@name': logName, // eslint-disable-line @typescript-eslint/naming-convention
-      '@@path': logPath, // eslint-disable-line @typescript-eslint/naming-convention
-      'bundle.js': bundleUri.toString(true), // eslint-disable-line @typescript-eslint/naming-convention
-      'sample.log': logPathUri.toString(true), // eslint-disable-line @typescript-eslint/naming-convention
-    };
-
-    const indexSrc = await this.getFile(index);
-    return indexSrc.replace(/@@name|@@path|bundle.js|sample.log/gi, function (matched) {
-      return toReplace[matched];
-    });
   }
 
   private static async getFile(filePath: string): Promise<string> {

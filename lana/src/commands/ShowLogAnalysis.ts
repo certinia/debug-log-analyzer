@@ -3,12 +3,13 @@
  */
 import { parse } from 'path';
 import { Uri, window } from 'vscode';
+import { WebviewPanel } from 'vscode';
 
 import { appName } from '../AppSettings';
 import { Context } from '../Context';
 import { QuickPickWorkspace } from '../display/QuickPickWorkspace';
 import { Command } from './Command';
-import { LogView } from './LogView';
+import { FetchLogCallBack, LogView } from './LogView';
 
 export class ShowLogAnalysis {
   static getCommand(context: Context): Command {
@@ -38,9 +39,18 @@ export class ShowLogAnalysis {
     if (filePath) {
       const name = parse(filePath).name;
       const ws = await QuickPickWorkspace.pickOrReturn(context);
+      const getLogCallBack: FetchLogCallBack = (panel: WebviewPanel) => {
+        panel.webview.postMessage({
+          command: 'fetchLog',
+          data: {
+            logName: name,
+            logUri: panel.webview.asWebviewUri(Uri.file(filePath)).toString(true),
+            logPath: filePath,
+          },
+        });
+      };
 
-      const view = await LogView.createView(ws, context, filePath);
-      LogView.appendView(view, context, name, filePath);
+      LogView.createView(ws, context, name, filePath, getLogCallBack);
     } else {
       context.display.showErrorMessage(
         'No file selected or the file is too large. Try again using the file explorer or text editor command.'
