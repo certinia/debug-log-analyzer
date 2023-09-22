@@ -12,7 +12,6 @@ import { LitElement, PropertyValues, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
-import { rootMethod } from '../Main';
 import MinMaxEditor from '../datagrid/editors/MinMax';
 import MinMaxFilter from '../datagrid/filters/MinMax';
 import NumberFormat from '../datagrid/format/Number';
@@ -25,6 +24,7 @@ import treeViewStyles from './TreeView.scss';
 
 let calltreeTable: Tabulator;
 let tableContainer: HTMLDivElement | null;
+let rootMethod: RootNode | null;
 
 @customElement('call-tree-view')
 export class CalltreeView extends LitElement {
@@ -126,11 +126,11 @@ export class CalltreeView extends LitElement {
 
   _appendTableWhenVisible() {
     const callTreeWrapper = this._callTreeTableWrapper;
-    const rootMethod = this.timelineRoot;
+    rootMethod = this.timelineRoot;
     if (callTreeWrapper && rootMethod) {
       const analysisObserver = new IntersectionObserver((entries, observer) => {
         const visible = entries[0].isIntersecting;
-        if (visible) {
+        if (rootMethod && visible) {
           renderCallTree(callTreeWrapper, rootMethod);
           observer.disconnect();
         }
@@ -393,7 +393,7 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
 }
 
 export async function goToRow(timestamp: number) {
-  if (!tableContainer) {
+  if (!tableContainer || !rootMethod) {
     return;
   }
 
