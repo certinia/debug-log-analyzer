@@ -17,7 +17,6 @@ import { globalStyles } from '../global.styles';
 import '../log-levels/LogLevels';
 import '../navbar/NavBar';
 import { Notification } from '../notifications/NotificationPanel';
-import { TruncationColor, TruncationEntry } from '../parsers/TreeParser';
 import { RootNode } from '../timeline/Timeline';
 import '../timeline/TimelineView';
 
