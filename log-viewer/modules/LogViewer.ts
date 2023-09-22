@@ -80,7 +80,7 @@ export class LogViewer extends LitElement {
     this.logPath = data.logPath?.trim();
 
     const logUri = data.logUri;
-    const logData = await this._readLog(logUri);
+    const logData = data.logData || (await this._readLog(logUri));
     this.logSize = logData.length;
     document.dispatchEvent(
       new CustomEvent('logsettings', {
