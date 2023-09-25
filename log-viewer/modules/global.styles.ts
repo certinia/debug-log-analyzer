@@ -6,14 +6,15 @@ export const globalStyles = css`
     text-decoration: none;
     cursor: pointer;
 
-    :hover {
+    &:hover {
       color: var(--vscode-textLink-activeForeground);
       text-decoration: underline;
     }
 
-    :active {
+    &:active {
       background: transparent;
       color: var(--vscode-textLink-activeForeground);
+      text-decoration: underline;
     }
   }
 

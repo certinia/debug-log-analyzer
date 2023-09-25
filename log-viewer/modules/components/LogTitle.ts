@@ -42,6 +42,12 @@ export class LogTitle extends LitElement {
         overflow: hidden;
         text-overflow: ellipsis;
       }
+
+      a {
+        &:hover {
+          background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
+        }
+      }
     `,
   ];
 
