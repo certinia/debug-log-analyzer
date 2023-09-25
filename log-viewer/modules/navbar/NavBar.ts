@@ -123,8 +123,8 @@ export class NavBar extends LitElement {
         <div class="navbar--left">
           <div id="status" class="status__bar">
             <log-title logName="${this.logName}" logPath="${this.logPath}"></log-title>
-            <badge-base>${sizeText}</badge-base>
-            <badge-base>${elapsedText}</badge-base>
+            <badge-base .isloading="${!sizeText}">${sizeText}</badge-base>
+            <badge-base .isloading="${!elapsedText}">${elapsedText}</badge-base>
             <badge-base status="${status}">${this.logStatus}</badge-base>
             <notification-tag .notifications="${this.notifications}"></notification-tag>
           </div>

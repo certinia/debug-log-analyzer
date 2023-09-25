@@ -7,6 +7,7 @@ import { customElement, property } from 'lit/decorators.js';
 
 import { globalStyles } from '../global.styles';
 import { hostService } from '../services/VSCodeService';
+import { skeletonStyles } from './skeleton/skeleton.styles';
 
 provideVSCodeDesignSystem().register(vsCodeButton());
 
@@ -22,12 +23,14 @@ export class LogTitle extends LitElement {
    */
   static styles = [
     globalStyles,
+    skeletonStyles,
     css`
       :host {
         --text-weight-semibold: 600;
         display: flex;
         align-items: center;
         min-width: 4ch;
+        min-height: 1rem;
       }
       .title-item {
         padding-block: 6px;
@@ -39,25 +42,14 @@ export class LogTitle extends LitElement {
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      a {
-        color: var(--vscode-textLink-foreground);
-        text-decoration: none;
-        cursor: pointer;
-
-        &:hover {
-          background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
-          text-decoration: underline;
-        }
-
-        &:active {
-          background: transparent;
-          text-decoration: underline;
-        }
-      }
     `,
   ];
 
   render() {
+    if (!this.logName) {
+      return html`<div class="skeleton">&nbsp;</div>`;
+    }
+
     return html`<a class="title-item" href="#" @click="${this._goToLog}" title="${this.logPath}"
       >${this.logName}</a
     >`;

@@ -59,9 +59,9 @@ export class RetrieveLogFile {
     const logFileId = await RetrieveLogFile.getLogFile(logFiles);
     if (logFileId) {
       const logFilePath = this.getLogFilePath(ws, logFileId);
-
+      const writeLogFile = this.writeLogFile(ws, logFilePath);
       const getLogCallBack: FetchLogCallBack = async (panel: WebviewPanel) => {
-        await this.writeLogFile(ws, logFilePath);
+        await writeLogFile;
         panel.webview.postMessage({
           command: 'fetchLog',
           data: {

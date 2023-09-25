@@ -12,6 +12,7 @@ import { LitElement, PropertyValues, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
+import '../components/skeleton/GridSkeleton';
 import MinMaxEditor from '../datagrid/editors/MinMax';
 import MinMaxFilter from '../datagrid/filters/MinMax';
 import NumberFormat from '../datagrid/format/Number';
@@ -73,6 +74,8 @@ export class CalltreeView extends LitElement {
   ];
 
   render() {
+    const skeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : '';
+
     return html`
       <div id="call-tree-container">
         <div>
@@ -99,6 +102,7 @@ export class CalltreeView extends LitElement {
           </div>
         </div>
         <div id="call-tree-table-container">
+          ${skeleton}
           <div id="call-tree-table"></div>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { globalStyles } from '../global.styles';
+import { skeletonStyles } from './skeleton/skeleton.styles';
 
 provideVSCodeDesignSystem().register(vsCodeTag());
 
@@ -13,6 +14,10 @@ provideVSCodeDesignSystem().register(vsCodeTag());
 export class BadgeBase extends LitElement {
   @property()
   status: 'success' | 'failure' | 'neutral' = 'neutral';
+
+  @property({ type: Boolean })
+  isloading = false;
+
   colorMap = new Map<string, string>([
     ['success', 'success-tag'],
     ['failure', 'failure-tag'],
@@ -20,6 +25,7 @@ export class BadgeBase extends LitElement {
 
   static styles = [
     globalStyles,
+    skeletonStyles,
     css`
       :host {
       }
@@ -46,8 +52,10 @@ export class BadgeBase extends LitElement {
   ];
 
   render() {
+    if (this.isloading) {
+      return html`<vscode-tag class="tag skeleton">&nbsp;</vscode-tag>`;
+    }
     const statusTag = this.colorMap.get(this.status);
-
     return html`<vscode-tag class="tag ${statusTag}"><slot></slot></vscode-tag>`;
   }
 }

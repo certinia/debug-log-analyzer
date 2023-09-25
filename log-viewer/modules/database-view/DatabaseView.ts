@@ -95,6 +95,9 @@ export class DatabaseView extends LitElement {
   ];
 
   render() {
+    const dmlSkeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : ``;
+    const soqlSkeleton = dmlSkeleton;
+
     return html`
       <div id="db-container">
         <div>
@@ -112,6 +115,7 @@ export class DatabaseView extends LitElement {
             </div>
           </div>
           <div id="dml-table-container">
+            ${dmlSkeleton}
             <div id="db-dml-table"></div>
           </div>
         </div>
@@ -130,6 +134,7 @@ export class DatabaseView extends LitElement {
             </div>
           </div>
           <div id="soql-table-container">
+            ${soqlSkeleton}
             <div id="db-soql-table"></div>
           </div>
         </div>
@@ -147,11 +152,12 @@ export class DatabaseView extends LitElement {
     soqlTable.setGroupBy(checkBox.checked ? 'soql' : '');
   }
 
-  async _appendTableWhenVisible() {
+  _appendTableWhenVisible() {
+    const dbContainer = this.renderRoot?.querySelector('#db-container');
     const dmlTableWrapper = this._dmlTableWrapper;
     const soqlTableWrapper = this._soqlTableWrapper;
     const treeRoot = this.timelineRoot;
-    if (dmlTableWrapper && soqlTableWrapper && treeRoot) {
+    if (dbContainer && dmlTableWrapper && soqlTableWrapper && treeRoot) {
       const dbObserver = new IntersectionObserver(async (entries, observer) => {
         const visible = entries[0].isIntersecting;
         if (visible) {
@@ -166,7 +172,7 @@ export class DatabaseView extends LitElement {
           renderSOQLTable(soqlTableWrapper, this.soqlLines);
         }
       });
-      dbObserver.observe(dmlTableWrapper);
+      dbObserver.observe(dbContainer);
     }
   }
 }
