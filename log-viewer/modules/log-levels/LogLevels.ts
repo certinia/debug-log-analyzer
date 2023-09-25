@@ -4,6 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
+import { skeletonStyles } from '../components/skeleton/skeleton.styles';
 import { globalStyles } from '../global.styles';
 import { LogSetting } from '../parsers/TreeParser';
 
@@ -21,6 +22,7 @@ export class LogLevels extends LitElement {
 
   static styles = [
     globalStyles,
+    skeletonStyles,
     css`
       :host {
         display: flex;
@@ -40,13 +42,29 @@ export class LogLevels extends LitElement {
       .setting__title {
         font-weight: bold;
       }
+
       .setting__level {
         color: #808080;
+      }
+
+      .setting-skeleton {
+        min-width: 5ch;
+        width: 100px;
+        height: 1.5rem;
       }
     `,
   ];
 
   render() {
+    if (this.logSettings.length < 1) {
+      const logLevels = [];
+      for (let i = 0; i < 8; i++) {
+        const levelHtml = html`<div class="setting-skeleton skeleton"></div>`;
+        logLevels.push(levelHtml);
+      }
+      return html`${logLevels}`;
+    }
+
     const logLevels = [];
     for (const { key, level } of this.logSettings) {
       const levelHtml = html`<div class="setting">

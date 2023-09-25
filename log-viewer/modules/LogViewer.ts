@@ -21,7 +21,7 @@ import { hostService } from './services/VSCodeService';
 @customElement('log-viewer')
 export class LogViewer extends LitElement {
   @property({ type: String })
-  logName = 'No Log';
+  logName = '';
   @property()
   logPath = '';
   @property()

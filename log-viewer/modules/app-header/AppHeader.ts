@@ -25,7 +25,7 @@ provideVSCodeDesignSystem().register(vsCodePanelTab(), vsCodePanelView(), vsCode
 @customElement('app-header')
 export class AppHeader extends LitElement {
   @property({ type: String })
-  logName = 'No Log';
+  logName = '';
   @property()
   logPath = '';
   @property()
