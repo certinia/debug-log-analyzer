@@ -5,6 +5,7 @@ import { LitElement, PropertyValues, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
+import '../components/skeleton/GridSkeleton';
 import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
@@ -54,6 +55,8 @@ export class AnalysisView extends LitElement {
   ];
 
   render() {
+    const skeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : '';
+
     return html`
       <div>
         <strong>Group by</strong>
@@ -63,6 +66,7 @@ export class AnalysisView extends LitElement {
         </div>
       </div>
       <div id="analysis-table-container">
+        ${skeleton}
         <div id="analysis-table"></div>
       </div>
     `;
