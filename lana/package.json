@@ -47,11 +47,13 @@
     "commands": [
       {
         "command": "lana.retrieveLogFile",
-        "title": "Log: Retrieve Apex Log And Show Analysis"
+        "title": "Log: Retrieve Apex Log And Show Analysis",
+        "icon": "./certinia-icon-color.png"
       },
       {
         "command": "lana.showLogAnalysis",
-        "title": "Log: Show Apex Log Analysis"
+        "title": "Log: Show Apex Log Analysis",
+        "icon": "./certinia-icon-color.png"
       }
     ],
     "languages": [

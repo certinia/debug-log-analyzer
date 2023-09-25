@@ -120,6 +120,7 @@ export default [
         targets: [
           { src: 'log-viewer/out/*', dest: 'lana/out' },
           { src: ['CHANGELOG.md', 'LICENSE.txt', 'README.md'], dest: 'lana' },
+          { src: 'lana/certinia-icon-color.png', dest: 'lana/out' },
         ],
       }),
     ],
