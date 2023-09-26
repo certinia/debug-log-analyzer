@@ -8,6 +8,7 @@
 //todo: add class to locate current tree for current log
 //todo: add filter on line type
 //todo: add filter on log level (fine, finer etc)
+import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
 import { LitElement, PropertyValues, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
@@ -22,6 +23,8 @@ import { globalStyles } from '../global.styles';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
 import treeViewStyles from './TreeView.scss';
+
+provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 let calltreeTable: Tabulator;
 let tableContainer: HTMLDivElement | null;
@@ -70,6 +73,15 @@ export class CalltreeView extends LitElement {
       #call-tree-table-container {
         min-height: 0px;
       }
+
+      .checkbox__middle {
+        vertical-align: bottom;
+      }
+
+      .filter-container {
+        display: flex;
+        gap: 10px;
+      }
     `,
   ];
 
@@ -80,25 +92,16 @@ export class CalltreeView extends LitElement {
       <div id="call-tree-container">
         <div>
           <strong>Filter</strong>
-          <div>
-            <input
-              type="button"
-              id="call-tree-expand-btn"
-              value="Expand"
-              @click="${this._expandButtonClick}"
-            />
-            <input
-              type="button"
-              id="call-tree-collapse-btn"
-              value="Collapse"
-              @click="${this._collapseButtonClick}"
-            />
-            <input
-              id="calltree-show-details"
-              type="checkbox"
-              @change="${this._handleShowDetailsChange}"
-            />
-            <label for="calltree-show-details">Show Details</label>
+          <div class="filter-container">
+            <vscode-button appearance="secondary" @click="${this._expandButtonClick}"
+              >Expand</vscode-button
+            >
+            <vscode-button appearance="secondary" @click="${this._collapseButtonClick}"
+              >Collapse</vscode-button
+            >
+            <vscode-checkbox class="checkbox__middle" @change="${this._handleShowDetailsChange}"
+              >Show Details</vscode-checkbox
+            >
           </div>
         </div>
         <div id="call-tree-table-container">
@@ -109,10 +112,9 @@ export class CalltreeView extends LitElement {
     `;
   }
 
-  _handleShowDetailsChange(event: Event) {
-    const showDetails = event.target as HTMLInputElement;
+  _handleShowDetailsChange(event: any) {
     calltreeTable.setFilter((data, _filterParams) => {
-      return showDetails.checked || data.originalData.duration || data.originalData.discontinuity;
+      return event.target.checked || data.originalData.duration || data.originalData.discontinuity;
     });
   }
 
