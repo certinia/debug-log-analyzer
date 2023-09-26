@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-// import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import {
   provideVSCodeDesignSystem,
   vsCodePanelTab,
@@ -18,7 +17,6 @@ import { globalStyles } from '../global.styles';
 import '../log-levels/LogLevels';
 import '../navbar/NavBar';
 import { Notification } from '../notifications/NotificationPanel';
-// import { codiconStyles } from '../styles/codicon.styles';
 import codiconStyles from '../styles/codicon.css';
 import { RootNode } from '../timeline/Timeline';
 import '../timeline/TimelineView';
