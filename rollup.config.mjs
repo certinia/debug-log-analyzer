@@ -121,6 +121,7 @@ export default [
           { src: 'log-viewer/out/*', dest: 'lana/out' },
           { src: ['CHANGELOG.md', 'LICENSE.txt', 'README.md'], dest: 'lana' },
           { src: 'lana/certinia-icon-color.png', dest: 'lana/out' },
+          { src: 'node_modules/@vscode/codicons/dist/codicon.ttf', dest: 'lana/out' },
         ],
       }),
     ],

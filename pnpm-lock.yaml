@@ -131,6 +131,9 @@ importers:
       '@apexdevtools/apex-parser':
         specifier: ^3.3.0
         version: 3.3.0
+      '@vscode/codicons':
+        specifier: ^0.0.33
+        version: 0.0.33
       '@vscode/webview-ui-toolkit':
         specifier: ^1.2.2
         version: 1.2.2(react@18.2.0)
@@ -1833,6 +1836,10 @@ packages:
       '@typescript-eslint/types': 5.62.0
       eslint-visitor-keys: 3.4.3
     dev: true
+
+  /@vscode/codicons@0.0.33:
+    resolution: {integrity: sha512-VdgpnD75swH9hpXjd34VBgQ2w2quK63WljodlUcOoJDPKiV+rPjHrcUc2sjLCNKxhl6oKqmsZgwOWcDAY2GKKQ==}
+    dev: false
 
   /@vscode/webview-ui-toolkit@1.2.2(react@18.2.0):
     resolution: {integrity: sha512-xIQoF4FC3Xh6d7KNKIoIezSiFWYFuf6gQMdDyKueKBFGeKwaHWEn+dY2g3makvvEsNMEDji/woEwvg9QSbuUsw==}

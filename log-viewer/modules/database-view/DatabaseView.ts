@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
+import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
 import { LitElement, PropertyValues, css, html, render, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
@@ -26,6 +27,8 @@ import { hostService } from '../services/VSCodeService';
 import './DatabaseSOQLDetailPanel';
 import './DatabaseSection';
 import databaseViewStyles from './DatabaseView.scss';
+
+provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 let soqlTable: Tabulator;
 let dmlTable: Tabulator;
@@ -105,13 +108,7 @@ export class DatabaseView extends LitElement {
           <div>
             <strong>Group by</strong>
             <div>
-              <input
-                id="db-dml-groupby-checkbox"
-                type="checkbox"
-                checked
-                @change=${this._dmlGroupBy}
-              />
-              <label for="db-dml-groupby-checkbox">DML</label>
+              <vscode-checkbox @change="${this._dmlGroupBy}" checked>DML</vscode-checkbox>
             </div>
           </div>
           <div id="dml-table-container">
@@ -124,13 +121,7 @@ export class DatabaseView extends LitElement {
           <div>
             <strong>Group by</strong>
             <div>
-              <input
-                id="db-soql-groupby-checkbox"
-                type="checkbox"
-                checked
-                @change=${this._soqlGroupBy}
-              />
-              <label for="db-soql-groupby-checkbox">SOQL</label>
+              <vscode-checkbox @change="${this._soqlGroupBy}" checked>SOQL</vscode-checkbox>
             </div>
           </div>
           <div id="soql-table-container">
@@ -142,14 +133,12 @@ export class DatabaseView extends LitElement {
     `;
   }
 
-  _dmlGroupBy(event: Event) {
-    const checkBox = event.target as HTMLInputElement;
-    dmlTable.setGroupBy(checkBox.checked ? 'dml' : '');
+  _dmlGroupBy(event: any) {
+    dmlTable.setGroupBy(event.target.checked ? 'dml' : '');
   }
 
-  _soqlGroupBy(event: Event) {
-    const checkBox = event.target as HTMLInputElement;
-    soqlTable.setGroupBy(checkBox.checked ? 'soql' : '');
+  _soqlGroupBy(event: any) {
+    soqlTable.setGroupBy(event.target.checked ? 'soql' : '');
   }
 
   _appendTableWhenVisible() {

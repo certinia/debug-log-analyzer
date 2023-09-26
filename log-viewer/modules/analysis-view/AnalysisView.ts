@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
+import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
 import { LitElement, PropertyValues, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
@@ -13,6 +14,8 @@ import dataGridStyles from '../datagrid/style/DataGrid.scss';
 import { globalStyles } from '../global.styles';
 import { RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
+
+provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 let analysisTable: Tabulator;
 let tableContainer: HTMLDivElement | null;
@@ -61,8 +64,7 @@ export class AnalysisView extends LitElement {
       <div>
         <strong>Group by</strong>
         <div>
-          <input id="analysis-groupby-checkbox" type="checkbox" @change="${this._groupBy}" />
-          <label for="analysis-groupby-checkbox">Type</label>
+          <vscode-checkbox @change="${this._groupBy}">Type</vscode-checkbox>
         </div>
       </div>
       <div id="analysis-table-container">
@@ -72,9 +74,8 @@ export class AnalysisView extends LitElement {
     `;
   }
 
-  _groupBy(event: Event) {
-    const checkBox = event.target as HTMLInputElement;
-    analysisTable.setGroupBy(checkBox.checked ? 'type' : '');
+  _groupBy(event: any) {
+    analysisTable.setGroupBy(event.target.checked ? 'type' : '');
   }
 
   _appendTableWhenVisible() {
