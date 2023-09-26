@@ -1,13 +1,14 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
+// import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import {
   provideVSCodeDesignSystem,
   vsCodePanelTab,
   vsCodePanelView,
   vsCodePanels,
 } from '@vscode/webview-ui-toolkit';
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import '../analysis-view/AnalysisView';
@@ -17,6 +18,8 @@ import { globalStyles } from '../global.styles';
 import '../log-levels/LogLevels';
 import '../navbar/NavBar';
 import { Notification } from '../notifications/NotificationPanel';
+// import { codiconStyles } from '../styles/codicon.styles';
+import codiconStyles from '../styles/codicon.css';
 import { RootNode } from '../timeline/Timeline';
 import '../timeline/TimelineView';
 
@@ -51,6 +54,7 @@ export class AppHeader extends LitElement {
 
   static styles = [
     globalStyles,
+    unsafeCSS(codiconStyles),
     css`
       :host {
         background-color: var(--vscode-tab-activeBackground);
@@ -105,24 +109,28 @@ export class AppHeader extends LitElement {
           data-show="timeline-view"
           @click="${this._showTabHTMLElem}"
         >
-          Timeline
+          <span class="codicon codicon-graph">&nbsp;</span>
+          <span>Timeline</span>
         </vscode-panel-tab>
         <vscode-panel-tab
           id="tree-tab"
           data-show="call-tree-view"
           @click="${this._showTabHTMLElem}"
         >
-          Call Tree
+          <span class="codicon codicon-list-tree">&nbsp;</span>
+          <span>Call Tree</span>
         </vscode-panel-tab>
         <vscode-panel-tab
           id="analysis-tab"
           data-show="analysis-view"
           @click="${this._showTabHTMLElem}"
         >
-          Analysis
+          <span class="codicon codicon-code">&nbsp;</span>
+          <span>Analysis</span>
         </vscode-panel-tab>
         <vscode-panel-tab id="database-tab" data-show="db-view" @click="${this._showTabHTMLElem}">
-          Database
+          <span class="codicon codicon-database">&nbsp;</span>
+          <span>Database</span>
         </vscode-panel-tab>
 
         <vscode-panel-view id="view1">
