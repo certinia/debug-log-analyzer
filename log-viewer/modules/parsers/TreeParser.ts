@@ -62,11 +62,13 @@ export class LineIterator {
 export class TruncationEntry {
   timestamp: number;
   reason: string;
+  description: string;
   color: string;
 
-  constructor(timestamp: number, reason: string, color: string) {
+  constructor(timestamp: number, reason: string, description: string, color: string) {
     this.timestamp = timestamp;
     this.reason = reason;
+    this.description = description;
     this.color = color;
   }
 }
@@ -112,7 +114,7 @@ export abstract class LogLine {
 
   onEnd?(end: LogLine, stack: LogLine[]): void;
 
-  onAfter?(next: LogLine): void;
+  onAfter?(next?: LogLine): void;
 }
 
 /**
@@ -191,7 +193,12 @@ export class Method extends TimedNode {
         return true; // we match a method further down the stack - unwind
       }
       // we found an exit event on its own e.g a `METHOD_EXIT` without a `METHOD_ENTRY`
-      truncateLog(endLine.timestamp, 'Unexpected-Exit', 'unexpected');
+      truncateLog(
+        endLine.timestamp,
+        'Unexpected-Exit',
+        'An exit event was found without a corresponding entry event e.g a `METHOD_EXIT` event without a `METHOD_ENTRY`',
+        'unexpected'
+      );
       return false; // we have no matching method - ignore
     }
   }
@@ -233,9 +240,19 @@ export class Method extends TimedNode {
         this.exitStamp = lastTimestamp;
 
         // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
-        truncateLog(lastTimestamp, 'Unexpected-End', 'unexpected');
+        truncateLog(
+          lastTimestamp,
+          'Unexpected-End',
+          'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
+          'unexpected'
+        );
         if (this.isTruncated) {
-          updateTruncated(lastTimestamp, 'Max-Size-reached', 'skip');
+          updateTruncated(
+            lastTimestamp,
+            'Max-Size-reached',
+            'The maximum log size has been reached. Part of the log has been truncated.',
+            'skip'
+          );
         }
         this.isTruncated = true;
       }
@@ -289,12 +306,17 @@ export class RootNode extends Method {
   }
 }
 
-export function truncateLog(timestamp: number, reason: string, colorKey: TruncateKey) {
+export function truncateLog(
+  timestamp: number,
+  reason: string,
+  description: string,
+  colorKey: TruncateKey
+) {
   if (!reasons.has(reason)) {
     reasons.add(reason);
     // default to error is probably the safest if we have no matching color for the type
     const color = truncateColor.get(colorKey) || TruncationColor.error;
-    truncated.push(new TruncationEntry(timestamp, reason, color));
+    truncated.push(new TruncationEntry(timestamp, reason, description, color));
 
     if (reason === 'Max-Size-reached') {
       maxSizeTimestamp = timestamp;
@@ -304,7 +326,12 @@ export function truncateLog(timestamp: number, reason: string, colorKey: Truncat
   }
 }
 
-function updateTruncated(timestamp: number, reason: string, colorKey: TruncateKey) {
+function updateTruncated(
+  timestamp: number,
+  reason: string,
+  description: string,
+  colorKey: TruncateKey
+) {
   const elem = truncated.findIndex((item) => {
     return item.reason === reason;
   });
@@ -313,7 +340,7 @@ function updateTruncated(timestamp: number, reason: string, colorKey: TruncateKe
   }
   reasons.delete(reason);
 
-  truncateLog(timestamp, reason, colorKey);
+  truncateLog(timestamp, reason, description, colorKey);
 }
 
 export function parseObjectNamespace(text: string): string {
@@ -917,7 +944,7 @@ class LimitUsageForNSLine extends LogLine {
     this.text = parts[2];
   }
 
-  onAfter(_next: LogLine): void {
+  onAfter(_next?: LogLine): void {
     const matched = this.text.match(/Maximum CPU time: (\d+)/),
       cpuText = matched ? matched[1] : '0',
       cpuTime = parseInt(cpuText, 10) * 1000000; // convert from milli-seconds to nano-seconds
@@ -1105,8 +1132,10 @@ class EnteringManagedPackageLine extends Method {
     this.text = this.type + ' : ' + this.namespace;
   }
 
-  onAfter(end: LogLine): void {
-    this.exitStamp = end.timestamp;
+  onAfter(end?: LogLine): void {
+    if (end) {
+      this.exitStamp = end.timestamp;
+    }
   }
 }
 
@@ -1869,13 +1898,19 @@ class ExceptionThrownLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    const text = parts[3];
-    if (text.indexOf('System.LimitException') >= 0) {
-      truncateLog(this.timestamp, text, 'error');
-    }
-
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = text;
+    this.text = parts[3];
+  }
+
+  onAfter(_next?: LogLine): void {
+    if (this.text.indexOf('System.LimitException') >= 0) {
+      const isMultiLine = this.text.indexOf('\n');
+      const len = isMultiLine < 0 ? 99 : isMultiLine;
+      const truncateText = this.text.length > len;
+      const summary = this.text.slice(0, len + 1) + (truncateText ? '…' : '');
+      const message = truncateText ? this.text : '';
+      truncateLog(this.timestamp, summary, message, 'error');
+    }
   }
 }
 
@@ -1886,9 +1921,14 @@ class FatalErrorLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    truncateLog(this.timestamp, 'FATAL ERROR! cause=' + parts[2], 'error');
-
     this.text = parts[2];
+  }
+
+  onAfter(_next?: LogLine): void {
+    const newLineIndex = this.text.indexOf('\n');
+    const summary = newLineIndex > -1 ? this.text.slice(0, newLineIndex + 1) : this.text;
+    const detailText = summary.length !== this.text.length ? this.text : '';
+    truncateLog(this.timestamp, 'FATAL ERROR! cause=' + summary, detailText, 'error');
   }
 }
 
@@ -2649,9 +2689,19 @@ export function parseLine(line: string, lastEntry: LogLine | null): LogLine | nu
     }
   } else {
     if (lastEntry && line.startsWith('*** Skipped')) {
-      truncateLog(lastEntry.timestamp, 'Skipped-Lines', 'skip');
+      truncateLog(
+        lastEntry.timestamp,
+        'Skipped-Lines',
+        `${line}. A section of the log has been skipped and the log has been truncated. Full details of this section of log can not be provided.`,
+        'skip'
+      );
     } else if (lastEntry && line.indexOf('MAXIMUM DEBUG LOG SIZE REACHED') >= 0) {
-      truncateLog(lastEntry.timestamp, 'Max-Size-reached', 'skip');
+      truncateLog(
+        lastEntry.timestamp,
+        'Max-Size-reached',
+        'The maximum log size has been reached. Part of the log has been truncated.',
+        'skip'
+      );
     } else if (settingsPattern.test(line)) {
       // skip an unexpected settings line
     } else {
@@ -2688,6 +2738,8 @@ export default async function parseLog(log: string): Promise<LogLine[]> {
       }
     }
   }
+
+  lastEntry?.onAfter?.();
 
   return logLines;
 }
