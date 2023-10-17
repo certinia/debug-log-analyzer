@@ -16,6 +16,7 @@ import '../components/CallStack';
 import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
+import dataGridStyles from '../datagrid/style/DataGrid.scss';
 import { globalStyles } from '../global.styles';
 import {
   DMLBeginLine,
@@ -63,6 +64,7 @@ export class DatabaseView extends LitElement {
   }
 
   static styles = [
+    unsafeCSS(dataGridStyles),
     unsafeCSS(databaseViewStyles),
     globalStyles,
     css`
@@ -238,6 +240,18 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
       headerMenu: csvheaderMenu('dml.csv'),
     },
     initialSort: [{ column: 'rowCount', dir: 'desc' }],
+    headerSortElement: function (column, dir) {
+      switch (dir) {
+        case 'asc':
+          return "<div class='sort-by--top'></div>";
+          break;
+        case 'desc':
+          return "<div class='sort-by--bottom'></div>";
+          break;
+        default:
+          return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
+      }
+    },
     columns: [
       {
         title: 'DML',
@@ -421,6 +435,18 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
       headerMenu: csvheaderMenu('soql.csv'),
     },
     initialSort: [{ column: 'rowCount', dir: 'desc' }],
+    headerSortElement: function (column, dir) {
+      switch (dir) {
+        case 'asc':
+          return "<div class='sort-by--top'></div>";
+          break;
+        case 'desc':
+          return "<div class='sort-by--bottom'></div>";
+          break;
+        default:
+          return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
+      }
+    },
     columns: [
       {
         title: 'Selective',
