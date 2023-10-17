@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Log issues show in a separate dialog when the issues count tag is clicked on the navigation bar
 - Show skeleton loading UIs / UI Outlines when waiting for the log to be processed e.g when running `Log: Retrieve Apex Log And Show Analysis` and `Log: Show Apex Log Analysis` ([#252][#252])
   - This could be waiting for the log to download from the org or to be parsed and processed.
-- Show the Certinia logo next to the Open Log Analyzer tab and next to the file name on the file list in the quick open menu ([#250][#250])
+- What's new notification to open the change log on upgrades ([#210][#210])
+- Show the Certinia logo next to the currently opened Log Analyzer tab and next to the file name on the file list in the quick open menu ([#250][#250])
 - The Log Analyzer will be published as a pre-release extension weekly ([#300][#300])
   - Click `Switch to Pre-Release Version` on the banner to get bleeding edge changes and help us to resolve bugs before the stable release.
 
@@ -250,6 +251,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Unreleased -->
 
+[#210]: https://github.com/certinia/debug-log-analyzer/issues/210
 [#250]: https://github.com/certinia/debug-log-analyzer/issues/250
 [#252]: https://github.com/certinia/debug-log-analyzer/issues/252
 [#363]: https://github.com/certinia/debug-log-analyzer/issues/363

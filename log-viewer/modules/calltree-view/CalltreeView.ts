@@ -2,6 +2,7 @@
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
 // todo: add breadcrumbs back? - I will do this but in a later PR + better
+// todo: improve scroll rows performance
 //
 //todo: ** future **
 //todo: show total and self as percentage of total? + do the same on the analysis view?

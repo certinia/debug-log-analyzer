@@ -407,6 +407,7 @@ export function setColors(timelineColors: TimelineColors) {
   state.requestRedraw();
 }
 
+// todo: this is slugish on zoom. Can be improve without swith from 2dgl?
 function drawTimeLine() {
   if (ctx) {
     resize();
