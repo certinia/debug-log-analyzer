@@ -97,7 +97,8 @@ export class LogViewer extends LitElement {
         const severity = element.color === TruncationColor.error ? 'Error' : 'Warning';
 
         const logMessage = new Notification();
-        logMessage.message = element.reason;
+        logMessage.summary = element.reason;
+        logMessage.message = element.description;
         logMessage.severity = severity;
         localNotifications.push(logMessage);
       });
@@ -124,9 +125,8 @@ export class LogViewer extends LitElement {
           } else {
             msg = String(err);
           }
-          msg = `Could not read log: ${msg}`;
 
-          truncateLog(0, msg, 'error');
+          truncateLog(0, 'Could not read log', msg || '', 'error');
           return Promise.reject('');
         });
     } else {
