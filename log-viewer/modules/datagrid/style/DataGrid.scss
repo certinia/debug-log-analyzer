@@ -87,7 +87,7 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
   }
 
   .tabulator-cell.datagrid-textarea {
-    white-space: pre-wrap;
+    white-space: normal;
     overflow-wrap: break-word;
   }
 

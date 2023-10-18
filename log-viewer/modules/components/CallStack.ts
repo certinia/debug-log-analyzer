@@ -13,22 +13,28 @@ import { LogLine } from '../parsers/TreeParser';
 export class CallStack extends LitElement {
   @property({ type: Number })
   timestamp = -1;
+  @property({ type: Number })
+  startDepth = 1;
+  @property({ type: Number })
+  endDepth = -1;
 
   static styles = [
     globalStyles,
     css`
       :host {
-        flex: 1;
-        overflow-y: scroll;
+        overflow: hidden;
         min-width: 0%;
+        min-height: 1ch;
         max-height: 30vh;
         padding: 0px 5px 0px 5px;
       }
 
+      :host(:hover) {
+        overflow: scroll;
+      }
+
       .stackEntry {
         cursor: pointer;
-        overflow: hidden;
-        text-overflow: ellipsis;
       }
 
       .dbLinkContainer {
@@ -44,33 +50,47 @@ export class CallStack extends LitElement {
         font-weight: var(--vscode-font-weight, normal);
         font-size: var(--vscode-editor-font-size, 0.9em);
       }
+
+      details {
+        display: flex;
+      }
     `,
   ];
 
   render() {
-    const htmlTitle = html`<span class="title">Callstack</span>`;
     const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() || [];
     if (stack.length) {
-      const details = stack.map((entry) => this.lineLink(entry));
-      return html`${htmlTitle}${details}`;
+      const details = stack.slice(this.startDepth, this.endDepth).map((entry) => {
+        return this.lineLink(entry);
+      });
+
+      if (details.length === 1) {
+        return details;
+      }
+
+      return html` <details>
+        <summary>${details[0]}</summary>
+        ${details.slice(1, -1)}
+      </details>`;
     } else {
-      return html`${htmlTitle}
-        <div class="stackEntry">No call stack available</div>`;
+      return html` <div class="stackEntry">No call stack available</div>`;
     }
   }
 
   private lineLink(line: LogLine) {
-    return html`<div class="dbLinkContainer" title="${line.text}">
+    return html`
       <a
         @click=${this.onCallerClick}
         class="stackEntry code-text"
         data-timestamp="${line.timestamp}"
         >${line.text}</a
       >
-    </div> `;
+    `;
   }
 
   private onCallerClick(evt: Event) {
+    evt.stopPropagation();
+    evt.preventDefault();
     const target = evt.target as HTMLElement;
     const dataTimestamp = target.getAttribute('data-timestamp');
     if (dataTimestamp) {
