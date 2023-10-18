@@ -91,7 +91,7 @@ export class SOQLLinterIssues extends LitElement {
     const soqlIssues = [];
     if (soqlLine) {
       const explain = soqlLine.children[0] as SOQLExecuteExplainLine;
-      if (explain.relativeCost && explain.relativeCost > 1) {
+      if (explain?.relativeCost && explain.relativeCost > 1) {
         soqlIssues.push(new ExplainLineSelectivityRule(explain.relativeCost));
       }
     }
