@@ -196,6 +196,7 @@ export async function renderCallTree(
         resizable: true,
         headerSortStartingDir: 'desc',
         headerTooltip: true,
+        headerWordWrap: true,
       },
       headerSortElement: function (column, dir) {
         switch (dir) {

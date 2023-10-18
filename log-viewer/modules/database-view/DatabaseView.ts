@@ -238,6 +238,7 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
       headerSortStartingDir: 'desc',
       headerTooltip: true,
       headerMenu: csvheaderMenu('dml.csv'),
+      headerWordWrap: true,
     },
     initialSort: [{ column: 'rowCount', dir: 'desc' }],
     headerSortElement: function (column, dir) {
@@ -433,6 +434,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
       headerSortStartingDir: 'desc',
       headerTooltip: true,
       headerMenu: csvheaderMenu('soql.csv'),
+      headerWordWrap: true,
     },
     initialSort: [{ column: 'rowCount', dir: 'desc' }],
     headerSortElement: function (column, dir) {

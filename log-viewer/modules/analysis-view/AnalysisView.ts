@@ -151,6 +151,7 @@ async function renderAnalysis(rootMethod: RootNode) {
       headerSortStartingDir: 'desc',
       headerTooltip: true,
       headerMenu: headerMenu,
+      headerWordWrap: true,
     },
     initialSort: [{ column: 'selfTime', dir: 'desc' }],
     headerSortElement: function (column, dir) {
