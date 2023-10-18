@@ -20,6 +20,7 @@ import MinMaxFilter from '../datagrid/filters/MinMax';
 import NumberFormat from '../datagrid/format/Number';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
 import { RowNavigation } from '../datagrid/module/RowNavigation';
+import dataGridStyles from '../datagrid/style/DataGrid.scss';
 import { globalStyles } from '../global.styles';
 import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
 import { hostService } from '../services/VSCodeService';
@@ -51,6 +52,7 @@ export class CalltreeView extends LitElement {
   }
 
   static styles = [
+    unsafeCSS(dataGridStyles),
     unsafeCSS(treeViewStyles),
     globalStyles,
     css`
@@ -194,6 +196,19 @@ export async function renderCallTree(
         resizable: true,
         headerSortStartingDir: 'desc',
         headerTooltip: true,
+        headerWordWrap: true,
+      },
+      headerSortElement: function (column, dir) {
+        switch (dir) {
+          case 'asc':
+            return "<div class='sort-by--top'></div>";
+            break;
+          case 'desc':
+            return "<div class='sort-by--bottom'></div>";
+            break;
+          default:
+            return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
+        }
       },
       columns: [
         {

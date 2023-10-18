@@ -87,11 +87,32 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
   }
 
   .tabulator-cell.datagrid-textarea {
-    white-space: pre-wrap;
+    white-space: normal;
     overflow-wrap: break-word;
   }
 
   input[type='checkbox'] {
     vertical-align: middle;
+  }
+
+  .sort-by {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .sort-by--bottom {
+    color: rgb(102, 102, 102);
+    border-bottom: none;
+    border-top: 6px solid rgb(102, 102, 102);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+  }
+  .sort-by--top {
+    color: rgb(102, 102, 102);
+    border-bottom: 6px solid rgb(102, 102, 102);
+    border-top: none;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
   }
 }

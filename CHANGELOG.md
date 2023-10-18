@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Log title redesigned for a more modern feel
   - Log Duration + Log Size now displayed as badges
   - Log issues show in a separate dialog when the issues count tag is clicked on the navigation bar
+- Database View tweaks ([#279][#279])
+  - Show full SOQL/ DML text instead of truncating
+  - Show the detail panel by default, including call stack and SOQL issues.
+- Database, Call Tree and Analysis View ([#279][#279])
+  - New sort icon (up and down arrow) when a column is in an unsorted state
 - Show skeleton loading UIs / UI Outlines when waiting for the log to be processed e.g when running `Log: Retrieve Apex Log And Show Analysis` and `Log: Show Apex Log Analysis` ([#252][#252])
   - This could be waiting for the log to download from the org or to be parsed and processed.
 - What's new notification to open the change log on upgrades ([#210][#210])
@@ -251,6 +256,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- Unreleased -->
 
+[#279]: https://github.com/certinia/debug-log-analyzer/issues/279
 [#210]: https://github.com/certinia/debug-log-analyzer/issues/210
 [#250]: https://github.com/certinia/debug-log-analyzer/issues/250
 [#252]: https://github.com/certinia/debug-log-analyzer/issues/252

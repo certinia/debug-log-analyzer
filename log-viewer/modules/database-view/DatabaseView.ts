@@ -16,6 +16,7 @@ import '../components/CallStack';
 import NumberAccessor from '../datagrid/dataaccessor/Number';
 import Number from '../datagrid/format/Number';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
+import dataGridStyles from '../datagrid/style/DataGrid.scss';
 import { globalStyles } from '../global.styles';
 import {
   DMLBeginLine,
@@ -63,6 +64,7 @@ export class DatabaseView extends LitElement {
   }
 
   static styles = [
+    unsafeCSS(dataGridStyles),
     unsafeCSS(databaseViewStyles),
     globalStyles,
     css`
@@ -167,8 +169,6 @@ export class DatabaseView extends LitElement {
 }
 
 function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
-  let currentSelectedRow: RowComponent | null;
-
   const dmlData: unknown[] = [];
   let dmlText: string[] = [];
   if (dmlLines) {
@@ -221,8 +221,8 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
       </div>
         `;
     },
+
     groupToggleElement: 'header',
-    selectable: 1,
     selectableCheck: function (row) {
       return !row.getData().isDetail;
     },
@@ -236,8 +236,21 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
       headerSortStartingDir: 'desc',
       headerTooltip: true,
       headerMenu: csvheaderMenu('dml.csv'),
+      headerWordWrap: true,
     },
     initialSort: [{ column: 'rowCount', dir: 'desc' }],
+    headerSortElement: function (column, dir) {
+      switch (dir) {
+        case 'asc':
+          return "<div class='sort-by--top'></div>";
+          break;
+        case 'desc':
+          return "<div class='sort-by--bottom'></div>";
+          break;
+        default:
+          return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
+      }
+    },
     columns: [
       {
         title: 'DML',
@@ -247,7 +260,16 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
         bottomCalc: () => {
           return 'Total';
         },
-        cssClass: 'datagrid-code-text',
+        cssClass: 'datagrid-textarea datagrid-code-text',
+        variableHeight: true,
+        formatter: (cell, _formatterParams, _onRendered) => {
+          const data: any = cell.getData();
+          return `<call-stack
+          timestamp=${data.timestamp}
+          startDepth="0"
+          endDepth="1"
+        ></call-stack>`;
+        },
       },
       {
         title: 'Row Count',
@@ -290,8 +312,25 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
   });
 
   dmlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
-    //@ts-expect-error types field needs update
-    group.isVisible && group.scrollTo('nearest', true);
+    if (!group.isVisible()) {
+      dmlTable.blockRedraw();
+      dmlTable.getRows().forEach((row) => {
+        !row.isTreeExpanded() && row.treeExpand();
+      });
+      dmlTable.restoreRedraw();
+    }
+  });
+
+  dmlTable.on('groupVisibilityChanged', (group: GroupComponent, visible: boolean) => {
+    const firstRow = visible ? group.getRows()[0] : group.getRows()[0].getPrevRow();
+    if (firstRow) {
+      // @ts-expect-error it has 2 params
+      firstRow.scrollTo('center', true).then(() => {
+        firstRow
+          .getElement()
+          .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+      });
+    }
   });
 
   dmlTable.on('rowClick', function (e, row) {
@@ -299,39 +338,23 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
     if (!(data.timestamp && data.dml)) {
       return;
     }
-    const oldRow = currentSelectedRow;
-    const table = row.getTable();
-    table.blockRedraw();
-    if (oldRow) {
-      oldRow.treeCollapse();
-      currentSelectedRow = null;
-    }
+    const origRowHeight = row.getElement().offsetHeight;
 
-    if (oldRow !== row) {
-      row.treeExpand();
-      currentSelectedRow = row;
-    }
-    table.restoreRedraw();
+    row.treeToggle();
+    row.getCell('soql').getElement().style.height = origRowHeight + 'px';
 
-    if (currentSelectedRow) {
-      const nextRow = currentSelectedRow.getNextRow() || currentSelectedRow.getTreeChildren()[0];
-      if (nextRow) {
-        // @ts-expect-error it has 2 params
-        nextRow.scrollTo('center', true).then(() => {
-          //NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
-          // This needs fixing in main tabulator lib
-          nextRow
-            .getElement()
-            .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-        });
-      }
+    const nextRow = row.getNextRow() || row.getTreeChildren()[0];
+    if (nextRow) {
+      // @ts-expect-error it has 2 params
+      nextRow.scrollTo('center', true).then(() => {
+        nextRow.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+      });
     }
   });
 }
 
 function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
   const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
-  let currentSelectedRow: RowComponent | null;
   interface GridSOQLData {
     isSelective: boolean | null;
     relativeCost: number | null;
@@ -405,7 +428,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
       </div>`;
     },
     groupToggleElement: 'header',
-    selectable: 1,
+
     selectableCheck: function (row) {
       return !row.getData().isDetail;
     },
@@ -419,9 +442,44 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
       headerSortStartingDir: 'desc',
       headerTooltip: true,
       headerMenu: csvheaderMenu('soql.csv'),
+      headerWordWrap: true,
     },
     initialSort: [{ column: 'rowCount', dir: 'desc' }],
+    headerSortElement: function (column, dir) {
+      switch (dir) {
+        case 'asc':
+          return "<div class='sort-by--top'></div>";
+          break;
+        case 'desc':
+          return "<div class='sort-by--bottom'></div>";
+          break;
+        default:
+          return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
+      }
+    },
     columns: [
+      {
+        title: 'SOQL',
+        field: 'soql',
+        headerSortStartingDir: 'asc',
+        sorter: 'string',
+        tooltip: true,
+        bottomCalc: () => {
+          return 'Total';
+        },
+        cssClass: 'datagrid-textarea datagrid-code-text',
+        variableHeight: true,
+        formatter: (cell, _formatterParams, _onRendered) => {
+          cell.getRow().normalizeHeight();
+
+          const data: any = cell.getData();
+          return `<call-stack
+          timestamp=${data.timestamp}
+          startDepth="0"
+          endDepth="1"
+        ></call-stack>`;
+        },
+      },
       {
         title: 'Selective',
         field: 'isSelective',
@@ -483,17 +541,6 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
         },
       },
       {
-        title: 'SOQL',
-        field: 'soql',
-        headerSortStartingDir: 'asc',
-        sorter: 'string',
-        tooltip: true,
-        bottomCalc: () => {
-          return 'Total';
-        },
-        cssClass: 'datagrid-code-text',
-      },
-      {
         title: 'Row Count',
         field: 'rowCount',
         sorter: 'number',
@@ -543,8 +590,25 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
   });
 
   soqlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
-    //@ts-expect-error types field needs update
-    group.isVisible && group.scrollTo('nearest', true);
+    if (!group.isVisible()) {
+      soqlTable.blockRedraw();
+      soqlTable.getRows().forEach((row) => {
+        !row.isTreeExpanded() && row.treeExpand();
+      });
+      soqlTable.restoreRedraw();
+    }
+  });
+
+  soqlTable.on('groupVisibilityChanged', (group: GroupComponent, visible: boolean) => {
+    const firstRow = visible ? group.getRows()[0] : group.getRows()[0].getPrevRow();
+    if (firstRow) {
+      // @ts-expect-error it has 2 params
+      firstRow.scrollTo('center', true).then(() => {
+        firstRow
+          .getElement()
+          .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+      });
+    }
   });
 
   soqlTable.on('rowClick', function (e, row) {
@@ -552,39 +616,25 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
     if (!(data.timestamp && data.soql)) {
       return;
     }
-    const oldRow = currentSelectedRow;
-    const table = row.getTable();
-    table.blockRedraw();
-    if (oldRow) {
-      oldRow.treeCollapse();
-      currentSelectedRow = null;
-    }
 
-    if (oldRow !== row) {
-      row.treeExpand();
-      currentSelectedRow = row;
-    }
-    table.restoreRedraw();
+    const origRowHeight = row.getElement().offsetHeight;
 
-    if (currentSelectedRow) {
-      const nextRow = currentSelectedRow.getNextRow() || currentSelectedRow.getTreeChildren()[0];
-      if (nextRow) {
-        // @ts-expect-error it has 2 params
-        nextRow.scrollTo('center', true).then(() => {
-          //NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
-          // This needs fixing in main tabulator lib
-          nextRow
-            .getElement()
-            .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-        });
-      }
+    row.treeToggle();
+    row.getCell('soql').getElement().style.height = origRowHeight + 'px';
+
+    const nextRow = row.getNextRow() || row.getTreeChildren()[0];
+    if (nextRow) {
+      // @ts-expect-error it has 2 params
+      nextRow.scrollTo('center', true).then(() => {
+        nextRow.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+      });
     }
   });
 }
 
 function createDetailPanel(timestamp: number) {
   const detailContainer = document.createElement('div');
-  detailContainer.className = 'row__details-container';
+  detailContainer.className = 'callstack-wrapper';
   render(html`<call-stack timestamp=${timestamp}></call-stack>`, detailContainer);
 
   return detailContainer;
