@@ -19,7 +19,6 @@
   font-family: monospace;
 }
 .db-group-row__title {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
