@@ -4,7 +4,7 @@ name: Publish GitHub Pages Site
 on:
   # Runs after the publish suceeds
   workflow_run:
-    workflows: [Publish]
+    workflows: ['Publish Stable']
     types: [completed]
 
   # Allows you to run this workflow manually from the Actions tab
