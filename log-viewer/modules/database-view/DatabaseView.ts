@@ -321,7 +321,7 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
   });
 
   dmlTable.on('groupVisibilityChanged', (group: GroupComponent, visible: boolean) => {
-    const firstRow = visible ? group.getRows()[0] : group.getRows()[0].getPrevRow();
+    const firstRow = visible ? group.getRows()[0] : group.getRows()[0]?.getPrevRow();
     if (firstRow) {
       // @ts-expect-error it has 2 params
       firstRow.scrollTo('center', true).then(() => {
@@ -599,7 +599,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
   });
 
   soqlTable.on('groupVisibilityChanged', (group: GroupComponent, visible: boolean) => {
-    const firstRow = visible ? group.getRows()[0] : group.getRows()[0].getPrevRow();
+    const firstRow = visible ? group.getRows()[0] : group.getRows()[0]?.getPrevRow();
     if (firstRow) {
       // @ts-expect-error it has 2 params
       firstRow.scrollTo('center', true).then(() => {
