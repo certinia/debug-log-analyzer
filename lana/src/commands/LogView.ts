@@ -44,7 +44,7 @@ export class LogView {
     const bundleUri = panel.webview.asWebviewUri(Uri.file(join(logViewerRoot, 'bundle.js')));
     const indexSrc = await this.getFile(index);
     const toReplace: { [key: string]: string } = {
-      '${extensionRoot}': panel.webview.asWebviewUri(Uri.file(join(logViewerRoot))).toString(),
+      '${extensionRoot}': panel.webview.asWebviewUri(Uri.file(join(logViewerRoot))).toString(), // eslint-disable-line @typescript-eslint/naming-convention
       'bundle.js': bundleUri.toString(true), // eslint-disable-line @typescript-eslint/naming-convention
     };
 
