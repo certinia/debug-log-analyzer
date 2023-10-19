@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Show the detail panel by default, including call stack and SOQL issues.
 - Database, Call Tree and Analysis View ([#279][#279])
   - New sort icon (up and down arrow) when a column is in an unsorted state
+- Analysis View ([#279][#279])
+  - Show full event text instead of truncating
 - Show skeleton loading UIs / UI Outlines when waiting for the log to be processed e.g when running `Log: Retrieve Apex Log And Show Analysis` and `Log: Show Apex Log Analysis` ([#252][#252])
   - This could be waiting for the log to download from the org or to be parsed and processed.
 - What's new notification to open the change log on upgrades ([#210][#210])
