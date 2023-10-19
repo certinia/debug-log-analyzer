@@ -9,8 +9,7 @@
   height: 100%;
 }
 .row__details-container {
-  border-bottom: 2px solid var(--vscode-editorHoverWidget-border);
-  padding: 5px 0px 5px 0px;
+  padding: 4px 0px 4px 0px;
   background-color: var(--vscode-editorHoverWidget-background);
 }
 .db-group-row {
@@ -19,7 +18,6 @@
   font-family: monospace;
 }
 .db-group-row__title {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

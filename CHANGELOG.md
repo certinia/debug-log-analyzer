@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.0] - 2023-10-19
 
 ### Added
 
@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Log title redesigned for a more modern feel
   - Log Duration + Log Size now displayed as badges
   - Log issues show in a separate dialog when the issues count tag is clicked on the navigation bar
+- Database View tweaks ([#279][#279])
+  - Show full SOQL/ DML text instead of truncating
+  - Show the detail panel by default, including call stack and SOQL issues.
+- Database, Call Tree and Analysis View ([#279][#279])
+  - New sort icon (up and down arrow) when a column is in an unsorted state
+- Analysis View ([#279][#279])
+  - Show full event text instead of truncating
 - Show skeleton loading UIs / UI Outlines when waiting for the log to be processed e.g when running `Log: Retrieve Apex Log And Show Analysis` and `Log: Show Apex Log Analysis` ([#252][#252])
   - This could be waiting for the log to download from the org or to be parsed and processed.
 - What's new notification to open the change log on upgrades ([#210][#210])
@@ -29,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `Export to CSV` not working when a log was opened in a new VSCode window and not associated to a workspace ([#363][#363])
+
+## [1.8.0]
+
+Skipped due to adopting odd numbering for pre releases and even number for releases.
 
 ## [1.7.1] - 2023-08-10
 
@@ -249,8 +260,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add explorer menu item
 - Provide more information when selecting log to download
 
-<!-- Unreleased -->
+<!-- v1.10.0 -->
 
+[#279]: https://github.com/certinia/debug-log-analyzer/issues/279
 [#210]: https://github.com/certinia/debug-log-analyzer/issues/210
 [#250]: https://github.com/certinia/debug-log-analyzer/issues/250
 [#252]: https://github.com/certinia/debug-log-analyzer/issues/252

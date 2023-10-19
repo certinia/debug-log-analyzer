@@ -151,15 +151,28 @@ async function renderAnalysis(rootMethod: RootNode) {
       headerSortStartingDir: 'desc',
       headerTooltip: true,
       headerMenu: headerMenu,
+      headerWordWrap: true,
     },
     initialSort: [{ column: 'selfTime', dir: 'desc' }],
+    headerSortElement: function (column, dir) {
+      switch (dir) {
+        case 'asc':
+          return "<div class='sort-by--top'></div>";
+          break;
+        case 'desc':
+          return "<div class='sort-by--bottom'></div>";
+          break;
+        default:
+          return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
+      }
+    },
     columns: [
       {
         title: 'Name',
         field: 'name',
+        formatter: 'textarea',
         headerSortStartingDir: 'asc',
         sorter: 'string',
-        tooltip: true,
         cssClass: 'datagrid-code-text',
         bottomCalc: () => {
           return 'Total';
