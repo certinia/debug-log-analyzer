@@ -323,7 +323,6 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
   dmlTable.on('groupVisibilityChanged', (group: GroupComponent, visible: boolean) => {
     const firstRow = visible ? group.getRows()[0] : group.getRows()[0]?.getPrevRow();
     if (firstRow) {
-      // @ts-expect-error it has 2 params
       firstRow.scrollTo('center', true).then(() => {
         firstRow
           .getElement()
@@ -344,7 +343,6 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
 
     const nextRow = row.getNextRow() || row.getTreeChildren()[0];
     if (nextRow) {
-      // @ts-expect-error it has 2 params
       nextRow.scrollTo('center', true).then(() => {
         nextRow.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
       });
@@ -601,7 +599,6 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
   soqlTable.on('groupVisibilityChanged', (group: GroupComponent, visible: boolean) => {
     const firstRow = visible ? group.getRows()[0] : group.getRows()[0]?.getPrevRow();
     if (firstRow) {
-      // @ts-expect-error it has 2 params
       firstRow.scrollTo('center', true).then(() => {
         firstRow
           .getElement()
@@ -623,7 +620,6 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
 
     const nextRow = row.getNextRow() || row.getTreeChildren()[0];
     if (nextRow) {
-      // @ts-expect-error it has 2 params
       nextRow.scrollTo('center', true).then(() => {
         nextRow.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
       });

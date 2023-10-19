@@ -13,23 +13,23 @@
   },
   "version": "0.1.0",
   "dependencies": {
-    "@apexdevtools/apex-parser": "^3.3.0",
+    "@apexdevtools/apex-parser": "^3.5.0",
     "@vscode/codicons": "^0.0.33",
     "@vscode/webview-ui-toolkit": "^1.2.2",
     "lit": "^2.8.0",
-    "tabulator-tables": "^5.5.1"
+    "tabulator-tables": "^5.5.2"
   },
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^25.0.0",
-    "@rollup/plugin-node-resolve": "^15.0.2",
-    "@types/tabulator-tables": "^5.4.5",
-    "concurrently": "^8.0.1",
-    "http-server": "^14.x.x",
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@types/tabulator-tables": "^5.5.3",
+    "concurrently": "^8.2.2",
+    "http-server": "^14.1.1",
     "node-sass": "^9.0.0",
     "postcss": "^8.4.31",
-    "rollup": "^3.26.3",
+    "rollup": "^3.29.4",
     "rollup-plugin-polyfill-node": "^0.12.0",
-    "rollup-plugin-postcss": "^4.0.0",
-    "typescript": "^5.0.4"
+    "rollup-plugin-postcss": "^4.0.2",
+    "typescript": "^5.2.2"
   }
 }

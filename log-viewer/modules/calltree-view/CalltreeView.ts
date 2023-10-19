@@ -187,10 +187,10 @@ export async function renderCallTree(
       height: '100%',
       maxHeight: '100%',
       dataTree: true,
-      // @ts-expect-error: needs to be added to type definition.
       dataTreeChildColumnCalcs: true,
       dataTreeBranchElement: '<span/>',
       selectable: 1,
+      // @ts-expect-error custom property for datagrid/module/RowKeyboardNavigation
       rowKeyboardNavigation: true,
       columnDefaults: {
         title: 'default',
