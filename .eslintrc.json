@@ -27,5 +27,5 @@
     "curly": "warn",
     "eqeqeq": "warn"
   },
-  "ignorePatterns": ["**/node_modules/*"]
+  "ignorePatterns": ["**/node_modules"]
 }

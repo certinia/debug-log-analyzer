@@ -5,9 +5,9 @@ import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-tool
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { globalStyles } from '../global.styles';
-import { hostService } from '../services/VSCodeService';
-import { skeletonStyles } from './skeleton/skeleton.styles';
+import { globalStyles } from '../global.styles.js';
+import { hostService } from '../services/VSCodeService.js';
+import { skeletonStyles } from './skeleton/skeleton.styles.js';
 
 provideVSCodeDesignSystem().register(vsCodeButton());
 

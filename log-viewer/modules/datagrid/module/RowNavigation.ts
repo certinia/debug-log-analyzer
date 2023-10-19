@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { Module, RowComponent, Tabulator } from 'tabulator-tables';
+import { Module, type RowComponent, Tabulator } from 'tabulator-tables';
 
 export class RowNavigation extends Module {
   constructor(table: Tabulator) {
@@ -27,7 +27,7 @@ export class RowNavigation extends Module {
       const len = rowsToExpand.length;
       for (let i = 0; i < len; i++) {
         const row = rowsToExpand[i];
-        row.treeExpand();
+        row?.treeExpand();
       }
 
       table.getSelectedRows().forEach((rowToDeselect) => {

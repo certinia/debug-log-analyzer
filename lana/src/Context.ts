@@ -1,15 +1,15 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { ExtensionContext, workspace } from 'vscode';
+import { type ExtensionContext, workspace } from 'vscode';
 
-import { Display } from './Display';
-import { SymbolFinder } from './SymbolFinder';
-import { WhatsNewNotification } from './WhatsNewNotification';
-import ShowAnalysisCodeLens from './codelenses/ShowAnalysisCodeLens';
-import { RetrieveLogFile } from './commands/RetrieveLogFile';
-import { ShowLogAnalysis } from './commands/ShowLogAnalysis';
-import { VSWorkspace } from './workspace/VSWorkspace';
+import { Display } from './Display.js';
+import { SymbolFinder } from './SymbolFinder.js';
+import { WhatsNewNotification } from './WhatsNewNotification.js';
+import ShowAnalysisCodeLens from './codelenses/ShowAnalysisCodeLens.js';
+import { RetrieveLogFile } from './commands/RetrieveLogFile.js';
+import { ShowLogAnalysis } from './commands/ShowLogAnalysis.js';
+import { VSWorkspace } from './workspace/VSWorkspace.js';
 
 export class Context {
   symbolFinder = new SymbolFinder();

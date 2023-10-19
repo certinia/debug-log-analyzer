@@ -4,10 +4,10 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { DatabaseAccess } from '../Database';
-import { goToRow } from '../calltree-view/CalltreeView';
-import { globalStyles } from '../global.styles';
-import { LogLine } from '../parsers/TreeParser';
+import { DatabaseAccess } from '../Database.js';
+import { goToRow } from '../calltree-view/CalltreeView.js';
+import { globalStyles } from '../global.styles.js';
+import { LogLine } from '../parsers/TreeParser.js';
 
 @customElement('call-stack')
 export class CallStack extends LitElement {

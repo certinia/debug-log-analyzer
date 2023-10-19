@@ -2,10 +2,10 @@
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
 import {
-  CellComponent,
-  EmptyCallback,
-  ValueBooleanCallback,
-  ValueVoidCallback,
+  type CellComponent,
+  type EmptyCallback,
+  type ValueBooleanCallback,
+  type ValueVoidCallback,
 } from 'tabulator-tables';
 
 import './MinMax.css';

@@ -4,9 +4,9 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { skeletonStyles } from '../components/skeleton/skeleton.styles';
-import { globalStyles } from '../global.styles';
-import { LogSetting } from '../parsers/TreeParser';
+import { skeletonStyles } from '../components/skeleton/skeleton.styles.js';
+import { globalStyles } from '../global.styles.js';
+import { LogSetting } from '../parsers/TreeParser.js';
 
 @customElement('log-levels')
 export class LogLevels extends LitElement {

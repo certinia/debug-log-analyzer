@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { Uri, WebviewPanel, WebviewPanelOptions, window } from 'vscode';
+import { Uri, type WebviewPanel, type WebviewPanelOptions, window } from 'vscode';
 
 export class WebView {
   static apply(name: string, title: string, resourceRoots: Uri[]): WebviewPanel {
