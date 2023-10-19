@@ -1,11 +1,11 @@
 {
   "extends": "../config/tsconfig.json",
   "compilerOptions": {
-    "lib": ["es2021"],
-    "module": "esnext",
+    "lib": ["ES2022"],
+    "module": "ESNext",
     "outDir": "out",
     "rootDir": "src",
-    "target": "es2021"
+    "target": "ES2022"
   },
   "include": ["./src/**/*.ts"]
 }
