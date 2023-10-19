@@ -6,7 +6,7 @@ import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
 import { globalStyles } from '../global.styles';
-import { TimelineGroup, keyMap } from './Timeline';
+import { type TimelineGroup, keyMap } from './Timeline';
 
 @customElement('timeline-key')
 export class Timelinekey extends LitElement {

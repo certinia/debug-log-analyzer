@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { KeybindingsModule, Module, RowComponent, Tabulator } from 'tabulator-tables';
+import { KeybindingsModule, Module, type RowComponent, Tabulator } from 'tabulator-tables';
 
 // todo: make this generic and support opening grouped rows too then use on DB view.
 // todo: remove the '@ts-expect-error' + fix the types file
@@ -56,7 +56,7 @@ const rowNavActions: { [key: string]: unknown } = {
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
     const previousRow = row?.getPrevRow();
-    if (previousRow) {
+    if (row && previousRow) {
       table.blockRedraw();
       row.deselect();
       previousRow.select();
@@ -79,7 +79,7 @@ const rowNavActions: { [key: string]: unknown } = {
     const table = this.table as Tabulator;
     const row = table.getSelectedRows()[0];
     const nextRow = row?.getNextRow();
-    if (nextRow) {
+    if (row && nextRow) {
       table.blockRedraw();
       row.deselect();
       nextRow.select();

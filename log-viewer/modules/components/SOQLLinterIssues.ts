@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { LitElement, PropertyValues, TemplateResult, css, html } from 'lit';
+import { LitElement, type PropertyValues, type TemplateResult, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { DatabaseAccess } from '../Database';
 import { globalStyles } from '../global.styles';
 import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
-import { SEVERITY_TYPES, SOQLLinter, SOQLLinterRule, Severity } from '../soql/SOQLLinter';
+import { SEVERITY_TYPES, SOQLLinter, type SOQLLinterRule, type Severity } from '../soql/SOQLLinter';
 
 @customElement('soql-issues')
 export class SOQLLinterIssues extends LitElement {

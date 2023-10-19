@@ -4,7 +4,7 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import formatDuration, { debounce } from '../Util';
 import { goToRow } from '../calltree-view/CalltreeView';
-import { Method, RootNode, TimedNode, TimelineKey, truncated } from '../parsers/TreeParser';
+import { Method, RootNode, TimedNode, type TimelineKey, truncated } from '../parsers/TreeParser';
 
 export { RootNode };
 
@@ -238,17 +238,19 @@ function nodesToRectangles(nodes: Method[], depth: number) {
   const len = nodes.length;
   for (let c = 0; c < len; c++) {
     const node = nodes[c];
-    const { timelineKey, duration } = node;
-    if (timelineKey && duration) {
-      addToRectQueue(node, depth);
-    }
-
-    // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
-    node.children.forEach((child) => {
-      if (child instanceof Method) {
-        children.push(child);
+    if (node) {
+      const { timelineKey, duration } = node;
+      if (timelineKey && duration) {
+        addToRectQueue(node, depth);
       }
-    });
+
+      // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
+      node.children.forEach((child) => {
+        if (child instanceof Method) {
+          children.push(child);
+        }
+      });
+    }
   }
 
   if (!children.length) {
@@ -323,26 +325,29 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 
   while (i < len) {
     const thisEntry = truncated[i++],
-      nextEntry = truncated[i] ?? {},
-      startTime = thisEntry.timestamp,
-      endTime = nextEntry.timestamp ?? timelineRoot.exitStamp;
+      nextEntry = truncated[i];
 
-    let x = startTime * state.zoom - state.offsetX;
-    let w = (endTime - startTime) * state.zoom;
+    if (thisEntry) {
+      const startTime = thisEntry?.timestamp,
+        endTime = nextEntry?.timestamp ?? timelineRoot.exitStamp;
 
-    // start of shape is outside the screen (remove from start and the end to compensate)
-    if (x < 0) {
-      w = w + x;
-      x = 0;
+      let x = startTime * state.zoom - state.offsetX;
+      let w = (endTime - startTime) * state.zoom;
+
+      // start of shape is outside the screen (remove from start and the end to compensate)
+      if (x < 0) {
+        w = w + x;
+        x = 0;
+      }
+      // end of shape is outside the screen (remove from end so we are not showing anything that is offscreen)
+      const widthOffScreen = x + w - displayWidth;
+      if (widthOffScreen > 0) {
+        w = w - widthOffScreen;
+      }
+
+      ctx.fillStyle = thisEntry.color;
+      ctx.fillRect(x, -displayHeight, w, displayHeight);
     }
-    // end of shape is outside the screen (remove from end so we are not showing anything that is offscreen)
-    const widthOffScreen = x + w - displayWidth;
-    if (widthOffScreen > 0) {
-      w = w - widthOffScreen;
-    }
-
-    ctx.fillStyle = thisEntry.color;
-    ctx.fillRect(x, -displayHeight, w, displayHeight);
   }
 }
 
@@ -525,16 +530,18 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
 
   while (i < len) {
     const thisEntry = truncated[i++],
-      nextEntry = truncated[i] ?? {},
-      startTime = thisEntry.timestamp,
-      endTime = nextEntry.timestamp ?? timelineRoot.exitStamp,
-      startX = startTime * state.zoom - state.offsetX,
-      endX = endTime * state.zoom - state.offsetX;
+      nextEntry = truncated[i];
+    if (thisEntry) {
+      const startTime = thisEntry.timestamp,
+        endTime = nextEntry?.timestamp ?? timelineRoot.exitStamp,
+        startX = startTime * state.zoom - state.offsetX,
+        endX = endTime * state.zoom - state.offsetX;
 
-    if (x >= startX && x <= endX) {
-      const toolTip = document.createElement('div');
-      toolTip.textContent = thisEntry.reason;
-      return toolTip;
+      if (x >= startX && x <= endX) {
+        const toolTip = document.createElement('div');
+        toolTip.textContent = thisEntry.reason;
+        return toolTip;
+      }
     }
   }
   return null; // target not found!

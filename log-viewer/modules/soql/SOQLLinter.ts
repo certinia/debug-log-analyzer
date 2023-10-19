@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { Stack } from '../Database';
+import { type Stack } from '../Database';
 import { SOQLParser, SOQLTree } from '../parsers/SOQLParser';
 
 //todo : need a general concept of stack (to pull out linter)

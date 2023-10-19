@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { LitElement, PropertyValues, css, html } from 'lit';
+import { LitElement, type PropertyValues, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { skeletonStyles } from '../components/skeleton/skeleton.styles';

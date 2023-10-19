@@ -20,9 +20,9 @@ describe('Analyse database tests', () => {
     const result = await DatabaseAccess.create(getRootMethod());
     const firstSOQL = result.getSOQLLines()[0];
 
-    expect(firstSOQL.text).toEqual('SELECT Id FROM Account');
+    expect(firstSOQL?.text).toEqual('SELECT Id FROM Account');
 
     const firstDML = result.getDMLLines()[0];
-    expect(firstDML.text).toEqual('DML Op:Insert Type:codaCompany__c');
+    expect(firstDML?.text).toEqual('DML Op:Insert Type:codaCompany__c');
   });
 });

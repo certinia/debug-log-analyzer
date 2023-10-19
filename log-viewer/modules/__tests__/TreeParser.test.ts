@@ -147,7 +147,7 @@ describe('parseLog tests', () => {
     parseLog(log);
 
     expect(truncated.length).toBe(1);
-    expect(truncated[0].reason).toBe('Skipped-Lines');
+    expect(truncated[0]?.reason).toBe('Skipped-Lines');
   });
 
   it('Should detect truncated logs', async () => {
@@ -160,7 +160,7 @@ describe('parseLog tests', () => {
     parseLog(log);
 
     expect(truncated.length).toBe(1);
-    expect(truncated[0].reason).toBe('Max-Size-reached');
+    expect(truncated[0]?.reason).toBe('Max-Size-reached');
   });
 
   it('Should detect exceptions', async () => {
@@ -173,7 +173,7 @@ describe('parseLog tests', () => {
     parseLog(log);
 
     expect(truncated.length).toBe(1);
-    expect(truncated[0].reason).toBe('System.LimitException: c2g:Too many SOQL queries: 101');
+    expect(truncated[0]?.reason).toBe('System.LimitException: c2g:Too many SOQL queries: 101');
   });
   it('Should detect fatal errors', async () => {
     const log =
@@ -185,7 +185,7 @@ describe('parseLog tests', () => {
     parseLog(log);
 
     expect(truncated.length).toBe(1);
-    expect(truncated[0].reason).toBe(
+    expect(truncated[0]?.reason).toBe(
       'FATAL ERROR! cause=System.LimitException: c2g:Too many SOQL queries: 101'
     );
   });
@@ -198,7 +198,7 @@ describe('parseLog tests', () => {
 
     parseLog(log);
     expect(logLines.length).toBe(4);
-    expect(logLines[1].lineNumber).toBe(185);
+    expect(logLines[1]?.lineNumber).toBe(185);
   });
   it('Packages should have a namespace', async () => {
     const log =
@@ -208,7 +208,7 @@ describe('parseLog tests', () => {
 
     parseLog(log);
     expect(logLines.length).toBe(3);
-    expect(logLines[1].namespace).toBe('appirio_core');
+    expect(logLines[1]?.namespace).toBe('appirio_core');
   });
   it('Limit Usage for NS provides cpuUsed', async () => {
     const log =
@@ -232,7 +232,7 @@ describe('parseLog tests', () => {
 
     parseLog(log);
     expect(logLines.length).toBe(5);
-    expect(logLines[2].type).toBe('LIMIT_USAGE_FOR_NS');
+    expect(logLines[2]?.type).toBe('LIMIT_USAGE_FOR_NS');
     expect(cpuUsed).toBe(4564000000);
   });
 
@@ -246,8 +246,8 @@ describe('parseLog tests', () => {
 
     parseLog(log);
     expect(logLines.length).toBe(3);
-    expect(logLines[1].type).toBe('FLOW_VALUE_ASSIGNMENT');
-    expect(logLines[1].text).toBe(
+    expect(logLines[1]?.type).toBe('FLOW_VALUE_ASSIGNMENT');
+    expect(logLines[1]?.text).toBe(
       'myVariable_old {Id=a6U6T000001DypKUAS, OwnerId=005d0000003141tAAA, IsDeleted=false, Name=TR-001752, CurrencyIsoCode=USD, RecordTypeId=012d0000000T5CLAA0, CreatedDate=2022-05-06 11:40:47, CreatedById=005d0000003141tAAA, LastModifiedDate=2022-05-06 11:40:47, LastModifiedById=005d0000003141tAAA, SystemModstamp=2022-05-06 11:40:47, LastViewedDate=null, LastReferencedDate=null, SCMC__Carrier_Service__c=null, SCMC__Carrier__c=null, SCMC__Destination_Location__c=null, SCMC__Destination_Ownership__c=null, SCMC__Destination_Warehouse__c=a6Y6T000001Ib9ZUAS, SCMC__Notes__c=TVPs To Amazon Europe Spain, SCMC__Override_Ship_To_Address__c=null, SCMC__Pickup_Address__c=null, SCMC__Pickup_Required__c=false, SCMC__Reason_Code__c=a5i0W000001Ydw3QAC, SCMC__Requested_Delivery_Date__c=null, SCMC__Revision__c=0, SCMC__Ship_To_City__c=null, SCMC__Ship_To_Country__c=null, SCMC__Ship_To_Line_1__c=null, SCMC__Ship_To_Line_2__c=null, SCMC__Ship_To_Name__c=null, SCMC__Ship_To_State_Province__c=null, SCMC__Ship_To_Zip_Postal_Code__c=null, SCMC__Shipment_Date__c=null, SCMC__Shipment_Required__c=true, SCMC__Shipment_Status__c=Open, SCMC__Source_Location__c=null, SCMC__Source_Ownership__c=null, SCMC__Source_Warehouse__c=a6Y6T000001IS9fUAG, SCMC__Status__c=New, SCMC__Tracking_Number__c=null, SCMC__Number_Of_Transfer_Lines__c=0, Created_Date__c=2022-05-06 11:40:47, Shipment_Instructions__c=1Z V8F 767 681769 7682\n' +
         '1Z V8F 767 68 3968 7204\n' +
         '1Z VSF 767 68 0562 3292}'
@@ -305,10 +305,10 @@ describe('parseLog tests', () => {
     const soqlLine = logLines[1] as SOQLExecuteBeginLine;
     expect(soqlLine.type).toEqual('SOQL_EXECUTE_BEGIN');
     expect(soqlLine.aggregations).toEqual(2);
-    expect(logLines[2].type).toEqual('SOQL_EXECUTE_EXPLAIN');
-    expect(logLines[3].type).toEqual('SOQL_EXECUTE_END');
-    expect(logLines[3].selfRowCount).toEqual(50);
-    expect(logLines[3].totalRowCount).toEqual(50);
+    expect(logLines[2]?.type).toEqual('SOQL_EXECUTE_EXPLAIN');
+    expect(logLines[3]?.type).toEqual('SOQL_EXECUTE_END');
+    expect(logLines[3]?.selfRowCount).toEqual(50);
+    expect(logLines[3]?.totalRowCount).toEqual(50);
     expect(logLines[4]).toBeInstanceOf(ExecutionFinishedLine);
 
     const soqlExplain = logLines[2] as SOQLExecuteExplainLine;
@@ -340,10 +340,10 @@ describe('getRootMethod tests', () => {
     const timedLogLines = rootMethod.children as TimedNode[];
     expect(timedLogLines.length).toBe(1);
     const startLine = timedLogLines[0];
-    expect(startLine.type).toBe('EXECUTION_STARTED');
+    expect(startLine?.type).toBe('EXECUTION_STARTED');
 
-    expect(startLine.children.length).toBe(1);
-    const unitStart = startLine.children[0] as CodeUnitStartedLine;
+    expect(startLine?.children.length).toBe(1);
+    const unitStart = startLine?.children[0] as CodeUnitStartedLine;
     expect(unitStart.type).toBe('CODE_UNIT_STARTED');
     expect(unitStart.codeUnitType).toBe('Workflow');
 
@@ -355,10 +355,10 @@ describe('getRootMethod tests', () => {
 
     expect(interViewsBegin.children.length).toBe(2);
     const interViewBegin = interViewsBegin.children[0];
-    expect(interViewBegin.type).toBe('FLOW_START_INTERVIEW_BEGIN');
+    expect(interViewBegin?.type).toBe('FLOW_START_INTERVIEW_BEGIN');
 
     const interViewEnd = interViewsBegin.children[1];
-    expect(interViewEnd.type).toBe('FLOW_START_INTERVIEW_END');
+    expect(interViewEnd?.type).toBe('FLOW_START_INTERVIEW_END');
   });
 
   it('FlowStartInterviewsBeginLine should be a flow ', async () => {
@@ -378,10 +378,10 @@ describe('getRootMethod tests', () => {
     const timedLogLines = rootMethod.children as TimedNode[];
     expect(timedLogLines.length).toBe(1);
     const startLine = timedLogLines[0];
-    expect(startLine.type).toBe('EXECUTION_STARTED');
+    expect(startLine?.type).toBe('EXECUTION_STARTED');
 
-    expect(startLine.children.length).toBe(1);
-    const unitStart = startLine.children[0] as CodeUnitStartedLine;
+    expect(startLine?.children.length).toBe(1);
+    const unitStart = startLine?.children[0] as CodeUnitStartedLine;
     expect(unitStart.type).toBe('CODE_UNIT_STARTED');
     expect(unitStart.codeUnitType).toBe('Flow');
 
@@ -393,10 +393,10 @@ describe('getRootMethod tests', () => {
 
     expect(interViewsBegin.children.length).toBe(2);
     const interViewBegin = interViewsBegin.children[0];
-    expect(interViewBegin.type).toBe('FLOW_START_INTERVIEW_BEGIN');
+    expect(interViewBegin?.type).toBe('FLOW_START_INTERVIEW_BEGIN');
 
     const interViewEnd = interViewsBegin.children[1];
-    expect(interViewEnd.type).toBe('FLOW_START_INTERVIEW_END');
+    expect(interViewEnd?.type).toBe('FLOW_START_INTERVIEW_END');
   });
 
   it('FlowStartInterviewsBeginLine should be a flow called from a process builder', async () => {
@@ -420,10 +420,10 @@ describe('getRootMethod tests', () => {
     const timedLogLines = rootMethod.children as TimedNode[];
     expect(timedLogLines.length).toBe(1);
     const startLine = timedLogLines[0];
-    expect(startLine.type).toBe('EXECUTION_STARTED');
+    expect(startLine?.type).toBe('EXECUTION_STARTED');
 
-    expect(startLine.children.length).toBe(1);
-    const unitStart = startLine.children[0] as CodeUnitStartedLine;
+    expect(startLine?.children.length).toBe(1);
+    const unitStart = startLine?.children[0] as CodeUnitStartedLine;
     expect(unitStart.type).toBe('CODE_UNIT_STARTED');
     expect(unitStart.codeUnitType).toBe('Workflow');
 
@@ -448,10 +448,10 @@ describe('getRootMethod tests', () => {
 
     expect(interViewsBegin.children.length).toBe(2);
     const interViewBegin = interViewsBegin.children[0];
-    expect(interViewBegin.type).toBe('FLOW_START_INTERVIEW_BEGIN');
+    expect(interViewBegin?.type).toBe('FLOW_START_INTERVIEW_BEGIN');
 
     const interViewEnd = interViewsBegin.children[1];
-    expect(interViewEnd.type).toBe('FLOW_START_INTERVIEW_END');
+    expect(interViewEnd?.type).toBe('FLOW_START_INTERVIEW_END');
   });
 
   it('Root exitStamp should match last line pair with a duration', async () => {
@@ -518,34 +518,34 @@ describe('getRootMethod tests', () => {
 
     const rootChildren = rootMethod.children as Method[];
 
-    const executionChildren = rootChildren[0].children as Method[];
+    const executionChildren = rootChildren[0]?.children as Method[];
     expect(executionChildren.length).toBe(5);
-    expect(executionChildren[0].type).toBe('METHOD_ENTRY');
-    expect(executionChildren[0].timestamp).toBe(200);
-    expect(executionChildren[0].exitStamp).toBe(300);
-    expect(executionChildren[0].children.length).toBe(1);
-    expect(executionChildren[0].children[0].type).toBe('ENTERING_MANAGED_PKG');
-    expect(executionChildren[0].children[0].namespace).toBe('ns');
+    expect(executionChildren[0]?.type).toBe('METHOD_ENTRY');
+    expect(executionChildren[0]?.timestamp).toBe(200);
+    expect(executionChildren[0]?.exitStamp).toBe(300);
+    expect(executionChildren[0]?.children.length).toBe(1);
+    expect(executionChildren[0]?.children[0]?.type).toBe('ENTERING_MANAGED_PKG');
+    expect(executionChildren[0]?.children[0]?.namespace).toBe('ns');
 
-    expect(executionChildren[1].type).toBe('ENTERING_MANAGED_PKG');
-    expect(executionChildren[1].namespace).toBe('ns');
-    expect(executionChildren[1].timestamp).toBe(400);
-    expect(executionChildren[1].exitStamp).toBe(700);
+    expect(executionChildren[1]?.type).toBe('ENTERING_MANAGED_PKG');
+    expect(executionChildren[1]?.namespace).toBe('ns');
+    expect(executionChildren[1]?.timestamp).toBe(400);
+    expect(executionChildren[1]?.exitStamp).toBe(700);
 
-    expect(executionChildren[2].type).toBe('ENTERING_MANAGED_PKG');
-    expect(executionChildren[2].namespace).toBe('ns2');
-    expect(executionChildren[2].timestamp).toBe(700);
-    expect(executionChildren[2].exitStamp).toBe(725);
+    expect(executionChildren[2]?.type).toBe('ENTERING_MANAGED_PKG');
+    expect(executionChildren[2]?.namespace).toBe('ns2');
+    expect(executionChildren[2]?.timestamp).toBe(700);
+    expect(executionChildren[2]?.exitStamp).toBe(725);
 
-    expect(executionChildren[3].type).toBe('DML_BEGIN');
-    expect(executionChildren[3].timestamp).toBe(725);
-    expect(executionChildren[3].exitStamp).toBe(750);
+    expect(executionChildren[3]?.type).toBe('DML_BEGIN');
+    expect(executionChildren[3]?.timestamp).toBe(725);
+    expect(executionChildren[3]?.exitStamp).toBe(750);
 
-    expect(executionChildren[4].type).toBe('ENTERING_MANAGED_PKG');
-    expect(executionChildren[4].namespace).toBe('ns2');
-    expect(executionChildren[4].timestamp).toBe(800);
-    expect(executionChildren[4].exitStamp).toBe(1100);
-    expect(executionChildren[4].children.length).toBe(0);
+    expect(executionChildren[4]?.type).toBe('ENTERING_MANAGED_PKG');
+    expect(executionChildren[4]?.namespace).toBe('ns2');
+    expect(executionChildren[4]?.timestamp).toBe(800);
+    expect(executionChildren[4]?.exitStamp).toBe(1100);
+    expect(executionChildren[4]?.children.length).toBe(0);
   });
 });
 

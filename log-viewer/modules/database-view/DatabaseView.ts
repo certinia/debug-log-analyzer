@@ -2,12 +2,12 @@
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
 import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
-import { LitElement, PropertyValues, css, html, render, unsafeCSS } from 'lit';
+import { LitElement, type PropertyValues, css, html, render, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
-  ColumnComponent,
-  GroupComponent,
-  RowComponent,
+  type ColumnComponent,
+  type GroupComponent,
+  type RowComponent,
   TabulatorFull as Tabulator,
 } from 'tabulator-tables';
 
@@ -148,7 +148,7 @@ export class DatabaseView extends LitElement {
     const treeRoot = this.timelineRoot;
     if (dbContainer && dmlTableWrapper && soqlTableWrapper && treeRoot) {
       const dbObserver = new IntersectionObserver(async (entries, observer) => {
-        const visible = entries[0].isIntersecting;
+        const visible = entries[0]?.isIntersecting;
         if (visible) {
           observer.disconnect();
 

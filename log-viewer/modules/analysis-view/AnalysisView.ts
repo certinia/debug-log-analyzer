@@ -2,9 +2,9 @@
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
 import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
-import { LitElement, PropertyValues, css, html, unsafeCSS } from 'lit';
+import { LitElement, type PropertyValues, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
+import { type ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
 import '../components/skeleton/GridSkeleton';
 import NumberAccessor from '../datagrid/dataaccessor/Number';
@@ -83,7 +83,7 @@ export class AnalysisView extends LitElement {
     const tableWrapper = this._tableWrapper;
     if (tableWrapper && rootMethod) {
       const analysisObserver = new IntersectionObserver((entries, observer) => {
-        const visible = entries[0].isIntersecting;
+        const visible = entries[0]?.isIntersecting;
         if (visible) {
           renderAnalysis(rootMethod);
           observer.disconnect();
