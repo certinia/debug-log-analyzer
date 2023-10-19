@@ -18,6 +18,8 @@
     "composite": true,
     "declarationMap": true,
 
+    "strictFunctionTypes": true,
+
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
@@ -30,5 +32,5 @@
     "removeComments": true,
     "sourceMap": false
   },
-  "exclude": ["node_modules/", ".*/"]
+  "exclude": ["**/node_modules", "**/.*/"]
 }
