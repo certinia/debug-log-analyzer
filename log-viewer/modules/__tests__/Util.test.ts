@@ -2,7 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  * @jest-environment jsdom
  */
-import formatDuration from '../Util';
+import formatDuration from '../Util.js';
 
 describe('Format duration tests', () => {
   it('Value converted from nanoseconds to milliseconds', () => {

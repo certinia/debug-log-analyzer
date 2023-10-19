@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { SOQLParser, SyntaxException } from '../parsers/SOQLParser';
+import { SOQLParser, SyntaxException } from '../parsers/SOQLParser.js';
 
 describe('Analyse database tests', () => {
   it('throws on unparsable query', async () => {

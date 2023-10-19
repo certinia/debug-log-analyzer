@@ -1,11 +1,11 @@
 {
   "extends": "../config/tsconfig.json",
   "compilerOptions": {
-    "lib": ["es2021", "dom"],
-    "module": "esnext",
+    "lib": ["ES2022", "dom", "DOM.Iterable"],
+    "module": "ESNext",
     "outDir": "out",
     "rootDir": "./modules",
-    "target": "es2021"
+    "target": "es2022"
   },
   "include": ["./modules/**/*.ts", "declarations.d.ts"]
 }

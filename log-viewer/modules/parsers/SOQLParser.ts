@@ -8,7 +8,7 @@ import {
   QueryContext,
 } from '@apexdevtools/apex-parser';
 import {
-  ANTLRErrorListener,
+  type ANTLRErrorListener,
   CharStreams,
   CommonTokenStream,
   RecognitionException,
@@ -69,7 +69,7 @@ export class SOQLTree {
     const fromContext = this._queryContext.fromNameList();
     const fieldNames = fromContext.fieldName();
     if (fieldNames.length === 1) {
-      return fieldNames[0].text;
+      return fieldNames[0]?.text;
     } else {
       return undefined;
     }

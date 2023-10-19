@@ -10,20 +10,20 @@
 //todo: add filter on line type
 //todo: add filter on log level (fine, finer etc)
 import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
-import { LitElement, PropertyValues, css, html, unsafeCSS } from 'lit';
+import { LitElement, type PropertyValues, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
+import { type RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
-import '../components/skeleton/GridSkeleton';
-import MinMaxEditor from '../datagrid/editors/MinMax';
-import MinMaxFilter from '../datagrid/filters/MinMax';
-import NumberFormat from '../datagrid/format/Number';
-import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
-import { RowNavigation } from '../datagrid/module/RowNavigation';
+import '../components/skeleton/GridSkeleton.js';
+import MinMaxEditor from '../datagrid/editors/MinMax.js';
+import MinMaxFilter from '../datagrid/filters/MinMax.js';
+import NumberFormat from '../datagrid/format/Number.js';
+import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation.js';
+import { RowNavigation } from '../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../datagrid/style/DataGrid.scss';
-import { globalStyles } from '../global.styles';
-import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
-import { hostService } from '../services/VSCodeService';
+import { globalStyles } from '../global.styles.js';
+import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser.js';
+import { hostService } from '../services/VSCodeService.js';
 import treeViewStyles from './TreeView.scss';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
@@ -138,7 +138,7 @@ export class CalltreeView extends LitElement {
     rootMethod = this.timelineRoot;
     if (callTreeWrapper && rootMethod) {
       const analysisObserver = new IntersectionObserver((entries, observer) => {
-        const visible = entries[0].isIntersecting;
+        const visible = entries[0]?.isIntersecting;
         if (rootMethod && visible) {
           renderCallTree(callTreeWrapper, rootMethod);
           observer.disconnect();
@@ -158,7 +158,8 @@ export async function renderCallTree(
     // Otherwise there are visible rendering issues.
     await new Promise((resolve, reject) => {
       const visibilityObserver = new IntersectionObserver((entries, observer) => {
-        const visible = entries[0].isIntersecting && entries[0].intersectionRatio > 0;
+        const entry = entries[0];
+        const visible = entry?.isIntersecting && entry?.intersectionRatio > 0;
         if (visible) {
           resolve(true);
           observer.disconnect();
@@ -369,9 +370,11 @@ function expandAll(rows: RowComponent[]) {
   const len = rows.length;
   for (let i = 0; i < len; i++) {
     const row = rows[i];
-    row.treeExpand();
+    if (row) {
+      row.treeExpand();
 
-    expandAll(row.getTreeChildren());
+      expandAll(row.getTreeChildren());
+    }
   }
 }
 
@@ -379,9 +382,11 @@ function collapseAll(rows: RowComponent[]) {
   const len = rows.length;
   for (let i = 0; i < len; i++) {
     const row = rows[i];
-    row.treeCollapse();
+    if (row) {
+      row.treeCollapse();
 
-    collapseAll(row.getTreeChildren());
+      collapseAll(row.getTreeChildren());
+    }
   }
 }
 
@@ -394,22 +399,23 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
   const results: CalltreeRow[] = [];
   for (let i = 0; i < len; i++) {
     const node = nodes[i];
-    const isTimedNode = node instanceof TimedNode;
-    const children = isTimedNode ? toCallTree(node.children) : null;
-    const data: CalltreeRow = {
-      id: node.timestamp,
-      text: node.text,
-      duration: node.duration,
-      selfTime: node.selfTime,
-      _children: children,
-      totalDmlCount: node.totalDmlCount,
-      totalSoqlCount: node.totalSoqlCount,
-      totalThrownCount: node.totalThrownCount,
-      rows: node.totalRowCount || 0,
-      originalData: node,
-    };
-
-    results.push(data);
+    if (node) {
+      const isTimedNode = node instanceof TimedNode;
+      const children = isTimedNode ? toCallTree(node.children) : null;
+      const data: CalltreeRow = {
+        id: node.timestamp,
+        text: node.text,
+        duration: node.duration,
+        selfTime: node.selfTime,
+        _children: children,
+        totalDmlCount: node.totalDmlCount,
+        totalSoqlCount: node.totalSoqlCount,
+        totalThrownCount: node.totalThrownCount,
+        rows: node.totalRowCount || 0,
+        originalData: node,
+      };
+      results.push(data);
+    }
   }
   return results;
 }
@@ -427,7 +433,7 @@ export async function goToRow(timestamp: number) {
   const len = rows.length;
   for (let i = 0; i < len; i++) {
     const row = rows[i];
-    treeRow = findByTime(row, timestamp);
+    treeRow = row ? findByTime(row, timestamp) : null;
     if (treeRow) {
       break;
     }
@@ -453,7 +459,7 @@ function findByTime(row: RowComponent, timeStamp: number): RowComponent | null {
       for (let i = 0; i < len; ++i) {
         const child = treeChildren[i];
 
-        const target = findByTime(child, timeStamp);
+        const target = child ? findByTime(child, timeStamp) : null;
         if (target) {
           return target;
         }

@@ -2,11 +2,11 @@
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
 import { provideVSCodeDesignSystem, vsCodeButton, vsCodeDivider } from '@vscode/webview-ui-toolkit';
-import { LitElement, TemplateResult, css, html } from 'lit';
+import { LitElement, type TemplateResult, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { globalStyles } from '../global.styles';
-import { notificationStyles } from '../notification.styles';
+import { globalStyles } from '../global.styles.js';
+import { notificationStyles } from '../notification.styles.js';
 
 provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider());
 

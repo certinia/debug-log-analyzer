@@ -4,8 +4,8 @@
 import { html, render } from 'lit';
 
 import './LogViewer';
-import { hostService } from './services/VSCodeService';
-import { setColors } from './timeline/Timeline';
+import { hostService } from './services/VSCodeService.js';
+import { setColors } from './timeline/Timeline.js';
 
 function handleMessage(evt: MessageEvent) {
   const message = evt.data;

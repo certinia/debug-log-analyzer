@@ -1,9 +1,16 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { Position, Selection, TextDocumentShowOptions, Uri, ViewColumn, commands } from 'vscode';
+import {
+  Position,
+  Selection,
+  type TextDocumentShowOptions,
+  Uri,
+  ViewColumn,
+  commands,
+} from 'vscode';
 
-import { Context } from '../Context';
+import { Context } from '../Context.js';
 
 export class OpenFileInPackage {
   static openFileForSymbol(

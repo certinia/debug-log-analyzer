@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { setNamespaces } from '../NamespaceExtrator';
+import { setNamespaces } from '../NamespaceExtrator.js';
 
 type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
 type TruncateKey = 'unexpected' | 'error' | 'skip';
@@ -51,11 +51,11 @@ export class LineIterator {
   }
 
   peek(): LogLine | null {
-    return this.index < this.length ? this.lines[this.index] : null;
+    return this.index < this.length ? this.lines[this.index] || null : null;
   }
 
   fetch(): LogLine | null {
-    return this.index < this.length ? this.lines[this.index++] : null;
+    return this.index < this.length ? this.lines[this.index++] || null : null;
   }
 }
 
@@ -104,9 +104,9 @@ export abstract class LogLine {
 
   constructor(parts: string[] | null) {
     if (parts) {
-      this.type = parts[1];
+      this.type = parts[1] || '';
       this.text = this.type;
-      this.timestamp = parseTimestamp(parts[0]);
+      this.timestamp = parseTimestamp(parts[0] || '');
     }
   }
 
@@ -300,7 +300,7 @@ export class RootNode extends Method {
           break;
         }
       }
-      endTime ??= child.timestamp;
+      endTime ??= child?.timestamp;
     }
     this.exitStamp = endTime || 0;
   }
@@ -343,7 +343,11 @@ function updateTruncated(
   truncateLog(timestamp, reason, description, colorKey);
 }
 
-export function parseObjectNamespace(text: string): string {
+export function parseObjectNamespace(text: string | null | undefined): string {
+  if (!text) {
+    return '';
+  }
+
   const sep = text.indexOf('__');
   if (sep < 0) {
     return 'unmanaged';
@@ -375,7 +379,11 @@ export function parseTimestamp(text: string): number {
   throw new Error(`Unable to parse timestamp: '${text}'`);
 }
 
-export function parseLineNumber(text: string): string | number {
+export function parseLineNumber(text: string | null | undefined): string | number {
+  if (!text) {
+    return 0;
+  }
+
   const lineNumberStr = text.slice(1, -1);
   if (lineNumberStr) {
     const lineNumber = Number(lineNumberStr);
@@ -384,7 +392,11 @@ export function parseLineNumber(text: string): string | number {
   throw new Error(`Unable to parse line number: '${text}'`);
 }
 
-export function parseRows(text: string): number {
+export function parseRows(text: string | null | undefined): number {
+  if (!text) {
+    return 0;
+  }
+
   const rowCount = text.slice(text.indexOf('Rows:') + 5);
   if (rowCount) {
     return Number(rowCount);
@@ -397,7 +409,7 @@ export function parseRows(text: string): number {
 class BulkHeapAllocateLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -443,7 +455,8 @@ class ConstructorEntryLine extends Method {
     super(parts, ['CONSTRUCTOR_EXIT'], 'method', 'method');
     this.lineNumber = parseLineNumber(parts[2]);
     const args = parts[4];
-    this.text = parts[5] + args.substring(args.lastIndexOf('('));
+
+    this.text = parts[5] + (args ? args.substring(args.lastIndexOf('(')) : '');
   }
 }
 
@@ -492,7 +505,7 @@ class SystemConstructorEntryLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['SYSTEM_CONSTRUCTOR_EXIT'], 'systemMethod', 'method');
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3];
+    this.text = parts[3] || '';
   }
 }
 
@@ -508,7 +521,7 @@ class SystemMethodEntryLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['SYSTEM_METHOD_EXIT'], 'systemMethod', 'method');
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3];
+    this.text = parts[3] || '';
   }
 }
 
@@ -535,16 +548,16 @@ export class CodeUnitStartedLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['CODE_UNIT_FINISHED'], 'codeUnit', CodeUnitStartedLine.getCpuType(parts));
 
-    const subParts = parts[3].split(':'),
-      name = parts[4] || parts[3];
+    const subParts = parts[3]?.split(':') || [],
+      name = parts[4] || parts[3] || '';
 
-    this.codeUnitType = subParts[0] || parts[4].split('/')[0];
+    this.codeUnitType = subParts[0] || parts[4]?.split('/')[0] || '';
     switch (this.codeUnitType) {
       case 'EventService':
         this.cpuType = 'method';
         this.namespace = parseObjectNamespace(subParts[1]);
 
-        this.text = parts[3];
+        this.text = parts[3] || '';
         break;
       case 'Validation':
         this.cpuType = 'custom';
@@ -567,14 +580,14 @@ export class CodeUnitStartedLine extends Method {
         if (name?.startsWith('VF:')) {
           this.namespace = parseVfNamespace(name);
         }
-        this.text = name || parts[3];
+        this.text = name || parts[3] || '';
         break;
     }
   }
 
   static getCpuType(parts: string[]) {
-    const subParts = parts[3].split(':'),
-      codeUnitType = subParts[0],
+    const subParts = parts[3]?.split(':') || [],
+      codeUnitType = subParts[0] || '',
       cpuType = cpuMap.get(codeUnitType);
 
     return cpuType ?? 'method';
@@ -585,7 +598,7 @@ export class CodeUnitFinishedLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -601,7 +614,7 @@ class VFApexCallStartLine extends Method {
     super(parts, ['VF_APEX_CALL_END'], 'method', 'method');
     this.lineNumber = parseLineNumber(parts[2]);
 
-    const classText = parts[5] || parts[3];
+    const classText = parts[5] || parts[3] || '';
     let methodtext = parts[4] || '';
     if (
       !methodtext &&
@@ -641,7 +654,7 @@ class VFApexCallEndLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -664,7 +677,7 @@ class VFFormulaStartLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['VF_EVALUATE_FORMULA_END'], 'systemMethod', 'custom');
-    this.text = parts[3];
+    this.text = parts[3] || '';
   }
 }
 
@@ -673,7 +686,7 @@ class VFFormulaEndLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -697,7 +710,7 @@ class VFPageMessageLine extends LogLine {
   acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -707,7 +720,8 @@ class DMLBeginLine extends Method {
     super(parts, ['DML_END'], 'dml', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = 'DML ' + parts[3] + ' ' + parts[4];
-    this.totalRowCount = this.selfRowCount = parseRows(parts[5]);
+    const rowCountString = parts[5];
+    this.totalRowCount = this.selfRowCount = rowCountString ? parseRows(rowCountString) : 0;
   }
 }
 
@@ -737,9 +751,12 @@ class SOQLExecuteBeginLine extends Method {
 
     const [, , , aggregations, soqlString] = parts;
 
-    const aggregationIndex = aggregations.indexOf('Aggregations:');
-    this.aggregations = Number(aggregations.slice(aggregationIndex + 13));
-    this.text = soqlString;
+    const aggregationText = aggregations || '';
+    if (aggregationText) {
+      const aggregationIndex = aggregationText.indexOf('Aggregations:');
+      this.aggregations = Number(aggregationText.slice(aggregationIndex + 13));
+    }
+    this.text = soqlString || '';
   }
 
   onEnd(end: SOQLExecuteEndLine, _stack: LogLine[]): void {
@@ -753,7 +770,7 @@ class SOQLExecuteEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.totalRowCount = this.selfRowCount = parseRows(parts[3]);
+    this.totalRowCount = this.selfRowCount = parseRows(parts[3] || '');
   }
 }
 
@@ -768,12 +785,14 @@ class SOQLExecuteExplainLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3];
 
-    const queryplanParts = parts[3].split('],');
+    const queryPlanDetails = parts[3] || '';
+    this.text = queryPlanDetails;
+
+    const queryplanParts = queryPlanDetails.split('],');
     if (queryplanParts.length > 1) {
-      const planExplain = queryplanParts[0];
-      const [cardinalityText, sobjCardinalityText, costText] = queryplanParts[1].split(',');
+      const planExplain = queryplanParts[0] || '';
+      const [cardinalityText, sobjCardinalityText, costText] = (queryplanParts[1] || '').split(',');
 
       const onIndex = planExplain.indexOf(' on');
       this.leadingOperationType = planExplain.slice(0, onIndex);
@@ -786,13 +805,17 @@ class SOQLExecuteExplainLine extends LogLine {
       const fieldsAsString = planExplain.slice(planExplain.indexOf('[') + 1).replace(/\s+/g, '');
       this.fields = fieldsAsString === '' ? [] : fieldsAsString.split(',');
 
-      this.cardinality = Number(
-        cardinalityText.slice(cardinalityText.indexOf('cardinality: ') + 13)
-      );
-      this.sObjectCardinality = Number(
-        sobjCardinalityText.slice(sobjCardinalityText.indexOf('sobjectCardinality: ') + 20)
-      );
-      this.relativeCost = Number(costText.slice(costText.indexOf('relativeCost ') + 13));
+      this.cardinality = cardinalityText
+        ? Number(cardinalityText.slice(cardinalityText.indexOf('cardinality: ') + 13))
+        : null;
+      this.sObjectCardinality = sobjCardinalityText
+        ? Number(
+            sobjCardinalityText.slice(sobjCardinalityText.indexOf('sobjectCardinality: ') + 20)
+          )
+        : null;
+      this.relativeCost = costText
+        ? Number(costText.slice(costText.indexOf('relativeCost ') + 13))
+        : null;
     }
   }
 }
@@ -815,7 +838,7 @@ class SOSLExecuteEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.totalRowCount = this.selfRowCount = parseRows(parts[3]);
+    this.totalRowCount = this.selfRowCount = parseRows(parts[3] || '');
   }
 }
 
@@ -823,7 +846,7 @@ class HeapAllocateLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3];
+    this.text = parts[3] || '';
   }
 }
 
@@ -847,8 +870,8 @@ class VariableScopeBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3];
-    this.value = parts[4];
+    this.text = parts[3] || '';
+    this.value = parts[4] || '';
   }
 
   onEnd(end: LogLine, _stack: LogLine[]): void {
@@ -868,8 +891,8 @@ class VariableAssignmentLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3];
-    this.value = parts[4];
+    this.text = parts[3] || '';
+    this.value = parts[4] || '';
   }
 }
 class UserInfoLine extends LogLine {
@@ -886,8 +909,8 @@ class UserDebugLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3];
-    this.value = parts[4];
+    this.text = parts[3] || '';
+    this.value = parts[4] || '';
   }
 }
 
@@ -941,12 +964,12 @@ class LimitUsageForNSLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 
   onAfter(_next?: LogLine): void {
     const matched = this.text.match(/Maximum CPU time: (\d+)/),
-      cpuText = matched ? matched[1] : '0',
+      cpuText = matched?.[1] || '0',
       cpuTime = parseInt(cpuText, 10) * 1000000; // convert from milli-seconds to nano-seconds
 
     if (!cpuUsed || cpuTime > cpuUsed) {
@@ -1071,7 +1094,7 @@ class SavePointSetLine extends LogLine {
 class TotalEmailRecipientsQueuedLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1097,14 +1120,14 @@ class SystemModeEnterLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
 class SystemModeExitLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1125,7 +1148,7 @@ export class ExecutionFinishedLine extends LogLine {
 class EnteringManagedPackageLine extends Method {
   constructor(parts: string[]) {
     super(parts, [], 'method', 'pkg');
-    const rawNs = parts[2],
+    const rawNs = parts[2] || '',
       lastDot = rawNs.lastIndexOf('.');
 
     this.namespace = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
@@ -1142,7 +1165,7 @@ class EnteringManagedPackageLine extends Method {
 class EventSericePubBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['EVENT_SERVICE_PUB_END'], 'flow', 'custom');
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1151,7 +1174,7 @@ class EventSericePubEndLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1210,7 +1233,7 @@ export class FlowStartInterviewsBeginLine extends Method {
       if (elem instanceof CodeUnitStartedLine) {
         flowType = elem.codeUnitType === 'Flow' ? 'Flow' : 'Process Builder';
         break;
-      } else if (elem.type === 'FLOW_START_INTERVIEWS_BEGIN') {
+      } else if (elem && elem.type === 'FLOW_START_INTERVIEWS_BEGIN') {
         flowType = 'Flow';
         break;
       }
@@ -1220,7 +1243,7 @@ export class FlowStartInterviewsBeginLine extends Method {
 
   getFlowName() {
     if (this.children.length) {
-      return this.children[0].text;
+      return this.children[0]?.text || '';
     }
     return '';
   }
@@ -1245,7 +1268,7 @@ class FlowStartInterviewsErrorLine extends LogLine {
 class FlowStartInterviewBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[3];
+    this.text = parts[3] || '';
   }
 }
 
@@ -1258,7 +1281,7 @@ class FlowStartInterviewEndLine extends LogLine {
 class FlowStartInterviewLimitUsageLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1354,7 +1377,7 @@ class FlowWaitWaitingDetailLine extends LogLine {
 class FlowInterviewFinishedLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[3];
+    this.text = parts[3] || '';
   }
 }
 
@@ -1376,7 +1399,7 @@ class FlowElementErrorLine extends LogLine {
   acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[1] + parts[2] + ' ' + parts[3] + ' ' + parts[4];
+    this.text = parts[1] || '' + parts[2] + ' ' + parts[3] + ' ' + parts[4];
   }
 }
 
@@ -1474,7 +1497,7 @@ class FlowBulkElementLimitUsageLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1553,7 +1576,7 @@ class TestingLimitsLine extends LogLine {
 class ValidationRuleLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[3];
+    this.text = parts[3] || '';
   }
 }
 
@@ -1561,7 +1584,7 @@ class ValidationErrorLine extends LogLine {
   acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1585,7 +1608,7 @@ class ValidationFormulaLine extends LogLine {
 class ValidationPassLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[3];
+    this.text = parts[3] || '';
   }
 }
 
@@ -1644,7 +1667,7 @@ class WFRuleEvalEndLine extends LogLine {
 class WFRuleEvalValueLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1653,7 +1676,7 @@ class WFRuleFilterLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1694,14 +1717,14 @@ class WFFormulaLine extends LogLine {
 class WFActionLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
 class WFActionsEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1764,7 +1787,7 @@ class WFEmailSentLine extends LogLine {
 class WFEnqueueActionsLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1832,7 +1855,7 @@ class WFProcessFoundLine extends LogLine {
 class WFProcessNode extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1853,21 +1876,21 @@ class WFResponseNotifyLine extends LogLine {
 class WFRuleEntryOrderLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
 class WFRuleInvocationLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
 class WFSoftRejectLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1881,7 +1904,7 @@ class WFTimeTriggerLine extends LogLine {
 class WFSpoolActionBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1899,7 +1922,7 @@ class ExceptionThrownLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3];
+    this.text = parts[3] || '';
   }
 
   onAfter(_next?: LogLine): void {
@@ -1921,7 +1944,7 @@ class FatalErrorLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 
   onAfter(_next?: LogLine): void {
@@ -1935,7 +1958,7 @@ class FatalErrorLine extends LogLine {
 class XDSDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1948,14 +1971,14 @@ class XDSResponseLine extends LogLine {
 class XDSResponseDetailLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
 class XDSResponseErrorLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -1992,7 +2015,7 @@ class DuplicateDetectionRule extends LogLine {
 class BulkDMLEntry extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -2670,7 +2693,7 @@ export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
 export function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
   const parts = line.split('|'),
     type = parts[1],
-    metaCtor = lineTypeMap.get(type);
+    metaCtor = lineTypeMap.get(type || '');
 
   if (metaCtor) {
     const entry = new metaCtor(parts);
@@ -2679,7 +2702,7 @@ export function parseLine(line: string, lastEntry: LogLine | null): LogLine | nu
     return entry;
   }
 
-  if (!typePattern.test(type) && lastEntry?.acceptsText) {
+  if ((!type || !typePattern.test(type)) && lastEntry && lastEntry.acceptsText) {
     // wrapped text from the previous entry?
     lastEntry.text += `\n${line}`;
   } else if (type) {
@@ -2770,13 +2793,15 @@ function aggregateTotals(node: TimedNode) {
 
   for (let i = 0; i < len; ++i) {
     const child = children[i];
-    if (child instanceof TimedNode) {
-      aggregateTotals(child);
+    if (child) {
+      if (child instanceof TimedNode) {
+        aggregateTotals(child);
+      }
+      node.totalDmlCount += child.totalDmlCount;
+      node.totalSoqlCount += child.totalSoqlCount;
+      node.totalThrownCount += child.totalThrownCount;
+      node.totalRowCount += child.totalRowCount;
     }
-    node.totalDmlCount += child.totalDmlCount;
-    node.totalSoqlCount += child.totalSoqlCount;
-    node.totalThrownCount += child.totalThrownCount;
-    node.totalRowCount += child.totalRowCount;
   }
 }
 
@@ -2784,36 +2809,38 @@ function insertPackageWrappers(node: Method) {
   const children = node.children;
   let lastPkg: TimedNode | null = null;
 
-  const newChildren = [];
+  const newChildren: LogLine[] = [];
   const len = children.length;
   for (let i = 0; i < len; i++) {
-    const child = children[i],
-      childType = child.type,
-      isPkgType = childType === 'ENTERING_MANAGED_PKG';
+    const child = children[i];
+    if (child) {
+      const childType = child.type,
+        isPkgType = childType === 'ENTERING_MANAGED_PKG';
 
-    if (lastPkg && child instanceof TimedNode) {
-      if (isPkgType && child.namespace === lastPkg.namespace) {
-        // combine adjacent (like) packages
-        lastPkg.exitStamp = child.exitStamp || child.timestamp;
-        continue; // skip any more child processing (it's gone)
-      } else if (!isPkgType) {
-        // we are done merging adjacent `ENTERING_MANAGED_PKG` of the same namesapce
-        lastPkg.recalculateDurations();
-        lastPkg = null;
+      if (lastPkg && child instanceof TimedNode) {
+        if (isPkgType && child.namespace === lastPkg.namespace) {
+          // combine adjacent (like) packages
+          lastPkg.exitStamp = child.exitStamp || child.timestamp;
+          continue; // skip any more child processing (it's gone)
+        } else if (!isPkgType) {
+          // we are done merging adjacent `ENTERING_MANAGED_PKG` of the same namesapce
+          lastPkg.recalculateDurations();
+          lastPkg = null;
+        }
       }
-    }
 
-    if (child instanceof Method) {
-      insertPackageWrappers(child);
-    }
+      if (child instanceof Method) {
+        insertPackageWrappers(child);
+      }
 
-    // It is a ENTERING_MANAGED_PKG line that does not match the last one
-    // or we have not come across a ENTERING_MANAGED_PKG line yet.
-    if (isPkgType) {
-      lastPkg?.recalculateDurations();
-      lastPkg = child as TimedNode;
+      // It is a ENTERING_MANAGED_PKG line that does not match the last one
+      // or we have not come across a ENTERING_MANAGED_PKG line yet.
+      if (isPkgType) {
+        lastPkg?.recalculateDurations();
+        lastPkg = child as TimedNode;
+      }
+      newChildren.push(child);
     }
-    newChildren.push(child);
   }
 
   lastPkg?.recalculateDurations();
@@ -2841,7 +2868,7 @@ export function getLogSettings(log: string) {
 
   return settingList.map((entry) => {
     const parts = entry.split(',');
-    return new LogSetting(parts[0], parts[1]);
+    return new LogSetting(parts[0] || '', parts[1] || '');
   });
 }
 

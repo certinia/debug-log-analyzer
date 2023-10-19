@@ -9,6 +9,7 @@
 .idea/
 
 *.vsix
+tsconfig.tsbuildinfo
 
 out/
 node_modules/*

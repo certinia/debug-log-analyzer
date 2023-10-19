@@ -2,22 +2,22 @@
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
 import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
-import { LitElement, PropertyValues, css, html, render, unsafeCSS } from 'lit';
+import { LitElement, type PropertyValues, css, html, render, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
-  ColumnComponent,
-  GroupComponent,
-  RowComponent,
+  type ColumnComponent,
+  type GroupComponent,
+  type RowComponent,
   TabulatorFull as Tabulator,
 } from 'tabulator-tables';
 
-import { DatabaseAccess } from '../Database';
-import '../components/CallStack';
-import NumberAccessor from '../datagrid/dataaccessor/Number';
-import Number from '../datagrid/format/Number';
-import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
+import { DatabaseAccess } from '../Database.js';
+import '../components/CallStack.js';
+import NumberAccessor from '../datagrid/dataaccessor/Number.js';
+import Number from '../datagrid/format/Number.js';
+import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation.js';
 import dataGridStyles from '../datagrid/style/DataGrid.scss';
-import { globalStyles } from '../global.styles';
+import { globalStyles } from '../global.styles.js';
 import {
   DMLBeginLine,
   RootNode,
@@ -150,7 +150,7 @@ export class DatabaseView extends LitElement {
     const treeRoot = this.timelineRoot;
     if (dbContainer && dmlTableWrapper && soqlTableWrapper && treeRoot) {
       const dbObserver = new IntersectionObserver(async (entries, observer) => {
-        const visible = entries[0].isIntersecting;
+        const visible = entries[0]?.isIntersecting;
         if (visible) {
           observer.disconnect();
 
@@ -321,7 +321,7 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
   });
 
   dmlTable.on('groupVisibilityChanged', (group: GroupComponent, visible: boolean) => {
-    const firstRow = visible ? group.getRows()[0] : group.getRows()[0].getPrevRow();
+    const firstRow = visible ? group.getRows()[0] : group.getRows()[0]?.getPrevRow();
     if (firstRow) {
       // @ts-expect-error it has 2 params
       firstRow.scrollTo('center', true).then(() => {
@@ -599,7 +599,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
   });
 
   soqlTable.on('groupVisibilityChanged', (group: GroupComponent, visible: boolean) => {
-    const firstRow = visible ? group.getRows()[0] : group.getRows()[0].getPrevRow();
+    const firstRow = visible ? group.getRows()[0] : group.getRows()[0]?.getPrevRow();
     if (firstRow) {
       // @ts-expect-error it has 2 params
       firstRow.scrollTo('center', true).then(() => {
