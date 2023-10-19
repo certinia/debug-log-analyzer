@@ -170,9 +170,9 @@ async function renderAnalysis(rootMethod: RootNode) {
       {
         title: 'Name',
         field: 'name',
+        formatter: 'textarea',
         headerSortStartingDir: 'asc',
         sorter: 'string',
-        tooltip: true,
         cssClass: 'datagrid-code-text',
         bottomCalc: () => {
           return 'Total';

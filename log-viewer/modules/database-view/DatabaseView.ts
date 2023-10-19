@@ -256,7 +256,6 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
         title: 'DML',
         field: 'dml',
         sorter: 'string',
-        tooltip: true,
         bottomCalc: () => {
           return 'Total';
         },
