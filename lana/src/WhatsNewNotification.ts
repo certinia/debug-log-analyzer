@@ -3,7 +3,7 @@
  */
 import { commands, window } from 'vscode';
 
-import { Context } from './Context';
+import { Context } from './Context.js';
 
 export class WhatsNewNotification {
   static async apply(context: Context): Promise<void> {

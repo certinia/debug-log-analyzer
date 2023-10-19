@@ -3,7 +3,7 @@
  */
 import { commands } from 'vscode';
 
-import { Context } from '../Context';
+import { Context } from '../Context.js';
 
 export class Command {
   private static commandPrefix = 'lana.';

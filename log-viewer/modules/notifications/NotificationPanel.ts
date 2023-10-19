@@ -5,8 +5,8 @@ import { provideVSCodeDesignSystem, vsCodeButton, vsCodeDivider } from '@vscode/
 import { LitElement, type TemplateResult, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { globalStyles } from '../global.styles';
-import { notificationStyles } from '../notification.styles';
+import { globalStyles } from '../global.styles.js';
+import { notificationStyles } from '../notification.styles.js';
 
 provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider());
 

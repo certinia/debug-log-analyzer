@@ -10,7 +10,7 @@ import {
   commands,
 } from 'vscode';
 
-import { Context } from '../Context';
+import { Context } from '../Context.js';
 
 export class OpenFileInPackage {
   static openFileForSymbol(

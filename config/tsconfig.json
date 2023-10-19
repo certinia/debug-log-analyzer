@@ -2,7 +2,7 @@
   "compilerOptions": {
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "target": "ES2022",
+    "target": "es2022",
     "verbatimModuleSyntax": true,
     "allowJs": true,
     "resolveJsonModule": true,

@@ -5,14 +5,14 @@ import { provideVSCodeDesignSystem, vsCodeButton, vsCodeTag } from '@vscode/webv
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import '../components/BadgeBase';
-import '../components/LogTitle';
-import { globalStyles } from '../global.styles';
-import { notificationStyles } from '../notification.styles';
-import '../notifications/NotificationPanel';
-import { Notification } from '../notifications/NotificationPanel';
-import '../notifications/NotificationTag';
-import { hostService } from '../services/VSCodeService';
+import '../components/BadgeBase.js';
+import '../components/LogTitle.js';
+import { globalStyles } from '../global.styles.js';
+import { notificationStyles } from '../notification.styles.js';
+import '../notifications/NotificationPanel.js';
+import { Notification } from '../notifications/NotificationPanel.js';
+import '../notifications/NotificationTag.js';
+import { hostService } from '../services/VSCodeService.js';
 import codiconStyles from '../styles/codicon.css';
 
 provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeTag());

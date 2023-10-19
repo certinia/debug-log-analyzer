@@ -4,9 +4,9 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import '../components/BadgeBase';
-import { globalStyles } from '../global.styles';
-import { Method } from '../parsers/TreeParser';
+import '../components/BadgeBase.js';
+import { globalStyles } from '../global.styles.js';
+import { Method } from '../parsers/TreeParser.js';
 
 @customElement('database-section')
 export class DatabaseSection extends LitElement {

@@ -4,8 +4,8 @@
 import { parse } from 'path';
 import { window } from 'vscode';
 
-import { Context } from '../Context';
-import { Item, Options, QuickPick } from './QuickPick';
+import { Context } from '../Context.js';
+import { Item, Options, QuickPick } from './QuickPick.js';
 
 export class QuickPickWorkspace {
   static async pickOrReturn(context: Context): Promise<string> {

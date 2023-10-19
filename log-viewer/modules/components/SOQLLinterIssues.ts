@@ -4,10 +4,15 @@
 import { LitElement, type PropertyValues, type TemplateResult, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { DatabaseAccess } from '../Database';
-import { globalStyles } from '../global.styles';
-import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser';
-import { SEVERITY_TYPES, SOQLLinter, type SOQLLinterRule, type Severity } from '../soql/SOQLLinter';
+import { DatabaseAccess } from '../Database.js';
+import { globalStyles } from '../global.styles.js';
+import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser.js';
+import {
+  SEVERITY_TYPES,
+  SOQLLinter,
+  type SOQLLinterRule,
+  type Severity,
+} from '../soql/SOQLLinter.js';
 
 @customElement('soql-issues')
 export class SOQLLinterIssues extends LitElement {

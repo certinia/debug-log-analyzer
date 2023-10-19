@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { type Stack } from '../Database';
-import { SOQLParser, SOQLTree } from '../parsers/SOQLParser';
+import { type Stack } from '../Database.js';
+import { SOQLParser, SOQLTree } from '../parsers/SOQLParser.js';
 
 //todo : need a general concept of stack (to pull out linter)
 export class SOQLLinter {

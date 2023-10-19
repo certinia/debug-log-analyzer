@@ -4,9 +4,9 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import './app-header/AppHeader';
-import { globalStyles } from './global.styles';
-import { Notification } from './notifications/NotificationPanel';
+import './app-header/AppHeader.js';
+import { globalStyles } from './global.styles.js';
+import { Notification } from './notifications/NotificationPanel.js';
 import parseLog, {
   RootNode,
   TruncationColor,
@@ -15,8 +15,8 @@ import parseLog, {
   totalDuration,
   truncateLog,
   truncated,
-} from './parsers/TreeParser';
-import { hostService } from './services/VSCodeService';
+} from './parsers/TreeParser.js';
+import { hostService } from './services/VSCodeService.js';
 
 @customElement('log-viewer')
 export class LogViewer extends LitElement {

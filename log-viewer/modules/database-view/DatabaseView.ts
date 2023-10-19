@@ -11,13 +11,13 @@ import {
   TabulatorFull as Tabulator,
 } from 'tabulator-tables';
 
-import { DatabaseAccess } from '../Database';
-import '../components/CallStack';
-import NumberAccessor from '../datagrid/dataaccessor/Number';
-import Number from '../datagrid/format/Number';
-import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
+import { DatabaseAccess } from '../Database.js';
+import '../components/CallStack.js';
+import NumberAccessor from '../datagrid/dataaccessor/Number.js';
+import Number from '../datagrid/format/Number.js';
+import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation.js';
 import dataGridStyles from '../datagrid/style/DataGrid.scss';
-import { globalStyles } from '../global.styles';
+import { globalStyles } from '../global.styles.js';
 import {
   DMLBeginLine,
   RootNode,

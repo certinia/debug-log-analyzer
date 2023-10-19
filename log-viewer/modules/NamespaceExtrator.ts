@@ -1,4 +1,4 @@
-import { RootNode } from './parsers/TreeParser';
+import { RootNode } from './parsers/TreeParser.js';
 
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.

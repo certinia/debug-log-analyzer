@@ -8,9 +8,9 @@ import { basename, dirname, join } from 'path';
 import { type WebviewPanel, window as vscWindow } from 'vscode';
 import { Uri, commands, workspace } from 'vscode';
 
-import { Context } from '../Context';
-import { OpenFileInPackage } from '../display/OpenFileInPackage';
-import { WebView } from '../display/WebView';
+import { Context } from '../Context.js';
+import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
+import { WebView } from '../display/WebView.js';
 
 interface WebViewLogFileRequest {
   cmd: string;

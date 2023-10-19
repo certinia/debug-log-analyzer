@@ -4,8 +4,10 @@ module.exports = {
       displayName: 'log-viewer',
       rootDir: '<rootDir>/log-viewer',
       testEnvironment: 'node',
+      moduleNameMapper: {
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+      },
       transform: {
-        // transform files with ts-jest
         '^.+\\.(ts|js)?$': '@swc/jest',
       },
       transformIgnorePatterns: [

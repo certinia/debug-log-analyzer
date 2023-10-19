@@ -14,16 +14,16 @@ import { LitElement, type PropertyValues, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { type RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
-import '../components/skeleton/GridSkeleton';
-import MinMaxEditor from '../datagrid/editors/MinMax';
-import MinMaxFilter from '../datagrid/filters/MinMax';
-import NumberFormat from '../datagrid/format/Number';
-import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation';
-import { RowNavigation } from '../datagrid/module/RowNavigation';
+import '../components/skeleton/GridSkeleton.js';
+import MinMaxEditor from '../datagrid/editors/MinMax.js';
+import MinMaxFilter from '../datagrid/filters/MinMax.js';
+import NumberFormat from '../datagrid/format/Number.js';
+import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation.js';
+import { RowNavigation } from '../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../datagrid/style/DataGrid.scss';
-import { globalStyles } from '../global.styles';
-import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser';
-import { hostService } from '../services/VSCodeService';
+import { globalStyles } from '../global.styles.js';
+import { LogLine, RootNode, TimedNode } from '../parsers/TreeParser.js';
+import { hostService } from '../services/VSCodeService.js';
 import treeViewStyles from './TreeView.scss';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());

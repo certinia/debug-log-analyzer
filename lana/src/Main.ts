@@ -3,8 +3,8 @@
  */
 import { type ExtensionContext } from 'vscode';
 
-import { Context } from './Context';
-import { Display } from './Display';
+import { Context } from './Context.js';
+import { Display } from './Display.js';
 
 export let context: Context | null = null;
 

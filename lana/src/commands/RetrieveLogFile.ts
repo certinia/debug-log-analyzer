@@ -6,14 +6,14 @@ import { existsSync } from 'fs';
 import { join, parse } from 'path';
 import { Uri, type WebviewPanel, window } from 'vscode';
 
-import { appName } from '../AppSettings';
-import { Context } from '../Context';
-import { Item, Options, QuickPick } from '../display/QuickPick';
-import { QuickPickWorkspace } from '../display/QuickPickWorkspace';
-import { GetLogFile } from '../sfdx/logs/GetLogFile';
-import { GetLogFiles } from '../sfdx/logs/GetLogFiles';
-import { Command } from './Command';
-import { type FetchLogCallBack, LogView } from './LogView';
+import { appName } from '../AppSettings.js';
+import { Context } from '../Context.js';
+import { Item, Options, QuickPick } from '../display/QuickPick.js';
+import { QuickPickWorkspace } from '../display/QuickPickWorkspace.js';
+import { GetLogFile } from '../sfdx/logs/GetLogFile.js';
+import { GetLogFiles } from '../sfdx/logs/GetLogFiles.js';
+import { Command } from './Command.js';
+import { type FetchLogCallBack, LogView } from './LogView.js';
 
 class DebugLogItem extends Item {
   logId: string;

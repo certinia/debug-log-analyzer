@@ -5,11 +5,11 @@ import { parse } from 'path';
 import { Uri, window } from 'vscode';
 import { type WebviewPanel } from 'vscode';
 
-import { appName } from '../AppSettings';
-import { Context } from '../Context';
-import { QuickPickWorkspace } from '../display/QuickPickWorkspace';
-import { Command } from './Command';
-import { type FetchLogCallBack, LogView } from './LogView';
+import { appName } from '../AppSettings.js';
+import { Context } from '../Context.js';
+import { QuickPickWorkspace } from '../display/QuickPickWorkspace.js';
+import { Command } from './Command.js';
+import { type FetchLogCallBack, LogView } from './LogView.js';
 
 export class ShowLogAnalysis {
   static getCommand(context: Context): Command {

@@ -5,9 +5,9 @@ import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-tool
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import '../components/BadgeBase';
-import { globalStyles } from '../global.styles';
-import './NotificationPanel';
+import '../components/BadgeBase.js';
+import { globalStyles } from '../global.styles.js';
+import './NotificationPanel.js';
 
 provideVSCodeDesignSystem().register(vsCodeButton());
 

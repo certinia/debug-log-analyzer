@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { Method } from '../../parsers/TreeParser';
-import { SOQLLinter } from '../../soql/SOQLLinter';
+import { Method } from '../../parsers/TreeParser.js';
+import { SOQLLinter } from '../../soql/SOQLLinter.js';
 
 describe('SOQL Linter rule tests', () => {
   it('No where clause should return rule', () => {
