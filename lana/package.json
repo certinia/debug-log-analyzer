@@ -1,7 +1,7 @@
 {
   "name": "lana",
   "displayName": "Apex Log Analyzer",
-  "version": "1.8.0",
+  "version": "1.10.0",
   "description": "Analyzer for Salesforce debug logs - Visualize code execution via a Flame graph and identify performance and SOQL/DML problems via Method and Database analysis",
   "keywords": [
     "apex",
