@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { LogRecord } from '@salesforce/apex-node';
+import { type LogRecord } from '@salesforce/apex-node';
 import { existsSync } from 'fs';
 import { join, parse } from 'path';
-import { Uri, WebviewPanel, window } from 'vscode';
+import { Uri, type WebviewPanel, window } from 'vscode';
 
 import { appName } from '../AppSettings';
 import { Context } from '../Context';
@@ -13,7 +13,7 @@ import { QuickPickWorkspace } from '../display/QuickPickWorkspace';
 import { GetLogFile } from '../sfdx/logs/GetLogFile';
 import { GetLogFiles } from '../sfdx/logs/GetLogFiles';
 import { Command } from './Command';
-import { FetchLogCallBack, LogView } from './LogView';
+import { type FetchLogCallBack, LogView } from './LogView';
 
 class DebugLogItem extends Item {
   logId: string;
@@ -99,11 +99,8 @@ export class RetrieveLogFile {
         return new DebugLogItem(name, description, detail, r.Id);
       });
 
-    const picked = await QuickPick.pick(items, new Options('Select a logfile'));
-    if (picked.length === 1) {
-      return picked[0].logId;
-    }
-    return null;
+    const [selectedLog] = await QuickPick.pick(items, new Options('Select a logfile'));
+    return selectedLog?.logId || null;
   }
 
   private static getLogFilePath(ws: string, fileId: string): string {

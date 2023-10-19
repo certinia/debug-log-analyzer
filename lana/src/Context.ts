@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { ExtensionContext, workspace } from 'vscode';
+import { type ExtensionContext, workspace } from 'vscode';
 
 import { Display } from './Display';
 import { SymbolFinder } from './SymbolFinder';

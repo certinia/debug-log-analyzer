@@ -3,13 +3,13 @@
  */
 import { parse } from 'path';
 import { Uri, window } from 'vscode';
-import { WebviewPanel } from 'vscode';
+import { type WebviewPanel } from 'vscode';
 
 import { appName } from '../AppSettings';
 import { Context } from '../Context';
 import { QuickPickWorkspace } from '../display/QuickPickWorkspace';
 import { Command } from './Command';
-import { FetchLogCallBack, LogView } from './LogView';
+import { type FetchLogCallBack, LogView } from './LogView';
 
 export class ShowLogAnalysis {
   static getCommand(context: Context): Command {

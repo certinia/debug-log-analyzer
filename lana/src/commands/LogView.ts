@@ -5,7 +5,7 @@ import { createReadStream } from 'fs';
 import { writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { basename, dirname, join } from 'path';
-import { WebviewPanel, window as vscWindow } from 'vscode';
+import { type WebviewPanel, window as vscWindow } from 'vscode';
 import { Uri, commands, workspace } from 'vscode';
 
 import { Context } from '../Context';
@@ -50,7 +50,7 @@ export class LogView {
 
     panel.iconPath = Uri.file(join(logViewerRoot, 'certinia-icon-color.png'));
     panel.webview.html = indexSrc.replace(/bundle.js|\${extensionRoot}/gi, function (matched) {
-      return toReplace[matched];
+      return toReplace[matched] || '';
     });
 
     panel.webview.onDidReceiveMessage(
@@ -71,12 +71,12 @@ export class LogView {
 
           case 'openType': {
             if (request.typeName) {
-              const parts = request.typeName.split('-');
+              const [className, lineNumber] = request.typeName.split('-');
               let line;
-              if (parts.length > 1) {
-                line = parseInt(parts[1]);
+              if (lineNumber) {
+                line = parseInt(lineNumber);
               }
-              OpenFileInPackage.openFileForSymbol(wsPath, context, parts[0], line);
+              OpenFileInPackage.openFileForSymbol(wsPath, context, className || '', line);
             }
             break;
           }
