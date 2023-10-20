@@ -23,6 +23,8 @@
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@types/tabulator-tables": "^5.5.3",
+    "@typescript-eslint/eslint-plugin": "^6.8.0",
+    "@typescript-eslint/parser": "^6.8.0",
     "concurrently": "^8.2.2",
     "http-server": "^14.1.1",
     "node-sass": "^9.0.0",
