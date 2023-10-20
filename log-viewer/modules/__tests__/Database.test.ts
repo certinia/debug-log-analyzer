@@ -2,7 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import { DatabaseAccess } from '../Database.js';
-import parseLog, { getRootMethod } from '../parsers/TreeParser.js';
+import parseLog, { getRootMethod } from '../parsers/TreeParserLegacy.js';
 
 describe('Analyse database tests', () => {
   it('Only DML and SOQL are collected', async () => {

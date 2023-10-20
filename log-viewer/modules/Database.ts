@@ -1,7 +1,12 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { DMLBeginLine, Method, RootNode, SOQLExecuteBeginLine } from './parsers/TreeParser.js';
+import {
+  DMLBeginLine,
+  Method,
+  RootNode,
+  SOQLExecuteBeginLine,
+} from './parsers/TreeParserLegacy.js';
 
 export type Stack = Method[];
 

@@ -5,7 +5,7 @@ import { LitElement, type PropertyValues, type TemplateResult, css, html } from 
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { DatabaseAccess } from '../Database.js';
-import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser.js';
+import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParserLegacy.js';
 import {
   SEVERITY_TYPES,
   SOQLLinter,

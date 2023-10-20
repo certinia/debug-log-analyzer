@@ -24,7 +24,7 @@ import parseLog, {
   parseTimestamp,
   parseVfNamespace,
   truncated,
-} from '../parsers/TreeParser.js';
+} from '../parsers/TreeParserLegacy.js';
 
 describe('parseObjectNamespace tests', () => {
   it('Should consider no separator to be unmanaged', () => {

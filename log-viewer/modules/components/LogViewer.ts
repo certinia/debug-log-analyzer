@@ -12,7 +12,7 @@ import parseLog, {
   totalDuration,
   truncateLog,
   truncated,
-} from '../parsers/TreeParser.js';
+} from '../parsers/TreeParserLegacy.js';
 import { hostService } from '../services/VSCodeService.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './AppHeader.js';

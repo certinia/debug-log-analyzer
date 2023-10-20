@@ -4,7 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { LogSetting } from '../parsers/TreeParser.js';
+import { LogSetting } from '../parsers/TreeParserLegacy.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { skeletonStyles } from './skeleton/skeleton.styles.js';
 

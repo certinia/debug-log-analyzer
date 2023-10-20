@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { Method } from '../../parsers/TreeParser.js';
+import { Method } from '../../parsers/TreeParserLegacy.js';
 import { SOQLLinter } from '../../soql/SOQLLinter.js';
 
 describe('SOQL Linter rule tests', () => {

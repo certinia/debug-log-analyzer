@@ -4,7 +4,13 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import formatDuration, { debounce } from '../Util.js';
 import { goToRow } from '../components/calltree-view/CalltreeView.js';
-import { Method, RootNode, TimedNode, type TimelineKey, truncated } from '../parsers/TreeParser.js';
+import {
+  Method,
+  RootNode,
+  TimedNode,
+  type TimelineKey,
+  truncated,
+} from '../parsers/TreeParserLegacy.js';
 
 export { RootNode };
 

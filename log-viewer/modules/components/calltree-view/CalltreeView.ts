@@ -20,7 +20,7 @@ import NumberFormat from '../../datagrid/format/Number.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
-import { LogLine, RootNode, TimedNode } from '../../parsers/TreeParser.js';
+import { LogLine, RootNode, TimedNode } from '../../parsers/TreeParserLegacy.js';
 import { hostService } from '../../services/VSCodeService.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../skeleton/GridSkeleton.js';
