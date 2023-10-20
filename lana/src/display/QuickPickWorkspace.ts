@@ -12,7 +12,7 @@ export class QuickPickWorkspace {
     if (context.workspaces.length > 1) {
       const [workspace] = await QuickPick.pick(
         context.workspaces.map((ws) => new Item(ws.name(), ws.path(), '')),
-        new Options('Select a workspace:')
+        new Options('Select a workspace:'),
       );
 
       if (workspace) {

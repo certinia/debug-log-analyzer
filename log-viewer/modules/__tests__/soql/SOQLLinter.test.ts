@@ -165,7 +165,7 @@ describe('SOQL in Trigger Rule tests', () => {
       ],
       ['CODE_UNIT_FINISHED'],
       'codeUnit',
-      'method'
+      'method',
     );
     mockTriggerLine.text = 'Account on Account trigger event AfterInsert';
 

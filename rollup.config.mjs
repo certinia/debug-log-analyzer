@@ -34,7 +34,7 @@ export default [
           exclude: 'node_modules',
           tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
           jsc: { transform: { useDefineForClassFields: false } },
-        })
+        }),
       ),
       production &&
         minify(
@@ -42,7 +42,7 @@ export default [
             // swc's minify option here
             mangle: true,
             compress: true,
-          })
+          }),
         ),
     ],
   },
@@ -66,7 +66,7 @@ export default [
           exclude: 'node_modules',
           tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
           jsc: { transform: { useDefineForClassFields: false } },
-        })
+        }),
       ),
       postcss({
         extensions: ['.css', '.scss'],
@@ -78,7 +78,7 @@ export default [
             // swc's minify option here
             mangle: true,
             compress: true,
-          })
+          }),
         ),
       minifyHTML({
         targets: [

@@ -107,7 +107,7 @@ class ThrowingErrorListener implements ANTLRErrorListener<Token> {
     line: number,
     charPositionInLine: number,
     msg: string,
-    _e: RecognitionException | undefined
+    _e: RecognitionException | undefined,
   ): void {
     throw new SyntaxException(line, charPositionInLine, msg);
   }

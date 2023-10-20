@@ -9,7 +9,7 @@ export default function (
   _type: 'data' | 'download' | 'clipboard',
   accessorParams: any,
   _column?: ColumnComponent,
-  _row?: RowComponent
+  _row?: RowComponent,
 ): any {
   const returnValue = (value || 0) / 1000000;
   return returnValue.toFixed(accessorParams.precision || 3);

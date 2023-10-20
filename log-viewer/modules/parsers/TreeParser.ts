@@ -165,7 +165,7 @@ export class Method extends TimedNode {
     parts: string[] | null,
     exitTypes: string[],
     timelineKey: TimelineKey,
-    cpuType: string
+    cpuType: string,
   ) {
     super(parts, timelineKey, cpuType);
     this.exitTypes = exitTypes;
@@ -197,7 +197,7 @@ export class Method extends TimedNode {
         endLine.timestamp,
         'Unexpected-Exit',
         'An exit event was found without a corresponding entry event e.g a `METHOD_EXIT` event without a `METHOD_ENTRY`',
-        'unexpected'
+        'unexpected',
       );
       return false; // we have no matching method - ignore
     }
@@ -244,14 +244,14 @@ export class Method extends TimedNode {
           lastTimestamp,
           'Unexpected-End',
           'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
-          'unexpected'
+          'unexpected',
         );
         if (this.isTruncated) {
           updateTruncated(
             lastTimestamp,
             'Max-Size-reached',
             'The maximum log size has been reached. Part of the log has been truncated.',
-            'skip'
+            'skip',
           );
         }
         this.isTruncated = true;
@@ -310,7 +310,7 @@ export function truncateLog(
   timestamp: number,
   reason: string,
   description: string,
-  colorKey: TruncateKey
+  colorKey: TruncateKey,
 ) {
   if (!reasons.has(reason)) {
     reasons.add(reason);
@@ -330,7 +330,7 @@ function updateTruncated(
   timestamp: number,
   reason: string,
   description: string,
-  colorKey: TruncateKey
+  colorKey: TruncateKey,
 ) {
   const elem = truncated.findIndex((item) => {
     return item.reason === reason;
@@ -620,7 +620,7 @@ class VFApexCallStartLine extends Method {
       !methodtext &&
       (!classText.includes(' ') ||
         this.invalidClasses.some((invalidCls: string) =>
-          classText.toLowerCase().includes(invalidCls)
+          classText.toLowerCase().includes(invalidCls),
         ))
     ) {
       // we have a system entry and they do not have exits
@@ -810,7 +810,7 @@ class SOQLExecuteExplainLine extends LogLine {
         : null;
       this.sObjectCardinality = sobjCardinalityText
         ? Number(
-            sobjCardinalityText.slice(sobjCardinalityText.indexOf('sobjectCardinality: ') + 20)
+            sobjCardinalityText.slice(sobjCardinalityText.indexOf('sobjectCardinality: ') + 20),
           )
         : null;
       this.relativeCost = costText
@@ -2716,14 +2716,14 @@ export function parseLine(line: string, lastEntry: LogLine | null): LogLine | nu
         lastEntry.timestamp,
         'Skipped-Lines',
         `${line}. A section of the log has been skipped and the log has been truncated. Full details of this section of log can not be provided.`,
-        'skip'
+        'skip',
       );
     } else if (lastEntry && line.indexOf('MAXIMUM DEBUG LOG SIZE REACHED') >= 0) {
       truncateLog(
         lastEntry.timestamp,
         'Max-Size-reached',
         'The maximum log size has been reached. Part of the log has been truncated.',
-        'skip'
+        'skip',
       );
     } else if (settingsPattern.test(line)) {
       // skip an unexpected settings line

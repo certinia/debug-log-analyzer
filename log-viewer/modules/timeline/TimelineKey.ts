@@ -44,7 +44,7 @@ export class Timelinekey extends LitElement {
       keyParts.push(
         html`<div class="timeline-key__entry" style="background-color:${keyMeta.fillColor}">
           <span>${keyMeta.label}</span>
-        </div>`
+        </div>`,
       );
     }
 

@@ -31,7 +31,7 @@ class ShowAnalysisCodeLens implements CodeLensProvider {
     // Register our CodeLens provider
     const codeLensProviderDisposable = languages.registerCodeLensProvider(
       docSelector,
-      new ShowAnalysisCodeLens(context)
+      new ShowAnalysisCodeLens(context),
     );
 
     // Push the command and CodeLens provider to the context so it can be disposed of later

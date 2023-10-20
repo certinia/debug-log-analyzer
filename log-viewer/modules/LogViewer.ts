@@ -85,7 +85,7 @@ export class LogViewer extends LitElement {
     document.dispatchEvent(
       new CustomEvent('logsettings', {
         detail: { logSettings: getLogSettings(logData) },
-      })
+      }),
     );
 
     parseLog(logData).then(() => {

@@ -14,7 +14,7 @@ import { type FetchLogCallBack, LogView } from './LogView.js';
 export class ShowLogAnalysis {
   static getCommand(context: Context): Command {
     return new Command('showLogAnalysis', 'Log: Show Apex Log Analysis', (uri: Uri) =>
-      ShowLogAnalysis.safeCommand(context, uri)
+      ShowLogAnalysis.safeCommand(context, uri),
     );
   }
 
@@ -53,10 +53,10 @@ export class ShowLogAnalysis {
       LogView.createView(ws, context, name, filePath, getLogCallBack);
     } else {
       context.display.showErrorMessage(
-        'No file selected or the file is too large. Try again using the file explorer or text editor command.'
+        'No file selected or the file is too large. Try again using the file explorer or text editor command.',
       );
       throw new Error(
-        'No file selected or the file is too large. Try again using the file explorer or text editor command.'
+        'No file selected or the file is too large. Try again using the file explorer or text editor command.',
       );
     }
   }

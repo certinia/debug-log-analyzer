@@ -68,22 +68,20 @@ export class SOQLLinterIssues extends LitElement {
           error: '❌',
           warning: '⚠️',
           info: 'ℹ️',
-        })
+        }),
       );
       this.issues.forEach((issue) => {
-        htmlText.push(
-          html`
-            <details>
-              <summary title="${issue.summary}">
-                <span title="${issue.severity}"
-                  >${severityToEmoji.get(issue.severity.toLowerCase())}
-                </span>
-                ${issue.summary}
-              </summary>
-              <p>${issue.message}</p>
-            </details>
-          `
-        );
+        htmlText.push(html`
+          <details>
+            <summary title="${issue.summary}">
+              <span title="${issue.severity}"
+                >${severityToEmoji.get(issue.severity.toLowerCase())}
+              </span>
+              ${issue.summary}
+            </summary>
+            <p>${issue.message}</p>
+          </details>
+        `);
       });
     } else {
       htmlText.push(html`<div class="issue-detail">No SOQL issues 👍</div>`);

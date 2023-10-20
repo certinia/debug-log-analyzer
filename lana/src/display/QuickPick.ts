@@ -43,7 +43,7 @@ export class QuickPick {
 
   static async showQuickPick<T extends QuickPickItem>(
     items: T[],
-    options: QuickPickOptions
+    options: QuickPickOptions,
   ): Promise<T | T[] | undefined> {
     return window.showQuickPick<T>(items, options, undefined);
   }

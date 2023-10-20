@@ -23,7 +23,7 @@ export class DatabaseAccess {
   public getStack(
     timestamp: number,
     stack: Stack = [],
-    line: Method = DatabaseAccess._treeRoot
+    line: Method = DatabaseAccess._treeRoot,
   ): Stack {
     const children = line.children;
     const len = children.length;
