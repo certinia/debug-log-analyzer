@@ -16,7 +16,7 @@
     "@apexdevtools/apex-parser": "^3.5.0",
     "@vscode/codicons": "^0.0.33",
     "@vscode/webview-ui-toolkit": "^1.2.2",
-    "lit": "^2.8.0",
+    "lit": "^3.0.0",
     "tabulator-tables": "^5.5.2"
   },
   "devDependencies": {
