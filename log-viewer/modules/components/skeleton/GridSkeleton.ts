@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 
-import { globalStyles } from '../../global.styles.js';
+import { globalStyles } from '../../styles/global.styles.js';
 import { skeletonStyles } from './skeleton.styles.js';
 
 @customElement('grid-skeleton')

@@ -5,7 +5,6 @@ import { LitElement, type PropertyValues, type TemplateResult, css, html } from 
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { DatabaseAccess } from '../Database.js';
-import { globalStyles } from '../global.styles.js';
 import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParser.js';
 import {
   SEVERITY_TYPES,
@@ -13,6 +12,7 @@ import {
   type SOQLLinterRule,
   type Severity,
 } from '../soql/SOQLLinter.js';
+import { globalStyles } from '../styles/global.styles.js';
 
 @customElement('soql-issues')
 export class SOQLLinterIssues extends LitElement {

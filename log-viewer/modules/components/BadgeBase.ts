@@ -5,7 +5,7 @@ import { provideVSCodeDesignSystem, vsCodeTag } from '@vscode/webview-ui-toolkit
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { globalStyles } from '../global.styles.js';
+import { globalStyles } from '../styles/global.styles.js';
 import { skeletonStyles } from './skeleton/skeleton.styles.js';
 
 provideVSCodeDesignSystem().register(vsCodeTag());

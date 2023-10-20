@@ -5,9 +5,9 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { DatabaseAccess } from '../Database.js';
-import { goToRow } from '../calltree-view/CalltreeView.js';
-import { globalStyles } from '../global.styles.js';
 import { LogLine } from '../parsers/TreeParser.js';
+import { globalStyles } from '../styles/global.styles.js';
+import { goToRow } from './calltree-view/CalltreeView.js';
 
 @customElement('call-stack')
 export class CallStack extends LitElement {

@@ -3,7 +3,7 @@
  */
 import { html, render } from 'lit';
 
-import './LogViewer';
+import './components/log-viewer/LogViewer';
 import { hostService } from './services/VSCodeService.js';
 import { setColors } from './timeline/Timeline.js';
 

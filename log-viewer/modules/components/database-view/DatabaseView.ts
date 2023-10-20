@@ -11,22 +11,22 @@ import {
   TabulatorFull as Tabulator,
 } from 'tabulator-tables';
 
-import { DatabaseAccess } from '../Database.js';
-import '../components/CallStack.js';
-import NumberAccessor from '../datagrid/dataaccessor/Number.js';
-import Number from '../datagrid/format/Number.js';
-import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation.js';
-import dataGridStyles from '../datagrid/style/DataGrid.scss';
-import { globalStyles } from '../global.styles.js';
+import { DatabaseAccess } from '../../Database.js';
+import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
+import Number from '../../datagrid/format/Number.js';
+import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
+import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 import {
   DMLBeginLine,
   RootNode,
   SOQLExecuteBeginLine,
   SOQLExecuteExplainLine,
-} from '../parsers/TreeParser';
-import { hostService } from '../services/VSCodeService';
-import './DatabaseSOQLDetailPanel';
-import './DatabaseSection';
+} from '../../parsers/TreeParser.js';
+import { hostService } from '../../services/VSCodeService.js';
+import { globalStyles } from '../../styles/global.styles.js';
+import '../CallStack.js';
+import './DatabaseSOQLDetailPanel.js';
+import './DatabaseSection.js';
 import databaseViewStyles from './DatabaseView.scss';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());

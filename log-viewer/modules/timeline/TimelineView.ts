@@ -5,7 +5,7 @@ import { LitElement, type PropertyValues, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { skeletonStyles } from '../components/skeleton/skeleton.styles.js';
-import { globalStyles } from '../global.styles.js';
+import { globalStyles } from '../styles/global.styles.js';
 import { RootNode, init as timelineInit } from './Timeline.js';
 import './TimelineKey.js';
 
