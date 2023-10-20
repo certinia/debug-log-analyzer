@@ -6,14 +6,14 @@ import { LitElement, type PropertyValues, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { type ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
-import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
-import Number from '../../datagrid/format/Number.js';
-import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
-import dataGridStyles from '../../datagrid/style/DataGrid.scss';
-import { RootNode, TimedNode } from '../../parsers/TreeParser.js';
-import { hostService } from '../../services/VSCodeService.js';
-import { globalStyles } from '../../styles/global.styles.js';
-import '../skeleton/GridSkeleton.js';
+import NumberAccessor from '../datagrid/dataaccessor/Number.js';
+import Number from '../datagrid/format/Number.js';
+import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation.js';
+import dataGridStyles from '../datagrid/style/DataGrid.scss';
+import { RootNode, TimedNode } from '../parsers/TreeParser.js';
+import { hostService } from '../services/VSCodeService.js';
+import { globalStyles } from '../styles/global.styles.js';
+import './skeleton/GridSkeleton.js';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 

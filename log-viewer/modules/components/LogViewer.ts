@@ -12,11 +12,11 @@ import parseLog, {
   totalDuration,
   truncateLog,
   truncated,
-} from '../../parsers/TreeParser.js';
-import { hostService } from '../../services/VSCodeService.js';
-import { globalStyles } from '../../styles/global.styles.js';
-import '../app-header/AppHeader.js';
-import { Notification } from '../notifications/NotificationPanel.js';
+} from '../parsers/TreeParser.js';
+import { hostService } from '../services/VSCodeService.js';
+import { globalStyles } from '../styles/global.styles.js';
+import './AppHeader.js';
+import { Notification } from './notifications/NotificationPanel.js';
 
 @customElement('log-viewer')
 export class LogViewer extends LitElement {
