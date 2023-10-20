@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { setNamespaces } from '../NamespaceExtrator.js';
+import { setNamespaces } from './NamespaceExtrator.js';
 
 type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
 type TruncateKey = 'unexpected' | 'error' | 'skip';

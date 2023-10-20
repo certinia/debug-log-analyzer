@@ -4,9 +4,9 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import '../components/CallStack.js';
-import '../components/SOQLLinterIssues.js';
-import { globalStyles } from '../global.styles.js';
+import { globalStyles } from '../../styles/global.styles.js';
+import '../CallStack.js';
+import '../SOQLLinterIssues.js';
 
 @customElement('db-soql-detail-panel')
 export class DatabaseSOQLDetailPanel extends LitElement {

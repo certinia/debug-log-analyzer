@@ -10,8 +10,8 @@ import { appName } from '../AppSettings.js';
 import { Context } from '../Context.js';
 import { Item, Options, QuickPick } from '../display/QuickPick.js';
 import { QuickPickWorkspace } from '../display/QuickPickWorkspace.js';
-import { GetLogFile } from '../sfdx/logs/GetLogFile.js';
-import { GetLogFiles } from '../sfdx/logs/GetLogFiles.js';
+import { GetLogFile } from '../salesforce/logs/GetLogFile.js';
+import { GetLogFiles } from '../salesforce/logs/GetLogFiles.js';
 import { Command } from './Command.js';
 import { type FetchLogCallBack, LogView } from './LogView.js';
 

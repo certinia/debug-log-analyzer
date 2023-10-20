@@ -4,7 +4,7 @@
 import { type ExtensionContext } from 'vscode';
 
 import { Context } from './Context.js';
-import { Display } from './Display.js';
+import { Display } from './display/Display.js';
 
 export let context: Context | null = null;
 

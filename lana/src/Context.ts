@@ -3,12 +3,12 @@
  */
 import { type ExtensionContext, workspace } from 'vscode';
 
-import { Display } from './Display.js';
-import { SymbolFinder } from './SymbolFinder.js';
-import { WhatsNewNotification } from './WhatsNewNotification.js';
 import ShowAnalysisCodeLens from './codelenses/ShowAnalysisCodeLens.js';
 import { RetrieveLogFile } from './commands/RetrieveLogFile.js';
 import { ShowLogAnalysis } from './commands/ShowLogAnalysis.js';
+import { Display } from './display/Display.js';
+import { WhatsNewNotification } from './display/WhatsNewNotification.js';
+import { SymbolFinder } from './salesforce/codesymbol/SymbolFinder.js';
 import { VSWorkspace } from './workspace/VSWorkspace.js';
 
 export class Context {
