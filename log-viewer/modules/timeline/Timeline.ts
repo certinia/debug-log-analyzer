@@ -430,7 +430,7 @@ function findByPosition(
   node: TimedNode,
   depth: number,
   x: number,
-  targetDepth: number
+  targetDepth: number,
 ): TimedNode | null {
   if (!node) {
     return null;
@@ -499,21 +499,21 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
         toolTip.appendChild(document.createTextNode(' => ' + target.exitStamp));
         toolTip.appendChild(brElem.cloneNode());
         toolTip.appendChild(
-          document.createTextNode(`duration: ${formatDuration(target.duration)}`)
+          document.createTextNode(`duration: ${formatDuration(target.duration)}`),
         );
 
         if (target.cpuType === 'free') {
           toolTip.appendChild(document.createTextNode(' (free)'));
         } else {
           toolTip.appendChild(
-            document.createTextNode(` (self ${formatDuration(target.selfTime)})`)
+            document.createTextNode(` (self ${formatDuration(target.selfTime)})`),
           );
         }
 
         if (target.totalRowCount !== null) {
           toolTip.appendChild(brElem.cloneNode());
           toolTip.appendChild(
-            document.createTextNode(`rows: ${target.totalRowCount} (self ${target.selfRowCount})`)
+            document.createTextNode(`rows: ${target.totalRowCount} (self ${target.selfRowCount})`),
           );
         }
       }
@@ -552,7 +552,7 @@ function showTooltipWithText(
   offsetY: number,
   tooltipText: HTMLDivElement | null,
   tooltip: HTMLElement,
-  timelineWrapper: HTMLElement
+  timelineWrapper: HTMLElement,
 ) {
   if (tooltipText && tooltip && timelineWrapper) {
     let posLeft = offsetX + 10,

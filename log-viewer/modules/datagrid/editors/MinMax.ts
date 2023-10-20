@@ -15,7 +15,7 @@ export default function (
   onRendered: EmptyCallback,
   success: ValueBooleanCallback,
   cancel: ValueVoidCallback,
-  _editorParams: object
+  _editorParams: object,
 ): HTMLElement | false {
   const container = document.createElement('span');
 

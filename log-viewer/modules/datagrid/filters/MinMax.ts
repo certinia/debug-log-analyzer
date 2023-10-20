@@ -6,12 +6,12 @@ export default function (
   filterVal: any,
   rowVal: any,
   rowData: any,
-  filterParams: { columnName: string; filterCache: Map<number, boolean> }
+  filterParams: { columnName: string; filterCache: Map<number, boolean> },
 ): boolean {
   if (!('start' in filterVal) || !('end' in filterVal)) {
     console.warn(
       'Filter Error - filter value is not an object with end and start properties:',
-      filterVal
+      filterVal,
     );
     return false;
   }
@@ -23,7 +23,7 @@ function deepFilter(
   headerValue: { start: number | null; end: number | null },
   rowValue: number,
   rowData: any,
-  filterParams: { columnName: string; filterCache: Map<number, boolean> }
+  filterParams: { columnName: string; filterCache: Map<number, boolean> },
 ): boolean {
   const cachedMatch = filterParams.filterCache.get(rowData.id);
   if (cachedMatch != null) {

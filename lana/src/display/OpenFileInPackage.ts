@@ -17,7 +17,7 @@ export class OpenFileInPackage {
     wsPath: string,
     context: Context,
     name: string,
-    lineNumber?: number
+    lineNumber?: number,
   ): void {
     const path = context.findSymbol(wsPath, name);
     if (path && lineNumber) {

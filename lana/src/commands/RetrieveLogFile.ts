@@ -24,7 +24,7 @@ class DebugLogItem extends Item {
     details: string,
     logId: string,
     sticky = true,
-    selected = false
+    selected = false,
   ) {
     super(name, desc, details, sticky, selected);
     this.logId = logId;
@@ -34,7 +34,7 @@ class DebugLogItem extends Item {
 export class RetrieveLogFile {
   static apply(context: Context): void {
     new Command('retrieveLogFile', 'Log: Retrieve Apex Log And Show Analysis', () =>
-      RetrieveLogFile.safeCommand(context)
+      RetrieveLogFile.safeCommand(context),
     ).register(context);
     context.display.output(`Registered command '${appName}: Retrieve Log'`);
   }

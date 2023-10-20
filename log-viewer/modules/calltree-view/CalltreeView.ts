@@ -151,7 +151,7 @@ export class CalltreeView extends LitElement {
 
 export async function renderCallTree(
   callTreeTableContainer: HTMLDivElement,
-  rootMethod: RootNode
+  rootMethod: RootNode,
 ): Promise<void> {
   if (calltreeTable) {
     // Ensure the table is fully visible before attempting to do things e.g go to rows.

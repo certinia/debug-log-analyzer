@@ -420,8 +420,8 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
       return `
       <div class="db-group-row">
         <div class="db-group-row__title" title="${value}">${value}</div><span>(${newCount} ${
-        newCount > 1 ? 'Queries' : 'Query'
-      })</span>
+          newCount > 1 ? 'Queries' : 'Query'
+        })</span>
       </div>`;
     },
     groupToggleElement: 'header',
@@ -522,7 +522,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
           _type: 'data' | 'download' | 'clipboard',
           _accessorParams: any,
           _column?: ColumnComponent,
-          _row?: RowComponent
+          _row?: RowComponent,
         ): any {
           return data.relativeCost;
         },
@@ -532,7 +532,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
           _type: 'data' | 'download' | 'clipboard',
           _accessorParams: any,
           _column?: ColumnComponent,
-          _row?: RowComponent
+          _row?: RowComponent,
         ): any {
           return data.relativeCost;
         },
@@ -637,7 +637,7 @@ function createDetailPanel(timestamp: number) {
 
 function createSOQLDetailPanel(
   timestamp: number,
-  timestampToSOQl: Map<number, SOQLExecuteBeginLine>
+  timestampToSOQl: Map<number, SOQLExecuteBeginLine>,
 ) {
   const detailContainer = document.createElement('div');
   detailContainer.className = 'row__details-container';
@@ -648,7 +648,7 @@ function createSOQLDetailPanel(
       timestamp=${timestamp}
       soql=${soqlLine?.text}
     ></db-soql-detail-panel>`,
-    detailContainer
+    detailContainer,
   );
 
   return detailContainer;

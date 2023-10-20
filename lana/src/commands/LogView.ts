@@ -32,7 +32,7 @@ export class LogView {
     context: Context,
     logName: string,
     logPath: string,
-    callback: FetchLogCallBack
+    callback: FetchLogCallBack,
   ): Promise<WebviewPanel> {
     const panel = WebView.apply('logFile', 'Log: ' + basename(logPath), [
       Uri.file(join(context.context.extensionPath, 'out')),
@@ -123,7 +123,7 @@ export class LogView {
         }
       },
       undefined,
-      []
+      [],
     );
 
     return panel;
