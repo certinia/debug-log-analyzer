@@ -117,7 +117,7 @@ importers:
         specifier: ^16.18.59
         version: 16.18.59
       '@types/vscode':
-        specifier: 1.74.0
+        specifier: ~1.74.0
         version: 1.74.0
       rollup:
         specifier: ^3.29.4
