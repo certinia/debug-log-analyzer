@@ -482,6 +482,10 @@ function showTooltip(offsetX: number, offsetY: number) {
 function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
   const target = findByPosition(timelineRoot, 0, x, depth);
   if (target) {
+    canvas.classList.remove('timeline-hover');
+    canvas.classList.remove('timeline-dragging');
+    canvas.classList.add('timeline-event--hover');
+
     const toolTip = document.createElement('div');
     const brElem = document.createElement('br');
     let displayText = target.text;
@@ -521,6 +525,9 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
 
     return toolTip;
   }
+  canvas.classList.add('timeline-hover');
+  canvas.classList.remove('timeline-event--hover');
+
   return null;
 }
 
@@ -617,14 +624,18 @@ function onClickCanvas(): void {
 }
 
 function onLeaveCanvas() {
-  dragging = false;
+  stopDragging();
   tooltip.style.display = 'none';
 }
 
 let dragging = false;
 let mouseDownPosition: { x: number; y: number };
+
 function handleMouseDown(): void {
   dragging = true;
+
+  canvas.classList.remove('timeline-hover');
+  canvas.classList.add('timeline-dragging');
   tooltip.style.display = 'none';
   mouseDownPosition = {
     x: lastMouseX,
@@ -633,8 +644,14 @@ function handleMouseDown(): void {
 }
 
 function handleMouseUp(): void {
-  dragging = false;
+  stopDragging();
   debounce(showTooltip(lastMouseX, lastMouseY));
+}
+
+function stopDragging() {
+  dragging = false;
+  canvas.classList.remove('timeline-dragging');
+  canvas.classList.add('timeline-hover');
 }
 
 function handleMouseMove(evt: MouseEvent) {
