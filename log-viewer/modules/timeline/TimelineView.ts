@@ -58,6 +58,10 @@ export class TimelineView extends LitElement {
         font-size: 1rem;
       }
 
+      .timeline-event--hover {
+        cursor: auto;
+      }
+
       #timeline-container {
         position: relative;
         overflow: hidden;
@@ -74,6 +78,15 @@ export class TimelineView extends LitElement {
         z-index: 0;
         width: 100%;
         height: 100%;
+      }
+
+      .timeline-hover:hover {
+        cursor: pointer;
+      }
+
+      .timeline-dragging {
+        cursor: -webkit-grabbing;
+        cursor: grabbing;
       }
 
       .skeleton-text {
@@ -103,7 +116,7 @@ export class TimelineView extends LitElement {
   render() {
     const skeleton = !this.timelineRoot
       ? this._getSkeletonTimeline()
-      : html`<canvas id="timeline"></canvas>`;
+      : html`<canvas id="timeline" class="timeline-hover"></canvas>`;
 
     return html`
       <div id="timeline-container">${skeleton}</div>

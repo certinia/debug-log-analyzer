@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Make dragging more obvious on the Timeline by showing different cursors ([#249][#249])
+  - Show the pointer cursor by default when hovering the Timeline.
+  - Show the grabbing cursor when the mouse is pressed down on the Timeline, to indicate drag is now possible.
+  - Show the default cursor when hovering a Timeline event.
+
 ## [1.10.0] - 2023-10-19
 
 ### Added
@@ -259,6 +268,10 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Misc Visual tweaks
 - Add explorer menu item
 - Provide more information when selecting log to download
+
+<!-- Unreleased -->
+
+[#423]: https://github.com/certinia/debug-log-analyzer/issues/423
 
 <!-- v1.10.0 -->
 
