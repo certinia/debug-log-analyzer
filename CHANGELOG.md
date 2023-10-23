@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Make dragging more obvious on the Timeline by showing different cursors ([#249][#249])
+- Make dragging more obvious on the Timeline by showing different cursors ([#423][#423])
   - Show the pointer cursor by default when hovering the Timeline.
   - Show the grabbing cursor when the mouse is pressed down on the Timeline, to indicate drag is now possible.
   - Show the default cursor when hovering a Timeline event.
