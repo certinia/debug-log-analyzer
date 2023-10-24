@@ -5,7 +5,7 @@
     "ecmaVersion": "latest",
     "sourceType": "module"
   },
-  "plugins": ["@typescript-eslint", "prettier"],
+  "plugins": ["@typescript-eslint"],
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/eslint-recommended",
@@ -14,7 +14,6 @@
   ],
   "rules": {
     "no-console": "warn",
-    "prettier/prettier": "error",
     "@typescript-eslint/naming-convention": "warn",
     "@typescript-eslint/semi": "warn",
     "@typescript-eslint/no-unused-vars": [
