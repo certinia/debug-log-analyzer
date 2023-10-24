@@ -15,7 +15,6 @@
     "@typescript-eslint/parser": "^6.8.0",
     "concurrently": "^8.2.2",
     "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-prettier": "^5.0.1",
     "husky": "^8.0.3",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
@@ -35,7 +34,7 @@
     "build:dev": "concurrently -r -g 'rm -rf lana/out && rollup -c rollup.config.mjs' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",
     "prepare": "husky install",
-    "lint": "concurrently -r -g 'eslint . --ext ts' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
+    "lint": "concurrently -r -g 'eslint . --ext ts' 'prettier **/*.{ts,css,md,scss} --check' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "test": "jest",
     "test:ci": "jest --runInBand",
     "prettier-format": "prettier '**/*.ts' --write"
