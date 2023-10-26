@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Show the grabbing cursor when the mouse is pressed down on the Timeline, to indicate drag is now possible.
   - Show the default cursor when hovering a Timeline event.
 
+## [1.10.1] - 2023-10-26
+
+### Fixed
+
+- Call Tree not showing `USER_DEBUG` content ([#429][#429])
+
 ## [1.10.0] - 2023-10-19
 
 ### Added
@@ -272,6 +278,10 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- Unreleased -->
 
 [#423]: https://github.com/certinia/debug-log-analyzer/issues/423
+
+<!-- v1.10.1 -->
+
+[#429]: https://github.com/certinia/debug-log-analyzer/issues/429
 
 <!-- v1.10.0 -->
 

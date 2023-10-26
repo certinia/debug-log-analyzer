@@ -870,15 +870,7 @@ class VariableScopeBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3] || '';
-    this.value = parts[4] || '';
-  }
-
-  onEnd(end: LogLine, _stack: LogLine[]): void {
-    if (end.value) {
-      this.value = end.value;
-    }
-    console.debug('NEVER HIT?');
+    this.text = parts.slice(3).join(' | ');
   }
 }
 
@@ -891,15 +883,14 @@ class VariableAssignmentLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3] || '';
-    this.value = parts[4] || '';
+    this.text = parts.slice(3).join(' | ');
   }
 }
 class UserInfoLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = this.type + ':' + parts[3] + ' ' + parts[4];
+    this.text = parts[3] + ' ' + parts[4];
   }
 }
 
@@ -909,8 +900,7 @@ class UserDebugLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3] || '';
-    this.value = parts[4] || '';
+    this.text = parts.slice(3).join(' | ');
   }
 }
 
@@ -930,7 +920,6 @@ class CumulativeLimitUsageEndLine extends LogLine {
 
 class CumulativeProfilingLine extends LogLine {
   acceptsText = true;
-
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] + ' ' + (parts[3] ?? '');
@@ -981,52 +970,52 @@ class LimitUsageForNSLine extends LogLine {
 class NBANodeBegin extends Method {
   constructor(parts: string[]) {
     super(parts, ['NBA_NODE_END'], 'systemMethod', 'method');
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 
 class NBANodeDetail extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBANodeEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBANodeError extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBAOfferInvalid extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBAStrategyBegin extends Method {
   constructor(parts: string[]) {
     super(parts, ['NBA_STRATEGY_END'], 'systemMethod', 'method');
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBAStrategyEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBAStrategyError extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 
@@ -1151,8 +1140,7 @@ class EnteringManagedPackageLine extends Method {
     const rawNs = parts[2] || '',
       lastDot = rawNs.lastIndexOf('.');
 
-    this.namespace = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
-    this.text = this.type + ' : ' + this.namespace;
+    this.text = this.namespace = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
   }
 
   onAfter(end?: LogLine): void {
@@ -1315,7 +1303,7 @@ class FlowElementBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['FLOW_ELEMENT_END'], 'flow', 'custom');
-    this.text = this.type + ' : ' + parts[3] + ' ' + parts[4];
+    this.text = parts[3] + ' ' + parts[4];
   }
 }
 
@@ -1464,7 +1452,7 @@ class FlowBulkElementBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['FLOW_BULK_ELEMENT_END'], 'flow', 'custom');
-    this.text = `${this.type} : ${parts[2]} - ${parts[3]}`;
+    this.text = `${parts[2]} - ${parts[3]}`;
   }
 }
 
@@ -1652,7 +1640,7 @@ class WFRuleEvalBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['WF_RULE_EVAL_END'], 'workflow', 'custom');
-    this.text = this.type + ' : ' + parts[2];
+    this.text = parts[2] || '';
   }
 }
 
@@ -2025,7 +2013,7 @@ class BulkDMLEntry extends LogLine {
 class DuplicateDetectionDetails extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 
@@ -2035,7 +2023,7 @@ class DuplicateDetectionDetails extends LogLine {
 class DuplicateDetectionSummary extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 
