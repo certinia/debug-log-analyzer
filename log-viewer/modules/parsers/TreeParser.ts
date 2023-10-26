@@ -958,52 +958,52 @@ class LimitUsageForNSLine extends LogLine {
 class NBANodeBegin extends Method {
   constructor(parts: string[]) {
     super(parts, ['NBA_NODE_END'], 'systemMethod', 'method');
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 
 class NBANodeDetail extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBANodeEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBANodeError extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBAOfferInvalid extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBAStrategyBegin extends Method {
   constructor(parts: string[]) {
     super(parts, ['NBA_STRATEGY_END'], 'systemMethod', 'method');
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBAStrategyEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBAStrategyError extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 
@@ -2002,7 +2002,7 @@ class BulkDMLEntry extends LogLine {
 class DuplicateDetectionDetails extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 
@@ -2012,7 +2012,7 @@ class DuplicateDetectionDetails extends LogLine {
 class DuplicateDetectionSummary extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 
