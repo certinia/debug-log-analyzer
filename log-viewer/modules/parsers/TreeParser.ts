@@ -847,15 +847,7 @@ class VariableScopeBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3];
-    this.value = parts[4];
-  }
-
-  onEnd(end: LogLine, _stack: LogLine[]): void {
-    if (end.value) {
-      this.value = end.value;
-    }
-    console.debug('NEVER HIT?');
+    this.text = parts.slice(3).join(' | ');
   }
 }
 
@@ -868,8 +860,7 @@ class VariableAssignmentLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3];
-    this.value = parts[4];
+    this.text = parts.slice(3).join(' | ');
   }
 }
 class UserInfoLine extends LogLine {
@@ -886,8 +877,7 @@ class UserDebugLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3];
-    this.value = parts[4];
+    this.text = parts.slice(3).join(' | ');
   }
 }
 
