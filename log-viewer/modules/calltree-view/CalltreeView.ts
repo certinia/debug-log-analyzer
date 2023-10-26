@@ -178,6 +178,7 @@ export async function renderCallTree(
 
     const selfTimeFilterCache = new Map<string, boolean>();
     const totalTimeFilterCache = new Map<string, boolean>();
+    let childIndent;
     calltreeTable = new Tabulator(callTreeTableContainer, {
       data: toCallTree(rootMethod.children),
       layout: 'fitColumns',
@@ -224,23 +225,23 @@ export async function renderCallTree(
             const row = cell.getRow();
             // @ts-expect-error: _row is private. This is temporary and I will patch the text wrap behaviour in the library.
             const treeLevel = row._row.modules.dataTree.index;
-            const indent = row.getTable().options.dataTreeChildIndent || 0;
-            const levelIndent = treeLevel * indent;
+            childIndent ??= row.getTable().options.dataTreeChildIndent || 0;
+            const levelIndent = treeLevel * childIndent;
             cellElem.style.paddingLeft = `${levelIndent + 4}px`;
             cellElem.style.textIndent = `-${levelIndent}px`;
 
             const node = (cell.getData() as CalltreeRow).originalData;
-            const text = node.text + (node.lineNumber ? `:${node.lineNumber}` : '');
+            let text = node.text;
             if (node.hasValidSymbols) {
-              const logLineBody = document.createElement('a');
-              logLineBody.href = '#';
-              logLineBody.textContent = text;
-              return logLineBody;
+              text += node.lineNumber ? `:${node.lineNumber}` : '';
+              return `<a href="#!">${text}</a>`;
             }
 
-            const textWrapper = document.createElement('span');
-            textWrapper.appendChild(document.createTextNode(text));
-            return textWrapper;
+            const excludedTypes = ['SOQL_EXECUTE_BEGIN', 'DML_BEGIN'];
+            text =
+              (!excludedTypes.includes(node.type) && node.type !== text ? node.type + ': ' : '') +
+              text;
+            return text;
           },
           variableHeight: true,
           cellClick: (e, cell) => {
