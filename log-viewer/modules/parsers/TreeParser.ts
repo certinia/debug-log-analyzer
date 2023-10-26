@@ -867,7 +867,7 @@ class UserInfoLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = this.type + ':' + parts[3] + ' ' + parts[4];
+    this.text = parts[3] + ' ' + parts[4];
   }
 }
 
@@ -1118,8 +1118,7 @@ class EnteringManagedPackageLine extends Method {
     const rawNs = parts[2],
       lastDot = rawNs.lastIndexOf('.');
 
-    this.namespace = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
-    this.text = this.type + ' : ' + this.namespace;
+    this.text = this.namespace = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
   }
 
   onAfter(end?: LogLine): void {
@@ -1282,7 +1281,7 @@ class FlowElementBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['FLOW_ELEMENT_END'], 'flow', 'custom');
-    this.text = this.type + ' : ' + parts[3] + ' ' + parts[4];
+    this.text = parts[3] + ' ' + parts[4];
   }
 }
 
@@ -1431,7 +1430,7 @@ class FlowBulkElementBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['FLOW_BULK_ELEMENT_END'], 'flow', 'custom');
-    this.text = `${this.type} : ${parts[2]} - ${parts[3]}`;
+    this.text = `${parts[2]} - ${parts[3]}`;
   }
 }
 
@@ -1619,7 +1618,7 @@ class WFRuleEvalBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['WF_RULE_EVAL_END'], 'workflow', 'custom');
-    this.text = this.type + ' : ' + parts[2];
+    this.text = parts[2];
   }
 }
 
