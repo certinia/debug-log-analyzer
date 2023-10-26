@@ -165,7 +165,7 @@ export class Method extends TimedNode {
     parts: string[] | null,
     exitTypes: string[],
     timelineKey: TimelineKey,
-    cpuType: string,
+    cpuType: string
   ) {
     super(parts, timelineKey, cpuType);
     this.exitTypes = exitTypes;
@@ -197,7 +197,7 @@ export class Method extends TimedNode {
         endLine.timestamp,
         'Unexpected-Exit',
         'An exit event was found without a corresponding entry event e.g a `METHOD_EXIT` event without a `METHOD_ENTRY`',
-        'unexpected',
+        'unexpected'
       );
       return false; // we have no matching method - ignore
     }
@@ -244,14 +244,14 @@ export class Method extends TimedNode {
           lastTimestamp,
           'Unexpected-End',
           'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
-          'unexpected',
+          'unexpected'
         );
         if (this.isTruncated) {
           updateTruncated(
             lastTimestamp,
             'Max-Size-reached',
             'The maximum log size has been reached. Part of the log has been truncated.',
-            'skip',
+            'skip'
           );
         }
         this.isTruncated = true;
@@ -310,7 +310,7 @@ export function truncateLog(
   timestamp: number,
   reason: string,
   description: string,
-  colorKey: TruncateKey,
+  colorKey: TruncateKey
 ) {
   if (!reasons.has(reason)) {
     reasons.add(reason);
@@ -330,7 +330,7 @@ function updateTruncated(
   timestamp: number,
   reason: string,
   description: string,
-  colorKey: TruncateKey,
+  colorKey: TruncateKey
 ) {
   const elem = truncated.findIndex((item) => {
     return item.reason === reason;
@@ -620,7 +620,7 @@ class VFApexCallStartLine extends Method {
       !methodtext &&
       (!classText.includes(' ') ||
         this.invalidClasses.some((invalidCls: string) =>
-          classText.toLowerCase().includes(invalidCls),
+          classText.toLowerCase().includes(invalidCls)
         ))
     ) {
       // we have a system entry and they do not have exits
@@ -810,7 +810,7 @@ class SOQLExecuteExplainLine extends LogLine {
         : null;
       this.sObjectCardinality = sobjCardinalityText
         ? Number(
-            sobjCardinalityText.slice(sobjCardinalityText.indexOf('sobjectCardinality: ') + 20),
+            sobjCardinalityText.slice(sobjCardinalityText.indexOf('sobjectCardinality: ') + 20)
           )
         : null;
       this.relativeCost = costText
@@ -870,15 +870,7 @@ class VariableScopeBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3] || '';
-    this.value = parts[4] || '';
-  }
-
-  onEnd(end: LogLine, _stack: LogLine[]): void {
-    if (end.value) {
-      this.value = end.value;
-    }
-    console.debug('NEVER HIT?');
+    this.text = parts.slice(3).join(' | ');
   }
 }
 
@@ -891,15 +883,14 @@ class VariableAssignmentLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3] || '';
-    this.value = parts[4] || '';
+    this.text = parts.slice(3).join(' | ');
   }
 }
 class UserInfoLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = this.type + ':' + parts[3] + ' ' + parts[4];
+    this.text = parts[3] + ' ' + parts[4];
   }
 }
 
@@ -909,8 +900,7 @@ class UserDebugLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.text = parts[3] || '';
-    this.value = parts[4] || '';
+    this.text = parts.slice(3).join(' | ');
   }
 }
 
@@ -981,52 +971,52 @@ class LimitUsageForNSLine extends LogLine {
 class NBANodeBegin extends Method {
   constructor(parts: string[]) {
     super(parts, ['NBA_NODE_END'], 'systemMethod', 'method');
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 
 class NBANodeDetail extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBANodeEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBANodeError extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBAOfferInvalid extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBAStrategyBegin extends Method {
   constructor(parts: string[]) {
     super(parts, ['NBA_STRATEGY_END'], 'systemMethod', 'method');
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBAStrategyEnd extends LogLine {
   isExit = true;
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 class NBAStrategyError extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 
@@ -1151,8 +1141,7 @@ class EnteringManagedPackageLine extends Method {
     const rawNs = parts[2] || '',
       lastDot = rawNs.lastIndexOf('.');
 
-    this.namespace = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
-    this.text = this.type + ' : ' + this.namespace;
+    this.text = this.namespace = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
   }
 
   onAfter(end?: LogLine): void {
@@ -1315,7 +1304,7 @@ class FlowElementBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['FLOW_ELEMENT_END'], 'flow', 'custom');
-    this.text = this.type + ' : ' + parts[3] + ' ' + parts[4];
+    this.text = parts[3] + ' ' + parts[4];
   }
 }
 
@@ -1464,7 +1453,7 @@ class FlowBulkElementBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['FLOW_BULK_ELEMENT_END'], 'flow', 'custom');
-    this.text = `${this.type} : ${parts[2]} - ${parts[3]}`;
+    this.text = `${parts[2]} - ${parts[3]}`;
   }
 }
 
@@ -1652,7 +1641,7 @@ class WFRuleEvalBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['WF_RULE_EVAL_END'], 'workflow', 'custom');
-    this.text = this.type + ' : ' + parts[2];
+    this.text = parts[2];
   }
 }
 
@@ -2025,7 +2014,7 @@ class BulkDMLEntry extends LogLine {
 class DuplicateDetectionDetails extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 
@@ -2035,7 +2024,7 @@ class DuplicateDetectionDetails extends LogLine {
 class DuplicateDetectionSummary extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.text = parts.slice(2, -1).join(' | ');
+    this.text = parts.slice(2).join(' | ');
   }
 }
 
@@ -2716,14 +2705,14 @@ export function parseLine(line: string, lastEntry: LogLine | null): LogLine | nu
         lastEntry.timestamp,
         'Skipped-Lines',
         `${line}. A section of the log has been skipped and the log has been truncated. Full details of this section of log can not be provided.`,
-        'skip',
+        'skip'
       );
     } else if (lastEntry && line.indexOf('MAXIMUM DEBUG LOG SIZE REACHED') >= 0) {
       truncateLog(
         lastEntry.timestamp,
         'Max-Size-reached',
         'The maximum log size has been reached. Part of the log has been truncated.',
-        'skip',
+        'skip'
       );
     } else if (settingsPattern.test(line)) {
       // skip an unexpected settings line
