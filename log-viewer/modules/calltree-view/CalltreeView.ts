@@ -230,8 +230,9 @@ export async function renderCallTree(
             cellElem.style.textIndent = `-${levelIndent}px`;
 
             const node = (cell.getData() as CalltreeRow).originalData;
-            const text = node.text + (node.lineNumber ? `:${node.lineNumber}` : '');
+            let text = node.text;
             if (node.hasValidSymbols) {
+              text += node.lineNumber ? `:${node.lineNumber}` : '';
               const logLineBody = document.createElement('a');
               logLineBody.href = '#';
               logLineBody.textContent = text;
