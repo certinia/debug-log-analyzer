@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import parseLog, {
+import ApexLogParser, {
   CodeUnitFinishedLine,
   CodeUnitStartedLine,
   ExecutionFinishedLine,
@@ -12,19 +12,14 @@ import parseLog, {
   SOQLExecuteBeginLine,
   SOQLExecuteExplainLine,
   TimedNode,
-  cpuUsed,
   getLogSettings,
-  getRootMethod,
   lineTypeMap,
-  logLines,
-  parseLine,
   parseLineNumber,
   parseObjectNamespace,
   parseRows,
   parseTimestamp,
   parseVfNamespace,
-  truncated,
-} from '../parsers/TreeParserLegacy.js';
+} from '../parsers/ApexLogParser.js';
 
 describe('parseObjectNamespace tests', () => {
   it('Should consider no separator to be unmanaged', () => {
@@ -69,25 +64,21 @@ describe('parseRows tests', () => {
 });
 
 describe('parseLine tests', () => {
+  const log1 = new ApexLogParser('09:18:22.6 (6574780)|DUMMY').parse();
+
+  it('Parser will return 0 lines if line has invalid type name', () => {
+    expect(log1.children.length).toEqual(0);
+  });
+
   const line =
     '15:20:52.222 (6574780)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()';
-
-  it('Should return null if no meta', () => {
-    expect(parseLine('09:18:22.6 (6574780)|DUMMY', null)).toEqual(null);
-  });
+  const log2 = new ApexLogParser(line).parse();
 
   it('Should return an object with meta as prototype', () => {
-    expect(parseLine(line, null)).toBeInstanceOf(MethodEntryLine);
-  });
-
-  it('Should return an object with a reference to the source line', () => {
-    const node = parseLine(line, null);
-    expect(node?.logLine).toEqual(line);
-  });
-
-  it('Should return an object with a timestamp', () => {
-    const node = parseLine(line, null);
-    expect(node?.timestamp).toEqual(6574780);
+    const methodLine = log2.children[0];
+    expect(methodLine).toBeInstanceOf(MethodEntryLine);
+    expect(methodLine?.logLine).toEqual(line);
+    expect(methodLine?.timestamp).toEqual(6574780);
   });
 });
 
@@ -100,12 +91,14 @@ describe('parseLog tests', () => {
       '09:19:13.82 (51592737891)|CODE_UNIT_FINISHED|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
-    parseLog(log);
-    expect(logLines.length).toEqual(4);
+    const apexLog = new ApexLogParser(log).parse();
+    const logLines = apexLog.children;
+    expect(logLines.length).toEqual(1);
     expect(logLines[0]).toBeInstanceOf(ExecutionStartedLine);
-    expect(logLines[1]).toBeInstanceOf(CodeUnitStartedLine);
-    expect(logLines[2]).toBeInstanceOf(CodeUnitFinishedLine);
-    expect(logLines[3]).toBeInstanceOf(ExecutionFinishedLine);
+
+    const firstChildren = (logLines[0] as Method).children;
+    expect(firstChildren.length).toEqual(1);
+    expect(firstChildren[0]).toBeInstanceOf(CodeUnitStartedLine);
   });
 
   it('Should parse between EXECUTION_STARTED and EXECUTION_FINISHED for CRLF (\r\n)', async () => {
@@ -116,12 +109,14 @@ describe('parseLog tests', () => {
       '09:19:13.82 (51592737891)|CODE_UNIT_FINISHED|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\r\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\r\n';
 
-    parseLog(log);
-    expect(logLines.length).toEqual(4);
+    const apexLog = new ApexLogParser(log).parse();
+
+    expect(logLines.length).toEqual(1);
     expect(logLines[0]).toBeInstanceOf(ExecutionStartedLine);
-    expect(logLines[1]).toBeInstanceOf(CodeUnitStartedLine);
-    expect(logLines[2]).toBeInstanceOf(CodeUnitFinishedLine);
-    expect(logLines[3]).toBeInstanceOf(ExecutionFinishedLine);
+
+    const firstChildren = (logLines[0] as Method).children;
+    expect(firstChildren.length).toEqual(1);
+    expect(firstChildren[0]).toBeInstanceOf(CodeUnitStartedLine);
   });
 
   it('Should handle partial logs', async () => {
