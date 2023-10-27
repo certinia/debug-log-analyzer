@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { setNamespaces } from './NamespaceExtrator.js';
+import { ApexLog } from './ApexLog.js';
 
 type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
 type TruncateKey = 'unexpected' | 'error' | 'skip';
@@ -30,14 +30,276 @@ const typePattern = /^[A-Z_]*$/,
   newlineRegex = /\r?\n/,
   settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
 
-let logLines: LogLine[] = [],
-  truncated: TruncationEntry[] = [],
-  maxSizeTimestamp: number | null = null,
-  reasons: Set<string> = new Set<string>(),
-  cpuUsed = 0,
-  lastTimestamp = null,
-  totalDuration = 0, // the maximum display value (in nano-seconds)
+export default class ApexLogParser {
+  debugLogData: string = '';
+
+  truncated: TruncationEntry[] = [];
+  maxSizeTimestamp: number | null = null;
+  reasons: Set<string> = new Set<string>();
+  cpuUsed = 0;
+  lastTimestamp = 0;
   discontinuity = false;
+
+  constructor(debugLog: string) {
+    this.debugLogData = debugLog;
+  }
+
+  parse(): ApexLog {
+    const logLines = this.parseLog(this.debugLogData);
+    const rootNode = this.getRootMethod(logLines);
+
+    const apexLog = new ApexLog();
+    apexLog.totalDuration = rootNode.duration;
+    apexLog.size = this.debugLogData.length;
+    apexLog.children = rootNode.children;
+    return apexLog;
+  }
+
+  private parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
+    const parts = line.split('|'),
+      type = parts[1],
+      metaCtor = lineTypeMap.get(type || '');
+
+    if (metaCtor) {
+      const entry = new metaCtor(parts);
+      entry.logLine = line;
+      lastEntry?.onAfter?.(this, entry);
+      return entry;
+    }
+
+    if ((!type || !typePattern.test(type)) && lastEntry && lastEntry.acceptsText) {
+      // wrapped text from the previous entry?
+      lastEntry.text += `\n${line}`;
+    } else if (type) {
+      if (type !== 'DUMMY') {
+        /* Used by tests */
+        console.warn(`Unknown log line: ${type}`);
+      }
+    } else {
+      if (lastEntry && line.startsWith('*** Skipped')) {
+        this.truncateLog(
+          lastEntry.timestamp,
+          'Skipped-Lines',
+          `${line}. A section of the log has been skipped and the log has been truncated. Full details of this section of log can not be provided.`,
+          'skip',
+        );
+      } else if (lastEntry && line.indexOf('MAXIMUM DEBUG LOG SIZE REACHED') >= 0) {
+        this.truncateLog(
+          lastEntry.timestamp,
+          'Max-Size-reached',
+          'The maximum log size has been reached. Part of the log has been truncated.',
+          'skip',
+        );
+      } else if (settingsPattern.test(line)) {
+        // skip an unexpected settings line
+      } else {
+        console.warn(`Bad log line: ${line}`);
+      }
+    }
+
+    return null;
+  }
+
+  // Matches CRLF (\r\n) + LF (\n)
+  // the ? matches the previous token 0 or 1 times.
+  private parseLog(log: string): LogLine[] {
+    const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || -1;
+    const rawLines = log.substring(start).split(newlineRegex);
+
+    // reset global variables to be captured during parsing
+    this.truncated = [];
+    this.reasons = new Set<string>();
+    this.cpuUsed = 0;
+    this.discontinuity = false;
+
+    const logLines = [];
+    let lastEntry = null;
+    const len = rawLines.length;
+    for (let i = 0; i < len; i++) {
+      const line = rawLines[i];
+      if (line) {
+        // ignore blank lines
+        const entry = this.parseLine(line, lastEntry);
+        if (entry) {
+          logLines.push(entry);
+          lastEntry = entry;
+        }
+      }
+    }
+
+    lastEntry?.onAfter?.(this);
+
+    return logLines;
+  }
+
+  private getRootMethod(logLines: LogLine[]) {
+    const lineIter = new LineIterator(logLines),
+      rootMethod = new RootNode(),
+      stack: Method[] = [];
+    let line: LogLine | null;
+
+    this.lastTimestamp = 0;
+    while ((line = lineIter.fetch())) {
+      line.loadContent?.(this, lineIter, stack);
+      rootMethod.addChild(line);
+    }
+    rootMethod.setTimes();
+
+    this.insertPackageWrappers(rootMethod);
+    this.setNamespaces(rootMethod);
+    this.aggregateTotals(rootMethod);
+    return rootMethod;
+  }
+
+  private aggregateTotals(node: TimedNode) {
+    const children = node.children,
+      len = children.length;
+
+    for (let i = 0; i < len; ++i) {
+      const child = children[i];
+      if (child) {
+        if (child instanceof TimedNode) {
+          this.aggregateTotals(child);
+        }
+        node.totalDmlCount += child.totalDmlCount;
+        node.totalSoqlCount += child.totalSoqlCount;
+        node.totalThrownCount += child.totalThrownCount;
+        node.totalRowCount += child.totalRowCount;
+      }
+    }
+  }
+
+  private insertPackageWrappers(node: Method) {
+    const children = node.children;
+    let lastPkg: TimedNode | null = null;
+
+    const newChildren: LogLine[] = [];
+    const len = children.length;
+    for (let i = 0; i < len; i++) {
+      const child = children[i];
+      if (child) {
+        const childType = child.type,
+          isPkgType = childType === 'ENTERING_MANAGED_PKG';
+
+        if (lastPkg && child instanceof TimedNode) {
+          if (isPkgType && child.namespace === lastPkg.namespace) {
+            // combine adjacent (like) packages
+            lastPkg.exitStamp = child.exitStamp || child.timestamp;
+            continue; // skip any more child processing (it's gone)
+          } else if (!isPkgType) {
+            // we are done merging adjacent `ENTERING_MANAGED_PKG` of the same namesapce
+            lastPkg.recalculateDurations();
+            lastPkg = null;
+          }
+        }
+
+        if (child instanceof Method) {
+          this.insertPackageWrappers(child);
+        }
+
+        // It is a ENTERING_MANAGED_PKG line that does not match the last one
+        // or we have not come across a ENTERING_MANAGED_PKG line yet.
+        if (isPkgType) {
+          lastPkg?.recalculateDurations();
+          lastPkg = child as TimedNode;
+        }
+        newChildren.push(child);
+      }
+    }
+
+    lastPkg?.recalculateDurations();
+    node.children = newChildren;
+  }
+
+  private collectNamespaces(node: RootNode): Set<string> {
+    const namespaces = new Set<string>();
+    let i = 0;
+    const children = node.children;
+    while (i < children.length) {
+      const child = children[i];
+      if (child) {
+        const childType = child.type;
+
+        if (childType === 'ENTERING_MANAGED_PKG') {
+          namespaces.add(child.text);
+        }
+      }
+      ++i;
+    }
+    return namespaces;
+  }
+
+  private extractNamespace(namespaces: Set<string>, text: string) {
+    const [namespace] = text.split('.');
+    if (namespace && namespaces.has(namespace)) {
+      return namespace;
+    } else {
+      return null;
+    }
+  }
+
+  private setNamespaces(node: RootNode) {
+    const namespaces = this.collectNamespaces(node);
+    const children = node.children;
+
+    let i = 0;
+    while (i < children.length) {
+      const child = children[i];
+      if (child) {
+        const childType = child.type;
+
+        if (childType === 'CODE_UNIT_STARTED' && child.type === 'method' && !child.namespace) {
+          child.namespace = this.extractNamespace(namespaces, child.text);
+        } else if (childType === 'EXCEPTION_THROWN') {
+          child.namespace = this.extractNamespace(namespaces, child.text);
+        } else if (childType === 'CONSTRUCTOR_ENTRY') {
+          child.namespace = this.extractNamespace(namespaces, child.text);
+        } else if (childType === 'METHOD_ENTRY') {
+          child.namespace = this.extractNamespace(namespaces, child.text);
+        }
+      }
+      ++i;
+    }
+    return namespaces;
+  }
+
+  public truncateLog(
+    timestamp: number,
+    reason: string,
+    description: string,
+    colorKey: TruncateKey,
+  ) {
+    if (!this.reasons.has(reason)) {
+      this.reasons.add(reason);
+      // default to error is probably the safest if we have no matching color for the type
+      const color = truncateColor.get(colorKey) || TruncationColor.error;
+      this.truncated.push(new TruncationEntry(timestamp, reason, description, color));
+
+      if (reason === 'Max-Size-reached') {
+        this.maxSizeTimestamp = timestamp;
+      }
+
+      this.truncated.sort((a, b) => a.timestamp - b.timestamp);
+    }
+  }
+
+  public updateTruncated(
+    timestamp: number,
+    reason: string,
+    description: string,
+    colorKey: TruncateKey,
+  ) {
+    const elem = this.truncated.findIndex((item) => {
+      return item.reason === reason;
+    });
+    if (elem > -1) {
+      this.truncated.splice(elem, 1);
+    }
+    this.reasons.delete(reason);
+
+    this.truncateLog(timestamp, reason, description, colorKey);
+  }
+}
 
 export class LineIterator {
   lines: LogLine[];
@@ -110,11 +372,11 @@ export abstract class LogLine {
     }
   }
 
-  loadContent?(lineIter: LineIterator, stack: Method[]): void;
+  loadContent?(parser: ApexLogParser, lineIter: LineIterator, stack: Method[]): void;
 
   onEnd?(end: LogLine, stack: LogLine[]): void;
 
-  onAfter?(next?: LogLine): void;
+  onAfter?(arser: ApexLogParser, next?: LogLine): void;
 }
 
 /**
@@ -178,22 +440,22 @@ export class Method extends TimedNode {
     );
   }
 
-  endMethod(endLine: LogLine, lineIter: LineIterator, stack: Method[]) {
+  endMethod(parser: ApexLogParser, endLine: LogLine, lineIter: LineIterator, stack: Method[]) {
     this.exitStamp = endLine.timestamp;
 
     // is this a 'good' end line?
     if (this.isMatchingEnd(endLine)) {
-      discontinuity = false; // end stack unwinding
+      parser.discontinuity = false; // end stack unwinding
       lineIter.fetch(); // consume the line
       return true; // success
-    } else if (discontinuity) {
+    } else if (parser.discontinuity) {
       return true; // exception - unwind
     } else {
       if (stack.some((m) => m.isMatchingEnd(endLine))) {
         return true; // we match a method further down the stack - unwind
       }
       // we found an exit event on its own e.g a `METHOD_EXIT` without a `METHOD_ENTRY`
-      truncateLog(
+      parser.truncateLog(
         endLine.timestamp,
         'Unexpected-Exit',
         'An exit event was found without a corresponding entry event e.g a `METHOD_EXIT` event without a `METHOD_ENTRY`',
@@ -203,8 +465,8 @@ export class Method extends TimedNode {
     }
   }
 
-  loadContent(lineIter: LineIterator, stack: Method[]) {
-    lastTimestamp = this.timestamp;
+  loadContent(parser: ApexLogParser, lineIter: LineIterator, stack: Method[]) {
+    parser.lastTimestamp = this.timestamp;
 
     if (this.exitTypes.length > 0) {
       let line;
@@ -213,10 +475,10 @@ export class Method extends TimedNode {
       while ((line = lineIter.peek())) {
         if (line.discontinuity) {
           // discontinuities are stack unwinding (caused by Exceptions)
-          discontinuity = true; // start unwinding stack
+          parser.discontinuity = true; // start unwinding stack
         }
 
-        if (line.isExit && this.endMethod(line, lineIter, stack)) {
+        if (line.isExit && this.endMethod(parser, line, lineIter, stack)) {
           if (this.onEnd) {
             // the method wants to see the exit line
             this.onEnd(line, stack);
@@ -224,31 +486,35 @@ export class Method extends TimedNode {
           break;
         }
 
-        if (maxSizeTimestamp && discontinuity && line.timestamp > maxSizeTimestamp) {
+        if (
+          parser.maxSizeTimestamp &&
+          parser.discontinuity &&
+          line.timestamp > parser.maxSizeTimestamp
+        ) {
           this.isTruncated = true;
           break;
         }
 
         lineIter.fetch(); // it's a child - consume the line
-        lastTimestamp = line.timestamp;
-        line.loadContent?.(lineIter, stack);
+        parser.lastTimestamp = line.timestamp;
+        line.loadContent?.(parser, lineIter, stack);
         this.addChild(line);
       }
 
       if (!line || this.isTruncated) {
         // truncated method - terminate at the end of the log
-        this.exitStamp = lastTimestamp;
+        this.exitStamp = parser.lastTimestamp;
 
         // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
-        truncateLog(
-          lastTimestamp,
+        parser.truncateLog(
+          parser.lastTimestamp,
           'Unexpected-End',
           'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
           'unexpected',
         );
         if (this.isTruncated) {
-          updateTruncated(
-            lastTimestamp,
+          parser.updateTruncated(
+            parser.lastTimestamp,
             'Max-Size-reached',
             'The maximum log size has been reached. Part of the log has been truncated.',
             'skip',
@@ -303,44 +569,8 @@ export class RootNode extends Method {
       endTime ??= child?.timestamp;
     }
     this.exitStamp = endTime || 0;
+    this.duration = this.exitStamp - this.timestamp;
   }
-}
-
-export function truncateLog(
-  timestamp: number,
-  reason: string,
-  description: string,
-  colorKey: TruncateKey,
-) {
-  if (!reasons.has(reason)) {
-    reasons.add(reason);
-    // default to error is probably the safest if we have no matching color for the type
-    const color = truncateColor.get(colorKey) || TruncationColor.error;
-    truncated.push(new TruncationEntry(timestamp, reason, description, color));
-
-    if (reason === 'Max-Size-reached') {
-      maxSizeTimestamp = timestamp;
-    }
-
-    truncated.sort((a, b) => a.timestamp - b.timestamp);
-  }
-}
-
-function updateTruncated(
-  timestamp: number,
-  reason: string,
-  description: string,
-  colorKey: TruncateKey,
-) {
-  const elem = truncated.findIndex((item) => {
-    return item.reason === reason;
-  });
-  if (elem > -1) {
-    truncated.splice(elem, 1);
-  }
-  reasons.delete(reason);
-
-  truncateLog(timestamp, reason, description, colorKey);
 }
 
 export function parseObjectNamespace(text: string | null | undefined): string {
@@ -956,13 +1186,13 @@ class LimitUsageForNSLine extends LogLine {
     this.text = parts[2] || '';
   }
 
-  onAfter(_next?: LogLine): void {
+  onAfter(parser: ApexLogParser, _next?: LogLine): void {
     const matched = this.text.match(/Maximum CPU time: (\d+)/),
       cpuText = matched?.[1] || '0',
       cpuTime = parseInt(cpuText, 10) * 1000000; // convert from milli-seconds to nano-seconds
 
-    if (!cpuUsed || cpuTime > cpuUsed) {
-      cpuUsed = cpuTime;
+    if (!parser.cpuUsed || cpuTime > parser.cpuUsed) {
+      parser.cpuUsed = cpuTime;
     }
   }
 }
@@ -1143,7 +1373,7 @@ class EnteringManagedPackageLine extends Method {
     this.text = this.namespace = lastDot < 0 ? rawNs : rawNs.substring(lastDot + 1);
   }
 
-  onAfter(end?: LogLine): void {
+  onAfter(parser: ApexLogParser, end?: LogLine): void {
     if (end) {
       this.exitStamp = end.timestamp;
     }
@@ -1913,14 +2143,14 @@ class ExceptionThrownLine extends LogLine {
     this.text = parts[3] || '';
   }
 
-  onAfter(_next?: LogLine): void {
+  onAfter(parser: ApexLogParser, _next?: LogLine): void {
     if (this.text.indexOf('System.LimitException') >= 0) {
       const isMultiLine = this.text.indexOf('\n');
       const len = isMultiLine < 0 ? 99 : isMultiLine;
       const truncateText = this.text.length > len;
       const summary = this.text.slice(0, len + 1) + (truncateText ? '…' : '');
       const message = truncateText ? this.text : '';
-      truncateLog(this.timestamp, summary, message, 'error');
+      parser.truncateLog(this.timestamp, summary, message, 'error');
     }
   }
 }
@@ -1935,11 +2165,11 @@ class FatalErrorLine extends LogLine {
     this.text = parts[2] || '';
   }
 
-  onAfter(_next?: LogLine): void {
+  onAfter(parser: ApexLogParser, _next?: LogLine): void {
     const newLineIndex = this.text.indexOf('\n');
     const summary = newLineIndex > -1 ? this.text.slice(0, newLineIndex + 1) : this.text;
     const detailText = summary.length !== this.text.length ? this.text : '';
-    truncateLog(this.timestamp, 'FATAL ERROR! cause=' + summary, detailText, 'error');
+    parser.truncateLog(this.timestamp, 'FATAL ERROR! cause=' + summary, detailText, 'error');
   }
 }
 
@@ -2678,163 +2908,6 @@ export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['DUPLICATE_RULE_FILTER_VALUE', DuplicateRuleFilterValue],
 ]);
 
-export function parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
-  const parts = line.split('|'),
-    type = parts[1],
-    metaCtor = lineTypeMap.get(type || '');
-
-  if (metaCtor) {
-    const entry = new metaCtor(parts);
-    entry.logLine = line;
-    lastEntry?.onAfter?.(entry);
-    return entry;
-  }
-
-  if ((!type || !typePattern.test(type)) && lastEntry && lastEntry.acceptsText) {
-    // wrapped text from the previous entry?
-    lastEntry.text += `\n${line}`;
-  } else if (type) {
-    if (type !== 'DUMMY') {
-      /* Used by tests */
-      console.warn(`Unknown log line: ${type}`);
-    }
-  } else {
-    if (lastEntry && line.startsWith('*** Skipped')) {
-      truncateLog(
-        lastEntry.timestamp,
-        'Skipped-Lines',
-        `${line}. A section of the log has been skipped and the log has been truncated. Full details of this section of log can not be provided.`,
-        'skip',
-      );
-    } else if (lastEntry && line.indexOf('MAXIMUM DEBUG LOG SIZE REACHED') >= 0) {
-      truncateLog(
-        lastEntry.timestamp,
-        'Max-Size-reached',
-        'The maximum log size has been reached. Part of the log has been truncated.',
-        'skip',
-      );
-    } else if (settingsPattern.test(line)) {
-      // skip an unexpected settings line
-    } else {
-      console.warn(`Bad log line: ${line}`);
-    }
-  }
-
-  return null;
-}
-
-// Matches CRLF (\r\n) + LF (\n)
-// the ? matches the previous token 0 or 1 times.
-export default async function parseLog(log: string): Promise<LogLine[]> {
-  const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || -1;
-  const rawLines = log.substring(start).split(newlineRegex);
-
-  // reset global variables to be captured during parsing
-  logLines = [];
-  truncated = [];
-  reasons = new Set<string>();
-  cpuUsed = 0;
-  discontinuity = false;
-
-  let lastEntry = null;
-  const len = rawLines.length;
-  for (let i = 0; i < len; i++) {
-    const line = rawLines[i];
-    if (line) {
-      // ignore blank lines
-      const entry = parseLine(line, lastEntry);
-      if (entry) {
-        logLines.push(entry);
-        lastEntry = entry;
-      }
-    }
-  }
-
-  lastEntry?.onAfter?.();
-
-  return logLines;
-}
-
-export function getRootMethod() {
-  const lineIter = new LineIterator(logLines),
-    rootMethod = new RootNode(),
-    stack: Method[] = [];
-  let line: LogLine | null;
-
-  lastTimestamp = null;
-  while ((line = lineIter.fetch())) {
-    line.loadContent?.(lineIter, stack);
-    rootMethod.addChild(line);
-  }
-  rootMethod.setTimes();
-  totalDuration = rootMethod.exitStamp - rootMethod.timestamp;
-
-  insertPackageWrappers(rootMethod);
-  setNamespaces(rootMethod);
-  aggregateTotals(rootMethod);
-  return rootMethod;
-}
-
-function aggregateTotals(node: TimedNode) {
-  const children = node.children,
-    len = children.length;
-
-  for (let i = 0; i < len; ++i) {
-    const child = children[i];
-    if (child) {
-      if (child instanceof TimedNode) {
-        aggregateTotals(child);
-      }
-      node.totalDmlCount += child.totalDmlCount;
-      node.totalSoqlCount += child.totalSoqlCount;
-      node.totalThrownCount += child.totalThrownCount;
-      node.totalRowCount += child.totalRowCount;
-    }
-  }
-}
-
-function insertPackageWrappers(node: Method) {
-  const children = node.children;
-  let lastPkg: TimedNode | null = null;
-
-  const newChildren: LogLine[] = [];
-  const len = children.length;
-  for (let i = 0; i < len; i++) {
-    const child = children[i];
-    if (child) {
-      const childType = child.type,
-        isPkgType = childType === 'ENTERING_MANAGED_PKG';
-
-      if (lastPkg && child instanceof TimedNode) {
-        if (isPkgType && child.namespace === lastPkg.namespace) {
-          // combine adjacent (like) packages
-          lastPkg.exitStamp = child.exitStamp || child.timestamp;
-          continue; // skip any more child processing (it's gone)
-        } else if (!isPkgType) {
-          // we are done merging adjacent `ENTERING_MANAGED_PKG` of the same namesapce
-          lastPkg.recalculateDurations();
-          lastPkg = null;
-        }
-      }
-
-      if (child instanceof Method) {
-        insertPackageWrappers(child);
-      }
-
-      // It is a ENTERING_MANAGED_PKG line that does not match the last one
-      // or we have not come across a ENTERING_MANAGED_PKG line yet.
-      if (isPkgType) {
-        lastPkg?.recalculateDurations();
-        lastPkg = child as TimedNode;
-      }
-      newChildren.push(child);
-    }
-  }
-
-  lastPkg?.recalculateDurations();
-  node.children = newChildren;
-}
-
 export class LogSetting {
   key: string;
   level: string;
@@ -2860,5 +2933,4 @@ export function getLogSettings(log: string) {
   });
 }
 
-export { logLines, totalDuration, truncated, cpuUsed };
 export { SOQLExecuteExplainLine, SOQLExecuteBeginLine, DMLBeginLine };
