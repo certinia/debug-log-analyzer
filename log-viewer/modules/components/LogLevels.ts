@@ -11,7 +11,7 @@ import { skeletonStyles } from './skeleton/skeleton.styles.js';
 @customElement('log-levels')
 export class LogLevels extends LitElement {
   @state()
-  logSettings: LogSetting[] = [];
+  logSettings: LogSetting[] | null = null;
 
   constructor() {
     super();
@@ -56,7 +56,7 @@ export class LogLevels extends LitElement {
   ];
 
   render() {
-    if (this.logSettings.length < 1) {
+    if (!this.logSettings) {
       const logLevels = [];
       for (let i = 0; i < 8; i++) {
         const levelHtml = html`<div class="setting-skeleton skeleton"></div>`;

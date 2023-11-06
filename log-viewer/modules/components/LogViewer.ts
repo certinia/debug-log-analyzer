@@ -10,7 +10,6 @@ import parseLog, {
   getLogSettings,
   getRootMethod,
   totalDuration,
-  truncateLog,
   truncated,
 } from '../parsers/TreeParser.js';
 import { hostService } from '../services/VSCodeService.js';
@@ -115,7 +114,7 @@ export class LogViewer extends LitElement {
           if (response.ok) {
             return response.text();
           } else {
-            throw Error(response.statusText);
+            throw Error(response.statusText || `Error reading log file: ${response.status}`);
           }
         })
         .catch((err: unknown) => {
@@ -125,9 +124,13 @@ export class LogViewer extends LitElement {
           } else {
             msg = String(err);
           }
+          const logMessage = new Notification();
+          logMessage.summary = 'Could not read log';
+          logMessage.message = msg || '';
+          logMessage.severity = 'Error';
+          this.notifications.push(logMessage);
 
-          truncateLog(0, 'Could not read log', msg || '', 'error');
-          return Promise.reject('');
+          return Promise.resolve('');
         });
     } else {
       return Promise.resolve('');

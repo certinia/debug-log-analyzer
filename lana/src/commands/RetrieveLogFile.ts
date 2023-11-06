@@ -4,7 +4,7 @@
 import { type LogRecord } from '@salesforce/apex-node';
 import { existsSync } from 'fs';
 import { join, parse } from 'path';
-import { Uri, type WebviewPanel, window } from 'vscode';
+import { type WebviewPanel, window } from 'vscode';
 
 import { appName } from '../AppSettings.js';
 import { Context } from '../Context.js';
@@ -13,7 +13,7 @@ import { QuickPickWorkspace } from '../display/QuickPickWorkspace.js';
 import { GetLogFile } from '../salesforce/logs/GetLogFile.js';
 import { GetLogFiles } from '../salesforce/logs/GetLogFiles.js';
 import { Command } from './Command.js';
-import { type FetchLogCallBack, LogView } from './LogView.js';
+import { LogView } from './LogView.js';
 
 class DebugLogItem extends Item {
   logId: string;
@@ -60,19 +60,7 @@ export class RetrieveLogFile {
     if (logFileId) {
       const logFilePath = this.getLogFilePath(ws, logFileId);
       const writeLogFile = this.writeLogFile(ws, logFilePath);
-      const getLogCallBack: FetchLogCallBack = async (panel: WebviewPanel) => {
-        await writeLogFile;
-        panel.webview.postMessage({
-          command: 'fetchLog',
-          data: {
-            logName: logFileId,
-            logUri: panel.webview.asWebviewUri(Uri.file(logFilePath)).toString(true),
-            logPath: logFilePath,
-          },
-        });
-      };
-
-      return LogView.createView(ws, context, logFilePath, logFileId, getLogCallBack);
+      return LogView.createView(ws, context, logFilePath, writeLogFile);
     }
   }
 
