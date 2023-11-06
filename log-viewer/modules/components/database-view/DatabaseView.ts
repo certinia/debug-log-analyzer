@@ -95,6 +95,9 @@ export class DatabaseView extends LitElement {
         width: 100%;
         min-height: 0%;
         min-width: 0%;
+        margin-bottom: 1rem;
+        display: flex;
+        flex-direction: column;
       }
     `,
   ];
@@ -320,14 +323,13 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
     }
   });
 
-  dmlTable.on('groupVisibilityChanged', (group: GroupComponent, visible: boolean) => {
-    const firstRow = visible ? group.getRows()[0] : group.getRows()[0]?.getPrevRow();
-    if (firstRow) {
-      firstRow.scrollTo('center', true).then(() => {
-        firstRow
-          .getElement()
-          .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-      });
+  dmlTable.on('groupVisibilityChanged', (group: GroupComponent, _visible: boolean) => {
+    const groupToFocus = group.getElement() ? group : findGroup(soqlTable, group.getKey());
+
+    if (groupToFocus) {
+      groupToFocus
+        .getElement()
+        .scrollIntoView({ behavior: 'instant', block: 'center', inline: 'start' });
     }
   });
 
@@ -336,17 +338,13 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
     if (!(data.timestamp && data.dml)) {
       return;
     }
+
     const origRowHeight = row.getElement().offsetHeight;
-
     row.treeToggle();
-    row.getCell('soql').getElement().style.height = origRowHeight + 'px';
+    row.getCell('dml').getElement().style.height = origRowHeight + 'px';
 
-    const nextRow = row.getNextRow() || row.getTreeChildren()[0];
-    if (nextRow) {
-      nextRow.scrollTo('center', true).then(() => {
-        nextRow.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-      });
-    }
+    row &&
+      row.getElement().scrollIntoView({ behavior: 'instant', block: 'center', inline: 'start' });
   });
 }
 
@@ -596,14 +594,13 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
     }
   });
 
-  soqlTable.on('groupVisibilityChanged', (group: GroupComponent, visible: boolean) => {
-    const firstRow = visible ? group.getRows()[0] : group.getRows()[0]?.getPrevRow();
-    if (firstRow) {
-      firstRow.scrollTo('center', true).then(() => {
-        firstRow
-          .getElement()
-          .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-      });
+  soqlTable.on('groupVisibilityChanged', (group: GroupComponent, _visible: boolean) => {
+    const groupToFocus = group.getElement() ? group : findGroup(soqlTable, group.getKey());
+
+    if (groupToFocus) {
+      groupToFocus
+        .getElement()
+        .scrollIntoView({ behavior: 'instant', block: 'center', inline: 'start' });
     }
   });
 
@@ -614,16 +611,11 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
     }
 
     const origRowHeight = row.getElement().offsetHeight;
-
     row.treeToggle();
     row.getCell('soql').getElement().style.height = origRowHeight + 'px';
 
-    const nextRow = row.getNextRow() || row.getTreeChildren()[0];
-    if (nextRow) {
-      nextRow.scrollTo('center', true).then(() => {
-        nextRow.getElement().scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-      });
-    }
+    row &&
+      row.getElement().scrollIntoView({ behavior: 'instant', block: 'center', inline: 'start' });
   });
 }
 
@@ -684,4 +676,19 @@ function downlodEncoder(defaultFileName: string) {
 
     return new Blob([fileContents], { type: mimeType });
   };
+}
+
+function findGroup(table: Tabulator, groupKey: string): GroupComponent | null | undefined {
+  let foundGroup = null;
+  const groups = soqlTable.getGroups();
+  let len = groups?.length - 1 || 0;
+  while (len >= 0 && !foundGroup) {
+    const toSearch = groups[len];
+    if (toSearch?.getKey() === groupKey) {
+      foundGroup = toSearch;
+      break;
+    }
+    len--;
+  }
+  return foundGroup;
 }

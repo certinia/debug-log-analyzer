@@ -116,8 +116,9 @@ export class CalltreeView extends LitElement {
   }
 
   _handleShowDetailsChange(event: any) {
+    const showDetails = event.target.checked;
     calltreeTable.setFilter((data, _filterParams) => {
-      return event.target.checked || data.originalData.duration || data.originalData.discontinuity;
+      return showDetails || data.originalData.duration || data.originalData.discontinuity;
     });
   }
 
@@ -151,7 +152,7 @@ export class CalltreeView extends LitElement {
 
 export async function renderCallTree(
   callTreeTableContainer: HTMLDivElement,
-  rootMethod: RootNode
+  rootMethod: RootNode,
 ): Promise<void> {
   if (calltreeTable) {
     // Ensure the table is fully visible before attempting to do things e.g go to rows.
