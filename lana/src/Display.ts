@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { Uri, commands, window } from 'vscode';
+import { MessageOptions, Uri, commands, window } from 'vscode';
 
 import { appName } from './AppSettings';
 
@@ -19,8 +19,8 @@ export class Display {
     window.showInformationMessage(s);
   }
 
-  showErrorMessage(s: string): void {
-    window.showErrorMessage(s);
+  showErrorMessage(s: string, options: MessageOptions = {}): void {
+    window.showErrorMessage(s, options);
   }
 
   showFile(path: string): void {

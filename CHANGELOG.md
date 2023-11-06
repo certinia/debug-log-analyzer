@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Call Tree Show Details not showing and hiding correctly ([#433][#433])
+- Infinite loading screen if file can not be found ([#435][#435])
 
 ## [1.10.1] - 2023-10-26
 
@@ -274,6 +275,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- v1.10.2 -->
 
+[#435]: https://github.com/certinia/debug-log-analyzer/issues/435
 [#433]: https://github.com/certinia/debug-log-analyzer/issues/433
 
 <!-- v1.10.1 -->

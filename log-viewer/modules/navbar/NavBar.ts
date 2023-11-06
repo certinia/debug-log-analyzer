@@ -91,7 +91,7 @@ export class NavBar extends LitElement {
   ];
 
   render() {
-    const sizeText = this.logSize ? (this.logSize / 1000000).toFixed(2) + ' MB' : '',
+    const sizeText = this._toSize(this.logSize),
       elapsedText = this._toDuration(this.logDuration);
 
     const status =
@@ -139,5 +139,13 @@ export class NavBar extends LitElement {
     }
 
     return (duration / 1_000_000_000).toFixed(3) + 's';
+  }
+
+  _toSize(fileSize: number | null) {
+    if (!fileSize && fileSize !== 0) {
+      return '';
+    }
+
+    return (fileSize / 1000000).toFixed(2) + ' MB';
   }
 }
