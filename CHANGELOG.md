@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.2] - 2023-11-07
+
+- Getting stuck on loading screen if file can not be found ([#435][#435])
+
 ## [1.10.1] - 2023-10-26
 
 ### Fixed
@@ -265,6 +269,10 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Misc Visual tweaks
 - Add explorer menu item
 - Provide more information when selecting log to download
+
+<!-- v1.10.2 -->
+
+[#435]: https://github.com/certinia/debug-log-analyzer/issues/435
 
 <!-- v1.10.1 -->
 
