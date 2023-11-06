@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { createReadStream } from 'fs';
+import { createReadStream, existsSync } from 'fs';
 import { writeFile } from 'fs/promises';
 import { homedir } from 'os';
-import { basename, dirname, join } from 'path';
+import { basename, dirname, join, parse } from 'path';
 import { WebviewPanel, window as vscWindow } from 'vscode';
 import { Uri, commands, workspace } from 'vscode';
 
@@ -20,19 +20,14 @@ interface WebViewLogFileRequest {
   options?: Record<string, never>;
 }
 
-export interface FetchLogCallBack {
-  (panel: WebviewPanel): void;
-}
-
 export class LogView {
   private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
 
   static async createView(
     wsPath: string,
     context: Context,
-    logName: string,
     logPath: string,
-    callback: FetchLogCallBack
+    beforeSendLog?: Promise<void>
   ): Promise<WebviewPanel> {
     const panel = WebView.apply('logFile', 'Log: ' + basename(logPath), [
       Uri.file(join(context.context.extensionPath, 'out')),
@@ -54,12 +49,13 @@ export class LogView {
     });
 
     panel.webview.onDidReceiveMessage(
-      (msg: WebViewLogFileRequest) => {
+      async (msg: WebViewLogFileRequest) => {
         const request = msg;
 
         switch (request.cmd) {
           case 'fetchLog': {
-            callback(panel);
+            await beforeSendLog;
+            LogView.sendLog(panel, context, logPath);
             break;
           }
 
@@ -142,6 +138,24 @@ export class LogView {
         .on('end', () => {
           resolve(data);
         });
+    });
+  }
+
+  private static sendLog(panel: WebviewPanel, context: Context, logFilePath: string) {
+    if (!existsSync(logFilePath)) {
+      context.display.showErrorMessage('Log file could not be found.', {
+        modal: true,
+      });
+    }
+
+    const filePath = parse(logFilePath);
+    panel.webview.postMessage({
+      command: 'fetchLog',
+      data: {
+        logName: filePath.name,
+        logUri: panel.webview.asWebviewUri(Uri.file(logFilePath)).toString(true),
+        logPath: logFilePath,
+      },
     });
   }
 }
