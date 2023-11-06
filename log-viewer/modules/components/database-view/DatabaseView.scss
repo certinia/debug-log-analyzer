@@ -1,13 +1,5 @@
 @import '../../datagrid/style/DataGrid.scss';
 
-#db-container {
-  overflow: scroll;
-}
-#db-dml-table,
-#db-soql-table {
-  margin-bottom: 1rem;
-  height: 100%;
-}
 .row__details-container {
   padding: 4px 0px 4px 0px;
   background-color: var(--vscode-editorHoverWidget-background);
