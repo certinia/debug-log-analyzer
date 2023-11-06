@@ -116,8 +116,9 @@ export class CalltreeView extends LitElement {
   }
 
   _handleShowDetailsChange(event: any) {
+    const showDetails = event.target.checked;
     calltreeTable.setFilter((data, _filterParams) => {
-      return event.target.checked || data.originalData.duration || data.originalData.discontinuity;
+      return showDetails || data.originalData.duration || data.originalData.discontinuity;
     });
   }
 
