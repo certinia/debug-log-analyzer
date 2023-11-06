@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Call Tree Show Details not showing and hiding correctly ([#433][#433])
 - Infinite loading screen if file can not be found ([#435][#435])
+- Many cases of UI jumping in the Database view when rows and groups are clicked ([#434][#434])
 
 ## [1.10.1] - 2023-10-26
 
@@ -275,6 +276,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- v1.10.2 -->
 
+[#434]: https://github.com/certinia/debug-log-analyzer/issues/434
 [#435]: https://github.com/certinia/debug-log-analyzer/issues/435
 [#433]: https://github.com/certinia/debug-log-analyzer/issues/433
 
