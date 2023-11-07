@@ -1133,11 +1133,7 @@ class VariableScopeBeginLine extends LogLine {
   }
 }
 
-class VariableScopeEndLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class VariableScopeEndLine extends LogLine {}
 class VariableAssignmentLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
@@ -1519,11 +1515,7 @@ class FlowStartInterviewBeginLine extends LogLine {
   }
 }
 
-class FlowStartInterviewEndLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class FlowStartInterviewEndLine extends LogLine {}
 
 class FlowStartInterviewLimitUsageLine extends LogLine {
   constructor(parts: string[]) {
@@ -1538,17 +1530,9 @@ class FlowStartScheduledRecordsLine extends LogLine {
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
-class FlowCreateInterviewBeginLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class FlowCreateInterviewBeginLine extends LogLine {}
 
-class FlowCreateInterviewEndLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class FlowCreateInterviewEndLine extends LogLine {}
 
 class FlowCreateInterviewErrorLine extends LogLine {
   constructor(parts: string[]) {
@@ -1773,11 +1757,7 @@ class PNNoDevicesLine extends LogLine {
     this.text = `${parts[2]}.${parts[3]}`;
   }
 }
-class PNNotEnabledLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class PNNotEnabledLine extends LogLine {}
 class PNSentLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
@@ -1799,11 +1779,7 @@ class SLAEvalMilestoneLine extends LogLine {
   }
 }
 
-class SLANullStartDateLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class SLANullStartDateLine extends LogLine {}
 
 class SLAProcessCaseLine extends LogLine {
   constructor(parts: string[]) {
@@ -1835,11 +1811,7 @@ class ValidationErrorLine extends LogLine {
   }
 }
 
-class ValidationFailLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class ValidationFailLine extends LogLine {}
 
 class ValidationFormulaLine extends LogLine {
   acceptsText = true;
@@ -1859,17 +1831,9 @@ class ValidationPassLine extends LogLine {
   }
 }
 
-class WFFlowActionBeginLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class WFFlowActionBeginLine extends LogLine {}
 
-class WFFlowActionEndLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class WFFlowActionEndLine extends LogLine {}
 
 class WFFlowActionErrorLine extends LogLine {
   acceptsText = true;
@@ -2045,11 +2009,7 @@ class WFEscalationActionLine extends LogLine {
   }
 }
 
-class WFEscalationRuleLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class WFEscalationRuleLine extends LogLine {}
 
 class WFEvalEntryCriteriaLine extends LogLine {
   constructor(parts: string[]) {
@@ -2066,11 +2026,7 @@ class WFFlowActionDetailLine extends LogLine {
   }
 }
 
-class WFHardRejectLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class WFHardRejectLine extends LogLine {}
 
 class WFNextApproverLine extends LogLine {
   constructor(parts: string[]) {
@@ -2079,11 +2035,7 @@ class WFNextApproverLine extends LogLine {
   }
 }
 
-class WFNoProcessFoundLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class WFNoProcessFoundLine extends LogLine {}
 
 class WFOutboundMsgLine extends LogLine {
   constructor(parts: string[]) {
@@ -2155,11 +2107,7 @@ class WFSpoolActionBeginLine extends LogLine {
   }
 }
 
-class WFTimeTriggersBeginLine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class WFTimeTriggersBeginLine extends LogLine {}
 
 class ExceptionThrownLine extends LogLine {
   discontinuity = true;
@@ -2286,177 +2234,57 @@ class DuplicateDetectionSummary extends LogLine {
   }
 }
 
-class WFKnowledgeAction extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class WFKnowledgeAction extends LogLine {}
 
-class WFSendAction extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class WFSendAction extends LogLine {}
 
-class WFQuickCreate extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class WFQuickCreate extends LogLine {}
 
-class WFApexAction extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class WFApexAction extends LogLine {}
 
-class InvocableActionDetail extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class InvocableActionError extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class InvocableActionDetail extends LogLine {}
+class InvocableActionError extends LogLine {}
 
-class FlowCollectionProcessDetail extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class FlowCollectionProcessDetail extends LogLine {}
 
-class FlowScheduledPathQueued extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class FlowScheduledPathQueued extends LogLine {}
 
-class RouteWorkAction extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class RouteWorkAction extends LogLine {}
 
-class AddSkillRequirementAction extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class AddSkillRequirementAction extends LogLine {}
 
-class AddScreenPopAction extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class AddScreenPopAction extends LogLine {}
 
-class CalloutRequestPrepare extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class CalloutRequestPrepare extends LogLine {}
 
-class CalloutRequestFinalize extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class CalloutRequestFinalize extends LogLine {}
 
-class FunctionInvocationRequest extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class FunctionInvocationRequest extends LogLine {}
 
-class FunctionInvocationResponse extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class FunctionInvocationResponse extends LogLine {}
 
-class XDSRequestDetail extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class XDSRequestDetail extends LogLine {}
 
-class ExternalServiceRequest extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class ExternalServiceRequest extends LogLine {}
 
-class ExternalServiceResponse extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class ExternalServiceResponse extends LogLine {}
 
-class BulkCountableStatementExecute extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class BulkCountableStatementExecute extends LogLine {}
 
-class DataWeaveUserDebug extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class UserDebugFinest extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class UserDebugFiner extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class UserDebugFine extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class UserDebugDebug extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class UserDebugInfo extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class UserDebugWarn extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class DataWeaveUserDebug extends LogLine {}
+class UserDebugFinest extends LogLine {}
+class UserDebugFiner extends LogLine {}
+class UserDebugFine extends LogLine {}
+class UserDebugDebug extends LogLine {}
+class UserDebugInfo extends LogLine {}
+class UserDebugWarn extends LogLine {}
 
-class UserDebugError extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class UserDebugError extends LogLine {}
 
-class VFApexCall extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class VFApexCall extends LogLine {}
 
-class HeapDump extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-class ScriptExecution extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class HeapDump extends LogLine {}
+class ScriptExecution extends LogLine {}
 class SessionCachePutBegin extends Method {
   constructor(parts: string[]) {
     super(parts, ['SESSION_CACHE_PUT_END'], 'method', 'method');
@@ -2481,11 +2309,7 @@ class SessionCacheGetEnd extends LogLine {
   }
 }
 
-class SessionCacheMemoryUsage extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class SessionCacheMemoryUsage extends LogLine {}
 
 class SessionCacheRemoveBegin extends Method {
   constructor(parts: string[]) {
@@ -2524,11 +2348,7 @@ class OrgCacheGetEnd extends LogLine {
   }
 }
 
-class OrgCacheMemoryUsage extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class OrgCacheMemoryUsage extends LogLine {}
 
 class OrgCacheRemoveBegin extends Method {
   constructor(parts: string[]) {
@@ -2543,17 +2363,9 @@ class OrgCacheRemoveEnd extends LogLine {
   }
 }
 
-class AEPersistValidation extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class AEPersistValidation extends LogLine {}
 
-class ReferencedObjectList extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class ReferencedObjectList extends LogLine {}
 
 class VFSerializeContinuationStateBegin extends Method {
   constructor(parts: string[]) {
@@ -2581,23 +2393,11 @@ class VFDeserializeContinuationStateEnd extends LogLine {
   }
 }
 
-class DuplicateRuleFilter extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class DuplicateRuleFilter extends LogLine {}
 
-class DuplicateRuleFilterResult extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class DuplicateRuleFilterResult extends LogLine {}
 
-class DuplicateRuleFilterValue extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class DuplicateRuleFilterValue extends LogLine {}
 
 class MatchEngineBegin extends Method {
   constructor(parts: string[]) {
@@ -2605,11 +2405,7 @@ class MatchEngineBegin extends Method {
   }
 }
 
-class MatchEngineInvocation extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class MatchEngineInvocation extends LogLine {}
 
 class MatchEngineEnd extends LogLine {
   isExit = true;
@@ -2618,71 +2414,27 @@ class MatchEngineEnd extends LogLine {
   }
 }
 
-class TemplateProcessingError extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class TemplateProcessingError extends LogLine {}
 
-class WaveAppLifecycle extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class WaveAppLifecycle extends LogLine {}
 
-class AppContainerInitiated extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class AppContainerInitiated extends LogLine {}
 
-class TemplatedAsset extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class TemplatedAsset extends LogLine {}
 
-class TransformationSummary extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class TransformationSummary extends LogLine {}
 
-class RulesExecutionSummary extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class RulesExecutionSummary extends LogLine {}
 
-class AssetDiffSummary extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class AssetDiffSummary extends LogLine {}
 
-class AssetDiffDetail extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class AssetDiffDetail extends LogLine {}
 
-class RulesExecutionDetail extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class RulesExecutionDetail extends LogLine {}
 
-class JsonDiffSummary extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class JsonDiffSummary extends LogLine {}
 
-class JsonDiffDetail extends LogLine {
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+class JsonDiffDetail extends LogLine {}
 
 export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['ADD_SCREEN_POP_ACTION', AddScreenPopAction],
