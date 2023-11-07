@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Show the grabbing cursor when the mouse is pressed down on the Timeline, to indicate drag is now possible.
   - Show the default cursor when hovering a Timeline event.
 
-## [1.10.2] - 2023-11-07
+## [1.10.3] - 2023-11-07
 
 ### Fixed
 
