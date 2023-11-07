@@ -117,8 +117,8 @@ importers:
         specifier: ^16.18.60
         version: 16.18.60
       '@types/vscode':
-        specifier: ^1.84.0
-        version: 1.84.0
+        specifier: ~1.74.0
+        version: 1.74.0
       rollup:
         specifier: ^3.29.4
         version: 3.29.4
@@ -1668,8 +1668,8 @@ packages:
     resolution: {integrity: sha512-I3pkr8j/6tmQtKV/ZzHtuaqYSQvyjGRKH4go60Rr0IDLlFxuRT5V32uvB1mecM5G1EVAUyF/4r4QZ1GHgz+mxA==}
     dev: false
 
-  /@types/vscode@1.84.0:
-    resolution: {integrity: sha512-lCGOSrhT3cL+foUEqc8G1PVZxoDbiMmxgnUZZTEnHF4mC47eKAUtBGAuMLY6o6Ua8PAuNCoKXbqPmJd1JYnQfg==}
+  /@types/vscode@1.74.0:
+    resolution: {integrity: sha512-LyeCIU3jb9d38w0MXFwta9r0Jx23ugujkAxdwLTNCyspdZTKUc43t7ppPbCiPoQ/Ivd/pnDFZrb4hWd45wrsgA==}
     dev: true
 
   /@types/yargs-parser@21.0.2:

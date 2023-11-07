@@ -170,7 +170,7 @@
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@types/node": "^16.18.60",
-    "@types/vscode": "^1.84.0",
+    "@types/vscode": "~1.74.0",
     "rollup": "^3.29.4",
     "typescript": "^5.2.2"
   }
