@@ -2,9 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import ApexLogParser, {
-  CodeUnitFinishedLine,
   CodeUnitStartedLine,
-  ExecutionFinishedLine,
   ExecutionStartedLine,
   LogLine,
   Method,
@@ -12,7 +10,6 @@ import ApexLogParser, {
   SOQLExecuteBeginLine,
   SOQLExecuteExplainLine,
   TimedNode,
-  getLogSettings,
   lineTypeMap,
   parseLineNumber,
   parseObjectNamespace,
@@ -111,10 +108,10 @@ describe('parseLog tests', () => {
 
     const apexLog = new ApexLogParser(log).parse();
 
-    expect(logLines.length).toEqual(1);
-    expect(logLines[0]).toBeInstanceOf(ExecutionStartedLine);
+    expect(apexLog.children.length).toEqual(1);
+    expect(apexLog.children[0]).toBeInstanceOf(ExecutionStartedLine);
 
-    const firstChildren = (logLines[0] as Method).children;
+    const firstChildren = (apexLog.children[0] as Method).children;
     expect(firstChildren.length).toEqual(1);
     expect(firstChildren[0]).toBeInstanceOf(CodeUnitStartedLine);
   });
@@ -124,11 +121,13 @@ describe('parseLog tests', () => {
       '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
       '09:18:22.6 (6586704)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\n';
 
-    parseLog(log);
+    const apexLog = new ApexLogParser(log).parse();
 
-    expect(logLines.length).toBe(2);
-    expect(logLines[0]).toBeInstanceOf(ExecutionStartedLine);
-    expect(logLines[1]).toBeInstanceOf(CodeUnitStartedLine);
+    expect(apexLog.children.length).toBe(1);
+    expect(apexLog.children[0]).toBeInstanceOf(ExecutionStartedLine);
+
+    const firstChildren = (apexLog.children[0] as Method).children;
+    expect(firstChildren[0]).toBeInstanceOf(CodeUnitStartedLine);
   });
 
   it('Should detect skipped log entries', async () => {
@@ -139,10 +138,10 @@ describe('parseLog tests', () => {
       '15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
       '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
 
-    parseLog(log);
+    const apexLog = new ApexLogParser(log).parse();
 
-    expect(truncated.length).toBe(1);
-    expect(truncated[0]?.reason).toBe('Skipped-Lines');
+    expect(apexLog.children.length).toBe(1);
+    expect(apexLog.truncated[0]?.reason).toBe('Skipped-Lines');
   });
 
   it('Should detect truncated logs', async () => {
@@ -152,10 +151,12 @@ describe('parseLog tests', () => {
       '15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
       '*********** MAXIMUM DEBUG LOG SIZE REACHED ***********\n';
 
-    parseLog(log);
+    const apexLog = new ApexLogParser(log).parse();
 
-    expect(truncated.length).toBe(1);
-    expect(truncated[0]?.reason).toBe('Max-Size-reached');
+    expect(apexLog.children.length).toBe(1);
+    expect(apexLog.truncated.length).toBe(2);
+    expect(apexLog.truncated[0]?.reason).toBe('Unexpected-End');
+    expect(apexLog.truncated[1]?.reason).toBe('Max-Size-reached');
   });
 
   it('Should detect exceptions', async () => {
@@ -165,10 +166,12 @@ describe('parseLog tests', () => {
       '16:16:04.97 (1000)|EXCEPTION_THROWN|[60]|System.LimitException: c2g:Too many SOQL queries: 101\n' +
       '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
 
-    parseLog(log);
+    const apexLog = new ApexLogParser(log).parse();
 
-    expect(truncated.length).toBe(1);
-    expect(truncated[0]?.reason).toBe('System.LimitException: c2g:Too many SOQL queries: 101');
+    expect(apexLog.children.length).toBe(1);
+    expect(apexLog.truncated[0]?.reason).toBe(
+      'System.LimitException: c2g:Too many SOQL queries: 101',
+    );
   });
   it('Should detect fatal errors', async () => {
     const log =
@@ -177,10 +180,10 @@ describe('parseLog tests', () => {
       '16:16:04.97 (1000)|FATAL_ERROR|System.LimitException: c2g:Too many SOQL queries: 101\n' +
       '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
 
-    parseLog(log);
+    const apexLog = new ApexLogParser(log).parse();
 
-    expect(truncated.length).toBe(1);
-    expect(truncated[0]?.reason).toBe(
+    expect(apexLog.children.length).toBe(1);
+    expect(apexLog.truncated[0]?.reason).toBe(
       'FATAL ERROR! cause=System.LimitException: c2g:Too many SOQL queries: 101',
     );
   });
@@ -191,9 +194,12 @@ describe('parseLog tests', () => {
       '15:20:52.222 (4113760256)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
-    parseLog(log);
-    expect(logLines.length).toBe(4);
-    expect(logLines[1]?.lineNumber).toBe(185);
+    const apexLog = new ApexLogParser(log).parse();
+
+    expect(apexLog.children.length).toBe(1);
+    const executeEvent = apexLog.children[0] as MethodEntryLine;
+
+    expect(executeEvent.children[0]?.lineNumber).toBe(185);
   });
   it('Packages should have a namespace', async () => {
     const log =
@@ -201,9 +207,9 @@ describe('parseLog tests', () => {
       '11:52:06.13 (151717928)|ENTERING_MANAGED_PKG|appirio_core\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
-    parseLog(log);
-    expect(logLines.length).toBe(3);
-    expect(logLines[1]?.namespace).toBe('appirio_core');
+    const apexLog = new ApexLogParser(log).parse();
+    const execEvent = apexLog.children[0] as MethodEntryLine;
+    expect(execEvent.children[0]?.namespace).toBe('appirio_core');
   });
   it('Limit Usage for NS provides cpuUsed', async () => {
     const log =
@@ -225,10 +231,14 @@ describe('parseLog tests', () => {
       '14:29:44.163 (40163621912)|CUMULATIVE_LIMIT_USAGE_END\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
-    parseLog(log);
-    expect(logLines.length).toBe(5);
-    expect(logLines[2]?.type).toBe('LIMIT_USAGE_FOR_NS');
-    expect(cpuUsed).toBe(4564000000);
+    const apexLog = new ApexLogParser(log).parse();
+    expect(apexLog.cpuTime).toBe(4564000000);
+    const execEvent = apexLog.children[0] as MethodEntryLine;
+    expect(execEvent.children.length).toBe(1);
+
+    const cumulativeUsage = execEvent.children[0] as MethodEntryLine;
+    const limitUsage = cumulativeUsage.children[0] as MethodEntryLine;
+    expect(limitUsage.type).toBe('LIMIT_USAGE_FOR_NS');
   });
 
   it('Flow Value Assignemnt can handle multiple lines', async () => {
@@ -239,15 +249,20 @@ describe('parseLog tests', () => {
       '1Z VSF 767 68 0562 3292}\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED';
 
-    parseLog(log);
-    expect(logLines.length).toBe(3);
-    expect(logLines[1]?.type).toBe('FLOW_VALUE_ASSIGNMENT');
-    expect(logLines[1]?.text).toBe(
+    const apexLog = new ApexLogParser(log).parse();
+
+    expect(apexLog.cpuTime).toBe(0);
+
+    const execEvent = apexLog.children[0] as MethodEntryLine;
+    expect(execEvent.children.length).toBe(1);
+
+    const flowLine = execEvent.children[0];
+    expect(flowLine?.type).toBe('FLOW_VALUE_ASSIGNMENT');
+    expect(flowLine?.text).toBe(
       'myVariable_old {Id=a6U6T000001DypKUAS, OwnerId=005d0000003141tAAA, IsDeleted=false, Name=TR-001752, CurrencyIsoCode=USD, RecordTypeId=012d0000000T5CLAA0, CreatedDate=2022-05-06 11:40:47, CreatedById=005d0000003141tAAA, LastModifiedDate=2022-05-06 11:40:47, LastModifiedById=005d0000003141tAAA, SystemModstamp=2022-05-06 11:40:47, LastViewedDate=null, LastReferencedDate=null, SCMC__Carrier_Service__c=null, SCMC__Carrier__c=null, SCMC__Destination_Location__c=null, SCMC__Destination_Ownership__c=null, SCMC__Destination_Warehouse__c=a6Y6T000001Ib9ZUAS, SCMC__Notes__c=TVPs To Amazon Europe Spain, SCMC__Override_Ship_To_Address__c=null, SCMC__Pickup_Address__c=null, SCMC__Pickup_Required__c=false, SCMC__Reason_Code__c=a5i0W000001Ydw3QAC, SCMC__Requested_Delivery_Date__c=null, SCMC__Revision__c=0, SCMC__Ship_To_City__c=null, SCMC__Ship_To_Country__c=null, SCMC__Ship_To_Line_1__c=null, SCMC__Ship_To_Line_2__c=null, SCMC__Ship_To_Name__c=null, SCMC__Ship_To_State_Province__c=null, SCMC__Ship_To_Zip_Postal_Code__c=null, SCMC__Shipment_Date__c=null, SCMC__Shipment_Required__c=true, SCMC__Shipment_Status__c=Open, SCMC__Source_Location__c=null, SCMC__Source_Ownership__c=null, SCMC__Source_Warehouse__c=a6Y6T000001IS9fUAG, SCMC__Status__c=New, SCMC__Tracking_Number__c=null, SCMC__Number_Of_Transfer_Lines__c=0, Created_Date__c=2022-05-06 11:40:47, Shipment_Instructions__c=1Z V8F 767 681769 7682\n' +
         '1Z V8F 767 68 3968 7204\n' +
         '1Z VSF 767 68 0562 3292}',
     );
-    expect(cpuUsed).toBe(0);
   });
 
   it('VF_APEX_CALL_START for ApexMessages calls should have no exittypes', async () => {
@@ -276,8 +291,9 @@ describe('parseLog tests', () => {
     09:15:43.335 (335933546)|VF_APEX_CALL_START|[EXTERNAL]|isSingle
     09:15:43.336 (336270391)|VF_APEX_CALL_START|[EXTERNAL]|messages`;
 
-    parseLog(log);
-    const methods = logLines as Method[];
+    const apexLog = new ApexLogParser(log).parse();
+
+    const methods = apexLog.children as Method[];
     expect(methods.length).toBe(24);
     methods.forEach((line) => {
       expect(line.exitTypes.length).toBe(0);
@@ -293,20 +309,19 @@ describe('parseLog tests', () => {
       '06:22:49.429 (15861665431)|SOQL_EXECUTE_END|[895]|Rows:50\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
-    parseLog(log);
-    expect(logLines.length).toEqual(5);
-    expect(logLines[0]).toBeInstanceOf(ExecutionStartedLine);
+    const apexLog = new ApexLogParser(log).parse();
+    const execEvent = apexLog.children[0] as MethodEntryLine;
+    expect(execEvent).toBeInstanceOf(ExecutionStartedLine);
 
-    const soqlLine = logLines[1] as SOQLExecuteBeginLine;
+    expect(execEvent.children.length).toEqual(1);
+    const soqlLine = execEvent.children[0] as SOQLExecuteBeginLine;
     expect(soqlLine.type).toEqual('SOQL_EXECUTE_BEGIN');
     expect(soqlLine.aggregations).toEqual(2);
-    expect(logLines[2]?.type).toEqual('SOQL_EXECUTE_EXPLAIN');
-    expect(logLines[3]?.type).toEqual('SOQL_EXECUTE_END');
-    expect(logLines[3]?.selfRowCount).toEqual(50);
-    expect(logLines[3]?.totalRowCount).toEqual(50);
-    expect(logLines[4]).toBeInstanceOf(ExecutionFinishedLine);
+    expect(soqlLine.selfRowCount).toEqual(50);
+    expect(soqlLine.totalRowCount).toEqual(50);
 
-    const soqlExplain = logLines[2] as SOQLExecuteExplainLine;
+    const soqlExplain = soqlLine.children[0] as SOQLExecuteExplainLine;
+    expect(soqlExplain.type).toEqual('SOQL_EXECUTE_EXPLAIN');
     expect(soqlExplain.type).toEqual('SOQL_EXECUTE_EXPLAIN');
     expect(soqlExplain.cardinality).toEqual(2);
     expect(soqlExplain.fields).toEqual(['MyField__c', 'AnotherField__c']);
@@ -329,10 +344,9 @@ describe('getRootMethod tests', () => {
       '17:52:35.317 (1499617717)|CODE_UNIT_FINISHED|Workflow:01Id0000000roIX\n' +
       '17:52:36.317 (1500000000)|EXECUTION_FINISHED\n';
 
-    parseLog(log);
-    const rootMethod = getRootMethod();
+    const apexLog = new ApexLogParser(log).parse();
 
-    const timedLogLines = rootMethod.children as TimedNode[];
+    const timedLogLines = apexLog.children as TimedNode[];
     expect(timedLogLines.length).toBe(1);
     const startLine = timedLogLines[0];
     expect(startLine?.type).toBe('EXECUTION_STARTED');
@@ -367,10 +381,9 @@ describe('getRootMethod tests', () => {
       '17:52:35.317 (1499617717)|CODE_UNIT_FINISHED|Flow:01Id0000000roIX\n' +
       '17:52:36.317 (1500000000)|EXECUTION_FINISHED\n';
 
-    parseLog(log);
-    const rootMethod = getRootMethod();
+    const apexLog = new ApexLogParser(log).parse();
 
-    const timedLogLines = rootMethod.children as TimedNode[];
+    const timedLogLines = apexLog.children as TimedNode[];
     expect(timedLogLines.length).toBe(1);
     const startLine = timedLogLines[0];
     expect(startLine?.type).toBe('EXECUTION_STARTED');
@@ -409,10 +422,9 @@ describe('getRootMethod tests', () => {
       '17:52:35.317 (1363038339)|CODE_UNIT_FINISHED|Workflow:01Id0000000roIX\n' +
       '17:52:36.317 (1500000000)|EXECUTION_FINISHED\n';
 
-    parseLog(log);
-    const rootMethod = getRootMethod();
+    const apexLog = new ApexLogParser(log).parse();
 
-    const timedLogLines = rootMethod.children as TimedNode[];
+    const timedLogLines = apexLog.children as TimedNode[];
     expect(timedLogLines.length).toBe(1);
     const startLine = timedLogLines[0];
     expect(startLine?.type).toBe('EXECUTION_STARTED');
@@ -467,13 +479,13 @@ describe('getRootMethod tests', () => {
       '17:52:36.320 (1520000000)|FLOW_START_INTERVIEWS_END|2\n' +
       '17:52:36.321 (1530000000)|FLOW_INTERVIEW_FINISHED_LIMIT_USAGE|SOQL queries: 0 out of 100';
 
-    parseLog(log);
-    const rootMethod = getRootMethod();
+    const apexLog = new ApexLogParser(log).parse();
+
     // This should match the last node with a duration
     // The last log line is information only (duration is 0)
     // The last `FLOW_START_INTERVIEW_BEGIN` + `FLOW_START_INTERVIEW_END` are the last pair that will result in a duration
-    expect(rootMethod.exitStamp).toBe(1530000000);
-    expect(rootMethod.executionEndTime).toBe(1520000000);
+    expect(apexLog.rootNode.exitStamp).toBe(1530000000);
+    expect(apexLog.rootNode.executionEndTime).toBe(1520000000);
   });
 
   it('Root exitStamp should match last line timestamp if none of the line pairs have duration', async () => {
@@ -483,10 +495,10 @@ describe('getRootMethod tests', () => {
       '17:52:38.321 (1520000000)|FLOW_INTERVIEW_FINISHED_LIMIT_USAGE|SOQL queries: 2 out of 100\n' +
       '17:52:39.321 (1530000000)|FLOW_INTERVIEW_FINISHED_LIMIT_USAGE|SOQL queries: 3 out of 100\n';
 
-    parseLog(log);
-    const rootMethod = getRootMethod();
-    expect(rootMethod.exitStamp).toBe(1530000000);
-    expect(rootMethod.executionEndTime).toBe(0);
+    const apexLog = new ApexLogParser(log).parse();
+
+    expect(apexLog.rootNode.exitStamp).toBe(1530000000);
+    expect(apexLog.rootNode.executionEndTime).toBe(0);
   });
 
   it('Entering Managed Package events should be merged', async () => {
@@ -505,13 +517,14 @@ describe('getRootMethod tests', () => {
       '11:52:06.13 (900)|ENTERING_MANAGED_PKG|ns2\n' +
       '11:52:06.13 (1000)|ENTERING_MANAGED_PKG|ns2\n' +
       '11:52:06.13 (1100)|ENTERING_MANAGED_PKG|ns2\n';
-    parseLog(log);
-    const rootMethod = getRootMethod();
-    expect(rootMethod.children.length).toBe(1);
-    expect(rootMethod.exitStamp).toBe(1100);
-    expect(rootMethod.executionEndTime).toBe(1100);
 
-    const rootChildren = rootMethod.children as Method[];
+    const apexLog = new ApexLogParser(log).parse();
+
+    expect(apexLog.rootNode.children.length).toBe(1);
+    expect(apexLog.rootNode.exitStamp).toBe(1100);
+    expect(apexLog.rootNode.executionEndTime).toBe(1100);
+
+    const rootChildren = apexLog.rootNode.children as Method[];
 
     const executionChildren = rootChildren[0]?.children as Method[];
     expect(executionChildren.length).toBe(5);
@@ -584,21 +597,23 @@ describe('Log Settings tests', () => {
     '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|partner.nisar.ahmed@philips.com.m2odryrun1|Greenwich Mean Time|GMTZ\n' +
     '09:18:22.6 (6574780)|EXECUTION_STARTED';
 
+  const apexLog = new ApexLogParser(log).parse();
+
   it('The settings should be found', () => {
-    expect(getLogSettings(log)).not.toBe(null);
+    expect(apexLog.debugLevels).not.toBe(null);
   });
   it('The settings should be as expected', () => {
-    expect(getLogSettings(log)).toEqual([
-      { key: 'APEX_CODE', level: 'FINE' },
-      { key: 'APEX_PROFILING', level: 'NONE' },
-      { key: 'CALLOUT', level: 'NONE' },
-      { key: 'DB', level: 'INFO' },
-      { key: 'NBA', level: 'NONE' },
-      { key: 'SYSTEM', level: 'NONE' },
-      { key: 'VALIDATION', level: 'INFO' },
-      { key: 'VISUALFORCE', level: 'NONE' },
-      { key: 'WAVE', level: 'NONE' },
-      { key: 'WORKFLOW', level: 'INFO' },
+    expect(apexLog.debugLevels).toEqual([
+      { logCategory: 'APEX_CODE', logLevel: 'FINE' },
+      { logCategory: 'APEX_PROFILING', logLevel: 'NONE' },
+      { logCategory: 'CALLOUT', logLevel: 'NONE' },
+      { logCategory: 'DB', logLevel: 'INFO' },
+      { logCategory: 'NBA', logLevel: 'NONE' },
+      { logCategory: 'SYSTEM', logLevel: 'NONE' },
+      { logCategory: 'VALIDATION', logLevel: 'INFO' },
+      { logCategory: 'VISUALFORCE', logLevel: 'NONE' },
+      { logCategory: 'WAVE', logLevel: 'NONE' },
+      { logCategory: 'WORKFLOW', logLevel: 'INFO' },
     ]);
   });
 });

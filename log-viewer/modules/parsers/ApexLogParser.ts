@@ -47,11 +47,15 @@ export default class ApexLogParser {
   parse(): ApexLog {
     const logLines = this.parseLog(this.debugLogData);
     const rootNode = this.getRootMethod(logLines);
+    const debugLevels = this.getDebugLevels(this.debugLogData);
 
-    const apexLog = new ApexLog();
+    const apexLog = new ApexLog(rootNode);
     apexLog.totalDuration = rootNode.duration;
     apexLog.size = this.debugLogData.length;
     apexLog.children = rootNode.children;
+    apexLog.debugLevels = debugLevels;
+    apexLog.truncated = this.truncated;
+    apexLog.cpuTime = this.cpuUsed;
     return apexLog;
   }
 
@@ -298,6 +302,31 @@ export default class ApexLogParser {
     this.reasons.delete(reason);
 
     this.truncateLog(timestamp, reason, description, colorKey);
+  }
+
+  private getDebugLevels(log: string): DebugLevel[] {
+    const match = log.match(settingsPattern);
+    if (!match) {
+      return [];
+    }
+
+    const settings = match[0],
+      settingList = settings.substring(settings.indexOf(' ') + 1).split(';');
+
+    return settingList.map((entry) => {
+      const parts = entry.split(',');
+      return new DebugLevel(parts[0] || '', parts[1] || '');
+    });
+  }
+}
+
+export class DebugLevel {
+  logCategory: string;
+  logLevel: string;
+
+  constructor(category: string, level: string) {
+    this.logCategory = category;
+    this.logLevel = level;
   }
 }
 
@@ -2907,30 +2936,5 @@ export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['DUPLICATE_RULE_FILTER_RESULT', DuplicateRuleFilterResult],
   ['DUPLICATE_RULE_FILTER_VALUE', DuplicateRuleFilterValue],
 ]);
-
-export class LogSetting {
-  key: string;
-  level: string;
-
-  constructor(key: string, level: string) {
-    this.key = key;
-    this.level = level;
-  }
-}
-
-export function getLogSettings(log: string) {
-  const match = log.match(settingsPattern);
-  if (!match) {
-    return [];
-  }
-
-  const settings = match[0],
-    settingList = settings.substring(settings.indexOf(' ') + 1).split(';');
-
-  return settingList.map((entry) => {
-    const parts = entry.split(',');
-    return new LogSetting(parts[0] || '', parts[1] || '');
-  });
-}
 
 export { SOQLExecuteExplainLine, SOQLExecuteBeginLine, DMLBeginLine };
