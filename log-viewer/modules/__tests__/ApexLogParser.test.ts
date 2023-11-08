@@ -484,8 +484,8 @@ describe('getRootMethod tests', () => {
     // This should match the last node with a duration
     // The last log line is information only (duration is 0)
     // The last `FLOW_START_INTERVIEW_BEGIN` + `FLOW_START_INTERVIEW_END` are the last pair that will result in a duration
-    expect(apexLog.rootNode.exitStamp).toBe(1530000000);
-    expect(apexLog.rootNode.executionEndTime).toBe(1520000000);
+    expect(apexLog.exitStamp).toBe(1530000000);
+    expect(apexLog.executionEndTime).toBe(1520000000);
   });
 
   it('Root exitStamp should match last line timestamp if none of the line pairs have duration', async () => {
@@ -497,8 +497,8 @@ describe('getRootMethod tests', () => {
 
     const apexLog = new ApexLogParser(log).parse();
 
-    expect(apexLog.rootNode.exitStamp).toBe(1530000000);
-    expect(apexLog.rootNode.executionEndTime).toBe(0);
+    expect(apexLog.exitStamp).toBe(1530000000);
+    expect(apexLog.executionEndTime).toBe(0);
   });
 
   it('Entering Managed Package events should be merged', async () => {
@@ -520,11 +520,11 @@ describe('getRootMethod tests', () => {
 
     const apexLog = new ApexLogParser(log).parse();
 
-    expect(apexLog.rootNode.children.length).toBe(1);
-    expect(apexLog.rootNode.exitStamp).toBe(1100);
-    expect(apexLog.rootNode.executionEndTime).toBe(1100);
+    expect(apexLog.children.length).toBe(1);
+    expect(apexLog.exitStamp).toBe(1100);
+    expect(apexLog.executionEndTime).toBe(1100);
 
-    const rootChildren = apexLog.rootNode.children as Method[];
+    const rootChildren = apexLog.children as Method[];
 
     const executionChildren = rootChildren[0]?.children as Method[];
     expect(executionChildren.length).toBe(5);

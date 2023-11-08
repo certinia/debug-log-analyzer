@@ -1,7 +1,9 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { ApexLog } from './ApexLog.js';
+// todo: regsiter multiple aggregaters classes so we do not have to loop multiple times.
+// todo: Each type should have namesapces assocated (default of unmanagd) - **NEW FEAT**
+// todo: remove console.debug and replace with a returned list of issues.
 
 type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
 type TruncateKey = 'unexpected' | 'error' | 'skip';
@@ -46,16 +48,13 @@ export default class ApexLogParser {
 
   parse(): ApexLog {
     const logLines = this.parseLog(this.debugLogData);
-    const rootNode = this.getRootMethod(logLines);
-    const debugLevels = this.getDebugLevels(this.debugLogData);
 
-    const apexLog = new ApexLog(rootNode);
-    apexLog.totalDuration = rootNode.duration;
+    const apexLog = this.toLogTree(logLines);
     apexLog.size = this.debugLogData.length;
-    apexLog.children = rootNode.children;
-    apexLog.debugLevels = debugLevels;
+    apexLog.debugLevels = this.getDebugLevels(this.debugLogData);
     apexLog.truncated = this.truncated;
     apexLog.cpuTime = this.cpuUsed;
+
     return apexLog;
   }
 
@@ -136,9 +135,9 @@ export default class ApexLogParser {
     return logLines;
   }
 
-  private getRootMethod(logLines: LogLine[]) {
+  private toLogTree(logLines: LogLine[]) {
     const lineIter = new LineIterator(logLines),
-      rootMethod = new RootNode(),
+      rootMethod = new ApexLog(),
       stack: Method[] = [];
     let line: LogLine | null;
 
@@ -215,7 +214,7 @@ export default class ApexLogParser {
     node.children = newChildren;
   }
 
-  private collectNamespaces(node: RootNode): Set<string> {
+  private collectNamespaces(node: ApexLog): Set<string> {
     const namespaces = new Set<string>();
     let i = 0;
     const children = node.children;
@@ -242,7 +241,7 @@ export default class ApexLogParser {
     }
   }
 
-  private setNamespaces(node: RootNode) {
+  private setNamespaces(node: ApexLog) {
     const namespaces = this.collectNamespaces(node);
     const children = node.children;
 
@@ -563,11 +562,19 @@ export class Method extends TimedNode {
  * It is a "pseudo" node and not present in the log.
  * Since it has children it extends "Method".
  */
-export class RootNode extends Method {
+export class ApexLog extends Method {
   text = 'Log Root';
   type = 'ROOT';
   timestamp = 0;
   exitStamp = 0;
+  /**
+   * The size of the log, in bytes
+   */
+  public size = 0;
+  public cpuTime: number = 0;
+  public debugLevels: DebugLevel[] = [];
+  public truncated: TruncationEntry[] = [];
+
   /**
    * The endtime with nodes of 0 duration excluded
    */
