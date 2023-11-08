@@ -384,7 +384,6 @@ export abstract class LogLine {
   value: string | null = null; // a variable value
   hasValidSymbols = false; // can we open source for this node?
   suffix: string | null = null; // extra description context
-  prefix: string | null = null; // extra description context
   discontinuity = false; // does this line cause a discontinuity in the call stack?
   totalRowCount = 0; // the number of rows in a database operation
   selfRowCount = 0;
@@ -1131,8 +1130,6 @@ class StatementExecuteLine extends LogLine {
 }
 
 class VariableScopeBeginLine extends LogLine {
-  prefix = 'ASSIGN ';
-
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
