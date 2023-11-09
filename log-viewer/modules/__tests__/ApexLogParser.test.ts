@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import ApexLogParser, {
+import {
   CodeUnitStartedLine,
   ExecutionStartedLine,
   LogLine,
@@ -11,6 +11,7 @@ import ApexLogParser, {
   SOQLExecuteExplainLine,
   TimedNode,
   lineTypeMap,
+  parse,
   parseLineNumber,
   parseObjectNamespace,
   parseRows,
@@ -61,7 +62,7 @@ describe('parseRows tests', () => {
 });
 
 describe('parseLine tests', () => {
-  const log1 = new ApexLogParser('09:18:22.6 (6574780)|DUMMY').parse();
+  const log1 = parse('09:18:22.6 (6574780)|DUMMY');
 
   it('Parser will return 0 lines if line has invalid type name', () => {
     expect(log1.children.length).toEqual(0);
@@ -69,7 +70,7 @@ describe('parseLine tests', () => {
 
   const line =
     '15:20:52.222 (6574780)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()';
-  const log2 = new ApexLogParser(line).parse();
+  const log2 = parse(line);
 
   it('Should return an object with meta as prototype', () => {
     const methodLine = log2.children[0];
@@ -88,7 +89,7 @@ describe('parseLog tests', () => {
       '09:19:13.82 (51592737891)|CODE_UNIT_FINISHED|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
     const logLines = apexLog.children;
     expect(logLines.length).toEqual(1);
     expect(logLines[0]).toBeInstanceOf(ExecutionStartedLine);
@@ -106,7 +107,7 @@ describe('parseLog tests', () => {
       '09:19:13.82 (51592737891)|CODE_UNIT_FINISHED|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\r\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\r\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     expect(apexLog.children.length).toEqual(1);
     expect(apexLog.children[0]).toBeInstanceOf(ExecutionStartedLine);
@@ -121,7 +122,7 @@ describe('parseLog tests', () => {
       '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
       '09:18:22.6 (6586704)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     expect(apexLog.children.length).toBe(1);
     expect(apexLog.children[0]).toBeInstanceOf(ExecutionStartedLine);
@@ -138,7 +139,7 @@ describe('parseLog tests', () => {
       '15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
       '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     expect(apexLog.children.length).toBe(1);
     expect(apexLog.truncated[0]?.reason).toBe('Skipped-Lines');
@@ -151,7 +152,7 @@ describe('parseLog tests', () => {
       '15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
       '*********** MAXIMUM DEBUG LOG SIZE REACHED ***********\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     expect(apexLog.children.length).toBe(1);
     expect(apexLog.truncated.length).toBe(2);
@@ -166,7 +167,7 @@ describe('parseLog tests', () => {
       '16:16:04.97 (1000)|EXCEPTION_THROWN|[60]|System.LimitException: c2g:Too many SOQL queries: 101\n' +
       '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     expect(apexLog.children.length).toBe(1);
     expect(apexLog.truncated[0]?.reason).toBe(
@@ -180,7 +181,7 @@ describe('parseLog tests', () => {
       '16:16:04.97 (1000)|FATAL_ERROR|System.LimitException: c2g:Too many SOQL queries: 101\n' +
       '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     expect(apexLog.children.length).toBe(1);
     expect(apexLog.truncated[0]?.reason).toBe(
@@ -194,7 +195,7 @@ describe('parseLog tests', () => {
       '15:20:52.222 (4113760256)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     expect(apexLog.children.length).toBe(1);
     const executeEvent = apexLog.children[0] as MethodEntryLine;
@@ -207,7 +208,7 @@ describe('parseLog tests', () => {
       '11:52:06.13 (151717928)|ENTERING_MANAGED_PKG|appirio_core\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
     const execEvent = apexLog.children[0] as MethodEntryLine;
     expect(execEvent.children[0]?.namespace).toBe('appirio_core');
   });
@@ -231,7 +232,7 @@ describe('parseLog tests', () => {
       '14:29:44.163 (40163621912)|CUMULATIVE_LIMIT_USAGE_END\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
     expect(apexLog.cpuTime).toBe(4564000000);
     const execEvent = apexLog.children[0] as MethodEntryLine;
     expect(execEvent.children.length).toBe(1);
@@ -249,7 +250,7 @@ describe('parseLog tests', () => {
       '1Z VSF 767 68 0562 3292}\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     expect(apexLog.cpuTime).toBe(0);
 
@@ -291,7 +292,7 @@ describe('parseLog tests', () => {
     09:15:43.335 (335933546)|VF_APEX_CALL_START|[EXTERNAL]|isSingle
     09:15:43.336 (336270391)|VF_APEX_CALL_START|[EXTERNAL]|messages`;
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     const methods = apexLog.children as Method[];
     expect(methods.length).toBe(24);
@@ -309,7 +310,7 @@ describe('parseLog tests', () => {
       '06:22:49.429 (15861665431)|SOQL_EXECUTE_END|[895]|Rows:50\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
     const execEvent = apexLog.children[0] as MethodEntryLine;
     expect(execEvent).toBeInstanceOf(ExecutionStartedLine);
 
@@ -344,7 +345,7 @@ describe('getRootMethod tests', () => {
       '17:52:35.317 (1499617717)|CODE_UNIT_FINISHED|Workflow:01Id0000000roIX\n' +
       '17:52:36.317 (1500000000)|EXECUTION_FINISHED\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     const timedLogLines = apexLog.children as TimedNode[];
     expect(timedLogLines.length).toBe(1);
@@ -381,7 +382,7 @@ describe('getRootMethod tests', () => {
       '17:52:35.317 (1499617717)|CODE_UNIT_FINISHED|Flow:01Id0000000roIX\n' +
       '17:52:36.317 (1500000000)|EXECUTION_FINISHED\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     const timedLogLines = apexLog.children as TimedNode[];
     expect(timedLogLines.length).toBe(1);
@@ -422,7 +423,7 @@ describe('getRootMethod tests', () => {
       '17:52:35.317 (1363038339)|CODE_UNIT_FINISHED|Workflow:01Id0000000roIX\n' +
       '17:52:36.317 (1500000000)|EXECUTION_FINISHED\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     const timedLogLines = apexLog.children as TimedNode[];
     expect(timedLogLines.length).toBe(1);
@@ -479,7 +480,7 @@ describe('getRootMethod tests', () => {
       '17:52:36.320 (1520000000)|FLOW_START_INTERVIEWS_END|2\n' +
       '17:52:36.321 (1530000000)|FLOW_INTERVIEW_FINISHED_LIMIT_USAGE|SOQL queries: 0 out of 100';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     // This should match the last node with a duration
     // The last log line is information only (duration is 0)
@@ -495,7 +496,7 @@ describe('getRootMethod tests', () => {
       '17:52:38.321 (1520000000)|FLOW_INTERVIEW_FINISHED_LIMIT_USAGE|SOQL queries: 2 out of 100\n' +
       '17:52:39.321 (1530000000)|FLOW_INTERVIEW_FINISHED_LIMIT_USAGE|SOQL queries: 3 out of 100\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     expect(apexLog.exitStamp).toBe(1530000000);
     expect(apexLog.executionEndTime).toBe(0);
@@ -518,7 +519,7 @@ describe('getRootMethod tests', () => {
       '11:52:06.13 (1000)|ENTERING_MANAGED_PKG|ns2\n' +
       '11:52:06.13 (1100)|ENTERING_MANAGED_PKG|ns2\n';
 
-    const apexLog = new ApexLogParser(log).parse();
+    const apexLog = parse(log);
 
     expect(apexLog.children.length).toBe(1);
     expect(apexLog.exitStamp).toBe(1100);
@@ -597,7 +598,7 @@ describe('Log Settings tests', () => {
     '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|partner.nisar.ahmed@philips.com.m2odryrun1|Greenwich Mean Time|GMTZ\n' +
     '09:18:22.6 (6574780)|EXECUTION_STARTED';
 
-  const apexLog = new ApexLogParser(log).parse();
+  const apexLog = parse(log);
 
   it('The settings should be found', () => {
     expect(apexLog.debugLevels).not.toBe(null);

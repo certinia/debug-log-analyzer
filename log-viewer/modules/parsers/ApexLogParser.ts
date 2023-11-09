@@ -32,9 +32,11 @@ const typePattern = /^[A-Z_]*$/,
   newlineRegex = /\r?\n/,
   settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
 
-export default class ApexLogParser {
-  debugLogData: string = '';
+export function parse(logData: string): ApexLog {
+  return new ApexLogParser().parse(logData);
+}
 
+export default class ApexLogParser {
   truncated: TruncationEntry[] = [];
   maxSizeTimestamp: number | null = null;
   reasons: Set<string> = new Set<string>();
@@ -42,16 +44,12 @@ export default class ApexLogParser {
   lastTimestamp = 0;
   discontinuity = false;
 
-  constructor(debugLog: string) {
-    this.debugLogData = debugLog;
-  }
-
-  parse(): ApexLog {
-    const logLines = this.parseLog(this.debugLogData);
+  parse(debugLog: string): ApexLog {
+    const logLines = this.parseLog(debugLog);
 
     const apexLog = this.toLogTree(logLines);
-    apexLog.size = this.debugLogData.length;
-    apexLog.debugLevels = this.getDebugLevels(this.debugLogData);
+    apexLog.size = debugLog.length;
+    apexLog.debugLevels = this.getDebugLevels(debugLog);
     apexLog.truncated = this.truncated;
     apexLog.cpuTime = this.cpuUsed;
 
@@ -143,7 +141,9 @@ export default class ApexLogParser {
 
     this.lastTimestamp = 0;
     while ((line = lineIter.fetch())) {
-      line.loadContent?.(this, lineIter, stack);
+      if (line instanceof Method) {
+        this.parseTree(line, lineIter, stack);
+      }
       rootMethod.addChild(line);
     }
     rootMethod.setTimes();
@@ -152,6 +152,107 @@ export default class ApexLogParser {
     this.setNamespaces(rootMethod);
     this.aggregateTotals(rootMethod);
     return rootMethod;
+  }
+
+  private parseTree(parentLine: Method, lineIter: LineIterator, stack: Method[]) {
+    this.lastTimestamp = parentLine.timestamp;
+
+    if (parentLine.exitTypes.length > 0) {
+      let line;
+
+      stack.push(parentLine);
+      while ((line = lineIter.peek())) {
+        if (line.discontinuity) {
+          // discontinuities are stack unwinding (caused by Exceptions)
+          this.discontinuity = true; // start unwinding stack
+        }
+
+        if (line.isExit && this.endMethod(parentLine, line, lineIter, stack)) {
+          if (parentLine.onEnd) {
+            // the method wants to see the exit line
+            parentLine.onEnd(line, stack);
+          }
+          break;
+        }
+
+        if (this.maxSizeTimestamp && this.discontinuity && line.timestamp > this.maxSizeTimestamp) {
+          parentLine.isTruncated = true;
+          break;
+        }
+
+        lineIter.fetch(); // it's a child - consume the line
+        this.lastTimestamp = line.timestamp;
+        if (line instanceof Method) {
+          this.parseTree(line, lineIter, stack);
+        }
+
+        parentLine.addChild(line);
+      }
+
+      if (!line || parentLine.isTruncated) {
+        // truncated method - terminate at the end of the log
+        parentLine.exitStamp = this.lastTimestamp;
+
+        // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
+        this.truncateLog(
+          this.lastTimestamp,
+          'Unexpected-End',
+          'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
+          'unexpected',
+        );
+        if (parentLine.isTruncated) {
+          this.updateTruncated(
+            this.lastTimestamp,
+            'Max-Size-reached',
+            'The maximum log size has been reached. Part of the log has been truncated.',
+            'skip',
+          );
+        }
+        parentLine.isTruncated = true;
+      }
+
+      stack.pop();
+      parentLine.recalculateDurations();
+    }
+  }
+
+  private isMatchingEnd(startMethod: Method, endLine: LogLine) {
+    return (
+      startMethod.exitTypes.includes(endLine.type) &&
+      (!endLine.lineNumber ||
+        !startMethod.lineNumber ||
+        endLine.lineNumber === startMethod.lineNumber)
+    );
+  }
+
+  private endMethod(
+    startMethod: Method,
+    endLine: LogLine,
+    lineIter: LineIterator,
+    stack: Method[],
+  ) {
+    startMethod.exitStamp = endLine.timestamp;
+
+    // is this a 'good' end line?
+    if (this.isMatchingEnd(startMethod, endLine)) {
+      this.discontinuity = false; // end stack unwinding
+      lineIter.fetch(); // consume the line
+      return true; // success
+    } else if (this.discontinuity) {
+      return true; // exception - unwind
+    } else {
+      if (stack.some((m) => this.isMatchingEnd(m, endLine))) {
+        return true; // we match a method further down the stack - unwind
+      }
+      // we found an exit event on its own e.g a `METHOD_EXIT` without a `METHOD_ENTRY`
+      this.truncateLog(
+        endLine.timestamp,
+        'Unexpected-Exit',
+        'An exit event was found without a corresponding entry event e.g a `METHOD_EXIT` event without a `METHOD_ENTRY`',
+        'unexpected',
+      );
+      return false; // we have no matching method - ignore
+    }
   }
 
   private aggregateTotals(node: TimedNode) {
@@ -399,8 +500,6 @@ export abstract class LogLine {
     }
   }
 
-  loadContent?(parser: ApexLogParser, lineIter: LineIterator, stack: Method[]): void;
-
   onEnd?(end: LogLine, stack: LogLine[]): void;
 
   onAfter?(arser: ApexLogParser, next?: LogLine): void;
@@ -458,101 +557,6 @@ export class Method extends TimedNode {
   ) {
     super(parts, timelineKey, cpuType);
     this.exitTypes = exitTypes;
-  }
-
-  isMatchingEnd(endLine: LogLine) {
-    return (
-      this.exitTypes.includes(endLine.type) &&
-      (!endLine.lineNumber || !this.lineNumber || endLine.lineNumber === this.lineNumber)
-    );
-  }
-
-  endMethod(parser: ApexLogParser, endLine: LogLine, lineIter: LineIterator, stack: Method[]) {
-    this.exitStamp = endLine.timestamp;
-
-    // is this a 'good' end line?
-    if (this.isMatchingEnd(endLine)) {
-      parser.discontinuity = false; // end stack unwinding
-      lineIter.fetch(); // consume the line
-      return true; // success
-    } else if (parser.discontinuity) {
-      return true; // exception - unwind
-    } else {
-      if (stack.some((m) => m.isMatchingEnd(endLine))) {
-        return true; // we match a method further down the stack - unwind
-      }
-      // we found an exit event on its own e.g a `METHOD_EXIT` without a `METHOD_ENTRY`
-      parser.truncateLog(
-        endLine.timestamp,
-        'Unexpected-Exit',
-        'An exit event was found without a corresponding entry event e.g a `METHOD_EXIT` event without a `METHOD_ENTRY`',
-        'unexpected',
-      );
-      return false; // we have no matching method - ignore
-    }
-  }
-
-  loadContent(parser: ApexLogParser, lineIter: LineIterator, stack: Method[]) {
-    parser.lastTimestamp = this.timestamp;
-
-    if (this.exitTypes.length > 0) {
-      let line;
-
-      stack.push(this);
-      while ((line = lineIter.peek())) {
-        if (line.discontinuity) {
-          // discontinuities are stack unwinding (caused by Exceptions)
-          parser.discontinuity = true; // start unwinding stack
-        }
-
-        if (line.isExit && this.endMethod(parser, line, lineIter, stack)) {
-          if (this.onEnd) {
-            // the method wants to see the exit line
-            this.onEnd(line, stack);
-          }
-          break;
-        }
-
-        if (
-          parser.maxSizeTimestamp &&
-          parser.discontinuity &&
-          line.timestamp > parser.maxSizeTimestamp
-        ) {
-          this.isTruncated = true;
-          break;
-        }
-
-        lineIter.fetch(); // it's a child - consume the line
-        parser.lastTimestamp = line.timestamp;
-        line.loadContent?.(parser, lineIter, stack);
-        this.addChild(line);
-      }
-
-      if (!line || this.isTruncated) {
-        // truncated method - terminate at the end of the log
-        this.exitStamp = parser.lastTimestamp;
-
-        // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
-        parser.truncateLog(
-          parser.lastTimestamp,
-          'Unexpected-End',
-          'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
-          'unexpected',
-        );
-        if (this.isTruncated) {
-          parser.updateTruncated(
-            parser.lastTimestamp,
-            'Max-Size-reached',
-            'The maximum log size has been reached. Part of the log has been truncated.',
-            'skip',
-          );
-        }
-        this.isTruncated = true;
-      }
-
-      stack.pop();
-      this.recalculateDurations();
-    }
   }
 }
 
