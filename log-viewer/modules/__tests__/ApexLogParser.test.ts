@@ -80,6 +80,22 @@ describe('parseLine tests', () => {
   });
 });
 
+describe('Invalid Debug Lines tests', () => {
+  it('Unrecognised line type will added to issues', () => {
+    const log1 = parse('09:18:22.6 (1)|FAKE_TYPE');
+    expect(log1.children.length).toEqual(0);
+    expect(log1.parsingErrors.length).toEqual(1);
+    expect(log1.parsingErrors[0]).toEqual(`Unknown log line: FAKE_TYPE`);
+  });
+
+  it('Bad Log line will added to issues', () => {
+    const log1 = parse('INVALID LINE');
+    expect(log1.children.length).toEqual(0);
+    expect(log1.parsingErrors.length).toEqual(1);
+    expect(log1.parsingErrors[0]).toEqual(`Bad log line: INVALID LINE`);
+  });
+});
+
 describe('parseLog tests', () => {
   it('Should parse between EXECUTION_STARTED and EXECUTION_FINISHED and return an iterator', async () => {
     const log =

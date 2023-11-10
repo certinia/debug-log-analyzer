@@ -2,11 +2,9 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 // todo: js doc comments
-// todo: remove duplicate classes
 
 // todo: regsiter multiple aggregaters classes so we do not have to loop multiple times.
 // todo: Each type should have namesapces assocated (default of unmanagd) - **NEW FEAT**
-// todo: remove console.debug and replace with a returned list of issues.
 
 type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
 export type IssueType = 'unexpected' | 'error' | 'skip';
@@ -30,6 +28,7 @@ export function parse(logData: string): ApexLog {
 
 export default class ApexLogParser {
   logIssues: LogIssue[] = [];
+  parsingErrors: string[] = [];
   maxSizeTimestamp: number | null = null;
   reasons: Set<string> = new Set<string>();
   cpuUsed = 0;
@@ -43,6 +42,7 @@ export default class ApexLogParser {
     apexLog.size = debugLog.length;
     apexLog.debugLevels = this.getDebugLevels(debugLog);
     apexLog.logIssues = this.logIssues;
+    apexLog.parsingErrors = this.parsingErrors;
     apexLog.cpuTime = this.cpuUsed;
 
     return apexLog;
@@ -64,10 +64,8 @@ export default class ApexLogParser {
       // wrapped text from the previous entry?
       lastEntry.text += `\n${line}`;
     } else if (type) {
-      if (type !== 'DUMMY') {
-        /* Used by tests */
-        console.warn(`Unknown log line: ${type}`);
-      }
+      const message = `Unknown log line: ${type}`;
+      !this.parsingErrors.includes(message) && this.parsingErrors.push(message);
     } else {
       if (lastEntry && line.startsWith('*** Skipped')) {
         this.truncateLog(
@@ -86,7 +84,7 @@ export default class ApexLogParser {
       } else if (settingsPattern.test(line)) {
         // skip an unexpected settings line
       } else {
-        console.warn(`Bad log line: ${line}`);
+        this.parsingErrors.push(`Bad log line: ${line}`);
       }
     }
 
@@ -592,6 +590,7 @@ export class ApexLog extends Method {
   public cpuTime: number = 0;
   public debugLevels: DebugLevel[] = [];
   public logIssues: LogIssue[] = [];
+  public parsingErrors: string[] = [];
 
   /**
    * The endtime with nodes of 0 duration excluded
