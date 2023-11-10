@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-let requestId: number;
+let requestId: number = 0;
 
 export default function formatDuration(duration: number) {
   const text = `${~~(duration / 1000)}`; // convert from nano-seconds to micro-seconds

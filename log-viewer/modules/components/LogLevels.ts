@@ -4,14 +4,14 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { LogSetting } from '../parsers/TreeParserLegacy.js';
+import { DebugLevel } from '../parsers/ApexLogParser.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { skeletonStyles } from './skeleton/skeleton.styles.js';
 
 @customElement('log-levels')
 export class LogLevels extends LitElement {
   @state()
-  logSettings: LogSetting[] | null = null;
+  logSettings: DebugLevel[] | null = null;
 
   constructor() {
     super();
@@ -66,10 +66,10 @@ export class LogLevels extends LitElement {
     }
 
     const logLevels = [];
-    for (const { key, level } of this.logSettings) {
+    for (const { logCategory, logLevel } of this.logSettings) {
       const levelHtml = html`<div class="setting">
-        <span class="setting__title">${key}:</span>
-        <span class="setting__level">${level}</span>
+        <span class="setting__title">${logCategory}:</span>
+        <span class="setting__level">${logLevel}</span>
       </div>`;
       logLevels.push(levelHtml);
     }

@@ -5,14 +5,14 @@
 import formatDuration, { debounce } from '../Util.js';
 import { goToRow } from '../components/calltree-view/CalltreeView.js';
 import {
+  ApexLog,
+  type IssueType,
   Method,
-  RootNode,
   TimedNode,
   type TimelineKey,
-  truncated,
-} from '../parsers/TreeParserLegacy.js';
+} from '../parsers/ApexLogParser.js';
 
-export { RootNode };
+export { ApexLog };
 
 export interface TimelineGroup {
   label: string;
@@ -30,6 +30,12 @@ interface TimelineColors {
   'System Method': '#5C3444';
 }
 /* eslint-enable @typescript-eslint/naming-convention */
+
+const truncationColors: Map<IssueType, string> = new Map([
+  ['error', 'rgba(255, 128, 128, 0.2)'],
+  ['skip', 'rgba(128, 255, 128, 0.2)'],
+  ['unexpected', 'rgba(128, 128, 255, 0.2)'],
+]);
 
 interface Rect {
   x: number;
@@ -150,7 +156,7 @@ let scaleFont: string,
   maxY: number,
   displayHeight: number,
   displayWidth: number,
-  timelineRoot: RootNode,
+  timelineRoot: ApexLog,
   lastMouseX: number,
   lastMouseY: number;
 
@@ -323,19 +329,20 @@ const drawRect = (rect: Rect) => {
 };
 
 function drawTruncation(ctx: CanvasRenderingContext2D) {
-  const len = truncated.length;
+  const issues = timelineRoot.logIssues;
+  const len = issues.length;
   if (!len) {
     return;
   }
   let i = 0;
 
   while (i < len) {
-    const thisEntry = truncated[i++],
-      nextEntry = truncated[i];
+    const thisEntry = issues[i++],
+      nextEntry = issues[i];
 
-    if (thisEntry) {
-      const startTime = thisEntry?.timestamp,
-        endTime = nextEntry?.timestamp ?? timelineRoot.exitStamp;
+    if (thisEntry?.startTime) {
+      const startTime = thisEntry.startTime,
+        endTime = nextEntry?.startTime ?? timelineRoot.exitStamp;
 
       let x = startTime * state.zoom - state.offsetX;
       let w = (endTime - startTime) * state.zoom;
@@ -351,14 +358,14 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
         w = w - widthOffScreen;
       }
 
-      ctx.fillStyle = thisEntry.color;
+      ctx.fillStyle = truncationColors.get(thisEntry.type) || '';
       ctx.fillRect(x, -displayHeight, w, displayHeight);
     }
   }
 }
 
 function calculateSizes() {
-  maxY = getMaxDepth(timelineRoot); // maximum nested call depth
+  maxY = getMaxDepth(timelineRoot, 0); // maximum nested call depth
   resetView();
 }
 
@@ -394,7 +401,7 @@ function resizeFont() {
   scaleFont = state.zoom > 0.0000004 ? 'normal 16px serif' : 'normal 8px serif';
 }
 
-export function init(timelineContainer: HTMLDivElement, rootMethod: RootNode) {
+export function init(timelineContainer: HTMLDivElement, rootMethod: ApexLog) {
   container = timelineContainer;
   canvas = timelineContainer.querySelector('#timeline') as HTMLCanvasElement;
   ctx = canvas.getContext('2d'); // can never be null since context (2d) is a supported type.
@@ -465,6 +472,7 @@ function findByPosition(
       for (let c = 0; c < len; ++c) {
         const child = node.children[c];
         if (child instanceof TimedNode) {
+          // -1 to ingnore the "ApexLog" root node
           const target = findByPosition(child, childDepth, x, targetDepth);
           if (target) {
             return target;
@@ -486,7 +494,8 @@ function showTooltip(offsetX: number, offsetY: number) {
 }
 
 function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
-  const target = findByPosition(timelineRoot, 0, x, depth);
+  // -1 to ingnore the "ApexLog" root node
+  const target = findByPosition(timelineRoot, -1, x, depth);
   if (target) {
     canvas.classList.remove('timeline-hover');
     canvas.classList.remove('timeline-dragging');
@@ -538,21 +547,22 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
 }
 
 function findTruncatedTooltip(x: number): HTMLDivElement | null {
-  const len = truncated?.length;
+  const issues = timelineRoot.logIssues;
+  const len = issues?.length;
   let i = 0;
 
   while (i < len) {
-    const thisEntry = truncated[i++],
-      nextEntry = truncated[i];
-    if (thisEntry) {
-      const startTime = thisEntry.timestamp,
-        endTime = nextEntry?.timestamp ?? timelineRoot.exitStamp,
+    const thisEntry = issues[i++],
+      nextEntry = issues[i];
+    if (thisEntry?.startTime) {
+      const startTime = thisEntry.startTime,
+        endTime = nextEntry?.startTime ?? timelineRoot.exitStamp,
         startX = startTime * state.zoom - state.offsetX,
         endX = endTime * state.zoom - state.offsetX;
 
       if (x >= startX && x <= endX) {
         const toolTip = document.createElement('div');
-        toolTip.textContent = thisEntry.reason;
+        toolTip.textContent = thisEntry.summary;
         return toolTip;
       }
     }
@@ -622,7 +632,7 @@ function onClickCanvas(): void {
   const isClick = mouseDownPosition.x === lastMouseX && mouseDownPosition.y === lastMouseY;
   if (!dragging && isClick) {
     const depth = ~~(((displayHeight - lastMouseY - state.offsetY) / realHeight) * maxY);
-    const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
+    const target = findByPosition(timelineRoot, -1, lastMouseX, depth);
     if (target && target.timestamp) {
       goToRow(target.timestamp);
     }

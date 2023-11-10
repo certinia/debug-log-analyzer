@@ -5,7 +5,7 @@ import { LitElement, type PropertyValues, type TemplateResult, css, html } from 
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { DatabaseAccess } from '../Database.js';
-import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/TreeParserLegacy.js';
+import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/ApexLogParser.js';
 import {
   SEVERITY_TYPES,
   SOQLLinter,
