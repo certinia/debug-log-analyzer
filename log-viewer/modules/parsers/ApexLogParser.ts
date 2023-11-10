@@ -59,7 +59,7 @@ export default class ApexLogParser {
   private parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
     const parts = line.split('|'),
       type = parts[1],
-      metaCtor = lineTypeMap.get(type || '');
+      metaCtor = getLogEventClass(type || '');
 
     if (metaCtor) {
       const entry = new metaCtor(parts);
@@ -500,9 +500,16 @@ export abstract class LogLine {
     }
   }
 
+  /** Called if a corresponding end event is found during tree parsing*/
   onEnd?(end: LogLine, stack: LogLine[]): void;
 
-  onAfter?(arser: ApexLogParser, next?: LogLine): void;
+  /** Called when the Log event after this one is created in the line parser*/
+  onAfter?(parser: ApexLogParser, next?: LogLine): void;
+}
+
+class BasicLogLine extends LogLine {}
+class BasicExitLine extends LogLine {
+  isExit = true;
 }
 
 /**
@@ -933,14 +940,6 @@ class VFDeserializeViewstateBeginLine extends Method {
   }
 }
 
-class VFDeserializeViewstateEndLine extends LogLine {
-  isExit = true;
-
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
 class VFFormulaStartLine extends Method {
   suffix = ' (VF FORMULA)';
 
@@ -964,14 +963,6 @@ class VFSeralizeViewStateStartLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['VF_SERIALIZE_VIEWSTATE_END'], 'systemMethod', 'method');
-  }
-}
-
-class VFSeralizeViewStateEndLine extends LogLine {
-  isExit = true;
-
-  constructor(parts: string[]) {
-    super(parts);
   }
 }
 
@@ -1141,7 +1132,6 @@ class VariableScopeBeginLine extends LogLine {
   }
 }
 
-class VariableScopeEndLine extends LogLine {}
 class VariableAssignmentLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
@@ -1173,14 +1163,6 @@ class CumulativeLimitUsageLine extends Method {
   }
 }
 
-class CumulativeLimitUsageEndLine extends LogLine {
-  isExit = true;
-
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
 class CumulativeProfilingLine extends LogLine {
   acceptsText = true;
   constructor(parts: string[]) {
@@ -1192,14 +1174,6 @@ class CumulativeProfilingLine extends LogLine {
 class CumulativeProfilingBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['CUMULATIVE_PROFILING_END'], 'systemMethod', 'custom');
-  }
-}
-
-class CumulativeProfilingEndLine extends LogLine {
-  isExit = true;
-
-  constructor(parts: string[]) {
-    super(parts);
   }
 }
 
@@ -1389,14 +1363,6 @@ export class ExecutionStartedLine extends Method {
   }
 }
 
-export class ExecutionFinishedLine extends LogLine {
-  isExit = true;
-
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
 class EnteringManagedPackageLine extends Method {
   constructor(parts: string[]) {
     super(parts, [], 'method', 'pkg');
@@ -1467,7 +1433,7 @@ export class FlowStartInterviewsBeginLine extends Method {
     super(parts, ['FLOW_START_INTERVIEWS_END'], 'flow', 'custom');
   }
 
-  onEnd(end: FlowStartInterviewsEndLine, stack: LogLine[]) {
+  onEnd(end: LogLine, stack: LogLine[]) {
     const flowType = this.getFlowType(stack);
     this.suffix = ` (${flowType})`;
     this.text += this.getFlowName();
@@ -1500,14 +1466,6 @@ export class FlowStartInterviewsBeginLine extends Method {
   }
 }
 
-class FlowStartInterviewsEndLine extends LogLine {
-  isExit = true;
-
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
 class FlowStartInterviewsErrorLine extends LogLine {
   acceptsText = true;
   constructor(parts: string[]) {
@@ -1523,8 +1481,6 @@ class FlowStartInterviewBeginLine extends LogLine {
   }
 }
 
-class FlowStartInterviewEndLine extends LogLine {}
-
 class FlowStartInterviewLimitUsageLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
@@ -1538,9 +1494,6 @@ class FlowStartScheduledRecordsLine extends LogLine {
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
-class FlowCreateInterviewBeginLine extends LogLine {}
-
-class FlowCreateInterviewEndLine extends LogLine {}
 
 class FlowCreateInterviewErrorLine extends LogLine {
   constructor(parts: string[]) {
@@ -1555,14 +1508,6 @@ class FlowElementBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['FLOW_ELEMENT_END'], 'flow', 'custom');
     this.text = parts[3] + ' ' + parts[4];
-  }
-}
-
-class FlowElementEndLine extends LogLine {
-  isExit = true;
-
-  constructor(parts: string[]) {
-    super(parts);
   }
 }
 
@@ -1707,14 +1652,6 @@ class FlowBulkElementBeginLine extends Method {
   }
 }
 
-class FlowBulkElementEndLine extends LogLine {
-  isExit = true;
-
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
 class FlowBulkElementDetailLine extends LogLine {
   declarative = true;
 
@@ -1765,7 +1702,7 @@ class PNNoDevicesLine extends LogLine {
     this.text = `${parts[2]}.${parts[3]}`;
   }
 }
-class PNNotEnabledLine extends LogLine {}
+
 class PNSentLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
@@ -1786,8 +1723,6 @@ class SLAEvalMilestoneLine extends LogLine {
     this.text = `${parts[2]}`;
   }
 }
-
-class SLANullStartDateLine extends LogLine {}
 
 class SLAProcessCaseLine extends LogLine {
   constructor(parts: string[]) {
@@ -1819,8 +1754,6 @@ class ValidationErrorLine extends LogLine {
   }
 }
 
-class ValidationFailLine extends LogLine {}
-
 class ValidationFormulaLine extends LogLine {
   acceptsText = true;
 
@@ -1838,10 +1771,6 @@ class ValidationPassLine extends LogLine {
     this.text = parts[3] || '';
   }
 }
-
-class WFFlowActionBeginLine extends LogLine {}
-
-class WFFlowActionEndLine extends LogLine {}
 
 class WFFlowActionErrorLine extends LogLine {
   acceptsText = true;
@@ -1875,14 +1804,6 @@ class WFRuleEvalBeginLine extends Method {
   }
 }
 
-class WFRuleEvalEndLine extends LogLine {
-  isExit = true;
-
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
 class WFRuleEvalValueLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
@@ -1899,28 +1820,12 @@ class WFRuleFilterLine extends LogLine {
   }
 }
 
-class WFRuleNotEvaluatedLine extends LogLine {
-  isExit = true;
-
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
 class WFCriteriaBeginLine extends Method {
   declarative = true;
 
   constructor(parts: string[]) {
     super(parts, ['WF_CRITERIA_END', 'WF_RULE_NOT_EVALUATED'], 'workflow', 'custom');
     this.text = 'WF_CRITERIA : ' + parts[5] + ' : ' + parts[3];
-  }
-}
-
-class WFCriteriaEndLine extends LogLine {
-  isExit = true;
-
-  constructor(parts: string[]) {
-    super(parts);
   }
 }
 
@@ -2017,8 +1922,6 @@ class WFEscalationActionLine extends LogLine {
   }
 }
 
-class WFEscalationRuleLine extends LogLine {}
-
 class WFEvalEntryCriteriaLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
@@ -2034,16 +1937,12 @@ class WFFlowActionDetailLine extends LogLine {
   }
 }
 
-class WFHardRejectLine extends LogLine {}
-
 class WFNextApproverLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
-
-class WFNoProcessFoundLine extends LogLine {}
 
 class WFOutboundMsgLine extends LogLine {
   constructor(parts: string[]) {
@@ -2114,8 +2013,6 @@ class WFSpoolActionBeginLine extends LogLine {
     this.text = parts[2] || '';
   }
 }
-
-class WFTimeTriggersBeginLine extends LogLine {}
 
 class ExceptionThrownLine extends LogLine {
   discontinuity = true;
@@ -2194,15 +2091,6 @@ class DuplicateDetectionBegin extends Method {
   }
 }
 
-// e.g. "09:45:31.888 (38909459101)|DUPLICATE_DETECTION_END"
-class DuplicateDetectionEnd extends LogLine {
-  isExit = true;
-
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
 // e.g. "09:45:31.888 (38889067408)|DUPLICATE_DETECTION_RULE_INVOCATION|DuplicateRuleId:0Bm20000000CaSP|DuplicateRuleName:Duplicate Account|DmlType:UPDATE"
 class DuplicateDetectionRule extends LogLine {
   constructor(parts: string[]) {
@@ -2242,66 +2130,9 @@ class DuplicateDetectionSummary extends LogLine {
   }
 }
 
-class WFKnowledgeAction extends LogLine {}
-
-class WFSendAction extends LogLine {}
-
-class WFQuickCreate extends LogLine {}
-
-class WFApexAction extends LogLine {}
-
-class InvocableActionDetail extends LogLine {}
-class InvocableActionError extends LogLine {}
-
-class FlowCollectionProcessDetail extends LogLine {}
-
-class FlowScheduledPathQueued extends LogLine {}
-
-class RouteWorkAction extends LogLine {}
-
-class AddSkillRequirementAction extends LogLine {}
-
-class AddScreenPopAction extends LogLine {}
-
-class CalloutRequestPrepare extends LogLine {}
-
-class CalloutRequestFinalize extends LogLine {}
-
-class FunctionInvocationRequest extends LogLine {}
-
-class FunctionInvocationResponse extends LogLine {}
-
-class XDSRequestDetail extends LogLine {}
-
-class ExternalServiceRequest extends LogLine {}
-
-class ExternalServiceResponse extends LogLine {}
-
-class BulkCountableStatementExecute extends LogLine {}
-
-class DataWeaveUserDebug extends LogLine {}
-class UserDebugFinest extends LogLine {}
-class UserDebugFiner extends LogLine {}
-class UserDebugFine extends LogLine {}
-class UserDebugDebug extends LogLine {}
-class UserDebugInfo extends LogLine {}
-class UserDebugWarn extends LogLine {}
-
-class UserDebugError extends LogLine {}
-
-class VFApexCall extends LogLine {}
-
-class HeapDump extends LogLine {}
-class ScriptExecution extends LogLine {}
 class SessionCachePutBegin extends Method {
   constructor(parts: string[]) {
     super(parts, ['SESSION_CACHE_PUT_END'], 'method', 'method');
-  }
-}
-class SessionCachePutEnd extends LogLine {
-  isExit = true;
-  constructor(parts: string[]) {
-    super(parts);
   }
 }
 class SessionCacheGetBegin extends Method {
@@ -2310,25 +2141,9 @@ class SessionCacheGetBegin extends Method {
   }
 }
 
-class SessionCacheGetEnd extends LogLine {
-  isExit = true;
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
-class SessionCacheMemoryUsage extends LogLine {}
-
 class SessionCacheRemoveBegin extends Method {
   constructor(parts: string[]) {
     super(parts, ['SESSION_CACHE_REMOVE_END'], 'method', 'method');
-  }
-}
-
-class SessionCacheRemoveEnd extends LogLine {
-  isExit = true;
-  constructor(parts: string[]) {
-    super(parts);
   }
 }
 
@@ -2337,26 +2152,12 @@ class OrgCachePutBegin extends Method {
     super(parts, ['ORG_CACHE_PUT_END'], 'method', 'method');
   }
 }
-class OrgCachePutEnd extends LogLine {
-  isExit = true;
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
+
 class OrgCacheGetBegin extends Method {
   constructor(parts: string[]) {
     super(parts, ['ORG_CACHE_GET_END'], 'method', 'method');
   }
 }
-
-class OrgCacheGetEnd extends LogLine {
-  isExit = true;
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
-class OrgCacheMemoryUsage extends LogLine {}
 
 class OrgCacheRemoveBegin extends Method {
   constructor(parts: string[]) {
@@ -2364,27 +2165,9 @@ class OrgCacheRemoveBegin extends Method {
   }
 }
 
-class OrgCacheRemoveEnd extends LogLine {
-  isExit = true;
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
-class AEPersistValidation extends LogLine {}
-
-class ReferencedObjectList extends LogLine {}
-
 class VFSerializeContinuationStateBegin extends Method {
   constructor(parts: string[]) {
     super(parts, ['VF_SERIALIZE_CONTINUATION_STATE_END'], 'method', 'method');
-  }
-}
-
-class VFSerializeContinuationStateEnd extends LogLine {
-  isExit = true;
-  constructor(parts: string[]) {
-    super(parts);
   }
 }
 
@@ -2394,71 +2177,30 @@ class VFDeserializeContinuationStateBegin extends Method {
   }
 }
 
-class VFDeserializeContinuationStateEnd extends LogLine {
-  isExit = true;
-  constructor(parts: string[]) {
-    super(parts);
-  }
-}
-
-class DuplicateRuleFilter extends LogLine {}
-
-class DuplicateRuleFilterResult extends LogLine {}
-
-class DuplicateRuleFilterValue extends LogLine {}
-
 class MatchEngineBegin extends Method {
   constructor(parts: string[]) {
     super(parts, ['MATCH_ENGINE_END'], 'method', 'method');
   }
 }
 
-class MatchEngineInvocation extends LogLine {}
-
-class MatchEngineEnd extends LogLine {
-  isExit = true;
-  constructor(parts: string[]) {
-    super(parts);
+function getLogEventClass(eventName: string): LogLineConstructor | null | undefined {
+  if (lineTypeMap.has(eventName)) {
+    return lineTypeMap.get(eventName);
+  } else if (basicLogEvents.includes(eventName)) {
+    return BasicLogLine;
+  } else if (basicExitLogEvents.includes(eventName)) {
+    return BasicExitLine;
   }
+
+  return null;
 }
 
-class TemplateProcessingError extends LogLine {}
-
-class WaveAppLifecycle extends LogLine {}
-
-class AppContainerInitiated extends LogLine {}
-
-class TemplatedAsset extends LogLine {}
-
-class TransformationSummary extends LogLine {}
-
-class RulesExecutionSummary extends LogLine {}
-
-class AssetDiffSummary extends LogLine {}
-
-class AssetDiffDetail extends LogLine {}
-
-class RulesExecutionDetail extends LogLine {}
-
-class JsonDiffSummary extends LogLine {}
-
-class JsonDiffDetail extends LogLine {}
-
-export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
-  ['ADD_SCREEN_POP_ACTION', AddScreenPopAction],
-  ['ADD_SKILL_REQUIREMENT_ACTION', AddSkillRequirementAction],
-  ['APP_CONTAINER_INITIATED', AppContainerInitiated],
-  ['ASSET_DIFF_DETAIL', AssetDiffDetail],
-  ['ASSET_DIFF_SUMMARY', AssetDiffSummary],
-  ['AE_PERSIST_VALIDATION', AEPersistValidation],
+type LogLineConstructor<T extends LogLine = LogLine> = new (parts: string[]) => T;
+export const lineTypeMap = new Map<string, LogLineConstructor>([
   ['BULK_DML_RETRY', BulkDMLEntry],
-  ['BULK_COUNTABLE_STATEMENT_EXECUTE', BulkCountableStatementExecute],
   ['BULK_HEAP_ALLOCATE', BulkHeapAllocateLine],
   ['CALLOUT_REQUEST', CalloutRequestLine],
   ['CALLOUT_RESPONSE', CalloutResponseLine],
-  ['CALLOUT_REQUEST_PREPARE', CalloutRequestPrepare],
-  ['CALLOUT_REQUEST_FINALIZE', CalloutRequestFinalize],
-  ['DATAWEAVE_USER_DEBUG', DataWeaveUserDebug],
   ['NAMED_CREDENTIAL_REQUEST', NamedCredentialRequestLine],
   ['NAMED_CREDENTIAL_RESPONSE', NamedCredentialResponseLine],
   ['NAMED_CREDENTIAL_RESPONSE_DETAIL', NamedCredentialResponseDetailLine],
@@ -2473,19 +2215,14 @@ export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['SYSTEM_METHOD_EXIT', SystemMethodExitLine],
   ['CODE_UNIT_STARTED', CodeUnitStartedLine],
   ['CODE_UNIT_FINISHED', CodeUnitFinishedLine],
-  ['VF_APEX_CALL', VFApexCall],
   ['VF_APEX_CALL_START', VFApexCallStartLine],
   ['VF_APEX_CALL_END', VFApexCallEndLine],
   ['VF_DESERIALIZE_VIEWSTATE_BEGIN', VFDeserializeViewstateBeginLine],
-  ['VF_DESERIALIZE_VIEWSTATE_END', VFDeserializeViewstateEndLine],
   ['VF_EVALUATE_FORMULA_BEGIN', VFFormulaStartLine],
   ['VF_EVALUATE_FORMULA_END', VFFormulaEndLine],
   ['VF_SERIALIZE_CONTINUATION_STATE_BEGIN', VFSerializeContinuationStateBegin],
-  ['VF_SERIALIZE_CONTINUATION_STATE_END', VFSerializeContinuationStateEnd],
   ['VF_DESERIALIZE_CONTINUATION_STATE_BEGIN', VFDeserializeContinuationStateBegin],
-  ['VF_DESERIALIZE_CONTINUATION_STATE_END', VFDeserializeContinuationStateEnd],
   ['VF_SERIALIZE_VIEWSTATE_BEGIN', VFSeralizeViewStateStartLine],
-  ['VF_SERIALIZE_VIEWSTATE_END', VFSeralizeViewStateEndLine],
   ['VF_PAGE_MESSAGE', VFPageMessageLine],
   ['DML_BEGIN', DMLBeginLine],
   ['DML_END', DMLEndLine],
@@ -2499,15 +2236,12 @@ export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['HEAP_DEALLOCATE', HeapDeallocateLine],
   ['STATEMENT_EXECUTE', StatementExecuteLine],
   ['VARIABLE_SCOPE_BEGIN', VariableScopeBeginLine],
-  ['VARIABLE_SCOPE_END', VariableScopeEndLine],
   ['VARIABLE_ASSIGNMENT', VariableAssignmentLine],
   ['USER_INFO', UserInfoLine],
   ['USER_DEBUG', UserDebugLine],
   ['CUMULATIVE_LIMIT_USAGE', CumulativeLimitUsageLine],
-  ['CUMULATIVE_LIMIT_USAGE_END', CumulativeLimitUsageEndLine],
   ['CUMULATIVE_PROFILING', CumulativeProfilingLine],
   ['CUMULATIVE_PROFILING_BEGIN', CumulativeProfilingBeginLine],
-  ['CUMULATIVE_PROFILING_END', CumulativeProfilingEndLine],
   ['LIMIT_USAGE', LimitUsageLine],
   ['LIMIT_USAGE_FOR_NS', LimitUsageForNSLine],
   ['NBA_NODE_BEGIN', NBANodeBegin],
@@ -2531,7 +2265,6 @@ export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['SYSTEM_MODE_ENTER', SystemModeEnterLine],
   ['SYSTEM_MODE_EXIT', SystemModeExitLine],
   ['EXECUTION_STARTED', ExecutionStartedLine],
-  ['EXECUTION_FINISHED', ExecutionFinishedLine],
   ['ENTERING_MANAGED_PKG', EnteringManagedPackageLine],
   ['EVENT_SERVICE_PUB_BEGIN', EventSericePubBeginLine],
   ['EVENT_SERVICE_PUB_END', EventSericePubEndLine],
@@ -2539,22 +2272,13 @@ export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['EVENT_SERVICE_SUB_BEGIN', EventSericeSubBeginLine],
   ['EVENT_SERVICE_SUB_DETAIL', EventSericeSubDetailLine],
   ['EVENT_SERVICE_SUB_END', EventSericeSubEndLine],
-  ['EXTERNAL_SERVICE_REQUEST', ExternalServiceRequest],
-  ['EXTERNAL_SERVICE_RESPONSE', ExternalServiceResponse],
-  ['FLOW_COLLECTION_PROCESSOR_DETAIL', FlowCollectionProcessDetail],
-  ['FLOW_SCHEDULED_PATH_QUEUED', FlowScheduledPathQueued],
   ['FLOW_START_INTERVIEWS_BEGIN', FlowStartInterviewsBeginLine],
-  ['FLOW_START_INTERVIEWS_END', FlowStartInterviewsEndLine],
   ['FLOW_START_INTERVIEWS_ERROR', FlowStartInterviewsErrorLine],
   ['FLOW_START_INTERVIEW_BEGIN', FlowStartInterviewBeginLine],
-  ['FLOW_START_INTERVIEW_END', FlowStartInterviewEndLine],
   ['FLOW_START_INTERVIEW_LIMIT_USAGE', FlowStartInterviewLimitUsageLine],
   ['FLOW_START_SCHEDULED_RECORDS', FlowStartScheduledRecordsLine],
-  ['FLOW_CREATE_INTERVIEW_BEGIN', FlowCreateInterviewBeginLine],
-  ['FLOW_CREATE_INTERVIEW_END', FlowCreateInterviewEndLine],
   ['FLOW_CREATE_INTERVIEW_ERROR', FlowCreateInterviewErrorLine],
   ['FLOW_ELEMENT_BEGIN', FlowElementBeginLine],
-  ['FLOW_ELEMENT_END', FlowElementEndLine],
   ['FLOW_ELEMENT_DEFERRED', FlowElementDeferredLine],
   ['FLOW_ELEMENT_ERROR', FlowElementErrorLine],
   ['FLOW_ELEMENT_FAULT', FlowElementFaultLine],
@@ -2574,83 +2298,40 @@ export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['FLOW_LOOP_DETAIL', FlowLoopDetailLine],
   ['FLOW_RULE_DETAIL', FlowRuleDetailLine],
   ['FLOW_BULK_ELEMENT_BEGIN', FlowBulkElementBeginLine],
-  ['FLOW_BULK_ELEMENT_END', FlowBulkElementEndLine],
   ['FLOW_BULK_ELEMENT_DETAIL', FlowBulkElementDetailLine],
   ['FLOW_BULK_ELEMENT_LIMIT_USAGE', FlowBulkElementLimitUsageLine],
   ['FLOW_BULK_ELEMENT_NOT_SUPPORTED', FlowBulkElementNotSupportedLine],
-  ['FUNCTION_INVOCATION_REQUEST', FunctionInvocationRequest],
-  ['FUNCTION_INVOCATION_RESPONSE', FunctionInvocationResponse],
-  ['HEAP_DUMP', HeapDump],
-  ['INVOCABLE_ACTION_DETAIL', InvocableActionDetail],
-  ['INVOCABLE_ACTION_ERROR', InvocableActionError],
-  ['JSON_DIFF_DETAIL', JsonDiffDetail],
-  ['JSON_DIFF_SUMMARY', JsonDiffSummary],
   ['MATCH_ENGINE_BEGIN', MatchEngineBegin],
-  ['MATCH_ENGINE_INVOCATION', MatchEngineInvocation],
-  ['MATCH_ENGINE_END', MatchEngineEnd],
   ['ORG_CACHE_PUT_BEGIN', OrgCachePutBegin],
   ['ORG_CACHE_GET_BEGIN', OrgCacheGetBegin],
-  ['ORG_CACHE_PUT_END', OrgCachePutEnd],
-  ['ORG_CACHE_GET_END', OrgCacheGetEnd],
-  ['ORG_CACHE_MEMORY_USAGE', OrgCacheMemoryUsage],
   ['ORG_CACHE_REMOVE_BEGIN', OrgCacheRemoveBegin],
-  ['ORG_CACHE_REMOVE_END', OrgCacheRemoveEnd],
   ['PUSH_NOTIFICATION_INVALID_APP', PNInvalidAppLine],
   ['PUSH_NOTIFICATION_INVALID_CERTIFICATE', PNInvalidCertificateLine],
   ['PUSH_NOTIFICATION_INVALID_NOTIFICATION', PNInvalidNotificationLine],
   ['PUSH_NOTIFICATION_NO_DEVICES', PNNoDevicesLine],
-  ['PUSH_NOTIFICATION_NOT_ENABLED', PNNotEnabledLine],
   ['PUSH_NOTIFICATION_SENT', PNSentLine],
-  ['REFERENCED_OBJECT_LIST', ReferencedObjectList],
-  ['ROUTE_WORK_ACTION', RouteWorkAction],
-  ['RULES_EXECUTION_DETAIL', RulesExecutionDetail],
-  ['RULES_EXECUTION_SUMMARY', RulesExecutionSummary],
-  ['SCRIPT_EXECUTION', ScriptExecution],
   ['SESSION_CACHE_PUT_BEGIN', SessionCachePutBegin],
   ['SESSION_CACHE_GET_BEGIN', SessionCacheGetBegin],
-  ['SESSION_CACHE_PUT_END', SessionCachePutEnd],
-  ['SESSION_CACHE_GET_END', SessionCacheGetEnd],
-  ['SESSION_CACHE_MEMORY_USAGE', SessionCacheMemoryUsage],
   ['SESSION_CACHE_REMOVE_BEGIN', SessionCacheRemoveBegin],
-  ['SESSION_CACHE_REMOVE_END', SessionCacheRemoveEnd],
   ['SLA_END', SLAEndLine],
   ['SLA_EVAL_MILESTONE', SLAEvalMilestoneLine],
-  ['SLA_NULL_START_DATE', SLANullStartDateLine],
   ['SLA_PROCESS_CASE', SLAProcessCaseLine],
-  ['TEMPLATE_PROCESSING_ERROR', TemplateProcessingError],
-  ['TEMPLATED_ASSET', TemplatedAsset],
-  ['TRANSFORMATION_SUMMARY', TransformationSummary],
   ['TESTING_LIMITS', TestingLimitsLine],
-  ['USER_DEBUG_FINER', UserDebugFiner],
-  ['USER_DEBUG_FINEST', UserDebugFinest],
-  ['USER_DEBUG_FINE', UserDebugFine],
-  ['USER_DEBUG_DEBUG', UserDebugDebug],
-  ['USER_DEBUG_INFO', UserDebugInfo],
-  ['USER_DEBUG_WARN', UserDebugWarn],
-  ['USER_DEBUG_ERROR', UserDebugError],
   ['VALIDATION_ERROR', ValidationErrorLine],
-  ['VALIDATION_FAIL', ValidationFailLine],
   ['VALIDATION_FORMULA', ValidationFormulaLine],
   ['VALIDATION_PASS', ValidationPassLine],
   ['VALIDATION_RULE', ValidationRuleLine],
-  ['WAVE_APP_LIFECYCLE', WaveAppLifecycle],
-  ['WF_FLOW_ACTION_BEGIN', WFFlowActionBeginLine],
-  ['WF_FLOW_ACTION_END', WFFlowActionEndLine],
   ['WF_FLOW_ACTION_ERROR', WFFlowActionErrorLine],
   ['WF_FLOW_ACTION_ERROR_DETAIL', WFFlowActionErrorDetailLine],
   ['WF_FIELD_UPDATE', WFFieldUpdateLine],
   ['WF_RULE_EVAL_BEGIN', WFRuleEvalBeginLine],
-  ['WF_RULE_EVAL_END', WFRuleEvalEndLine],
   ['WF_RULE_EVAL_VALUE', WFRuleEvalValueLine],
   ['WF_RULE_FILTER', WFRuleFilterLine],
-  ['WF_RULE_NOT_EVALUATED', WFRuleNotEvaluatedLine],
   ['WF_CRITERIA_BEGIN', WFCriteriaBeginLine],
-  ['WF_CRITERIA_END', WFCriteriaEndLine],
   ['WF_FORMULA', WFFormulaLine],
   ['WF_ACTION', WFActionLine],
   ['WF_ACTIONS_END', WFActionsEndLine],
   ['WF_ACTION_TASK', WFActionTaskLine],
-  ['WF_APEX_ACTION', WFApexAction],
   ['WF_APPROVAL', WFApprovalLine],
   ['WF_APPROVAL_REMOVE', WFApprovalRemoveLine],
   ['WF_APPROVAL_SUBMIT', WFApprovalSubmitLine],
@@ -2660,41 +2341,119 @@ export const lineTypeMap = new Map<string, new (parts: string[]) => LogLine>([
   ['WF_EMAIL_SENT', WFEmailSentLine],
   ['WF_ENQUEUE_ACTIONS', WFEnqueueActionsLine],
   ['WF_ESCALATION_ACTION', WFEscalationActionLine],
-  ['WF_ESCALATION_RULE', WFEscalationRuleLine],
   ['WF_EVAL_ENTRY_CRITERIA', WFEvalEntryCriteriaLine],
   ['WF_FLOW_ACTION_DETAIL', WFFlowActionDetailLine],
-  ['WF_HARD_REJECT', WFHardRejectLine],
-  ['WF_KNOWLEDGE_ACTION', WFKnowledgeAction],
   ['WF_NEXT_APPROVER', WFNextApproverLine],
-  ['WF_NO_PROCESS_FOUND', WFNoProcessFoundLine],
   ['WF_OUTBOUND_MSG', WFOutboundMsgLine],
   ['WF_PROCESS_FOUND', WFProcessFoundLine],
   ['WF_PROCESS_NODE', WFProcessNode],
-  ['WF_QUICK_CREATE', WFQuickCreate],
   ['WF_REASSIGN_RECORD', WFReassignRecordLine],
   ['WF_RESPONSE_NOTIFY', WFResponseNotifyLine],
   ['WF_RULE_ENTRY_ORDER', WFRuleEntryOrderLine],
   ['WF_RULE_INVOCATION', WFRuleInvocationLine],
-  ['WF_KNOWLEDGE_ACTION', WFSendAction],
   ['WF_SOFT_REJECT', WFSoftRejectLine],
   ['WF_SPOOL_ACTION_BEGIN', WFSpoolActionBeginLine],
   ['WF_TIME_TRIGGER', WFTimeTriggerLine],
-  ['WF_TIME_TRIGGERS_BEGIN', WFTimeTriggersBeginLine],
   ['EXCEPTION_THROWN', ExceptionThrownLine],
   ['FATAL_ERROR', FatalErrorLine],
   ['XDS_DETAIL', XDSDetailLine],
-  ['XDS_REQUEST_DETAIL', XDSRequestDetail],
   ['XDS_RESPONSE', XDSResponseLine],
   ['XDS_RESPONSE_DETAIL', XDSResponseDetailLine],
   ['XDS_RESPONSE_ERROR', XDSResponseErrorLine],
   ['DUPLICATE_DETECTION_BEGIN', DuplicateDetectionBegin],
-  ['DUPLICATE_DETECTION_END', DuplicateDetectionEnd],
   ['DUPLICATE_DETECTION_RULE_INVOCATION', DuplicateDetectionRule],
   ['DUPLICATE_DETECTION_MATCH_INVOCATION_DETAILS', DuplicateDetectionDetails],
   ['DUPLICATE_DETECTION_MATCH_INVOCATION_SUMMARY', DuplicateDetectionSummary],
-  ['DUPLICATE_RULE_FILTER', DuplicateRuleFilter],
-  ['DUPLICATE_RULE_FILTER_RESULT', DuplicateRuleFilterResult],
-  ['DUPLICATE_RULE_FILTER_VALUE', DuplicateRuleFilterValue],
 ]);
+
+const basicLogEvents = [
+  'BULK_COUNTABLE_STATEMENT_EXECUTE',
+  'TEMPLATE_PROCESSING_ERROR',
+  'EXTERNAL_SERVICE_REQUEST',
+  'FLOW_START_INTERVIEW_END',
+  'FLOW_CREATE_INTERVIEW_BEGIN',
+  'FLOW_CREATE_INTERVIEW_END',
+  'VARIABLE_SCOPE_END',
+  'PUSH_NOTIFICATION_NOT_ENABLED',
+  'SLA_NULL_START_DATE',
+  'TEMPLATE_PROCESSING_ERROR',
+  'VALIDATION_FAIL',
+  `WF_FLOW_ACTION_BEGIN`,
+  'WF_FLOW_ACTION_END',
+  'WF_ESCALATION_RULE',
+  'WF_HARD_REJECT',
+  'WF_NO_PROCESS_FOUND',
+  'WF_TIME_TRIGGERS_BEGIN',
+  'WF_KNOWLEDGE_ACTION',
+  'WF_SEND_ACTION',
+  'WAVE_APP_LIFECYCLE',
+  'WF_QUICK_CREATE',
+  'WF_APEX_ACTION',
+  'INVOCABLE_ACTION_DETAIL',
+  'INVOCABLE_ACTION_ERROR',
+  'FLOW_COLLECTION_PROCESSOR_DETAIL',
+  'FLOW_SCHEDULED_PATH_QUEUED',
+  'ROUTE_WORK_ACTION',
+  'ADD_SKILL_REQUIREMENT_ACTION',
+  'ADD_SCREEN_POP_ACTION',
+  'CALLOUT_REQUEST_PREPARE',
+  'CALLOUT_REQUEST_FINALIZE',
+  'FUNCTION_INVOCATION_REQUEST',
+  'APP_CONTAINER_INITIATED',
+  'FUNCTION_INVOCATION_RESPONSE',
+  'XDS_REQUEST_DETAIL',
+  'EXTERNAL_SERVICE_RESPONSE',
+  'DATAWEAVE_USER_DEBUG',
+  'USER_DEBUG_FINER',
+  'USER_DEBUG_FINEST',
+  'USER_DEBUG_FINE',
+  'USER_DEBUG_DEBUG',
+  'USER_DEBUG_INFO',
+  'USER_DEBUG_WARN',
+  'USER_DEBUG_ERROR',
+  'VF_APEX_CALL',
+  'HEAP_DUMP',
+  'SCRIPT_EXECUTION',
+  'SESSION_CACHE_MEMORY_USAGE',
+  'ORG_CACHE_MEMORY_USAGE',
+  'AE_PERSIST_VALIDATION',
+  'REFERENCED_OBJECT_LIST',
+  'DUPLICATE_RULE_FILTER',
+  'DUPLICATE_RULE_FILTER_RESULT',
+  'DUPLICATE_RULE_FILTER_VALUE',
+  'TEMPLATED_ASSET',
+  'TRANSFORMATION_SUMMARY',
+  'RULES_EXECUTION_SUMMARY',
+  'ASSET_DIFF_SUMMARY',
+  'ASSET_DIFF_DETAIL',
+  'RULES_EXECUTION_DETAIL',
+  'JSON_DIFF_SUMMARY',
+  'JSON_DIFF_DETAIL',
+  'MATCH_ENGINE_INVOCATION',
+];
+
+const basicExitLogEvents = [
+  'VF_DESERIALIZE_VIEWSTATE_END',
+  'VF_SERIALIZE_VIEWSTATE_END',
+  'CUMULATIVE_LIMIT_USAGE_END',
+  'CUMULATIVE_PROFILING_END',
+  'EXECUTION_FINISHED',
+  'FLOW_START_INTERVIEWS_END',
+  'FLOW_ELEMENT_END',
+  'FLOW_BULK_ELEMENT_END',
+  'WF_RULE_EVAL_END',
+  'WF_RULE_NOT_EVALUATED',
+  'WF_CRITERIA_END',
+  'DUPLICATE_DETECTION_END',
+  'VF_SERIALIZE_CONTINUATION_STATE_END',
+  'VF_DESERIALIZE_CONTINUATION_STATE_END',
+  'MATCH_ENGINE_END',
+  'ORG_CACHE_PUT_END',
+  'ORG_CACHE_GET_END',
+  'ORG_CACHE_REMOVE_END',
+  'SESSION_CACHE_PUT_END',
+  'SESSION_CACHE_GET_END',
+  'SESSION_CACHE_REMOVE_END',
+];
 
 export { SOQLExecuteExplainLine, SOQLExecuteBeginLine, DMLBeginLine };
