@@ -154,44 +154,52 @@ export default class ApexLogParser {
     return rootMethod;
   }
 
-  private parseTree(parentLine: Method, lineIter: LineIterator, stack: Method[]) {
-    this.lastTimestamp = parentLine.timestamp;
+  private parseTree(currentLine: Method, lineIter: LineIterator, stack: Method[]) {
+    this.lastTimestamp = currentLine.timestamp;
 
-    if (parentLine.exitTypes.length > 0) {
-      let line;
+    if (currentLine.exitTypes.length > 0) {
+      let nextLine;
 
-      stack.push(parentLine);
-      while ((line = lineIter.peek())) {
-        if (line.discontinuity) {
+      stack.push(currentLine);
+      while ((nextLine = lineIter.peek())) {
+        if (nextLine.discontinuity) {
           // discontinuities are stack unwinding (caused by Exceptions)
           this.discontinuity = true; // start unwinding stack
         }
 
-        if (line.isExit && this.endMethod(parentLine, line, lineIter, stack)) {
-          if (parentLine.onEnd) {
+        // Exit Line has been found no more work needed
+        if (nextLine.isExit && this.endMethod(currentLine, nextLine, lineIter, stack)) {
+          if (currentLine.onEnd) {
             // the method wants to see the exit line
-            parentLine.onEnd(line, stack);
+            currentLine.onEnd(nextLine, stack);
           }
           break;
         }
 
-        if (this.maxSizeTimestamp && this.discontinuity && line.timestamp > this.maxSizeTimestamp) {
-          parentLine.isTruncated = true;
+        if (
+          this.maxSizeTimestamp &&
+          this.discontinuity &&
+          nextLine.timestamp > this.maxSizeTimestamp
+        ) {
+          // The current line was truncated (we did not find the exit line before the end of log) and there was a discontinuity
+          currentLine.isTruncated = true;
           break;
         }
 
         lineIter.fetch(); // it's a child - consume the line
-        this.lastTimestamp = line.timestamp;
-        if (line instanceof Method) {
-          this.parseTree(line, lineIter, stack);
+        this.lastTimestamp = nextLine.timestamp;
+        if (nextLine instanceof Method) {
+          this.parseTree(nextLine, lineIter, stack);
         }
 
-        parentLine.addChild(line);
+        currentLine.addChild(nextLine);
       }
 
-      if (!line || parentLine.isTruncated) {
+      // End of line error handling. We have finished processing this log line and either got to the end
+      // of the log without finding an exit line or the current line was truncated)
+      if (!nextLine || currentLine.isTruncated) {
         // truncated method - terminate at the end of the log
-        parentLine.exitStamp = this.lastTimestamp;
+        currentLine.exitStamp = this.lastTimestamp;
 
         // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
         this.truncateLog(
@@ -200,7 +208,8 @@ export default class ApexLogParser {
           'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
           'unexpected',
         );
-        if (parentLine.isTruncated) {
+
+        if (currentLine.isTruncated) {
           this.updateTruncated(
             this.lastTimestamp,
             'Max-Size-reached',
@@ -208,11 +217,11 @@ export default class ApexLogParser {
             'skip',
           );
         }
-        parentLine.isTruncated = true;
+        currentLine.isTruncated = true;
       }
 
       stack.pop();
-      parentLine.recalculateDurations();
+      currentLine.recalculateDurations();
     }
   }
 
