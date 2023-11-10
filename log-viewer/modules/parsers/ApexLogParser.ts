@@ -1,13 +1,15 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
+// todo: js doc comments
+// todo: remove duplicate classes
+
 // todo: regsiter multiple aggregaters classes so we do not have to loop multiple times.
 // todo: Each type should have namesapces assocated (default of unmanagd) - **NEW FEAT**
 // todo: remove console.debug and replace with a returned list of issues.
 
 type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
-type TruncateKey = 'unexpected' | 'error' | 'skip';
-type RGBA = `rgba(${number}, ${number}, ${number}, ${number})`;
+export type IssueType = 'unexpected' | 'error' | 'skip';
 
 export type TimelineKey =
   | 'method'
@@ -18,17 +20,7 @@ export type TimelineKey =
   | 'flow'
   | 'workflow';
 
-export enum TruncationColor {
-  error = 'rgba(255, 128, 128, 0.2)',
-  skip = 'rgba(128, 255, 128, 0.2)',
-  unexpected = 'rgba(128, 128, 255, 0.2)',
-}
 const typePattern = /^[A-Z_]*$/,
-  truncateColor: Map<TruncateKey, RGBA> = new Map([
-    ['error', TruncationColor.error],
-    ['skip', TruncationColor.skip],
-    ['unexpected', TruncationColor.unexpected],
-  ]),
   newlineRegex = /\r?\n/,
   settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
 
@@ -37,7 +29,7 @@ export function parse(logData: string): ApexLog {
 }
 
 export default class ApexLogParser {
-  truncated: TruncationEntry[] = [];
+  logIssues: LogIssue[] = [];
   maxSizeTimestamp: number | null = null;
   reasons: Set<string> = new Set<string>();
   cpuUsed = 0;
@@ -50,7 +42,7 @@ export default class ApexLogParser {
     const apexLog = this.toLogTree(logLines);
     apexLog.size = debugLog.length;
     apexLog.debugLevels = this.getDebugLevels(debugLog);
-    apexLog.truncated = this.truncated;
+    apexLog.logIssues = this.logIssues;
     apexLog.cpuTime = this.cpuUsed;
 
     return apexLog;
@@ -108,7 +100,7 @@ export default class ApexLogParser {
     const rawLines = log.substring(start).split(newlineRegex);
 
     // reset global variables to be captured during parsing
-    this.truncated = [];
+    this.logIssues = [];
     this.reasons = new Set<string>();
     this.cpuUsed = 0;
     this.discontinuity = false;
@@ -149,6 +141,7 @@ export default class ApexLogParser {
     rootMethod.setTimes();
 
     this.insertPackageWrappers(rootMethod);
+
     this.setNamespaces(rootMethod);
     this.aggregateTotals(rootMethod);
     return rootMethod;
@@ -351,6 +344,11 @@ export default class ApexLogParser {
     }
   }
 
+  /**
+   * TODO: This does not work correctly and does not recursively navigate the tree, needs a rework when we get the the namespace ticket
+   * @param node
+   * @returns
+   */
   private setNamespaces(node: ApexLog) {
     const namespaces = this.collectNamespaces(node);
     const children = node.children;
@@ -376,41 +374,35 @@ export default class ApexLogParser {
     return namespaces;
   }
 
-  public truncateLog(
-    timestamp: number,
-    reason: string,
-    description: string,
-    colorKey: TruncateKey,
-  ) {
-    if (!this.reasons.has(reason)) {
-      this.reasons.add(reason);
+  public truncateLog(startTime: number, summary: string, description: string, type: IssueType) {
+    if (!this.reasons.has(summary)) {
+      this.reasons.add(summary);
       // default to error is probably the safest if we have no matching color for the type
-      const color = truncateColor.get(colorKey) || TruncationColor.error;
-      this.truncated.push(new TruncationEntry(timestamp, reason, description, color));
+      this.logIssues.push({
+        startTime: startTime,
+        summary: summary,
+        description: description,
+        type: type,
+      });
 
-      if (reason === 'Max-Size-reached') {
-        this.maxSizeTimestamp = timestamp;
+      if (summary === 'Max-Size-reached') {
+        this.maxSizeTimestamp = startTime;
       }
 
-      this.truncated.sort((a, b) => a.timestamp - b.timestamp);
+      this.logIssues.sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
     }
   }
 
-  public updateTruncated(
-    timestamp: number,
-    reason: string,
-    description: string,
-    colorKey: TruncateKey,
-  ) {
-    const elem = this.truncated.findIndex((item) => {
-      return item.reason === reason;
+  public updateTruncated(startTime: number, summary: string, description: string, type: IssueType) {
+    const elem = this.logIssues.findIndex((item) => {
+      return item.summary === summary;
     });
     if (elem > -1) {
-      this.truncated.splice(elem, 1);
+      this.logIssues.splice(elem, 1);
     }
-    this.reasons.delete(reason);
+    this.reasons.delete(summary);
 
-    this.truncateLog(timestamp, reason, description, colorKey);
+    this.truncateLog(startTime, summary, description, type);
   }
 
   private getDebugLevels(log: string): DebugLevel[] {
@@ -457,6 +449,13 @@ export class LineIterator {
   fetch(): LogLine | null {
     return this.index < this.length ? this.lines[this.index++] || null : null;
   }
+}
+
+interface LogIssue {
+  startTime?: number;
+  summary: string;
+  description: string;
+  type: IssueType;
 }
 
 export class TruncationEntry {
@@ -592,7 +591,7 @@ export class ApexLog extends Method {
   public size = 0;
   public cpuTime: number = 0;
   public debugLevels: DebugLevel[] = [];
-  public truncated: TruncationEntry[] = [];
+  public logIssues: LogIssue[] = [];
 
   /**
    * The endtime with nodes of 0 duration excluded

@@ -142,7 +142,7 @@ describe('parseLog tests', () => {
     const apexLog = parse(log);
 
     expect(apexLog.children.length).toBe(1);
-    expect(apexLog.truncated[0]?.reason).toBe('Skipped-Lines');
+    expect(apexLog.logIssues[0]?.summary).toBe('Skipped-Lines');
   });
 
   it('Should detect truncated logs', async () => {
@@ -155,9 +155,9 @@ describe('parseLog tests', () => {
     const apexLog = parse(log);
 
     expect(apexLog.children.length).toBe(1);
-    expect(apexLog.truncated.length).toBe(2);
-    expect(apexLog.truncated[0]?.reason).toBe('Unexpected-End');
-    expect(apexLog.truncated[1]?.reason).toBe('Max-Size-reached');
+    expect(apexLog.logIssues.length).toBe(2);
+    expect(apexLog.logIssues[0]?.summary).toBe('Unexpected-End');
+    expect(apexLog.logIssues[1]?.summary).toBe('Max-Size-reached');
   });
 
   it('Should detect exceptions', async () => {
@@ -170,7 +170,7 @@ describe('parseLog tests', () => {
     const apexLog = parse(log);
 
     expect(apexLog.children.length).toBe(1);
-    expect(apexLog.truncated[0]?.reason).toBe(
+    expect(apexLog.logIssues[0]?.summary).toBe(
       'System.LimitException: c2g:Too many SOQL queries: 101',
     );
   });
@@ -184,7 +184,7 @@ describe('parseLog tests', () => {
     const apexLog = parse(log);
 
     expect(apexLog.children.length).toBe(1);
-    expect(apexLog.truncated[0]?.reason).toBe(
+    expect(apexLog.logIssues[0]?.summary).toBe(
       'FATAL ERROR! cause=System.LimitException: c2g:Too many SOQL queries: 101',
     );
   });
@@ -660,15 +660,17 @@ describe('Line Type Tests', () => {
         line.exitTypes.forEach((exitType) => {
           const exitCls = lineTypeMap.get(exitType);
           expect(exitCls).not.toBe(null);
-          const exitLine = new exitCls!([
-            '14:32:07.563 (17358806534)',
-            'DUMMY',
-            '[10]',
-            'Rows:3',
-            '',
-            'Rows:5',
-          ]) as LogLine;
-          expect(exitLine.isExit).toBe(true);
+          if (exitCls) {
+            const exitLine = new exitCls!([
+              '14:32:07.563 (17358806534)',
+              'DUMMY',
+              '[10]',
+              'Rows:3',
+              '',
+              'Rows:5',
+            ]) as LogLine;
+            expect(exitLine.isExit).toBe(true);
+          }
         });
       }
     }
