@@ -2553,7 +2553,7 @@ const basicLogEvents: LogEventType[] = [
   'JSON_DIFF_SUMMARY',
   'JSON_DIFF_DETAIL',
   'MATCH_ENGINE_INVOCATION',
-] as const;
+];
 
 const basicExitLogEvents: LogEventType[] = [
   'VF_DESERIALIZE_VIEWSTATE_END',
