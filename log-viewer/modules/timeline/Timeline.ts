@@ -245,26 +245,23 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-const isMethod = (child: LogLine): child is Method => child instanceof Method;
 function nodesToRectangles(nodes: Method[], depth: number) {
   const children: Method[] = [];
   const len = nodes.length;
   for (let c = 0; c < len; c++) {
     const node = nodes[c];
     if (node) {
-      const { timelineKey, duration } = node;
-      if (timelineKey && duration) {
+      const { subCategory: subCategory, duration } = node;
+      if (subCategory && duration) {
         addToRectQueue(node, depth);
       }
 
       // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
-      // node.children.forEach((child) => {
-      //   if (child instanceof Method) {
-      //     children.push(child);
-      //   }
-      // });
-
-      Array.prototype.push.apply(children, node.children.filter(isMethod));
+      node.children.forEach((child) => {
+        if (child instanceof Method) {
+          children.push(child);
+        }
+      });
     }
   }
 
@@ -491,7 +488,7 @@ function findByPosition(
 
 function showTooltip(offsetX: number, offsetY: number) {
   if (!dragging && container && tooltip) {
-    const depth = ~~(((displayHeight - offsetY - state.offsetY) / realHeight) * maxY);
+    const depth = getDepth(offsetY);
     const tooltipText = findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
     showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
   }
@@ -634,12 +631,16 @@ function onMouseMove(evt: MouseEvent) {
 function onClickCanvas(): void {
   const isClick = mouseDownPosition.x === lastMouseX && mouseDownPosition.y === lastMouseY;
   if (!dragging && isClick) {
-    const depth = ~~(((displayHeight - lastMouseY - state.offsetY) / realHeight) * maxY);
+    const depth = getDepth(lastMouseY);
     const target = findByPosition(timelineRoot, -1, lastMouseX, depth);
     if (target && target.timestamp) {
       goToRow(target.timestamp);
     }
   }
+}
+
+function getDepth(y: number) {
+  return ~~(((displayHeight - y - state.offsetY) / realHeight) * maxY);
 }
 
 function onLeaveCanvas() {
