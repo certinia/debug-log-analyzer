@@ -4,13 +4,7 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import formatDuration, { debounce } from '../Util.js';
 import { goToRow } from '../components/calltree-view/CalltreeView.js';
-import {
-  ApexLog,
-  LogLine,
-  type LogSubCategory,
-  Method,
-  TimedNode,
-} from '../parsers/ApexLogParser.js';
+import { ApexLog, type LogSubCategory, Method, TimedNode } from '../parsers/ApexLogParser.js';
 
 export { ApexLog };
 
@@ -425,7 +419,7 @@ export function setColors(timelineColors: TimelineColors) {
   state.requestRedraw();
 }
 
-// todo: this is slugish on zoom. Can be improve without swith from 2dgl?
+// todo: this is slugish on zoom. Can be improve without swith from 2dgl? (need to use integer for x and y on .rect())
 function drawTimeLine() {
   if (ctx) {
     resize();
