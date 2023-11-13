@@ -9,10 +9,6 @@ export default function (
   filterParams: { columnName: string; filterCache: Map<number, boolean> },
 ): boolean {
   if (!('start' in filterVal) || !('end' in filterVal)) {
-    console.warn(
-      'Filter Error - filter value is not an object with end and start properties:',
-      filterVal,
-    );
     return false;
   }
 
