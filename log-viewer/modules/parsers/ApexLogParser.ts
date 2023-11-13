@@ -2,8 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 
-// todo: regsiter multiple aggregaters classes so we do not have to loop multiple times.
-// todo: Each type should have namesapces assocated (default of unmanagd) - **NEW FEAT**
+// todo: Each type should have namespaces assocated (default of unmanagd) - **NEW FEAT**
 
 const typePattern = /^[A-Z_]*$/,
   newlineRegex = /\r?\n/,
@@ -85,19 +84,20 @@ export default class ApexLogParser {
       !this.parsingErrors.includes(message) && this.parsingErrors.push(message);
     } else {
       if (lastEntry && line.startsWith('*** Skipped')) {
-        this.truncateLog(
+        this.addLogIssue(
           lastEntry.timestamp,
           'Skipped-Lines',
           `${line}. A section of the log has been skipped and the log has been truncated. Full details of this section of log can not be provided.`,
           'skip',
         );
       } else if (lastEntry && line.indexOf('MAXIMUM DEBUG LOG SIZE REACHED') >= 0) {
-        this.truncateLog(
+        this.addLogIssue(
           lastEntry.timestamp,
           'Max-Size-reached',
           'The maximum log size has been reached. Part of the log has been truncated.',
           'skip',
         );
+        this.maxSizeTimestamp = lastEntry.timestamp;
       } else if (settingsPattern.test(line)) {
         // skip an unexpected settings line
       } else {
@@ -210,7 +210,7 @@ export default class ApexLogParser {
         currentLine.exitStamp = this.lastTimestamp;
 
         // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
-        this.truncateLog(
+        this.addLogIssue(
           this.lastTimestamp,
           'Unexpected-End',
           'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
@@ -218,12 +218,13 @@ export default class ApexLogParser {
         );
 
         if (currentLine.isTruncated) {
-          this.updateTruncated(
+          this.updateLogIssue(
             this.lastTimestamp,
             'Max-Size-reached',
             'The maximum log size has been reached. Part of the log has been truncated.',
             'skip',
           );
+          this.maxSizeTimestamp = this.lastTimestamp;
         }
         currentLine.isTruncated = true;
       }
@@ -263,7 +264,7 @@ export default class ApexLogParser {
         return true; // we match a method further down the stack - unwind
       }
       // we found an exit event on its own e.g a `METHOD_EXIT` without a `METHOD_ENTRY`
-      this.truncateLog(
+      this.addLogIssue(
         endLine.timestamp,
         'Unexpected-Exit',
         'An exit event was found without a corresponding entry event e.g a `METHOD_EXIT` event without a `METHOD_ENTRY`',
@@ -390,10 +391,9 @@ export default class ApexLogParser {
     return namespaces;
   }
 
-  public truncateLog(startTime: number, summary: string, description: string, type: IssueType) {
+  public addLogIssue(startTime: number, summary: string, description: string, type: IssueType) {
     if (!this.reasons.has(summary)) {
       this.reasons.add(summary);
-      // default to error is probably the safest if we have no matching color for the type
       this.logIssues.push({
         startTime: startTime,
         summary: summary,
@@ -401,15 +401,11 @@ export default class ApexLogParser {
         type: type,
       });
 
-      if (summary === 'Max-Size-reached') {
-        this.maxSizeTimestamp = startTime;
-      }
-
       this.logIssues.sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
     }
   }
 
-  public updateTruncated(startTime: number, summary: string, description: string, type: IssueType) {
+  private updateLogIssue(startTime: number, summary: string, description: string, type: IssueType) {
     const elem = this.logIssues.findIndex((item) => {
       return item.summary === summary;
     });
@@ -418,7 +414,7 @@ export default class ApexLogParser {
     }
     this.reasons.delete(summary);
 
-    this.truncateLog(startTime, summary, description, type);
+    this.addLogIssue(startTime, summary, description, type);
   }
 
   private getDebugLevels(log: string): DebugLevel[] {
@@ -2159,7 +2155,7 @@ class ExceptionThrownLine extends LogLine {
       const truncateText = this.text.length > len;
       const summary = this.text.slice(0, len + 1) + (truncateText ? '…' : '');
       const message = truncateText ? this.text : '';
-      parser.truncateLog(this.timestamp, summary, message, 'error');
+      parser.addLogIssue(this.timestamp, summary, message, 'error');
     }
   }
 }
@@ -2178,7 +2174,7 @@ class FatalErrorLine extends LogLine {
     const newLineIndex = this.text.indexOf('\n');
     const summary = newLineIndex > -1 ? this.text.slice(0, newLineIndex + 1) : this.text;
     const detailText = summary.length !== this.text.length ? this.text : '';
-    parser.truncateLog(this.timestamp, 'FATAL ERROR! cause=' + summary, detailText, 'error');
+    parser.addLogIssue(this.timestamp, 'FATAL ERROR! cause=' + summary, detailText, 'error');
   }
 }
 
