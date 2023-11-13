@@ -4,7 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { Method } from '../../parsers/TreeParser.js';
+import { Method } from '../../parsers/ApexLogParser.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../BadgeBase.js';
 

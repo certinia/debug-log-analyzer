@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { Method } from '../../parsers/TreeParser.js';
+import { Method } from '../../parsers/ApexLogParser.js';
 import { SOQLLinter } from '../../soql/SOQLLinter.js';
 
 describe('SOQL Linter rule tests', () => {
@@ -164,7 +164,7 @@ describe('SOQL in Trigger Rule tests', () => {
         '__sfdc_trigger/Account',
       ],
       ['CODE_UNIT_FINISHED'],
-      'codeUnit',
+      'Code Unit',
       'method',
     );
     mockTriggerLine.text = 'Account on Account trigger event AfterInsert';

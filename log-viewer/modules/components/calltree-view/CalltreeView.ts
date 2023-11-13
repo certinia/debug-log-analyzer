@@ -20,7 +20,7 @@ import NumberFormat from '../../datagrid/format/Number.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
-import { LogLine, RootNode, TimedNode } from '../../parsers/TreeParser.js';
+import { ApexLog, type LogEventType, LogLine, TimedNode } from '../../parsers/ApexLogParser.js';
 import { hostService } from '../../services/VSCodeService.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../skeleton/GridSkeleton.js';
@@ -30,12 +30,12 @@ provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
 let calltreeTable: Tabulator;
 let tableContainer: HTMLDivElement | null;
-let rootMethod: RootNode | null;
+let rootMethod: ApexLog | null;
 
 @customElement('call-tree-view')
 export class CalltreeView extends LitElement {
   @property()
-  timelineRoot: RootNode | null = null;
+  timelineRoot: ApexLog | null = null;
 
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
@@ -152,7 +152,7 @@ export class CalltreeView extends LitElement {
 
 export async function renderCallTree(
   callTreeTableContainer: HTMLDivElement,
-  rootMethod: RootNode,
+  rootMethod: ApexLog,
 ): Promise<void> {
   if (calltreeTable) {
     // Ensure the table is fully visible before attempting to do things e.g go to rows.
@@ -239,10 +239,12 @@ export async function renderCallTree(
               return `<a href="#!">${text}</a>`;
             }
 
-            const excludedTypes = ['SOQL_EXECUTE_BEGIN', 'DML_BEGIN'];
+            const excludedTypes: LogEventType[] = ['SOQL_EXECUTE_BEGIN', 'DML_BEGIN'];
             text =
-              (!excludedTypes.includes(node.type) && node.type !== text ? node.type + ': ' : '') +
-              text;
+              (node.type &&
+                (!excludedTypes.includes(node.type) && node.type !== text ? node.type + ': ' : '') +
+                  text) ||
+              '';
             return text;
           },
           variableHeight: true,

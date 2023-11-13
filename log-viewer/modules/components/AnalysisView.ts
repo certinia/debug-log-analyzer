@@ -10,7 +10,7 @@ import NumberAccessor from '../datagrid/dataaccessor/Number.js';
 import Number from '../datagrid/format/Number.js';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation.js';
 import dataGridStyles from '../datagrid/style/DataGrid.scss';
-import { RootNode, TimedNode } from '../parsers/TreeParser.js';
+import { ApexLog, TimedNode } from '../parsers/ApexLogParser.js';
 import { hostService } from '../services/VSCodeService.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './skeleton/GridSkeleton.js';
@@ -22,7 +22,7 @@ let tableContainer: HTMLDivElement | null;
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
   @property()
-  timelineRoot: RootNode | null = null;
+  timelineRoot: ApexLog | null = null;
 
   get _tableWrapper(): HTMLDivElement | null {
     return (tableContainer = this.renderRoot?.querySelector('#analysis-table') ?? null);
@@ -94,7 +94,7 @@ export class AnalysisView extends LitElement {
   }
 }
 
-async function renderAnalysis(rootMethod: RootNode) {
+async function renderAnalysis(rootMethod: ApexLog) {
   if (!tableContainer) {
     return;
   }
@@ -237,7 +237,7 @@ async function renderAnalysis(rootMethod: RootNode) {
 
 export class Metric {
   name: string;
-  type: string;
+  type;
   count = 0;
   totalTime = 0;
   selfTime = 0;

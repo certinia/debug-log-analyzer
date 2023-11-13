@@ -17,11 +17,11 @@ import Number from '../../datagrid/format/Number.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 import {
+  ApexLog,
   DMLBeginLine,
-  RootNode,
   SOQLExecuteBeginLine,
   SOQLExecuteExplainLine,
-} from '../../parsers/TreeParser.js';
+} from '../../parsers/ApexLogParser.js';
 import { hostService } from '../../services/VSCodeService.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../CallStack.js';
@@ -37,7 +37,7 @@ let dmlTable: Tabulator;
 @customElement('database-view')
 export class DatabaseView extends LitElement {
   @property()
-  timelineRoot: RootNode | null = null;
+  timelineRoot: ApexLog | null = null;
 
   @state()
   dmlLines: DMLBeginLine[] = [];

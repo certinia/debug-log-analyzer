@@ -4,9 +4,9 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import formatDuration, { debounce } from '../Util.js';
 import { goToRow } from '../components/calltree-view/CalltreeView.js';
-import { Method, RootNode, TimedNode, type TimelineKey, truncated } from '../parsers/TreeParser.js';
+import { ApexLog, type LogSubCategory, Method, TimedNode } from '../parsers/ApexLogParser.js';
 
-export { RootNode };
+export { ApexLog };
 
 export interface TimelineGroup {
   label: string;
@@ -25,6 +25,12 @@ interface TimelineColors {
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
+const truncationColors: Map<string, string> = new Map([
+  ['error', 'rgba(255, 128, 128, 0.2)'],
+  ['skip', 'rgba(128, 255, 128, 0.2)'],
+  ['unexpected', 'rgba(128, 128, 255, 0.2)'],
+]);
+
 interface Rect {
   x: number;
   y: number;
@@ -33,51 +39,51 @@ interface Rect {
 
 const scaleY = -15,
   strokeColor = '#D3D3D3';
-export const keyMap: Map<TimelineKey, TimelineGroup> = new Map([
+export const keyMap: Map<LogSubCategory, TimelineGroup> = new Map([
   [
-    'codeUnit',
+    'Code Unit',
     {
       label: 'Code Unit',
       fillColor: '#88AE58',
     },
   ],
   [
-    'workflow',
+    'Workflow',
     {
       label: 'Workflow',
       fillColor: '#51A16E',
     },
   ],
   [
-    'method',
+    'Method',
     {
       label: 'Method',
       fillColor: '#2B8F81',
     },
   ],
   [
-    'flow',
+    'Flow',
     {
       label: 'Flow',
       fillColor: '#337986',
     },
   ],
   [
-    'dml',
+    'DML',
     {
       label: 'DML',
       fillColor: '#285663',
     },
   ],
   [
-    'soql',
+    'SOQL',
     {
       label: 'SOQL',
       fillColor: '#5D4963',
     },
   ],
   [
-    'systemMethod',
+    'System Method',
     {
       label: 'System Method',
       fillColor: '#5C3444',
@@ -144,7 +150,7 @@ let scaleFont: string,
   maxY: number,
   displayHeight: number,
   displayWidth: number,
-  timelineRoot: RootNode,
+  timelineRoot: ApexLog,
   lastMouseX: number,
   lastMouseY: number;
 
@@ -239,8 +245,8 @@ function nodesToRectangles(nodes: Method[], depth: number) {
   for (let c = 0; c < len; c++) {
     const node = nodes[c];
     if (node) {
-      const { timelineKey, duration } = node;
-      if (timelineKey && duration) {
+      const { subCategory: subCategory, duration } = node;
+      if (subCategory && duration) {
         addToRectQueue(node, depth);
       }
 
@@ -260,7 +266,7 @@ function nodesToRectangles(nodes: Method[], depth: number) {
   nodesToRectangles(children, depth + 1);
 }
 
-const rectRenderQueue = new Map<TimelineKey, Rect[]>();
+const rectRenderQueue = new Map<LogSubCategory, Rect[]>();
 
 /**
  * Create a rectangle for the node and add it to the correct render list for it's type.
@@ -268,11 +274,11 @@ const rectRenderQueue = new Map<TimelineKey, Rect[]>();
  * @param y The call depth of the node
  */
 function addToRectQueue(node: Method, y: number) {
-  const { timelineKey: tlKey, timestamp: x, duration: w } = node;
+  const { subCategory: subCategory, timestamp: x, duration: w } = node;
   const rect: Rect = { x, y, w };
-  let list = rectRenderQueue.get(tlKey);
+  let list = rectRenderQueue.get(subCategory);
   if (!list) {
-    rectRenderQueue.set(tlKey, (list = []));
+    rectRenderQueue.set(subCategory, (list = []));
   }
   list.push(rect);
 }
@@ -317,19 +323,20 @@ const drawRect = (rect: Rect) => {
 };
 
 function drawTruncation(ctx: CanvasRenderingContext2D) {
-  const len = truncated.length;
+  const issues = timelineRoot.logIssues;
+  const len = issues.length;
   if (!len) {
     return;
   }
   let i = 0;
 
   while (i < len) {
-    const thisEntry = truncated[i++],
-      nextEntry = truncated[i];
+    const thisEntry = issues[i++],
+      nextEntry = issues[i];
 
-    if (thisEntry) {
-      const startTime = thisEntry?.timestamp,
-        endTime = nextEntry?.timestamp ?? timelineRoot.exitStamp;
+    if (thisEntry?.startTime) {
+      const startTime = thisEntry.startTime,
+        endTime = nextEntry?.startTime ?? timelineRoot.exitStamp;
 
       let x = startTime * state.zoom - state.offsetX;
       let w = (endTime - startTime) * state.zoom;
@@ -345,14 +352,14 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
         w = w - widthOffScreen;
       }
 
-      ctx.fillStyle = thisEntry.color;
+      ctx.fillStyle = truncationColors.get(thisEntry.type) || '';
       ctx.fillRect(x, -displayHeight, w, displayHeight);
     }
   }
 }
 
 function calculateSizes() {
-  maxY = getMaxDepth(timelineRoot); // maximum nested call depth
+  maxY = getMaxDepth(timelineRoot, 0); // maximum nested call depth
   resetView();
 }
 
@@ -388,7 +395,7 @@ function resizeFont() {
   scaleFont = state.zoom > 0.0000004 ? 'normal 16px serif' : 'normal 8px serif';
 }
 
-export function init(timelineContainer: HTMLDivElement, rootMethod: RootNode) {
+export function init(timelineContainer: HTMLDivElement, rootMethod: ApexLog) {
   container = timelineContainer;
   canvas = timelineContainer.querySelector('#timeline') as HTMLCanvasElement;
   ctx = canvas.getContext('2d'); // can never be null since context (2d) is a supported type.
@@ -412,11 +419,12 @@ export function setColors(timelineColors: TimelineColors) {
   state.requestRedraw();
 }
 
-// todo: this is slugish on zoom. Can be improve without swith from 2dgl?
+// todo: this is slugish on zoom. Can be improve without swith from 2dgl? (need to use integer for x and y on .rect())
 function drawTimeLine() {
   if (ctx) {
     resize();
     ctx.clearRect(0, -displayHeight, displayWidth, displayHeight);
+
     drawTruncation(ctx);
     drawScale(ctx);
     ctx.strokeStyle = strokeColor;
@@ -459,6 +467,7 @@ function findByPosition(
       for (let c = 0; c < len; ++c) {
         const child = node.children[c];
         if (child instanceof TimedNode) {
+          // -1 to ingnore the "ApexLog" root node
           const target = findByPosition(child, childDepth, x, targetDepth);
           if (target) {
             return target;
@@ -473,17 +482,17 @@ function findByPosition(
 
 function showTooltip(offsetX: number, offsetY: number) {
   if (!dragging && container && tooltip) {
-    const depth = ~~(((displayHeight - offsetY - state.offsetY) / realHeight) * maxY);
+    const depth = getDepth(offsetY);
     const tooltipText = findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
     showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
   }
 }
 
 function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
-  const target = findByPosition(timelineRoot, 0, x, depth);
+  // -1 to izgnore the "ApexLog" root node
+  const target = findByPosition(timelineRoot, -1, x, depth);
   if (target) {
-    canvas.classList.remove('timeline-hover');
-    canvas.classList.remove('timeline-dragging');
+    canvas.classList.remove('timeline-hover', 'timeline-dragging');
     canvas.classList.add('timeline-event--hover');
 
     const toolTip = document.createElement('div');
@@ -493,7 +502,7 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
       displayText += target.suffix;
     }
 
-    toolTip.appendChild(document.createTextNode(target.type));
+    toolTip.appendChild(document.createTextNode(target.type || ''));
     toolTip.appendChild(brElem.cloneNode());
     toolTip.appendChild(document.createTextNode(displayText));
     if (target.timestamp && target.duration && target.selfTime) {
@@ -532,21 +541,22 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
 }
 
 function findTruncatedTooltip(x: number): HTMLDivElement | null {
-  const len = truncated?.length;
+  const issues = timelineRoot.logIssues;
+  const len = issues?.length;
   let i = 0;
 
   while (i < len) {
-    const thisEntry = truncated[i++],
-      nextEntry = truncated[i];
-    if (thisEntry) {
-      const startTime = thisEntry.timestamp,
-        endTime = nextEntry?.timestamp ?? timelineRoot.exitStamp,
+    const thisEntry = issues[i++],
+      nextEntry = issues[i];
+    if (thisEntry?.startTime) {
+      const startTime = thisEntry.startTime,
+        endTime = nextEntry?.startTime ?? timelineRoot.exitStamp,
         startX = startTime * state.zoom - state.offsetX,
         endX = endTime * state.zoom - state.offsetX;
 
       if (x >= startX && x <= endX) {
         const toolTip = document.createElement('div');
-        toolTip.textContent = thisEntry.reason;
+        toolTip.textContent = thisEntry.summary;
         return toolTip;
       }
     }
@@ -615,12 +625,16 @@ function onMouseMove(evt: MouseEvent) {
 function onClickCanvas(): void {
   const isClick = mouseDownPosition.x === lastMouseX && mouseDownPosition.y === lastMouseY;
   if (!dragging && isClick) {
-    const depth = ~~(((displayHeight - lastMouseY - state.offsetY) / realHeight) * maxY);
-    const target = findByPosition(timelineRoot, 0, lastMouseX, depth);
+    const depth = getDepth(lastMouseY);
+    const target = findByPosition(timelineRoot, -1, lastMouseX, depth);
     if (target && target.timestamp) {
       goToRow(target.timestamp);
     }
   }
+}
+
+function getDepth(y: number) {
+  return ~~(((displayHeight - y - state.offsetY) / realHeight) * maxY);
 }
 
 function onLeaveCanvas() {

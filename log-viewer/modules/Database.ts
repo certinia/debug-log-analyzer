@@ -1,15 +1,15 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { DMLBeginLine, Method, RootNode, SOQLExecuteBeginLine } from './parsers/TreeParser.js';
+import { ApexLog, DMLBeginLine, Method, SOQLExecuteBeginLine } from './parsers/ApexLogParser.js';
 
 export type Stack = Method[];
 
 export class DatabaseAccess {
   private static _instance: DatabaseAccess | null = null;
-  private static _treeRoot: RootNode;
+  private static _treeRoot: ApexLog;
 
-  static async create(rootMethod: RootNode): Promise<DatabaseAccess> {
+  static async create(rootMethod: ApexLog): Promise<DatabaseAccess> {
     const databaseAccess = new DatabaseAccess();
     this._treeRoot = rootMethod;
     this._instance = databaseAccess;

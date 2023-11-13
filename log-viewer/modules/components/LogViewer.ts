@@ -4,14 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import parseLog, {
-  RootNode,
-  TruncationColor,
-  getLogSettings,
-  getRootMethod,
-  totalDuration,
-  truncated,
-} from '../parsers/TreeParser.js';
+import { ApexLog, parse } from '../parsers/ApexLogParser.js';
 import { hostService } from '../services/VSCodeService.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './AppHeader.js';
@@ -32,7 +25,7 @@ export class LogViewer extends LitElement {
   @property()
   notifications: Notification[] = [];
   @property()
-  timelineRoot: RootNode | null = null;
+  timelineRoot: ApexLog | null = null;
 
   static styles = [
     globalStyles,
@@ -80,31 +73,30 @@ export class LogViewer extends LitElement {
 
     const logUri = data.logUri;
     const logData = data.logData || (await this._readLog(logUri));
-    this.logSize = logData.length;
+
+    const apexLog = parse(logData);
+    this.logSize = apexLog.size;
+    this.timelineRoot = apexLog;
+    this.logDuration = apexLog.duration;
     document.dispatchEvent(
       new CustomEvent('logsettings', {
-        detail: { logSettings: getLogSettings(logData) },
+        detail: { logSettings: this.timelineRoot?.debugLevels },
       }),
     );
 
-    parseLog(logData).then(() => {
-      this.timelineRoot = getRootMethod();
-      this.logDuration = totalDuration;
+    const localNotifications = Array.from(this.notifications);
+    apexLog.logIssues.forEach((element) => {
+      const severity = element.type === 'error' ? 'Error' : 'Warning';
 
-      const localNotifications = Array.from(this.notifications);
-      truncated.forEach((element) => {
-        const severity = element.color === TruncationColor.error ? 'Error' : 'Warning';
-
-        const logMessage = new Notification();
-        logMessage.summary = element.reason;
-        logMessage.message = element.description;
-        logMessage.severity = severity;
-        localNotifications.push(logMessage);
-      });
-      this.notifications = localNotifications;
-
-      this.logStatus = 'Ready';
+      const logMessage = new Notification();
+      logMessage.summary = element.summary;
+      logMessage.message = element.description;
+      logMessage.severity = severity;
+      localNotifications.push(logMessage);
     });
+    this.notifications = localNotifications;
+
+    this.logStatus = 'Ready';
   }
 
   async _readLog(logUri: string): Promise<string> {

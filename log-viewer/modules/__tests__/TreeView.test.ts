@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import parseLog, { logLines } from '../parsers/TreeParser.js';
-import { LineIterator } from '../parsers/TreeParser.js';
+import parseLog, { logLines } from '../parsers/TreeParserLegacy.js';
+import { LineIterator } from '../parsers/TreeParserLegacy.js';
 
 describe('LineIterator tests', () => {
   it('Should return null when there are no more lines', () => {

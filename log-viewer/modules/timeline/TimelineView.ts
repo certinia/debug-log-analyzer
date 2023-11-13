@@ -6,13 +6,13 @@ import { customElement, property } from 'lit/decorators.js';
 
 import { skeletonStyles } from '../components/skeleton/skeleton.styles.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { RootNode, init as timelineInit } from './Timeline.js';
+import { ApexLog, init as timelineInit } from './Timeline.js';
 import './TimelineKey.js';
 
 @customElement('timeline-view')
 export class TimelineView extends LitElement {
   @property()
-  timelineRoot: RootNode | null = null;
+  timelineRoot: ApexLog | null = null;
 
   get _timelineContainer(): HTMLDivElement | null {
     return this.renderRoot?.querySelector('#timeline-container') ?? null;

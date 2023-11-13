@@ -12,7 +12,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import codiconStyles from '../styles/codicon.css';
 import { globalStyles } from '../styles/global.styles.js';
-import { RootNode } from '../timeline/Timeline.js';
+import { ApexLog } from '../timeline/Timeline.js';
 import '../timeline/TimelineView.js';
 import './AnalysisView.js';
 import './LogLevels.js';
@@ -38,7 +38,7 @@ export class AppHeader extends LitElement {
   @property()
   notifications: Notification[] = [];
   @property()
-  timelineRoot: RootNode | null = null;
+  timelineRoot: ApexLog | null = null;
 
   @state()
   _selectedTab = 'timeline-tab';
