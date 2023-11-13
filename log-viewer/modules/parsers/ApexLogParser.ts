@@ -5,6 +5,31 @@
 // todo: regsiter multiple aggregaters classes so we do not have to loop multiple times.
 // todo: Each type should have namesapces assocated (default of unmanagd) - **NEW FEAT**
 
+const typePattern = /^[A-Z_]*$/,
+  newlineRegex = /\r?\n/,
+  settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
+
+type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
+type IssueType = 'unexpected' | 'error' | 'skip';
+
+export type LogSubCategory =
+  | 'Method'
+  | 'System Method'
+  | 'Code Unit'
+  | 'DML'
+  | 'SOQL'
+  | 'Flow'
+  | 'Workflow';
+
+/**
+ * Takes string input of a log and returns the ApexLog class, which represents a log tree
+ * @param {string} logData
+ * @returns {ApexLog}
+ */
+export function parse(logData: string): ApexLog {
+  return new ApexLogParser().parse(logData);
+}
+
 /**
  * An Apex Log file can be parsed by passing the text.
  * You can either import the ApexLogParser class or import the parse method e.g.
@@ -13,27 +38,6 @@
  * const apexLog = new ApexLogParser().parse(logText);
  * const apexLog = parse(logText);
  */
-
-type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
-type IssueType = 'unexpected' | 'error' | 'skip';
-
-export type TimelineKey =
-  | 'method'
-  | 'systemMethod'
-  | 'codeUnit'
-  | 'dml'
-  | 'soql'
-  | 'flow'
-  | 'workflow';
-
-const typePattern = /^[A-Z_]*$/,
-  newlineRegex = /\r?\n/,
-  settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
-
-export function parse(logData: string): ApexLog {
-  return new ApexLogParser().parse(logData);
-}
-
 export default class ApexLogParser {
   logIssues: LogIssue[] = [];
   parsingErrors: string[] = [];
@@ -43,6 +47,11 @@ export default class ApexLogParser {
   lastTimestamp = 0;
   discontinuity = false;
 
+  /**
+   * Takes string input of a log and returns the ApexLog class, which represents a log tree
+   * @param {string} debugLog
+   * @returns {ApexLog}
+   */
   parse(debugLog: string): ApexLog {
     const logLines = this.parseLog(debugLog);
 
@@ -606,18 +615,18 @@ export class TimedNode extends LogLine {
   children: LogLine[] = [];
 
   /**
-   * The log category this evebt belongs to
+   * The log sub category this event belongs to
    */
-  timelineKey: TimelineKey;
+  subCategory: LogSubCategory;
 
   /**
    * The CPU type, e.g loading, method, custom
    */
   cpuType: string; // the category key to collect our cpu usage
 
-  constructor(parts: string[] | null, timelineKey: TimelineKey, cpuType: string) {
+  constructor(parts: string[] | null, timelineKey: LogSubCategory, cpuType: string) {
     super(parts);
-    this.timelineKey = timelineKey;
+    this.subCategory = timelineKey;
     this.cpuType = cpuType;
   }
 
@@ -658,7 +667,7 @@ export class Method extends TimedNode {
   constructor(
     parts: string[] | null,
     exitTypes: string[],
-    timelineKey: TimelineKey,
+    timelineKey: LogSubCategory,
     cpuType: string,
   ) {
     super(parts, timelineKey, cpuType);
@@ -707,7 +716,7 @@ export class ApexLog extends Method {
   executionEndTime = 0;
 
   constructor() {
-    super(null, [], 'codeUnit', '');
+    super(null, [], 'Code Unit', '');
   }
 
   setTimes() {
@@ -799,9 +808,11 @@ export function parseRows(text: string | null | undefined): number {
 /* Log line entry Parsers */
 
 class BulkHeapAllocateLine extends LogLine {
+  logCategory: 'Apex Code';
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] || '';
+    this.logCategory = 'Apex Code';
   }
 }
 
@@ -844,7 +855,7 @@ class ConstructorEntryLine extends Method {
   suffix = ' (constructor)';
 
   constructor(parts: string[]) {
-    super(parts, ['CONSTRUCTOR_EXIT'], 'method', 'method');
+    super(parts, ['CONSTRUCTOR_EXIT'], 'Method', 'method');
     this.lineNumber = parseLineNumber(parts[2]);
     const args = parts[4];
 
@@ -873,7 +884,7 @@ export class MethodEntryLine extends Method {
   hasValidSymbols = true;
 
   constructor(parts: string[]) {
-    super(parts, ['METHOD_EXIT'], 'method', 'method');
+    super(parts, ['METHOD_EXIT'], 'Method', 'method');
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[4] || this.type || '';
     if (this.text === 'System.Type.forName(String, String)') {
@@ -895,7 +906,7 @@ class SystemConstructorEntryLine extends Method {
   suffix = '(system constructor)';
 
   constructor(parts: string[]) {
-    super(parts, ['SYSTEM_CONSTRUCTOR_EXIT'], 'systemMethod', 'method');
+    super(parts, ['SYSTEM_CONSTRUCTOR_EXIT'], 'System Method', 'method');
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[3] || '';
   }
@@ -911,7 +922,7 @@ class SystemConstructorExitLine extends LogLine {
 }
 class SystemMethodEntryLine extends Method {
   constructor(parts: string[]) {
-    super(parts, ['SYSTEM_METHOD_EXIT'], 'systemMethod', 'method');
+    super(parts, ['SYSTEM_METHOD_EXIT'], 'System Method', 'method');
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[3] || '';
   }
@@ -938,7 +949,7 @@ export class CodeUnitStartedLine extends Method {
   codeUnitType = '';
 
   constructor(parts: string[]) {
-    super(parts, ['CODE_UNIT_FINISHED'], 'codeUnit', CodeUnitStartedLine.getCpuType(parts));
+    super(parts, ['CODE_UNIT_FINISHED'], 'Code Unit', CodeUnitStartedLine.getCpuType(parts));
 
     const subParts = parts[3]?.split(':') || [],
       name = parts[4] || parts[3] || '';
@@ -1003,7 +1014,7 @@ class VFApexCallStartLine extends Method {
   ];
 
   constructor(parts: string[]) {
-    super(parts, ['VF_APEX_CALL_END'], 'method', 'method');
+    super(parts, ['VF_APEX_CALL_END'], 'Method', 'method');
     this.lineNumber = parseLineNumber(parts[2]);
 
     const classText = parts[5] || parts[3] || '';
@@ -1052,7 +1063,7 @@ class VFApexCallEndLine extends LogLine {
 
 class VFDeserializeViewstateBeginLine extends Method {
   constructor(parts: string[]) {
-    super(parts, ['VF_DESERIALIZE_VIEWSTATE_END'], 'systemMethod', 'method');
+    super(parts, ['VF_DESERIALIZE_VIEWSTATE_END'], 'System Method', 'method');
   }
 }
 
@@ -1060,7 +1071,7 @@ class VFFormulaStartLine extends Method {
   suffix = ' (VF FORMULA)';
 
   constructor(parts: string[]) {
-    super(parts, ['VF_EVALUATE_FORMULA_END'], 'systemMethod', 'custom');
+    super(parts, ['VF_EVALUATE_FORMULA_END'], 'System Method', 'custom');
     this.text = parts[3] || '';
   }
 }
@@ -1078,7 +1089,7 @@ class VFSeralizeViewStateStartLine extends Method {
   namespace = 'system';
 
   constructor(parts: string[]) {
-    super(parts, ['VF_SERIALIZE_VIEWSTATE_END'], 'systemMethod', 'method');
+    super(parts, ['VF_SERIALIZE_VIEWSTATE_END'], 'System Method', 'method');
   }
 }
 
@@ -1093,7 +1104,7 @@ class VFPageMessageLine extends LogLine {
 class DMLBeginLine extends Method {
   totalDmlCount = 1;
   constructor(parts: string[]) {
-    super(parts, ['DML_END'], 'dml', 'free');
+    super(parts, ['DML_END'], 'DML', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = 'DML ' + parts[3] + ' ' + parts[4];
     const rowCountString = parts[5];
@@ -1122,7 +1133,7 @@ class SOQLExecuteBeginLine extends Method {
   totalSoqlCount = 1;
 
   constructor(parts: string[]) {
-    super(parts, ['SOQL_EXECUTE_END'], 'soql', 'free');
+    super(parts, ['SOQL_EXECUTE_END'], 'SOQL', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
 
     const [, , , aggregations, soqlString] = parts;
@@ -1198,7 +1209,7 @@ class SOQLExecuteExplainLine extends LogLine {
 
 class SOSLExecuteBeginLine extends Method {
   constructor(parts: string[]) {
-    super(parts, ['SOSL_EXECUTE_END'], 'soql', 'free');
+    super(parts, ['SOSL_EXECUTE_END'], 'SOQL', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = `SOSL: ${parts[3]}`;
   }
@@ -1275,7 +1286,7 @@ class UserDebugLine extends LogLine {
 
 class CumulativeLimitUsageLine extends Method {
   constructor(parts: string[]) {
-    super(parts, ['CUMULATIVE_LIMIT_USAGE_END'], 'systemMethod', 'system');
+    super(parts, ['CUMULATIVE_LIMIT_USAGE_END'], 'System Method', 'system');
   }
 }
 
@@ -1289,7 +1300,7 @@ class CumulativeProfilingLine extends LogLine {
 
 class CumulativeProfilingBeginLine extends Method {
   constructor(parts: string[]) {
-    super(parts, ['CUMULATIVE_PROFILING_END'], 'systemMethod', 'custom');
+    super(parts, ['CUMULATIVE_PROFILING_END'], 'System Method', 'custom');
   }
 }
 
@@ -1322,7 +1333,7 @@ class LimitUsageForNSLine extends LogLine {
 
 class NBANodeBegin extends Method {
   constructor(parts: string[]) {
-    super(parts, ['NBA_NODE_END'], 'systemMethod', 'method');
+    super(parts, ['NBA_NODE_END'], 'System Method', 'method');
     this.text = parts.slice(2).join(' | ');
   }
 }
@@ -1354,7 +1365,7 @@ class NBAOfferInvalid extends LogLine {
 }
 class NBAStrategyBegin extends Method {
   constructor(parts: string[]) {
-    super(parts, ['NBA_STRATEGY_END'], 'systemMethod', 'method');
+    super(parts, ['NBA_STRATEGY_END'], 'System Method', 'method');
     this.text = parts.slice(2).join(' | ');
   }
 }
@@ -1394,7 +1405,7 @@ class PopTraceFlagsLine extends LogLine {
 
 class QueryMoreBeginLine extends Method {
   constructor(parts: string[]) {
-    super(parts, ['QUERY_MORE_END'], 'soql', 'custom');
+    super(parts, ['QUERY_MORE_END'], 'SOQL', 'custom');
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = `line: ${this.lineNumber}`;
   }
@@ -1475,13 +1486,13 @@ class SystemModeExitLine extends LogLine {
 
 export class ExecutionStartedLine extends Method {
   constructor(parts: string[]) {
-    super(parts, ['EXECUTION_FINISHED'], 'method', 'method');
+    super(parts, ['EXECUTION_FINISHED'], 'Method', 'method');
   }
 }
 
 class EnteringManagedPackageLine extends Method {
   constructor(parts: string[]) {
-    super(parts, [], 'method', 'pkg');
+    super(parts, [], 'Method', 'pkg');
     const rawNs = parts[2] || '',
       lastDot = rawNs.lastIndexOf('.');
 
@@ -1497,7 +1508,7 @@ class EnteringManagedPackageLine extends Method {
 
 class EventSericePubBeginLine extends Method {
   constructor(parts: string[]) {
-    super(parts, ['EVENT_SERVICE_PUB_END'], 'flow', 'custom');
+    super(parts, ['EVENT_SERVICE_PUB_END'], 'Flow', 'custom');
     this.text = parts[2] || '';
   }
 }
@@ -1520,7 +1531,7 @@ class EventSericePubDetailLine extends LogLine {
 
 class EventSericeSubBeginLine extends Method {
   constructor(parts: string[]) {
-    super(parts, ['EVENT_SERVICE_SUB_END'], 'flow', 'custom');
+    super(parts, ['EVENT_SERVICE_SUB_END'], 'Flow', 'custom');
     this.text = `${parts[2]} ${parts[3]}`;
   }
 }
@@ -1546,7 +1557,7 @@ export class FlowStartInterviewsBeginLine extends Method {
   text = 'FLOW_START_INTERVIEWS : ';
 
   constructor(parts: string[]) {
-    super(parts, ['FLOW_START_INTERVIEWS_END'], 'flow', 'custom');
+    super(parts, ['FLOW_START_INTERVIEWS_END'], 'Flow', 'custom');
   }
 
   onEnd(end: LogLine, stack: LogLine[]) {
@@ -1622,7 +1633,7 @@ class FlowElementBeginLine extends Method {
   declarative = true;
 
   constructor(parts: string[]) {
-    super(parts, ['FLOW_ELEMENT_END'], 'flow', 'custom');
+    super(parts, ['FLOW_ELEMENT_END'], 'Flow', 'custom');
     this.text = parts[3] + ' ' + parts[4];
   }
 }
@@ -1763,7 +1774,7 @@ class FlowBulkElementBeginLine extends Method {
   declarative = true;
 
   constructor(parts: string[]) {
-    super(parts, ['FLOW_BULK_ELEMENT_END'], 'flow', 'custom');
+    super(parts, ['FLOW_BULK_ELEMENT_END'], 'Flow', 'custom');
     this.text = `${parts[2]} - ${parts[3]}`;
   }
 }
@@ -1915,7 +1926,7 @@ class WFRuleEvalBeginLine extends Method {
   declarative = true;
 
   constructor(parts: string[]) {
-    super(parts, ['WF_RULE_EVAL_END'], 'workflow', 'custom');
+    super(parts, ['WF_RULE_EVAL_END'], 'Workflow', 'custom');
     this.text = parts[2] || '';
   }
 }
@@ -1940,7 +1951,7 @@ class WFCriteriaBeginLine extends Method {
   declarative = true;
 
   constructor(parts: string[]) {
-    super(parts, ['WF_CRITERIA_END', 'WF_RULE_NOT_EVALUATED'], 'workflow', 'custom');
+    super(parts, ['WF_CRITERIA_END', 'WF_RULE_NOT_EVALUATED'], 'Workflow', 'custom');
     this.text = 'WF_CRITERIA : ' + parts[5] + ' : ' + parts[3];
   }
 }
@@ -2203,7 +2214,7 @@ class DuplicateDetectionBegin extends Method {
   declarative = true;
 
   constructor(parts: string[]) {
-    super(parts, ['DUPLICATE_DETECTION_END'], 'workflow', 'custom');
+    super(parts, ['DUPLICATE_DETECTION_END'], 'Workflow', 'custom');
   }
 }
 
@@ -2248,54 +2259,54 @@ class DuplicateDetectionSummary extends LogLine {
 
 class SessionCachePutBegin extends Method {
   constructor(parts: string[]) {
-    super(parts, ['SESSION_CACHE_PUT_END'], 'method', 'method');
+    super(parts, ['SESSION_CACHE_PUT_END'], 'Method', 'method');
   }
 }
 class SessionCacheGetBegin extends Method {
   constructor(parts: string[]) {
-    super(parts, ['SESSION_CACHE_GET_END'], 'method', 'method');
+    super(parts, ['SESSION_CACHE_GET_END'], 'Method', 'method');
   }
 }
 
 class SessionCacheRemoveBegin extends Method {
   constructor(parts: string[]) {
-    super(parts, ['SESSION_CACHE_REMOVE_END'], 'method', 'method');
+    super(parts, ['SESSION_CACHE_REMOVE_END'], 'Method', 'method');
   }
 }
 
 class OrgCachePutBegin extends Method {
   constructor(parts: string[]) {
-    super(parts, ['ORG_CACHE_PUT_END'], 'method', 'method');
+    super(parts, ['ORG_CACHE_PUT_END'], 'Method', 'method');
   }
 }
 
 class OrgCacheGetBegin extends Method {
   constructor(parts: string[]) {
-    super(parts, ['ORG_CACHE_GET_END'], 'method', 'method');
+    super(parts, ['ORG_CACHE_GET_END'], 'Method', 'method');
   }
 }
 
 class OrgCacheRemoveBegin extends Method {
   constructor(parts: string[]) {
-    super(parts, ['ORG_CACHE_REMOVE_END'], 'method', 'method');
+    super(parts, ['ORG_CACHE_REMOVE_END'], 'Method', 'method');
   }
 }
 
 class VFSerializeContinuationStateBegin extends Method {
   constructor(parts: string[]) {
-    super(parts, ['VF_SERIALIZE_CONTINUATION_STATE_END'], 'method', 'method');
+    super(parts, ['VF_SERIALIZE_CONTINUATION_STATE_END'], 'Method', 'method');
   }
 }
 
 class VFDeserializeContinuationStateBegin extends Method {
   constructor(parts: string[]) {
-    super(parts, ['VF_SERIALIZE_CONTINUATION_STATE_END'], 'method', 'method');
+    super(parts, ['VF_SERIALIZE_CONTINUATION_STATE_END'], 'Method', 'method');
   }
 }
 
 class MatchEngineBegin extends Method {
   constructor(parts: string[]) {
-    super(parts, ['MATCH_ENGINE_END'], 'method', 'method');
+    super(parts, ['MATCH_ENGINE_END'], 'Method', 'method');
   }
 }
 
@@ -2546,7 +2557,7 @@ const basicLogEvents: LogEventType[] = [
   'JSON_DIFF_SUMMARY',
   'JSON_DIFF_DETAIL',
   'MATCH_ENGINE_INVOCATION',
-];
+] as const;
 
 const basicExitLogEvents: LogEventType[] = [
   'VF_DESERIALIZE_VIEWSTATE_END',

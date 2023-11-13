@@ -4,7 +4,13 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import formatDuration, { debounce } from '../Util.js';
 import { goToRow } from '../components/calltree-view/CalltreeView.js';
-import { ApexLog, LogLine, Method, TimedNode, type TimelineKey } from '../parsers/ApexLogParser.js';
+import {
+  ApexLog,
+  LogLine,
+  type LogSubCategory,
+  Method,
+  TimedNode,
+} from '../parsers/ApexLogParser.js';
 
 export { ApexLog };
 
@@ -39,51 +45,51 @@ interface Rect {
 
 const scaleY = -15,
   strokeColor = '#D3D3D3';
-export const keyMap: Map<TimelineKey, TimelineGroup> = new Map([
+export const keyMap: Map<LogSubCategory, TimelineGroup> = new Map([
   [
-    'codeUnit',
+    'Code Unit',
     {
       label: 'Code Unit',
       fillColor: '#88AE58',
     },
   ],
   [
-    'workflow',
+    'Workflow',
     {
       label: 'Workflow',
       fillColor: '#51A16E',
     },
   ],
   [
-    'method',
+    'Method',
     {
       label: 'Method',
       fillColor: '#2B8F81',
     },
   ],
   [
-    'flow',
+    'Flow',
     {
       label: 'Flow',
       fillColor: '#337986',
     },
   ],
   [
-    'dml',
+    'DML',
     {
       label: 'DML',
       fillColor: '#285663',
     },
   ],
   [
-    'soql',
+    'SOQL',
     {
       label: 'SOQL',
       fillColor: '#5D4963',
     },
   ],
   [
-    'systemMethod',
+    'System Method',
     {
       label: 'System Method',
       fillColor: '#5C3444',
@@ -269,7 +275,7 @@ function nodesToRectangles(nodes: Method[], depth: number) {
   nodesToRectangles(children, depth + 1);
 }
 
-const rectRenderQueue = new Map<TimelineKey, Rect[]>();
+const rectRenderQueue = new Map<LogSubCategory, Rect[]>();
 
 /**
  * Create a rectangle for the node and add it to the correct render list for it's type.
@@ -277,11 +283,11 @@ const rectRenderQueue = new Map<TimelineKey, Rect[]>();
  * @param y The call depth of the node
  */
 function addToRectQueue(node: Method, y: number) {
-  const { timelineKey: tlKey, timestamp: x, duration: w } = node;
+  const { subCategory: subCategory, timestamp: x, duration: w } = node;
   const rect: Rect = { x, y, w };
-  let list = rectRenderQueue.get(tlKey);
+  let list = rectRenderQueue.get(subCategory);
   if (!list) {
-    rectRenderQueue.set(tlKey, (list = []));
+    rectRenderQueue.set(subCategory, (list = []));
   }
   list.push(rect);
 }
@@ -320,7 +326,7 @@ const drawRect = (rect: Rect) => {
         w = w - widthOffScreen;
       }
 
-      ctx?.rect(~~x, ~~y, w, scaleY);
+      ctx?.rect(x, y, w, scaleY);
     }
   }
 };
