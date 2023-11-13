@@ -505,7 +505,7 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
       displayText += target.suffix;
     }
 
-    toolTip.appendChild(document.createTextNode(target.type));
+    toolTip.appendChild(document.createTextNode(target.type || ''));
     toolTip.appendChild(brElem.cloneNode());
     toolTip.appendChild(document.createTextNode(displayText));
     if (target.timestamp && target.duration && target.selfTime) {

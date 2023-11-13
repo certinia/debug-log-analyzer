@@ -20,7 +20,7 @@ import NumberFormat from '../../datagrid/format/Number.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
-import { ApexLog, LogLine, TimedNode } from '../../parsers/ApexLogParser.js';
+import { ApexLog, type LogEventType, LogLine, TimedNode } from '../../parsers/ApexLogParser.js';
 import { hostService } from '../../services/VSCodeService.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../skeleton/GridSkeleton.js';
@@ -239,10 +239,12 @@ export async function renderCallTree(
               return `<a href="#!">${text}</a>`;
             }
 
-            const excludedTypes = ['SOQL_EXECUTE_BEGIN', 'DML_BEGIN'];
+            const excludedTypes: LogEventType[] = ['SOQL_EXECUTE_BEGIN', 'DML_BEGIN'];
             text =
-              (!excludedTypes.includes(node.type) && node.type !== text ? node.type + ': ' : '') +
-              text;
+              (node.type &&
+                (!excludedTypes.includes(node.type) && node.type !== text ? node.type + ': ' : '') +
+                  text) ||
+              '';
             return text;
           },
           variableHeight: true,

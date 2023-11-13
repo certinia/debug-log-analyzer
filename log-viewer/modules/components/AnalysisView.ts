@@ -237,7 +237,7 @@ async function renderAnalysis(rootMethod: ApexLog) {
 
 export class Metric {
   name: string;
-  type: string;
+  type;
   count = 0;
   totalTime = 0;
   selfTime = 0;
