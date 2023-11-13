@@ -2579,7 +2579,7 @@ const basicExitLogEvents: LogEventType[] = [
   'SESSION_CACHE_REMOVE_END',
 ];
 
-const LogEventNames = [
+const logEventNames = [
   'BULK_DML_RETRY',
   'BULK_HEAP_ALLOCATE',
   'CALLOUT_REQUEST',
@@ -2833,6 +2833,6 @@ const LogEventNames = [
   'SESSION_CACHE_REMOVE_END',
 ] as const;
 
-export type LogEventType = (typeof LogEventNames)[number];
+export type LogEventType = (typeof logEventNames)[number];
 
 export { SOQLExecuteExplainLine, SOQLExecuteBeginLine, DMLBeginLine };
