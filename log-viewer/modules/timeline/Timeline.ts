@@ -4,13 +4,7 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import formatDuration, { debounce } from '../Util.js';
 import { goToRow } from '../components/calltree-view/CalltreeView.js';
-import {
-  ApexLog,
-  type IssueType,
-  Method,
-  TimedNode,
-  type TimelineKey,
-} from '../parsers/ApexLogParser.js';
+import { ApexLog, LogLine, Method, TimedNode, type TimelineKey } from '../parsers/ApexLogParser.js';
 
 export { ApexLog };
 
@@ -31,7 +25,7 @@ interface TimelineColors {
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
-const truncationColors: Map<IssueType, string> = new Map([
+const truncationColors: Map<string, string> = new Map([
   ['error', 'rgba(255, 128, 128, 0.2)'],
   ['skip', 'rgba(128, 255, 128, 0.2)'],
   ['unexpected', 'rgba(128, 128, 255, 0.2)'],
@@ -245,6 +239,7 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
+const isMethod = (child: LogLine): child is Method => child instanceof Method;
 function nodesToRectangles(nodes: Method[], depth: number) {
   const children: Method[] = [];
   const len = nodes.length;
@@ -257,11 +252,13 @@ function nodesToRectangles(nodes: Method[], depth: number) {
       }
 
       // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
-      node.children.forEach((child) => {
-        if (child instanceof Method) {
-          children.push(child);
-        }
-      });
+      // node.children.forEach((child) => {
+      //   if (child instanceof Method) {
+      //     children.push(child);
+      //   }
+      // });
+
+      Array.prototype.push.apply(children, node.children.filter(isMethod));
     }
   }
 
@@ -323,7 +320,7 @@ const drawRect = (rect: Rect) => {
         w = w - widthOffScreen;
       }
 
-      ctx?.rect(x, y, w, scaleY);
+      ctx?.rect(~~x, ~~y, w, scaleY);
     }
   }
 };
@@ -430,6 +427,7 @@ function drawTimeLine() {
   if (ctx) {
     resize();
     ctx.clearRect(0, -displayHeight, displayWidth, displayHeight);
+
     drawTruncation(ctx);
     drawScale(ctx);
     ctx.strokeStyle = strokeColor;
@@ -494,11 +492,10 @@ function showTooltip(offsetX: number, offsetY: number) {
 }
 
 function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
-  // -1 to ingnore the "ApexLog" root node
+  // -1 to izgnore the "ApexLog" root node
   const target = findByPosition(timelineRoot, -1, x, depth);
   if (target) {
-    canvas.classList.remove('timeline-hover');
-    canvas.classList.remove('timeline-dragging');
+    canvas.classList.remove('timeline-hover', 'timeline-dragging');
     canvas.classList.add('timeline-event--hover');
 
     const toolTip = document.createElement('div');
