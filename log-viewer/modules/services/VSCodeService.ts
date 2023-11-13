@@ -42,79 +42,58 @@ export class VSCodeService implements HostService {
     try {
       this.vscodeAPIInstance = acquireVsCodeApi();
     } catch (e) {
-      console.log('acquireVsCodeApi() exception: ' + e);
+      throw new Error(`acquireVsCodeApi() exception: ${e}`);
     }
+  }
+
+  getVsCodeAPIInstance() {
+    if (VSCodeService._instance && !this.vscodeAPIInstance) {
+      throw new Error(`VsCodeApi not found`);
+    }
+    return this.vscodeAPIInstance;
   }
 
   fetchLog() {
-    if (this.vscodeAPIInstance) {
-      this.vscodeAPIInstance.postMessage({
-        cmd: 'fetchLog',
-      });
-    } else {
-      console.log(`VSCodeService.fetchLog() with no VSCode instance.`);
-    }
+    this.getVsCodeAPIInstance()?.postMessage({
+      cmd: 'fetchLog',
+    });
   }
 
   openPath(path: string) {
-    if (this.vscodeAPIInstance) {
-      this.vscodeAPIInstance.postMessage({
-        cmd: 'openPath',
-        path: path,
-      });
-    } else {
-      console.log(`VSCodeService.openPath(${path}) with no VSCode instance.`);
-    }
+    this.getVsCodeAPIInstance()?.postMessage({
+      cmd: 'openPath',
+      path: path,
+    });
   }
 
   openType(info: OpenInfo) {
-    if (this.vscodeAPIInstance) {
-      this.vscodeAPIInstance.postMessage({
-        cmd: 'openType',
-        typeName: info.typeName,
-        text: info.text,
-      });
-    } else {
-      console.log(`VSCodeService.openType(${info}) with no VSCode instance.`);
-    }
+    this.getVsCodeAPIInstance()?.postMessage({
+      cmd: 'openType',
+      typeName: info.typeName,
+      text: info.text,
+    });
   }
 
   openHelp() {
-    if (this.vscodeAPIInstance) {
-      this.vscodeAPIInstance.postMessage({ cmd: 'openHelp' });
-    } else {
-      console.log(`VSCodeService.open() with no VSCode instance.`);
-    }
+    this.getVsCodeAPIInstance()?.postMessage({ cmd: 'openHelp' });
   }
 
   getConfig() {
-    if (this.vscodeAPIInstance) {
-      this.vscodeAPIInstance.postMessage({ cmd: 'getConfig' });
-    } else {
-      console.log(`VSCodeService.getConfig() with no VSCode instance.`);
-    }
+    this.getVsCodeAPIInstance()?.postMessage({ cmd: 'getConfig' });
   }
 
   saveFile(request: { fileContent: string; defaultFilename: string }) {
-    if (this.vscodeAPIInstance) {
-      this.vscodeAPIInstance.postMessage({
-        cmd: 'saveFile',
-        text: request.fileContent,
-        options: { defaultUri: request.defaultFilename },
-      });
-    } else {
-      console.log(`VSCodeService.saveFile() with no VSCode instance.`);
-    }
+    this.getVsCodeAPIInstance()?.postMessage({
+      cmd: 'saveFile',
+      text: request.fileContent,
+      options: { defaultUri: request.defaultFilename },
+    });
   }
 
   showError(text: string) {
-    if (this.vscodeAPIInstance) {
-      this.vscodeAPIInstance.postMessage({
-        cmd: 'showError',
-        text: text,
-      });
-    } else {
-      console.log(`VSCodeService.showError() with no VSCode instance.`);
-    }
+    this.getVsCodeAPIInstance()?.postMessage({
+      cmd: 'showError',
+      text: text,
+    });
   }
 }
