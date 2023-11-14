@@ -85,14 +85,14 @@ describe('Invalid Debug Lines tests', () => {
     const log1 = parse('09:18:22.6 (1)|FAKE_TYPE');
     expect(log1.children.length).toEqual(0);
     expect(log1.parsingErrors.length).toEqual(1);
-    expect(log1.parsingErrors[0]).toEqual(`Unknown log line: FAKE_TYPE`);
+    expect(log1.parsingErrors[0]).toEqual(`Unsupported log event name: FAKE_TYPE`);
   });
 
   it('Bad Log line will added to issues', () => {
     const log1 = parse('INVALID LINE');
     expect(log1.children.length).toEqual(0);
     expect(log1.parsingErrors.length).toEqual(1);
-    expect(log1.parsingErrors[0]).toEqual(`Bad log line: INVALID LINE`);
+    expect(log1.parsingErrors[0]).toEqual(`Invalid log line: INVALID LINE`);
   });
 });
 

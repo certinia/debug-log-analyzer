@@ -878,7 +878,6 @@ class VariableScopeBeginLine extends LogLine {
     if (end.value) {
       this.value = end.value;
     }
-    console.debug('NEVER HIT?');
   }
 }
 
@@ -2708,6 +2707,8 @@ export function parseLine(line: string, lastEntry: LogLine | null): LogLine | nu
   } else if (type) {
     if (type !== 'DUMMY') {
       /* Used by tests */
+      // Allowed to e diabled in legacy parser only
+      // eslint-disable-next-line no-console
       console.warn(`Unknown log line: ${type}`);
     }
   } else {
@@ -2728,6 +2729,8 @@ export function parseLine(line: string, lastEntry: LogLine | null): LogLine | nu
     } else if (settingsPattern.test(line)) {
       // skip an unexpected settings line
     } else {
+      // Allowed to e diabled in legacy parser only
+      // eslint-disable-next-line no-console
       console.warn(`Bad log line: ${line}`);
     }
   }
