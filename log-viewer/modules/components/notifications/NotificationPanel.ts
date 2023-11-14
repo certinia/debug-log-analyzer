@@ -129,6 +129,6 @@ export class NotificationPanel extends LitElement {
 
 export class Notification {
   summary = '';
-  message = '';
+  message: string | TemplateResult<1> = '';
   severity: 'Error' | 'Warning' | 'Info' | 'none' = 'none';
 }

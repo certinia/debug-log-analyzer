@@ -11,6 +11,7 @@ import { globalStyles } from '../styles/global.styles.js';
 import { notificationStyles } from '../styles/notification.styles.js';
 import './BadgeBase.js';
 import './LogTitle.js';
+import './notifications/NotificationButton.js';
 import './notifications/NotificationPanel.js';
 import { Notification } from './notifications/NotificationPanel.js';
 import './notifications/NotificationTag.js';
@@ -36,6 +37,9 @@ export class NavBar extends LitElement {
 
   @property()
   notifications: Notification[] = [];
+
+  @property()
+  parserIssues: Notification[] = [];
 
   static styles = [
     globalStyles,
@@ -113,6 +117,7 @@ export class NavBar extends LitElement {
           </div>
         </div>
         <div class="navbar--right">
+        <notification-button .notifications="${this.parserIssues}"></notification-button>
           <vscode-button
             appearance="icon"
             aria-label="Help"

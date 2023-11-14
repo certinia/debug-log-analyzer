@@ -80,7 +80,7 @@ export default class ApexLogParser {
       // wrapped text from the previous entry?
       lastEntry.text += `\n${line}`;
     } else if (type) {
-      const message = `Unknown log line: ${type}`;
+      const message = `Unsupported log event name: ${type}`;
       !this.parsingErrors.includes(message) && this.parsingErrors.push(message);
     } else {
       if (lastEntry && line.startsWith('*** Skipped')) {
@@ -101,7 +101,7 @@ export default class ApexLogParser {
       } else if (settingsPattern.test(line)) {
         // skip an unexpected settings line
       } else {
-        this.parsingErrors.push(`Bad log line: ${line}`);
+        this.parsingErrors.push(`Invalid log line: ${line}`);
       }
     }
 

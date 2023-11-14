@@ -38,6 +38,8 @@ export class AppHeader extends LitElement {
   @property()
   notifications: Notification[] = [];
   @property()
+  parserIssues: Notification[] = [];
+  @property()
   timelineRoot: ApexLog | null = null;
 
   @state()
@@ -99,6 +101,7 @@ export class AppHeader extends LitElement {
         .logDuration=${this.logDuration}
         .logStatus=${this.logStatus}
         .notifications=${this.notifications}
+        .parserIssues=${this.parserIssues}
       ></nav-bar>
       <log-levels></log-levels>
       <vscode-panels activeid="${this._selectedTab}">

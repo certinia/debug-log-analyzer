@@ -25,6 +25,8 @@ export class LogViewer extends LitElement {
   @property()
   notifications: Notification[] = [];
   @property()
+  parserIssues: Notification[] = [];
+  @property()
   timelineRoot: ApexLog | null = null;
 
   static styles = [
@@ -53,6 +55,7 @@ export class LogViewer extends LitElement {
       .logDuration=${this.logDuration}
       .logStatus=${this.logStatus}
       .notifications=${this.notifications}
+      .parserIssues=${this.parserIssues}
       .timelineRoot=${this.timelineRoot}
     ></app-header>`;
   }
@@ -75,6 +78,7 @@ export class LogViewer extends LitElement {
     const logData = data.logData || (await this._readLog(logUri));
 
     const apexLog = parse(logData);
+
     this.logSize = apexLog.size;
     this.timelineRoot = apexLog;
     this.logDuration = apexLog.duration;
@@ -95,6 +99,8 @@ export class LogViewer extends LitElement {
       localNotifications.push(logMessage);
     });
     this.notifications = localNotifications;
+
+    this.parserIssues = this.parserIssuesToMessages(apexLog);
 
     this.logStatus = 'Ready';
   }
@@ -127,5 +133,30 @@ export class LogViewer extends LitElement {
     } else {
       return Promise.resolve('');
     }
+  }
+
+  private parserIssuesToMessages(apexLog: ApexLog) {
+    const issues: Notification[] = [];
+    apexLog.parsingErrors.forEach((message) => {
+      const isUnknownType = this.isUnknownType(message);
+
+      const logMessage = new Notification();
+      logMessage.summary = isUnknownType ? message : message.slice(0, message.indexOf(':'));
+      logMessage.message = isUnknownType
+        ? html`<a
+            href=${`command:vscode.open?${encodeURIComponent(
+              JSON.stringify('https://github.com/certinia/debug-log-analyzer/issues'),
+            )}`}
+            >report unsupported type</a
+          >`
+        : message.slice(message.indexOf(':') + 1);
+      logMessage.severity = 'Info';
+      issues.push(logMessage);
+    });
+    return issues;
+  }
+
+  private isUnknownType(message: string) {
+    return message.startsWith('Unsupported log event name:');
   }
 }
