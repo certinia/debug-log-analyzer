@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Show Log Parsing issues via notification bell ([#209][#209])
+  - Shows unsupported log event names + invalid log lines
+
 ### Changed
 
 - Make dragging more obvious on the Timeline by showing different cursors ([#423][#423])
@@ -286,6 +291,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- Unreleased -->
 
 [#423]: https://github.com/certinia/debug-log-analyzer/issues/423
+[#209]: https://github.com/certinia/debug-log-analyzer/issues/209
 
 <!-- v1.10.2 -->
 
