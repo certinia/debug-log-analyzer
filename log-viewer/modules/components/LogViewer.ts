@@ -70,12 +70,12 @@ export class LogViewer extends LitElement {
     }
   }
 
-  async _handleLogFetch(data: any) {
-    this.logName = data.logName?.trim();
-    this.logPath = data.logPath?.trim();
+  async _handleLogFetch(data: LogDataEvent) {
+    this.logName = data.logName?.trim() || '';
+    this.logPath = data.logPath?.trim() || '';
 
     const logUri = data.logUri;
-    const logData = data.logData || (await this._readLog(logUri));
+    const logData = data.logData || (await this._readLog(logUri || ''));
 
     const apexLog = parse(logData);
 
@@ -159,4 +159,11 @@ export class LogViewer extends LitElement {
   private isUnknownType(message: string) {
     return message.startsWith('Unsupported log event name:');
   }
+}
+
+interface LogDataEvent {
+  logName?: string;
+  logUri?: string;
+  logPath?: string;
+  logData?: string;
 }

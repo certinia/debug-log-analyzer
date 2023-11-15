@@ -138,12 +138,14 @@ export class DatabaseView extends LitElement {
     `;
   }
 
-  _dmlGroupBy(event: any) {
-    dmlTable.setGroupBy(event.target.checked ? 'dml' : '');
+  _dmlGroupBy(event: Event) {
+    const target = event.target as HTMLInputElement;
+    dmlTable.setGroupBy(target.checked ? 'dml' : '');
   }
 
-  _soqlGroupBy(event: any) {
-    soqlTable.setGroupBy(event.target.checked ? 'soql' : '');
+  _soqlGroupBy(event: Event) {
+    const target = event.target as HTMLInputElement;
+    soqlTable.setGroupBy(target.checked ? 'soql' : '');
   }
 
   _appendTableWhenVisible() {
@@ -172,7 +174,16 @@ export class DatabaseView extends LitElement {
 }
 
 function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
-  const dmlData: unknown[] = [];
+  interface DMLRow {
+    dml?: string;
+    rowCount?: number;
+    timeTaken?: number;
+    timestamp: number;
+    isDetail?: boolean;
+    _children?: DMLRow[];
+  }
+
+  const dmlData: DMLRow[] = [];
   let dmlText: string[] = [];
   if (dmlLines) {
     for (const dml of dmlLines) {
@@ -212,7 +223,7 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
     groupClosedShowCalcs: true,
     groupStartOpen: false,
     groupValues: [dmlText],
-    groupHeader(value, count, data: any[], _group) {
+    groupHeader(value, count, data: DMLRow[], _group) {
       const hasDetail = data.some((d) => {
         return d.isDetail;
       });
@@ -265,7 +276,7 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
         cssClass: 'datagrid-textarea datagrid-code-text',
         variableHeight: true,
         formatter: (cell, _formatterParams, _onRendered) => {
-          const data: any = cell.getData();
+          const data = cell.getData() as DMLRow;
           return `<call-stack
           timestamp=${data.timestamp}
           startDepth="0"
@@ -351,20 +362,22 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
 function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
   const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
   interface GridSOQLData {
-    isSelective: boolean | null;
-    relativeCost: number | null;
-    soql: string;
-    rowCount: number | null;
-    timeTaken: number | null;
-    aggregations: number;
+    isSelective?: boolean | null;
+    relativeCost?: number | null;
+    soql?: string;
+    rowCount?: number | null;
+    timeTaken?: number | null;
+    aggregations?: number;
     timestamp: number;
+    isDetail?: boolean;
+    _children?: GridSOQLData[];
   }
 
   soqlLines?.forEach((line) => {
     timestampToSOQl.set(line.timestamp, line);
   });
 
-  const soqlData: unknown[] = [];
+  const soqlData: GridSOQLData[] = [];
   let soqlText: string[] = [];
   if (soqlLines) {
     for (const soql of soqlLines) {
@@ -409,7 +422,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
     groupClosedShowCalcs: true,
     groupStartOpen: false,
     groupValues: [soqlText],
-    groupHeader(value, count, data: any[], _group) {
+    groupHeader(value, count, data: GridSOQLData[], _group) {
       const hasDetail = data.some((d) => {
         return d.isDetail;
       });
@@ -467,7 +480,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
         formatter: (cell, _formatterParams, _onRendered) => {
           cell.getRow().normalizeHeight();
 
-          const data: any = cell.getData();
+          const data = cell.getData() as GridSOQLData;
           return `<call-stack
           timestamp=${data.timestamp}
           startDepth="0"
@@ -515,23 +528,23 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
           return title;
         },
         accessorDownload: function (
-          _value: any,
-          data: any,
+          _value: unknown,
+          data: GridSOQLData,
           _type: 'data' | 'download' | 'clipboard',
-          _accessorParams: any,
+          _accessorParams: unknown,
           _column?: ColumnComponent,
           _row?: RowComponent,
-        ): any {
+        ): number | null | undefined {
           return data.relativeCost;
         },
         accessorClipboard: function (
-          _value: any,
-          data: any,
+          _value: unknown,
+          data: GridSOQLData,
           _type: 'data' | 'download' | 'clipboard',
-          _accessorParams: any,
+          _accessorParams: unknown,
           _column?: ColumnComponent,
           _row?: RowComponent,
-        ): any {
+        ): number | null | undefined {
           return data.relativeCost;
         },
       },
