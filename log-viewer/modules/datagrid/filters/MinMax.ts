@@ -3,9 +3,9 @@
  */
 
 export default function (
-  filterVal: any,
-  rowVal: any,
-  rowData: any,
+  filterVal: { start: number | null; end: number | null },
+  rowVal: number,
+  rowData: { _children: []; id: number },
   filterParams: { columnName: string; filterCache: Map<number, boolean> },
 ): boolean {
   if (!('start' in filterVal) || !('end' in filterVal)) {
@@ -18,11 +18,11 @@ export default function (
 function deepFilter(
   headerValue: { start: number | null; end: number | null },
   rowValue: number,
-  rowData: any,
+  rowData: { _children: []; id: number },
   filterParams: { columnName: string; filterCache: Map<number, boolean> },
 ): boolean {
   const cachedMatch = filterParams.filterCache.get(rowData.id);
-  if (cachedMatch != null) {
+  if (cachedMatch !== null && cachedMatch !== undefined) {
     return cachedMatch;
   }
 

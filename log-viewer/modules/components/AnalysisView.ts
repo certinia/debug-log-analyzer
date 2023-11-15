@@ -74,8 +74,9 @@ export class AnalysisView extends LitElement {
     `;
   }
 
-  _groupBy(event: any) {
-    analysisTable.setGroupBy(event.target.checked ? 'type' : '');
+  _groupBy(event: Event) {
+    const target = event.target as HTMLInputElement;
+    analysisTable.setGroupBy(target.checked ? 'type' : '');
   }
 
   _appendTableWhenVisible() {
