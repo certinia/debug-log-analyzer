@@ -330,6 +330,9 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
   }
   let i = 0;
 
+  ctx.strokeStyle = '#808080';
+  ctx.beginPath();
+
   while (i < len) {
     const thisEntry = issues[i++],
       nextEntry = issues[i];
@@ -352,10 +355,17 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
         w = w - widthOffScreen;
       }
 
+      ctx.moveTo(x, -displayHeight);
+      ctx.lineTo(x, 0);
+
+      ctx.moveTo(x + w, -displayHeight);
+      ctx.lineTo(x + w, 0);
+
       ctx.fillStyle = truncationColors.get(thisEntry.type) || '';
       ctx.fillRect(x, -displayHeight, w, displayHeight);
     }
   }
+  ctx.stroke();
 }
 
 function calculateSizes() {
