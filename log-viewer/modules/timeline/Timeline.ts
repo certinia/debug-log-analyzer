@@ -27,7 +27,7 @@ interface TimelineColors {
 
 const truncationColors: Map<string, string> = new Map([
   ['error', 'rgba(255, 128, 128, 0.2)'],
-  ['skip', 'rgba(128, 255, 128, 0.2)'],
+  ['skip', 'rgb(30, 128, 255, 0.2)'],
   ['unexpected', 'rgba(128, 128, 255, 0.2)'],
 ]);
 
