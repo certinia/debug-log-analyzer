@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
+import { existsSync } from 'fs';
 import { Uri, window } from 'vscode';
 
 import { appName } from '../AppSettings.js';
@@ -32,11 +33,12 @@ export class ShowLogAnalysis {
   }
 
   private static async command(context: Context, uri: Uri): Promise<void> {
-    const filePath = uri?.fsPath || window?.activeTextEditor?.document.fileName;
+    const filePath = uri?.fsPath || window?.activeTextEditor?.document.fileName || '';
+    const fileContent = !existsSync(filePath) ? window?.activeTextEditor?.document.getText() : '';
 
-    if (filePath) {
+    if (filePath || fileContent) {
       const ws = await QuickPickWorkspace.pickOrReturn(context);
-      LogView.createView(ws, context, filePath);
+      LogView.createView(ws, context, Promise.resolve(), filePath, fileContent);
     } else {
       context.display.showErrorMessage(
         'No file selected or the file is too large. Try again using the file explorer or text editor command.',
