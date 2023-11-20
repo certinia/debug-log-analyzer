@@ -27,7 +27,7 @@ interface TimelineColors {
 
 const truncationColors: Map<string, string> = new Map([
   ['error', 'rgba(255, 128, 128, 0.2)'],
-  ['skip', 'rgba(128, 255, 128, 0.2)'],
+  ['skip', 'rgb(30, 128, 255, 0.2)'],
   ['unexpected', 'rgba(128, 128, 255, 0.2)'],
 ]);
 
@@ -330,6 +330,9 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
   }
   let i = 0;
 
+  ctx.strokeStyle = '#808080';
+  ctx.beginPath();
+
   while (i < len) {
     const thisEntry = issues[i++],
       nextEntry = issues[i];
@@ -352,10 +355,17 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
         w = w - widthOffScreen;
       }
 
+      ctx.moveTo(x, -displayHeight);
+      ctx.lineTo(x, 0);
+
+      ctx.moveTo(x + w, -displayHeight);
+      ctx.lineTo(x + w, 0);
+
       ctx.fillStyle = truncationColors.get(thisEntry.type) || '';
       ctx.fillRect(x, -displayHeight, w, displayHeight);
     }
   }
+  ctx.stroke();
 }
 
 function calculateSizes() {
