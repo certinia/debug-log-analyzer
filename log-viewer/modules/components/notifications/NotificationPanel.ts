@@ -78,7 +78,7 @@ export class NotificationPanel extends LitElement {
       }
 
       .info {
-        background-color: var(--notification-info-background);
+        background-color: var(--notification-information-background);
       }
 
       .text-container {
@@ -127,8 +127,9 @@ export class NotificationPanel extends LitElement {
   }
 }
 
+export type NotificationSeverity = 'Error' | 'Warning' | 'Info' | 'None';
 export class Notification {
   summary = '';
   message: string | TemplateResult<1> = '';
-  severity: 'Error' | 'Warning' | 'Info' | 'none' = 'none';
+  severity: NotificationSeverity = 'None';
 }

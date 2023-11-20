@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Debug Only Call Tree filtering ([#86][#86])
+  - Filters the Call Tree to show only debug statments with the context of the Call Stack.
 - Show Log Parsing issues via notification bell ([#209][#209])
   - Shows unsupported log event names + invalid log lines
 
@@ -18,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Show the pointer cursor by default when hovering the Timeline.
   - Show the grabbing cursor when the mouse is pressed down on the Timeline, to indicate drag is now possible.
   - Show the default cursor when hovering a Timeline event.
+- Timeline event marker clarity improvements ([#115][#115])
+  - Skipped-Lines and Max-Size-reached marker color from green to blue. Green normal mean things are ok, blue better represents information.
+  - Added faint grey lines between the event markers to seperates them. This helps when two error are next to each other.
 
 ## [1.10.3] - 2023-11-07
 
@@ -290,6 +295,8 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#86]: https://github.com/certinia/debug-log-analyzer/issues/86
+[#115]: https://github.com/certinia/debug-log-analyzer/issues/115
 [#423]: https://github.com/certinia/debug-log-analyzer/issues/423
 [#209]: https://github.com/certinia/debug-log-analyzer/issues/209
 

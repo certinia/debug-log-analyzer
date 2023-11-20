@@ -8,7 +8,7 @@ import { ApexLog, parse } from '../parsers/ApexLogParser.js';
 import { hostService } from '../services/VSCodeService.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './AppHeader.js';
-import { Notification } from './notifications/NotificationPanel.js';
+import { Notification, type NotificationSeverity } from './notifications/NotificationPanel.js';
 
 @customElement('log-viewer')
 export class LogViewer extends LitElement {
@@ -90,13 +90,15 @@ export class LogViewer extends LitElement {
 
     const localNotifications = Array.from(this.notifications);
     apexLog.logIssues.forEach((element) => {
-      const severity = element.type === 'error' ? 'Error' : 'Warning';
+      const severity = this.toSeverity(element.type);
 
       const logMessage = new Notification();
       logMessage.summary = element.summary;
       logMessage.message = element.description;
       logMessage.severity = severity;
       localNotifications.push(logMessage);
+
+      console.debug('s,', severity, logMessage);
     });
     this.notifications = localNotifications;
 
@@ -135,6 +137,15 @@ export class LogViewer extends LitElement {
     }
   }
 
+  severity = new Map<string, NotificationSeverity>([
+    ['error', 'Error'],
+    ['unexpected', 'Warning'],
+    ['skip', 'Info'],
+  ]);
+  private toSeverity(errorType: 'unexpected' | 'error' | 'skip') {
+    return this.severity.get(errorType) || 'Info';
+  }
+
   private parserIssuesToMessages(apexLog: ApexLog) {
     const issues: Notification[] = [];
     apexLog.parsingErrors.forEach((message) => {
@@ -150,7 +161,6 @@ export class LogViewer extends LitElement {
             >report unsupported type</a
           >`
         : message.slice(message.indexOf(':') + 1);
-      logMessage.severity = 'Info';
       issues.push(logMessage);
     });
     return issues;
