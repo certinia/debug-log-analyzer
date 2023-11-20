@@ -31,11 +31,15 @@ provideVSCodeDesignSystem().register(vsCodeCheckbox());
 let calltreeTable: Tabulator;
 let tableContainer: HTMLDivElement | null;
 let rootMethod: ApexLog | null;
+const debugOnlyFilterCache = new Map<number, boolean>();
+const showDetailsFilterCache = new Map<number, boolean>();
 
 @customElement('call-tree-view')
 export class CalltreeView extends LitElement {
   @property()
   timelineRoot: ApexLog | null = null;
+
+  filterState = { showDetails: false, debugOnly: false };
 
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
@@ -81,9 +85,19 @@ export class CalltreeView extends LitElement {
         vertical-align: bottom;
       }
 
-      .filter-container {
+      .header-bar {
         display: flex;
         gap: 10px;
+      }
+
+      .filter-container {
+        display: flex;
+        gap: 5px;
+        align-items: end;
+      }
+
+      .filter-section {
+        display: block;
       }
     `,
   ];
@@ -94,17 +108,27 @@ export class CalltreeView extends LitElement {
     return html`
       <div id="call-tree-container">
         <div>
-          <strong>Filter</strong>
-          <div class="filter-container">
-            <vscode-button appearance="secondary" @click="${this._expandButtonClick}"
-              >Expand</vscode-button
-            >
-            <vscode-button appearance="secondary" @click="${this._collapseButtonClick}"
-              >Collapse</vscode-button
-            >
-            <vscode-checkbox class="checkbox__middle" @change="${this._handleShowDetailsChange}"
-              >Show Details</vscode-checkbox
-            >
+          <div class="header-bar">
+            <div class="filter-container">
+              <vscode-button appearance="secondary" @click="${this._expandButtonClick}"
+                >Expand</vscode-button
+              >
+              <vscode-button appearance="secondary" @click="${this._collapseButtonClick}"
+                >Collapse</vscode-button
+              >
+            </div>
+
+            <div class="filter-section">
+              <strong>Filter</strong>
+              <div class="filter-container">
+                <vscode-checkbox class="checkbox__middle" @change="${this._handleShowDetailsChange}"
+                  >Details</vscode-checkbox
+                >
+                <vscode-checkbox class="checkbox__middle" @change="${this._handleDebugOnlyChange}"
+                  >Debug Only</vscode-checkbox
+                >
+              </div>
+            </div>
           </div>
         </div>
         <div id="call-tree-table-container">
@@ -117,21 +141,47 @@ export class CalltreeView extends LitElement {
 
   _handleShowDetailsChange(event: Event) {
     const target = event.target as HTMLInputElement;
-    const showDetails = target.checked;
-    calltreeTable.setFilter((data, _filterParams) => {
-      return showDetails || data.originalData.duration || data.originalData.discontinuity;
-    });
+    this.filterState.showDetails = target.checked;
+    this._updateFiltering();
+  }
+
+  _handleDebugOnlyChange(event: Event) {
+    const target = event.target as HTMLInputElement;
+    this.filterState.debugOnly = target.checked;
+    this._updateFiltering();
+  }
+
+  _updateFiltering() {
+    calltreeTable.blockRedraw();
+    if (this.filterState.showDetails) {
+      // @ts-expect-error valid
+      calltreeTable.removeFilter(showDetailsFilter);
+    } else if (!this.filterState.showDetails) {
+      // @ts-expect-error valid
+      calltreeTable.addFilter(showDetailsFilter);
+    }
+
+    if (this.filterState.debugOnly) {
+      calltreeTable.clearFilter(false);
+      // @ts-expect-error valid
+      calltreeTable.addFilter(debugFilter);
+    } else if (!this.filterState.debugOnly) {
+      // @ts-expect-error valid
+      calltreeTable.removeFilter(debugFilter);
+    }
+
+    calltreeTable.restoreRedraw();
   }
 
   _expandButtonClick() {
     calltreeTable.blockRedraw();
-    expandAll(calltreeTable.getRows());
+    expandCollapseAll(calltreeTable.getRows(), true);
     calltreeTable.restoreRedraw();
   }
 
   _collapseButtonClick() {
     calltreeTable.blockRedraw();
-    collapseAll(calltreeTable.getRows());
+    expandCollapseAll(calltreeTable.getRows(), false);
     calltreeTable.restoreRedraw();
   }
 
@@ -149,6 +199,34 @@ export class CalltreeView extends LitElement {
       analysisObserver.observe(callTreeWrapper);
     }
   }
+}
+
+function deepFilter(
+  rowData: CalltreeRow,
+  filterFunction: (rowData: CalltreeRow) => boolean,
+  filterParams: { filterCache: Map<number, boolean> },
+): boolean {
+  const cachedMatch = filterParams.filterCache.get(rowData.id);
+  if (cachedMatch !== null && cachedMatch !== undefined) {
+    return cachedMatch;
+  }
+
+  let childMatch = false;
+  for (const childRow of rowData._children || []) {
+    const match = deepFilter(childRow, filterFunction, filterParams);
+
+    if (match) {
+      childMatch = true;
+      break;
+    }
+  }
+
+  filterParams.filterCache.set(rowData.id, childMatch);
+  if (childMatch) {
+    return true;
+  }
+
+  return filterFunction(rowData);
 }
 
 export async function renderCallTree(
@@ -283,7 +361,7 @@ export async function renderCallTree(
           width: 60,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          bottomCalc: 'sum',
+          bottomCalc: 'max',
         },
         {
           title: 'SOQL Count',
@@ -292,7 +370,7 @@ export async function renderCallTree(
           width: 60,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          bottomCalc: 'sum',
+          bottomCalc: 'max',
         },
         {
           title: 'Throws Count',
@@ -301,7 +379,7 @@ export async function renderCallTree(
           width: 60,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          bottomCalc: 'sum',
+          bottomCalc: 'max',
         },
         {
           title: 'Rows',
@@ -310,7 +388,7 @@ export async function renderCallTree(
           width: 60,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          bottomCalc: 'sum',
+          bottomCalc: 'max',
         },
         {
           title: 'Total Time (ms)',
@@ -326,7 +404,7 @@ export async function renderCallTree(
             precision: 3,
           },
           bottomCalcFormatter: NumberFormat,
-          bottomCalc: 'sum',
+          bottomCalc: 'max',
           bottomCalcParams: { precision: 3 },
           headerFilter: MinMaxEditor,
           headerFilterFunc: MinMaxFilter,
@@ -360,37 +438,30 @@ export async function renderCallTree(
     calltreeTable.on('dataFiltered', () => {
       totalTimeFilterCache.clear();
       selfTimeFilterCache.clear();
+      debugOnlyFilterCache.clear();
+      showDetailsFilterCache.clear();
     });
 
     calltreeTable.on('tableBuilt', () => {
       resolve();
-      calltreeTable.setFilter((data, _filterParams) => {
-        return data.originalData.duration || data.originalData.discontinuity;
-      });
+      //@ts-expect-error valid
+      calltreeTable.addFilter(showDetailsFilter);
     });
   });
 }
 
-function expandAll(rows: RowComponent[]) {
+function expandCollapseAll(rows: RowComponent[], expand: boolean = true) {
   const len = rows.length;
   for (let i = 0; i < len; i++) {
     const row = rows[i];
     if (row) {
-      row.treeExpand();
+      if (expand) {
+        row.treeExpand();
+      } else {
+        row.treeCollapse();
+      }
 
-      expandAll(row.getTreeChildren());
-    }
-  }
-}
-
-function collapseAll(rows: RowComponent[]) {
-  const len = rows.length;
-  for (let i = 0; i < len; i++) {
-    const row = rows[i];
-    if (row) {
-      row.treeCollapse();
-
-      collapseAll(row.getTreeChildren());
+      expandCollapseAll(row.getTreeChildren(), expand);
     }
   }
 }
@@ -486,3 +557,38 @@ interface CalltreeRow {
   totalThrownCount: number;
   rows: number;
 }
+
+const showDetailsFilter = (data: CalltreeRow) => {
+  return deepFilter(
+    data,
+    (rowData) => {
+      return rowData.originalData.duration > 0 || rowData.originalData.discontinuity;
+    },
+    {
+      filterCache: showDetailsFilterCache,
+    },
+  );
+};
+
+const debugFilter = (data: CalltreeRow) => {
+  return deepFilter(
+    data,
+    (rowData) => {
+      const debugValues = [
+        'USER_DEBUG',
+        'DATAWEAVE_USER_DEBUG',
+        'USER_DEBUG_FINER',
+        'USER_DEBUG_FINEST',
+        'USER_DEBUG_FINE',
+        'USER_DEBUG_DEBUG',
+        'USER_DEBUG_INFO',
+        'USER_DEBUG_WARN',
+        'USER_DEBUG_ERROR',
+      ];
+      return debugValues.includes(rowData.originalData.type || '');
+    },
+    {
+      filterCache: debugOnlyFilterCache,
+    },
+  );
+};
