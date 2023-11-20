@@ -283,7 +283,7 @@ export async function renderCallTree(
           width: 60,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          bottomCalc: 'sum',
+          bottomCalc: 'max',
         },
         {
           title: 'SOQL Count',
@@ -292,7 +292,7 @@ export async function renderCallTree(
           width: 60,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          bottomCalc: 'sum',
+          bottomCalc: 'max',
         },
         {
           title: 'Throws Count',
@@ -301,7 +301,7 @@ export async function renderCallTree(
           width: 60,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          bottomCalc: 'sum',
+          bottomCalc: 'max',
         },
         {
           title: 'Rows',
@@ -310,7 +310,7 @@ export async function renderCallTree(
           width: 60,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          bottomCalc: 'sum',
+          bottomCalc: 'max',
         },
         {
           title: 'Total Time (ms)',
