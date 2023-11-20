@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Debug Only Call Tree filtering ([#86][#86])
+  - Filters the Call Tree to show only debug statments with the context of the Call Stack.
 - Show Log Parsing issues via notification bell ([#209][#209])
   - Shows unsupported log event names + invalid log lines
 
@@ -290,6 +292,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#86]: https://github.com/certinia/debug-log-analyzer/issues/86
 [#423]: https://github.com/certinia/debug-log-analyzer/issues/423
 [#209]: https://github.com/certinia/debug-log-analyzer/issues/209
 
