@@ -26,13 +26,15 @@ export class LogView {
   static async createView(
     wsPath: string,
     context: Context,
-    logPath: string,
     beforeSendLog?: Promise<void>,
+    logPath?: string,
+    logData?: string,
   ): Promise<WebviewPanel> {
-    const panel = WebView.apply('logFile', 'Log: ' + basename(logPath), [
-      Uri.file(join(context.context.extensionPath, 'out')),
-      Uri.file(dirname(logPath)),
-    ]);
+    const panel = WebView.apply(
+      'logFile',
+      'Log: ' + logPath ? basename(logPath || '') : 'Untitled',
+      [Uri.file(join(context.context.extensionPath, 'out')), Uri.file(dirname(logPath || ''))],
+    );
 
     const logViewerRoot = join(context.context.extensionPath, 'out');
     const index = join(logViewerRoot, 'index.html');
@@ -55,7 +57,7 @@ export class LogView {
         switch (request.cmd) {
           case 'fetchLog': {
             await beforeSendLog;
-            LogView.sendLog(panel, context, logPath);
+            LogView.sendLog(panel, context, logPath, logData);
             break;
           }
 
@@ -141,20 +143,26 @@ export class LogView {
     });
   }
 
-  private static sendLog(panel: WebviewPanel, context: Context, logFilePath: string) {
-    if (!existsSync(logFilePath)) {
+  private static sendLog(
+    panel: WebviewPanel,
+    context: Context,
+    logFilePath?: string,
+    logData?: string,
+  ) {
+    if (!logData && !existsSync(logFilePath || '')) {
       context.display.showErrorMessage('Log file could not be found.', {
         modal: true,
       });
     }
 
-    const filePath = parse(logFilePath);
+    const filePath = parse(logFilePath || '');
     panel.webview.postMessage({
       command: 'fetchLog',
       data: {
         logName: filePath.name,
-        logUri: panel.webview.asWebviewUri(Uri.file(logFilePath)).toString(true),
+        logUri: logFilePath ? panel.webview.asWebviewUri(Uri.file(logFilePath)).toString(true) : '',
         logPath: logFilePath,
+        logData: logData,
       },
     });
   }
