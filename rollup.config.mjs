@@ -99,7 +99,7 @@ export default [
                   minifyURLs: true,
                   preventAttributesEscaping: true,
                   processConditionalComments: true,
-                  removeAttributeQuotes: true,
+                  removeAttributeQuotes: false,
                   removeComments: true,
                   removeEmptyAttributes: true,
                   removeOptionalTags: true,
