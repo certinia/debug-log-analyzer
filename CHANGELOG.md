@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Skipped-Lines and Max-Size-reached marker color from green to blue. Green normal mean things are ok, blue better represents information.
   - Added faint grey lines between the event markers to seperates them. This helps when two error are next to each other.
 
+## [1.10.4] - 2023-11-22
+
+### Fixed
+
+- Log Analysis not displaying if user path contained whitespace ([#447][#447])
+
 ## [1.10.3] - 2023-11-07
 
 ### Fixed
@@ -303,6 +309,10 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#115]: https://github.com/certinia/debug-log-analyzer/issues/115
 [#423]: https://github.com/certinia/debug-log-analyzer/issues/423
 [#209]: https://github.com/certinia/debug-log-analyzer/issues/209
+
+<!-- v1.10.4 -->
+
+[#447]: https://github.com/certinia/debug-log-analyzer/issues/447
 
 <!-- v1.10.2 -->
 
