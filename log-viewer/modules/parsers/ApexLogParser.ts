@@ -1996,9 +1996,9 @@ class WFApprovalRemoveLine extends LogLine {
   }
 }
 
-class WFApprovalSubmitLine extends LogLine {
+class WFApprovalSubmitLine extends Method {
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_PROCESS_FOUND'], 'Workflow', 'custom');
     this.text = `${parts[2]}`;
   }
 }
@@ -2075,6 +2075,7 @@ class WFOutboundMsgLine extends LogLine {
 }
 
 class WFProcessFoundLine extends LogLine {
+  isExit = true;
   constructor(parts: string[]) {
     super(parts);
     this.text = `${parts[2]} : ${parts[3]}`;
