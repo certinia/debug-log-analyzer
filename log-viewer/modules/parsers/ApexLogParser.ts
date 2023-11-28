@@ -79,7 +79,7 @@ export default class ApexLogParser {
     if ((!type || !typePattern.test(type)) && lastEntry && lastEntry.acceptsText) {
       // wrapped text from the previous entry?
       lastEntry.text += `\n${line}`;
-    } else if (type) {
+    } else if (type && typePattern.test(type)) {
       const message = `Unsupported log event name: ${type}`;
       !this.parsingErrors.includes(message) && this.parsingErrors.push(message);
     } else {
