@@ -3,6 +3,7 @@
  */
 
 // todo: Each type should have namespaces assocated (default of unmanagd) - **NEW FEAT**
+// Add new aggregate tuple {self: , total:} usage sum.dml.self
 
 const typePattern = /^[A-Z_]*$/,
   newlineRegex = /\r?\n/,
@@ -536,7 +537,8 @@ export abstract class LogLine {
   isExit = false;
 
   /**
-   *  Should the exitstamp be the timestamp of the next line?
+   * Should the exitstamp be the timestamp of the next line?
+   * These kind of lines can not be used as exit lines for anything othe than other pseudo exits.
    */
   nextLineIsExit = false;
 
@@ -1931,9 +1933,11 @@ class WFFlowActionErrorDetailLine extends LogLine {
   }
 }
 
-class WFFieldUpdateLine extends LogLine {
+class WFFieldUpdateLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_FIELD_UPDATE'], 'Workflow', 'custom');
     this.text = ' ' + parts[2] + ' ' + parts[3] + ' ' + parts[4] + ' ' + parts[5] + ' ' + parts[6];
   }
 }
@@ -1972,11 +1976,13 @@ class WFCriteriaBeginLine extends Method {
   }
 }
 
-class WFFormulaLine extends LogLine {
+class WFFormulaLine extends Method {
   acceptsText = true;
+  isExit = true;
+  nextLineIsExit = true;
 
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_FORMULA'], 'Workflow', 'custom');
     this.text = parts[2] + ' : ' + parts[3];
   }
 }
@@ -2002,9 +2008,11 @@ class WFActionTaskLine extends LogLine {
   }
 }
 
-class WFApprovalLine extends LogLine {
+class WFApprovalLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_APPROVAL'], 'Workflow', 'custom');
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -2017,8 +2025,10 @@ class WFApprovalRemoveLine extends LogLine {
 }
 
 class WFApprovalSubmitLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts, ['WF_PROCESS_FOUND'], 'Workflow', 'custom');
+    super(parts, ['WF_APPROVAL_SUBMIT'], 'Workflow', 'custom');
     this.text = `${parts[2]}`;
   }
 }
@@ -2037,16 +2047,20 @@ class WFAssignLine extends LogLine {
   }
 }
 
-class WFEmailAlertLine extends LogLine {
+class WFEmailAlertLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_EMAIL_ALERT'], 'Workflow', 'custom');
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
 
-class WFEmailSentLine extends LogLine {
+class WFEmailSentLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_EMAIL_SENT'], 'Workflow', 'custom');
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -2065,9 +2079,11 @@ class WFEscalationActionLine extends LogLine {
   }
 }
 
-class WFEvalEntryCriteriaLine extends LogLine {
+class WFEvalEntryCriteriaLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_EVAL_ENTRY_CRITERIA'], 'Workflow', 'custom');
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -2080,9 +2096,11 @@ class WFFlowActionDetailLine extends LogLine {
   }
 }
 
-class WFNextApproverLine extends LogLine {
+class WFNextApproverLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_NEXT_APPROVER'], 'Workflow', 'custom');
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -2094,17 +2112,20 @@ class WFOutboundMsgLine extends LogLine {
   }
 }
 
-class WFProcessFoundLine extends LogLine {
+class WFProcessFoundLine extends Method {
   isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_PROCESS_FOUND'], 'Workflow', 'custom');
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
 
-class WFProcessNode extends LogLine {
+class WFProcessNode extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_PROCESS_NODE'], 'Workflow', 'custom');
     this.text = parts[2] || '';
   }
 }
@@ -2130,9 +2151,11 @@ class WFRuleEntryOrderLine extends LogLine {
   }
 }
 
-class WFRuleInvocationLine extends LogLine {
+class WFRuleInvocationLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_RULE_INVOCATION'], 'Workflow', 'custom');
     this.text = parts[2] || '';
   }
 }
