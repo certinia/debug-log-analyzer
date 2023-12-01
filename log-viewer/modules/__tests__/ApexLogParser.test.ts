@@ -80,6 +80,98 @@ describe('parseLine tests', () => {
   });
 });
 
+describe('Pseudo EXIT events', () => {
+  it('WF_APPROVAL_SUBMIT', () => {
+    const logData =
+      '00:00:00.757 (1)|WF_APPROVAL_SUBMIT|[Record: myrecord1 anId1]\n' +
+      '00:00:00.757 (2)|WF_PROCESS_FOUND|ProcessDefinitionNameOrId:<processId>|Applicable process was found.\n' +
+      '00:00:00.757 (3)|WF_APPROVAL_SUBMIT|[Record: myrecord2 anId2]\n' +
+      '00:00:00.757 (4)|WF_PROCESS_FOUND|ProcessDefinitionNameOrId:<processId>|Applicable process was found.';
+
+    const log1 = parse(logData);
+    expect(log1.children.length).toEqual(4);
+    expect(log1.duration).toEqual(3);
+
+    const approval1 = log1.children[0] as Method;
+    expect(approval1.duration).toEqual(1);
+    expect(approval1.type).toEqual('WF_APPROVAL_SUBMIT');
+
+    const processFound1 = log1.children[1] as Method;
+    expect(processFound1.duration).toEqual(1);
+    expect(processFound1.type).toEqual('WF_PROCESS_FOUND');
+
+    const approval2 = log1.children[2] as Method;
+    expect(approval2.duration).toEqual(1);
+    expect(approval2.type).toEqual('WF_APPROVAL_SUBMIT');
+
+    const processFound2 = log1.children[3] as Method;
+    expect(processFound2.duration).toEqual(0); // no lines after the last WF_PROCESS_FOUND to use as an exit
+    expect(processFound2.type).toEqual('WF_PROCESS_FOUND');
+  });
+
+  it('Pseudo EXIT With Entry after last event', () => {
+    const logData =
+      '00:00:00.757 (1)|CODE_UNIT_STARTED|[EXTERNAL]|Workflow:ApprovalProcessActions\n' +
+      '00:00:00.757 (2)|WF_NEXT_APPROVER|Phillip Box|Related User|: Approver\n' +
+      '00:00:00.757 (3)|WF_NEXT_APPROVER|Phillip Box|Related User|: Approver\n' +
+      '00:00:00.757 (4)|WF_NEXT_APPROVER|Phillip Box|Related User|: Approver\n' +
+      '00:00:00.757 (5)|METHOD_ENTRY|[17]|a00000000000000|ns.MyClass.myMethod()\n' +
+      '00:00:00.757 (6)|METHOD_EXIT|[17]|a00000000000000|ns.MyClass.myMethod()\n' +
+      '00:00:00.757 (7)|CODE_UNIT_FINISHED|Workflow:ApprovalProcessActions\n';
+
+    const log1 = parse(logData);
+    expect(log1.children.length).toEqual(1);
+    expect(log1.duration).toEqual(6);
+
+    const children = (log1.children[0] as Method).children;
+    expect(children.length).toEqual(4);
+
+    const child1 = children[0] as Method;
+    expect(child1.timestamp).toEqual(2);
+    expect(child1.exitStamp).toEqual(3);
+
+    const child2 = children[1] as Method;
+    expect(child2.timestamp).toEqual(3);
+    expect(child2.exitStamp).toEqual(4);
+
+    const child3 = children[2] as Method;
+    expect(child3.timestamp).toEqual(4);
+    expect(child3.exitStamp).toEqual(5);
+
+    const child4 = children[3] as Method;
+    expect(child4.timestamp).toEqual(5);
+    expect(child4.exitStamp).toEqual(6);
+  });
+
+  it('Pseudo EXIT With Exit after last event', () => {
+    const logData =
+      '00:00:00.757 (1)|CODE_UNIT_STARTED|[EXTERNAL]|Workflow:ApprovalProcessActions\n' +
+      '00:00:00.757 (2)|WF_NEXT_APPROVER|Phillip Box|Related User|: Approver\n' +
+      '00:00:00.757 (3)|WF_NEXT_APPROVER|Phillip Box|Related User|: Approver\n' +
+      '00:00:00.757 (4)|WF_NEXT_APPROVER|Phillip Box|Related User|: Approver\n' +
+      '00:00:00.757 (5)|CODE_UNIT_FINISHED|Workflow:ApprovalProcessActions\n';
+
+    const log1 = parse(logData);
+    expect(log1.children.length).toEqual(1);
+    expect(log1.duration).toEqual(4);
+
+    const children = (log1.children[0] as Method).children;
+    expect(children.length).toEqual(3);
+
+    const child1 = children[0] as Method;
+    expect(child1.timestamp).toEqual(2);
+    expect(child1.exitStamp).toEqual(3);
+
+    const child2 = children[1] as Method;
+    expect(child2.timestamp).toEqual(3);
+    expect(child2.exitStamp).toEqual(4);
+
+    const child3 = children[2] as Method;
+    expect(child3.timestamp).toEqual(4);
+    expect(child3.exitStamp).toEqual(5);
+  });
+});
+
 describe('Invalid Debug Lines tests', () => {
   it('Unrecognised line type will added to issues', () => {
     const log1 = parse('09:18:22.6 (1)|FAKE_TYPE');
@@ -379,12 +471,10 @@ describe('getRootMethod tests', () => {
     expect(interViewsBegin.text).toBe('FLOW_START_INTERVIEWS : Example Process Builder');
     expect(interViewsBegin.suffix).toBe(' (Process Builder)');
 
-    expect(interViewsBegin.children.length).toBe(2);
+    expect(interViewsBegin.children.length).toBe(1);
     const interViewBegin = interViewsBegin.children[0];
     expect(interViewBegin?.type).toBe('FLOW_START_INTERVIEW_BEGIN');
-
-    const interViewEnd = interViewsBegin.children[1];
-    expect(interViewEnd?.type).toBe('FLOW_START_INTERVIEW_END');
+    expect(interViewBegin?.duration).toBe(6332706);
   });
 
   it('FlowStartInterviewsBeginLine should be a flow ', async () => {
@@ -416,12 +506,10 @@ describe('getRootMethod tests', () => {
     expect(interViewsBegin.text).toBe('FLOW_START_INTERVIEWS : Example Flow');
     expect(interViewsBegin.suffix).toBe(' (Flow)');
 
-    expect(interViewsBegin.children.length).toBe(2);
+    expect(interViewsBegin.children.length).toBe(1);
     const interViewBegin = interViewsBegin.children[0];
     expect(interViewBegin?.type).toBe('FLOW_START_INTERVIEW_BEGIN');
-
-    const interViewEnd = interViewsBegin.children[1];
-    expect(interViewEnd?.type).toBe('FLOW_START_INTERVIEW_END');
+    expect(interViewBegin?.duration).toBe(6332706);
   });
 
   it('FlowStartInterviewsBeginLine should be a flow called from a process builder', async () => {
@@ -457,25 +545,21 @@ describe('getRootMethod tests', () => {
     expect(pbBegin.text).toBe('FLOW_START_INTERVIEWS : Example Process Builder');
     expect(pbBegin.suffix).toBe(' (Process Builder)');
 
-    expect(pbBegin.children.length).toBe(3);
+    expect(pbBegin.children.length).toBe(1);
     const pbDetail = pbBegin.children[0] as TimedNode;
     expect(pbDetail.type).toBe('FLOW_START_INTERVIEW_BEGIN');
     expect(pbDetail.text).toBe('Example Process Builder');
 
-    const interViewsBegin = pbBegin.children[1] as TimedNode;
+    const interViewsBegin = pbDetail.children[0] as TimedNode;
     expect(interViewsBegin.type).toBe('FLOW_START_INTERVIEWS_BEGIN');
     expect(interViewsBegin.text).toBe('FLOW_START_INTERVIEWS : Example Flow');
     expect(interViewsBegin.suffix).toBe(' (Flow)');
+    expect(interViewsBegin.duration).toBe(3);
 
-    const pbDetailEnd = pbBegin.children[2] as TimedNode;
-    expect(pbDetailEnd.type).toBe('FLOW_START_INTERVIEW_END');
-
-    expect(interViewsBegin.children.length).toBe(2);
+    expect(interViewsBegin.children.length).toBe(1);
     const interViewBegin = interViewsBegin.children[0];
     expect(interViewBegin?.type).toBe('FLOW_START_INTERVIEW_BEGIN');
-
-    const interViewEnd = interViewsBegin.children[1];
-    expect(interViewEnd?.type).toBe('FLOW_START_INTERVIEW_END');
+    expect(interViewBegin?.duration).toBe(1);
   });
 
   it('Root exitStamp should match last line pair with a duration', async () => {
@@ -574,40 +658,6 @@ describe('getRootMethod tests', () => {
   });
 });
 
-describe('lineTypeMap tests', () => {
-  it('Lines referenced by exitTypes should be exits', () => {
-    for (const [_keyName, cls] of lineTypeMap) {
-      const line = new cls([
-        '14:32:07.563 (17358806534)',
-        'DUMMY',
-        '[10]',
-        'Rows:3',
-        '',
-        'Rows:5',
-      ]) as LogLine;
-      if (line instanceof Method) {
-        expect(line.exitTypes).not.toBe(null);
-        expect(line.isExit).toBe(false);
-        line.exitTypes.forEach((exitType) => {
-          const exitCls = lineTypeMap.get(exitType);
-          expect(exitCls).not.toBe(null);
-          if (exitCls) {
-            const exitLine = new exitCls([
-              '14:32:07.563 (17358806534)',
-              'DUMMY',
-              '[10]',
-              'Rows:3',
-              '',
-              'Rows:5',
-            ]) as LogLine;
-            expect(exitLine.isExit).toBe(true);
-          }
-        });
-      }
-    }
-  });
-});
-
 describe('Log Settings tests', () => {
   const log =
     '43.0 APEX_CODE,FINE;APEX_PROFILING,NONE;CALLOUT,NONE;DB,INFO;NBA,NONE;SYSTEM,NONE;VALIDATION,INFO;VISUALFORCE,NONE;WAVE,NONE;WORKFLOW,INFO\n' +
@@ -661,7 +711,7 @@ describe('Recalculate durations tests', () => {
 
 describe('Line Type Tests', () => {
   it('Lines referenced by exitTypes should be exits', () => {
-    for (const lineType of lineTypeMap.values()) {
+    for (const [key, lineType] of lineTypeMap) {
       const line = new lineType([
         '14:32:07.563 (17358806534)',
         'DUMMY',
@@ -672,7 +722,9 @@ describe('Line Type Tests', () => {
       ]) as LogLine;
       if (line instanceof Method) {
         expect(line.exitTypes).not.toBe(null);
-        expect(line.isExit).toBe(false);
+        if (line.isExit) {
+          expect(line.exitTypes).toEqual([key]);
+        }
         line.exitTypes.forEach((exitType) => {
           const exitCls = lineTypeMap.get(exitType);
           expect(exitCls).not.toBe(null);

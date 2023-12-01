@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Open Apex Log Analyzer from a dirty vscode editor ([#213][#213])
   - Supports opening Apex Log Analyzer when a log is dragged and dropped into Salesforce Code Builder.
   - It allows for a log analysis to be shown when a file is deleted on local disk or a log is copy and pasted into an editor window without saving.
+- Show time taken for more events within the `Workflow:ApprovalProcessActions` Code Unit ([#336][#336])
+  - Estimates the time taken for some events without an exit event within `Workflow:ApprovalProcessActions` Code Unit e.g `WF_APPROVAl` + `WF_EMAIL_SENT`
 - Make dragging more obvious on the Timeline by showing different cursors ([#423][#423])
   - Show the pointer cursor by default when hovering the Timeline.
   - Show the grabbing cursor when the mouse is pressed down on the Timeline, to indicate drag is now possible.
@@ -304,6 +306,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#336]: https://github.com/certinia/debug-log-analyzer/issues/336
 [#213]: https://github.com/certinia/debug-log-analyzer/issues/213
 [#86]: https://github.com/certinia/debug-log-analyzer/issues/86
 [#115]: https://github.com/certinia/debug-log-analyzer/issues/115

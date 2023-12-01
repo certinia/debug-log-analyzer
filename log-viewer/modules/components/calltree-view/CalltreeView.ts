@@ -212,12 +212,17 @@ function deepFilter(
   }
 
   let childMatch = false;
-  for (const childRow of rowData._children || []) {
-    const match = deepFilter(childRow, filterFunction, filterParams);
+  const children = rowData._children || [];
+  let len = children.length;
+  while (len-- > 0) {
+    const childRow = children[len];
+    if (childRow) {
+      const match = deepFilter(childRow, filterFunction, filterParams);
 
-    if (match) {
-      childMatch = true;
-      break;
+      if (match) {
+        childMatch = true;
+        break;
+      }
     }
   }
 
