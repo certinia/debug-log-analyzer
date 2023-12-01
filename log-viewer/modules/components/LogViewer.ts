@@ -97,8 +97,6 @@ export class LogViewer extends LitElement {
       logMessage.message = element.description;
       logMessage.severity = severity;
       localNotifications.push(logMessage);
-
-      console.debug('s,', severity, logMessage);
     });
     this.notifications = localNotifications;
 

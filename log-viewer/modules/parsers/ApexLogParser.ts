@@ -3,6 +3,7 @@
  */
 
 // todo: Each type should have namespaces assocated (default of unmanagd) - **NEW FEAT**
+// Add new aggregate tuple {self: , total:} usage sum.dml.self
 
 const typePattern = /^[A-Z_]*$/,
   newlineRegex = /\r?\n/,
@@ -79,7 +80,7 @@ export default class ApexLogParser {
     if ((!type || !typePattern.test(type)) && lastEntry && lastEntry.acceptsText) {
       // wrapped text from the previous entry?
       lastEntry.text += `\n${line}`;
-    } else if (type) {
+    } else if (type && typePattern.test(type)) {
       const message = `Unsupported log event name: ${type}`;
       !this.parsingErrors.includes(message) && this.parsingErrors.push(message);
     } else {
@@ -165,7 +166,9 @@ export default class ApexLogParser {
   private parseTree(currentLine: Method, lineIter: LineIterator, stack: Method[]) {
     this.lastTimestamp = currentLine.timestamp;
 
-    if (currentLine.exitTypes.length > 0) {
+    const isEntry = currentLine.exitTypes.length > 0;
+    if (isEntry) {
+      const exitOnNextLine = currentLine.nextLineIsExit;
       let nextLine;
 
       stack.push(currentLine);
@@ -175,8 +178,21 @@ export default class ApexLogParser {
           this.discontinuity = true; // start unwinding stack
         }
 
+        if (
+          exitOnNextLine &&
+          (nextLine.nextLineIsExit || nextLine.isExit || nextLine.exitTypes.length > 0)
+        ) {
+          currentLine.exitStamp = nextLine.timestamp;
+          currentLine.onEnd?.(nextLine, stack);
+          break;
+        }
+
         // Exit Line has been found no more work needed
-        if (nextLine.isExit && this.endMethod(currentLine, nextLine, lineIter, stack)) {
+        if (
+          !nextLine.nextLineIsExit &&
+          nextLine.isExit &&
+          this.endMethod(currentLine, nextLine, lineIter, stack)
+        ) {
           if (currentLine.onEnd) {
             // the method wants to see the exit line
             currentLine.onEnd(nextLine, stack);
@@ -521,6 +537,12 @@ export abstract class LogLine {
   isExit = false;
 
   /**
+   * Should the exitstamp be the timestamp of the next line?
+   * These kind of lines can not be used as exit lines for anything othe than other pseudo exits.
+   */
+  nextLineIsExit = false;
+
+  /**
    * The line number within the containing class
    */
   lineNumber: LineNumber = null;
@@ -574,6 +596,11 @@ export abstract class LogLine {
    * The total number of exceptions thrown (EXCEPTION_THROWN) in this node and child nodes
    */
   totalThrownCount = 0;
+
+  /**
+   * The line types which would legitimately end this method
+   */
+  exitTypes: LogEventType[] = [];
 
   constructor(parts: string[] | null) {
     if (parts) {
@@ -650,11 +677,6 @@ export class TimedNode extends LogLine {
  * The method will be rendered as "expandable" in the tree-view, if it has children.
  */
 export class Method extends TimedNode {
-  /**
-   * The line types which would legitimately end this method
-   */
-  exitTypes: LogEventType[];
-
   /**
    * Whether the log event was truncated when the log ended, e,g no matching end event
    */
@@ -1597,9 +1619,9 @@ class FlowStartInterviewsErrorLine extends LogLine {
   }
 }
 
-class FlowStartInterviewBeginLine extends LogLine {
+class FlowStartInterviewBeginLine extends Method {
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['FLOW_START_INTERVIEW_END'], 'Flow', 'custom');
     this.text = parts[3] || '';
   }
 }
@@ -1911,9 +1933,11 @@ class WFFlowActionErrorDetailLine extends LogLine {
   }
 }
 
-class WFFieldUpdateLine extends LogLine {
+class WFFieldUpdateLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_FIELD_UPDATE'], 'Workflow', 'custom');
     this.text = ' ' + parts[2] + ' ' + parts[3] + ' ' + parts[4] + ' ' + parts[5] + ' ' + parts[6];
   }
 }
@@ -1952,11 +1976,13 @@ class WFCriteriaBeginLine extends Method {
   }
 }
 
-class WFFormulaLine extends LogLine {
+class WFFormulaLine extends Method {
   acceptsText = true;
+  isExit = true;
+  nextLineIsExit = true;
 
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_FORMULA'], 'Workflow', 'custom');
     this.text = parts[2] + ' : ' + parts[3];
   }
 }
@@ -1982,9 +2008,11 @@ class WFActionTaskLine extends LogLine {
   }
 }
 
-class WFApprovalLine extends LogLine {
+class WFApprovalLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_APPROVAL'], 'Workflow', 'custom');
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -1996,9 +2024,11 @@ class WFApprovalRemoveLine extends LogLine {
   }
 }
 
-class WFApprovalSubmitLine extends LogLine {
+class WFApprovalSubmitLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_APPROVAL_SUBMIT'], 'Workflow', 'custom');
     this.text = `${parts[2]}`;
   }
 }
@@ -2017,16 +2047,20 @@ class WFAssignLine extends LogLine {
   }
 }
 
-class WFEmailAlertLine extends LogLine {
+class WFEmailAlertLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_EMAIL_ALERT'], 'Workflow', 'custom');
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
 
-class WFEmailSentLine extends LogLine {
+class WFEmailSentLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_EMAIL_SENT'], 'Workflow', 'custom');
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -2045,9 +2079,11 @@ class WFEscalationActionLine extends LogLine {
   }
 }
 
-class WFEvalEntryCriteriaLine extends LogLine {
+class WFEvalEntryCriteriaLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_EVAL_ENTRY_CRITERIA'], 'Workflow', 'custom');
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -2060,9 +2096,11 @@ class WFFlowActionDetailLine extends LogLine {
   }
 }
 
-class WFNextApproverLine extends LogLine {
+class WFNextApproverLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_NEXT_APPROVER'], 'Workflow', 'custom');
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -2074,16 +2112,20 @@ class WFOutboundMsgLine extends LogLine {
   }
 }
 
-class WFProcessFoundLine extends LogLine {
+class WFProcessFoundLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_PROCESS_FOUND'], 'Workflow', 'custom');
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
 
-class WFProcessNode extends LogLine {
+class WFProcessNode extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_PROCESS_NODE'], 'Workflow', 'custom');
     this.text = parts[2] || '';
   }
 }
@@ -2109,9 +2151,11 @@ class WFRuleEntryOrderLine extends LogLine {
   }
 }
 
-class WFRuleInvocationLine extends LogLine {
+class WFRuleInvocationLine extends Method {
+  isExit = true;
+  nextLineIsExit = true;
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['WF_RULE_INVOCATION'], 'Workflow', 'custom');
     this.text = parts[2] || '';
   }
 }
@@ -2493,7 +2537,6 @@ const basicLogEvents: LogEventType[] = [
   'BULK_COUNTABLE_STATEMENT_EXECUTE',
   'TEMPLATE_PROCESSING_ERROR',
   'EXTERNAL_SERVICE_REQUEST',
-  'FLOW_START_INTERVIEW_END',
   'FLOW_CREATE_INTERVIEW_BEGIN',
   'FLOW_CREATE_INTERVIEW_END',
   'VARIABLE_SCOPE_END',
@@ -2556,6 +2599,7 @@ const basicLogEvents: LogEventType[] = [
 ];
 
 const basicExitLogEvents: LogEventType[] = [
+  'FLOW_START_INTERVIEW_END',
   'VF_DESERIALIZE_VIEWSTATE_END',
   'VF_SERIALIZE_VIEWSTATE_END',
   'CUMULATIVE_LIMIT_USAGE_END',
