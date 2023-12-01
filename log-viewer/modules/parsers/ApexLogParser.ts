@@ -1597,9 +1597,9 @@ class FlowStartInterviewsErrorLine extends LogLine {
   }
 }
 
-class FlowStartInterviewBeginLine extends LogLine {
+class FlowStartInterviewBeginLine extends Method {
   constructor(parts: string[]) {
-    super(parts);
+    super(parts, ['FLOW_START_INTERVIEW_END'], 'Flow', 'custom');
     this.text = parts[3] || '';
   }
 }
@@ -2494,7 +2494,6 @@ const basicLogEvents: LogEventType[] = [
   'BULK_COUNTABLE_STATEMENT_EXECUTE',
   'TEMPLATE_PROCESSING_ERROR',
   'EXTERNAL_SERVICE_REQUEST',
-  'FLOW_START_INTERVIEW_END',
   'FLOW_CREATE_INTERVIEW_BEGIN',
   'FLOW_CREATE_INTERVIEW_END',
   'VARIABLE_SCOPE_END',
@@ -2557,6 +2556,7 @@ const basicLogEvents: LogEventType[] = [
 ];
 
 const basicExitLogEvents: LogEventType[] = [
+  'FLOW_START_INTERVIEW_END',
   'VF_DESERIALIZE_VIEWSTATE_END',
   'VF_SERIALIZE_VIEWSTATE_END',
   'CUMULATIVE_LIMIT_USAGE_END',
