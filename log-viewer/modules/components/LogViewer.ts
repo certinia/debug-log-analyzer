@@ -81,7 +81,7 @@ export class LogViewer extends LitElement {
 
     this.logSize = apexLog.size;
     this.timelineRoot = apexLog;
-    this.logDuration = apexLog.duration;
+    this.logDuration = apexLog.duration.total;
     document.dispatchEvent(
       new CustomEvent('logsettings', {
         detail: { logSettings: this.timelineRoot?.debugLevels },

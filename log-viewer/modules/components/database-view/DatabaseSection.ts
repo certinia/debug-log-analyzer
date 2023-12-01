@@ -36,7 +36,7 @@ export class DatabaseSection extends LitElement {
     const totalCount = this.dbLines.length;
     let totalRows = 0;
     this.dbLines.forEach((value) => {
-      totalRows += value.selfRowCount || 0;
+      totalRows += value.rowCount.self || 0;
     });
 
     return html`

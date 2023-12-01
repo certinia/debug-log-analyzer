@@ -190,8 +190,8 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
       dmlText.push(dml.text);
       dmlData.push({
         dml: dml.text,
-        rowCount: dml.selfRowCount,
-        timeTaken: dml.duration,
+        rowCount: dml.rowCount.self,
+        timeTaken: dml.duration.total,
         timestamp: dml.timestamp,
         _children: [{ timestamp: dml.timestamp, isDetail: true }],
       });
@@ -388,8 +388,8 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
         isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
         relativeCost: explainLine?.relativeCost,
         soql: soql.text,
-        rowCount: soql.selfRowCount,
-        timeTaken: soql.duration,
+        rowCount: soql.rowCount.self,
+        timeTaken: soql.duration.total,
         aggregations: soql.aggregations,
         timestamp: soql.timestamp,
         _children: [{ timestamp: soql.timestamp, isDetail: true }],

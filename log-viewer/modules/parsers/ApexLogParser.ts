@@ -300,10 +300,10 @@ export default class ApexLogParser {
         if (child instanceof TimedNode) {
           this.aggregateTotals(child);
         }
-        node.totalDmlCount += child.totalDmlCount;
-        node.totalSoqlCount += child.totalSoqlCount;
+        node.dmlCount.total += child.dmlCount.total;
+        node.soqlCount.total += child.soqlCount.total;
         node.totalThrownCount += child.totalThrownCount;
-        node.totalRowCount += child.totalRowCount;
+        node.rowCount.total += child.rowCount.total;
       }
     }
   }
@@ -449,6 +449,11 @@ export default class ApexLogParser {
   }
 }
 
+interface SelfTotal {
+  self: number;
+  total: number;
+}
+
 export class DebugLevel {
   logCategory: string;
   logLevel: string;
@@ -491,20 +496,6 @@ interface LogIssue {
  */
 export abstract class LogLine {
   // common metadata (available for all lines)
-  /**
-   * The net (wall) time spent in the node (when not inside children)
-   */
-  selfTime = 0;
-
-  /**
-   * The total (wall) time spent in the node
-   */
-  duration = 0;
-
-  /**
-   * The timestamp of this log line, in nanoseconds
-   */
-  timestamp = 0;
 
   /**
    * The type of this log line from the log file e.g METHOD_ENTRY
@@ -558,7 +549,7 @@ export abstract class LogLine {
   value: string | null = null;
 
   /**
-   * Could have a corresponding file in the workspace?
+   * Could match to a corresponding symbol in a file in the workspace?
    */
   hasValidSymbols = false;
 
@@ -573,24 +564,59 @@ export abstract class LogLine {
   discontinuity = false;
 
   /**
-   * The total number of rows in all database operations for this node and child nodes
+   * The timestamp of this log line, in nanoseconds
    */
-  totalRowCount = 0;
+  timestamp = 0;
 
   /**
-   * The number of rows in all database operations for this node, excluding child nodes
+   * The time spent.
    */
-  selfRowCount = 0;
+  duration: SelfTotal = {
+    /**
+     * The net (wall) time spent in the node (when not inside children)
+     */
+    self: 0,
+    /**
+     * The total (wall) time spent in the node
+     */
+    total: 0,
+  };
 
   /**
-   * The total number of DML operations (DML_BEGIN) in this node and child nodes
+   * Total + self row counts for DML, SOQL + SOSL.
    */
-  totalDmlCount = 0;
+  rowCount: SelfTotal = {
+    /**
+     * The number of rows in all database operations for this node, excluding child nodes
+     */
+    self: 0,
+    /**
+     * The total number of rows in all database operations for this node and child nodes
+     */
+    total: 0,
+  };
 
-  /**
-   * The total number of SOQL operations (SOQL_EXECUTE_BEGIN) in this node and child nodes
-   */
-  totalSoqlCount = 0;
+  dmlCount: SelfTotal = {
+    /**
+     * The net number of DML operations (DML_BEGIN) in this node  in this node.
+     */
+    self: 0,
+    /**
+     * The total number of DML operations (DML_BEGIN) in this node and child nodes
+     */
+    total: 0,
+  };
+
+  soqlCount: SelfTotal = {
+    /**
+     * The net number of SOQL operations (SOQL_EXECUTE_BEGIN) in this node.
+     */
+    self: 0,
+    /**
+     * The total number of SOQL operations (SOQL_EXECUTE_BEGIN) in this node and child nodes
+     */
+    total: 0,
+  };
 
   /**
    * The total number of exceptions thrown (EXCEPTION_THROWN) in this node and child nodes
@@ -622,6 +648,8 @@ class BasicExitLine extends LogLine {
   isExit = true;
 }
 
+type CPUType = 'loading' | 'custom' | 'method' | 'free' | 'system' | 'pkg' | '';
+
 /**
  * Log lines extend this class if they have a duration (and hence can be shown on the timeline).
  * There are no real children (as there is no exit line), but children can get reparented here...
@@ -645,9 +673,9 @@ export class TimedNode extends LogLine {
   /**
    * The CPU type, e.g loading, method, custom
    */
-  cpuType: string; // the category key to collect our cpu usage
+  cpuType: CPUType; // the category key to collect our cpu usage
 
-  constructor(parts: string[] | null, timelineKey: LogSubCategory, cpuType: string) {
+  constructor(parts: string[] | null, timelineKey: LogSubCategory, cpuType: CPUType) {
     super(parts);
     this.subCategory = timelineKey;
     this.cpuType = cpuType;
@@ -659,13 +687,13 @@ export class TimedNode extends LogLine {
 
   recalculateDurations() {
     if (this.exitStamp) {
-      this.duration = this.exitStamp - this.timestamp;
+      this.duration.total = this.exitStamp - this.timestamp;
 
       let childDuration = 0;
       this.children.forEach((child) => {
-        childDuration += child.duration;
+        childDuration += child.duration.total;
       });
-      this.selfTime = this.duration - childDuration;
+      this.duration.self = this.duration.total - childDuration;
     }
   }
 }
@@ -686,7 +714,7 @@ export class Method extends TimedNode {
     parts: string[] | null,
     exitTypes: string[],
     timelineKey: LogSubCategory,
-    cpuType: string,
+    cpuType: CPUType,
   ) {
     super(parts, timelineKey, cpuType);
     this.exitTypes = exitTypes as LogEventType[];
@@ -758,7 +786,7 @@ export class ApexLog extends Method {
       endTime ??= child?.timestamp;
     }
     this.exitStamp = endTime || 0;
-    this.duration = this.exitStamp - this.timestamp;
+    this.duration.total = this.exitStamp - this.timestamp;
   }
 }
 
@@ -955,7 +983,7 @@ class SystemMethodExitLine extends LogLine {
   }
 }
 
-const cpuMap: Map<string, string> = new Map([
+const cpuMap: Map<string, CPUType> = new Map([
   ['EventService', 'method'],
   ['Validation', 'custom'],
   ['Workflow', 'custom'],
@@ -1120,13 +1148,17 @@ class VFPageMessageLine extends LogLine {
 }
 
 class DMLBeginLine extends Method {
-  totalDmlCount = 1;
+  dmlCount = {
+    self: 1,
+    total: 1,
+  };
+
   constructor(parts: string[]) {
     super(parts, ['DML_END'], 'DML', 'free');
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = 'DML ' + parts[3] + ' ' + parts[4];
     const rowCountString = parts[5];
-    this.totalRowCount = this.selfRowCount = rowCountString ? parseRows(rowCountString) : 0;
+    this.rowCount.total = this.rowCount.self = rowCountString ? parseRows(rowCountString) : 0;
   }
 }
 
@@ -1148,7 +1180,10 @@ class IdeasQueryExecuteLine extends LogLine {
 
 class SOQLExecuteBeginLine extends Method {
   aggregations = 0;
-  totalSoqlCount = 1;
+  soqlCount = {
+    self: 1,
+    total: 1,
+  };
 
   constructor(parts: string[]) {
     super(parts, ['SOQL_EXECUTE_END'], 'SOQL', 'free');
@@ -1165,7 +1200,7 @@ class SOQLExecuteBeginLine extends Method {
   }
 
   onEnd(end: SOQLExecuteEndLine, _stack: LogLine[]): void {
-    this.totalRowCount = this.selfRowCount = end.totalRowCount;
+    this.rowCount.total = this.rowCount.self = end.rowCount.total;
   }
 }
 
@@ -1175,7 +1210,7 @@ class SOQLExecuteEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.totalRowCount = this.selfRowCount = parseRows(parts[3] || '');
+    this.rowCount.total = this.rowCount.self = parseRows(parts[3] || '');
   }
 }
 
@@ -1233,7 +1268,7 @@ class SOSLExecuteBeginLine extends Method {
   }
 
   onEnd(end: SOSLExecuteEndLine, _stack: LogLine[]): void {
-    this.totalRowCount = this.selfRowCount = end.totalRowCount;
+    this.rowCount.total = this.rowCount.self = end.rowCount.total;
   }
 }
 
@@ -1243,7 +1278,7 @@ class SOSLExecuteEndLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
-    this.totalRowCount = this.selfRowCount = parseRows(parts[3] || '');
+    this.rowCount.total = this.rowCount.self = parseRows(parts[3] || '');
   }
 }
 
