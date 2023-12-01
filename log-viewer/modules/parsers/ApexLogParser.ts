@@ -165,7 +165,9 @@ export default class ApexLogParser {
   private parseTree(currentLine: Method, lineIter: LineIterator, stack: Method[]) {
     this.lastTimestamp = currentLine.timestamp;
 
-    if (currentLine.exitTypes.length > 0) {
+    const isEntry = currentLine.exitTypes.length > 0;
+    if (isEntry) {
+      const exitOnNextLine = currentLine.nextLineIsExit;
       let nextLine;
 
       stack.push(currentLine);
@@ -175,8 +177,21 @@ export default class ApexLogParser {
           this.discontinuity = true; // start unwinding stack
         }
 
+        if (
+          exitOnNextLine &&
+          (nextLine.nextLineIsExit || nextLine.isExit || nextLine.exitTypes.length > 0)
+        ) {
+          currentLine.exitStamp = nextLine.timestamp;
+          currentLine.onEnd?.(nextLine, stack);
+          break;
+        }
+
         // Exit Line has been found no more work needed
-        if (nextLine.isExit && this.endMethod(currentLine, nextLine, lineIter, stack)) {
+        if (
+          !nextLine.nextLineIsExit &&
+          nextLine.isExit &&
+          this.endMethod(currentLine, nextLine, lineIter, stack)
+        ) {
           if (currentLine.onEnd) {
             // the method wants to see the exit line
             currentLine.onEnd(nextLine, stack);
@@ -521,6 +536,11 @@ export abstract class LogLine {
   isExit = false;
 
   /**
+   *  Should the exitstamp be the timestamp of the next line?
+   */
+  nextLineIsExit = false;
+
+  /**
    * The line number within the containing class
    */
   lineNumber: LineNumber = null;
@@ -574,6 +594,11 @@ export abstract class LogLine {
    * The total number of exceptions thrown (EXCEPTION_THROWN) in this node and child nodes
    */
   totalThrownCount = 0;
+
+  /**
+   * The line types which would legitimately end this method
+   */
+  exitTypes: LogEventType[] = [];
 
   constructor(parts: string[] | null) {
     if (parts) {
@@ -650,11 +675,6 @@ export class TimedNode extends LogLine {
  * The method will be rendered as "expandable" in the tree-view, if it has children.
  */
 export class Method extends TimedNode {
-  /**
-   * The line types which would legitimately end this method
-   */
-  exitTypes: LogEventType[];
-
   /**
    * Whether the log event was truncated when the log ended, e,g no matching end event
    */
