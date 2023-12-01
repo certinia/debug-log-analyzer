@@ -3,7 +3,7 @@
  */
 import { type ExtensionContext, workspace } from 'vscode';
 
-import ShowAnalysisCodeLens from './codelenses/ShowAnalysisCodeLens.js';
+import { ShowAnalysisCodeLens } from './codelenses/ShowAnalysisCodeLens.js';
 import { RetrieveLogFile } from './commands/RetrieveLogFile.js';
 import { ShowLogAnalysis } from './commands/ShowLogAnalysis.js';
 import { Display } from './display/Display.js';

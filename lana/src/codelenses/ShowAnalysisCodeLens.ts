@@ -39,4 +39,4 @@ class ShowAnalysisCodeLens implements CodeLensProvider {
   }
 }
 
-export default ShowAnalysisCodeLens;
+export { ShowAnalysisCodeLens };
