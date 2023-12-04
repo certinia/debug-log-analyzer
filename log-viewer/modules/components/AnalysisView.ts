@@ -7,7 +7,7 @@ import { customElement, property } from 'lit/decorators.js';
 import { type ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
 import NumberAccessor from '../datagrid/dataaccessor/Number.js';
-import Progress from '../datagrid/format/Progress.js';
+import { progressFormatter } from '../datagrid/format/Progress.js';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation.js';
 import dataGridStyles from '../datagrid/style/DataGrid.scss';
 import { ApexLog, TimedNode } from '../parsers/ApexLogParser.js';
@@ -205,14 +205,14 @@ async function renderAnalysis(rootMethod: ApexLog) {
         width: 150,
         hozAlign: 'right',
         headerHozAlign: 'right',
-        formatter: Progress,
+        formatter: progressFormatter,
         formatterParams: {
           thousand: false,
           precision: 3,
           totalValue: rootMethod.duration,
         },
         accessorDownload: NumberAccessor,
-        bottomCalcFormatter: Progress,
+        bottomCalcFormatter: progressFormatter,
         bottomCalc: 'sum',
         bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration },
       },
@@ -225,14 +225,14 @@ async function renderAnalysis(rootMethod: ApexLog) {
         headerHozAlign: 'right',
         bottomCalc: 'sum',
         bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration },
-        formatter: Progress,
+        formatter: progressFormatter,
         formatterParams: {
           thousand: false,
           precision: 3,
           totalValue: rootMethod.duration,
         },
         accessorDownload: NumberAccessor,
-        bottomCalcFormatter: Progress,
+        bottomCalcFormatter: progressFormatter,
       },
     ],
   });
