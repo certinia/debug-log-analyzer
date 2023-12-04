@@ -105,7 +105,7 @@ The tooltip provides the following information.\
 
 Shows the call stack which can be expanded and collapsed. Clicking on a link will take you to that line in the class if it can be found in the current open project.
 
-![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.10/lana-calltree.png)
+![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.12/lana-calltree.png)
 
 Each row shows event type, details such as method signature, self and total time as well as aggregated DML, SOQL, Throws and Row counts.
 
@@ -130,7 +130,7 @@ The Call Tree can be navigated with the keyboard. The up and down keys will move
 
 Show analysis of method calls by showing Self Time, Total Time, Count (number of times a method was called), name and type. Each column can be sorted ascending or descending by clicking the column header.
 
-![analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.10/lana-analysis.png)
+![analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.12/lana-analysis.png)
 
 #### Sort
 
