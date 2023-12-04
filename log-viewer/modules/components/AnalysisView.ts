@@ -7,7 +7,7 @@ import { customElement, property } from 'lit/decorators.js';
 import { type ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
 
 import NumberAccessor from '../datagrid/dataaccessor/Number.js';
-import Number from '../datagrid/format/Number.js';
+import { progressFormatter } from '../datagrid/format/Progress.js';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation.js';
 import dataGridStyles from '../datagrid/style/DataGrid.scss';
 import { ApexLog, TimedNode } from '../parsers/ApexLogParser.js';
@@ -202,35 +202,37 @@ async function renderAnalysis(rootMethod: ApexLog) {
         title: 'Total Time (ms)',
         field: 'totalTime',
         sorter: 'number',
-        width: 100,
+        width: 150,
         hozAlign: 'right',
         headerHozAlign: 'right',
-        formatter: Number,
+        formatter: progressFormatter,
         formatterParams: {
           thousand: false,
           precision: 3,
+          totalValue: rootMethod.duration,
         },
         accessorDownload: NumberAccessor,
-        bottomCalcFormatter: Number,
+        bottomCalcFormatter: progressFormatter,
         bottomCalc: 'sum',
-        bottomCalcFormatterParams: { precision: 3 },
+        bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration },
       },
       {
         title: 'Self Time (ms)',
         field: 'selfTime',
         sorter: 'number',
-        width: 100,
+        width: 150,
         hozAlign: 'right',
         headerHozAlign: 'right',
         bottomCalc: 'sum',
-        bottomCalcFormatterParams: { precision: 3 },
-        formatter: Number,
+        bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration },
+        formatter: progressFormatter,
         formatterParams: {
           thousand: false,
           precision: 3,
+          totalValue: rootMethod.duration,
         },
         accessorDownload: NumberAccessor,
-        bottomCalcFormatter: Number,
+        bottomCalcFormatter: progressFormatter,
       },
     ],
   });

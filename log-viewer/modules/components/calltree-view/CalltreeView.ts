@@ -16,7 +16,7 @@ import { type RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables'
 
 import MinMaxEditor from '../../datagrid/editors/MinMax.js';
 import MinMaxFilter from '../../datagrid/filters/MinMax.js';
-import NumberFormat from '../../datagrid/format/Number.js';
+import { progressFormatter } from '../../datagrid/format/Progress.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
@@ -400,17 +400,18 @@ export async function renderCallTree(
           field: 'duration',
           sorter: 'number',
           headerSortTristate: true,
-          width: 100,
+          width: 150,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          formatter: NumberFormat,
+          formatter: progressFormatter,
           formatterParams: {
             thousand: false,
             precision: 3,
+            totalValue: rootMethod.duration,
           },
-          bottomCalcFormatter: NumberFormat,
+          bottomCalcFormatter: progressFormatter,
           bottomCalc: 'max',
-          bottomCalcParams: { precision: 3 },
+          bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration },
           headerFilter: MinMaxEditor,
           headerFilterFunc: MinMaxFilter,
           headerFilterFuncParams: { columnName: 'duration', filterCache: totalTimeFilterCache },
@@ -421,16 +422,17 @@ export async function renderCallTree(
           field: 'selfTime',
           sorter: 'number',
           headerSortTristate: true,
-          width: 100,
+          width: 150,
           hozAlign: 'right',
           headerHozAlign: 'right',
           bottomCalc: 'sum',
-          bottomCalcParams: { precision: 3 },
-          bottomCalcFormatter: NumberFormat,
-          formatter: NumberFormat,
+          bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration },
+          bottomCalcFormatter: progressFormatter,
+          formatter: progressFormatter,
           formatterParams: {
             thousand: false,
             precision: 3,
+            totalValue: rootMethod.duration,
           },
           headerFilter: MinMaxEditor,
           headerFilterFunc: MinMaxFilter,

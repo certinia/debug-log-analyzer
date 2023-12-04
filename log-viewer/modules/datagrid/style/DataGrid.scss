@@ -40,6 +40,7 @@ $footerSeparatorColor: transparent; //footer bottom separator color
 $footerActiveColor: #d00 !default; //footer bottom active text color
 @import '~tabulator-tables/src/scss/tabulator.scss';
 @import '../editors/MinMax';
+@import '../format/Progress';
 
 .tabulator {
   .tabulator-tableholder {

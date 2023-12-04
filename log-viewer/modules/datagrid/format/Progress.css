@@ -1,0 +1,19 @@
+.progress-wrapper {
+  position: relative;
+  font-variant-numeric: tabular-nums;
+}
+.progress-bar {
+  position: absolute;
+  background: #a97d0f;
+  opacity: 0.3;
+  height: 100%;
+  right: 0;
+}
+.progress-bar__text {
+  position: relative;
+  white-space: pre;
+  display: inline-flex;
+}
+.progress-bar__text__percent {
+  width: 9ch;
+}
