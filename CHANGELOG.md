@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Debug Only Call Tree filtering ([#86][#86])
   - Filters the Call Tree to show only debug statments with the context of the Call Stack.
+- Percent value (of the total log time) in the self and total columns. Visually represent the percentage via a percent bar as well as a value e.g 100 (50%) ([#311][#311])
+  - This is show for both the Call Tree and Analysis
 - Show Log Parsing issues via notification bell ([#209][#209])
   - Shows unsupported log event names + invalid log lines
 
@@ -306,6 +308,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#311]: https://github.com/certinia/debug-log-analyzer/issues/311
 [#336]: https://github.com/certinia/debug-log-analyzer/issues/336
 [#213]: https://github.com/certinia/debug-log-analyzer/issues/213
 [#86]: https://github.com/certinia/debug-log-analyzer/issues/86
