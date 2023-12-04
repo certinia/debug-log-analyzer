@@ -488,13 +488,13 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
       const data: CalltreeRow = {
         id: node.timestamp,
         text: node.text,
-        duration: node.duration,
-        selfTime: node.selfTime,
+        duration: node.duration.total,
+        selfTime: node.duration.self,
         _children: children,
-        totalDmlCount: node.totalDmlCount,
-        totalSoqlCount: node.totalSoqlCount,
+        totalDmlCount: node.dmlCount.total,
+        totalSoqlCount: node.soqlCount.total,
         totalThrownCount: node.totalThrownCount,
-        rows: node.totalRowCount || 0,
+        rows: node.rowCount.total,
         originalData: node,
       };
       results.push(data);
@@ -569,7 +569,7 @@ const showDetailsFilter = (data: CalltreeRow) => {
   return deepFilter(
     data,
     (rowData) => {
-      return rowData.originalData.duration > 0 || rowData.originalData.discontinuity;
+      return rowData.originalData.duration.total > 0 || rowData.originalData.discontinuity;
     },
     {
       filterCache: showDetailsFilterCache,

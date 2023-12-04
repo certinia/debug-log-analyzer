@@ -90,22 +90,22 @@ describe('Pseudo EXIT events', () => {
 
     const log1 = parse(logData);
     expect(log1.children.length).toEqual(4);
-    expect(log1.duration).toEqual(3);
+    expect(log1.duration).toEqual({ self: 0, total: 3 });
 
     const approval1 = log1.children[0] as Method;
-    expect(approval1.duration).toEqual(1);
+    expect(approval1.duration).toEqual({ self: 1, total: 1 });
     expect(approval1.type).toEqual('WF_APPROVAL_SUBMIT');
 
     const processFound1 = log1.children[1] as Method;
-    expect(processFound1.duration).toEqual(1);
+    expect(processFound1.duration).toEqual({ self: 1, total: 1 });
     expect(processFound1.type).toEqual('WF_PROCESS_FOUND');
 
     const approval2 = log1.children[2] as Method;
-    expect(approval2.duration).toEqual(1);
+    expect(approval2.duration).toEqual({ self: 1, total: 1 });
     expect(approval2.type).toEqual('WF_APPROVAL_SUBMIT');
 
     const processFound2 = log1.children[3] as Method;
-    expect(processFound2.duration).toEqual(0); // no lines after the last WF_PROCESS_FOUND to use as an exit
+    expect(processFound2.duration).toEqual({ self: 0, total: 0 }); // no lines after the last WF_PROCESS_FOUND to use as an exit
     expect(processFound2.type).toEqual('WF_PROCESS_FOUND');
   });
 
@@ -121,7 +121,7 @@ describe('Pseudo EXIT events', () => {
 
     const log1 = parse(logData);
     expect(log1.children.length).toEqual(1);
-    expect(log1.duration).toEqual(6);
+    expect(log1.duration).toEqual({ self: 0, total: 6 });
 
     const children = (log1.children[0] as Method).children;
     expect(children.length).toEqual(4);
@@ -153,7 +153,7 @@ describe('Pseudo EXIT events', () => {
 
     const log1 = parse(logData);
     expect(log1.children.length).toEqual(1);
-    expect(log1.duration).toEqual(4);
+    expect(log1.duration).toEqual({ self: 0, total: 4 });
 
     const children = (log1.children[0] as Method).children;
     expect(children.length).toEqual(3);
@@ -426,8 +426,8 @@ describe('parseLog tests', () => {
     const soqlLine = execEvent.children[0] as SOQLExecuteBeginLine;
     expect(soqlLine.type).toEqual('SOQL_EXECUTE_BEGIN');
     expect(soqlLine.aggregations).toEqual(2);
-    expect(soqlLine.selfRowCount).toEqual(50);
-    expect(soqlLine.totalRowCount).toEqual(50);
+    expect(soqlLine.rowCount.self).toEqual(50);
+    expect(soqlLine.rowCount.total).toEqual(50);
 
     const soqlExplain = soqlLine.children[0] as SOQLExecuteExplainLine;
     expect(soqlExplain.type).toEqual('SOQL_EXECUTE_EXPLAIN');
@@ -474,7 +474,7 @@ describe('getRootMethod tests', () => {
     expect(interViewsBegin.children.length).toBe(1);
     const interViewBegin = interViewsBegin.children[0];
     expect(interViewBegin?.type).toBe('FLOW_START_INTERVIEW_BEGIN');
-    expect(interViewBegin?.duration).toBe(6332706);
+    expect(interViewBegin?.duration).toEqual({ self: 6332706, total: 6332706 });
   });
 
   it('FlowStartInterviewsBeginLine should be a flow ', async () => {
@@ -509,7 +509,7 @@ describe('getRootMethod tests', () => {
     expect(interViewsBegin.children.length).toBe(1);
     const interViewBegin = interViewsBegin.children[0];
     expect(interViewBegin?.type).toBe('FLOW_START_INTERVIEW_BEGIN');
-    expect(interViewBegin?.duration).toBe(6332706);
+    expect(interViewBegin?.duration).toEqual({ self: 6332706, total: 6332706 });
   });
 
   it('FlowStartInterviewsBeginLine should be a flow called from a process builder', async () => {
@@ -554,12 +554,12 @@ describe('getRootMethod tests', () => {
     expect(interViewsBegin.type).toBe('FLOW_START_INTERVIEWS_BEGIN');
     expect(interViewsBegin.text).toBe('FLOW_START_INTERVIEWS : Example Flow');
     expect(interViewsBegin.suffix).toBe(' (Flow)');
-    expect(interViewsBegin.duration).toBe(3);
+    expect(interViewsBegin.duration).toEqual({ self: 2, total: 3 });
 
     expect(interViewsBegin.children.length).toBe(1);
     const interViewBegin = interViewsBegin.children[0];
     expect(interViewBegin?.type).toBe('FLOW_START_INTERVIEW_BEGIN');
-    expect(interViewBegin?.duration).toBe(1);
+    expect(interViewBegin?.duration).toEqual({ self: 1, total: 1 });
   });
 
   it('Root exitStamp should match last line pair with a duration', async () => {
@@ -691,21 +691,20 @@ describe('Recalculate durations tests', () => {
     node.exitStamp = 3;
 
     node.recalculateDurations();
-    expect(node.duration).toBe(2);
-    expect(node.selfTime).toBe(2);
+    expect(node.duration).toEqual({ self: 2, total: 2 });
   });
+
   it('Children are subtracted from net duration', () => {
     const node = new Method(['14:32:07.563 (0)', 'DUMMY'], [], 'Method', ''),
       child1 = new Method(['14:32:07.563 (10)', 'DUMMY'], [], 'Method', ''),
       child2 = new Method(['14:32:07.563 (70)', 'DUMMY'], [], 'Method', '');
     node.exitStamp = 100;
-    child1.duration = 50;
-    child2.duration = 25;
+    child1.duration.total = 50;
+    child2.duration.total = 25;
     node.addChild(child1);
     node.addChild(child2);
     node.recalculateDurations();
-    expect(node.duration).toBe(100);
-    expect(node.selfTime).toBe(25);
+    expect(node.duration).toEqual({ self: 25, total: 100 });
   });
 });
 

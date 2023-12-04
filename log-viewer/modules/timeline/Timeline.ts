@@ -274,7 +274,11 @@ const rectRenderQueue = new Map<LogSubCategory, Rect[]>();
  * @param y The call depth of the node
  */
 function addToRectQueue(node: Method, y: number) {
-  const { subCategory: subCategory, timestamp: x, duration: w } = node;
+  const {
+    subCategory: subCategory,
+    timestamp: x,
+    duration: { total: w },
+  } = node;
   const rect: Rect = { x, y, w };
   let list = rectRenderQueue.get(subCategory);
   if (!list) {
@@ -457,7 +461,7 @@ function findByPosition(
   if (node.duration) {
     // we can only test nodes with a duration
     const starttime = node.timestamp * state.zoom - state.offsetX;
-    const width = node.duration * state.zoom;
+    const width = node.duration.total * state.zoom;
     const endtime = starttime + width;
 
     if (width < 0.05 || starttime > x || endtime < x) {
@@ -499,7 +503,7 @@ function showTooltip(offsetX: number, offsetY: number) {
 }
 
 function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
-  // -1 to izgnore the "ApexLog" root node
+  // -1 to ignore the "ApexLog" root node
   const target = findByPosition(timelineRoot, -1, x, depth);
   if (target) {
     canvas.classList.remove('timeline-hover', 'timeline-dragging');
@@ -515,28 +519,32 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
     toolTip.appendChild(document.createTextNode(target.type || ''));
     toolTip.appendChild(brElem.cloneNode());
     toolTip.appendChild(document.createTextNode(displayText));
-    if (target.timestamp && target.duration && target.selfTime) {
+    if (target.timestamp) {
       toolTip.appendChild(brElem.cloneNode());
       toolTip.appendChild(document.createTextNode('timestamp: ' + target.timestamp));
       if (target.exitStamp) {
         toolTip.appendChild(document.createTextNode(' => ' + target.exitStamp));
         toolTip.appendChild(brElem.cloneNode());
-        toolTip.appendChild(
-          document.createTextNode(`duration: ${formatDuration(target.duration)}`),
-        );
-
-        if (target.cpuType === 'free') {
-          toolTip.appendChild(document.createTextNode(' (free)'));
-        } else {
+        if (target.duration.total) {
           toolTip.appendChild(
-            document.createTextNode(` (self ${formatDuration(target.selfTime)})`),
+            document.createTextNode(`total: ${formatDuration(target.duration.total)}`),
           );
         }
 
-        if (target.totalRowCount !== null) {
+        if (target.cpuType === 'free') {
+          toolTip.appendChild(document.createTextNode(' (free)'));
+        } else if (target.duration.self) {
+          toolTip.appendChild(
+            document.createTextNode(` (self ${formatDuration(target.duration.self)})`),
+          );
+        }
+
+        if (target.rowCount.total !== null) {
           toolTip.appendChild(brElem.cloneNode());
           toolTip.appendChild(
-            document.createTextNode(`rows: ${target.totalRowCount} (self ${target.selfRowCount})`),
+            document.createTextNode(
+              `rows: ${target.rowCount.total} (self ${target.rowCount.self})`,
+            ),
           );
         }
       }
