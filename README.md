@@ -128,7 +128,8 @@ Each column can be sorted by clicking the column header, this will sort the rows
 
 #### Filtering
 
-Details (events with 0 time) are hidden by default but can be shown/ hidden.
+Details (events with 0 time) are hidden by default but can be shown/ hidden.\
+Show only debug statements using the Debug Only filter.\
 Min and Max filtering can be done on the _Total Time_ and _Self Time_ columns.
 
 #### Keyboard Navigation
@@ -143,7 +144,7 @@ Show analysis of method calls by showing Self Time, Total Time, Count (number of
 
 #### Sort
 
-By default the Analysis table is sorted with the events that took the longest by Self Time at the top.
+By default the Analysis table is sorted with the events that took the longest by Self Time at the top.\
 Each column can be sorted by clicking the column header, this will sort the rows ascending or descending.
 
 #### Group
