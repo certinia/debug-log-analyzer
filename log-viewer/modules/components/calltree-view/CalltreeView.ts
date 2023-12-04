@@ -16,7 +16,7 @@ import { type RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables'
 
 import MinMaxEditor from '../../datagrid/editors/MinMax.js';
 import MinMaxFilter from '../../datagrid/filters/MinMax.js';
-import NumberFormat from '../../datagrid/format/Number.js';
+import { progressFormatter } from '../../datagrid/format/Progress.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
@@ -403,13 +403,13 @@ export async function renderCallTree(
           width: 150,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          formatter: ProgressFormat,
+          formatter: progressFormatter,
           formatterParams: {
             thousand: false,
             precision: 3,
             totalValue: rootMethod.duration,
           },
-          bottomCalcFormatter: ProgressFormat,
+          bottomCalcFormatter: progressFormatter,
           bottomCalc: 'max',
           bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration },
           headerFilter: MinMaxEditor,
@@ -427,8 +427,8 @@ export async function renderCallTree(
           headerHozAlign: 'right',
           bottomCalc: 'sum',
           bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration },
-          bottomCalcFormatter: ProgressFormat,
-          formatter: ProgressFormat,
+          bottomCalcFormatter: progressFormatter,
+          formatter: progressFormatter,
           formatterParams: {
             thousand: false,
             precision: 3,
