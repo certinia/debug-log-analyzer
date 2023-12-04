@@ -167,13 +167,10 @@
     "@salesforce/apex-node": "^1.6.2"
   },
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^25.0.7",
-    "@rollup/plugin-node-resolve": "^15.2.3",
     "@types/node": "~18.15.0",
     "@types/vscode": "~1.74.0",
     "@typescript-eslint/eslint-plugin": "^6.8.0",
     "@typescript-eslint/parser": "^6.8.0",
-    "rollup": "^3.29.4",
     "typescript": "^5.2.2"
   }
 }
