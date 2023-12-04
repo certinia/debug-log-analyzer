@@ -2,7 +2,7 @@
 
 Apex Log Analyzer makes performance analysis of Salesforce debug logs much easier and quicker. Visualize code execution via a Flame chart and Call Tree, identify and resolve performance and SOQL/DML problems via Method and Database Analysis.
 
-![preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.10/lana-preview.gif)
+![preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.12/lana-preview.gif)
 
 ## WARNING
 
