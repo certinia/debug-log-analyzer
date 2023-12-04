@@ -83,14 +83,14 @@ importers:
         specifier: ^1.0.0
         version: 1.0.0(rollup@4.6.1)
       rollup-plugin-polyfill-node:
-        specifier: ^0.12.0
-        version: 0.12.0(rollup@4.6.1)
+        specifier: ^0.13.0
+        version: 0.13.0(rollup@4.6.1)
       rollup-plugin-postcss:
         specifier: ^4.0.2
         version: 4.0.2(postcss@8.4.31)
       rollup-plugin-swc3:
-        specifier: ^0.10.3
-        version: 0.10.3(@swc/core@1.3.96)(rollup@4.6.1)
+        specifier: ^0.10.4
+        version: 0.10.4(@swc/core@1.3.96)(rollup@4.6.1)
 
   lana:
     dependencies:
@@ -6217,10 +6217,10 @@ packages:
       rollup: 4.6.1
     dev: true
 
-  /rollup-plugin-polyfill-node@0.12.0(rollup@4.6.1):
-    resolution: {integrity: sha512-PWEVfDxLEKt8JX1nZ0NkUAgXpkZMTb85rO/Ru9AQ69wYW8VUCfDgP4CGRXXWYni5wDF0vIeR1UoF3Jmw/Lt3Ug==}
+  /rollup-plugin-polyfill-node@0.13.0(rollup@4.6.1):
+    resolution: {integrity: sha512-FYEvpCaD5jGtyBuBFcQImEGmTxDTPbiHjJdrYIp+mFIwgXiXabxvKUK7ZT9P31ozu2Tqm9llYQMRWsfvTMTAOw==}
     peerDependencies:
-      rollup: ^1.20.0 || ^2.0.0 || ^3.0.0
+      rollup: ^1.20.0 || ^2.0.0 || ^3.0.0 || ^4.0.0
     dependencies:
       '@rollup/plugin-inject': 5.0.5(rollup@4.6.1)
       rollup: 4.6.1
@@ -6250,8 +6250,8 @@ packages:
       - ts-node
     dev: true
 
-  /rollup-plugin-swc3@0.10.3(@swc/core@1.3.96)(rollup@4.6.1):
-    resolution: {integrity: sha512-GWoMkm3ATumN8EPHBKLrpCufcRNn7SfLyvMKWUfCVLidPuPjlQZfNBeQXP6OEiHBguZzriCssX43EnV3+Y54bA==}
+  /rollup-plugin-swc3@0.10.4(@swc/core@1.3.96)(rollup@4.6.1):
+    resolution: {integrity: sha512-ggLdYqAe3fZmhuyavDnuixMcNyK1/7CIlmJatW2UcKveN1GpQeFlaRjtXnK6/UCIt71SVr3Qy6p2iCLIkXq3iQ==}
     engines: {node: '>=12'}
     peerDependencies:
       '@swc/core': '>=1.2.165'
@@ -6262,7 +6262,7 @@ packages:
       '@swc/core': 1.3.96(@swc/helpers@0.5.3)
       get-tsconfig: 4.7.2
       rollup: 4.6.1
-      rollup-swc-preserve-directives: 0.5.0(@swc/core@1.3.96)(rollup@4.6.1)
+      rollup-swc-preserve-directives: 0.6.0(@swc/core@1.3.96)(rollup@4.6.1)
     dev: true
 
   /rollup-pluginutils@2.8.2:
@@ -6271,11 +6271,11 @@ packages:
       estree-walker: 0.6.1
     dev: true
 
-  /rollup-swc-preserve-directives@0.5.0(@swc/core@1.3.96)(rollup@4.6.1):
-    resolution: {integrity: sha512-6lnPZn2laSsdYcdCSE28z4Dwg2mCN5loF+/wBjybh25GJmONjHTf3orWa5j1zjEWY3RcGRjJ8K/52ePqtfy6dw==}
+  /rollup-swc-preserve-directives@0.6.0(@swc/core@1.3.96)(rollup@4.6.1):
+    resolution: {integrity: sha512-MkKETpYF2ml5p15IxqbvLdFxWV6b99ALT6qL/okXYhaaiK8Mqu95nyk90+m58Ye+jMOpnhQsdK3JGMIPUV7i5g==}
     peerDependencies:
       '@swc/core': '>=1.3.79'
-      rollup: ^2.0.0 || ^3.0.0
+      rollup: ^2.0.0 || ^3.0.0 || ^4.0.0
     dependencies:
       '@napi-rs/magic-string': 0.3.4
       '@swc/core': 1.3.96(@swc/helpers@0.5.3)
