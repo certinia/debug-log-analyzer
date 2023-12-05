@@ -102,8 +102,8 @@ export class NavBar extends LitElement {
       this.notifications.length > 0
         ? 'failure'
         : this.logStatus !== 'Processing...'
-        ? 'success'
-        : '';
+          ? 'success'
+          : '';
 
     return html`
       <div class="navbar">
