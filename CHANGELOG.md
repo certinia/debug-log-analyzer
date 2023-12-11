@@ -10,17 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Debug Only Call Tree filtering ([#86][#86])
-  - Filters the Call Tree to show only debug statments with the context of the Call Stack.
+  - Filters the Call Tree to show only debug statements with the context of the Call Stack.
 - Percent value (of the total log time) in the self and total columns. Visually represent the percentage via a percent bar as well as a value e.g 100 (50%) ([#311][#311])
   - This is show for both the Call Tree and Analysis
 - Show Log Parsing issues via notification bell ([#209][#209])
   - Shows unsupported log event names + invalid log lines
-
-### Changed
-
 - Open Apex Log Analyzer from a dirty vscode editor ([#213][#213])
   - Supports opening Apex Log Analyzer when a log is dragged and dropped into Salesforce Code Builder.
   - It allows for a log analysis to be shown when a file is deleted on local disk or a log is copy and pasted into an editor window without saving.
+
+### Changed
+
 - Show time taken for more events within the `Workflow:ApprovalProcessActions` Code Unit ([#336][#336])
   - Estimates the time taken for some events without an exit event within `Workflow:ApprovalProcessActions` Code Unit e.g `WF_APPROVAl` + `WF_EMAIL_SENT`
 - Make dragging more obvious on the Timeline by showing different cursors ([#423][#423])
@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Show the default cursor when hovering a Timeline event.
 - Timeline event marker clarity improvements ([#115][#115])
   - Skipped-Lines and Max-Size-reached marker color from green to blue. Green normal mean things are ok, blue better represents information.
-  - Added faint grey lines between the event markers to seperates them. This helps when two error are next to each other.
+  - Added faint grey lines between the event markers to separates them. This helps when two error are next to each other.
 
 ## [1.10.4] - 2023-11-22
 
