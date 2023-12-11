@@ -6,18 +6,17 @@ import { Workspace, Workspaces } from '@apexdevtools/apex-ls';
 import { VSWorkspace } from '../../workspace/VSWorkspace.js';
 
 export class SymbolFinder {
-  async findSymbol(workspaces: VSWorkspace[], symbol: string): Promise<string | null> {
-    let path = null;
+  async findSymbol(workspaces: VSWorkspace[], symbol: string): Promise<string[]> {
+    const paths = [];
     for (const ws of workspaces) {
       const apexWs = Workspaces.get(ws.path());
       const filePath = this.findInWorkspace(apexWs, symbol);
       if (filePath) {
-        path = filePath;
-        break;
+        paths.push(filePath);
       }
     }
 
-    return path;
+    return paths;
   }
 
   private findInWorkspace(ws: Workspace, symbol: string): string | null {
