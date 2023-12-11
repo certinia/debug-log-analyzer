@@ -24,7 +24,6 @@ export class LogView {
   private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
 
   static async createView(
-    wsPath: string,
     context: Context,
     beforeSendLog?: Promise<void>,
     logPath?: string,
@@ -74,7 +73,7 @@ export class LogView {
               if (lineNumber) {
                 line = parseInt(lineNumber);
               }
-              OpenFileInPackage.openFileForSymbol(wsPath, context, className || '', line);
+              OpenFileInPackage.openFileForSymbol(context, className || '', line);
             }
             break;
           }

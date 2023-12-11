@@ -6,7 +6,6 @@ import { Uri, window } from 'vscode';
 
 import { appName } from '../AppSettings.js';
 import { Context } from '../Context.js';
-import { QuickPickWorkspace } from '../display/QuickPickWorkspace.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 
@@ -37,8 +36,7 @@ export class ShowLogAnalysis {
     const fileContent = !existsSync(filePath) ? window?.activeTextEditor?.document.getText() : '';
 
     if (filePath || fileContent) {
-      const ws = await QuickPickWorkspace.pickOrReturn(context);
-      LogView.createView(ws, context, Promise.resolve(), filePath, fileContent);
+      LogView.createView(context, Promise.resolve(), filePath, fileContent);
     } else {
       context.display.showErrorMessage(
         'No file selected or the file is too large. Try again using the file explorer or text editor command.',
