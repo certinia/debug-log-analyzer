@@ -60,7 +60,7 @@ export class RetrieveLogFile {
     if (logFileId) {
       const logFilePath = this.getLogFilePath(ws, logFileId);
       const writeLogFile = this.writeLogFile(ws, logFilePath);
-      return LogView.createView(ws, context, writeLogFile, logFilePath);
+      return LogView.createView(context, writeLogFile, logFilePath);
     }
   }
 

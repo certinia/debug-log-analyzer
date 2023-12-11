@@ -13,13 +13,12 @@ import {
 import { Context } from '../Context.js';
 
 export class OpenFileInPackage {
-  static openFileForSymbol(
-    wsPath: string,
+  static async openFileForSymbol(
     context: Context,
     name: string,
     lineNumber?: number,
-  ): void {
-    const path = context.findSymbol(wsPath, name);
+  ): Promise<void> {
+    const path = await context.findSymbol(name);
     if (path && lineNumber) {
       const zeroBasedLine = lineNumber - 1;
       const linePosition = new Position(zeroBasedLine, 0);

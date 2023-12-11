@@ -33,8 +33,8 @@ export class Context {
     WhatsNewNotification.apply(this);
   }
 
-  findSymbol(wsPath: string, symbol: string): string | null {
-    const path = this.symbolFinder.findSymbol(wsPath, symbol);
+  async findSymbol(symbol: string): Promise<string | null> {
+    const path = await this.symbolFinder.findSymbol(this.workspaces, symbol);
     if (!path) {
       this.display.showErrorMessage(`Type '${symbol}' was not found in workspace`);
     }
