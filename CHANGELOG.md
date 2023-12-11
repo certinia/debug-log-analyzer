@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Go to File multiple workspace handling to be simpified ([#202][#202])
   - Go to file from Call Tree will only ask you to select a workspace if more than one matching file is found in multiple workspaces, instead of everytime.
 
+## [1.12.1] - 2023-12-11
+
+### Fixed
+
+- Unable to Save file when exporting CSV from Analysis or Database ([#461][#461])
+
 ## [1.12.0] - 2023-12-05
 
 ### Added
@@ -316,6 +322,10 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- Unreleased -->
 
 [#202]: https://github.com/certinia/debug-log-analyzer/issues/202
+
+<!-- v1.12.1 -->
+
+[#461]: https://github.com/certinia/debug-log-analyzer/issues/461
 
 <!-- v1.12.0 -->
 
