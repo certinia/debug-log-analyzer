@@ -38,6 +38,6 @@ jobs:
           ovsx verify-pat -p ${{ secrets.OVSX_TOKEN }}
 
           echo "Publish to vsce"
-          vsce publish -p ${{ secrets.VSCE_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
+          vsce publish --no-dependencies -p ${{ secrets.VSCE_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
           echo "Publish to ovsx"
-          ovsx publish -p ${{ secrets.OVSX_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
+          ovsx publish --no-dependencies -p ${{ secrets.OVSX_TOKEN }} --packagePath lana-${{ github.event.release.tag_name }}.vsix
