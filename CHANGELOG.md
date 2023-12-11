@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Simplified Go to File multiple workspace handling ([#202][#202])
-  - Go to file from Call Tree, to only ask you to select a workspace if more than one matching file is found in multiple workspaces.
+- Go to File multiple workspace handling to be simpified ([#202][#202])
+  - Go to file from Call Tree will only ask you to select a workspace if more than one matching file is found in multiple workspaces, instead of everytime.
 
 ## [1.12.0] - 2023-12-05
 
