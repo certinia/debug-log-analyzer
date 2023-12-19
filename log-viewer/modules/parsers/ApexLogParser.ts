@@ -296,11 +296,10 @@ export default class ApexLogParser {
   }
 
   private aggregateTotals(node: TimedNode) {
-    const children = node.children,
-      len = children.length;
+    let len = node.children.length;
 
-    for (let i = 0; i < len; ++i) {
-      const child = children[i];
+    while (len--) {
+      const child = node.children[len];
       if (child) {
         if (child instanceof TimedNode) {
           this.aggregateTotals(child);
