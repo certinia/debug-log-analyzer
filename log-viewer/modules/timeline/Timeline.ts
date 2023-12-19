@@ -245,10 +245,15 @@ function drawScale(ctx: CanvasRenderingContext2D) {
 }
 
 function nodesToRectangles(nodes: Method[], depth: number) {
-  const children: Method[] = [];
   const len = nodes.length;
-  for (let c = 0; c < len; c++) {
-    const node = nodes[c];
+  if (!len) {
+    return;
+  }
+
+  const children: Method[] = [];
+  let i = 0;
+  while (i < len) {
+    const node = nodes[i];
     if (node) {
       const { subCategory: subCategory, duration } = node;
       if (subCategory && duration) {
@@ -262,10 +267,7 @@ function nodesToRectangles(nodes: Method[], depth: number) {
         }
       });
     }
-  }
-
-  if (!children.length) {
-    return;
+    i++;
   }
 
   nodesToRectangles(children, depth + 1);
