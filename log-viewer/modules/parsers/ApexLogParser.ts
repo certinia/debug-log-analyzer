@@ -2386,11 +2386,12 @@ class MatchEngineBegin extends Method {
 }
 
 function getLogEventClass(eventName: LogEventType): LogLineConstructor | null | undefined {
-  if (lineTypeMap.has(eventName)) {
-    return lineTypeMap.get(eventName);
-  } else if (basicLogEvents.includes(eventName)) {
+  const logType = lineTypeMap.get(eventName);
+  if (logType) {
+    return logType;
+  } else if (basicLogEvents.indexOf(eventName) !== -1) {
     return BasicLogLine;
-  } else if (basicExitLogEvents.includes(eventName)) {
+  } else if (basicExitLogEvents.indexOf(eventName) !== -1) {
     return BasicExitLine;
   }
 
