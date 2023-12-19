@@ -831,16 +831,19 @@ export function parseTimestamp(text: string): number {
 }
 
 export function parseLineNumber(text: string | null | undefined): string | number {
-  if (!text) {
-    return 0;
+  switch (true) {
+    case text === '[EXTERNAL]':
+      return 'EXTERNAL';
+    case !!text: {
+      const lineNumberStr = text.slice(1, -1);
+      if (lineNumberStr) {
+        return Number(lineNumberStr);
+      }
+      throw new Error(`Unable to parse line number: '${text}'`);
+    }
+    default:
+      return 0;
   }
-
-  const lineNumberStr = text.slice(1, -1);
-  if (lineNumberStr) {
-    const lineNumber = Number(lineNumberStr);
-    return !Number.isNaN(lineNumber) ? lineNumber : lineNumberStr;
-  }
-  throw new Error(`Unable to parse line number: '${text}'`);
 }
 
 export function parseRows(text: string | null | undefined): number {
