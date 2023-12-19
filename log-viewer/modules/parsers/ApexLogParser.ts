@@ -113,7 +113,9 @@ export default class ApexLogParser {
   // the ? matches the previous token 0 or 1 times.
   private parseLog(log: string): LogLine[] {
     const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || -1;
-    const rawLines = log.substring(start).split(newlineRegex);
+
+    const eol = this.getEOLRegex(log);
+    const rawLines = log.substring(start).split(eol);
 
     // reset global variables to be captured during parsing
     this.logIssues = [];
@@ -135,10 +137,14 @@ export default class ApexLogParser {
         }
       }
     }
-
     lastEntry?.onAfter?.(this);
 
     return logLines;
+  }
+
+  private getEOLRegex(text: string) {
+    const match = /\r\n$/.test(text);
+    return match ? /\r\n/ : /\n/;
   }
 
   private toLogTree(logLines: LogLine[]) {
