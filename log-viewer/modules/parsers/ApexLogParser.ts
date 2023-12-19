@@ -823,9 +823,9 @@ export function parseVfNamespace(text: string): string {
 }
 
 export function parseTimestamp(text: string): number {
-  const timestamp = text.slice(text.indexOf('(') + 1, -1);
-  if (timestamp) {
-    return Number(timestamp);
+  const start = text.indexOf('(');
+  if (start !== -1) {
+    return Number(text.slice(start + 1, -1));
   }
   throw new Error(`Unable to parse timestamp: '${text}'`);
 }
