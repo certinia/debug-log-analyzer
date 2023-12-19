@@ -6,7 +6,6 @@
 // Add new aggregate tuple {self: , total:} usage sum.dml.self
 
 const typePattern = /^[A-Z_]*$/,
-  newlineRegex = /\r?\n/,
   settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
 
 type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
