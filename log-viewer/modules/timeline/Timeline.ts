@@ -4,7 +4,13 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import formatDuration, { debounce } from '../Util.js';
 import { goToRow } from '../components/calltree-view/CalltreeView.js';
-import { ApexLog, type LogSubCategory, Method, TimedNode } from '../parsers/ApexLogParser.js';
+import {
+  ApexLog,
+  LogLine,
+  type LogSubCategory,
+  Method,
+  TimedNode,
+} from '../parsers/ApexLogParser.js';
 
 export { ApexLog };
 
@@ -154,19 +160,18 @@ let scaleFont: string,
   lastMouseX: number,
   lastMouseY: number;
 
-function getMaxDepth(node: Method, depth = 0) {
-  if (!node.children.length) {
+function getMaxDepth(nodes: LogLine[], depth = 0): number {
+  let len = nodes.length;
+  if (!len) {
     return depth;
   }
 
-  const childDepth = node.duration ? depth + 1 : depth;
-
+  depth++;
   let maxDepth = depth;
-  const len = node.children.length - 1;
-  for (let c = len; c >= 0; --c) {
-    const child = node.children[c];
-    if (child instanceof Method) {
-      const d = getMaxDepth(child, childDepth);
+  while (len--) {
+    const node = nodes[len];
+    if (node?.duration && node instanceof Method) {
+      const d = getMaxDepth(node.children, depth);
       if (d > maxDepth) {
         maxDepth = d;
       }
@@ -373,7 +378,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 }
 
 function calculateSizes() {
-  maxY = getMaxDepth(timelineRoot, 0); // maximum nested call depth
+  maxY = getMaxDepth(timelineRoot.children, 0); // maximum nested call depth
   resetView();
 }
 
