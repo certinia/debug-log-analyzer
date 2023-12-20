@@ -3,10 +3,8 @@
  */
 
 // todo: Each type should have namespaces assocated (default of unmanagd) - **NEW FEAT**
-// Add new aggregate tuple {self: , total:} usage sum.dml.self
 
 const typePattern = /^[A-Z_]*$/,
-  newlineRegex = /\r?\n/,
   settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
 
 type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
@@ -112,8 +110,8 @@ export default class ApexLogParser {
   // Matches CRLF (\r\n) + LF (\n)
   // the ? matches the previous token 0 or 1 times.
   private parseLog(log: string): LogLine[] {
-    const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || -1;
-    const rawLines = log.substring(start).split(newlineRegex);
+    const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || 0;
+    const rawLines = log.slice(start).split(/\r?\n/);
 
     // reset global variables to be captured during parsing
     this.logIssues = [];
@@ -135,7 +133,6 @@ export default class ApexLogParser {
         }
       }
     }
-
     lastEntry?.onAfter?.(this);
 
     return logLines;
@@ -159,7 +156,7 @@ export default class ApexLogParser {
     this.insertPackageWrappers(rootMethod);
 
     this.setNamespaces(rootMethod);
-    this.aggregateTotals(rootMethod);
+    this.aggregateTotals([rootMethod]);
     return rootMethod;
   }
 
@@ -290,20 +287,41 @@ export default class ApexLogParser {
     }
   }
 
-  private aggregateTotals(node: TimedNode) {
-    const children = node.children,
-      len = children.length;
+  private aggregateTotals(nodes: LogLine[]) {
+    const len = nodes.length;
+    if (!len) {
+      return;
+    }
 
-    for (let i = 0; i < len; ++i) {
-      const child = children[i];
-      if (child) {
-        if (child instanceof TimedNode) {
-          this.aggregateTotals(child);
+    // This method purposely collects the children in bulk to avoid as much recursion as possible. This increases performance to be just over ~3 times faster or ~70% faster.
+
+    // collect all children for the supplied nodes.
+    const children: LogLine[] = [];
+    let i = len;
+    while (i--) {
+      const parent = nodes[i];
+      if (parent?.children.length) {
+        parent.children.forEach((child) => {
+          children.push(child);
+        });
+      }
+    }
+
+    if (children.length) {
+      this.aggregateTotals(children);
+
+      // sum the children in bulk
+      i = len;
+      while (i--) {
+        const parent = nodes[i];
+        if (parent?.children.length) {
+          parent.children.forEach((child) => {
+            parent.dmlCount.total += child.dmlCount.total;
+            parent.soqlCount.total += child.soqlCount.total;
+            parent.totalThrownCount += child.totalThrownCount;
+            parent.rowCount.total += child.rowCount.total;
+          });
         }
-        node.dmlCount.total += child.dmlCount.total;
-        node.soqlCount.total += child.soqlCount.total;
-        node.totalThrownCount += child.totalThrownCount;
-        node.rowCount.total += child.rowCount.total;
       }
     }
   }
@@ -498,6 +516,11 @@ export abstract class LogLine {
   // common metadata (available for all lines)
 
   /**
+   * All child nodes of the current node
+   */
+  children: LogLine[] = [];
+
+  /**
    * The type of this log line from the log file e.g METHOD_ENTRY
    */
   type: LogEventType | null = null;
@@ -661,11 +684,6 @@ export class TimedNode extends LogLine {
   exitStamp: number | null = null;
 
   /**
-   * All child nodes of the current node
-   */
-  children: LogLine[] = [];
-
-  /**
    * The log sub category this event belongs to
    */
   subCategory: LogSubCategory;
@@ -819,24 +837,27 @@ export function parseVfNamespace(text: string): string {
 }
 
 export function parseTimestamp(text: string): number {
-  const timestamp = text.slice(text.indexOf('(') + 1, -1);
-  if (timestamp) {
-    return Number(timestamp);
+  const start = text.indexOf('(');
+  if (start !== -1) {
+    return Number(text.slice(start + 1, -1));
   }
   throw new Error(`Unable to parse timestamp: '${text}'`);
 }
 
 export function parseLineNumber(text: string | null | undefined): string | number {
-  if (!text) {
-    return 0;
+  switch (true) {
+    case text === '[EXTERNAL]':
+      return 'EXTERNAL';
+    case !!text: {
+      const lineNumberStr = text.slice(1, -1);
+      if (lineNumberStr) {
+        return Number(lineNumberStr);
+      }
+      throw new Error(`Unable to parse line number: '${text}'`);
+    }
+    default:
+      return 0;
   }
-
-  const lineNumberStr = text.slice(1, -1);
-  if (lineNumberStr) {
-    const lineNumber = Number(lineNumberStr);
-    return !Number.isNaN(lineNumber) ? lineNumber : lineNumberStr;
-  }
-  throw new Error(`Unable to parse line number: '${text}'`);
 }
 
 export function parseRows(text: string | null | undefined): number {
@@ -2386,11 +2407,12 @@ class MatchEngineBegin extends Method {
 }
 
 function getLogEventClass(eventName: LogEventType): LogLineConstructor | null | undefined {
-  if (lineTypeMap.has(eventName)) {
-    return lineTypeMap.get(eventName);
-  } else if (basicLogEvents.includes(eventName)) {
+  const logType = lineTypeMap.get(eventName);
+  if (logType) {
+    return logType;
+  } else if (basicLogEvents.indexOf(eventName) !== -1) {
     return BasicLogLine;
-  } else if (basicExitLogEvents.includes(eventName)) {
+  } else if (basicExitLogEvents.indexOf(eventName) !== -1) {
     return BasicExitLine;
   }
 

@@ -298,17 +298,19 @@ describe('parseLog tests', () => {
   });
   it('Methods should have line-numbers', async () => {
     const log =
-      '09:18:22.6 (6574780)|EXECUTION_STARTED\n\n' +
-      '15:20:52.222 (4113741282)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
-      '15:20:52.222 (4113760256)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
-      '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
+      '09:18:22.6 (0)|EXECUTION_STARTED\n\n' +
+      '15:20:52.222 (1)|METHOD_ENTRY|[185]|Id1|CODAUnitOfWork.getNextIdInternal()\n' +
+      '15:20:52.222 (2)|METHOD_EXIT|[185]|Id1|CODAUnitOfWork.getNextIdInternal()\n' +
+      '15:20:52.222 (3)|METHOD_ENTRY|[EXTERNAL]|Id2|MyClass.MyMethod2()\n' +
+      '15:20:52.222 (4)|METHOD_EXIT|[EXTERNAL]|Id2|MyClass.MyMethod2()\n' +
+      '09:19:13.82 (5)|EXECUTION_FINISHED\n';
 
     const apexLog = parse(log);
 
     expect(apexLog.children.length).toBe(1);
     const executeEvent = apexLog.children[0] as MethodEntryLine;
-
     expect(executeEvent.children[0]?.lineNumber).toBe(185);
+    expect(executeEvent.children[1]?.lineNumber).toBe('EXTERNAL');
   });
   it('Packages should have a namespace', async () => {
     const log =

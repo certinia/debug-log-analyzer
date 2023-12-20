@@ -2,7 +2,7 @@
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
 import { LitElement, css, html } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators.js';
 
 import { DebugLevel } from '../parsers/ApexLogParser.js';
 import { globalStyles } from '../styles/global.styles.js';
@@ -10,14 +10,11 @@ import { skeletonStyles } from './skeleton/skeleton.styles.js';
 
 @customElement('log-levels')
 export class LogLevels extends LitElement {
-  @state()
+  @property()
   logSettings: DebugLevel[] | null = null;
 
   constructor() {
     super();
-    document.addEventListener('logsettings', (e: Event) => {
-      this._updateLog(e);
-    });
   }
 
   static styles = [
@@ -74,9 +71,5 @@ export class LogLevels extends LitElement {
       logLevels.push(levelHtml);
     }
     return html`${logLevels}`;
-  }
-
-  _updateLog(e: Event) {
-    this.logSettings = (e as CustomEvent).detail.logSettings;
   }
 }

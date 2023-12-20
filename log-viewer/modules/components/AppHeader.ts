@@ -103,7 +103,7 @@ export class AppHeader extends LitElement {
         .notifications=${this.notifications}
         .parserIssues=${this.parserIssues}
       ></nav-bar>
-      <log-levels></log-levels>
+      <log-levels .logSettings=${this.timelineRoot?.debugLevels}></log-levels>
       <vscode-panels activeid="${this._selectedTab}">
         <vscode-panel-tab
           id="timeline-tab"
