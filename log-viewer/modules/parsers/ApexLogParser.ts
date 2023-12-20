@@ -299,10 +299,10 @@ export default class ApexLogParser {
     const children: LogLine[] = [];
     let i = len;
     while (i--) {
-      const child = nodes[i];
-      if (child?.children.length) {
-        child.children.forEach((element) => {
-          children.push(element);
+      const parent = nodes[i];
+      if (parent?.children.length) {
+        parent.children.forEach((child) => {
+          children.push(child);
         });
       }
     }
@@ -313,13 +313,13 @@ export default class ApexLogParser {
       // sum the children in bulk
       i = len;
       while (i--) {
-        const child = nodes[i];
-        if (child?.children.length) {
-          child.children.forEach((element) => {
-            child.dmlCount.total += element.dmlCount.total;
-            child.soqlCount.total += element.soqlCount.total;
-            child.totalThrownCount += element.totalThrownCount;
-            child.rowCount.total += element.rowCount.total;
+        const parent = nodes[i];
+        if (parent?.children.length) {
+          parent.children.forEach((child) => {
+            parent.dmlCount.total += child.dmlCount.total;
+            parent.soqlCount.total += child.soqlCount.total;
+            parent.totalThrownCount += child.totalThrownCount;
+            parent.rowCount.total += child.rowCount.total;
           });
         }
       }
