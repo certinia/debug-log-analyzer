@@ -95,11 +95,11 @@ jobs:
 
           echo "Publish to vsce
           vsix name: $pkgPath"
-          vsce publish --no-dependencies --pre-release -p ${{ secrets.VSCE_TOKEN }} --packagePath ${pkgPath}
+          vsce publish --packagePath ${pkgPath} --no-dependencies --pre-release -p ${{ secrets.VSCE_TOKEN }} --skip-duplicate
 
           echo "
           Publish to ovsx"
-          ovsx publish --no-dependencies --pre-release -p ${{ secrets.OVSX_TOKEN }} --packagePath ${pkgPath}
+          ovsx publish ${pkgPath} --no-dependencies --pre-release -p ${{ secrets.OVSX_TOKEN }} --skip-duplicate
       - name: Update pre-release tag
         run: |
           echo "Updating pre release tag"
