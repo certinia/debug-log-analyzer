@@ -111,7 +111,7 @@ export default class ApexLogParser {
   // Matches CRLF (\r\n) + LF (\n)
   // the ? matches the previous token 0 or 1 times.
   private parseLog(log: string): LogLine[] {
-    const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || -1;
+    const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || 0;
     const rawLines = log.slice(start).split(/\r?\n/);
 
     // reset global variables to be captured during parsing
