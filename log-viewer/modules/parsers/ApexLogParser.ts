@@ -287,34 +287,51 @@ export default class ApexLogParser {
     }
   }
 
+  private flattenByDepth(nodes: LogLine[]) {
+    const result = new Map<number, LogLine[]>();
+    result.set(0, nodes);
+
+    let currentDepth = 1;
+
+    let currentNodes = nodes;
+    let len = currentNodes.length;
+    while (len) {
+      while (len--) {
+        const node = currentNodes[len];
+        if (node?.children) {
+          let children = result.get(currentDepth);
+          if (!children) {
+            children = [];
+            result.set(currentDepth, children);
+          }
+
+          Array.prototype.push.apply(children, node.children);
+        }
+      }
+      currentNodes = result.get(currentDepth++) || [];
+      len = currentNodes.length;
+    }
+
+    return result;
+  }
+
   private aggregateTotals(nodes: LogLine[]) {
     const len = nodes.length;
     if (!len) {
       return;
     }
 
-    // This method purposely collects the children in bulk to avoid as much recursion as possible. This increases performance to be just over ~3 times faster or ~70% faster.
+    // This method purposely processes the children at the lowest depth first in bulk to avoid as much recursion as possible. This increases performance to be just over ~3 times faster or ~70% faster.
 
-    // collect all children for the supplied nodes.
-    const children: LogLine[] = [];
-    let i = len;
-    while (i--) {
-      const parent = nodes[i];
-      if (parent?.children.length) {
-        parent.children.forEach((child) => {
-          children.push(child);
-        });
-      }
-    }
-
-    if (children.length) {
-      this.aggregateTotals(children);
-
-      // sum the children in bulk
-      i = len;
+    // collect all children for the supplied nodes by depth.
+    const nodesByDepth = this.flattenByDepth(nodes);
+    let depth = nodesByDepth.size;
+    while (depth--) {
+      const nds = nodesByDepth.get(depth) || [];
+      let i = nds.length;
       while (i--) {
-        const parent = nodes[i];
-        if (parent?.children.length) {
+        const parent = nds[i];
+        if (parent?.children) {
           parent.children.forEach((child) => {
             parent.dmlCount.total += child.dmlCount.total;
             parent.soqlCount.total += child.soqlCount.total;
