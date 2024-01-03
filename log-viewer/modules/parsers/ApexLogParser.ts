@@ -722,12 +722,10 @@ export class TimedNode extends LogLine {
 
   recalculateDurations() {
     if (this.exitStamp) {
+      const childDuration = this.children.reduce((accumulator, currentValue) => {
+        return accumulator + currentValue.duration.total;
+      }, 0);
       this.duration.total = this.exitStamp - this.timestamp;
-
-      let childDuration = 0;
-      this.children.forEach((child) => {
-        childDuration += child.duration.total;
-      });
       this.duration.self = this.duration.total - childDuration;
     }
   }
