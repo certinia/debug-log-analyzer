@@ -2434,6 +2434,29 @@ class MatchEngineBegin extends Method {
 }
 
 function getLogEventClass(eventName: LogEventType): LogLineConstructor | null | undefined {
+  // Fast path for the most commonly occuring types
+  switch (eventName) {
+    case 'METHOD_ENTRY':
+      return MethodEntryLine;
+      break;
+
+    case 'METHOD_EXIT':
+      return MethodExitLine;
+      break;
+
+    case 'CONSTRUCTOR_ENTRY':
+      return ConstructorEntryLine;
+      break;
+
+    case 'CONSTRUCTOR_EXIT':
+      return ConstructorExitLine;
+      break;
+
+    default:
+      break;
+  }
+
+  // Handle all other types
   const logType = lineTypeMap.get(eventName);
   if (logType) {
     return logType;
