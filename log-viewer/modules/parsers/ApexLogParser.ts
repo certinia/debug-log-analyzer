@@ -107,11 +107,9 @@ export default class ApexLogParser {
     return null;
   }
 
-  // Matches CRLF (\r\n) + LF (\n)
-  // the ? matches the previous token 0 or 1 times.
   private parseLog(log: string): LogLine[] {
     const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || 0;
-    const rawLines = log.slice(start).split(/\r?\n/);
+    const rawLines = this.splitByNextLine(log.slice(start));
 
     // reset global variables to be captured during parsing
     this.logIssues = [];
@@ -136,6 +134,19 @@ export default class ApexLogParser {
     lastEntry?.onAfter?.(this);
 
     return logLines;
+  }
+
+  // Matches CRLF (\r\n) + LF (\n)
+  // the ? matches the previous token 0 or 1 times.
+  private splitByNextLine(text: string) {
+    const hascrlfEOL = text.indexOf('\r\n') > -1;
+    let regex;
+    if (!hascrlfEOL) {
+      regex = /\n/;
+    } else {
+      regex = /\r?\n/;
+    }
+    return text.split(regex);
   }
 
   private toLogTree(logLines: LogLine[]) {
