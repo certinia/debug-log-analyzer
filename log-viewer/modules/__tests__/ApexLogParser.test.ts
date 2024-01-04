@@ -12,10 +12,8 @@ import {
   TimedNode,
   lineTypeMap,
   parse,
-  parseLineNumber,
   parseObjectNamespace,
   parseRows,
-  parseTimestamp,
   parseVfNamespace,
 } from '../parsers/ApexLogParser.js';
 
@@ -40,18 +38,6 @@ describe('parseVfNamespace tests', () => {
   });
   it('Should accept properly formatted namespaces', () => {
     expect(parseVfNamespace('VF: /apex/pse__ProjectBilling')).toEqual('pse');
-  });
-});
-
-describe('parseTimestamp tests', () => {
-  it("Should parse the timestamp from it's section", () => {
-    expect(parseTimestamp('22:00:05.0 (59752074)')).toEqual(59752074);
-  });
-});
-
-describe('parseLineNumber tests', () => {
-  it("Should parse the line-number from it's section", () => {
-    expect(parseLineNumber('[37]')).toEqual(37);
   });
 });
 
@@ -93,20 +79,32 @@ describe('Pseudo EXIT events', () => {
     expect(log1.duration).toEqual({ self: 0, total: 3 });
 
     const approval1 = log1.children[0] as Method;
-    expect(approval1.duration).toEqual({ self: 1, total: 1 });
-    expect(approval1.type).toEqual('WF_APPROVAL_SUBMIT');
+    expect(approval1).toMatchObject({
+      type: 'WF_APPROVAL_SUBMIT',
+      timestamp: 1,
+      duration: { self: 1, total: 1 },
+    });
 
     const processFound1 = log1.children[1] as Method;
-    expect(processFound1.duration).toEqual({ self: 1, total: 1 });
-    expect(processFound1.type).toEqual('WF_PROCESS_FOUND');
+    expect(processFound1).toMatchObject({
+      type: 'WF_PROCESS_FOUND',
+      timestamp: 2,
+      duration: { self: 1, total: 1 },
+    });
 
     const approval2 = log1.children[2] as Method;
-    expect(approval2.duration).toEqual({ self: 1, total: 1 });
-    expect(approval2.type).toEqual('WF_APPROVAL_SUBMIT');
+    expect(approval2).toMatchObject({
+      type: 'WF_APPROVAL_SUBMIT',
+      timestamp: 3,
+      duration: { self: 1, total: 1 },
+    });
 
     const processFound2 = log1.children[3] as Method;
-    expect(processFound2.duration).toEqual({ self: 0, total: 0 }); // no lines after the last WF_PROCESS_FOUND to use as an exit
-    expect(processFound2.type).toEqual('WF_PROCESS_FOUND');
+    expect(processFound2).toMatchObject({
+      type: 'WF_PROCESS_FOUND',
+      timestamp: 4,
+      duration: { self: 0, total: 0 }, // no lines after the last WF_PROCESS_FOUND to use as an exit
+    });
   });
 
   it('Pseudo EXIT With Entry after last event', () => {
@@ -693,6 +691,7 @@ describe('Recalculate durations tests', () => {
     node.exitStamp = 3;
 
     node.recalculateDurations();
+    expect(node.timestamp).toEqual(1);
     expect(node.duration).toEqual({ self: 2, total: 2 });
   });
 
