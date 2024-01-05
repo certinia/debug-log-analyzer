@@ -307,16 +307,16 @@ export default class ApexLogParser {
     let currentNodes = nodes;
     let len = currentNodes.length;
     while (len) {
+      result.set(currentDepth, []);
       while (len--) {
         const node = currentNodes[len];
         if (node?.children) {
-          let children = result.get(currentDepth);
-          if (!children) {
-            children = [];
-            result.set(currentDepth, children);
-          }
-
-          Array.prototype.push.apply(children, node.children);
+          const children = result.get(currentDepth)!;
+          node.children.forEach((c) => {
+            if (c.children.length) {
+              children.push(c);
+            }
+          });
         }
       }
       currentNodes = result.get(currentDepth++) || [];
