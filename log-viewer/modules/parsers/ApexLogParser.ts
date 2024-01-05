@@ -165,7 +165,6 @@ export default class ApexLogParser {
     rootMethod.setTimes();
 
     this.insertPackageWrappers(rootMethod);
-
     this.setNamespaces(rootMethod);
     this.aggregateTotals([rootMethod]);
     return rootMethod;
@@ -342,14 +341,13 @@ export default class ApexLogParser {
       let i = nds.length;
       while (i--) {
         const parent = nds[i];
-        if (parent?.children) {
-          parent.children.forEach((child) => {
-            parent.dmlCount.total += child.dmlCount.total;
-            parent.soqlCount.total += child.soqlCount.total;
-            parent.totalThrownCount += child.totalThrownCount;
-            parent.rowCount.total += child.rowCount.total;
-          });
-        }
+        parent?.children.forEach((child) => {
+          parent.dmlCount.total += child.dmlCount.total;
+          parent.soqlCount.total += child.soqlCount.total;
+          parent.totalThrownCount += child.totalThrownCount;
+          parent.rowCount.total += child.rowCount.total;
+          parent.duration.self -= child.duration.total;
+        });
       }
     }
   }
@@ -758,11 +756,7 @@ export class TimedNode extends LogLine {
 
   recalculateDurations() {
     if (this.exitStamp) {
-      const childDuration = this.children.reduce((accumulator, currentValue) => {
-        return accumulator + currentValue.duration.total;
-      }, 0);
-      this.duration.total = this.exitStamp - this.timestamp;
-      this.duration.self = this.duration.total - childDuration;
+      this.duration.total = this.duration.self = this.exitStamp - this.timestamp;
     }
   }
 }
