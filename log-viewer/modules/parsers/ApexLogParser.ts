@@ -2,8 +2,6 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 
-// todo: Each type should have namespaces assocated (default of unmanagd) - **NEW FEAT**
-
 const typePattern = /^[A-Z_]*$/,
   settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
 
