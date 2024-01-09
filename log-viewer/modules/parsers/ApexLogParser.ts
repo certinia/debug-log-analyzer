@@ -19,13 +19,16 @@ export type LogSubCategory =
   | 'Flow'
   | 'Workflow';
 
+let currentParser: ApexLogParser | null;
+
 /**
  * Takes string input of a log and returns the ApexLog class, which represents a log tree
  * @param {string} logData
  * @returns {ApexLog}
  */
 export function parse(logData: string): ApexLog {
-  return new ApexLogParser().parse(logData);
+  currentParser = new ApexLogParser();
+  return currentParser.parse(logData);
 }
 
 /**
@@ -44,6 +47,7 @@ export default class ApexLogParser {
   cpuUsed = 0;
   lastTimestamp = 0;
   discontinuity = false;
+  namespaces = new Set<string>();
 
   /**
    * Takes string input of a log and returns the ApexLog class, which represents a log tree
@@ -72,6 +76,7 @@ export default class ApexLogParser {
       const entry = new metaCtor(parts);
       entry.logLine = line;
       lastEntry?.onAfter?.(this, entry);
+      this.namespaces.add(entry.namespace);
       return entry;
     }
 
@@ -155,7 +160,7 @@ export default class ApexLogParser {
 
     this.insertPackageWrappers(rootMethod);
 
-    this.setNamespaces(rootMethod);
+    // this.setNamespaces(rootMethod);
     this.aggregateTotals([rootMethod]);
     return rootMethod;
   }
@@ -924,9 +929,15 @@ class ConstructorEntryLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['CONSTRUCTOR_EXIT'], 'Method', 'method');
     this.lineNumber = parseLineNumber(parts[2]);
-    const args = parts[4];
+    const [, , , , args, className] = parts;
 
-    this.text = parts[5] + (args ? args.substring(args.lastIndexOf('(')) : '');
+    this.text = className + (args ? args.substring(args.lastIndexOf('(')) : '');
+    const constructorParts = (className ?? '').split('.');
+    const possibleNs = constructorParts[0] || '';
+    // inmner class with a namespace
+    if (constructorParts.length === 3 || currentParser?.namespaces.has(possibleNs)) {
+      this.namespace = possibleNs ?? this.namespace;
+    }
   }
 }
 
@@ -957,6 +968,18 @@ export class MethodEntryLine extends Method {
     if (this.text === 'System.Type.forName(String, String)') {
       this.cpuType = 'loading'; // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
       // no namespace or it will get charged...
+    } else {
+      const methodNameParts = parts[4]?.split('.') ?? '';
+      const possibleNs = methodNameParts[0] ?? '';
+      if (methodNameParts.length === 4 || currentParser?.namespaces.has(possibleNs)) {
+        this.namespace = possibleNs;
+      }
+    }
+  }
+
+  onEnd(end: MethodExitLine, _stack: LogLine[]): void {
+    if (!end.text.endsWith(')')) {
+      this.namespace = end.namespace;
     }
   }
 }
@@ -966,6 +989,14 @@ class MethodExitLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = parseLineNumber(parts[2]);
+    this.text = parts[4] ?? parts[3] ?? '';
+
+    if (!this.text.endsWith(')')) {
+      const index = this.text.indexOf('.');
+      if (index !== -1) {
+        this.namespace = this.text.slice(0, index);
+      }
+    }
   }
 }
 
@@ -1073,14 +1104,6 @@ export class CodeUnitStartedLine extends Method {
         break;
       }
     }
-  }
-
-  static getCpuType(parts: string[]) {
-    const subParts = parts[3]?.split(':') || [],
-      codeUnitType = subParts[0] || '',
-      cpuType = cpuMap.get(codeUnitType);
-
-    return cpuType ?? 'method';
   }
 }
 export class CodeUnitFinishedLine extends LogLine {

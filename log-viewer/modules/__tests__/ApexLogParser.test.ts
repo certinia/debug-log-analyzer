@@ -696,36 +696,40 @@ describe('namespace tests', () => {
       '01:01:01.000 (4)|CODE_UNIT_FINISHED\n' +
       '01:01:01.000 (5)|CODE_UNIT_STARTED|[EXTERNAL]|0664J000002uLqm|VF: /apex/MyNs__MyObject\n' +
       '01:01:01.000 (6)|CODE_UNIT_FINISHED\n' +
-      '01:01:01.000 (7)|CODE_UNIT_STARTED|[EXTERNAL]|apex://MyNs.MyLightningController/ACTION$load\n' +
-      '01:01:01.000 (8)|CODE_UNIT_FINISHED\n' +
-      '01:01:01.000 (9)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyNs.MyLightningController.load()\n' +
+      '01:01:01.000 (7)|CODE_UNIT_STARTED|[EXTERNAL]|0666C0000000bhK|MyNs.VFRemote: MyNs.MyController invoke(save)\n' +
+      '01:01:01.000 (8)|CODE_UNIT_FINISHED|MyNs.VFRemote: MyNs.MyController invoke(save)\n' +
+      '01:01:01.000 (9)|CODE_UNIT_STARTED|[EXTERNAL]|apex://MyNs.MyLightningController/ACTION$load\n' +
       '01:01:01.000 (10)|CODE_UNIT_FINISHED\n' +
-      '01:01:01.000 (11)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyNs.MyLightningController\n' +
+      '01:01:01.000 (11)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyNs.MyLightningController.load()\n' +
       '01:01:01.000 (12)|CODE_UNIT_FINISHED\n' +
-      '01:01:01.000 (13)|CODE_UNIT_STARTED|[EXTERNAL]|DuplicateDetector\n' +
+      '01:01:01.000 (13)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyNs.MyLightningController\n' +
       '01:01:01.000 (14)|CODE_UNIT_FINISHED\n' +
-      '01:01:01.000 (15)|CODE_UNIT_STARTED|[EXTERNAL]|Flow:01I4J000001GaHW\n' +
+      '01:01:01.000 (15)|CODE_UNIT_STARTED|[EXTERNAL]|DuplicateDetector\n' +
       '01:01:01.000 (16)|CODE_UNIT_FINISHED\n' +
-      '01:01:01.000 (17)|CODE_UNIT_STARTED|[EXTERNAL]|Workflow:01I4J000001GaHW\n' +
+      '01:01:01.000 (17)|CODE_UNIT_STARTED|[EXTERNAL]|Flow:01I4J000001GaHW\n' +
       '01:01:01.000 (18)|CODE_UNIT_FINISHED\n' +
-      '01:01:01.000 (19)|CODE_UNIT_STARTED|[EXTERNAL]|Validation:MyObject:aAS8d000000kIiO\n' +
+      '01:01:01.000 (19)|CODE_UNIT_STARTED|[EXTERNAL]|Workflow:01I4J000001GaHW\n' +
       '01:01:01.000 (20)|CODE_UNIT_FINISHED\n' +
-      '01:01:01.000 (21)|CODE_UNIT_STARTED|[EXTERNAL]|01q58000000352C|MyTrigger on MyObject trigger event BeforeInsert|__sfdc_trigger/MyTrigger\n' +
-      '01:01:01.000 (22)|CODE_UNIT_FINISHED|MyTrigger on MyObject trigger event BeforeInsert|__sfdc_trigger/MyTrigger\n' +
+      '01:01:01.000 (21)|CODE_UNIT_STARTED|[EXTERNAL]|Validation:MyObject:aAS8d000000kIiO\n' +
+      '01:01:01.000 (22)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (23)|CODE_UNIT_STARTED|[EXTERNAL]|01q58000000352C|MyTrigger on MyObject trigger event BeforeInsert|__sfdc_trigger/MyTrigger\n' +
+      '01:01:01.000 (24)|CODE_UNIT_FINISHED|MyTrigger on MyObject trigger event BeforeInsert|__sfdc_trigger/MyTrigger\n' +
       '01:01:01.000 (23)|CODE_UNIT_STARTED|[EXTERNAL]|EventService:MyObject\n' +
       '01:01:01.000 (24)|CODE_UNIT_FINISHED\n' +
       '01:01:01.000 (25)|CODE_UNIT_STARTED|[EXTERNAL]|0664J000002uLqm|VF: /apex/MyObject\n' +
       '01:01:01.000 (26)|CODE_UNIT_FINISHED\n' +
       '01:01:01.000 (27)|CODE_UNIT_STARTED|[EXTERNAL]|apex://MyLightningController/ACTION$load\n' +
       '01:01:01.000 (28)|CODE_UNIT_FINISHED\n' +
-      '01:01:01.000 (29)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyLightningController.load()\n' +
-      '01:01:01.000 (30)|CODE_UNIT_FINISHED\n' +
-      '01:01:01.000 (31)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyLightningController\n' +
-      '01:01:01.000 (32)|CODE_UNIT_FINISHED\n';
+      '01:01:01.000 (29)|CODE_UNIT_STARTED|[EXTERNAL]|0666C0000000bhK|VFRemote: MyController invoke(save)\n' +
+      '01:01:01.000 (30)|CODE_UNIT_FINISHED|VFRemote: MyController invoke(save)\n' +
+      '01:01:01.000 (31)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyLightningController.load()\n' +
+      '01:01:01.000 (32)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (33)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyLightningController\n' +
+      '01:01:01.000 (34)|CODE_UNIT_FINISHED\n';
 
     const apexLog = parse(log);
 
-    expect(apexLog.children.length).toEqual(16);
+    expect(apexLog.children.length).toEqual(18);
 
     expect(apexLog.children[0]).toMatchObject({
       namespace: 'MyNS',
@@ -744,67 +748,151 @@ describe('namespace tests', () => {
 
     expect(apexLog.children[3]).toMatchObject({
       namespace: 'MyNs',
-      text: 'apex://MyNs.MyLightningController/ACTION$load',
+      text: 'MyNs.VFRemote: MyNs.MyController invoke(save)',
     });
 
     expect(apexLog.children[4]).toMatchObject({
       namespace: 'MyNs',
-      text: 'MyNs.MyLightningController.load()',
+      text: 'apex://MyNs.MyLightningController/ACTION$load',
     });
 
     expect(apexLog.children[5]).toMatchObject({
       namespace: 'MyNs',
-      text: 'MyNs.MyLightningController',
+      text: 'MyNs.MyLightningController.load()',
     });
 
     expect(apexLog.children[6]).toMatchObject({
-      namespace: 'default',
-      text: 'DuplicateDetector',
+      namespace: 'MyNs',
+      text: 'MyNs.MyLightningController',
     });
 
     expect(apexLog.children[7]).toMatchObject({
       namespace: 'default',
-      text: 'Flow:01I4J000001GaHW',
+      text: 'DuplicateDetector',
     });
 
     expect(apexLog.children[8]).toMatchObject({
       namespace: 'default',
-      text: 'Workflow:01I4J000001GaHW',
+      text: 'Flow:01I4J000001GaHW',
     });
 
     expect(apexLog.children[9]).toMatchObject({
       namespace: 'default',
-      text: 'Validation:MyObject:aAS8d000000kIiO',
+      text: 'Workflow:01I4J000001GaHW',
     });
 
     expect(apexLog.children[10]).toMatchObject({
       namespace: 'default',
-      text: 'MyTrigger on MyObject trigger event BeforeInsert',
+      text: 'Validation:MyObject:aAS8d000000kIiO',
     });
 
     expect(apexLog.children[11]).toMatchObject({
       namespace: 'default',
-      text: 'EventService:MyObject',
+      text: 'MyTrigger on MyObject trigger event BeforeInsert',
     });
 
     expect(apexLog.children[12]).toMatchObject({
       namespace: 'default',
-      text: 'VF: /apex/MyObject',
+      text: 'EventService:MyObject',
     });
 
     expect(apexLog.children[13]).toMatchObject({
       namespace: 'default',
-      text: 'apex://MyLightningController/ACTION$load',
+      text: 'VF: /apex/MyObject',
     });
 
     expect(apexLog.children[14]).toMatchObject({
       namespace: 'default',
-      text: 'MyLightningController.load()',
+      text: 'apex://MyLightningController/ACTION$load',
     });
 
     expect(apexLog.children[15]).toMatchObject({
       namespace: 'default',
+      text: 'VFRemote: MyController invoke(save)',
+    });
+
+    expect(apexLog.children[16]).toMatchObject({
+      namespace: 'default',
+      text: 'MyLightningController.load()',
+    });
+
+    expect(apexLog.children[17]).toMatchObject({
+      namespace: 'default',
       text: 'MyLightningController',
+    });
+  });
+
+  it('Method Entry namesapce', () => {
+    const log = [
+      '07:09:40.0 (1)|EXECUTION_STARTED',
+      '07:09:40.0 (2)|CODE_UNIT_STARTED|[EXTERNAL]|execute_anonymous_apex',
+      '07:09:40.0 (3)|CONSTRUCTOR_ENTRY|[1]|01pDS00000uYQmZ|<init>()|ns.OuterClass.InnerClass',
+      '07:09:40.0 (4)|CONSTRUCTOR_EXIT|[1]|01pDS00000uYQmZ|<init>()|ns.OuterClass.InnerClass',
+      '07:09:40.0 (5)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.InnerClass.innerMethod()',
+      '07:09:40.0 (6)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns.OuterClass.InnerClass.innerMethod()',
+      '07:09:40.0 (7)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.OuterClass()',
+      '07:09:40.0 (8)|METHOD_EXIT|[1]|ns.OuterClass',
+      '07:09:40.0 (9)|CONSTRUCTOR_ENTRY|[1]|01pDS00000uYQmZ|<init>()|ns.OuterClass',
+      '07:09:40.0 (10)|CONSTRUCTOR_EXIT|[1]|01pDS00000uYQmZ|<init>()|ns.OuterClass',
+      '07:09:40.0 (11)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.myMethod()',
+      '07:09:40.0 (12)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns.OuterClass.myMethod()',
+      '07:09:40.0 (13)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns2.StaticOuter.StaticOuter()',
+      '07:09:40.0 (14)|METHOD_EXIT|[1]|ns2.StaticOuter',
+      '07:09:40.0 (15)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns2.StaticOuter.staticMethod()',
+      '07:09:40.0 (16)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns2.StaticOuter.staticMethod()',
+      '07:09:40.0 (17)|CODE_UNIT_FINISHED|execute_anonymous_apex',
+      '07:09:40.0 (18)|EXECUTION_FINISHED',
+    ].join('\n');
+
+    const apexLog = parse(log);
+    expect(apexLog.children.length).toEqual(1);
+    expect(apexLog.children[0]).toMatchObject({
+      namespace: 'default',
+      text: 'EXECUTION_STARTED',
+    });
+
+    const execute = apexLog.children[0]!;
+    expect(execute.children.length).toEqual(1);
+    expect(execute.children[0]).toMatchObject({
+      namespace: 'default',
+      text: 'execute_anonymous_apex',
+    });
+
+    const codeUnit = execute.children[0]!;
+    expect(codeUnit.children.length).toEqual(7);
+    expect(codeUnit.children[0]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.InnerClass()',
+    });
+
+    expect(codeUnit.children[1]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.InnerClass.innerMethod()',
+    });
+
+    expect(codeUnit.children[2]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.OuterClass()',
+    });
+
+    expect(codeUnit.children[3]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass()',
+    });
+
+    expect(codeUnit.children[4]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.myMethod()',
+    });
+
+    expect(codeUnit.children[5]).toMatchObject({
+      namespace: 'ns2',
+      text: 'ns2.StaticOuter.StaticOuter()',
+    });
+
+    expect(codeUnit.children[6]).toMatchObject({
+      namespace: 'ns2',
+      text: 'ns2.StaticOuter.staticMethod()',
     });
   });
 });
