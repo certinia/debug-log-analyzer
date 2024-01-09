@@ -1004,19 +1004,12 @@ class SystemMethodExitLine extends LogLine {
   }
 }
 
-const cpuMap: Map<string, CPUType> = new Map([
-  ['EventService', 'method'],
-  ['Validation', 'custom'],
-  ['Workflow', 'custom'],
-  ['Flow', 'custom'],
-]);
-
 export class CodeUnitStartedLine extends Method {
   suffix = ' (entrypoint)';
   codeUnitType = '';
 
   constructor(parts: string[]) {
-    super(parts, ['CODE_UNIT_FINISHED'], 'Code Unit', CodeUnitStartedLine.getCpuType(parts));
+    super(parts, ['CODE_UNIT_FINISHED'], 'Code Unit', 'custom');
 
     const typeString = parts[5] || parts[4] || parts[3] || '';
     let sepIndex = typeString.indexOf(':');
