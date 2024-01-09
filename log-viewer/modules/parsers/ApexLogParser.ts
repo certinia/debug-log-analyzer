@@ -391,7 +391,7 @@ export default class ApexLogParser {
     if (namespace && namespaces.has(namespace)) {
       return namespace;
     } else {
-      return null;
+      return 'default';
     }
   }
 
@@ -564,7 +564,7 @@ export abstract class LogLine {
   /**
    * The package namespace associated with this log line
    */
-  namespace: string | null = null;
+  namespace: string | 'default' = 'default';
 
   /**
    * The variable value
@@ -815,23 +815,23 @@ export function parseObjectNamespace(text: string | null | undefined): string {
 
   const sep = text.indexOf('__');
   if (sep < 0) {
-    return 'unmanaged';
+    return 'default';
   }
   return text.substring(0, sep);
 }
 
 export function parseVfNamespace(text: string): string {
   const sep = text.indexOf('__');
-  if (sep < 0) {
-    return 'unmanaged';
+  if (sep === -1) {
+    return 'default';
   }
   const firstSlash = text.indexOf('/');
-  if (firstSlash < 0) {
-    return 'unmanaged';
+  if (firstSlash === -1) {
+    return 'default';
   }
   const secondSlash = text.indexOf('/', firstSlash + 1);
   if (secondSlash < 0) {
-    return 'unmanaged';
+    return 'default';
   }
   return text.substring(secondSlash + 1, sep);
 }
@@ -1021,7 +1021,8 @@ export class CodeUnitStartedLine extends Method {
     const subParts = parts[3]?.split(':') || [],
       name = parts[4] || parts[3] || '';
 
-    this.codeUnitType = subParts[0] || parts[4]?.split('/')[0] || '';
+    this.codeUnitType =
+      parts[5]?.slice(0, parts[5].indexOf('/')) || parts[4]?.split('/')[0] || subParts[0] || '';
     switch (this.codeUnitType) {
       case 'EventService':
         this.cpuType = 'method';
@@ -1045,12 +1046,32 @@ export class CodeUnitStartedLine extends Method {
         this.declarative = true;
         this.text = name || this.codeUnitType;
         break;
+      case 'VF: ':
+        this.cpuType = 'method';
+        this.namespace = parseVfNamespace(name);
+        this.text = name || parts[3] || '';
+        break;
+      case 'apex': {
+        this.cpuType = 'method';
+        const namespaceIndex = name.indexOf('.');
+        this.namespace =
+          namespaceIndex !== -1
+            ? name.slice(name.indexOf('apex://') + 7, namespaceIndex)
+            : 'default';
+        this.text = name || parts[3] || '';
+        break;
+      }
+      case '__sfdc_trigger': {
+        this.cpuType = 'method';
+        this.text = name || parts[4] || '';
+        const triggerParts = parts[5]?.split('/') || '';
+        this.namespace = triggerParts.length === 3 ? triggerParts[1] || 'default' : 'default';
+        break;
+      }
       default:
         this.cpuType = 'method';
-        if (name?.startsWith('VF:')) {
-          this.namespace = parseVfNamespace(name);
-        }
         this.text = name || parts[3] || '';
+        // TODO: Should be a class try to parse namespacve
         break;
     }
   }
@@ -1173,6 +1194,8 @@ class DMLBeginLine extends Method {
     self: 1,
     total: 1,
   };
+
+  namespace = 'default';
 
   constructor(parts: string[]) {
     super(parts, ['DML_END'], 'DML', 'free');
