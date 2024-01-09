@@ -1018,38 +1018,40 @@ export class CodeUnitStartedLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['CODE_UNIT_FINISHED'], 'Code Unit', CodeUnitStartedLine.getCpuType(parts));
 
-    const subParts = parts[3]?.split(':') || [],
-      name = parts[4] || parts[3] || '';
+    const typeString = parts[5] || parts[4] || parts[3] || '';
+    let sepIndex = typeString.indexOf(':');
+    if (sepIndex === -1) {
+      sepIndex = typeString.indexOf('/');
+    }
+    this.codeUnitType = sepIndex !== -1 ? typeString.slice(0, sepIndex) : '';
 
-    this.codeUnitType =
-      parts[5]?.slice(0, parts[5].indexOf('/')) || parts[4]?.split('/')[0] || subParts[0] || '';
+    const name = parts[4] || parts[3] || this.codeUnitType || '';
     switch (this.codeUnitType) {
       case 'EventService':
         this.cpuType = 'method';
-        this.namespace = parseObjectNamespace(subParts[1]);
-
-        this.text = parts[3] || '';
+        this.namespace = parseObjectNamespace(typeString.slice(sepIndex + 1));
+        this.text = name;
         break;
       case 'Validation':
         this.cpuType = 'custom';
         this.declarative = true;
 
-        this.text = name || this.codeUnitType + ':' + subParts[1];
+        this.text = name;
         break;
       case 'Workflow':
         this.cpuType = 'custom';
         this.declarative = true;
-        this.text = name || this.codeUnitType;
+        this.text = name;
         break;
       case 'Flow':
         this.cpuType = 'custom';
         this.declarative = true;
-        this.text = name || this.codeUnitType;
+        this.text = name;
         break;
-      case 'VF: ':
+      case 'VF':
         this.cpuType = 'method';
         this.namespace = parseVfNamespace(name);
-        this.text = name || parts[3] || '';
+        this.text = name;
         break;
       case 'apex': {
         this.cpuType = 'method';
@@ -1058,7 +1060,7 @@ export class CodeUnitStartedLine extends Method {
           namespaceIndex !== -1
             ? name.slice(name.indexOf('apex://') + 7, namespaceIndex)
             : 'default';
-        this.text = name || parts[3] || '';
+        this.text = name;
         break;
       }
       case '__sfdc_trigger': {
@@ -1068,11 +1070,15 @@ export class CodeUnitStartedLine extends Method {
         this.namespace = triggerParts.length === 3 ? triggerParts[1] || 'default' : 'default';
         break;
       }
-      default:
+      default: {
         this.cpuType = 'method';
-        this.text = name || parts[3] || '';
-        // TODO: Should be a class try to parse namespacve
+        this.text = name;
+        const methodName = name.split('.');
+        if (methodName.length === 3 || (methodName.length === 2 && !methodName[1]?.endsWith(')'))) {
+          this.namespace = methodName[0] || 'default';
+        }
         break;
+      }
     }
   }
 
