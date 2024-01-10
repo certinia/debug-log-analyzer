@@ -165,6 +165,7 @@ export default class ApexLogParser {
 
   private parseTree(currentLine: Method, lineIter: LineIterator, stack: Method[]) {
     this.lastTimestamp = currentLine.timestamp;
+    currentLine.namespace ||= 'default';
 
     const isEntry = currentLine.exitTypes.length > 0;
     if (isEntry) {
@@ -216,6 +217,7 @@ export default class ApexLogParser {
           this.parseTree(nextLine, lineIter, stack);
         }
 
+        nextLine.namespace ||= currentLine.namespace || 'default';
         currentLine.addChild(nextLine);
       }
 
@@ -566,8 +568,9 @@ export abstract class LogLine {
 
   /**
    * The package namespace associated with this log line
+   * @default default
    */
-  namespace: string | 'default' = 'default';
+  namespace: string | 'default' = '';
 
   /**
    * The variable value
