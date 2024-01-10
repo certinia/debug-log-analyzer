@@ -822,7 +822,7 @@ describe('namespace tests', () => {
     });
   });
 
-  it('Method Entry namesapce', () => {
+  it('Method + constructor namespace parsing', () => {
     const log = [
       '07:09:40.0 (1)|EXECUTION_STARTED',
       '07:09:40.0 (2)|CODE_UNIT_STARTED|[EXTERNAL]|execute_anonymous_apex',
@@ -840,8 +840,22 @@ describe('namespace tests', () => {
       '07:09:40.0 (14)|METHOD_EXIT|[1]|ns2.StaticOuter',
       '07:09:40.0 (15)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns2.StaticOuter.staticMethod()',
       '07:09:40.0 (16)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns2.StaticOuter.staticMethod()',
-      '07:09:40.0 (17)|CODE_UNIT_FINISHED|execute_anonymous_apex',
-      '07:09:40.0 (18)|EXECUTION_FINISHED',
+      '07:09:40.0 (17)|CONSTRUCTOR_ENTRY|[1]|01pDS00000uYQmZ|<init>()|OuterClass.InnerClass',
+      '07:09:40.0 (18)|CONSTRUCTOR_EXIT|[1]|01pDS00000uYQmZ|<init>()|OuterClass.InnerClass',
+      '07:09:40.0 (19)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.InnerClass.innerMethod()',
+      '07:09:40.0 (20)|METHOD_EXIT|[1]|01pDS00000uYQmZ|OuterClass.InnerClass.innerMethod()',
+      '07:09:40.0 (21)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.OuterClass()',
+      '07:09:40.0 (22)|METHOD_EXIT|[1]|OuterClass',
+      '07:09:40.0 (23)|CONSTRUCTOR_ENTRY|[1]|01pDS00000uYQmZ|<init>()|OuterClass',
+      '07:09:40.0 (24)|CONSTRUCTOR_EXIT|[1]|01pDS00000uYQmZ|<init>()|OuterClass',
+      '07:09:40.0 (25)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.myMethod()',
+      '07:09:40.0 (26)|METHOD_EXIT|[1]|01pDS00000uYQmZ|OuterClass.myMethod()',
+      '07:09:40.0 (27)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|StaticOuter.StaticOuter()',
+      '07:09:40.0 (28)|METHOD_EXIT|[1]|StaticOuter',
+      '07:09:40.0 (29)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|StaticOuter.staticMethod()',
+      '07:09:40.0 (30)|METHOD_EXIT|[1]|01pDS00000uYQmZ|StaticOuter.staticMethod()',
+      '07:09:40.0 (31)|CODE_UNIT_FINISHED|execute_anonymous_apex',
+      '07:09:40.0 (32)|EXECUTION_FINISHED',
     ].join('\n');
 
     const apexLog = parse(log);
@@ -859,7 +873,7 @@ describe('namespace tests', () => {
     });
 
     const codeUnit = execute.children[0]!;
-    expect(codeUnit.children.length).toEqual(7);
+    expect(codeUnit.children.length).toEqual(14);
     expect(codeUnit.children[0]).toMatchObject({
       namespace: 'ns',
       text: 'ns.OuterClass.InnerClass()',
@@ -893,6 +907,41 @@ describe('namespace tests', () => {
     expect(codeUnit.children[6]).toMatchObject({
       namespace: 'ns2',
       text: 'ns2.StaticOuter.staticMethod()',
+    });
+
+    expect(codeUnit.children[7]).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass.InnerClass()',
+    });
+
+    expect(codeUnit.children[8]).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass.InnerClass.innerMethod()',
+    });
+
+    expect(codeUnit.children[9]).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass.OuterClass()',
+    });
+
+    expect(codeUnit.children[10]).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass()',
+    });
+
+    expect(codeUnit.children[11]).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass.myMethod()',
+    });
+
+    expect(codeUnit.children[12]).toMatchObject({
+      namespace: 'default',
+      text: 'StaticOuter.StaticOuter()',
+    });
+
+    expect(codeUnit.children[13]).toMatchObject({
+      namespace: 'default',
+      text: 'StaticOuter.staticMethod()',
     });
   });
 });
