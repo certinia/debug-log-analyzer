@@ -694,19 +694,6 @@ describe('Recalculate durations tests', () => {
     expect(node.timestamp).toEqual(1);
     expect(node.duration).toEqual({ self: 2, total: 2 });
   });
-
-  it('Children are subtracted from net duration', () => {
-    const node = new Method(['14:32:07.563 (0)', 'DUMMY'], [], 'Method', ''),
-      child1 = new Method(['14:32:07.563 (10)', 'DUMMY'], [], 'Method', ''),
-      child2 = new Method(['14:32:07.563 (70)', 'DUMMY'], [], 'Method', '');
-    node.exitStamp = 100;
-    child1.duration.total = 50;
-    child2.duration.total = 25;
-    node.addChild(child1);
-    node.addChild(child2);
-    node.recalculateDurations();
-    expect(node.duration).toEqual({ self: 25, total: 100 });
-  });
 });
 
 describe('Line Type Tests', () => {

@@ -166,7 +166,7 @@ export default class ApexLogParser {
 
     this.insertPackageWrappers(rootMethod);
     this.setNamespaces(rootMethod);
-    this.aggregateTotals([rootMethod]);
+    this.aggregateTotals(rootMethod.children);
     return rootMethod;
   }
 
