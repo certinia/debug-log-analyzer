@@ -854,6 +854,8 @@ describe('namespace tests', () => {
       '07:09:40.0 (28)|METHOD_EXIT|[1]|StaticOuter',
       '07:09:40.0 (29)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|StaticOuter.staticMethod()',
       '07:09:40.0 (30)|METHOD_EXIT|[1]|01pDS00000uYQmZ|StaticOuter.staticMethod()',
+      '07:09:40.0 (30)|METHOD_ENTRY|[169]||Database.QueryLocatorIterator.hasNext()',
+      '07:09:40.0 (31)|METHOD_EXIT|[169]||Database.QueryLocatorIterator.hasNext()',
       '07:09:40.0 (31)|CODE_UNIT_FINISHED|execute_anonymous_apex',
       '07:09:40.0 (32)|EXECUTION_FINISHED',
     ].join('\n');
@@ -873,7 +875,7 @@ describe('namespace tests', () => {
     });
 
     const codeUnit = execute.children[0]!;
-    expect(codeUnit.children.length).toEqual(14);
+    expect(codeUnit.children.length).toEqual(15);
     expect(codeUnit.children[0]).toMatchObject({
       namespace: 'ns',
       text: 'ns.OuterClass.InnerClass()',
@@ -942,6 +944,138 @@ describe('namespace tests', () => {
     expect(codeUnit.children[13]).toMatchObject({
       namespace: 'default',
       text: 'StaticOuter.staticMethod()',
+    });
+
+    expect(codeUnit.children[14]).toMatchObject({
+      namespace: 'default',
+      text: 'Database.QueryLocatorIterator.hasNext()',
+    });
+  });
+
+  it('namespace should propagate', () => {
+    const log1 = [
+      '16:09:42.2 (0)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.OuterClass()',
+      '16:09:42.2 (1)|METHOD_EXIT|[1]|OuterClass',
+      '16:09:42.2 (1)|METHOD_ENTRY|[5]|01p4J00000L8iGZ|OuterClass.staticMethod()',
+      '16:09:42.2 (1)|METHOD_ENTRY|[169]||Database.QueryLocatorIterator.hasNext()',
+      '16:09:42.2 (1)|METHOD_EXIT|[169]||Database.QueryLocatorIterator.hasNext()',
+      '16:09:42.2 (1)|SOQL_EXECUTE_BEGIN|[64]|Aggregations:0|SELECT ID FROM MyObject__c',
+      '16:09:42.2 (1)|SOQL_EXECUTE_END|[64]|Rows:1',
+      '16:09:42.2 (1)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.OuterClass()',
+      '16:09:42.2 (1)|METHOD_EXIT|[1]|ns.OuterClass',
+      '16:09:42.2 (2)|METHOD_ENTRY|[5]|01p4J00000L8iGZ|ns.OuterClass.staticMethod()',
+      '16:09:42.2 (3)|DML_BEGIN|[180]|Op:Insert|Type:SObject|Rows:2',
+      '16:09:42.2 (4)|CODE_UNIT_STARTED|[EXTERNAL]|01q4J000000bcrb|ns.MyObjectTrigger on MyObject trigger event BeforeUpdate|__sfdc_trigger/ns/MyObjectTrigger',
+      '16:09:42.2 (5)|METHOD_ENTRY|[5]|01p4J00000L8iGZ|ns.OuterClass.OuterClass()',
+      '16:09:42.2 (6)|CONSTRUCTOR_ENTRY|[14]|01p4J00000L8iGZ|<init>()|ns.OuterClass',
+      '16:09:42.2 (7)|CONSTRUCTOR_EXIT|[14]|01p4J00000L8iGZ|<init>()|ns.OuterClass',
+      '16:09:42.2 (8)|METHOD_EXIT|[5]|ns.OuterClass',
+      '16:09:42.2 (9)|METHOD_ENTRY|[288]||System.Type.forName(String)',
+      '16:09:42.2 (10)|METHOD_EXIT|[288]||System.Type.forName(String)',
+      '16:09:42.2 (11)|METHOD_ENTRY|[288]|1|ns.Class1.method1()',
+      '16:09:42.2 (12)|METHOD_ENTRY|[288]|1|ns.Class1.method2()',
+      '16:09:42.2 (12)|METHOD_ENTRY|[169]||Database.QueryLocatorIterator.hasNext()',
+      '16:09:42.2 (13)|METHOD_EXIT|[169]||Database.QueryLocatorIterator.hasNext()',
+      '16:09:42.2 (13)|SOQL_EXECUTE_BEGIN|[64]|Aggregations:0|SELECT ID FROM MyObject__c',
+      '16:09:42.2 (14)|SOQL_EXECUTE_END|[64]|Rows:1',
+      '16:09:42.2 (15)|METHOD_EXIT|[288]|1|ns.Class1.method2()',
+      '16:09:42.2 (16)|METHOD_EXIT|[288]|1|ns.Class1.method1()',
+      '16:09:42.2 (17)|CODE_UNIT_FINISHED|ns.MyObjectTrigger on MyObject trigger event BeforeUpdate|__sfdc_trigger/ns/MyObjectTrigger',
+      '16:09:42.2 (18)|DML_END|[180]',
+      '16:09:42.2 (19)|METHOD_EXIT|[5]|01p4J00000L8iGZ|ns.OuterClass.staticMethod()',
+      '16:09:42.2 (20)|METHOD_EXIT|[5]|01p4J00000L8iGZ|OuterClass.staticMethod()',
+    ].join('\n');
+
+    const apexLog = parse(log1);
+    expect(apexLog.children.length).toEqual(2);
+    expect(apexLog.children[0]).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass.OuterClass()',
+    });
+
+    let logLine = apexLog.children[1]!;
+    expect(logLine).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass.staticMethod()',
+    });
+
+    expect(logLine.children.length).toEqual(4);
+
+    expect(logLine.children[0]).toMatchObject({
+      namespace: 'default',
+      text: 'Database.QueryLocatorIterator.hasNext()',
+    });
+
+    expect(logLine.children[1]).toMatchObject({
+      namespace: 'default',
+      text: 'SELECT ID FROM MyObject__c',
+    });
+
+    expect(logLine.children[2]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.OuterClass()',
+    });
+
+    logLine = logLine.children[3]!;
+    expect(logLine).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.staticMethod()',
+    });
+
+    expect(logLine.children.length).toEqual(1);
+    logLine = logLine.children[0]!;
+    expect(logLine).toMatchObject({
+      namespace: 'default',
+      text: 'DML Op:Insert Type:SObject',
+    });
+
+    expect(logLine.children.length).toEqual(1);
+    logLine = logLine.children[0]!;
+    expect(logLine).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.MyObjectTrigger on MyObject trigger event BeforeUpdate',
+    });
+
+    expect(logLine.children.length).toEqual(3);
+    expect(logLine.children[0]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.OuterClass()',
+    });
+
+    expect(logLine.children[0]!.children.length).toEqual(1);
+    expect(logLine.children[0]!.children[0]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass()',
+    });
+
+    expect(logLine.children[1]).toMatchObject({
+      namespace: 'ns',
+      text: 'System.Type.forName(String)',
+    });
+
+    expect(logLine.children[2]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.Class1.method1()',
+    });
+
+    logLine = logLine.children[2]!;
+    expect(logLine.children.length).toEqual(1);
+    expect(logLine.children[0]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.Class1.method2()',
+    });
+
+    logLine = logLine.children[0]!;
+    expect(logLine.children.length).toEqual(2);
+
+    expect(logLine.children[0]).toMatchObject({
+      namespace: 'ns',
+      text: 'Database.QueryLocatorIterator.hasNext()',
+    });
+
+    expect(logLine.children[1]).toMatchObject({
+      namespace: 'ns',
+      text: 'SELECT ID FROM MyObject__c',
     });
   });
 });

@@ -74,7 +74,7 @@ export default class ApexLogParser {
       const entry = new metaCtor(parts);
       entry.logLine = line;
       lastEntry?.onAfter?.(this, entry);
-      this.namespaces.add(entry.namespace);
+      entry.namespace && this.namespaces.add(entry.namespace);
       return entry;
     }
 
@@ -211,13 +211,13 @@ export default class ApexLogParser {
           break;
         }
 
+        nextLine.namespace ||= currentLine.namespace || 'default';
         lineIter.fetch(); // it's a child - consume the line
         this.lastTimestamp = nextLine.timestamp;
         if (nextLine instanceof Method) {
           this.parseTree(nextLine, lineIter, stack);
         }
 
-        nextLine.namespace ||= currentLine.namespace || 'default';
         currentLine.addChild(nextLine);
       }
 
@@ -966,9 +966,10 @@ export class MethodEntryLine extends Method {
     super(parts, ['METHOD_EXIT'], 'Method', 'method');
     this.lineNumber = parseLineNumber(parts[2]);
     this.text = parts[4] || this.type || '';
-    if (this.text === 'System.Type.forName(String, String)') {
-      this.cpuType = 'loading'; // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
-      // no namespace or it will get charged...
+    if (this.text.indexOf('System.Type.forName(') !== -1) {
+      // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
+      this.cpuType = 'loading';
+      // this.namespace = 'default';
     } else {
       const methodNameParts = parts[4]?.split('.') ?? '';
       const possibleNs = methodNameParts[0] ?? '';
@@ -979,7 +980,7 @@ export class MethodEntryLine extends Method {
   }
 
   onEnd(end: MethodExitLine, _stack: LogLine[]): void {
-    if (!end.text.endsWith(')')) {
+    if (end.namespace && !end.text.endsWith(')')) {
       this.namespace = end.namespace;
     }
   }
