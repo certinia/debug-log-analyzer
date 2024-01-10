@@ -110,11 +110,9 @@ export default class ApexLogParser {
     return null;
   }
 
-  // Matches CRLF (\r\n) + LF (\n)
-  // the ? matches the previous token 0 or 1 times.
   private parseLog(log: string): LogLine[] {
     const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || 0;
-    const rawLines = log.slice(start).split(/\r?\n/);
+    const rawLines = this.splitByNextLine(log.slice(start));
 
     // reset global variables to be captured during parsing
     this.logIssues = [];
@@ -141,6 +139,19 @@ export default class ApexLogParser {
     return logLines;
   }
 
+  // Matches CRLF (\r\n) + LF (\n)
+  // the ? matches the previous token 0 or 1 times.
+  private splitByNextLine(text: string) {
+    const hascrlfEOL = text.indexOf('\r\n') > -1;
+    let regex;
+    if (!hascrlfEOL) {
+      regex = /\n/;
+    } else {
+      regex = /\r?\n/;
+    }
+    return text.split(regex);
+  }
+
   private toLogTree(logLines: LogLine[]) {
     const lineIter = new LineIterator(logLines),
       rootMethod = new ApexLog(),
@@ -157,9 +168,7 @@ export default class ApexLogParser {
     rootMethod.setTimes();
 
     this.insertPackageWrappers(rootMethod);
-
-    // this.setNamespaces(rootMethod);
-    this.aggregateTotals([rootMethod]);
+    this.aggregateTotals(rootMethod.children);
     return rootMethod;
   }
 
@@ -292,41 +301,57 @@ export default class ApexLogParser {
     }
   }
 
+  private flattenByDepth(nodes: LogLine[]) {
+    const result = new Map<number, LogLine[]>();
+    result.set(0, nodes);
+
+    let currentDepth = 1;
+
+    let currentNodes = nodes;
+    let len = currentNodes.length;
+    while (len) {
+      result.set(currentDepth, []);
+      while (len--) {
+        const node = currentNodes[len];
+        if (node?.children) {
+          const children = result.get(currentDepth)!;
+          node.children.forEach((c) => {
+            if (c.children.length) {
+              children.push(c);
+            }
+          });
+        }
+      }
+      currentNodes = result.get(currentDepth++) || [];
+      len = currentNodes.length;
+    }
+
+    return result;
+  }
+
   private aggregateTotals(nodes: LogLine[]) {
     const len = nodes.length;
     if (!len) {
       return;
     }
 
-    // This method purposely collects the children in bulk to avoid as much recursion as possible. This increases performance to be just over ~3 times faster or ~70% faster.
+    // This method purposely processes the children at the lowest depth first in bulk to avoid as much recursion as possible. This increases performance to be just over ~3 times faster or ~70% faster.
 
-    // collect all children for the supplied nodes.
-    const children: LogLine[] = [];
-    let i = len;
-    while (i--) {
-      const parent = nodes[i];
-      if (parent?.children.length) {
-        parent.children.forEach((child) => {
-          children.push(child);
-        });
-      }
-    }
-
-    if (children.length) {
-      this.aggregateTotals(children);
-
-      // sum the children in bulk
-      i = len;
+    // collect all children for the supplied nodes by depth.
+    const nodesByDepth = this.flattenByDepth(nodes);
+    let depth = nodesByDepth.size;
+    while (depth--) {
+      const nds = nodesByDepth.get(depth) || [];
+      let i = nds.length;
       while (i--) {
-        const parent = nodes[i];
-        if (parent?.children.length) {
-          parent.children.forEach((child) => {
-            parent.dmlCount.total += child.dmlCount.total;
-            parent.soqlCount.total += child.soqlCount.total;
-            parent.totalThrownCount += child.totalThrownCount;
-            parent.rowCount.total += child.rowCount.total;
-          });
-        }
+        const parent = nds[i];
+        parent?.children.forEach((child) => {
+          parent.dmlCount.total += child.dmlCount.total;
+          parent.soqlCount.total += child.soqlCount.total;
+          parent.totalThrownCount += child.totalThrownCount;
+          parent.rowCount.total += child.rowCount.total;
+          parent.duration.self -= child.duration.total;
+        });
       }
     }
   }
@@ -659,9 +684,10 @@ export abstract class LogLine {
 
   constructor(parts: string[] | null) {
     if (parts) {
-      this.type = parts[1] as LogEventType;
+      const [timeData, type] = parts;
+      this.type = type as LogEventType;
       this.text = this.type;
-      this.timestamp = parseTimestamp(parts[0] || '');
+      this.timestamp = this.parseTimestamp(timeData as string);
     }
   }
 
@@ -670,6 +696,30 @@ export abstract class LogLine {
 
   /** Called when the Log event after this one is created in the line parser*/
   onAfter?(parser: ApexLogParser, next?: LogLine): void;
+
+  private parseTimestamp(text: string): number {
+    const start = text.indexOf('(');
+    if (start !== -1) {
+      return Number(text.slice(start + 1, -1));
+    }
+    throw new Error(`Unable to parse timestamp: '${text}'`);
+  }
+
+  protected parseLineNumber(text: string | null | undefined): string | number {
+    switch (true) {
+      case text === '[EXTERNAL]':
+        return 'EXTERNAL';
+      case !!text: {
+        const lineNumberStr = text.slice(1, -1);
+        if (lineNumberStr) {
+          return Number(lineNumberStr);
+        }
+        throw new Error(`Unable to parse line number: '${text}'`);
+      }
+      default:
+        return 0;
+    }
+  }
 }
 
 class BasicLogLine extends LogLine {}
@@ -711,13 +761,7 @@ export class TimedNode extends LogLine {
 
   recalculateDurations() {
     if (this.exitStamp) {
-      this.duration.total = this.exitStamp - this.timestamp;
-
-      let childDuration = 0;
-      this.children.forEach((child) => {
-        childDuration += child.duration.total;
-      });
-      this.duration.self = this.duration.total - childDuration;
+      this.duration.total = this.duration.self = this.exitStamp - this.timestamp;
     }
   }
 }
@@ -842,30 +886,6 @@ export function parseVfNamespace(text: string): string {
   return text.substring(secondSlash + 1, sep);
 }
 
-export function parseTimestamp(text: string): number {
-  const start = text.indexOf('(');
-  if (start !== -1) {
-    return Number(text.slice(start + 1, -1));
-  }
-  throw new Error(`Unable to parse timestamp: '${text}'`);
-}
-
-export function parseLineNumber(text: string | null | undefined): string | number {
-  switch (true) {
-    case text === '[EXTERNAL]':
-      return 'EXTERNAL';
-    case !!text: {
-      const lineNumberStr = text.slice(1, -1);
-      if (lineNumberStr) {
-        return Number(lineNumberStr);
-      }
-      throw new Error(`Unable to parse line number: '${text}'`);
-    }
-    default:
-      return 0;
-  }
-}
-
 export function parseRows(text: string | null | undefined): number {
   if (!text) {
     return 0;
@@ -929,7 +949,7 @@ class ConstructorEntryLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['CONSTRUCTOR_EXIT'], 'Method', 'method');
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     const [, , , , args, className] = parts;
 
     this.text = className + (args ? args.substring(args.lastIndexOf('(')) : '');
@@ -947,7 +967,7 @@ class ConstructorExitLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
   }
 }
 
@@ -955,7 +975,7 @@ class EmailQueueLine extends LogLine {
   acceptsText = true;
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
   }
 }
 
@@ -964,7 +984,7 @@ export class MethodEntryLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['METHOD_EXIT'], 'Method', 'method');
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[4] || this.type || '';
     if (this.text.indexOf('System.Type.forName(') !== -1) {
       // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
@@ -990,7 +1010,7 @@ class MethodExitLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[4] ?? parts[3] ?? '';
 
     if (!this.text.endsWith(')')) {
@@ -1007,7 +1027,7 @@ class SystemConstructorEntryLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['SYSTEM_CONSTRUCTOR_EXIT'], 'System Method', 'method');
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
   }
 }
@@ -1017,13 +1037,13 @@ class SystemConstructorExitLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
   }
 }
 class SystemMethodEntryLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['SYSTEM_METHOD_EXIT'], 'System Method', 'method');
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
   }
 }
@@ -1033,7 +1053,7 @@ class SystemMethodExitLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
   }
 }
 
@@ -1127,7 +1147,7 @@ class VFApexCallStartLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['VF_APEX_CALL_END'], 'Method', 'method');
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
 
     const classText = parts[5] || parts[3] || '';
     let methodtext = parts[4] || '';
@@ -1223,7 +1243,7 @@ class DMLBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['DML_END'], 'DML', 'free');
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = 'DML ' + parts[3] + ' ' + parts[4];
     const rowCountString = parts[5];
     this.rowCount.total = this.rowCount.self = rowCountString ? parseRows(rowCountString) : 0;
@@ -1235,14 +1255,14 @@ class DMLEndLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
   }
 }
 
 class IdeasQueryExecuteLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
   }
 }
 
@@ -1255,7 +1275,7 @@ class SOQLExecuteBeginLine extends Method {
 
   constructor(parts: string[]) {
     super(parts, ['SOQL_EXECUTE_END'], 'SOQL', 'free');
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
 
     const [, , , aggregations, soqlString] = parts;
 
@@ -1277,7 +1297,7 @@ class SOQLExecuteEndLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.rowCount.total = this.rowCount.self = parseRows(parts[3] || '');
   }
 }
@@ -1292,7 +1312,7 @@ class SOQLExecuteExplainLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
 
     const queryPlanDetails = parts[3] || '';
     this.text = queryPlanDetails;
@@ -1331,7 +1351,7 @@ class SOQLExecuteExplainLine extends LogLine {
 class SOSLExecuteBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['SOSL_EXECUTE_END'], 'SOQL', 'free');
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = `SOSL: ${parts[3]}`;
   }
 
@@ -1345,7 +1365,7 @@ class SOSLExecuteEndLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.rowCount.total = this.rowCount.self = parseRows(parts[3] || '');
   }
 }
@@ -1353,7 +1373,7 @@ class SOSLExecuteEndLine extends LogLine {
 class HeapAllocateLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
   }
 }
@@ -1361,21 +1381,21 @@ class HeapAllocateLine extends LogLine {
 class HeapDeallocateLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
   }
 }
 
 class StatementExecuteLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
   }
 }
 
 class VariableScopeBeginLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts.slice(3).join(' | ');
   }
 }
@@ -1383,14 +1403,14 @@ class VariableScopeBeginLine extends LogLine {
 class VariableAssignmentLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts.slice(3).join(' | ');
   }
 }
 class UserInfoLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] + ' ' + parts[4];
   }
 }
@@ -1400,7 +1420,7 @@ class UserDebugLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts.slice(3).join(' | ');
   }
 }
@@ -1428,7 +1448,7 @@ class CumulativeProfilingBeginLine extends Method {
 class LimitUsageLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] + ' ' + parts[4] + ' out of ' + parts[5];
   }
 }
@@ -1509,7 +1529,7 @@ class PushTraceFlagsLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[4] + ', line:' + this.lineNumber + ' - ' + parts[5];
   }
 }
@@ -1519,7 +1539,7 @@ class PopTraceFlagsLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[4] + ', line:' + this.lineNumber + ' - ' + parts[5];
   }
 }
@@ -1527,7 +1547,7 @@ class PopTraceFlagsLine extends LogLine {
 class QueryMoreBeginLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['QUERY_MORE_END'], 'SOQL', 'custom');
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = `line: ${this.lineNumber}`;
   }
 }
@@ -1537,14 +1557,14 @@ class QueryMoreEndLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = `line: ${this.lineNumber}`;
   }
 }
 class QueryMoreIterationsLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = `line: ${this.lineNumber}, iterations:${parts[3]}`;
   }
 }
@@ -1552,7 +1572,7 @@ class QueryMoreIterationsLine extends LogLine {
 class SavepointRollbackLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = `${parts[3]}, line: ${this.lineNumber}`;
   }
 }
@@ -1560,7 +1580,7 @@ class SavepointRollbackLine extends LogLine {
 class SavePointSetLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = `${parts[3]}, line: ${this.lineNumber}`;
   }
 }
@@ -2291,7 +2311,7 @@ class ExceptionThrownLine extends LogLine {
 
   constructor(parts: string[]) {
     super(parts);
-    this.lineNumber = parseLineNumber(parts[2]);
+    this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
   }
 
@@ -2454,6 +2474,29 @@ class MatchEngineBegin extends Method {
 }
 
 function getLogEventClass(eventName: LogEventType): LogLineConstructor | null | undefined {
+  // Fast path for the most commonly occuring types
+  switch (eventName) {
+    case 'METHOD_ENTRY':
+      return MethodEntryLine;
+      break;
+
+    case 'METHOD_EXIT':
+      return MethodExitLine;
+      break;
+
+    case 'CONSTRUCTOR_ENTRY':
+      return ConstructorEntryLine;
+      break;
+
+    case 'CONSTRUCTOR_EXIT':
+      return ConstructorExitLine;
+      break;
+
+    default:
+      break;
+  }
+
+  // Handle all other types
   const logType = lineTypeMap.get(eventName);
   if (logType) {
     return logType;
