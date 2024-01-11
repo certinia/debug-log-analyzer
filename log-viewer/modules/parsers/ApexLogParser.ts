@@ -990,7 +990,10 @@ export class MethodEntryLine extends Method {
       // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
       this.cpuType = 'loading';
     } else {
-      const methodNameParts = parts[4]?.split('.') ?? '';
+      const methodName = parts[4] || '';
+      const methodNameParts = methodName
+        ? methodName.slice(0, methodName.indexOf('('))?.split('.')
+        : '';
       const possibleNs = methodNameParts[0] ?? '';
       if (methodNameParts.length === 4 || currentParser?.namespaces.has(possibleNs)) {
         this.namespace = possibleNs;
@@ -1118,8 +1121,10 @@ export class CodeUnitStartedLine extends Method {
       default: {
         this.cpuType = 'method';
         this.text = name;
-        const methodName = name.split('.');
-        if (methodName.length === 3 || (methodName.length === 2 && !methodName[1]?.endsWith(')'))) {
+        const openBracket = name.lastIndexOf('(');
+        const methodName =
+          openBracket !== -1 ? name.slice(0, openBracket + 1).split('.') : name.split('.');
+        if (methodName.length === 3 || (methodName.length === 2 && !methodName[1]?.endsWith('('))) {
           this.namespace = methodName[0] || 'default';
         }
         break;
