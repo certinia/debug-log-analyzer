@@ -989,6 +989,7 @@ export class MethodEntryLine extends Method {
     if (this.text.indexOf('System.Type.forName(') !== -1) {
       // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
       this.cpuType = 'loading';
+      // this.namespace = 'default';
     } else {
       const methodName = parts[4] || '';
       const methodNameParts = methodName
@@ -1222,6 +1223,8 @@ class VFFormulaEndLine extends LogLine {
 }
 
 class VFSeralizeViewStateStartLine extends Method {
+  namespace = 'system';
+
   constructor(parts: string[]) {
     super(parts, ['VF_SERIALIZE_VIEWSTATE_END'], 'System Method', 'method');
   }
@@ -1428,7 +1431,6 @@ class UserDebugLine extends LogLine {
 }
 
 class CumulativeLimitUsageLine extends Method {
-  namespace = 'default';
   constructor(parts: string[]) {
     super(parts, ['CUMULATIVE_LIMIT_USAGE_END'], 'System Method', 'system');
   }
@@ -1436,7 +1438,6 @@ class CumulativeLimitUsageLine extends Method {
 
 class CumulativeProfilingLine extends LogLine {
   acceptsText = true;
-  namespace = 'default';
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] + ' ' + (parts[3] ?? '');
@@ -1444,14 +1445,12 @@ class CumulativeProfilingLine extends LogLine {
 }
 
 class CumulativeProfilingBeginLine extends Method {
-  namespace = 'default';
   constructor(parts: string[]) {
     super(parts, ['CUMULATIVE_PROFILING_END'], 'System Method', 'custom');
   }
 }
 
 class LimitUsageLine extends LogLine {
-  namespace = 'default';
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
@@ -1461,7 +1460,6 @@ class LimitUsageLine extends LogLine {
 
 class LimitUsageForNSLine extends LogLine {
   acceptsText = true;
-  namespace = 'default';
 
   constructor(parts: string[]) {
     super(parts);
@@ -1532,6 +1530,8 @@ class NBAStrategyError extends LogLine {
 }
 
 class PushTraceFlagsLine extends LogLine {
+  namespace = 'system';
+
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
@@ -1540,6 +1540,8 @@ class PushTraceFlagsLine extends LogLine {
 }
 
 class PopTraceFlagsLine extends LogLine {
+  namespace = 'system';
+
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
