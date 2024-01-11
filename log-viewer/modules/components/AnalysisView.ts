@@ -65,6 +65,7 @@ export class AnalysisView extends LitElement {
         <strong>Group by</strong>
         <div>
           <vscode-checkbox @change="${this._groupBy}">Type</vscode-checkbox>
+          <vscode-checkbox @change="${this._groupBy}">Namespace</vscode-checkbox>
         </div>
       </div>
       <div id="analysis-table-container">
@@ -76,7 +77,8 @@ export class AnalysisView extends LitElement {
 
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
-    analysisTable.setGroupBy(target.checked ? 'type' : '');
+
+    analysisTable.setGroupBy(target.checked ? target.textContent?.toLowerCase() || '' : '');
   }
 
   _appendTableWhenVisible() {
@@ -181,6 +183,15 @@ async function renderAnalysis(rootMethod: ApexLog) {
         widthGrow: 5,
       },
       {
+        title: 'Namespace',
+        field: 'namespace',
+        headerSortStartingDir: 'desc',
+        width: 150,
+        sorter: 'string',
+        cssClass: 'datagrid-code-text',
+        tooltip: true,
+      },
+      {
         title: 'Type',
         field: 'type',
         headerSortStartingDir: 'asc',
@@ -202,7 +213,7 @@ async function renderAnalysis(rootMethod: ApexLog) {
         title: 'Total Time (ms)',
         field: 'totalTime',
         sorter: 'number',
-        width: 150,
+        width: 165,
         hozAlign: 'right',
         headerHozAlign: 'right',
         formatter: progressFormatter,
@@ -220,7 +231,7 @@ async function renderAnalysis(rootMethod: ApexLog) {
         title: 'Self Time (ms)',
         field: 'selfTime',
         sorter: 'number',
-        width: 150,
+        width: 165,
         hozAlign: 'right',
         headerHozAlign: 'right',
         bottomCalc: 'sum',
@@ -244,10 +255,12 @@ export class Metric {
   count = 0;
   totalTime = 0;
   selfTime = 0;
+  namespace;
 
-  constructor(name: string, node: TimedNode) {
-    this.name = name;
+  constructor(node: TimedNode) {
+    this.name = node.text;
     this.type = node.type;
+    this.namespace = node.namespace;
   }
 }
 
@@ -259,7 +272,7 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
     const selfTime = node.duration.self;
     let metric = map.get(key);
     if (!metric) {
-      metric = new Metric(key, node);
+      metric = new Metric(node);
       map.set(key, metric);
     }
 
@@ -270,7 +283,7 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
 
   children.forEach(function (child) {
     if (child instanceof TimedNode) {
-      addNodeToMap(map, child, child.text);
+      addNodeToMap(map, child, child.namespace + child.text);
     }
   });
 }
