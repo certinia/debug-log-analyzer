@@ -698,7 +698,7 @@ describe('namespace tests', () => {
       '01:01:01.000 (8)|CODE_UNIT_FINISHED|MyNs.VFRemote: MyNs.MyController invoke(save)\n' +
       '01:01:01.000 (9)|CODE_UNIT_STARTED|[EXTERNAL]|apex://MyNs.MyLightningController/ACTION$load\n' +
       '01:01:01.000 (10)|CODE_UNIT_FINISHED\n' +
-      '01:01:01.000 (11)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyNs.MyLightningController.load()\n' +
+      '01:01:01.000 (11)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyNs.MyLightningController.load(MyNs.MyLightningController.Config)\n' +
       '01:01:01.000 (12)|CODE_UNIT_FINISHED\n' +
       '01:01:01.000 (13)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyNs.MyLightningController\n' +
       '01:01:01.000 (14)|CODE_UNIT_FINISHED\n' +
@@ -720,7 +720,7 @@ describe('namespace tests', () => {
       '01:01:01.000 (28)|CODE_UNIT_FINISHED\n' +
       '01:01:01.000 (29)|CODE_UNIT_STARTED|[EXTERNAL]|0666C0000000bhK|VFRemote: MyController invoke(save)\n' +
       '01:01:01.000 (30)|CODE_UNIT_FINISHED|VFRemote: MyController invoke(save)\n' +
-      '01:01:01.000 (31)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyLightningController.load()\n' +
+      '01:01:01.000 (31)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyLightningController.load(MyLightningController.Config)\n' +
       '01:01:01.000 (32)|CODE_UNIT_FINISHED\n' +
       '01:01:01.000 (33)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyLightningController\n' +
       '01:01:01.000 (34)|CODE_UNIT_FINISHED\n';
@@ -756,7 +756,7 @@ describe('namespace tests', () => {
 
     expect(apexLog.children[5]).toMatchObject({
       namespace: 'MyNs',
-      text: 'MyNs.MyLightningController.load()',
+      text: 'MyNs.MyLightningController.load(MyNs.MyLightningController.Config)',
     });
 
     expect(apexLog.children[6]).toMatchObject({
@@ -811,7 +811,7 @@ describe('namespace tests', () => {
 
     expect(apexLog.children[16]).toMatchObject({
       namespace: 'default',
-      text: 'MyLightningController.load()',
+      text: 'MyLightningController.load(MyLightningController.Config)',
     });
 
     expect(apexLog.children[17]).toMatchObject({
@@ -826,32 +826,32 @@ describe('namespace tests', () => {
       '07:09:40.0 (2)|CODE_UNIT_STARTED|[EXTERNAL]|execute_anonymous_apex',
       '07:09:40.0 (3)|CONSTRUCTOR_ENTRY|[1]|01pDS00000uYQmZ|<init>()|ns.OuterClass.InnerClass',
       '07:09:40.0 (4)|CONSTRUCTOR_EXIT|[1]|01pDS00000uYQmZ|<init>()|ns.OuterClass.InnerClass',
-      '07:09:40.0 (5)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.InnerClass.innerMethod()',
-      '07:09:40.0 (6)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns.OuterClass.InnerClass.innerMethod()',
+      '07:09:40.0 (5)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.InnerClass.innerMethod(ns.OuterClass.Config)',
+      '07:09:40.0 (6)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns.OuterClass.InnerClass.innerMethod(ns.OuterClass.Config)',
       '07:09:40.0 (7)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.OuterClass()',
       '07:09:40.0 (8)|METHOD_EXIT|[1]|ns.OuterClass',
       '07:09:40.0 (9)|CONSTRUCTOR_ENTRY|[1]|01pDS00000uYQmZ|<init>()|ns.OuterClass',
       '07:09:40.0 (10)|CONSTRUCTOR_EXIT|[1]|01pDS00000uYQmZ|<init>()|ns.OuterClass',
-      '07:09:40.0 (11)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.myMethod()',
-      '07:09:40.0 (12)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns.OuterClass.myMethod()',
+      '07:09:40.0 (11)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.myMethod(ns.OuterClass.Config)',
+      '07:09:40.0 (12)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns.OuterClass.myMethod(ns.OuterClass.Config)',
       '07:09:40.0 (13)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns2.StaticOuter.StaticOuter()',
       '07:09:40.0 (14)|METHOD_EXIT|[1]|ns2.StaticOuter',
-      '07:09:40.0 (15)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns2.StaticOuter.staticMethod()',
-      '07:09:40.0 (16)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns2.StaticOuter.staticMethod()',
+      '07:09:40.0 (15)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns2.StaticOuter.staticMethod(ns2.StaticOuter.Config)',
+      '07:09:40.0 (16)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns2.StaticOuter.staticMethod(ns2.StaticOuter.Config)',
       '07:09:40.0 (17)|CONSTRUCTOR_ENTRY|[1]|01pDS00000uYQmZ|<init>()|OuterClass.InnerClass',
       '07:09:40.0 (18)|CONSTRUCTOR_EXIT|[1]|01pDS00000uYQmZ|<init>()|OuterClass.InnerClass',
-      '07:09:40.0 (19)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.InnerClass.innerMethod()',
-      '07:09:40.0 (20)|METHOD_EXIT|[1]|01pDS00000uYQmZ|OuterClass.InnerClass.innerMethod()',
+      '07:09:40.0 (19)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.InnerClass.innerMethod(OuterClass.Config)',
+      '07:09:40.0 (20)|METHOD_EXIT|[1]|01pDS00000uYQmZ|OuterClass.InnerClass.innerMethod(OuterClass.Config)',
       '07:09:40.0 (21)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.OuterClass()',
       '07:09:40.0 (22)|METHOD_EXIT|[1]|OuterClass',
       '07:09:40.0 (23)|CONSTRUCTOR_ENTRY|[1]|01pDS00000uYQmZ|<init>()|OuterClass',
       '07:09:40.0 (24)|CONSTRUCTOR_EXIT|[1]|01pDS00000uYQmZ|<init>()|OuterClass',
-      '07:09:40.0 (25)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.myMethod()',
-      '07:09:40.0 (26)|METHOD_EXIT|[1]|01pDS00000uYQmZ|OuterClass.myMethod()',
+      '07:09:40.0 (25)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.myMethod(OuterClass.Config)',
+      '07:09:40.0 (26)|METHOD_EXIT|[1]|01pDS00000uYQmZ|OuterClass.myMethod(OuterClass.Config)',
       '07:09:40.0 (27)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|StaticOuter.StaticOuter()',
       '07:09:40.0 (28)|METHOD_EXIT|[1]|StaticOuter',
-      '07:09:40.0 (29)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|StaticOuter.staticMethod()',
-      '07:09:40.0 (30)|METHOD_EXIT|[1]|01pDS00000uYQmZ|StaticOuter.staticMethod()',
+      '07:09:40.0 (29)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|StaticOuter.staticMethod(StaticOuter.Config)',
+      '07:09:40.0 (30)|METHOD_EXIT|[1]|01pDS00000uYQmZ|StaticOuter.staticMethod(StaticOuter.Config)',
       '07:09:40.0 (30)|METHOD_ENTRY|[169]||Database.QueryLocatorIterator.hasNext()',
       '07:09:40.0 (31)|METHOD_EXIT|[169]||Database.QueryLocatorIterator.hasNext()',
       '07:09:40.0 (31)|CODE_UNIT_FINISHED|execute_anonymous_apex',
@@ -881,7 +881,7 @@ describe('namespace tests', () => {
 
     expect(codeUnit.children[1]).toMatchObject({
       namespace: 'ns',
-      text: 'ns.OuterClass.InnerClass.innerMethod()',
+      text: 'ns.OuterClass.InnerClass.innerMethod(ns.OuterClass.Config)',
     });
 
     expect(codeUnit.children[2]).toMatchObject({
@@ -896,7 +896,7 @@ describe('namespace tests', () => {
 
     expect(codeUnit.children[4]).toMatchObject({
       namespace: 'ns',
-      text: 'ns.OuterClass.myMethod()',
+      text: 'ns.OuterClass.myMethod(ns.OuterClass.Config)',
     });
 
     expect(codeUnit.children[5]).toMatchObject({
@@ -906,7 +906,7 @@ describe('namespace tests', () => {
 
     expect(codeUnit.children[6]).toMatchObject({
       namespace: 'ns2',
-      text: 'ns2.StaticOuter.staticMethod()',
+      text: 'ns2.StaticOuter.staticMethod(ns2.StaticOuter.Config)',
     });
 
     expect(codeUnit.children[7]).toMatchObject({
@@ -916,7 +916,7 @@ describe('namespace tests', () => {
 
     expect(codeUnit.children[8]).toMatchObject({
       namespace: 'default',
-      text: 'OuterClass.InnerClass.innerMethod()',
+      text: 'OuterClass.InnerClass.innerMethod(OuterClass.Config)',
     });
 
     expect(codeUnit.children[9]).toMatchObject({
@@ -931,7 +931,7 @@ describe('namespace tests', () => {
 
     expect(codeUnit.children[11]).toMatchObject({
       namespace: 'default',
-      text: 'OuterClass.myMethod()',
+      text: 'OuterClass.myMethod(OuterClass.Config)',
     });
 
     expect(codeUnit.children[12]).toMatchObject({
@@ -941,7 +941,7 @@ describe('namespace tests', () => {
 
     expect(codeUnit.children[13]).toMatchObject({
       namespace: 'default',
-      text: 'StaticOuter.staticMethod()',
+      text: 'StaticOuter.staticMethod(StaticOuter.Config)',
     });
 
     expect(codeUnit.children[14]).toMatchObject({
