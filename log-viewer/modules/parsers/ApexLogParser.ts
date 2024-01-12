@@ -922,6 +922,7 @@ class EmailQueueLine extends LogLine {
   }
 }
 
+// todo: avoid some of ns parsing work if we have done it before.
 export class MethodEntryLine extends Method {
   hasValidSymbols = true;
 
