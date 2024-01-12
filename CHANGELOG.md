@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- View and Group by namespace on analysis ([#299][#299])
+  - View the namespace each log event occured in!
+
 ### Changed
 
 - Go to File multiple workspace handling to be simpified ([#202][#202])
@@ -321,6 +326,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#299]: https://github.com/certinia/debug-log-analyzer/issues/299
 [#202]: https://github.com/certinia/debug-log-analyzer/issues/202
 
 <!-- v1.12.1 -->
