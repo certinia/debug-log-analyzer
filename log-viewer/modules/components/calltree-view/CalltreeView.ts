@@ -360,6 +360,13 @@ export async function renderCallTree(
           widthGrow: 5,
         },
         {
+          title: 'Namespace',
+          field: 'namespace',
+          sorter: 'string',
+          width: 120,
+          cssClass: 'datagrid-code-text',
+        },
+        {
           title: 'DML Count',
           field: 'totalDmlCount',
           sorter: 'number',
@@ -488,6 +495,7 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
       const data: CalltreeRow = {
         id: node.timestamp,
         text: node.text,
+        namespace: node.namespace,
         duration: node.duration.total,
         selfTime: node.duration.self,
         _children: children,
@@ -557,6 +565,7 @@ interface CalltreeRow {
   originalData: LogLine;
   text: string;
   duration: number;
+  namespace: string;
   selfTime: number;
   _children: CalltreeRow[] | undefined | null;
   totalDmlCount: number;
