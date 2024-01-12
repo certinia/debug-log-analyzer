@@ -398,63 +398,6 @@ export default class ApexLogParser {
     node.children = newChildren;
   }
 
-  private collectNamespaces(node: ApexLog): Set<string> {
-    const namespaces = new Set<string>();
-    let i = 0;
-    const children = node.children;
-    while (i < children.length) {
-      const child = children[i];
-      if (child) {
-        const childType = child.type;
-
-        if (childType === 'ENTERING_MANAGED_PKG') {
-          namespaces.add(child.text);
-        }
-      }
-      ++i;
-    }
-    return namespaces;
-  }
-
-  private extractNamespace(namespaces: Set<string>, text: string) {
-    const [namespace] = text.split('.');
-    if (namespace && namespaces.has(namespace)) {
-      return namespace;
-    } else {
-      return 'default';
-    }
-  }
-
-  /**
-   * TODO: This does not work correctly and does not recursively navigate the tree, needs a rework when we get the the namespace ticket
-   * @param node
-   * @returns
-   */
-  private setNamespaces(node: ApexLog) {
-    const namespaces = this.collectNamespaces(node);
-    const children = node.children;
-
-    let i = 0;
-    while (i < children.length) {
-      const child = children[i];
-      if (child) {
-        const childType = child.type;
-
-        if (childType === 'CODE_UNIT_STARTED' && !child.namespace) {
-          child.namespace = this.extractNamespace(namespaces, child.text);
-        } else if (childType === 'EXCEPTION_THROWN') {
-          child.namespace = this.extractNamespace(namespaces, child.text);
-        } else if (childType === 'CONSTRUCTOR_ENTRY') {
-          child.namespace = this.extractNamespace(namespaces, child.text);
-        } else if (childType === 'METHOD_ENTRY') {
-          child.namespace = this.extractNamespace(namespaces, child.text);
-        }
-      }
-      ++i;
-    }
-    return namespaces;
-  }
-
   public addLogIssue(startTime: number, summary: string, description: string, type: IssueType) {
     if (!this.reasons.has(summary)) {
       this.reasons.add(summary);
