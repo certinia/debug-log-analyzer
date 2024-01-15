@@ -37,7 +37,7 @@ export function parse(logData: string): ApexLog {
  * const apexLog = new ApexLogParser().parse(logText);
  * const apexLog = parse(logText);
  */
-export default class ApexLogParser {
+class ApexLogParser {
   logIssues: LogIssue[] = [];
   parsingErrors: string[] = [];
   maxSizeTimestamp: number | null = null;
@@ -53,9 +53,8 @@ export default class ApexLogParser {
    * @returns {ApexLog}
    */
   parse(debugLog: string): ApexLog {
-    const logLines = this.parseLog(debugLog);
-
-    const apexLog = this.toLogTree(logLines);
+    const lineGenerator = this.generateLogLines(debugLog);
+    const apexLog = this.toLogTree(lineGenerator);
     apexLog.size = debugLog.length;
     apexLog.debugLevels = this.getDebugLevels(debugLog);
     apexLog.logIssues = this.logIssues;
@@ -110,65 +109,67 @@ export default class ApexLogParser {
     return null;
   }
 
-  private parseLog(log: string): LogLine[] {
+  private *generateLogLines(log: string): Generator<LogLine> {
     const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || 0;
-    const rawLines = this.splitByNextLine(log.slice(start));
+    if (start > 0) {
+      log = log.slice(start);
+    }
 
-    // reset global variables to be captured during parsing
-    this.logIssues = [];
-    this.reasons = new Set<string>();
-    this.cpuUsed = 0;
-    this.discontinuity = false;
-
-    const logLines = [];
+    const hascrlf = log.indexOf('\r\n') > -1;
     let lastEntry = null;
-    const len = rawLines.length;
-    for (let i = 0; i < len; i++) {
-      const line = rawLines[i];
+    let eolIndex = log.indexOf('\n');
+    let startIndex = 0;
+    let crlfIndex = -1;
+
+    while (eolIndex !== -1) {
+      if (hascrlf && eolIndex > crlfIndex) {
+        crlfIndex = log.indexOf('\r', startIndex);
+      }
+      const line = log.slice(startIndex, crlfIndex + 1 === eolIndex ? crlfIndex : eolIndex);
       if (line) {
         // ignore blank lines
         const entry = this.parseLine(line, lastEntry);
         if (entry) {
-          logLines.push(entry);
           lastEntry = entry;
+          yield entry;
         }
       }
+      startIndex = eolIndex + 1;
+      eolIndex = log.indexOf('\n', startIndex);
     }
-    lastEntry?.onAfter?.(this);
 
-    return logLines;
+    // Parse the last line
+    const line = log.slice(startIndex, log.length);
+    if (line) {
+      // ignore blank lines
+      const entry = this.parseLine(line, lastEntry);
+      if (entry) {
+        entry?.onAfter?.(this);
+        yield entry;
+      }
+    }
   }
 
-  // Matches CRLF (\r\n) + LF (\n)
-  // the ? matches the previous token 0 or 1 times.
-  private splitByNextLine(text: string) {
-    const hascrlfEOL = text.indexOf('\r\n') > -1;
-    let regex;
-    if (!hascrlfEOL) {
-      regex = /\n/;
-    } else {
-      regex = /\r?\n/;
-    }
-    return text.split(regex);
-  }
-
-  private toLogTree(logLines: LogLine[]) {
-    const lineIter = new LineIterator(logLines),
-      rootMethod = new ApexLog(),
+  private toLogTree(lineGenerator: Generator<LogLine>) {
+    const rootMethod = new ApexLog(),
       stack: Method[] = [];
     let line: LogLine | null;
-
     this.lastTimestamp = 0;
-    while ((line = lineIter.fetch())) {
-      if (line instanceof Method) {
-        this.parseTree(line, lineIter, stack);
-      }
-      rootMethod.addChild(line);
-    }
-    rootMethod.setTimes();
 
-    this.insertPackageWrappers(rootMethod);
-    this.aggregateTotals(rootMethod.children);
+    if (currentParser) {
+      const lineIter = new LineIterator(lineGenerator);
+
+      while ((line = lineIter.fetch())) {
+        if (line instanceof Method) {
+          this.parseTree(line, lineIter, stack);
+        }
+        rootMethod.addChild(line);
+      }
+      rootMethod.setTimes();
+
+      this.insertPackageWrappers(rootMethod);
+      this.aggregateTotals([rootMethod]);
+    }
     return rootMethod;
   }
 
@@ -456,22 +457,22 @@ export class DebugLevel {
 }
 
 export class LineIterator {
-  lines: LogLine[];
-  index: number;
-  length: number;
+  next: LogLine | null = null;
+  lineGenerator: Generator<LogLine>;
 
-  constructor(lines: LogLine[]) {
-    this.lines = lines;
-    this.index = 0;
-    this.length = lines.length;
+  constructor(lineGenerator: Generator<LogLine>) {
+    this.lineGenerator = lineGenerator;
+    this.next = this.lineGenerator.next().value;
   }
 
   peek(): LogLine | null {
-    return this.index < this.length ? this.lines[this.index] || null : null;
+    return this.next;
   }
 
   fetch(): LogLine | null {
-    return this.index < this.length ? this.lines[this.index++] || null : null;
+    const result = this.next;
+    this.next = this.lineGenerator.next().value;
+    return result;
   }
 }
 
@@ -797,7 +798,7 @@ export class ApexLog extends Method {
       endTime ??= child?.timestamp;
     }
     this.exitStamp = endTime || 0;
-    this.duration.total = this.exitStamp - this.timestamp;
+    this.recalculateDurations();
   }
 }
 
