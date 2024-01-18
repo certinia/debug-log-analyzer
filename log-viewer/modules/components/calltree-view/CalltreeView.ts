@@ -264,6 +264,8 @@ export async function renderCallTree(
 
     const selfTimeFilterCache = new Map<string, boolean>();
     const totalTimeFilterCache = new Map<string, boolean>();
+    const namespaceFilterCache = new Map<string, boolean>();
+
     let childIndent;
     calltreeTable = new Tabulator(callTreeTableContainer, {
       data: toCallTree(rootMethod.children),
@@ -365,6 +367,15 @@ export async function renderCallTree(
           sorter: 'string',
           width: 120,
           cssClass: 'datagrid-code-text',
+          headerFilter: 'list',
+          headerFilterFunc: namespaceFilter,
+          headerFilterFuncParams: { filterCache: namespaceFilterCache },
+          headerFilterParams: {
+            values: rootMethod.namespaces,
+            clearable: true,
+            multiselect: true,
+          },
+          headerFilterLiveFilter: false,
         },
         {
           title: 'DML Count',
@@ -454,6 +465,7 @@ export async function renderCallTree(
       selfTimeFilterCache.clear();
       debugOnlyFilterCache.clear();
       showDetailsFilterCache.clear();
+      namespaceFilterCache.clear();
     });
 
     calltreeTable.on('tableBuilt', () => {
@@ -605,6 +617,27 @@ const debugFilter = (data: CalltreeRow) => {
     },
     {
       filterCache: debugOnlyFilterCache,
+    },
+  );
+};
+
+const namespaceFilter = (
+  selectedNamespaces: string[],
+  namespace: string,
+  data: CalltreeRow,
+  filterParams: { columnName: string; filterCache: Map<number, boolean> },
+) => {
+  if (selectedNamespaces.length === 0) {
+    return true;
+  }
+
+  return deepFilter(
+    data,
+    (rowData) => {
+      return selectedNamespaces.includes(rowData.originalData.namespace || '');
+    },
+    {
+      filterCache: filterParams.filterCache,
     },
   );
 };
