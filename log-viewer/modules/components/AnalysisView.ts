@@ -217,6 +217,14 @@ async function renderAnalysis(rootMethod: ApexLog) {
         sorter: 'string',
         cssClass: 'datagrid-code-text',
         tooltip: true,
+        headerFilter: 'list',
+        headerFilterFunc: 'in',
+        headerFilterParams: {
+          valuesLookup: 'all',
+          clearable: true,
+          multiselect: true,
+        },
+        headerFilterLiveFilter: false,
       },
       {
         title: 'Type',
