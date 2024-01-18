@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- View and Group by namespace on analysis ([#299][#299])
-  - View the namespace each log event occured in!
+- View, Filter and Group by namespace on the Call Tree, Analysis + Database views ([#299][#299])
+- View and Filter : Call Tree, Analysis and Database views
+- Group by : Analysis and Database views
 
 ### Changed
 
