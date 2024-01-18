@@ -2,8 +2,6 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 
-// todo: Each type should have namespaces assocated (default of unmanagd) - **NEW FEAT**
-
 const typePattern = /^[A-Z_]*$/,
   settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
 
@@ -19,13 +17,16 @@ export type LogSubCategory =
   | 'Flow'
   | 'Workflow';
 
+let currentParser: ApexLogParser | null;
+
 /**
  * Takes string input of a log and returns the ApexLog class, which represents a log tree
  * @param {string} logData
  * @returns {ApexLog}
  */
 export function parse(logData: string): ApexLog {
-  return new ApexLogParser().parse(logData);
+  currentParser = new ApexLogParser();
+  return currentParser.parse(logData);
 }
 
 /**
@@ -44,6 +45,7 @@ export default class ApexLogParser {
   cpuUsed = 0;
   lastTimestamp = 0;
   discontinuity = false;
+  namespaces = new Set<string>();
 
   /**
    * Takes string input of a log and returns the ApexLog class, which represents a log tree
@@ -59,6 +61,7 @@ export default class ApexLogParser {
     apexLog.logIssues = this.logIssues;
     apexLog.parsingErrors = this.parsingErrors;
     apexLog.cpuTime = this.cpuUsed;
+    apexLog.namespaces = [...this.namespaces];
 
     return apexLog;
   }
@@ -72,6 +75,7 @@ export default class ApexLogParser {
       const entry = new metaCtor(parts);
       entry.logLine = line;
       lastEntry?.onAfter?.(this, entry);
+      entry.namespace && this.namespaces.add(entry.namespace);
       return entry;
     }
 
@@ -165,13 +169,13 @@ export default class ApexLogParser {
     rootMethod.setTimes();
 
     this.insertPackageWrappers(rootMethod);
-    this.setNamespaces(rootMethod);
     this.aggregateTotals(rootMethod.children);
     return rootMethod;
   }
 
   private parseTree(currentLine: Method, lineIter: LineIterator, stack: Method[]) {
     this.lastTimestamp = currentLine.timestamp;
+    currentLine.namespace ||= 'default';
 
     const isEntry = currentLine.exitTypes.length > 0;
     if (isEntry) {
@@ -217,6 +221,7 @@ export default class ApexLogParser {
           break;
         }
 
+        nextLine.namespace ||= currentLine.namespace || 'default';
         lineIter.fetch(); // it's a child - consume the line
         this.lastTimestamp = nextLine.timestamp;
         if (nextLine instanceof Method) {
@@ -394,63 +399,6 @@ export default class ApexLogParser {
     node.children = newChildren;
   }
 
-  private collectNamespaces(node: ApexLog): Set<string> {
-    const namespaces = new Set<string>();
-    let i = 0;
-    const children = node.children;
-    while (i < children.length) {
-      const child = children[i];
-      if (child) {
-        const childType = child.type;
-
-        if (childType === 'ENTERING_MANAGED_PKG') {
-          namespaces.add(child.text);
-        }
-      }
-      ++i;
-    }
-    return namespaces;
-  }
-
-  private extractNamespace(namespaces: Set<string>, text: string) {
-    const [namespace] = text.split('.');
-    if (namespace && namespaces.has(namespace)) {
-      return namespace;
-    } else {
-      return null;
-    }
-  }
-
-  /**
-   * TODO: This does not work correctly and does not recursively navigate the tree, needs a rework when we get the the namespace ticket
-   * @param node
-   * @returns
-   */
-  private setNamespaces(node: ApexLog) {
-    const namespaces = this.collectNamespaces(node);
-    const children = node.children;
-
-    let i = 0;
-    while (i < children.length) {
-      const child = children[i];
-      if (child) {
-        const childType = child.type;
-
-        if (childType === 'CODE_UNIT_STARTED' && !child.namespace) {
-          child.namespace = this.extractNamespace(namespaces, child.text);
-        } else if (childType === 'EXCEPTION_THROWN') {
-          child.namespace = this.extractNamespace(namespaces, child.text);
-        } else if (childType === 'CONSTRUCTOR_ENTRY') {
-          child.namespace = this.extractNamespace(namespaces, child.text);
-        } else if (childType === 'METHOD_ENTRY') {
-          child.namespace = this.extractNamespace(namespaces, child.text);
-        }
-      }
-      ++i;
-    }
-    return namespaces;
-  }
-
   public addLogIssue(startTime: number, summary: string, description: string, type: IssueType) {
     if (!this.reasons.has(summary)) {
       this.reasons.add(summary);
@@ -589,8 +537,9 @@ export abstract class LogLine {
 
   /**
    * The package namespace associated with this log line
+   * @default default
    */
-  namespace: string | null = null;
+  namespace: string | 'default' = '';
 
   /**
    * The variable value
@@ -810,6 +759,11 @@ export class ApexLog extends Method {
   public debugLevels: DebugLevel[] = [];
 
   /**
+   * All the namespaces that appear in this log.
+   */
+  public namespaces: string[] = [];
+
+  /**
    * Any issues within the log, such as cpu time exceeded or max log size reached.
    */
   public logIssues: LogIssue[] = [];
@@ -860,23 +814,23 @@ export function parseObjectNamespace(text: string | null | undefined): string {
 
   const sep = text.indexOf('__');
   if (sep < 0) {
-    return 'unmanaged';
+    return 'default';
   }
   return text.substring(0, sep);
 }
 
 export function parseVfNamespace(text: string): string {
   const sep = text.indexOf('__');
-  if (sep < 0) {
-    return 'unmanaged';
+  if (sep === -1) {
+    return 'default';
   }
   const firstSlash = text.indexOf('/');
-  if (firstSlash < 0) {
-    return 'unmanaged';
+  if (firstSlash === -1) {
+    return 'default';
   }
   const secondSlash = text.indexOf('/', firstSlash + 1);
   if (secondSlash < 0) {
-    return 'unmanaged';
+    return 'default';
   }
   return text.substring(secondSlash + 1, sep);
 }
@@ -945,9 +899,15 @@ class ConstructorEntryLine extends Method {
   constructor(parts: string[]) {
     super(parts, ['CONSTRUCTOR_EXIT'], 'Method', 'method');
     this.lineNumber = this.parseLineNumber(parts[2]);
-    const args = parts[4];
+    const [, , , , args, className] = parts;
 
-    this.text = parts[5] + (args ? args.substring(args.lastIndexOf('(')) : '');
+    this.text = className + (args ? args.substring(args.lastIndexOf('(')) : '');
+    const constructorParts = (className ?? '').split('.');
+    const possibleNs = constructorParts[0] || '';
+    // inmner class with a namespace
+    if (constructorParts.length === 3 || currentParser?.namespaces.has(possibleNs)) {
+      this.namespace = possibleNs ?? this.namespace;
+    }
   }
 }
 
@@ -968,6 +928,7 @@ class EmailQueueLine extends LogLine {
   }
 }
 
+// todo: avoid some of ns parsing work if we have done it before.
 export class MethodEntryLine extends Method {
   hasValidSymbols = true;
 
@@ -975,9 +936,24 @@ export class MethodEntryLine extends Method {
     super(parts, ['METHOD_EXIT'], 'Method', 'method');
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[4] || this.type || '';
-    if (this.text === 'System.Type.forName(String, String)') {
-      this.cpuType = 'loading'; // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
-      // no namespace or it will get charged...
+    if (this.text.indexOf('System.Type.forName(') !== -1) {
+      // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
+      this.cpuType = 'loading';
+    } else {
+      const methodName = parts[4] || '';
+      const methodNameParts = methodName
+        ? methodName.slice(0, methodName.indexOf('('))?.split('.')
+        : '';
+      const possibleNs = methodNameParts[0] ?? '';
+      if (methodNameParts.length === 4 || currentParser?.namespaces.has(possibleNs)) {
+        this.namespace = possibleNs;
+      }
+    }
+  }
+
+  onEnd(end: MethodExitLine, _stack: LogLine[]): void {
+    if (end.namespace && !end.text.endsWith(')')) {
+      this.namespace = end.namespace;
     }
   }
 }
@@ -987,6 +963,14 @@ class MethodExitLine extends LogLine {
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
+    this.text = parts[4] ?? parts[3] ?? '';
+
+    if (!this.text.endsWith(')')) {
+      const index = this.text.indexOf('.');
+      if (index !== -1) {
+        this.namespace = this.text.slice(0, index);
+      }
+    }
   }
 }
 
@@ -1025,63 +1009,79 @@ class SystemMethodExitLine extends LogLine {
   }
 }
 
-const cpuMap: Map<string, CPUType> = new Map([
-  ['EventService', 'method'],
-  ['Validation', 'custom'],
-  ['Workflow', 'custom'],
-  ['Flow', 'custom'],
-]);
-
 export class CodeUnitStartedLine extends Method {
   suffix = ' (entrypoint)';
   codeUnitType = '';
 
   constructor(parts: string[]) {
-    super(parts, ['CODE_UNIT_FINISHED'], 'Code Unit', CodeUnitStartedLine.getCpuType(parts));
+    super(parts, ['CODE_UNIT_FINISHED'], 'Code Unit', 'custom');
 
-    const subParts = parts[3]?.split(':') || [],
-      name = parts[4] || parts[3] || '';
+    const typeString = parts[5] || parts[4] || parts[3] || '';
+    let sepIndex = typeString.indexOf(':');
+    if (sepIndex === -1) {
+      sepIndex = typeString.indexOf('/');
+    }
+    this.codeUnitType = sepIndex !== -1 ? typeString.slice(0, sepIndex) : '';
 
-    this.codeUnitType = subParts[0] || parts[4]?.split('/')[0] || '';
+    const name = parts[4] || parts[3] || this.codeUnitType || '';
     switch (this.codeUnitType) {
       case 'EventService':
         this.cpuType = 'method';
-        this.namespace = parseObjectNamespace(subParts[1]);
-
-        this.text = parts[3] || '';
+        this.namespace = parseObjectNamespace(typeString.slice(sepIndex + 1));
+        this.text = name;
         break;
       case 'Validation':
         this.cpuType = 'custom';
         this.declarative = true;
 
-        this.text = name || this.codeUnitType + ':' + subParts[1];
+        this.text = name;
         break;
       case 'Workflow':
         this.cpuType = 'custom';
         this.declarative = true;
-        this.text = name || this.codeUnitType;
+        this.text = name;
         break;
       case 'Flow':
         this.cpuType = 'custom';
         this.declarative = true;
-        this.text = name || this.codeUnitType;
+        this.text = name;
         break;
-      default:
+      case 'VF':
         this.cpuType = 'method';
-        if (name?.startsWith('VF:')) {
-          this.namespace = parseVfNamespace(name);
-        }
-        this.text = name || parts[3] || '';
+        this.namespace = parseVfNamespace(name);
+        this.text = name;
         break;
+      case 'apex': {
+        this.cpuType = 'method';
+        const namespaceIndex = name.indexOf('.');
+        this.namespace =
+          namespaceIndex !== -1
+            ? name.slice(name.indexOf('apex://') + 7, namespaceIndex)
+            : 'default';
+        this.text = name;
+        break;
+      }
+      case '__sfdc_trigger': {
+        this.cpuType = 'method';
+        this.text = name || parts[4] || '';
+        const triggerParts = parts[5]?.split('/') || '';
+        this.namespace = triggerParts.length === 3 ? triggerParts[1] || 'default' : 'default';
+        break;
+      }
+      default: {
+        this.cpuType = 'method';
+        this.text = name;
+        const openBracket = name.lastIndexOf('(');
+        const methodName =
+          openBracket !== -1 ? name.slice(0, openBracket + 1).split('.') : name.split('.');
+        if (methodName.length === 3 || (methodName.length === 2 && !methodName[1]?.endsWith('('))) {
+          this.namespace = methodName[0] || 'default';
+        }
+        break;
+      }
     }
-  }
 
-  static getCpuType(parts: string[]) {
-    const subParts = parts[3]?.split(':') || [],
-      codeUnitType = subParts[0] || '',
-      cpuType = cpuMap.get(codeUnitType);
-
-    return cpuType ?? 'method';
+    this.namespace ||= 'default';
   }
 }
 export class CodeUnitFinishedLine extends LogLine {
@@ -1174,8 +1174,6 @@ class VFFormulaEndLine extends LogLine {
 }
 
 class VFSeralizeViewStateStartLine extends Method {
-  namespace = 'system';
-
   constructor(parts: string[]) {
     super(parts, ['VF_SERIALIZE_VIEWSTATE_END'], 'System Method', 'method');
   }
@@ -1194,6 +1192,8 @@ class DMLBeginLine extends Method {
     self: 1,
     total: 1,
   };
+
+  namespace = 'default';
 
   constructor(parts: string[]) {
     super(parts, ['DML_END'], 'DML', 'free');
@@ -1380,6 +1380,7 @@ class UserDebugLine extends LogLine {
 }
 
 class CumulativeLimitUsageLine extends Method {
+  namespace = 'default';
   constructor(parts: string[]) {
     super(parts, ['CUMULATIVE_LIMIT_USAGE_END'], 'System Method', 'system');
   }
@@ -1387,6 +1388,7 @@ class CumulativeLimitUsageLine extends Method {
 
 class CumulativeProfilingLine extends LogLine {
   acceptsText = true;
+  namespace = 'default';
   constructor(parts: string[]) {
     super(parts);
     this.text = parts[2] + ' ' + (parts[3] ?? '');
@@ -1394,12 +1396,14 @@ class CumulativeProfilingLine extends LogLine {
 }
 
 class CumulativeProfilingBeginLine extends Method {
+  namespace = 'default';
   constructor(parts: string[]) {
     super(parts, ['CUMULATIVE_PROFILING_END'], 'System Method', 'custom');
   }
 }
 
 class LimitUsageLine extends LogLine {
+  namespace = 'default';
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
@@ -1409,6 +1413,7 @@ class LimitUsageLine extends LogLine {
 
 class LimitUsageForNSLine extends LogLine {
   acceptsText = true;
+  namespace = 'default';
 
   constructor(parts: string[]) {
     super(parts);
@@ -1479,8 +1484,6 @@ class NBAStrategyError extends LogLine {
 }
 
 class PushTraceFlagsLine extends LogLine {
-  namespace = 'system';
-
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
@@ -1489,8 +1492,6 @@ class PushTraceFlagsLine extends LogLine {
 }
 
 class PopTraceFlagsLine extends LogLine {
-  namespace = 'system';
-
   constructor(parts: string[]) {
     super(parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
@@ -1580,6 +1581,7 @@ class SystemModeExitLine extends LogLine {
 }
 
 export class ExecutionStartedLine extends Method {
+  namespace = 'default';
   constructor(parts: string[]) {
     super(parts, ['EXECUTION_FINISHED'], 'Method', 'method');
   }

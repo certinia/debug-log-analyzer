@@ -19,7 +19,7 @@ import {
 
 describe('parseObjectNamespace tests', () => {
   it('Should consider no separator to be unmanaged', () => {
-    expect(parseObjectNamespace('Account')).toEqual('unmanaged');
+    expect(parseObjectNamespace('Account')).toEqual('default');
   });
   it('Should accept properly formatted namespaces', () => {
     expect(parseObjectNamespace('key001__Upsell_Contract__e')).toEqual('key001');
@@ -28,13 +28,13 @@ describe('parseObjectNamespace tests', () => {
 
 describe('parseVfNamespace tests', () => {
   it('Should consider no separator to be unmanaged', () => {
-    expect(parseVfNamespace('VF: /apex/CashMatching')).toEqual('unmanaged');
+    expect(parseVfNamespace('VF: /apex/CashMatching')).toEqual('default');
   });
   it('Should consider no slashes to be unmanaged', () => {
-    expect(parseVfNamespace('VF: pse__ProjectBilling')).toEqual('unmanaged');
+    expect(parseVfNamespace('VF: pse__ProjectBilling')).toEqual('default');
   });
   it('Should consider one slash to be unmanaged', () => {
-    expect(parseVfNamespace('VF: /pse__ProjectBilling')).toEqual('unmanaged');
+    expect(parseVfNamespace('VF: /pse__ProjectBilling')).toEqual('default');
   });
   it('Should accept properly formatted namespaces', () => {
     expect(parseVfNamespace('VF: /apex/pse__ProjectBilling')).toEqual('pse');
@@ -682,6 +682,400 @@ describe('Log Settings tests', () => {
       { logCategory: 'WAVE', logLevel: 'NONE' },
       { logCategory: 'WORKFLOW', logLevel: 'INFO' },
     ]);
+  });
+});
+
+describe('namespace tests', () => {
+  it('CodeUnit Started should have namespaces set', () => {
+    const log =
+      '01:01:01.000 (1)|CODE_UNIT_STARTED|[EXTERNAL]|01q58000000352C|MyNS.MyTrigger on MyObject trigger event BeforeInsert|__sfdc_trigger/MyNS/MyTrigger\n' +
+      '01:01:01.000 (2)|CODE_UNIT_FINISHED|MyNS.MyTrigger on MyObject trigger event BeforeInsert|__sfdc_trigger/MyNS/MyTrigger\n' +
+      '01:01:01.000 (3)|CODE_UNIT_STARTED|[EXTERNAL]|EventService:MyNS__MyObject\n' +
+      '01:01:01.000 (4)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (5)|CODE_UNIT_STARTED|[EXTERNAL]|0664J000002uLqm|VF: /apex/MyNs__MyObject\n' +
+      '01:01:01.000 (6)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (7)|CODE_UNIT_STARTED|[EXTERNAL]|0666C0000000bhK|MyNs.VFRemote: MyNs.MyController invoke(save)\n' +
+      '01:01:01.000 (8)|CODE_UNIT_FINISHED|MyNs.VFRemote: MyNs.MyController invoke(save)\n' +
+      '01:01:01.000 (9)|CODE_UNIT_STARTED|[EXTERNAL]|apex://MyNs.MyLightningController/ACTION$load\n' +
+      '01:01:01.000 (10)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (11)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyNs.MyLightningController.load(MyNs.MyLightningController.Config)\n' +
+      '01:01:01.000 (12)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (13)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyNs.MyLightningController\n' +
+      '01:01:01.000 (14)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (15)|CODE_UNIT_STARTED|[EXTERNAL]|DuplicateDetector\n' +
+      '01:01:01.000 (16)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (17)|CODE_UNIT_STARTED|[EXTERNAL]|Flow:01I4J000001GaHW\n' +
+      '01:01:01.000 (18)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (19)|CODE_UNIT_STARTED|[EXTERNAL]|Workflow:01I4J000001GaHW\n' +
+      '01:01:01.000 (20)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (21)|CODE_UNIT_STARTED|[EXTERNAL]|Validation:MyObject:aAS8d000000kIiO\n' +
+      '01:01:01.000 (22)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (23)|CODE_UNIT_STARTED|[EXTERNAL]|01q58000000352C|MyTrigger on MyObject trigger event BeforeInsert|__sfdc_trigger/MyTrigger\n' +
+      '01:01:01.000 (24)|CODE_UNIT_FINISHED|MyTrigger on MyObject trigger event BeforeInsert|__sfdc_trigger/MyTrigger\n' +
+      '01:01:01.000 (23)|CODE_UNIT_STARTED|[EXTERNAL]|EventService:MyObject\n' +
+      '01:01:01.000 (24)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (25)|CODE_UNIT_STARTED|[EXTERNAL]|0664J000002uLqm|VF: /apex/MyObject\n' +
+      '01:01:01.000 (26)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (27)|CODE_UNIT_STARTED|[EXTERNAL]|apex://MyLightningController/ACTION$load\n' +
+      '01:01:01.000 (28)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (29)|CODE_UNIT_STARTED|[EXTERNAL]|0666C0000000bhK|VFRemote: MyController invoke(save)\n' +
+      '01:01:01.000 (30)|CODE_UNIT_FINISHED|VFRemote: MyController invoke(save)\n' +
+      '01:01:01.000 (31)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyLightningController.load(MyLightningController.Config)\n' +
+      '01:01:01.000 (32)|CODE_UNIT_FINISHED\n' +
+      '01:01:01.000 (33)|CODE_UNIT_STARTED|[EXTERNAL]|01p2u000000H2Is|MyLightningController\n' +
+      '01:01:01.000 (34)|CODE_UNIT_FINISHED\n';
+
+    const apexLog = parse(log);
+    expect(apexLog.namespaces).toEqual(['MyNS', 'MyNs', 'default']);
+    expect(apexLog.children.length).toEqual(18);
+
+    expect(apexLog.children[0]).toMatchObject({
+      namespace: 'MyNS',
+      text: 'MyNS.MyTrigger on MyObject trigger event BeforeInsert',
+    });
+
+    expect(apexLog.children[1]).toMatchObject({
+      namespace: 'MyNS',
+      text: 'EventService:MyNS__MyObject',
+    });
+
+    expect(apexLog.children[2]).toMatchObject({
+      namespace: 'MyNs',
+      text: 'VF: /apex/MyNs__MyObject',
+    });
+
+    expect(apexLog.children[3]).toMatchObject({
+      namespace: 'MyNs',
+      text: 'MyNs.VFRemote: MyNs.MyController invoke(save)',
+    });
+
+    expect(apexLog.children[4]).toMatchObject({
+      namespace: 'MyNs',
+      text: 'apex://MyNs.MyLightningController/ACTION$load',
+    });
+
+    expect(apexLog.children[5]).toMatchObject({
+      namespace: 'MyNs',
+      text: 'MyNs.MyLightningController.load(MyNs.MyLightningController.Config)',
+    });
+
+    expect(apexLog.children[6]).toMatchObject({
+      namespace: 'MyNs',
+      text: 'MyNs.MyLightningController',
+    });
+
+    expect(apexLog.children[7]).toMatchObject({
+      namespace: 'default',
+      text: 'DuplicateDetector',
+    });
+
+    expect(apexLog.children[8]).toMatchObject({
+      namespace: 'default',
+      text: 'Flow:01I4J000001GaHW',
+    });
+
+    expect(apexLog.children[9]).toMatchObject({
+      namespace: 'default',
+      text: 'Workflow:01I4J000001GaHW',
+    });
+
+    expect(apexLog.children[10]).toMatchObject({
+      namespace: 'default',
+      text: 'Validation:MyObject:aAS8d000000kIiO',
+    });
+
+    expect(apexLog.children[11]).toMatchObject({
+      namespace: 'default',
+      text: 'MyTrigger on MyObject trigger event BeforeInsert',
+    });
+
+    expect(apexLog.children[12]).toMatchObject({
+      namespace: 'default',
+      text: 'EventService:MyObject',
+    });
+
+    expect(apexLog.children[13]).toMatchObject({
+      namespace: 'default',
+      text: 'VF: /apex/MyObject',
+    });
+
+    expect(apexLog.children[14]).toMatchObject({
+      namespace: 'default',
+      text: 'apex://MyLightningController/ACTION$load',
+    });
+
+    expect(apexLog.children[15]).toMatchObject({
+      namespace: 'default',
+      text: 'VFRemote: MyController invoke(save)',
+    });
+
+    expect(apexLog.children[16]).toMatchObject({
+      namespace: 'default',
+      text: 'MyLightningController.load(MyLightningController.Config)',
+    });
+
+    expect(apexLog.children[17]).toMatchObject({
+      namespace: 'default',
+      text: 'MyLightningController',
+    });
+  });
+
+  it('Method + constructor namespace parsing', () => {
+    const log = [
+      '07:09:40.0 (1)|EXECUTION_STARTED',
+      '07:09:40.0 (2)|CODE_UNIT_STARTED|[EXTERNAL]|execute_anonymous_apex',
+      '07:09:40.0 (3)|CONSTRUCTOR_ENTRY|[1]|01pDS00000uYQmZ|<init>()|ns.OuterClass.InnerClass',
+      '07:09:40.0 (4)|CONSTRUCTOR_EXIT|[1]|01pDS00000uYQmZ|<init>()|ns.OuterClass.InnerClass',
+      '07:09:40.0 (5)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.InnerClass.innerMethod(ns.OuterClass.Config)',
+      '07:09:40.0 (6)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns.OuterClass.InnerClass.innerMethod(ns.OuterClass.Config)',
+      '07:09:40.0 (7)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.OuterClass()',
+      '07:09:40.0 (8)|METHOD_EXIT|[1]|ns.OuterClass',
+      '07:09:40.0 (9)|CONSTRUCTOR_ENTRY|[1]|01pDS00000uYQmZ|<init>()|ns.OuterClass',
+      '07:09:40.0 (10)|CONSTRUCTOR_EXIT|[1]|01pDS00000uYQmZ|<init>()|ns.OuterClass',
+      '07:09:40.0 (11)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.myMethod(ns.OuterClass.Config)',
+      '07:09:40.0 (12)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns.OuterClass.myMethod(ns.OuterClass.Config)',
+      '07:09:40.0 (13)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns2.StaticOuter.StaticOuter()',
+      '07:09:40.0 (14)|METHOD_EXIT|[1]|ns2.StaticOuter',
+      '07:09:40.0 (15)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns2.StaticOuter.staticMethod(ns2.StaticOuter.Config)',
+      '07:09:40.0 (16)|METHOD_EXIT|[1]|01pDS00000uYQmZ|ns2.StaticOuter.staticMethod(ns2.StaticOuter.Config)',
+      '07:09:40.0 (17)|CONSTRUCTOR_ENTRY|[1]|01pDS00000uYQmZ|<init>()|OuterClass.InnerClass',
+      '07:09:40.0 (18)|CONSTRUCTOR_EXIT|[1]|01pDS00000uYQmZ|<init>()|OuterClass.InnerClass',
+      '07:09:40.0 (19)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.InnerClass.innerMethod(OuterClass.Config)',
+      '07:09:40.0 (20)|METHOD_EXIT|[1]|01pDS00000uYQmZ|OuterClass.InnerClass.innerMethod(OuterClass.Config)',
+      '07:09:40.0 (21)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.OuterClass()',
+      '07:09:40.0 (22)|METHOD_EXIT|[1]|OuterClass',
+      '07:09:40.0 (23)|CONSTRUCTOR_ENTRY|[1]|01pDS00000uYQmZ|<init>()|OuterClass',
+      '07:09:40.0 (24)|CONSTRUCTOR_EXIT|[1]|01pDS00000uYQmZ|<init>()|OuterClass',
+      '07:09:40.0 (25)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.myMethod(OuterClass.Config)',
+      '07:09:40.0 (26)|METHOD_EXIT|[1]|01pDS00000uYQmZ|OuterClass.myMethod(OuterClass.Config)',
+      '07:09:40.0 (27)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|StaticOuter.StaticOuter()',
+      '07:09:40.0 (28)|METHOD_EXIT|[1]|StaticOuter',
+      '07:09:40.0 (29)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|StaticOuter.staticMethod(StaticOuter.Config)',
+      '07:09:40.0 (30)|METHOD_EXIT|[1]|01pDS00000uYQmZ|StaticOuter.staticMethod(StaticOuter.Config)',
+      '07:09:40.0 (30)|METHOD_ENTRY|[169]||Database.QueryLocatorIterator.hasNext()',
+      '07:09:40.0 (31)|METHOD_EXIT|[169]||Database.QueryLocatorIterator.hasNext()',
+      '07:09:40.0 (31)|CODE_UNIT_FINISHED|execute_anonymous_apex',
+      '07:09:40.0 (32)|EXECUTION_FINISHED',
+    ].join('\n');
+
+    const apexLog = parse(log);
+    expect(apexLog.namespaces).toEqual(['default', 'ns', 'ns2']);
+    expect(apexLog.children.length).toEqual(1);
+    expect(apexLog.children[0]).toMatchObject({
+      namespace: 'default',
+      text: 'EXECUTION_STARTED',
+    });
+
+    const execute = apexLog.children[0]!;
+    expect(execute.children.length).toEqual(1);
+    expect(execute.children[0]).toMatchObject({
+      namespace: 'default',
+      text: 'execute_anonymous_apex',
+    });
+
+    const codeUnit = execute.children[0]!;
+    expect(codeUnit.children.length).toEqual(15);
+    expect(codeUnit.children[0]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.InnerClass()',
+    });
+
+    expect(codeUnit.children[1]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.InnerClass.innerMethod(ns.OuterClass.Config)',
+    });
+
+    expect(codeUnit.children[2]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.OuterClass()',
+    });
+
+    expect(codeUnit.children[3]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass()',
+    });
+
+    expect(codeUnit.children[4]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.myMethod(ns.OuterClass.Config)',
+    });
+
+    expect(codeUnit.children[5]).toMatchObject({
+      namespace: 'ns2',
+      text: 'ns2.StaticOuter.StaticOuter()',
+    });
+
+    expect(codeUnit.children[6]).toMatchObject({
+      namespace: 'ns2',
+      text: 'ns2.StaticOuter.staticMethod(ns2.StaticOuter.Config)',
+    });
+
+    expect(codeUnit.children[7]).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass.InnerClass()',
+    });
+
+    expect(codeUnit.children[8]).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass.InnerClass.innerMethod(OuterClass.Config)',
+    });
+
+    expect(codeUnit.children[9]).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass.OuterClass()',
+    });
+
+    expect(codeUnit.children[10]).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass()',
+    });
+
+    expect(codeUnit.children[11]).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass.myMethod(OuterClass.Config)',
+    });
+
+    expect(codeUnit.children[12]).toMatchObject({
+      namespace: 'default',
+      text: 'StaticOuter.StaticOuter()',
+    });
+
+    expect(codeUnit.children[13]).toMatchObject({
+      namespace: 'default',
+      text: 'StaticOuter.staticMethod(StaticOuter.Config)',
+    });
+
+    expect(codeUnit.children[14]).toMatchObject({
+      namespace: 'default',
+      text: 'Database.QueryLocatorIterator.hasNext()',
+    });
+  });
+
+  it('namespace should propagate', () => {
+    const log1 = [
+      '16:09:42.2 (0)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|OuterClass.OuterClass()',
+      '16:09:42.2 (1)|METHOD_EXIT|[1]|OuterClass',
+      '16:09:42.2 (1)|METHOD_ENTRY|[5]|01p4J00000L8iGZ|OuterClass.staticMethod()',
+      '16:09:42.2 (1)|METHOD_ENTRY|[169]||Database.QueryLocatorIterator.hasNext()',
+      '16:09:42.2 (1)|METHOD_EXIT|[169]||Database.QueryLocatorIterator.hasNext()',
+      '16:09:42.2 (1)|SOQL_EXECUTE_BEGIN|[64]|Aggregations:0|SELECT ID FROM MyObject__c',
+      '16:09:42.2 (1)|SOQL_EXECUTE_END|[64]|Rows:1',
+      '16:09:42.2 (1)|METHOD_ENTRY|[1]|01pDS00000uYQmZ|ns.OuterClass.OuterClass()',
+      '16:09:42.2 (1)|METHOD_EXIT|[1]|ns.OuterClass',
+      '16:09:42.2 (2)|METHOD_ENTRY|[5]|01p4J00000L8iGZ|ns.OuterClass.staticMethod()',
+      '16:09:42.2 (3)|DML_BEGIN|[180]|Op:Insert|Type:SObject|Rows:2',
+      '16:09:42.2 (4)|CODE_UNIT_STARTED|[EXTERNAL]|01q4J000000bcrb|ns.MyObjectTrigger on MyObject trigger event BeforeUpdate|__sfdc_trigger/ns/MyObjectTrigger',
+      '16:09:42.2 (5)|METHOD_ENTRY|[5]|01p4J00000L8iGZ|ns.OuterClass.OuterClass()',
+      '16:09:42.2 (6)|CONSTRUCTOR_ENTRY|[14]|01p4J00000L8iGZ|<init>()|ns.OuterClass',
+      '16:09:42.2 (7)|CONSTRUCTOR_EXIT|[14]|01p4J00000L8iGZ|<init>()|ns.OuterClass',
+      '16:09:42.2 (8)|METHOD_EXIT|[5]|ns.OuterClass',
+      '16:09:42.2 (9)|METHOD_ENTRY|[288]||System.Type.forName(String)',
+      '16:09:42.2 (10)|METHOD_EXIT|[288]||System.Type.forName(String)',
+      '16:09:42.2 (11)|METHOD_ENTRY|[288]|1|ns.Class1.method1()',
+      '16:09:42.2 (12)|METHOD_ENTRY|[288]|1|ns.Class1.method2()',
+      '16:09:42.2 (12)|METHOD_ENTRY|[169]||Database.QueryLocatorIterator.hasNext()',
+      '16:09:42.2 (13)|METHOD_EXIT|[169]||Database.QueryLocatorIterator.hasNext()',
+      '16:09:42.2 (13)|SOQL_EXECUTE_BEGIN|[64]|Aggregations:0|SELECT ID FROM MyObject__c',
+      '16:09:42.2 (14)|SOQL_EXECUTE_END|[64]|Rows:1',
+      '16:09:42.2 (15)|METHOD_EXIT|[288]|1|ns.Class1.method2()',
+      '16:09:42.2 (16)|METHOD_EXIT|[288]|1|ns.Class1.method1()',
+      '16:09:42.2 (17)|CODE_UNIT_FINISHED|ns.MyObjectTrigger on MyObject trigger event BeforeUpdate|__sfdc_trigger/ns/MyObjectTrigger',
+      '16:09:42.2 (18)|DML_END|[180]',
+      '16:09:42.2 (19)|METHOD_EXIT|[5]|01p4J00000L8iGZ|ns.OuterClass.staticMethod()',
+      '16:09:42.2 (20)|METHOD_EXIT|[5]|01p4J00000L8iGZ|OuterClass.staticMethod()',
+    ].join('\n');
+
+    const apexLog = parse(log1);
+    expect(apexLog.children.length).toEqual(2);
+    expect(apexLog.children[0]).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass.OuterClass()',
+    });
+
+    let logLine = apexLog.children[1]!;
+    expect(logLine).toMatchObject({
+      namespace: 'default',
+      text: 'OuterClass.staticMethod()',
+    });
+
+    expect(logLine.children.length).toEqual(4);
+
+    expect(logLine.children[0]).toMatchObject({
+      namespace: 'default',
+      text: 'Database.QueryLocatorIterator.hasNext()',
+    });
+
+    expect(logLine.children[1]).toMatchObject({
+      namespace: 'default',
+      text: 'SELECT ID FROM MyObject__c',
+    });
+
+    expect(logLine.children[2]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.OuterClass()',
+    });
+
+    logLine = logLine.children[3]!;
+    expect(logLine).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.staticMethod()',
+    });
+
+    expect(logLine.children.length).toEqual(1);
+    logLine = logLine.children[0]!;
+    expect(logLine).toMatchObject({
+      namespace: 'default',
+      text: 'DML Op:Insert Type:SObject',
+    });
+
+    expect(logLine.children.length).toEqual(1);
+    logLine = logLine.children[0]!;
+    expect(logLine).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.MyObjectTrigger on MyObject trigger event BeforeUpdate',
+    });
+
+    expect(logLine.children.length).toEqual(3);
+    expect(logLine.children[0]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass.OuterClass()',
+    });
+
+    expect(logLine.children[0]!.children.length).toEqual(1);
+    expect(logLine.children[0]!.children[0]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.OuterClass()',
+    });
+
+    expect(logLine.children[1]).toMatchObject({
+      namespace: 'ns',
+      text: 'System.Type.forName(String)',
+    });
+
+    expect(logLine.children[2]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.Class1.method1()',
+    });
+
+    logLine = logLine.children[2]!;
+    expect(logLine.children.length).toEqual(1);
+    expect(logLine.children[0]).toMatchObject({
+      namespace: 'ns',
+      text: 'ns.Class1.method2()',
+    });
+
+    logLine = logLine.children[0]!;
+    expect(logLine.children.length).toEqual(2);
+
+    expect(logLine.children[0]).toMatchObject({
+      namespace: 'ns',
+      text: 'Database.QueryLocatorIterator.hasNext()',
+    });
+
+    expect(logLine.children[1]).toMatchObject({
+      namespace: 'ns',
+      text: 'SELECT ID FROM MyObject__c',
+    });
   });
 });
 

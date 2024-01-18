@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- View, Filter and Group by namespace on the Call Tree, Analysis + Database views ([#299][#299])
+- View and Filter : Call Tree, Analysis and Database views
+- Group by : Analysis and Database views
+
 ### Changed
 
 - Go to File multiple workspace handling to be simpified ([#202][#202])
@@ -321,6 +327,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#299]: https://github.com/certinia/debug-log-analyzer/issues/299
 [#202]: https://github.com/certinia/debug-log-analyzer/issues/202
 
 <!-- v1.12.1 -->

@@ -1,7 +1,12 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
+import {
+  provideVSCodeDesignSystem,
+  vsCodeCheckbox,
+  vsCodeDropdown,
+  vsCodeOption,
+} from '@vscode/webview-ui-toolkit';
 import { LitElement, type PropertyValues, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { type ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
@@ -15,7 +20,7 @@ import { hostService } from '../services/VSCodeService.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './skeleton/GridSkeleton.js';
 
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
+provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
 
 let analysisTable: Tabulator;
 let tableContainer: HTMLDivElement | null;
@@ -48,11 +53,29 @@ export class AnalysisView extends LitElement {
         display: flex;
         flex-direction: column;
         flex: 1;
+        gap: 1rem;
       }
 
       #analysis-table-container {
         display: contents;
         height: 100%;
+      }
+
+      .dropdown-container {
+        box-sizing: border-box;
+        display: flex;
+        flex-flow: column nowrap;
+        align-items: flex-start;
+        justify-content: flex-start;
+      }
+
+      .dropdown-container label {
+        display: block;
+        color: var(--vscode-foreground);
+        cursor: pointer;
+        font-size: var(--vscode-font-size);
+        line-height: normal;
+        margin-bottom: 2px;
       }
     `,
   ];
@@ -61,10 +84,14 @@ export class AnalysisView extends LitElement {
     const skeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : '';
 
     return html`
-      <div>
-        <strong>Group by</strong>
-        <div>
-          <vscode-checkbox @change="${this._groupBy}">Type</vscode-checkbox>
+      <div class="filter-container">
+        <div class="dropdown-container">
+          <label for="groupby-dropdown">Group by</label>
+          <vscode-dropdown id="groupby-dropdown" @change="${this._groupBy}">
+            <vscode-option>None</vscode-option>
+            <vscode-option>Namespace</vscode-option>
+            <vscode-option>Type</vscode-option>
+          </vscode-dropdown>
         </div>
       </div>
       <div id="analysis-table-container">
@@ -76,7 +103,9 @@ export class AnalysisView extends LitElement {
 
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
-    analysisTable.setGroupBy(target.checked ? 'type' : '');
+    const fieldName = target.value.toLowerCase();
+
+    analysisTable.setGroupBy(fieldName !== 'none' ? fieldName : '');
   }
 
   _appendTableWhenVisible() {
@@ -181,6 +210,23 @@ async function renderAnalysis(rootMethod: ApexLog) {
         widthGrow: 5,
       },
       {
+        title: 'Namespace',
+        field: 'namespace',
+        headerSortStartingDir: 'desc',
+        width: 150,
+        sorter: 'string',
+        cssClass: 'datagrid-code-text',
+        tooltip: true,
+        headerFilter: 'list',
+        headerFilterFunc: 'in',
+        headerFilterParams: {
+          valuesLookup: 'all',
+          clearable: true,
+          multiselect: true,
+        },
+        headerFilterLiveFilter: false,
+      },
+      {
         title: 'Type',
         field: 'type',
         headerSortStartingDir: 'asc',
@@ -202,7 +248,7 @@ async function renderAnalysis(rootMethod: ApexLog) {
         title: 'Total Time (ms)',
         field: 'totalTime',
         sorter: 'number',
-        width: 150,
+        width: 165,
         hozAlign: 'right',
         headerHozAlign: 'right',
         formatter: progressFormatter,
@@ -220,7 +266,7 @@ async function renderAnalysis(rootMethod: ApexLog) {
         title: 'Self Time (ms)',
         field: 'selfTime',
         sorter: 'number',
-        width: 150,
+        width: 165,
         hozAlign: 'right',
         headerHozAlign: 'right',
         bottomCalc: 'sum',
@@ -244,10 +290,12 @@ export class Metric {
   count = 0;
   totalTime = 0;
   selfTime = 0;
+  namespace;
 
-  constructor(name: string, node: TimedNode) {
-    this.name = name;
+  constructor(node: TimedNode) {
+    this.name = node.text;
     this.type = node.type;
+    this.namespace = node.namespace;
   }
 }
 
@@ -259,7 +307,7 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
     const selfTime = node.duration.self;
     let metric = map.get(key);
     if (!metric) {
-      metric = new Metric(key, node);
+      metric = new Metric(node);
       map.set(key, metric);
     }
 
@@ -270,7 +318,7 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
 
   children.forEach(function (child) {
     if (child instanceof TimedNode) {
-      addNodeToMap(map, child, child.text);
+      addNodeToMap(map, child, child.namespace + child.text);
     }
   });
 }
