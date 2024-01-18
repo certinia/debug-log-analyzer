@@ -1,7 +1,12 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
+import {
+  provideVSCodeDesignSystem,
+  vsCodeCheckbox,
+  vsCodeDropdown,
+  vsCodeOption,
+} from '@vscode/webview-ui-toolkit';
 import { LitElement, type PropertyValues, css, html, render, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
@@ -29,7 +34,7 @@ import './DatabaseSOQLDetailPanel.js';
 import './DatabaseSection.js';
 import databaseViewStyles from './DatabaseView.scss';
 
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
+provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
 
 let soqlTable: Tabulator;
 let dmlTable: Tabulator;
@@ -99,6 +104,27 @@ export class DatabaseView extends LitElement {
         display: flex;
         flex-direction: column;
       }
+
+      .filter-container {
+        margin-bottom: 1rem;
+      }
+
+      .dropdown-container {
+        box-sizing: border-box;
+        display: flex;
+        flex-flow: column nowrap;
+        align-items: flex-start;
+        justify-content: flex-start;
+      }
+
+      .dropdown-container label {
+        display: block;
+        color: var(--vscode-foreground);
+        cursor: pointer;
+        font-size: var(--vscode-font-size);
+        line-height: normal;
+        margin-bottom: 2px;
+      }
     `,
   ];
 
@@ -123,10 +149,14 @@ export class DatabaseView extends LitElement {
         </div>
         <div>
           <database-section title="SOQL Statements" .dbLines="${this.soqlLines}"></database-section>
-          <div>
-            <strong>Group by</strong>
-            <div>
-              <vscode-checkbox @change="${this._soqlGroupBy}" checked>SOQL</vscode-checkbox>
+          <div class="filter-container">
+            <div class="dropdown-container">
+              <label for="soql-groupby-dropdown">Group by</label>
+              <vscode-dropdown id="soql-groupby-dropdown" @change="${this._soqlGroupBy}">
+                <vscode-option>SOQL</vscode-option>
+                <vscode-option>Namespace</vscode-option>
+                <vscode-option>None</vscode-option>
+              </vscode-dropdown>
             </div>
           </div>
           <div id="soql-table-container">
@@ -145,7 +175,13 @@ export class DatabaseView extends LitElement {
 
   _soqlGroupBy(event: Event) {
     const target = event.target as HTMLInputElement;
-    soqlTable.setGroupBy(target.checked ? 'soql' : '');
+    const fieldName = target.value.toLowerCase();
+    const groupValue = fieldName !== 'none' ? fieldName : '';
+
+    soqlTable.setGroupValues([
+      groupValue ? sortByFrequency(soqlTable.getData(), groupValue) : [''],
+    ]);
+    soqlTable.setGroupBy(groupValue);
   }
 
   _appendTableWhenVisible() {
@@ -184,10 +220,8 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
   }
 
   const dmlData: DMLRow[] = [];
-  let dmlText: string[] = [];
   if (dmlLines) {
     for (const dml of dmlLines) {
-      dmlText.push(dml.text);
       dmlData.push({
         dml: dml.text,
         rowCount: dml.rowCount.self,
@@ -196,9 +230,8 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
         _children: [{ timestamp: dml.timestamp, isDetail: true }],
       });
     }
-
-    dmlText = sortByFrequency(dmlText);
   }
+  const dmlText = sortByFrequency(dmlData || [], 'dml');
 
   dmlTable = new Tabulator(dmlTableContainer, {
     height: '100%',
@@ -365,6 +398,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
     isSelective?: boolean | null;
     relativeCost?: number | null;
     soql?: string;
+    namespace?: string;
     rowCount?: number | null;
     timeTaken?: number | null;
     aggregations?: number;
@@ -378,16 +412,14 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
   });
 
   const soqlData: GridSOQLData[] = [];
-  let soqlText: string[] = [];
   if (soqlLines) {
     for (const soql of soqlLines) {
-      soqlText.push(soql.text);
-
       const explainLine = soql.children[0] as SOQLExecuteExplainLine;
       soqlData.push({
         isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
         relativeCost: explainLine?.relativeCost,
         soql: soql.text,
+        namespace: soql.namespace,
         rowCount: soql.rowCount.self,
         timeTaken: soql.duration.total,
         aggregations: soql.aggregations,
@@ -395,9 +427,9 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
         _children: [{ timestamp: soql.timestamp, isDetail: true }],
       });
     }
-
-    soqlText = sortByFrequency(soqlText);
   }
+
+  const soqlText = sortByFrequency(soqlData || [], 'soql');
 
   soqlTable = new Tabulator(soqlTableContainer, {
     height: '100%',
@@ -549,6 +581,21 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
         },
       },
       {
+        title: 'Namespace',
+        field: 'namespace',
+        sorter: 'string',
+        cssClass: 'datagrid-code-text',
+        width: 120,
+        headerFilter: 'list',
+        headerFilterFunc: 'in',
+        headerFilterParams: {
+          valuesLookup: 'all',
+          clearable: true,
+          multiselect: true,
+        },
+        headerFilterLiveFilter: false,
+      },
+      {
         title: 'Row Count',
         field: 'rowCount',
         sorter: 'number',
@@ -659,12 +706,13 @@ function createSOQLDetailPanel(
   return detailContainer;
 }
 
-function sortByFrequency(dataArray: string[]) {
+function sortByFrequency(dataArray: any[], field: string) {
   const map = new Map<string, number>();
   dataArray.forEach((val) => {
-    map.set(val, (map.get(val) || 0) + 1);
+    map.set(val[field], (map.get(val[field]) || 0) + 1);
   });
   const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
+
   return [...newMap.keys()];
 }
 

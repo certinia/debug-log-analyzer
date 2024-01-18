@@ -1,7 +1,12 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
+import {
+  provideVSCodeDesignSystem,
+  vsCodeCheckbox,
+  vsCodeDropdown,
+  vsCodeOption,
+} from '@vscode/webview-ui-toolkit';
 import { LitElement, type PropertyValues, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { type ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
@@ -15,7 +20,7 @@ import { hostService } from '../services/VSCodeService.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './skeleton/GridSkeleton.js';
 
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
+provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
 
 let analysisTable: Tabulator;
 let tableContainer: HTMLDivElement | null;
@@ -48,11 +53,29 @@ export class AnalysisView extends LitElement {
         display: flex;
         flex-direction: column;
         flex: 1;
+        gap: 1rem;
       }
 
       #analysis-table-container {
         display: contents;
         height: 100%;
+      }
+
+      .dropdown-container {
+        box-sizing: border-box;
+        display: flex;
+        flex-flow: column nowrap;
+        align-items: flex-start;
+        justify-content: flex-start;
+      }
+
+      .dropdown-container label {
+        display: block;
+        color: var(--vscode-foreground);
+        cursor: pointer;
+        font-size: var(--vscode-font-size);
+        line-height: normal;
+        margin-bottom: 2px;
       }
     `,
   ];
@@ -61,11 +84,14 @@ export class AnalysisView extends LitElement {
     const skeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : '';
 
     return html`
-      <div>
-        <strong>Group by</strong>
-        <div>
-          <vscode-checkbox @change="${this._groupBy}">Type</vscode-checkbox>
-          <vscode-checkbox @change="${this._groupBy}">Namespace</vscode-checkbox>
+      <div class="filter-container">
+        <div class="dropdown-container">
+          <label for="groupby-dropdown">Group by</label>
+          <vscode-dropdown id="groupby-dropdown" @change="${this._groupBy}">
+            <vscode-option>None</vscode-option>
+            <vscode-option>Namespace</vscode-option>
+            <vscode-option>Type</vscode-option>
+          </vscode-dropdown>
         </div>
       </div>
       <div id="analysis-table-container">
@@ -77,8 +103,9 @@ export class AnalysisView extends LitElement {
 
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
+    const fieldName = target.value.toLowerCase();
 
-    analysisTable.setGroupBy(target.checked ? target.textContent?.toLowerCase() || '' : '');
+    analysisTable.setGroupBy(fieldName !== 'none' ? fieldName : '');
   }
 
   _appendTableWhenVisible() {
@@ -190,6 +217,14 @@ async function renderAnalysis(rootMethod: ApexLog) {
         sorter: 'string',
         cssClass: 'datagrid-code-text',
         tooltip: true,
+        headerFilter: 'list',
+        headerFilterFunc: 'in',
+        headerFilterParams: {
+          valuesLookup: 'all',
+          clearable: true,
+          multiselect: true,
+        },
+        headerFilterLiveFilter: false,
       },
       {
         title: 'Type',

@@ -726,7 +726,7 @@ describe('namespace tests', () => {
       '01:01:01.000 (34)|CODE_UNIT_FINISHED\n';
 
     const apexLog = parse(log);
-
+    expect(apexLog.namespaces).toEqual(['MyNS', 'MyNs', 'default']);
     expect(apexLog.children.length).toEqual(18);
 
     expect(apexLog.children[0]).toMatchObject({
@@ -859,6 +859,7 @@ describe('namespace tests', () => {
     ].join('\n');
 
     const apexLog = parse(log);
+    expect(apexLog.namespaces).toEqual(['default', 'ns', 'ns2']);
     expect(apexLog.children.length).toEqual(1);
     expect(apexLog.children[0]).toMatchObject({
       namespace: 'default',

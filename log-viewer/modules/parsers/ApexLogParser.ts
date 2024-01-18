@@ -60,6 +60,7 @@ class ApexLogParser {
     apexLog.logIssues = this.logIssues;
     apexLog.parsingErrors = this.parsingErrors;
     apexLog.cpuTime = this.cpuUsed;
+    apexLog.namespaces = [...this.namespaces];
 
     return apexLog;
   }
@@ -759,6 +760,11 @@ export class ApexLog extends Method {
   public debugLevels: DebugLevel[] = [];
 
   /**
+   * All the namespaces that appear in this log.
+   */
+  public namespaces: string[] = [];
+
+  /**
    * Any issues within the log, such as cpu time exceeded or max log size reached.
    */
   public logIssues: LogIssue[] = [];
@@ -923,6 +929,7 @@ class EmailQueueLine extends LogLine {
   }
 }
 
+// todo: avoid some of ns parsing work if we have done it before.
 export class MethodEntryLine extends Method {
   hasValidSymbols = true;
 
@@ -1074,6 +1081,8 @@ export class CodeUnitStartedLine extends Method {
         break;
       }
     }
+
+    this.namespace ||= 'default';
   }
 }
 export class CodeUnitFinishedLine extends LogLine {
@@ -1573,6 +1582,7 @@ class SystemModeExitLine extends LogLine {
 }
 
 export class ExecutionStartedLine extends Method {
+  namespace = 'default';
   constructor(parts: string[]) {
     super(parts, ['EXECUTION_FINISHED'], 'Method', 'method');
   }

@@ -264,6 +264,8 @@ export async function renderCallTree(
 
     const selfTimeFilterCache = new Map<string, boolean>();
     const totalTimeFilterCache = new Map<string, boolean>();
+    const namespaceFilterCache = new Map<string, boolean>();
+
     let childIndent;
     calltreeTable = new Tabulator(callTreeTableContainer, {
       data: toCallTree(rootMethod.children),
@@ -360,6 +362,22 @@ export async function renderCallTree(
           widthGrow: 5,
         },
         {
+          title: 'Namespace',
+          field: 'namespace',
+          sorter: 'string',
+          width: 120,
+          cssClass: 'datagrid-code-text',
+          headerFilter: 'list',
+          headerFilterFunc: namespaceFilter,
+          headerFilterFuncParams: { filterCache: namespaceFilterCache },
+          headerFilterParams: {
+            values: rootMethod.namespaces,
+            clearable: true,
+            multiselect: true,
+          },
+          headerFilterLiveFilter: false,
+        },
+        {
           title: 'DML Count',
           field: 'totalDmlCount',
           sorter: 'number',
@@ -447,6 +465,7 @@ export async function renderCallTree(
       selfTimeFilterCache.clear();
       debugOnlyFilterCache.clear();
       showDetailsFilterCache.clear();
+      namespaceFilterCache.clear();
     });
 
     calltreeTable.on('tableBuilt', () => {
@@ -488,6 +507,7 @@ function toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
       const data: CalltreeRow = {
         id: node.timestamp,
         text: node.text,
+        namespace: node.namespace,
         duration: node.duration.total,
         selfTime: node.duration.self,
         _children: children,
@@ -557,6 +577,7 @@ interface CalltreeRow {
   originalData: LogLine;
   text: string;
   duration: number;
+  namespace: string;
   selfTime: number;
   _children: CalltreeRow[] | undefined | null;
   totalDmlCount: number;
@@ -596,6 +617,27 @@ const debugFilter = (data: CalltreeRow) => {
     },
     {
       filterCache: debugOnlyFilterCache,
+    },
+  );
+};
+
+const namespaceFilter = (
+  selectedNamespaces: string[],
+  namespace: string,
+  data: CalltreeRow,
+  filterParams: { columnName: string; filterCache: Map<number, boolean> },
+) => {
+  if (selectedNamespaces.length === 0) {
+    return true;
+  }
+
+  return deepFilter(
+    data,
+    (rowData) => {
+      return selectedNamespaces.includes(rowData.originalData.namespace || '');
+    },
+    {
+      filterCache: filterParams.filterCache,
     },
   );
 };
