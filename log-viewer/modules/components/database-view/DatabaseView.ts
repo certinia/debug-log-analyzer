@@ -586,6 +586,14 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
         sorter: 'string',
         cssClass: 'datagrid-code-text',
         width: 120,
+        headerFilter: 'list',
+        headerFilterFunc: 'in',
+        headerFilterParams: {
+          valuesLookup: 'all',
+          clearable: true,
+          multiselect: true,
+        },
+        headerFilterLiveFilter: false,
       },
       {
         title: 'Row Count',
