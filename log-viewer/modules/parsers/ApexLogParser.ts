@@ -43,7 +43,6 @@ class ApexLogParser {
   maxSizeTimestamp: number | null = null;
   reasons: Set<string> = new Set<string>();
   cpuUsed = 0;
-  lastTimestamp = 0;
   discontinuity = false;
   namespaces: string[] = [];
 
@@ -157,7 +156,6 @@ class ApexLogParser {
     const rootMethod = new ApexLog(),
       stack: Method[] = [];
     let line: LogLine | null;
-    this.lastTimestamp = 0;
 
     if (currentParser) {
       const lineIter = new LineIterator(lineGenerator);
@@ -177,7 +175,7 @@ class ApexLogParser {
   }
 
   private parseTree(currentLine: Method, lineIter: LineIterator, stack: Method[]) {
-    this.lastTimestamp = currentLine.timestamp;
+    let lastTimestamp = currentLine.timestamp;
     currentLine.namespace ||= 'default';
 
     const isEntry = currentLine.exitTypes.length > 0;
@@ -186,7 +184,10 @@ class ApexLogParser {
       let nextLine;
 
       stack.push(currentLine);
+
       while ((nextLine = lineIter.peek())) {
+        lastTimestamp = nextLine.timestamp;
+        // discontinuities are stack unwinding (caused by Exceptions)
         this.discontinuity ||= nextLine.discontinuity; // start unwinding stack
 
         if (
@@ -204,10 +205,8 @@ class ApexLogParser {
           nextLine.isExit &&
           this.endMethod(currentLine, nextLine, lineIter, stack)
         ) {
-          if (currentLine.onEnd) {
-            // the method wants to see the exit line
-            currentLine.onEnd(nextLine, stack);
-          }
+          // the method wants to see the exit line
+          currentLine.onEnd?.(nextLine, stack);
           break;
         }
 
@@ -223,23 +222,23 @@ class ApexLogParser {
 
         nextLine.namespace ||= currentLine.namespace || 'default';
         lineIter.fetch(); // it's a child - consume the line
-        this.lastTimestamp = nextLine.timestamp;
+
         if (nextLine instanceof Method) {
           this.parseTree(nextLine, lineIter, stack);
         }
 
-        currentLine.addChild(nextLine);
+        currentLine.children.push(nextLine);
       }
 
       // End of line error handling. We have finished processing this log line and either got to the end
       // of the log without finding an exit line or the current line was truncated)
       if (!nextLine || currentLine.isTruncated) {
         // truncated method - terminate at the end of the log
-        currentLine.exitStamp = this.lastTimestamp;
+        currentLine.exitStamp = lastTimestamp;
 
         // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
         this.addLogIssue(
-          this.lastTimestamp,
+          lastTimestamp,
           'Unexpected-End',
           'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
           'unexpected',
@@ -247,12 +246,12 @@ class ApexLogParser {
 
         if (currentLine.isTruncated) {
           this.updateLogIssue(
-            this.lastTimestamp,
+            lastTimestamp,
             'Max-Size-reached',
             'The maximum log size has been reached. Part of the log has been truncated.',
             'skip',
           );
-          this.maxSizeTimestamp = this.lastTimestamp;
+          this.maxSizeTimestamp = lastTimestamp;
         }
         currentLine.isTruncated = true;
       }
