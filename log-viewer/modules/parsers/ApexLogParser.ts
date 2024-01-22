@@ -816,10 +816,10 @@ export function parseObjectNamespace(text: string | null | undefined): string {
   }
 
   const sep = text.indexOf('__');
-  if (sep < 0) {
+  if (sep === -1) {
     return 'default';
   }
-  return text.substring(0, sep);
+  return text.slice(0, sep);
 }
 
 export function parseVfNamespace(text: string): string {
