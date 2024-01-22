@@ -59,7 +59,7 @@ class ApexLogParser {
     apexLog.logIssues = this.logIssues;
     apexLog.parsingErrors = this.parsingErrors;
     apexLog.cpuTime = this.cpuUsed;
-    apexLog.namespaces = [...this.namespaces];
+    apexLog.namespaces = this.namespaces;
 
     return apexLog;
   }
