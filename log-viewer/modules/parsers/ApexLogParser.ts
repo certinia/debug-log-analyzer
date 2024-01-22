@@ -269,9 +269,9 @@ class ApexLogParser {
     return (
       endLine.type &&
       startMethod.exitTypes.includes(endLine.type) &&
-      (!endLine.lineNumber ||
-        !startMethod.lineNumber ||
-        endLine.lineNumber === startMethod.lineNumber)
+      (endLine.lineNumber === startMethod.lineNumber ||
+        !endLine.lineNumber ||
+        !startMethod.lineNumber)
     );
   }
 
