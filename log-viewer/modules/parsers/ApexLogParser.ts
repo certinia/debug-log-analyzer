@@ -187,10 +187,7 @@ class ApexLogParser {
 
       stack.push(currentLine);
       while ((nextLine = lineIter.peek())) {
-        if (nextLine.discontinuity) {
-          // discontinuities are stack unwinding (caused by Exceptions)
-          this.discontinuity = true; // start unwinding stack
-        }
+        this.discontinuity ||= nextLine.discontinuity; // start unwinding stack
 
         if (
           exitOnNextLine &&
