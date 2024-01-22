@@ -18,8 +18,8 @@ describe('Analyse database tests', () => {
 
     const apexLog = parse(log);
     const result = await DatabaseAccess.create(apexLog);
+
     const firstSOQL = result.getSOQLLines()[0];
-    console.debug('a', apexLog, result);
     expect(firstSOQL?.text).toEqual('SELECT Id FROM Account');
 
     const firstDML = result.getDMLLines()[0];
