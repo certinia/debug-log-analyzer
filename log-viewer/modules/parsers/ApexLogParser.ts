@@ -45,7 +45,7 @@ class ApexLogParser {
   cpuUsed = 0;
   lastTimestamp = 0;
   discontinuity = false;
-  namespaces = new Set<string>();
+  namespaces: string[] = [];
 
   /**
    * Takes string input of a log and returns the ApexLog class, which represents a log tree
@@ -74,7 +74,9 @@ class ApexLogParser {
       const entry = new metaCtor(parts);
       entry.logLine = line;
       lastEntry?.onAfter?.(this, entry);
-      entry.namespace && this.namespaces.add(entry.namespace);
+      entry.namespace &&
+        !this.namespaces.includes(entry.namespace) &&
+        this.namespaces.push(entry.namespace);
       return entry;
     }
 
@@ -124,7 +126,7 @@ class ApexLogParser {
 
     while (eolIndex !== -1) {
       if (hascrlf && eolIndex > crlfIndex) {
-        crlfIndex = log.indexOf('\r', startIndex);
+        crlfIndex = log.indexOf('\r', eolIndex - 1);
       }
       const line = log.slice(startIndex, crlfIndex + 1 === eolIndex ? crlfIndex : eolIndex);
       if (line) {
@@ -836,6 +838,52 @@ export function parseVfNamespace(text: string): string {
   return text.substring(secondSlash + 1, sep);
 }
 
+export function parseMethodNamespace(methodName: string): string {
+  const methodBracketIndex = methodName.indexOf('(');
+  if (methodBracketIndex === -1) {
+    return '';
+  }
+
+  let possibleNs = methodName.slice(0, methodName.indexOf('.'));
+  possibleNs =
+    currentParser?.namespaces.find((ns) => {
+      return ns === possibleNs;
+    }) || '';
+
+  if (possibleNs) {
+    return possibleNs;
+  }
+
+  const methodNameParts = methodName ? methodName.slice(0, methodBracketIndex)?.split('.') : '';
+  if (methodNameParts.length === 4) {
+    return methodNameParts[0] ?? '';
+  } else if (methodNameParts.length === 2) {
+    return 'default';
+  }
+
+  return '';
+}
+
+export function parseConstructorNamespace(className: string): string {
+  let possibleNs = className.slice(0, className.indexOf('.'));
+  possibleNs =
+    currentParser?.namespaces.find((ns) => {
+      return ns === possibleNs;
+    }) || '';
+
+  if (possibleNs) {
+    return possibleNs;
+  }
+  const constructorParts = (className ?? '').split('.');
+  possibleNs = constructorParts[0] || '';
+  // inmner class with a namespace
+  if (constructorParts.length === 3) {
+    return possibleNs;
+  }
+
+  return '';
+}
+
 export function parseRows(text: string | null | undefined): number {
   if (!text) {
     return 0;
@@ -903,11 +951,9 @@ class ConstructorEntryLine extends Method {
     const [, , , , args, className] = parts;
 
     this.text = className + (args ? args.substring(args.lastIndexOf('(')) : '');
-    const constructorParts = (className ?? '').split('.');
-    const possibleNs = constructorParts[0] || '';
-    // inmner class with a namespace
-    if (constructorParts.length === 3 || currentParser?.namespaces.has(possibleNs)) {
-      this.namespace = possibleNs ?? this.namespace;
+    const possibleNS = parseConstructorNamespace(className || '');
+    if (possibleNS) {
+      this.namespace = possibleNS;
     }
   }
 }
@@ -929,7 +975,6 @@ class EmailQueueLine extends LogLine {
   }
 }
 
-// todo: avoid some of ns parsing work if we have done it before.
 export class MethodEntryLine extends Method {
   hasValidSymbols = true;
 
@@ -941,12 +986,8 @@ export class MethodEntryLine extends Method {
       // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
       this.cpuType = 'loading';
     } else {
-      const methodName = parts[4] || '';
-      const methodNameParts = methodName
-        ? methodName.slice(0, methodName.indexOf('('))?.split('.')
-        : '';
-      const possibleNs = methodNameParts[0] ?? '';
-      if (methodNameParts.length === 4 || currentParser?.namespaces.has(possibleNs)) {
+      const possibleNs = parseMethodNamespace(parts[4] || '');
+      if (possibleNs) {
         this.namespace = possibleNs;
       }
     }
