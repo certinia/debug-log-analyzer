@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { type ExtensionContext, workspace } from 'vscode';
+import { workspace, type ExtensionContext } from 'vscode';
 
 import { ShowAnalysisCodeLens } from './codelenses/ShowAnalysisCodeLens.js';
 import { RetrieveLogFile } from './commands/RetrieveLogFile.js';

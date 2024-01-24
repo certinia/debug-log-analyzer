@@ -3020,4 +3020,4 @@ const logEventNames = [
 
 export type LogEventType = (typeof logEventNames)[number];
 
-export { SOQLExecuteExplainLine, SOQLExecuteBeginLine, DMLBeginLine };
+export { DMLBeginLine, SOQLExecuteBeginLine, SOQLExecuteExplainLine };

@@ -5,8 +5,7 @@ import { createReadStream, existsSync } from 'fs';
 import { writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { basename, dirname, join, parse } from 'path';
-import { type WebviewPanel, window as vscWindow } from 'vscode';
-import { Uri, commands, workspace } from 'vscode';
+import { Uri, commands, window as vscWindow, workspace, type WebviewPanel } from 'vscode';
 
 import { Context } from '../Context.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';

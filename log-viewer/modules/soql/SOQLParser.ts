@@ -8,12 +8,12 @@ import {
   QueryContext,
 } from '@apexdevtools/apex-parser';
 import {
-  type ANTLRErrorListener,
   CharStreams,
   CommonTokenStream,
   RecognitionException,
   Recognizer,
   Token,
+  type ANTLRErrorListener,
 } from 'antlr4ts';
 
 // To understand the parser AST see https://github.com/nawforce/apex-parser/blob/master/antlr/ApexParser.g4

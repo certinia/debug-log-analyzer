@@ -7,13 +7,13 @@ import {
   vsCodeDropdown,
   vsCodeOption,
 } from '@vscode/webview-ui-toolkit';
-import { LitElement, type PropertyValues, css, html, render, unsafeCSS } from 'lit';
+import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
+  TabulatorFull as Tabulator,
   type ColumnComponent,
   type GroupComponent,
   type RowComponent,
-  TabulatorFull as Tabulator,
 } from 'tabulator-tables';
 
 import { DatabaseAccess } from '../../Database.js';

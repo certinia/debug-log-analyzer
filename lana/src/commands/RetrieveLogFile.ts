@@ -4,7 +4,7 @@
 import { type LogRecord } from '@salesforce/apex-node';
 import { existsSync } from 'fs';
 import { join, parse } from 'path';
-import { type WebviewPanel, window } from 'vscode';
+import { window, type WebviewPanel } from 'vscode';
 
 import { appName } from '../AppSettings.js';
 import { Context } from '../Context.js';

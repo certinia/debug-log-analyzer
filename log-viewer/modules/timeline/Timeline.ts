@@ -7,9 +7,9 @@ import { goToRow } from '../components/calltree-view/CalltreeView.js';
 import {
   ApexLog,
   LogLine,
-  type LogSubCategory,
   Method,
   TimedNode,
+  type LogSubCategory,
 } from '../parsers/ApexLogParser.js';
 
 export { ApexLog };
