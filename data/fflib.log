@@ -14,96 +14,96 @@ Execute Anonymous: insert accs2;
 04:16:38.5 (5771141)|EXECUTION_STARTED
 04:16:38.5 (5778372)|CODE_UNIT_STARTED|[EXTERNAL]|execute_anonymous_apex
 04:16:38.5 (33157208)|DML_BEGIN|[10]|Op:Insert|Type:Account|Rows:250
-04:16:38.5 (134504471)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event BeforeInsert|__sfdc_trigger/Account
+04:16:38.5 (134504471)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event BeforeInsert|__sfdc_trigger/fflib/Account
 04:16:38.5 (137671487)|SYSTEM_METHOD_ENTRY|[1]|Type.Type()
 04:16:38.5 (137693187)|SYSTEM_METHOD_EXIT|[1]|Type
-04:16:38.5 (150701564)|METHOD_ENTRY|[41]|01pDC000001iob6|fflib_SObjectDomain.fflib_SObjectDomain()
+04:16:38.5 (150701564)|METHOD_ENTRY|[41]|01pDC000001iob6|fflib.fflib_SObjectDomain.fflib.fflib_SObjectDomain()
 04:16:38.5 (151491618)|SYSTEM_MODE_ENTER|false
-04:16:38.5 (151775302)|CONSTRUCTOR_ENTRY|[109]|01pDC000001iob6|<init>()|fflib_SObjectDomain.ErrorFactory
-04:16:38.5 (152028145)|CONSTRUCTOR_EXIT|[109]|01pDC000001iob6|<init>()|fflib_SObjectDomain.ErrorFactory
-04:16:38.5 (152581105)|CONSTRUCTOR_ENTRY|[111]|01pDC000001iob6|<init>()|fflib_SObjectDomain.TestFactory
-04:16:38.5 (152664507)|CONSTRUCTOR_ENTRY|[769]|01pDC000001iob6|<init>()|fflib_SObjectDomain.MockDatabase
-04:16:38.5 (152782505)|CONSTRUCTOR_EXIT|[769]|01pDC000001iob6|<init>()|fflib_SObjectDomain.MockDatabase
-04:16:38.5 (152798999)|CONSTRUCTOR_EXIT|[111]|01pDC000001iob6|<init>()|fflib_SObjectDomain.TestFactory
+04:16:38.5 (151775302)|CONSTRUCTOR_ENTRY|[109]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.ErrorFactory
+04:16:38.5 (152028145)|CONSTRUCTOR_EXIT|[109]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.ErrorFactory
+04:16:38.5 (152581105)|CONSTRUCTOR_ENTRY|[111]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.TestFactory
+04:16:38.5 (152664507)|CONSTRUCTOR_ENTRY|[769]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.MockDatabase
+04:16:38.5 (152782505)|CONSTRUCTOR_EXIT|[769]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.MockDatabase
+04:16:38.5 (152798999)|CONSTRUCTOR_EXIT|[111]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.TestFactory
 04:16:38.5 (152887605)|SYSTEM_MODE_EXIT|false
-04:16:38.5 (152906158)|METHOD_EXIT|[41]|fflib_SObjectDomain
-04:16:38.5 (152932614)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:38.5 (152906158)|METHOD_EXIT|[41]|fflib.fflib_SObjectDomain
+04:16:38.5 (152932614)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:38.5 (152988705)|SYSTEM_MODE_ENTER|false
 04:16:38.5 (153061482)|SYSTEM_METHOD_ENTRY|[1]|Test.Test()
 04:16:38.5 (153077111)|SYSTEM_METHOD_EXIT|[1]|Test
 04:16:38.5 (153098015)|METHOD_ENTRY|[379]||System.Test.isRunningTest()
 04:16:38.5 (153310661)|METHOD_EXIT|[379]||System.Test.isRunningTest()
-04:16:38.5 (153371572)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:38.5 (153462955)|METHOD_EXIT|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:38.5 (153602915)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:38.5 (153371572)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:38.5 (153462955)|METHOD_EXIT|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:38.5 (153602915)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
 04:16:38.5 (153667508)|METHOD_ENTRY|[409]||System.Type.getName()
 04:16:38.5 (153708125)|METHOD_EXIT|[409]||System.Type.getName()
 04:16:38.5 (153767508)|METHOD_ENTRY|[410]||System.Type.forName(String)
 04:16:38.5 (156068079)|METHOD_EXIT|[410]||System.Type.forName(String)
 04:16:38.5 (156097638)|METHOD_ENTRY|[411]||System.Type.newInstance()
 04:16:38.5 (156385397)|METHOD_EXIT|[411]||System.Type.newInstance()
-04:16:38.5 (156441188)|METHOD_ENTRY|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:38.5 (156512640)|METHOD_ENTRY|[1]|01pDC000001ioaq|AccountDomain.AccountDomain()
-04:16:38.5 (156536505)|METHOD_EXIT|[1]|AccountDomain
-04:16:38.5 (157025028)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:38.5 (157110372)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:38.5 (157468290)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:38.5 (157869469)|METHOD_ENTRY|[26]|01pDC000001iobD|fflib_SObjects.fflib_SObjects()
-04:16:38.5 (158075242)|CONSTRUCTOR_ENTRY|[40]|01pDC000001iobD|<init>()|fflib_SObjects.ErrorFactory
-04:16:38.5 (158245438)|CONSTRUCTOR_EXIT|[40]|01pDC000001iobD|<init>()|fflib_SObjects.ErrorFactory
-04:16:38.5 (158288542)|METHOD_EXIT|[26]|fflib_SObjects
-04:16:38.5 (158307905)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:38.5 (158355416)|METHOD_ENTRY|[26]|01pDC000001iob0|fflib_Objects.fflib_Objects()
-04:16:38.5 (158369016)|METHOD_EXIT|[26]|fflib_Objects
-04:16:38.5 (158381901)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:38.5 (158513468)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:38.5 (159529166)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:38.5 (159651231)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:38.5 (159876009)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:38.5 (159926672)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:38.5 (159947765)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:38.5 (159966417)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:38.5 (159983694)|METHOD_EXIT|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:38.5 (160051682)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:38.5 (160402275)|CONSTRUCTOR_ENTRY|[476]|01pDC000001iob6|<init>()|fflib_SObjectDomain.TriggerEvent
-04:16:38.5 (160504603)|METHOD_ENTRY|[495]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAll()
-04:16:38.5 (160655906)|METHOD_ENTRY|[521]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAllBefore()
-04:16:38.5 (160688452)|METHOD_ENTRY|[531]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableBeforeInsert()
-04:16:38.5 (160760385)|METHOD_EXIT|[531]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableBeforeInsert()
-04:16:38.5 (160780889)|METHOD_ENTRY|[531]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableBeforeUpdate()
-04:16:38.5 (160830039)|METHOD_EXIT|[531]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableBeforeUpdate()
-04:16:38.5 (160846178)|METHOD_ENTRY|[531]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableBeforeDelete()
-04:16:38.5 (160891255)|METHOD_EXIT|[531]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableBeforeDelete()
-04:16:38.5 (160905264)|METHOD_EXIT|[521]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAllBefore()
-04:16:38.5 (160919934)|METHOD_ENTRY|[521]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAllAfter()
-04:16:38.5 (160936569)|METHOD_ENTRY|[541]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAfterInsert()
-04:16:38.5 (160992595)|METHOD_EXIT|[541]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAfterInsert()
-04:16:38.5 (161009105)|METHOD_ENTRY|[541]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAfterUpdate()
-04:16:38.5 (161054251)|METHOD_EXIT|[541]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAfterUpdate()
-04:16:38.5 (161071774)|METHOD_ENTRY|[541]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAfterDelete()
-04:16:38.5 (161115681)|METHOD_EXIT|[541]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAfterDelete()
-04:16:38.5 (161133474)|METHOD_ENTRY|[541]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAfterUndelete()
-04:16:38.5 (161180607)|METHOD_EXIT|[541]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAfterUndelete()
-04:16:38.5 (161192138)|METHOD_EXIT|[521]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAllAfter()
-04:16:38.5 (161202558)|METHOD_EXIT|[495]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.enableAll()
-04:16:38.5 (161217944)|CONSTRUCTOR_EXIT|[476]|01pDC000001iob6|<init>()|fflib_SObjectDomain.TriggerEvent
-04:16:38.5 (161519245)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:38.5 (161558728)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:38.5 (161621908)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:38.5 (161727612)|METHOD_ENTRY|[434]|01pDC000001iob6|fflib_SObjectDomain.handleBeforeInsert()
-04:16:38.5 (161779805)|METHOD_ENTRY|[202]|01pDC000001ioaq|AccountDomain.onApplyDefaults()
-04:16:38.5 (161846725)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:38.5 (161875010)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:38.5 (161929051)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:38.5 (161955718)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:38.5 (170494531)|METHOD_EXIT|[202]|01pDC000001ioaq|AccountDomain.onApplyDefaults()
-04:16:38.5 (170533937)|METHOD_ENTRY|[203]|01pDC000001ioaq|AccountDomain.onBeforeInsert()
+04:16:38.5 (156441188)|METHOD_ENTRY|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:38.5 (156512640)|METHOD_ENTRY|[1]|01pDC000001ioaq|fflib.AccountDomain.AccountDomain()
+04:16:38.5 (156536505)|METHOD_EXIT|[1]|fflib.AccountDomain
+04:16:38.5 (157025028)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:38.5 (157110372)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:38.5 (157468290)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:38.5 (157869469)|METHOD_ENTRY|[26]|01pDC000001iobD|fflib.fflib_SObjects.fflib.fflib_SObjects()
+04:16:38.5 (158075242)|CONSTRUCTOR_ENTRY|[40]|01pDC000001iobD|<init>()|fflib.fflib_SObjects.ErrorFactory
+04:16:38.5 (158245438)|CONSTRUCTOR_EXIT|[40]|01pDC000001iobD|<init>()|fflib.fflib_SObjects.ErrorFactory
+04:16:38.5 (158288542)|METHOD_EXIT|[26]|fflib.fflib_SObjects
+04:16:38.5 (158307905)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:38.5 (158355416)|METHOD_ENTRY|[26]|01pDC000001iob0|fflib.fflib_Objects.fflib.fflib_Objects()
+04:16:38.5 (158369016)|METHOD_EXIT|[26]|fflib.fflib_Objects
+04:16:38.5 (158381901)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:38.5 (158513468)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:38.5 (159529166)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:38.5 (159651231)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:38.5 (159876009)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:38.5 (159926672)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:38.5 (159947765)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:38.5 (159966417)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:38.5 (159983694)|METHOD_EXIT|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:38.5 (160051682)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:38.5 (160402275)|CONSTRUCTOR_ENTRY|[476]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.TriggerEvent
+04:16:38.5 (160504603)|METHOD_ENTRY|[495]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAll()
+04:16:38.5 (160655906)|METHOD_ENTRY|[521]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAllBefore()
+04:16:38.5 (160688452)|METHOD_ENTRY|[531]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableBeforeInsert()
+04:16:38.5 (160760385)|METHOD_EXIT|[531]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableBeforeInsert()
+04:16:38.5 (160780889)|METHOD_ENTRY|[531]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableBeforeUpdate()
+04:16:38.5 (160830039)|METHOD_EXIT|[531]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableBeforeUpdate()
+04:16:38.5 (160846178)|METHOD_ENTRY|[531]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableBeforeDelete()
+04:16:38.5 (160891255)|METHOD_EXIT|[531]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableBeforeDelete()
+04:16:38.5 (160905264)|METHOD_EXIT|[521]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAllBefore()
+04:16:38.5 (160919934)|METHOD_ENTRY|[521]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAllAfter()
+04:16:38.5 (160936569)|METHOD_ENTRY|[541]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAfterInsert()
+04:16:38.5 (160992595)|METHOD_EXIT|[541]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAfterInsert()
+04:16:38.5 (161009105)|METHOD_ENTRY|[541]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAfterUpdate()
+04:16:38.5 (161054251)|METHOD_EXIT|[541]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAfterUpdate()
+04:16:38.5 (161071774)|METHOD_ENTRY|[541]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAfterDelete()
+04:16:38.5 (161115681)|METHOD_EXIT|[541]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAfterDelete()
+04:16:38.5 (161133474)|METHOD_ENTRY|[541]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAfterUndelete()
+04:16:38.5 (161180607)|METHOD_EXIT|[541]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAfterUndelete()
+04:16:38.5 (161192138)|METHOD_EXIT|[521]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAllAfter()
+04:16:38.5 (161202558)|METHOD_EXIT|[495]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.enableAll()
+04:16:38.5 (161217944)|CONSTRUCTOR_EXIT|[476]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.TriggerEvent
+04:16:38.5 (161519245)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:38.5 (161558728)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:38.5 (161621908)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:38.5 (161727612)|METHOD_ENTRY|[434]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleBeforeInsert()
+04:16:38.5 (161779805)|METHOD_ENTRY|[202]|01pDC000001ioaq|fflib.AccountDomain.onApplyDefaults()
+04:16:38.5 (161846725)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:38.5 (161875010)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:38.5 (161929051)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:38.5 (161955718)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:38.5 (170494531)|METHOD_EXIT|[202]|01pDC000001ioaq|fflib.AccountDomain.onApplyDefaults()
+04:16:38.5 (170533937)|METHOD_ENTRY|[203]|01pDC000001ioaq|fflib.AccountDomain.onBeforeInsert()
 04:16:38.5 (170721612)|USER_DEBUG|[50]|ERROR|No before insert logic
-04:16:38.5 (170754137)|METHOD_EXIT|[203]|01pDC000001ioaq|AccountDomain.onBeforeInsert()
-04:16:38.5 (170770110)|METHOD_EXIT|[434]|01pDC000001iob6|fflib_SObjectDomain.handleBeforeInsert()
-04:16:38.5 (170790676)|METHOD_EXIT|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:38.5 (170754137)|METHOD_EXIT|[203]|01pDC000001ioaq|fflib.AccountDomain.onBeforeInsert()
+04:16:38.5 (170770110)|METHOD_EXIT|[434]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleBeforeInsert()
+04:16:38.5 (170790676)|METHOD_EXIT|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
 04:16:38.5 (170803581)|SYSTEM_MODE_EXIT|false
-04:16:38.5 (170818963)|METHOD_EXIT|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:38.5 (170818963)|METHOD_EXIT|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:38.170 (170837025)|CUMULATIVE_LIMIT_USAGE
 04:16:38.170 (170837025)|LIMIT_USAGE_FOR_NS|(default)|
   Number of SOQL queries: 0 out of 100
@@ -164,11 +164,11 @@ Execute Anonymous: insert accs2;
   String:_sfdcAdditionalCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
-  fflib_SObjectDomain.ErrorFactory:_static_Errors:0
-  fflib_SObjects.ErrorFactory:_static_Errors:0
-  fflib_SObjectDomain.TestFactory:_static_Test:0
-  Map<System.Type,fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
-  Map<System.Type,List<fflib_SObjectDomain>>:_static_TriggerStateByClass:0
+  fflib.fflib_SObjectDomain.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjects.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjectDomain.TestFactory:_static_Test:0
+  Map<System.Type,fflib.fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
+  Map<System.Type,List<fflib.fflib_SObjectDomain>>:_static_TriggerStateByClass:0
   List<Account>:_static_accs:0
   List<Account>:_static_accs2:0
   char[]:digits:0
@@ -179,7 +179,7 @@ Execute Anonymous: insert accs2;
 
 04:16:38.170 (170837025)|CUMULATIVE_LIMIT_USAGE_END
 
-04:16:38.5 (171376049)|CODE_UNIT_FINISHED|Account on Account trigger event BeforeInsert|__sfdc_trigger/Account
+04:16:38.5 (171376049)|CODE_UNIT_FINISHED|Account on Account trigger event BeforeInsert|__sfdc_trigger/fflib/Account
 04:16:38.5 (186798924)|CODE_UNIT_STARTED|[EXTERNAL]|DuplicateDetector
 04:16:38.5 (186840828)|DUPLICATE_DETECTION_BEGIN
 04:16:38.5 (187389892)|DUPLICATE_DETECTION_RULE_INVOCATION|DuplicateRuleId:0BmDC000000PVhq|DuplicateRuleName:Standard Account Duplicate Rule|DmlType:INSERT
@@ -386,99 +386,99 @@ Execute Anonymous: insert accs2;
 04:16:38.5 (323667350)|DUPLICATE_DETECTION_MATCH_INVOCATION_SUMMARY|EntityType:Account|NumRecordsToBeSaved:200|NumRecordsToBeSavedWithDuplicates:0|NumDuplicateRecordsFound:0
 04:16:38.5 (324014650)|DUPLICATE_DETECTION_END
 04:16:38.5 (324024252)|CODE_UNIT_FINISHED|DuplicateDetector
-04:16:39.166 (1166781977)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event AfterInsert|__sfdc_trigger/Account
-04:16:39.166 (1167982209)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:39.166 (1166781977)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event AfterInsert|__sfdc_trigger/fflib/Account
+04:16:39.166 (1167982209)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:39.166 (1168514950)|SYSTEM_MODE_ENTER|false
 04:16:39.166 (1168566098)|METHOD_ENTRY|[379]||System.Test.isRunningTest()
 04:16:39.166 (1168619551)|METHOD_EXIT|[379]||System.Test.isRunningTest()
-04:16:39.166 (1168653872)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:39.166 (1168705736)|METHOD_EXIT|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:39.166 (1168777480)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
-04:16:39.166 (1168814779)|METHOD_ENTRY|[405]|01pDC000001iob6|fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
-04:16:39.166 (1168971866)|METHOD_EXIT|[405]|01pDC000001iob6|fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
+04:16:39.166 (1168653872)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:39.166 (1168705736)|METHOD_EXIT|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:39.166 (1168777480)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:39.166 (1168814779)|METHOD_ENTRY|[405]|01pDC000001iob6|fflib.fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
+04:16:39.166 (1168971866)|METHOD_EXIT|[405]|01pDC000001iob6|fflib.fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
 04:16:39.166 (1168986519)|METHOD_ENTRY|[409]||System.Type.getName()
 04:16:39.166 (1168997719)|METHOD_EXIT|[409]||System.Type.getName()
 04:16:39.166 (1169025255)|METHOD_ENTRY|[410]||System.Type.forName(String)
 04:16:39.166 (1169109071)|METHOD_EXIT|[410]||System.Type.forName(String)
 04:16:39.166 (1169118872)|METHOD_ENTRY|[411]||System.Type.newInstance()
 04:16:39.166 (1169181762)|METHOD_EXIT|[411]||System.Type.newInstance()
-04:16:39.166 (1169199282)|METHOD_ENTRY|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:39.166 (1169220757)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:39.166 (1169240601)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:39.166 (1169296777)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:39.166 (1169318744)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:39.166 (1169335242)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:39.166 (1169401790)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:39.166 (1169485132)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:39.166 (1169502297)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:39.166 (1169543885)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:39.166 (1169590021)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:39.166 (1169609986)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:39.166 (1169622408)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:39.166 (1169635147)|METHOD_EXIT|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:39.166 (1169661436)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:39.166 (1169843515)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:39.166 (1169858278)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:39.166 (1169913468)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:39.166 (1169945942)|METHOD_ENTRY|[440]|01pDC000001iob6|fflib_SObjectDomain.handleAfterInsert()
-04:16:39.166 (1170081028)|METHOD_ENTRY|[232]|01pDC000001ioaq|AccountDomain.onValidate()
-04:16:39.166 (1170126733)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:39.166 (1170140616)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:39.166 (1170164877)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:39.166 (1170191018)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
+04:16:39.166 (1169199282)|METHOD_ENTRY|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:39.166 (1169220757)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:39.166 (1169240601)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:39.166 (1169296777)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:39.166 (1169318744)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:39.166 (1169335242)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:39.166 (1169401790)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:39.166 (1169485132)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:39.166 (1169502297)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:39.166 (1169543885)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:39.166 (1169590021)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:39.166 (1169609986)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:39.166 (1169622408)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:39.166 (1169635147)|METHOD_EXIT|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:39.166 (1169661436)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:39.166 (1169843515)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:39.166 (1169858278)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:39.166 (1169913468)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:39.166 (1169945942)|METHOD_ENTRY|[440]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleAfterInsert()
+04:16:39.166 (1170081028)|METHOD_ENTRY|[232]|01pDC000001ioaq|fflib.AccountDomain.onValidate()
+04:16:39.166 (1170126733)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:39.166 (1170140616)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:39.166 (1170164877)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:39.166 (1170191018)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
 04:16:39.166 (1176612132)|SOQL_EXECUTE_BEGIN|[22]|Aggregations:0|SELECT Id, Name FROM Account ORDER BY Name ASC NULLS FIRST LIMIT 4000
 04:16:39.166 (1201737084)|SOQL_EXECUTE_EXPLAIN|[22]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:39.166 (1201756148)|SOQL_EXECUTE_END|[22]|Rows:2701
-04:16:39.166 (1204419543)|METHOD_ENTRY|[23]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:39.166 (1204487019)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:39.166 (1204515009)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:39.166 (1204528259)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:39.166 (1204538658)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:39.166 (1204550562)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:39.166 (1204561199)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:39.166 (1204578598)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:39.166 (1204594589)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:39.166 (1453941059)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:39.166 (1453967249)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:39.166 (1453987656)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:39.166 (1703778945)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:39.166 (1703801943)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:39.166 (1703817276)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:39.166 (1953770101)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:39.166 (1953794722)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:39.166 (1953812559)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:40.203 (2203761487)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:40.203 (2203794843)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:40.203 (2203815280)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:40.203 (2453763690)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:40.203 (2453789157)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:40.203 (2453805870)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:40.203 (2703761194)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:40.203 (2703790640)|METHOD_EXIT|[23]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:40.203 (2703899020)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:40.203 (2703914839)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:40.203 (2703934556)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:40.203 (2703966815)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
+04:16:39.166 (1204419543)|METHOD_ENTRY|[23]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:39.166 (1204487019)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:39.166 (1204515009)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:39.166 (1204528259)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:39.166 (1204538658)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:39.166 (1204550562)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:39.166 (1204561199)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:39.166 (1204578598)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:39.166 (1204594589)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:39.166 (1453941059)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:39.166 (1453967249)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:39.166 (1453987656)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:39.166 (1703778945)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:39.166 (1703801943)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:39.166 (1703817276)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:39.166 (1953770101)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:39.166 (1953794722)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:39.166 (1953812559)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:40.203 (2203761487)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:40.203 (2203794843)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:40.203 (2203815280)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:40.203 (2453763690)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:40.203 (2453789157)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:40.203 (2453805870)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:40.203 (2703761194)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:40.203 (2703790640)|METHOD_EXIT|[23]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:40.203 (2703899020)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:40.203 (2703914839)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:40.203 (2703934556)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:40.203 (2703966815)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
 04:16:40.203 (2705089984)|SOQL_EXECUTE_BEGIN|[26]|Aggregations:0|SELECT Id, Name FROM Account WHERE Id = :tmpVar1 ORDER BY Name ASC NULLS FIRST LIMIT 4000
 04:16:40.203 (2712541971)|SOQL_EXECUTE_EXPLAIN|[26]|Index on Account : [Id], cardinality: 200, sobjectCardinality: 2001, relativeCost 0.333
 04:16:40.203 (2712557651)|SOQL_EXECUTE_END|[26]|Rows:200
-04:16:40.203 (2712913429)|METHOD_EXIT|[232]|01pDC000001ioaq|AccountDomain.onValidate()
-04:16:40.203 (2713628946)|METHOD_ENTRY|[233]|01pDC000001ioaq|AccountDomain.onAfterInsert()
+04:16:40.203 (2712913429)|METHOD_EXIT|[232]|01pDC000001ioaq|fflib.AccountDomain.onValidate()
+04:16:40.203 (2713628946)|METHOD_ENTRY|[233]|01pDC000001ioaq|fflib.AccountDomain.onAfterInsert()
 04:16:40.203 (2714009885)|SOQL_EXECUTE_BEGIN|[59]|Aggregations:0|SELECT Id, Name FROM Account LIMIT 4000
 04:16:40.203 (2742774315)|SOQL_EXECUTE_EXPLAIN|[59]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:40.203 (2742794454)|SOQL_EXECUTE_END|[59]|Rows:2701
-04:16:40.203 (2825785677)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:40.203 (2825815196)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:40.203 (2825836753)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:40.203 (2825861826)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
+04:16:40.203 (2825785677)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:40.203 (2825815196)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:40.203 (2825836753)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:40.203 (2825861826)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
 04:16:40.203 (2841625601)|SOQL_EXECUTE_BEGIN|[76]|Aggregations:0|SELECT Id, Name FROM Account WHERE Id = :tmpVar1 AND Name LIKE '%A' LIMIT 4000
 04:16:40.203 (2960555312)|SOQL_EXECUTE_EXPLAIN|[76]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:40.203 (2960578678)|SOQL_EXECUTE_END|[76]|Rows:2701
-04:16:40.203 (2963385161)|METHOD_EXIT|[233]|01pDC000001ioaq|AccountDomain.onAfterInsert()
-04:16:40.203 (2963409141)|METHOD_EXIT|[440]|01pDC000001iob6|fflib_SObjectDomain.handleAfterInsert()
-04:16:40.203 (2963425830)|METHOD_EXIT|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:40.203 (2963385161)|METHOD_EXIT|[233]|01pDC000001ioaq|fflib.AccountDomain.onAfterInsert()
+04:16:40.203 (2963409141)|METHOD_EXIT|[440]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleAfterInsert()
+04:16:40.203 (2963425830)|METHOD_EXIT|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
 04:16:40.203 (2963434978)|SYSTEM_MODE_EXIT|false
-04:16:40.203 (2963454100)|METHOD_EXIT|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:40.203 (2963454100)|METHOD_EXIT|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:40.963 (2963470501)|CUMULATIVE_LIMIT_USAGE
 04:16:40.963 (2963470501)|LIMIT_USAGE_FOR_NS|(default)|
   Number of SOQL queries: 4 out of 100
@@ -539,11 +539,11 @@ Execute Anonymous: insert accs2;
   String:_sfdcAdditionalCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
-  fflib_SObjectDomain.ErrorFactory:_static_Errors:0
-  fflib_SObjects.ErrorFactory:_static_Errors:0
-  fflib_SObjectDomain.TestFactory:_static_Test:0
-  Map<System.Type,fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
-  Map<System.Type,List<fflib_SObjectDomain>>:_static_TriggerStateByClass:0
+  fflib.fflib_SObjectDomain.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjects.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjectDomain.TestFactory:_static_Test:0
+  Map<System.Type,fflib.fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
+  Map<System.Type,List<fflib.fflib_SObjectDomain>>:_static_TriggerStateByClass:0
   List<Account>:_static_accs:0
   List<Account>:_static_accs2:0
   char[]:digits:0
@@ -554,53 +554,53 @@ Execute Anonymous: insert accs2;
 
 04:16:40.963 (2963470501)|CUMULATIVE_LIMIT_USAGE_END
 
-04:16:40.203 (2963941636)|CODE_UNIT_FINISHED|Account on Account trigger event AfterInsert|__sfdc_trigger/Account
-04:16:40.203 (2998287616)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event BeforeInsert|__sfdc_trigger/Account
-04:16:40.203 (2998590801)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:40.203 (2963941636)|CODE_UNIT_FINISHED|Account on Account trigger event AfterInsert|__sfdc_trigger/fflib/Account
+04:16:40.203 (2998287616)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event BeforeInsert|__sfdc_trigger/fflib/Account
+04:16:40.203 (2998590801)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:40.203 (2999266221)|SYSTEM_MODE_ENTER|false
 04:16:40.203 (2999298124)|METHOD_ENTRY|[379]||System.Test.isRunningTest()
 04:16:40.203 (2999322476)|METHOD_EXIT|[379]||System.Test.isRunningTest()
-04:16:40.203 (2999352568)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:40.203 (2999398964)|METHOD_EXIT|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:40.203 (2999468440)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:40.203 (2999352568)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:40.203 (2999398964)|METHOD_EXIT|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:40.203 (2999468440)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
 04:16:40.203 (2999487871)|METHOD_ENTRY|[409]||System.Type.getName()
 04:16:40.203 (2999508344)|METHOD_EXIT|[409]||System.Type.getName()
 04:16:40.203 (2999562700)|METHOD_ENTRY|[410]||System.Type.forName(String)
 04:16:40.203 (2999657577)|METHOD_EXIT|[410]||System.Type.forName(String)
 04:16:40.203 (2999676217)|METHOD_ENTRY|[411]||System.Type.newInstance()
 04:16:40.203 (2999743765)|METHOD_EXIT|[411]||System.Type.newInstance()
-04:16:40.203 (2999761546)|METHOD_ENTRY|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:40.203 (2999783980)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:40.203 (2999806386)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:40.203 (2999859757)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:40.203 (2999880918)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:40.203 (2999897878)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:40.203 (2999988168)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:40.203 (3000055313)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:40.203 (3000071315)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:40.203 (3000111686)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:40.203 (3000132725)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:40.203 (3000144798)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:40.203 (3000156675)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:40.203 (3000168693)|METHOD_EXIT|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:40.203 (3000195927)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:40.203 (3000382486)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:40.203 (3000397992)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:40.203 (3000418410)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:40.203 (3000429409)|METHOD_ENTRY|[434]|01pDC000001iob6|fflib_SObjectDomain.handleBeforeInsert()
-04:16:40.203 (3000444367)|METHOD_ENTRY|[202]|01pDC000001ioaq|AccountDomain.onApplyDefaults()
-04:16:40.203 (3000464401)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:40.203 (3000475936)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:40.203 (3000492779)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:40.203 (3000511160)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:40.203 (3002224811)|METHOD_EXIT|[202]|01pDC000001ioaq|AccountDomain.onApplyDefaults()
-04:16:40.203 (3002244143)|METHOD_ENTRY|[203]|01pDC000001ioaq|AccountDomain.onBeforeInsert()
+04:16:40.203 (2999761546)|METHOD_ENTRY|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:40.203 (2999783980)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:40.203 (2999806386)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:40.203 (2999859757)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:40.203 (2999880918)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:40.203 (2999897878)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:40.203 (2999988168)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:40.203 (3000055313)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:40.203 (3000071315)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:40.203 (3000111686)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:40.203 (3000132725)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:40.203 (3000144798)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:40.203 (3000156675)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:40.203 (3000168693)|METHOD_EXIT|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:40.203 (3000195927)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:40.203 (3000382486)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:40.203 (3000397992)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:40.203 (3000418410)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:40.203 (3000429409)|METHOD_ENTRY|[434]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleBeforeInsert()
+04:16:40.203 (3000444367)|METHOD_ENTRY|[202]|01pDC000001ioaq|fflib.AccountDomain.onApplyDefaults()
+04:16:40.203 (3000464401)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:40.203 (3000475936)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:40.203 (3000492779)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:40.203 (3000511160)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:40.203 (3002224811)|METHOD_EXIT|[202]|01pDC000001ioaq|fflib.AccountDomain.onApplyDefaults()
+04:16:40.203 (3002244143)|METHOD_ENTRY|[203]|01pDC000001ioaq|fflib.AccountDomain.onBeforeInsert()
 04:16:40.203 (3002279147)|USER_DEBUG|[50]|ERROR|No before insert logic
-04:16:40.203 (3002293370)|METHOD_EXIT|[203]|01pDC000001ioaq|AccountDomain.onBeforeInsert()
-04:16:40.203 (3002302895)|METHOD_EXIT|[434]|01pDC000001iob6|fflib_SObjectDomain.handleBeforeInsert()
-04:16:40.203 (3002317714)|METHOD_EXIT|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:40.203 (3002293370)|METHOD_EXIT|[203]|01pDC000001ioaq|fflib.AccountDomain.onBeforeInsert()
+04:16:40.203 (3002302895)|METHOD_EXIT|[434]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleBeforeInsert()
+04:16:40.203 (3002317714)|METHOD_EXIT|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
 04:16:40.203 (3002326716)|SYSTEM_MODE_EXIT|false
-04:16:40.203 (3002337693)|METHOD_EXIT|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:40.203 (3002337693)|METHOD_EXIT|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:41.2 (3002348326)|CUMULATIVE_LIMIT_USAGE
 04:16:41.2 (3002348326)|LIMIT_USAGE_FOR_NS|(default)|
   Number of SOQL queries: 4 out of 100
@@ -661,11 +661,11 @@ Execute Anonymous: insert accs2;
   String:_sfdcAdditionalCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
-  fflib_SObjectDomain.ErrorFactory:_static_Errors:0
-  fflib_SObjects.ErrorFactory:_static_Errors:0
-  fflib_SObjectDomain.TestFactory:_static_Test:0
-  Map<System.Type,fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
-  Map<System.Type,List<fflib_SObjectDomain>>:_static_TriggerStateByClass:0
+  fflib.fflib_SObjectDomain.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjects.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjectDomain.TestFactory:_static_Test:0
+  Map<System.Type,fflib.fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
+  Map<System.Type,List<fflib.fflib_SObjectDomain>>:_static_TriggerStateByClass:0
   List<Account>:_static_accs:0
   List<Account>:_static_accs2:0
   char[]:digits:0
@@ -676,7 +676,7 @@ Execute Anonymous: insert accs2;
 
 04:16:41.2 (3002348326)|CUMULATIVE_LIMIT_USAGE_END
 
-04:16:40.203 (3002664991)|CODE_UNIT_FINISHED|Account on Account trigger event BeforeInsert|__sfdc_trigger/Account
+04:16:40.203 (3002664991)|CODE_UNIT_FINISHED|Account on Account trigger event BeforeInsert|__sfdc_trigger/fflib/Account
 04:16:40.203 (3006144811)|CODE_UNIT_STARTED|[EXTERNAL]|DuplicateDetector
 04:16:40.203 (3006164255)|DUPLICATE_DETECTION_BEGIN
 04:16:40.203 (3006237757)|DUPLICATE_DETECTION_RULE_INVOCATION|DuplicateRuleId:0BmDC000000PVhq|DuplicateRuleName:Standard Account Duplicate Rule|DmlType:INSERT
@@ -733,99 +733,99 @@ Execute Anonymous: insert accs2;
 04:16:40.203 (3044946889)|DUPLICATE_DETECTION_MATCH_INVOCATION_SUMMARY|EntityType:Account|NumRecordsToBeSaved:50|NumRecordsToBeSavedWithDuplicates:0|NumDuplicateRecordsFound:0
 04:16:40.203 (3045173829)|DUPLICATE_DETECTION_END
 04:16:40.203 (3045184434)|CODE_UNIT_FINISHED|DuplicateDetector
-04:16:41.272 (3272778737)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event AfterInsert|__sfdc_trigger/Account
-04:16:41.272 (3273353862)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:41.272 (3272778737)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event AfterInsert|__sfdc_trigger/fflib/Account
+04:16:41.272 (3273353862)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:41.272 (3273935326)|SYSTEM_MODE_ENTER|false
 04:16:41.272 (3273963602)|METHOD_ENTRY|[379]||System.Test.isRunningTest()
 04:16:41.272 (3273987718)|METHOD_EXIT|[379]||System.Test.isRunningTest()
-04:16:41.272 (3274013536)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:41.272 (3274057244)|METHOD_EXIT|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:41.272 (3274112613)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
-04:16:41.272 (3274148221)|METHOD_ENTRY|[405]|01pDC000001iob6|fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
-04:16:41.272 (3274271961)|METHOD_EXIT|[405]|01pDC000001iob6|fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
+04:16:41.272 (3274013536)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:41.272 (3274057244)|METHOD_EXIT|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:41.272 (3274112613)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:41.272 (3274148221)|METHOD_ENTRY|[405]|01pDC000001iob6|fflib.fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
+04:16:41.272 (3274271961)|METHOD_EXIT|[405]|01pDC000001iob6|fflib.fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
 04:16:41.272 (3274287476)|METHOD_ENTRY|[409]||System.Type.getName()
 04:16:41.272 (3274299674)|METHOD_EXIT|[409]||System.Type.getName()
 04:16:41.272 (3274328374)|METHOD_ENTRY|[410]||System.Type.forName(String)
 04:16:41.272 (3274451217)|METHOD_EXIT|[410]||System.Type.forName(String)
 04:16:41.272 (3274469686)|METHOD_ENTRY|[411]||System.Type.newInstance()
 04:16:41.272 (3274555955)|METHOD_EXIT|[411]||System.Type.newInstance()
-04:16:41.272 (3274576731)|METHOD_ENTRY|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:41.272 (3274607412)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:41.272 (3274630597)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:41.272 (3274684405)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:41.272 (3274707238)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:41.272 (3274723429)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:41.272 (3274786406)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:41.272 (3274839420)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:41.272 (3274854521)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:41.272 (3274895822)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:41.272 (3274919564)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:41.272 (3274932084)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:41.272 (3274943563)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:41.272 (3274955074)|METHOD_EXIT|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:41.272 (3274979121)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:41.272 (3275166681)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:41.272 (3275180192)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:41.272 (3275202401)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:41.272 (3275215261)|METHOD_ENTRY|[440]|01pDC000001iob6|fflib_SObjectDomain.handleAfterInsert()
-04:16:41.272 (3275257515)|METHOD_ENTRY|[232]|01pDC000001ioaq|AccountDomain.onValidate()
-04:16:41.272 (3275278388)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:41.272 (3275289374)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:41.272 (3275305459)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:41.272 (3275324945)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
+04:16:41.272 (3274576731)|METHOD_ENTRY|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:41.272 (3274607412)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:41.272 (3274630597)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:41.272 (3274684405)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:41.272 (3274707238)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:41.272 (3274723429)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:41.272 (3274786406)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:41.272 (3274839420)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:41.272 (3274854521)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:41.272 (3274895822)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:41.272 (3274919564)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:41.272 (3274932084)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:41.272 (3274943563)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:41.272 (3274955074)|METHOD_EXIT|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:41.272 (3274979121)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:41.272 (3275166681)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:41.272 (3275180192)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:41.272 (3275202401)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:41.272 (3275215261)|METHOD_ENTRY|[440]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleAfterInsert()
+04:16:41.272 (3275257515)|METHOD_ENTRY|[232]|01pDC000001ioaq|fflib.AccountDomain.onValidate()
+04:16:41.272 (3275278388)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:41.272 (3275289374)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:41.272 (3275305459)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:41.272 (3275324945)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
 04:16:41.272 (3277260205)|SOQL_EXECUTE_BEGIN|[22]|Aggregations:0|SELECT Id, Name FROM Account ORDER BY Name ASC NULLS FIRST LIMIT 4000
 04:16:41.272 (3304071602)|SOQL_EXECUTE_EXPLAIN|[22]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:41.272 (3304092554)|SOQL_EXECUTE_END|[22]|Rows:2751
-04:16:41.272 (3307069935)|METHOD_ENTRY|[23]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:41.272 (3307112006)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:41.272 (3307127504)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:41.272 (3307138386)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:41.272 (3307158482)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:41.272 (3307170746)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:41.272 (3307181109)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:41.272 (3307198992)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:41.272 (3307210710)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:41.272 (3556793073)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:41.272 (3556823393)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:41.272 (3557491530)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:41.272 (3806755523)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:41.272 (3806791559)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:41.272 (3806808176)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:41.272 (4056771891)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:41.272 (4056805291)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:41.272 (4056821627)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:42.306 (4306778626)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:42.306 (4306820318)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:42.306 (4306844964)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:42.306 (4556746775)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:42.306 (4556772178)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:42.306 (4556788610)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:42.306 (4806748466)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:42.306 (4806772373)|METHOD_EXIT|[23]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:42.306 (4806839497)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:42.306 (4806857505)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:42.306 (4806876295)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:42.306 (4806900221)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
+04:16:41.272 (3307069935)|METHOD_ENTRY|[23]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:41.272 (3307112006)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:41.272 (3307127504)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:41.272 (3307138386)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:41.272 (3307158482)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:41.272 (3307170746)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:41.272 (3307181109)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:41.272 (3307198992)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:41.272 (3307210710)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:41.272 (3556793073)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:41.272 (3556823393)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:41.272 (3557491530)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:41.272 (3806755523)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:41.272 (3806791559)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:41.272 (3806808176)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:41.272 (4056771891)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:41.272 (4056805291)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:41.272 (4056821627)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:42.306 (4306778626)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:42.306 (4306820318)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:42.306 (4306844964)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:42.306 (4556746775)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:42.306 (4556772178)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:42.306 (4556788610)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:42.306 (4806748466)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:42.306 (4806772373)|METHOD_EXIT|[23]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:42.306 (4806839497)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:42.306 (4806857505)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:42.306 (4806876295)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:42.306 (4806900221)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
 04:16:42.306 (4807617658)|SOQL_EXECUTE_BEGIN|[26]|Aggregations:0|SELECT Id, Name FROM Account WHERE Id = :tmpVar1 ORDER BY Name ASC NULLS FIRST LIMIT 4000
 04:16:42.306 (4814264694)|SOQL_EXECUTE_EXPLAIN|[26]|Index on Account : [Id], cardinality: 50, sobjectCardinality: 2001, relativeCost 0.083
 04:16:42.306 (4814279623)|SOQL_EXECUTE_END|[26]|Rows:50
-04:16:42.306 (4814472239)|METHOD_EXIT|[232]|01pDC000001ioaq|AccountDomain.onValidate()
-04:16:42.306 (4814496623)|METHOD_ENTRY|[233]|01pDC000001ioaq|AccountDomain.onAfterInsert()
+04:16:42.306 (4814472239)|METHOD_EXIT|[232]|01pDC000001ioaq|fflib.AccountDomain.onValidate()
+04:16:42.306 (4814496623)|METHOD_ENTRY|[233]|01pDC000001ioaq|fflib.AccountDomain.onAfterInsert()
 04:16:42.306 (4814781861)|SOQL_EXECUTE_BEGIN|[59]|Aggregations:0|SELECT Id, Name FROM Account LIMIT 4000
 04:16:42.306 (4838562495)|SOQL_EXECUTE_EXPLAIN|[59]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:42.306 (4838579291)|SOQL_EXECUTE_END|[59]|Rows:2751
-04:16:42.306 (4927434884)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:42.306 (4927464586)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:42.306 (4927485825)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:42.306 (4927511524)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
+04:16:42.306 (4927434884)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:42.306 (4927464586)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:42.306 (4927485825)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:42.306 (4927511524)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
 04:16:42.306 (4941772842)|SOQL_EXECUTE_BEGIN|[76]|Aggregations:0|SELECT Id, Name FROM Account WHERE Id = :tmpVar1 AND Name LIKE '%A' LIMIT 4000
 04:16:42.306 (4989979359)|SOQL_EXECUTE_EXPLAIN|[76]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:42.306 (4990007124)|SOQL_EXECUTE_END|[76]|Rows:2751
-04:16:42.306 (4993095213)|METHOD_EXIT|[233]|01pDC000001ioaq|AccountDomain.onAfterInsert()
-04:16:42.306 (4993124369)|METHOD_EXIT|[440]|01pDC000001iob6|fflib_SObjectDomain.handleAfterInsert()
-04:16:42.306 (4993138972)|METHOD_EXIT|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:42.306 (4993095213)|METHOD_EXIT|[233]|01pDC000001ioaq|fflib.AccountDomain.onAfterInsert()
+04:16:42.306 (4993124369)|METHOD_EXIT|[440]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleAfterInsert()
+04:16:42.306 (4993138972)|METHOD_EXIT|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
 04:16:42.306 (4993149690)|SYSTEM_MODE_EXIT|false
-04:16:42.306 (4993163004)|METHOD_EXIT|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:42.306 (4993163004)|METHOD_EXIT|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:42.993 (4993179130)|CUMULATIVE_LIMIT_USAGE
 04:16:42.993 (4993179130)|LIMIT_USAGE_FOR_NS|(default)|
   Number of SOQL queries: 8 out of 100
@@ -886,11 +886,11 @@ Execute Anonymous: insert accs2;
   String:_sfdcAdditionalCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
-  fflib_SObjectDomain.ErrorFactory:_static_Errors:0
-  fflib_SObjects.ErrorFactory:_static_Errors:0
-  fflib_SObjectDomain.TestFactory:_static_Test:0
-  Map<System.Type,fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
-  Map<System.Type,List<fflib_SObjectDomain>>:_static_TriggerStateByClass:0
+  fflib.fflib_SObjectDomain.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjects.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjectDomain.TestFactory:_static_Test:0
+  Map<System.Type,fflib.fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
+  Map<System.Type,List<fflib.fflib_SObjectDomain>>:_static_TriggerStateByClass:0
   List<Account>:_static_accs:0
   List<Account>:_static_accs2:0
   char[]:digits:0
@@ -901,55 +901,55 @@ Execute Anonymous: insert accs2;
 
 04:16:42.993 (4993179130)|CUMULATIVE_LIMIT_USAGE_END
 
-04:16:42.306 (4993535678)|CODE_UNIT_FINISHED|Account on Account trigger event AfterInsert|__sfdc_trigger/Account
+04:16:42.306 (4993535678)|CODE_UNIT_FINISHED|Account on Account trigger event AfterInsert|__sfdc_trigger/fflib/Account
 04:16:42.306 (4998142451)|DML_END|[10]
 04:16:42.306 (4998529349)|DML_BEGIN|[11]|Op:Insert|Type:Account|Rows:250
-04:16:42.306 (5054541874)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event BeforeInsert|__sfdc_trigger/Account
-04:16:42.306 (5055003762)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:42.306 (5054541874)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event BeforeInsert|__sfdc_trigger/fflib/Account
+04:16:42.306 (5055003762)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:42.306 (5055526156)|SYSTEM_MODE_ENTER|false
 04:16:42.306 (5055556284)|METHOD_ENTRY|[379]||System.Test.isRunningTest()
 04:16:42.306 (5055580209)|METHOD_EXIT|[379]||System.Test.isRunningTest()
-04:16:42.306 (5055611260)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:42.306 (5055657518)|METHOD_EXIT|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:42.306 (5055724060)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:42.306 (5055611260)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:42.306 (5055657518)|METHOD_EXIT|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:42.306 (5055724060)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
 04:16:42.306 (5055743954)|METHOD_ENTRY|[409]||System.Type.getName()
 04:16:42.306 (5055764635)|METHOD_EXIT|[409]||System.Type.getName()
 04:16:42.306 (5055806596)|METHOD_ENTRY|[410]||System.Type.forName(String)
 04:16:42.306 (5055891350)|METHOD_EXIT|[410]||System.Type.forName(String)
 04:16:42.306 (5055901151)|METHOD_ENTRY|[411]||System.Type.newInstance()
 04:16:42.306 (5055967231)|METHOD_EXIT|[411]||System.Type.newInstance()
-04:16:42.306 (5055985928)|METHOD_ENTRY|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:42.306 (5056007102)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:42.306 (5056029100)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:42.306 (5056090165)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:42.306 (5056111400)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:42.306 (5056127544)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:42.306 (5056189368)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:42.306 (5056251926)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:42.306 (5056266645)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:42.306 (5056307210)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:42.306 (5056329163)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:42.306 (5056342946)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:42.306 (5056354967)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:42.306 (5056365402)|METHOD_EXIT|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:42.306 (5056395125)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:42.306 (5056625724)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:42.306 (5056641340)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:42.306 (5056661231)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:42.306 (5056672658)|METHOD_ENTRY|[434]|01pDC000001iob6|fflib_SObjectDomain.handleBeforeInsert()
-04:16:42.306 (5056688132)|METHOD_ENTRY|[202]|01pDC000001ioaq|AccountDomain.onApplyDefaults()
-04:16:42.306 (5056708556)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:42.306 (5056720564)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:42.306 (5056737497)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:42.306 (5056757047)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:42.306 (5063054673)|METHOD_EXIT|[202]|01pDC000001ioaq|AccountDomain.onApplyDefaults()
-04:16:42.306 (5063075179)|METHOD_ENTRY|[203]|01pDC000001ioaq|AccountDomain.onBeforeInsert()
+04:16:42.306 (5055985928)|METHOD_ENTRY|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:42.306 (5056007102)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:42.306 (5056029100)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:42.306 (5056090165)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:42.306 (5056111400)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:42.306 (5056127544)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:42.306 (5056189368)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:42.306 (5056251926)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:42.306 (5056266645)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:42.306 (5056307210)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:42.306 (5056329163)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:42.306 (5056342946)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:42.306 (5056354967)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:42.306 (5056365402)|METHOD_EXIT|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:42.306 (5056395125)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:42.306 (5056625724)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:42.306 (5056641340)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:42.306 (5056661231)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:42.306 (5056672658)|METHOD_ENTRY|[434]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleBeforeInsert()
+04:16:42.306 (5056688132)|METHOD_ENTRY|[202]|01pDC000001ioaq|fflib.AccountDomain.onApplyDefaults()
+04:16:42.306 (5056708556)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:42.306 (5056720564)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:42.306 (5056737497)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:42.306 (5056757047)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:42.306 (5063054673)|METHOD_EXIT|[202]|01pDC000001ioaq|fflib.AccountDomain.onApplyDefaults()
+04:16:42.306 (5063075179)|METHOD_ENTRY|[203]|01pDC000001ioaq|fflib.AccountDomain.onBeforeInsert()
 04:16:42.306 (5063113218)|USER_DEBUG|[50]|ERROR|No before insert logic
-04:16:42.306 (5063126940)|METHOD_EXIT|[203]|01pDC000001ioaq|AccountDomain.onBeforeInsert()
-04:16:42.306 (5063136622)|METHOD_EXIT|[434]|01pDC000001iob6|fflib_SObjectDomain.handleBeforeInsert()
-04:16:42.306 (5063151576)|METHOD_EXIT|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:42.306 (5063126940)|METHOD_EXIT|[203]|01pDC000001ioaq|fflib.AccountDomain.onBeforeInsert()
+04:16:42.306 (5063136622)|METHOD_EXIT|[434]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleBeforeInsert()
+04:16:42.306 (5063151576)|METHOD_EXIT|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
 04:16:42.306 (5063161228)|SYSTEM_MODE_EXIT|false
-04:16:42.306 (5063187634)|METHOD_EXIT|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:42.306 (5063187634)|METHOD_EXIT|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:43.63 (5063207056)|CUMULATIVE_LIMIT_USAGE
 04:16:43.63 (5063207056)|LIMIT_USAGE_FOR_NS|(default)|
   Number of SOQL queries: 8 out of 100
@@ -1010,11 +1010,11 @@ Execute Anonymous: insert accs2;
   String:_sfdcAdditionalCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
-  fflib_SObjectDomain.ErrorFactory:_static_Errors:0
-  fflib_SObjects.ErrorFactory:_static_Errors:0
-  fflib_SObjectDomain.TestFactory:_static_Test:0
-  Map<System.Type,fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
-  Map<System.Type,List<fflib_SObjectDomain>>:_static_TriggerStateByClass:0
+  fflib.fflib_SObjectDomain.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjects.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjectDomain.TestFactory:_static_Test:0
+  Map<System.Type,fflib.fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
+  Map<System.Type,List<fflib.fflib_SObjectDomain>>:_static_TriggerStateByClass:0
   List<Account>:_static_accs:0
   List<Account>:_static_accs2:0
   char[]:digits:0
@@ -1025,7 +1025,7 @@ Execute Anonymous: insert accs2;
 
 04:16:43.63 (5063207056)|CUMULATIVE_LIMIT_USAGE_END
 
-04:16:42.306 (5063614285)|CODE_UNIT_FINISHED|Account on Account trigger event BeforeInsert|__sfdc_trigger/Account
+04:16:42.306 (5063614285)|CODE_UNIT_FINISHED|Account on Account trigger event BeforeInsert|__sfdc_trigger/fflib/Account
 04:16:42.306 (5077234720)|CODE_UNIT_STARTED|[EXTERNAL]|DuplicateDetector
 04:16:42.306 (5077262508)|DUPLICATE_DETECTION_BEGIN
 04:16:42.306 (5077343701)|DUPLICATE_DETECTION_RULE_INVOCATION|DuplicateRuleId:0BmDC000000PVhq|DuplicateRuleName:Standard Account Duplicate Rule|DmlType:INSERT
@@ -1232,99 +1232,99 @@ Execute Anonymous: insert accs2;
 04:16:42.306 (5169583820)|DUPLICATE_DETECTION_MATCH_INVOCATION_SUMMARY|EntityType:Account|NumRecordsToBeSaved:200|NumRecordsToBeSavedWithDuplicates:0|NumDuplicateRecordsFound:0
 04:16:42.306 (5170090631)|DUPLICATE_DETECTION_END
 04:16:42.306 (5170105294)|CODE_UNIT_FINISHED|DuplicateDetector
-04:16:44.274 (6274163829)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event AfterInsert|__sfdc_trigger/Account
-04:16:44.274 (6275532493)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:44.274 (6274163829)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event AfterInsert|__sfdc_trigger/fflib/Account
+04:16:44.274 (6275532493)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:44.274 (6276108230)|SYSTEM_MODE_ENTER|false
 04:16:44.274 (6276138118)|METHOD_ENTRY|[379]||System.Test.isRunningTest()
 04:16:44.274 (6276164690)|METHOD_EXIT|[379]||System.Test.isRunningTest()
-04:16:44.274 (6276191115)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:44.274 (6276240250)|METHOD_EXIT|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:44.274 (6276309077)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
-04:16:44.274 (6276328328)|METHOD_ENTRY|[405]|01pDC000001iob6|fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
-04:16:44.274 (6276434672)|METHOD_EXIT|[405]|01pDC000001iob6|fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
+04:16:44.274 (6276191115)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:44.274 (6276240250)|METHOD_EXIT|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:44.274 (6276309077)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:44.274 (6276328328)|METHOD_ENTRY|[405]|01pDC000001iob6|fflib.fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
+04:16:44.274 (6276434672)|METHOD_EXIT|[405]|01pDC000001iob6|fflib.fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
 04:16:44.274 (6276447305)|METHOD_ENTRY|[409]||System.Type.getName()
 04:16:44.274 (6276456917)|METHOD_EXIT|[409]||System.Type.getName()
 04:16:44.274 (6276487420)|METHOD_ENTRY|[410]||System.Type.forName(String)
 04:16:44.274 (6276570960)|METHOD_EXIT|[410]||System.Type.forName(String)
 04:16:44.274 (6276578545)|METHOD_ENTRY|[411]||System.Type.newInstance()
 04:16:44.274 (6276657123)|METHOD_EXIT|[411]||System.Type.newInstance()
-04:16:44.274 (6276675233)|METHOD_ENTRY|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:44.274 (6276696362)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:44.274 (6276717151)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:44.274 (6276778704)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:44.274 (6276849107)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:44.274 (6276868931)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:44.274 (6276933729)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:44.274 (6276995600)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:44.274 (6277010160)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:44.274 (6277055106)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:44.274 (6277078632)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:44.274 (6277091405)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:44.274 (6277102578)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:44.274 (6277113459)|METHOD_EXIT|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:44.274 (6277139037)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:44.274 (6277344895)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:44.274 (6277368821)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:44.274 (6277387599)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:44.274 (6277404031)|METHOD_ENTRY|[440]|01pDC000001iob6|fflib_SObjectDomain.handleAfterInsert()
-04:16:44.274 (6277444513)|METHOD_ENTRY|[232]|01pDC000001ioaq|AccountDomain.onValidate()
-04:16:44.274 (6277463325)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:44.274 (6277473112)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:44.274 (6277487743)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:44.274 (6277505467)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
+04:16:44.274 (6276675233)|METHOD_ENTRY|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:44.274 (6276696362)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:44.274 (6276717151)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:44.274 (6276778704)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:44.274 (6276849107)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:44.274 (6276868931)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:44.274 (6276933729)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:44.274 (6276995600)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:44.274 (6277010160)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:44.274 (6277055106)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:44.274 (6277078632)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:44.274 (6277091405)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:44.274 (6277102578)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:44.274 (6277113459)|METHOD_EXIT|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:44.274 (6277139037)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:44.274 (6277344895)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:44.274 (6277368821)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:44.274 (6277387599)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:44.274 (6277404031)|METHOD_ENTRY|[440]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleAfterInsert()
+04:16:44.274 (6277444513)|METHOD_ENTRY|[232]|01pDC000001ioaq|fflib.AccountDomain.onValidate()
+04:16:44.274 (6277463325)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:44.274 (6277473112)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:44.274 (6277487743)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:44.274 (6277505467)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
 04:16:44.274 (6283786934)|SOQL_EXECUTE_BEGIN|[22]|Aggregations:0|SELECT Id, Name FROM Account ORDER BY Name ASC NULLS FIRST LIMIT 4000
 04:16:44.274 (6312553343)|SOQL_EXECUTE_EXPLAIN|[22]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:44.274 (6312572319)|SOQL_EXECUTE_END|[22]|Rows:2951
-04:16:44.274 (6315593452)|METHOD_ENTRY|[23]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:44.274 (6315650023)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:44.274 (6315666672)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:44.274 (6315677714)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:44.274 (6315690530)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:44.274 (6315701237)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:44.274 (6315713204)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:44.274 (6315730097)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:44.274 (6315741318)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:44.274 (6565772159)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:44.274 (6565795366)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:44.274 (6565812154)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:44.274 (6815767009)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:44.274 (6815799191)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:44.274 (6815823275)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:44.274 (7065749606)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:44.274 (7065773371)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:44.274 (7065788672)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:45.323 (7323754383)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:45.323 (7323818945)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:45.323 (7323856270)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:45.323 (7573782306)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:45.323 (7573822101)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:45.323 (7573840349)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:45.323 (7823761138)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:45.323 (7823785672)|METHOD_EXIT|[23]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:45.323 (7823857067)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:45.323 (7823870081)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:45.323 (7823888747)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:45.323 (7823928901)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
+04:16:44.274 (6315593452)|METHOD_ENTRY|[23]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:44.274 (6315650023)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:44.274 (6315666672)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:44.274 (6315677714)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:44.274 (6315690530)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:44.274 (6315701237)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:44.274 (6315713204)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:44.274 (6315730097)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:44.274 (6315741318)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:44.274 (6565772159)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:44.274 (6565795366)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:44.274 (6565812154)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:44.274 (6815767009)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:44.274 (6815799191)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:44.274 (6815823275)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:44.274 (7065749606)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:44.274 (7065773371)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:44.274 (7065788672)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:45.323 (7323754383)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:45.323 (7323818945)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:45.323 (7323856270)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:45.323 (7573782306)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:45.323 (7573822101)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:45.323 (7573840349)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:45.323 (7823761138)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:45.323 (7823785672)|METHOD_EXIT|[23]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:45.323 (7823857067)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:45.323 (7823870081)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:45.323 (7823888747)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:45.323 (7823928901)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
 04:16:45.323 (7825223146)|SOQL_EXECUTE_BEGIN|[26]|Aggregations:0|SELECT Id, Name FROM Account WHERE Id = :tmpVar1 ORDER BY Name ASC NULLS FIRST LIMIT 4000
 04:16:45.323 (7833617363)|SOQL_EXECUTE_EXPLAIN|[26]|Index on Account : [Id], cardinality: 200, sobjectCardinality: 2001, relativeCost 0.333
 04:16:45.323 (7833645486)|SOQL_EXECUTE_END|[26]|Rows:200
-04:16:45.323 (7834109884)|METHOD_EXIT|[232]|01pDC000001ioaq|AccountDomain.onValidate()
-04:16:45.323 (7834142050)|METHOD_ENTRY|[233]|01pDC000001ioaq|AccountDomain.onAfterInsert()
+04:16:45.323 (7834109884)|METHOD_EXIT|[232]|01pDC000001ioaq|fflib.AccountDomain.onValidate()
+04:16:45.323 (7834142050)|METHOD_ENTRY|[233]|01pDC000001ioaq|fflib.AccountDomain.onAfterInsert()
 04:16:45.323 (7834449759)|SOQL_EXECUTE_BEGIN|[59]|Aggregations:0|SELECT Id, Name FROM Account LIMIT 4000
 04:16:45.323 (7860519952)|SOQL_EXECUTE_EXPLAIN|[59]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:45.323 (7860538841)|SOQL_EXECUTE_END|[59]|Rows:2951
-04:16:45.323 (7938015782)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:45.323 (7938060693)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:45.323 (7938087613)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:45.323 (7938120756)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
+04:16:45.323 (7938015782)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:45.323 (7938060693)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:45.323 (7938087613)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:45.323 (7938120756)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
 04:16:45.323 (7951721001)|SOQL_EXECUTE_BEGIN|[76]|Aggregations:0|SELECT Id, Name FROM Account WHERE Id = :tmpVar1 AND Name LIKE '%A' LIMIT 4000
 04:16:45.323 (7984859273)|SOQL_EXECUTE_EXPLAIN|[76]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:45.323 (7984882273)|SOQL_EXECUTE_END|[76]|Rows:2951
-04:16:45.323 (7988522332)|METHOD_EXIT|[233]|01pDC000001ioaq|AccountDomain.onAfterInsert()
-04:16:45.323 (7988551498)|METHOD_EXIT|[440]|01pDC000001iob6|fflib_SObjectDomain.handleAfterInsert()
-04:16:45.323 (7988568806)|METHOD_EXIT|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:45.323 (7988522332)|METHOD_EXIT|[233]|01pDC000001ioaq|fflib.AccountDomain.onAfterInsert()
+04:16:45.323 (7988551498)|METHOD_EXIT|[440]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleAfterInsert()
+04:16:45.323 (7988568806)|METHOD_EXIT|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
 04:16:45.323 (7988583533)|SYSTEM_MODE_EXIT|false
-04:16:45.323 (7988607714)|METHOD_EXIT|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:45.323 (7988607714)|METHOD_EXIT|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:45.988 (7988640834)|CUMULATIVE_LIMIT_USAGE
 04:16:45.988 (7988640834)|LIMIT_USAGE_FOR_NS|(default)|
   Number of SOQL queries: 12 out of 100
@@ -1385,11 +1385,11 @@ Execute Anonymous: insert accs2;
   String:_sfdcAdditionalCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
-  fflib_SObjectDomain.ErrorFactory:_static_Errors:0
-  fflib_SObjects.ErrorFactory:_static_Errors:0
-  fflib_SObjectDomain.TestFactory:_static_Test:0
-  Map<System.Type,fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
-  Map<System.Type,List<fflib_SObjectDomain>>:_static_TriggerStateByClass:0
+  fflib.fflib_SObjectDomain.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjects.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjectDomain.TestFactory:_static_Test:0
+  Map<System.Type,fflib.fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
+  Map<System.Type,List<fflib.fflib_SObjectDomain>>:_static_TriggerStateByClass:0
   List<Account>:_static_accs:0
   List<Account>:_static_accs2:0
   char[]:digits:0
@@ -1400,53 +1400,53 @@ Execute Anonymous: insert accs2;
 
 04:16:45.988 (7988640834)|CUMULATIVE_LIMIT_USAGE_END
 
-04:16:45.323 (7989357575)|CODE_UNIT_FINISHED|Account on Account trigger event AfterInsert|__sfdc_trigger/Account
-04:16:45.323 (8020099247)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event BeforeInsert|__sfdc_trigger/Account
-04:16:45.323 (8020511913)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:45.323 (7989357575)|CODE_UNIT_FINISHED|Account on Account trigger event AfterInsert|__sfdc_trigger/fflib/Account
+04:16:45.323 (8020099247)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event BeforeInsert|__sfdc_trigger/fflib/Account
+04:16:45.323 (8020511913)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:45.323 (8021009976)|SYSTEM_MODE_ENTER|false
 04:16:45.323 (8021048750)|METHOD_ENTRY|[379]||System.Test.isRunningTest()
 04:16:45.323 (8021081239)|METHOD_EXIT|[379]||System.Test.isRunningTest()
-04:16:45.323 (8021108805)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:45.323 (8021160046)|METHOD_EXIT|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:45.323 (8021243299)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:45.323 (8021108805)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:45.323 (8021160046)|METHOD_EXIT|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:45.323 (8021243299)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
 04:16:45.323 (8021266077)|METHOD_ENTRY|[409]||System.Type.getName()
 04:16:45.323 (8021293739)|METHOD_EXIT|[409]||System.Type.getName()
 04:16:45.323 (8021338261)|METHOD_ENTRY|[410]||System.Type.forName(String)
 04:16:45.323 (8021450928)|METHOD_EXIT|[410]||System.Type.forName(String)
 04:16:45.323 (8021461994)|METHOD_ENTRY|[411]||System.Type.newInstance()
 04:16:45.323 (8021537872)|METHOD_EXIT|[411]||System.Type.newInstance()
-04:16:45.323 (8021555272)|METHOD_ENTRY|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:45.323 (8021578193)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:45.323 (8021610979)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:45.323 (8021696203)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:45.323 (8021717558)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:45.323 (8021732842)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:45.323 (8021804754)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:45.323 (8021891440)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:45.323 (8021905970)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:45.323 (8021946642)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:45.323 (8021967129)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:45.323 (8021981274)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:45.323 (8021991306)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:45.323 (8022002926)|METHOD_EXIT|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:45.323 (8022028848)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:45.323 (8022245640)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:45.323 (8022258256)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:45.323 (8022278910)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:45.323 (8022290599)|METHOD_ENTRY|[434]|01pDC000001iob6|fflib_SObjectDomain.handleBeforeInsert()
-04:16:45.323 (8022311038)|METHOD_ENTRY|[202]|01pDC000001ioaq|AccountDomain.onApplyDefaults()
-04:16:45.323 (8022338920)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:45.323 (8022356976)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:45.323 (8022379962)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:45.323 (8022417631)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:45.323 (8024798146)|METHOD_EXIT|[202]|01pDC000001ioaq|AccountDomain.onApplyDefaults()
-04:16:45.323 (8024824878)|METHOD_ENTRY|[203]|01pDC000001ioaq|AccountDomain.onBeforeInsert()
+04:16:45.323 (8021555272)|METHOD_ENTRY|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:45.323 (8021578193)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:45.323 (8021610979)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:45.323 (8021696203)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:45.323 (8021717558)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:45.323 (8021732842)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:45.323 (8021804754)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:45.323 (8021891440)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:45.323 (8021905970)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:45.323 (8021946642)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:45.323 (8021967129)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:45.323 (8021981274)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:45.323 (8021991306)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:45.323 (8022002926)|METHOD_EXIT|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:45.323 (8022028848)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:45.323 (8022245640)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:45.323 (8022258256)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:45.323 (8022278910)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:45.323 (8022290599)|METHOD_ENTRY|[434]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleBeforeInsert()
+04:16:45.323 (8022311038)|METHOD_ENTRY|[202]|01pDC000001ioaq|fflib.AccountDomain.onApplyDefaults()
+04:16:45.323 (8022338920)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:45.323 (8022356976)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:45.323 (8022379962)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:45.323 (8022417631)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:45.323 (8024798146)|METHOD_EXIT|[202]|01pDC000001ioaq|fflib.AccountDomain.onApplyDefaults()
+04:16:45.323 (8024824878)|METHOD_ENTRY|[203]|01pDC000001ioaq|fflib.AccountDomain.onBeforeInsert()
 04:16:45.323 (8024890362)|USER_DEBUG|[50]|ERROR|No before insert logic
-04:16:45.323 (8024914224)|METHOD_EXIT|[203]|01pDC000001ioaq|AccountDomain.onBeforeInsert()
-04:16:45.323 (8024928658)|METHOD_EXIT|[434]|01pDC000001iob6|fflib_SObjectDomain.handleBeforeInsert()
-04:16:45.323 (8024952471)|METHOD_EXIT|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:45.323 (8024914224)|METHOD_EXIT|[203]|01pDC000001ioaq|fflib.AccountDomain.onBeforeInsert()
+04:16:45.323 (8024928658)|METHOD_EXIT|[434]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleBeforeInsert()
+04:16:45.323 (8024952471)|METHOD_EXIT|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
 04:16:45.323 (8024964875)|SYSTEM_MODE_EXIT|false
-04:16:45.323 (8024978926)|METHOD_EXIT|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:45.323 (8024978926)|METHOD_EXIT|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:46.24 (8024994071)|CUMULATIVE_LIMIT_USAGE
 04:16:46.24 (8024994071)|LIMIT_USAGE_FOR_NS|(default)|
   Number of SOQL queries: 12 out of 100
@@ -1507,11 +1507,11 @@ Execute Anonymous: insert accs2;
   String:_sfdcAdditionalCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
-  fflib_SObjectDomain.ErrorFactory:_static_Errors:0
-  fflib_SObjects.ErrorFactory:_static_Errors:0
-  fflib_SObjectDomain.TestFactory:_static_Test:0
-  Map<System.Type,fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
-  Map<System.Type,List<fflib_SObjectDomain>>:_static_TriggerStateByClass:0
+  fflib.fflib_SObjectDomain.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjects.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjectDomain.TestFactory:_static_Test:0
+  Map<System.Type,fflib.fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
+  Map<System.Type,List<fflib.fflib_SObjectDomain>>:_static_TriggerStateByClass:0
   List<Account>:_static_accs:0
   List<Account>:_static_accs2:0
   char[]:digits:0
@@ -1522,7 +1522,7 @@ Execute Anonymous: insert accs2;
 
 04:16:46.24 (8024994071)|CUMULATIVE_LIMIT_USAGE_END
 
-04:16:45.323 (8025384798)|CODE_UNIT_FINISHED|Account on Account trigger event BeforeInsert|__sfdc_trigger/Account
+04:16:45.323 (8025384798)|CODE_UNIT_FINISHED|Account on Account trigger event BeforeInsert|__sfdc_trigger/fflib/Account
 04:16:45.323 (8029219134)|CODE_UNIT_STARTED|[EXTERNAL]|DuplicateDetector
 04:16:45.323 (8029247331)|DUPLICATE_DETECTION_BEGIN
 04:16:45.323 (8029413709)|DUPLICATE_DETECTION_RULE_INVOCATION|DuplicateRuleId:0BmDC000000PVhq|DuplicateRuleName:Standard Account Duplicate Rule|DmlType:INSERT
@@ -1579,99 +1579,99 @@ Execute Anonymous: insert accs2;
 04:16:45.323 (8062419735)|DUPLICATE_DETECTION_MATCH_INVOCATION_SUMMARY|EntityType:Account|NumRecordsToBeSaved:50|NumRecordsToBeSavedWithDuplicates:0|NumDuplicateRecordsFound:0
 04:16:45.323 (8062747472)|DUPLICATE_DETECTION_END
 04:16:45.323 (8062757975)|CODE_UNIT_FINISHED|DuplicateDetector
-04:16:45.323 (8265320363)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event AfterInsert|__sfdc_trigger/Account
-04:16:45.323 (8265914990)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:45.323 (8265320363)|CODE_UNIT_STARTED|[EXTERNAL]|01qDC00000062JD|Account on Account trigger event AfterInsert|__sfdc_trigger/fflib/Account
+04:16:45.323 (8265914990)|METHOD_ENTRY|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:45.323 (8266456328)|SYSTEM_MODE_ENTER|false
 04:16:45.323 (8266489276)|METHOD_ENTRY|[379]||System.Test.isRunningTest()
 04:16:45.323 (8266514651)|METHOD_EXIT|[379]||System.Test.isRunningTest()
-04:16:45.323 (8266540495)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:45.323 (8266587364)|METHOD_EXIT|[379]|01pDC000001iob6|fflib_SObjectDomain.MockDatabase.hasRecords()
-04:16:45.323 (8266668710)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
-04:16:45.323 (8266690229)|METHOD_ENTRY|[405]|01pDC000001iob6|fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
-04:16:45.323 (8266826113)|METHOD_EXIT|[405]|01pDC000001iob6|fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
+04:16:45.323 (8266540495)|METHOD_ENTRY|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:45.323 (8266587364)|METHOD_EXIT|[379]|01pDC000001iob6|fflib.fflib_SObjectDomain.MockDatabase.hasRecords()
+04:16:45.323 (8266668710)|METHOD_ENTRY|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:45.323 (8266690229)|METHOD_ENTRY|[405]|01pDC000001iob6|fflib.fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
+04:16:45.323 (8266826113)|METHOD_EXIT|[405]|01pDC000001iob6|fflib.fflib_SObjectDomain.popTriggerInstance(System.Type, List<SObject>)
 04:16:45.323 (8266840425)|METHOD_ENTRY|[409]||System.Type.getName()
 04:16:45.323 (8266851997)|METHOD_EXIT|[409]||System.Type.getName()
 04:16:45.323 (8266880213)|METHOD_ENTRY|[410]||System.Type.forName(String)
 04:16:45.323 (8266993467)|METHOD_EXIT|[410]||System.Type.forName(String)
 04:16:45.323 (8267003978)|METHOD_ENTRY|[411]||System.Type.newInstance()
 04:16:45.323 (8267070552)|METHOD_EXIT|[411]||System.Type.newInstance()
-04:16:45.323 (8267086759)|METHOD_ENTRY|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:45.323 (8267106219)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:45.323 (8267128259)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:45.323 (8267202295)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:45.323 (8267224981)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:45.323 (8267244398)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:45.323 (8267326002)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib_Objects
-04:16:45.323 (8267390417)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjects
-04:16:45.323 (8267406154)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:45.323 (8267446507)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib_SObjectDomain.Configuration
-04:16:45.323 (8267468755)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib_SObjectDomain
-04:16:45.323 (8267482058)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib_SObjectDomain
-04:16:45.323 (8267493907)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|AccountDomain
-04:16:45.323 (8267506153)|METHOD_EXIT|[414]|01pDC000001ioaq|AccountDomain.Constructor.construct(List<SObject>)
-04:16:45.323 (8267532572)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:45.323 (8267796031)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.getTriggerEvent(System.Type)
-04:16:45.323 (8267812875)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:45.323 (8267830726)|METHOD_EXIT|[426]|01pDC000001iob6|fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
-04:16:45.323 (8267839732)|METHOD_ENTRY|[440]|01pDC000001iob6|fflib_SObjectDomain.handleAfterInsert()
-04:16:45.323 (8267899474)|METHOD_ENTRY|[232]|01pDC000001ioaq|AccountDomain.onValidate()
-04:16:45.323 (8267917753)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:45.323 (8267927928)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:45.323 (8267942010)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:45.323 (8267961458)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
+04:16:45.323 (8267086759)|METHOD_ENTRY|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:45.323 (8267106219)|CONSTRUCTOR_ENTRY|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:45.323 (8267128259)|CONSTRUCTOR_ENTRY|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:45.323 (8267202295)|CONSTRUCTOR_ENTRY|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:45.323 (8267224981)|CONSTRUCTOR_ENTRY|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:45.323 (8267244398)|CONSTRUCTOR_ENTRY|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:45.323 (8267326002)|CONSTRUCTOR_EXIT|[53]|01pDC000001iob0|<init>(List<ANY>)|fflib.fflib_Objects
+04:16:45.323 (8267390417)|CONSTRUCTOR_EXIT|[141]|01pDC000001iobD|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjects
+04:16:45.323 (8267406154)|CONSTRUCTOR_ENTRY|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:45.323 (8267446507)|CONSTRUCTOR_EXIT|[144]|01pDC000001iob6|<init>()|fflib.fflib_SObjectDomain.Configuration
+04:16:45.323 (8267468755)|CONSTRUCTOR_EXIT|[126]|01pDC000001iob6|<init>(List<SObject>,Schema.SObjectType)|fflib.fflib_SObjectDomain
+04:16:45.323 (8267482058)|CONSTRUCTOR_EXIT|[4]|01pDC000001iob6|<init>(List<SObject>)|fflib.fflib_SObjectDomain
+04:16:45.323 (8267493907)|CONSTRUCTOR_EXIT|[90]|01pDC000001ioaq|<init>(List<Account>)|fflib.AccountDomain
+04:16:45.323 (8267506153)|METHOD_EXIT|[414]|01pDC000001ioaq|fflib.AccountDomain.Constructor.construct(List<SObject>)
+04:16:45.323 (8267532572)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:45.323 (8267796031)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.getTriggerEvent(System.Type)
+04:16:45.323 (8267812875)|METHOD_ENTRY|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:45.323 (8267830726)|METHOD_EXIT|[426]|01pDC000001iob6|fflib.fflib_SObjectDomain.TriggerEvent.isEnabled(Boolean, Boolean, Boolean, Boolean, Boolean, Boolean)
+04:16:45.323 (8267839732)|METHOD_ENTRY|[440]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleAfterInsert()
+04:16:45.323 (8267899474)|METHOD_ENTRY|[232]|01pDC000001ioaq|fflib.AccountDomain.onValidate()
+04:16:45.323 (8267917753)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:45.323 (8267927928)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:45.323 (8267942010)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:45.323 (8267961458)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
 04:16:45.323 (8269839807)|SOQL_EXECUTE_BEGIN|[22]|Aggregations:0|SELECT Id, Name FROM Account ORDER BY Name ASC NULLS FIRST LIMIT 4000
 04:16:45.323 (8297887294)|SOQL_EXECUTE_EXPLAIN|[22]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:45.323 (8297904363)|SOQL_EXECUTE_END|[22]|Rows:3001
-04:16:45.323 (8301041000)|METHOD_ENTRY|[23]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:45.323 (8301080994)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:45.323 (8301108848)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:45.323 (8301120523)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:45.323 (8301132262)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:45.323 (8301146221)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:45.323 (8301158193)|METHOD_ENTRY|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:45.323 (8301174944)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:45.323 (8301187291)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:46.550 (8550745917)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:46.550 (8550776475)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:46.550 (8550794439)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:46.550 (8800760894)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:46.550 (8800782982)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:46.550 (8800800036)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:46.550 (9050752732)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:46.550 (9050777908)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:46.550 (9050793726)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:46.550 (9300746379)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:46.550 (9300771318)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:46.550 (9300787864)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:47.550 (9550750180)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:47.550 (9550781756)|METHOD_EXIT|[31]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:47.550 (9550799767)|METHOD_ENTRY|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:47.550 (9800752838)|METHOD_EXIT|[32]|01pDC000001ioaq|AccountDomain.delay(Integer)
-04:16:47.550 (9800786786)|METHOD_EXIT|[23]|01pDC000001ioaq|AccountDomain.biggerStacks(Integer, Integer)
-04:16:47.550 (9800874056)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:47.550 (9800888189)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:47.550 (9800907320)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:47.550 (9800938267)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
+04:16:45.323 (8301041000)|METHOD_ENTRY|[23]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:45.323 (8301080994)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:45.323 (8301108848)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:45.323 (8301120523)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:45.323 (8301132262)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:45.323 (8301146221)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:45.323 (8301158193)|METHOD_ENTRY|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:45.323 (8301174944)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:45.323 (8301187291)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:46.550 (8550745917)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:46.550 (8550776475)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:46.550 (8550794439)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:46.550 (8800760894)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:46.550 (8800782982)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:46.550 (8800800036)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:46.550 (9050752732)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:46.550 (9050777908)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:46.550 (9050793726)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:46.550 (9300746379)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:46.550 (9300771318)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:46.550 (9300787864)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:47.550 (9550750180)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:47.550 (9550781756)|METHOD_EXIT|[31]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:47.550 (9550799767)|METHOD_ENTRY|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:47.550 (9800752838)|METHOD_EXIT|[32]|01pDC000001ioaq|fflib.AccountDomain.delay(Integer)
+04:16:47.550 (9800786786)|METHOD_EXIT|[23]|01pDC000001ioaq|fflib.AccountDomain.biggerStacks(Integer, Integer)
+04:16:47.550 (9800874056)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:47.550 (9800888189)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:47.550 (9800907320)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:47.550 (9800938267)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
 04:16:47.550 (9801797293)|SOQL_EXECUTE_BEGIN|[26]|Aggregations:0|SELECT Id, Name FROM Account WHERE Id = :tmpVar1 ORDER BY Name ASC NULLS FIRST LIMIT 4000
 04:16:47.550 (9807957190)|SOQL_EXECUTE_EXPLAIN|[26]|Index on Account : [Id], cardinality: 50, sobjectCardinality: 2001, relativeCost 0.083
 04:16:47.550 (9807986000)|SOQL_EXECUTE_END|[26]|Rows:50
-04:16:47.550 (9808275858)|METHOD_EXIT|[232]|01pDC000001ioaq|AccountDomain.onValidate()
-04:16:47.550 (9808313272)|METHOD_ENTRY|[233]|01pDC000001ioaq|AccountDomain.onAfterInsert()
+04:16:47.550 (9808275858)|METHOD_EXIT|[232]|01pDC000001ioaq|fflib.AccountDomain.onValidate()
+04:16:47.550 (9808313272)|METHOD_ENTRY|[233]|01pDC000001ioaq|fflib.AccountDomain.onAfterInsert()
 04:16:47.550 (9808707590)|SOQL_EXECUTE_BEGIN|[59]|Aggregations:0|SELECT Id, Name FROM Account LIMIT 4000
 04:16:47.550 (9837091727)|SOQL_EXECUTE_EXPLAIN|[59]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:47.550 (9837112098)|SOQL_EXECUTE_END|[59]|Rows:3001
-04:16:47.550 (9916974057)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
-04:16:47.550 (9917003709)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:47.550 (9917026919)|METHOD_EXIT|[59]|01pDC000001iob0|fflib_Objects.getObjects()
-04:16:47.550 (9917057362)|METHOD_EXIT|[51]|01pDC000001iobD|fflib_SObjects.getRecords()
+04:16:47.550 (9916974057)|METHOD_ENTRY|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
+04:16:47.550 (9917003709)|METHOD_ENTRY|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:47.550 (9917026919)|METHOD_EXIT|[59]|01pDC000001iob0|fflib.fflib_Objects.getObjects()
+04:16:47.550 (9917057362)|METHOD_EXIT|[51]|01pDC000001iobD|fflib.fflib_SObjects.getRecords()
 04:16:47.550 (9929621957)|SOQL_EXECUTE_BEGIN|[76]|Aggregations:0|SELECT Id, Name FROM Account WHERE Id = :tmpVar1 AND Name LIKE '%A' LIMIT 4000
 04:16:47.550 (9969531069)|SOQL_EXECUTE_EXPLAIN|[76]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:47.550 (9969552164)|SOQL_EXECUTE_END|[76]|Rows:3001
-04:16:47.550 (9972512825)|METHOD_EXIT|[233]|01pDC000001ioaq|AccountDomain.onAfterInsert()
-04:16:47.550 (9972535905)|METHOD_EXIT|[440]|01pDC000001iob6|fflib_SObjectDomain.handleAfterInsert()
-04:16:47.550 (9972551369)|METHOD_EXIT|[387]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
+04:16:47.550 (9972512825)|METHOD_EXIT|[233]|01pDC000001ioaq|fflib.AccountDomain.onAfterInsert()
+04:16:47.550 (9972535905)|METHOD_EXIT|[440]|01pDC000001iob6|fflib.fflib_SObjectDomain.handleAfterInsert()
+04:16:47.550 (9972551369)|METHOD_EXIT|[387]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>)
 04:16:47.550 (9972559647)|SYSTEM_MODE_EXIT|false
-04:16:47.550 (9972573083)|METHOD_EXIT|[3]|01pDC000001iob6|fflib_SObjectDomain.triggerHandler(System.Type)
+04:16:47.550 (9972573083)|METHOD_EXIT|[3]|01pDC000001iob6|fflib.fflib_SObjectDomain.triggerHandler(System.Type)
 04:16:47.972 (9972587886)|CUMULATIVE_LIMIT_USAGE
 04:16:47.972 (9972587886)|LIMIT_USAGE_FOR_NS|(default)|
   Number of SOQL queries: 16 out of 100
@@ -1732,11 +1732,11 @@ Execute Anonymous: insert accs2;
   String:_sfdcAdditionalCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
-  fflib_SObjectDomain.ErrorFactory:_static_Errors:0
-  fflib_SObjects.ErrorFactory:_static_Errors:0
-  fflib_SObjectDomain.TestFactory:_static_Test:0
-  Map<System.Type,fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
-  Map<System.Type,List<fflib_SObjectDomain>>:_static_TriggerStateByClass:0
+  fflib.fflib_SObjectDomain.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjects.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjectDomain.TestFactory:_static_Test:0
+  Map<System.Type,fflib.fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
+  Map<System.Type,List<fflib.fflib_SObjectDomain>>:_static_TriggerStateByClass:0
   List<Account>:_static_accs:0
   List<Account>:_static_accs2:0
   char[]:digits:0
@@ -1747,7 +1747,7 @@ Execute Anonymous: insert accs2;
 
 04:16:47.972 (9972587886)|CUMULATIVE_LIMIT_USAGE_END
 
-04:16:47.550 (9972929657)|CODE_UNIT_FINISHED|Account on Account trigger event AfterInsert|__sfdc_trigger/Account
+04:16:47.550 (9972929657)|CODE_UNIT_FINISHED|Account on Account trigger event AfterInsert|__sfdc_trigger/fflib/Account
 04:16:47.550 (9977319516)|DML_END|[11]
 04:16:47.550 (10313021768)|CODE_UNIT_STARTED|[EXTERNAL]|DuplicateDetector
 04:16:47.550 (10313055739)|DUPLICATE_DETECTION_BEGIN
@@ -1828,11 +1828,11 @@ Execute Anonymous: insert accs2;
   String:_sfdcAdditionalCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
   String:_sfdcSuppressedCodeLocations:0
-  fflib_SObjectDomain.ErrorFactory:_static_Errors:0
-  fflib_SObjects.ErrorFactory:_static_Errors:0
-  fflib_SObjectDomain.TestFactory:_static_Test:0
-  Map<System.Type,fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
-  Map<System.Type,List<fflib_SObjectDomain>>:_static_TriggerStateByClass:0
+  fflib.fflib_SObjectDomain.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjects.ErrorFactory:_static_Errors:0
+  fflib.fflib_SObjectDomain.TestFactory:_static_Test:0
+  Map<System.Type,fflib.fflib_SObjectDomain.TriggerEvent>:_static_TriggerEventByClass:0
+  Map<System.Type,List<fflib.fflib_SObjectDomain>>:_static_TriggerStateByClass:0
   List<Account>:_static_accs:0
   List<Account>:_static_accs2:0
   char[]:digits:0
@@ -1849,11 +1849,11 @@ Invalid Log Line
 04:16:48.375 (11375731384)|EXECUTION_FINISHED
 04:16:48.375 (11375731384)|CUMULATIVE_PROFILING_BEGIN
 04:16:48.375 (11375731384)|CUMULATIVE_PROFILING|SOQL operations|
-Class.AccountDomain.onAfterInsert: line 76, column 1: [SELECT Id, Name FROM Account WHERE Name != 'An Account']: executed 1 times in 1000 ms
-Class.AccountDomain.onAfterInsert: line 76, column 1: [SELECT Id, Name from Account WHERE Id IN:recordIds LIMIT 4000]: executed 4 times in 258 ms
-Class.AccountDomain.onValidate: line 22, column 1: [SELECT Id, Name from Account ORDER BY Name LIMIT 4000]: executed 4 times in 122 ms
-Class.AccountDomain.onAfterInsert: line 59, column 1: [SELECT Id, Name from Account LIMIT 4000]: executed 4 times in 119 ms
-Class.AccountDomain.onValidate: line 26, column 1: [SELECT Id, Name from Account WHERE Id IN:recordIds ORDER BY Name LIMIT 4000]: executed 4 times in 33 ms
+Class.fflib.AccountDomain.onAfterInsert: line 76, column 1: [SELECT Id, Name FROM Account WHERE Name != 'An Account']: executed 1 times in 1000 ms
+Class.fflib.AccountDomain.onAfterInsert: line 76, column 1: [SELECT Id, Name from Account WHERE Id IN:recordIds LIMIT 4000]: executed 4 times in 258 ms
+Class.fflib.AccountDomain.onValidate: line 22, column 1: [SELECT Id, Name from Account ORDER BY Name LIMIT 4000]: executed 4 times in 122 ms
+Class.fflib.AccountDomain.onAfterInsert: line 59, column 1: [SELECT Id, Name from Account LIMIT 4000]: executed 4 times in 119 ms
+Class.fflib.AccountDomain.onValidate: line 26, column 1: [SELECT Id, Name from Account WHERE Id IN:recordIds ORDER BY Name LIMIT 4000]: executed 4 times in 33 ms
 
 04:16:48.375 (11375731384)|CUMULATIVE_PROFILING|No profiling information for SOSL operations
 04:16:48.375 (11375731384)|CUMULATIVE_PROFILING|DML operations|
@@ -1861,16 +1861,16 @@ AnonymousBlock: line 11, column 1: Insert: List<Account>: executed 1 time in 497
 AnonymousBlock: line 10, column 1: Insert: List<Account>: executed 1 time in 4965 ms
 
 04:16:48.375 (11375731384)|CUMULATIVE_PROFILING|method invocations|
-Class.AccountDomain.biggerStacks: line 31, column 1: private void biggerStacks(Integer, Integer): executed 24 times in 15021 ms
+Class.fflib.AccountDomain.biggerStacks: line 31, column 1: private void biggerStacks(Integer, Integer): executed 24 times in 15021 ms
 External entry point: public static void execute(): executed 1 time in 9971 ms
 Trigger.Account: line 3, column 1: public static void triggerHandler(System.Type): executed 8 times in 6969 ms
-Class.fflib_SObjectDomain.triggerHandler: line 387, column 1: private static void triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>): executed 8 times in 6963 ms
-Class.fflib_SObjectDomain.triggerHandler: line 440, column 1: public void handleAfterInsert(): executed 4 times in 6926 ms
-Class.fflib_SObjectDomain.handleAfterInsert: line 232, column 1: public void onValidate(): executed 4 times in 6179 ms
-Class.AccountDomain.onValidate: line 23, column 1: private void biggerStacks(Integer, Integer): executed 4 times in 6009 ms
-Class.AccountDomain.biggerStacks: line 32, column 1: private void delay(Integer): executed 24 times in 6008 ms
+Class.fflib.fflib_SObjectDomain.triggerHandler: line 387, column 1: private static void triggerHandler(System.Type, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, List<SObject>, Map<Id,SObject>): executed 8 times in 6963 ms
+Class.fflib.fflib_SObjectDomain.triggerHandler: line 440, column 1: public void handleAfterInsert(): executed 4 times in 6926 ms
+Class.fflib.fflib_SObjectDomain.handleAfterInsert: line 232, column 1: public void onValidate(): executed 4 times in 6179 ms
+Class.fflib.AccountDomain.onValidate: line 23, column 1: private void biggerStacks(Integer, Integer): executed 4 times in 6009 ms
+Class.fflib.AccountDomain.biggerStacks: line 32, column 1: private void delay(Integer): executed 24 times in 6008 ms
 External entry point: public void invoke(): executed 1 time in 1706 ms
-Class.AccountDomain.delay: line 38, column 1: public static Time addMilliseconds(Time, Integer): executed 721096 times in 1153 ms
-Class.fflib_SObjectDomain.handleAfterInsert: line 233, column 1: public void onAfterInsert(): executed 4 times in 747 ms
+Class.fflib.AccountDomain.delay: line 38, column 1: public static Time addMilliseconds(Time, Integer): executed 721096 times in 1153 ms
+Class.fflib.fflib_SObjectDomain.handleAfterInsert: line 233, column 1: public void onAfterInsert(): executed 4 times in 747 ms
 
 04:16:48.375 (11375731384)|CUMULATIVE_PROFILING_END
