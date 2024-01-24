@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Go to File multiple workspace handling to be simpified ([#202][#202])
+- Apex Log Parser Speed improveed to between 2 and 3 faster ([#475][#475])
+- Go to file multiple workspace handling simplified ([#202][#202])
   - Go to file from Call Tree will only ask you to select a workspace if more than one matching file is found in multiple workspaces, instead of everytime.
 
 ## [1.12.1] - 2023-12-11
@@ -327,6 +328,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#475]: https://github.com/certinia/debug-log-analyzer/issues/475
 [#299]: https://github.com/certinia/debug-log-analyzer/issues/299
 [#202]: https://github.com/certinia/debug-log-analyzer/issues/202
 

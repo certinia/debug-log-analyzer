@@ -2,7 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import { DatabaseAccess } from '../Database.js';
-import logParser from '../parsers/ApexLogParser.js';
+import { parse } from '../parsers/ApexLogParser.js';
 
 describe('Analyse database tests', () => {
   it('Only DML and SOQL are collected', async () => {
@@ -16,10 +16,10 @@ describe('Analyse database tests', () => {
       '09:19:13.82 (51592737891)|CODE_UNIT_FINISHED|pse.VFRemote: pse.SenchaTCController invoke(saveTimecard)\n' +
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
-    const apexLog = new logParser().parse(log);
+    const apexLog = parse(log);
     const result = await DatabaseAccess.create(apexLog);
-    const firstSOQL = result.getSOQLLines()[0];
 
+    const firstSOQL = result.getSOQLLines()[0];
     expect(firstSOQL?.text).toEqual('SELECT Id FROM Account');
 
     const firstDML = result.getDMLLines()[0];

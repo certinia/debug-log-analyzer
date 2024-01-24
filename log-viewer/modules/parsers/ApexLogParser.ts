@@ -37,15 +37,14 @@ export function parse(logData: string): ApexLog {
  * const apexLog = new ApexLogParser().parse(logText);
  * const apexLog = parse(logText);
  */
-export default class ApexLogParser {
+class ApexLogParser {
   logIssues: LogIssue[] = [];
   parsingErrors: string[] = [];
   maxSizeTimestamp: number | null = null;
   reasons: Set<string> = new Set<string>();
   cpuUsed = 0;
-  lastTimestamp = 0;
   discontinuity = false;
-  namespaces = new Set<string>();
+  namespaces: string[] = [];
 
   /**
    * Takes string input of a log and returns the ApexLog class, which represents a log tree
@@ -53,15 +52,14 @@ export default class ApexLogParser {
    * @returns {ApexLog}
    */
   parse(debugLog: string): ApexLog {
-    const logLines = this.parseLog(debugLog);
-
-    const apexLog = this.toLogTree(logLines);
+    const lineGenerator = this.generateLogLines(debugLog);
+    const apexLog = this.toLogTree(lineGenerator);
     apexLog.size = debugLog.length;
     apexLog.debugLevels = this.getDebugLevels(debugLog);
     apexLog.logIssues = this.logIssues;
     apexLog.parsingErrors = this.parsingErrors;
     apexLog.cpuTime = this.cpuUsed;
-    apexLog.namespaces = [...this.namespaces];
+    apexLog.namespaces = this.namespaces;
 
     return apexLog;
   }
@@ -75,7 +73,9 @@ export default class ApexLogParser {
       const entry = new metaCtor(parts);
       entry.logLine = line;
       lastEntry?.onAfter?.(this, entry);
-      entry.namespace && this.namespaces.add(entry.namespace);
+      entry.namespace &&
+        !this.namespaces.includes(entry.namespace) &&
+        this.namespaces.push(entry.namespace);
       return entry;
     }
 
@@ -111,70 +111,71 @@ export default class ApexLogParser {
     return null;
   }
 
-  private parseLog(log: string): LogLine[] {
+  private *generateLogLines(log: string): Generator<LogLine> {
     const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || 0;
-    const rawLines = this.splitByNextLine(log.slice(start));
+    if (start > 0) {
+      log = log.slice(start);
+    }
 
-    // reset global variables to be captured during parsing
-    this.logIssues = [];
-    this.reasons = new Set<string>();
-    this.cpuUsed = 0;
-    this.discontinuity = false;
-
-    const logLines = [];
+    const hascrlf = log.indexOf('\r\n') > -1;
     let lastEntry = null;
-    const len = rawLines.length;
-    for (let i = 0; i < len; i++) {
-      const line = rawLines[i];
+    let eolIndex = log.indexOf('\n');
+    let startIndex = 0;
+    let crlfIndex = -1;
+
+    while (eolIndex !== -1) {
+      if (hascrlf && eolIndex > crlfIndex) {
+        crlfIndex = log.indexOf('\r', eolIndex - 1);
+      }
+      const line = log.slice(startIndex, crlfIndex + 1 === eolIndex ? crlfIndex : eolIndex);
       if (line) {
         // ignore blank lines
         const entry = this.parseLine(line, lastEntry);
         if (entry) {
-          logLines.push(entry);
           lastEntry = entry;
+          yield entry;
         }
       }
+      startIndex = eolIndex + 1;
+      eolIndex = log.indexOf('\n', startIndex);
     }
-    lastEntry?.onAfter?.(this);
 
-    return logLines;
+    // Parse the last line
+    const line = log.slice(startIndex, log.length);
+    if (line) {
+      // ignore blank lines
+      const entry = this.parseLine(line, lastEntry);
+      if (entry) {
+        entry?.onAfter?.(this);
+        yield entry;
+      }
+    }
   }
 
-  // Matches CRLF (\r\n) + LF (\n)
-  // the ? matches the previous token 0 or 1 times.
-  private splitByNextLine(text: string) {
-    const hascrlfEOL = text.indexOf('\r\n') > -1;
-    let regex;
-    if (!hascrlfEOL) {
-      regex = /\n/;
-    } else {
-      regex = /\r?\n/;
-    }
-    return text.split(regex);
-  }
-
-  private toLogTree(logLines: LogLine[]) {
-    const lineIter = new LineIterator(logLines),
-      rootMethod = new ApexLog(),
+  private toLogTree(lineGenerator: Generator<LogLine>) {
+    const rootMethod = new ApexLog(),
       stack: Method[] = [];
     let line: LogLine | null;
 
-    this.lastTimestamp = 0;
-    while ((line = lineIter.fetch())) {
-      if (line instanceof Method) {
-        this.parseTree(line, lineIter, stack);
-      }
-      rootMethod.addChild(line);
-    }
-    rootMethod.setTimes();
+    if (currentParser) {
+      const lineIter = new LineIterator(lineGenerator);
 
-    this.insertPackageWrappers(rootMethod);
-    this.aggregateTotals(rootMethod.children);
+      while ((line = lineIter.fetch())) {
+        if (line instanceof Method) {
+          this.parseTree(line, lineIter, stack);
+        }
+        rootMethod.addChild(line);
+      }
+      rootMethod.setTimes();
+
+      this.insertPackageWrappers(rootMethod);
+      this.aggregateTotals([rootMethod]);
+    }
     return rootMethod;
   }
 
   private parseTree(currentLine: Method, lineIter: LineIterator, stack: Method[]) {
-    this.lastTimestamp = currentLine.timestamp;
+    let lastTimestamp = currentLine.timestamp;
     currentLine.namespace ||= 'default';
 
     const isEntry = currentLine.exitTypes.length > 0;
@@ -183,11 +184,11 @@ export default class ApexLogParser {
       let nextLine;
 
       stack.push(currentLine);
+
       while ((nextLine = lineIter.peek())) {
-        if (nextLine.discontinuity) {
-          // discontinuities are stack unwinding (caused by Exceptions)
-          this.discontinuity = true; // start unwinding stack
-        }
+        lastTimestamp = nextLine.timestamp;
+        // discontinuities are stack unwinding (caused by Exceptions)
+        this.discontinuity ||= nextLine.discontinuity; // start unwinding stack
 
         if (
           exitOnNextLine &&
@@ -204,10 +205,8 @@ export default class ApexLogParser {
           nextLine.isExit &&
           this.endMethod(currentLine, nextLine, lineIter, stack)
         ) {
-          if (currentLine.onEnd) {
-            // the method wants to see the exit line
-            currentLine.onEnd(nextLine, stack);
-          }
+          // the method wants to see the exit line
+          currentLine.onEnd?.(nextLine, stack);
           break;
         }
 
@@ -223,23 +222,23 @@ export default class ApexLogParser {
 
         nextLine.namespace ||= currentLine.namespace || 'default';
         lineIter.fetch(); // it's a child - consume the line
-        this.lastTimestamp = nextLine.timestamp;
+
         if (nextLine instanceof Method) {
           this.parseTree(nextLine, lineIter, stack);
         }
 
-        currentLine.addChild(nextLine);
+        currentLine.children.push(nextLine);
       }
 
       // End of line error handling. We have finished processing this log line and either got to the end
       // of the log without finding an exit line or the current line was truncated)
       if (!nextLine || currentLine.isTruncated) {
         // truncated method - terminate at the end of the log
-        currentLine.exitStamp = this.lastTimestamp;
+        currentLine.exitStamp = lastTimestamp;
 
         // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
         this.addLogIssue(
-          this.lastTimestamp,
+          lastTimestamp,
           'Unexpected-End',
           'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
           'unexpected',
@@ -247,12 +246,12 @@ export default class ApexLogParser {
 
         if (currentLine.isTruncated) {
           this.updateLogIssue(
-            this.lastTimestamp,
+            lastTimestamp,
             'Max-Size-reached',
             'The maximum log size has been reached. Part of the log has been truncated.',
             'skip',
           );
-          this.maxSizeTimestamp = this.lastTimestamp;
+          this.maxSizeTimestamp = lastTimestamp;
         }
         currentLine.isTruncated = true;
       }
@@ -266,9 +265,9 @@ export default class ApexLogParser {
     return (
       endLine.type &&
       startMethod.exitTypes.includes(endLine.type) &&
-      (!endLine.lineNumber ||
-        !startMethod.lineNumber ||
-        endLine.lineNumber === startMethod.lineNumber)
+      (endLine.lineNumber === startMethod.lineNumber ||
+        !endLine.lineNumber ||
+        !startMethod.lineNumber)
     );
   }
 
@@ -457,22 +456,22 @@ export class DebugLevel {
 }
 
 export class LineIterator {
-  lines: LogLine[];
-  index: number;
-  length: number;
+  next: LogLine | null = null;
+  lineGenerator: Generator<LogLine>;
 
-  constructor(lines: LogLine[]) {
-    this.lines = lines;
-    this.index = 0;
-    this.length = lines.length;
+  constructor(lineGenerator: Generator<LogLine>) {
+    this.lineGenerator = lineGenerator;
+    this.next = this.lineGenerator.next().value;
   }
 
   peek(): LogLine | null {
-    return this.index < this.length ? this.lines[this.index] || null : null;
+    return this.next;
   }
 
   fetch(): LogLine | null {
-    return this.index < this.length ? this.lines[this.index++] || null : null;
+    const result = this.next;
+    this.next = this.lineGenerator.next().value;
+    return result;
   }
 }
 
@@ -803,7 +802,7 @@ export class ApexLog extends Method {
       endTime ??= child?.timestamp;
     }
     this.exitStamp = endTime || 0;
-    this.duration.total = this.exitStamp - this.timestamp;
+    this.recalculateDurations();
   }
 }
 
@@ -813,10 +812,10 @@ export function parseObjectNamespace(text: string | null | undefined): string {
   }
 
   const sep = text.indexOf('__');
-  if (sep < 0) {
+  if (sep === -1) {
     return 'default';
   }
-  return text.substring(0, sep);
+  return text.slice(0, sep);
 }
 
 export function parseVfNamespace(text: string): string {
@@ -833,6 +832,52 @@ export function parseVfNamespace(text: string): string {
     return 'default';
   }
   return text.substring(secondSlash + 1, sep);
+}
+
+export function parseMethodNamespace(methodName: string): string {
+  const methodBracketIndex = methodName.indexOf('(');
+  if (methodBracketIndex === -1) {
+    return '';
+  }
+
+  let possibleNs = methodName.slice(0, methodName.indexOf('.'));
+  possibleNs =
+    currentParser?.namespaces.find((ns) => {
+      return ns === possibleNs;
+    }) || '';
+
+  if (possibleNs) {
+    return possibleNs;
+  }
+
+  const methodNameParts = methodName ? methodName.slice(0, methodBracketIndex)?.split('.') : '';
+  if (methodNameParts.length === 4) {
+    return methodNameParts[0] ?? '';
+  } else if (methodNameParts.length === 2) {
+    return 'default';
+  }
+
+  return '';
+}
+
+export function parseConstructorNamespace(className: string): string {
+  let possibleNs = className.slice(0, className.indexOf('.'));
+  possibleNs =
+    currentParser?.namespaces.find((ns) => {
+      return ns === possibleNs;
+    }) || '';
+
+  if (possibleNs) {
+    return possibleNs;
+  }
+  const constructorParts = (className ?? '').split('.');
+  possibleNs = constructorParts[0] || '';
+  // inmner class with a namespace
+  if (constructorParts.length === 3) {
+    return possibleNs;
+  }
+
+  return '';
 }
 
 export function parseRows(text: string | null | undefined): number {
@@ -902,11 +947,9 @@ class ConstructorEntryLine extends Method {
     const [, , , , args, className] = parts;
 
     this.text = className + (args ? args.substring(args.lastIndexOf('(')) : '');
-    const constructorParts = (className ?? '').split('.');
-    const possibleNs = constructorParts[0] || '';
-    // inmner class with a namespace
-    if (constructorParts.length === 3 || currentParser?.namespaces.has(possibleNs)) {
-      this.namespace = possibleNs ?? this.namespace;
+    const possibleNS = parseConstructorNamespace(className || '');
+    if (possibleNS) {
+      this.namespace = possibleNS;
     }
   }
 }
@@ -928,7 +971,6 @@ class EmailQueueLine extends LogLine {
   }
 }
 
-// todo: avoid some of ns parsing work if we have done it before.
 export class MethodEntryLine extends Method {
   hasValidSymbols = true;
 
@@ -940,12 +982,8 @@ export class MethodEntryLine extends Method {
       // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
       this.cpuType = 'loading';
     } else {
-      const methodName = parts[4] || '';
-      const methodNameParts = methodName
-        ? methodName.slice(0, methodName.indexOf('('))?.split('.')
-        : '';
-      const possibleNs = methodNameParts[0] ?? '';
-      if (methodNameParts.length === 4 || currentParser?.namespaces.has(possibleNs)) {
+      const possibleNs = parseMethodNamespace(parts[4] || '');
+      if (possibleNs) {
         this.namespace = possibleNs;
       }
     }
