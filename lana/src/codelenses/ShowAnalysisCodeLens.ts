@@ -1,4 +1,4 @@
-import { CodeLens, type CodeLensProvider, Range, type TextDocument, languages } from 'vscode';
+import { CodeLens, Range, languages, type CodeLensProvider, type TextDocument } from 'vscode';
 
 import { Context } from '../Context.js';
 import { ShowLogAnalysis } from '../commands/ShowLogAnalysis.js';

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { KeybindingsModule, Module, type RowComponent, Tabulator } from 'tabulator-tables';
+import { KeybindingsModule, Module, Tabulator, type RowComponent } from 'tabulator-tables';
 
 // todo: make this generic and support opening grouped rows too then use on DB view.
 // todo: remove the '@ts-expect-error' + fix the types file

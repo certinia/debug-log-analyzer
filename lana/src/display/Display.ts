@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { type MessageOptions, Uri, commands, window } from 'vscode';
+import { Uri, commands, window, type MessageOptions } from 'vscode';
 
 import { appName } from '../AppSettings.js';
 
