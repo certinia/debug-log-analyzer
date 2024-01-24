@@ -7,9 +7,9 @@ import {
   vsCodeDropdown,
   vsCodeOption,
 } from '@vscode/webview-ui-toolkit';
-import { LitElement, type PropertyValues, css, html, unsafeCSS } from 'lit';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { type ColumnComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
+import { TabulatorFull as Tabulator, type ColumnComponent } from 'tabulator-tables';
 
 import NumberAccessor from '../datagrid/dataaccessor/Number.js';
 import { progressFormatter } from '../datagrid/format/Progress.js';

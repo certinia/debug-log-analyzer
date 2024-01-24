@@ -10,9 +10,9 @@
 //todo: add filter on line type
 //todo: add filter on log level (fine, finer etc)
 import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
-import { LitElement, type PropertyValues, css, html, unsafeCSS } from 'lit';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { type RowComponent, TabulatorFull as Tabulator } from 'tabulator-tables';
+import { TabulatorFull as Tabulator, type RowComponent } from 'tabulator-tables';
 
 import MinMaxEditor from '../../datagrid/editors/MinMax.js';
 import MinMaxFilter from '../../datagrid/filters/MinMax.js';
@@ -20,7 +20,7 @@ import { progressFormatter } from '../../datagrid/format/Progress.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
-import { ApexLog, type LogEventType, LogLine, TimedNode } from '../../parsers/ApexLogParser.js';
+import { ApexLog, LogLine, TimedNode, type LogEventType } from '../../parsers/ApexLogParser.js';
 import { hostService } from '../../services/VSCodeService.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../skeleton/GridSkeleton.js';

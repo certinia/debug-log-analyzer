@@ -5,10 +5,10 @@ import { sep } from 'path';
 import {
   Position,
   Selection,
-  type TextDocumentShowOptions,
   Uri,
   ViewColumn,
   commands,
+  type TextDocumentShowOptions,
 } from 'vscode';
 
 import { Context } from '../Context.js';

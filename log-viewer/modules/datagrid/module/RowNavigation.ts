@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { Module, type RowComponent, Tabulator } from 'tabulator-tables';
+import { Module, Tabulator, type RowComponent } from 'tabulator-tables';
 
 export class RowNavigation extends Module {
   constructor(table: Tabulator) {
