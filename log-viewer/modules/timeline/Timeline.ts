@@ -160,24 +160,33 @@ let scaleFont: string,
   lastMouseX: number,
   lastMouseY: number;
 
-function getMaxDepth(nodes: LogLine[], depth = 0): number {
-  let len = nodes.length;
-  if (!len) {
-    return depth;
-  }
+function getMaxDepth(nodes: LogLine[]) {
+  const result = new Map<number, LogLine[]>();
+  result.set(0, nodes);
 
-  depth++;
-  let maxDepth = depth;
-  while (len--) {
-    const node = nodes[len];
-    if (node?.duration && node instanceof Method) {
-      const d = getMaxDepth(node.children, depth);
-      if (d > maxDepth) {
-        maxDepth = d;
+  let currentDepth = 1;
+
+  let currentNodes = nodes;
+  let len = currentNodes.length;
+  while (len) {
+    result.set(currentDepth, []);
+    while (len--) {
+      const node = currentNodes[len];
+      if (node?.children && node.duration) {
+        const children = result.get(currentDepth)!;
+        node.children.forEach((c) => {
+          if (c.children.length) {
+            children.push(c);
+          }
+        });
       }
     }
+    currentNodes = result.get(currentDepth++) || [];
+    len = currentNodes.length;
   }
-  return maxDepth;
+  result.clear();
+
+  return currentDepth;
 }
 
 function drawScale(ctx: CanvasRenderingContext2D) {
@@ -380,7 +389,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 }
 
 function calculateSizes() {
-  maxY = getMaxDepth(timelineRoot.children, 0); // maximum nested call depth
+  maxY = getMaxDepth(timelineRoot.children); // maximum nested call depth
   resetView();
 }
 
