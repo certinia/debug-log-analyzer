@@ -253,35 +253,36 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-function nodesToRectangles(nodes: Method[], depth: number) {
-  const len = nodes.length;
-  if (!len) {
-    return;
-  }
+function nodesToRectangles(nodes: Method[]) {
+  const result = new Map<number, Method[]>();
 
-  const children: Method[] = [];
-  let i = 0;
-  while (i < len) {
-    const node = nodes[i];
-    if (node) {
-      const { subCategory: subCategory, duration } = node;
-      if (subCategory && duration) {
-        addToRectQueue(node, depth);
-      }
-
-      // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
-      node.children.forEach((child) => {
-        if (child instanceof Method) {
-          children.push(child);
+  let currentDepth = 0;
+  let currentNodes = nodes;
+  let len = currentNodes.length;
+  while (len) {
+    result.set(currentDepth, []);
+    while (len--) {
+      const node = currentNodes[len];
+      if (node) {
+        const { subCategory: subCategory, duration } = node;
+        if (subCategory && duration) {
+          addToRectQueue(node, currentDepth);
         }
-      });
+
+        // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
+        const children = result.get(currentDepth)!;
+        node.children.forEach((child) => {
+          if (child.exitTypes.length) {
+            children.push(child as Method);
+          }
+        });
+      }
     }
-    i++;
+    // result.delete(currentDepth);
+    currentNodes = result.get(currentDepth++) || [];
+    len = currentNodes.length;
   }
-
-  nodesToRectangles(children, depth + 1);
 }
-
 const rectRenderQueue = new Map<LogSubCategory, Rect[]>();
 
 /**
@@ -433,7 +434,7 @@ export function init(timelineContainer: HTMLDivElement, rootMethod: ApexLog) {
   onInitTimeline();
 
   calculateSizes();
-  nodesToRectangles([timelineRoot], -1);
+  nodesToRectangles(timelineRoot.children as Method[]);
   if (ctx) {
     requestAnimationFrame(drawTimeLine);
   }
