@@ -1,3 +1,5 @@
+import { split } from './StringUtils';
+
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
@@ -43,6 +45,7 @@ class ApexLogParser {
   maxSizeTimestamp: number | null = null;
   reasons: Set<string> = new Set<string>();
   cpuUsed = 0;
+  lastTimestamp = 0;
   discontinuity = false;
   namespaces: string[] = [];
 
@@ -175,7 +178,7 @@ class ApexLogParser {
   }
 
   private parseTree(currentLine: Method, lineIter: LineIterator, stack: Method[]) {
-    let lastTimestamp = currentLine.timestamp;
+    this.lastTimestamp = currentLine.timestamp;
     currentLine.namespace ||= 'default';
 
     const isEntry = currentLine.exitTypes.length > 0;
@@ -186,7 +189,6 @@ class ApexLogParser {
       stack.push(currentLine);
 
       while ((nextLine = lineIter.peek())) {
-        lastTimestamp = nextLine.timestamp;
         // discontinuities are stack unwinding (caused by Exceptions)
         this.discontinuity ||= nextLine.discontinuity; // start unwinding stack
 
@@ -222,6 +224,7 @@ class ApexLogParser {
 
         nextLine.namespace ||= currentLine.namespace || 'default';
         lineIter.fetch(); // it's a child - consume the line
+        this.lastTimestamp = nextLine.timestamp;
 
         if (nextLine instanceof Method) {
           this.parseTree(nextLine, lineIter, stack);
@@ -234,11 +237,11 @@ class ApexLogParser {
       // of the log without finding an exit line or the current line was truncated)
       if (!nextLine || currentLine.isTruncated) {
         // truncated method - terminate at the end of the log
-        currentLine.exitStamp = lastTimestamp;
+        currentLine.exitStamp = this.lastTimestamp;
 
         // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
         this.addLogIssue(
-          lastTimestamp,
+          this.lastTimestamp,
           'Unexpected-End',
           'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
           'unexpected',
@@ -246,12 +249,12 @@ class ApexLogParser {
 
         if (currentLine.isTruncated) {
           this.updateLogIssue(
-            lastTimestamp,
+            this.lastTimestamp,
             'Max-Size-reached',
             'The maximum log size has been reached. Part of the log has been truncated.',
             'skip',
           );
-          this.maxSizeTimestamp = lastTimestamp;
+          this.maxSizeTimestamp = this.lastTimestamp;
         }
         currentLine.isTruncated = true;
       }
