@@ -631,9 +631,8 @@ export abstract class LogLine {
   constructor(parts: string[] | null) {
     if (parts) {
       const [timeData, type] = parts;
-      this.type = type as LogEventType;
-      this.text = this.type;
-      this.timestamp = this.parseTimestamp(timeData as string);
+      this.text = this.type = type as LogEventType;
+      this.timestamp = this.parseTimestamp(timeData || '');
     }
   }
 
