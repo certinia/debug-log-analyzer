@@ -272,8 +272,8 @@ function nodesToRectangles(nodes: Method[]) {
         // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
         const children = result.get(currentDepth)!;
         node.children.forEach((child) => {
-          if (child.exitTypes.length) {
-            children.push(child as Method);
+          if (child instanceof Method) {
+            children.push(child);
           }
         });
       }
