@@ -1,5 +1,3 @@
-import { split } from './StringUtils';
-
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
@@ -122,15 +120,17 @@ class ApexLogParser {
 
     const hascrlf = log.indexOf('\r\n') > -1;
     let lastEntry = null;
-    let eolIndex = log.indexOf('\n');
+    let lfIndex = null;
+    let eolIndex = (lfIndex = log.indexOf('\n'));
     let startIndex = 0;
     let crlfIndex = -1;
 
     while (eolIndex !== -1) {
       if (hascrlf && eolIndex > crlfIndex) {
         crlfIndex = log.indexOf('\r', eolIndex - 1);
+        eolIndex = crlfIndex + 1 === eolIndex ? crlfIndex : lfIndex;
       }
-      const line = log.slice(startIndex, crlfIndex + 1 === eolIndex ? crlfIndex : eolIndex);
+      const line = log.slice(startIndex, eolIndex);
       if (line) {
         // ignore blank lines
         const entry = this.parseLine(line, lastEntry);
@@ -139,8 +139,8 @@ class ApexLogParser {
           yield entry;
         }
       }
-      startIndex = eolIndex + 1;
-      eolIndex = log.indexOf('\n', startIndex);
+      startIndex = lfIndex + 1;
+      lfIndex = eolIndex = log.indexOf('\n', startIndex);
     }
 
     // Parse the last line
