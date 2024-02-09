@@ -43,8 +43,10 @@ class ApexLogParser {
   maxSizeTimestamp: number | null = null;
   reasons: Set<string> = new Set<string>();
   cpuUsed = 0;
+  lastTimestamp = 0;
   discontinuity = false;
   namespaces: string[] = [];
+  namespacesUniq = new Set<string>();
 
   /**
    * Takes string input of a log and returns the ApexLog class, which represents a log tree
@@ -65,69 +67,71 @@ class ApexLogParser {
   }
 
   private parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
-    const parts = line.split('|'),
-      type = parts[1] || '';
+    const parts = line.split('|');
 
+    const type = parts[1] ?? '';
     const metaCtor = getLogEventClass(type as LogEventType);
     if (metaCtor) {
       const entry = new metaCtor(parts);
       entry.logLine = line;
       lastEntry?.onAfter?.(this, entry);
-      entry.namespace &&
-        !this.namespaces.includes(entry.namespace) &&
+      if (entry.namespace && !this.namespacesUniq.has(entry.namespace)) {
         this.namespaces.push(entry.namespace);
+        this.namespacesUniq.add(entry.namespace);
+      }
       return entry;
     }
 
-    if ((!type || !typePattern.test(type)) && lastEntry && lastEntry.acceptsText) {
+    const hasType = type && typePattern.test(type);
+    if (!hasType && lastEntry?.acceptsText) {
       // wrapped text from the previous entry?
-      lastEntry.text += `\n${line}`;
-    } else if (type && typePattern.test(type)) {
+      lastEntry.text += '\n' + line;
+    } else if (hasType) {
       const message = `Unsupported log event name: ${type}`;
       !this.parsingErrors.includes(message) && this.parsingErrors.push(message);
+    } else if (lastEntry && line.startsWith('*** Skipped')) {
+      this.addLogIssue(
+        lastEntry.timestamp,
+        'Skipped-Lines',
+        `${line}. A section of the log has been skipped and the log has been truncated. Full details of this section of log can not be provided.`,
+        'skip',
+      );
+    } else if (lastEntry && line.indexOf('MAXIMUM DEBUG LOG SIZE REACHED') !== -1) {
+      this.addLogIssue(
+        lastEntry.timestamp,
+        'Max-Size-reached',
+        'The maximum log size has been reached. Part of the log has been truncated.',
+        'skip',
+      );
+      this.maxSizeTimestamp = lastEntry.timestamp;
+    } else if (!hasType && settingsPattern.test(line)) {
+      // skip an unexpected settings line
     } else {
-      if (lastEntry && line.startsWith('*** Skipped')) {
-        this.addLogIssue(
-          lastEntry.timestamp,
-          'Skipped-Lines',
-          `${line}. A section of the log has been skipped and the log has been truncated. Full details of this section of log can not be provided.`,
-          'skip',
-        );
-      } else if (lastEntry && line.indexOf('MAXIMUM DEBUG LOG SIZE REACHED') >= 0) {
-        this.addLogIssue(
-          lastEntry.timestamp,
-          'Max-Size-reached',
-          'The maximum log size has been reached. Part of the log has been truncated.',
-          'skip',
-        );
-        this.maxSizeTimestamp = lastEntry.timestamp;
-      } else if (settingsPattern.test(line)) {
-        // skip an unexpected settings line
-      } else {
-        this.parsingErrors.push(`Invalid log line: ${line}`);
-      }
+      this.parsingErrors.push(`Invalid log line: ${line}`);
     }
 
     return null;
   }
 
   private *generateLogLines(log: string): Generator<LogLine> {
-    const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || 0;
+    const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index ?? 0;
     if (start > 0) {
       log = log.slice(start);
     }
 
     const hascrlf = log.indexOf('\r\n') > -1;
     let lastEntry = null;
-    let eolIndex = log.indexOf('\n');
+    let lfIndex = null;
+    let eolIndex = (lfIndex = log.indexOf('\n'));
     let startIndex = 0;
     let crlfIndex = -1;
 
     while (eolIndex !== -1) {
       if (hascrlf && eolIndex > crlfIndex) {
         crlfIndex = log.indexOf('\r', eolIndex - 1);
+        eolIndex = crlfIndex + 1 === eolIndex ? crlfIndex : lfIndex;
       }
-      const line = log.slice(startIndex, crlfIndex + 1 === eolIndex ? crlfIndex : eolIndex);
+      const line = log.slice(startIndex, eolIndex);
       if (line) {
         // ignore blank lines
         const entry = this.parseLine(line, lastEntry);
@@ -136,8 +140,8 @@ class ApexLogParser {
           yield entry;
         }
       }
-      startIndex = eolIndex + 1;
-      eolIndex = log.indexOf('\n', startIndex);
+      startIndex = lfIndex + 1;
+      lfIndex = eolIndex = log.indexOf('\n', startIndex);
     }
 
     // Parse the last line
@@ -175,10 +179,10 @@ class ApexLogParser {
   }
 
   private parseTree(currentLine: Method, lineIter: LineIterator, stack: Method[]) {
-    let lastTimestamp = currentLine.timestamp;
+    this.lastTimestamp = currentLine.timestamp;
     currentLine.namespace ||= 'default';
 
-    const isEntry = currentLine.exitTypes.length > 0;
+    const isEntry = currentLine.exitTypes.length;
     if (isEntry) {
       const exitOnNextLine = currentLine.nextLineIsExit;
       let nextLine;
@@ -186,33 +190,30 @@ class ApexLogParser {
       stack.push(currentLine);
 
       while ((nextLine = lineIter.peek())) {
-        lastTimestamp = nextLine.timestamp;
         // discontinuities are stack unwinding (caused by Exceptions)
         this.discontinuity ||= nextLine.discontinuity; // start unwinding stack
 
+        // Exit Line has been found no more work needed
         if (
+          !exitOnNextLine &&
+          !nextLine.nextLineIsExit &&
+          nextLine.isExit &&
+          !nextLine.exitTypes.length &&
+          this.endMethod(currentLine, nextLine, lineIter, stack)
+        ) {
+          // the method wants to see the exit line
+          currentLine.onEnd?.(nextLine, stack);
+          break;
+        } else if (
           exitOnNextLine &&
           (nextLine.nextLineIsExit || nextLine.isExit || nextLine.exitTypes.length > 0)
         ) {
           currentLine.exitStamp = nextLine.timestamp;
           currentLine.onEnd?.(nextLine, stack);
           break;
-        }
-
-        // Exit Line has been found no more work needed
-        if (
-          !nextLine.nextLineIsExit &&
-          nextLine.isExit &&
-          this.endMethod(currentLine, nextLine, lineIter, stack)
-        ) {
-          // the method wants to see the exit line
-          currentLine.onEnd?.(nextLine, stack);
-          break;
-        }
-
-        if (
-          this.maxSizeTimestamp &&
+        } else if (
           this.discontinuity &&
+          this.maxSizeTimestamp &&
           nextLine.timestamp > this.maxSizeTimestamp
         ) {
           // The current line was truncated (we did not find the exit line before the end of log) and there was a discontinuity
@@ -222,6 +223,7 @@ class ApexLogParser {
 
         nextLine.namespace ||= currentLine.namespace || 'default';
         lineIter.fetch(); // it's a child - consume the line
+        this.lastTimestamp = nextLine.timestamp;
 
         if (nextLine instanceof Method) {
           this.parseTree(nextLine, lineIter, stack);
@@ -234,11 +236,11 @@ class ApexLogParser {
       // of the log without finding an exit line or the current line was truncated)
       if (!nextLine || currentLine.isTruncated) {
         // truncated method - terminate at the end of the log
-        currentLine.exitStamp = lastTimestamp;
+        currentLine.exitStamp = this.lastTimestamp;
 
         // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
         this.addLogIssue(
-          lastTimestamp,
+          this.lastTimestamp,
           'Unexpected-End',
           'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
           'unexpected',
@@ -246,12 +248,12 @@ class ApexLogParser {
 
         if (currentLine.isTruncated) {
           this.updateLogIssue(
-            lastTimestamp,
+            this.lastTimestamp,
             'Max-Size-reached',
             'The maximum log size has been reached. Part of the log has been truncated.',
             'skip',
           );
-          this.maxSizeTimestamp = lastTimestamp;
+          this.maxSizeTimestamp = this.lastTimestamp;
         }
         currentLine.isTruncated = true;
       }
@@ -322,7 +324,7 @@ class ApexLogParser {
           });
         }
       }
-      currentNodes = result.get(currentDepth++) || [];
+      currentNodes = result.get(currentDepth++) ?? [];
       len = currentNodes.length;
     }
 
@@ -341,7 +343,7 @@ class ApexLogParser {
     const nodesByDepth = this.flattenByDepth(nodes);
     let depth = nodesByDepth.size;
     while (depth--) {
-      const nds = nodesByDepth.get(depth) || [];
+      const nds = nodesByDepth.get(depth) ?? [];
       let i = nds.length;
       while (i--) {
         const parent = nds[i];
@@ -353,6 +355,7 @@ class ApexLogParser {
           parent.duration.self -= child.duration.total;
         });
       }
+      nodesByDepth.delete(depth);
     }
   }
 
@@ -365,9 +368,7 @@ class ApexLogParser {
     for (let i = 0; i < len; i++) {
       const child = children[i];
       if (child) {
-        const childType = child.type,
-          isPkgType = childType === 'ENTERING_MANAGED_PKG';
-
+        const isPkgType = child.type === 'ENTERING_MANAGED_PKG';
         if (lastPkg && child instanceof TimedNode) {
           if (isPkgType && child.namespace === lastPkg.namespace) {
             // combine adjacent (like) packages
@@ -456,7 +457,7 @@ export class DebugLevel {
 }
 
 export class LineIterator {
-  next: LogLine | null = null;
+  next: LogLine | null;
   lineGenerator: Generator<LogLine>;
 
   constructor(lineGenerator: Generator<LogLine>) {
@@ -506,7 +507,7 @@ export abstract class LogLine {
   /**
    * A parsed version of the log line text useful for display in UIs
    */
-  text = '';
+  text;
 
   // optional metadata
   /**
@@ -563,7 +564,7 @@ export abstract class LogLine {
   /**
    * The timestamp of this log line, in nanoseconds
    */
-  timestamp = 0;
+  timestamp;
 
   /**
    * The time spent.
@@ -628,9 +629,11 @@ export abstract class LogLine {
   constructor(parts: string[] | null) {
     if (parts) {
       const [timeData, type] = parts;
-      this.type = type as LogEventType;
-      this.text = this.type;
-      this.timestamp = this.parseTimestamp(timeData as string);
+      this.text = this.type = type as LogEventType;
+      this.timestamp = this.parseTimestamp(timeData || '');
+    } else {
+      this.timestamp = 0;
+      this.text = '';
     }
   }
 
@@ -2468,23 +2471,23 @@ class MatchEngineBegin extends Method {
 }
 
 function getLogEventClass(eventName: LogEventType): LogLineConstructor | null | undefined {
+  if (!eventName) {
+    return null;
+  }
+
   // Fast path for the most commonly occuring types
   switch (eventName) {
     case 'METHOD_ENTRY':
       return MethodEntryLine;
-      break;
 
     case 'METHOD_EXIT':
       return MethodExitLine;
-      break;
 
     case 'CONSTRUCTOR_ENTRY':
       return ConstructorEntryLine;
-      break;
 
     case 'CONSTRUCTOR_EXIT':
       return ConstructorExitLine;
-      break;
 
     default:
       break;
@@ -2504,7 +2507,10 @@ function getLogEventClass(eventName: LogEventType): LogLineConstructor | null | 
 }
 
 type LogLineConstructor<T extends LogLine = LogLine> = new (parts: string[]) => T;
-export const lineTypeMap = new Map<LogEventType, LogLineConstructor>([
+export const lineTypeMap: ReadonlyMap<LogEventType, LogLineConstructor> = new Map<
+  LogEventType,
+  LogLineConstructor
+>([
   ['BULK_DML_RETRY', BulkDMLEntry],
   ['BULK_HEAP_ALLOCATE', BulkHeapAllocateLine],
   ['CALLOUT_REQUEST', CalloutRequestLine],

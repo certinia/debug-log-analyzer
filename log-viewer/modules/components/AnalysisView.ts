@@ -303,8 +303,6 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
   const children = node.children;
 
   if (key) {
-    const totalTime = node.duration.total;
-    const selfTime = node.duration.self;
     let metric = map.get(key);
     if (!metric) {
       metric = new Metric(node);
@@ -312,8 +310,8 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
     }
 
     ++metric.count;
-    metric.totalTime += totalTime;
-    metric.selfTime += selfTime;
+    metric.totalTime += node.duration.total;
+    metric.selfTime += node.duration.self;
   }
 
   children.forEach(function (child) {

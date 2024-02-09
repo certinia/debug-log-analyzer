@@ -160,24 +160,33 @@ let scaleFont: string,
   lastMouseX: number,
   lastMouseY: number;
 
-function getMaxDepth(nodes: LogLine[], depth = 0): number {
-  let len = nodes.length;
-  if (!len) {
-    return depth;
-  }
+function getMaxDepth(nodes: LogLine[]) {
+  const result = new Map<number, LogLine[]>();
+  result.set(0, nodes);
 
-  depth++;
-  let maxDepth = depth;
-  while (len--) {
-    const node = nodes[len];
-    if (node?.duration && node instanceof Method) {
-      const d = getMaxDepth(node.children, depth);
-      if (d > maxDepth) {
-        maxDepth = d;
+  let currentDepth = 1;
+
+  let currentNodes = nodes;
+  let len = currentNodes.length;
+  while (len) {
+    result.set(currentDepth, []);
+    while (len--) {
+      const node = currentNodes[len];
+      if (node?.children && node.duration) {
+        const children = result.get(currentDepth)!;
+        node.children.forEach((c) => {
+          if (c.children.length) {
+            children.push(c);
+          }
+        });
       }
     }
+    currentNodes = result.get(currentDepth++) || [];
+    len = currentNodes.length;
   }
-  return maxDepth;
+  result.clear();
+
+  return currentDepth;
 }
 
 function drawScale(ctx: CanvasRenderingContext2D) {
@@ -244,35 +253,36 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-function nodesToRectangles(nodes: Method[], depth: number) {
-  const len = nodes.length;
-  if (!len) {
-    return;
-  }
+function nodesToRectangles(nodes: Method[]) {
+  const result = new Map<number, Method[]>();
 
-  const children: Method[] = [];
-  let i = 0;
-  while (i < len) {
-    const node = nodes[i];
-    if (node) {
-      const { subCategory: subCategory, duration } = node;
-      if (subCategory && duration) {
-        addToRectQueue(node, depth);
-      }
-
-      // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
-      node.children.forEach((child) => {
-        if (child instanceof Method) {
-          children.push(child);
+  let currentDepth = 0;
+  let currentNodes = nodes;
+  let len = currentNodes.length;
+  while (len) {
+    result.set(currentDepth, []);
+    while (len--) {
+      const node = currentNodes[len];
+      if (node) {
+        const { subCategory: subCategory, duration } = node;
+        if (subCategory && duration) {
+          addToRectQueue(node, currentDepth);
         }
-      });
+
+        // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
+        const children = result.get(currentDepth)!;
+        node.children.forEach((child) => {
+          if (child instanceof Method) {
+            children.push(child);
+          }
+        });
+      }
     }
-    i++;
+    // result.delete(currentDepth);
+    currentNodes = result.get(currentDepth++) || [];
+    len = currentNodes.length;
   }
-
-  nodesToRectangles(children, depth + 1);
 }
-
 const rectRenderQueue = new Map<LogSubCategory, Rect[]>();
 
 /**
@@ -380,7 +390,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 }
 
 function calculateSizes() {
-  maxY = getMaxDepth(timelineRoot.children, 0); // maximum nested call depth
+  maxY = getMaxDepth(timelineRoot.children); // maximum nested call depth
   resetView();
 }
 
@@ -424,7 +434,7 @@ export function init(timelineContainer: HTMLDivElement, rootMethod: ApexLog) {
   onInitTimeline();
 
   calculateSizes();
-  nodesToRectangles([timelineRoot], -1);
+  nodesToRectangles(timelineRoot.children as Method[]);
   if (ctx) {
     requestAnimationFrame(drawTimeLine);
   }
