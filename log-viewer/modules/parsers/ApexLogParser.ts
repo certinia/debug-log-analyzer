@@ -325,7 +325,7 @@ class ApexLogParser {
           });
         }
       }
-      currentNodes = result.get(currentDepth++) || [];
+      currentNodes = result.get(currentDepth++) ?? [];
       len = currentNodes.length;
     }
 
@@ -344,7 +344,7 @@ class ApexLogParser {
     const nodesByDepth = this.flattenByDepth(nodes);
     let depth = nodesByDepth.size;
     while (depth--) {
-      const nds = nodesByDepth.get(depth) || [];
+      const nds = nodesByDepth.get(depth) ?? [];
       let i = nds.length;
       while (i--) {
         const parent = nds[i];
@@ -356,6 +356,7 @@ class ApexLogParser {
           parent.duration.self -= child.duration.total;
         });
       }
+      nodesByDepth.delete(depth);
     }
   }
 
@@ -459,7 +460,7 @@ export class DebugLevel {
 }
 
 export class LineIterator {
-  next: LogLine | null = null;
+  next: LogLine | null;
   lineGenerator: Generator<LogLine>;
 
   constructor(lineGenerator: Generator<LogLine>) {
@@ -509,7 +510,7 @@ export abstract class LogLine {
   /**
    * A parsed version of the log line text useful for display in UIs
    */
-  text = '';
+  text;
 
   // optional metadata
   /**
@@ -566,7 +567,7 @@ export abstract class LogLine {
   /**
    * The timestamp of this log line, in nanoseconds
    */
-  timestamp = 0;
+  timestamp;
 
   /**
    * The time spent.
@@ -633,6 +634,9 @@ export abstract class LogLine {
       const [timeData, type] = parts;
       this.text = this.type = type as LogEventType;
       this.timestamp = this.parseTimestamp(timeData || '');
+    } else {
+      this.timestamp = 0;
+      this.text = '';
     }
   }
 
@@ -2470,23 +2474,23 @@ class MatchEngineBegin extends Method {
 }
 
 function getLogEventClass(eventName: LogEventType): LogLineConstructor | null | undefined {
+  if (!eventName) {
+    return null;
+  }
+
   // Fast path for the most commonly occuring types
   switch (eventName) {
     case 'METHOD_ENTRY':
       return MethodEntryLine;
-      break;
 
     case 'METHOD_EXIT':
       return MethodExitLine;
-      break;
 
     case 'CONSTRUCTOR_ENTRY':
       return ConstructorEntryLine;
-      break;
 
     case 'CONSTRUCTOR_EXIT':
       return ConstructorExitLine;
-      break;
 
     default:
       break;
@@ -2506,7 +2510,10 @@ function getLogEventClass(eventName: LogEventType): LogLineConstructor | null | 
 }
 
 type LogLineConstructor<T extends LogLine = LogLine> = new (parts: string[]) => T;
-export const lineTypeMap = new Map<LogEventType, LogLineConstructor>([
+export const lineTypeMap: ReadonlyMap<LogEventType, LogLineConstructor> = new Map<
+  LogEventType,
+  LogLineConstructor
+>([
   ['BULK_DML_RETRY', BulkDMLEntry],
   ['BULK_HEAP_ALLOCATE', BulkHeapAllocateLine],
   ['CALLOUT_REQUEST', CalloutRequestLine],
