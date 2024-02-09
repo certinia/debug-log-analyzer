@@ -182,7 +182,7 @@ class ApexLogParser {
     this.lastTimestamp = currentLine.timestamp;
     currentLine.namespace ||= 'default';
 
-    const isEntry = currentLine.exitTypes.length > 0;
+    const isEntry = currentLine.exitTypes.length;
     if (isEntry) {
       const exitOnNextLine = currentLine.nextLineIsExit;
       let nextLine;
@@ -193,29 +193,27 @@ class ApexLogParser {
         // discontinuities are stack unwinding (caused by Exceptions)
         this.discontinuity ||= nextLine.discontinuity; // start unwinding stack
 
+        // Exit Line has been found no more work needed
         if (
+          !exitOnNextLine &&
+          !nextLine.nextLineIsExit &&
+          nextLine.isExit &&
+          !nextLine.exitTypes.length &&
+          this.endMethod(currentLine, nextLine, lineIter, stack)
+        ) {
+          // the method wants to see the exit line
+          currentLine.onEnd?.(nextLine, stack);
+          break;
+        } else if (
           exitOnNextLine &&
           (nextLine.nextLineIsExit || nextLine.isExit || nextLine.exitTypes.length > 0)
         ) {
           currentLine.exitStamp = nextLine.timestamp;
           currentLine.onEnd?.(nextLine, stack);
           break;
-        }
-
-        // Exit Line has been found no more work needed
-        if (
-          !nextLine.nextLineIsExit &&
-          nextLine.isExit &&
-          this.endMethod(currentLine, nextLine, lineIter, stack)
-        ) {
-          // the method wants to see the exit line
-          currentLine.onEnd?.(nextLine, stack);
-          break;
-        }
-
-        if (
-          this.maxSizeTimestamp &&
+        } else if (
           this.discontinuity &&
+          this.maxSizeTimestamp &&
           nextLine.timestamp > this.maxSizeTimestamp
         ) {
           // The current line was truncated (we did not find the exit line before the end of log) and there was a discontinuity
