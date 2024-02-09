@@ -368,9 +368,7 @@ class ApexLogParser {
     for (let i = 0; i < len; i++) {
       const child = children[i];
       if (child) {
-        const childType = child.type,
-          isPkgType = childType === 'ENTERING_MANAGED_PKG';
-
+        const isPkgType = child.type === 'ENTERING_MANAGED_PKG';
         if (lastPkg && child instanceof TimedNode) {
           if (isPkgType && child.namespace === lastPkg.namespace) {
             // combine adjacent (like) packages
