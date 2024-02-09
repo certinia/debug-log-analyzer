@@ -46,6 +46,7 @@ class ApexLogParser {
   lastTimestamp = 0;
   discontinuity = false;
   namespaces: string[] = [];
+  namespacesUniq = new Set<string>();
 
   /**
    * Takes string input of a log and returns the ApexLog class, which represents a log tree
@@ -66,54 +67,54 @@ class ApexLogParser {
   }
 
   private parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
-    const parts = line.split('|'),
-      type = parts[1] || '';
+    const parts = line.split('|');
 
+    const type = parts[1] ?? '';
     const metaCtor = getLogEventClass(type as LogEventType);
     if (metaCtor) {
       const entry = new metaCtor(parts);
       entry.logLine = line;
       lastEntry?.onAfter?.(this, entry);
-      entry.namespace &&
-        !this.namespaces.includes(entry.namespace) &&
+      if (entry.namespace && !this.namespacesUniq.has(entry.namespace)) {
         this.namespaces.push(entry.namespace);
+        this.namespacesUniq.add(entry.namespace);
+      }
       return entry;
     }
 
-    if ((!type || !typePattern.test(type)) && lastEntry && lastEntry.acceptsText) {
+    const hasType = type && typePattern.test(type);
+    if (!hasType && lastEntry?.acceptsText) {
       // wrapped text from the previous entry?
-      lastEntry.text += `\n${line}`;
-    } else if (type && typePattern.test(type)) {
+      lastEntry.text += '\n' + line;
+    } else if (hasType) {
       const message = `Unsupported log event name: ${type}`;
       !this.parsingErrors.includes(message) && this.parsingErrors.push(message);
+    } else if (lastEntry && line.startsWith('*** Skipped')) {
+      this.addLogIssue(
+        lastEntry.timestamp,
+        'Skipped-Lines',
+        `${line}. A section of the log has been skipped and the log has been truncated. Full details of this section of log can not be provided.`,
+        'skip',
+      );
+    } else if (lastEntry && line.indexOf('MAXIMUM DEBUG LOG SIZE REACHED') !== -1) {
+      this.addLogIssue(
+        lastEntry.timestamp,
+        'Max-Size-reached',
+        'The maximum log size has been reached. Part of the log has been truncated.',
+        'skip',
+      );
+      this.maxSizeTimestamp = lastEntry.timestamp;
+    } else if (!hasType && settingsPattern.test(line)) {
+      // skip an unexpected settings line
     } else {
-      if (lastEntry && line.startsWith('*** Skipped')) {
-        this.addLogIssue(
-          lastEntry.timestamp,
-          'Skipped-Lines',
-          `${line}. A section of the log has been skipped and the log has been truncated. Full details of this section of log can not be provided.`,
-          'skip',
-        );
-      } else if (lastEntry && line.indexOf('MAXIMUM DEBUG LOG SIZE REACHED') >= 0) {
-        this.addLogIssue(
-          lastEntry.timestamp,
-          'Max-Size-reached',
-          'The maximum log size has been reached. Part of the log has been truncated.',
-          'skip',
-        );
-        this.maxSizeTimestamp = lastEntry.timestamp;
-      } else if (settingsPattern.test(line)) {
-        // skip an unexpected settings line
-      } else {
-        this.parsingErrors.push(`Invalid log line: ${line}`);
-      }
+      this.parsingErrors.push(`Invalid log line: ${line}`);
     }
 
     return null;
   }
 
   private *generateLogLines(log: string): Generator<LogLine> {
-    const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index || 0;
+    const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index ?? 0;
     if (start > 0) {
       log = log.slice(start);
     }
