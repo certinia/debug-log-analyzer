@@ -12,12 +12,12 @@ jobs:
     name: Verify Files
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
         with:
           version: 8
       - name: Set up Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '16.x'
           cache: 'pnpm'
@@ -30,12 +30,12 @@ jobs:
     name: Run Log-viewer Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
         with:
           version: 8
       - name: Set up Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '16'
           cache: 'pnpm'
@@ -49,12 +49,12 @@ jobs:
     name: Verify VSCode Package Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
         with:
           version: 8
       - name: Set up Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '16'
           cache: 'pnpm'
