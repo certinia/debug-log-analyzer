@@ -95,8 +95,8 @@ importers:
   lana:
     dependencies:
       '@apexdevtools/apex-ls':
-        specifier: ^4.3.1
-        version: 4.3.1
+        specifier: ^5.0.0
+        version: 5.0.0
       '@apexdevtools/sfdx-auth-helper':
         specifier: ^2.1.0
         version: 2.1.0
@@ -181,22 +181,14 @@ packages:
       '@jridgewell/trace-mapping': 0.3.22
     dev: true
 
-  /@apexdevtools/apex-ls@4.3.1:
-    resolution: {integrity: sha512-sj2cClOfV/E5nXgqKCglsbS0xmZdAAfTQsp42eb8/ShoathZpyu7Liy3CWRy8cObbZZ3zizUuKPwenP0lrgPDA==}
+  /@apexdevtools/apex-ls@5.0.0:
+    resolution: {integrity: sha512-rc8NJd9lnkMJrOYJIOTLWgAhgKt2+epbILyS/XMXl8KjuQ7g1CP6Btgbhm7r3AbgWHu+b8/607ewc9/NFpnhsQ==}
     engines: {node: '>=14.0.0'}
     dependencies:
-      '@apexdevtools/apex-parser': 3.3.0
+      '@apexdevtools/apex-parser': 3.5.0
       '@apexdevtools/vf-parser': 1.1.0
       '@xmldom/xmldom': 0.7.9
       antlr4ts: 0.5.0-alpha.4
-    dev: false
-
-  /@apexdevtools/apex-parser@3.3.0:
-    resolution: {integrity: sha512-RK36FBytyIlVUWlH9RXadxEL+aZ9vNG5cEuLFWBuwLAsVQA3xU35Uw4CYDEDSoTjbOHcI8PXcEqTC5i3E/tADA==}
-    engines: {node: '>=8.0.0'}
-    dependencies:
-      antlr4ts: 0.5.0-alpha.4
-      node-dir: 0.1.17
     dev: false
 
   /@apexdevtools/apex-parser@3.5.0:
