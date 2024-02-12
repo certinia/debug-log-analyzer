@@ -328,6 +328,8 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+<!-- v1.14.0 -->
+
 [#475]: https://github.com/certinia/debug-log-analyzer/issues/475
 [#299]: https://github.com/certinia/debug-log-analyzer/issues/299
 [#202]: https://github.com/certinia/debug-log-analyzer/issues/202
