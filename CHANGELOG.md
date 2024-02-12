@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Apex Log Parser is up to 3X faster ([#475][#475])
+- Apex Log Parsing is up to 3X faster ([#475][#475])
 - Go to file multiple workspace handling simplified ([#202][#202])
   - Go to file from Call Tree will only ask you to select a workspace if more than one matching file is found in multiple workspaces, instead of everytime.
 
