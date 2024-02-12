@@ -5,17 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.14.0] - 2024-02-12
 
 ### Added
 
 - View, Filter and Group by namespace on the Call Tree, Analysis + Database views ([#299][#299])
-- View and Filter : Call Tree, Analysis and Database views
-- Group by : Analysis and Database views
+  - View and Filter by namespace on the Call Tree, Analysis and Database views
+  - Group by namespace on the Analysis and Database views
 
 ### Changed
 
-- Apex Log Parser Speed improveed to between 2 and 3 faster ([#475][#475])
+- Apex Log Parsing is up to 3X faster ([#475][#475])
 - Go to file multiple workspace handling simplified ([#202][#202])
   - Go to file from Call Tree will only ask you to select a workspace if more than one matching file is found in multiple workspaces, instead of everytime.
 
