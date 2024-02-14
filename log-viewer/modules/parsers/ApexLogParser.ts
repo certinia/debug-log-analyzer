@@ -476,7 +476,7 @@ export class LineIterator {
   }
 }
 
-interface LogIssue {
+export interface LogIssue {
   startTime?: number;
   summary: string;
   description: string;

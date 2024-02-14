@@ -9,6 +9,7 @@ import {
   LogLine,
   Method,
   TimedNode,
+  type LogIssue,
   type LogSubCategory,
 } from '../parsers/ApexLogParser.js';
 
@@ -577,6 +578,16 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
 }
 
 function findTruncatedTooltip(x: number): HTMLDivElement | null {
+  const logIssue = findLogIssue(x);
+  if (logIssue) {
+    const toolTip = document.createElement('div');
+    toolTip.textContent = logIssue.summary;
+    return toolTip;
+  }
+  return null; // target not found!
+}
+
+function findLogIssue(x: number): LogIssue | null {
   const issues = timelineRoot.logIssues;
   const len = issues?.length;
   let i = 0;
@@ -591,9 +602,7 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
         endX = endTime * state.zoom - state.offsetX;
 
       if (x >= startX && x <= endX) {
-        const toolTip = document.createElement('div');
-        toolTip.textContent = thisEntry.summary;
-        return toolTip;
+        return thisEntry;
       }
     }
   }
