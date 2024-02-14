@@ -537,44 +537,48 @@ export async function goToRow(timestamp: number) {
   document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
   await renderCallTree(tableContainer, rootMethod);
 
-  let treeRow: RowComponent | null = null;
-  const rows = calltreeTable.getRows();
-  const len = rows.length;
-  for (let i = 0; i < len; i++) {
-    const row = rows[i];
-    treeRow = row ? findByTime(row, timestamp) : null;
-    if (treeRow) {
-      break;
-    }
-  }
+  const treeRow = findByTime(calltreeTable.getRows(), timestamp);
   //@ts-expect-error This is a custom function added in by RowNavigation custom module
   calltreeTable.goToRow(treeRow);
 }
 
-function findByTime(row: RowComponent, timeStamp: number): RowComponent | null {
-  if (timeStamp) {
-    const node = (row.getData() as CalltreeRow).originalData;
-    if (node.timestamp === timeStamp) {
-      return row;
+function findByTime(rows: RowComponent[], timeStamp: number): RowComponent | null {
+  if (!rows) {
+    return null;
+  }
+
+  let start = 0,
+    end = rows.length - 1;
+
+  // Iterate as long as the beginning does not encounter the end.
+  while (start <= end) {
+    // find out the middle index
+    const mid = Math.floor((start + end) / 2);
+
+    const row = rows[mid];
+
+    if (!row) {
+      break;
     }
-    if (node instanceof TimedNode) {
-      // do not search children is the timestamp is outside of the parents timeframe
-      if (node.exitStamp && !(timeStamp >= node.timestamp && timeStamp <= node.exitStamp)) {
-        return null;
-      }
+    const node = (row.getData() as CalltreeRow).originalData as TimedNode;
 
-      const treeChildren = row.getTreeChildren();
-      const len = treeChildren.length;
-      for (let i = 0; i < len; ++i) {
-        const child = treeChildren[i];
-
-        const target = child ? findByTime(child, timeStamp) : null;
-        if (target) {
-          return target;
-        }
-      }
+    // Return True if the element is present in the middle.
+    const isInRange = node.exitStamp && timeStamp >= node.timestamp && timeStamp <= node.exitStamp;
+    if (timeStamp === node.timestamp) {
+      return row;
+    } else if (isInRange) {
+      return findByTime(row.getTreeChildren(), timeStamp);
+    }
+    // Otherwise, look in the left or right half
+    else if (node.exitStamp && timeStamp > node.exitStamp) {
+      start = mid + 1;
+    } else if (timeStamp < node.timestamp) {
+      end = mid - 1;
+    } else {
+      return null;
     }
   }
+
   return null;
 }
 
