@@ -24,7 +24,6 @@ import { ApexLog, LogLine, TimedNode, type LogEventType } from '../../parsers/Ap
 import { hostService } from '../../services/VSCodeService.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../skeleton/GridSkeleton.js';
-import treeViewStyles from './TreeView.scss';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
@@ -57,7 +56,6 @@ export class CalltreeView extends LitElement {
 
   static styles = [
     unsafeCSS(dataGridStyles),
-    unsafeCSS(treeViewStyles),
     globalStyles,
     css`
       :host {
