@@ -322,7 +322,10 @@ export async function renderCallTree(
             let text = node.text;
             if (node.hasValidSymbols) {
               text += node.lineNumber ? `:${node.lineNumber}` : '';
-              return `<a href="#!">${text}</a>`;
+              const link = document.createElement('a');
+              link.setAttribute('href', '#!');
+              link.textContent = text;
+              return link;
             }
 
             const excludedTypes: LogEventType[] = ['SOQL_EXECUTE_BEGIN', 'DML_BEGIN'];
@@ -331,7 +334,10 @@ export async function renderCallTree(
                 (!excludedTypes.includes(node.type) && node.type !== text ? node.type + ': ' : '') +
                   text) ||
               '';
-            return text;
+
+            const textSpan = document.createElement('span');
+            textSpan.textContent = text;
+            return textSpan;
           },
           variableHeight: true,
           cellClick: (e, cell) => {
