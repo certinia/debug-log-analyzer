@@ -671,9 +671,15 @@ function onClickCanvas(): void {
   const isClick = mouseDownPosition.x === lastMouseX && mouseDownPosition.y === lastMouseY;
   if (!dragging && isClick) {
     const depth = getDepth(lastMouseY);
-    const target = findByPosition(timelineRoot, -1, lastMouseX, depth);
-    if (target && target.timestamp) {
-      goToRow(target.timestamp);
+    const timeStamp = findByPosition(
+      timelineRoot.children as TimedNode[],
+      0,
+      lastMouseX,
+      depth,
+    )?.timestamp;
+
+    if (timeStamp) {
+      goToRow(timeStamp);
     }
   }
 }
