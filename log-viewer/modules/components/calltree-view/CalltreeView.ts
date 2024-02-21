@@ -62,7 +62,6 @@ export class CalltreeView extends LitElement {
         height: 100%;
         width: 100%;
         display: flex;
-        flex: 1;
       }
 
       #call-tree-container {
@@ -70,13 +69,18 @@ export class CalltreeView extends LitElement {
         flex-direction: column;
         height: 100%;
         width: 100%;
-        min-height: 0%;
-        min-width: 0%;
-        flex: 1;
+        min-height: 0;
+        min-width: 0;
       }
 
       #call-tree-table-container {
-        min-height: 0px;
+        height: 100%;
+        flex-grow: 1;
+        min-height: 0;
+      }
+
+      #call-tree-table {
+        height: 100%;
       }
 
       .checkbox__middle {
@@ -170,7 +174,6 @@ export class CalltreeView extends LitElement {
 
     calltreeTable.restoreRedraw();
   }
-
   _expandButtonClick() {
     calltreeTable.blockRedraw();
     expandCollapseAll(calltreeTable.getRows(), true);
@@ -187,13 +190,16 @@ export class CalltreeView extends LitElement {
     const callTreeWrapper = this._callTreeTableWrapper;
     rootMethod = this.timelineRoot;
     if (callTreeWrapper && rootMethod) {
-      const analysisObserver = new IntersectionObserver((entries, observer) => {
-        const visible = entries[0]?.isIntersecting;
-        if (rootMethod && visible) {
-          renderCallTree(callTreeWrapper, rootMethod);
-          observer.disconnect();
-        }
-      });
+      const analysisObserver = new IntersectionObserver(
+        (entries, observer) => {
+          const visible = entries[0]?.isIntersecting;
+          if (rootMethod && visible) {
+            renderCallTree(callTreeWrapper, rootMethod);
+            observer.disconnect();
+          }
+        },
+        { threshold: 1 },
+      );
       analysisObserver.observe(callTreeWrapper);
     }
   }
@@ -240,20 +246,24 @@ export async function renderCallTree(
     // Ensure the table is fully visible before attempting to do things e.g go to rows.
     // Otherwise there are visible rendering issues.
     await new Promise((resolve, reject) => {
-      const visibilityObserver = new IntersectionObserver((entries, observer) => {
-        const entry = entries[0];
-        const visible = entry?.isIntersecting && entry?.intersectionRatio > 0;
-        if (visible) {
-          resolve(true);
-          observer.disconnect();
-        } else {
-          reject();
-        }
-      });
-
+      const visibilityObserver = new IntersectionObserver(
+        (entries, observer) => {
+          const entry = entries[0];
+          const visible = entry?.isIntersecting && entry?.intersectionRatio > 0;
+          if (visible) {
+            resolve(true);
+            observer.disconnect();
+          } else {
+            reject();
+          }
+        },
+        { threshold: 1 },
+      );
       visibilityObserver.observe(callTreeTableContainer);
     });
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+
     return Promise.resolve();
   }
 
