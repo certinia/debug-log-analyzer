@@ -483,9 +483,50 @@ export async function renderCallTree(
     });
 
     calltreeTable.on('tableBuilt', () => {
-      resolve();
       //@ts-expect-error valid
       calltreeTable.addFilter(showDetailsFilter);
+      resolve();
+    });
+
+    let middleRow: RowComponent | null;
+    calltreeTable.on('renderStarted', () => {
+      if (calltreeTable && !middleRow) {
+        middleRow = findMiddleVisibleRow(calltreeTable);
+      }
+    });
+
+    calltreeTable.on('renderComplete', async () => {
+      let rowToScrollTo = middleRow;
+
+      if (rowToScrollTo) {
+        //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+        const internalRow = rowToScrollTo._getSelf();
+        const displayRows = internalRow.table.rowManager.getDisplayRows();
+        const canScroll = displayRows.indexOf(internalRow) !== -1;
+        if (!canScroll) {
+          const node = (rowToScrollTo.getData() as CalltreeRow).originalData as TimedNode;
+          rowToScrollTo = findClosestActive(calltreeTable.getRows('active'), node.timestamp);
+        }
+
+        if (rowToScrollTo) {
+          calltreeTable.scrollToRow(rowToScrollTo, 'center', true).then(() => {
+            if (rowToScrollTo) {
+              // row.getElement().scrollIntoView
+
+              // NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
+              // This needs fixing in main tabulator lib
+              window.requestAnimationFrame(() => {
+                // table.scrollToRow(row, 'center', true);
+                rowToScrollTo
+                  ?.getElement()
+                  .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+              });
+            }
+          });
+        }
+      }
+
+      middleRow = null;
     });
   });
 }
@@ -494,15 +535,12 @@ function expandCollapseAll(rows: RowComponent[], expand: boolean = true) {
   const len = rows.length;
   for (let i = 0; i < len; i++) {
     const row = rows[i];
-    if (row) {
-      if (expand) {
-        row.treeExpand();
-      } else {
-        row.treeCollapse();
-      }
-
-      expandCollapseAll(row.getTreeChildren(), expand);
+    if (!row) {
+      continue;
     }
+
+    expand ? row.treeExpand() : row.treeCollapse();
+    expandCollapseAll(row.getTreeChildren(), expand);
   }
 }
 
@@ -562,9 +600,7 @@ function findByTime(rows: RowComponent[], timeStamp: number): RowComponent | nul
   while (start <= end) {
     // find out the middle index
     const mid = Math.floor((start + end) / 2);
-
     const row = rows[mid];
-
     if (!row) {
       break;
     }
@@ -587,6 +623,137 @@ function findByTime(rows: RowComponent[], timeStamp: number): RowComponent | nul
     }
   }
 
+  return null;
+}
+
+function findClosestActive(rows: RowComponent[], timeStamp: number): RowComponent | null {
+  if (!rows) {
+    return null;
+  }
+
+  let start = 0,
+    end = rows.length - 1;
+
+  // Iterate as long as the beginning does not encounter the end.
+  while (start <= end) {
+    // find out the middle index
+    const mid = Math.floor((start + end) / 2);
+    const row = rows[mid];
+
+    if (!row) {
+      break;
+    }
+    const node = (row.getData() as CalltreeRow).originalData as TimedNode;
+
+    //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+    const internalRow = row._getSelf();
+    const displayRows = internalRow.table.rowManager.getDisplayRows();
+
+    if (timeStamp === node.timestamp) {
+      const isActive = displayRows.indexOf(internalRow) !== -1;
+      if (isActive) {
+        return row;
+      }
+
+      return findClosestActiveSibling(mid, rows, displayRows);
+    } else if (node.exitStamp && timeStamp >= node.timestamp && timeStamp <= node.exitStamp) {
+      const childMatch = findClosestActive(row.getTreeChildren(), timeStamp);
+      if (childMatch) {
+        return childMatch;
+      }
+      return findClosestActiveSibling(mid, rows, displayRows);
+    }
+    // Otherwise, look in the left or right half
+    else if (node.exitStamp && timeStamp > node.exitStamp) {
+      start = mid + 1;
+    } else if (timeStamp < node.timestamp) {
+      end = mid - 1;
+    } else {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function findClosestActiveSibling(
+  midIndex: number,
+  rows: RowComponent[],
+  activeRows: RowComponent[],
+) {
+  const indexes = [];
+
+  let previousIndex = midIndex;
+  let previousVisible;
+  while (previousIndex >= 0) {
+    previousVisible = rows[previousIndex];
+    if (!previousVisible) {
+      continue;
+    }
+    //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+    const internalRow = previousVisible._getSelf();
+    const isActive = activeRows.indexOf(internalRow) !== -1;
+    if (previousVisible && isActive) {
+      indexes.push(previousIndex);
+      break;
+    }
+
+    previousIndex--;
+  }
+
+  const distanceFromMid = previousIndex > -1 ? midIndex - previousIndex : midIndex;
+
+  const len = rows.length;
+  let nextIndex = midIndex;
+  let nextVisible;
+  while (nextIndex >= 0 && nextIndex !== len && nextIndex - midIndex < distanceFromMid) {
+    nextVisible = rows[nextIndex];
+    if (!nextVisible) {
+      continue;
+    }
+
+    //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+    const internalRow = nextVisible._getSelf();
+    const isActive = activeRows.indexOf(internalRow) !== -1;
+    if (nextVisible && isActive) {
+      indexes.push(nextIndex);
+      break;
+    }
+    nextIndex++;
+  }
+
+  const closestIndex = indexes.length
+    ? indexes.reduce((a, b) => {
+        return Math.abs(b - midIndex) < Math.abs(a - midIndex) ? b : a;
+      })
+    : null;
+
+  return closestIndex ? rows[closestIndex] || null : null;
+}
+
+function findMiddleVisibleRow(table: Tabulator) {
+  const visibleRows = table.getRows('visible');
+  if (visibleRows.length === 1) {
+    return visibleRows[0] || null;
+  }
+
+  const tableRect = table.element.getBoundingClientRect();
+  const totalHeight = Math.round(tableRect.height / 2);
+
+  let currentHeight = 0;
+  for (const row of visibleRows) {
+    const elementRect = row.getElement().getBoundingClientRect();
+
+    const topDiff = tableRect.top - elementRect.top;
+    currentHeight += topDiff > 0 ? elementRect.height - topDiff : elementRect.height;
+
+    const bottomDiff = elementRect.bottom - tableRect.bottom;
+    currentHeight -= bottomDiff > 0 ? bottomDiff : 0;
+
+    if (Math.round(currentHeight) >= totalHeight) {
+      return row;
+    }
+  }
   return null;
 }
 

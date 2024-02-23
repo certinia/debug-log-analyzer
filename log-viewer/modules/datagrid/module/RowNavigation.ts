@@ -34,7 +34,20 @@ export class RowNavigation extends Module {
       row.select();
       table.restoreRedraw();
 
-      table.scrollToRow(row, 'center', true);
+      table.scrollToRow(row, 'center', true).then(() => {
+        if (row) {
+          // row.getElement().scrollIntoView
+
+          // NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
+          // This needs fixing in main tabulator lib
+          window.requestAnimationFrame(() => {
+            // table.scrollToRow(row, 'center', true);
+            const elem = row.getElement();
+            elem.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+            elem.focus();
+          });
+        }
+      });
     }
   }
 }
