@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Click on an Timeline Error to go to the Call Tree ([#481][#481])
+
 ### Changed
 
 - Call Tree to keep currently visible rows in view when filtering / expanding([#481][#481])

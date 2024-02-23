@@ -580,10 +580,15 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
 function findTruncatedTooltip(x: number): HTMLDivElement | null {
   const logIssue = findLogIssue(x);
   if (logIssue) {
+    canvas.classList.remove('timeline-hover', 'timeline-dragging');
+    canvas.classList.add('timeline-event--hover');
+
     const toolTip = document.createElement('div');
     toolTip.textContent = logIssue.summary;
     return toolTip;
   }
+  canvas.classList.add('timeline-hover');
+  canvas.classList.remove('timeline-event--hover');
   return null; // target not found!
 }
 
@@ -671,12 +676,16 @@ function onClickCanvas(): void {
   const isClick = mouseDownPosition.x === lastMouseX && mouseDownPosition.y === lastMouseY;
   if (!dragging && isClick) {
     const depth = getDepth(lastMouseY);
-    const timeStamp = findByPosition(
+    let timeStamp = findByPosition(
       timelineRoot.children as TimedNode[],
       0,
       lastMouseX,
       depth,
     )?.timestamp;
+
+    if (!timeStamp) {
+      timeStamp = findLogIssue(lastMouseX)?.startTime;
+    }
 
     if (timeStamp) {
       goToRow(timeStamp);
