@@ -5,10 +5,10 @@ import { Method } from '../../parsers/ApexLogParser.js';
 import { SOQLLinter } from '../../soql/SOQLLinter.js';
 
 describe('SOQL Linter rule tests', () => {
-  it('No where clause should return rule', () => {
+  it('No where clause should return rule', async () => {
     const soql = 'SELECT Id FROM ANOBJECT__c';
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
     const undoundedSoqlRule = {
       summary: 'SOQL is unbounded. Add a WHERE or LIMIT clause or both.',
       message:
@@ -19,10 +19,10 @@ describe('SOQL Linter rule tests', () => {
     expect(results).toEqual([undoundedSoqlRule]);
   });
 
-  it('Leading % wildcard should return rule', () => {
+  it('Leading % wildcard should return rule', async () => {
     const soql = "SELECT Id FROM ANOBJECT__c WHERE Name LIKE '%SomeName'";
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
     const leadingWildcardRule = {
       summary:
         'Avoid a leading "%" wildcard when using a LIKE clause. This will impact query performance.',
@@ -43,26 +43,26 @@ describe('LastModifiedDate Index Rule', () => {
     severity: 'Info',
   };
 
-  it('< on LastModifiedDate should return rule', () => {
+  it('< on LastModifiedDate should return rule', async () => {
     const soql = 'SELECT Id FROM Obj__c WHERE LastModifiedDate < TODAY';
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
 
     expect(results).toEqual([lastModifiedDateIndexRule]);
   });
 
-  it('> on LastModifiedDate should not return rule', () => {
+  it('> on LastModifiedDate should not return rule', async () => {
     const soql = 'SELECT Id FROM Obj__c WHERE LastModifiedDate > TODAY';
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
 
     expect(results).toEqual([]);
   });
 
-  it('= on LastModifiedDate should not return rule', () => {
+  it('= on LastModifiedDate should not return rule', async () => {
     const soql = 'SELECT Id FROM Obj__c WHERE LastModifiedDate = TODAY';
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
 
     expect(results).toEqual([]);
   });
@@ -77,42 +77,42 @@ describe('Negative Filter Operator Rule tests', () => {
     severity: 'Warning',
   };
 
-  it('!= : should return rule', () => {
+  it('!= : should return rule', async () => {
     const soql = "SELECT Id FROM ANOBJECT__c WHERE Name != 'A Name'";
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
 
     expect(results).toEqual([negativeFilterRule]);
   });
 
-  it('<> : should return rule', () => {
+  it('<> : should return rule', async () => {
     const soql = "SELECT Id FROM ANOBJECT__c WHERE Name <> 'A Name'";
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
 
     expect(results).toEqual([negativeFilterRule]);
   });
 
-  it('EXCLUDES : should return rule', () => {
+  it('EXCLUDES : should return rule', async () => {
     const soql = "SELECT Id FROM ANOBJECT__c WHERE Name EXCLUDES ('A Name')";
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
 
     expect(results).toEqual([negativeFilterRule]);
   });
 
-  it('NOT : should return rule', () => {
+  it('NOT : should return rule', async () => {
     const soql = "SELECT Id FROM ANOBJECT__c WHERE NOT Name = 'A Name'";
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
 
     expect(results).toEqual([negativeFilterRule]);
   });
 
-  it('NOT IN : should return rule', () => {
+  it('NOT IN : should return rule', async () => {
     const soql = "SELECT Id FROM ANOBJECT__c WHERE Id NOT IN ('a0000000000aaaa')";
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
 
     expect(results).toEqual([negativeFilterRule]);
   });
@@ -127,18 +127,18 @@ describe('Order By Without Limit Rule tests', () => {
     severity: 'Info',
   };
 
-  it('Order by only should return rule', () => {
+  it('Order by only should return rule', async () => {
     const soql = "SELECT Id FROM AnObject__c WHERE Status__c = 'Open' ORDER BY AField__c";
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
 
     expect(results).toEqual([orderByWithoutLimit]);
   });
 
-  it('Order by with limit should not return rule', () => {
+  it('Order by with limit should not return rule', async () => {
     const soql = 'SELECT Id FROM AnObject__c ORDER BY AField__c LIMIT 1000';
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
 
     expect(results).toEqual([]);
   });
@@ -152,7 +152,7 @@ describe('SOQL in Trigger Rule tests', () => {
     severity: 'Warning',
   };
 
-  it('soql in trigger should return rule', () => {
+  it('soql in trigger should return rule', async () => {
     const soql = 'SELECT Id FROM AnObject__c WHERE value__c > 0';
     const mockTriggerLine = new Method(
       [
@@ -169,15 +169,15 @@ describe('SOQL in Trigger Rule tests', () => {
     );
     mockTriggerLine.text = 'Account on Account trigger event AfterInsert';
 
-    const results = new SOQLLinter().lint(soql, [mockTriggerLine]);
+    const results = await new SOQLLinter().lint(soql, [mockTriggerLine]);
 
     expect(results).toEqual([triggerNonSelective]);
   });
 
-  it('soql outside trigger should not return rule', () => {
+  it('soql outside trigger should not return rule', async () => {
     const soql = 'SELECT Id FROM AnObject__c WHERE value__c > 0';
 
-    const results = new SOQLLinter().lint(soql);
+    const results = await new SOQLLinter().lint(soql);
 
     expect(results).toEqual([]);
   });
