@@ -6,10 +6,10 @@ import { SOQLParser, SOQLTree } from './SOQLParser.js';
 
 //todo : need a general concept of stack (to pull out linter)
 export class SOQLLinter {
-  lint(soql: string, stack?: Stack): SOQLLinterRule[] {
+  async lint(soql: string, stack?: Stack): Promise<SOQLLinterRule[]> {
     const results: SOQLLinterRule[] = [];
 
-    const tree = new SOQLParser().parse(soql);
+    const tree = await new SOQLParser().parse(soql);
     const rules = [
       new UnboundedSOQLRule(),
       new LeadingPercentWildcardRule(),
