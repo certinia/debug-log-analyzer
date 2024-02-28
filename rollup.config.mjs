@@ -48,11 +48,12 @@ export default [
     ],
   },
   {
-    input: './log-viewer/modules/Main.ts',
+    input: { bundle: './log-viewer/modules/Main.ts' },
     output: [
       {
         format: 'es',
-        file: './log-viewer/out/bundle.js',
+        dir: './log-viewer/out',
+        chunkFileNames: '[name].js',
         sourcemap: false,
       },
     ],
@@ -79,6 +80,7 @@ export default [
             // swc's minify option here
             mangle: true,
             compress: true,
+            module: true,
           }),
         ),
       minifyHTML({
