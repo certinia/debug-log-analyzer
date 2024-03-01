@@ -20,8 +20,7 @@ export default [
     input: './lana/src/Main.ts',
     output: {
       format: 'cjs',
-      dir: './lana/out',
-      chunkFileNames: 'lana-[name].js',
+      file: './lana/out/Main.js',
       sourcemap: false,
     },
     external: ['vscode'],
