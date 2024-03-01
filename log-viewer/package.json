@@ -16,18 +16,18 @@
     "@apexdevtools/apex-parser": "^3.5.0",
     "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",
-    "lit": "^3.1.0",
-    "tabulator-tables": "^5.5.2"
+    "lit": "^3.1.2",
+    "tabulator-tables": "^5.5.4"
   },
   "devDependencies": {
-    "@types/tabulator-tables": "^5.5.4",
-    "@typescript-eslint/eslint-plugin": "^6.14.0",
-    "@typescript-eslint/parser": "^6.14.0",
+    "@types/tabulator-tables": "^5.5.8",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
     "concurrently": "^8.2.2",
     "http-server": "^14.1.1",
     "node-sass": "^9.0.0",
-    "postcss": "^8.4.32",
-    "sass": "^1.69.5",
+    "postcss": "^8.4.35",
+    "sass": "^1.70.0",
     "typescript": "^5.3.3"
   }
 }

@@ -45,12 +45,12 @@ export class SOQLLinterIssues extends LitElement {
     `,
   ];
 
-  updated(changedProperties: PropertyValues): void {
+  async updated(changedProperties: PropertyValues): Promise<void> {
     if (changedProperties.has('soql')) {
       const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() || [];
       const soqlLine = stack[0] as SOQLExecuteBeginLine;
       this.issues = this.getIssuesFromSOQLLine(soqlLine);
-      this.issues = this.issues.concat(new SOQLLinter().lint(this.soql, stack));
+      this.issues = this.issues.concat(await new SOQLLinter().lint(this.soql, stack));
       this.issues.sort((a, b) => {
         return SEVERITY_TYPES.indexOf(a.severity) - SEVERITY_TYPES.indexOf(b.severity);
       });
