@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.1] - 2024-03-01
+
+### Fixed
+
+- `Log: Retrieve Apex Log And Show Analysis` not working ([#490][#490])
+
 ## [1.14.0] - 2024-02-12
 
 ### Added
@@ -326,7 +332,11 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Add explorer menu item
 - Provide more information when selecting log to download
 
-<!-- Unreleased -->
+<!-- v1.14.1 -->
+
+[#490]: https://github.com/certinia/debug-log-analyzer/issues/490
+
+<!-- v1.14.0 -->
 
 [#475]: https://github.com/certinia/debug-log-analyzer/issues/475
 [#299]: https://github.com/certinia/debug-log-analyzer/issues/299
