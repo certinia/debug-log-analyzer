@@ -21,7 +21,7 @@ export default [
     output: {
       format: 'cjs',
       dir: './lana/out',
-      chunkFileNames: '[name].js',
+      chunkFileNames: 'lana-[name].js',
       sourcemap: false,
     },
     external: ['vscode'],
@@ -53,7 +53,7 @@ export default [
       {
         format: 'es',
         dir: './log-viewer/out',
-        chunkFileNames: '[name].js',
+        chunkFileNames: 'log-viewer-[name].js',
         sourcemap: false,
       },
     ],
