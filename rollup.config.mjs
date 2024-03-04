@@ -6,12 +6,7 @@ import copy from 'rollup-plugin-copy';
 import { minifyHTML } from 'rollup-plugin-minify-html';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
-import {
-  defineRollupSwcMinifyOption,
-  defineRollupSwcOption,
-  minify,
-  swc,
-} from 'rollup-plugin-swc3';
+import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
 
 const production = process.env.NODE_ENV === 'production';
 console.log('Package mode:', production ? 'production' : 'development');
@@ -20,9 +15,11 @@ export default [
     input: './lana/src/Main.ts',
     output: {
       format: 'cjs',
-      file: './lana/out/Main.js',
+      dir: './lana/out',
+      chunkFileNames: 'lana-[name].js',
       sourcemap: false,
     },
+
     external: ['vscode'],
     plugins: [
       nodeResolve({ preferBuiltins: true, dedupe: ['@salesforce/core'] }),
@@ -33,17 +30,18 @@ export default [
           include: /\.[mc]?[jt]sx?$/,
           exclude: 'node_modules',
           tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
-          jsc: { transform: { useDefineForClassFields: false } },
+          jsc: {
+            minify: {
+              compress: production,
+              mangle: production
+                ? {
+                    keep_classnames: true,
+                  }
+                : false,
+            },
+          },
         }),
       ),
-      production &&
-        minify(
-          defineRollupSwcMinifyOption({
-            // swc's minify option here
-            mangle: true,
-            compress: true,
-          }),
-        ),
     ],
   },
   {
@@ -66,22 +64,23 @@ export default [
           include: /\.[mc]?[jt]sx?$/,
           exclude: 'node_modules',
           tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
-          jsc: { transform: { useDefineForClassFields: false } },
+          jsc: {
+            transform: { useDefineForClassFields: false },
+            minify: {
+              compress: production,
+              mangle: production
+                ? {
+                    keep_classnames: true,
+                  }
+                : false,
+            },
+          },
         }),
       ),
       postcss({
         extensions: ['.css', '.scss'],
         minimize: true,
       }),
-      production &&
-        minify(
-          defineRollupSwcMinifyOption({
-            // swc's minify option here
-            mangle: true,
-            compress: true,
-            module: true,
-          }),
-        ),
       minifyHTML({
         targets: [
           {

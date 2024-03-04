@@ -1,15 +1,8 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
+import { type QueryContext } from '@apexdevtools/apex-parser';
 import {
-  ApexLexer,
-  ApexParser,
-  CaseInsensitiveInputStream,
-  type QueryContext,
-} from '@apexdevtools/apex-parser';
-import {
-  CharStreams,
-  CommonTokenStream,
   type ANTLRErrorListener,
   type RecognitionException,
   type Recognizer,
@@ -78,6 +71,14 @@ export class SOQLTree {
 
 export class SOQLParser {
   async parse(query: string): Promise<SOQLTree> {
+    // Dynamic import for code splitting. Improves performance by reducing the amount of JS that is loaded and parsed at the start.
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const { ApexLexer, ApexParser, CaseInsensitiveInputStream } = await import(
+      '@apexdevtools/apex-parser'
+    );
+    // Dynamic import for code splitting. Improves performance by reducing the amount of JS that is loaded and parsed at the start.
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const { CharStreams, CommonTokenStream } = await import('antlr4ts');
     const lexer = new ApexLexer(new CaseInsensitiveInputStream(CharStreams.fromString(query)));
     const tokens = new CommonTokenStream(lexer);
     const parser = new ApexParser(tokens);
