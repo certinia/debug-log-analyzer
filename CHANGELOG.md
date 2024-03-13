@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Faster Extension startup time, roughly 12 times faster.
+- Faster Extension startup time, roughly 12 times faster and starts up time is less than 10ms.
 
 ## [1.14.1] - 2024-03-01
 
