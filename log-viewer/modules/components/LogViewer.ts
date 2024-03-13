@@ -101,8 +101,8 @@ export class LogViewer extends LitElement {
   }
 
   async _readLog(logUri: string): Promise<string> {
-    if (logUri) {
-      return fetch(logUri)
+    if ((logUri && logUri.startsWith('https://file')) || logUri.startsWith('file://')) {
+      return fetch(new URL(logUri), { mode: 'cors' })
         .then((response) => {
           if (response.ok) {
             return response.text();
@@ -126,6 +126,11 @@ export class LogViewer extends LitElement {
           return Promise.resolve('');
         });
     } else {
+      const logMessage = new Notification();
+      logMessage.summary = 'Could not read log';
+      logMessage.message = '';
+      logMessage.severity = 'Error';
+      this.notifications.push(logMessage);
       return Promise.resolve('');
     }
   }
