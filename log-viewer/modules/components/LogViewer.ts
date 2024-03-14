@@ -103,7 +103,7 @@ export class LogViewer extends LitElement {
   async _readLog(logUri: string): Promise<string> {
     const logURL = new URL(logUri);
     if (logUri && this.uriIsValid(logURL)) {
-      return fetch('')
+      return fetch(logURL)
         .then((response) => {
           if (response.ok) {
             return response.text();
