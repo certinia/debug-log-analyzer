@@ -102,10 +102,8 @@ export class LogViewer extends LitElement {
 
   async _readLog(logUri: string): Promise<string> {
     const vsCodeHost = 'https://file+.vscode-resource.vscode-cdn.net/';
-    const prefix = logUri.startsWith(vsCodeHost) ? vsCodeHost : 'file:///';
-    const logPath = prefix + logUri.replace(vsCodeHost, '');
-    const logURL = new URL(logPath);
-    if (logUri) {
+    const logURL = new URL(logUri);
+    if (logURL.hostname === vsCodeHost || logURL.protocol === 'file:') {
       return fetch(logURL)
         .then((response) => {
           if (response.ok) {
