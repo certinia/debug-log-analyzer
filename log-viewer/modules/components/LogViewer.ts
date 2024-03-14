@@ -101,8 +101,9 @@ export class LogViewer extends LitElement {
   }
 
   async _readLog(logUri: string): Promise<string> {
-    if ((logUri && logUri.startsWith('https://file')) || logUri.startsWith('file://')) {
-      return fetch(new URL(logUri), { mode: 'cors' })
+    const logURL = new URL(logUri);
+    if (logUri && this.uriIsValid(logURL)) {
+      return fetch('')
         .then((response) => {
           if (response.ok) {
             return response.text();
@@ -111,12 +112,8 @@ export class LogViewer extends LitElement {
           }
         })
         .catch((err: unknown) => {
-          let msg;
-          if (err instanceof Error) {
-            msg = err.name === 'TypeError' ? name : err.message;
-          } else {
-            msg = String(err);
-          }
+          const msg = err instanceof Error ? err.message : String(err);
+
           const logMessage = new Notification();
           logMessage.summary = 'Could not read log';
           logMessage.message = msg || '';
@@ -128,11 +125,23 @@ export class LogViewer extends LitElement {
     } else {
       const logMessage = new Notification();
       logMessage.summary = 'Could not read log';
-      logMessage.message = '';
+      logMessage.message = 'Invalid Log Path';
       logMessage.severity = 'Error';
       this.notifications.push(logMessage);
       return Promise.resolve('');
     }
+  }
+
+  private uriIsValid(url: URL): boolean {
+    if (url.protocol === 'https:' && url.hostname === 'file+.vscode-resource.vscode-cdn.net') {
+      return true;
+    }
+
+    if (url.protocol === 'file:' && url.hostname === 'file+.vscode-resource.vscode-cdn.net') {
+      return true;
+    }
+
+    return false;
   }
 
   severity = new Map<string, NotificationSeverity>([
