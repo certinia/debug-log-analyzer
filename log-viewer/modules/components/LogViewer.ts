@@ -74,8 +74,7 @@ export class LogViewer extends LitElement {
     this.logName = data.logName?.trim() || '';
     this.logPath = data.logPath?.trim() || '';
 
-    const logUri = data.logUri;
-    const logData = data.logData || (await this._readLog(logUri || ''));
+    const logData = data.logData || (await this._readLog(data));
 
     const apexLog = parse(logData);
 
@@ -100,11 +99,17 @@ export class LogViewer extends LitElement {
     this.logStatus = 'Ready';
   }
 
-  async _readLog(logUri: string): Promise<string> {
-    const vsCodeHost = 'https://file+.vscode-resource.vscode-cdn.net/';
-    const logURL = new URL(logUri);
-    if (logURL.hostname === vsCodeHost || logURL.protocol === 'file:') {
-      return fetch(logURL)
+  async _readLog(data: LogDataEvent): Promise<string> {
+    const suppliedLogURL = new URL(data.logUri ?? '');
+    const logHost =
+      suppliedLogURL.hostname === 'file+.vscode-resource.vscode-cdn.net'
+        ? 'file+.vscode-resource.vscode-cdn.net'
+        : suppliedLogURL.hostname;
+    const logPath = suppliedLogURL.pathname;
+    const protocol = suppliedLogURL.protocol;
+
+    if (logHost) {
+      return fetch(new URL(protocol + '//' + logHost + logPath))
         .then((response) => {
           if (response.ok) {
             return response.text();
