@@ -101,8 +101,11 @@ export class LogViewer extends LitElement {
   }
 
   async _readLog(logUri: string): Promise<string> {
-    const logURL = new URL(logUri);
-    if (logUri && this.uriIsValid(logURL)) {
+    const vsCodeHost = 'https://file+.vscode-resource.vscode-cdn.net/';
+    const prefix = logUri.startsWith(vsCodeHost) ? vsCodeHost : 'file:///';
+    const logPath = prefix + logUri.replace(vsCodeHost, '');
+    const logURL = new URL(logPath);
+    if (logUri) {
       return fetch(logURL)
         .then((response) => {
           if (response.ok) {
@@ -130,18 +133,6 @@ export class LogViewer extends LitElement {
       this.notifications.push(logMessage);
       return Promise.resolve('');
     }
-  }
-
-  private uriIsValid(url: URL): boolean {
-    if (url.protocol === 'https:' && url.hostname === 'file+.vscode-resource.vscode-cdn.net') {
-      return true;
-    }
-
-    if (url.protocol === 'file:' && url.hostname === 'file+.vscode-resource.vscode-cdn.net') {
-      return true;
-    }
-
-    return false;
   }
 
   severity = new Map<string, NotificationSeverity>([
