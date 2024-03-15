@@ -111,21 +111,21 @@ export class LogViewer extends LitElement {
           }
         })
         .catch((err: unknown) => {
-          let msg;
-          if (err instanceof Error) {
-            msg = err.name === 'TypeError' ? name : err.message;
-          } else {
-            msg = String(err);
-          }
+          const msg = err instanceof Error ? err.message : String(err);
+
           const logMessage = new Notification();
           logMessage.summary = 'Could not read log';
           logMessage.message = msg || '';
           logMessage.severity = 'Error';
           this.notifications.push(logMessage);
-
           return Promise.resolve('');
         });
     } else {
+      const logMessage = new Notification();
+      logMessage.summary = 'Could not read log';
+      logMessage.message = 'Invalid Log Path';
+      logMessage.severity = 'Error';
+      this.notifications.push(logMessage);
       return Promise.resolve('');
     }
   }
