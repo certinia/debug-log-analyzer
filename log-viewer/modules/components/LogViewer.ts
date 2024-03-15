@@ -91,6 +91,7 @@ export class LogViewer extends LitElement {
       logMessage.summary = element.summary;
       logMessage.message = element.description;
       logMessage.severity = severity;
+      logMessage.timestamp = element.startTime || null;
       localNotifications.push(logMessage);
     });
     this.notifications = localNotifications;
@@ -154,6 +155,7 @@ export class LogViewer extends LitElement {
             >report unsupported type</a
           >`
         : message.slice(message.indexOf(':') + 1);
+
       issues.push(logMessage);
     });
     return issues;
