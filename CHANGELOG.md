@@ -9,12 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Click on an Timeline Error to go to the Call Tree ([#481][#481])
+- Go To Call Tree button on the Log Issues list ([#481][#481])
 
 ### Changed
 
 - Call Tree to keep currently visible rows in view when filtering / expanding([#481][#481])
   - This wil keep what you are currentl looking at in view instead of it disapearing
+- Timeline errors can be clicked to go to the Call Tree ([#481][#481])
 
 ## [1.14.0] - 2024-02-12
 
