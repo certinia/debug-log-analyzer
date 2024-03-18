@@ -601,20 +601,22 @@ function findByTime(rows: RowComponent[], timeStamp: number): RowComponent | nul
     // find out the middle index
     const mid = Math.floor((start + end) / 2);
     const row = rows[mid];
+
     if (!row) {
       break;
     }
     const node = (row.getData() as CalltreeRow).originalData as TimedNode;
 
     // Return True if the element is present in the middle.
-    const isInRange = node.exitStamp && timeStamp >= node.timestamp && timeStamp <= node.exitStamp;
+    const endTime = node.exitStamp ?? node.timestamp;
+    const isInRange = timeStamp >= node.timestamp && timeStamp <= endTime;
     if (timeStamp === node.timestamp) {
       return row;
     } else if (isInRange) {
       return findByTime(row.getTreeChildren(), timeStamp);
     }
     // Otherwise, look in the left or right half
-    else if (node.exitStamp && timeStamp > node.exitStamp) {
+    else if (timeStamp > endTime) {
       start = mid + 1;
     } else if (timeStamp < node.timestamp) {
       end = mid - 1;
@@ -648,6 +650,7 @@ function findClosestActive(rows: RowComponent[], timeStamp: number): RowComponen
     //@ts-expect-error This is private to tabulator, but we have no other choice atm.
     const internalRow = row._getSelf();
     const displayRows = internalRow.table.rowManager.getDisplayRows();
+    const endTime = node.exitStamp ?? node.timestamp;
 
     if (timeStamp === node.timestamp) {
       const isActive = displayRows.indexOf(internalRow) !== -1;
@@ -656,7 +659,7 @@ function findClosestActive(rows: RowComponent[], timeStamp: number): RowComponen
       }
 
       return findClosestActiveSibling(mid, rows, displayRows);
-    } else if (node.exitStamp && timeStamp >= node.timestamp && timeStamp <= node.exitStamp) {
+    } else if (timeStamp >= node.timestamp && timeStamp <= endTime) {
       const childMatch = findClosestActive(row.getTreeChildren(), timeStamp);
       if (childMatch) {
         return childMatch;
@@ -664,7 +667,7 @@ function findClosestActive(rows: RowComponent[], timeStamp: number): RowComponen
       return findClosestActiveSibling(mid, rows, displayRows);
     }
     // Otherwise, look in the left or right half
-    else if (node.exitStamp && timeStamp > node.exitStamp) {
+    else if (timeStamp > endTime) {
       start = mid + 1;
     } else if (timeStamp < node.timestamp) {
       end = mid - 1;
