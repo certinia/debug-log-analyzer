@@ -9,6 +9,7 @@ import {
   LogLine,
   Method,
   TimedNode,
+  type LogIssue,
   type LogSubCategory,
 } from '../parsers/ApexLogParser.js';
 
@@ -466,49 +467,50 @@ function drawTimeLine() {
 }
 
 function findByPosition(
-  node: TimedNode,
+  nodes: LogLine[],
   depth: number,
   x: number,
   targetDepth: number,
-): TimedNode | null {
-  if (!node) {
+): LogLine | null {
+  if (!nodes) {
     return null;
   }
 
-  if (node.duration) {
-    // we can only test nodes with a duration
+  let start = 0,
+    end = nodes.length - 1;
+
+  // Iterate as long as the beginning does not encounter the end.
+  while (start <= end) {
+    // find out the middle index
+    const mid = Math.floor((start + end) / 2);
+
+    const node = nodes[mid];
+    if (!node) {
+      break;
+    }
     const starttime = node.timestamp * state.zoom - state.offsetX;
     const width = node.duration.total * state.zoom;
     const endtime = starttime + width;
 
-    if (width < 0.05 || starttime > x || endtime < x) {
-      return null; // x-axis miss (can't include us or children)
+    // Return True if the element is present in the middle.
+    const isInRange = width >= 0.05 && starttime <= x && endtime >= x;
+    const isMatchingDepth = depth === targetDepth;
+    if (isInRange && isMatchingDepth && node.duration.total) {
+      return node;
+    } else if (isInRange && !isMatchingDepth && node.duration.total) {
+      return findByPosition(node.children, depth + 1, x, targetDepth);
     }
-
-    if (depth === targetDepth) {
-      return node; // target found!
-    }
-  }
-
-  if (node.children.length) {
-    // search children
-    const childDepth = node.duration ? depth + 1 : depth;
-    if (targetDepth >= childDepth) {
-      const len = node.children.length;
-      for (let c = 0; c < len; ++c) {
-        const child = node.children[c];
-        if (child instanceof TimedNode) {
-          // -1 to ingnore the "ApexLog" root node
-          const target = findByPosition(child, childDepth, x, targetDepth);
-          if (target) {
-            return target;
-          }
-        }
-      }
+    // Otherwise, look in the left or right half
+    else if (x > endtime) {
+      start = mid + 1;
+    } else if (x < starttime) {
+      end = mid - 1;
+    } else {
+      return null;
     }
   }
 
-  return null; // target not found!
+  return null;
 }
 
 function showTooltip(offsetX: number, offsetY: number) {
@@ -520,9 +522,9 @@ function showTooltip(offsetX: number, offsetY: number) {
 }
 
 function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
-  // -1 to ignore the "ApexLog" root node
-  const target = findByPosition(timelineRoot, -1, x, depth);
-  if (target) {
+  const target = findByPosition(timelineRoot.children, 0, x, depth);
+
+  if (target && target instanceof TimedNode) {
     canvas.classList.remove('timeline-hover', 'timeline-dragging');
     canvas.classList.add('timeline-event--hover');
 
@@ -576,6 +578,21 @@ function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
 }
 
 function findTruncatedTooltip(x: number): HTMLDivElement | null {
+  const logIssue = findLogIssue(x);
+  if (logIssue) {
+    canvas.classList.remove('timeline-hover', 'timeline-dragging');
+    canvas.classList.add('timeline-event--hover');
+
+    const toolTip = document.createElement('div');
+    toolTip.textContent = logIssue.summary;
+    return toolTip;
+  }
+  canvas.classList.add('timeline-hover');
+  canvas.classList.remove('timeline-event--hover');
+  return null; // target not found!
+}
+
+function findLogIssue(x: number): LogIssue | null {
   const issues = timelineRoot.logIssues;
   const len = issues?.length;
   let i = 0;
@@ -590,9 +607,7 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
         endX = endTime * state.zoom - state.offsetX;
 
       if (x >= startX && x <= endX) {
-        const toolTip = document.createElement('div');
-        toolTip.textContent = thisEntry.summary;
-        return toolTip;
+        return thisEntry;
       }
     }
   }
@@ -661,9 +676,19 @@ function onClickCanvas(): void {
   const isClick = mouseDownPosition.x === lastMouseX && mouseDownPosition.y === lastMouseY;
   if (!dragging && isClick) {
     const depth = getDepth(lastMouseY);
-    const target = findByPosition(timelineRoot, -1, lastMouseX, depth);
-    if (target && target.timestamp) {
-      goToRow(target.timestamp);
+    let timeStamp = findByPosition(
+      timelineRoot.children as TimedNode[],
+      0,
+      lastMouseX,
+      depth,
+    )?.timestamp;
+
+    if (!timeStamp) {
+      timeStamp = findLogIssue(lastMouseX)?.startTime;
+    }
+
+    if (timeStamp) {
+      goToRow(timeStamp);
     }
   }
 }

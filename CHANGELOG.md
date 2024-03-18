@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Go To Call Tree button on the Log Issues list ([#481][#481])
+
+### Changed
+
+- Call Tree to keep currently visible rows in view when filtering / expanding([#481][#481])
+  - This wil keep what you are currentl looking at in view instead of it disapearing
+- Timeline errors can be clicked to go to the Call Tree ([#481][#481])
+
 ### Changed
 
 - Faster Extension startup time, roughly 12 times faster and starts up time is less than 10ms.
@@ -341,6 +351,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- v1.14.1 -->
 
 [#490]: https://github.com/certinia/debug-log-analyzer/issues/490
+[#481]: https://github.com/certinia/debug-log-analyzer/issues/481
 
 <!-- v1.14.0 -->
 

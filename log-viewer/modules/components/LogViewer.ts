@@ -91,6 +91,7 @@ export class LogViewer extends LitElement {
       logMessage.summary = element.summary;
       logMessage.message = element.description;
       logMessage.severity = severity;
+      logMessage.timestamp = element.startTime || null;
       localNotifications.push(logMessage);
     });
     this.notifications = localNotifications;
@@ -111,21 +112,21 @@ export class LogViewer extends LitElement {
           }
         })
         .catch((err: unknown) => {
-          let msg;
-          if (err instanceof Error) {
-            msg = err.name === 'TypeError' ? name : err.message;
-          } else {
-            msg = String(err);
-          }
+          const msg = err instanceof Error ? err.message : String(err);
+
           const logMessage = new Notification();
           logMessage.summary = 'Could not read log';
           logMessage.message = msg || '';
           logMessage.severity = 'Error';
           this.notifications.push(logMessage);
-
           return Promise.resolve('');
         });
     } else {
+      const logMessage = new Notification();
+      logMessage.summary = 'Could not read log';
+      logMessage.message = 'Invalid Log Path';
+      logMessage.severity = 'Error';
+      this.notifications.push(logMessage);
       return Promise.resolve('');
     }
   }
@@ -154,6 +155,7 @@ export class LogViewer extends LitElement {
             >report unsupported type</a
           >`
         : message.slice(message.indexOf(':') + 1);
+
       issues.push(logMessage);
     });
     return issues;

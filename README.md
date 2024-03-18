@@ -95,7 +95,8 @@ The Timeline shows a visualization of code execution during a request’s execut
 
 #### Go to Call Tree
 
-Clicking an event in the Timeline will go to and select that event in the Call Tree.
+- Clicking an event in the Timeline will go to and select that event in the Call Tree.
+- Clicking on an issue in the timeline background will go to and select that event in the Call Tree.
 
 #### Tooltip
 

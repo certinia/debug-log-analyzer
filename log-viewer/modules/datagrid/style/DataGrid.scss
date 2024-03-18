@@ -109,6 +109,8 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
   .tabulator-cell.datagrid-textarea {
     white-space: normal;
     overflow-wrap: break-word;
+    min-height: 0;
+    height: 100%;
   }
 
   input[type='checkbox'] {

@@ -24,7 +24,6 @@ import { ApexLog, LogLine, TimedNode, type LogEventType } from '../../parsers/Ap
 import { hostService } from '../../services/VSCodeService.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../skeleton/GridSkeleton.js';
-import treeViewStyles from './TreeView.scss';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
@@ -57,14 +56,12 @@ export class CalltreeView extends LitElement {
 
   static styles = [
     unsafeCSS(dataGridStyles),
-    unsafeCSS(treeViewStyles),
     globalStyles,
     css`
       :host {
         height: 100%;
         width: 100%;
         display: flex;
-        flex: 1;
       }
 
       #call-tree-container {
@@ -72,13 +69,18 @@ export class CalltreeView extends LitElement {
         flex-direction: column;
         height: 100%;
         width: 100%;
-        min-height: 0%;
-        min-width: 0%;
-        flex: 1;
+        min-height: 0;
+        min-width: 0;
       }
 
       #call-tree-table-container {
-        min-height: 0px;
+        height: 100%;
+        flex-grow: 1;
+        min-height: 0;
+      }
+
+      #call-tree-table {
+        height: 100%;
       }
 
       .checkbox__middle {
@@ -172,7 +174,6 @@ export class CalltreeView extends LitElement {
 
     calltreeTable.restoreRedraw();
   }
-
   _expandButtonClick() {
     calltreeTable.blockRedraw();
     expandCollapseAll(calltreeTable.getRows(), true);
@@ -189,13 +190,16 @@ export class CalltreeView extends LitElement {
     const callTreeWrapper = this._callTreeTableWrapper;
     rootMethod = this.timelineRoot;
     if (callTreeWrapper && rootMethod) {
-      const analysisObserver = new IntersectionObserver((entries, observer) => {
-        const visible = entries[0]?.isIntersecting;
-        if (rootMethod && visible) {
-          renderCallTree(callTreeWrapper, rootMethod);
-          observer.disconnect();
-        }
-      });
+      const analysisObserver = new IntersectionObserver(
+        (entries, observer) => {
+          const visible = entries[0]?.isIntersecting;
+          if (rootMethod && visible) {
+            renderCallTree(callTreeWrapper, rootMethod);
+            observer.disconnect();
+          }
+        },
+        { threshold: 1 },
+      );
       analysisObserver.observe(callTreeWrapper);
     }
   }
@@ -242,20 +246,24 @@ export async function renderCallTree(
     // Ensure the table is fully visible before attempting to do things e.g go to rows.
     // Otherwise there are visible rendering issues.
     await new Promise((resolve, reject) => {
-      const visibilityObserver = new IntersectionObserver((entries, observer) => {
-        const entry = entries[0];
-        const visible = entry?.isIntersecting && entry?.intersectionRatio > 0;
-        if (visible) {
-          resolve(true);
-          observer.disconnect();
-        } else {
-          reject();
-        }
-      });
-
+      const visibilityObserver = new IntersectionObserver(
+        (entries, observer) => {
+          const entry = entries[0];
+          const visible = entry?.isIntersecting && entry?.intersectionRatio > 0;
+          if (visible) {
+            resolve(true);
+            observer.disconnect();
+          } else {
+            reject();
+          }
+        },
+        { threshold: 1 },
+      );
       visibilityObserver.observe(callTreeTableContainer);
     });
     await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+
     return Promise.resolve();
   }
 
@@ -322,7 +330,10 @@ export async function renderCallTree(
             let text = node.text;
             if (node.hasValidSymbols) {
               text += node.lineNumber ? `:${node.lineNumber}` : '';
-              return `<a href="#!">${text}</a>`;
+              const link = document.createElement('a');
+              link.setAttribute('href', '#!');
+              link.textContent = text;
+              return link;
             }
 
             const excludedTypes: LogEventType[] = ['SOQL_EXECUTE_BEGIN', 'DML_BEGIN'];
@@ -331,7 +342,10 @@ export async function renderCallTree(
                 (!excludedTypes.includes(node.type) && node.type !== text ? node.type + ': ' : '') +
                   text) ||
               '';
-            return text;
+
+            const textSpan = document.createElement('span');
+            textSpan.textContent = text;
+            return textSpan;
           },
           variableHeight: true,
           cellClick: (e, cell) => {
@@ -469,9 +483,50 @@ export async function renderCallTree(
     });
 
     calltreeTable.on('tableBuilt', () => {
-      resolve();
       //@ts-expect-error valid
       calltreeTable.addFilter(showDetailsFilter);
+      resolve();
+    });
+
+    let middleRow: RowComponent | null;
+    calltreeTable.on('renderStarted', () => {
+      if (calltreeTable && !middleRow) {
+        middleRow = findMiddleVisibleRow(calltreeTable);
+      }
+    });
+
+    calltreeTable.on('renderComplete', async () => {
+      let rowToScrollTo = middleRow;
+
+      if (rowToScrollTo) {
+        //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+        const internalRow = rowToScrollTo._getSelf();
+        const displayRows = internalRow.table.rowManager.getDisplayRows();
+        const canScroll = displayRows.indexOf(internalRow) !== -1;
+        if (!canScroll) {
+          const node = (rowToScrollTo.getData() as CalltreeRow).originalData as TimedNode;
+          rowToScrollTo = findClosestActive(calltreeTable.getRows('active'), node.timestamp);
+        }
+
+        if (rowToScrollTo) {
+          calltreeTable.scrollToRow(rowToScrollTo, 'center', true).then(() => {
+            if (rowToScrollTo) {
+              // row.getElement().scrollIntoView
+
+              // NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
+              // This needs fixing in main tabulator lib
+              window.requestAnimationFrame(() => {
+                // table.scrollToRow(row, 'center', true);
+                rowToScrollTo
+                  ?.getElement()
+                  .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+              });
+            }
+          });
+        }
+      }
+
+      middleRow = null;
     });
   });
 }
@@ -480,15 +535,12 @@ function expandCollapseAll(rows: RowComponent[], expand: boolean = true) {
   const len = rows.length;
   for (let i = 0; i < len; i++) {
     const row = rows[i];
-    if (row) {
-      if (expand) {
-        row.treeExpand();
-      } else {
-        row.treeCollapse();
-      }
-
-      expandCollapseAll(row.getTreeChildren(), expand);
+    if (!row) {
+      continue;
     }
+
+    expand ? row.treeExpand() : row.treeCollapse();
+    expandCollapseAll(row.getTreeChildren(), expand);
   }
 }
 
@@ -531,42 +583,178 @@ export async function goToRow(timestamp: number) {
   document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
   await renderCallTree(tableContainer, rootMethod);
 
-  let treeRow: RowComponent | null = null;
-  const rows = calltreeTable.getRows();
-  const len = rows.length;
-  for (let i = 0; i < len; i++) {
-    const row = rows[i];
-    treeRow = row ? findByTime(row, timestamp) : null;
-    if (treeRow) {
-      break;
-    }
-  }
+  const treeRow = findByTime(calltreeTable.getRows(), timestamp);
   //@ts-expect-error This is a custom function added in by RowNavigation custom module
   calltreeTable.goToRow(treeRow);
 }
 
-function findByTime(row: RowComponent, timeStamp: number): RowComponent | null {
-  if (timeStamp) {
-    const node = (row.getData() as CalltreeRow).originalData;
-    if (node.timestamp === timeStamp) {
-      return row;
+function findByTime(rows: RowComponent[], timeStamp: number): RowComponent | null {
+  if (!rows) {
+    return null;
+  }
+
+  let start = 0,
+    end = rows.length - 1;
+
+  // Iterate as long as the beginning does not encounter the end.
+  while (start <= end) {
+    // find out the middle index
+    const mid = Math.floor((start + end) / 2);
+    const row = rows[mid];
+
+    if (!row) {
+      break;
     }
-    if (node instanceof TimedNode) {
-      // do not search children is the timestamp is outside of the parents timeframe
-      if (node.exitStamp && !(timeStamp >= node.timestamp && timeStamp <= node.exitStamp)) {
-        return null;
+    const node = (row.getData() as CalltreeRow).originalData as TimedNode;
+
+    // Return True if the element is present in the middle.
+    const endTime = node.exitStamp ?? node.timestamp;
+    const isInRange = timeStamp >= node.timestamp && timeStamp <= endTime;
+    if (timeStamp === node.timestamp) {
+      return row;
+    } else if (isInRange) {
+      return findByTime(row.getTreeChildren(), timeStamp);
+    }
+    // Otherwise, look in the left or right half
+    else if (timeStamp > endTime) {
+      start = mid + 1;
+    } else if (timeStamp < node.timestamp) {
+      end = mid - 1;
+    } else {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function findClosestActive(rows: RowComponent[], timeStamp: number): RowComponent | null {
+  if (!rows) {
+    return null;
+  }
+
+  let start = 0,
+    end = rows.length - 1;
+
+  // Iterate as long as the beginning does not encounter the end.
+  while (start <= end) {
+    // find out the middle index
+    const mid = Math.floor((start + end) / 2);
+    const row = rows[mid];
+
+    if (!row) {
+      break;
+    }
+    const node = (row.getData() as CalltreeRow).originalData as TimedNode;
+
+    //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+    const internalRow = row._getSelf();
+    const displayRows = internalRow.table.rowManager.getDisplayRows();
+    const endTime = node.exitStamp ?? node.timestamp;
+
+    if (timeStamp === node.timestamp) {
+      const isActive = displayRows.indexOf(internalRow) !== -1;
+      if (isActive) {
+        return row;
       }
 
-      const treeChildren = row.getTreeChildren();
-      const len = treeChildren.length;
-      for (let i = 0; i < len; ++i) {
-        const child = treeChildren[i];
-
-        const target = child ? findByTime(child, timeStamp) : null;
-        if (target) {
-          return target;
-        }
+      return findClosestActiveSibling(mid, rows, displayRows);
+    } else if (timeStamp >= node.timestamp && timeStamp <= endTime) {
+      const childMatch = findClosestActive(row.getTreeChildren(), timeStamp);
+      if (childMatch) {
+        return childMatch;
       }
+      return findClosestActiveSibling(mid, rows, displayRows);
+    }
+    // Otherwise, look in the left or right half
+    else if (timeStamp > endTime) {
+      start = mid + 1;
+    } else if (timeStamp < node.timestamp) {
+      end = mid - 1;
+    } else {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function findClosestActiveSibling(
+  midIndex: number,
+  rows: RowComponent[],
+  activeRows: RowComponent[],
+) {
+  const indexes = [];
+
+  let previousIndex = midIndex;
+  let previousVisible;
+  while (previousIndex >= 0) {
+    previousVisible = rows[previousIndex];
+    if (!previousVisible) {
+      continue;
+    }
+    //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+    const internalRow = previousVisible._getSelf();
+    const isActive = activeRows.indexOf(internalRow) !== -1;
+    if (previousVisible && isActive) {
+      indexes.push(previousIndex);
+      break;
+    }
+
+    previousIndex--;
+  }
+
+  const distanceFromMid = previousIndex > -1 ? midIndex - previousIndex : midIndex;
+
+  const len = rows.length;
+  let nextIndex = midIndex;
+  let nextVisible;
+  while (nextIndex >= 0 && nextIndex !== len && nextIndex - midIndex < distanceFromMid) {
+    nextVisible = rows[nextIndex];
+    if (!nextVisible) {
+      continue;
+    }
+
+    //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+    const internalRow = nextVisible._getSelf();
+    const isActive = activeRows.indexOf(internalRow) !== -1;
+    if (nextVisible && isActive) {
+      indexes.push(nextIndex);
+      break;
+    }
+    nextIndex++;
+  }
+
+  const closestIndex = indexes.length
+    ? indexes.reduce((a, b) => {
+        return Math.abs(b - midIndex) < Math.abs(a - midIndex) ? b : a;
+      })
+    : null;
+
+  return closestIndex ? rows[closestIndex] || null : null;
+}
+
+function findMiddleVisibleRow(table: Tabulator) {
+  const visibleRows = table.getRows('visible');
+  if (visibleRows.length === 1) {
+    return visibleRows[0] || null;
+  }
+
+  const tableRect = table.element.getBoundingClientRect();
+  const totalHeight = Math.round(tableRect.height / 2);
+
+  let currentHeight = 0;
+  for (const row of visibleRows) {
+    const elementRect = row.getElement().getBoundingClientRect();
+
+    const topDiff = tableRect.top - elementRect.top;
+    currentHeight += topDiff > 0 ? elementRect.height - topDiff : elementRect.height;
+
+    const bottomDiff = elementRect.bottom - tableRect.bottom;
+    currentHeight -= bottomDiff > 0 ? bottomDiff : 0;
+
+    if (Math.round(currentHeight) >= totalHeight) {
+      return row;
     }
   }
   return null;
@@ -590,7 +778,8 @@ const showDetailsFilter = (data: CalltreeRow) => {
   return deepFilter(
     data,
     (rowData) => {
-      return rowData.originalData.duration.total > 0 || rowData.originalData.discontinuity;
+      const logLine = rowData.originalData;
+      return logLine.duration.total > 0 || logLine.exitTypes.length > 0 || logLine.discontinuity;
     },
     {
       filterCache: showDetailsFilterCache,

@@ -15,15 +15,6 @@ export class NotificationPanel extends LitElement {
   @property({ type: Boolean })
   open = false;
 
-  @property()
-  notifications: Notification[] = [];
-
-  colorStyles = new Map([
-    ['Error', 'error'],
-    ['Warning', 'warning'],
-    ['Info', 'info'],
-  ]);
-
   static styles = [
     globalStyles,
     css`
@@ -88,41 +79,10 @@ export class NotificationPanel extends LitElement {
   ];
 
   render() {
-    const sortOrder = new Map([
-      ['Error', 0],
-      ['Warning', 1],
-      ['Info', 2],
-    ]);
-
-    this.notifications.sort((a, b) => {
-      return (sortOrder.get(a.severity) || 0) - (sortOrder.get(b.severity) || 0);
-    });
-
-    const messages: TemplateResult[] = [];
-
-    const lastIndex = this.notifications.length - 1;
-    this.notifications.forEach((item, index) => {
-      const colorStyle = this.colorStyles.get(item.severity) || '';
-
-      const content = item.message
-        ? html`<details>
-            <summary>${item.summary}</summary>
-            <div class="text-container">${item.message}</div>
-          </details>`
-        : html`<div class="text-container">${item.summary}</div>`;
-
-      messages.push(html`<div class="notification ${colorStyle}">${content}</div>`);
-      if (index !== lastIndex) {
-        messages.push(html`<vscode-divider role="separator"></vscode-divider>`);
-      }
-    });
-
-    if (this.notifications.length < 1) {
-      messages.push(html`<div class="no-messages"><h3>No Messages!</h3></div>`);
-    }
-
-    return html` <div class="container ${this.open ? '' : 'closed'}">
-      <div class="error-list">${html`${messages}`}</div>
+    return html`<div class="container ${this.open ? '' : 'closed'}">
+      <div class="error-list">
+        <slot name="items"><h3 class="no-messages">No Items!</h3></slot>
+      </div>
     </div>`;
   }
 }
@@ -132,4 +92,5 @@ export class Notification {
   summary = '';
   message: string | TemplateResult<1> = '';
   severity: NotificationSeverity = 'None';
+  timestamp: number | null = null;
 }
