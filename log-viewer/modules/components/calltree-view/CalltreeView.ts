@@ -778,7 +778,8 @@ const showDetailsFilter = (data: CalltreeRow) => {
   return deepFilter(
     data,
     (rowData) => {
-      return rowData.originalData.duration.total > 0 || rowData.originalData.discontinuity;
+      const logLine = rowData.originalData;
+      return logLine.duration.total > 0 || logLine.exitTypes.length > 0 || logLine.discontinuity;
     },
     {
       filterCache: showDetailsFilterCache,
