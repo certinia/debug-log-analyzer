@@ -46,11 +46,11 @@ export class LogViewer extends LitElement {
 
   constructor() {
     super();
-    vscodeMessenger.request('fetchLog').then((msg: any) => {
+    vscodeMessenger.request<LogDataEvent>('fetchLog').then((msg) => {
       this._handleLogFetch(msg);
     });
 
-    vscodeMessenger.request('getConfig').then((msg: any) => {
+    vscodeMessenger.request<VSCodeLanaConfig>('getConfig').then((msg) => {
       setColors(msg.timeline.colors);
       this.timelineKeys = Array.from(keyMap.values());
     });
@@ -171,4 +171,19 @@ interface LogDataEvent {
   logUri?: string;
   logPath?: string;
   logData?: string;
+}
+
+/* eslint-disable @typescript-eslint/naming-convention */
+interface VSCodeLanaConfig {
+  timeline: {
+    colors: {
+      'Code Unit': '#88AE58';
+      Workflow: '#51A16E';
+      Method: '#2B8F81';
+      Flow: '#337986';
+      DML: '#285663';
+      SOQL: '#5D4963';
+      'System Method': '#5C3444';
+    };
+  };
 }

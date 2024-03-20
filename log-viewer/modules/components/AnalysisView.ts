@@ -154,7 +154,7 @@ async function renderAnalysis(rootMethod: ApexLog) {
     downloadEncoder: function (fileContents: string, mimeType) {
       const vscodeHost = vscodeMessenger.getVsCodeAPI();
       if (vscodeHost) {
-        vscodeMessenger.send('saveFile', {
+        vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
           fileContent: fileContents,
           options: {
             defaultFileName: 'analysis.csv',
@@ -325,3 +325,10 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
     }
   });
 }
+
+type VSCodeSaveFile = {
+  fileContent: string;
+  options: {
+    defaultFileName: string;
+  };
+};

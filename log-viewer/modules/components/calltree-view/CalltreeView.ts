@@ -367,7 +367,7 @@ export async function renderCallTree(
                 typeName = qname + lineNumber;
               }
 
-              vscodeMessenger.send('openType', {
+              vscodeMessenger.send<VSCodeApexSymbol>('openType', {
                 typeName: typeName,
                 text: text,
               });
@@ -829,4 +829,9 @@ const namespaceFilter = (
       filterCache: filterParams.filterCache,
     },
   );
+};
+
+type VSCodeApexSymbol = {
+  typeName: string;
+  text: string;
 };

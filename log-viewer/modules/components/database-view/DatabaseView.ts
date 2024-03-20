@@ -731,7 +731,7 @@ function downlodEncoder(defaultFileName: string) {
   return function (fileContents: string, mimeType: string) {
     const vscode = vscodeMessenger.getVsCodeAPI();
     if (vscode) {
-      vscodeMessenger.send('saveFile', {
+      vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
         fileContent: fileContents,
         options: {
           defaultFileName: defaultFileName,
@@ -758,3 +758,10 @@ function findGroup(table: Tabulator, groupKey: string): GroupComponent | null | 
   }
   return foundGroup;
 }
+
+type VSCodeSaveFile = {
+  fileContent: string;
+  options: {
+    defaultFileName: string;
+  };
+};
