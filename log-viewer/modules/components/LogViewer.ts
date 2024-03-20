@@ -7,8 +7,11 @@ import { customElement, property } from 'lit/decorators.js';
 import { ApexLog, parse } from '../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../styles/global.styles.js';
+import type { TimelineGroup } from '../timeline/Timeline.js';
 import './AppHeader.js';
 import { Notification, type NotificationSeverity } from './notifications/NotificationPanel.js';
+
+import { keyMap, setColors } from '../timeline/Timeline.js';
 
 @customElement('log-viewer')
 export class LogViewer extends LitElement {
@@ -28,6 +31,8 @@ export class LogViewer extends LitElement {
   parserIssues: Notification[] = [];
   @property()
   timelineRoot: ApexLog | null = null;
+  @property()
+  timelineKeys: TimelineGroup[] = [];
 
   static styles = [
     globalStyles,
@@ -44,6 +49,11 @@ export class LogViewer extends LitElement {
     vscodeMessenger.request('fetchLog').then((msg: any) => {
       this._handleLogFetch(msg);
     });
+
+    vscodeMessenger.request('getConfig').then((msg: any) => {
+      setColors(msg.timeline.colors);
+      this.timelineKeys = Array.from(keyMap.values());
+    });
   }
 
   render() {
@@ -56,6 +66,7 @@ export class LogViewer extends LitElement {
       .notifications=${this.notifications}
       .parserIssues=${this.parserIssues}
       .timelineRoot=${this.timelineRoot}
+      .timelineKeys=${this.timelineKeys}
     ></app-header>`;
   }
 

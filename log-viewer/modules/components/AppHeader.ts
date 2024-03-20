@@ -12,7 +12,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import codiconStyles from '../styles/codicon.css';
 import { globalStyles } from '../styles/global.styles.js';
-import { ApexLog } from '../timeline/Timeline.js';
+import { ApexLog, type TimelineGroup } from '../timeline/Timeline.js';
 import '../timeline/TimelineView.js';
 import './AnalysisView.js';
 import './LogLevels.js';
@@ -41,6 +41,8 @@ export class AppHeader extends LitElement {
   parserIssues: Notification[] = [];
   @property()
   timelineRoot: ApexLog | null = null;
+  @property()
+  timelineKeys: TimelineGroup[] = [];
 
   @state()
   _selectedTab = 'timeline-tab';
@@ -135,7 +137,10 @@ export class AppHeader extends LitElement {
         </vscode-panel-tab>
 
         <vscode-panel-view id="view1">
-          <timeline-view .timelineRoot="${this.timelineRoot}"></timeline-view>
+          <timeline-view
+            .timelineRoot="${this.timelineRoot}"
+            .timelineKeys="${this.timelineKeys}"
+          ></timeline-view>
         </vscode-panel-view>
         <vscode-panel-view id="view2">
           <call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view>
