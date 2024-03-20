@@ -5,7 +5,7 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { ApexLog, parse } from '../parsers/ApexLogParser.js';
-import { hostService } from '../services/VSCodeService.js';
+import { vscodeMessenger } from '../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './AppHeader.js';
 import { Notification, type NotificationSeverity } from './notifications/NotificationPanel.js';
@@ -41,10 +41,9 @@ export class LogViewer extends LitElement {
 
   constructor() {
     super();
-    window.addEventListener('message', (e: MessageEvent) => {
-      this.handleMessage(e);
+    vscodeMessenger.request('fetchLog').then((msg: any) => {
+      this._handleLogFetch(msg);
     });
-    hostService().fetchLog();
   }
 
   render() {
@@ -58,16 +57,6 @@ export class LogViewer extends LitElement {
       .parserIssues=${this.parserIssues}
       .timelineRoot=${this.timelineRoot}
     ></app-header>`;
-  }
-
-  private async handleMessage(evt: MessageEvent) {
-    const message = evt.data;
-    switch (message.command) {
-      case 'fetchLog':
-        this._handleLogFetch(message.data);
-
-        break;
-    }
   }
 
   async _handleLogFetch(data: LogDataEvent) {

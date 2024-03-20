@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-// todo: update the key colors when we get a message from the vscode webview side
 import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
@@ -16,6 +15,8 @@ export class Timelinekey extends LitElement {
   constructor() {
     super();
 
+    // NOTE: If we passed in the key as a propoerty we would not need to listen for this.
+    // This is a work around and may be revisted.
     window.addEventListener('message', (e: MessageEvent) => {
       this.handleMessage(e);
     });
@@ -52,8 +53,8 @@ export class Timelinekey extends LitElement {
   }
 
   private handleMessage(evt: MessageEvent) {
-    const message = evt.data;
-    switch (message.command) {
+    const { cmd } = evt.data;
+    switch (cmd) {
       case 'getConfig':
         this.timlineKeys = Array.from(keyMap.values());
         break;

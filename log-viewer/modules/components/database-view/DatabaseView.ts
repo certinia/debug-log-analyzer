@@ -27,7 +27,7 @@ import {
   SOQLExecuteBeginLine,
   SOQLExecuteExplainLine,
 } from '../../parsers/ApexLogParser.js';
-import { hostService } from '../../services/VSCodeService.js';
+import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../CallStack.js';
 import './DatabaseSOQLDetailPanel.js';
@@ -729,9 +729,12 @@ function csvheaderMenu(csvFileName: string) {
 
 function downlodEncoder(defaultFileName: string) {
   return function (fileContents: string, mimeType: string) {
-    const vscodeHost = hostService();
-    if (vscodeHost) {
-      vscodeHost.saveFile({ fileContent: fileContents, defaultFilename: defaultFileName });
+    const vscode = vscodeMessenger.getVsCodeAPI();
+    if (vscode) {
+      vscodeMessenger.send('saveFile', {
+        fileContent: fileContents,
+        defaultFilename: defaultFileName,
+      });
       return false;
     }
 

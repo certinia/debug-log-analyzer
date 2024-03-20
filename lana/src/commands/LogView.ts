@@ -11,12 +11,10 @@ import { Context } from '../Context.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
 
-interface WebViewLogFileRequest {
+interface WebViewLogFileRequest<T = any> {
+  requestId: string;
   cmd: string;
-  text: string | undefined;
-  typeName: string | undefined;
-  path: string | undefined;
-  options?: Record<string, never>;
+  payload: T;
 }
 
 export class LogView {
@@ -50,24 +48,24 @@ export class LogView {
 
     panel.webview.onDidReceiveMessage(
       async (msg: WebViewLogFileRequest) => {
-        const request = msg;
+        const { cmd, requestId, payload } = msg;
 
-        switch (request.cmd) {
+        switch (cmd) {
           case 'fetchLog': {
             await beforeSendLog;
-            LogView.sendLog(panel, context, logPath, logData);
+            LogView.sendLog(requestId, panel, context, logPath, logData);
             break;
           }
 
           case 'openPath':
-            if (request.path) {
-              context.display.showFile(request.path);
+            if (payload || '') {
+              context.display.showFile(payload || '');
             }
             break;
 
           case 'openType': {
-            if (request.typeName) {
-              const [className, lineNumber] = request.typeName.split('-');
+            if (payload.typeName) {
+              const [className, lineNumber] = payload.typeName.split('-');
               let line;
               if (lineNumber) {
                 line = parseInt(lineNumber);
@@ -83,23 +81,25 @@ export class LogView {
           }
 
           case 'getConfig': {
+            console.debug('send color', msg);
             panel.webview.postMessage({
-              command: 'getConfig',
-              data: workspace.getConfiguration('lana'),
+              requestId,
+              cmd: 'getConfig',
+              payload: workspace.getConfiguration('lana'),
             });
             break;
           }
 
           case 'saveFile': {
-            if (request.text && request.options?.defaultUri) {
+            if (payload.text && payload.options?.defaultUri) {
               const defaultWorkspace = (workspace.workspaceFolders || [])[0];
               const defaultDir = defaultWorkspace?.uri.path || homedir();
               const destinationFile = await vscWindow.showSaveDialog({
-                defaultUri: Uri.file(join(defaultDir, request.options.defaultUri)),
+                defaultUri: Uri.file(join(defaultDir, payload.options.defaultUri)),
               });
 
               if (destinationFile) {
-                writeFile(destinationFile.fsPath, request.text).catch((error) => {
+                writeFile(destinationFile.fsPath, payload.text).catch((error) => {
                   const msg = error instanceof Error ? error.message : String(error);
                   vscWindow.showErrorMessage(`Unable to save file: ${msg}`);
                 });
@@ -109,8 +109,8 @@ export class LogView {
           }
 
           case 'showError': {
-            if (request.text) {
-              vscWindow.showErrorMessage(request.text);
+            if (payload.text) {
+              vscWindow.showErrorMessage(payload.text);
             }
             break;
           }
@@ -140,6 +140,7 @@ export class LogView {
   }
 
   private static sendLog(
+    requestId: string,
     panel: WebviewPanel,
     context: Context,
     logFilePath?: string,
@@ -153,8 +154,9 @@ export class LogView {
 
     const filePath = parse(logFilePath || '');
     panel.webview.postMessage({
-      command: 'fetchLog',
-      data: {
+      requestId,
+      cmd: 'fetchLog',
+      payload: {
         logName: filePath.name,
         logUri: logFilePath ? panel.webview.asWebviewUri(Uri.file(logFilePath)).toString(true) : '',
         logPath: logFilePath,

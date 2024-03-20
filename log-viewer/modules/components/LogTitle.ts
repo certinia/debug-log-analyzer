@@ -5,7 +5,7 @@ import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-tool
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { hostService } from '../services/VSCodeService.js';
+import { vscodeMessenger } from '../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { skeletonStyles } from './skeleton/skeleton.styles.js';
 
@@ -62,6 +62,6 @@ export class LogTitle extends LitElement {
   }
 
   _goToLog() {
-    hostService().openPath(this.logPath);
+    vscodeMessenger.send('openPath', this.logPath);
   }
 }

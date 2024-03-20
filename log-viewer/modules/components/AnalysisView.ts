@@ -16,7 +16,7 @@ import { progressFormatter } from '../datagrid/format/Progress.js';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation.js';
 import dataGridStyles from '../datagrid/style/DataGrid.scss';
 import { ApexLog, TimedNode } from '../parsers/ApexLogParser.js';
-import { hostService } from '../services/VSCodeService.js';
+import { vscodeMessenger } from '../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './skeleton/GridSkeleton.js';
 
@@ -152,9 +152,12 @@ async function renderAnalysis(rootMethod: ApexLog) {
     columnCalcs: 'both',
     clipboard: true,
     downloadEncoder: function (fileContents: string, mimeType) {
-      const vscodeHost = hostService();
+      const vscodeHost = vscodeMessenger.getVsCodeAPI();
       if (vscodeHost) {
-        vscodeHost.saveFile({ fileContent: fileContents, defaultFilename: 'analysis.csv' });
+        vscodeMessenger.send('saveFile', {
+          fileContent: fileContents,
+          defaultFilename: 'analysis.csv',
+        });
         return false;
       }
 
