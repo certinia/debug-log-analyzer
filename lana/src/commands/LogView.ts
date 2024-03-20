@@ -96,6 +96,7 @@ export class LogView {
             const { fileContent, options } = <
               { fileContent: string; options: { defaultFileName?: string } }
             >payload;
+
             if (fileContent && options?.defaultFileName) {
               const defaultWorkspace = (workspace.workspaceFolders || [])[0];
               const defaultDir = defaultWorkspace?.uri.path || homedir();

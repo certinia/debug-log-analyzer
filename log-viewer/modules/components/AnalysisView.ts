@@ -156,7 +156,9 @@ async function renderAnalysis(rootMethod: ApexLog) {
       if (vscodeHost) {
         vscodeMessenger.send('saveFile', {
           fileContent: fileContents,
-          defaultFilename: 'analysis.csv',
+          options: {
+            defaultFileName: 'analysis.csv',
+          },
         });
         return false;
       }

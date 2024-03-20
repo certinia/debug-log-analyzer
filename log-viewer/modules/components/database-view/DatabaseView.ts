@@ -733,7 +733,9 @@ function downlodEncoder(defaultFileName: string) {
     if (vscode) {
       vscodeMessenger.send('saveFile', {
         fileContent: fileContents,
-        defaultFilename: defaultFileName,
+        options: {
+          defaultFileName: defaultFileName,
+        },
       });
       return false;
     }
