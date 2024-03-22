@@ -52,7 +52,6 @@ const config: Config = {
       } satisfies Preset.Options,
     ],
   ],
-
   themeConfig: {
     // Replace with your project's social card
     image: 'img/lana-timeline.png',
@@ -73,6 +72,10 @@ const config: Config = {
         {
           href: `https://github.com/${organizationName}/${projectName}`,
           label: 'GitHub',
+          position: 'right',
+        },
+        {
+          type: 'search',
           position: 'right',
         },
       ],
@@ -115,6 +118,37 @@ const config: Config = {
       darkTheme: prismThemes.dracula,
     },
   } satisfies Preset.ThemeConfig,
+  themes: [
+    [
+      '@easyops-cn/docusaurus-search-local',
+      {
+        // Base route path(s) of docs. Slash at beginning is not required.
+        docsRouteBasePath: '/',
+
+        // Whether to add a hashed query when fetching index
+        hashed: true,
+
+        // Highlight search terms on target page.
+        highlightSearchTermsOnTargetPage: true,
+
+        // whether to index docs pages
+        indexDocs: true,
+
+        // whether to index blog pages
+        indexBlog: true,
+
+        // whether to index static pages
+        // /404.html is never indexed
+        indexPages: true,
+
+        // language of your documentation, see next section
+        language: 'en',
+
+        // Enable this if you want to be able to search for any partial word at the cost of search performance.
+        removeDefaultStemmer: true,
+      },
+    ],
+  ],
 };
 
 export default config;
