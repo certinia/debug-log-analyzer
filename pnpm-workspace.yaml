@@ -1,3 +1,4 @@
 packages:
   - 'lana'
+  - 'lana-docs-site'
   - 'log-viewer'
