@@ -96,7 +96,11 @@ const config: Config = {
           items: [
             {
               label: 'Introduction',
-              to: '/',
+              to: 'docs/introduction',
+            },
+            {
+              label: 'Installation',
+              to: 'docs/installation',
             },
           ],
         },
@@ -104,8 +108,16 @@ const config: Config = {
           title: 'Community',
           items: [
             {
-              label: 'X',
-              href: 'https://twitter.com/CertiniaInc',
+              label: 'Support',
+              to: 'community/support',
+            },
+            {
+              label: 'Contributing',
+              to: 'community/contributing',
+            },
+            {
+              label: 'Changelog',
+              to: 'community/changelog',
             },
           ],
         },
@@ -115,6 +127,10 @@ const config: Config = {
             {
               label: 'GitHub',
               href: `https://github.com/${organizationName}/${projectName}`,
+            },
+            {
+              label: 'Twitter',
+              href: 'https://twitter.com/CertiniaInc',
             },
           ],
         },
