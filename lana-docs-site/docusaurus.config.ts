@@ -46,6 +46,7 @@ const config: Config = {
           // Remove this to remove the "edit this page" links.
           editUrl: `https://github.com/${organizationName}/${projectName}/tree/main/lana-docs-site`,
         },
+
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -68,6 +69,13 @@ const config: Config = {
           sidebarId: 'docSidebar',
           position: 'left',
           label: 'Docs',
+        },
+
+        {
+          type: 'docSidebar',
+          sidebarId: 'communitySidebar',
+          position: 'left',
+          label: 'Community',
         },
         {
           href: `https://github.com/${organizationName}/${projectName}`,
