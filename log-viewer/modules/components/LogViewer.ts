@@ -5,10 +5,13 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { ApexLog, parse } from '../parsers/ApexLogParser.js';
-import { hostService } from '../services/VSCodeService.js';
+import { vscodeMessenger } from '../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../styles/global.styles.js';
+import type { TimelineGroup } from '../timeline/Timeline.js';
 import './AppHeader.js';
 import { Notification, type NotificationSeverity } from './notifications/NotificationPanel.js';
+
+import { keyMap, setColors } from '../timeline/Timeline.js';
 
 @customElement('log-viewer')
 export class LogViewer extends LitElement {
@@ -28,6 +31,8 @@ export class LogViewer extends LitElement {
   parserIssues: Notification[] = [];
   @property()
   timelineRoot: ApexLog | null = null;
+  @property()
+  timelineKeys: TimelineGroup[] = [];
 
   static styles = [
     globalStyles,
@@ -41,10 +46,14 @@ export class LogViewer extends LitElement {
 
   constructor() {
     super();
-    window.addEventListener('message', (e: MessageEvent) => {
-      this.handleMessage(e);
+    vscodeMessenger.request<LogDataEvent>('fetchLog').then((msg) => {
+      this._handleLogFetch(msg);
     });
-    hostService().fetchLog();
+
+    vscodeMessenger.request<VSCodeLanaConfig>('getConfig').then((msg) => {
+      setColors(msg.timeline.colors);
+      this.timelineKeys = Array.from(keyMap.values());
+    });
   }
 
   render() {
@@ -57,17 +66,8 @@ export class LogViewer extends LitElement {
       .notifications=${this.notifications}
       .parserIssues=${this.parserIssues}
       .timelineRoot=${this.timelineRoot}
+      .timelineKeys=${this.timelineKeys}
     ></app-header>`;
-  }
-
-  private async handleMessage(evt: MessageEvent) {
-    const message = evt.data;
-    switch (message.command) {
-      case 'fetchLog':
-        this._handleLogFetch(message.data);
-
-        break;
-    }
   }
 
   async _handleLogFetch(data: LogDataEvent) {
@@ -171,4 +171,19 @@ interface LogDataEvent {
   logUri?: string;
   logPath?: string;
   logData?: string;
+}
+
+/* eslint-disable @typescript-eslint/naming-convention */
+interface VSCodeLanaConfig {
+  timeline: {
+    colors: {
+      'Code Unit': '#88AE58';
+      Workflow: '#51A16E';
+      Method: '#2B8F81';
+      Flow: '#337986';
+      DML: '#285663';
+      SOQL: '#5D4963';
+      'System Method': '#5C3444';
+    };
+  };
 }

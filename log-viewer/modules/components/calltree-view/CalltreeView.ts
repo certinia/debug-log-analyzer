@@ -22,7 +22,7 @@ import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigati
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 import { ApexLog, LogLine, TimedNode, type LogEventType } from '../../parsers/ApexLogParser.js';
-import { hostService } from '../../services/VSCodeService.js';
+import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../skeleton/GridSkeleton.js';
 
@@ -368,11 +368,11 @@ export async function renderCallTree(
               } else {
                 typeName = qname + lineNumber;
               }
-              const fileOpenInfo = {
+
+              vscodeMessenger.send<VSCodeApexSymbol>('openType', {
                 typeName: typeName,
                 text: text,
-              };
-              hostService().openType(fileOpenInfo);
+              });
             }
           },
           widthGrow: 5,
@@ -831,4 +831,9 @@ const namespaceFilter = (
       filterCache: filterParams.filterCache,
     },
   );
+};
+
+type VSCodeApexSymbol = {
+  typeName: string;
+  text: string;
 };

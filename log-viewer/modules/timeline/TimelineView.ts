@@ -6,13 +6,15 @@ import { customElement, property } from 'lit/decorators.js';
 
 import { skeletonStyles } from '../components/skeleton/skeleton.styles.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { ApexLog, init as timelineInit } from './Timeline.js';
+import { ApexLog, init as timelineInit, type TimelineGroup } from './Timeline.js';
 import './TimelineKey.js';
 
 @customElement('timeline-view')
 export class TimelineView extends LitElement {
   @property()
   timelineRoot: ApexLog | null = null;
+  @property()
+  timelineKeys: TimelineGroup[] = [];
 
   get _timelineContainer(): HTMLDivElement | null {
     return this.renderRoot?.querySelector('#timeline-container') ?? null;
@@ -120,7 +122,7 @@ export class TimelineView extends LitElement {
 
     return html`
       <div id="timeline-container">${skeleton}</div>
-      <timeline-key></timeline-key>
+      <timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>
     `;
   }
 
