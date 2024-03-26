@@ -5,7 +5,7 @@ import { provideVSCodeDesignSystem, vsCodeButton, vsCodeTag } from '@vscode/webv
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { hostService } from '../services/VSCodeService.js';
+import { vscodeMessenger } from '../services/VSCodeExtensionMessenger.js';
 import codiconStyles from '../styles/codicon.css';
 import { globalStyles } from '../styles/global.styles.js';
 import { notificationStyles } from '../styles/notification.styles.js';
@@ -124,7 +124,7 @@ export class NavBar extends LitElement {
             class="icon-button"
             title="Help"
             @click=${() => {
-              hostService().openHelp();
+              vscodeMessenger.send('openHelp');
             }}
           >
             <span class="codicon icon codicon-question"</span>
@@ -135,7 +135,7 @@ export class NavBar extends LitElement {
   }
 
   _goToLog() {
-    hostService().openPath(this.logPath);
+    vscodeMessenger.send('openPath', this.logPath);
   }
 
   _toDuration(duration: number | null) {
