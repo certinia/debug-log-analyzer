@@ -12,7 +12,8 @@
 import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { TabulatorFull as Tabulator, type RowComponent } from 'tabulator-tables';
+import { Tabulator, type RowComponent } from 'tabulator-tables';
+import * as CommonModules from '../../datagrid/module/CommonModules.js';
 
 import MinMaxEditor from '../../datagrid/editors/MinMax.js';
 import MinMaxFilter from '../../datagrid/filters/MinMax.js';
@@ -268,6 +269,7 @@ export async function renderCallTree(
   }
 
   return new Promise((resolve) => {
+    Tabulator.registerModule(Object.values(CommonModules));
     Tabulator.registerModule([RowKeyboardNavigation, RowNavigation]);
 
     const selfTimeFilterCache = new Map<string, boolean>();
@@ -285,7 +287,7 @@ export async function renderCallTree(
       dataTree: true,
       dataTreeChildColumnCalcs: true,
       dataTreeBranchElement: '<span/>',
-      selectable: 1,
+      selectableRows: 1,
       // @ts-expect-error custom property for datagrid/module/RowKeyboardNavigation
       rowKeyboardNavigation: true,
       columnDefaults: {
