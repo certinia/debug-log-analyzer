@@ -1,5 +1,5 @@
 ---
-id: my-home-doc
+id: intro
 slug: /
 sidebar_position: 1
 ---
