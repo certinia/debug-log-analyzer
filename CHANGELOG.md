@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Huge perfornmance improvement for the Call Tree, all operations should be 3X faster. ([#500][#500])
+  - Includes expanding, filtering and scrolling.
 - Call Tree to keep currently visible rows in view when filtering / expanding([#481][#481])
   - This wil keep what you are currentl looking at in view instead of it disapearing
 - Timeline errors can be clicked to go to the Call Tree ([#481][#481])
@@ -351,6 +353,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#500]: https://github.com/certinia/debug-log-analyzer/issues/500
 [#65]: https://github.com/certinia/debug-log-analyzer/issues/65
 [#481]: https://github.com/certinia/debug-log-analyzer/issues/481
 

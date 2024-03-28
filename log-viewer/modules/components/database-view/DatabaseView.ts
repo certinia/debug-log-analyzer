@@ -10,11 +10,13 @@ import {
 import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
-  TabulatorFull as Tabulator,
+  Tabulator,
   type ColumnComponent,
   type GroupComponent,
   type RowComponent,
 } from 'tabulator-tables';
+
+import * as CommonModules from '../../datagrid/module/CommonModules.js';
 
 import { DatabaseAccess } from '../../Database.js';
 import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
@@ -199,6 +201,7 @@ export class DatabaseView extends LitElement {
           this.dmlLines = dbAccess.getDMLLines() || [];
           this.soqlLines = dbAccess.getSOQLLines() || [];
 
+          Tabulator.registerModule(Object.values(CommonModules));
           Tabulator.registerModule([RowKeyboardNavigation]);
           renderDMLTable(dmlTableWrapper, this.dmlLines);
           renderSOQLTable(soqlTableWrapper, this.soqlLines);
@@ -270,7 +273,7 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
     },
 
     groupToggleElement: 'header',
-    selectableCheck: function (row) {
+    selectableRowsCheck: function (row: RowComponent) {
       return !row.getData().isDetail;
     },
     dataTree: true,
@@ -468,8 +471,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
       </div>`;
     },
     groupToggleElement: 'header',
-
-    selectableCheck: function (row) {
+    selectableRowsCheck: function (row: RowComponent) {
       return !row.getData().isDetail;
     },
     dataTree: true,

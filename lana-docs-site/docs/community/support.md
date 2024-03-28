@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Support
 
-Before participating, please read our [Code of Conduct](https://github.com/certinia/debug-log-analyzer/blob/main/CODE_OF_CONDUCT).
+Before participating, please read our [Code of Conduct](https://github.com/certinia/debug-log-analyzer/blob/main/CODE_OF_CONDUCT.md).
 
 ## Discussion
 

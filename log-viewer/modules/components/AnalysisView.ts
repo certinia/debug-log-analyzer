@@ -9,7 +9,8 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { TabulatorFull as Tabulator, type ColumnComponent } from 'tabulator-tables';
+import { Tabulator, type ColumnComponent } from 'tabulator-tables';
+import * as CommonModules from '../datagrid/module/CommonModules.js';
 
 import NumberAccessor from '../datagrid/dataaccessor/Number.js';
 import { progressFormatter } from '../datagrid/format/Progress.js';
@@ -142,10 +143,11 @@ async function renderAnalysis(rootMethod: ApexLog) {
     },
   ];
 
+  Tabulator.registerModule(Object.values(CommonModules));
   Tabulator.registerModule(RowKeyboardNavigation);
   analysisTable = new Tabulator(tableContainer, {
     rowKeyboardNavigation: true,
-    selectable: 1,
+    selectableRows: 1,
     data: metricList,
     layout: 'fitColumns',
     placeholder: 'No Analysis Available',
