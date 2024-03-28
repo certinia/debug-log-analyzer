@@ -1,8 +1,8 @@
 # Contributing
 
-🎉🥳 Thank you for contributing 🥳🎉\
+🎉🥳 Thank you for contributing 🥳🎉
 
-Please read and follow the [code of conduct](./CODE_OF_CONTDUCT) whilst interacting with this project.
+Please read and follow the [code of conduct](https://github.com/certinia/debug-log-analyzer/blob/main/CODE_OF_CONDUCT.md) whilst interacting with this project.
 
 First things first, before raising an issue check the [open issues](https://github.com/certinia/debug-log-analyzer/issues), there may already be something similar to what you are looking for.
 If there is not, open an issue before contributing, it allows us to provide help and advice or just avoid duplicate effort.
