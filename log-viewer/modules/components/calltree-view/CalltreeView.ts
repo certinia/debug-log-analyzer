@@ -563,6 +563,16 @@ export class CalltreeView extends LitElement {
         resolve();
       });
 
+      calltreeTable.on('dataTreeRowExpanded', () => {
+        window.cancelAnimationFrame(gotToRowId);
+        middleRow = null;
+      });
+
+      calltreeTable.on('dataTreeRowCollapsed', () => {
+        window.cancelAnimationFrame(gotToRowId);
+        middleRow = null;
+      });
+
       let middleRow: RowComponent | null;
       calltreeTable.on('renderStarted', () => {
         if (calltreeTable && !middleRow) {
@@ -570,41 +580,43 @@ export class CalltreeView extends LitElement {
         }
       });
 
+      let gotToRowId = 0;
       calltreeTable.on('renderComplete', async () => {
         let rowToScrollTo = middleRow;
-
-        if (rowToScrollTo) {
-          //@ts-expect-error This is private to tabulator, but we have no other choice atm.
-          const internalRow = rowToScrollTo._getSelf();
-          const displayRows = internalRow.table.rowManager.getDisplayRows();
-          const canScroll = displayRows.indexOf(internalRow) !== -1;
-          if (!canScroll) {
-            const node = (rowToScrollTo.getData() as CalltreeRow).originalData as TimedNode;
-            rowToScrollTo = this._findClosestActive(
-              calltreeTable.getRows('active'),
-              node.timestamp,
-            );
-          }
-
+        gotToRowId = window.requestAnimationFrame(() => {
           if (rowToScrollTo) {
-            calltreeTable.scrollToRow(rowToScrollTo, 'center', true).then(() => {
-              if (rowToScrollTo) {
-                // row.getElement().scrollIntoView
+            //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+            const internalRow = rowToScrollTo._getSelf();
+            const displayRows = internalRow.table.rowManager.getDisplayRows();
+            const canScroll = displayRows.indexOf(internalRow) !== -1;
+            if (!canScroll) {
+              const node = (rowToScrollTo.getData() as CalltreeRow).originalData as TimedNode;
+              rowToScrollTo = this._findClosestActive(
+                calltreeTable.getRows('active'),
+                node.timestamp,
+              );
+            }
 
-                // NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
-                // This needs fixing in main tabulator lib
-                window.requestAnimationFrame(() => {
-                  // table.scrollToRow(row, 'center', true);
-                  rowToScrollTo
-                    ?.getElement()
-                    .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-                });
-              }
-            });
+            if (rowToScrollTo) {
+              calltreeTable.scrollToRow(rowToScrollTo, 'center', true).then(() => {
+                if (rowToScrollTo) {
+                  // row.getElement().scrollIntoView
+
+                  // NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
+                  // This needs fixing in main tabulator lib
+                  window.requestAnimationFrame(() => {
+                    // table.scrollToRow(row, 'center', true);
+                    rowToScrollTo
+                      ?.getElement()
+                      .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+                  });
+                }
+              });
+            }
           }
-        }
 
-        middleRow = null;
+          middleRow = null;
+        });
       });
     });
   }
