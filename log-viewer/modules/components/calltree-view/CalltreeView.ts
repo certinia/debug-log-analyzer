@@ -353,22 +353,16 @@ export class CalltreeView extends LitElement {
         data: this._toCallTree(rootMethod.children),
         layout: 'fitColumns',
         placeholder: 'No Call Tree Available',
-        columnCalcs: 'both',
         height: '100%',
         maxHeight: '100%',
+        //  custom property for datagrid/module/RowKeyboardNavigation
+        rowKeyboardNavigation: true,
         dataTree: true,
         dataTreeChildColumnCalcs: true,
         dataTreeBranchElement: '<span/>',
         selectableRows: 1,
-        // @ts-expect-error custom property for datagrid/module/RowKeyboardNavigation
-        rowKeyboardNavigation: true,
-        columnDefaults: {
-          title: 'default',
-          resizable: true,
-          headerSortStartingDir: 'desc',
-          headerTooltip: true,
-          headerWordWrap: true,
-        },
+        // @ts-expect-error it is possible to pass a function to intitialFilter the types need updating
+        initialFilter: this._showDetailsFilter,
         headerSortElement: function (column, dir) {
           switch (dir) {
             case 'asc':
@@ -380,6 +374,14 @@ export class CalltreeView extends LitElement {
             default:
               return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
           }
+        },
+        columnCalcs: 'both',
+        columnDefaults: {
+          title: 'default',
+          resizable: true,
+          headerSortStartingDir: 'desc',
+          headerTooltip: true,
+          headerWordWrap: true,
         },
         columns: [
           {
@@ -558,9 +560,6 @@ export class CalltreeView extends LitElement {
       });
 
       calltreeTable.on('tableBuilt', () => {
-        const filter = this._showDetailsFilter;
-        // @ts-expect-error valid
-        calltreeTable.addFilter(filter);
         resolve();
       });
 
