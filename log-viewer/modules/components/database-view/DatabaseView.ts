@@ -273,7 +273,7 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
     },
 
     groupToggleElement: 'header',
-    selectableRowsCheck: function (row) {
+    selectableRowsCheck: function (row: RowComponent) {
       return !row.getData().isDetail;
     },
     dataTree: true,
@@ -471,8 +471,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
       </div>`;
     },
     groupToggleElement: 'header',
-
-    selectableRowsCheck: function (row) {
+    selectableRowsCheck: function (row: RowComponent) {
       return !row.getData().isDetail;
     },
     dataTree: true,
