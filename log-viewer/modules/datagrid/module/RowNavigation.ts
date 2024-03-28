@@ -4,6 +4,8 @@
 import { Module, Tabulator, type RowComponent } from 'tabulator-tables';
 
 export class RowNavigation extends Module {
+  static moduleName = 'rowNavigation';
+
   constructor(table: Tabulator) {
     super(table);
     // @ts-expect-error registerTableFunction() needs adding to tabulator types
