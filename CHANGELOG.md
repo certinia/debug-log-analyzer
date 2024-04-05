@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Go To Call Tree button on the Log Issues list ([#481][#481])
+- New ways to open the log analysis ([#506][#506])
+  - From the button on the editor title menu
+  - From the tab context menu (right clicking the editor tab)
 - Brand new [documentation site](https://certinia.github.io/debug-log-analyzer) ([#65][#65])
 
 ### Changed
@@ -353,6 +356,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#506]: https://github.com/certinia/debug-log-analyzer/issues/506
 [#500]: https://github.com/certinia/debug-log-analyzer/issues/500
 [#65]: https://github.com/certinia/debug-log-analyzer/issues/65
 [#481]: https://github.com/certinia/debug-log-analyzer/issues/481

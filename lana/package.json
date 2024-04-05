@@ -83,6 +83,20 @@
           "when": "resourceLangId == apexlog"
         }
       ],
+      "editor/title/context": [
+        {
+          "command": "lana.showLogAnalysis",
+          "when": "resourceLangId == apexlog",
+          "group": "lana"
+        }
+      ],
+      "editor/title/run": [
+        {
+          "command": "lana.showLogAnalysis",
+          "when": "resourceLangId == apexlog",
+          "group": "lana"
+        }
+      ],
       "explorer/context": [
         {
           "command": "lana.showLogAnalysis",
