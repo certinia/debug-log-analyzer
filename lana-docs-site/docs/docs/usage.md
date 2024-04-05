@@ -17,6 +17,10 @@ With the `.log` file open in VSCode.
    ![show analysis lens](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.10/lana-showanalysis-lens.webp)\
    or
 1. Right click -> 'Log: Show Apex Log Analysis'
+   or
+1. Click editor 'Log: Show Apex Log Analysis' icon button at top of editor
+   or
+1. Right click editor tab -> 'Log: Show Apex Log Analysis'
 
 ## Download a log
 
