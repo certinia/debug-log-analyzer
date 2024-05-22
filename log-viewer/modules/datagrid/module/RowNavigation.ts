@@ -5,6 +5,7 @@ import { Module, Tabulator, type RowComponent } from 'tabulator-tables';
 
 export class RowNavigation extends Module {
   static moduleName = 'rowNavigation';
+  tableHolder: HTMLElement | null = null;
 
   constructor(table: Tabulator) {
     super(table);
@@ -15,6 +16,9 @@ export class RowNavigation extends Module {
   goToRow(row: RowComponent) {
     if (row) {
       const table = this.table;
+      this.tableHolder ??= table.element.querySelector('.tabulator-tableholder') as HTMLElement;
+      this.tableHolder.focus();
+
       table.blockRedraw();
       const rowsToExpand = [];
       let parent = row.getTreeParent();
@@ -34,21 +38,15 @@ export class RowNavigation extends Module {
       });
       row.select();
       table.restoreRedraw();
-
-      table.scrollToRow(row, 'center', true).then(() => {
-        if (row) {
-          // row.getElement().scrollIntoView
-
-          // NOTE: This is a workaround for the fact that `row.scrollTo('center'` does not work correctly for ros near the bottom.
-          // This needs fixing in main tabulator lib
-          window.requestAnimationFrame(() => {
-            // table.scrollToRow(row, 'center', true);
-            const elem = row.getElement();
-            elem.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-            elem.focus();
-          });
-        }
-      });
+      row && setTimeout(() => this._scrollToRow(row));
     }
+  }
+
+  _scrollToRow(row: RowComponent) {
+    this.table.scrollToRow(row, 'center', true).then(() => {
+      const elem = row.getElement();
+      elem.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+      elem.focus();
+    });
   }
 }
