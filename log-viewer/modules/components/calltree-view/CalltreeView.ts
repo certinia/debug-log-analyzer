@@ -334,10 +334,7 @@ export class CalltreeView extends LitElement {
         );
         visibilityObserver.observe(callTreeTableContainer);
       });
-      await new Promise((resolve) => window.requestAnimationFrame(resolve));
-      await new Promise((resolve) => window.requestAnimationFrame(resolve));
-
-      return Promise.resolve();
+      return new Promise((resolve) => setTimeout(resolve));
     }
 
     return new Promise((resolve) => {
