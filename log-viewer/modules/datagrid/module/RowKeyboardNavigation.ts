@@ -24,7 +24,6 @@ export class RowKeyboardNavigation extends Module {
   constructor(table: Tabulator) {
     super(table);
     this.localTable = table;
-    // @ts-expect-error registerTableOption() needs adding to tabulator types
     this.registerTableOption(rowNavOptionName, false);
   }
 
