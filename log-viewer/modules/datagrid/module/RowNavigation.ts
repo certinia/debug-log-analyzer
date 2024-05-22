@@ -14,8 +14,7 @@ export class RowNavigation extends Module {
 
   goToRow(row: RowComponent) {
     if (row) {
-      // @ts-expect-error table is not in types fpr Module class
-      const table = this.table as Tabulator;
+      const table = this.table;
       table.blockRedraw();
       const rowsToExpand = [];
       let parent = row.getTreeParent();
