@@ -34,7 +34,7 @@ export function parse(logData: string): ApexLog {
  * const apexLog = new ApexLogParser().parse(logText);
  * const apexLog = parse(logText);
  */
-class ApexLogParser {
+export class ApexLogParser {
   logIssues: LogIssue[] = [];
   parsingErrors: string[] = [];
   maxSizeTimestamp: number | null = null;
@@ -842,26 +842,6 @@ export function parseVfNamespace(text: string): string {
   return text.substring(secondSlash + 1, sep);
 }
 
-export function parseConstructorNamespace(className: string): string {
-  let possibleNs = className.slice(0, className.indexOf('.'));
-  possibleNs =
-    currentParser?.namespaces.find((ns) => {
-      return ns === possibleNs;
-    }) || '';
-
-  if (possibleNs) {
-    return possibleNs;
-  }
-  const constructorParts = (className ?? '').split('.');
-  possibleNs = constructorParts[0] || '';
-  // inmner class with a namespace
-  if (constructorParts.length === 3) {
-    return possibleNs;
-  }
-
-  return '';
-}
-
 export function parseRows(text: string | null | undefined): number {
   if (!text) {
     return 0;
@@ -929,7 +909,7 @@ class ConstructorEntryLine extends Method {
     const [, , , , args, className] = parts;
 
     this.text = className + (args ? args.substring(args.lastIndexOf('(')) : '');
-    const possibleNS = parseConstructorNamespace(className || '');
+    const possibleNS = this._parseConstructorNamespace(className || '');
     if (possibleNS) {
       this.namespace = possibleNS;
     }
