@@ -31,7 +31,7 @@ let holder: HTMLElement | null = null;
 let table: HTMLElement | null = null;
 
 @customElement('dml-view')
-export class DatabaseView extends LitElement {
+export class DMLView extends LitElement {
   @property()
   timelineRoot: ApexLog | null = null;
 

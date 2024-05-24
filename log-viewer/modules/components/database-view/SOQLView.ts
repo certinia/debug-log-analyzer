@@ -41,7 +41,7 @@ let holder: HTMLElement | null = null;
 let table: HTMLElement | null = null;
 
 @customElement('soql-view')
-export class DatabaseView extends LitElement {
+export class SOQLView extends LitElement {
   @property()
   timelineRoot: ApexLog | null = null;
 
