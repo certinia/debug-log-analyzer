@@ -240,9 +240,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
       return !row.getData().isDetail;
     },
     dataTree: true,
-    dataTreeBranchElement: '<span></span>',
-    dataTreeCollapseElement: '<span></span>',
-    dataTreeExpandElement: '<span></span>',
+    dataTreeBranchElement: false,
     columnDefaults: {
       title: 'default',
       resizable: true,
