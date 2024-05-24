@@ -68,7 +68,8 @@ export class SOQLView extends LitElement {
     globalStyles,
     css`
       :host {
-        display: inline-block;
+        display: flex;
+        flex-direction: column;
         height: 100%;
         width: 100%;
       }
@@ -239,9 +240,7 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
       return !row.getData().isDetail;
     },
     dataTree: true,
-    dataTreeBranchElement: '<span></span>',
-    dataTreeCollapseElement: '<span></span>',
-    dataTreeExpandElement: '<span></span>',
+    dataTreeBranchElement: false,
     columnDefaults: {
       title: 'default',
       resizable: true,

@@ -26,6 +26,8 @@ export class DatabaseView extends LitElement {
     globalStyles,
     css`
       :host {
+        display: flex;
+        flex-direction: column;
         height: 100%;
         width: 100%;
       }

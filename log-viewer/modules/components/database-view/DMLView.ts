@@ -58,7 +58,8 @@ export class DMLView extends LitElement {
     globalStyles,
     css`
       :host {
-        display: inline-block;
+        display: flex;
+        flex-direction: column;
         height: 100%;
         width: 100%;
       }
@@ -187,9 +188,7 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
       return !row.getData().isDetail;
     },
     dataTree: true,
-    dataTreeBranchElement: '<span></span>',
-    dataTreeCollapseElement: '<span></span>',
-    dataTreeExpandElement: '<span></span>',
+    dataTreeBranchElement: false,
     columnDefaults: {
       title: 'default',
       resizable: true,
@@ -316,7 +315,7 @@ function _getTableHolder() {
 
 function createDetailPanel(timestamp: number) {
   const detailContainer = document.createElement('div');
-  detailContainer.className = 'callstack-wrapper';
+  detailContainer.className = 'row__details-container';
   render(html`<call-stack timestamp=${timestamp}></call-stack>`, detailContainer);
 
   return detailContainer;
