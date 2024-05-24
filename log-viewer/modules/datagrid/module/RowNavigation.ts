@@ -44,9 +44,12 @@ export class RowNavigation extends Module {
 
   _scrollToRow(row: RowComponent) {
     this.table.scrollToRow(row, 'center', true).then(() => {
-      const elem = row.getElement();
-      elem.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-      elem.focus();
+      setTimeout(() => {
+        const elem = row.getElement();
+        // NOTE: work around because this.table.scrollToRow does not work correctly when the row is near the very bottom of the grid.
+        elem.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+        elem.focus();
+      });
     });
   }
 }
