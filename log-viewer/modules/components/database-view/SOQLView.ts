@@ -68,7 +68,8 @@ export class SOQLView extends LitElement {
     globalStyles,
     css`
       :host {
-        display: inline-block;
+        display: flex;
+        flex-direction: column;
         height: 100%;
         width: 100%;
       }
