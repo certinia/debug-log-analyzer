@@ -513,21 +513,6 @@ function downlodEncoder(defaultFileName: string) {
   };
 }
 
-function findGroup(table: Tabulator, groupKey: string): GroupComponent | null | undefined {
-  let foundGroup = null;
-  const groups = table.getGroups();
-  let len = groups?.length - 1 || 0;
-  while (len >= 0 && !foundGroup) {
-    const toSearch = groups[len];
-    if (toSearch?.getKey() === groupKey) {
-      foundGroup = toSearch;
-      break;
-    }
-    len--;
-  }
-  return foundGroup;
-}
-
 type VSCodeSaveFile = {
   fileContent: string;
   options: {
