@@ -37,6 +37,8 @@ import databaseViewStyles from './DatabaseView.scss';
 provideVSCodeDesignSystem().register(vsCodeDropdown(), vsCodeOption());
 
 let soqlTable: Tabulator;
+let holder: HTMLElement | null = null;
+let table: HTMLElement | null = null;
 
 @customElement('soql-view')
 export class DatabaseView extends LitElement {
@@ -429,23 +431,29 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
     const origRowHeight = row.getElement().offsetHeight;
     row.treeToggle();
     row.getCell('soql').getElement().style.height = origRowHeight + 'px';
-
-    setTimeout(() => {
-      row &&
-        row.getElement().scrollIntoView({ behavior: 'instant', block: 'center', inline: 'start' });
-    });
   });
 
-  soqlTable.on('groupVisibilityChanged', async (group: GroupComponent, _visible: boolean) => {
-    const groupToFocus = group.getElement() ? group : findGroup(soqlTable, group.getKey());
-    if (groupToFocus) {
-      setTimeout(() => {
-        groupToFocus
-          .getElement()
-          .scrollIntoView({ behavior: 'instant', block: 'center', inline: 'start' });
-      });
-    }
+  soqlTable.on('renderStarted', () => {
+    const holder = _getTableHolder();
+    holder.style.minHeight = holder.clientHeight + 'px';
+    holder.style.overflowAnchor = 'none';
   });
+
+  soqlTable.on('renderComplete', () => {
+    const holder = _getTableHolder();
+    const table = _getTable();
+    holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
+  });
+}
+
+function _getTable() {
+  table ??= soqlTable.element.querySelector('.tabulator-table')! as HTMLElement;
+  return table;
+}
+
+function _getTableHolder() {
+  holder ??= soqlTable.element.querySelector('.tabulator-tableholder')! as HTMLElement;
+  return holder;
 }
 
 function createSOQLDetailPanel(

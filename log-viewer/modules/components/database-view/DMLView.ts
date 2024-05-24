@@ -27,6 +27,8 @@ import databaseViewStyles from './DatabaseView.scss';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 let dmlTable: Tabulator;
+let holder: HTMLElement | null = null;
+let table: HTMLElement | null = null;
 
 @customElement('dml-view')
 export class DatabaseView extends LitElement {
@@ -278,17 +280,6 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
     }
   });
 
-  dmlTable.on('groupVisibilityChanged', (group: GroupComponent, _visible: boolean) => {
-    const groupToFocus = group.getElement() ? group : findGroup(dmlTable, group.getKey());
-    if (groupToFocus) {
-      setTimeout(() => {
-        groupToFocus
-          .getElement()
-          .scrollIntoView({ behavior: 'instant', block: 'center', inline: 'start' });
-      });
-    }
-  });
-
   dmlTable.on('rowClick', function (e, row) {
     const data = row.getData();
     if (!(data.timestamp && data.dml)) {
@@ -298,12 +289,29 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
     const origRowHeight = row.getElement().offsetHeight;
     row.treeToggle();
     row.getCell('dml').getElement().style.height = origRowHeight + 'px';
-
-    setTimeout(() => {
-      row &&
-        row.getElement().scrollIntoView({ behavior: 'instant', block: 'center', inline: 'start' });
-    });
   });
+
+  dmlTable.on('renderStarted', () => {
+    const holder = _getTableHolder();
+    holder.style.minHeight = holder.clientHeight + 'px';
+    holder.style.overflowAnchor = 'none';
+  });
+
+  dmlTable.on('renderComplete', () => {
+    const holder = _getTableHolder();
+    const table = _getTable();
+    holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
+  });
+}
+
+function _getTable() {
+  table ??= dmlTable.element.querySelector('.tabulator-table')! as HTMLElement;
+  return table;
+}
+
+function _getTableHolder() {
+  holder ??= dmlTable.element.querySelector('.tabulator-tableholder')! as HTMLElement;
+  return holder;
 }
 
 function createDetailPanel(timestamp: number) {
@@ -350,21 +358,6 @@ function downlodEncoder(defaultFileName: string) {
 
     return new Blob([fileContents], { type: mimeType });
   };
-}
-
-function findGroup(table: Tabulator, groupKey: string): GroupComponent | null | undefined {
-  let foundGroup = null;
-  const groups = table.getGroups();
-  let len = groups?.length - 1 || 0;
-  while (len >= 0 && !foundGroup) {
-    const toSearch = groups[len];
-    if (toSearch?.getKey() === groupKey) {
-      foundGroup = toSearch;
-      break;
-    }
-    len--;
-  }
-  return foundGroup;
 }
 
 type VSCodeSaveFile = {
