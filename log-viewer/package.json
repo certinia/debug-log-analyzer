@@ -13,10 +13,10 @@
   },
   "version": "0.1.0",
   "dependencies": {
-    "@apexdevtools/apex-parser": "^3.5.0",
+    "@apexdevtools/apex-parser": "^3.6.0",
     "@vscode/codicons": "^0.0.35",
     "@vscode/webview-ui-toolkit": "^1.4.0",
-    "lit": "^3.1.2",
+    "lit": "^3.1.3",
     "tabulator-tables": "^6.2.1"
   },
   "devDependencies": {
