@@ -2,6 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import {
+  ApexLogParser,
   CodeUnitStartedLine,
   ExecutionStartedLine,
   LogLine,
@@ -1081,7 +1082,8 @@ describe('namespace tests', () => {
 
 describe('Recalculate durations tests', () => {
   it('Recalculates parent node', () => {
-    const node = new Method(['14:32:07.563 (1)', 'DUMMY'], [], 'Method', '');
+    const parser = new ApexLogParser();
+    const node = new Method(parser, ['14:32:07.563 (1)', 'DUMMY'], [], 'Method', '');
     node.exitStamp = 3;
 
     node.recalculateDurations();
@@ -1092,8 +1094,9 @@ describe('Recalculate durations tests', () => {
 
 describe('Line Type Tests', () => {
   it('Lines referenced by exitTypes should be exits', () => {
+    const parser = new ApexLogParser();
     for (const [key, lineType] of lineTypeMap) {
-      const line = new lineType([
+      const line = new lineType(parser, [
         '14:32:07.563 (17358806534)',
         'DUMMY',
         '[10]',
@@ -1110,7 +1113,7 @@ describe('Line Type Tests', () => {
           const exitCls = lineTypeMap.get(exitType);
           expect(exitCls).not.toBe(null);
           if (exitCls) {
-            const exitLine = new exitCls!([
+            const exitLine = new exitCls!(parser, [
               '14:32:07.563 (17358806534)',
               'DUMMY',
               '[10]',
@@ -1126,7 +1129,8 @@ describe('Line Type Tests', () => {
   });
 
   it('SOQL Explain null when no plan available ', () => {
-    const qp = new SOQLExecuteExplainLine([
+    const parser = new ApexLogParser();
+    const qp = new SOQLExecuteExplainLine(parser, [
       '6:22:36.91 (2106345473)',
       'SOQL_EXECUTE_EXPLAIN',
       '[19]',

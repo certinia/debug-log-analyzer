@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { Method } from '../../parsers/ApexLogParser.js';
+import { ApexLogParser, Method } from '../../parsers/ApexLogParser.js';
 import { SOQLLinter } from '../../soql/SOQLLinter.js';
 
 describe('SOQL Linter rule tests', () => {
@@ -153,8 +153,10 @@ describe('SOQL in Trigger Rule tests', () => {
   };
 
   it('soql in trigger should return rule', async () => {
+    const parser = new ApexLogParser();
     const soql = 'SELECT Id FROM AnObject__c WHERE value__c > 0';
     const mockTriggerLine = new Method(
+      parser,
       [
         '04:16:39.166 (1166781977)',
         'CODE_UNIT_STARTED',
