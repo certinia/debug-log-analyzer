@@ -1,11 +1,42 @@
 {
-  "extends": "../config/tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2022", "dom", "DOM.Iterable"],
-    "module": "ESNext",
+
     "outDir": "out",
     "rootDir": "./modules",
-    "target": "es2022"
+
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "es2022",
+    "verbatimModuleSyntax": true,
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "noEmit": true,
+
+    "composite": true,
+    "declarationMap": true,
+
+    "strictFunctionTypes": true,
+
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "forceConsistentCasingInFileNames": true,
+    "importHelpers": true,
+    "isolatedModules": true,
+    "noEmitOnError": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "removeComments": true,
+    "sourceMap": false
   },
-  "include": ["./modules/**/*.ts", "declarations.d.ts"]
+  "include": ["./modules/**/*.ts", "declarations.d.ts"],
+  "exclude": ["**/node_modules", "**/.*/"]
 }
