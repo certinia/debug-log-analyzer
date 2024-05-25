@@ -35,5 +35,6 @@
     "removeComments": true,
     "sourceMap": false
   },
-  "include": ["./src/**/*.ts", "**/node_modules", "**/.*/"]
+  "include": ["./src/**/*.ts"],
+  "exclude": ["**/node_modules", "**/.*/"]
 }
