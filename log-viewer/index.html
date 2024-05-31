@@ -1,37 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Log Viewer</title>
-    <meta
-      name="description"
-      content="Analyzer for Salesforce debug logs - Visualize code execution via a Flame chart and identify performance and SOQL/DML problems via Method and Database analysis"
-    />
-    <style>
-      html {
-        width: 100%;
-        height: 100%;
-        font-size: var(--vscode-editor-font-size);
-      }
-      body {
-        color: var(--vscode-editor-foreground);
-        font-family: monospace;
-        font-weight: normal;
-        font-size: var(--vscode-editor-font-size);
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-      }
-      @font-face {
-        font-family: 'codicon';
-        font-display: block;
-        src: url('${extensionRoot}/codicon.ttf?2ab61cbaefbdf4c7c5589068100bee0c') format('truetype');
-      }
-    </style>
 
-    <script type="module" defer crossorigin="anonymous" src="bundle.js"></script>
-  </head>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Log Viewer</title>
+  <meta name="description"
+    content="Analyzer for Salesforce debug logs - Visualize code execution via a Flame chart and identify performance and SOQL/DML problems via Method and Database analysis" />
+  <style>
+    html {
+      width: 100%;
+      height: 100%;
+      font-size: var(--vscode-editor-font-size);
+    }
 
-  <body></body>
+    body {
+      color: var(--vscode-editor-foreground);
+      font-family: monospace;
+      font-weight: normal;
+      font-size: var(--vscode-editor-font-size);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    @font-face {
+      font-family: 'codicon';
+      font-display: block;
+      src: url('${extensionRoot}/codicon.ttf?38dcd33a732ebca5a557e04831e9e235') format('truetype');
+    }
+  </style>
+
+  <script type="module" defer crossorigin="anonymous" src="bundle.js"></script>
+</head>
+
+<body></body>
+
 </html>
