@@ -163,8 +163,8 @@ importers:
   log-viewer:
     dependencies:
       '@apexdevtools/apex-parser':
-        specifier: ^3.6.0
-        version: 3.6.0
+        specifier: ^4.1.0
+        version: 4.1.0
       '@vscode/codicons':
         specifier: ^0.0.35
         version: 0.0.35
@@ -286,6 +286,10 @@ packages:
 
   '@apexdevtools/apex-parser@3.6.0':
     resolution: {integrity: sha512-VoFcsb6iP35r4cwNGzm4pkZ4lkSLrDXlNwPmbpc7kHD01nQa3YHp8O5Jw7GIargmM8Gtv2ZtwDvMZsuygotYxg==}
+    engines: {node: '>=8.0.0'}
+
+  '@apexdevtools/apex-parser@4.1.0':
+    resolution: {integrity: sha512-Bj9kmOXb/ArMhxVt/aliqq45StCxbAcy1W/liIGtWi5jgzJg0xH7our+hFtMlJ7TOoVZ8mjh6oiuPNaSoJbNZA==}
     engines: {node: '>=8.0.0'}
 
   '@apexdevtools/sfdx-auth-helper@2.1.0':
@@ -7391,6 +7395,11 @@ snapshots:
       antlr4ts: 0.5.0-alpha.4
 
   '@apexdevtools/apex-parser@3.6.0':
+    dependencies:
+      antlr4ts: 0.5.0-alpha.4
+      node-dir: 0.1.17
+
+  '@apexdevtools/apex-parser@4.1.0':
     dependencies:
       antlr4ts: 0.5.0-alpha.4
       node-dir: 0.1.17
