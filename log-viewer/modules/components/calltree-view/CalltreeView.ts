@@ -9,9 +9,15 @@
 //todo: add class to locate current tree for current log
 //todo: add filter on line type
 //todo: add filter on log level (fine, finer etc)
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
+import {
+  provideVSCodeDesignSystem,
+  vsCodeCheckbox,
+  vsCodeDropdown,
+  vsCodeOption,
+} from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
 
@@ -27,7 +33,7 @@ import { globalStyles } from '../../styles/global.styles.js';
 import '../skeleton/GridSkeleton.js';
 import { MiddleRowFocus } from './module/MiddleRowFocus.js';
 
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
+provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
 
 let calltreeTable: Tabulator;
 let tableContainer: HTMLDivElement | null;
@@ -38,9 +44,14 @@ export class CalltreeView extends LitElement {
   @property()
   timelineRoot: ApexLog | null = null;
 
-  filterState = { showDetails: false, debugOnly: false };
+  filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: string[] } = {
+    showDetails: false,
+    debugOnly: false,
+    selectedTypes: [],
+  };
   debugOnlyFilterCache = new Map<number, boolean>();
   showDetailsFilterCache = new Map<number, boolean>();
+  typeFilterCache = new Map<number, boolean>();
 
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
@@ -89,7 +100,7 @@ export class CalltreeView extends LitElement {
         height: 100%;
       }
 
-      .checkbox__middle {
+      .align__middle {
         vertical-align: bottom;
       }
 
@@ -101,7 +112,14 @@ export class CalltreeView extends LitElement {
       .filter-container {
         display: flex;
         gap: 5px;
+      }
+
+      .filter-container.align__end {
         align-items: end;
+      }
+
+      .filter-container.align__middle {
+        align-items: center;
       }
 
       .filter-section {
@@ -117,7 +135,7 @@ export class CalltreeView extends LitElement {
       <div id="call-tree-container">
         <div>
           <div class="header-bar">
-            <div class="filter-container">
+            <div class="filter-container align__end">
               <vscode-button appearance="secondary" @click="${this._expandButtonClick}"
                 >Expand</vscode-button
               >
@@ -128,23 +146,41 @@ export class CalltreeView extends LitElement {
 
             <div class="filter-section">
               <strong>Filter</strong>
-              <div class="filter-container">
-                <vscode-checkbox class="checkbox__middle" @change="${this._handleShowDetailsChange}"
+              <div class="filter-container align__middle">
+                <vscode-checkbox class="align__middle" @change="${this._handleShowDetailsChange}"
                   >Details</vscode-checkbox
                 >
-                <vscode-checkbox class="checkbox__middle" @change="${this._handleDebugOnlyChange}"
+
+                <vscode-checkbox class="align__end" @change="${this._handleDebugOnlyChange}"
                   >Debug Only</vscode-checkbox
                 >
+
+                <label for="types">Event Types:</label>
+                <vscode-dropdown @change="${this._handleTypeFilter}">
+                  <vscode-option>None</vscode-option>
+                  ${repeat(
+                    this._getAllTypes(this.timelineRoot?.children ?? []),
+                    (type, _index) => html`<vscode-option>${type}</vscode-option>`,
+                  )}
+                </vscode-dropdown>
               </div>
             </div>
           </div>
         </div>
+
         <div id="call-tree-table-container">
           ${skeleton}
           <div id="call-tree-table"></div>
         </div>
       </div>
     `;
+  }
+
+  _getAllTypes(data: LogLine[]): string[] {
+    const flatten = (line: LogLine): LogLine[] => [line, ...line.children.flatMap(flatten)];
+    const flattened = data.flatMap(flatten);
+
+    return [...new Set(flattened.map((item) => item.type?.toString() ?? ''))].sort();
   }
 
   _handleShowDetailsChange(event: Event) {
@@ -159,27 +195,43 @@ export class CalltreeView extends LitElement {
     this._updateFiltering();
   }
 
+  _handleTypeFilter(event: CustomEvent<{ selectedOptions: [{ value: string }] }>) {
+    this.filterState.selectedTypes = [];
+    event.detail.selectedOptions.forEach((element) => {
+      this.filterState.selectedTypes.push(element.value);
+    });
+    this._updateFiltering();
+  }
+
   _updateFiltering() {
-    calltreeTable.blockRedraw();
-    if (this.filterState.showDetails) {
-      // @ts-expect-error valid
-      calltreeTable.removeFilter(this._showDetailsFilter);
-    } else if (!this.filterState.showDetails) {
-      // @ts-expect-error valid
-      calltreeTable.addFilter(this._showDetailsFilter);
-    }
+    const filtersToAdd = [];
 
+    // if debug only we want to show everything and apply the debug only filter.
+    // So we make sure this will be the only filter applied
     if (this.filterState.debugOnly) {
-      calltreeTable.clearFilter(false);
-      // @ts-expect-error valid
-      calltreeTable.addFilter(this._debugFilter);
-    } else if (!this.filterState.debugOnly) {
-      // @ts-expect-error valid
-      calltreeTable.removeFilter(this._debugFilter);
+      filtersToAdd.push(this._debugFilter);
+    } else {
+      if (
+        this.filterState.selectedTypes.length > 0 &&
+        this.filterState.selectedTypes[0] !== 'None'
+      ) {
+        filtersToAdd.push(this._typeFilter);
+      }
+
+      if (!this.filterState.showDetails) {
+        filtersToAdd.push(this._showDetailsFilter);
+      }
     }
 
+    calltreeTable.blockRedraw();
+    calltreeTable.clearFilter(false);
+    filtersToAdd.forEach((filter) => {
+      // @ts-expect-error valid
+      calltreeTable.addFilter(filter);
+    });
     calltreeTable.restoreRedraw();
   }
+
   _expandButtonClick() {
     calltreeTable.blockRedraw();
     this._expandCollapseAll(calltreeTable.getRows(), true);
@@ -236,24 +288,40 @@ export class CalltreeView extends LitElement {
   };
 
   _debugFilter = (data: CalltreeRow) => {
+    const debugValues = [
+      'USER_DEBUG',
+      'DATAWEAVE_USER_DEBUG',
+      'USER_DEBUG_FINER',
+      'USER_DEBUG_FINEST',
+      'USER_DEBUG_FINE',
+      'USER_DEBUG_DEBUG',
+      'USER_DEBUG_INFO',
+      'USER_DEBUG_WARN',
+      'USER_DEBUG_ERROR',
+    ];
     return this._deepFilter(
       data,
       (rowData) => {
-        const debugValues = [
-          'USER_DEBUG',
-          'DATAWEAVE_USER_DEBUG',
-          'USER_DEBUG_FINER',
-          'USER_DEBUG_FINEST',
-          'USER_DEBUG_FINE',
-          'USER_DEBUG_DEBUG',
-          'USER_DEBUG_INFO',
-          'USER_DEBUG_WARN',
-          'USER_DEBUG_ERROR',
-        ];
         return debugValues.includes(rowData.originalData.type || '');
       },
       {
         filterCache: this.debugOnlyFilterCache,
+      },
+    );
+  };
+
+  _typeFilter = (data: CalltreeRow) => {
+    return this._deepFilter(
+      data,
+      (rowData) => {
+        if (!rowData.originalData.type) {
+          return false;
+        }
+
+        return this.filterState.selectedTypes.includes(rowData.originalData.type);
+      },
+      {
+        filterCache: this.typeFilterCache,
       },
     );
   };
@@ -554,9 +622,10 @@ export class CalltreeView extends LitElement {
       calltreeTable.on('dataFiltered', () => {
         totalTimeFilterCache.clear();
         selfTimeFilterCache.clear();
+        namespaceFilterCache.clear();
         this.debugOnlyFilterCache.clear();
         this.showDetailsFilterCache.clear();
-        namespaceFilterCache.clear();
+        this.typeFilterCache.clear();
       });
 
       calltreeTable.on('tableBuilt', () => {
