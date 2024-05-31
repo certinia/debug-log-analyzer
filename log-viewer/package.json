@@ -13,21 +13,21 @@
   },
   "version": "0.1.0",
   "dependencies": {
-    "@apexdevtools/apex-parser": "^3.6.0",
-    "@vscode/codicons": "^0.0.35",
+    "@apexdevtools/apex-parser": "^4.1.0",
+    "@vscode/codicons": "^0.0.36",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "lit": "^3.1.3",
     "tabulator-tables": "^6.2.1"
   },
   "devDependencies": {
     "@types/tabulator-tables": "^6.2.0",
-    "@typescript-eslint/eslint-plugin": "^6.21.0",
-    "@typescript-eslint/parser": "^6.21.0",
+    "@typescript-eslint/eslint-plugin": "^7.11.0",
+    "@typescript-eslint/parser": "^7.11.0",
     "concurrently": "^8.2.2",
     "http-server": "^14.1.1",
     "node-sass": "^9.0.0",
     "postcss": "^8.4.38",
-    "sass": "^1.77.2",
+    "sass": "^1.77.4",
     "typescript": "^5.4.5"
   }
 }
