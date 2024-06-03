@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Call Tree: filter on event type ([#382][#382])
+  - Can be used to filter down to `EXCEPTION_THROWN` events only.
 - Go To Call Tree button on the Log Issues list ([#481][#481])
 - New ways to open the log analysis ([#506][#506])
   - From the button on the editor title menu
@@ -356,6 +358,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#382]: https://github.com/certinia/debug-log-analyzer/issues/382
 [#506]: https://github.com/certinia/debug-log-analyzer/issues/506
 [#500]: https://github.com/certinia/debug-log-analyzer/issues/500
 [#65]: https://github.com/certinia/debug-log-analyzer/issues/65
