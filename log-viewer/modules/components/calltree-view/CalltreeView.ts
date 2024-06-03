@@ -100,10 +100,6 @@ export class CalltreeView extends LitElement {
         height: 100%;
       }
 
-      .align__middle {
-        vertical-align: bottom;
-      }
-
       .header-bar {
         display: flex;
         gap: 10px;
@@ -114,16 +110,33 @@ export class CalltreeView extends LitElement {
         gap: 5px;
       }
 
-      .filter-container.align__end {
-        align-items: end;
-      }
-
-      .filter-container.align__middle {
-        align-items: center;
-      }
-
       .filter-section {
         display: block;
+      }
+
+      .dropdown-container {
+        box-sizing: border-box;
+        display: flex;
+        flex-flow: column nowrap;
+        align-items: flex-start;
+        justify-content: flex-start;
+      }
+
+      .dropdown-container label {
+        display: block;
+        color: var(--vscode-foreground);
+        cursor: pointer;
+        font-size: var(--vscode-font-size);
+        line-height: normal;
+        margin-bottom: 2px;
+      }
+
+      vscode-dropdown::part(listbox) {
+        width: auto;
+      }
+
+      .align__end {
+        align-items: end;
       }
     `,
   ];
@@ -146,8 +159,8 @@ export class CalltreeView extends LitElement {
 
             <div class="filter-section">
               <strong>Filter</strong>
-              <div class="filter-container align__middle">
-                <vscode-checkbox class="align__middle" @change="${this._handleShowDetailsChange}"
+              <div class="filter-container align__end">
+                <vscode-checkbox class="align__end" @change="${this._handleShowDetailsChange}"
                   >Details</vscode-checkbox
                 >
 
@@ -155,14 +168,16 @@ export class CalltreeView extends LitElement {
                   >Debug Only</vscode-checkbox
                 >
 
-                <label for="types">Type:</label>
-                <vscode-dropdown @change="${this._handleTypeFilter}">
-                  <vscode-option>None</vscode-option>
-                  ${repeat(
-                    this._getAllTypes(this.timelineRoot?.children ?? []),
-                    (type, _index) => html`<vscode-option>${type}</vscode-option>`,
-                  )}
-                </vscode-dropdown>
+                <div class="dropdown-container">
+                  <label for="types">Type:</label>
+                  <vscode-dropdown @change="${this._handleTypeFilter}">
+                    <vscode-option>None</vscode-option>
+                    ${repeat(
+                      this._getAllTypes(this.timelineRoot?.children ?? []),
+                      (type, _index) => html`<vscode-option>${type}</vscode-option>`,
+                    )}
+                  </vscode-dropdown>
+                </div>
               </div>
             </div>
           </div>
