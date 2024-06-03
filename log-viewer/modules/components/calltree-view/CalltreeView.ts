@@ -155,7 +155,7 @@ export class CalltreeView extends LitElement {
                   >Debug Only</vscode-checkbox
                 >
 
-                <label for="types">Event Types:</label>
+                <label for="types">Type:</label>
                 <vscode-dropdown @change="${this._handleTypeFilter}">
                   <vscode-option>None</vscode-option>
                   ${repeat(
