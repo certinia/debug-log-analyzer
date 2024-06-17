@@ -60,13 +60,11 @@ export class DMLView extends LitElement {
       :host {
         display: flex;
         flex-direction: column;
-        height: 100%;
         width: 100%;
       }
 
       #dml-table-container {
-        // height: 100%;
-        // width: 100%;
+        height: 100%;
       }
 
       #db-dml-table {
