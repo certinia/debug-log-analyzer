@@ -9,25 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Call Tree: filter on event type ([#382][#382])
-  - Can be used to filter down to `EXCEPTION_THROWN` events only.
-- Go To Call Tree button on the Log Issues list ([#481][#481])
-- New ways to open the log analysis ([#506][#506])
-  - From the button on the editor title menu
-  - From the tab context menu (right clicking the editor tab)
-- Brand new [documentation site](https://certinia.github.io/debug-log-analyzer) ([#65][#65])
+- Call Tree filter by event type: filter down to specific event types e.g `EXCEPTION_THROWN`. ([#382][#382])
+- Go To Call Tree button from the issue list. ([#481][#481])
+- More ways to open the log analysis. ([#506][#506])
+  - From the button on the editor title menu.
+  - From the tab context menu (right clicking the editor tab).
+- Brand new [documentation site](https://certinia.github.io/debug-log-analyzer). ([#65][#65])
 
 ### Changed
 
-- Huge perfornmance improvement for the Call Tree, all operations should be 3X faster. ([#500][#500])
-  - Includes expanding, filtering and scrolling.
-- Call Tree to keep currently visible rows in view when filtering / expanding([#481][#481])
-  - This wil keep what you are currentl looking at in view instead of it disapearing
-- Timeline errors can be clicked to go to the Call Tree ([#481][#481])
-
-### Changed
-
-- Faster Extension startup time, roughly 12 times faster and starts up time is less than 10ms.
+- Call Tree performance improvements: All operations should be 3X faster (including expanding, filtering and scrolling). ([#500][#500])
+- Call Tree keeps focus on the visible rows after filtering / expanding.([#481][#481])
+- Go to the Call Tree from the Timeline errors. ([#481][#481])
+- Faster Extension startup time: roughly 12 times faster and starts up time is less than 10ms.
 
 ## [1.14.1] - 2024-03-01
 

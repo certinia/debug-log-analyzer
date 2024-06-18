@@ -70,13 +70,11 @@ export class SOQLView extends LitElement {
       :host {
         display: flex;
         flex-direction: column;
-        height: 100%;
         width: 100%;
       }
 
       #soql-table-container {
-        // height: 100%;
-        // width: 100%;
+        height: 100%;
       }
 
       #db-soql-table {
