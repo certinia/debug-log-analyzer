@@ -9,6 +9,7 @@ import { vscodeMessenger } from '../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../styles/global.styles.js';
 import type { TimelineGroup } from '../timeline/Timeline.js';
 import './AppHeader.js';
+import './find-widget/FindWidget.js';
 import { Notification, type NotificationSeverity } from './notifications/NotificationPanel.js';
 
 import { keyMap, setColors } from '../timeline/Timeline.js';
@@ -57,17 +58,18 @@ export class LogViewer extends LitElement {
   }
 
   render() {
-    return html`<app-header
-      .logName=${this.logName}
-      .logPath=${this.logPath}
-      .logSize=${this.logSize}
-      .logDuration=${this.logDuration}
-      .logStatus=${this.logStatus}
-      .notifications=${this.notifications}
-      .parserIssues=${this.parserIssues}
-      .timelineRoot=${this.timelineRoot}
-      .timelineKeys=${this.timelineKeys}
-    ></app-header>`;
+    return html` <find-widget></find-widget>
+      <app-header
+        .logName=${this.logName}
+        .logPath=${this.logPath}
+        .logSize=${this.logSize}
+        .logDuration=${this.logDuration}
+        .logStatus=${this.logStatus}
+        .notifications=${this.notifications}
+        .parserIssues=${this.parserIssues}
+        .timelineRoot=${this.timelineRoot}
+        .timelineKeys=${this.timelineKeys}
+      ></app-header>`;
   }
 
   async _handleLogFetch(data: LogDataEvent) {

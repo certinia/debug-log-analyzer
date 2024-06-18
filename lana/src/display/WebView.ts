@@ -14,7 +14,7 @@ class WebViewOptions implements WebviewPanelOptions {
   enableScripts = true;
   retainContextWhenHidden = true;
   localResourceRoots: Uri[];
-  enableFindWidget = true;
+  enableFindWidget = false;
 
   constructor(resourceRoots: Uri[]) {
     this.localResourceRoots = resourceRoots;
