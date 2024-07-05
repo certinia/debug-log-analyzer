@@ -11,11 +11,22 @@ provideVSCodeDesignSystem().register(vsCodeTextField());
 export class FindWidget extends LitElement {
   @state() isVisble = false;
   @state() matchCase = false;
+  @state() totalMatches = 0;
+  @state() currentMatch = 1;
+  lastMatch: string | null = null;
+  nextMatchDirection = true;
+  debounce;
 
   constructor() {
     super();
     document.addEventListener('keydown', (e: KeyboardEvent) => {
-      this._keyPress(e);
+      clearTimeout(this.debounce);
+      this.debounce = setTimeout(() => {
+        this._keyPress(e);
+      }, 15);
+    });
+    document.addEventListener('lv-find-results', (e: { detail: { totalMatches: number } }) => {
+      this._updateCounts(e);
     });
   }
 
@@ -24,6 +35,7 @@ export class FindWidget extends LitElement {
     unsafeCSS(codiconStyles),
     css`
       :host {
+        font-size: 12px;
       }
 
       .wrapper {
@@ -97,6 +109,19 @@ export class FindWidget extends LitElement {
         color: var(--vscode-inputOption-activeForeground);
         border: 1px solid var(--vscode-inputOption-activeBorder);
       }
+
+      .matches-count {
+        min-width: 69px;
+        box-sizing: border-box;
+        display: flex;
+        flex: initial;
+        height: 25px;
+        line-height: 23px;
+        margin: 0 0 0 3px;
+        padding: 2px 0 0 2px;
+        text-align: center;
+        vertical-align: middle;
+      }
     `,
   ];
 
@@ -119,12 +144,21 @@ export class FindWidget extends LitElement {
           </vs-icon-checkbox>
         </section>
       </vscode-text-field>
+      <div class="matches-count">${this._getMatchesText()}</div>
 
       <div class="find-actions">
-        <vscode-button appearance="icon" title="Previous Match" class="find-button"
+        <vscode-button
+          appearance="icon"
+          title="Previous Match"
+          class="find-button"
+          @click=${this._previousMatch}
           ><span class="codicon codicon-arrow-up"></span
         ></vscode-button>
-        <vscode-button appearance="icon" title="Next Match" class="find-button"
+        <vscode-button
+          appearance="icon"
+          title="Next Match"
+          class="find-button"
+          @click=${this._nextMatch}
           ><span class="codicon codicon-arrow-down"></span
         ></vscode-button>
         <vscode-button appearance="icon" title="Close" class="find-button" @click=${this._closeFind}
@@ -134,12 +168,25 @@ export class FindWidget extends LitElement {
     </div>`;
   }
 
+  _getMatchesText() {
+    if (this.totalMatches === 0) {
+      return 'No Matches';
+    }
+
+    return (this.totalMatches ? this.currentMatch : '?') + ' of ' + this.totalMatches;
+  }
+
   _matchCase() {
+    this._resetCounts();
     this.matchCase = !this.matchCase;
+    this._triggerFind();
   }
 
   _closeFind() {
     this.isVisble = false;
+    this.currentMatch = 0;
+    this.totalMatches = 0;
+    document.dispatchEvent(new CustomEvent('lv-find-close', { detail: {} }));
   }
 
   _findInputClick() {
@@ -151,13 +198,49 @@ export class FindWidget extends LitElement {
     }
   }
 
+  _previousMatch() {
+    if (this.currentMatch !== null) {
+      this.currentMatch--;
+      this.nextMatchDirection = false;
+      if (this.currentMatch < 1) {
+        this.currentMatch = this.totalMatches;
+      }
+
+      document.dispatchEvent(new CustomEvent('lv-find-match', this._getFindEvent()));
+    }
+  }
+
+  _nextMatch() {
+    if (this.currentMatch !== null) {
+      this.currentMatch++;
+      this.nextMatchDirection = true;
+      if (this.currentMatch > this.totalMatches) {
+        this.currentMatch = 1;
+      }
+
+      document.dispatchEvent(new CustomEvent('lv-find-match', this._getFindEvent()));
+    }
+  }
+
   get inputbox() {
     return this.shadowRoot?.querySelector<HTMLInputElement>('.find-input-box');
+  }
+
+  _updateCounts(e: { detail: { totalMatches: number } }) {
+    this.totalMatches = e.detail.totalMatches;
+    this.currentMatch = 1;
+  }
+
+  _resetCounts() {
+    this.totalMatches = 0;
+    this.currentMatch = 1;
   }
 
   _keyPress(e: KeyboardEvent) {
     if (e.key === 'f' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
+
+      !this.isVisble && !this.totalMatches && this._triggerFind();
       this._findInputClick();
       return;
     }
@@ -169,22 +252,46 @@ export class FindWidget extends LitElement {
       return;
     }
 
-    const inputBox = this.inputbox;
-
     switch (e.key) {
       case 'Escape':
-        this.isVisble = false;
+        this._closeFind();
+
         break;
 
       case 'Enter': {
-        document.dispatchEvent(
-          new CustomEvent('lv-find', { detail: { text: inputBox?.value.toLowerCase() } }),
-        );
+        if (this._hasMatchValueChanged()) {
+          this._triggerFind();
+        } else {
+          this.nextMatchDirection ? this._nextMatch() : this._previousMatch();
+        }
         break;
       }
 
       default:
         break;
     }
+  }
+
+  _triggerFind() {
+    document.dispatchEvent(new CustomEvent('lv-find', this._getFindEvent()));
+  }
+
+  _getMatchValue() {
+    return this.inputbox?.value ?? '';
+  }
+
+  _hasMatchValueChanged() {
+    return this.lastMatch !== this._getMatchValue();
+  }
+
+  _getFindEvent() {
+    this.lastMatch = this._getMatchValue();
+    return {
+      detail: {
+        text: this._getMatchValue(),
+        count: this.currentMatch,
+        options: { matchCase: this.matchCase },
+      },
+    };
   }
 }
