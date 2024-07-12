@@ -909,7 +909,6 @@ function handleScroll(evt: WheelEvent) {
   }
 }
 
-// TODO: show tooltip
 function _findOnTimeline(
   e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>,
 ) {
@@ -975,7 +974,7 @@ function onInitTimeline(): void {
   new ResizeObserver(resize).observe(container);
   container.addEventListener('mousemove', onMouseMove);
 
-  document.addEventListener('lv-find', _findOnTimeline);
-  document.addEventListener('lv-find-match', _findOnTimeline);
-  document.addEventListener('lv-find-close', _findOnTimeline);
+  document.addEventListener('lv-find', _findOnTimeline as EventListener);
+  document.addEventListener('lv-find-match', _findOnTimeline as EventListener);
+  document.addEventListener('lv-find-close', _findOnTimeline as EventListener);
 }
