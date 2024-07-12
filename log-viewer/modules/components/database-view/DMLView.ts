@@ -17,11 +17,13 @@ import { DatabaseAccess } from '../../Database.js';
 import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
 import Number from '../../datagrid/format/Number.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
+import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 import { ApexLog, DMLBeginLine } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../CallStack.js';
+import { Find, formatter } from '../calltree-view/module/Find.js';
 import './DatabaseSection.js';
 import databaseViewStyles from './DatabaseView.scss';
 
@@ -29,11 +31,20 @@ provideVSCodeDesignSystem().register(vsCodeCheckbox());
 let dmlTable: Tabulator;
 let holder: HTMLElement | null = null;
 let table: HTMLElement | null = null;
+let findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
+  text: '',
+  count: 0,
+  options: { matchCase: false },
+};
+let findMap = {};
 
 @customElement('dml-view')
 export class DMLView extends LitElement {
   @property()
   timelineRoot: ApexLog | null = null;
+
+  @property()
+  highlightIndex: number = 0;
 
   @state()
   dmlLines: DMLBeginLine[] = [];
@@ -44,11 +55,17 @@ export class DMLView extends LitElement {
 
   constructor() {
     super();
+
+    document.addEventListener('lv-find', this._find as EventListener);
+    document.addEventListener('lv-find-close', this._find as EventListener);
   }
 
   updated(changedProperties: PropertyValues): void {
     if (this.timelineRoot && changedProperties.has('timelineRoot')) {
       this._appendTableWhenVisible();
+    }
+    if (changedProperties.has('highlightIndex')) {
+      this._highlightMatches(this.highlightIndex);
     }
   }
 
@@ -112,13 +129,53 @@ export class DMLView extends LitElement {
           this.dmlLines = dbAccess.getDMLLines() || [];
 
           Tabulator.registerModule(Object.values(CommonModules));
-          Tabulator.registerModule([RowKeyboardNavigation]);
+          Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
           renderDMLTable(dmlTableWrapper, this.dmlLines);
         }
       });
       dbObserver.observe(this);
     }
   }
+
+  _highlightMatches(highlightIndex: number) {
+    if (!dmlTable?.element?.clientHeight) {
+      return;
+    }
+
+    findArgs.count = highlightIndex;
+    const currentRow: RowComponent = findMap[highlightIndex];
+    const rows = [currentRow, findMap[highlightIndex + 1], findMap[highlightIndex - 1]];
+    rows.forEach((row) => {
+      row?.reformat();
+    });
+    dmlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+  }
+
+  _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
+    if (!dmlTable?.element?.clientHeight) {
+      return;
+    }
+
+    const hasFindClosed = e.type === 'lv-find-close';
+    const findArgsParam = e.detail;
+    const newSearch =
+      findArgsParam.text !== findArgs.text ||
+      findArgsParam.options.matchCase !== findArgs.options?.matchCase;
+    findArgs = findArgsParam;
+
+    if (newSearch || hasFindClosed) {
+      const result = dmlTable.find(findArgs);
+      findMap = result.matchIndexes;
+
+      if (!hasFindClosed) {
+        document.dispatchEvent(
+          new CustomEvent('db-find-results', {
+            detail: { totalMatches: result.totalMatches, type: 'dml' },
+          }),
+        );
+      }
+    }
+  };
 }
 
 function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
@@ -260,6 +317,7 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
         const detailContainer = createDetailPanel(data.timestamp);
         row.getElement().replaceChildren(detailContainer);
       }
+      formatter(row, findArgs);
     },
   });
 
