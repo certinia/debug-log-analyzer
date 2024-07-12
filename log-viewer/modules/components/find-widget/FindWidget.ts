@@ -1,3 +1,5 @@
+//totod: event types
+
 import { provideVSCodeDesignSystem, vsCodeTextField } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
@@ -15,19 +17,19 @@ export class FindWidget extends LitElement {
   @state() currentMatch = 1;
   lastMatch: string | null = null;
   nextMatchDirection = true;
-  debounce;
+  debounce: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     super();
     document.addEventListener('keydown', (e: KeyboardEvent) => {
-      clearTimeout(this.debounce);
+      this.debounce && clearTimeout(this.debounce);
       this.debounce = setTimeout(() => {
         this._keyPress(e);
-      }, 15);
+      }, 20);
     });
-    document.addEventListener('lv-find-results', (e: { detail: { totalMatches: number } }) => {
+    document.addEventListener('lv-find-results', ((e: CustomEvent<{ totalMatches: number }>) => {
       this._updateCounts(e);
-    });
+    }) as EventListener);
   }
 
   static styles = [
@@ -184,9 +186,10 @@ export class FindWidget extends LitElement {
 
   _closeFind() {
     this.isVisble = false;
-    this.currentMatch = 0;
-    this.totalMatches = 0;
-    document.dispatchEvent(new CustomEvent('lv-find-close', { detail: {} }));
+    this._resetCounts();
+    const findEvt = this._getFindEvent();
+    findEvt.detail.text = '';
+    document.dispatchEvent(new CustomEvent('lv-find-close', findEvt));
   }
 
   _findInputClick() {
@@ -273,6 +276,7 @@ export class FindWidget extends LitElement {
   }
 
   _triggerFind() {
+    this._resetCounts();
     document.dispatchEvent(new CustomEvent('lv-find', this._getFindEvent()));
   }
 

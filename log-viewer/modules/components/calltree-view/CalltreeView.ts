@@ -31,6 +31,7 @@ import { ApexLog, LogLine, TimedNode, type LogEventType } from '../../parsers/Ap
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../skeleton/GridSkeleton.js';
+import { Find, formatter } from './module/Find.js';
 import { MiddleRowFocus } from './module/MiddleRowFocus.js';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
@@ -53,6 +54,8 @@ export class CalltreeView extends LitElement {
   showDetailsFilterCache = new Map<number, boolean>();
   typeFilterCache = new Map<number, boolean>();
 
+  findMap = {};
+
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
   }
@@ -60,9 +63,13 @@ export class CalltreeView extends LitElement {
   constructor() {
     super();
 
-    document.addEventListener('calltree-go-to-row', (e: Event) => {
-      this._goToRow((e as CustomEvent).detail.timestamp);
-    });
+    document.addEventListener('calltree-go-to-row', ((e: CustomEvent) => {
+      this._goToRow(e.detail.timestamp);
+    }) as EventListener);
+
+    document.addEventListener('lv-find', this._find as EventListener);
+    document.addEventListener('lv-find-match', this._find as EventListener);
+    document.addEventListener('lv-find-close', this._find as EventListener);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -286,7 +293,54 @@ export class CalltreeView extends LitElement {
 
     const treeRow = this._findByTime(calltreeTable.getRows(), timestamp);
     //@ts-expect-error This is a custom function added in by RowNavigation custom module
-    calltreeTable.goToRow(treeRow);
+    calltreeTable.goToRow(treeRow, { scrollIfVisible: true, focusRow: true });
+  }
+
+  searchString = '';
+  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
+    text: '',
+    count: 0,
+    options: { matchCase: false },
+  };
+
+  _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
+    if (!calltreeTable?.element.clientHeight) {
+      return;
+    }
+
+    const hasFindClosed = e.type === 'lv-find-close';
+    const findArgs = e.detail;
+    const newSearch =
+      findArgs.text !== this.findArgs.text ||
+      findArgs.options.matchCase !== this.findArgs.options?.matchCase;
+    this.findArgs = findArgs;
+
+    if (newSearch || hasFindClosed) {
+      const result = calltreeTable.find(findArgs);
+      this.findMap = result.matchIndexes;
+
+      if (!hasFindClosed) {
+        document.dispatchEvent(
+          new CustomEvent('lv-find-results', { detail: { totalMatches: result.totalMatches } }),
+        );
+      }
+    }
+
+    const currentRow: RowComponent = this.findMap[findArgs.count];
+    const rows = [currentRow, this.findMap[findArgs.count + 1], this.findMap[findArgs.count - 1]];
+    rows.forEach((row) => {
+      row?.reformat();
+    });
+    calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+  };
+
+  _highlight(inputString: string, substring: string) {
+    const regex = new RegExp(substring, 'gi');
+    const resultString = inputString.replace(
+      regex,
+      '<span style="background-color:yellow;border:1px solid lightgrey">$&</span>',
+    );
+    return resultString;
   }
 
   _showDetailsFilter = (data: CalltreeRow) => {
@@ -423,7 +477,7 @@ export class CalltreeView extends LitElement {
 
     return new Promise((resolve) => {
       Tabulator.registerModule(Object.values(CommonModules));
-      Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, MiddleRowFocus]);
+      Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, MiddleRowFocus, Find]);
 
       const selfTimeFilterCache = new Map<string, boolean>();
       const totalTimeFilterCache = new Map<string, boolean>();
@@ -457,6 +511,9 @@ export class CalltreeView extends LitElement {
             default:
               return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
           }
+        },
+        rowFormatter: (row: RowComponent) => {
+          formatter(row, this.findArgs);
         },
         columnCalcs: 'both',
         columnDefaults: {
