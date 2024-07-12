@@ -1,14 +1,7 @@
 /*
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
-import {
-  CellComponent,
-  FormatModule,
-  Module,
-  type ColumnComponent,
-  type RowComponent,
-  type Tabulator,
-} from 'tabulator-tables';
+import { Module, type RowComponent, type Tabulator } from 'tabulator-tables';
 
 export class Find extends Module {
   static moduleName = 'FindModule';
@@ -53,16 +46,9 @@ export class Find extends Module {
     const flattenedRows = rows.flatMap(flatten);
 
     tbl.blockRedraw();
-    const cols = tbl.getColumns();
-    const len = flattenedRows.length;
-
-    const searchRegex = searchString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(searchRegex, `g${findArgs.options.matchCase ? 'i' : ''}`);
-
+    const regex = new RegExp(searchString, `g${findArgs.options.matchCase ? 'i' : ''}`);
     const rowsToReformat = [];
-
-    const columnFormatters = this._columnsToValFinder(cols);
-    const colFormattersLen = columnFormatters.length;
+    const len = flattenedRows.length;
     for (let i = 0; i < len; i++) {
       const row = flattenedRows[i];
       if (!row) {
@@ -82,17 +68,10 @@ export class Find extends Module {
         continue;
       }
       let reformat = false;
-      for (let j = 0; j < colFormattersLen; j++) {
-        const colFormatter = columnFormatters[j];
-        if (!colFormatter) {
-          continue;
-        }
 
-        colFormatter.data = data;
-        colFormatter.row = row;
-        colFormatter.value = data[colFormatter.columnComponent.getField()];
-
-        let val = colFormatter.getFormattedValue();
+      row.getCells().forEach((cell) => {
+        const elem = cell.getElement();
+        let val = elem?.textContent?.trim() ?? '';
         if (!findArgs.options.matchCase) {
           val = val.toLowerCase();
         }
@@ -106,13 +85,10 @@ export class Find extends Module {
           }
           reformat = true;
         }
-      }
+      });
 
       if (reformat && !clearHighlight) {
-        // data.highlightIndexs = ++highlightIndex;
-        // row.update({ isHighlighted: true });
         rowsToReformat.push(row);
-        // row.normalizeHeight();
       }
     }
     rowsToReformat.forEach((row) => {
@@ -122,34 +98,6 @@ export class Find extends Module {
 
     result.totalMatches = totalMatches;
     return result;
-  }
-
-  _getCellValue(component: CellComponent) {
-    const rawCell = component._getSelf();
-    const val = rawCell.chain('cell-format', rawCell, null, () => {
-      return rawCell.value;
-    });
-
-    if (val instanceof Node) {
-      return val.textContent?.trim();
-    }
-
-    return val?.toString();
-  }
-
-  _columnsToValFinder(cols: ColumnComponent[]) {
-    const valFinders: FakeCell[] = [];
-
-    const formatterDiv = document.createElement('div');
-    const formatModule = new FormatModule(this.table);
-    cols.forEach((col) => {
-      const sCell = new FakeCell();
-      sCell.element = formatterDiv;
-      sCell.setColumn(col);
-      sCell.formatter = sCell.format.formatter.bind(formatModule);
-      valFinders.push(sCell);
-    });
-    return valFinders;
   }
 }
 
@@ -163,7 +111,7 @@ export function formatter(row: RowComponent, findArgs: FindArgs) {
   const searchRegex = searchAsHTML.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regex = new RegExp(searchRegex, `g${findArgs.options.matchCase ? '' : 'i'}`);
   let i = 0;
-  const data = row.getData();
+  const data = row.getData() ?? row.data;
   const matchIndex = findArgs.count;
   row.getCells().forEach((cell) => {
     const cellElem = cell.getElement();
@@ -195,63 +143,3 @@ function _escapeHtml(unsafe: string) {
 }
 
 type FindArgs = { text: string; count: number; options: { matchCase: boolean } };
-
-class FakeCell {
-  row;
-  element;
-  value;
-  data;
-  column;
-  columnComponent;
-  format;
-  formatter;
-
-  static regexForHTML = /<([A-Za-z][A-Za-z0-9]*)\b[^>]*>(.*?)<\/\1>/;
-
-  getRow() {
-    return this.row;
-  }
-  getElement() {
-    return this.element;
-  }
-
-  getValue() {
-    return this.value;
-  }
-
-  getData() {
-    return this.data;
-  }
-
-  getComponent() {
-    return this;
-  }
-
-  getFormattedValue(): string {
-    const params =
-      typeof this.format.params === 'function' ? this.format.params(this) : this.format.params;
-
-    let val = this.formatter(this, params);
-    if (val instanceof Node) {
-      val = val.textContent?.trim();
-    } else {
-      // val = val.toString();
-
-      val = val
-        .toString()
-        .replace(/<[^>]+>/g, '')
-        .trim();
-    }
-    return val;
-  }
-
-  setColumn(col: ColumnComponent) {
-    this.columnComponent = col;
-    this.column = col._getSelf();
-    this.format = this.column.modules.format;
-  }
-
-  // getTable(){
-
-  // }
-}
