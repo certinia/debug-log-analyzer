@@ -9,7 +9,7 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { Tabulator, type ColumnComponent } from 'tabulator-tables';
+import { Tabulator, type ColumnComponent, type RowComponent } from 'tabulator-tables';
 import * as CommonModules from '../datagrid/module/CommonModules.js';
 
 import NumberAccessor from '../datagrid/dataaccessor/Number.js';
@@ -21,10 +21,19 @@ import { vscodeMessenger } from '../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './skeleton/GridSkeleton.js';
 
+import { Find, formatter } from '../components/calltree-view/module/Find.js';
+import { RowNavigation } from '../datagrid/module/RowNavigation.js';
+
 provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
 
 let analysisTable: Tabulator;
 let tableContainer: HTMLDivElement | null;
+let findMap = {};
+let findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
+  text: '',
+  count: 0,
+  options: { matchCase: false },
+};
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
   @property()
@@ -36,6 +45,10 @@ export class AnalysisView extends LitElement {
 
   constructor() {
     super();
+
+    document.addEventListener('lv-find', this._find as EventListener);
+    document.addEventListener('lv-find-match', this._find as EventListener);
+    document.addEventListener('lv-find-close', this._find as EventListener);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -123,6 +136,37 @@ export class AnalysisView extends LitElement {
       analysisObserver.observe(tableWrapper);
     }
   }
+
+  _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
+    if (!analysisTable?.element.clientHeight) {
+      return;
+    }
+
+    const hasFindClosed = e.type === 'lv-find-close';
+    const findArgsParam = e.detail;
+    const newSearch =
+      findArgsParam.text !== findArgs.text ||
+      findArgsParam.options.matchCase !== findArgs.options?.matchCase;
+    findArgs = findArgsParam;
+
+    if (newSearch || hasFindClosed) {
+      const result = analysisTable.find(findArgs);
+      findMap = result.matchIndexes;
+
+      if (!hasFindClosed) {
+        document.dispatchEvent(
+          new CustomEvent('lv-find-results', { detail: { totalMatches: result.totalMatches } }),
+        );
+      }
+    }
+
+    const currentRow: RowComponent = findMap[findArgs.count];
+    const rows = [currentRow, findMap[findArgs.count + 1], findMap[findArgs.count - 1]];
+    rows.forEach((row) => {
+      row?.reformat();
+    });
+    analysisTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+  };
 }
 
 async function renderAnalysis(rootMethod: ApexLog) {
@@ -144,7 +188,7 @@ async function renderAnalysis(rootMethod: ApexLog) {
   ];
 
   Tabulator.registerModule(Object.values(CommonModules));
-  Tabulator.registerModule(RowKeyboardNavigation);
+  Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
   analysisTable = new Tabulator(tableContainer, {
     rowKeyboardNavigation: true,
     selectableRows: 1,
@@ -182,6 +226,9 @@ async function renderAnalysis(rootMethod: ApexLog) {
     groupClosedShowCalcs: true,
     groupStartOpen: false,
     groupToggleElement: 'header',
+    rowFormatter: (row: RowComponent) => {
+      formatter(row, findArgs);
+    },
     columnDefaults: {
       title: 'default',
       resizable: true,
