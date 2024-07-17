@@ -46,7 +46,7 @@ export class Find extends Module {
     const flattenedRows = rows.flatMap(flatten);
 
     tbl.blockRedraw();
-    const regex = new RegExp(searchString, `g${findArgs.options.matchCase ? 'i' : ''}`);
+    const regex = new RegExp(searchString, `g${findArgs.options.matchCase ? '' : 'i'}`);
     const rowsToReformat = [];
     const len = flattenedRows.length;
     for (let i = 0; i < len; i++) {
@@ -71,13 +71,9 @@ export class Find extends Module {
 
       row.getCells().forEach((cell) => {
         const elem = cell.getElement();
-        let val = elem?.textContent?.trim() ?? '';
-        if (!findArgs.options.matchCase) {
-          val = val.toLowerCase();
-        }
-        if (val.includes(searchString)) {
-          const match = val.match(regex);
-          const kLen = match?.length ?? 0;
+        const matchCount = this._countMatches(elem, findArgs, regex);
+        if (matchCount) {
+          const kLen = matchCount;
           for (let k = 0; k < kLen; k++) {
             totalMatches++;
             data.highlightIndexes.push(totalMatches);
@@ -99,47 +95,112 @@ export class Find extends Module {
     result.totalMatches = totalMatches;
     return result;
   }
+
+  _countMatches(elem: Node, findArgs: FindArgs, regex: RegExp) {
+    let count = 0;
+    const children =
+      (elem.childNodes?.length ? elem.childNodes : elem.renderRoot?.childNodes) ?? [];
+    const len = children.length;
+    for (let i = 0; i < len; i++) {
+      const cur = children[i];
+      if (!cur) {
+        continue;
+      }
+
+      if (cur.nodeType === 1) {
+        count += this._countMatches(cur, findArgs, regex);
+      } else if (cur.nodeType === 3) {
+        const originalText = cur.textContent;
+        if (!originalText) {
+          continue;
+        }
+        const match = originalText.match(regex);
+        count += match?.length ?? 0;
+      }
+    }
+    return count;
+  }
 }
 
 export function formatter(row: RowComponent, findArgs: FindArgs) {
   if (!findArgs.text || !row.getData()) {
     return;
   }
-  const searchText = findArgs.options.matchCase ? findArgs.text : findArgs.text.toLowerCase();
   // escape special charcters
-  const searchAsHTML = _escapeHtml(searchText);
-  const searchRegex = searchAsHTML.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(searchRegex, `g${findArgs.options.matchCase ? '' : 'i'}`);
-  let i = 0;
   const data = row.getData() ?? row.data;
-  const matchIndex = findArgs.count;
   row.getCells().forEach((cell) => {
     const cellElem = cell.getElement();
-    const val = cellElem.innerHTML ?? '';
-
-    if (
-      findArgs.options.matchCase
-        ? val.includes(searchAsHTML)
-        : val.toLowerCase().includes(searchAsHTML)
-    ) {
-      const resultString = val.replace(regex, (match) => {
-        const highlightIndex = data.highlightIndexes[i++];
-        return highlightIndex === matchIndex
-          ? `<span style="background-color:#8B8000;border:1px solid lightgrey">${match}</span>`
-          : `<span style="background-color:yellow;border:1px solid lightgrey">${match}</span>`;
-      });
-      cellElem.innerHTML = resultString;
-    }
+    _highlightText(cellElem, findArgs, { indexes: data.highlightIndexes, currentMatch: 0 });
   });
+
+  if (row._getSelf().type !== 'calc') {
+    row.normalizeHeight();
+  }
 }
 
-function _escapeHtml(unsafe: string) {
-  return unsafe
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+function _highlightText(
+  elem: Node,
+  findArgs: FindArgs,
+  highlights: { indexes: number[]; currentMatch: number },
+) {
+  const searchText = findArgs.options.matchCase ? findArgs.text : findArgs.text.toLowerCase();
+  const matchHighlightIndex = findArgs.count;
+
+  const children = (elem.childNodes?.length ? elem.childNodes : elem.renderRoot?.childNodes) ?? [];
+  const len = children.length;
+  for (let i = 0; i < len; i++) {
+    const cur = children[i];
+    if (!cur) {
+      continue;
+    }
+
+    if (cur.nodeType === 1) {
+      _highlightText(cur, findArgs, highlights);
+    } else if (cur.nodeType === 3) {
+      const parentNode = cur.parentNode;
+      let originalText = cur.textContent;
+      if (!originalText) {
+        continue;
+      }
+
+      let matchIndex = (
+        findArgs.options.matchCase ? originalText : originalText?.toLowerCase()
+      )?.indexOf(searchText);
+      while (matchIndex > -1) {
+        const hightlightIndex = highlights.indexes[highlights.currentMatch++];
+
+        const endOfMatchIndex = matchIndex + searchText.length;
+        const matchingText = originalText.substring(matchIndex, endOfMatchIndex);
+
+        const highlightSpan = document.createElement('span');
+        highlightSpan.style.backgroundColor =
+          hightlightIndex === matchHighlightIndex ? '#8B8000' : 'yellow';
+        highlightSpan.textContent = matchingText;
+        if (parentNode.isEqualNode(highlightSpan)) {
+          break;
+        }
+
+        if (matchIndex > 0) {
+          const beforeText = originalText.substring(0, matchIndex);
+          const beforeTextElem = document.createElement('text');
+          beforeTextElem.textContent = beforeText;
+          parentNode?.insertBefore(beforeTextElem, cur);
+        }
+        parentNode?.insertBefore(highlightSpan, cur);
+
+        const endText = originalText.substring(endOfMatchIndex, originalText.length);
+        if (!endText.length) {
+          parentNode?.removeChild(cur);
+          break;
+        }
+        cur.textContent = endText;
+        originalText = endText;
+        matchIndex = (
+          findArgs.options.matchCase ? originalText : originalText?.toLowerCase()
+        )?.indexOf(searchText);
+      }
+    }
+  }
 }
 
 type FindArgs = { text: string; count: number; options: { matchCase: boolean } };

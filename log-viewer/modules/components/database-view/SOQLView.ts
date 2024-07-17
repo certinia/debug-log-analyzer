@@ -57,6 +57,9 @@ export class SOQLView extends LitElement {
   highlightIndex: number = 0;
 
   @state()
+  oldIndex: number = 0;
+
+  @state()
   soqlLines: SOQLExecuteBeginLine[] = [];
 
   get _soqlTableWrapper(): HTMLDivElement | null {
@@ -181,11 +184,13 @@ export class SOQLView extends LitElement {
 
     findArgs.count = highlightIndex;
     const currentRow: RowComponent = findMap[highlightIndex];
-    const rows = [currentRow, findMap[highlightIndex + 1], findMap[highlightIndex - 1]];
+    const rows = [currentRow, findMap[this.oldIndex]];
     rows.forEach((row) => {
       row?.reformat();
     });
     soqlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+
+    this.oldIndex = highlightIndex;
   }
 
   _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
@@ -198,7 +203,7 @@ export class SOQLView extends LitElement {
     const newSearch =
       findArgsParam.text !== findArgs.text ||
       findArgsParam.options.matchCase !== findArgs.options?.matchCase;
-    findArgs = findArgsParam;
+    findArgs = JSON.parse(JSON.stringify(findArgsParam));
 
     if (newSearch || hasFindClosed) {
       const result = soqlTable.find(findArgs);
@@ -330,14 +335,12 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
         cssClass: 'datagrid-textarea datagrid-code-text',
         variableHeight: true,
         formatter: (cell, _formatterParams, _onRendered) => {
-          cell.getRow().normalizeHeight();
-
           const data = cell.getData() as GridSOQLData;
           return `<call-stack
-          timestamp=${data.timestamp}
-          startDepth="0"
-          endDepth="1"
-        ></call-stack>`;
+            timestamp=${data.timestamp}
+            startDepth="0"
+            endDepth="1"
+          ></call-stack>`;
         },
       },
       {
@@ -455,12 +458,14 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
       const data = row.getData();
       if (data.isDetail && data.timestamp) {
         const detailContainer = createSOQLDetailPanel(data.timestamp, timestampToSOQl);
-        // return detailContainer;
+
         row.getElement().replaceChildren(detailContainer);
         row.normalizeHeight();
       }
 
-      formatter(row, findArgs);
+      requestAnimationFrame(() => {
+        formatter(row, findArgs);
+      });
     },
   });
 

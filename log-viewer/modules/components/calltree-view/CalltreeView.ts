@@ -513,7 +513,9 @@ export class CalltreeView extends LitElement {
           }
         },
         rowFormatter: (row: RowComponent) => {
-          formatter(row, this.findArgs);
+          requestAnimationFrame(() => {
+            formatter(row, this.findArgs);
+          });
         },
         columnCalcs: 'both',
         columnDefaults: {

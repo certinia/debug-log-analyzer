@@ -76,10 +76,10 @@ export class DatabaseView extends LitElement {
     const matchIndex = arg.count;
     if (matchIndex <= this.dmlMatches) {
       this.dmlHighlightIndex = matchIndex;
-      this.soqlHighlightIndex++;
+      this.soqlHighlightIndex = 0;
     } else {
       this.soqlHighlightIndex = matchIndex - this.dmlMatches;
-      this.dmlHighlightIndex++;
+      this.dmlHighlightIndex = 0;
     }
   };
 

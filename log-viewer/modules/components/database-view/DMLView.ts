@@ -46,6 +46,9 @@ export class DMLView extends LitElement {
   @property()
   highlightIndex: number = 0;
 
+  @property()
+  oldIndex: number = 0;
+
   @state()
   dmlLines: DMLBeginLine[] = [];
 
@@ -144,11 +147,12 @@ export class DMLView extends LitElement {
 
     findArgs.count = highlightIndex;
     const currentRow: RowComponent = findMap[highlightIndex];
-    const rows = [currentRow, findMap[highlightIndex + 1], findMap[highlightIndex - 1]];
+    const rows = [currentRow, findMap[this.oldIndex]];
     rows.forEach((row) => {
       row?.reformat();
     });
     dmlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+    this.oldIndex = highlightIndex;
   }
 
   _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
@@ -161,7 +165,7 @@ export class DMLView extends LitElement {
     const newSearch =
       findArgsParam.text !== findArgs.text ||
       findArgsParam.options.matchCase !== findArgs.options?.matchCase;
-    findArgs = findArgsParam;
+    findArgs = JSON.parse(JSON.stringify(findArgsParam));
 
     if (newSearch || hasFindClosed) {
       const result = dmlTable.find(findArgs);
@@ -278,10 +282,10 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
         formatter: (cell, _formatterParams, _onRendered) => {
           const data = cell.getData() as DMLRow;
           return `<call-stack
-          timestamp=${data.timestamp}
-          startDepth="0"
-          endDepth="1"
-        ></call-stack>`;
+            timestamp="${data.timestamp}"
+            startDepth="0"
+            endDepth="1"
+          ></call-stack>`;
         },
       },
       {
@@ -316,8 +320,12 @@ function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]
       if (data.isDetail && data.timestamp) {
         const detailContainer = createDetailPanel(data.timestamp);
         row.getElement().replaceChildren(detailContainer);
+        row.normalizeHeight();
       }
-      formatter(row, findArgs);
+
+      requestAnimationFrame(() => {
+        formatter(row, findArgs);
+      });
     },
   });
 
