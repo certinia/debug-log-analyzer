@@ -23,7 +23,7 @@ export class RowNavigation extends Module {
       table.blockRedraw();
 
       const grp = row.getGroup();
-      if (!grp.isVisible()) {
+      if (grp && !grp.isVisible()) {
         grp.show();
       }
 

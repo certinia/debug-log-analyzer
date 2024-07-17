@@ -26,10 +26,7 @@ export class Find extends Module {
     }
 
     const findOptions = findArgs.options;
-
     const searchString = findOptions.matchCase ? findArgs.text : findArgs.text.toLowerCase();
-
-    let totalMatches = 0;
 
     const flattenFromGrps = (row: GroupComponent): RowComponent[] => {
       const mergedArray: RowComponent[] = [];
@@ -55,10 +52,11 @@ export class Find extends Module {
     };
 
     // Only get the currently visible rows
-    const flattenedRows =
-      tbl.getGroups().flatMap(flattenFromGrps) || tbl.getRows('active').flatMap(flatten);
+    const grps = tbl.getGroups().flatMap(flattenFromGrps);
+    const flattenedRows = grps.length ? grps : tbl.getRows('active').flatMap(flatten);
 
     tbl.blockRedraw();
+    let totalMatches = 0;
     const regex = new RegExp(searchString, `g${findArgs.options.matchCase ? '' : 'i'}`);
     const rowsToReformat = [];
     const len = flattenedRows.length;
