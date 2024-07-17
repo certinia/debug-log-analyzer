@@ -28,7 +28,7 @@ provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeO
 
 let analysisTable: Tabulator;
 let tableContainer: HTMLDivElement | null;
-let findMap = {};
+let findMap: { [key: number]: RowComponent } = {};
 let findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
   text: '',
   count: 0,
@@ -150,6 +150,7 @@ export class AnalysisView extends LitElement {
     findArgs = findArgsParam;
 
     if (newSearch || hasFindClosed) {
+      //@ts-expect-error This is a custom function added in by Find custom module
       const result = analysisTable.find(findArgs);
       findMap = result.matchIndexes;
 
@@ -160,11 +161,12 @@ export class AnalysisView extends LitElement {
       }
     }
 
-    const currentRow: RowComponent = findMap[findArgs.count];
+    const currentRow = findMap[findArgs.count];
     const rows = [currentRow, findMap[findArgs.count + 1], findMap[findArgs.count - 1]];
     rows.forEach((row) => {
       row?.reformat();
     });
+    //@ts-expect-error This is a custom function added in by RowNavigation custom module
     analysisTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
   };
 }

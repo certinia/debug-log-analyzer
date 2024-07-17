@@ -28,6 +28,7 @@ export class RowNavigation extends Module {
       }
 
       const rowsToExpand = [];
+      //@ts-expect-error This is private to tabulator, but we have no other choice atm.
       let parent = row._getSelf().modules.dataTree ? row.getTreeParent() : false;
       while (parent) {
         if (!parent.isTreeExpanded()) {

@@ -8,13 +8,14 @@ export class Find extends Module {
 
   constructor(table: Tabulator) {
     super(table);
+    // @ts-expect-error registerTableFunction() needs adding to tabulator types
     this.registerTableFunction('find', this._find.bind(this));
   }
 
   initialize() {}
 
   _find(findArgs: FindArgs) {
-    const result = {
+    const result: { totalMatches: number; matchIndexes: { [key: number]: RowComponent } } = {
       totalMatches: 0,
       matchIndexes: {},
     };
@@ -110,7 +111,9 @@ export class Find extends Module {
 
   _countMatches(elem: Node, findArgs: FindArgs, regex: RegExp) {
     let count = 0;
+
     const children =
+      //@ts-expect-error renderRoot does not exist on node and we should probably not access it but there is no other option at the moment
       (elem.childNodes?.length ? elem.childNodes : elem.renderRoot?.childNodes) ?? [];
     const len = children.length;
     for (let i = 0; i < len; i++) {
@@ -138,14 +141,15 @@ export function formatter(row: RowComponent, findArgs: FindArgs) {
   if (!findArgs.text || !row.getData()) {
     return;
   }
-  // escape special charcters
-  const data = row.getData() ?? row.data;
+
+  const data = row.getData();
   row.getCells().forEach((cell) => {
     const cellElem = cell.getElement();
     _highlightText(cellElem, findArgs, { indexes: data.highlightIndexes, currentMatch: 0 });
   });
 
-  if (row._getSelf().type !== 'calc') {
+  //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+  if (row._getSelf().type === 'row') {
     row.normalizeHeight();
   }
 }
@@ -158,6 +162,7 @@ function _highlightText(
   const searchText = findArgs.options.matchCase ? findArgs.text : findArgs.text.toLowerCase();
   const matchHighlightIndex = findArgs.count;
 
+  //@ts-expect-error renderRoot does not exist on node and we should probably not access it but there is no other option at the moment
   const children = (elem.childNodes?.length ? elem.childNodes : elem.renderRoot?.childNodes) ?? [];
   const len = children.length;
   for (let i = 0; i < len; i++) {

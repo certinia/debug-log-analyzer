@@ -54,7 +54,7 @@ export class CalltreeView extends LitElement {
   showDetailsFilterCache = new Map<number, boolean>();
   typeFilterCache = new Map<number, boolean>();
 
-  findMap = {};
+  findMap: { [key: number]: RowComponent } = {};
 
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
@@ -316,6 +316,7 @@ export class CalltreeView extends LitElement {
     this.findArgs = findArgs;
 
     if (newSearch || hasFindClosed) {
+      //@ts-expect-error This is a custom function added in by Find custom module
       const result = calltreeTable.find(findArgs);
       this.findMap = result.matchIndexes;
 
@@ -326,11 +327,12 @@ export class CalltreeView extends LitElement {
       }
     }
 
-    const currentRow: RowComponent = this.findMap[findArgs.count];
+    const currentRow = this.findMap[findArgs.count];
     const rows = [currentRow, this.findMap[findArgs.count + 1], this.findMap[findArgs.count - 1]];
     rows.forEach((row) => {
       row?.reformat();
     });
+    //@ts-expect-error This is a custom function added in by RowNavigation custom module
     calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
   };
 

@@ -36,7 +36,7 @@ let findArgs: { text: string; count: number; options: { matchCase: boolean } } =
   count: 0,
   options: { matchCase: false },
 };
-let findMap = {};
+let findMap: { [key: number]: RowComponent } = {};
 
 @customElement('dml-view')
 export class DMLView extends LitElement {
@@ -146,11 +146,12 @@ export class DMLView extends LitElement {
     }
 
     findArgs.count = highlightIndex;
-    const currentRow: RowComponent = findMap[highlightIndex];
+    const currentRow = findMap[highlightIndex];
     const rows = [currentRow, findMap[this.oldIndex]];
     rows.forEach((row) => {
       row?.reformat();
     });
+    //@ts-expect-error This is a custom function added in by RowNavigation custom module
     dmlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
     this.oldIndex = highlightIndex;
   }
@@ -168,6 +169,7 @@ export class DMLView extends LitElement {
     findArgs = JSON.parse(JSON.stringify(findArgsParam));
 
     if (newSearch || hasFindClosed) {
+      //@ts-expect-error This is a custom function added in by Find custom module
       const result = dmlTable.find(findArgs);
       findMap = result.matchIndexes;
 
@@ -183,15 +185,6 @@ export class DMLView extends LitElement {
 }
 
 function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
-  interface DMLRow {
-    dml?: string;
-    rowCount?: number;
-    timeTaken?: number;
-    timestamp: number;
-    isDetail?: boolean;
-    _children?: DMLRow[];
-  }
-
   const dmlData: DMLRow[] = [];
   if (dmlLines) {
     for (const dml of dmlLines) {
@@ -385,10 +378,11 @@ function createDetailPanel(timestamp: number) {
   return detailContainer;
 }
 
-function sortByFrequency(dataArray: any[], field: string) {
-  const map = new Map<string, number>();
-  dataArray.forEach((val) => {
-    map.set(val[field], (map.get(val[field]) || 0) + 1);
+function sortByFrequency(dataArray: DMLRow[], field: keyof DMLRow) {
+  const map = new Map<unknown, number>();
+  dataArray.forEach((row) => {
+    const val = row[field];
+    map.set(val, (map.get(val) || 0) + 1);
   });
   const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
 
@@ -429,3 +423,12 @@ type VSCodeSaveFile = {
     defaultFileName: string;
   };
 };
+
+interface DMLRow {
+  dml?: string;
+  rowCount?: number;
+  timeTaken?: number;
+  timestamp: number;
+  isDetail?: boolean;
+  _children?: DMLRow[];
+}
