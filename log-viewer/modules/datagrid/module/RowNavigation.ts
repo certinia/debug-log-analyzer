@@ -21,6 +21,12 @@ export class RowNavigation extends Module {
       this.tableHolder ??= table.element.querySelector('.tabulator-tableholder') as HTMLElement;
 
       table.blockRedraw();
+
+      const grp = row.getGroup();
+      if (!grp.isVisible()) {
+        grp.show();
+      }
+
       const rowsToExpand = [];
       let parent = row._getSelf().modules.dataTree ? row.getTreeParent() : false;
       while (parent) {

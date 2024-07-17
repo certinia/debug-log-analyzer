@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
-import { Module, type RowComponent, type Tabulator } from 'tabulator-tables';
+import { Module, type GroupComponent, type RowComponent, type Tabulator } from 'tabulator-tables';
 
 export class Find extends Module {
   static moduleName = 'FindModule';
@@ -30,6 +30,18 @@ export class Find extends Module {
 
     let totalMatches = 0;
 
+    const flattenFromGrps = (row: GroupComponent): RowComponent[] => {
+      const mergedArray: RowComponent[] = [];
+      Array.prototype.push.apply(mergedArray, row.getRows());
+      row
+        .getSubGroups()
+        .flatMap(flattenFromGrps)
+        .forEach((child) => {
+          mergedArray.push(child);
+        });
+      return mergedArray;
+    };
+
     const flatten = (row: RowComponent): RowComponent[] => {
       const mergedArray = [row];
       row
@@ -42,8 +54,8 @@ export class Find extends Module {
     };
 
     // Only get the currently visible rows
-    const rows = tbl.getRows('active');
-    const flattenedRows = rows.flatMap(flatten);
+    const flattenedRows =
+      tbl.getGroups().flatMap(flattenFromGrps) || tbl.getRows('active').flatMap(flatten);
 
     tbl.blockRedraw();
     const regex = new RegExp(searchString, `g${findArgs.options.matchCase ? '' : 'i'}`);
