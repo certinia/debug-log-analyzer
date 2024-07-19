@@ -165,7 +165,11 @@ let scaleFont: string,
 
 let searchString: string = '';
 let matchIndex: number | null = null;
-let findOptions: { matchCase: boolean } = { matchCase: false };
+let findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
+  text: '',
+  count: 1,
+  options: { matchCase: false },
+};
 
 function getMaxDepth(nodes: LogLine[]) {
   const result = new Map<number, LogLine[]>();
@@ -339,14 +343,14 @@ function hasFindMatch(node: Method) {
   }
 
   const nodeType = node.type ?? '';
-  const matchType = findOptions.matchCase
+  const matchType = findArgs.options.matchCase
     ? nodeType.includes(searchString)
     : nodeType.toLowerCase().includes(searchString);
   if (matchType) {
     return matchType;
   }
 
-  return findOptions.matchCase
+  return findArgs.options.matchCase
     ? node.text.includes(searchString)
     : node.text.toLowerCase().includes(searchString);
 }
@@ -914,34 +918,33 @@ function handleScroll(evt: WheelEvent) {
 function _findOnTimeline(
   e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>,
 ) {
-  if (!isVisible) {
-    return;
-  }
   _hideTooltip();
-  const hasFindClosed = e.type === 'lv-find-close';
-  const findArgs = e.detail;
-  const newSearch =
-    findArgs.text !== searchString || findArgs.options.matchCase !== findOptions?.matchCase;
-  findOptions = findArgs.options;
 
-  if (hasFindClosed) {
-    searchString = '';
-  } else if (newSearch) {
-    searchString = findOptions.matchCase ? findArgs.text : findArgs.text.toLowerCase();
+  const newFindArgs = JSON.parse(JSON.stringify(e.detail));
+  const newSearch =
+    newFindArgs.text !== findArgs.text ||
+    newFindArgs.options.matchCase !== findArgs.options?.matchCase;
+  findArgs = newFindArgs;
+
+  const clearHighlights = e.type === 'lv-find-close' || (!isVisible && newFindArgs.count === 0);
+  if (clearHighlights) {
+    newFindArgs.text = '';
   }
 
+  searchString = findArgs.options.matchCase ? findArgs.text : findArgs.text.toLowerCase();
   matchIndex = findArgs.count;
-  rectRenderQueue.clear();
-  borderRenderQueue.clear();
-  nodesToRectangles(timelineRoot.children as Method[]);
+  if (newSearch || clearHighlights) {
+    rectRenderQueue.clear();
+    borderRenderQueue.clear();
+    nodesToRectangles(timelineRoot.children as Method[]);
+    const findResults = borderRenderQueue.get(findMatchColor) || [];
 
-  const findResults = borderRenderQueue.get(findMatchColor) || [];
-  if (newSearch) {
     document.dispatchEvent(
       new CustomEvent('lv-find-results', { detail: { totalMatches: findResults.length } }),
     );
   }
 
+  const findResults = borderRenderQueue.get(findMatchColor) || [];
   const currentMatch = findResults[matchIndex - 1];
   if (currentMatch) {
     const x = currentMatch.x * state.zoom;
