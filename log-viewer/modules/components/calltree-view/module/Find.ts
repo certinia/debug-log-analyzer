@@ -21,10 +21,6 @@ export class Find extends Module {
     };
 
     const tbl = this.table;
-    if (!tbl?.element.clientHeight) {
-      return;
-    }
-
     const findOptions = findArgs.options;
     const searchString = findOptions.matchCase ? findArgs.text : findArgs.text.toLowerCase();
 
@@ -188,8 +184,8 @@ function _highlightText(
         const matchingText = originalText.substring(matchIndex, endOfMatchIndex);
 
         const highlightSpan = document.createElement('span');
-        highlightSpan.style.backgroundColor =
-          hightlightIndex === matchHighlightIndex ? '#8B8000' : 'yellow';
+        highlightSpan.className =
+          hightlightIndex === matchHighlightIndex ? 'currentFindMatch' : 'findMatch';
         highlightSpan.textContent = matchingText;
         if (parentNode.isEqualNode(highlightSpan)) {
           break;
