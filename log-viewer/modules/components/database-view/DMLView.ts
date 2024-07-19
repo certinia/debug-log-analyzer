@@ -37,6 +37,7 @@ let findArgs: { text: string; count: number; options: { matchCase: boolean } } =
   options: { matchCase: false },
 };
 let findMap: { [key: number]: RowComponent } = {};
+let totalMatches = 0;
 
 @customElement('dml-view')
 export class DMLView extends LitElement {
@@ -151,29 +152,41 @@ export class DMLView extends LitElement {
     rows.forEach((row) => {
       row?.reformat();
     });
-    //@ts-expect-error This is a custom function added in by RowNavigation custom module
-    dmlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+    if (currentRow) {
+      //@ts-expect-error This is a custom function added in by RowNavigation custom module
+      dmlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+    }
     this.oldIndex = highlightIndex;
   }
 
   _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
-    if (!dmlTable?.element?.clientHeight) {
+    const isTableVisible = !!dmlTable?.element?.clientHeight;
+    if (!isTableVisible && !totalMatches) {
       return;
     }
 
-    const hasFindClosed = e.type === 'lv-find-close';
-    const findArgsParam = e.detail;
-    const newSearch =
-      findArgsParam.text !== findArgs.text ||
-      findArgsParam.options.matchCase !== findArgs.options?.matchCase;
-    findArgs = JSON.parse(JSON.stringify(findArgsParam));
+    const newFindArgs = JSON.parse(JSON.stringify(e.detail));
+    if (!isTableVisible) {
+      newFindArgs.text = '';
+    }
 
-    if (newSearch || hasFindClosed) {
+    const newSearch =
+      newFindArgs.text !== findArgs.text ||
+      newFindArgs.options.matchCase !== findArgs.options?.matchCase;
+    findArgs = newFindArgs;
+
+    const clearHighlights =
+      e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
+    if (clearHighlights) {
+      newFindArgs.text = '';
+    }
+    if (newSearch || clearHighlights) {
       //@ts-expect-error This is a custom function added in by Find custom module
       const result = dmlTable.find(findArgs);
+      totalMatches = result.totalMatches;
       findMap = result.matchIndexes;
 
-      if (!hasFindClosed) {
+      if (!clearHighlights) {
         document.dispatchEvent(
           new CustomEvent('db-find-results', {
             detail: { totalMatches: result.totalMatches, type: 'dml' },

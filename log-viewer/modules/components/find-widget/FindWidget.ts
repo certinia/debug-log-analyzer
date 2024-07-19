@@ -11,10 +11,11 @@ provideVSCodeDesignSystem().register(vsCodeTextField());
 
 @customElement('find-widget')
 export class FindWidget extends LitElement {
-  @state() isVisble = false;
-  @state() matchCase = false;
   @state() totalMatches = 0;
   @state() currentMatch = 1;
+  @state() isVisble = false;
+  @state() matchCase = false;
+
   lastMatch: string | null = null;
   nextMatchDirection = true;
   debounce: ReturnType<typeof setTimeout> | null = null;
@@ -27,7 +28,9 @@ export class FindWidget extends LitElement {
         this._keyPress(e);
       }, 20);
     });
-    document.addEventListener('lv-find-results', ((e: CustomEvent<{ totalMatches: number }>) => {
+    document.addEventListener('lv-find-results', ((
+      e: CustomEvent<{ totalMatches: number; count?: number }>,
+    ) => {
       this._updateCounts(e);
     }) as EventListener);
   }
@@ -229,9 +232,9 @@ export class FindWidget extends LitElement {
     return this.shadowRoot?.querySelector<HTMLInputElement>('.find-input-box');
   }
 
-  _updateCounts(e: { detail: { totalMatches: number } }) {
+  _updateCounts(e: { detail: { totalMatches: number; count?: number } }) {
     this.totalMatches = e.detail.totalMatches;
-    this.currentMatch = 1;
+    this.currentMatch = e.detail.count ?? 1;
   }
 
   _resetCounts() {
@@ -262,7 +265,7 @@ export class FindWidget extends LitElement {
         break;
 
       case 'Enter': {
-        if (this._hasMatchValueChanged()) {
+        if (this._hasMatchValueChanged() || !this.totalMatches) {
           this._triggerFind();
         } else {
           this.nextMatchDirection ? this._nextMatch() : this._previousMatch();

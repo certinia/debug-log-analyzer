@@ -55,6 +55,7 @@ export class CalltreeView extends LitElement {
   typeFilterCache = new Map<number, boolean>();
 
   findMap: { [key: number]: RowComponent } = {};
+  totalMatches = 0;
 
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
@@ -304,36 +305,49 @@ export class CalltreeView extends LitElement {
   };
 
   _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
-    if (!calltreeTable?.element.clientHeight) {
+    const isTableVisible = !!calltreeTable?.element?.clientHeight;
+    if (!isTableVisible && !this.totalMatches) {
       return;
     }
 
-    const hasFindClosed = e.type === 'lv-find-close';
-    const findArgs = e.detail;
+    const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
-      findArgs.text !== this.findArgs.text ||
-      findArgs.options.matchCase !== this.findArgs.options?.matchCase;
-    this.findArgs = findArgs;
+      newFindArgs.text !== this.findArgs.text ||
+      newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
+    this.findArgs = newFindArgs;
 
-    if (newSearch || hasFindClosed) {
+    const clearHighlights =
+      e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
+    if (clearHighlights) {
+      newFindArgs.text = '';
+    }
+    if (newSearch || clearHighlights) {
       //@ts-expect-error This is a custom function added in by Find custom module
-      const result = calltreeTable.find(findArgs);
+      const result = calltreeTable.find(this.findArgs);
+      this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
-      if (!hasFindClosed) {
+      if (!clearHighlights) {
         document.dispatchEvent(
           new CustomEvent('lv-find-results', { detail: { totalMatches: result.totalMatches } }),
         );
       }
     }
 
-    const currentRow = this.findMap[findArgs.count];
-    const rows = [currentRow, this.findMap[findArgs.count + 1], this.findMap[findArgs.count - 1]];
+    const currentRow = this.findMap[this.findArgs.count];
+    const rows = [
+      currentRow,
+      this.findMap[this.findArgs.count + 1],
+      this.findMap[this.findArgs.count - 1],
+    ];
     rows.forEach((row) => {
       row?.reformat();
     });
-    //@ts-expect-error This is a custom function added in by RowNavigation custom module
-    calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+
+    if (currentRow) {
+      //@ts-expect-error This is a custom function added in by RowNavigation custom module
+      calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+    }
   };
 
   _highlight(inputString: string, substring: string) {

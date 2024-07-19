@@ -47,6 +47,7 @@ let findArgs: { text: string; count: number; options: { matchCase: boolean } } =
   options: { matchCase: false },
 };
 let findMap: { [key: number]: RowComponent } = {};
+let totalMatches = 0;
 
 @customElement('soql-view')
 export class SOQLView extends LitElement {
@@ -188,30 +189,39 @@ export class SOQLView extends LitElement {
     rows.forEach((row) => {
       row?.reformat();
     });
-    //@ts-expect-error This is a custom function added in by RowNavigation custom module
-    soqlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+
+    if (currentRow) {
+      //@ts-expect-error This is a custom function added in by RowNavigation custom module
+      soqlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+    }
 
     this.oldIndex = highlightIndex;
   }
 
   _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
-    if (!soqlTable?.element?.clientHeight) {
+    const isTableVisible = !!soqlTable?.element?.clientHeight;
+    if (!isTableVisible && !totalMatches) {
       return;
     }
 
-    const hasFindClosed = e.type === 'lv-find-close';
-    const findArgsParam = e.detail;
+    const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
-      findArgsParam.text !== findArgs.text ||
-      findArgsParam.options.matchCase !== findArgs.options?.matchCase;
-    findArgs = JSON.parse(JSON.stringify(findArgsParam));
+      newFindArgs.text !== findArgs.text ||
+      newFindArgs.options.matchCase !== findArgs.options?.matchCase;
+    findArgs = newFindArgs;
 
-    if (newSearch || hasFindClosed) {
+    const clearHighlights =
+      e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
+    if (clearHighlights) {
+      newFindArgs.text = '';
+    }
+    if (newSearch || clearHighlights) {
       //@ts-expect-error This is a custom function added in by Find custom module
       const result = soqlTable.find(findArgs);
+      totalMatches = 0;
       findMap = result.matchIndexes;
 
-      if (!hasFindClosed) {
+      if (!clearHighlights) {
         document.dispatchEvent(
           new CustomEvent('db-find-results', {
             detail: { totalMatches: result.totalMatches, type: 'soql' },

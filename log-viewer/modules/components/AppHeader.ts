@@ -19,6 +19,7 @@ import './LogLevels.js';
 import './NavBar.js';
 import './calltree-view/CalltreeView';
 import './database-view/DatabaseView.js';
+import './find-widget/FindWidget.js';
 import { Notification } from './notifications/NotificationPanel.js';
 
 provideVSCodeDesignSystem().register(vsCodePanelTab(), vsCodePanelView(), vsCodePanels());
@@ -94,6 +95,7 @@ export class AppHeader extends LitElement {
     `,
   ];
 
+  // TODO: use @change on vscode-panels to detect tab change instead of @click on <vscode-panel-tab
   render() {
     return html`
       <nav-bar
@@ -106,6 +108,7 @@ export class AppHeader extends LitElement {
         .parserIssues=${this.parserIssues}
       ></nav-bar>
       <log-levels .logSettings=${this.timelineRoot?.debugLevels}></log-levels>
+      <find-widget></find-widget>
       <vscode-panels activeid="${this._selectedTab}">
         <vscode-panel-tab
           id="timeline-tab"
@@ -156,7 +159,7 @@ export class AppHeader extends LitElement {
   }
 
   _showTabHTMLElem(e: Event) {
-    const input = e.target as HTMLElement;
+    const input = e.currentTarget as HTMLElement;
     this._showTab(input.id);
   }
 
@@ -168,6 +171,16 @@ export class AppHeader extends LitElement {
   _showTab(tabId: string) {
     if (this._selectedTab !== tabId) {
       this._selectedTab = tabId;
+
+      // Not really happy this is here, find needs a refactor
+      const findEvt = {
+        detail: {
+          text: '',
+          count: 0,
+          options: { matchCase: false },
+        },
+      };
+      document.dispatchEvent(new CustomEvent('lv-find', findEvt));
     }
   }
 }

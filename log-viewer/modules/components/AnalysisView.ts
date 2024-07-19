@@ -34,6 +34,7 @@ let findArgs: { text: string; count: number; options: { matchCase: boolean } } =
   count: 0,
   options: { matchCase: false },
 };
+let totalMatches = 0;
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
   @property()
@@ -138,23 +139,29 @@ export class AnalysisView extends LitElement {
   }
 
   _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
-    if (!analysisTable?.element.clientHeight) {
+    const isTableVisible = !!analysisTable?.element?.clientHeight;
+    if (!isTableVisible && !totalMatches) {
       return;
     }
 
-    const hasFindClosed = e.type === 'lv-find-close';
-    const findArgsParam = e.detail;
+    const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
-      findArgsParam.text !== findArgs.text ||
-      findArgsParam.options.matchCase !== findArgs.options?.matchCase;
-    findArgs = findArgsParam;
+      newFindArgs.text !== findArgs.text ||
+      newFindArgs.options.matchCase !== findArgs.options?.matchCase;
+    findArgs = newFindArgs;
 
-    if (newSearch || hasFindClosed) {
+    const clearHighlights =
+      e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
+    if (clearHighlights) {
+      newFindArgs.text = '';
+    }
+    if (newSearch || clearHighlights) {
       //@ts-expect-error This is a custom function added in by Find custom module
       const result = analysisTable.find(findArgs);
+      totalMatches = result.totalMatches;
       findMap = result.matchIndexes;
 
-      if (!hasFindClosed) {
+      if (!clearHighlights) {
         document.dispatchEvent(
           new CustomEvent('lv-find-results', { detail: { totalMatches: result.totalMatches } }),
         );
