@@ -22,6 +22,14 @@ The Timeline shows a visualization of code execution during a request’s execut
 - Scroll left and right on the mouse to move the time line left are right, when zoomed
 - Click the mouse down and drag to move the timeline around both in the x and y direction, when zoomed
 
+### Find
+
+- CMD/CTRL + f to open find
+- Events with matching text are highlighted, there is a different highlight for the current match.
+- Previous match, next match and case sensitive search all supported.
+- If the next matching event is off screen that event will be centered on the timeline.
+- The find will match on Event Type or text in the event
+
 ### Go to Call Tree
 
 Clicking an event in the Timeline will go to and select that event in the Call Tree.
@@ -39,13 +47,20 @@ The tooltip provides the following information.\
 **Duration** - Made up of **Total Time** (time spent in that event and its children) and **Self Time** (time directly spent in that event).\
 **Rows** - Shows **Total Rows** (rows from that event and its children) and **Self Rows** (rows directly from that event).
 
-### Call Tree
+## Call Tree
 
 Shows the call stack which can be expanded and collapsed. Clicking on a link will take you to that line in the class if it can be found in the current open project.
 
 ![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.14/lana-calltree.png)
 
 Each row shows event type, details such as method signature, self and total time as well as aggregated DML, SOQL, Throws and Row counts.
+
+### Find
+
+- CMD/CTRL + f to open find
+- Any matching text is highlighted, there is a different highlight for the current match.
+- Previous match, next match and case sensitive search all supported.
+- If the next matching text is within a parent that parent will be expanded.
 
 ### Go to Code
 
@@ -71,6 +86,13 @@ The Call Tree can be navigated with the keyboard. The up and down keys will move
 Show analysis of method calls by showing Self Time, Total Time, Count (number of times a method was called), name and type. Each column can be sorted ascending or descending by clicking the column header.
 
 ![analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.14/lana-analysis.png)
+
+### Find
+
+- CMD/CTRL + f to open find
+- Any matching text is highlighted, there is a different highlight for the current match.
+- Previous match, next match and case sensitive search all supported.
+- If the next matching text is within a group that group will be expanded.
 
 ### Sort
 
@@ -100,6 +122,13 @@ Shows the SOQL and DML that occurred the number of rows returned, the time taken
 ![database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.14/lana-database.png)
 
 The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determine. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
+
+### Find
+
+- CMD/CTRL + f to open find
+- Any matching text is highlighted, there is a different highlight for the current match.
+- Previous match, next match and case sensitive search all supported.
+- If the next matching text is within a group that group will be expanded.
 
 ### Sort
 
