@@ -289,8 +289,8 @@ function nodesToRectangles(nodes: Method[]) {
     currentNodes = result.get(currentDepth++) || [];
     len = currentNodes.length;
     borderRenderQueue.set(
-      '462617',
-      borderRenderQueue.get('#462617')?.sort((a, b) => {
+      findMatchColor,
+      borderRenderQueue.get(findMatchColor)?.sort((a, b) => {
         return a.x - b.x;
       }) || [],
     );
@@ -298,11 +298,9 @@ function nodesToRectangles(nodes: Method[]) {
 }
 const rectRenderQueue = new Map<LogSubCategory, Rect[]>();
 const borderRenderQueue = new Map<string, Rect[]>();
-const borderSettings = new Map<string, number>([
-  [strokeColor, 1],
-  ['#462617', 3],
-]);
-const foundRectColor = '#8b5805';
+let borderSettings = new Map<string, number>();
+let findMatchColor = '#ea5c0054';
+let currentFindMatchColor = '#9e6a03';
 
 /**
  * Create a rectangle for the node and add it to the correct render list for it's type.
@@ -318,7 +316,7 @@ function addToRectQueue(node: Method, y: number) {
   let borderColor = '';
 
   if (hasFindMatch(node)) {
-    borderColor = '#462617';
+    borderColor = findMatchColor;
   }
 
   const rect: Rect = { x, y, w, borderColor };
@@ -373,35 +371,40 @@ function renderRectangles(ctx: CanvasRenderingContext2D) {
   }
 
   // Draw borders around the rectangles
+  const currentFindMatchIndex = (matchIndex ?? 0) - 1;
   for (const [borderColor, items] of borderRenderQueue) {
     ctx.lineWidth = borderSettings.get(borderColor) || 1;
     ctx.strokeStyle = borderColor;
+
     ctx.beginPath();
-    items.forEach((item) => {
-      drawBorder(item);
+    items.forEach((item, index) => {
+      if (currentFindMatchIndex !== index) {
+        drawBorder(item);
+      }
     });
     ctx.stroke();
     ctx.closePath();
   }
 
-  const findResults = borderRenderQueue.get('#462617');
+  const findResults = borderRenderQueue.get(findMatchColor);
   if (findResults?.length) {
-    // Semi transparency rectangle over the matchinbg search results.
-    ctx.globalAlpha = 0.4;
-    ctx.fillStyle = '#462617';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = findMatchColor;
+
     ctx.beginPath();
-    findResults.forEach((item) => {
-      drawBorder(item);
+    findResults.forEach((item, index) => {
+      if (currentFindMatchIndex !== index) {
+        drawBorder(item);
+      }
     });
     ctx.fill();
     ctx.closePath();
 
-    // Semi transparency rectangle over the matchinbg search results.
-    const currentFindMatch = matchIndex !== null ? findResults[matchIndex - 1] : null;
+    const currentFindMatch = findResults[currentFindMatchIndex];
     if (currentFindMatch) {
-      ctx.lineWidth = 5;
-      ctx.strokeStyle = foundRectColor;
-      // ctx.strokeStyle = 'blue';
+      ctx.strokeStyle = currentFindMatchColor;
+      ctx.fillStyle = currentFindMatchColor;
       ctx.beginPath();
 
       drawBorder(currentFindMatch, true);
@@ -832,7 +835,6 @@ function getDepth(y: number) {
 
 function depthToMouseY(depth: number) {
   const b2 = (depth / maxY) * realHeight;
-  // return displayHeight - state.offsetY - b2 + scaleY;
   return displayHeight - state.offsetY - b2;
 }
 
@@ -932,9 +934,8 @@ function _findOnTimeline(
   rectRenderQueue.clear();
   borderRenderQueue.clear();
   nodesToRectangles(timelineRoot.children as Method[]);
-  state.requestRedraw();
 
-  const findResults = borderRenderQueue.get('#462617') || [];
+  const findResults = borderRenderQueue.get(findMatchColor) || [];
   if (newSearch) {
     document.dispatchEvent(
       new CustomEvent('lv-find-results', { detail: { totalMatches: findResults.length } }),
@@ -953,14 +954,29 @@ function _findOnTimeline(
       const midPoint = w / 2;
       state.offsetX = Math.max(0, Math.min(maxWidth, x + midPoint - displayWidth / 2));
     }
-    showTooltip(xPos + w / 3, depthToMouseY(currentMatch.y), true);
+
+    const ls = Math.max(x - state.offsetX, 0);
+    const rs = Math.min(x + w - state.offsetX, displayWidth);
+    const xMidPoint = ls + (rs - ls) / 2;
+    showTooltip(xMidPoint, depthToMouseY(currentMatch.y), true);
   }
+  state.requestRedraw();
 }
 
 function onInitTimeline(): void {
   tooltip = document.createElement('div');
   tooltip.id = 'timeline-tooltip';
   container.appendChild(tooltip);
+
+  const computedStyle = getComputedStyle(canvas);
+  findMatchColor =
+    computedStyle.getPropertyValue('--vscode-editor-findMatchHighlightBackground') ?? '#ea5c0054';
+  currentFindMatchColor =
+    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground') ?? '#9e6a03';
+  borderSettings = new Map<string, number>([
+    [strokeColor, 1],
+    [findMatchColor, 2],
+  ]);
 
   if (canvas) {
     canvas.addEventListener('mouseout', onLeaveCanvas);
