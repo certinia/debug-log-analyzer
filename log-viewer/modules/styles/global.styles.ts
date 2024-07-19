@@ -30,4 +30,19 @@ export const globalStyles = css`
   ::-webkit-scrollbar-thumb {
     background-color: var(--vscode-scrollbarSlider-background);
   }
+
+  .findMatch {
+    animation-duration: 0;
+    animation-name: inherit !important;
+    color: var(--vscode-editor-findMatchForeground);
+    background-color: var(--vscode-editor-findMatchHighlightBackground, 'yellow');
+  }
+
+  .currentFindMatch {
+    color: var(--vscode-editor-findMatchHighlightForeground);
+    background-color: var(--vscode-editor-findMatchBackground, '#8B8000');
+    border: 2px solid var(--vscode-editor-findMatchBorder);
+    padding: 1px;
+    box-sizing: border-box;
+  }
 `;
