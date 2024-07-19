@@ -21,6 +21,7 @@ import { DatabaseAccess } from '../../Database.js';
 import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
 import Number from '../../datagrid/format/Number.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
+import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 import {
   ApexLog,
@@ -30,6 +31,7 @@ import {
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../CallStack.js';
+import { Find, formatter } from '../calltree-view/module/Find.js';
 import './DatabaseSOQLDetailPanel.js';
 import './DatabaseSection.js';
 import databaseViewStyles from './DatabaseView.scss';
@@ -39,11 +41,24 @@ provideVSCodeDesignSystem().register(vsCodeDropdown(), vsCodeOption());
 let soqlTable: Tabulator;
 let holder: HTMLElement | null = null;
 let table: HTMLElement | null = null;
+let findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
+  text: '',
+  count: 0,
+  options: { matchCase: false },
+};
+let findMap: { [key: number]: RowComponent } = {};
+let totalMatches = 0;
 
 @customElement('soql-view')
 export class SOQLView extends LitElement {
   @property()
   timelineRoot: ApexLog | null = null;
+
+  @property()
+  highlightIndex: number = 0;
+
+  @state()
+  oldIndex: number = 0;
 
   @state()
   soqlLines: SOQLExecuteBeginLine[] = [];
@@ -54,11 +69,17 @@ export class SOQLView extends LitElement {
 
   constructor() {
     super();
+
+    document.addEventListener('lv-find', this._find as EventListener);
+    document.addEventListener('lv-find-close', this._find as EventListener);
   }
 
   updated(changedProperties: PropertyValues): void {
     if (this.timelineRoot && changedProperties.has('timelineRoot')) {
       this._appendTableWhenVisible();
+    }
+    if (changedProperties.has('highlightIndex')) {
+      this._highlightMatches(this.highlightIndex);
     }
   }
 
@@ -133,7 +154,7 @@ export class SOQLView extends LitElement {
     const groupValue = fieldName !== 'none' ? fieldName : '';
 
     soqlTable.setGroupValues([
-      groupValue ? sortByFrequency(soqlTable.getData(), groupValue) : [''],
+      groupValue ? sortByFrequency(soqlTable.getData(), groupValue as keyof GridSOQLData) : [''],
     ]);
     soqlTable.setGroupBy(groupValue);
   }
@@ -149,29 +170,70 @@ export class SOQLView extends LitElement {
           this.soqlLines = (await DatabaseAccess.create(treeRoot)).getSOQLLines() || [];
 
           Tabulator.registerModule(Object.values(CommonModules));
-          Tabulator.registerModule([RowKeyboardNavigation]);
+          Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
           renderSOQLTable(soqlTableWrapper, this.soqlLines);
         }
       });
       dbObserver.observe(this);
     }
   }
+
+  _highlightMatches(highlightIndex: number) {
+    if (!soqlTable?.element?.clientHeight) {
+      return;
+    }
+
+    findArgs.count = highlightIndex;
+    const currentRow = findMap[highlightIndex];
+    const rows = [currentRow, findMap[this.oldIndex]];
+    rows.forEach((row) => {
+      row?.reformat();
+    });
+
+    if (currentRow) {
+      //@ts-expect-error This is a custom function added in by RowNavigation custom module
+      soqlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+    }
+
+    this.oldIndex = highlightIndex;
+  }
+
+  _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
+    const isTableVisible = !!soqlTable?.element?.clientHeight;
+    if (!isTableVisible && !totalMatches) {
+      return;
+    }
+
+    const newFindArgs = JSON.parse(JSON.stringify(e.detail));
+    const newSearch =
+      newFindArgs.text !== findArgs.text ||
+      newFindArgs.options.matchCase !== findArgs.options?.matchCase;
+    findArgs = newFindArgs;
+
+    const clearHighlights =
+      e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
+    if (clearHighlights) {
+      newFindArgs.text = '';
+    }
+    if (newSearch || clearHighlights) {
+      //@ts-expect-error This is a custom function added in by Find custom module
+      const result = soqlTable.find(findArgs);
+      totalMatches = 0;
+      findMap = result.matchIndexes;
+
+      if (!clearHighlights) {
+        document.dispatchEvent(
+          new CustomEvent('db-find-results', {
+            detail: { totalMatches: result.totalMatches, type: 'soql' },
+          }),
+        );
+      }
+    }
+  };
 }
 
 function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
   const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
-  interface GridSOQLData {
-    isSelective?: boolean | null;
-    relativeCost?: number | null;
-    soql?: string;
-    namespace?: string;
-    rowCount?: number | null;
-    timeTaken?: number | null;
-    aggregations?: number;
-    timestamp: number;
-    isDetail?: boolean;
-    _children?: GridSOQLData[];
-  }
 
   soqlLines?.forEach((line) => {
     timestampToSOQl.set(line.timestamp, line);
@@ -273,14 +335,12 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
         cssClass: 'datagrid-textarea datagrid-code-text',
         variableHeight: true,
         formatter: (cell, _formatterParams, _onRendered) => {
-          cell.getRow().normalizeHeight();
-
           const data = cell.getData() as GridSOQLData;
           return `<call-stack
-          timestamp=${data.timestamp}
-          startDepth="0"
-          endDepth="1"
-        ></call-stack>`;
+            timestamp=${data.timestamp}
+            startDepth="0"
+            endDepth="1"
+          ></call-stack>`;
         },
       },
       {
@@ -398,10 +458,14 @@ function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecute
       const data = row.getData();
       if (data.isDetail && data.timestamp) {
         const detailContainer = createSOQLDetailPanel(data.timestamp, timestampToSOQl);
-        // return detailContainer;
+
         row.getElement().replaceChildren(detailContainer);
         row.normalizeHeight();
       }
+
+      requestAnimationFrame(() => {
+        formatter(row, findArgs);
+      });
     },
   });
 
@@ -472,10 +536,11 @@ function createSOQLDetailPanel(
   return detailContainer;
 }
 
-function sortByFrequency(dataArray: any[], field: string) {
-  const map = new Map<string, number>();
-  dataArray.forEach((val) => {
-    map.set(val[field], (map.get(val[field]) || 0) + 1);
+function sortByFrequency(dataArray: GridSOQLData[], field: keyof GridSOQLData) {
+  const map = new Map<unknown, number>();
+  dataArray.forEach((row) => {
+    const val = row[field];
+    map.set(val, (map.get(val) || 0) + 1);
   });
   const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
 
@@ -516,3 +581,16 @@ type VSCodeSaveFile = {
     defaultFileName: string;
   };
 };
+
+interface GridSOQLData {
+  isSelective?: boolean | null;
+  relativeCost?: number | null;
+  soql?: string;
+  namespace?: string;
+  rowCount?: number | null;
+  timeTaken?: number | null;
+  aggregations?: number;
+  timestamp: number;
+  isDetail?: boolean;
+  _children?: GridSOQLData[];
+}

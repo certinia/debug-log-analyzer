@@ -42,10 +42,11 @@ interface Rect {
   x: number;
   y: number;
   w: number;
+  borderColor: string;
 }
 
-const scaleY = -15,
-  strokeColor = '#D3D3D3';
+const scaleY = -15;
+const strokeColor = '#D3D3D3';
 export const keyMap: Map<LogSubCategory, TimelineGroup> = new Map([
   [
     'Code Unit',
@@ -152,6 +153,7 @@ let container: HTMLDivElement;
 let canvas: HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D | null;
 
+let isVisible = false;
 let realHeight = 0;
 let scaleFont: string,
   maxY: number,
@@ -160,6 +162,10 @@ let scaleFont: string,
   timelineRoot: ApexLog,
   lastMouseX: number,
   lastMouseY: number;
+
+let searchString: string = '';
+let matchIndex: number | null = null;
+let findOptions: { matchCase: boolean } = { matchCase: false };
 
 function getMaxDepth(nodes: LogLine[]) {
   const result = new Map<number, LogLine[]>();
@@ -279,12 +285,22 @@ function nodesToRectangles(nodes: Method[]) {
         });
       }
     }
-    // result.delete(currentDepth);
+
     currentNodes = result.get(currentDepth++) || [];
     len = currentNodes.length;
+    borderRenderQueue.set(
+      findMatchColor,
+      borderRenderQueue.get(findMatchColor)?.sort((a, b) => {
+        return a.x - b.x;
+      }) || [],
+    );
   }
 }
 const rectRenderQueue = new Map<LogSubCategory, Rect[]>();
+const borderRenderQueue = new Map<string, Rect[]>();
+let borderSettings = new Map<string, number>();
+let findMatchColor = '#ea5c0054';
+let currentFindMatchColor = '#9e6a03';
 
 /**
  * Create a rectangle for the node and add it to the correct render list for it's type.
@@ -297,34 +313,142 @@ function addToRectQueue(node: Method, y: number) {
     timestamp: x,
     duration: { total: w },
   } = node;
-  const rect: Rect = { x, y, w };
+  let borderColor = '';
+
+  if (hasFindMatch(node)) {
+    borderColor = findMatchColor;
+  }
+
+  const rect: Rect = { x, y, w, borderColor };
   let list = rectRenderQueue.get(subCategory);
   if (!list) {
     rectRenderQueue.set(subCategory, (list = []));
   }
   list.push(rect);
+
+  let borders = borderRenderQueue.get(borderColor);
+  if (!borders) {
+    borderRenderQueue.set(borderColor, (borders = []));
+  }
+  borders.push(rect);
+}
+
+function hasFindMatch(node: Method) {
+  if (!searchString || !node) {
+    return false;
+  }
+
+  const nodeType = node.type ?? '';
+  const matchType = findOptions.matchCase
+    ? nodeType.includes(searchString)
+    : nodeType.toLowerCase().includes(searchString);
+  if (matchType) {
+    return matchType;
+  }
+
+  return findOptions.matchCase
+    ? node.text.includes(searchString)
+    : node.text.toLowerCase().includes(searchString);
 }
 
 function renderRectangles(ctx: CanvasRenderingContext2D) {
+  // rectRenderQueue is grouped by Timeline Key (rectangle color), draw rectangles based on fill color .
   ctx.lineWidth = 1;
+  ctx.strokeStyle = strokeColor;
+  ctx.globalAlpha = 1;
   for (const [tlKey, items] of rectRenderQueue) {
     const tl = keyMap.get(tlKey);
     if (!tl) {
       continue;
     }
     ctx.beginPath();
-    // ctx.strokeStyle = tl.strokeColor;
     ctx.fillStyle = tl.fillColor;
-    items.forEach(drawRect);
+    items.forEach((item) => {
+      drawRect(item);
+    });
     ctx.fill();
+    ctx.closePath();
+  }
+
+  // Draw borders around the rectangles
+  const currentFindMatchIndex = (matchIndex ?? 0) - 1;
+  for (const [borderColor, items] of borderRenderQueue) {
+    ctx.lineWidth = borderSettings.get(borderColor) || 1;
+    ctx.strokeStyle = borderColor;
+
+    ctx.beginPath();
+    items.forEach((item, index) => {
+      if (currentFindMatchIndex !== index) {
+        drawBorder(item);
+      }
+    });
     ctx.stroke();
+    ctx.closePath();
+  }
+
+  const findResults = borderRenderQueue.get(findMatchColor);
+  if (findResults?.length) {
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = findMatchColor;
+
+    ctx.beginPath();
+    findResults.forEach((item, index) => {
+      if (currentFindMatchIndex !== index) {
+        drawBorder(item);
+      }
+    });
+    ctx.fill();
+    ctx.closePath();
+
+    const currentFindMatch = findResults[currentFindMatchIndex];
+    if (currentFindMatch) {
+      ctx.strokeStyle = currentFindMatchColor;
+      ctx.fillStyle = currentFindMatchColor;
+      ctx.beginPath();
+
+      drawBorder(currentFindMatch, true);
+      ctx.stroke();
+      ctx.fill();
+      ctx.closePath();
+    }
+    ctx.globalAlpha = 1;
   }
 }
 
-const drawRect = (rect: Rect) => {
+const drawBorder = (rect: Rect, ignoreWidth: boolean = false) => {
+  if (!ctx) {
+    return;
+  }
   // nanoseconds
   let w = rect.w * state.zoom;
-  if (w >= 0.05) {
+  if (w >= 0.05 || ignoreWidth) {
+    let x = rect.x * state.zoom - state.offsetX;
+    const y = rect.y * scaleY - state.offsetY;
+    if (x < displayWidth && x + w > 0 && y > -displayHeight && y + scaleY < 0) {
+      // start of shape is outside the screen (remove from start and the end to compensate)
+      if (x < 0) {
+        w = w + x;
+        x = 0;
+      }
+      // end of shape is outside the screen (remove from end so we are not showing anything that is offscreen)
+      const widthOffScreen = x + w - displayWidth;
+      if (widthOffScreen > 0) {
+        w = w - widthOffScreen;
+      }
+
+      ctx.rect(x, y, w, scaleY);
+    }
+  }
+};
+
+const drawRect = (rect: Rect, ignoreWidth: boolean = false) => {
+  if (!ctx) {
+    return;
+  }
+  // nanoseconds
+  let w = rect.w * state.zoom;
+  if (w >= 0.05 || ignoreWidth) {
     let x = rect.x * state.zoom - state.offsetX;
     const y = rect.y * scaleY - state.offsetY;
     if (x < displayWidth && x + w > 0 && y > -displayHeight && y + scaleY < 0) {
@@ -407,6 +531,7 @@ function resize() {
     return;
   }
   const { clientWidth: newWidth, clientHeight: newHeight } = container;
+  isVisible = !!newWidth;
   if (newWidth && newHeight && (newWidth !== displayWidth || newHeight !== displayHeight)) {
     canvas.width = displayWidth = newWidth;
     canvas.height = displayHeight = newHeight;
@@ -471,6 +596,7 @@ function findByPosition(
   depth: number,
   x: number,
   targetDepth: number,
+  shouldIgnoreWidth: boolean,
 ): LogLine | null {
   if (!nodes) {
     return null;
@@ -493,12 +619,12 @@ function findByPosition(
     const endtime = starttime + width;
 
     // Return True if the element is present in the middle.
-    const isInRange = width >= 0.05 && starttime <= x && endtime >= x;
+    const isInRange = (shouldIgnoreWidth || width >= 0.05) && starttime <= x && endtime >= x;
     const isMatchingDepth = depth === targetDepth;
     if (isInRange && isMatchingDepth && node.duration.total) {
       return node;
     } else if (isInRange && !isMatchingDepth && node.duration.total) {
-      return findByPosition(node.children, depth + 1, x, targetDepth);
+      return findByPosition(node.children, depth + 1, x, targetDepth, shouldIgnoreWidth);
     }
     // Otherwise, look in the left or right half
     else if (x > endtime) {
@@ -513,16 +639,21 @@ function findByPosition(
   return null;
 }
 
-function showTooltip(offsetX: number, offsetY: number) {
+function showTooltip(offsetX: number, offsetY: number, shouldIgnoreWidth: boolean) {
   if (!dragging && container && tooltip) {
     const depth = getDepth(offsetY);
-    const tooltipText = findTimelineTooltip(offsetX, depth) || findTruncatedTooltip(offsetX);
+    const tooltipText =
+      findTimelineTooltip(offsetX, depth, shouldIgnoreWidth) || findTruncatedTooltip(offsetX);
     showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
   }
 }
 
-function findTimelineTooltip(x: number, depth: number): HTMLDivElement | null {
-  const target = findByPosition(timelineRoot.children, 0, x, depth);
+function findTimelineTooltip(
+  x: number,
+  depth: number,
+  shouldIgnoreWidth: boolean,
+): HTMLDivElement | null {
+  const target = findByPosition(timelineRoot.children, 0, x, depth, shouldIgnoreWidth);
 
   if (target && target instanceof TimedNode) {
     canvas.classList.remove('timeline-hover', 'timeline-dragging');
@@ -647,6 +778,10 @@ function showTooltipWithText(
   }
 }
 
+function _hideTooltip() {
+  tooltip.style.display = 'none';
+}
+
 /**
  * Convert target position to timeline position.
  *
@@ -667,7 +802,7 @@ function onMouseMove(evt: MouseEvent) {
     if (clRect) {
       lastMouseX = evt.clientX - clRect.left;
       lastMouseY = evt.clientY - clRect.top;
-      debounce(showTooltip(lastMouseX, lastMouseY));
+      debounce(showTooltip(lastMouseX, lastMouseY, false));
     }
   }
 }
@@ -681,6 +816,7 @@ function onClickCanvas(): void {
       0,
       lastMouseX,
       depth,
+      false,
     )?.timestamp;
 
     if (!timeStamp) {
@@ -695,6 +831,11 @@ function onClickCanvas(): void {
 
 function getDepth(y: number) {
   return ~~(((displayHeight - y - state.offsetY) / realHeight) * maxY);
+}
+
+function depthToMouseY(depth: number) {
+  const b2 = (depth / maxY) * realHeight;
+  return displayHeight - state.offsetY - b2;
 }
 
 function onLeaveCanvas() {
@@ -719,7 +860,7 @@ function handleMouseDown(): void {
 
 function handleMouseUp(): void {
   stopDragging();
-  debounce(showTooltip(lastMouseX, lastMouseY));
+  debounce(showTooltip(lastMouseX, lastMouseY, false));
 }
 
 function stopDragging() {
@@ -766,14 +907,76 @@ function handleScroll(evt: WheelEvent) {
       const maxWidth = state.zoom * timelineRoot.exitStamp - displayWidth;
       state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX + deltaX));
     }
-    debounce(showTooltip(lastMouseX, lastMouseY));
+    debounce(showTooltip(lastMouseX, lastMouseY, false));
   }
+}
+
+function _findOnTimeline(
+  e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>,
+) {
+  if (!isVisible) {
+    return;
+  }
+  _hideTooltip();
+  const hasFindClosed = e.type === 'lv-find-close';
+  const findArgs = e.detail;
+  const newSearch =
+    findArgs.text !== searchString || findArgs.options.matchCase !== findOptions?.matchCase;
+  findOptions = findArgs.options;
+
+  if (hasFindClosed) {
+    searchString = '';
+  } else if (newSearch) {
+    searchString = findOptions.matchCase ? findArgs.text : findArgs.text.toLowerCase();
+  }
+
+  matchIndex = findArgs.count;
+  rectRenderQueue.clear();
+  borderRenderQueue.clear();
+  nodesToRectangles(timelineRoot.children as Method[]);
+
+  const findResults = borderRenderQueue.get(findMatchColor) || [];
+  if (newSearch) {
+    document.dispatchEvent(
+      new CustomEvent('lv-find-results', { detail: { totalMatches: findResults.length } }),
+    );
+  }
+
+  const currentMatch = findResults[matchIndex - 1];
+  if (currentMatch) {
+    const x = currentMatch.x * state.zoom;
+    const w = currentMatch.w * state.zoom;
+    const xPos = x - state.offsetX;
+
+    if (xPos > displayWidth || xPos + w < 0) {
+      // center current event in middle of screen
+      const maxWidth = state.zoom * timelineRoot.exitStamp - displayWidth;
+      const midPoint = w / 2;
+      state.offsetX = Math.max(0, Math.min(maxWidth, x + midPoint - displayWidth / 2));
+    }
+
+    const ls = Math.max(x - state.offsetX, 0);
+    const rs = Math.min(x + w - state.offsetX, displayWidth);
+    const xMidPoint = ls + (rs - ls) / 2;
+    showTooltip(xMidPoint, depthToMouseY(currentMatch.y), true);
+  }
+  state.requestRedraw();
 }
 
 function onInitTimeline(): void {
   tooltip = document.createElement('div');
   tooltip.id = 'timeline-tooltip';
   container.appendChild(tooltip);
+
+  const computedStyle = getComputedStyle(canvas);
+  findMatchColor =
+    computedStyle.getPropertyValue('--vscode-editor-findMatchHighlightBackground') ?? '#ea5c0054';
+  currentFindMatchColor =
+    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground') ?? '#9e6a03';
+  borderSettings = new Map<string, number>([
+    [strokeColor, 1],
+    [findMatchColor, 2],
+  ]);
 
   if (canvas) {
     canvas.addEventListener('mouseout', onLeaveCanvas);
@@ -786,4 +989,8 @@ function onInitTimeline(): void {
 
   new ResizeObserver(resize).observe(container);
   container.addEventListener('mousemove', onMouseMove);
+
+  document.addEventListener('lv-find', _findOnTimeline as EventListener);
+  document.addEventListener('lv-find-match', _findOnTimeline as EventListener);
+  document.addEventListener('lv-find-close', _findOnTimeline as EventListener);
 }

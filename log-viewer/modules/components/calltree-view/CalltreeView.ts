@@ -31,6 +31,7 @@ import { ApexLog, LogLine, TimedNode, type LogEventType } from '../../parsers/Ap
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../skeleton/GridSkeleton.js';
+import { Find, formatter } from './module/Find.js';
 import { MiddleRowFocus } from './module/MiddleRowFocus.js';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
@@ -53,6 +54,9 @@ export class CalltreeView extends LitElement {
   showDetailsFilterCache = new Map<number, boolean>();
   typeFilterCache = new Map<number, boolean>();
 
+  findMap: { [key: number]: RowComponent } = {};
+  totalMatches = 0;
+
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
   }
@@ -60,9 +64,13 @@ export class CalltreeView extends LitElement {
   constructor() {
     super();
 
-    document.addEventListener('calltree-go-to-row', (e: Event) => {
-      this._goToRow((e as CustomEvent).detail.timestamp);
-    });
+    document.addEventListener('calltree-go-to-row', ((e: CustomEvent) => {
+      this._goToRow(e.detail.timestamp);
+    }) as EventListener);
+
+    document.addEventListener('lv-find', this._find as EventListener);
+    document.addEventListener('lv-find-match', this._find as EventListener);
+    document.addEventListener('lv-find-close', this._find as EventListener);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -286,7 +294,69 @@ export class CalltreeView extends LitElement {
 
     const treeRow = this._findByTime(calltreeTable.getRows(), timestamp);
     //@ts-expect-error This is a custom function added in by RowNavigation custom module
-    calltreeTable.goToRow(treeRow);
+    calltreeTable.goToRow(treeRow, { scrollIfVisible: true, focusRow: true });
+  }
+
+  searchString = '';
+  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
+    text: '',
+    count: 0,
+    options: { matchCase: false },
+  };
+
+  _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
+    const isTableVisible = !!calltreeTable?.element?.clientHeight;
+    if (!isTableVisible && !this.totalMatches) {
+      return;
+    }
+
+    const newFindArgs = JSON.parse(JSON.stringify(e.detail));
+    const newSearch =
+      newFindArgs.text !== this.findArgs.text ||
+      newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
+    this.findArgs = newFindArgs;
+
+    const clearHighlights =
+      e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
+    if (clearHighlights) {
+      newFindArgs.text = '';
+    }
+    if (newSearch || clearHighlights) {
+      //@ts-expect-error This is a custom function added in by Find custom module
+      const result = calltreeTable.find(this.findArgs);
+      this.totalMatches = result.totalMatches;
+      this.findMap = result.matchIndexes;
+
+      if (!clearHighlights) {
+        document.dispatchEvent(
+          new CustomEvent('lv-find-results', { detail: { totalMatches: result.totalMatches } }),
+        );
+      }
+    }
+
+    const currentRow = this.findMap[this.findArgs.count];
+    const rows = [
+      currentRow,
+      this.findMap[this.findArgs.count + 1],
+      this.findMap[this.findArgs.count - 1],
+    ];
+    rows.forEach((row) => {
+      row?.reformat();
+    });
+
+    if (currentRow) {
+      //@ts-expect-error This is a custom function added in by RowNavigation custom module
+      calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+    }
+  };
+
+  _highlight(inputString: string, substring: string) {
+    const regex = new RegExp(substring, 'gi');
+    const resultString = inputString.replace(
+      regex,
+      '<span style="background-color:yellow;border:1px solid lightgrey">$&</span>',
+    );
+    return resultString;
   }
 
   _showDetailsFilter = (data: CalltreeRow) => {
@@ -423,7 +493,7 @@ export class CalltreeView extends LitElement {
 
     return new Promise((resolve) => {
       Tabulator.registerModule(Object.values(CommonModules));
-      Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, MiddleRowFocus]);
+      Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, MiddleRowFocus, Find]);
 
       const selfTimeFilterCache = new Map<string, boolean>();
       const totalTimeFilterCache = new Map<string, boolean>();
@@ -457,6 +527,11 @@ export class CalltreeView extends LitElement {
             default:
               return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
           }
+        },
+        rowFormatter: (row: RowComponent) => {
+          requestAnimationFrame(() => {
+            formatter(row, this.findArgs);
+          });
         },
         columnCalcs: 'both',
         columnDefaults: {

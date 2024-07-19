@@ -57,7 +57,7 @@ export class LogViewer extends LitElement {
   }
 
   render() {
-    return html`<app-header
+    return html` <app-header
       .logName=${this.logName}
       .logPath=${this.logPath}
       .logSize=${this.logSize}
