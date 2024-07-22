@@ -20,8 +20,7 @@ Apex Log Analyzer makes performance analysis of Salesforce debug logs much easie
 > Higher log levels result in higher reported execution time than would be seen with logging off.\
 > This is due to the over head associated with logging method entry and exit.
 
-[Installation](#installation 'Go to Installation') |
-[Usage](#usage 'Go to Usage') |
+[Getting Started](#getting-started 'Go to Getting Started') |
 [Features](#features 'Go to Features') |
 [Settings](#settings 'Go to Settings') |
 [Explore the Docs](https://certinia.github.io/debug-log-analyzer/) |
@@ -29,12 +28,14 @@ Apex Log Analyzer makes performance analysis of Salesforce debug logs much easie
 [Contributors](#contributors 'Go to Contributors') |
 [License](#license 'Go to License')
 
-## Installation
+## Getting Started
+
+### Installation
 
 ![install](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.10/install-lana.webp)
 
-- Search for `Apex Log Analyzer` in extensions.
-- Click install + then reload VSCode.
+Search for `Apex Log Analyzer` from the extensions side bar in VS Code and click `Install` or
+install from the VS Code market place by clicking install on [Visual Studio Code Market Place: Apex Log Analyzer](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
 
 ### Pre-Release
 
@@ -42,23 +43,18 @@ Click `Switch to Pre-Release Version` on the banner to get bleeding edge changes
 
 ### Command Pallette
 
-- Open command pallette (CMD/CTRL + Shift + P), paste `ext install financialforce.lana`, and press enter.
-- Click reload in the extensions tab.
+Open command pallette (CMD/CTRL + Shift + P), paste `ext install financialforce.lana`, and press enter.
 
 ```sh
 ext install financialforce.lana
 ```
 
-### VSCode Marketplace
+### Show Analysis
 
-- Install from the VSCode market place by clicking install on [Visual Studio Code Market Place: Apex Log Analyzer](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
-
-## Usage
-
-Start the analysis either from a log you have already downloaded or by downloading a log from an org to view.
+Start the analysis either from a log you have already downloaded or by downloading a log from an org.
 On larger logs the analysis window make take a few seconds to appear.
 
-### From an Open Log File
+#### From an Open Log File
 
 With the `.log` file open in VSCode.
 
@@ -73,7 +69,7 @@ With the `.log` file open in VSCode.
    or
 1. Right click editor tab -> 'Log: Show Apex Log Analysis'
 
-### Download a log
+#### Download a log
 
 1. Open command pallette (CMD/CTRL + Shift + P) -> 'Log: Retrieve Apex Log And Show Analysis
 
