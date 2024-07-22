@@ -52,5 +52,6 @@
       "@apexdevtools/sfdx-auth-helper>jsforce": "^2.0.0-beta.27",
       "@apexdevtools/sfdx-auth-helper>@salesforce/core": "^4.3.11"
     }
-  }
+  },
+  "version": "1.16.0"
 }
