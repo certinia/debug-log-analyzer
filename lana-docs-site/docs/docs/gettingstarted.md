@@ -2,7 +2,7 @@
 sidebar_position: 3
 ---
 
-# Usage
+# Getting Started
 
 Start the analysis either from a log you have already downloaded or by downloading a log from an org to view.
 On larger logs the analysis window make take a few seconds to appear.

@@ -20,8 +20,7 @@ Apex Log Analyzer makes performance analysis of Salesforce debug logs much easie
 > Higher log levels result in higher reported execution time than would be seen with logging off.\
 > This is due to the over head associated with logging method entry and exit.
 
-[Installation](#installation 'Go to Installation') |
-[Usage](#usage 'Go to Usage') |
+[Getting Started](#getting-started 'Go to Getting Started') |
 [Features](#features 'Go to Features') |
 [Settings](#settings 'Go to Settings') |
 [Explore the Docs](https://certinia.github.io/debug-log-analyzer/) |
@@ -29,12 +28,14 @@ Apex Log Analyzer makes performance analysis of Salesforce debug logs much easie
 [Contributors](#contributors 'Go to Contributors') |
 [License](#license 'Go to License')
 
-## Installation
+## Getting Started
+
+### Installation
 
 ![install](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.10/install-lana.webp)
 
-- Search for `Apex Log Analyzer` in extensions.
-- Click install + then reload VSCode.
+Search for `Apex Log Analyzer` from the extensions side bar in VS Code and click `Install` or
+install from the VS Code market place by clicking install on [Visual Studio Code Market Place: Apex Log Analyzer](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
 
 ### Pre-Release
 
@@ -42,23 +43,18 @@ Click `Switch to Pre-Release Version` on the banner to get bleeding edge changes
 
 ### Command Pallette
 
-- Open command pallette (CMD/CTRL + Shift + P), paste `ext install financialforce.lana`, and press enter.
-- Click reload in the extensions tab.
+Open command pallette (CMD/CTRL + Shift + P), paste `ext install financialforce.lana`, and press enter.
 
 ```sh
 ext install financialforce.lana
 ```
 
-### VSCode Marketplace
+### Show Analysis
 
-- Install from the VSCode market place by clicking install on [Visual Studio Code Market Place: Apex Log Analyzer](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
-
-## Usage
-
-Start the analysis either from a log you have already downloaded or by downloading a log from an org to view.
+Start the analysis either from a log you have already downloaded or by downloading a log from an org.
 On larger logs the analysis window make take a few seconds to appear.
 
-### From an Open Log File
+#### From an Open Log File
 
 With the `.log` file open in VSCode.
 
@@ -73,16 +69,17 @@ With the `.log` file open in VSCode.
    or
 1. Right click editor tab -> 'Log: Show Apex Log Analysis'
 
-### Download a log
+#### Download a log
 
 1. Open command pallette (CMD/CTRL + Shift + P) -> 'Log: Retrieve Apex Log And Show Analysis
 
-## Features
+## ✨ Features
 
-- [**Timeline / Flame chart**](#timeline--flame-chart) - Gain a deep understanding of code execution over time via a timeline flame chart and tooltips to show additional information about events.
-- [**Call Tree**](#call-tree) - View the execution path in a tree view with aggregated DML Count, SOQL Count, Throws Count, Row Count, Self Time and Total Time. Apply filters to filter the events.
-- [**Analysis**](#analysis) - Quickly identify which methods took the most time in aggregate.
-- [**Database**](#database) - Identify which SOQL + DML executed the most, returned the most rows and took the most time.
+- 🔥 [**Timeline / Flame chart**](#timeline--flame-chart) - Gain a deep understanding of code execution over time via a timeline flame chart and tooltips to show additional information about events.
+- 🌳 [**Call Tree**](#call-tree) - View the execution path in a tree view with aggregated DML Count, SOQL Count, Throws Count, Row Count, Self Time and Total Time. Apply filters to filter the events.
+- 🧠 [**Analysis**](#analysis) - Quickly identify which methods took the most time in aggregate.
+- 💾 [**Database**](#database) - Identify which SOQL + DML executed the most, returned the most rows and took the most time.
+- 🔍 [**Find**](#find) - Find, highlight and step through matching text and log events on the Timeline, Call Tree, Analysis
 
 ### Timeline / Flame chart
 
@@ -96,14 +93,6 @@ The Timeline shows a visualization of code execution during a request’s execut
 - When zooming the mouse pointer position is kept on screen.
 - Scroll left and right on the mouse to move the time line left are right, when zoomed
 - Click the mouse down and drag to move the timeline around both in the x and y direction, when zoomed
-
-#### Find
-
-- CMD/CTRL + f to open find
-- Events with matching text are highlighted, there is a different highlight for the current match.
-- Previous match, next match and case sensitive search all supported.
-- If the next matching event is off screen that event will be centered on the timeline.
-- The find will match on Event Type or text in the event
 
 #### Go to Call Tree
 
@@ -131,13 +120,6 @@ Shows the call stack which can be expanded and collapsed. Clicking on a link wil
 
 Each row shows event type, details such as method signature, self and total time as well as aggregated DML, SOQL, Throws and Row counts.
 
-#### Find
-
-- CMD/CTRL + f to open find
-- Any matching text is highlighted, there is a different highlight for the current match.
-- Previous match, next match and case sensitive search all supported.
-- If the next matching text is within a parent that parent will be expanded.
-
 #### Go to Code
 
 Clicking the link in the event column will open the corresponding file and line, if that file exists in the current workspace.
@@ -162,13 +144,6 @@ The Call Tree can be navigated with the keyboard. The up and down keys will move
 Show analysis of method calls by showing Self Time, Total Time, Count (number of times a method was called), name and type. Each column can be sorted ascending or descending by clicking the column header.
 
 ![analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.14/lana-analysis.png)
-
-#### Find
-
-- CMD/CTRL + f to open find
-- Any matching text is highlighted, there is a different highlight for the current match.
-- Previous match, next match and case sensitive search all supported.
-- If the next matching text is within a group that group will be expanded.
 
 #### Sort
 
@@ -198,13 +173,6 @@ Shows the SOQL and DML that occurred the number of rows returned, the time taken
 ![database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.14/lana-database.png)
 
 The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determine. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
-
-#### Find
-
-- CMD/CTRL + f to open find
-- Any matching text is highlighted, there is a different highlight for the current match.
-- Previous match, next match and case sensitive search all supported.
-- If the next matching text is within a group that group will be expanded.
 
 #### Sort
 
@@ -237,7 +205,35 @@ For SOQL rows, to the right of the Call Stack is SOQL Analysis which shows infor
 Click the header menu,`⋮`, and use `Export to CSV` to save the table content to a file.
 Focus the Analysis table and use `CMD / CTRL + c` to copy the table content to clipboard. This can then be pasted into a spreadsheet or other file.
 
-## Settings
+### Find
+
+- CMD/CTRL + f to open find
+- Any matching text is highlighted, the current match has a lighter hightlight.
+- Previous match, next match and case sensitive search all supported.
+
+#### Timeline
+
+- If the next matching event is off screen that event will be centered on the timeline.
+- The find will match on Event Type or text in the event
+- The tooltip is shown for the current matching event, making it easy to view the event details such as Total or Self time.
+
+![Timeline find](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.16/lana-timeline-find.png)
+
+#### Call Tree
+
+- If the next matching text is within a parent that parent will be expanded.
+- The row with the current matching text will also be highlighted
+
+![Call Tree find](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.16/lana-calltree-find.png)
+
+#### Analysis + Database
+
+- If the next matching text is within a group that group will be expanded.
+- The row with the current matching text will also be highlighted
+
+![Analysis find](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.16/lana-analysis-find.png)
+
+## 🛠️ Settings
 
 ### Timeline color settings
 
@@ -267,9 +263,9 @@ settings.json
 Help us to make things better by [Contributing](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/CONTRIBUTING.md)\
 Find out how to [Build](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/BUILDING.md) the extension
 
-## Contributors
+## 🎉 Contributors
 
-Thanks to the everyone who has contributed &#10084; &#128591;
+Thanks to the everyone who has contributed ❤️ 🙏;
 
 <p align="center">
   <a href="https://github.com/certinia/debug-log-analyzer/graphs/contributors">
