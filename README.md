@@ -77,12 +77,13 @@ With the `.log` file open in VSCode.
 
 1. Open command pallette (CMD/CTRL + Shift + P) -> 'Log: Retrieve Apex Log And Show Analysis
 
-## Features
+## ✨ Features
 
-- [**Timeline / Flame chart**](#timeline--flame-chart) - Gain a deep understanding of code execution over time via a timeline flame chart and tooltips to show additional information about events.
-- [**Call Tree**](#call-tree) - View the execution path in a tree view with aggregated DML Count, SOQL Count, Throws Count, Row Count, Self Time and Total Time. Apply filters to filter the events.
-- [**Analysis**](#analysis) - Quickly identify which methods took the most time in aggregate.
-- [**Database**](#database) - Identify which SOQL + DML executed the most, returned the most rows and took the most time.
+- 🔥 [**Timeline / Flame chart**](#timeline--flame-chart) - Gain a deep understanding of code execution over time via a timeline flame chart and tooltips to show additional information about events.
+- 🌳 [**Call Tree**](#call-tree) - View the execution path in a tree view with aggregated DML Count, SOQL Count, Throws Count, Row Count, Self Time and Total Time. Apply filters to filter the events.
+- 🧠 [**Analysis**](#analysis) - Quickly identify which methods took the most time in aggregate.
+- 💾 [**Database**](#database) - Identify which SOQL + DML executed the most, returned the most rows and took the most time.
+- 🔍 [**Find**](#find) - Find, highlight and step through matching text and log events on the Timeline, Call Tree, Analysis
 
 ### Timeline / Flame chart
 
@@ -236,6 +237,8 @@ Focus the Analysis table and use `CMD / CTRL + c` to copy the table content to c
 
 ![Analysis find](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.16/lana-analysis-find.png)
 
+## 🛠️ Settings
+
 ### Timeline color settings
 
 The default colors shown on the timeline can be changed in the VSCode settings.\
@@ -264,9 +267,9 @@ settings.json
 Help us to make things better by [Contributing](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/CONTRIBUTING.md)\
 Find out how to [Build](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/BUILDING.md) the extension
 
-## Contributors
+## 🎉 Contributors
 
-Thanks to the everyone who has contributed &#10084; &#128591;
+Thanks to the everyone who has contributed ❤️ 🙏;
 
 <p align="center">
   <a href="https://github.com/certinia/debug-log-analyzer/graphs/contributors">
