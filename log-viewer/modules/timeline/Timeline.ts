@@ -170,6 +170,7 @@ let findArgs: { text: string; count: number; options: { matchCase: boolean } } =
   count: 1,
   options: { matchCase: false },
 };
+let totalMatches = 0;
 
 function getMaxDepth(nodes: LogLine[]) {
   const result = new Map<number, LogLine[]>();
@@ -918,6 +919,9 @@ function handleScroll(evt: WheelEvent) {
 function _findOnTimeline(
   e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>,
 ) {
+  if (!isVisible && !totalMatches) {
+    return;
+  }
   _hideTooltip();
 
   const newFindArgs = JSON.parse(JSON.stringify(e.detail));
@@ -938,10 +942,13 @@ function _findOnTimeline(
     borderRenderQueue.clear();
     nodesToRectangles(timelineRoot.children as Method[]);
     const findResults = borderRenderQueue.get(findMatchColor) || [];
+    totalMatches = findResults.length;
 
-    document.dispatchEvent(
-      new CustomEvent('lv-find-results', { detail: { totalMatches: findResults.length } }),
-    );
+    if (!clearHighlights) {
+      document.dispatchEvent(
+        new CustomEvent('lv-find-results', { detail: { totalMatches: totalMatches } }),
+      );
+    }
   }
 
   const findResults = borderRenderQueue.get(findMatchColor) || [];
