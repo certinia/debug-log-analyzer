@@ -46,7 +46,7 @@ export class Find extends Module {
 
     // Only get the currently visible rows
     const grps = tbl.getGroups().flatMap(flattenFromGrps);
-    const flattenedRows = grps.length ? grps : tbl.getRows(true).flatMap(flatten);
+    const flattenedRows = grps.length ? grps : tbl.getRows('active').flatMap(flatten);
 
     tbl.blockRedraw();
     let totalMatches = 0;
