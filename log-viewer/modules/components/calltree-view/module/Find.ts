@@ -38,12 +38,9 @@ export class Find extends Module {
 
     const flatten = (row: RowComponent): RowComponent[] => {
       const mergedArray = [row];
-      row
-        .getTreeChildren()
-        .flatMap(flatten)
-        .forEach((child) => {
-          mergedArray.push(child);
-        });
+      (row.getTreeChildren() ?? []).flatMap(flatten).forEach((child) => {
+        mergedArray.push(child);
+      });
       return mergedArray;
     };
 
@@ -137,9 +134,14 @@ export function formatter(row: RowComponent, findArgs: FindArgs) {
   }
 
   const data = row.getData();
+  const highlights = {
+    indexes: data.highlightIndexes,
+    currentMatch: 0,
+  };
+
   row.getCells().forEach((cell) => {
     const cellElem = cell.getElement();
-    _highlightText(cellElem, findArgs, { indexes: data.highlightIndexes, currentMatch: 0 });
+    _highlightText(cellElem, findArgs, highlights);
   });
 
   //@ts-expect-error This is private to tabulator, but we have no other choice atm.

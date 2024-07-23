@@ -554,7 +554,11 @@ export class CalltreeView extends LitElement {
               const cellElem = cell.getElement();
               const row = cell.getRow();
               // @ts-expect-error: _row is private. This is temporary and I will patch the text wrap behaviour in the library.
-              const treeLevel = row._row.modules.dataTree.index;
+              const dataTree = row._row.modules.dataTree;
+              if (!dataTree) {
+                return '';
+              }
+              const treeLevel = dataTree?.index;
               childIndent ??= row.getTable().options.dataTreeChildIndent || 0;
               const levelIndent = treeLevel * childIndent;
               cellElem.style.paddingLeft = `${levelIndent + 4}px`;
@@ -728,12 +732,17 @@ export class CalltreeView extends LitElement {
     const len = rows.length;
     for (let i = 0; i < len; i++) {
       const row = rows[i];
-      if (!row) {
+      //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+      if (!row?._getSelf().modules?.dataTree) {
         continue;
       }
 
-      expand ? row.treeExpand() : row.treeCollapse();
-      this._expandCollapseAll(row.getTreeChildren(), expand);
+      if (expand) {
+        row.treeExpand();
+      } else {
+        row.treeCollapse();
+      }
+      this._expandCollapseAll(row.getTreeChildren() ?? [], expand);
     }
   }
 
@@ -793,7 +802,7 @@ export class CalltreeView extends LitElement {
       if (timeStamp === node.timestamp) {
         return row;
       } else if (isInRange) {
-        return this._findByTime(row.getTreeChildren(), timeStamp);
+        return this._findByTime(row.getTreeChildren() ?? [], timeStamp);
       }
       // Otherwise, look in the left or right half
       else if (timeStamp > endTime) {

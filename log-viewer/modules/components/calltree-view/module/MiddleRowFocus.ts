@@ -113,7 +113,7 @@ export class MiddleRowFocus extends Module {
 
         return this._findClosestActiveSibling(mid, rows, displayRows);
       } else if (timeStamp >= node.timestamp && timeStamp <= endTime) {
-        const childMatch = this._findClosestActive(row.getTreeChildren(), timeStamp);
+        const childMatch = this._findClosestActive(row.getTreeChildren() ?? [], timeStamp);
         if (childMatch) {
           return childMatch;
         }
