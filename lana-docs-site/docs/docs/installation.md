@@ -4,7 +4,7 @@ sidebar_position: 2
 
 # Installation
 
-![install](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.10/install-lana.webp)
+![install](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/install-lana.webp)
 
 Search for `Apex Log Analyzer` from the extensions side bar in VS Code and click `Install` or
 install from the VS Code market place by clicking install on [Visual Studio Code Market Place: Apex Log Analyzer](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)

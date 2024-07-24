@@ -9,7 +9,7 @@ sidebar_position: 4
 The default colors shown on the timeline can be changed in the VSCode settings.\
 Either in the UI `preferences -> extensions -> Apex Log Analyzer`
 
-![color settings](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.10/settings-color-lana.webp)
+![color settings](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/settings-color-lana.webp)
 
 or
 
