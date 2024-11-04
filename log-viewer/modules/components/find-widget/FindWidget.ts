@@ -18,16 +18,13 @@ export class FindWidget extends LitElement {
 
   lastMatch: string | null = null;
   nextMatchDirection = true;
-  debounce: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     super();
-    document.addEventListener('keydown', (e: KeyboardEvent) => {
-      this.debounce && clearTimeout(this.debounce);
-      this.debounce = setTimeout(() => {
-        this._keyPress(e);
-      }, 20);
+    window.addEventListener('keydown', (e: KeyboardEvent) => {
+      this._keyPress(e);
     });
+
     document.addEventListener('lv-find-results', ((
       e: CustomEvent<{ totalMatches: number; count?: number }>,
     ) => {
@@ -243,7 +240,11 @@ export class FindWidget extends LitElement {
   }
 
   _keyPress(e: KeyboardEvent) {
-    if (e.key === 'f' && (e.metaKey || e.ctrlKey)) {
+    if (e.repeat) {
+      return;
+    }
+
+    if (e.key === 'f' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
       e.preventDefault();
 
       !this.isVisble && !this.totalMatches && this._triggerFind();
