@@ -322,7 +322,7 @@ async function renderAnalysis(rootMethod: ApexLog) {
         },
         accessorDownload: NumberAccessor,
         bottomCalcFormatter: progressFormatter,
-        bottomCalc: 'sum',
+        bottomCalc: 'max',
         bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
       },
       {
