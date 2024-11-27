@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed search being triggered by and hijacking the "Find in Files" keybinding (CMD / CTRL + SHIFT + f) ([#537][#537])
 - Analysis: Total Time showing a higher value than it should ([#526][#526])
+- Analysis, Call Tree and Database search results not being consistent ([#536][#536])
 
 ## [1.16.0] - 2024-07-23
 
@@ -362,6 +363,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 [#537]: https://github.com/certinia/debug-log-analyzer/issues/537
 [#526]: https://github.com/certinia/debug-log-analyzer/issues/526
+[#536]: https://github.com/certinia/debug-log-analyzer/issues/536
 
 <!-- v1.16.0 -->
 

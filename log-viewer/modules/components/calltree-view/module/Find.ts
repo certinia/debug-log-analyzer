@@ -20,9 +20,7 @@ export class Find extends Module {
       matchIndexes: {},
     };
 
-    const tbl = this.table;
-    const findOptions = findArgs.options;
-    const searchString = findOptions.matchCase ? findArgs.text : findArgs.text.toLowerCase();
+    this._clearMatches();
 
     const flattenFromGrps = (row: GroupComponent): RowComponent[] => {
       const mergedArray: RowComponent[] = [];
@@ -45,12 +43,17 @@ export class Find extends Module {
     };
 
     // Only get the currently visible rows
+    const tbl = this.table;
     const grps = tbl.getGroups().flatMap(flattenFromGrps);
     const flattenedRows = grps.length ? grps : tbl.getRows('active').flatMap(flatten);
 
+    const findOptions = findArgs.options;
+    let searchString = findOptions.matchCase ? findArgs.text : findArgs.text.toLowerCase();
+    searchString = searchString.replaceAll(/[[\]*+?{}.()^$|\\-]/g, '\\$&');
+    const regex = new RegExp(searchString, `g${findArgs.options.matchCase ? '' : 'i'}`);
+
     tbl.blockRedraw();
     let totalMatches = 0;
-    const regex = new RegExp(searchString, `g${findArgs.options.matchCase ? '' : 'i'}`);
     const rowsToReformat = [];
     const len = flattenedRows.length;
     for (let i = 0; i < len; i++) {
@@ -125,6 +128,31 @@ export class Find extends Module {
       }
     }
     return count;
+  }
+
+  _clearMatches() {
+    const matches = this.table.element.querySelectorAll('.currentFindMatch, .findMatch');
+    for (const elm of matches) {
+      const previous = elm.previousSibling;
+      const next = elm.nextSibling;
+      if (previous) {
+        const newText = (previous.textContent ?? '') + elm.textContent;
+        previous.textContent = newText;
+
+        if (next) {
+          const newText = (previous.textContent ?? '') + next.textContent;
+          previous.textContent = newText;
+        }
+        elm.remove();
+      } else {
+        if (next) {
+          const newText = (elm.textContent ?? '') + next.textContent;
+          elm.textContent = newText;
+          next.remove();
+        }
+        elm.classList.remove('currentFindMatch', 'findMatch');
+      }
+    }
   }
 }
 
