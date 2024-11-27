@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed search being triggered by and hijacking the "Find in Files" keybinding (CMD / CTRL + SHIFT + f) ([#537][#537])
 - Analysis: Total Time showing a higher value than it should ([#526][#526])
-- Analysis, Call Tree and Database search results will now be consistent ([#536][#536])
+- Analysis, Call Tree and Database search results not being consistent ([#536][#536])
 
 ## [1.16.0] - 2024-07-23
 
