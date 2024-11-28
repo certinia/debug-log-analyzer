@@ -759,7 +759,7 @@ export class CalltreeView extends LitElement {
         const isTimedNode = node instanceof TimedNode;
         const children = isTimedNode ? this._toCallTree(node.children) : null;
         const data: CalltreeRow = {
-          id: node.timestamp,
+          id: node.timestamp + '-' + i,
           text: node.text,
           namespace: node.namespace,
           duration: node.duration.total,
@@ -819,7 +819,7 @@ export class CalltreeView extends LitElement {
 }
 
 interface CalltreeRow {
-  id: number;
+  id: string;
   originalData: LogLine;
   text: string;
   duration: number;
