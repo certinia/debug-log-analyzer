@@ -46,9 +46,9 @@ export class CalltreeView extends LitElement {
     debugOnly: false,
     selectedTypes: [],
   };
-  debugOnlyFilterCache = new Map<number, boolean>();
-  showDetailsFilterCache = new Map<number, boolean>();
-  typeFilterCache = new Map<number, boolean>();
+  debugOnlyFilterCache = new Map<string, boolean>();
+  showDetailsFilterCache = new Map<string, boolean>();
+  typeFilterCache = new Map<string, boolean>();
 
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
@@ -431,7 +431,7 @@ export class CalltreeView extends LitElement {
     selectedNamespaces: string[],
     namespace: string,
     data: CalltreeRow,
-    filterParams: { columnName: string; filterCache: Map<number, boolean> },
+    filterParams: { columnName: string; filterCache: Map<string, boolean> },
   ) => {
     if (selectedNamespaces.length === 0) {
       return true;
@@ -451,7 +451,7 @@ export class CalltreeView extends LitElement {
   private _deepFilter(
     rowData: CalltreeRow,
     filterFunction: (rowData: CalltreeRow) => boolean,
-    filterParams: { filterCache: Map<number, boolean> },
+    filterParams: { filterCache: Map<string, boolean> },
   ): boolean {
     const cachedMatch = filterParams.filterCache.get(rowData.id);
     if (cachedMatch !== null && cachedMatch !== undefined) {
