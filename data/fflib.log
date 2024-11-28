@@ -1767,6 +1767,7 @@ Execute Anonymous: insert accs2;
 04:16:47.550 (10362229050)|SOQL_EXECUTE_BEGIN|[76]|Aggregations:0|SELECT Id, Name FROM Account WHERE Name != 'An Account' ORDER BY Name
 04:16:47.550 (10362229050)|SOQL_EXECUTE_EXPLAIN|[76]|TableScan on Account : [], cardinality: 2001, sobjectCardinality: 2001, relativeCost 2.834
 04:16:48.550 (11362229050)|SOQL_EXECUTE_END|[76]|Rows:2951
+04:16:48.375 (11362229150)|FATAL_ERROR|System.LimitException: Apex CPU time limit exceeded
 
 04:16:48.362 (11375731384)|CUMULATIVE_LIMIT_USAGE
 04:16:48.362 (11375731384)|LIMIT_USAGE_FOR_NS|(default)|
