@@ -153,45 +153,6 @@ export class ApexLogParser {
     }
   }
 
-  // private *generateLogLines(log: string): Generator<LogLine> {
-  //   const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index ?? 0;
-  //   if (start > 0) {
-  //     log = log.slice(start).replaceAll('\r\n', '\n');
-  //   }
-
-  //   // const hascrlf = log.indexOf('\r\n') > -1;
-  //   let lastEntry = null;
-  //   let lfIndex = null;
-  //   let eolIndex = (lfIndex = log.indexOf('\n'));
-  //   let startIndex = 0;
-  //   // let crlfIndex = -1;
-
-  //   while (eolIndex !== -1) {
-  //     const line = log.slice(startIndex, eolIndex);
-  //     if (line) {
-  //       // ignore blank lines
-  //       const entry = this.parseLine(line, lastEntry);
-  //       if (entry) {
-  //         lastEntry = entry;
-  //         yield entry;
-  //       }
-  //     }
-  //     startIndex = lfIndex + 1;
-  //     lfIndex = eolIndex = log.indexOf('\n', startIndex);
-  //   }
-
-  //   // Parse the last line
-  //   const line = log.slice(startIndex, log.length);
-  //   if (line) {
-  //     // ignore blank lines
-  //     const entry = this.parseLine(line, lastEntry);
-  //     if (entry) {
-  //       entry?.onAfter?.(this);
-  //       yield entry;
-  //     }
-  //   }
-  // }
-
   private toLogTree(lineGenerator: Generator<LogLine>) {
     const rootMethod = new ApexLog(this),
       stack: Method[] = [];
