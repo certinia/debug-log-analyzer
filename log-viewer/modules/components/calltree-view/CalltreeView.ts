@@ -305,11 +305,14 @@ export class CalltreeView extends LitElement {
   }
 
   async _goToRow(timestamp: number) {
-    if (!this.tableContainer || !this.rootMethod || !this.calltreeTable) {
+    if (!this.tableContainer || !this.rootMethod) {
       return;
     }
     document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
     await this._renderCallTree(this.tableContainer, this.rootMethod);
+    if (!this.calltreeTable) {
+      return;
+    }
 
     const treeRow = this._findByTime(this.calltreeTable.getRows(), timestamp);
     //@ts-expect-error This is a custom function added in by RowNavigation custom module
