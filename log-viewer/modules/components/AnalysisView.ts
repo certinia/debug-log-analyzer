@@ -26,30 +26,31 @@ import { RowNavigation } from '../datagrid/module/RowNavigation.js';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
 
-let analysisTable: Tabulator;
-let tableContainer: HTMLDivElement | null;
-let findMap: { [key: number]: RowComponent } = {};
-let findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
-  text: '',
-  count: 0,
-  options: { matchCase: false },
-};
-let totalMatches = 0;
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
   @property()
   timelineRoot: ApexLog | null = null;
 
+  analysisTable: Tabulator | null = null;
+  tableContainer: HTMLDivElement | null = null;
+  findMap: { [key: number]: RowComponent } = {};
+  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
+    text: '',
+    count: 0,
+    options: { matchCase: false },
+  };
+  totalMatches = 0;
+
   get _tableWrapper(): HTMLDivElement | null {
-    return (tableContainer = this.renderRoot?.querySelector('#analysis-table') ?? null);
+    return (this.tableContainer = this.renderRoot?.querySelector('#analysis-table') ?? null);
   }
 
   constructor() {
     super();
 
-    document.addEventListener('lv-find', this._find as EventListener);
-    document.addEventListener('lv-find-match', this._find as EventListener);
-    document.addEventListener('lv-find-close', this._find as EventListener);
+    document.addEventListener('lv-find', this._findEvt);
+    document.addEventListener('lv-find-match', this._findEvt);
+    document.addEventListener('lv-find-close', this._findEvt);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -116,11 +117,13 @@ export class AnalysisView extends LitElement {
     `;
   }
 
+  _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
+
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
     const fieldName = target.value.toLowerCase();
 
-    analysisTable.setGroupBy(fieldName !== 'none' ? fieldName : '');
+    this.analysisTable?.setGroupBy(fieldName !== 'none' ? fieldName : '');
   }
 
   _appendTableWhenVisible() {
@@ -130,7 +133,7 @@ export class AnalysisView extends LitElement {
       const analysisObserver = new IntersectionObserver((entries, observer) => {
         const visible = entries[0]?.isIntersecting;
         if (visible) {
-          renderAnalysis(rootMethod);
+          this._renderAnalysis(rootMethod);
           observer.disconnect();
         }
       });
@@ -138,17 +141,17 @@ export class AnalysisView extends LitElement {
     }
   }
 
-  _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
-    const isTableVisible = !!analysisTable?.element?.clientHeight;
-    if (!isTableVisible && !totalMatches) {
+  _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+    const isTableVisible = !!this.analysisTable?.element?.clientHeight;
+    if (!isTableVisible && !this.totalMatches) {
       return;
     }
 
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
-      newFindArgs.text !== findArgs.text ||
-      newFindArgs.options.matchCase !== findArgs.options?.matchCase;
-    findArgs = newFindArgs;
+      newFindArgs.text !== this.findArgs.text ||
+      newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
+    this.findArgs = newFindArgs;
 
     const clearHighlights =
       e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
@@ -157,9 +160,9 @@ export class AnalysisView extends LitElement {
     }
     if (newSearch || clearHighlights) {
       //@ts-expect-error This is a custom function added in by Find custom module
-      const result = analysisTable.find(findArgs);
-      totalMatches = result.totalMatches;
-      findMap = result.matchIndexes;
+      const result = this.analysisTable.find(this.findArgs);
+      this.totalMatches = result.totalMatches;
+      this.findMap = result.matchIndexes;
 
       if (!clearHighlights) {
         document.dispatchEvent(
@@ -168,185 +171,205 @@ export class AnalysisView extends LitElement {
       }
     }
 
-    const currentRow = findMap[findArgs.count];
-    const rows = [currentRow, findMap[findArgs.count + 1], findMap[findArgs.count - 1]];
+    const currentRow = this.findMap[this.findArgs.count];
+    const rows = [
+      currentRow,
+      this.findMap[this.findArgs.count + 1],
+      this.findMap[this.findArgs.count - 1],
+    ];
     rows.forEach((row) => {
       row?.reformat();
     });
     //@ts-expect-error This is a custom function added in by RowNavigation custom module
-    analysisTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
-  };
-}
-
-async function renderAnalysis(rootMethod: ApexLog) {
-  if (!tableContainer) {
-    return;
+    this.analysisTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
   }
-  const methodMap: Map<string, Metric> = new Map();
 
-  addNodeToMap(methodMap, rootMethod);
-  const metricList = [...methodMap.values()];
+  async _renderAnalysis(rootMethod: ApexLog) {
+    if (!this.tableContainer) {
+      return;
+    }
+    const methodMap: Map<string, Metric> = new Map();
 
-  const headerMenu = [
-    {
-      label: 'Export to CSV',
-      action: function (_e: PointerEvent, column: ColumnComponent) {
-        column.getTable().download('csv', 'analysis.csv', { bom: true, delimiter: ',' });
-      },
-    },
-  ];
+    addNodeToMap(methodMap, rootMethod);
+    const metricList = [...methodMap.values()];
 
-  Tabulator.registerModule(Object.values(CommonModules));
-  Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
-  analysisTable = new Tabulator(tableContainer, {
-    rowKeyboardNavigation: true,
-    selectableRows: 1,
-    data: metricList,
-    layout: 'fitColumns',
-    placeholder: 'No Analysis Available',
-    columnCalcs: 'both',
-    clipboard: true,
-    downloadEncoder: function (fileContents: string, mimeType) {
-      const vscodeHost = vscodeMessenger.getVsCodeAPI();
-      if (vscodeHost) {
-        vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
-          fileContent: fileContents,
-          options: {
-            defaultFileName: 'analysis.csv',
-          },
-        });
-        return false;
-      }
-
-      return new Blob([fileContents], { type: mimeType });
-    },
-    downloadRowRange: 'all',
-    downloadConfig: {
-      columnHeaders: true,
-      columnGroups: true,
-      rowGroups: true,
-      columnCalcs: false,
-      dataTree: true,
-    },
-    //@ts-expect-error types need update array is valid
-    keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
-    clipboardCopyRowRange: 'all',
-    height: '100%',
-    groupClosedShowCalcs: true,
-    groupStartOpen: false,
-    groupToggleElement: 'header',
-    rowFormatter: (row: RowComponent) => {
-      formatter(row, findArgs);
-    },
-    columnDefaults: {
-      title: 'default',
-      resizable: true,
-      headerSortStartingDir: 'desc',
-      headerTooltip: true,
-      headerMenu: headerMenu,
-      headerWordWrap: true,
-    },
-    initialSort: [{ column: 'selfTime', dir: 'desc' }],
-    headerSortElement: function (column, dir) {
-      switch (dir) {
-        case 'asc':
-          return "<div class='sort-by--top'></div>";
-          break;
-        case 'desc':
-          return "<div class='sort-by--bottom'></div>";
-          break;
-        default:
-          return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
-      }
-    },
-    columns: [
+    const headerMenu = [
       {
-        title: 'Name',
-        field: 'name',
-        formatter: 'textarea',
-        headerSortStartingDir: 'asc',
-        sorter: 'string',
-        cssClass: 'datagrid-code-text',
-        bottomCalc: () => {
-          return 'Total';
+        label: 'Export to CSV',
+        action: function (_e: PointerEvent, column: ColumnComponent) {
+          column.getTable().download('csv', 'analysis.csv', { bom: true, delimiter: ',' });
         },
-        widthGrow: 5,
       },
-      {
-        title: 'Namespace',
-        field: 'namespace',
+    ];
+
+    Tabulator.registerModule(Object.values(CommonModules));
+    Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
+    this.analysisTable = new Tabulator(this.tableContainer, {
+      rowKeyboardNavigation: true,
+      selectableRows: 1,
+      data: metricList,
+      layout: 'fitColumns',
+      placeholder: 'No Analysis Available',
+      columnCalcs: 'both',
+      clipboard: true,
+      downloadEncoder: function (fileContents: string, mimeType) {
+        const vscodeHost = vscodeMessenger.getVsCodeAPI();
+        if (vscodeHost) {
+          vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
+            fileContent: fileContents,
+            options: {
+              defaultFileName: 'analysis.csv',
+            },
+          });
+          return false;
+        }
+
+        return new Blob([fileContents], { type: mimeType });
+      },
+      downloadRowRange: 'all',
+      downloadConfig: {
+        columnHeaders: true,
+        columnGroups: true,
+        rowGroups: true,
+        columnCalcs: false,
+        dataTree: true,
+      },
+      //@ts-expect-error types need update array is valid
+      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
+      clipboardCopyRowRange: 'all',
+      height: '100%',
+      groupClosedShowCalcs: true,
+      groupStartOpen: false,
+      groupToggleElement: 'header',
+      rowFormatter: (row: RowComponent) => {
+        formatter(row, this.findArgs);
+      },
+      columnDefaults: {
+        title: 'default',
+        resizable: true,
         headerSortStartingDir: 'desc',
-        width: 150,
-        sorter: 'string',
-        cssClass: 'datagrid-code-text',
-        tooltip: true,
-        headerFilter: 'list',
-        headerFilterFunc: 'in',
-        headerFilterParams: {
-          valuesLookup: 'all',
-          clearable: true,
-          multiselect: true,
+        headerTooltip: true,
+        headerMenu: headerMenu,
+        headerWordWrap: true,
+      },
+      initialSort: [{ column: 'selfTime', dir: 'desc' }],
+      headerSortElement: function (column, dir) {
+        switch (dir) {
+          case 'asc':
+            return "<div class='sort-by--top'></div>";
+            break;
+          case 'desc':
+            return "<div class='sort-by--bottom'></div>";
+            break;
+          default:
+            return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
+        }
+      },
+      columns: [
+        {
+          title: 'Name',
+          field: 'name',
+          formatter: 'textarea',
+          headerSortStartingDir: 'asc',
+          sorter: 'string',
+          cssClass: 'datagrid-code-text',
+          bottomCalc: () => {
+            return 'Total';
+          },
+          widthGrow: 5,
         },
-        headerFilterLiveFilter: false,
-      },
-      {
-        title: 'Type',
-        field: 'type',
-        headerSortStartingDir: 'asc',
-        width: 150,
-        sorter: 'string',
-        tooltip: true,
-        cssClass: 'datagrid-code-text',
-      },
-      {
-        title: 'Count',
-        field: 'count',
-        sorter: 'number',
-        width: 65,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
-      {
-        title: 'Total Time (ms)',
-        field: 'totalTime',
-        sorter: 'number',
-        width: 165,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        formatter: progressFormatter,
-        formatterParams: {
-          thousand: false,
-          precision: 3,
-          totalValue: rootMethod.duration.total,
+        {
+          title: 'Namespace',
+          field: 'namespace',
+          headerSortStartingDir: 'desc',
+          width: 150,
+          sorter: 'string',
+          cssClass: 'datagrid-code-text',
+          tooltip: true,
+          headerFilter: 'list',
+          headerFilterFunc: 'in',
+          headerFilterParams: {
+            valuesLookup: 'all',
+            clearable: true,
+            multiselect: true,
+          },
+          headerFilterLiveFilter: false,
         },
-        accessorDownload: NumberAccessor,
-        bottomCalcFormatter: progressFormatter,
-        bottomCalc: 'max',
-        bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
-      },
-      {
-        title: 'Self Time (ms)',
-        field: 'selfTime',
-        sorter: 'number',
-        width: 165,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-        bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
-        formatter: progressFormatter,
-        formatterParams: {
-          thousand: false,
-          precision: 3,
-          totalValue: rootMethod.duration.total,
+        {
+          title: 'Type',
+          field: 'type',
+          headerSortStartingDir: 'asc',
+          width: 150,
+          sorter: 'string',
+          tooltip: true,
+          cssClass: 'datagrid-code-text',
         },
-        accessorDownload: NumberAccessor,
-        bottomCalcFormatter: progressFormatter,
-      },
-    ],
-  });
-}
+        {
+          title: 'Count',
+          field: 'count',
+          sorter: 'number',
+          width: 65,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          bottomCalc: 'sum',
+        },
+        {
+          title: 'Total Time (ms)',
+          field: 'totalTime',
+          sorter: 'number',
+          width: 165,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          formatter: progressFormatter,
+          formatterParams: {
+            thousand: false,
+            precision: 3,
+            totalValue: rootMethod.duration.total,
+          },
+          accessorDownload: NumberAccessor,
+          bottomCalcFormatter: progressFormatter,
+          bottomCalc: 'max',
+          bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
+        },
+        {
+          title: 'Self Time (ms)',
+          field: 'selfTime',
+          sorter: 'number',
+          width: 165,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          bottomCalc: 'sum',
+          bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
+          formatter: progressFormatter,
+          formatterParams: {
+            thousand: false,
+            precision: 3,
+            totalValue: rootMethod.duration.total,
+          },
+          accessorDownload: NumberAccessor,
+          bottomCalcFormatter: progressFormatter,
+        },
+      ],
+    });
 
+    this.analysisTable.on('dataFiltering', () => {
+      this._resetFindWidget();
+      this._clearSearchHighlights();
+    });
+  }
+
+  _resetFindWidget() {
+    document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
+  }
+
+  _clearSearchHighlights() {
+    this._find(
+      new CustomEvent('lv-find', {
+        detail: { text: '', count: 0, options: { matchCase: false } },
+      }),
+    );
+  }
+}
 export class Metric {
   name: string;
   type;
@@ -390,3 +413,5 @@ type VSCodeSaveFile = {
     defaultFileName: string;
   };
 };
+
+type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

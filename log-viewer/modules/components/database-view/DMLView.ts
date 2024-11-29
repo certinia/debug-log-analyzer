@@ -28,16 +28,6 @@ import './DatabaseSection.js';
 import databaseViewStyles from './DatabaseView.scss';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
-let dmlTable: Tabulator;
-let holder: HTMLElement | null = null;
-let table: HTMLElement | null = null;
-let findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
-  text: '',
-  count: 0,
-  options: { matchCase: false },
-};
-let findMap: { [key: number]: RowComponent } = {};
-let totalMatches = 0;
 
 @customElement('dml-view')
 export class DMLView extends LitElement {
@@ -53,15 +43,22 @@ export class DMLView extends LitElement {
   @state()
   dmlLines: DMLBeginLine[] = [];
 
-  get _dmlTableWrapper(): HTMLDivElement | null {
-    return this.renderRoot?.querySelector('#db-dml-table') ?? null;
-  }
+  dmlTable: Tabulator | null = null;
+  holder: HTMLElement | null = null;
+  table: HTMLElement | null = null;
+  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
+    text: '',
+    count: 0,
+    options: { matchCase: false },
+  };
+  findMap: { [key: number]: RowComponent } = {};
+  totalMatches = 0;
 
   constructor() {
     super();
 
-    document.addEventListener('lv-find', this._find as EventListener);
-    document.addEventListener('lv-find-close', this._find as EventListener);
+    document.addEventListener('lv-find', this._findEvt);
+    document.addEventListener('lv-find-close', this._findEvt);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -115,9 +112,15 @@ export class DMLView extends LitElement {
     `;
   }
 
+  _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
+
   _dmlGroupBy(event: Event) {
     const target = event.target as HTMLInputElement;
-    dmlTable.setGroupBy(target.checked ? 'dml' : '');
+    this.dmlTable?.setGroupBy(target.checked ? 'dml' : '');
+  }
+
+  get _dmlTableWrapper(): HTMLDivElement | null {
+    return this.renderRoot?.querySelector('#db-dml-table') ?? null;
   }
 
   _appendTableWhenVisible() {
@@ -134,7 +137,7 @@ export class DMLView extends LitElement {
 
           Tabulator.registerModule(Object.values(CommonModules));
           Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
-          renderDMLTable(dmlTableWrapper, this.dmlLines);
+          this._renderDMLTable(dmlTableWrapper, this.dmlLines);
         }
       });
       dbObserver.observe(this);
@@ -142,26 +145,26 @@ export class DMLView extends LitElement {
   }
 
   _highlightMatches(highlightIndex: number) {
-    if (!dmlTable?.element?.clientHeight) {
+    if (!this.dmlTable?.element?.clientHeight) {
       return;
     }
 
-    findArgs.count = highlightIndex;
-    const currentRow = findMap[highlightIndex];
-    const rows = [currentRow, findMap[this.oldIndex]];
+    this.findArgs.count = highlightIndex;
+    const currentRow = this.findMap[highlightIndex];
+    const rows = [currentRow, this.findMap[this.oldIndex]];
     rows.forEach((row) => {
       row?.reformat();
     });
     if (currentRow) {
       //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      dmlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+      this.dmlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
     }
     this.oldIndex = highlightIndex;
   }
 
-  _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
-    const isTableVisible = !!dmlTable?.element?.clientHeight;
-    if (!isTableVisible && !totalMatches) {
+  _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+    const isTableVisible = !!this.dmlTable?.element?.clientHeight;
+    if (!isTableVisible && !this.totalMatches) {
       return;
     }
 
@@ -171,9 +174,9 @@ export class DMLView extends LitElement {
     }
 
     const newSearch =
-      newFindArgs.text !== findArgs.text ||
-      newFindArgs.options.matchCase !== findArgs.options?.matchCase;
-    findArgs = newFindArgs;
+      newFindArgs.text !== this.findArgs.text ||
+      newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
+    this.findArgs = newFindArgs;
 
     const clearHighlights =
       e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
@@ -182,9 +185,9 @@ export class DMLView extends LitElement {
     }
     if (newSearch || clearHighlights) {
       //@ts-expect-error This is a custom function added in by Find custom module
-      const result = dmlTable.find(findArgs);
-      totalMatches = result.totalMatches;
-      findMap = result.matchIndexes;
+      const result = this.dmlTable.find(this.findArgs);
+      this.totalMatches = result.totalMatches;
+      this.findMap = result.matchIndexes;
 
       if (!clearHighlights) {
         document.dispatchEvent(
@@ -194,240 +197,261 @@ export class DMLView extends LitElement {
         );
       }
     }
-  };
-}
-
-function renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
-  const dmlData: DMLRow[] = [];
-  if (dmlLines) {
-    for (const dml of dmlLines) {
-      dmlData.push({
-        dml: dml.text,
-        rowCount: dml.rowCount.self,
-        timeTaken: dml.duration.total,
-        timestamp: dml.timestamp,
-        _children: [{ timestamp: dml.timestamp, isDetail: true }],
-      });
-    }
   }
-  const dmlText = sortByFrequency(dmlData || [], 'dml');
 
-  dmlTable = new Tabulator(dmlTableContainer, {
-    height: '100%',
-    clipboard: true,
-    downloadEncoder: downlodEncoder('dml.csv'),
-    downloadRowRange: 'all',
-    downloadConfig: {
-      columnHeaders: true,
-      columnGroups: true,
-      rowGroups: true,
-      columnCalcs: false,
-      dataTree: true,
-    },
-    //@ts-expect-error types need update array is valid
-    keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
-    clipboardCopyRowRange: 'all',
-    rowKeyboardNavigation: true,
-    data: dmlData, //set initial table data
-    layout: 'fitColumns',
-    placeholder: 'No DML statements found',
-    columnCalcs: 'both',
-    groupClosedShowCalcs: true,
-    groupStartOpen: false,
-    groupValues: [dmlText],
-    groupHeader(value, count, data: DMLRow[], _group) {
-      const hasDetail = data.some((d) => {
-        return d.isDetail;
-      });
+  _renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
+    const dmlData: DMLRow[] = [];
+    if (dmlLines) {
+      for (const dml of dmlLines) {
+        dmlData.push({
+          dml: dml.text,
+          rowCount: dml.rowCount.self,
+          timeTaken: dml.duration.total,
+          timestamp: dml.timestamp,
+          _children: [{ timestamp: dml.timestamp, isDetail: true }],
+        });
+      }
+    }
+    const dmlText = this.sortByFrequency(dmlData || [], 'dml');
 
-      const newCount = hasDetail ? count - 1 : count;
-      return `
+    this.dmlTable = new Tabulator(dmlTableContainer, {
+      height: '100%',
+      clipboard: true,
+      downloadEncoder: this.downlodEncoder('dml.csv'),
+      downloadRowRange: 'all',
+      downloadConfig: {
+        columnHeaders: true,
+        columnGroups: true,
+        rowGroups: true,
+        columnCalcs: false,
+        dataTree: true,
+      },
+      //@ts-expect-error types need update array is valid
+      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
+      clipboardCopyRowRange: 'all',
+      rowKeyboardNavigation: true,
+      data: dmlData, //set initial table data
+      layout: 'fitColumns',
+      placeholder: 'No DML statements found',
+      columnCalcs: 'both',
+      groupClosedShowCalcs: true,
+      groupStartOpen: false,
+      groupValues: [dmlText],
+      groupHeader(value, count, data: DMLRow[], _group) {
+        const hasDetail = data.some((d) => {
+          return d.isDetail;
+        });
+
+        const newCount = hasDetail ? count - 1 : count;
+        return `
       <div class="db-group-row">
         <div class="db-group-row__title" title="${value}">${value}</div><span>(${newCount} DML)</span>
       </div>
         `;
-    },
+      },
 
-    groupToggleElement: 'header',
-    selectableRowsCheck: function (row: RowComponent) {
-      return !row.getData().isDetail;
-    },
-    dataTree: true,
-    dataTreeBranchElement: false,
-    columnDefaults: {
-      title: 'default',
-      resizable: true,
-      headerSortStartingDir: 'desc',
-      headerTooltip: true,
-      headerMenu: csvheaderMenu('dml.csv'),
-      headerWordWrap: true,
-    },
-    initialSort: [{ column: 'rowCount', dir: 'desc' }],
-    headerSortElement: function (column, dir) {
-      switch (dir) {
-        case 'asc':
-          return "<div class='sort-by--top'></div>";
-          break;
-        case 'desc':
-          return "<div class='sort-by--bottom'></div>";
-          break;
-        default:
-          return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
-      }
-    },
-    columns: [
-      {
-        title: 'DML',
-        field: 'dml',
-        sorter: 'string',
-        bottomCalc: () => {
-          return 'Total';
-        },
-        cssClass: 'datagrid-textarea datagrid-code-text',
-        variableHeight: true,
-        formatter: (cell, _formatterParams, _onRendered) => {
-          const data = cell.getData() as DMLRow;
-          return `<call-stack
+      groupToggleElement: 'header',
+      selectableRowsCheck: function (row: RowComponent) {
+        return !row.getData().isDetail;
+      },
+      dataTree: true,
+      dataTreeBranchElement: false,
+      columnDefaults: {
+        title: 'default',
+        resizable: true,
+        headerSortStartingDir: 'desc',
+        headerTooltip: true,
+        headerMenu: this.csvheaderMenu('dml.csv'),
+        headerWordWrap: true,
+      },
+      initialSort: [{ column: 'rowCount', dir: 'desc' }],
+      headerSortElement: function (column, dir) {
+        switch (dir) {
+          case 'asc':
+            return "<div class='sort-by--top'></div>";
+            break;
+          case 'desc':
+            return "<div class='sort-by--bottom'></div>";
+            break;
+          default:
+            return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
+        }
+      },
+      columns: [
+        {
+          title: 'DML',
+          field: 'dml',
+          sorter: 'string',
+          bottomCalc: () => {
+            return 'Total';
+          },
+          cssClass: 'datagrid-textarea datagrid-code-text',
+          variableHeight: true,
+          formatter: (cell, _formatterParams, _onRendered) => {
+            const data = cell.getData() as DMLRow;
+            return `<call-stack
             timestamp="${data.timestamp}"
             startDepth="0"
             endDepth="1"
           ></call-stack>`;
+          },
         },
-      },
-      {
-        title: 'Row Count',
-        field: 'rowCount',
-        sorter: 'number',
-        width: 90,
-        bottomCalc: 'sum',
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-      },
-      {
-        title: 'Time Taken (ms)',
-        field: 'timeTaken',
-        sorter: 'number',
-        width: 110,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        formatter: Number,
-        formatterParams: {
-          thousand: false,
-          precision: 3,
+        {
+          title: 'Row Count',
+          field: 'rowCount',
+          sorter: 'number',
+          width: 90,
+          bottomCalc: 'sum',
+          hozAlign: 'right',
+          headerHozAlign: 'right',
         },
-        accessorDownload: NumberAccessor,
-        bottomCalcFormatter: Number,
-        bottomCalc: 'sum',
-        bottomCalcFormatterParams: { precision: 3 },
+        {
+          title: 'Time Taken (ms)',
+          field: 'timeTaken',
+          sorter: 'number',
+          width: 110,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          formatter: Number,
+          formatterParams: {
+            thousand: false,
+            precision: 3,
+          },
+          accessorDownload: NumberAccessor,
+          bottomCalcFormatter: Number,
+          bottomCalc: 'sum',
+          bottomCalcFormatterParams: { precision: 3 },
+        },
+      ],
+      rowFormatter: (row) => {
+        const data = row.getData();
+        if (data.isDetail && data.timestamp) {
+          const detailContainer = this.createDetailPanel(data.timestamp);
+          row.getElement().replaceChildren(detailContainer);
+          row.normalizeHeight();
+        }
+
+        requestAnimationFrame(() => {
+          formatter(row, this.findArgs);
+        });
       },
-    ],
-    rowFormatter: function (row) {
+    });
+
+    this.dmlTable.on('dataFiltering', () => {
+      this._resetFindWidget();
+      this._clearSearchHighlights();
+    });
+
+    this.dmlTable.on('tableBuilt', () => {
+      this.dmlTable?.setGroupBy('dml');
+    });
+
+    this.dmlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
+      if (!group.isVisible()) {
+        this.dmlTable?.blockRedraw();
+        this.dmlTable?.getRows().forEach((row) => {
+          !row.isTreeExpanded() && row.treeExpand();
+        });
+        this.dmlTable?.restoreRedraw();
+      }
+    });
+
+    this.dmlTable.on('rowClick', function (e, row) {
       const data = row.getData();
-      if (data.isDetail && data.timestamp) {
-        const detailContainer = createDetailPanel(data.timestamp);
-        row.getElement().replaceChildren(detailContainer);
-        row.normalizeHeight();
+      if (!(data.timestamp && data.dml)) {
+        return;
       }
 
-      requestAnimationFrame(() => {
-        formatter(row, findArgs);
-      });
-    },
-  });
+      const origRowHeight = row.getElement().offsetHeight;
+      row.treeToggle();
+      row.getCell('dml').getElement().style.height = origRowHeight + 'px';
+    });
 
-  dmlTable.on('tableBuilt', () => {
-    dmlTable.setGroupBy('dml');
-  });
+    this.dmlTable.on('renderStarted', () => {
+      const holder = this._getTableHolder();
+      holder.style.minHeight = holder.clientHeight + 'px';
+      holder.style.overflowAnchor = 'none';
+    });
 
-  dmlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
-    if (!group.isVisible()) {
-      dmlTable.blockRedraw();
-      dmlTable.getRows().forEach((row) => {
-        !row.isTreeExpanded() && row.treeExpand();
-      });
-      dmlTable.restoreRedraw();
-    }
-  });
+    this.dmlTable.on('renderComplete', () => {
+      const holder = this._getTableHolder();
+      const table = this._getTable();
+      holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
+    });
+  }
 
-  dmlTable.on('rowClick', function (e, row) {
-    const data = row.getData();
-    if (!(data.timestamp && data.dml)) {
-      return;
-    }
+  _resetFindWidget() {
+    document.dispatchEvent(
+      new CustomEvent('db-find-results', {
+        detail: { totalMatches: 0, type: 'dml' },
+      }),
+    );
+  }
 
-    const origRowHeight = row.getElement().offsetHeight;
-    row.treeToggle();
-    row.getCell('dml').getElement().style.height = origRowHeight + 'px';
-  });
+  private _clearSearchHighlights() {
+    this._find(
+      new CustomEvent('lv-find', {
+        detail: { text: '', count: 0, options: { matchCase: false } },
+      }),
+    );
+  }
 
-  dmlTable.on('renderStarted', () => {
-    const holder = _getTableHolder();
-    holder.style.minHeight = holder.clientHeight + 'px';
-    holder.style.overflowAnchor = 'none';
-  });
+  _getTable() {
+    this.table ??= this.dmlTable?.element.querySelector('.tabulator-table') as HTMLElement;
+    return this.table;
+  }
 
-  dmlTable.on('renderComplete', () => {
-    const holder = _getTableHolder();
-    const table = _getTable();
-    holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
-  });
-}
+  _getTableHolder() {
+    this.holder = this.dmlTable?.element.querySelector('.tabulator-tableholder') as HTMLElement;
+    return this.holder;
+  }
 
-function _getTable() {
-  table ??= dmlTable.element.querySelector('.tabulator-table')! as HTMLElement;
-  return table;
-}
+  createDetailPanel(timestamp: number) {
+    const detailContainer = document.createElement('div');
+    detailContainer.className = 'row__details-container';
+    render(html`<call-stack timestamp=${timestamp}></call-stack>`, detailContainer);
 
-function _getTableHolder() {
-  holder ??= dmlTable.element.querySelector('.tabulator-tableholder')! as HTMLElement;
-  return holder;
-}
+    return detailContainer;
+  }
 
-function createDetailPanel(timestamp: number) {
-  const detailContainer = document.createElement('div');
-  detailContainer.className = 'row__details-container';
-  render(html`<call-stack timestamp=${timestamp}></call-stack>`, detailContainer);
+  sortByFrequency(dataArray: DMLRow[], field: keyof DMLRow) {
+    const map = new Map<unknown, number>();
+    dataArray.forEach((row) => {
+      const val = row[field];
+      map.set(val, (map.get(val) || 0) + 1);
+    });
+    const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
 
-  return detailContainer;
-}
+    return [...newMap.keys()];
+  }
 
-function sortByFrequency(dataArray: DMLRow[], field: keyof DMLRow) {
-  const map = new Map<unknown, number>();
-  dataArray.forEach((row) => {
-    const val = row[field];
-    map.set(val, (map.get(val) || 0) + 1);
-  });
-  const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
-
-  return [...newMap.keys()];
-}
-
-function csvheaderMenu(csvFileName: string) {
-  return [
-    {
-      label: 'Export to CSV',
-      action: function (_e: PointerEvent, column: ColumnComponent) {
-        column.getTable().download('csv', csvFileName, { bom: true, delimiter: ',' });
-      },
-    },
-  ];
-}
-
-function downlodEncoder(defaultFileName: string) {
-  return function (fileContents: string, mimeType: string) {
-    const vscode = vscodeMessenger.getVsCodeAPI();
-    if (vscode) {
-      vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
-        fileContent: fileContents,
-        options: {
-          defaultFileName: defaultFileName,
+  csvheaderMenu(csvFileName: string) {
+    return [
+      {
+        label: 'Export to CSV',
+        action: function (_e: PointerEvent, column: ColumnComponent) {
+          column.getTable().download('csv', csvFileName, { bom: true, delimiter: ',' });
         },
-      });
-      return false;
-    }
+      },
+    ];
+  }
 
-    return new Blob([fileContents], { type: mimeType });
-  };
+  downlodEncoder(defaultFileName: string) {
+    return function (fileContents: string, mimeType: string) {
+      const vscode = vscodeMessenger.getVsCodeAPI();
+      if (vscode) {
+        vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
+          fileContent: fileContents,
+          options: {
+            defaultFileName: defaultFileName,
+          },
+        });
+        return false;
+      }
+
+      return new Blob([fileContents], { type: mimeType });
+    };
+  }
 }
 
 type VSCodeSaveFile = {
@@ -445,3 +469,5 @@ interface DMLRow {
   isDetail?: boolean;
   _children?: DMLRow[];
 }
+
+type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;
