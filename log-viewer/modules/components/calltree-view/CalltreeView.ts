@@ -181,7 +181,7 @@ export class CalltreeView extends LitElement {
                   <vscode-dropdown @change="${this._handleTypeFilter}">
                     <vscode-option>None</vscode-option>
                     ${repeat(
-                      this._getAllTypes(this.timelineRoot?.children ?? []).sort(),
+                      this._getAllTypes(this.timelineRoot?.children ?? []),
                       (type, _index) => html`<vscode-option>${type}</vscode-option>`,
                     )}
                   </vscode-dropdown>
@@ -200,32 +200,27 @@ export class CalltreeView extends LitElement {
   }
 
   _getAllTypes(data: LogLine[]): string[] {
-    let len = data.length;
-    if (len === 0) {
-      return [];
-    }
-
+    const flattened = this._flatten(data);
     const types = new Set<string>();
-    const children: LogLine[] = [];
-
-    while (len--) {
-      const line = data[len];
-      if (!line) {
-        continue;
-      }
+    for (const line of flattened) {
       types.add(line.type?.toString() ?? '');
-      for (const c of line?.children ?? []) {
-        children.push(c);
-      }
     }
+    return Array.from(types).sort();
+  }
 
-    if (children.length > 0) {
-      for (const c of this._getAllTypes(children)) {
-        types.add(c);
+  _flat(arr: LogLine[], target: LogLine[]) {
+    arr.forEach((el) => {
+      target.push(el);
+      if (el.children.length > 0) {
+        this._flat(el.children, target);
       }
-    }
+    });
+  }
 
-    return Array.from(types);
+  _flatten(arr: LogLine[]) {
+    const flattened: LogLine[] = [];
+    this._flat(arr, flattened);
+    return flattened;
   }
 
   _handleShowDetailsChange(event: Event) {
