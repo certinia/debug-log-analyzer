@@ -21,6 +21,7 @@ import { vscodeMessenger } from '../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './skeleton/GridSkeleton.js';
 
+import { callStackSum } from '../components/analysis-view/column-calcs/CallStackSum.js';
 import { Find, formatter } from '../components/calltree-view/module/Find.js';
 import { RowNavigation } from '../datagrid/module/RowNavigation.js';
 
@@ -191,7 +192,7 @@ export class AnalysisView extends LitElement {
     const methodMap: Map<string, Metric> = new Map();
 
     addNodeToMap(methodMap, rootMethod);
-    const metricList = [...methodMap.values()];
+    const metricList = Array.from(methodMap.values());
 
     const headerMenu = [
       {
@@ -328,7 +329,7 @@ export class AnalysisView extends LitElement {
           },
           accessorDownload: NumberAccessor,
           bottomCalcFormatter: progressFormatter,
-          bottomCalc: 'max',
+          bottomCalc: callStackSum,
           bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
         },
         {
@@ -377,11 +378,13 @@ export class Metric {
   totalTime = 0;
   selfTime = 0;
   namespace;
+  nodes: TimedNode[] = [];
 
   constructor(node: TimedNode) {
     this.name = node.text;
     this.type = node.type;
     this.namespace = node.namespace;
+    this.nodes.push(node);
   }
 }
 
@@ -398,6 +401,7 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
     ++metric.count;
     metric.totalTime += node.duration.total;
     metric.selfTime += node.duration.self;
+    metric.nodes.push(node);
   }
 
   children.forEach(function (child) {
