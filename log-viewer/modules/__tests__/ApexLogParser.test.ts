@@ -88,6 +88,7 @@ describe('Pseudo EXIT events', () => {
 
     const processFound1 = log1.children[1] as Method;
     expect(processFound1).toMatchObject({
+      parent: log1,
       type: 'WF_PROCESS_FOUND',
       timestamp: 2,
       duration: { self: 1, total: 1 },
@@ -95,6 +96,7 @@ describe('Pseudo EXIT events', () => {
 
     const approval2 = log1.children[2] as Method;
     expect(approval2).toMatchObject({
+      parent: log1,
       type: 'WF_APPROVAL_SUBMIT',
       timestamp: 3,
       duration: { self: 1, total: 1 },
@@ -102,6 +104,7 @@ describe('Pseudo EXIT events', () => {
 
     const processFound2 = log1.children[3] as Method;
     expect(processFound2).toMatchObject({
+      parent: log1,
       type: 'WF_PROCESS_FOUND',
       timestamp: 4,
       duration: { self: 0, total: 0 }, // no lines after the last WF_PROCESS_FOUND to use as an exit
@@ -425,20 +428,24 @@ describe('parseLog tests', () => {
 
     expect(execEvent.children.length).toEqual(1);
     const soqlLine = execEvent.children[0] as SOQLExecuteBeginLine;
-    expect(soqlLine.type).toEqual('SOQL_EXECUTE_BEGIN');
-    expect(soqlLine.aggregations).toEqual(2);
-    expect(soqlLine.rowCount.self).toEqual(50);
-    expect(soqlLine.rowCount.total).toEqual(50);
+    expect(soqlLine).toMatchObject({
+      parent: execEvent,
+      type: 'SOQL_EXECUTE_BEGIN',
+      aggregations: 2,
+      rowCount: { self: 50, total: 50 },
+    });
 
     const soqlExplain = soqlLine.children[0] as SOQLExecuteExplainLine;
-    expect(soqlExplain.type).toEqual('SOQL_EXECUTE_EXPLAIN');
-    expect(soqlExplain.type).toEqual('SOQL_EXECUTE_EXPLAIN');
-    expect(soqlExplain.cardinality).toEqual(2);
-    expect(soqlExplain.fields).toEqual(['MyField__c', 'AnotherField__c']);
-    expect(soqlExplain.leadingOperationType).toEqual('TableScan');
-    expect(soqlExplain.relativeCost).toEqual(1.3);
-    expect(soqlExplain.sObjectCardinality).toEqual(2);
-    expect(soqlExplain.sObjectType).toEqual('MySObject__c');
+    expect(soqlExplain).toMatchObject({
+      parent: soqlLine,
+      type: 'SOQL_EXECUTE_EXPLAIN',
+      cardinality: 2,
+      fields: ['MyField__c', 'AnotherField__c'],
+      leadingOperationType: 'TableScan',
+      relativeCost: 1.3,
+      sObjectCardinality: 2,
+      sObjectType: 'MySObject__c',
+    });
   });
 });
 
@@ -463,19 +470,28 @@ describe('getRootMethod tests', () => {
 
     expect(startLine?.children.length).toBe(1);
     const unitStart = startLine?.children[0] as CodeUnitStartedLine;
-    expect(unitStart.type).toBe('CODE_UNIT_STARTED');
-    expect(unitStart.codeUnitType).toBe('Workflow');
+    expect(unitStart).toMatchObject({
+      parent: startLine,
+      type: 'CODE_UNIT_STARTED',
+      codeUnitType: 'Workflow',
+    });
 
     expect(unitStart.children.length).toBe(1);
     const interViewsBegin = unitStart.children[0] as TimedNode;
-    expect(interViewsBegin.type).toBe('FLOW_START_INTERVIEWS_BEGIN');
-    expect(interViewsBegin.text).toBe('FLOW_START_INTERVIEWS : Example Process Builder');
-    expect(interViewsBegin.suffix).toBe(' (Process Builder)');
+    expect(interViewsBegin).toMatchObject({
+      parent: unitStart,
+      type: 'FLOW_START_INTERVIEWS_BEGIN',
+      text: 'FLOW_START_INTERVIEWS : Example Process Builder',
+      suffix: ' (Process Builder)',
+    });
 
     expect(interViewsBegin.children.length).toBe(1);
     const interViewBegin = interViewsBegin.children[0];
-    expect(interViewBegin?.type).toBe('FLOW_START_INTERVIEW_BEGIN');
-    expect(interViewBegin?.duration).toEqual({ self: 6332706, total: 6332706 });
+    expect(interViewBegin).toMatchObject({
+      parent: interViewsBegin,
+      type: 'FLOW_START_INTERVIEW_BEGIN',
+      duration: { self: 6332706, total: 6332706 },
+    });
   });
 
   it('FlowStartInterviewsBeginLine should be a flow ', async () => {
@@ -627,35 +643,53 @@ describe('getRootMethod tests', () => {
     expect(apexLog.executionEndTime).toBe(1100);
 
     const rootChildren = apexLog.children as Method[];
-
-    const executionChildren = rootChildren[0]?.children as Method[];
+    const executionStarted = rootChildren[0];
+    const executionChildren = executionStarted?.children as Method[];
     expect(executionChildren.length).toBe(5);
-    expect(executionChildren[0]?.type).toBe('METHOD_ENTRY');
-    expect(executionChildren[0]?.timestamp).toBe(200);
-    expect(executionChildren[0]?.exitStamp).toBe(300);
-    expect(executionChildren[0]?.children.length).toBe(1);
-    expect(executionChildren[0]?.children[0]?.type).toBe('ENTERING_MANAGED_PKG');
-    expect(executionChildren[0]?.children[0]?.namespace).toBe('ns');
 
-    expect(executionChildren[1]?.type).toBe('ENTERING_MANAGED_PKG');
-    expect(executionChildren[1]?.namespace).toBe('ns');
-    expect(executionChildren[1]?.timestamp).toBe(400);
-    expect(executionChildren[1]?.exitStamp).toBe(700);
+    expect(executionChildren[0]).toMatchObject({
+      parent: executionStarted,
+      type: 'METHOD_ENTRY',
+      timestamp: 200,
+      exitStamp: 300,
+      children: [{ type: 'ENTERING_MANAGED_PKG', namespace: 'ns' }],
+    });
 
-    expect(executionChildren[2]?.type).toBe('ENTERING_MANAGED_PKG');
-    expect(executionChildren[2]?.namespace).toBe('ns2');
-    expect(executionChildren[2]?.timestamp).toBe(700);
-    expect(executionChildren[2]?.exitStamp).toBe(725);
+    expect(executionChildren[1]).toMatchObject({
+      parent: executionStarted,
+      type: 'ENTERING_MANAGED_PKG',
+      timestamp: 400,
+      exitStamp: 700,
+      children: [],
+      namespace: 'ns',
+    });
 
-    expect(executionChildren[3]?.type).toBe('DML_BEGIN');
-    expect(executionChildren[3]?.timestamp).toBe(725);
-    expect(executionChildren[3]?.exitStamp).toBe(750);
+    expect(executionChildren[2]).toMatchObject({
+      parent: executionStarted,
+      type: 'ENTERING_MANAGED_PKG',
+      timestamp: 700,
+      exitStamp: 725,
+      children: [],
+      namespace: 'ns2',
+    });
 
-    expect(executionChildren[4]?.type).toBe('ENTERING_MANAGED_PKG');
-    expect(executionChildren[4]?.namespace).toBe('ns2');
-    expect(executionChildren[4]?.timestamp).toBe(800);
-    expect(executionChildren[4]?.exitStamp).toBe(1100);
-    expect(executionChildren[4]?.children.length).toBe(0);
+    expect(executionChildren[3]).toMatchObject({
+      parent: executionStarted,
+      type: 'DML_BEGIN',
+      timestamp: 725,
+      exitStamp: 750,
+      children: [],
+      namespace: 'default',
+    });
+
+    expect(executionChildren[4]).toMatchObject({
+      parent: executionStarted,
+      type: 'ENTERING_MANAGED_PKG',
+      timestamp: 800,
+      exitStamp: 1100,
+      children: [],
+      namespace: 'ns2',
+    });
   });
 });
 

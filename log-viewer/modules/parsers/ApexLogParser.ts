@@ -164,6 +164,7 @@ export class ApexLogParser {
       if (line instanceof Method) {
         this.parseTree(line, lineIter, stack);
       }
+      line.parent = rootMethod;
       rootMethod.addChild(line);
     }
     rootMethod.setTimes();
@@ -225,6 +226,7 @@ export class ApexLogParser {
           this.parseTree(nextLine, lineIter, stack);
         }
 
+        nextLine.parent = currentLine;
         currentLine.children.push(nextLine);
       }
 
@@ -486,6 +488,8 @@ export abstract class LogLine {
   logParser: ApexLogParser;
 
   // common metadata (available for all lines)
+
+  parent: LogLine | null = null;
 
   /**
    * All child nodes of the current node
