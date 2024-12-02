@@ -16,7 +16,7 @@ import NumberAccessor from '../datagrid/dataaccessor/Number.js';
 import { progressFormatter } from '../datagrid/format/Progress.js';
 import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation.js';
 import dataGridStyles from '../datagrid/style/DataGrid.scss';
-import { ApexLog, TimedNode } from '../parsers/ApexLogParser.js';
+import { ApexLog, LogLine } from '../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../styles/global.styles.js';
 import './skeleton/GridSkeleton.js';
@@ -189,10 +189,7 @@ export class AnalysisView extends LitElement {
     if (!this.tableContainer) {
       return;
     }
-    const methodMap: Map<string, Metric> = new Map();
-
-    addNodeToMap(methodMap, rootMethod);
-    const metricList = Array.from(methodMap.values());
+    const metricList = groupMetrics(rootMethod);
 
     const headerMenu = [
       {
@@ -378,20 +375,29 @@ export class Metric {
   totalTime = 0;
   selfTime = 0;
   namespace;
-  nodes: TimedNode[] = [];
+  nodes: LogLine[] = [];
 
-  constructor(node: TimedNode) {
+  constructor(node: LogLine) {
     this.name = node.text;
     this.type = node.type;
     this.namespace = node.namespace;
-    this.nodes.push(node);
   }
 }
 
-function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
-  const children = node.children;
+function groupMetrics(root: LogLine) {
+  const methodMap: Map<string, Metric> = new Map();
 
-  if (key) {
+  for (const child of root.children) {
+    if (child.duration.total) {
+      addNodeToMap(methodMap, child);
+    }
+  }
+  return Array.from(methodMap.values());
+}
+
+function addNodeToMap(map: Map<string, Metric>, node: LogLine) {
+  if (node.duration.total) {
+    const key = node.namespace + node.text;
     let metric = map.get(key);
     if (!metric) {
       metric = new Metric(node);
@@ -404,11 +410,11 @@ function addNodeToMap(map: Map<string, Metric>, node: TimedNode, key?: string) {
     metric.nodes.push(node);
   }
 
-  children.forEach(function (child) {
-    if (child instanceof TimedNode) {
-      addNodeToMap(map, child, child.namespace + child.text);
+  for (const child of node.children) {
+    if (child.duration.total) {
+      addNodeToMap(map, child);
     }
-  });
+  }
 }
 
 type VSCodeSaveFile = {
