@@ -36,10 +36,6 @@ import { MiddleRowFocus } from './module/MiddleRowFocus.js';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
 
-let calltreeTable: Tabulator;
-let tableContainer: HTMLDivElement | null;
-let rootMethod: ApexLog | null;
-
 @customElement('call-tree-view')
 export class CalltreeView extends LitElement {
   @property()
@@ -50,15 +46,27 @@ export class CalltreeView extends LitElement {
     debugOnly: false,
     selectedTypes: [],
   };
-  debugOnlyFilterCache = new Map<number, boolean>();
-  showDetailsFilterCache = new Map<number, boolean>();
-  typeFilterCache = new Map<number, boolean>();
+  debugOnlyFilterCache = new Map<string, boolean>();
+  showDetailsFilterCache = new Map<string, boolean>();
+  typeFilterCache = new Map<string, boolean>();
 
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
 
+  canClearSearchHighlights = false;
+  searchString = '';
+  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
+    text: '',
+    count: 0,
+    options: { matchCase: false },
+  };
+
+  calltreeTable: Tabulator | null = null;
+  tableContainer: HTMLDivElement | null = null;
+  rootMethod: ApexLog | null = null;
+
   get _callTreeTableWrapper(): HTMLDivElement | null {
-    return (tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
+    return (this.tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
   }
 
   constructor() {
@@ -68,9 +76,9 @@ export class CalltreeView extends LitElement {
       this._goToRow(e.detail.timestamp);
     }) as EventListener);
 
-    document.addEventListener('lv-find', this._find as EventListener);
-    document.addEventListener('lv-find-match', this._find as EventListener);
-    document.addEventListener('lv-find-close', this._find as EventListener);
+    document.addEventListener('lv-find', this._findEvt);
+    document.addEventListener('lv-find-match', this._findEvt);
+    document.addEventListener('lv-find-close', this._findEvt);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -199,6 +207,8 @@ export class CalltreeView extends LitElement {
     `;
   }
 
+  _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
+
   _getAllTypes(data: LogLine[]): string[] {
     const flattened = this._flatten(data);
     const types = new Set<string>();
@@ -244,6 +254,9 @@ export class CalltreeView extends LitElement {
   }
 
   _updateFiltering() {
+    if (!this.calltreeTable) {
+      return;
+    }
     const filtersToAdd = [];
 
     // if debug only we want to show everything and apply the debug only filter.
@@ -263,36 +276,42 @@ export class CalltreeView extends LitElement {
       }
     }
 
-    calltreeTable.blockRedraw();
-    calltreeTable.clearFilter(false);
+    this.calltreeTable.blockRedraw();
+    this.calltreeTable.clearFilter(false);
     filtersToAdd.forEach((filter) => {
       // @ts-expect-error valid
-      calltreeTable.addFilter(filter);
+      this.calltreeTable.addFilter(filter);
     });
-    calltreeTable.restoreRedraw();
+    this.calltreeTable.restoreRedraw();
   }
 
   _expandButtonClick() {
-    calltreeTable.blockRedraw();
-    this._expandCollapseAll(calltreeTable.getRows(), true);
-    calltreeTable.restoreRedraw();
+    if (!this.calltreeTable) {
+      return;
+    }
+    this.calltreeTable.blockRedraw();
+    this._expandCollapseAll(this.calltreeTable.getRows(), true);
+    this.calltreeTable.restoreRedraw();
   }
 
   _collapseButtonClick() {
-    calltreeTable.blockRedraw();
-    this._expandCollapseAll(calltreeTable.getRows(), false);
-    calltreeTable.restoreRedraw();
+    if (!this.calltreeTable) {
+      return;
+    }
+    this.calltreeTable.blockRedraw();
+    this._expandCollapseAll(this.calltreeTable.getRows(), false);
+    this.calltreeTable.restoreRedraw();
   }
 
   _appendTableWhenVisible() {
     const callTreeWrapper = this._callTreeTableWrapper;
-    rootMethod = this.timelineRoot;
-    if (callTreeWrapper && rootMethod) {
+    this.rootMethod = this.timelineRoot;
+    if (callTreeWrapper && this.rootMethod) {
       const analysisObserver = new IntersectionObserver(
         (entries, observer) => {
           const visible = entries[0]?.isIntersecting;
-          if (rootMethod && visible) {
-            this._renderCallTree(callTreeWrapper, rootMethod);
+          if (this.rootMethod && visible) {
+            this._renderCallTree(callTreeWrapper, this.rootMethod);
             observer.disconnect();
           }
         },
@@ -303,29 +322,29 @@ export class CalltreeView extends LitElement {
   }
 
   async _goToRow(timestamp: number) {
-    if (!tableContainer || !rootMethod) {
+    if (!this.tableContainer || !this.rootMethod) {
       return;
     }
     document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
-    await this._renderCallTree(tableContainer, rootMethod);
+    await this._renderCallTree(this.tableContainer, this.rootMethod);
+    if (!this.calltreeTable) {
+      return;
+    }
 
-    const treeRow = this._findByTime(calltreeTable.getRows(), timestamp);
+    const treeRow = this._findByTime(this.calltreeTable.getRows(), timestamp);
     //@ts-expect-error This is a custom function added in by RowNavigation custom module
-    calltreeTable.goToRow(treeRow, { scrollIfVisible: true, focusRow: true });
+    this.calltreeTable.goToRow(treeRow, { scrollIfVisible: true, focusRow: true });
   }
 
-  searchString = '';
-  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
-    text: '',
-    count: 0,
-    options: { matchCase: false },
-  };
-
-  _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
-    const isTableVisible = !!calltreeTable?.element?.clientHeight;
+  _find(
+    e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>,
+    canClearOverride = true,
+  ) {
+    const isTableVisible = !!this.calltreeTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
     }
+    this.canClearSearchHighlights = canClearOverride;
 
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
@@ -340,7 +359,7 @@ export class CalltreeView extends LitElement {
     }
     if (newSearch || clearHighlights) {
       //@ts-expect-error This is a custom function added in by Find custom module
-      const result = calltreeTable.find(this.findArgs);
+      const result = this.calltreeTable.find(this.findArgs);
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
@@ -363,9 +382,9 @@ export class CalltreeView extends LitElement {
 
     if (currentRow) {
       //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+      this.calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
     }
-  };
+  }
 
   _highlight(inputString: string, substring: string) {
     const regex = new RegExp(substring, 'gi');
@@ -432,7 +451,7 @@ export class CalltreeView extends LitElement {
     selectedNamespaces: string[],
     namespace: string,
     data: CalltreeRow,
-    filterParams: { columnName: string; filterCache: Map<number, boolean> },
+    filterParams: { columnName: string; filterCache: Map<string, boolean> },
   ) => {
     if (selectedNamespaces.length === 0) {
       return true;
@@ -452,7 +471,7 @@ export class CalltreeView extends LitElement {
   private _deepFilter(
     rowData: CalltreeRow,
     filterFunction: (rowData: CalltreeRow) => boolean,
-    filterParams: { filterCache: Map<number, boolean> },
+    filterParams: { filterCache: Map<string, boolean> },
   ): boolean {
     const cachedMatch = filterParams.filterCache.get(rowData.id);
     if (cachedMatch !== null && cachedMatch !== undefined) {
@@ -462,7 +481,7 @@ export class CalltreeView extends LitElement {
     let childMatch = false;
     const children = rowData._children || [];
     let len = children.length;
-    while (len-- > 0) {
+    while (--len >= 0) {
       const childRow = children[len];
       if (childRow) {
         const match = this._deepFilter(childRow, filterFunction, filterParams);
@@ -486,7 +505,7 @@ export class CalltreeView extends LitElement {
     callTreeTableContainer: HTMLDivElement,
     rootMethod: ApexLog,
   ): Promise<void> {
-    if (calltreeTable) {
+    if (this.calltreeTable) {
       // Ensure the table is fully visible before attempting to do things e.g go to rows.
       // Otherwise there are visible rendering issues.
       await new Promise((resolve, reject) => {
@@ -517,7 +536,7 @@ export class CalltreeView extends LitElement {
       const namespaceFilterCache = new Map<string, boolean>();
 
       let childIndent;
-      calltreeTable = new Tabulator(callTreeTableContainer, {
+      this.calltreeTable = new Tabulator(callTreeTableContainer, {
         data: this._toCallTree(rootMethod.children),
         layout: 'fitColumns',
         placeholder: 'No Call Tree Available',
@@ -730,7 +749,17 @@ export class CalltreeView extends LitElement {
         ],
       });
 
-      calltreeTable.on('dataFiltered', () => {
+      this.calltreeTable.on('dataFiltering', () => {
+        // With a datatree the dataFiltering event occurs multi times and we only want to call this once.
+        // We will reset the flag when the user next searches.
+        if (this.canClearSearchHighlights) {
+          this.canClearSearchHighlights = false;
+          this._resetFindWidget();
+          this._clearSearchHighlights();
+        }
+      });
+
+      this.calltreeTable.on('dataFiltered', () => {
         totalTimeFilterCache.clear();
         selfTimeFilterCache.clear();
         namespaceFilterCache.clear();
@@ -739,10 +768,23 @@ export class CalltreeView extends LitElement {
         this.typeFilterCache.clear();
       });
 
-      calltreeTable.on('tableBuilt', () => {
+      this.calltreeTable.on('tableBuilt', () => {
         resolve();
       });
     });
+  }
+
+  private _resetFindWidget() {
+    document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
+  }
+
+  private _clearSearchHighlights() {
+    this._find(
+      new CustomEvent('lv-find', {
+        detail: { text: '', count: 0, options: { matchCase: false } },
+      }),
+      false,
+    );
   }
 
   private _expandCollapseAll(rows: RowComponent[], expand: boolean = true) {
@@ -776,7 +818,7 @@ export class CalltreeView extends LitElement {
         const isTimedNode = node instanceof TimedNode;
         const children = isTimedNode ? this._toCallTree(node.children) : null;
         const data: CalltreeRow = {
-          id: node.timestamp,
+          id: node.timestamp + '-' + i,
           text: node.text,
           namespace: node.namespace,
           duration: node.duration.total,
@@ -836,7 +878,7 @@ export class CalltreeView extends LitElement {
 }
 
 interface CalltreeRow {
-  id: number;
+  id: string;
   originalData: LogLine;
   text: string;
   duration: number;
@@ -850,10 +892,6 @@ interface CalltreeRow {
 }
 
 export async function goToRow(timestamp: number) {
-  if (!tableContainer || !rootMethod) {
-    return;
-  }
-
   document.dispatchEvent(
     new CustomEvent('calltree-go-to-row', { detail: { timestamp: timestamp } }),
   );
@@ -863,3 +901,5 @@ type VSCodeApexSymbol = {
   typeName: string;
   text: string;
 };
+
+type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;
