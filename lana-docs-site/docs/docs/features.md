@@ -4,11 +4,11 @@ sidebar_position: 4
 
 # ✨ Features
 
-- 🔥 [**Timeline / Flame chart**](#timeline--flame-chart) - Gain a deep understanding of code execution over time via a timeline flame chart and tooltips to show additional information about events.
-- 🌳 [**Call Tree**](#call-tree) - View the execution path in a tree view with aggregated DML Count, SOQL Count, Throws Count, Row Count, Self Time and Total Time. Apply filters to filter the events.
-- 🧠 [**Analysis**](#analysis) - Quickly identify which methods took the most time in aggregate.
-- 💾 [**Database**](#database) - Identify which SOQL + DML executed the most, returned the most rows and took the most time.
-- 🔍 [**Find**](#find) - Find, highlight and step through matching text and log events on the Timeline, Call Tree, Analysis
+- 🔥 [**Timeline / Flame chart**](#-timeline--flame-chart) - Gain a deep understanding of code execution over time via a timeline flame chart and tooltips to show additional information about events.
+- 🌳 [**Call Tree**](#-call-tree) - View the execution path in a tree view with aggregated DML Count, SOQL Count, Throws Count, Row Count, Self Time and Total Time. Apply filters to filter the events.
+- 🧠 [**Analysis**](#-analysis) - Quickly identify which methods took the most time in aggregate.
+- 💾 [**Database**](#-database) - Identify which SOQL + DML executed the most, returned the most rows and took the most time.
+- 🔍 [**Find**](#-find) - Find, highlight and step through matching text and log events on the Timeline, Call Tree, Analysis
 
 ## 🔥 Timeline / Flame chart
 
