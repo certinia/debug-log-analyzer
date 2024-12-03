@@ -27,8 +27,9 @@ _Describe what should have happened_.
 
 _Describe what actually happened instead_.
 
-### Additional information
+### Additional information (example logs / images)
 
+_If possible provide an example log that shows the issue (remember to remove any private or sensitive info before sharing)_.
 _Feel free to attach a screenshot_.
 
 **VS Code Version**:

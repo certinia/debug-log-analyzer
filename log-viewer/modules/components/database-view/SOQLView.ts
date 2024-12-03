@@ -38,17 +38,6 @@ import databaseViewStyles from './DatabaseView.scss';
 
 provideVSCodeDesignSystem().register(vsCodeDropdown(), vsCodeOption());
 
-let soqlTable: Tabulator;
-let holder: HTMLElement | null = null;
-let table: HTMLElement | null = null;
-let findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
-  text: '',
-  count: 0,
-  options: { matchCase: false },
-};
-let findMap: { [key: number]: RowComponent } = {};
-let totalMatches = 0;
-
 @customElement('soql-view')
 export class SOQLView extends LitElement {
   @property()
@@ -63,6 +52,17 @@ export class SOQLView extends LitElement {
   @state()
   soqlLines: SOQLExecuteBeginLine[] = [];
 
+  soqlTable: Tabulator | null = null;
+  holder: HTMLElement | null = null;
+  table: HTMLElement | null = null;
+  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
+    text: '',
+    count: 0,
+    options: { matchCase: false },
+  };
+  findMap: { [key: number]: RowComponent } = {};
+  totalMatches = 0;
+
   get _soqlTableWrapper(): HTMLDivElement | null {
     return this.renderRoot?.querySelector('#db-soql-table') ?? null;
   }
@@ -70,8 +70,8 @@ export class SOQLView extends LitElement {
   constructor() {
     super();
 
-    document.addEventListener('lv-find', this._find as EventListener);
-    document.addEventListener('lv-find-close', this._find as EventListener);
+    document.addEventListener('lv-find', this._findEvt);
+    document.addEventListener('lv-find-close', this._findEvt);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -148,15 +148,22 @@ export class SOQLView extends LitElement {
     `;
   }
 
+  _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
+
   _soqlGroupBy(event: Event) {
     const target = event.target as HTMLInputElement;
     const fieldName = target.value.toLowerCase();
     const groupValue = fieldName !== 'none' ? fieldName : '';
+    if (!this.soqlTable) {
+      return;
+    }
 
-    soqlTable.setGroupValues([
-      groupValue ? sortByFrequency(soqlTable.getData(), groupValue as keyof GridSOQLData) : [''],
+    this.soqlTable.setGroupValues([
+      groupValue
+        ? this.sortByFrequency(this.soqlTable.getData(), groupValue as keyof GridSOQLData)
+        : [''],
     ]);
-    soqlTable.setGroupBy(groupValue);
+    this.soqlTable.setGroupBy(groupValue);
   }
 
   _appendTableWhenVisible() {
@@ -171,7 +178,7 @@ export class SOQLView extends LitElement {
 
           Tabulator.registerModule(Object.values(CommonModules));
           Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
-          renderSOQLTable(soqlTableWrapper, this.soqlLines);
+          this._renderSOQLTable(soqlTableWrapper, this.soqlLines);
         }
       });
       dbObserver.observe(this);
@@ -179,36 +186,36 @@ export class SOQLView extends LitElement {
   }
 
   _highlightMatches(highlightIndex: number) {
-    if (!soqlTable?.element?.clientHeight) {
+    if (!this.soqlTable?.element?.clientHeight) {
       return;
     }
 
-    findArgs.count = highlightIndex;
-    const currentRow = findMap[highlightIndex];
-    const rows = [currentRow, findMap[this.oldIndex]];
+    this.findArgs.count = highlightIndex;
+    const currentRow = this.findMap[highlightIndex];
+    const rows = [currentRow, this.findMap[this.oldIndex]];
     rows.forEach((row) => {
       row?.reformat();
     });
 
     if (currentRow) {
       //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      soqlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+      this.soqlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
     }
 
     this.oldIndex = highlightIndex;
   }
 
-  _find = (e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) => {
-    const isTableVisible = !!soqlTable?.element?.clientHeight;
-    if (!isTableVisible && !totalMatches) {
+  _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+    const isTableVisible = !!this.soqlTable?.element?.clientHeight;
+    if (!isTableVisible && !this.totalMatches) {
       return;
     }
 
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
-      newFindArgs.text !== findArgs.text ||
-      newFindArgs.options.matchCase !== findArgs.options?.matchCase;
-    findArgs = newFindArgs;
+      newFindArgs.text !== this.findArgs.text ||
+      newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
+    this.findArgs = newFindArgs;
 
     const clearHighlights =
       e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
@@ -217,9 +224,9 @@ export class SOQLView extends LitElement {
     }
     if (newSearch || clearHighlights) {
       //@ts-expect-error This is a custom function added in by Find custom module
-      const result = soqlTable.find(findArgs);
-      totalMatches = 0;
-      findMap = result.matchIndexes;
+      const result = this.soqlTable.find(this.findArgs);
+      this.totalMatches = 0;
+      this.findMap = result.matchIndexes;
 
       if (!clearHighlights) {
         document.dispatchEvent(
@@ -229,350 +236,368 @@ export class SOQLView extends LitElement {
         );
       }
     }
-  };
-}
-
-function renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
-  const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
-
-  soqlLines?.forEach((line) => {
-    timestampToSOQl.set(line.timestamp, line);
-  });
-
-  const soqlData: GridSOQLData[] = [];
-  if (soqlLines) {
-    for (const soql of soqlLines) {
-      const explainLine = soql.children[0] as SOQLExecuteExplainLine;
-      soqlData.push({
-        isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
-        relativeCost: explainLine?.relativeCost,
-        soql: soql.text,
-        namespace: soql.namespace,
-        rowCount: soql.rowCount.self,
-        timeTaken: soql.duration.total,
-        aggregations: soql.aggregations,
-        timestamp: soql.timestamp,
-        _children: [{ timestamp: soql.timestamp, isDetail: true }],
-      });
-    }
   }
 
-  const soqlText = sortByFrequency(soqlData || [], 'soql');
+  _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
+    const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
 
-  soqlTable = new Tabulator(soqlTableContainer, {
-    height: '100%',
-    rowKeyboardNavigation: true,
-    data: soqlData,
-    layout: 'fitColumns',
-    placeholder: 'No SOQL queries found',
-    columnCalcs: 'both',
-    clipboard: true,
-    downloadEncoder: downlodEncoder('soql.csv'),
-    downloadRowRange: 'all',
-    downloadConfig: {
-      columnHeaders: true,
-      columnGroups: true,
-      rowGroups: true,
-      columnCalcs: false,
-      dataTree: true,
-    },
-    //@ts-expect-error types need update array is valid
-    keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
-    clipboardCopyRowRange: 'all',
-    groupClosedShowCalcs: true,
-    groupStartOpen: false,
-    groupValues: [soqlText],
-    groupHeader(value, count, data: GridSOQLData[], _group) {
-      const hasDetail = data.some((d) => {
-        return d.isDetail;
-      });
+    soqlLines?.forEach((line) => {
+      timestampToSOQl.set(line.timestamp, line);
+    });
 
-      const newCount = hasDetail ? count - 1 : count;
-      return `
+    const soqlData: GridSOQLData[] = [];
+    if (soqlLines) {
+      for (const soql of soqlLines) {
+        const explainLine = soql.children[0] as SOQLExecuteExplainLine;
+        soqlData.push({
+          isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
+          relativeCost: explainLine?.relativeCost,
+          soql: soql.text,
+          namespace: soql.namespace,
+          rowCount: soql.rowCount.self,
+          timeTaken: soql.duration.total,
+          aggregations: soql.aggregations,
+          timestamp: soql.timestamp,
+          _children: [{ timestamp: soql.timestamp, isDetail: true }],
+        });
+      }
+    }
+
+    const soqlText = this.sortByFrequency(soqlData || [], 'soql');
+
+    this.soqlTable = new Tabulator(soqlTableContainer, {
+      height: '100%',
+      rowKeyboardNavigation: true,
+      data: soqlData,
+      layout: 'fitColumns',
+      placeholder: 'No SOQL queries found',
+      columnCalcs: 'both',
+      clipboard: true,
+      downloadEncoder: this.downlodEncoder('soql.csv'),
+      downloadRowRange: 'all',
+      downloadConfig: {
+        columnHeaders: true,
+        columnGroups: true,
+        rowGroups: true,
+        columnCalcs: false,
+        dataTree: true,
+      },
+      //@ts-expect-error types need update array is valid
+      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
+      clipboardCopyRowRange: 'all',
+      groupClosedShowCalcs: true,
+      groupStartOpen: false,
+      groupValues: [soqlText],
+      groupHeader(value, count, data: GridSOQLData[], _group) {
+        const hasDetail = data.some((d) => {
+          return d.isDetail;
+        });
+
+        const newCount = hasDetail ? count - 1 : count;
+        return `
       <div class="db-group-row">
         <div class="db-group-row__title" title="${value}">${value}</div><span>(${newCount} ${
           newCount > 1 ? 'Queries' : 'Query'
         })</span>
       </div>`;
-    },
-    groupToggleElement: 'header',
-    selectableRowsCheck: function (row: RowComponent) {
-      return !row.getData().isDetail;
-    },
-    dataTree: true,
-    dataTreeBranchElement: false,
-    columnDefaults: {
-      title: 'default',
-      resizable: true,
-      headerSortStartingDir: 'desc',
-      headerTooltip: true,
-      headerMenu: csvheaderMenu('soql.csv'),
-      headerWordWrap: true,
-    },
-    initialSort: [{ column: 'rowCount', dir: 'desc' }],
-    headerSortElement: function (column, dir) {
-      switch (dir) {
-        case 'asc':
-          return "<div class='sort-by--top'></div>";
-          break;
-        case 'desc':
-          return "<div class='sort-by--bottom'></div>";
-          break;
-        default:
-          return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
-      }
-    },
-    columns: [
-      {
-        title: 'SOQL',
-        field: 'soql',
-        headerSortStartingDir: 'asc',
-        sorter: 'string',
-        tooltip: true,
-        bottomCalc: () => {
-          return 'Total';
-        },
-        cssClass: 'datagrid-textarea datagrid-code-text',
-        variableHeight: true,
-        formatter: (cell, _formatterParams, _onRendered) => {
-          const data = cell.getData() as GridSOQLData;
-          return `<call-stack
+      },
+      groupToggleElement: 'header',
+      selectableRowsCheck: function (row: RowComponent) {
+        return !row.getData().isDetail;
+      },
+      dataTree: true,
+      dataTreeBranchElement: false,
+      columnDefaults: {
+        title: 'default',
+        resizable: true,
+        headerSortStartingDir: 'desc',
+        headerTooltip: true,
+        headerMenu: this.csvheaderMenu('soql.csv'),
+        headerWordWrap: true,
+      },
+      initialSort: [{ column: 'rowCount', dir: 'desc' }],
+      headerSortElement: function (column, dir) {
+        switch (dir) {
+          case 'asc':
+            return "<div class='sort-by--top'></div>";
+            break;
+          case 'desc':
+            return "<div class='sort-by--bottom'></div>";
+            break;
+          default:
+            return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
+        }
+      },
+      columns: [
+        {
+          title: 'SOQL',
+          field: 'soql',
+          headerSortStartingDir: 'asc',
+          sorter: 'string',
+          tooltip: true,
+          bottomCalc: () => {
+            return 'Total';
+          },
+          cssClass: 'datagrid-textarea datagrid-code-text',
+          variableHeight: true,
+          formatter: (cell, _formatterParams, _onRendered) => {
+            const data = cell.getData() as GridSOQLData;
+            return `<call-stack
             timestamp=${data.timestamp}
             startDepth="0"
             endDepth="1"
           ></call-stack>`;
+          },
         },
-      },
-      {
-        title: 'Selective',
-        field: 'isSelective',
-        formatter: 'tickCross',
-        formatterParams: {
-          allowEmpty: true,
-        },
-        width: 40,
-        hozAlign: 'center',
-        vertAlign: 'middle',
-        sorter: function (a, b, aRow, bRow, _column, dir, _sorterParams) {
-          // Always Sort null values to the bottom (when we do not have selectivity)
-          if (a === null) {
-            return dir === 'asc' ? 1 : -1;
-          } else if (b === null) {
-            return dir === 'asc' ? -1 : 1;
-          }
+        {
+          title: 'Selective',
+          field: 'isSelective',
+          formatter: 'tickCross',
+          formatterParams: {
+            allowEmpty: true,
+          },
+          width: 40,
+          hozAlign: 'center',
+          vertAlign: 'middle',
+          sorter: function (a, b, aRow, bRow, _column, dir, _sorterParams) {
+            // Always Sort null values to the bottom (when we do not have selectivity)
+            if (a === null) {
+              return dir === 'asc' ? 1 : -1;
+            } else if (b === null) {
+              return dir === 'asc' ? -1 : 1;
+            }
 
-          const aRowData = aRow.getData();
-          const bRowData = bRow.getData();
+            const aRowData = aRow.getData();
+            const bRowData = bRow.getData();
 
-          return (aRowData.relativeCost || 0) - (bRowData.relativeCost || 0);
-        },
-        tooltip: function (e, cell, _onRendered) {
-          const { isSelective, relativeCost } = cell.getData() as GridSOQLData;
-          let title;
-          if (isSelective === null) {
-            title = 'Selectivity could not be determined.';
-          } else if (isSelective) {
-            title = 'Query is selective.';
-          } else {
-            title = 'Query is not selective.';
-          }
+            return (aRowData.relativeCost || 0) - (bRowData.relativeCost || 0);
+          },
+          tooltip: function (e, cell, _onRendered) {
+            const { isSelective, relativeCost } = cell.getData() as GridSOQLData;
+            let title;
+            if (isSelective === null) {
+              title = 'Selectivity could not be determined.';
+            } else if (isSelective) {
+              title = 'Query is selective.';
+            } else {
+              title = 'Query is not selective.';
+            }
 
-          if (relativeCost) {
-            title += `<br>Relative cost: ${relativeCost}`;
-          }
-          return title;
+            if (relativeCost) {
+              title += `<br>Relative cost: ${relativeCost}`;
+            }
+            return title;
+          },
+          accessorDownload: function (
+            _value: unknown,
+            data: GridSOQLData,
+            _type: 'data' | 'download' | 'clipboard',
+            _accessorParams: unknown,
+            _column?: ColumnComponent,
+            _row?: RowComponent,
+          ): number | null | undefined {
+            return data.relativeCost;
+          },
+          accessorClipboard: function (
+            _value: unknown,
+            data: GridSOQLData,
+            _type: 'data' | 'download' | 'clipboard',
+            _accessorParams: unknown,
+            _column?: ColumnComponent,
+            _row?: RowComponent,
+          ): number | null | undefined {
+            return data.relativeCost;
+          },
         },
-        accessorDownload: function (
-          _value: unknown,
-          data: GridSOQLData,
-          _type: 'data' | 'download' | 'clipboard',
-          _accessorParams: unknown,
-          _column?: ColumnComponent,
-          _row?: RowComponent,
-        ): number | null | undefined {
-          return data.relativeCost;
+        {
+          title: 'Namespace',
+          field: 'namespace',
+          sorter: 'string',
+          cssClass: 'datagrid-code-text',
+          width: 120,
+          headerFilter: 'list',
+          headerFilterFunc: 'in',
+          headerFilterParams: {
+            valuesLookup: 'all',
+            clearable: true,
+            multiselect: true,
+          },
+          headerFilterLiveFilter: false,
         },
-        accessorClipboard: function (
-          _value: unknown,
-          data: GridSOQLData,
-          _type: 'data' | 'download' | 'clipboard',
-          _accessorParams: unknown,
-          _column?: ColumnComponent,
-          _row?: RowComponent,
-        ): number | null | undefined {
-          return data.relativeCost;
+        {
+          title: 'Row Count',
+          field: 'rowCount',
+          sorter: 'number',
+          width: 100,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          bottomCalc: 'sum',
         },
-      },
-      {
-        title: 'Namespace',
-        field: 'namespace',
-        sorter: 'string',
-        cssClass: 'datagrid-code-text',
-        width: 120,
-        headerFilter: 'list',
-        headerFilterFunc: 'in',
-        headerFilterParams: {
-          valuesLookup: 'all',
-          clearable: true,
-          multiselect: true,
+        {
+          title: 'Time Taken (ms)',
+          field: 'timeTaken',
+          sorter: 'number',
+          width: 120,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          formatter: Number,
+          formatterParams: {
+            thousand: false,
+            precision: 3,
+          },
+          accessorDownload: NumberAccessor,
+          bottomCalcFormatter: Number,
+          bottomCalc: 'sum',
+          bottomCalcFormatterParams: { precision: 3 },
         },
-        headerFilterLiveFilter: false,
-      },
-      {
-        title: 'Row Count',
-        field: 'rowCount',
-        sorter: 'number',
-        width: 100,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
-      {
-        title: 'Time Taken (ms)',
-        field: 'timeTaken',
-        sorter: 'number',
-        width: 120,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        formatter: Number,
-        formatterParams: {
-          thousand: false,
-          precision: 3,
+        {
+          title: 'Aggregations',
+          field: 'aggregations',
+          sorter: 'number',
+          width: 100,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          bottomCalc: 'sum',
         },
-        accessorDownload: NumberAccessor,
-        bottomCalcFormatter: Number,
-        bottomCalc: 'sum',
-        bottomCalcFormatterParams: { precision: 3 },
+      ],
+      rowFormatter: (row) => {
+        const data = row.getData();
+        if (data.isDetail && data.timestamp) {
+          const detailContainer = this.createSOQLDetailPanel(data.timestamp, timestampToSOQl);
+
+          row.getElement().replaceChildren(detailContainer);
+          row.normalizeHeight();
+        }
+
+        requestAnimationFrame(() => {
+          formatter(row, this.findArgs);
+        });
       },
-      {
-        title: 'Aggregations',
-        field: 'aggregations',
-        sorter: 'number',
-        width: 100,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
-    ],
-    rowFormatter: function (row) {
+    });
+
+    this.soqlTable.on('tableBuilt', () => {
+      this.soqlTable?.setGroupBy('soql');
+    });
+
+    this.soqlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
+      if (!group.isVisible()) {
+        this.soqlTable?.blockRedraw();
+        this.soqlTable?.getRows().forEach((row) => {
+          !row.isTreeExpanded() && row.treeExpand();
+        });
+        this.soqlTable?.restoreRedraw();
+      }
+    });
+
+    this.soqlTable.on('rowClick', function (e, row) {
       const data = row.getData();
-      if (data.isDetail && data.timestamp) {
-        const detailContainer = createSOQLDetailPanel(data.timestamp, timestampToSOQl);
-
-        row.getElement().replaceChildren(detailContainer);
-        row.normalizeHeight();
+      if (!(data.timestamp && data.soql)) {
+        return;
       }
 
-      requestAnimationFrame(() => {
-        formatter(row, findArgs);
-      });
-    },
-  });
+      const origRowHeight = row.getElement().offsetHeight;
+      row.treeToggle();
+      row.getCell('soql').getElement().style.height = origRowHeight + 'px';
+    });
 
-  soqlTable.on('tableBuilt', () => {
-    soqlTable.setGroupBy('soql');
-  });
+    this.soqlTable.on('dataFiltering', () => {
+      this._resetFindWidget();
+      this._clearSearchHighlights();
+    });
 
-  soqlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
-    if (!group.isVisible()) {
-      soqlTable.blockRedraw();
-      soqlTable.getRows().forEach((row) => {
-        !row.isTreeExpanded() && row.treeExpand();
-      });
-      soqlTable.restoreRedraw();
-    }
-  });
+    this.soqlTable.on('renderStarted', () => {
+      const holder = this._getTableHolder();
+      holder.style.minHeight = holder.clientHeight + 'px';
+      holder.style.overflowAnchor = 'none';
+    });
 
-  soqlTable.on('rowClick', function (e, row) {
-    const data = row.getData();
-    if (!(data.timestamp && data.soql)) {
-      return;
-    }
+    this.soqlTable.on('renderComplete', () => {
+      const holder = this._getTableHolder();
+      const table = this._getTable();
+      holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
+    });
+  }
 
-    const origRowHeight = row.getElement().offsetHeight;
-    row.treeToggle();
-    row.getCell('soql').getElement().style.height = origRowHeight + 'px';
-  });
+  _resetFindWidget() {
+    document.dispatchEvent(
+      new CustomEvent('db-find-results', {
+        detail: { totalMatches: 0, type: 'soql' },
+      }),
+    );
+  }
 
-  soqlTable.on('renderStarted', () => {
-    const holder = _getTableHolder();
-    holder.style.minHeight = holder.clientHeight + 'px';
-    holder.style.overflowAnchor = 'none';
-  });
+  _clearSearchHighlights() {
+    this._find(
+      new CustomEvent('lv-find', {
+        detail: { text: '', count: 0, options: { matchCase: false } },
+      }),
+    );
+  }
 
-  soqlTable.on('renderComplete', () => {
-    const holder = _getTableHolder();
-    const table = _getTable();
-    holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
-  });
-}
+  _getTable() {
+    this.table ??= this.soqlTable?.element.querySelector('.tabulator-table') as HTMLElement;
+    return this.table;
+  }
 
-function _getTable() {
-  table ??= soqlTable.element.querySelector('.tabulator-table')! as HTMLElement;
-  return table;
-}
+  _getTableHolder() {
+    this.holder ??= this.soqlTable?.element.querySelector('.tabulator-tableholder') as HTMLElement;
+    return this.holder;
+  }
 
-function _getTableHolder() {
-  holder ??= soqlTable.element.querySelector('.tabulator-tableholder')! as HTMLElement;
-  return holder;
-}
+  createSOQLDetailPanel(timestamp: number, timestampToSOQl: Map<number, SOQLExecuteBeginLine>) {
+    const detailContainer = document.createElement('div');
+    detailContainer.className = 'row__details-container';
 
-function createSOQLDetailPanel(
-  timestamp: number,
-  timestampToSOQl: Map<number, SOQLExecuteBeginLine>,
-) {
-  const detailContainer = document.createElement('div');
-  detailContainer.className = 'row__details-container';
+    const soqlLine = timestampToSOQl.get(timestamp);
+    render(
+      html`<db-soql-detail-panel
+        timestamp=${timestamp}
+        soql=${soqlLine?.text}
+      ></db-soql-detail-panel>`,
+      detailContainer,
+    );
 
-  const soqlLine = timestampToSOQl.get(timestamp);
-  render(
-    html`<db-soql-detail-panel
-      timestamp=${timestamp}
-      soql=${soqlLine?.text}
-    ></db-soql-detail-panel>`,
-    detailContainer,
-  );
+    return detailContainer;
+  }
 
-  return detailContainer;
-}
+  sortByFrequency(dataArray: GridSOQLData[], field: keyof GridSOQLData) {
+    const map = new Map<unknown, number>();
+    dataArray.forEach((row) => {
+      const val = row[field];
+      map.set(val, (map.get(val) || 0) + 1);
+    });
+    const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
 
-function sortByFrequency(dataArray: GridSOQLData[], field: keyof GridSOQLData) {
-  const map = new Map<unknown, number>();
-  dataArray.forEach((row) => {
-    const val = row[field];
-    map.set(val, (map.get(val) || 0) + 1);
-  });
-  const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
+    return [...newMap.keys()];
+  }
 
-  return [...newMap.keys()];
-}
-
-function csvheaderMenu(csvFileName: string) {
-  return [
-    {
-      label: 'Export to CSV',
-      action: function (_e: PointerEvent, column: ColumnComponent) {
-        column.getTable().download('csv', csvFileName, { bom: true, delimiter: ',' });
-      },
-    },
-  ];
-}
-
-function downlodEncoder(defaultFileName: string) {
-  return function (fileContents: string, mimeType: string) {
-    const vscode = vscodeMessenger.getVsCodeAPI();
-    if (vscode) {
-      vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
-        fileContent: fileContents,
-        options: {
-          defaultFileName: defaultFileName,
+  csvheaderMenu(csvFileName: string) {
+    return [
+      {
+        label: 'Export to CSV',
+        action: function (_e: PointerEvent, column: ColumnComponent) {
+          column.getTable().download('csv', csvFileName, { bom: true, delimiter: ',' });
         },
-      });
-      return false;
-    }
+      },
+    ];
+  }
 
-    return new Blob([fileContents], { type: mimeType });
-  };
+  downlodEncoder(defaultFileName: string) {
+    return function (fileContents: string, mimeType: string) {
+      const vscode = vscodeMessenger.getVsCodeAPI();
+      if (vscode) {
+        vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
+          fileContent: fileContents,
+          options: {
+            defaultFileName: defaultFileName,
+          },
+        });
+        return false;
+      }
+
+      return new Blob([fileContents], { type: mimeType });
+    };
+  }
 }
 
 type VSCodeSaveFile = {
@@ -594,3 +619,5 @@ interface GridSOQLData {
   isDetail?: boolean;
   _children?: GridSOQLData[];
 }
+
+type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;
