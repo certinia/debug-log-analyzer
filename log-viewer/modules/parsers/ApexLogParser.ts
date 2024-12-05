@@ -111,8 +111,8 @@ export class ApexLogParser {
   }
 
   private *generateLogLines(log: string): Generator<LogLine> {
-    const start = log.match(/^.*EXECUTION_STARTED.*$/m)?.index ?? 0;
-    if (start > 0) {
+    const start = log.search(/^\d{2}:\d{2}:\d{2}.\d{1} \(\d+\)\|EXECUTION_STARTED$/m);
+    if (start > -1) {
       log = log.slice(start);
     }
 
