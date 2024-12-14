@@ -210,10 +210,27 @@ export class CalltreeView extends LitElement {
   _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
 
   _getAllTypes(data: LogLine[]): string[] {
-    const flatten = (line: LogLine): LogLine[] => [line, ...line.children.flatMap(flatten)];
-    const flattened = data.flatMap(flatten);
+    const flattened = this._flatten(data);
+    const types = new Set<string>();
+    for (const line of flattened) {
+      types.add(line.type?.toString() ?? '');
+    }
+    return Array.from(types).sort();
+  }
 
-    return [...new Set(flattened.map((item) => item.type?.toString() ?? ''))].sort();
+  _flat(arr: LogLine[], target: LogLine[]) {
+    arr.forEach((el) => {
+      target.push(el);
+      if (el.children.length > 0) {
+        this._flat(el.children, target);
+      }
+    });
+  }
+
+  _flatten(arr: LogLine[]) {
+    const flattened: LogLine[] = [];
+    this._flat(arr, flattened);
+    return flattened;
   }
 
   _handleShowDetailsChange(event: Event) {
