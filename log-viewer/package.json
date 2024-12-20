@@ -20,14 +20,14 @@
     "tabulator-tables": "^6.2.1"
   },
   "devDependencies": {
-    "@types/tabulator-tables": "^6.2.0",
-    "@typescript-eslint/eslint-plugin": "^7.11.0",
-    "@typescript-eslint/parser": "^7.11.0",
+    "@types/tabulator-tables": "^6.2.3",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
     "concurrently": "^8.2.2",
     "http-server": "^14.1.1",
     "node-sass": "^9.0.0",
-    "postcss": "^8.4.38",
-    "sass": "^1.77.4",
-    "typescript": "^5.4.5"
+    "postcss": "^8.4.49",
+    "sass": "^1.83.0",
+    "typescript": "^5.7.2"
   }
 }
