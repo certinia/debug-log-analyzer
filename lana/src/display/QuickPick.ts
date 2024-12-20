@@ -23,11 +23,27 @@ export class Options implements QuickPickOptions {
   canPickMany: boolean;
   ignoreFocusOut: boolean;
   placeHolder: string;
+  matchOnDescription: boolean;
+  matchOnDetail: boolean;
 
-  constructor(placeholder: string, ignoreDefocus = false, multiSelect = false) {
+  constructor({
+    placeholder,
+    ignoreDefocus = false,
+    multiSelect = false,
+    matchOnDescription = false,
+    matchOnDetail = false,
+  }: {
+    placeholder: string;
+    ignoreDefocus?: boolean;
+    multiSelect?: boolean;
+    matchOnDescription?: boolean;
+    matchOnDetail?: boolean;
+  }) {
     this.placeHolder = placeholder;
     this.ignoreFocusOut = ignoreDefocus;
     this.canPickMany = multiSelect;
+    this.matchOnDescription = matchOnDescription;
+    this.matchOnDetail = matchOnDetail;
   }
 }
 

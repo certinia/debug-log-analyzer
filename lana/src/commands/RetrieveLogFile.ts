@@ -23,7 +23,7 @@ class DebugLogItem extends Item {
     desc: string,
     details: string,
     logId: string,
-    sticky = true,
+    sticky = false,
     selected = false,
   ) {
     super(name, desc, details, sticky, selected);
@@ -87,7 +87,14 @@ export class RetrieveLogFile {
         return new DebugLogItem(name, description, detail, r.Id);
       });
 
-    const [selectedLog] = await QuickPick.pick(items, new Options('Select a logfile'));
+    const [selectedLog] = await QuickPick.pick(
+      items,
+      new Options({
+        placeholder: 'Select a workspace:',
+        matchOnDescription: true,
+        matchOnDetail: true,
+      }),
+    );
     return selectedLog?.logId || null;
   }
 

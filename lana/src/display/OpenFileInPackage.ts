@@ -35,7 +35,11 @@ export class OpenFileInPackage {
       matchingWs.length > 1
         ? await QuickPick.pick(
             matchingWs.map((p) => new Item(p.name(), p.path(), '')),
-            new Options('Select a workspace:'),
+            new Options({
+              placeholder: 'Select a workspace:',
+              matchOnDescription: true,
+              matchOnDetail: true,
+            }),
           )
         : [new Item(matchingWs[0]?.name() || '', matchingWs[0]?.path() || '', '')];
 
