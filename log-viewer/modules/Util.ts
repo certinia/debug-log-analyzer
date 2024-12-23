@@ -11,12 +11,14 @@ export default function formatDuration(duration: number) {
   return `${millis}.${micros}ms`;
 }
 
-export function debounce(callBack: void) {
+export function debounce<T extends unknown[]>(callBack: (...args: T) => unknown) {
   if (requestId) {
     window.cancelAnimationFrame(requestId);
   }
 
-  requestId = window.requestAnimationFrame(() => {
-    callBack;
-  });
+  return (...args: T) => {
+    requestId = window.requestAnimationFrame(() => {
+      callBack(...args);
+    });
+  };
 }

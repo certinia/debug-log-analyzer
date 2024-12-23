@@ -85,7 +85,9 @@ export class ApexLogParser {
       lastEntry.text += '\n' + line;
     } else if (hasType) {
       const message = `Unsupported log event name: ${type}`;
-      !this.parsingErrors.includes(message) && this.parsingErrors.push(message);
+      if (!this.parsingErrors.includes(message)) {
+        this.parsingErrors.push(message);
+      }
     } else if (lastEntry && line.startsWith('*** Skipped')) {
       this.addLogIssue(
         lastEntry.timestamp,
@@ -2782,7 +2784,7 @@ const basicExitLogEvents: LogEventType[] = [
   'SESSION_CACHE_REMOVE_END',
 ];
 
-const logEventNames = [
+const _logEventNames = [
   'BULK_DML_RETRY',
   'BULK_HEAP_ALLOCATE',
   'CALLOUT_REQUEST',
@@ -3036,6 +3038,6 @@ const logEventNames = [
   'SESSION_CACHE_REMOVE_END',
 ] as const;
 
-export type LogEventType = (typeof logEventNames)[number];
+export type LogEventType = (typeof _logEventNames)[number];
 
 export { DMLBeginLine, SOQLExecuteBeginLine, SOQLExecuteExplainLine };

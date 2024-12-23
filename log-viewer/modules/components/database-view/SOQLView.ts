@@ -483,7 +483,9 @@ export class SOQLView extends LitElement {
       if (!group.isVisible()) {
         this.soqlTable?.blockRedraw();
         this.soqlTable?.getRows().forEach((row) => {
-          !row.isTreeExpanded() && row.treeExpand();
+          if (!row.isTreeExpanded()) {
+            row.treeExpand();
+          }
         });
         this.soqlTable?.restoreRedraw();
       }

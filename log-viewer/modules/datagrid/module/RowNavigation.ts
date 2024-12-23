@@ -47,8 +47,12 @@ export class RowNavigation extends Module {
       row.select();
       table.restoreRedraw();
 
-      focusRow && this.tableHolder.focus();
-      row && setTimeout(() => this._scrollToRow(row, opts));
+      if (focusRow) {
+        this.tableHolder.focus();
+      }
+      if (row) {
+        setTimeout(() => this._scrollToRow(row, opts));
+      }
     }
   }
 
@@ -64,7 +68,9 @@ export class RowNavigation extends Module {
           elem.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
         }
 
-        focusRow && elem.focus();
+        if (focusRow) {
+          elem.focus();
+        }
       });
     });
   }
