@@ -15,7 +15,7 @@ const rowNavOptionName = 'rowKeyboardNavigation' as const;
  * in keybings e.g  keybindings: { previousRow: false },
  */
 export class RowKeyboardNavigation extends Module {
-  static moduleName = 'rowNavigation';
+  static moduleName = 'rowKeyboardNavigation';
   static moduleExtensions = this.getModuleExtensions();
 
   localTable: Tabulator;
