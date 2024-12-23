@@ -807,7 +807,7 @@ function onMouseMove(evt: MouseEvent) {
     if (clRect) {
       lastMouseX = evt.clientX - clRect.left;
       lastMouseY = evt.clientY - clRect.top;
-      debounce(showTooltip(lastMouseX, lastMouseY, false));
+      debounce(showTooltip)(lastMouseX, lastMouseY, false);
     }
   }
 }
@@ -865,7 +865,7 @@ function handleMouseDown(): void {
 
 function handleMouseUp(): void {
   stopDragging();
-  debounce(showTooltip(lastMouseX, lastMouseY, false));
+  debounce(showTooltip)(lastMouseX, lastMouseY, false);
 }
 
 function stopDragging() {
@@ -912,7 +912,8 @@ function handleScroll(evt: WheelEvent) {
       const maxWidth = state.zoom * timelineRoot.exitStamp - displayWidth;
       state.offsetX = Math.max(0, Math.min(maxWidth, state.offsetX + deltaX));
     }
-    debounce(showTooltip(lastMouseX, lastMouseY, false));
+
+    debounce(showTooltip)(lastMouseX, lastMouseY, false);
   }
 }
 

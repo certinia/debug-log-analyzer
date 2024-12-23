@@ -15,7 +15,7 @@
   "rules": {
     "no-console": "warn",
     "@typescript-eslint/naming-convention": "warn",
-    "@typescript-eslint/semi": "warn",
+    "semi": "warn",
     "@typescript-eslint/no-unused-vars": [
       "error",
       {

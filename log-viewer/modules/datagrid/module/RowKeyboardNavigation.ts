@@ -40,7 +40,9 @@ export class RowKeyboardNavigation extends Module {
     this.tableHolder ??= table.element.querySelector('.tabulator-tableholder') as HTMLElement;
 
     const selectedRow = table.getSelectedRows()[0];
-    !selectedRow && row.select();
+    if (!selectedRow) {
+      row.select();
+    }
     this.tableHolder?.focus();
   }
 

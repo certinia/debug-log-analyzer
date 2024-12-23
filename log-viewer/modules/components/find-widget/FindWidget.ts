@@ -247,7 +247,9 @@ export class FindWidget extends LitElement {
     if (e.key === 'f' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
       e.preventDefault();
 
-      !this.isVisble && !this.totalMatches && this._triggerFind();
+      if (!this.isVisble && !this.totalMatches) {
+        this._triggerFind();
+      }
       this._findInputClick();
       return;
     }
@@ -268,8 +270,10 @@ export class FindWidget extends LitElement {
       case 'Enter': {
         if (this._hasMatchValueChanged() || !this.totalMatches) {
           this._triggerFind();
+        } else if (this.nextMatchDirection) {
+          this._nextMatch();
         } else {
-          this.nextMatchDirection ? this._nextMatch() : this._previousMatch();
+          this._previousMatch();
         }
         break;
       }
