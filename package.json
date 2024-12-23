@@ -34,7 +34,7 @@
     "build:dev": "rm -rf lana/out && concurrently -r -g 'rollup -c rollup.config.mjs' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",
     "prepare": "husky",
-    "lint": "concurrently -r -g 'eslint . --ext ts' 'prettier --cache **/*.{ts,css,md,scss} --check' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
+    "lint": "concurrently -r -g 'eslint . --ext ts -c .eslintrc.json' 'prettier --cache **/*.{ts,css,md,scss} --check' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "test": "jest",
     "test:ci": "jest --runInBand",
     "prettier-format": "prettier '**/*.ts' --cache --write"
