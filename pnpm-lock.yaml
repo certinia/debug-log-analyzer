@@ -104,8 +104,8 @@ importers:
   lana:
     dependencies:
       '@apexdevtools/apex-ls':
-        specifier: ^5.2.0
-        version: 5.2.0
+        specifier: ^5.7.0
+        version: 5.7.0
       '@apexdevtools/sfdx-auth-helper':
         specifier: ^2.1.0
         version: 2.1.0(encoding@0.1.13)
@@ -289,16 +289,16 @@ packages:
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
 
-  '@apexdevtools/apex-ls@5.2.0':
-    resolution: {integrity: sha512-8/kLZAtVf/oY7BdnjDiMmkYGp5W+KLXGeAy+VuIQdux9Sj0Co60hdy3SFSLO2nvhOl3vLMx33WBQyH+9f0Sfmw==}
+  '@apexdevtools/apex-ls@5.7.0':
+    resolution: {integrity: sha512-AOTQxg7kknAE9vkvfNE4pzpf2rxpKbeTYLUITL6KjdWVBHhaoTdbcpqC2z0tsjAbLG1BjShKPhDhth1pMYZ49Q==}
     engines: {node: '>=14.0.0'}
-
-  '@apexdevtools/apex-parser@3.6.0':
-    resolution: {integrity: sha512-VoFcsb6iP35r4cwNGzm4pkZ4lkSLrDXlNwPmbpc7kHD01nQa3YHp8O5Jw7GIargmM8Gtv2ZtwDvMZsuygotYxg==}
-    engines: {node: '>=8.0.0'}
 
   '@apexdevtools/apex-parser@4.1.0':
     resolution: {integrity: sha512-Bj9kmOXb/ArMhxVt/aliqq45StCxbAcy1W/liIGtWi5jgzJg0xH7our+hFtMlJ7TOoVZ8mjh6oiuPNaSoJbNZA==}
+    engines: {node: '>=8.0.0'}
+
+  '@apexdevtools/apex-parser@4.3.1':
+    resolution: {integrity: sha512-RlaWpAFudE0GvUcim/xLBNw5ipNgT0Yd1eM7jeZJS0R9qn5DxeUGY3636zfgKgWkK04075y1fgNbPsIi/EjKiw==}
     engines: {node: '>=8.0.0'}
 
   '@apexdevtools/sfdx-auth-helper@2.1.0':
@@ -3224,7 +3224,6 @@ packages:
   '@xmldom/xmldom@0.7.9':
     resolution: {integrity: sha512-yceMpm/xd4W2a85iqZyO09gTnHvXF6pyiWjD2jcOJs7hRoZtNNOO1eJlhHj1ixA+xip2hOyGn+LgcvLCMo5zXA==}
     engines: {node: '>=10.0.0'}
-    deprecated: this version is no longer supported, please update to at least 0.8.*
 
   '@xtuc/ieee754@1.2.0':
     resolution: {integrity: sha512-DX8nKgqcGwsc0eJSqYt5lwP4DH5FlHnmuWWBRy7X0NcaGR0ZtuyeESgMwTYVEtxmsNGY+qit4QYT/MIYTOTPeA==}
@@ -8745,19 +8744,19 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.5
       '@jridgewell/trace-mapping': 0.3.25
 
-  '@apexdevtools/apex-ls@5.2.0':
+  '@apexdevtools/apex-ls@5.7.0':
     dependencies:
-      '@apexdevtools/apex-parser': 3.6.0
+      '@apexdevtools/apex-parser': 4.3.1
       '@apexdevtools/vf-parser': 1.1.0
       '@xmldom/xmldom': 0.7.9
       antlr4ts: 0.5.0-alpha.4
 
-  '@apexdevtools/apex-parser@3.6.0':
+  '@apexdevtools/apex-parser@4.1.0':
     dependencies:
       antlr4ts: 0.5.0-alpha.4
       node-dir: 0.1.17
 
-  '@apexdevtools/apex-parser@4.1.0':
+  '@apexdevtools/apex-parser@4.3.1':
     dependencies:
       antlr4ts: 0.5.0-alpha.4
       node-dir: 0.1.17

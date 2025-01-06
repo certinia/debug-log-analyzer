@@ -176,7 +176,7 @@
     "tsc:lint": "tsc --noemit --skipLibCheck"
   },
   "dependencies": {
-    "@apexdevtools/apex-ls": "^5.2.0",
+    "@apexdevtools/apex-ls": "^5.7.0",
     "@apexdevtools/sfdx-auth-helper": "^2.1.0",
     "@salesforce/apex-node": "^1.6.2"
   },
