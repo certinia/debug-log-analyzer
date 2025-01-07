@@ -16,7 +16,7 @@ import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
 import { progressFormatter } from '../../datagrid/format/Progress.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
-import { ApexLog, LogLine } from '../../parsers/ApexLogParser.js';
+import { ApexLog, LogEvent } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import { isVisible } from '../../Util.js';
@@ -379,16 +379,16 @@ export class Metric {
   totalTime = 0;
   selfTime = 0;
   namespace;
-  nodes: LogLine[] = [];
+  nodes: LogEvent[] = [];
 
-  constructor(node: LogLine) {
+  constructor(node: LogEvent) {
     this.name = node.text;
     this.type = node.type;
     this.namespace = node.namespace;
   }
 }
 
-function groupMetrics(root: LogLine) {
+function groupMetrics(root: LogEvent) {
   const methodMap: Map<string, Metric> = new Map();
 
   for (const child of root.children) {
@@ -399,7 +399,7 @@ function groupMetrics(root: LogLine) {
   return Array.from(methodMap.values());
 }
 
-function addNodeToMap(map: Map<string, Metric>, node: LogLine) {
+function addNodeToMap(map: Map<string, Metric>, node: LogEvent) {
   if (node.duration.total) {
     const key = node.namespace + node.text;
     let metric = map.get(key);

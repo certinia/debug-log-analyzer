@@ -2,9 +2,9 @@
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
 import { Module, type RowComponent, type Tabulator } from 'tabulator-tables';
-import type { LogLine } from '../../../parsers/ApexLogParser';
+import type { LogEvent } from '../../../parsers/ApexLogParser';
 
-type TimedNodeProp = { originalData: LogLine };
+type TimedNodeProp = { originalData: LogEvent };
 
 const middleRowFocusOption = 'middleRowFocus' as const;
 /**

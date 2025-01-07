@@ -5,7 +5,7 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { DatabaseAccess } from '../Database.js';
-import { LogLine } from '../parsers/ApexLogParser.js';
+import { LogEvent } from '../parsers/ApexLogParser.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { goToRow } from './calltree-view/CalltreeView.js';
 
@@ -77,7 +77,7 @@ export class CallStack extends LitElement {
     }
   }
 
-  private lineLink(line: LogLine) {
+  private lineLink(line: LogEvent) {
     return html`
       <a
         @click=${this.onCallerClick}

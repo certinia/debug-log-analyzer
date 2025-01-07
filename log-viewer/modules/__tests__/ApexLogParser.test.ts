@@ -5,7 +5,7 @@ import {
   ApexLogParser,
   CodeUnitStartedLine,
   ExecutionStartedLine,
-  LogLine,
+  LogEvent,
   Method,
   MethodEntryLine,
   SOQLExecuteBeginLine,
@@ -1136,7 +1136,7 @@ describe('Line Type Tests', () => {
         'Rows:3',
         '',
         'Rows:5',
-      ]) as LogLine;
+      ]) as LogEvent;
 
       if (line.exitTypes.length) {
         line.exitTypes.forEach((exitType) => {
@@ -1150,7 +1150,7 @@ describe('Line Type Tests', () => {
               'Rows:3',
               '',
               'Rows:5',
-            ]) as LogLine;
+            ]) as LogEvent;
             expect(exitLine.isExit).toBe(true);
           }
         });

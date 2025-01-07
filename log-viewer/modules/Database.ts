@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { ApexLog, DMLBeginLine, LogLine, SOQLExecuteBeginLine } from './parsers/ApexLogParser.js';
+import { ApexLog, DMLBeginLine, LogEvent, SOQLExecuteBeginLine } from './parsers/ApexLogParser.js';
 
-export type Stack = LogLine[];
+export type Stack = LogEvent[];
 
 export class DatabaseAccess {
   private static _instance: DatabaseAccess | null = null;
@@ -23,7 +23,7 @@ export class DatabaseAccess {
   public getStack(
     timestamp: number,
     stack: Stack = [],
-    line: LogLine = DatabaseAccess._treeRoot,
+    line: LogEvent = DatabaseAccess._treeRoot,
   ): Stack {
     const children = line.children;
     const len = children.length;
@@ -45,7 +45,7 @@ export class DatabaseAccess {
     return [];
   }
 
-  public getSOQLLines(line: LogLine = DatabaseAccess._treeRoot): SOQLExecuteBeginLine[] {
+  public getSOQLLines(line: LogEvent = DatabaseAccess._treeRoot): SOQLExecuteBeginLine[] {
     const results: SOQLExecuteBeginLine[] = [];
 
     const children = line.children;
@@ -64,7 +64,7 @@ export class DatabaseAccess {
     return results;
   }
 
-  public getDMLLines(line: LogLine = DatabaseAccess._treeRoot): DMLBeginLine[] {
+  public getDMLLines(line: LogEvent = DatabaseAccess._treeRoot): DMLBeginLine[] {
     const results: DMLBeginLine[] = [];
 
     const children = line.children;

@@ -4,7 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { LogLine } from '../../parsers/ApexLogParser.js';
+import { LogEvent } from '../../parsers/ApexLogParser.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../BadgeBase.js';
 
@@ -13,7 +13,7 @@ export class DatabaseSection extends LitElement {
   @property({ type: String })
   title = '';
   @property({ type: Object, attribute: false })
-  dbLines: LogLine[] = [];
+  dbLines: LogEvent[] = [];
 
   static styles = [
     globalStyles,

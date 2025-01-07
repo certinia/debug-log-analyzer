@@ -6,7 +6,7 @@ import formatDuration, { debounce } from '../Util.js';
 import { goToRow } from '../components/calltree-view/CalltreeView.js';
 import {
   ApexLog,
-  LogLine,
+  LogEvent,
   Method,
   type LogIssue,
   type LogSubCategory,
@@ -171,8 +171,8 @@ let findArgs: { text: string; count: number; options: { matchCase: boolean } } =
 };
 let totalMatches = 0;
 
-function getMaxDepth(nodes: LogLine[]) {
-  const result = new Map<number, LogLine[]>();
+function getMaxDepth(nodes: LogEvent[]) {
+  const result = new Map<number, LogEvent[]>();
   result.set(0, nodes);
 
   let currentDepth = 1;
@@ -596,12 +596,12 @@ function drawTimeLine() {
 }
 
 function findByPosition(
-  nodes: LogLine[],
+  nodes: LogEvent[],
   depth: number,
   x: number,
   targetDepth: number,
   shouldIgnoreWidth: boolean,
-): LogLine | null {
+): LogEvent | null {
   if (!nodes) {
     return null;
   }
