@@ -372,12 +372,12 @@ export class ApexLogParser {
         continue;
       }
       const isPkgType = child.type === 'ENTERING_MANAGED_PKG';
-      if (lastPkg && child.exitStamp) {
+      if (lastPkg) {
         if (isPkgType && child.namespace === lastPkg.namespace) {
           // combine adjacent (like) packages
           lastPkg.exitStamp = child.exitStamp || child.timestamp;
           continue; // skip any more child processing (it's gone)
-        } else if (!isPkgType) {
+        } else if (!isPkgType && child.exitStamp) {
           // we are done merging adjacent `ENTERING_MANAGED_PKG` of the same namesapce
           lastPkg.recalculateDurations();
           lastPkg = null;

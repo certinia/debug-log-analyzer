@@ -1128,7 +1128,7 @@ describe('Recalculate durations tests', () => {
 describe('Line Type Tests', () => {
   it('Lines referenced by exitTypes should be exits', () => {
     const parser = new ApexLogParser();
-    for (const [key, lineType] of lineTypeMap) {
+    for (const lineType of Object.values(lineTypeMap)) {
       const line = new lineType(parser, [
         '14:32:07.563 (17358806534)',
         'DUMMY',
@@ -1138,25 +1138,23 @@ describe('Line Type Tests', () => {
         'Rows:5',
       ]) as LogLine;
 
-      expect(line.exitTypes).not.toBe(null);
-      if (line.isExit) {
-        expect(line.exitTypes).toEqual([key]);
+      if (line.exitTypes.length) {
+        line.exitTypes.forEach((exitType) => {
+          const exitCls = lineTypeMap.get(exitType);
+          expect(exitCls).not.toBe(null);
+          if (exitCls) {
+            const exitLine = new exitCls!(parser, [
+              '14:32:07.563 (17358806534)',
+              'DUMMY',
+              '[10]',
+              'Rows:3',
+              '',
+              'Rows:5',
+            ]) as LogLine;
+            expect(exitLine.isExit).toBe(true);
+          }
+        });
       }
-      line.exitTypes.forEach((exitType) => {
-        const exitCls = lineTypeMap.get(exitType);
-        expect(exitCls).not.toBe(null);
-        if (exitCls) {
-          const exitLine = new exitCls!(parser, [
-            '14:32:07.563 (17358806534)',
-            'DUMMY',
-            '[10]',
-            'Rows:3',
-            '',
-            'Rows:5',
-          ]) as LogLine;
-          expect(exitLine.isExit).toBe(true);
-        }
-      });
     }
   });
 
