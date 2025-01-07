@@ -328,11 +328,11 @@ export class CalltreeView extends LitElement {
   }
 
   async _goToRow(timestamp: number) {
-    if (!this.tableContainer || !this.rootMethod) {
+    if (!this._callTreeTableWrapper || !this.rootMethod) {
       return;
     }
     document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
-    await this._renderCallTree(this.tableContainer, this.rootMethod);
+    await this._renderCallTree(this._callTreeTableWrapper, this.rootMethod);
     if (!this.calltreeTable) {
       return;
     }
