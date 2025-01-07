@@ -22,3 +22,22 @@ export function debounce<T extends unknown[]>(callBack: (...args: T) => unknown)
     });
   };
 }
+
+export async function isVisible(
+  element: HTMLElement,
+  options?: IntersectionObserverInit,
+): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const observer = new IntersectionObserver((entries, observerInstance) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          resolve(true);
+          observerInstance.disconnect();
+          return;
+        }
+      }
+    }, options);
+
+    observer.observe(element);
+  });
+}

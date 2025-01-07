@@ -14,12 +14,12 @@ import codiconStyles from '../styles/codicon.css';
 import { globalStyles } from '../styles/global.styles.js';
 import { ApexLog, type TimelineGroup } from '../timeline/Timeline.js';
 import '../timeline/TimelineView.js';
-import './AnalysisView.js';
-import './LogLevels.js';
-import './NavBar.js';
+import './analysis-view/AnalysisView.js';
 import './calltree-view/CalltreeView';
 import './database-view/DatabaseView.js';
 import './find-widget/FindWidget.js';
+import './LogLevels.js';
+import './NavBar.js';
 import { Notification } from './notifications/NotificationPanel.js';
 
 provideVSCodeDesignSystem().register(vsCodePanelTab(), vsCodePanelView(), vsCodePanels());
