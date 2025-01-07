@@ -18,6 +18,7 @@ import {
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
 
 import { DatabaseAccess } from '../../Database.js';
+import { isVisible } from '../../Util.js';
 import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
 import Number from '../../datagrid/format/Number.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
@@ -30,11 +31,13 @@ import {
 } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
-import '../CallStack.js';
 import { Find, formatter } from '../calltree-view/module/Find.js';
+import databaseViewStyles from './DatabaseView.scss';
+
+// lit components
+import '../CallStack.js';
 import './DatabaseSOQLDetailPanel.js';
 import './DatabaseSection.js';
-import databaseViewStyles from './DatabaseView.scss';
 
 provideVSCodeDesignSystem().register(vsCodeDropdown(), vsCodeOption());
 
@@ -75,9 +78,14 @@ export class SOQLView extends LitElement {
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (this.timelineRoot && changedProperties.has('timelineRoot')) {
+    if (
+      this.timelineRoot &&
+      changedProperties.has('timelineRoot') &&
+      !changedProperties.get('timelineRoot')
+    ) {
       this._appendTableWhenVisible();
     }
+
     if (changedProperties.has('highlightIndex')) {
       this._highlightMatches(this.highlightIndex);
     }
@@ -167,22 +175,21 @@ export class SOQLView extends LitElement {
   }
 
   _appendTableWhenVisible() {
-    const soqlTableWrapper = this._soqlTableWrapper;
-    const treeRoot = this.timelineRoot;
-    if (soqlTableWrapper && treeRoot) {
-      const dbObserver = new IntersectionObserver(async (entries, observer) => {
-        const visible = entries[0]?.isIntersecting;
-        if (visible) {
-          observer.disconnect();
-          this.soqlLines = (await DatabaseAccess.create(treeRoot)).getSOQLLines() || [];
-
-          Tabulator.registerModule(Object.values(CommonModules));
-          Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
-          this._renderSOQLTable(soqlTableWrapper, this.soqlLines);
-        }
-      });
-      dbObserver.observe(this);
+    if (this.soqlTable) {
+      return;
     }
+
+    isVisible(this).then(async (isVisible) => {
+      const treeRoot = this.timelineRoot;
+      const tableWrapper = this._soqlTableWrapper;
+      if (tableWrapper && treeRoot && isVisible) {
+        this.soqlLines = (await DatabaseAccess.create(treeRoot)).getSOQLLines() || [];
+
+        Tabulator.registerModule(Object.values(CommonModules));
+        Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
+        this._renderSOQLTable(tableWrapper, this.soqlLines);
+      }
+    });
   }
 
   _highlightMatches(highlightIndex: number) {

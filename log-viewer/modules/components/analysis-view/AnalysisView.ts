@@ -10,56 +10,28 @@ import {
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { Tabulator, type ColumnComponent, type RowComponent } from 'tabulator-tables';
-import * as CommonModules from '../datagrid/module/CommonModules.js';
+import * as CommonModules from '../../datagrid/module/CommonModules.js';
 
-import NumberAccessor from '../datagrid/dataaccessor/Number.js';
-import { progressFormatter } from '../datagrid/format/Progress.js';
-import { RowKeyboardNavigation } from '../datagrid/module/RowKeyboardNavigation.js';
-import dataGridStyles from '../datagrid/style/DataGrid.scss';
-import { ApexLog, LogLine } from '../parsers/ApexLogParser.js';
-import { vscodeMessenger } from '../services/VSCodeExtensionMessenger.js';
-import { globalStyles } from '../styles/global.styles.js';
-import './skeleton/GridSkeleton.js';
+import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
+import { progressFormatter } from '../../datagrid/format/Progress.js';
+import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
+import dataGridStyles from '../../datagrid/style/DataGrid.scss';
+import { ApexLog, LogLine } from '../../parsers/ApexLogParser.js';
+import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
+import { globalStyles } from '../../styles/global.styles.js';
+import { isVisible } from '../../Util.js';
 
-import { callStackSum } from '../components/analysis-view/column-calcs/CallStackSum.js';
-import { Find, formatter } from '../components/calltree-view/module/Find.js';
-import { RowNavigation } from '../datagrid/module/RowNavigation.js';
+import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
+import { Find, formatter } from '../calltree-view/module/Find.js';
+import { callStackSum } from './column-calcs/CallStackSum.js';
+
+// Components
+import '../skeleton/GridSkeleton.js';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
 
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
-  @property()
-  timelineRoot: ApexLog | null = null;
-
-  analysisTable: Tabulator | null = null;
-  tableContainer: HTMLDivElement | null = null;
-  findMap: { [key: number]: RowComponent } = {};
-  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
-    text: '',
-    count: 0,
-    options: { matchCase: false },
-  };
-  totalMatches = 0;
-
-  get _tableWrapper(): HTMLDivElement | null {
-    return (this.tableContainer = this.renderRoot?.querySelector('#analysis-table') ?? null);
-  }
-
-  constructor() {
-    super();
-
-    document.addEventListener('lv-find', this._findEvt);
-    document.addEventListener('lv-find-match', this._findEvt);
-    document.addEventListener('lv-find-close', this._findEvt);
-  }
-
-  updated(changedProperties: PropertyValues): void {
-    if (this.timelineRoot && changedProperties.has('timelineRoot')) {
-      this._appendTableWhenVisible();
-    }
-  }
-
   static styles = [
     unsafeCSS(dataGridStyles),
     globalStyles,
@@ -97,6 +69,37 @@ export class AnalysisView extends LitElement {
     `,
   ];
 
+  @property()
+  timelineRoot: ApexLog | null = null;
+
+  analysisTable: Tabulator | null = null;
+  tableContainer: HTMLDivElement | null = null;
+  findMap: { [key: number]: RowComponent } = {};
+  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
+    text: '',
+    count: 0,
+    options: { matchCase: false },
+  };
+  totalMatches = 0;
+
+  constructor() {
+    super();
+
+    document.addEventListener('lv-find', this._findEvt);
+    document.addEventListener('lv-find-match', this._findEvt);
+    document.addEventListener('lv-find-close', this._findEvt);
+  }
+
+  updated(changedProperties: PropertyValues): void {
+    if (
+      this.timelineRoot &&
+      changedProperties.has('timelineRoot') &&
+      !changedProperties.get('timelineRoot')
+    ) {
+      this._appendTableWhenVisible();
+    }
+  }
+
   render() {
     const skeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : '';
 
@@ -118,6 +121,10 @@ export class AnalysisView extends LitElement {
     `;
   }
 
+  get _tableWrapper(): HTMLDivElement | null | undefined {
+    return (this.tableContainer ??= this.renderRoot?.querySelector('#analysis-table'));
+  }
+
   _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
 
   _groupBy(event: Event) {
@@ -128,18 +135,15 @@ export class AnalysisView extends LitElement {
   }
 
   _appendTableWhenVisible() {
-    const rootMethod = this.timelineRoot;
-    const tableWrapper = this._tableWrapper;
-    if (tableWrapper && rootMethod) {
-      const analysisObserver = new IntersectionObserver((entries, observer) => {
-        const visible = entries[0]?.isIntersecting;
-        if (visible) {
-          this._renderAnalysis(rootMethod);
-          observer.disconnect();
-        }
-      });
-      analysisObserver.observe(tableWrapper);
+    if (this.analysisTable) {
+      return;
     }
+
+    isVisible(this).then((isVisible) => {
+      if (this.timelineRoot && isVisible) {
+        this._renderAnalysis(this.timelineRoot);
+      }
+    });
   }
 
   _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
@@ -186,7 +190,7 @@ export class AnalysisView extends LitElement {
   }
 
   async _renderAnalysis(rootMethod: ApexLog) {
-    if (!this.tableContainer) {
+    if (!this._tableWrapper) {
       return;
     }
     const metricList = groupMetrics(rootMethod);
@@ -202,7 +206,7 @@ export class AnalysisView extends LitElement {
 
     Tabulator.registerModule(Object.values(CommonModules));
     Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
-    this.analysisTable = new Tabulator(this.tableContainer, {
+    this.analysisTable = new Tabulator(this._tableWrapper, {
       rowKeyboardNavigation: true,
       selectableRows: 1,
       data: metricList,
