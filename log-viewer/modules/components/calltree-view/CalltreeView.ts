@@ -16,7 +16,7 @@ import {
   vsCodeOption,
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
@@ -30,6 +30,7 @@ import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 import { ApexLog, LogLine, TimedNode, type LogEventType } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
+import { isVisible } from '../../Util.js';
 import '../skeleton/GridSkeleton.js';
 import { Find, formatter } from './module/Find.js';
 import { MiddleRowFocus } from './module/MiddleRowFocus.js';
@@ -40,6 +41,9 @@ provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeO
 export class CalltreeView extends LitElement {
   @property()
   timelineRoot: ApexLog | null = null;
+
+  @state()
+  isVisible = false;
 
   filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: string[] } = {
     showDetails: false,
@@ -82,7 +86,11 @@ export class CalltreeView extends LitElement {
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (this.timelineRoot && changedProperties.has('timelineRoot')) {
+    if (
+      this.timelineRoot &&
+      changedProperties.has('timelineRoot') &&
+      !changedProperties.get('timelineRoot')
+    ) {
       this._appendTableWhenVisible();
     }
   }
@@ -188,10 +196,12 @@ export class CalltreeView extends LitElement {
                   <label for="types">Type:</label>
                   <vscode-dropdown @change="${this._handleTypeFilter}">
                     <vscode-option>None</vscode-option>
-                    ${repeat(
-                      this._getAllTypes(this.timelineRoot?.children ?? []),
-                      (type, _index) => html`<vscode-option>${type}</vscode-option>`,
-                    )}
+                    ${this.isVisible
+                      ? repeat(
+                          this._getAllTypes(this.timelineRoot?.children ?? []),
+                          (type, _index) => html`<vscode-option>${type}</vscode-option>`,
+                        )
+                      : ''}
                   </vscode-dropdown>
                 </div>
               </div>
@@ -304,21 +314,17 @@ export class CalltreeView extends LitElement {
   }
 
   _appendTableWhenVisible() {
-    const callTreeWrapper = this._callTreeTableWrapper;
-    this.rootMethod = this.timelineRoot;
-    if (callTreeWrapper && this.rootMethod) {
-      const analysisObserver = new IntersectionObserver(
-        (entries, observer) => {
-          const visible = entries[0]?.isIntersecting;
-          if (this.rootMethod && visible) {
-            this._renderCallTree(callTreeWrapper, this.rootMethod);
-            observer.disconnect();
-          }
-        },
-        { threshold: 1 },
-      );
-      analysisObserver.observe(callTreeWrapper);
+    if (this.calltreeTable) {
+      return;
     }
+
+    this.rootMethod = this.timelineRoot;
+    isVisible(this).then((isVisible) => {
+      this.isVisible = isVisible;
+      if (this.rootMethod && this._callTreeTableWrapper) {
+        this._renderCallTree(this._callTreeTableWrapper, this.rootMethod);
+      }
+    });
   }
 
   async _goToRow(timestamp: number) {
@@ -812,26 +818,25 @@ export class CalltreeView extends LitElement {
     }
 
     const results: CalltreeRow[] = [];
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < len; ++i) {
       const node = nodes[i];
-      if (node) {
-        const isTimedNode = node instanceof TimedNode;
-        const children = isTimedNode ? this._toCallTree(node.children) : null;
-        const data: CalltreeRow = {
-          id: node.timestamp + '-' + i,
-          text: node.text,
-          namespace: node.namespace,
-          duration: node.duration.total,
-          selfTime: node.duration.self,
-          _children: children,
-          totalDmlCount: node.dmlCount.total,
-          totalSoqlCount: node.soqlCount.total,
-          totalThrownCount: node.totalThrownCount,
-          rows: node.rowCount.total,
-          originalData: node,
-        };
-        results.push(data);
+      if (!node) {
+        continue;
       }
+      const children = node.children.length ? this._toCallTree(node.children) : null;
+      results.push({
+        id: node.timestamp + '-' + i,
+        text: node.text,
+        namespace: node.namespace,
+        duration: node.duration.total,
+        selfTime: node.duration.self,
+        _children: children,
+        totalDmlCount: node.dmlCount.total,
+        totalSoqlCount: node.soqlCount.total,
+        totalThrownCount: node.totalThrownCount,
+        rows: node.rowCount.total,
+        originalData: node,
+      });
     }
     return results;
   }
