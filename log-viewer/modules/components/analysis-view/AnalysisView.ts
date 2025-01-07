@@ -91,7 +91,11 @@ export class AnalysisView extends LitElement {
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (this.timelineRoot && !changedProperties.get('timelineRoot')) {
+    if (
+      this.timelineRoot &&
+      changedProperties.has('timelineRoot') &&
+      !changedProperties.get('timelineRoot')
+    ) {
       this._appendTableWhenVisible();
     }
   }
@@ -131,6 +135,10 @@ export class AnalysisView extends LitElement {
   }
 
   _appendTableWhenVisible() {
+    if (this.analysisTable) {
+      return;
+    }
+
     isVisible(this).then((isVisible) => {
       if (this.timelineRoot && isVisible) {
         this._renderAnalysis(this.timelineRoot);
