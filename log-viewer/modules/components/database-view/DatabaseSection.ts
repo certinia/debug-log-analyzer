@@ -4,7 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { Method } from '../../parsers/ApexLogParser.js';
+import { LogLine } from '../../parsers/ApexLogParser.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../BadgeBase.js';
 
@@ -13,7 +13,7 @@ export class DatabaseSection extends LitElement {
   @property({ type: String })
   title = '';
   @property({ type: Object, attribute: false })
-  dbLines: Method[] = [];
+  dbLines: LogLine[] = [];
 
   static styles = [
     globalStyles,
@@ -35,8 +35,8 @@ export class DatabaseSection extends LitElement {
   render() {
     const totalCount = this.dbLines.length;
     let totalRows = 0;
-    this.dbLines.forEach((value) => {
-      totalRows += value.rowCount.self || 0;
+    this.dbLines.forEach((dbLine) => {
+      totalRows += dbLine.rowCount.self || 0;
     });
 
     return html`

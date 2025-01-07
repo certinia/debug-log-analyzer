@@ -8,7 +8,6 @@ import {
   ApexLog,
   LogLine,
   Method,
-  TimedNode,
   type LogIssue,
   type LogSubCategory,
 } from '../parsers/ApexLogParser.js';
@@ -660,7 +659,7 @@ function findTimelineTooltip(
 ): HTMLDivElement | null {
   const target = findByPosition(timelineRoot.children, 0, x, depth, shouldIgnoreWidth);
 
-  if (target && target instanceof TimedNode) {
+  if (target) {
     canvas.classList.remove('timeline-hover', 'timeline-dragging');
     canvas.classList.add('timeline-event--hover');
 
@@ -816,13 +815,7 @@ function onClickCanvas(): void {
   const isClick = mouseDownPosition.x === lastMouseX && mouseDownPosition.y === lastMouseY;
   if (!dragging && isClick) {
     const depth = getDepth(lastMouseY);
-    let timeStamp = findByPosition(
-      timelineRoot.children as TimedNode[],
-      0,
-      lastMouseX,
-      depth,
-      false,
-    )?.timestamp;
+    let timeStamp = findByPosition(timelineRoot.children, 0, lastMouseX, depth, false)?.timestamp;
 
     if (!timeStamp) {
       timeStamp = findLogIssue(lastMouseX)?.startTime;

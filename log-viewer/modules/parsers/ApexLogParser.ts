@@ -9,6 +9,7 @@ type LineNumber = number | string | null; // an actual line-number or 'EXTERNAL'
 type IssueType = 'unexpected' | 'error' | 'skip';
 
 export type LogSubCategory =
+  | ''
   | 'Method'
   | 'System Method'
   | 'Code Unit'
@@ -157,17 +158,17 @@ export class ApexLogParser {
 
   private toLogTree(lineGenerator: Generator<LogLine>) {
     const rootMethod = new ApexLog(this),
-      stack: Method[] = [];
+      stack: LogLine[] = [];
     let line: LogLine | null;
 
     const lineIter = new LineIterator(lineGenerator);
 
     while ((line = lineIter.fetch())) {
-      if (line instanceof Method) {
+      if (line.exitTypes.length) {
         this.parseTree(line, lineIter, stack);
       }
       line.parent = rootMethod;
-      rootMethod.addChild(line);
+      rootMethod.children.push(line);
     }
     rootMethod.setTimes();
 
@@ -177,7 +178,7 @@ export class ApexLogParser {
     return rootMethod;
   }
 
-  private parseTree(currentLine: Method, lineIter: LineIterator, stack: Method[]) {
+  private parseTree(currentLine: LogLine, lineIter: LineIterator, stack: LogLine[]) {
     this.lastTimestamp = currentLine.timestamp;
     currentLine.namespace ||= 'default';
 
@@ -224,7 +225,7 @@ export class ApexLogParser {
         lineIter.fetch(); // it's a child - consume the line
         this.lastTimestamp = nextLine.timestamp;
 
-        if (nextLine instanceof Method) {
+        if (nextLine.exitTypes.length) {
           this.parseTree(nextLine, lineIter, stack);
         }
 
@@ -263,7 +264,7 @@ export class ApexLogParser {
     }
   }
 
-  private isMatchingEnd(startMethod: Method, endLine: LogLine) {
+  private isMatchingEnd(startMethod: LogLine, endLine: LogLine) {
     return (
       endLine.type &&
       startMethod.exitTypes.includes(endLine.type) &&
@@ -274,10 +275,10 @@ export class ApexLogParser {
   }
 
   private endMethod(
-    startMethod: Method,
+    startMethod: LogLine,
     endLine: LogLine,
     lineIter: LineIterator,
-    stack: Method[],
+    stack: LogLine[],
   ) {
     startMethod.exitStamp = endLine.timestamp;
 
@@ -359,40 +360,41 @@ export class ApexLogParser {
     }
   }
 
-  private insertPackageWrappers(node: Method) {
+  private insertPackageWrappers(node: LogLine) {
     const children = node.children;
-    let lastPkg: TimedNode | null = null;
+    let lastPkg: LogLine | null = null;
 
     const newChildren: LogLine[] = [];
     const len = children.length;
     for (let i = 0; i < len; i++) {
       const child = children[i];
-      if (child) {
-        const isPkgType = child.type === 'ENTERING_MANAGED_PKG';
-        if (lastPkg && child instanceof TimedNode) {
-          if (isPkgType && child.namespace === lastPkg.namespace) {
-            // combine adjacent (like) packages
-            lastPkg.exitStamp = child.exitStamp || child.timestamp;
-            continue; // skip any more child processing (it's gone)
-          } else if (!isPkgType) {
-            // we are done merging adjacent `ENTERING_MANAGED_PKG` of the same namesapce
-            lastPkg.recalculateDurations();
-            lastPkg = null;
-          }
-        }
-
-        if (child instanceof Method) {
-          this.insertPackageWrappers(child);
-        }
-
-        // It is a ENTERING_MANAGED_PKG line that does not match the last one
-        // or we have not come across a ENTERING_MANAGED_PKG line yet.
-        if (isPkgType) {
-          lastPkg?.recalculateDurations();
-          lastPkg = child as TimedNode;
-        }
-        newChildren.push(child);
+      if (!child) {
+        continue;
       }
+      const isPkgType = child.type === 'ENTERING_MANAGED_PKG';
+      if (lastPkg && child.exitStamp) {
+        if (isPkgType && child.namespace === lastPkg.namespace) {
+          // combine adjacent (like) packages
+          lastPkg.exitStamp = child.exitStamp || child.timestamp;
+          continue; // skip any more child processing (it's gone)
+        } else if (!isPkgType) {
+          // we are done merging adjacent `ENTERING_MANAGED_PKG` of the same namesapce
+          lastPkg.recalculateDurations();
+          lastPkg = null;
+        }
+      }
+
+      if (child.exitTypes) {
+        this.insertPackageWrappers(child);
+      }
+
+      // It is a ENTERING_MANAGED_PKG line that does not match the last one
+      // or we have not come across a ENTERING_MANAGED_PKG line yet.
+      if (isPkgType) {
+        lastPkg?.recalculateDurations();
+        lastPkg = child;
+      }
+      newChildren.push(child);
     }
 
     lastPkg?.recalculateDurations();
@@ -529,6 +531,11 @@ export abstract class LogLine {
   isExit = false;
 
   /**
+   * Whether the log event was truncated when the log ended, e,g no matching end event
+   */
+  isTruncated = false;
+
+  /**
    * Should the exitstamp be the timestamp of the next line?
    * These kind of lines can not be used as exit lines for anything othe than other pseudo exits.
    */
@@ -569,6 +576,21 @@ export abstract class LogLine {
    * The timestamp of this log line, in nanoseconds
    */
   timestamp;
+
+  /**
+   * The timestamp when the node finished, in nanoseconds
+   */
+  exitStamp: number | null = null;
+
+  /**
+   * The log sub category this event belongs to
+   */
+  subCategory: LogSubCategory = '';
+
+  /**
+   * The CPU type, e.g loading, method, custom
+   */
+  cpuType: CPUType = ''; // the category key to collect our cpu usage
 
   /**
    * The time spent.
@@ -648,6 +670,12 @@ export abstract class LogLine {
   /** Called when the Log event after this one is created in the line parser*/
   onAfter?(parser: ApexLogParser, next?: LogLine): void;
 
+  public recalculateDurations() {
+    if (this.exitStamp) {
+      this.duration.total = this.duration.self = this.exitStamp - this.timestamp;
+    }
+  }
+
   private parseTimestamp(text: string): number {
     const start = text.indexOf('(');
     if (start !== -1) {
@@ -681,59 +709,12 @@ class BasicExitLine extends LogLine {
 type CPUType = 'loading' | 'custom' | 'method' | 'free' | 'system' | 'pkg' | '';
 
 /**
- * Log lines extend this class if they have a duration (and hence can be shown on the timeline).
- * There are no real children (as there is no exit line), but children can get reparented here...
- */
-export class TimedNode extends LogLine {
-  /**
-   * The timestamp when the node finished, in nanoseconds
-   */
-  exitStamp: number | null = null;
-
-  /**
-   * The log sub category this event belongs to
-   */
-  subCategory: LogSubCategory;
-
-  /**
-   * The CPU type, e.g loading, method, custom
-   */
-  cpuType: CPUType; // the category key to collect our cpu usage
-
-  constructor(
-    parser: ApexLogParser,
-    parts: string[] | null,
-    timelineKey: LogSubCategory,
-    cpuType: CPUType,
-  ) {
-    super(parser, parts);
-    this.subCategory = timelineKey;
-    this.cpuType = cpuType;
-  }
-
-  addChild(line: LogLine) {
-    this.children.push(line);
-  }
-
-  recalculateDurations() {
-    if (this.exitStamp) {
-      this.duration.total = this.duration.self = this.exitStamp - this.timestamp;
-    }
-  }
-}
-
-/**
  * Log lines extend this class if they have a start-line and an end-line (and hence can have children in-between).
  * - The start-line should extend "Method" and collect any children.
  * - The end-line should extend "Detail" and terminate the method (also providing the "exitStamp").
  * The method will be rendered as "expandable" in the tree-view, if it has children.
  */
-export class Method extends TimedNode {
-  /**
-   * Whether the log event was truncated when the log ended, e,g no matching end event
-   */
-  isTruncated = false;
-
+export class Method extends LogLine {
   constructor(
     parser: ApexLogParser,
     parts: string[] | null,
@@ -741,7 +722,9 @@ export class Method extends TimedNode {
     timelineKey: LogSubCategory,
     cpuType: CPUType,
   ) {
-    super(parser, parts, timelineKey, cpuType);
+    super(parser, parts);
+    this.subCategory = timelineKey;
+    this.cpuType = cpuType;
     this.exitTypes = exitTypes as LogEventType[];
   }
 }
@@ -806,7 +789,7 @@ export class ApexLog extends Method {
     for (let i = reverseLen; i >= 0; i--) {
       const child = this.children[i];
       // If there is no duration on a node then it is not going to be shown on the timeline anyway
-      if (child instanceof TimedNode && child.exitStamp) {
+      if (child?.exitStamp) {
         endTime ??= child.exitStamp;
         if (child.duration) {
           this.executionEndTime = child.exitStamp;

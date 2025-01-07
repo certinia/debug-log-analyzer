@@ -27,7 +27,7 @@ import { progressFormatter } from '../../datagrid/format/Progress.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
-import { ApexLog, LogLine, TimedNode, type LogEventType } from '../../parsers/ApexLogParser.js';
+import { ApexLog, LogLine, type LogEventType } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import { isVisible } from '../../Util.js';
@@ -858,7 +858,7 @@ export class CalltreeView extends LitElement {
       if (!row) {
         break;
       }
-      const node = (row.getData() as CalltreeRow).originalData as TimedNode;
+      const node = (row.getData() as CalltreeRow).originalData as LogLine;
 
       // Return True if the element is present in the middle.
       const endTime = node.exitStamp ?? node.timestamp;
