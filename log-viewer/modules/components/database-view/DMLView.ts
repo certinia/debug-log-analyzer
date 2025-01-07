@@ -22,10 +22,13 @@ import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 import { ApexLog, DMLBeginLine } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
-import '../CallStack.js';
+import { isVisible } from '../../Util.js';
 import { Find, formatter } from '../calltree-view/module/Find.js';
-import './DatabaseSection.js';
 import databaseViewStyles from './DatabaseView.scss';
+
+// lit components
+import '../CallStack.js';
+import './DatabaseSection.js';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox());
 
@@ -62,9 +65,14 @@ export class DMLView extends LitElement {
   }
 
   updated(changedProperties: PropertyValues): void {
-    if (this.timelineRoot && changedProperties.has('timelineRoot')) {
+    if (
+      this.timelineRoot &&
+      changedProperties.has('timelineRoot') &&
+      !changedProperties.get('timelineRoot')
+    ) {
       this._appendTableWhenVisible();
     }
+
     if (changedProperties.has('highlightIndex')) {
       this._highlightMatches(this.highlightIndex);
     }
@@ -124,24 +132,22 @@ export class DMLView extends LitElement {
   }
 
   _appendTableWhenVisible() {
-    const dmlTableWrapper = this._dmlTableWrapper;
-    const treeRoot = this.timelineRoot;
-    if (dmlTableWrapper && treeRoot) {
-      const dbObserver = new IntersectionObserver(async (entries, observer) => {
-        const visible = entries[0]?.isIntersecting;
-        if (visible) {
-          observer.disconnect();
-
-          const dbAccess = await DatabaseAccess.create(treeRoot);
-          this.dmlLines = dbAccess.getDMLLines() || [];
-
-          Tabulator.registerModule(Object.values(CommonModules));
-          Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
-          this._renderDMLTable(dmlTableWrapper, this.dmlLines);
-        }
-      });
-      dbObserver.observe(this);
+    if (this.dmlTable) {
+      return;
     }
+
+    isVisible(this).then(async (isVisible) => {
+      const treeRoot = this.timelineRoot;
+      const tableWrapper = this._dmlTableWrapper;
+      if (tableWrapper && treeRoot && isVisible) {
+        const dbAccess = await DatabaseAccess.create(treeRoot);
+        this.dmlLines = dbAccess.getDMLLines() || [];
+
+        Tabulator.registerModule(Object.values(CommonModules));
+        Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
+        this._renderDMLTable(tableWrapper, this.dmlLines);
+      }
+    });
   }
 
   _highlightMatches(highlightIndex: number) {
