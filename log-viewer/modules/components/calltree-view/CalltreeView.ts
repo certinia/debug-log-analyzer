@@ -794,11 +794,14 @@ export class CalltreeView extends LitElement {
   }
 
   private _expandCollapseAll(rows: RowComponent[], expand: boolean = true) {
+    if (!this.calltreeTable?.modules?.dataTree) {
+      return;
+    }
+
     const len = rows.length;
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < len; ++i) {
       const row = rows[i];
-      //@ts-expect-error This is private to tabulator, but we have no other choice atm.
-      if (!row?._getSelf().modules?.dataTree) {
+      if (!row) {
         continue;
       }
 

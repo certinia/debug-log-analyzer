@@ -308,7 +308,8 @@ export class SOQLView extends LitElement {
         })</span>
       </div>`;
       },
-      groupToggleElement: 'header',
+      groupToggleElement: false,
+      selectableRows: 'highlight',
       selectableRowsCheck: function (row: RowComponent) {
         return !row.getData().isDetail;
       },
@@ -487,18 +488,29 @@ export class SOQLView extends LitElement {
     });
 
     this.soqlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
+      const { type } = window.getSelection() ?? {};
+      if (type === 'Range') {
+        return;
+      }
+
+      this.soqlTable?.blockRedraw();
+      group.toggle();
       if (!group.isVisible()) {
-        this.soqlTable?.blockRedraw();
         this.soqlTable?.getRows().forEach((row) => {
           if (!row.isTreeExpanded()) {
             row.treeExpand();
           }
         });
-        this.soqlTable?.restoreRedraw();
       }
+      this.soqlTable?.restoreRedraw();
     });
 
     this.soqlTable.on('rowClick', function (e, row) {
+      const { type } = window.getSelection() ?? {};
+      if (type === 'Range') {
+        return;
+      }
+
       const data = row.getData();
       if (!(data.timestamp && data.soql)) {
         return;
