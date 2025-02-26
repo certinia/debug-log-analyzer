@@ -1,7 +1,13 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { KeybindingsModule, Module, Tabulator, type RowComponent } from 'tabulator-tables';
+import {
+  KeybindingsModule,
+  Module,
+  SelectRowModule,
+  Tabulator,
+  type RowComponent,
+} from 'tabulator-tables';
 
 // todo: make this generic and support opening grouped rows too then use on DB view.
 // todo: remove the '@ts-expect-error' + fix the types file
@@ -18,9 +24,9 @@ export class RowKeyboardNavigation extends Module {
   static moduleName = 'rowKeyboardNavigation';
   static moduleExtensions = this.getModuleExtensions();
 
-  localTable: Tabulator;
+  private localTable: Tabulator;
+  private tableHolder: HTMLElement | null = null;
 
-  tableHolder: HTMLElement | null = null;
   constructor(table: Tabulator) {
     super(table);
     this.localTable = table;
@@ -28,13 +34,18 @@ export class RowKeyboardNavigation extends Module {
   }
 
   initialize() {
+    this.setOption('selectableRows', 'highlight');
     this.localTable.on('dataTreeRowExpanded', (row, _level) => {
       this.rowExpandedToggled(row, _level);
     });
     this.localTable.on('dataTreeRowCollapsed', (row, _level) => {
       this.rowExpandedToggled(row, _level);
     });
+    this.localTable.on('rowClick', (event, row) => {
+      this.rowClick(event, row);
+    });
   }
+
   rowExpandedToggled(row: RowComponent, _level: number) {
     const table = row.getTable();
     this.tableHolder ??= table.element.querySelector('.tabulator-tableholder') as HTMLElement;
@@ -44,6 +55,19 @@ export class RowKeyboardNavigation extends Module {
       row.select();
     }
     this.tableHolder?.focus();
+  }
+
+  rowClick(event: UIEvent, row: RowComponent) {
+    const { type } = window.getSelection() ?? {};
+    if (type === 'Range') {
+      return;
+    }
+    this.localTable.blockRedraw();
+    for (const row of this.localTable.getSelectedRows()) {
+      row.deselect();
+    }
+    row.toggleSelect();
+    this.localTable.restoreRedraw();
   }
 
   private static getModuleExtensions() {
@@ -169,4 +193,4 @@ export class RowKeyboardNavigation extends Module {
   }
 }
 
-Tabulator.registerModule(KeybindingsModule);
+Tabulator.registerModule([KeybindingsModule, SelectRowModule]);

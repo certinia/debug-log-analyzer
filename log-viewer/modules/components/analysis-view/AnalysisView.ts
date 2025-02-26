@@ -208,7 +208,7 @@ export class AnalysisView extends LitElement {
     Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
     this.analysisTable = new Tabulator(this._tableWrapper, {
       rowKeyboardNavigation: true,
-      selectableRows: 1,
+      selectableRows: 'highlight',
       data: metricList,
       layout: 'fitColumns',
       placeholder: 'No Analysis Available',

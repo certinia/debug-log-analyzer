@@ -256,10 +256,11 @@ export class DMLView extends LitElement {
         `;
       },
 
-      groupToggleElement: 'header',
+      groupToggleElement: false,
       selectableRowsCheck: function (row: RowComponent) {
         return !row.getData().isDetail;
       },
+      selectableRows: 'highlight',
       dataTree: true,
       dataTreeBranchElement: false,
       columnDefaults: {
@@ -353,18 +354,29 @@ export class DMLView extends LitElement {
     });
 
     this.dmlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
+      const { type } = window.getSelection() ?? {};
+      if (type === 'Range') {
+        return;
+      }
+
+      this.dmlTable?.blockRedraw();
+      group.toggle();
       if (!group.isVisible()) {
-        this.dmlTable?.blockRedraw();
         this.dmlTable?.getRows().forEach((row) => {
           if (!row.isTreeExpanded()) {
             row.treeExpand();
           }
         });
-        this.dmlTable?.restoreRedraw();
       }
+      this.dmlTable?.restoreRedraw();
     });
 
     this.dmlTable.on('rowClick', function (e, row) {
+      const { type } = window.getSelection() ?? {};
+      if (type === 'Range') {
+        return;
+      }
+
       const data = row.getData();
       if (!(data.timestamp && data.dml)) {
         return;
