@@ -630,6 +630,11 @@ export class CalltreeView extends LitElement {
             },
             variableHeight: true,
             cellClick: (e, cell) => {
+              const { type } = window.getSelection() ?? {};
+              if (type === 'Range') {
+                return;
+              }
+
               if (!(e.target as HTMLElement).matches('a')) {
                 return;
               }
