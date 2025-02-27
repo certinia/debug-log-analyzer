@@ -1,12 +1,12 @@
-import type { LogLine } from '../../../parsers/ApexLogParser';
+import type { LogEvent } from '../../../parsers/ApexLogParser';
 import { type Metric } from '../AnalysisView.js';
 
 export function callStackSum(_values: number[], data: Metric[], _calcParams: unknown) {
-  const nodes: LogLine[] = [];
+  const nodes: LogEvent[] = [];
   for (const row of data) {
     Array.prototype.push.apply(nodes, row.nodes);
   }
-  const allNodes = new Set<LogLine>(nodes);
+  const allNodes = new Set<LogEvent>(nodes);
 
   let total = 0;
   for (const node of nodes) {
@@ -18,7 +18,7 @@ export function callStackSum(_values: number[], data: Metric[], _calcParams: unk
   return total;
 }
 
-function _isChildOfOther(node: LogLine, filteredNodes: Set<LogLine>) {
+function _isChildOfOther(node: LogEvent, filteredNodes: Set<LogEvent>) {
   let parent = node.parent;
   while (parent) {
     if (filteredNodes.has(parent)) {
