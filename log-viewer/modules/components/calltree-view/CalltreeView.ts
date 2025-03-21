@@ -679,7 +679,7 @@ export class CalltreeView extends LitElement {
           },
           {
             title: 'DML Count',
-            field: 'totalDmlCount',
+            field: 'dmlCount.total',
             sorter: 'number',
             width: 60,
             hozAlign: 'right',
@@ -688,7 +688,7 @@ export class CalltreeView extends LitElement {
           },
           {
             title: 'SOQL Count',
-            field: 'totalSoqlCount',
+            field: 'soqlCount.total',
             sorter: 'number',
             width: 60,
             hozAlign: 'right',
@@ -705,8 +705,17 @@ export class CalltreeView extends LitElement {
             bottomCalc: 'max',
           },
           {
-            title: 'Rows',
-            field: 'rows',
+            title: 'DML Rows',
+            field: 'dmlRowCount.total',
+            sorter: 'number',
+            width: 60,
+            hozAlign: 'right',
+            headerHozAlign: 'right',
+            bottomCalc: 'max',
+          },
+          {
+            title: 'SOQL Rows',
+            field: 'soqlRowCount.total',
             sorter: 'number',
             width: 60,
             hozAlign: 'right',
@@ -715,7 +724,7 @@ export class CalltreeView extends LitElement {
           },
           {
             title: 'Total Time (ms)',
-            field: 'duration',
+            field: 'duration.total',
             sorter: 'number',
             headerSortTristate: true,
             width: 150,
@@ -737,7 +746,7 @@ export class CalltreeView extends LitElement {
           },
           {
             title: 'Self Time (ms)',
-            field: 'selfTime',
+            field: 'duration.self',
             sorter: 'number',
             headerSortTristate: true,
             width: 150,
@@ -834,16 +843,9 @@ export class CalltreeView extends LitElement {
       const children = node.children.length ? this._toCallTree(node.children) : null;
       results.push({
         id: node.timestamp + '-' + i,
-        text: node.text,
-        namespace: node.namespace,
-        duration: node.duration.total,
-        selfTime: node.duration.self,
-        _children: children,
-        totalDmlCount: node.dmlCount.total,
-        totalSoqlCount: node.soqlCount.total,
-        totalThrownCount: node.totalThrownCount,
-        rows: node.rowCount.total,
         originalData: node,
+        _children: children,
+        ...node,
       });
     }
     return results;
@@ -890,18 +892,10 @@ export class CalltreeView extends LitElement {
   }
 }
 
-interface CalltreeRow {
+interface CalltreeRow extends LogLine {
   id: string;
   originalData: LogLine;
-  text: string;
-  duration: number;
-  namespace: string;
-  selfTime: number;
   _children: CalltreeRow[] | undefined | null;
-  totalDmlCount: number;
-  totalSoqlCount: number;
-  totalThrownCount: number;
-  rows: number;
 }
 
 export async function goToRow(timestamp: number) {

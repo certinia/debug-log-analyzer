@@ -350,9 +350,11 @@ export class ApexLogParser {
         parent?.children.forEach((child) => {
           parent.dmlCount.total += child.dmlCount.total;
           parent.soqlCount.total += child.soqlCount.total;
-          parent.totalThrownCount += child.totalThrownCount;
-          parent.rowCount.total += child.rowCount.total;
+          parent.dmlRowCount.total += child.dmlRowCount.total;
+          parent.soqlRowCount.total += child.soqlRowCount.total;
+          parent.soslRowCount.total += child.soslRowCount.total;
           parent.duration.self -= child.duration.total;
+          parent.totalThrownCount += child.totalThrownCount;
         });
       }
       nodesByDepth.delete(depth);
@@ -585,22 +587,50 @@ export abstract class LogLine {
   };
 
   /**
-   * Total + self row counts for DML, SOQL + SOSL.
+   * Total + self row counts for DML
    */
-  rowCount: SelfTotal = {
+  dmlRowCount: SelfTotal = {
     /**
-     * The number of rows in all database operations for this node, excluding child nodes
+     * The net number of DML rows for this node, excluding child nodes
      */
     self: 0,
     /**
-     * The total number of rows in all database operations for this node and child nodes
+     * The total number of DML rows for this node and child nodes
+     */
+    total: 0,
+  };
+
+  /**
+   * Total + self row counts for SOQL
+   */
+  soqlRowCount: SelfTotal = {
+    /**
+     * The net number of SOQL rows for this node, excluding child nodes
+     */
+    self: 0,
+    /**
+     * The total number of SOQL rows for this node and child nodes
+     */
+    total: 0,
+  };
+
+  /**
+   * Total + self row counts for SOSL
+   */
+  soslRowCount: SelfTotal = {
+    /**
+     * The net number of SOSL rows for this node, excluding child nodes
+     */
+    self: 0,
+    /**
+     * The total number of SOSL rows for this node and child nodes
      */
     total: 0,
   };
 
   dmlCount: SelfTotal = {
     /**
-     * The net number of DML operations (DML_BEGIN) in this node  in this node.
+     * The net number of DML operations (DML_BEGIN) in this node.
      */
     self: 0,
     /**
@@ -1252,7 +1282,7 @@ class DMLBeginLine extends Method {
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = 'DML ' + parts[3] + ' ' + parts[4];
     const rowCountString = parts[5];
-    this.rowCount.total = this.rowCount.self = rowCountString ? parseRows(rowCountString) : 0;
+    this.dmlRowCount.total = this.dmlRowCount.self = rowCountString ? parseRows(rowCountString) : 0;
   }
 }
 
@@ -1294,7 +1324,7 @@ class SOQLExecuteBeginLine extends Method {
   }
 
   onEnd(end: SOQLExecuteEndLine, _stack: LogLine[]): void {
-    this.rowCount.total = this.rowCount.self = end.rowCount.total;
+    this.soqlRowCount.total = this.soqlRowCount.self = end.soqlRowCount.total;
   }
 }
 
@@ -1304,7 +1334,7 @@ class SOQLExecuteEndLine extends LogLine {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
-    this.rowCount.total = this.rowCount.self = parseRows(parts[3] || '');
+    this.soqlRowCount.total = this.soqlRowCount.self = parseRows(parts[3] || '');
   }
 }
 
@@ -1362,7 +1392,7 @@ class SOSLExecuteBeginLine extends Method {
   }
 
   onEnd(end: SOSLExecuteEndLine, _stack: LogLine[]): void {
-    this.rowCount.total = this.rowCount.self = end.rowCount.total;
+    this.soslRowCount.total = this.soslRowCount.self = end.soslRowCount.total;
   }
 }
 
@@ -1372,7 +1402,7 @@ class SOSLExecuteEndLine extends LogLine {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
-    this.rowCount.total = this.rowCount.self = parseRows(parts[3] || '');
+    this.soslRowCount.total = this.soslRowCount.self = parseRows(parts[3] || '');
   }
 }
 
