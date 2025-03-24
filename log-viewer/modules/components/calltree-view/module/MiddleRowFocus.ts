@@ -16,7 +16,7 @@ const middleRowFocusOption = 'middleRowFocus' as const;
 export class MiddleRowFocus extends Module {
   static moduleName = 'middleRowFocus';
 
-  goToRowId: number = 0;
+  middleRow: RowComponent | null = null;
   constructor(table: Tabulator) {
     super(table);
     this.registerTableOption(middleRowFocusOption, false);
@@ -26,35 +26,36 @@ export class MiddleRowFocus extends Module {
     // @ts-expect-error not in types
     if (this.options(middleRowFocusOption)) {
       this.table.on('dataTreeRowExpanded', () => {
-        window.clearTimeout(this.goToRowId);
-        middleRow = null;
+        this._clearFocusRow();
       });
 
       this.table.on('dataTreeRowCollapsed', () => {
-        window.clearTimeout(this.goToRowId);
-        middleRow = null;
+        this._clearFocusRow();
       });
 
-      let middleRow: RowComponent | null;
       this.table.on('renderStarted', () => {
-        if (this.table && !middleRow) {
-          middleRow = this._findMiddleVisibleRow(this.table);
+        if (this.table && !this.middleRow) {
+          this.middleRow = this._findMiddleVisibleRow(this.table);
         }
       });
 
       this.table.on('renderComplete', async () => {
-        const rowToScrollTo = middleRow;
-        this.goToRowId = this._scrollToRow(rowToScrollTo);
-        middleRow = null;
+        const rowToScrollTo = this.middleRow;
+        this._scrollToRow(rowToScrollTo);
+        this.middleRow = null;
       });
     }
   }
 
-  private _scrollToRow(row: RowComponent | null): number {
+  private _clearFocusRow() {
+    this.middleRow = null;
+  }
+
+  private _scrollToRow(row: RowComponent | null) {
     if (!row) {
-      return 0;
+      return;
     }
-    return window.setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       let rowToScrollTo: RowComponent | null = row;
       if (rowToScrollTo) {
         //@ts-expect-error This is private to tabulator, but we have no other choice atm.
@@ -78,6 +79,8 @@ export class MiddleRowFocus extends Module {
           });
         }
       }
+
+      window.clearTimeout(timeoutId);
     });
   }
 
