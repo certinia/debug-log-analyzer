@@ -338,9 +338,7 @@ export class DMLView extends LitElement {
           row.normalizeHeight();
         }
 
-        requestAnimationFrame(() => {
-          formatter(row, this.findArgs);
-        });
+        formatter(row, this.findArgs);
       },
     });
 
