@@ -16,6 +16,7 @@ const middleRowFocusOption = 'middleRowFocus' as const;
 export class MiddleRowFocus extends Module {
   static moduleName = 'middleRowFocus';
 
+  tableHolder: HTMLElement | null = null;
   middleRow: RowComponent | null = null;
   constructor(table: Tabulator) {
     super(table);
@@ -25,6 +26,8 @@ export class MiddleRowFocus extends Module {
   initialize() {
     // @ts-expect-error not in types
     if (this.options(middleRowFocusOption)) {
+      this.tableHolder = this.table.element.querySelector('.tabulator-tableholder');
+
       this.table.on('dataTreeRowExpanded', () => {
         this._clearFocusRow();
       });
@@ -34,8 +37,8 @@ export class MiddleRowFocus extends Module {
       });
 
       this.table.on('renderStarted', () => {
-        if (this.table && !this.middleRow) {
-          this.middleRow = this._findMiddleVisibleRow(this.table);
+        if (this.table && this.tableHolder && !this.middleRow) {
+          this.middleRow = this._findMiddleVisibleRow(this.tableHolder);
         }
       });
 
@@ -55,33 +58,32 @@ export class MiddleRowFocus extends Module {
     if (!row) {
       return;
     }
-    const timeoutId = window.setTimeout(() => {
-      let rowToScrollTo: RowComponent | null = row;
+
+    let rowToScrollTo: RowComponent | null = row;
+    if (rowToScrollTo) {
+      const displayRows = this.table.rowManager.getDisplayRows();
+      //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+      const internalRow = rowToScrollTo._getSelf();
+      const canScroll = displayRows.indexOf(internalRow) !== -1;
+      if (!canScroll) {
+        const rowData = rowToScrollTo.getData() as TimedNodeProp;
+        const node = rowData.originalData;
+
+        rowToScrollTo = this._findClosestActive(this.table.getRows('active'), node.timestamp);
+      }
+
       if (rowToScrollTo) {
-        //@ts-expect-error This is private to tabulator, but we have no other choice atm.
-        const internalRow = rowToScrollTo._getSelf();
-        const displayRows = internalRow.table.rowManager.getDisplayRows();
-        const canScroll = displayRows.indexOf(internalRow) !== -1;
-        if (!canScroll) {
-          const rowData = rowToScrollTo.getData() as TimedNodeProp;
-          const node = rowData.originalData;
-
-          rowToScrollTo = this._findClosestActive(this.table.getRows('active'), node.timestamp);
-        }
-
-        if (rowToScrollTo) {
-          this.table.scrollToRow(rowToScrollTo, 'center', true).then(() => {
+        this.table.scrollToRow(rowToScrollTo, 'center', true).then(() => {
+          setTimeout(() => {
             if (rowToScrollTo) {
               rowToScrollTo
                 ?.getElement()
                 .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
             }
           });
-        }
+        });
       }
-
-      window.clearTimeout(timeoutId);
-    });
+    }
   }
 
   private _findClosestActive(rows: RowComponent[], timeStamp: number): RowComponent | null {
@@ -93,6 +95,7 @@ export class MiddleRowFocus extends Module {
       end = rows.length - 1;
 
     // Iterate as long as the beginning does not encounter the end.
+    const displayRows = this.table.rowManager.getDisplayRows();
     while (start <= end) {
       // find out the middle index
       const mid = Math.floor((start + end) / 2);
@@ -102,13 +105,11 @@ export class MiddleRowFocus extends Module {
         break;
       }
       const node = (row.getData() as TimedNodeProp).originalData;
-
-      //@ts-expect-error This is private to tabulator, but we have no other choice atm.
-      const internalRow = row._getSelf();
-      const displayRows = internalRow.table.rowManager.getDisplayRows();
       const endTime = node.exitStamp ?? node.timestamp;
 
       if (timeStamp === node.timestamp) {
+        //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+        const internalRow = row._getSelf();
         const isActive = displayRows.indexOf(internalRow) !== -1;
         if (isActive) {
           return row;
@@ -190,13 +191,16 @@ export class MiddleRowFocus extends Module {
     return closestIndex ? rows[closestIndex] || null : null;
   }
 
-  private _findMiddleVisibleRow(table: Tabulator) {
-    const visibleRows = table.getRows('visible');
-    if (visibleRows.length === 1) {
-      return visibleRows[0] || null;
+  private _findMiddleVisibleRow(tableHolder: HTMLElement) {
+    const visibleRows = this.table.getRows('visible');
+    const len = visibleRows.length;
+    if (len === 0) {
+      return null;
+    } else if (len === 1) {
+      return visibleRows[0] ?? null;
     }
 
-    const tableRect = table.element.getBoundingClientRect();
+    const tableRect = tableHolder.getBoundingClientRect();
     const totalHeight = Math.round(tableRect.height / 2);
 
     let currentHeight = 0;
