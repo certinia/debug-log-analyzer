@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Change
+
+- Highlight and copy text to clipboard: Call Tree, Analysis and Database views ([#504][#504])
+  - Previously the highlighted text would be immediately cleared
+
+### Fixed
+
+- Performance regression of Call Tree rendering ([#581][#581])
+- Call Tree not correctly keeping position when rows where hidden / shown via Details and Debug Only ([#581][#581])
+
 ## [1.16.1] - 2024-12-03
 
 ### Fixed
@@ -360,6 +372,11 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Provide more information when selecting log to download
 
 <!-- Unreleased -->
+
+[#504]: https://github.com/certinia/debug-log-analyzer/issues/504
+[#581]: https://github.com/certinia/debug-log-analyzer/issues/581
+
+<!-- 1.16.1 -->
 
 [#537]: https://github.com/certinia/debug-log-analyzer/issues/537
 [#526]: https://github.com/certinia/debug-log-analyzer/issues/526

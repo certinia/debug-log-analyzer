@@ -89,6 +89,11 @@ export class CallStack extends LitElement {
   }
 
   private onCallerClick(evt: Event) {
+    const { type } = window.getSelection() ?? {};
+    if (type === 'Range') {
+      return;
+    }
+
     evt.stopPropagation();
     evt.preventDefault();
     const target = evt.target as HTMLElement;
