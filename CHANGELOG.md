@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Table actions: copy to clipboard and export to CSV
+
 ### Change
 
 - Highlight and copy text to clipboard: Call Tree, Analysis and Database views ([#504][#504])

@@ -3,6 +3,7 @@
  */
 import {
   provideVSCodeDesignSystem,
+  vsCodeButton,
   vsCodeCheckbox,
   vsCodeDropdown,
   vsCodeOption,
@@ -11,6 +12,7 @@ import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { Tabulator, type ColumnComponent, type RowComponent } from 'tabulator-tables';
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
+import codiconStyles from '../../styles/codicon.css';
 
 import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
 import { progressFormatter } from '../../datagrid/format/Progress.js';
@@ -28,12 +30,18 @@ import { callStackSum } from './column-calcs/CallStackSum.js';
 // Components
 import '../skeleton/GridSkeleton.js';
 
-provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
+provideVSCodeDesignSystem().register(
+  vsCodeButton(),
+  vsCodeCheckbox(),
+  vsCodeDropdown(),
+  vsCodeOption(),
+);
 
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
+    unsafeCSS(codiconStyles),
     globalStyles,
     css`
       :host {
@@ -65,6 +73,17 @@ export class AnalysisView extends LitElement {
         font-size: var(--vscode-font-size);
         line-height: normal;
         margin-bottom: 2px;
+      }
+
+      .actions-container {
+        display: flex;
+      }
+
+      .actions-container .actions-container--right {
+        align-items: center;
+        display: flex;
+        flex: 1 1 auto;
+        justify-content: flex-end;
       }
     `,
   ];
@@ -104,7 +123,7 @@ export class AnalysisView extends LitElement {
     const skeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : '';
 
     return html`
-      <div class="filter-container">
+      <div class="actions-container">
         <div class="dropdown-container">
           <label for="groupby-dropdown">Group by</label>
           <vscode-dropdown id="groupby-dropdown" @change="${this._groupBy}">
@@ -113,12 +132,38 @@ export class AnalysisView extends LitElement {
             <vscode-option>Type</vscode-option>
           </vscode-dropdown>
         </div>
+        <div class="actions-container--right">
+          <vscode-button
+            appearance="icon"
+            aria-label="Export to CSV"
+            title="Export to CSV"
+            @click=${this._exportToCSV}
+          >
+            <span class="codicon codicon-desktop-download"></span>
+          </vscode-button>
+          <vscode-button
+            appearance="icon"
+            aria-label="Copy to clipboard"
+            title="Copy to clipboard"
+            @click=${this._copyToClipboard}
+          >
+            <span class="codicon codicon-copy"></span>
+          </vscode-button>
+        </div>
       </div>
       <div id="analysis-table-container">
         ${skeleton}
         <div id="analysis-table"></div>
       </div>
     `;
+  }
+
+  _copyToClipboard() {
+    this.analysisTable?.copyToClipboard('all');
+  }
+
+  _exportToCSV() {
+    this.analysisTable?.download('csv', 'analysis.csv', { bom: true, delimiter: ',' });
   }
 
   get _tableWrapper(): HTMLDivElement | null | undefined {
