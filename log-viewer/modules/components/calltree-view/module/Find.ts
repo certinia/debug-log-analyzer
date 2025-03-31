@@ -157,25 +157,27 @@ export class Find extends Module {
 }
 
 export function formatter(row: RowComponent, findArgs: FindArgs) {
-  if (!findArgs.text || !row.getData()) {
+  const { text, count } = findArgs;
+  if (!text || !count || !row.getData()) {
     return;
   }
+  requestAnimationFrame(() => {
+    const data = row.getData();
+    const highlights = {
+      indexes: data.highlightIndexes,
+      currentMatch: 0,
+    };
 
-  const data = row.getData();
-  const highlights = {
-    indexes: data.highlightIndexes,
-    currentMatch: 0,
-  };
+    row.getCells().forEach((cell) => {
+      const cellElem = cell.getElement();
+      _highlightText(cellElem, findArgs, highlights);
+    });
 
-  row.getCells().forEach((cell) => {
-    const cellElem = cell.getElement();
-    _highlightText(cellElem, findArgs, highlights);
+    //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+    if (row._getSelf().type === 'row') {
+      row.normalizeHeight();
+    }
   });
-
-  //@ts-expect-error This is private to tabulator, but we have no other choice atm.
-  if (row._getSelf().type === 'row') {
-    row.normalizeHeight();
-  }
 }
 
 function _highlightText(

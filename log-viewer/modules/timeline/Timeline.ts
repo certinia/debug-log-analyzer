@@ -161,7 +161,8 @@ let scaleFont: string,
   displayWidth: number,
   timelineRoot: ApexLog,
   lastMouseX: number,
-  lastMouseY: number;
+  lastMouseY: number,
+  dpr = window.devicePixelRatio || 1;
 
 let searchString: string = '';
 let matchIndex: number | null = null;
@@ -532,17 +533,27 @@ function resetView() {
 }
 
 function resize() {
-  if (!container) {
+  if (!container || !ctx) {
     return;
   }
-  const { clientWidth: newWidth, clientHeight: newHeight } = container;
-  isVisible = !!newWidth;
-  if (newWidth && newHeight && (newWidth !== displayWidth || newHeight !== displayHeight)) {
-    canvas.width = displayWidth = newWidth;
-    canvas.height = displayHeight = newHeight;
-    ctx?.setTransform(1, 0, 0, 1, 0, displayHeight); // shift y-axis down so that 0,0 is bottom-lefts
 
-    const newDefaultZoom = newWidth / timelineRoot.exitStamp;
+  dpr ??= window.devicePixelRatio || 1;
+  const { width: newWidth, height: newHeight } = container.getBoundingClientRect();
+  isVisible = !!newWidth;
+
+  if (newWidth && newHeight && (newWidth !== displayWidth || newHeight !== displayHeight)) {
+    canvas.width = newWidth * dpr;
+    canvas.height = newHeight * dpr;
+    displayWidth = newWidth;
+    displayHeight = newHeight;
+
+    // shift y-axis down so that 0,0 is bottom-lefts
+    ctx.setTransform(1, 0, 0, 1, 0, canvas.height);
+    // Scale all drawing operations by the dpr, so you
+    // don't have to worry about the difference.
+    ctx.scale(dpr, dpr);
+
+    const newDefaultZoom = displayWidth / timelineRoot.exitStamp;
     // defaults if not set yet
     state.defaultZoom ||= state.zoom ||= newDefaultZoom;
 
@@ -559,7 +570,7 @@ function resizeFont() {
 
 export function init(timelineContainer: HTMLDivElement, rootMethod: ApexLog) {
   container = timelineContainer;
-  canvas = timelineContainer.querySelector('#timeline') as HTMLCanvasElement;
+  canvas = timelineContainer.querySelector('#timeline')!;
   ctx = canvas.getContext('2d'); // can never be null since context (2d) is a supported type.
   timelineRoot = rootMethod;
   onInitTimeline();
@@ -589,6 +600,7 @@ function drawTimeLine() {
 
     drawTruncation(ctx);
     drawScale(ctx);
+
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 1;
     renderRectangles(ctx);
@@ -648,8 +660,8 @@ function showTooltip(offsetX: number, offsetY: number, shouldIgnoreWidth: boolea
   if (!dragging && container && tooltip) {
     const depth = getDepth(offsetY);
     const tooltipText =
-      findTimelineTooltip(offsetX, depth, shouldIgnoreWidth) || findTruncatedTooltip(offsetX);
-    showTooltipWithText(offsetX, offsetY, tooltipText, tooltip, container);
+      findTimelineTooltip(offsetX, depth, shouldIgnoreWidth) ?? findTruncatedTooltip(offsetX);
+    showTooltipWithText(offsetX, offsetY, tooltipText, tooltip);
   }
 }
 
@@ -755,9 +767,8 @@ function showTooltipWithText(
   offsetY: number,
   tooltipText: HTMLDivElement | null,
   tooltip: HTMLElement,
-  timelineWrapper: HTMLElement,
 ) {
-  if (tooltipText && tooltip && timelineWrapper) {
+  if (tooltipText && tooltip && container) {
     let posLeft = offsetX + 10,
       posTop = offsetY + 2;
 
@@ -765,12 +776,13 @@ function showTooltipWithText(
     tooltip.appendChild(tooltipText);
     tooltip.style.cssText = `left:${posLeft}px; top:${posTop}px; display: block;`;
 
-    const xDelta = tooltip.offsetWidth - timelineWrapper.offsetWidth + posLeft;
+    const { offsetWidth: width, offsetHeight: height } = container;
+    const xDelta = tooltip.offsetWidth - width + posLeft;
     if (xDelta > 0) {
       posLeft -= xDelta - 4;
     }
 
-    const yDelta = tooltip.offsetHeight - timelineWrapper.offsetHeight + posTop;
+    const yDelta = tooltip.offsetHeight - height + posTop;
     if (yDelta > 0) {
       posTop -= tooltip.offsetHeight + 4;
     }
@@ -802,13 +814,11 @@ function _hideTooltip() {
 function onMouseMove(evt: MouseEvent) {
   const target = evt.target as HTMLElement;
 
-  if (target && (target.id === 'timeline' || target.id === 'tooltip')) {
-    const clRect = canvas?.getBoundingClientRect();
-    if (clRect) {
-      lastMouseX = evt.clientX - clRect.left;
-      lastMouseY = evt.clientY - clRect.top;
-      debounce(showTooltip)(lastMouseX, lastMouseY, false);
-    }
+  if (target && canvas && (target.id === 'timeline' || target.id === 'tooltip')) {
+    const { left, top } = canvas.getBoundingClientRect();
+    lastMouseX = evt.clientX - left;
+    lastMouseY = evt.clientY - top;
+    debounce(showTooltip)(lastMouseX, lastMouseY, false);
   }
 }
 
