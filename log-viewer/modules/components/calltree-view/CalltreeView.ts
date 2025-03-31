@@ -296,7 +296,7 @@ export class CalltreeView extends LitElement {
   }
 
   _expandButtonClick() {
-    if (!this.calltreeTable) {
+    if (!this.calltreeTable?.modules?.dataTree) {
       return;
     }
     this.calltreeTable.blockRedraw();
@@ -305,7 +305,7 @@ export class CalltreeView extends LitElement {
   }
 
   _collapseButtonClick() {
-    if (!this.calltreeTable) {
+    if (!this.calltreeTable?.modules?.dataTree) {
       return;
     }
     this.calltreeTable.blockRedraw();
@@ -797,10 +797,6 @@ export class CalltreeView extends LitElement {
   }
 
   private _expandCollapseAll(rows: RowComponent[], expand: boolean = true) {
-    if (!this.calltreeTable?.modules?.dataTree) {
-      return;
-    }
-
     const len = rows.length;
     for (let i = 0; i < len; ++i) {
       const row = rows[i];
