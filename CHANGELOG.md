@@ -7,10 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Change
+### Changed
 
 - Highlight and copy text to clipboard: Call Tree, Analysis and Database views ([#504][#504])
-  - Previously the highlighted text would be immediately cleared
+  - Previously the highlighted text would be immediately cleared.
+- Column totals for Grouped rows will now be shown inside the groups instead of on a seperate row ([#583][#583])
 
 ### Fixed
 
@@ -375,6 +376,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 [#504]: https://github.com/certinia/debug-log-analyzer/issues/504
 [#581]: https://github.com/certinia/debug-log-analyzer/issues/581
+[#583]: https://github.com/certinia/debug-log-analyzer/issues/583
 
 <!-- 1.16.1 -->
 
