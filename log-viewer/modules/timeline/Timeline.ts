@@ -776,13 +776,12 @@ function showTooltipWithText(
     tooltip.appendChild(tooltipText);
     tooltip.style.cssText = `left:${posLeft}px; top:${posTop}px; display: block;`;
 
-    const width = container.offsetWidth;
+    const { offsetWidth: width, offsetHeight: height } = container;
     const xDelta = tooltip.offsetWidth - width + posLeft;
     if (xDelta > 0) {
       posLeft -= xDelta - 4;
     }
 
-    const height = container.offsetHeight;
     const yDelta = tooltip.offsetHeight - height + posTop;
     if (yDelta > 0) {
       posTop -= tooltip.offsetHeight + 4;
