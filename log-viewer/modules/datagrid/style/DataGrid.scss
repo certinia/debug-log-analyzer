@@ -85,9 +85,14 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
       max-width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
-      display: flex;
+      padding: unset;
       &:hover {
         background-color: $rowHoverBackground;
+      }
+
+      span {
+        margin-left: unset;
+        color: unset;
       }
     }
   }
