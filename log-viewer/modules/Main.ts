@@ -9,4 +9,4 @@ function onInit(): void {
   render(html`<log-viewer></log-viewer>`, document.body);
 }
 
-window.addEventListener('DOMContentLoaded', onInit);
+window.addEventListener('DOMContentLoaded', onInit, { once: true });
