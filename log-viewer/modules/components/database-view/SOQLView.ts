@@ -15,15 +15,21 @@ import {
   type RowComponent,
 } from 'tabulator-tables';
 
+//tabulator custom modules
+import { GroupCalcs } from '../../datagrid/group-calcs/GroupCalcs.js';
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
-
-import { DatabaseAccess } from '../../Database.js';
-import { isVisible } from '../../Util.js';
-import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
-import Number from '../../datagrid/format/Number.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
+import { Find, formatter } from '../calltree-view/module/Find.js';
+
+// tabulator others
+import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
+import Number from '../../datagrid/format/Number.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
+
+// others
+import { DatabaseAccess } from '../../Database.js';
+import { isVisible } from '../../Util.js';
 import {
   ApexLog,
   SOQLExecuteBeginLine,
@@ -31,7 +37,6 @@ import {
 } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
-import { Find, formatter } from '../calltree-view/module/Find.js';
 import databaseViewStyles from './DatabaseView.scss';
 
 // lit components
@@ -186,7 +191,7 @@ export class SOQLView extends LitElement {
         this.soqlLines = (await DatabaseAccess.create(treeRoot)).getSOQLLines() || [];
 
         Tabulator.registerModule(Object.values(CommonModules));
-        Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
+        Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs]);
         this._renderSOQLTable(tableWrapper, this.soqlLines);
       }
     });
@@ -278,7 +283,7 @@ export class SOQLView extends LitElement {
       data: soqlData,
       layout: 'fitColumns',
       placeholder: 'No SOQL queries found',
-      columnCalcs: 'both',
+      columnCalcs: 'table',
       clipboard: true,
       downloadEncoder: this.downlodEncoder('soql.csv'),
       downloadRowRange: 'all',
@@ -292,22 +297,10 @@ export class SOQLView extends LitElement {
       //@ts-expect-error types need update array is valid
       keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
       clipboardCopyRowRange: 'all',
+      groupCalcs: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
       groupValues: [soqlText],
-      groupHeader(value, count, data: GridSOQLData[], _group) {
-        const hasDetail = data.some((d) => {
-          return d.isDetail;
-        });
-
-        const newCount = hasDetail ? count - 1 : count;
-        return `
-      <div class="db-group-row">
-        <div class="db-group-row__title" title="${value}">${value}</div><span>(${newCount} ${
-          newCount > 1 ? 'Queries' : 'Query'
-        })</span>
-      </div>`;
-      },
       groupToggleElement: false,
       selectableRows: 'highlight',
       selectableRowsCheck: function (row: RowComponent) {

@@ -27,6 +27,8 @@ import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import { Find, formatter } from '../calltree-view/module/Find.js';
 import { callStackSum } from './column-calcs/CallStackSum.js';
 
+import { GroupCalcs } from '../../datagrid/group-calcs/GroupCalcs.js';
+
 // Components
 import '../skeleton/GridSkeleton.js';
 
@@ -250,14 +252,14 @@ export class AnalysisView extends LitElement {
     ];
 
     Tabulator.registerModule(Object.values(CommonModules));
-    Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
+    Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs]);
     this.analysisTable = new Tabulator(this._tableWrapper, {
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
       data: metricList,
       layout: 'fitColumns',
       placeholder: 'No Analysis Available',
-      columnCalcs: 'both',
+      columnCalcs: 'table',
       clipboard: true,
       downloadEncoder: function (fileContents: string, mimeType) {
         const vscodeHost = vscodeMessenger.getVsCodeAPI();
@@ -285,6 +287,7 @@ export class AnalysisView extends LitElement {
       keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
       clipboardCopyRowRange: 'all',
       height: '100%',
+      groupCalcs: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
       groupToggleElement: 'header',
