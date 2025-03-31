@@ -11,19 +11,24 @@ import {
   type RowComponent,
 } from 'tabulator-tables';
 
+// tabulator custom modules
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
-
-import { DatabaseAccess } from '../../Database.js';
-import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
-import Number from '../../datagrid/format/Number.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
+import { GroupCalcs } from '.././../datagrid/group-calcs/GroupCalcs.js';
+import { Find, formatter } from '../calltree-view/module/Find.js';
+
+// tabulator others
+import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
+import Number from '../../datagrid/format/Number.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
+
+// others
+import { DatabaseAccess } from '../../Database.js';
 import { ApexLog, DMLBeginLine } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import { isVisible } from '../../Util.js';
-import { Find, formatter } from '../calltree-view/module/Find.js';
 import databaseViewStyles from './DatabaseView.scss';
 
 // lit components
@@ -144,7 +149,7 @@ export class DMLView extends LitElement {
         this.dmlLines = dbAccess.getDMLLines() || [];
 
         Tabulator.registerModule(Object.values(CommonModules));
-        Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find]);
+        Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs]);
         this._renderDMLTable(tableWrapper, this.dmlLines);
       }
     });
@@ -239,27 +244,16 @@ export class DMLView extends LitElement {
       data: dmlData, //set initial table data
       layout: 'fitColumns',
       placeholder: 'No DML statements found',
-      columnCalcs: 'both',
+      columnCalcs: 'table',
+      groupCalcs: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
       groupValues: [dmlText],
-      groupHeader(value, count, data: DMLRow[], _group) {
-        const hasDetail = data.some((d) => {
-          return d.isDetail;
-        });
-
-        const newCount = hasDetail ? count - 1 : count;
-        return `
-      <div class="db-group-row">
-        <div class="db-group-row__title" title="${value}">${value}</div><span>(${newCount} DML)</span>
-      </div>
-        `;
-      },
-
-      groupToggleElement: 'header',
+      groupToggleElement: false,
       selectableRowsCheck: function (row: RowComponent) {
         return !row.getData().isDetail;
       },
+      selectableRows: 'highlight',
       dataTree: true,
       dataTreeBranchElement: false,
       columnDefaults: {
@@ -337,9 +331,7 @@ export class DMLView extends LitElement {
           row.normalizeHeight();
         }
 
-        requestAnimationFrame(() => {
-          formatter(row, this.findArgs);
-        });
+        formatter(row, this.findArgs);
       },
     });
 
@@ -353,18 +345,29 @@ export class DMLView extends LitElement {
     });
 
     this.dmlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
+      const { type } = window.getSelection() ?? {};
+      if (type === 'Range') {
+        return;
+      }
+
+      this.dmlTable?.blockRedraw();
+      group.toggle();
       if (!group.isVisible()) {
-        this.dmlTable?.blockRedraw();
         this.dmlTable?.getRows().forEach((row) => {
           if (!row.isTreeExpanded()) {
             row.treeExpand();
           }
         });
-        this.dmlTable?.restoreRedraw();
       }
+      this.dmlTable?.restoreRedraw();
     });
 
     this.dmlTable.on('rowClick', function (e, row) {
+      const { type } = window.getSelection() ?? {};
+      if (type === 'Range') {
+        return;
+      }
+
       const data = row.getData();
       if (!(data.timestamp && data.dml)) {
         return;

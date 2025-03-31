@@ -296,7 +296,7 @@ export class CalltreeView extends LitElement {
   }
 
   _expandButtonClick() {
-    if (!this.calltreeTable) {
+    if (!this.calltreeTable?.modules?.dataTree) {
       return;
     }
     this.calltreeTable.blockRedraw();
@@ -305,7 +305,7 @@ export class CalltreeView extends LitElement {
   }
 
   _collapseButtonClick() {
-    if (!this.calltreeTable) {
+    if (!this.calltreeTable?.modules?.dataTree) {
       return;
     }
     this.calltreeTable.blockRedraw();
@@ -571,9 +571,7 @@ export class CalltreeView extends LitElement {
           }
         },
         rowFormatter: (row: RowComponent) => {
-          requestAnimationFrame(() => {
-            formatter(row, this.findArgs);
-          });
+          formatter(row, this.findArgs);
         },
         columnCalcs: 'both',
         columnDefaults: {
@@ -630,6 +628,11 @@ export class CalltreeView extends LitElement {
             },
             variableHeight: true,
             cellClick: (e, cell) => {
+              const { type } = window.getSelection() ?? {};
+              if (type === 'Range') {
+                return;
+              }
+
               if (!(e.target as HTMLElement).matches('a')) {
                 return;
               }
@@ -795,10 +798,9 @@ export class CalltreeView extends LitElement {
 
   private _expandCollapseAll(rows: RowComponent[], expand: boolean = true) {
     const len = rows.length;
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < len; ++i) {
       const row = rows[i];
-      //@ts-expect-error This is private to tabulator, but we have no other choice atm.
-      if (!row?._getSelf().modules?.dataTree) {
+      if (!row) {
         continue;
       }
 

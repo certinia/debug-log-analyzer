@@ -33,26 +33,27 @@ export class CallStack extends LitElement {
         overflow: scroll;
       }
 
-      .stackEntry {
+      details summary {
         cursor: pointer;
       }
 
-      .dbLinkContainer {
+      details summary > * {
+        display: inline;
+      }
+
+      .callstack {
         display: flex;
+        flex-direction: column;
       }
 
-      .title {
-        font-weight: bold;
+      .callstack__item {
+        cursor: pointer;
       }
 
-      .code-text {
+      .code_text {
         font-family: monospace;
         font-weight: var(--vscode-font-weight, normal);
         font-size: var(--vscode-editor-font-size, 0.9em);
-      }
-
-      details {
-        display: flex;
       }
     `,
   ];
@@ -70,10 +71,10 @@ export class CallStack extends LitElement {
 
       return html` <details>
         <summary>${details[0]}</summary>
-        ${details.slice(1, -1)}
+        <div class="callstack">${details.slice(1, -1)}</div>
       </details>`;
     } else {
-      return html` <div class="stackEntry">No call stack available</div>`;
+      return html` <div class="callstack__item">No call stack available</div>`;
     }
   }
 
@@ -81,7 +82,7 @@ export class CallStack extends LitElement {
     return html`
       <a
         @click=${this.onCallerClick}
-        class="stackEntry code-text"
+        class="callstack__item code_text"
         data-timestamp="${line.timestamp}"
         >${line.text}</a
       >
@@ -89,6 +90,11 @@ export class CallStack extends LitElement {
   }
 
   private onCallerClick(evt: Event) {
+    const { type } = window.getSelection() ?? {};
+    if (type === 'Range') {
+      return;
+    }
+
     evt.stopPropagation();
     evt.preventDefault();
     const target = evt.target as HTMLElement;
