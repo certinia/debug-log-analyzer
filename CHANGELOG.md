@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Change
 
-- Highlight and copy text to clipboard: Call Tree, Analysis and Database views ([#504][#504])
-  - Previously the highlighted text would be immediately cleared
+- Highlight and copy text to clipboard: Call Tree, Analysis and Database views. ([#504][#504])
+  - Previously the highlighted text would be immediately cleared.
+- Sharper timeline rending on HiDPI displays ([#588][#588]).
 
 ### Fixed
 
@@ -375,6 +376,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 [#504]: https://github.com/certinia/debug-log-analyzer/issues/504
 [#581]: https://github.com/certinia/debug-log-analyzer/issues/581
+[#588]: https://github.com/certinia/debug-log-analyzer/issues/588
 
 <!-- 1.16.1 -->
 
