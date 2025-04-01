@@ -132,8 +132,13 @@ export class AnalysisView extends LitElement {
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
     const fieldName = target.value.toLowerCase();
-
-    this.analysisTable?.setGroupBy(fieldName !== 'none' ? fieldName : '');
+    if (this.analysisTable) {
+      this.analysisTable.options.groupBy = fieldName !== 'none' ? fieldName : '';
+      this.analysisTable?.blockRedraw();
+      this._sortGroups();
+      this.analysisTable?.setGroupBy(fieldName !== 'none' ? fieldName : '');
+      this.analysisTable?.restoreRedraw();
+    }
   }
 
   _appendTableWhenVisible() {
@@ -277,6 +282,7 @@ export class AnalysisView extends LitElement {
           formatter: 'textarea',
           headerSortStartingDir: 'asc',
           sorter: 'string',
+          headerSortTristate: true,
           cssClass: 'datagrid-code-text',
           bottomCalc: () => {
             return 'Total';
@@ -361,6 +367,85 @@ export class AnalysisView extends LitElement {
       this._resetFindWidget();
       this._clearSearchHighlights();
     });
+
+    this.analysisTable.on('dataSorting', (sorters) => {
+      this.analysisTable?.blockRedraw();
+      this._sortGroups();
+      this.analysisTable?.restoreRedraw();
+    });
+  }
+
+  _sortGroups() {
+    if (
+      this.analysisTable &&
+      this.analysisTable.options.sortMode !== 'remote' &&
+      this.analysisTable.options.groupBy
+    ) {
+      const groupRows = this.analysisTable.modules.groupRows;
+      const columnCalcs = this.analysisTable.modules.columnCalcs;
+      const rows = this.analysisTable.rowManager.rows;
+      const sorter = this.analysisTable.modules.sort;
+      const sortList = this.analysisTable.options.sortOrderReverse
+        ? sorter.sortList.slice().reverse()
+        : sorter.sortList;
+
+      const groupTotalsRows = [];
+      const field = columnCalcs.botCalcs[0].field;
+      groupRows.configureGroupSetup();
+      groupRows.generateGroups(rows);
+
+      groupRows.groupList.forEach((group) => {
+        const row = columnCalcs.generateBottomRow(group.rows);
+        row.data[field] = group.key;
+        row.key = group.key;
+        row.rows = group.rows;
+        row.generateCells();
+        groupTotalsRows.push(row);
+      });
+
+      const sortListActual = [];
+      //build list of valid sorters and trigger column specific callbacks before sort begins
+      sortList.forEach(function (item, i) {
+        var sortObj;
+
+        if (item.column) {
+          sortObj = item.column.modules.sort;
+
+          if (sortObj) {
+            //if no sorter has been defined, take a guess
+            if (!sortObj.sorter) {
+              sortObj.sorter = sorter.findSorter(item.column);
+            }
+
+            item.params =
+              typeof sortObj.params === 'function'
+                ? sortObj.params(item.column.getComponent(), item.dir)
+                : sortObj.params;
+
+            sortListActual.push(item);
+          }
+        }
+      });
+
+      //sort data
+      if (sortListActual.length) {
+        sorter._sortItems(groupTotalsRows, sortListActual);
+      } else {
+        groupTotalsRows.sort((a, b) => {
+          const index = b.rows.length - a.rows.length;
+          if (index === 0) {
+            return a.key.localeCompare(b.key);
+          }
+          return index;
+        });
+      }
+      const groupValues = [];
+      groupTotalsRows.forEach((colTotals) => {
+        groupValues.push(colTotals.data[field]);
+      });
+
+      this.analysisTable?.setGroupValues([groupValues]);
+    }
   }
 
   _resetFindWidget() {
