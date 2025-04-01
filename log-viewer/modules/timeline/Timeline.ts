@@ -6,9 +6,8 @@ import formatDuration, { debounce } from '../Util.js';
 import { goToRow } from '../components/calltree-view/CalltreeView.js';
 import {
   ApexLog,
-  LogLine,
+  LogEvent,
   Method,
-  TimedNode,
   type LogIssue,
   type LogSubCategory,
 } from '../parsers/ApexLogParser.js';
@@ -173,8 +172,8 @@ let findArgs: { text: string; count: number; options: { matchCase: boolean } } =
 };
 let totalMatches = 0;
 
-function getMaxDepth(nodes: LogLine[]) {
-  const result = new Map<number, LogLine[]>();
+function getMaxDepth(nodes: LogEvent[]) {
+  const result = new Map<number, LogEvent[]>();
   result.set(0, nodes);
 
   let currentDepth = 1;
@@ -609,12 +608,12 @@ function drawTimeLine() {
 }
 
 function findByPosition(
-  nodes: LogLine[],
+  nodes: LogEvent[],
   depth: number,
   x: number,
   targetDepth: number,
   shouldIgnoreWidth: boolean,
-): LogLine | null {
+): LogEvent | null {
   if (!nodes) {
     return null;
   }
@@ -672,7 +671,7 @@ function findTimelineTooltip(
 ): HTMLDivElement | null {
   const target = findByPosition(timelineRoot.children, 0, x, depth, shouldIgnoreWidth);
 
-  if (target && target instanceof TimedNode) {
+  if (target) {
     canvas.classList.remove('timeline-hover', 'timeline-dragging');
     canvas.classList.add('timeline-event--hover');
 
@@ -826,13 +825,7 @@ function onClickCanvas(): void {
   const isClick = mouseDownPosition.x === lastMouseX && mouseDownPosition.y === lastMouseY;
   if (!dragging && isClick) {
     const depth = getDepth(lastMouseY);
-    let timeStamp = findByPosition(
-      timelineRoot.children as TimedNode[],
-      0,
-      lastMouseX,
-      depth,
-      false,
-    )?.timestamp;
+    let timeStamp = findByPosition(timelineRoot.children, 0, lastMouseX, depth, false)?.timestamp;
 
     if (!timeStamp) {
       timeStamp = findLogIssue(lastMouseX)?.startTime;
