@@ -1,7 +1,8 @@
 ---
 name: ✨ Feature request
 about: Suggest an idea for this project
-title: 'feat: <title>'
+title: '✨ feat: <title>'
+type: 'Feature'
 labels: ['enhancement', 'needs-triage']
 assignees: ''
 ---
