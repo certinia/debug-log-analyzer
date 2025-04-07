@@ -30,6 +30,7 @@ import { callStackSum } from './column-calcs/CallStackSum.js';
 import { GroupCalcs } from '../../datagrid/group-calcs/GroupCalcs.js';
 
 // Components
+import '../datagrid/datagrid-filter-bar.js';
 import '../skeleton/GridSkeleton.js';
 
 provideVSCodeDesignSystem().register(
@@ -76,17 +77,6 @@ export class AnalysisView extends LitElement {
         line-height: normal;
         margin-bottom: 2px;
       }
-
-      .actions-container {
-        display: flex;
-      }
-
-      .actions-container .actions-container--right {
-        align-items: center;
-        display: flex;
-        flex: 1 1 auto;
-        justify-content: flex-end;
-      }
     `,
   ];
 
@@ -125,16 +115,17 @@ export class AnalysisView extends LitElement {
     const skeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : '';
 
     return html`
-      <div class="actions-container">
-        <div class="dropdown-container">
-          <label for="groupby-dropdown">Group by</label>
+      <datagrid-filter-bar>
+        <div slot="filters" class="dropdown-container">
+          <label for="groupby-dropdown"><strong>Group by</strong></label>
           <vscode-dropdown id="groupby-dropdown" @change="${this._groupBy}">
             <vscode-option>None</vscode-option>
             <vscode-option>Namespace</vscode-option>
             <vscode-option>Type</vscode-option>
           </vscode-dropdown>
         </div>
-        <div class="actions-container--right">
+
+        <div slot="actions">
           <vscode-button
             appearance="icon"
             aria-label="Export to CSV"
@@ -152,7 +143,8 @@ export class AnalysisView extends LitElement {
             <span class="codicon codicon-copy"></span>
           </vscode-button>
         </div>
-      </div>
+      </datagrid-filter-bar>
+
       <div id="analysis-table-container">
         ${skeleton}
         <div id="analysis-table"></div>
