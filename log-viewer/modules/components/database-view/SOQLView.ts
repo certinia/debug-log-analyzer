@@ -17,7 +17,7 @@ import {
 } from 'tabulator-tables';
 
 //tabulator custom modules
-import { GroupCalcs } from '../../datagrid/group-calcs/GroupCalcs.js';
+import { GroupCalcs } from '../../datagrid/groups/GroupCalcs.js';
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';

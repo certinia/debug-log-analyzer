@@ -19,7 +19,7 @@ import { Tabulator, type RowComponent } from 'tabulator-tables';
 import { isVisible } from '../../Util.js';
 import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
 import { progressFormatter } from '../../datagrid/format/Progress.js';
-import { GroupCalcs } from '../../datagrid/group-calcs/GroupCalcs.js';
+import { GroupCalcs } from '../../datagrid/groups/GroupCalcs.js';
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';

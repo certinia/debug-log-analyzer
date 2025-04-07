@@ -11,10 +11,10 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 // tabulator custom modules
+import { GroupCalcs } from '../../datagrid/groups/GroupCalcs.js';
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
-import { GroupCalcs } from '.././../datagrid/group-calcs/GroupCalcs.js';
 import { Find, formatter } from '../calltree-view/module/Find.js';
 
 // tabulator others
