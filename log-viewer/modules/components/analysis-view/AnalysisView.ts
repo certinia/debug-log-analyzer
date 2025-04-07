@@ -10,24 +10,23 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { Tabulator, type ColumnComponent, type RowComponent } from 'tabulator-tables';
-import * as CommonModules from '../../datagrid/module/CommonModules.js';
-import codiconStyles from '../../styles/codicon.css';
-
-import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
-import { progressFormatter } from '../../datagrid/format/Progress.js';
-import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
-import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 import { ApexLog, LogLine } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
-import { isVisible } from '../../Util.js';
 
+// Tabulator custom modules, imports + styles
+import { Tabulator, type ColumnComponent, type RowComponent } from 'tabulator-tables';
+import { isVisible } from '../../Util.js';
+import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
+import { progressFormatter } from '../../datagrid/format/Progress.js';
+import { GroupCalcs } from '../../datagrid/group-calcs/GroupCalcs.js';
+import * as CommonModules from '../../datagrid/module/CommonModules.js';
+import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
+import dataGridStyles from '../../datagrid/style/DataGrid.scss';
+import codiconStyles from '../../styles/codicon.css';
 import { Find, formatter } from '../calltree-view/module/Find.js';
 import { callStackSum } from './column-calcs/CallStackSum.js';
-
-import { GroupCalcs } from '../../datagrid/group-calcs/GroupCalcs.js';
 
 // Components
 import '../datagrid/datagrid-filter-bar.js';
@@ -67,15 +66,15 @@ export class AnalysisView extends LitElement {
         flex-flow: column nowrap;
         align-items: flex-start;
         justify-content: flex-start;
-      }
 
-      .dropdown-container label {
-        display: block;
-        color: var(--vscode-foreground);
-        cursor: pointer;
-        font-size: var(--vscode-font-size);
-        line-height: normal;
-        margin-bottom: 2px;
+        label {
+          display: block;
+          color: var(--vscode-foreground);
+          cursor: pointer;
+          font-size: var(--vscode-font-size);
+          line-height: normal;
+          margin-bottom: 2px;
+        }
       }
     `,
   ];
