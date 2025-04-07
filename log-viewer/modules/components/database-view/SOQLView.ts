@@ -3,6 +3,7 @@
  */
 import {
   provideVSCodeDesignSystem,
+  vsCodeButton,
   vsCodeDropdown,
   vsCodeOption,
 } from '@vscode/webview-ui-toolkit';
@@ -36,6 +37,7 @@ import {
   SOQLExecuteExplainLine,
 } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
+import codiconStyles from '../../styles/codicon.css';
 import { globalStyles } from '../../styles/global.styles.js';
 import databaseViewStyles from './DatabaseView.scss';
 
@@ -44,7 +46,7 @@ import '../CallStack.js';
 import './DatabaseSOQLDetailPanel.js';
 import './DatabaseSection.js';
 
-provideVSCodeDesignSystem().register(vsCodeDropdown(), vsCodeOption());
+provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDropdown(), vsCodeOption());
 
 @customElement('soql-view')
 export class SOQLView extends LitElement {
@@ -99,6 +101,7 @@ export class SOQLView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
     unsafeCSS(databaseViewStyles),
+    unsafeCSS(codiconStyles),
     globalStyles,
     css`
       :host {
@@ -117,25 +120,21 @@ export class SOQLView extends LitElement {
         margin-bottom: 1rem;
       }
 
-      .filter-container {
-        margin-bottom: 1rem;
-      }
-
       .dropdown-container {
         box-sizing: border-box;
         display: flex;
         flex-flow: column nowrap;
         align-items: flex-start;
         justify-content: flex-start;
-      }
 
-      .dropdown-container label {
-        display: block;
-        color: var(--vscode-foreground);
-        cursor: pointer;
-        font-size: var(--vscode-font-size);
-        line-height: normal;
-        margin-bottom: 2px;
+        label {
+          display: block;
+          color: var(--vscode-foreground);
+          cursor: pointer;
+          font-size: var(--vscode-font-size);
+          line-height: normal;
+          margin-bottom: 2px;
+        }
       }
     `,
   ];
@@ -144,21 +143,50 @@ export class SOQLView extends LitElement {
     const soqlSkeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : ``;
     return html`
       <database-section title="SOQL Statements" .dbLines="${this.soqlLines}"></database-section>
-      <div class="filter-container">
-        <div class="dropdown-container">
-          <label for="soql-groupby-dropdown">Group by</label>
+
+      <datagrid-filter-bar>
+        <div slot="filters" class="dropdown-container">
+          <label for="soql-groupby-dropdown"><strong>Group by</strong></label>
           <vscode-dropdown id="soql-groupby-dropdown" @change="${this._soqlGroupBy}">
             <vscode-option>SOQL</vscode-option>
             <vscode-option>Namespace</vscode-option>
             <vscode-option>None</vscode-option>
           </vscode-dropdown>
         </div>
-      </div>
+
+        <div slot="actions">
+          <vscode-button
+            appearance="icon"
+            aria-label="Export to CSV"
+            title="Export to CSV"
+            @click=${this._exportToCSV}
+          >
+            <span class="codicon codicon-desktop-download"></span>
+          </vscode-button>
+          <vscode-button
+            appearance="icon"
+            aria-label="Copy to clipboard"
+            title="Copy to clipboard"
+            @click=${this._copyToClipboard}
+          >
+            <span class="codicon codicon-copy"></span>
+          </vscode-button>
+        </div>
+      </datagrid-filter-bar>
+
       <div id="soql-table-container">
         ${soqlSkeleton}
         <div id="db-soql-table"></div>
       </div>
     `;
+  }
+
+  _copyToClipboard() {
+    this.soqlTable?.copyToClipboard('all');
+  }
+
+  _exportToCSV() {
+    this.soqlTable?.download('csv', 'soql.csv', { bom: true, delimiter: ',' });
   }
 
   _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
@@ -313,7 +341,6 @@ export class SOQLView extends LitElement {
         resizable: true,
         headerSortStartingDir: 'desc',
         headerTooltip: true,
-        headerMenu: this.csvheaderMenu('soql.csv'),
         headerWordWrap: true,
       },
       initialSort: [{ column: 'rowCount', dir: 'desc' }],
@@ -581,17 +608,6 @@ export class SOQLView extends LitElement {
     const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
 
     return [...newMap.keys()];
-  }
-
-  csvheaderMenu(csvFileName: string) {
-    return [
-      {
-        label: 'Export to CSV',
-        action: function (_e: PointerEvent, column: ColumnComponent) {
-          column.getTable().download('csv', csvFileName, { bom: true, delimiter: ',' });
-        },
-      },
-    ];
   }
 
   downlodEncoder(defaultFileName: string) {
