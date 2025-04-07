@@ -250,7 +250,7 @@ export class AnalysisView extends LitElement {
 
         return new Blob([fileContents], { type: mimeType });
       },
-      dataTree: true,
+      dataTree: true, // temporary: fixes a disappearing table issue when scroll is dragged (needs fix in Tabulator)
       downloadRowRange: 'all',
       downloadConfig: {
         columnHeaders: true,
