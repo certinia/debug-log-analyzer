@@ -50,14 +50,32 @@ export class AnalysisView extends LitElement {
         height: 100%;
         width: 100%;
         display: flex;
-        flex-direction: column;
-        flex: 1;
         gap: 1rem;
       }
 
-      #analysis-table-container {
-        display: contents;
+      .analysis-view {
+        display: flex;
+        flex-direction: column;
         height: 100%;
+        width: 100%;
+      }
+
+      #analysis-table-container {
+        height: 100%;
+        width: 100%;
+        min-height: 0;
+        min-width: 0;
+      }
+
+      #analysis-table {
+        display: inline-block;
+        height: 100%;
+        width: 100%;
+      }
+
+      .filter-container {
+        display: flex;
+        gap: 5px;
       }
 
       .dropdown-container {
@@ -114,39 +132,41 @@ export class AnalysisView extends LitElement {
     const skeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : '';
 
     return html`
-      <datagrid-filter-bar>
-        <div slot="filters" class="dropdown-container">
-          <label for="groupby-dropdown"><strong>Group by</strong></label>
-          <vscode-dropdown id="groupby-dropdown" @change="${this._groupBy}">
-            <vscode-option>None</vscode-option>
-            <vscode-option>Namespace</vscode-option>
-            <vscode-option>Type</vscode-option>
-          </vscode-dropdown>
-        </div>
+      <div class="analysis-view">
+        <datagrid-filter-bar>
+          <div slot="filters" class="dropdown-container">
+            <label for="groupby-dropdown"><strong>Group by</strong></label>
+            <vscode-dropdown id="groupby-dropdown" @change="${this._groupBy}">
+              <vscode-option>None</vscode-option>
+              <vscode-option>Namespace</vscode-option>
+              <vscode-option>Type</vscode-option>
+            </vscode-dropdown>
+          </div>
 
-        <div slot="actions">
-          <vscode-button
-            appearance="icon"
-            aria-label="Export to CSV"
-            title="Export to CSV"
-            @click=${this._exportToCSV}
-          >
-            <span class="codicon codicon-desktop-download"></span>
-          </vscode-button>
-          <vscode-button
-            appearance="icon"
-            aria-label="Copy to clipboard"
-            title="Copy to clipboard"
-            @click=${this._copyToClipboard}
-          >
-            <span class="codicon codicon-copy"></span>
-          </vscode-button>
-        </div>
-      </datagrid-filter-bar>
+          <div slot="actions">
+            <vscode-button
+              appearance="icon"
+              aria-label="Export to CSV"
+              title="Export to CSV"
+              @click=${this._exportToCSV}
+            >
+              <span class="codicon codicon-desktop-download"></span>
+            </vscode-button>
+            <vscode-button
+              appearance="icon"
+              aria-label="Copy to clipboard"
+              title="Copy to clipboard"
+              @click=${this._copyToClipboard}
+            >
+              <span class="codicon codicon-copy"></span>
+            </vscode-button>
+          </div>
+        </datagrid-filter-bar>
 
-      <div id="analysis-table-container">
-        ${skeleton}
-        <div id="analysis-table"></div>
+        <div id="analysis-table-container">
+          ${skeleton}
+          <div id="analysis-table"></div>
+        </div>
       </div>
     `;
   }
@@ -257,6 +277,7 @@ export class AnalysisView extends LitElement {
 
         return new Blob([fileContents], { type: mimeType });
       },
+      dataTree: true, // temporary: fixes a disappearing table issue when scroll is dragged (needs fix in Tabulator)
       downloadRowRange: 'all',
       downloadConfig: {
         columnHeaders: true,
@@ -269,6 +290,7 @@ export class AnalysisView extends LitElement {
       keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
       clipboardCopyRowRange: 'all',
       height: '100%',
+      maxHeight: '100%',
       groupCalcs: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
@@ -325,6 +347,7 @@ export class AnalysisView extends LitElement {
             multiselect: true,
           },
           headerFilterLiveFilter: false,
+          variableHeight: true,
         },
         {
           title: 'Type',
