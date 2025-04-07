@@ -3,53 +3,79 @@
  */
 import {
   provideVSCodeDesignSystem,
+  vsCodeButton,
   vsCodeCheckbox,
   vsCodeDropdown,
   vsCodeOption,
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { Tabulator, type ColumnComponent, type RowComponent } from 'tabulator-tables';
-import * as CommonModules from '../../datagrid/module/CommonModules.js';
-
-import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
-import { progressFormatter } from '../../datagrid/format/Progress.js';
-import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
-import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 import { ApexLog, LogLine } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
-import { isVisible } from '../../Util.js';
 
+// Tabulator custom modules, imports + styles
+import { Tabulator, type RowComponent } from 'tabulator-tables';
+import { isVisible } from '../../Util.js';
+import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
+import { progressFormatter } from '../../datagrid/format/Progress.js';
+import { GroupCalcs } from '../../datagrid/group-calcs/GroupCalcs.js';
+import * as CommonModules from '../../datagrid/module/CommonModules.js';
+import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
+import dataGridStyles from '../../datagrid/style/DataGrid.scss';
+import codiconStyles from '../../styles/codicon.css';
 import { Find, formatter } from '../calltree-view/module/Find.js';
 import { callStackSum } from './column-calcs/CallStackSum.js';
 
-import { GroupCalcs } from '../../datagrid/group-calcs/GroupCalcs.js';
-
 // Components
+import '../datagrid/datagrid-filter-bar.js';
 import '../skeleton/GridSkeleton.js';
 
-provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
+provideVSCodeDesignSystem().register(
+  vsCodeButton(),
+  vsCodeCheckbox(),
+  vsCodeDropdown(),
+  vsCodeOption(),
+);
 
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
+    unsafeCSS(codiconStyles),
     globalStyles,
     css`
       :host {
         height: 100%;
         width: 100%;
         display: flex;
-        flex-direction: column;
-        flex: 1;
         gap: 1rem;
       }
 
-      #analysis-table-container {
-        display: contents;
+      .analysis-view {
+        display: flex;
+        flex-direction: column;
         height: 100%;
+        width: 100%;
+      }
+
+      #analysis-table-container {
+        height: 100%;
+        width: 100%;
+        min-height: 0;
+        min-width: 0;
+      }
+
+      #analysis-table {
+        display: inline-block;
+        height: 100%;
+        width: 100%;
+      }
+
+      .filter-container {
+        display: flex;
+        gap: 5px;
       }
 
       .dropdown-container {
@@ -58,15 +84,15 @@ export class AnalysisView extends LitElement {
         flex-flow: column nowrap;
         align-items: flex-start;
         justify-content: flex-start;
-      }
 
-      .dropdown-container label {
-        display: block;
-        color: var(--vscode-foreground);
-        cursor: pointer;
-        font-size: var(--vscode-font-size);
-        line-height: normal;
-        margin-bottom: 2px;
+        label {
+          display: block;
+          color: var(--vscode-foreground);
+          cursor: pointer;
+          font-size: var(--vscode-font-size);
+          line-height: normal;
+          margin-bottom: 2px;
+        }
       }
     `,
   ];
@@ -106,21 +132,51 @@ export class AnalysisView extends LitElement {
     const skeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : '';
 
     return html`
-      <div class="filter-container">
-        <div class="dropdown-container">
-          <label for="groupby-dropdown">Group by</label>
-          <vscode-dropdown id="groupby-dropdown" @change="${this._groupBy}">
-            <vscode-option>None</vscode-option>
-            <vscode-option>Namespace</vscode-option>
-            <vscode-option>Type</vscode-option>
-          </vscode-dropdown>
+      <div class="analysis-view">
+        <datagrid-filter-bar>
+          <div slot="filters" class="dropdown-container">
+            <label for="groupby-dropdown"><strong>Group by</strong></label>
+            <vscode-dropdown id="groupby-dropdown" @change="${this._groupBy}">
+              <vscode-option>None</vscode-option>
+              <vscode-option>Namespace</vscode-option>
+              <vscode-option>Type</vscode-option>
+            </vscode-dropdown>
+          </div>
+
+          <div slot="actions">
+            <vscode-button
+              appearance="icon"
+              aria-label="Export to CSV"
+              title="Export to CSV"
+              @click=${this._exportToCSV}
+            >
+              <span class="codicon codicon-desktop-download"></span>
+            </vscode-button>
+            <vscode-button
+              appearance="icon"
+              aria-label="Copy to clipboard"
+              title="Copy to clipboard"
+              @click=${this._copyToClipboard}
+            >
+              <span class="codicon codicon-copy"></span>
+            </vscode-button>
+          </div>
+        </datagrid-filter-bar>
+
+        <div id="analysis-table-container">
+          ${skeleton}
+          <div id="analysis-table"></div>
         </div>
       </div>
-      <div id="analysis-table-container">
-        ${skeleton}
-        <div id="analysis-table"></div>
-      </div>
     `;
+  }
+
+  _copyToClipboard() {
+    this.analysisTable?.copyToClipboard('all');
+  }
+
+  _exportToCSV() {
+    this.analysisTable?.download('csv', 'analysis.csv', { bom: true, delimiter: ',' });
   }
 
   get _tableWrapper(): HTMLDivElement | null | undefined {
@@ -202,15 +258,6 @@ export class AnalysisView extends LitElement {
     }
     const metricList = groupMetrics(rootMethod);
 
-    const headerMenu = [
-      {
-        label: 'Export to CSV',
-        action: function (_e: PointerEvent, column: ColumnComponent) {
-          column.getTable().download('csv', 'analysis.csv', { bom: true, delimiter: ',' });
-        },
-      },
-    ];
-
     Tabulator.registerModule(Object.values(CommonModules));
     Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs]);
     this.analysisTable = new Tabulator(this._tableWrapper, {
@@ -235,6 +282,7 @@ export class AnalysisView extends LitElement {
 
         return new Blob([fileContents], { type: mimeType });
       },
+      dataTree: true, // temporary: fixes a disappearing table issue when scroll is dragged (needs fix in Tabulator)
       downloadRowRange: 'all',
       downloadConfig: {
         columnHeaders: true,
@@ -247,6 +295,7 @@ export class AnalysisView extends LitElement {
       keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
       clipboardCopyRowRange: 'all',
       height: '100%',
+      maxHeight: '100%',
       groupCalcs: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
@@ -259,7 +308,6 @@ export class AnalysisView extends LitElement {
         resizable: true,
         headerSortStartingDir: 'desc',
         headerTooltip: true,
-        headerMenu: headerMenu,
         headerWordWrap: true,
       },
       initialSort: [{ column: 'selfTime', dir: 'desc' }],
@@ -305,6 +353,7 @@ export class AnalysisView extends LitElement {
             multiselect: true,
           },
           headerFilterLiveFilter: false,
+          variableHeight: true,
         },
         {
           title: 'Type',

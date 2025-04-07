@@ -1,7 +1,8 @@
 ---
 name: 🔧 Chore
 about: Something other than a bug/ feature.
-title: 'chore: <title>'
+title: '🔧 chore: <title>'
+type: 'Task'
 labels: ['chore']
 assignees: ''
 ---

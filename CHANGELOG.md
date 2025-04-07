@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Column totals for Grouped rows will now be shown inside the groups instead of on a seperate row ([#583][#583]).
+- Table actions: Copy to clipboard and Export to CSV directly from the button above the Analysis and Database table ([#589]).
 
 ### Changed
 
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Call Tree: Performance regression of Call Tree rendering ([#581][#581]).
 - Call Tree: Call Tree not correctly keeping position when rows where hidden / shown via Details and Debug Only ([#581][#581]).
 - Database: Call stack shows items horizontally instead of vertically ([#582][#582])
+- Analysis: Sometimes disappered when dragging the scroll bar down, sorry about that. ([#590])
 
 ## [1.16.1] - 2024-12-03
 
@@ -384,6 +386,8 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#582]: https://github.com/certinia/debug-log-analyzer/issues/582
 [#588]: https://github.com/certinia/debug-log-analyzer/issues/588
 [#583]: https://github.com/certinia/debug-log-analyzer/issues/583
+[#589]: https://github.com/certinia/debug-log-analyzer/issues/589
+[#590]: https://github.com/certinia/debug-log-analyzer/issues/590
 
 <!-- 1.16.1 -->
 
