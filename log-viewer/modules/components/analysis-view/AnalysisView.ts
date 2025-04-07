@@ -15,7 +15,7 @@ import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 
 // Tabulator custom modules, imports + styles
-import { Tabulator, type ColumnComponent, type RowComponent } from 'tabulator-tables';
+import { Tabulator, type RowComponent } from 'tabulator-tables';
 import { isVisible } from '../../Util.js';
 import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
 import { progressFormatter } from '../../datagrid/format/Progress.js';
@@ -233,15 +233,6 @@ export class AnalysisView extends LitElement {
     }
     const metricList = groupMetrics(rootMethod);
 
-    const headerMenu = [
-      {
-        label: 'Export to CSV',
-        action: function (_e: PointerEvent, column: ColumnComponent) {
-          column.getTable().download('csv', 'analysis.csv', { bom: true, delimiter: ',' });
-        },
-      },
-    ];
-
     Tabulator.registerModule(Object.values(CommonModules));
     Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs]);
     this.analysisTable = new Tabulator(this._tableWrapper, {
@@ -290,7 +281,6 @@ export class AnalysisView extends LitElement {
         resizable: true,
         headerSortStartingDir: 'desc',
         headerTooltip: true,
-        headerMenu: headerMenu,
         headerWordWrap: true,
       },
       initialSort: [{ column: 'selfTime', dir: 'desc' }],

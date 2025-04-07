@@ -8,12 +8,7 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import {
-  Tabulator,
-  type ColumnComponent,
-  type GroupComponent,
-  type RowComponent,
-} from 'tabulator-tables';
+import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 // tabulator custom modules
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
@@ -298,7 +293,6 @@ export class DMLView extends LitElement {
         resizable: true,
         headerSortStartingDir: 'desc',
         headerTooltip: true,
-        headerMenu: this.csvheaderMenu('dml.csv'),
         headerWordWrap: true,
       },
       initialSort: [{ column: 'rowCount', dir: 'desc' }],
@@ -471,17 +465,6 @@ export class DMLView extends LitElement {
     const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
 
     return [...newMap.keys()];
-  }
-
-  csvheaderMenu(csvFileName: string) {
-    return [
-      {
-        label: 'Export to CSV',
-        action: function (_e: PointerEvent, column: ColumnComponent) {
-          column.getTable().download('csv', csvFileName, { bom: true, delimiter: ',' });
-        },
-      },
-    ];
   }
 
   downlodEncoder(defaultFileName: string) {

@@ -341,7 +341,6 @@ export class SOQLView extends LitElement {
         resizable: true,
         headerSortStartingDir: 'desc',
         headerTooltip: true,
-        headerMenu: this.csvheaderMenu('soql.csv'),
         headerWordWrap: true,
       },
       initialSort: [{ column: 'rowCount', dir: 'desc' }],
@@ -609,17 +608,6 @@ export class SOQLView extends LitElement {
     const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
 
     return [...newMap.keys()];
-  }
-
-  csvheaderMenu(csvFileName: string) {
-    return [
-      {
-        label: 'Export to CSV',
-        action: function (_e: PointerEvent, column: ColumnComponent) {
-          column.getTable().download('csv', csvFileName, { bom: true, delimiter: ',' });
-        },
-      },
-    ];
   }
 
   downlodEncoder(defaultFileName: string) {
