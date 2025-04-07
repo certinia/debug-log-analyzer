@@ -110,18 +110,19 @@ export class CalltreeView extends LitElement {
         flex-direction: column;
         height: 100%;
         width: 100%;
-        min-height: 0;
-        min-width: 0;
       }
 
       #call-tree-table-container {
         height: 100%;
-        flex-grow: 1;
+        width: 100%;
         min-height: 0;
+        min-width: 0;
       }
 
       #call-tree-table {
+        display: inline-block;
         height: 100%;
+        width: 100%;
       }
 
       .header-bar {

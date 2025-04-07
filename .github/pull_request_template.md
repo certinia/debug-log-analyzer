@@ -17,14 +17,14 @@
 - [ ] 🔧 Chore
 - [ ] 💥 Breaking change
 
-## [optional] Any images / gifs / video
+## Any images / gifs / video [optional]
 
-## Related Tickets & Documents
+## Related Issues
 
-Related Issue #
 fixes #
 resolves #
 closes #
+related #
 
 ## Added tests?
 
@@ -39,4 +39,4 @@ closes #
 - [ ] 📖 help site
 - [ ] 🙅 not needed
 
-## [optional] Are there any post-deployment tasks we need to perform?
+## Anything else we need to know? [optional]

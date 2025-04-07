@@ -1,15 +1,14 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeCheckbox } from '@vscode/webview-ui-toolkit';
+import {
+  provideVSCodeDesignSystem,
+  vsCodeButton,
+  vsCodeCheckbox,
+} from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import {
-  Tabulator,
-  type ColumnComponent,
-  type GroupComponent,
-  type RowComponent,
-} from 'tabulator-tables';
+import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 // tabulator custom modules
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
@@ -27,6 +26,7 @@ import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 import { DatabaseAccess } from '../../Database.js';
 import { ApexLog, DMLBeginLine } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
+import codiconStyles from '../../styles/codicon.css';
 import { globalStyles } from '../../styles/global.styles.js';
 import { isVisible } from '../../Util.js';
 import databaseViewStyles from './DatabaseView.scss';
@@ -35,7 +35,7 @@ import databaseViewStyles from './DatabaseView.scss';
 import '../CallStack.js';
 import './DatabaseSection.js';
 
-provideVSCodeDesignSystem().register(vsCodeCheckbox());
+provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeCheckbox());
 
 @customElement('dml-view')
 export class DMLView extends LitElement {
@@ -86,6 +86,7 @@ export class DMLView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
     unsafeCSS(databaseViewStyles),
+    unsafeCSS(codiconStyles),
     globalStyles,
     css`
       :host {
@@ -112,17 +113,48 @@ export class DMLView extends LitElement {
 
     return html`
       <database-section title="DML Statements" .dbLines="${this.dmlLines}"></database-section>
-      <div>
-        <strong>Group by</strong>
-        <div>
-          <vscode-checkbox @change="${this._dmlGroupBy}" checked>DML</vscode-checkbox>
+
+      <datagrid-filter-bar>
+        <div slot="filters">
+          <strong>Group by</strong>
+          <div>
+            <vscode-checkbox @change="${this._dmlGroupBy}" checked>DML</vscode-checkbox>
+          </div>
         </div>
-      </div>
+
+        <div slot="actions">
+          <vscode-button
+            appearance="icon"
+            aria-label="Export to CSV"
+            title="Export to CSV"
+            @click=${this._exportToCSV}
+          >
+            <span class="codicon codicon-desktop-download"></span>
+          </vscode-button>
+          <vscode-button
+            appearance="icon"
+            aria-label="Copy to clipboard"
+            title="Copy to clipboard"
+            @click=${this._copyToClipboard}
+          >
+            <span class="codicon codicon-copy"></span>
+          </vscode-button>
+        </div>
+      </datagrid-filter-bar>
+
       <div id="dml-table-container">
         ${dmlSkeleton}
         <div id="db-dml-table"></div>
       </div>
     `;
+  }
+
+  _copyToClipboard() {
+    this.dmlTable?.copyToClipboard('all');
+  }
+
+  _exportToCSV() {
+    this.dmlTable?.download('csv', 'dml.csv', { bom: true, delimiter: ',' });
   }
 
   _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
@@ -261,7 +293,6 @@ export class DMLView extends LitElement {
         resizable: true,
         headerSortStartingDir: 'desc',
         headerTooltip: true,
-        headerMenu: this.csvheaderMenu('dml.csv'),
         headerWordWrap: true,
       },
       initialSort: [{ column: 'rowCount', dir: 'desc' }],
@@ -434,17 +465,6 @@ export class DMLView extends LitElement {
     const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
 
     return [...newMap.keys()];
-  }
-
-  csvheaderMenu(csvFileName: string) {
-    return [
-      {
-        label: 'Export to CSV',
-        action: function (_e: PointerEvent, column: ColumnComponent) {
-          column.getTable().download('csv', csvFileName, { bom: true, delimiter: ',' });
-        },
-      },
-    ];
   }
 
   downlodEncoder(defaultFileName: string) {

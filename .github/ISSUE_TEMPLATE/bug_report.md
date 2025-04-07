@@ -1,7 +1,8 @@
 ---
 name: 🐛 Bug report
 about: Create a report to help us improve
-title: 'bug: <title>'
+title: '🐛 bug: <title>'
+type: 'Bug'
 labels: ['bug', 'needs-triage']
 assignees: ''
 ---
