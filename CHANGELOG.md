@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Column totals for Grouped rows will now be shown inside the groups instead of on a seperate row ([#583][#583]).
-- Table actions: copy to clipboard and export to CSV
+- Table actions: Copy to clipboard and Export to CSV directly from the button above the Analysis and Database table ([#589]).
 
 ### Changed
 
@@ -385,6 +385,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#582]: https://github.com/certinia/debug-log-analyzer/issues/582
 [#588]: https://github.com/certinia/debug-log-analyzer/issues/588
 [#583]: https://github.com/certinia/debug-log-analyzer/issues/583
+[#589]: https://github.com/certinia/debug-log-analyzer/issues/589
 
 <!-- 1.16.1 -->
 
