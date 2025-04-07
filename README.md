@@ -7,6 +7,8 @@
 
 Apex Log Analyzer makes performance analysis of Salesforce debug logs much easier and quicker. Visualize code execution via a Flame chart and Call Tree, identify and resolve performance and SOQL/DML problems via Method and Database Analysis.
 
+Visualize code execution via a Flame chart and identify performance and SOQL/DML problems via Method and Database analysis
+
 ![preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-preview.gif)
 
 ## WARNING
@@ -163,8 +165,8 @@ The rows can be grouped by Type or Namespace
 
 #### Export to CSV + copy to clipboard
 
-Click the header menu,`⋮`, and use `Export to CSV` to save the table content to a file.
-Focus the Analysis table and use `CMD / CTRL + c` to copy the table content to clipboard. This can then be pasted into a spreadsheet or other file.
+Use `Export to CSV` above the table to save the table content to a file or `Copy to Clipboard`.
+You can also focus the Analysis table and use `CMD / CTRL + c` to copy the table content to clipboard. This can then be pasted into a spreadsheet or other file.
 
 ### Database
 
@@ -202,8 +204,8 @@ For SOQL rows, to the right of the Call Stack is SOQL Analysis which shows infor
 
 #### Export to CSV + copy to clipboard
 
-Click the header menu,`⋮`, and use `Export to CSV` to save the table content to a file.
-Focus the Analysis table and use `CMD / CTRL + c` to copy the table content to clipboard. This can then be pasted into a spreadsheet or other file.
+Use `Export to CSV` above the table to save the table content to a file or `Copy to Clipboard`.
+You can also focus the DML/ SOQL tables and use `CMD / CTRL + c` to copy the table content to clipboard. This can then be pasted into a spreadsheet or other file.
 
 ### Find
 
