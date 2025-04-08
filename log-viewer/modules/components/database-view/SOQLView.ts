@@ -328,6 +328,7 @@ export class SOQLView extends LitElement {
       keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
       clipboardCopyRowRange: 'all',
       groupCalcs: true,
+      groupSort: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
       groupBy: 'soql',
