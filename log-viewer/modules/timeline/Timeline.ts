@@ -736,6 +736,15 @@ function findTimelineTooltip(
           );
         }
 
+        if (target.soslCount.total) {
+          toolTip.appendChild(brElem.cloneNode());
+          toolTip.appendChild(
+            document.createTextNode(
+              `SOSL: ${target.soslCount.total} (self ${target.soslCount.self})`,
+            ),
+          );
+        }
+
         if (target.soslRowCount.total) {
           toolTip.appendChild(brElem.cloneNode());
           toolTip.appendChild(

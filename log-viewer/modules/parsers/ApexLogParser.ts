@@ -350,6 +350,7 @@ export class ApexLogParser {
         parent?.children.forEach((child) => {
           parent.dmlCount.total += child.dmlCount.total;
           parent.soqlCount.total += child.soqlCount.total;
+          parent.soslCount.total += child.soslCount.total;
           parent.dmlRowCount.total += child.dmlRowCount.total;
           parent.soqlRowCount.total += child.soqlRowCount.total;
           parent.soslRowCount.total += child.soslRowCount.total;
@@ -646,6 +647,17 @@ export abstract class LogLine {
     self: 0,
     /**
      * The total number of SOQL operations (SOQL_EXECUTE_BEGIN) in this node and child nodes
+     */
+    total: 0,
+  };
+
+  soslCount: SelfTotal = {
+    /**
+     * The net number of SOSL operations (SOSL_EXECUTE_BEGIN) in this node.
+     */
+    self: 0,
+    /**
+     * The total number of SOSL operations (SOSL_EXECUTE_BEGIN) in this node and child nodes
      */
     total: 0,
   };
@@ -1389,6 +1401,11 @@ class SOSLExecuteBeginLine extends Method {
     super(parser, parts, ['SOSL_EXECUTE_END'], 'SOQL', 'free');
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = `SOSL: ${parts[3]}`;
+
+    this.soslCount = {
+      self: 1,
+      total: 1,
+    };
   }
 
   onEnd(end: SOSLExecuteEndLine, _stack: LogLine[]): void {
