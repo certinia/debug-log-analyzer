@@ -762,7 +762,10 @@ export class CalltreeView extends LitElement {
             },
             headerFilter: MinMaxEditor,
             headerFilterFunc: MinMaxFilter,
-            headerFilterFuncParams: { columnName: 'selfTime', filterCache: selfTimeFilterCache },
+            headerFilterFuncParams: {
+              columnName: 'duration.self',
+              filterCache: selfTimeFilterCache,
+            },
             headerFilterLiveFilter: false,
           },
         ],
@@ -840,7 +843,14 @@ export class CalltreeView extends LitElement {
         id: node.timestamp + '-' + i,
         originalData: node,
         _children: children,
-        ...node,
+        text: node.text,
+        namespace: node.namespace,
+        duration: node.duration,
+        dmlCount: node.dmlCount,
+        soqlCount: node.soqlCount,
+        dmlRowCount: node.dmlRowCount,
+        soqlRowCount: node.soqlRowCount,
+        totalThrownCount: node.totalThrownCount,
       });
     }
     return results;
@@ -887,11 +897,21 @@ export class CalltreeView extends LitElement {
   }
 }
 
-interface CalltreeRow extends LogLine {
+interface CalltreeRow {
   id: string;
   originalData: LogLine;
   _children: CalltreeRow[] | undefined | null;
+  text: string;
+  duration: CountTotals;
+  namespace: string;
+  dmlCount: CountTotals;
+  soqlCount: CountTotals;
+  dmlRowCount: CountTotals;
+  soqlRowCount: CountTotals;
+  totalThrownCount: number;
 }
+
+type CountTotals = { self: number; total: number };
 
 export async function goToRow(timestamp: number) {
   document.dispatchEvent(
