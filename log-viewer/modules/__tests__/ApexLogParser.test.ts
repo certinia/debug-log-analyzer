@@ -432,7 +432,8 @@ describe('parseLog tests', () => {
       parent: execEvent,
       type: 'SOQL_EXECUTE_BEGIN',
       aggregations: 2,
-      rowCount: { self: 50, total: 50 },
+      soqlRowCount: { self: 50, total: 50 },
+      soqlCount: { self: 1, total: 1 },
     });
 
     const soqlExplain = soqlLine.children[0] as SOQLExecuteExplainLine;
