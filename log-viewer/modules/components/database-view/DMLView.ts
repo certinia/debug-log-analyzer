@@ -12,6 +12,7 @@ import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tab
 
 // tabulator custom modules
 import { GroupCalcs } from '../../datagrid/groups/GroupCalcs.js';
+import { GroupSort } from '../../datagrid/groups/GroupSort.js';
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
@@ -161,7 +162,8 @@ export class DMLView extends LitElement {
 
   _dmlGroupBy(event: Event) {
     const target = event.target as HTMLInputElement;
-    this.dmlTable?.setGroupBy(target.checked ? 'dml' : '');
+    //@ts-expect-error This is a custom function added in the GroupSort custom module
+    this.dmlTable?.setSortedGroupBy(target.checked ? 'dml' : '');
   }
 
   get _dmlTableWrapper(): HTMLDivElement | null {
@@ -181,7 +183,13 @@ export class DMLView extends LitElement {
         this.dmlLines = dbAccess.getDMLLines() || [];
 
         Tabulator.registerModule(Object.values(CommonModules));
-        Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs]);
+        Tabulator.registerModule([
+          RowKeyboardNavigation,
+          RowNavigation,
+          Find,
+          GroupCalcs,
+          GroupSort,
+        ]);
         this._renderDMLTable(tableWrapper, this.dmlLines);
       }
     });
@@ -278,9 +286,11 @@ export class DMLView extends LitElement {
       placeholder: 'No DML statements found',
       columnCalcs: 'table',
       groupCalcs: true,
+      groupSort: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
       groupValues: [dmlText],
+      groupBy: ['dml'],
       groupToggleElement: false,
       selectableRowsCheck: function (row: RowComponent) {
         return !row.getData().isDetail;
@@ -295,7 +305,6 @@ export class DMLView extends LitElement {
         headerTooltip: true,
         headerWordWrap: true,
       },
-      initialSort: [{ column: 'rowCount', dir: 'desc' }],
       headerSortElement: function (column, dir) {
         switch (dir) {
           case 'asc':
@@ -316,6 +325,7 @@ export class DMLView extends LitElement {
           bottomCalc: () => {
             return 'Total';
           },
+          headerSortTristate: true,
           cssClass: 'datagrid-textarea datagrid-code-text',
           variableHeight: true,
           formatter: (cell, _formatterParams, _onRendered) => {
@@ -369,10 +379,6 @@ export class DMLView extends LitElement {
     this.dmlTable.on('dataFiltering', () => {
       this._resetFindWidget();
       this._clearSearchHighlights();
-    });
-
-    this.dmlTable.on('tableBuilt', () => {
-      this.dmlTable?.setGroupBy('dml');
     });
 
     this.dmlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
