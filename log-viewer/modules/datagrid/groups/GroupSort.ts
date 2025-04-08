@@ -26,10 +26,10 @@ export class GroupSort extends Module {
     const oldGrpArg = this.table.options.groupBy as GroupArg;
     const oldGrpArray = Array.isArray(oldGrpArg) ? oldGrpArg : [oldGrpArg];
     if (!this._areGroupsEqual(oldGrpArray, grpArray)) {
-      this.table.options.groupBy = grpArray;
+      this.table.options.groupBy = grpArg;
       this.table.blockRedraw();
       this._sortGroups();
-      this.table.setGroupBy(grpArray);
+      this.table.setGroupBy(grpArg);
       this.table.restoreRedraw();
     }
   }
