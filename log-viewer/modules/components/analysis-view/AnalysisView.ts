@@ -19,7 +19,8 @@ import { Tabulator, type RowComponent } from 'tabulator-tables';
 import { isVisible } from '../../Util.js';
 import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
 import { progressFormatter } from '../../datagrid/format/Progress.js';
-import { GroupCalcs } from '../../datagrid/group-calcs/GroupCalcs.js';
+import { GroupCalcs } from '../../datagrid/groups/GroupCalcs.js';
+import { GroupSort } from '../../datagrid/groups/GroupSort.js';
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
@@ -188,8 +189,10 @@ export class AnalysisView extends LitElement {
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
     const fieldName = target.value.toLowerCase();
-
-    this.analysisTable?.setGroupBy(fieldName !== 'none' ? fieldName : '');
+    if (this.analysisTable) {
+      //@ts-expect-error This is a custom function added in the GroupSort custom module
+      this.analysisTable?.setSortedGroupBy(fieldName !== 'none' ? fieldName : '');
+    }
   }
 
   _appendTableWhenVisible() {
@@ -254,7 +257,7 @@ export class AnalysisView extends LitElement {
     const metricList = groupMetrics(rootMethod);
 
     Tabulator.registerModule(Object.values(CommonModules));
-    Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs]);
+    Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs, GroupSort]);
     this.analysisTable = new Tabulator(this._tableWrapper, {
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
@@ -292,6 +295,7 @@ export class AnalysisView extends LitElement {
       height: '100%',
       maxHeight: '100%',
       groupCalcs: true,
+      groupSort: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
       groupToggleElement: 'header',
@@ -325,6 +329,7 @@ export class AnalysisView extends LitElement {
           formatter: 'textarea',
           headerSortStartingDir: 'asc',
           sorter: 'string',
+          headerSortTristate: true,
           cssClass: 'datagrid-code-text',
           bottomCalc: () => {
             return 'Total';
