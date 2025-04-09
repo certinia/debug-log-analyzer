@@ -432,7 +432,8 @@ describe('parseLog tests', () => {
       parent: execEvent,
       type: 'SOQL_EXECUTE_BEGIN',
       aggregations: 2,
-      rowCount: { self: 50, total: 50 },
+      soqlRowCount: { self: 50, total: 50 },
+      soqlCount: { self: 1, total: 1 },
     });
 
     const soqlExplain = soqlLine.children[0] as SOQLExecuteExplainLine;
@@ -1177,5 +1178,184 @@ describe('Line Type Tests', () => {
     expect(qp.relativeCost).toBe(null);
     expect(qp.sObjectCardinality).toBe(null);
     expect(qp.sObjectType).toBe(null);
+  });
+});
+
+describe('Aggregating Totals', () => {
+  it('should sum from child to parent', () => {
+    const logArray = [
+      '01:02:03.04 (0)|EXECUTION_STARTED',
+      '01:02:03.04 (1)|METHOD_ENTRY|[1]|a00000000000000|ns.MyClass.myMethod()',
+      '01:02:03.04 (2)|METHOD_ENTRY|[1]|a00000000000000|ns.MyClass.soql()',
+      '01:02:03.04 (3)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT ID FROM MyObject__c',
+      '01:02:03.04 (4)|SOQL_EXECUTE_END|[2]|Rows:1',
+      '01:02:03.04 (5)|SOQL_EXECUTE_BEGIN|[2]|Aggregations:0|SELECT ID FROM MyObject__c',
+      '01:02:03.04 (6)|SOQL_EXECUTE_END|[2]|Rows:2',
+      '01:02:03.04 (7)|METHOD_EXIT|[1]|a00000000000000|ns.MyClass.soql()',
+      '01:02:03.04 (8)|METHOD_ENTRY|[1]|a00000000000000|ns.MyClass.dml()',
+      '01:02:03.04 (9)|DML_BEGIN|[194]|Op:Update|Type:ns2__MyObject__c|Rows:1',
+      '01:02:03.04 (10)|DML_END|[194]',
+      '01:02:03.04 (11)|DML_BEGIN|[194]|Op:Update|Type:ns2__MyObject__c|Rows:4',
+      '01:02:03.04 (12)|DML_END|[194]',
+      '01:02:03.04 (13)|METHOD_EXIT|[1]|a00000000000000|ns.MyClass.dml()',
+      '01:02:03.04 (14)|METHOD_ENTRY|[1]|a00000000000000|ns.MyClass.sosl()',
+      "01:02:03.04 (15)|SOSL_EXECUTE_BEGIN|[1]|FIND 'hello*' IN ALL FIELDS RETURNING account(Id, Name)",
+      '01:02:03.04 (16)|SOSL_EXECUTE_END|[1]|Rows:250',
+      "01:02:03.04 (17)|SOSL_EXECUTE_BEGIN|[1]|FIND 'hello*' IN ALL FIELDS RETURNING account(Id, Name)",
+      '01:02:03.04 (18)|SOSL_EXECUTE_END|[1]|Rows:150',
+      '01:02:03.04 (19)|EXCEPTION_THROWN|[60]|System.LimitException: c2g:Too many SOQL queries: 101',
+      '01:02:03.04 (20)|METHOD_EXIT|[1]|a00000000000000|ns.MyClass.sosl()',
+      '01:02:03.04 (21)|EXCEPTION_THROWN|[60]|System.LimitException: c2g:Too many SOQL queries: 101',
+      '01:02:03.04 (22)|EXCEPTION_THROWN|[60]|System.LimitException: c2g:Too many SOQL queries: 101',
+      '01:02:03.04 (23)|METHOD_EXIT|[1]|a00000000000000|ns.MyClass.myMethod()',
+      '01:02:03.04 (24)|EXECUTION_FINISHED',
+    ];
+    const log1 = logArray.join('\n');
+
+    const defaultCounts = {
+      dmlCount: { total: 0, self: 0 },
+      soqlCount: { total: 0, self: 0 },
+      soslCount: { total: 0, self: 0 },
+      dmlRowCount: { total: 0, self: 0 },
+      soqlRowCount: { total: 0, self: 0 },
+      soslRowCount: { total: 0, self: 0 },
+      totalThrownCount: 0,
+    };
+
+    const apexLog = parse(log1);
+    expect(apexLog).toMatchObject(
+      // EXECUTION_STARTED
+      {
+        duration: { total: 24, self: 0 },
+        dmlCount: { total: 2, self: 0 },
+        soqlCount: { total: 2, self: 0 },
+        soslCount: { total: 2, self: 0 },
+        dmlRowCount: { total: 5, self: 0 },
+        soqlRowCount: { total: 3, self: 0 },
+        soslRowCount: { total: 400, self: 0 },
+        type: null,
+        children: [
+          {
+            duration: { total: 24, self: 2 },
+            dmlCount: { total: 2, self: 0 },
+            soqlCount: { total: 2, self: 0 },
+            soslCount: { total: 2, self: 0 },
+            dmlRowCount: { total: 5, self: 0 },
+            soqlRowCount: { total: 3, self: 0 },
+            soslRowCount: { total: 400, self: 0 },
+            totalThrownCount: 3,
+            logLine: logArray[0],
+            children: [
+              // ns.MyClass.myMethod()
+              {
+                duration: { total: 22, self: 6 },
+                dmlCount: { total: 2, self: 0 },
+                soqlCount: { total: 2, self: 0 },
+                soslCount: { total: 2, self: 0 },
+                dmlRowCount: { total: 5, self: 0 },
+                soqlRowCount: { total: 3, self: 0 },
+                soslRowCount: { total: 400, self: 0 },
+                totalThrownCount: 3,
+                logLine: logArray[1],
+                children: [
+                  // ns.MyClass.soql()
+                  {
+                    ...defaultCounts,
+                    duration: { total: 5, self: 3 },
+                    logLine: logArray[2],
+                    soqlCount: { total: 2, self: 0 },
+                    soqlRowCount: { total: 3, self: 0 },
+                    children: [
+                      //SELECT ID FROM MyObject__c
+                      {
+                        ...defaultCounts,
+                        duration: { total: 1, self: 1 },
+                        soqlCount: { total: 1, self: 1 },
+                        soqlRowCount: { total: 1, self: 1 },
+                        logLine: logArray[3],
+                      },
+                      // SELECT ID FROM MyObject__c
+                      {
+                        ...defaultCounts,
+                        duration: { total: 1, self: 1 },
+                        soqlCount: { total: 1, self: 1 },
+                        soqlRowCount: { total: 2, self: 2 },
+                        logLine: logArray[5],
+                      },
+                    ],
+                  },
+                  // ns.MyClass.dml()
+                  {
+                    ...defaultCounts,
+                    duration: { total: 5, self: 3 },
+                    dmlCount: { total: 2, self: 0 },
+                    dmlRowCount: { total: 5, self: 0 },
+                    logLine: logArray[8],
+                    children: [
+                      {
+                        ...defaultCounts,
+                        duration: { total: 1, self: 1 },
+                        dmlCount: { total: 1, self: 1 },
+                        dmlRowCount: { total: 1, self: 1 },
+                        logLine: logArray[9],
+                      },
+                      {
+                        ...defaultCounts,
+                        duration: { total: 1, self: 1 },
+                        dmlCount: { total: 1, self: 1 },
+                        dmlRowCount: { total: 4, self: 4 },
+                        logLine: logArray[11],
+                      },
+                    ],
+                  },
+                  //ns.MyClass.sosl()
+                  {
+                    ...defaultCounts,
+                    duration: { total: 6, self: 4 },
+                    soslCount: { total: 2, self: 0 },
+                    soslRowCount: { total: 400, self: 0 },
+                    totalThrownCount: 1,
+                    logLine: logArray[14],
+                    children: [
+                      {
+                        ...defaultCounts,
+                        duration: { total: 1, self: 1 },
+                        soslCount: { total: 1, self: 1 },
+                        soslRowCount: { total: 250, self: 250 },
+                        totalThrownCount: 0,
+                        logLine: logArray[15],
+                      },
+                      {
+                        ...defaultCounts,
+                        duration: { total: 1, self: 1 },
+                        soslCount: { total: 1, self: 1 },
+                        soslRowCount: { total: 150, self: 150 },
+                        totalThrownCount: 0,
+                        logLine: logArray[17],
+                      },
+                      // Exception
+                      {
+                        ...defaultCounts,
+                        totalThrownCount: 1,
+                      },
+                    ],
+                  },
+                  // Exception
+                  {
+                    ...defaultCounts,
+                    totalThrownCount: 1,
+                  },
+                  // Exception
+                  {
+                    ...defaultCounts,
+                    totalThrownCount: 1,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    );
   });
 });

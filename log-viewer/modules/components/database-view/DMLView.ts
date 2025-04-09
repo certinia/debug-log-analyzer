@@ -256,7 +256,7 @@ export class DMLView extends LitElement {
       for (const dml of dmlLines) {
         dmlData.push({
           dml: dml.text,
-          rowCount: dml.rowCount.self,
+          rowCount: dml.dmlRowCount.self,
           timeTaken: dml.duration.total,
           timestamp: dml.timestamp,
           _children: [{ timestamp: dml.timestamp, isDetail: true }],

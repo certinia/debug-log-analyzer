@@ -296,7 +296,7 @@ export class SOQLView extends LitElement {
           relativeCost: explainLine?.relativeCost,
           soql: soql.text,
           namespace: soql.namespace,
-          rowCount: soql.rowCount.self,
+          rowCount: soql.soqlRowCount.self,
           timeTaken: soql.duration.total,
           aggregations: soql.aggregations,
           timestamp: soql.timestamp,

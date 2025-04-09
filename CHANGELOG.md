@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Table actions: Copy to clipboard and Export to CSV directly from the button above the Analysis and Database table ([#589]).
 - Sort grouped rows by clicking column headers ([#592]).
   - Tri state on Group name column will sort by number of items in the group
+- Replace the Rows column on the Call Tree with two seperate columns, DML rows and SOQL rows ([#93]).
+- Replace Rows count on the Timeline tooltip with two new counts, DML rows and SOQL rows ([#93]).
 
 ### Changed
 
@@ -391,6 +393,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#589]: https://github.com/certinia/debug-log-analyzer/issues/589
 [#590]: https://github.com/certinia/debug-log-analyzer/issues/590
 [#592]: https://github.com/certinia/debug-log-analyzer/issues/592
+[#93]: https://github.com/certinia/debug-log-analyzer/issues/93
 
 <!-- 1.16.1 -->
 
