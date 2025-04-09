@@ -17,7 +17,8 @@ import {
 } from 'tabulator-tables';
 
 //tabulator custom modules
-import { GroupCalcs } from '../../datagrid/group-calcs/GroupCalcs.js';
+import { GroupCalcs } from '../../datagrid/groups/GroupCalcs.js';
+import { GroupSort } from '../../datagrid/groups/GroupSort.js';
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
@@ -192,19 +193,14 @@ export class SOQLView extends LitElement {
   _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
 
   _soqlGroupBy(event: Event) {
-    const target = event.target as HTMLInputElement;
-    const fieldName = target.value.toLowerCase();
-    const groupValue = fieldName !== 'none' ? fieldName : '';
     if (!this.soqlTable) {
       return;
     }
-
-    this.soqlTable.setGroupValues([
-      groupValue
-        ? this.sortByFrequency(this.soqlTable.getData(), groupValue as keyof GridSOQLData)
-        : [''],
-    ]);
-    this.soqlTable.setGroupBy(groupValue);
+    const target = event.target as HTMLInputElement;
+    const fieldName = target.value.toLowerCase();
+    const groupValue = fieldName !== 'none' ? fieldName : '';
+    //@ts-expect-error This is a custom function added in the GroupSort custom module
+    this.soqlTable.setSortedGroupBy(groupValue);
   }
 
   _appendTableWhenVisible() {
@@ -219,7 +215,13 @@ export class SOQLView extends LitElement {
         this.soqlLines = (await DatabaseAccess.create(treeRoot)).getSOQLLines() || [];
 
         Tabulator.registerModule(Object.values(CommonModules));
-        Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs]);
+        Tabulator.registerModule([
+          RowKeyboardNavigation,
+          RowNavigation,
+          Find,
+          GroupCalcs,
+          GroupSort,
+        ]);
         this._renderSOQLTable(tableWrapper, this.soqlLines);
       }
     });
@@ -294,7 +296,7 @@ export class SOQLView extends LitElement {
           relativeCost: explainLine?.relativeCost,
           soql: soql.text,
           namespace: soql.namespace,
-          rowCount: soql.rowCount.self,
+          rowCount: soql.soqlRowCount.self,
           timeTaken: soql.duration.total,
           aggregations: soql.aggregations,
           timestamp: soql.timestamp,
@@ -326,8 +328,10 @@ export class SOQLView extends LitElement {
       keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
       clipboardCopyRowRange: 'all',
       groupCalcs: true,
+      groupSort: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
+      groupBy: 'soql',
       groupValues: [soqlText],
       groupToggleElement: false,
       selectableRows: 'highlight',
@@ -343,7 +347,6 @@ export class SOQLView extends LitElement {
         headerTooltip: true,
         headerWordWrap: true,
       },
-      initialSort: [{ column: 'rowCount', dir: 'desc' }],
       headerSortElement: function (column, dir) {
         switch (dir) {
           case 'asc':
@@ -366,6 +369,7 @@ export class SOQLView extends LitElement {
           bottomCalc: () => {
             return 'Total';
           },
+          headerSortTristate: true,
           cssClass: 'datagrid-textarea datagrid-code-text',
           variableHeight: true,
           formatter: (cell, _formatterParams, _onRendered) => {
@@ -499,10 +503,6 @@ export class SOQLView extends LitElement {
 
         formatter(row, this.findArgs);
       },
-    });
-
-    this.soqlTable.on('tableBuilt', () => {
-      this.soqlTable?.setGroupBy('soql');
     });
 
     this.soqlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {

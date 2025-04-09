@@ -678,7 +678,7 @@ export class CalltreeView extends LitElement {
           },
           {
             title: 'DML Count',
-            field: 'totalDmlCount',
+            field: 'dmlCount.total',
             sorter: 'number',
             width: 60,
             hozAlign: 'right',
@@ -687,7 +687,7 @@ export class CalltreeView extends LitElement {
           },
           {
             title: 'SOQL Count',
-            field: 'totalSoqlCount',
+            field: 'soqlCount.total',
             sorter: 'number',
             width: 60,
             hozAlign: 'right',
@@ -704,8 +704,17 @@ export class CalltreeView extends LitElement {
             bottomCalc: 'max',
           },
           {
-            title: 'Rows',
-            field: 'rows',
+            title: 'DML Rows',
+            field: 'dmlRowCount.total',
+            sorter: 'number',
+            width: 60,
+            hozAlign: 'right',
+            headerHozAlign: 'right',
+            bottomCalc: 'max',
+          },
+          {
+            title: 'SOQL Rows',
+            field: 'soqlRowCount.total',
             sorter: 'number',
             width: 60,
             hozAlign: 'right',
@@ -714,7 +723,7 @@ export class CalltreeView extends LitElement {
           },
           {
             title: 'Total Time (ms)',
-            field: 'duration',
+            field: 'duration.total',
             sorter: 'number',
             headerSortTristate: true,
             width: 150,
@@ -736,7 +745,7 @@ export class CalltreeView extends LitElement {
           },
           {
             title: 'Self Time (ms)',
-            field: 'selfTime',
+            field: 'duration.self',
             sorter: 'number',
             headerSortTristate: true,
             width: 150,
@@ -753,7 +762,10 @@ export class CalltreeView extends LitElement {
             },
             headerFilter: MinMaxEditor,
             headerFilterFunc: MinMaxFilter,
-            headerFilterFuncParams: { columnName: 'selfTime', filterCache: selfTimeFilterCache },
+            headerFilterFuncParams: {
+              columnName: 'duration.self',
+              filterCache: selfTimeFilterCache,
+            },
             headerFilterLiveFilter: false,
           },
         ],
@@ -829,16 +841,16 @@ export class CalltreeView extends LitElement {
       const children = node.children.length ? this._toCallTree(node.children) : null;
       results.push({
         id: node.timestamp + '-' + i,
+        originalData: node,
+        _children: children,
         text: node.text,
         namespace: node.namespace,
-        duration: node.duration.total,
-        selfTime: node.duration.self,
-        _children: children,
-        totalDmlCount: node.dmlCount.total,
-        totalSoqlCount: node.soqlCount.total,
+        duration: node.duration,
+        dmlCount: node.dmlCount,
+        soqlCount: node.soqlCount,
+        dmlRowCount: node.dmlRowCount,
+        soqlRowCount: node.soqlRowCount,
         totalThrownCount: node.totalThrownCount,
-        rows: node.rowCount.total,
-        originalData: node,
       });
     }
     return results;
@@ -888,16 +900,18 @@ export class CalltreeView extends LitElement {
 interface CalltreeRow {
   id: string;
   originalData: LogEvent;
-  text: string;
-  duration: number;
-  namespace: string;
-  selfTime: number;
   _children: CalltreeRow[] | undefined | null;
-  totalDmlCount: number;
-  totalSoqlCount: number;
+  text: string;
+  duration: CountTotals;
+  namespace: string;
+  dmlCount: CountTotals;
+  soqlCount: CountTotals;
+  dmlRowCount: CountTotals;
+  soqlRowCount: CountTotals;
   totalThrownCount: number;
-  rows: number;
 }
+
+type CountTotals = { self: number; total: number };
 
 export async function goToRow(timestamp: number) {
   document.dispatchEvent(

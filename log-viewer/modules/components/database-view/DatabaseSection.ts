@@ -35,8 +35,8 @@ export class DatabaseSection extends LitElement {
   render() {
     const totalCount = this.dbLines.length;
     let totalRows = 0;
-    this.dbLines.forEach((dbLine) => {
-      totalRows += dbLine.rowCount.self || 0;
+    this.dbLines.forEach((value) => {
+      totalRows += value.dmlRowCount.self || value.soqlRowCount.self || 0;
     });
 
     return html`

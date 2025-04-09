@@ -677,14 +677,10 @@ function findTimelineTooltip(
 
     const toolTip = document.createElement('div');
     const brElem = document.createElement('br');
-    let displayText = target.text;
-    if (target.suffix) {
-      displayText += target.suffix;
-    }
 
     toolTip.appendChild(document.createTextNode(target.type || ''));
     toolTip.appendChild(brElem.cloneNode());
-    toolTip.appendChild(document.createTextNode(displayText));
+    toolTip.appendChild(document.createTextNode(target.text + (target.suffix ?? '')));
     if (target.timestamp) {
       toolTip.appendChild(brElem.cloneNode());
       toolTip.appendChild(document.createTextNode('timestamp: ' + target.timestamp));
@@ -705,11 +701,54 @@ function findTimelineTooltip(
           );
         }
 
-        if (target.rowCount.total !== null) {
+        if (target.dmlCount.total) {
+          toolTip.appendChild(brElem.cloneNode());
+          toolTip.appendChild(
+            document.createTextNode(`DML: ${target.dmlCount.total} (self ${target.dmlCount.self})`),
+          );
+        }
+
+        if (target.dmlRowCount.total) {
           toolTip.appendChild(brElem.cloneNode());
           toolTip.appendChild(
             document.createTextNode(
-              `rows: ${target.rowCount.total} (self ${target.rowCount.self})`,
+              `DML rows: ${target.dmlRowCount.total} (self ${target.dmlRowCount.self})`,
+            ),
+          );
+        }
+
+        if (target.soqlCount.total) {
+          toolTip.appendChild(brElem.cloneNode());
+          toolTip.appendChild(
+            document.createTextNode(
+              `SOQL: ${target.soqlCount.total} (self ${target.soqlCount.self})`,
+            ),
+          );
+        }
+
+        if (target.soqlRowCount.total) {
+          toolTip.appendChild(brElem.cloneNode());
+          toolTip.appendChild(
+            document.createTextNode(
+              `SOQL rows: ${target.soqlRowCount.total} (self ${target.soqlRowCount.self})`,
+            ),
+          );
+        }
+
+        if (target.soslCount.total) {
+          toolTip.appendChild(brElem.cloneNode());
+          toolTip.appendChild(
+            document.createTextNode(
+              `SOSL: ${target.soslCount.total} (self ${target.soslCount.self})`,
+            ),
+          );
+        }
+
+        if (target.soslRowCount.total) {
+          toolTip.appendChild(brElem.cloneNode());
+          toolTip.appendChild(
+            document.createTextNode(
+              `SOSL rows: ${target.soslRowCount.total} (self ${target.soslRowCount.self})`,
             ),
           );
         }
