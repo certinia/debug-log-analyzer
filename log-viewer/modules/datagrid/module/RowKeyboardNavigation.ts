@@ -48,13 +48,10 @@ export class RowKeyboardNavigation extends Module {
 
   rowExpandedToggled(row: RowComponent, _level: number) {
     const table = row.getTable();
-    this.tableHolder ??= table.element.querySelector('.tabulator-tableholder') as HTMLElement;
-
-    const selectedRow = table.getSelectedRows()[0];
-    if (!selectedRow) {
+    const selectedRows = table.getSelectedRows();
+    if (!selectedRows.length) {
       row.select();
     }
-    this.tableHolder?.focus();
   }
 
   rowClick(event: UIEvent, row: RowComponent) {

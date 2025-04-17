@@ -302,6 +302,7 @@ export class CalltreeView extends LitElement {
     }
     this.calltreeTable.blockRedraw();
     this._expandCollapseAll(this.calltreeTable.getRows(), true);
+    this.calltreeTable.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
     this.calltreeTable.restoreRedraw();
   }
 
@@ -311,6 +312,7 @@ export class CalltreeView extends LitElement {
     }
     this.calltreeTable.blockRedraw();
     this._expandCollapseAll(this.calltreeTable.getRows(), false);
+    this.calltreeTable.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
     this.calltreeTable.restoreRedraw();
   }
 
@@ -343,15 +345,12 @@ export class CalltreeView extends LitElement {
     this.calltreeTable.goToRow(treeRow, { scrollIfVisible: true, focusRow: true });
   }
 
-  _find(
-    e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>,
-    canClearOverride = true,
-  ) {
+  _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
     const isTableVisible = !!this.calltreeTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
     }
-    this.canClearSearchHighlights = canClearOverride;
+    this.canClearSearchHighlights = false;
 
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
@@ -360,7 +359,8 @@ export class CalltreeView extends LitElement {
     this.findArgs = newFindArgs;
 
     const clearHighlights =
-      e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
+      e.type === 'lv-find-close' ||
+      (this.canClearSearchHighlights && !isTableVisible && newFindArgs.count === 0);
     if (clearHighlights) {
       newFindArgs.text = '';
     }
@@ -377,6 +377,7 @@ export class CalltreeView extends LitElement {
       }
     }
 
+    this.calltreeTable?.blockRedraw();
     const currentRow = this.findMap[this.findArgs.count];
     const rows = [
       currentRow,
@@ -391,6 +392,8 @@ export class CalltreeView extends LitElement {
       //@ts-expect-error This is a custom function added in by RowNavigation custom module
       this.calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
     }
+    this.calltreeTable?.restoreRedraw();
+    this.canClearSearchHighlights = true;
   }
 
   _highlight(inputString: string, substring: string) {
@@ -805,7 +808,6 @@ export class CalltreeView extends LitElement {
       new CustomEvent('lv-find', {
         detail: { text: '', count: 0, options: { matchCase: false } },
       }),
-      false,
     );
   }
 
