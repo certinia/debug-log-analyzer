@@ -17,10 +17,10 @@
     "@vscode/codicons": "^0.0.36",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "lit": "^3.2.1",
-    "tabulator-tables": "^6.3.0"
+    "tabulator-tables": "^6.3.1"
   },
   "devDependencies": {
-    "@types/tabulator-tables": "^6.2.3",
+    "@types/tabulator-tables": "^6.2.6",
     "@typescript-eslint/eslint-plugin": "^8.18.1",
     "@typescript-eslint/parser": "^8.18.1",
     "concurrently": "^9.1.0",
