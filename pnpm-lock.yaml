@@ -101,8 +101,8 @@ importers:
   lana:
     dependencies:
       '@apexdevtools/apex-ls':
-        specifier: ^5.7.0
-        version: 5.7.0
+        specifier: ^5.9.0
+        version: 5.9.0
       '@apexdevtools/sfdx-auth-helper':
         specifier: ^2.1.0
         version: 2.1.0(encoding@0.1.13)
@@ -293,8 +293,8 @@ packages:
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
 
-  '@apexdevtools/apex-ls@5.7.0':
-    resolution: {integrity: sha512-AOTQxg7kknAE9vkvfNE4pzpf2rxpKbeTYLUITL6KjdWVBHhaoTdbcpqC2z0tsjAbLG1BjShKPhDhth1pMYZ49Q==}
+  '@apexdevtools/apex-ls@5.9.0':
+    resolution: {integrity: sha512-X15n0N15A3LWQ1bfAZwl/d57nPFBaUCgzti/qQAdMmNeZJmCJiAk7pEk8j3Ap+0bkMbtgmgp4aRIBpuhjN8n5Q==}
     engines: {node: '>=14.0.0'}
 
   '@apexdevtools/apex-parser@4.3.1':
@@ -7921,7 +7921,7 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.8
       '@jridgewell/trace-mapping': 0.3.25
 
-  '@apexdevtools/apex-ls@5.7.0':
+  '@apexdevtools/apex-ls@5.9.0':
     dependencies:
       '@apexdevtools/apex-parser': 4.3.1
       '@apexdevtools/vf-parser': 1.1.0
