@@ -302,6 +302,7 @@ export class CalltreeView extends LitElement {
     }
     this.calltreeTable.blockRedraw();
     this._expandCollapseAll(this.calltreeTable.getRows(), true);
+    this.calltreeTable.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
     this.calltreeTable.restoreRedraw();
   }
 
@@ -311,6 +312,7 @@ export class CalltreeView extends LitElement {
     }
     this.calltreeTable.blockRedraw();
     this._expandCollapseAll(this.calltreeTable.getRows(), false);
+    this.calltreeTable.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
     this.calltreeTable.restoreRedraw();
   }
 
