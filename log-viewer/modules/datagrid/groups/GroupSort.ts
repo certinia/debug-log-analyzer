@@ -30,14 +30,6 @@ export class GroupSort extends Module {
     }
   }
 
-  _areGroupsEqual(oldGroups: unknown[], newGroups: unknown[]) {
-    return (
-      oldGroups &&
-      newGroups.length === oldGroups.length &&
-      newGroups.every((value, index) => value === oldGroups[index])
-    );
-  }
-
   _sortGroups() {
     const grpArray = Array.isArray(this.table.options.groupBy)
       ? this.table.options.groupBy
@@ -46,12 +38,6 @@ export class GroupSort extends Module {
 
     const validGrps = grpArray.filter(Boolean).length > 0;
     if (this.table && options.sortMode !== 'remote' && validGrps) {
-      const originalGroupVals = options.groupValues ?? [[]];
-      const { modules } = this.table;
-
-      const groupsByKey: { [key: string]: unknown[] } = {};
-      const rows = this.table.rowManager.rows;
-
       let groupFunc = grpArray[0];
       const grpField = groupFunc as string;
       if (typeof groupFunc === 'string') {
@@ -60,7 +46,9 @@ export class GroupSort extends Module {
         };
       }
 
+      const groupsByKey: { [key: string]: unknown[] } = {};
       if (groupFunc) {
+        const rows = this.table.rowManager.rows;
         rows.forEach((row: InternalColumnTotal) => {
           const grpVal = groupFunc(row.data);
           let groupRows = groupsByKey[grpVal];
@@ -72,10 +60,9 @@ export class GroupSort extends Module {
         });
       }
 
-      const groupTotalsRows: InternalColumnTotal[] = [];
-      const columnCalcs = modules.columnCalcs;
+      let groupTotalsRows: InternalColumnTotal[] = [];
+      const columnCalcs = this.table.modules.columnCalcs;
       const field = columnCalcs.botCalcs[0].field;
-
       for (const [key, rows] of Object.entries(groupsByKey)) {
         const row = columnCalcs.generateBottomRow(rows);
         row.data[field] = key;
@@ -84,54 +71,70 @@ export class GroupSort extends Module {
         row.generateCells();
         groupTotalsRows.push(row);
       }
-      const sortListActual: unknown[] = [];
-      const sorter = modules.sort;
-      const sortList: InternalSortItem[] = options.sortOrderReverse
-        ? sorter.sortList.slice().reverse()
-        : sorter.sortList;
-      sortList.forEach((item) => {
-        if (item.column) {
-          const sortObj = item.column.modules.sort;
-          if (sortObj) {
-            //if no sorter has been defined, take a guess
-            if (!sortObj.sorter) {
-              sortObj.sorter = sorter.findSorter(item.column);
-            }
 
-            item.params =
-              typeof sortObj.params === 'function'
-                ? sortObj.params(item.column.getComponent(), item.dir)
-                : sortObj.params;
-
-            sortListActual.push(item);
-          }
-        }
-      });
-
-      //sort data
-      if (sortListActual.length) {
-        sorter._sortItems(groupTotalsRows, sortListActual);
-      } else {
-        groupTotalsRows.sort((a, b) => {
-          const index = b.rows.length - a.rows.length;
-          if (index === 0) {
-            return a.key.localeCompare(b.key);
-          }
-          return index;
-        });
-      }
+      groupTotalsRows = this._sortGroupTotals(groupTotalsRows);
       const groupValues: string[] = [];
       groupTotalsRows.forEach((colTotals) => {
         groupValues.push(colTotals.data[field] as string);
       });
 
-      const ogGroups = originalGroupVals[0] ?? [];
-      if (!this._areGroupsEqual(groupValues, ogGroups)) {
+      const originalGroupVals = (options.groupValues ?? [[]])[0] ?? [];
+      if (!this._areGroupsEqual(groupValues, originalGroupVals)) {
         this.table?.setGroupValues([groupValues]);
       }
     } else {
       this.table?.setGroupValues([]);
     }
+  }
+
+  _areGroupsEqual(oldGroups: unknown[], newGroups: unknown[]) {
+    return (
+      oldGroups &&
+      newGroups.length === oldGroups.length &&
+      newGroups.every((value, index) => value === oldGroups[index])
+    );
+  }
+
+  _sortGroupTotals(groupTotalsRows: InternalColumnTotal[]) {
+    const sortListActual: unknown[] = [];
+    const { modules, options } = this.table;
+
+    const sorter = modules.sort;
+    const sortList: InternalSortItem[] = options.sortOrderReverse
+      ? sorter.sortList.slice().reverse()
+      : sorter.sortList;
+    sortList.forEach((item) => {
+      if (item.column) {
+        const sortObj = item.column.modules.sort;
+        if (sortObj) {
+          //if no sorter has been defined, take a guess
+          if (!sortObj.sorter) {
+            sortObj.sorter = sorter.findSorter(item.column);
+          }
+
+          item.params =
+            typeof sortObj.params === 'function'
+              ? sortObj.params(item.column.getComponent(), item.dir)
+              : sortObj.params;
+
+          sortListActual.push(item);
+        }
+      }
+    });
+
+    //sort data
+    if (sortListActual.length) {
+      sorter._sortItems(groupTotalsRows, sortListActual);
+    } else {
+      groupTotalsRows.sort((a, b) => {
+        const index = b.rows.length - a.rows.length;
+        if (index === 0) {
+          return a.key.localeCompare(b.key);
+        }
+        return index;
+      });
+    }
+    return groupTotalsRows;
   }
 }
 
