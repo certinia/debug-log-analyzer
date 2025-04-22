@@ -344,6 +344,7 @@ export class SOQLView extends LitElement {
       },
       dataTree: true,
       dataTreeBranchElement: false,
+      dataTreeStartExpanded: true,
       columnDefaults: {
         title: 'default',
         resizable: true,
@@ -517,13 +518,6 @@ export class SOQLView extends LitElement {
 
       this.soqlTable?.blockRedraw();
       group.toggle();
-      if (!group.isVisible()) {
-        this.soqlTable?.getRows().forEach((row) => {
-          if (!row.isTreeExpanded()) {
-            row.treeExpand();
-          }
-        });
-      }
       this.soqlTable?.restoreRedraw();
     });
 

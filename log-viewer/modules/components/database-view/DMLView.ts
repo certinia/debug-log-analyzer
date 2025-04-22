@@ -395,13 +395,6 @@ export class DMLView extends LitElement {
 
       this.dmlTable?.blockRedraw();
       group.toggle();
-      if (!group.isVisible()) {
-        this.dmlTable?.getRows().forEach((row) => {
-          if (!row.isTreeExpanded()) {
-            row.treeExpand();
-          }
-        });
-      }
       this.dmlTable?.restoreRedraw();
     });
 
