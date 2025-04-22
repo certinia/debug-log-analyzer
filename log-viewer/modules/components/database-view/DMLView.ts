@@ -62,6 +62,7 @@ export class DMLView extends LitElement {
   };
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
+  canClearHighlights = false;
 
   constructor() {
     super();
@@ -219,6 +220,8 @@ export class DMLView extends LitElement {
       return;
     }
 
+    this.canClearHighlights = true;
+
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     if (!isTableVisible) {
       newFindArgs.text = '';
@@ -229,8 +232,7 @@ export class DMLView extends LitElement {
       newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
     this.findArgs = newFindArgs;
 
-    const clearHighlights =
-      e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
+    const clearHighlights = e.type === 'lv-find-close';
     if (clearHighlights) {
       newFindArgs.text = '';
     }
@@ -248,6 +250,7 @@ export class DMLView extends LitElement {
         );
       }
     }
+    this.canClearHighlights = false;
   }
 
   _renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
@@ -298,6 +301,7 @@ export class DMLView extends LitElement {
       selectableRows: 'highlight',
       dataTree: true,
       dataTreeBranchElement: false,
+      dataTreeStartExpanded: true,
       columnDefaults: {
         title: 'default',
         resizable: true,
@@ -377,8 +381,10 @@ export class DMLView extends LitElement {
     });
 
     this.dmlTable.on('dataFiltering', () => {
-      this._resetFindWidget();
-      this._clearSearchHighlights();
+      if (this.canClearHighlights) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
     });
 
     this.dmlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
@@ -438,7 +444,7 @@ export class DMLView extends LitElement {
 
   private _clearSearchHighlights() {
     this._find(
-      new CustomEvent('lv-find', {
+      new CustomEvent('lv-find-close', {
         detail: { text: '', count: 0, options: { matchCase: false } },
       }),
     );
