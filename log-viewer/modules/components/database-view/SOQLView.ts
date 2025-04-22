@@ -73,6 +73,7 @@ export class SOQLView extends LitElement {
   };
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
+  canClearHighlights = false;
 
   get _soqlTableWrapper(): HTMLDivElement | null {
     return this.renderRoot?.querySelector('#db-soql-table') ?? null;
@@ -253,14 +254,15 @@ export class SOQLView extends LitElement {
       return;
     }
 
+    this.canClearHighlights = true;
+
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
       newFindArgs.text !== this.findArgs.text ||
       newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
     this.findArgs = newFindArgs;
 
-    const clearHighlights =
-      e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
+    const clearHighlights = e.type === 'lv-find-close';
     if (clearHighlights) {
       newFindArgs.text = '';
     }
@@ -278,6 +280,8 @@ export class SOQLView extends LitElement {
         );
       }
     }
+
+    this.canClearHighlights = false;
   }
 
   _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
@@ -340,6 +344,7 @@ export class SOQLView extends LitElement {
       },
       dataTree: true,
       dataTreeBranchElement: false,
+      dataTreeStartExpanded: true,
       columnDefaults: {
         title: 'default',
         resizable: true,
@@ -513,13 +518,6 @@ export class SOQLView extends LitElement {
 
       this.soqlTable?.blockRedraw();
       group.toggle();
-      if (!group.isVisible()) {
-        this.soqlTable?.getRows().forEach((row) => {
-          if (!row.isTreeExpanded()) {
-            row.treeExpand();
-          }
-        });
-      }
       this.soqlTable?.restoreRedraw();
     });
 
@@ -540,8 +538,10 @@ export class SOQLView extends LitElement {
     });
 
     this.soqlTable.on('dataFiltering', () => {
-      this._resetFindWidget();
-      this._clearSearchHighlights();
+      if (this.canClearHighlights) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
     });
 
     this.soqlTable.on('renderStarted', () => {
@@ -567,7 +567,7 @@ export class SOQLView extends LitElement {
 
   _clearSearchHighlights() {
     this._find(
-      new CustomEvent('lv-find', {
+      new CustomEvent('lv-find-close', {
         detail: { text: '', count: 0, options: { matchCase: false } },
       }),
     );

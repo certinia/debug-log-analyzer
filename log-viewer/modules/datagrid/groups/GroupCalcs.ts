@@ -27,10 +27,10 @@ export class GroupCalcs extends Module {
     const arrowClone = rawGroup.arrowElement.cloneNode(true);
     rawGroup.arrowElement = document.createElement('span');
 
-    const rowFrag = document.createDocumentFragment();
     const firstCell = row.cells[0].getElement();
     firstCell.insertBefore(arrowClone, firstCell.firstChild);
 
+    const rowFrag = document.createDocumentFragment();
     row.cells.forEach((cell: { getElement(): HTMLElement }) => {
       rowFrag.appendChild(cell.getElement());
     });
