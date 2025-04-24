@@ -19,14 +19,8 @@ Welcome to the development guide for the **Apex Log Analyzer** VS Code extension
 Before you start developing, make sure you have the following tools installed:
 
 - **Node.js** v16 or above: [Install Node.js](https://nodejs.org/en/)
-- **[VS Code Extension Manager](https://github.com/microsoft/vscode-vsce)** (you wont need this): This tool is required only to package and distribute the extension. Install it globally with:
-
-  ```zsh
-  pnpm add -g @vscode/vsce
-  ```
-
-For more information, visit the [VS Code Extension Manager GitHub](https://github.com/microsoft/vscode-vsce).
-Packaging and distrubition is handled in GitHub automatically.
+- **[pnpm](https://pnpm.io/)**: This package manager will be used for installing dependencies
+- \*\*[VS Code](https://code.visualstudio.com/)
 
 Once you’ve got these ready, you’re all set to get started! 🚀
 
@@ -91,6 +85,21 @@ Once you’ve built the extension or run the watcher, you can run it inside a lo
 2. **Refresh the extension host:**
 
    If you're using the **watch** mode (see below), refresh the extension host view by pressing CMD/CTRL + R or clicking the restart icon.
+
+## 🧪 Testing Your Changes
+
+Make sure your changes don’t break anything. If you’re working on a feature or bug fix that requires tests, be sure to add or update the relevant tests.
+
+Run Tests Locally:
+If you have added or modified tests, you can run them with:
+
+```zsh
+pnpm run test
+```
+
+or run the tests from the test explorer in VScode
+
+Ensure all tests pass before submitting your pull request.
 
 ## 📦 Packaging the Extension
 
