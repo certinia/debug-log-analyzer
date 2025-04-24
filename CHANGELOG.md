@@ -9,26 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Column totals for Grouped rows will now be shown inside the groups instead of on a seperate row ([#583][#583]).
-- Table actions: Copy to clipboard and Export to CSV directly from the button above the Analysis and Database table ([#589]).
-- Sort grouped rows by clicking column headers ([#592]).
-  - Tri state on Group name column will sort by number of items in the group
-- Replace the Rows column on the Call Tree with two seperate columns, DML rows and SOQL rows ([#93]).
-- Replace Rows count on the Timeline tooltip with two new counts, DML rows and SOQL rows ([#93]).
+- **📊 Grouped Row Totals**: Column totals are now displayed inside their respective groups instead of a separate row ([#583]).
+- **🔼🔽 Grouped Row Sorting**: You can now sort grouped rows by clicking on the column headers ([#592]).
+  - To sort a group by the number of items within the group click the Group Name column until the third sort state is shown.
+- **🔢 New Call Tree Columns**: The Rows column is replaced with the DML Rows and SOQL Rows columns ([#93]).
+- **⏱️ New Timeline Tooltip values**: The Rows count in the Timeline tooltip is now split into DML Rows and SOQL Rows ([#93]).
+- **📋💾 Table Actions**: Added options to Copy to Clipboard and Export to CSV directly from the table action buttons above the Analysis and Database tables ([#589]).
 
 ### Changed
 
-- Highlight and copy text to clipboard: Call Tree, Analysis and Database views ([#504][#504]).
-  - Previously the highlighted text would be immediately cleared.
-- Sharper timeline rending on HiDPI displays ([#588][#588]).
-- Call Tree search will now only search in the visible filtered rows ([#539]).
+- **✂️ Copy Text in Views**: You can now highlight and copy text from the Call Tree, Analysis, and Database views without the text clearing immediately after highlighting ([#504]).
+- **💎 Improved HiDPI Rendering**: Sharpened rendering for the timeline on HiDPI displays ([#588]).
+- **🔍 Call Tree Search**: Search in the Call Tree now only includes the visible filtered rows ([#539]).
 
 ### Fixed
 
-- Call Tree: Performance regression of Call Tree rendering ([#581][#581]).
-- Call Tree: Call Tree not correctly keeping position when rows where hidden / shown via Details and Debug Only ([#581][#581]).
-- Database: Call stack shows items horizontally instead of vertically ([#582][#582])
-- Analysis: Sometimes disappered when dragging the scroll bar down, sorry about that. ([#590])
+- **Call Tree Performance**: Fixed a performance regression affecting Call Tree rendering ([#581]).
+- **Call Tree Positioning**: Fixed the Call Tree position was not maintained quite right when some filter were applied. ([#581]).
+- **Database Call Stack Display**: Fixed issue where the Call Stack items were displayed horizontally instead of vertically ([#582]).
+- **Analysis View Stability**: Fixed issue where the Analysis view sometimes disappeared when scrolling down. Apologies for the inconvenience! ([#590]).
 
 ## [1.16.1] - 2024-12-03
 
