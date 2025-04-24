@@ -30,6 +30,11 @@ We can't wait to see your contributions! Whether it’s fixing a bug, adding a n
 5. **Push** your changes.
 6. **Open a PR** for review!
 
+## 📅 Commit Message Guidelines
+
+- We follow a simple format for commit messages: [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+- Use the imperative mood in the subject line (e.g., "fix: date parsing in log parser" rather than "fixed date parsing in log parser").
+
 ## 💬 Need Help?
 
 If you get stuck at any point, feel free to open an issue or reach out to us in the discussions tab. We’re here to help and we want to make your contribution experience as smooth as possible. 🤗
