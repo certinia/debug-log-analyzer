@@ -1,59 +1,37 @@
-# Contributing
+# 🤝 Contributing to Apex Log Analyzer
 
-🎉🥳 Thank you for contributing 🥳🎉
+🎉🥳 Thank you for contributing! 🥳🎉
 
-Please read and follow the [code of conduct](https://github.com/certinia/debug-log-analyzer/blob/main/CODE_OF_CONDUCT.md) whilst interacting with this project.
+We truly appreciate your help in making Apex Log Analyzer better. Whether you're fixing a bug, adding a feature, or improving documentation, your contributions are invaluable to us!
 
-First things first, before raising an issue check the [open issues](https://github.com/certinia/debug-log-analyzer/issues), there may already be something similar to what you are looking for.
-If there is not, open an issue before contributing, it allows us to provide help and advice or just avoid duplicate effort.
+Before you dive in, please make sure to review our [code of conduct](https://github.com/certinia/debug-log-analyzer/blob/main/CODE_OF_CONDUCT.md) to ensure a welcoming environment for everyone.
 
-## Getting the Code
+## 📋 Before You Start
 
-1. Create a fork of the project
-2. Clone your fork `git clone git@github.com:<username>/debug-log-analyzer.git`
-3. Create a topic branch in your fork from main e.g (`feat-some-description` or `bug-some-description`)
-4. Edit the code in your fork.
-5. Create a pull request back to main, we will suggest any changes and get it merged.
+### Search for Existing Issues
 
-### Dependencies
+1. **Check out the [open issues](https://github.com/certinia/debug-log-analyzer/issues)** first to see if your idea or bug has already been reported.
+2. If you don’t see anything related, **open an issue**! We’d love to hear your thoughts and provide feedback or suggestions before you get started. This helps avoid duplicate work and ensures we’re aligned.
 
-Make sure you have [`pnpm` installed](https://pnpm.io/installation)
+## 🛠️ Setting Up Your Development Environment
 
-From a terminal, where you have cloned the repository, execute the following command to install the required dependencies:
+For detailed instructions on setting up your development environment, refer to the [Development Guide](https://github.com/certinia/debug-log-analyzer/blob/main/DEVELOPING.md).
 
-```zsh
-pnpm i
-```
+## 🚀 Ready to Contribute?
 
-### Build
+We can't wait to see your contributions! Whether it’s fixing a bug, adding a new feature, or improving the docs, we truly appreciate your time and effort.
 
-```zsh
-pnpm run build
-```
+### Quick Recap of Steps
 
-> NOTE: This will rebuild the whole project, to do a quick build (skipping minification) run `pnpm run build:dev`
+1. **Fork** the repo.
+2. **Clone** your fork locally.
+3. Create a **feature branch** e.g (`feat-some-description` or `bug-some-description`).
+4. **Make your changes**.
+5. **Push** your changes.
+6. **Open a PR** for review!
 
-### Watch
+## 💬 Need Help?
 
-During development run the watch command to make builds for changes quickly. execute the following command:
+If you get stuck at any point, feel free to open an issue or reach out to us in the discussions tab. We’re here to help and we want to make your contribution experience as smooth as possible. 🤗
 
-```zsh
-pnpm run watch
-```
-
-This will do a full build of the bundles and then watch for file changes in the `lana` and `log-viewer` source, compiling those changes incrementally, for a fast dev experience.
-
-## Tests
-
-```zsh
-pnpm run test
-```
-
-## Package
-
-To create a VSIX (VSCode install bundle)
-
-```zsh
-cd lana
-vsce package --no-dependencies
-```
+Thank you again for contributing to **Apex Log Analyzer**! Your input helps make this tool even better for Salesforce developers. 🙌
