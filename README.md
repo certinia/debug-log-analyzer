@@ -13,7 +13,7 @@ Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers.
 [Installation](#🛠️-installation 'Install Apex Log Analyzer in VS Code') |
 [Debug Log Levels](#⚙️-recommended-debug-log-levels 'Go to Recommended Debug Log Levels') |
 [Features](#🔥-flame-chart-timeline 'Go to Features') |
-[Customization](#🎨-customization 'Go to Customization') |.
+[Customization](#🎨-customization 'Go to Customization') |
 [Documentation](#📚-documentation 'Go to Documentation') |
 [Contributors](#❤️-contributors 'Go to Contributors') |
 [License](#📄-license 'Go to License')
