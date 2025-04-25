@@ -6,14 +6,14 @@
 [![Ratings](https://img.shields.io/visual-studio-marketplace/r/financialforce.lana)](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
 
 **Analyze Salesforce Apex Debug logs with blazing speed.**  
-Apex Log Analyzer is a powerful VS Code extension for Salesforce developers. Instantly visualize and debug Apex logs in VS Code with interactive flame charts, dynamic call trees, and database insights to fix slow SOQL, DML, and Apex methods. Identify performance issues, uncover bottlenecks, and debug complex transactions faster than ever.
+Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers. Instantly visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep insight into complex transactions and optimize slow Apex methods faster than ever.
 
 ![Apex Log Analyzer Preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-preview.gif)
 
 [Installation](#🛠️-installation 'Install Apex Log Analyzer in VS Code') |
 [Debug Log Levels](#⚙️-recommended-debug-log-levels 'Go to Recommended Debug Log Levels') |
 [Features](#🔥-flame-chart-timeline 'Go to Features') |
-[Customization](#🎨-customization 'Go to Customization') |
+[Customization](#🎨-customization 'Go to Customization') |.
 [Documentation](#📚-documentation 'Go to Documentation') |
 [Contributors](#❤️-contributors 'Go to Contributors') |
 [License](#📄-license 'Go to License')
