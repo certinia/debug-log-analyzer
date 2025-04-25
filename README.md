@@ -10,19 +10,19 @@ Apex Log Analyzer is a powerful VS Code extension for Salesforce developers. Ins
 
 ![Apex Log Analyzer Preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-preview.gif)
 
-[Installation](#-installation 'Install Apex Log Analyzer in VS Code') |
-[Debug Log Levels](#-recommended-debug-log-levels 'Go to Recommended Debug Log Levels') |
-[Features](#-flame-chart-timeline 'Go to Features') |
-[Customization](#-customization 'Go to Customization') |
-[Documentation](#-documentation 'Go to Documentation') |
-[Contributors](#-contributors 'Go to Contributors') |
-[License](#-license 'Go to License')
+[Installation](#🛠️-installation 'Install Apex Log Analyzer in VS Code') |
+[Debug Log Levels](#⚙️-recommended-debug-log-levels 'Go to Recommended Debug Log Levels') |
+[Features](#🔥-flame-chart-timeline 'Go to Features') |
+[Customization](#🎨-customization 'Go to Customization') |
+[Documentation](#📚-documentation 'Go to Documentation') |
+[Contributors](#❤️-contributors 'Go to Contributors') |
+[License](#📄-license 'Go to License')
 
 ## 🚀 Key Features
 
-- **🔥 [Flame Chart Timeline](#-flame-chart-timeline)** – Visualize every method, SOQL query, and DML operation in your Apex logs.
-- **🌲 [Interactive Call Tree](#-call-tree)** – Dive into execution stacks with timing, row counts, and DML/ SOQL metrics.
-- **📊 [Apex](#-apex-analysis) + [Database](#-database-analysis) Analysis** – Identify slow-performing SOQL, high-impact DML, and time-heavy Apex methods.
+- **🔥 [Flame Chart Timeline](#🔥-flame-chart-timeline)** – Visualize every method, SOQL query, and DML operation in your Apex logs.
+- **🌲 [Interactive Call Tree](#🌲-call-tree)** – Dive into execution stacks with timing, row counts, and DML/ SOQL metrics.
+- **📊 [Apex](#📊-apex-analysis) + [Database](#🗄️-database-analysis) Analysis** – Identify slow-performing SOQL, high-impact DML, and time-heavy Apex methods.
 - **🧠 Smart Filtering + Sorting** – Focus on what matters: filter by namespace, event type, or duration.
 - **🔍 Deep Search** – Find events across the flame chart, call tree, and database tables.
 - **📤 Export + Share** – Copy or Export Salesforce debug log insights for analysis or collaboration.
@@ -117,7 +117,7 @@ See which methods are the slowest, most frequent. or expensive.
 
 ![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-analysis.png)
 
-## 🗃️ Database Analysis
+## 🗄️ Database Analysis
 
 Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues.
 
@@ -159,8 +159,8 @@ Or go to: `Preferences > Extensions > Apex Log Analyzer`.
 ## 📚 Documentation
 
 - [User Guide & Docs](https://certinia.github.io/debug-log-analyzer/)
-- [Contribute](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/CONTRIBUTING.md)
-- [Develop](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/DEVELOPING.md)
+- [Contribute](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/CONTRIBUTING.md)
+- [Develop](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/DEVELOPING.md)
 
 ## ❤️ Contributors
 
