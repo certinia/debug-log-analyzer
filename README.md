@@ -179,6 +179,10 @@ Copyright &copy; Certinia Inc. All rights reserved.
 </p>
 <p align="center">
   <a href="https://opensource.org/licenses/BSD-3-Clause">
-    <img src="https://img.shields.io/badge/License-BSD_3--Clause-blue.svg?style=flat-square"/>
+    <img src="https://img.shields.io/badge/License-BSD_3--Clause-blue.svg?style=flat-square"/>.
   </a>
 </p>
+
+## 🙏 Acknowledgments
+
+This project uses [Tabulator Tables](http://tabulator.info/), an open-source table library, under the MIT license. Tabulator is a powerful and flexible table library that helped with the interactive table features in the Apex Log Analyzer extension.
