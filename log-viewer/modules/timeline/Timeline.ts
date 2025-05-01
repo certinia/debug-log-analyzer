@@ -173,33 +173,24 @@ let findArgs: { text: string; count: number; options: { matchCase: boolean } } =
 };
 let totalMatches = 0;
 
-function getMaxDepth(nodes: LogLine[]) {
-  const result = new Map<number, LogLine[]>();
-  result.set(0, nodes);
+function getMaxDepth(nodes: LogLine[]): number {
+  let maxDepth = 0;
+  let currentLevel = nodes.filter((n) => n.exitTypes.length);
 
-  let currentDepth = 1;
-
-  let currentNodes = nodes;
-  let len = currentNodes.length;
-  while (len) {
-    result.set(currentDepth, []);
-    while (len--) {
-      const node = currentNodes[len];
-      if (node?.children && node.duration) {
-        const children = result.get(currentDepth)!;
-        node.children.forEach((c) => {
-          if (c.children.length) {
-            children.push(c);
-          }
-        });
+  while (currentLevel.length) {
+    maxDepth++;
+    const nextLevel: LogLine[] = [];
+    for (const node of currentLevel) {
+      for (const child of node.children) {
+        if (child.exitTypes.length) {
+          nextLevel.push(child);
+        }
       }
     }
-    currentNodes = result.get(currentDepth++) || [];
-    len = currentNodes.length;
+    currentLevel = nextLevel;
   }
-  result.clear();
 
-  return currentDepth;
+  return maxDepth;
 }
 
 function drawScale(ctx: CanvasRenderingContext2D) {
@@ -266,40 +257,33 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-function nodesToRectangles(nodes: Method[]) {
-  const result = new Map<number, Method[]>();
+function nodesToRectangles(rootNodes: Method[]) {
+  let depth = 0;
+  let currentLevel = rootNodes.filter((n) => n.exitTypes.length);
 
-  let currentDepth = 0;
-  let currentNodes = nodes;
-  let len = currentNodes.length;
-  while (len) {
-    result.set(currentDepth, []);
-    while (len--) {
-      const node = currentNodes[len];
-      if (node) {
-        const { subCategory: subCategory, duration } = node;
-        if (subCategory && duration) {
-          addToRectQueue(node, currentDepth);
+  while (currentLevel.length) {
+    const nextLevel: Method[] = [];
+
+    for (const node of currentLevel) {
+      if (node.subCategory && node.duration) {
+        addToRectQueue(node, depth);
+      }
+
+      for (const child of node.children) {
+        if (child instanceof Method) {
+          nextLevel.push(child);
         }
-
-        // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
-        const children = result.get(currentDepth)!;
-        node.children.forEach((child) => {
-          if (child instanceof Method) {
-            children.push(child);
-          }
-        });
       }
     }
 
-    currentNodes = result.get(currentDepth++) || [];
-    len = currentNodes.length;
-    borderRenderQueue.set(
-      findMatchColor,
-      borderRenderQueue.get(findMatchColor)?.sort((a, b) => {
-        return a.x - b.x;
-      }) || [],
-    );
+    depth++;
+    currentLevel = nextLevel;
+  }
+
+  // sort all borders once
+  const borders = borderRenderQueue.get(findMatchColor);
+  if (borders) {
+    borders.sort((a, b) => a.x - b.x);
   }
 }
 const rectRenderQueue = new Map<LogSubCategory, Rect[]>();
