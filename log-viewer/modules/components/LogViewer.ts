@@ -97,38 +97,41 @@ export class LogViewer extends LitElement {
     this.notifications = localNotifications;
 
     this.parserIssues = this.parserIssuesToMessages(apexLog);
-
     this.logStatus = 'Ready';
   }
 
   async _readLog(logUri: string): Promise<string> {
+    let msg = '';
     if (logUri) {
-      return fetch(logUri)
-        .then((response) => {
-          if (response.ok) {
-            return response.text();
-          } else {
-            throw Error(response.statusText || `Error reading log file: ${response.status}`);
-          }
-        })
-        .catch((err: unknown) => {
-          const msg = err instanceof Error ? err.message : String(err);
+      try {
+        const response = await fetch(logUri);
+        if (!response.ok || !response.body) {
+          throw new Error(response.statusText || `Error reading log file: ${response.status}`);
+        }
 
-          const logMessage = new Notification();
-          logMessage.summary = 'Could not read log';
-          logMessage.message = msg || '';
-          logMessage.severity = 'Error';
-          this.notifications.push(logMessage);
-          return Promise.resolve('');
-        });
+        const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+        const chunks: string[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+          chunks.push(value);
+        }
+        return chunks.join('');
+      } catch (err: unknown) {
+        msg = (err instanceof Error ? err.message : String(err)) ?? '';
+      }
     } else {
-      const logMessage = new Notification();
-      logMessage.summary = 'Could not read log';
-      logMessage.message = 'Invalid Log Path';
-      logMessage.severity = 'Error';
-      this.notifications.push(logMessage);
-      return Promise.resolve('');
+      msg = 'Invalid Log Path';
     }
+
+    const logMessage = new Notification();
+    logMessage.summary = 'Could not read log';
+    logMessage.message = msg;
+    logMessage.severity = 'Error';
+    this.notifications.push(logMessage);
+    return '';
   }
 
   severity = new Map<string, NotificationSeverity>([
