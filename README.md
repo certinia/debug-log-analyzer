@@ -179,7 +179,7 @@ Copyright &copy; Certinia Inc. All rights reserved.
 </p>
 <p align="center">
   <a href="https://opensource.org/licenses/BSD-3-Clause">
-    <img src="https://img.shields.io/badge/License-BSD_3--Clause-blue.svg?style=flat-square"/>.
+    <img src="https://img.shields.io/badge/License-BSD_3--Clause-blue.svg?style=flat-square"/>
   </a>
 </p>
 
