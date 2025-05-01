@@ -43,8 +43,7 @@ export class ApexLogParser {
   cpuUsed = 0;
   lastTimestamp = 0;
   discontinuity = false;
-  namespaces: string[] = [];
-  namespacesUniq = new Set<string>();
+  namespaces = new Set<string>();
 
   /**
    * Takes string input of a log and returns the ApexLog class, which represents a log tree
@@ -59,7 +58,7 @@ export class ApexLogParser {
     apexLog.logIssues = this.logIssues;
     apexLog.parsingErrors = this.parsingErrors;
     apexLog.cpuTime = this.cpuUsed;
-    apexLog.namespaces = this.namespaces;
+    apexLog.namespaces = Array.from(this.namespaces);
 
     return apexLog;
   }
@@ -68,14 +67,14 @@ export class ApexLogParser {
     const parts = line.split('|');
 
     const type = parts[1] ?? '';
+
     const metaCtor = getLogEventClass(type as LogEventType);
     if (metaCtor) {
       const entry = new metaCtor(this, parts);
       entry.logLine = line;
       lastEntry?.onAfter?.(this, entry);
-      if (entry.namespace && !this.namespacesUniq.has(entry.namespace)) {
-        this.namespaces.push(entry.namespace);
-        this.namespacesUniq.add(entry.namespace);
+      if (entry.namespace) {
+        this.namespaces.add(entry.namespace);
       }
       return entry;
     }
@@ -170,11 +169,10 @@ export class ApexLogParser {
       line.parent = rootMethod;
       rootMethod.children.push(line);
     }
-    rootMethod.setTimes();
 
+    rootMethod.setTimes();
     this.insertPackageWrappers(rootMethod);
     this.aggregateTotals([rootMethod]);
-
     return rootMethod;
   }
 
@@ -699,7 +697,7 @@ export abstract class LogEvent {
     if (parts) {
       const [timeData, type] = parts;
       this.text = this.type = type as LogEventType;
-      this.timestamp = this.parseTimestamp(timeData || '');
+      this.timestamp = timeData ? this.parseTimestamp(timeData) : 0;
     } else {
       this.timestamp = 0;
       this.text = '';
@@ -948,14 +946,10 @@ class ConstructorEntryLine extends Method {
 
   _parseConstructorNamespace(className: string): string {
     let possibleNs = className.slice(0, className.indexOf('.'));
-    possibleNs =
-      this.logParser.namespaces.find((ns) => {
-        return ns === possibleNs;
-      }) || '';
-
-    if (possibleNs) {
+    if (this.logParser.namespaces.has(possibleNs)) {
       return possibleNs;
     }
+
     const constructorParts = (className ?? '').split('.');
     possibleNs = constructorParts[0] || '';
     // inmner class with a namespace
@@ -990,12 +984,12 @@ export class MethodEntryLine extends Method {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['METHOD_EXIT'], 'Method', 'method');
     this.lineNumber = this.parseLineNumber(parts[2]);
-    this.text = parts[4] || this.type || '';
+    this.text = parts[4] || this.type || this.text;
     if (this.text.indexOf('System.Type.forName(') !== -1) {
       // assume we are not charged for class loading (or at least not lengthy remote-loading / compiling)
       this.cpuType = 'loading';
     } else {
-      const possibleNs = this._parseMethodNamespace(parts[4] || '');
+      const possibleNs = this._parseMethodNamespace(parts[4]);
       if (possibleNs) {
         this.namespace = possibleNs;
       }
@@ -1008,23 +1002,27 @@ export class MethodEntryLine extends Method {
     }
   }
 
-  _parseMethodNamespace(methodName: string): string {
+  _parseMethodNamespace(methodName: string | undefined): string {
+    if (!methodName) {
+      return '';
+    }
+
     const methodBracketIndex = methodName.indexOf('(');
     if (methodBracketIndex === -1) {
       return '';
     }
 
-    let possibleNs = methodName.slice(0, methodName.indexOf('.'));
-    possibleNs =
-      this.logParser.namespaces.find((ns) => {
-        return ns === possibleNs;
-      }) || '';
+    const nsSeparator = methodName.indexOf('.');
+    if (nsSeparator === -1) {
+      return '';
+    }
 
-    if (possibleNs) {
+    const possibleNs = methodName.slice(0, nsSeparator);
+    if (this.logParser.namespaces.has(possibleNs)) {
       return possibleNs;
     }
 
-    const methodNameParts = methodName ? methodName.slice(0, methodBracketIndex)?.split('.') : '';
+    const methodNameParts = methodName.slice(0, methodBracketIndex)?.split('.');
     if (methodNameParts.length === 4) {
       return methodNameParts[0] ?? '';
     } else if (methodNameParts.length === 2) {
@@ -1040,9 +1038,12 @@ class MethodExitLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
-    this.text = parts[4] ?? parts[3] ?? '';
+    this.text = parts[4] ?? parts[3] ?? this.text;
 
+    /*A method will end with ')'. Without that this it represents the first reference to a class, outer or inner. One of the few reliable ways to determine valid namespaces. The first reference to a class (outer or inner) will always have an METHOD_EXIT containing the Outer class name with namespace if present. Other events will follow, CONSTRUCTOR_ENTRY etc. But this case will only ever have 2 parts ns.Outer even if the first reference was actually an inner class e.g new ns.Outer.Inner();*/
+    // If does not end in ) then we have a reference to the class, either via outer or inner.
     if (!this.text.endsWith(')')) {
+      // if there is a . the we have a namespace e.g ns.Outer
       const index = this.text.indexOf('.');
       if (index !== -1) {
         this.namespace = this.text.slice(0, index);
