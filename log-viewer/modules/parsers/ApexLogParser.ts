@@ -756,7 +756,7 @@ type CPUType = 'loading' | 'custom' | 'method' | 'free' | 'system' | 'pkg' | '';
  * - The end-line should extend "Detail" and terminate the method (also providing the "exitStamp").
  * The method will be rendered as "expandable" in the tree-view, if it has children.
  */
-export class Method extends LogEvent {
+class Method extends LogEvent {
   constructor(
     parser: ApexLogParser,
     parts: string[] | null,

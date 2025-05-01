@@ -4,13 +4,7 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import formatDuration, { debounce } from '../Util.js';
 import { goToRow } from '../components/calltree-view/CalltreeView.js';
-import {
-  ApexLog,
-  LogEvent,
-  Method,
-  type LogIssue,
-  type LogSubCategory,
-} from '../parsers/ApexLogParser.js';
+import { ApexLog, LogEvent, type LogIssue, type LogSubCategory } from '../parsers/ApexLogParser.js';
 
 export { ApexLog };
 
@@ -297,14 +291,14 @@ let currentFindMatchColor = '#9e6a03';
  * @param node The node to be rendered
  * @param y The call depth of the node
  */
-function addToRectQueue(node: Method, y: number) {
+function addToRectQueue(node: LogEvent, y: number) {
   const {
     subCategory: subCategory,
     timestamp: x,
     duration: { total: w },
   } = node;
-  let borderColor = '';
 
+  let borderColor = '';
   if (hasFindMatch(node)) {
     borderColor = findMatchColor;
   }
@@ -323,15 +317,15 @@ function addToRectQueue(node: Method, y: number) {
   borders.push(rect);
 }
 
-function hasFindMatch(node: Method) {
+function hasFindMatch(node: LogEvent) {
   if (!searchString || !node) {
     return false;
   }
 
-  const nodeType = node.type ?? '';
+  const nodeType = node.type;
   const matchType = findArgs.options.matchCase
-    ? nodeType.includes(searchString)
-    : nodeType.toLowerCase().includes(searchString);
+    ? nodeType?.includes(searchString)
+    : nodeType?.toLowerCase().includes(searchString);
   if (matchType) {
     return matchType;
   }
@@ -560,7 +554,7 @@ export function init(timelineContainer: HTMLDivElement, rootMethod: ApexLog) {
   onInitTimeline();
 
   calculateSizes();
-  nodesToRectangles(timelineRoot.children as Method[]);
+  nodesToRectangles(timelineRoot.children);
   if (ctx) {
     requestAnimationFrame(drawTimeLine);
   }
@@ -968,7 +962,7 @@ function _findOnTimeline(
   if (newSearch || clearHighlights) {
     rectRenderQueue.clear();
     borderRenderQueue.clear();
-    nodesToRectangles(timelineRoot.children as Method[]);
+    nodesToRectangles(timelineRoot.children);
     const findResults = borderRenderQueue.get(findMatchColor) || [];
     totalMatches = findResults.length;
 

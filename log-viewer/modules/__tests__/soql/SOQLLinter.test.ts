@@ -1,8 +1,17 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { ApexLogParser, Method } from '../../parsers/ApexLogParser.js';
+import { ApexLogParser, LogEvent } from '../../parsers/ApexLogParser.js';
 import { SOQLLinter } from '../../soql/SOQLLinter.js';
+
+class DummySOQLLine extends LogEvent {
+  constructor(parser: ApexLogParser, parts: string[] | null) {
+    super(parser, parts);
+    this.subCategory = 'Code Unit';
+    this.cpuType = 'method';
+    this.exitTypes = ['CODE_UNIT_FINISHED'];
+  }
+}
 
 describe('SOQL Linter rule tests', () => {
   it('No where clause should return rule', async () => {
@@ -155,20 +164,14 @@ describe('SOQL in Trigger Rule tests', () => {
   it('soql in trigger should return rule', async () => {
     const parser = new ApexLogParser();
     const soql = 'SELECT Id FROM AnObject__c WHERE value__c > 0';
-    const mockTriggerLine = new Method(
-      parser,
-      [
-        '04:16:39.166 (1166781977)',
-        'CODE_UNIT_STARTED',
-        '[EXTERNAL]',
-        'a0000000000aaaa',
-        'Account on Account trigger event AfterInsert',
-        '__sfdc_trigger/Account',
-      ],
-      ['CODE_UNIT_FINISHED'],
-      'Code Unit',
-      'method',
-    );
+    const mockTriggerLine = new DummySOQLLine(parser, [
+      '04:16:39.166 (1166781977)',
+      'CODE_UNIT_STARTED',
+      '[EXTERNAL]',
+      'a0000000000aaaa',
+      'Account on Account trigger event AfterInsert',
+      '__sfdc_trigger/Account',
+    ]);
     mockTriggerLine.text = 'Account on Account trigger event AfterInsert';
 
     const results = await new SOQLLinter().lint(soql, [mockTriggerLine]);

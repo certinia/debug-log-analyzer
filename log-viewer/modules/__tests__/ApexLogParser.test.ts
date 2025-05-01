@@ -6,7 +6,6 @@ import {
   CodeUnitStartedLine,
   ExecutionStartedLine,
   LogEvent,
-  Method,
   MethodEntryLine,
   SOQLExecuteBeginLine,
   SOQLExecuteExplainLine,
@@ -16,6 +15,12 @@ import {
   parseRows,
   parseVfNamespace,
 } from '../parsers/ApexLogParser.js';
+
+class DummyLine extends LogEvent {
+  constructor(parser: ApexLogParser, parts: string[]) {
+    super(parser, parts);
+  }
+}
 
 describe('parseObjectNamespace tests', () => {
   it('Should consider no separator to be unmanaged', () => {
@@ -1117,7 +1122,8 @@ describe('namespace tests', () => {
 describe('Recalculate durations tests', () => {
   it('Recalculates parent node', () => {
     const parser = new ApexLogParser();
-    const node = new Method(parser, ['14:32:07.563 (1)', 'DUMMY'], [], 'Method', '');
+    const node = new DummyLine(parser, ['14:32:07.563 (1)', 'DUMMY']);
+    node.subCategory = 'Method';
     node.exitStamp = 3;
 
     node.recalculateDurations();
