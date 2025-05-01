@@ -256,40 +256,34 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-function nodesToRectangles(nodes: Method[]) {
-  const result = new Map<number, Method[]>();
+function nodesToRectangles(rootNodes: LogEvent[]) {
+  // seed depth 0
+  let depth = 0;
+  let currentLevel = rootNodes.filter((n) => n.exitTypes.length);
 
-  let currentDepth = 0;
-  let currentNodes = nodes;
-  let len = currentNodes.length;
-  while (len) {
-    result.set(currentDepth, []);
-    while (len--) {
-      const node = currentNodes[len];
-      if (node) {
-        const { subCategory: subCategory, duration } = node;
-        if (subCategory && duration) {
-          addToRectQueue(node, currentDepth);
+  while (currentLevel.length) {
+    const nextLevel: LogEvent[] = [];
+
+    for (const node of currentLevel) {
+      if (node.subCategory && node.duration) {
+        addToRectQueue(node, depth);
+      }
+
+      for (const child of node.children) {
+        if (child.exitTypes.length) {
+          nextLevel.push(child);
         }
-
-        // The spread operator caused Maximum call stack size exceeded when there are lots of child nodes.
-        const children = result.get(currentDepth)!;
-        node.children.forEach((child) => {
-          if (child instanceof Method) {
-            children.push(child);
-          }
-        });
       }
     }
 
-    currentNodes = result.get(currentDepth++) || [];
-    len = currentNodes.length;
-    borderRenderQueue.set(
-      findMatchColor,
-      borderRenderQueue.get(findMatchColor)?.sort((a, b) => {
-        return a.x - b.x;
-      }) || [],
-    );
+    depth++;
+    currentLevel = nextLevel;
+  }
+
+  // sort all borders once
+  const borders = borderRenderQueue.get(findMatchColor);
+  if (borders) {
+    borders.sort((a, b) => a.x - b.x);
   }
 }
 const rectRenderQueue = new Map<LogSubCategory, Rect[]>();
