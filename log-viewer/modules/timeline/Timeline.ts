@@ -257,13 +257,12 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-function nodesToRectangles(rootNodes: LogEvent[]) {
-  // seed depth 0
+function nodesToRectangles(rootNodes: Method[]) {
   let depth = 0;
   let currentLevel = rootNodes.filter((n) => n.exitTypes.length);
 
   while (currentLevel.length) {
-    const nextLevel: LogEvent[] = [];
+    const nextLevel: Method[] = [];
 
     for (const node of currentLevel) {
       if (node.subCategory && node.duration) {
@@ -271,7 +270,7 @@ function nodesToRectangles(rootNodes: LogEvent[]) {
       }
 
       for (const child of node.children) {
-        if (child.exitTypes.length) {
+        if (child instanceof Method) {
           nextLevel.push(child);
         }
       }
