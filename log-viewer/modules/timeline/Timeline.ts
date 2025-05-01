@@ -172,33 +172,24 @@ let findArgs: { text: string; count: number; options: { matchCase: boolean } } =
 };
 let totalMatches = 0;
 
-function getMaxDepth(nodes: LogEvent[]) {
-  const result = new Map<number, LogEvent[]>();
-  result.set(0, nodes);
+function getMaxDepth(nodes: LogEvent[]): number {
+  let maxDepth = 0;
+  let currentLevel = nodes.filter((n) => n.exitTypes.length);
 
-  let currentDepth = 1;
-
-  let currentNodes = nodes;
-  let len = currentNodes.length;
-  while (len) {
-    result.set(currentDepth, []);
-    while (len--) {
-      const node = currentNodes[len];
-      if (node?.children && node.duration) {
-        const children = result.get(currentDepth)!;
-        node.children.forEach((c) => {
-          if (c.children.length) {
-            children.push(c);
-          }
-        });
+  while (currentLevel.length) {
+    maxDepth++;
+    const nextLevel: LogEvent[] = [];
+    for (const node of currentLevel) {
+      for (const child of node.children) {
+        if (child.exitTypes.length) {
+          nextLevel.push(child);
+        }
       }
     }
-    currentNodes = result.get(currentDepth++) || [];
-    len = currentNodes.length;
+    currentLevel = nextLevel;
   }
-  result.clear();
 
-  return currentDepth;
+  return maxDepth;
 }
 
 function drawScale(ctx: CanvasRenderingContext2D) {
