@@ -32,11 +32,11 @@ import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 // others
 import { DatabaseAccess } from '../../Database.js';
 import { isVisible } from '../../Util.js';
-import {
+import type {
   ApexLog,
   SOQLExecuteBeginLine,
   SOQLExecuteExplainLine,
-} from '../../parsers/ApexLogParser.js';
+} from '../../parsers/LogEvents.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import codiconStyles from '../../styles/codicon.css';
 import { globalStyles } from '../../styles/global.styles.js';

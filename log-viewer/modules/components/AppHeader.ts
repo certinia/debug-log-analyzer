@@ -10,9 +10,10 @@ import {
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
+import type { ApexLog } from '../parsers/LogEvents.js';
 import codiconStyles from '../styles/codicon.css';
 import { globalStyles } from '../styles/global.styles.js';
-import { ApexLog, type TimelineGroup } from '../timeline/Timeline.js';
+import type { TimelineGroup } from '../timeline/Timeline.js';
 import '../timeline/TimelineView.js';
 import './analysis-view/AnalysisView.js';
 import './calltree-view/CalltreeView';

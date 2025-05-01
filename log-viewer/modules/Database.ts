@@ -1,7 +1,12 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { ApexLog, DMLBeginLine, LogEvent, SOQLExecuteBeginLine } from './parsers/ApexLogParser.js';
+import {
+  type ApexLog,
+  DMLBeginLine,
+  type LogEvent,
+  SOQLExecuteBeginLine,
+} from './parsers/LogEvents.js';
 
 export type Stack = LogEvent[];
 

@@ -10,7 +10,7 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { ApexLog, LogEvent } from '../../parsers/ApexLogParser.js';
+import type { ApexLog, LogEvent } from '../../parsers/LogEvents.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 

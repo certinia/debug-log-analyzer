@@ -5,7 +5,7 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { DatabaseAccess } from '../Database.js';
-import { LogEvent } from '../parsers/ApexLogParser.js';
+import type { LogEvent } from '../parsers/LogEvents.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { goToRow } from './calltree-view/CalltreeView.js';
 

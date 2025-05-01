@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { ApexLogParser, LogEvent } from '../../parsers/ApexLogParser.js';
+import { ApexLogParser } from '../../parsers/ApexLogParser.js';
+import { LogEvent } from '../../parsers/LogEvents.js';
 import { SOQLLinter } from '../../soql/SOQLLinter.js';
 
 class DummySOQLLine extends LogEvent {

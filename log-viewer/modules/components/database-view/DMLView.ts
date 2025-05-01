@@ -25,7 +25,7 @@ import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 
 // others
 import { DatabaseAccess } from '../../Database.js';
-import { ApexLog, DMLBeginLine } from '../../parsers/ApexLogParser.js';
+import type { ApexLog, DMLBeginLine } from '../../parsers/LogEvents.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import codiconStyles from '../../styles/codicon.css';
 import { globalStyles } from '../../styles/global.styles.js';

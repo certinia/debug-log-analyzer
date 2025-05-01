@@ -2,19 +2,19 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import {
-  ApexLogParser,
   CodeUnitStartedLine,
   ExecutionStartedLine,
   LogEvent,
   MethodEntryLine,
   SOQLExecuteBeginLine,
   SOQLExecuteExplainLine,
-  lineTypeMap,
-  parse,
   parseObjectNamespace,
   parseRows,
   parseVfNamespace,
-} from '../parsers/ApexLogParser.js';
+} from '../parsers/LogEvents.js';
+import { lineTypeMap } from '../parsers/LogLineMapping.js';
+
+import { ApexLogParser, parse } from '../parsers/ApexLogParser.js';
 
 class DummyLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
