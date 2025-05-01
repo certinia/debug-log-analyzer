@@ -78,7 +78,7 @@ export class ApexLogParser {
       return entry;
     }
 
-    const hasType = type && typePattern.test(type);
+    const hasType = !!(type && typePattern.test(type));
     if (!hasType && lastEntry?.acceptsText) {
       // wrapped text from the previous entry?
       lastEntry.text += '\n' + line;
@@ -218,27 +218,26 @@ export class ApexLogParser {
           break;
         }
 
-        nextLine.namespace ||= currentLine.namespace || 'default';
         lineIter.fetch(); // it's a child - consume the line
         this.lastTimestamp = nextLine.timestamp;
+        nextLine.namespace ||= currentLine.namespace || 'default';
+        nextLine.parent = currentLine;
+        currentLine.children.push(nextLine);
 
         if (nextLine instanceof Method) {
           this.parseTree(nextLine, lineIter, stack);
         }
-
-        nextLine.parent = currentLine;
-        currentLine.children.push(nextLine);
       }
 
       // End of line error handling. We have finished processing this log line and either got to the end
       // of the log without finding an exit line or the current line was truncated)
       if (!nextLine || currentLine.isTruncated) {
         // truncated method - terminate at the end of the log
-        currentLine.exitStamp = this.lastTimestamp;
+        currentLine.exitStamp = this.lastTimestamp ?? currentLine.timestamp;
 
         // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
         this.addLogIssue(
-          this.lastTimestamp,
+          currentLine.exitStamp,
           'Unexpected-End',
           'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
           'unexpected',
@@ -246,12 +245,12 @@ export class ApexLogParser {
 
         if (currentLine.isTruncated) {
           this.updateLogIssue(
-            this.lastTimestamp,
+            currentLine.exitStamp,
             'Max-Size-reached',
             'The maximum log size has been reached. Part of the log has been truncated.',
             'skip',
           );
-          this.maxSizeTimestamp = this.lastTimestamp;
+          this.maxSizeTimestamp = currentLine.exitStamp;
         }
         currentLine.isTruncated = true;
       }
@@ -262,7 +261,7 @@ export class ApexLogParser {
   }
 
   private isMatchingEnd(startMethod: Method, endLine: LogLine) {
-    return (
+    return !!(
       endLine.type &&
       startMethod.exitTypes.includes(endLine.type) &&
       (endLine.lineNumber === startMethod.lineNumber ||
