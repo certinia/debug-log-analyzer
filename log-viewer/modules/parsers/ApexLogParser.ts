@@ -303,18 +303,18 @@ export class ApexLogParser {
 
   private flattenByDepth(nodes: LogEvent[]) {
     const result = new Map<number, LogEvent[]>();
-    result.set(0, nodes);
 
-    let currentDepth = 1;
+    let currentDepth = 0;
 
     let currentNodes = nodes;
     let len = currentNodes.length;
     while (len) {
-      result.set(currentDepth, []);
+      result.set(currentDepth, currentNodes);
+
+      const children: LogEvent[] = [];
       while (len--) {
         const node = currentNodes[len];
         if (node?.children) {
-          const children = result.get(currentDepth)!;
           node.children.forEach((c) => {
             if (c.children.length) {
               children.push(c);
@@ -322,7 +322,8 @@ export class ApexLogParser {
           });
         }
       }
-      currentNodes = result.get(currentDepth++) ?? [];
+      currentDepth++;
+      currentNodes = children;
       len = currentNodes.length;
     }
 
