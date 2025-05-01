@@ -1,7 +1,13 @@
 /*
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
-import { Module, type GroupComponent, type RowComponent, type Tabulator } from 'tabulator-tables';
+import {
+  Module,
+  type CellComponent,
+  type GroupComponent,
+  type RowComponent,
+  type Tabulator,
+} from 'tabulator-tables';
 
 export class Find extends Module {
   static moduleName = 'FindModule';
@@ -34,18 +40,9 @@ export class Find extends Module {
       return mergedArray;
     };
 
-    const flatten = (row: RowComponent): RowComponent[] => {
-      const mergedArray = [row];
-      (row.getTreeChildren() ?? []).flatMap(flatten).forEach((child) => {
-        mergedArray.push(child);
-      });
-      return mergedArray;
-    };
-
-    // Only get the currently visible rows
     const tbl = this.table;
     const grps = tbl.getGroups().flatMap(flattenFromGrps);
-    const flattenedRows = grps.length ? grps : tbl.getRows('active').flatMap(flatten);
+    const flattenedRows = grps.length ? grps : this._getRows(tbl.getRows('active'));
 
     const findOptions = findArgs.options;
     let searchString = findOptions.matchCase ? findArgs.text : findArgs.text.toLowerCase();
@@ -76,7 +73,7 @@ export class Find extends Module {
       }
       let reformat = false;
 
-      row.getCells().forEach((cell) => {
+      row.getCells().forEach((cell: CellComponent) => {
         const elem = cell.getElement();
         const matchCount = this._countMatches(elem, findArgs, regex);
         if (matchCount) {
@@ -128,6 +125,52 @@ export class Find extends Module {
       }
     }
     return count;
+  }
+
+  _getRows(rows: RowComponent[]) {
+    const isDataTreeEnabled = this.table.modules.dataTree && this.table.options.dataTreeFilter;
+    if (!isDataTreeEnabled) {
+      return rows;
+    }
+
+    const children = [];
+    for (const row of rows) {
+      children.push(row);
+      for (const child of this._getFilteredChildren(row)) {
+        children.push(child);
+      }
+    }
+    return children;
+  }
+
+  _getFilteredChildren(row: RowComponent): RowComponent[] {
+    const output: RowComponent[] = [];
+
+    const filtering = this.table.modules.filter;
+    const sorting = this.table.options.dataTreeSort ? this.table.modules.sort : null;
+    let internalChildren = [];
+    for (const child of row.getTreeChildren()) {
+      //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+      internalChildren.push(child._getSelf());
+    }
+    internalChildren = filtering.filter(internalChildren);
+    if (sorting) {
+      sorting.sort(internalChildren, true);
+    }
+
+    const filteredChildren = [];
+    for (const internalChild of internalChildren) {
+      const childComp: RowComponent = internalChild.getComponent();
+      filteredChildren.push(childComp);
+      output.push(childComp);
+
+      const subChildren = this._getFilteredChildren(childComp);
+      subChildren.forEach((sub) => {
+        output.push(sub);
+      });
+    }
+
+    return output;
   }
 
   _clearMatches() {

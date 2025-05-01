@@ -219,8 +219,7 @@ export class AnalysisView extends LitElement {
       newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
     this.findArgs = newFindArgs;
 
-    const clearHighlights =
-      e.type === 'lv-find-close' || (!isTableVisible && newFindArgs.count === 0);
+    const clearHighlights = e.type === 'lv-find-close';
     if (clearHighlights) {
       newFindArgs.text = '';
     }
@@ -423,7 +422,7 @@ export class AnalysisView extends LitElement {
 
   _clearSearchHighlights() {
     this._find(
-      new CustomEvent('lv-find', {
+      new CustomEvent('lv-find-close', {
         detail: { text: '', count: 0, options: { matchCase: false } },
       }),
     );

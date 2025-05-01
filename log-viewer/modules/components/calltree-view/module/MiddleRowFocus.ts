@@ -75,11 +75,9 @@ export class MiddleRowFocus extends Module {
       if (rowToScrollTo) {
         this.table.scrollToRow(rowToScrollTo, 'center', true).then(() => {
           setTimeout(() => {
-            if (rowToScrollTo) {
-              rowToScrollTo
-                ?.getElement()
-                .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-            }
+            rowToScrollTo
+              ?.getElement()
+              .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
           });
         });
       }
