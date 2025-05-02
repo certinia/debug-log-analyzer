@@ -35,7 +35,6 @@ export class ApexLogParser {
   lastTimestamp = 0;
   discontinuity = false;
   namespaces = new Set<string>();
-  namespaces = new Set<string>();
 
   /**
    * Takes string input of a log and returns the ApexLog class, which represents a log tree
