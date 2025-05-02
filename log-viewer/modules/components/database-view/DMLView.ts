@@ -379,13 +379,6 @@ export class DMLView extends LitElement {
       },
     });
 
-    this.dmlTable.on('dataFiltering', () => {
-      if (!this.blockClearHighlights) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
     this.dmlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
       const { type } = window.getSelection() ?? {};
       if (type === 'Range') {
@@ -414,6 +407,11 @@ export class DMLView extends LitElement {
     });
 
     this.dmlTable.on('renderStarted', () => {
+      if (!this.blockClearHighlights) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
+
       const holder = this._getTableHolder();
       holder.style.minHeight = holder.clientHeight + 'px';
       holder.style.overflowAnchor = 'none';

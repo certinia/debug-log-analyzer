@@ -535,14 +535,12 @@ export class SOQLView extends LitElement {
       row.getCell('soql').getElement().style.height = origRowHeight + 'px';
     });
 
-    this.soqlTable.on('dataFiltering', () => {
+    this.soqlTable.on('renderStarted', () => {
       if (!this.blockClearHighlights) {
         this._resetFindWidget();
         this._clearSearchHighlights();
       }
-    });
 
-    this.soqlTable.on('renderStarted', () => {
       const holder = this._getTableHolder();
       holder.style.minHeight = holder.clientHeight + 'px';
       holder.style.overflowAnchor = 'none';

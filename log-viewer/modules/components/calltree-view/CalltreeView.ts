@@ -779,15 +779,6 @@ export class CalltreeView extends LitElement {
         ],
       });
 
-      this.calltreeTable.on('dataFiltering', () => {
-        // With a datatree the dataFiltering event occurs multi times and we only want to call this once.
-        // We will reset the flag when the user next searches.
-        if (!this.blockClearHighlights) {
-          this._resetFindWidget();
-          this._clearSearchHighlights();
-        }
-      });
-
       this.calltreeTable.on('dataFiltered', () => {
         totalTimeFilterCache.clear();
         selfTimeFilterCache.clear();
@@ -795,6 +786,13 @@ export class CalltreeView extends LitElement {
         this.debugOnlyFilterCache.clear();
         this.showDetailsFilterCache.clear();
         this.typeFilterCache.clear();
+      });
+
+      this.calltreeTable.on('renderStarted', () => {
+        if (!this.blockClearHighlights) {
+          this._resetFindWidget();
+          this._clearSearchHighlights();
+        }
       });
 
       this.calltreeTable.on('tableBuilt', () => {

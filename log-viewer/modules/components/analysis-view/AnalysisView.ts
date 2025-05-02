@@ -421,7 +421,7 @@ export class AnalysisView extends LitElement {
       ],
     });
 
-    this.analysisTable.on('dataFiltering', () => {
+    this.analysisTable.on('renderStarted', () => {
       if (!this.blockClearHighlights) {
         this._resetFindWidget();
         this._clearSearchHighlights();
