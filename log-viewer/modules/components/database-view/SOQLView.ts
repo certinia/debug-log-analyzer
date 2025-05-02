@@ -235,6 +235,8 @@ export class SOQLView extends LitElement {
 
     this.findArgs.count = highlightIndex;
     const currentRow = this.findMap[highlightIndex];
+    this.blockClearHighlights = true;
+    this.soqlTable.blockRedraw();
     const rows = [currentRow, this.findMap[this.oldIndex]];
     rows.forEach((row) => {
       row?.reformat();
@@ -244,6 +246,8 @@ export class SOQLView extends LitElement {
       //@ts-expect-error This is a custom function added in by RowNavigation custom module
       this.soqlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
     }
+    this.soqlTable.restoreRedraw();
+    this.blockClearHighlights = false;
 
     this.oldIndex = highlightIndex;
   }

@@ -204,6 +204,8 @@ export class DMLView extends LitElement {
     this.findArgs.count = highlightIndex;
     const currentRow = this.findMap[highlightIndex];
     const rows = [currentRow, this.findMap[this.oldIndex]];
+    this.blockClearHighlights = true;
+    this.dmlTable.blockRedraw();
     rows.forEach((row) => {
       row?.reformat();
     });
@@ -211,6 +213,8 @@ export class DMLView extends LitElement {
       //@ts-expect-error This is a custom function added in by RowNavigation custom module
       this.dmlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
     }
+    this.dmlTable.restoreRedraw();
+    this.blockClearHighlights = false;
     this.oldIndex = highlightIndex;
   }
 
