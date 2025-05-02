@@ -315,8 +315,6 @@ export class ApexLogParser {
       }
       currentDepth++;
       currentNodes = children;
-      currentDepth++;
-      currentNodes = children;
       len = currentNodes.length;
     }
 
@@ -378,7 +376,7 @@ export class ApexLogParser {
         }
       }
 
-      if (child.exitTypes) {
+      if (child.exitTypes.length) {
         this.insertPackageWrappers(child);
       }
 
