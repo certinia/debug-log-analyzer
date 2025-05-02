@@ -5,7 +5,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { ApexLog } from '../../parsers/ApexLogParser.js';
+import type { ApexLog } from '../../parsers/LogEvents.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import '../CallStack.js';
 import './DMLView.js';
