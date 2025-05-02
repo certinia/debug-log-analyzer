@@ -62,7 +62,7 @@ export class DMLView extends LitElement {
   };
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
-  canClearHighlights = false;
+  blockClearHighlights = false;
 
   constructor() {
     super();
@@ -220,8 +220,6 @@ export class DMLView extends LitElement {
       return;
     }
 
-    this.canClearHighlights = true;
-
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     if (!isTableVisible) {
       newFindArgs.text = '';
@@ -237,8 +235,10 @@ export class DMLView extends LitElement {
       newFindArgs.text = '';
     }
     if (newSearch || clearHighlights) {
+      this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
       const result = this.dmlTable.find(this.findArgs);
+      this.blockClearHighlights = false;
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
@@ -250,7 +250,6 @@ export class DMLView extends LitElement {
         );
       }
     }
-    this.canClearHighlights = false;
   }
 
   _renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
@@ -381,7 +380,7 @@ export class DMLView extends LitElement {
     });
 
     this.dmlTable.on('dataFiltering', () => {
-      if (this.canClearHighlights) {
+      if (!this.blockClearHighlights) {
         this._resetFindWidget();
         this._clearSearchHighlights();
       }

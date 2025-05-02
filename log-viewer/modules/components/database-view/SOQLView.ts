@@ -73,7 +73,7 @@ export class SOQLView extends LitElement {
   };
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
-  canClearHighlights = false;
+  blockClearHighlights = false;
 
   get _soqlTableWrapper(): HTMLDivElement | null {
     return this.renderRoot?.querySelector('#db-soql-table') ?? null;
@@ -254,8 +254,6 @@ export class SOQLView extends LitElement {
       return;
     }
 
-    this.canClearHighlights = true;
-
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
       newFindArgs.text !== this.findArgs.text ||
@@ -267,8 +265,10 @@ export class SOQLView extends LitElement {
       newFindArgs.text = '';
     }
     if (newSearch || clearHighlights) {
+      this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
       const result = this.soqlTable.find(this.findArgs);
+      this.blockClearHighlights = false;
       this.totalMatches = 0;
       this.findMap = result.matchIndexes;
 
@@ -280,8 +280,6 @@ export class SOQLView extends LitElement {
         );
       }
     }
-
-    this.canClearHighlights = false;
   }
 
   _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
@@ -538,7 +536,7 @@ export class SOQLView extends LitElement {
     });
 
     this.soqlTable.on('dataFiltering', () => {
-      if (this.canClearHighlights) {
+      if (!this.blockClearHighlights) {
         this._resetFindWidget();
         this._clearSearchHighlights();
       }
