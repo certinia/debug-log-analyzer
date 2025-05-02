@@ -13,7 +13,7 @@ export default [
   {
     input: './lana/src/Main.ts',
     output: {
-      format: 'cjs',
+      format: 'es',
       dir: './lana/out',
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
