@@ -141,6 +141,10 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
     border-left: 6px solid transparent;
     border-right: 6px solid transparent;
   }
+
+  .number-cell {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 .tabulator-edit-list {
