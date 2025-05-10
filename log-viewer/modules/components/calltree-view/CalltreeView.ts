@@ -666,7 +666,6 @@ export class CalltreeView extends LitElement {
             field: 'namespace',
             sorter: 'string',
             width: 120,
-            cssClass: 'datagrid-code-text',
             headerFilter: 'list',
             headerFilterFunc: this._namespaceFilter,
             headerFilterFuncParams: { filterCache: namespaceFilterCache },

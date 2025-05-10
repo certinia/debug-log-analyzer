@@ -450,7 +450,6 @@ export class SOQLView extends LitElement {
           title: 'Namespace',
           field: 'namespace',
           sorter: 'string',
-          cssClass: 'datagrid-code-text',
           width: 120,
           headerFilter: 'list',
           headerFilterFunc: 'in',

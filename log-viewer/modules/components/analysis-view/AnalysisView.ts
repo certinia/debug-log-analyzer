@@ -341,7 +341,6 @@ export class AnalysisView extends LitElement {
           headerSortStartingDir: 'desc',
           width: 150,
           sorter: 'string',
-          cssClass: 'datagrid-code-text',
           tooltip: true,
           headerFilter: 'list',
           headerFilterFunc: 'in',
@@ -351,7 +350,6 @@ export class AnalysisView extends LitElement {
             multiselect: true,
           },
           headerFilterLiveFilter: false,
-          variableHeight: true,
         },
         {
           title: 'Type',
@@ -360,7 +358,6 @@ export class AnalysisView extends LitElement {
           width: 150,
           sorter: 'string',
           tooltip: true,
-          cssClass: 'datagrid-code-text',
         },
         {
           title: 'Count',
