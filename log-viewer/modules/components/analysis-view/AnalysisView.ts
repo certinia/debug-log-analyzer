@@ -363,6 +363,7 @@ export class AnalysisView extends LitElement {
           title: 'Count',
           field: 'count',
           sorter: 'number',
+          cssClass: 'number-cell',
           width: 65,
           hozAlign: 'right',
           headerHozAlign: 'right',
