@@ -73,7 +73,7 @@ export class SOQLView extends LitElement {
   };
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
-  canClearHighlights = false;
+  blockClearHighlights = false;
 
   get _soqlTableWrapper(): HTMLDivElement | null {
     return this.renderRoot?.querySelector('#db-soql-table') ?? null;
@@ -235,6 +235,8 @@ export class SOQLView extends LitElement {
 
     this.findArgs.count = highlightIndex;
     const currentRow = this.findMap[highlightIndex];
+    this.blockClearHighlights = true;
+    this.soqlTable.blockRedraw();
     const rows = [currentRow, this.findMap[this.oldIndex]];
     rows.forEach((row) => {
       row?.reformat();
@@ -244,6 +246,8 @@ export class SOQLView extends LitElement {
       //@ts-expect-error This is a custom function added in by RowNavigation custom module
       this.soqlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
     }
+    this.soqlTable.restoreRedraw();
+    this.blockClearHighlights = false;
 
     this.oldIndex = highlightIndex;
   }
@@ -253,8 +257,6 @@ export class SOQLView extends LitElement {
     if (!isTableVisible && !this.totalMatches) {
       return;
     }
-
-    this.canClearHighlights = true;
 
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
@@ -267,8 +269,10 @@ export class SOQLView extends LitElement {
       newFindArgs.text = '';
     }
     if (newSearch || clearHighlights) {
+      this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
       const result = this.soqlTable.find(this.findArgs);
+      this.blockClearHighlights = false;
       this.totalMatches = 0;
       this.findMap = result.matchIndexes;
 
@@ -280,8 +284,6 @@ export class SOQLView extends LitElement {
         );
       }
     }
-
-    this.canClearHighlights = false;
   }
 
   _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
@@ -539,14 +541,12 @@ export class SOQLView extends LitElement {
       row.getCell('soql').getElement().style.height = origRowHeight + 'px';
     });
 
-    this.soqlTable.on('dataFiltering', () => {
-      if (this.canClearHighlights) {
+    this.soqlTable.on('renderStarted', () => {
+      if (!this.blockClearHighlights) {
         this._resetFindWidget();
         this._clearSearchHighlights();
       }
-    });
 
-    this.soqlTable.on('renderStarted', () => {
       const holder = this._getTableHolder();
       holder.style.minHeight = holder.clientHeight + 'px';
       holder.style.overflowAnchor = 'none';

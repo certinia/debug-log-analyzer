@@ -57,7 +57,7 @@ export class CalltreeView extends LitElement {
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
 
-  canClearSearchHighlights = false;
+  blockClearHighlights = false;
   searchString = '';
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
@@ -350,7 +350,6 @@ export class CalltreeView extends LitElement {
     if (!isTableVisible && !this.totalMatches) {
       return;
     }
-    this.canClearSearchHighlights = false;
 
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
@@ -363,8 +362,10 @@ export class CalltreeView extends LitElement {
       newFindArgs.text = '';
     }
     if (newSearch || clearHighlights) {
+      this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
       const result = this.calltreeTable.find(this.findArgs);
+      this.blockClearHighlights = false;
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
@@ -375,6 +376,12 @@ export class CalltreeView extends LitElement {
       }
     }
 
+    // Highlight the current row and reset the previous or next depending on whether we are stepping forward or back.
+    const hasHighlights = Object.keys(this.findMap).length !== 0;
+    if (!hasHighlights) {
+      return;
+    }
+    this.blockClearHighlights = true;
     this.calltreeTable?.blockRedraw();
     const currentRow = this.findMap[this.findArgs.count];
     const rows = [
@@ -391,7 +398,7 @@ export class CalltreeView extends LitElement {
       this.calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
     }
     this.calltreeTable?.restoreRedraw();
-    this.canClearSearchHighlights = true;
+    this.blockClearHighlights = false;
   }
 
   _highlight(inputString: string, substring: string) {
@@ -776,16 +783,6 @@ export class CalltreeView extends LitElement {
         ],
       });
 
-      this.calltreeTable.on('dataFiltering', () => {
-        // With a datatree the dataFiltering event occurs multi times and we only want to call this once.
-        // We will reset the flag when the user next searches.
-        if (this.canClearSearchHighlights) {
-          this.canClearSearchHighlights = false;
-          this._resetFindWidget();
-          this._clearSearchHighlights();
-        }
-      });
-
       this.calltreeTable.on('dataFiltered', () => {
         totalTimeFilterCache.clear();
         selfTimeFilterCache.clear();
@@ -793,6 +790,13 @@ export class CalltreeView extends LitElement {
         this.debugOnlyFilterCache.clear();
         this.showDetailsFilterCache.clear();
         this.typeFilterCache.clear();
+      });
+
+      this.calltreeTable.on('renderStarted', () => {
+        if (!this.blockClearHighlights) {
+          this._resetFindWidget();
+          this._clearSearchHighlights();
+        }
       });
 
       this.calltreeTable.on('tableBuilt', () => {

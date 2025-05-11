@@ -110,6 +110,7 @@ export class AnalysisView extends LitElement {
     options: { matchCase: false },
   };
   totalMatches = 0;
+  blockClearHighlights = false;
 
   constructor() {
     super();
@@ -224,8 +225,10 @@ export class AnalysisView extends LitElement {
       newFindArgs.text = '';
     }
     if (newSearch || clearHighlights) {
+      this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
       const result = this.analysisTable.find(this.findArgs);
+      this.blockClearHighlights = false;
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
@@ -236,6 +239,12 @@ export class AnalysisView extends LitElement {
       }
     }
 
+    const hasHighlights = Object.keys(this.findMap).length !== 0;
+    if (!hasHighlights) {
+      return;
+    }
+    this.blockClearHighlights = true;
+    this.analysisTable?.blockRedraw();
     const currentRow = this.findMap[this.findArgs.count];
     const rows = [
       currentRow,
@@ -247,6 +256,8 @@ export class AnalysisView extends LitElement {
     });
     //@ts-expect-error This is a custom function added in by RowNavigation custom module
     this.analysisTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+    this.analysisTable?.restoreRedraw();
+    this.blockClearHighlights = false;
   }
 
   async _renderAnalysis(rootMethod: ApexLog) {
@@ -408,9 +419,11 @@ export class AnalysisView extends LitElement {
       ],
     });
 
-    this.analysisTable.on('dataFiltering', () => {
-      this._resetFindWidget();
-      this._clearSearchHighlights();
+    this.analysisTable.on('renderStarted', () => {
+      if (!this.blockClearHighlights) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
     });
   }
 
