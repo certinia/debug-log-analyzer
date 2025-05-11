@@ -29,7 +29,7 @@ $rowSelectedBackground: var(--vscode-list-activeSelectionBackground);
 //row background color when selected and hovered
 $rowSelectedBackgroundHover: var(--vscode-list-activeSelectionBackground);
 
-$editBoxColor: var(--vscode-list-activeSelectionBackground, #1d68cd); //border color for edit boxes
+$editBoxColor: var(--vscode-focusBorder, #1d68cd); //border color for edit boxes
 $errorColor: #dd0000 !default; //error indication
 
 //footer theming
@@ -62,7 +62,6 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
       padding: 2px 4px;
       box-sizing: border-box;
       border-radius: 2px;
-      font-size: inherit;
       appearance: textfield !important;
     }
     input[type='search']:focus {
@@ -142,8 +141,25 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
     border-left: 6px solid transparent;
     border-right: 6px solid transparent;
   }
+
+  .number-cell {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 .tabulator-edit-list {
   border-color: var(--vscode-focusBorder, default);
+
+  .tabulator-edit-list-item {
+    color: var(--vscode-editor-foreground, 'white');
+    &.active {
+      background-color: var(--vscode-list-activeSelectionBackground);
+      color: var(--vscode-editor-foreground, 'white');
+    }
+
+    &:hover {
+      background-color: var(--vscode-list-activeSelectionBackground);
+      color: var(--vscode-editor-foreground, 'white');
+    }
+  }
 }

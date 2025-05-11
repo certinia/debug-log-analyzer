@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **✂️ Copy Text in Views**: You can now highlight and copy text from the Call Tree, Analysis, and Database views without the text clearing immediately after highlighting ([#504]).
 - **💎 Improved HiDPI Rendering**: Sharpened rendering for the timeline on HiDPI displays ([#588]).
 - **🔍 Call Tree Search**: Search in the Call Tree now only includes the visible filtered rows ([#539]).
+- **🎨 Search Input Styling:**: The grid search input fits into VS Code styles better ([#619]).
 
 ### Fixed
 
@@ -395,6 +396,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#592]: https://github.com/certinia/debug-log-analyzer/issues/592
 [#93]: https://github.com/certinia/debug-log-analyzer/issues/93
 [#539]: https://github.com/certinia/debug-log-analyzer/issues/539
+[#619]: https://github.com/certinia/debug-log-analyzer/issues/619
 
 <!-- 1.16.1 -->
 
