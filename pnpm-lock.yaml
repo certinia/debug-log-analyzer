@@ -114,8 +114,8 @@ importers:
         specifier: ~20.14.8
         version: 20.14.15
       '@types/vscode':
-        specifier: ~1.74.0
-        version: 1.74.1
+        specifier: ~1.99.1
+        version: 1.99.1
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.30.1
         version: 8.31.0(@typescript-eslint/parser@8.31.0(eslint@9.25.1(jiti@1.21.7))(typescript@5.8.3))(eslint@9.25.1(jiti@1.21.7))(typescript@5.8.3)
@@ -2456,9 +2456,8 @@ packages:
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
-  '@types/vscode@1.74.1':
-    resolution: {integrity: sha512-/4bwu5Lz2tQIhCDfGyEho36jEBHfEGgbuajgFZgRIfsfK/U0vv8diYIvQRiz8cc9tGlzd7m/NJscEJ7gFExJ4g==}
-    deprecated: 'Warning: @types/vscode@1.74.1 contains types for VS Code 1.75. Please install @types/vscode@1.74.0 if your extension is expected to run in VS Code 1.74'
+  '@types/vscode@1.99.1':
+    resolution: {integrity: sha512-cQlqxHZ040ta6ovZXnXRxs3fJiTmlurkIWOfZVcLSZPcm9J4ikFpXuB7gihofGn5ng+kDVma5EmJIclfk0trPQ==}
 
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
@@ -10839,7 +10838,7 @@ snapshots:
 
   '@types/unist@3.0.3': {}
 
-  '@types/vscode@1.74.1': {}
+  '@types/vscode@1.99.1': {}
 
   '@types/ws@8.18.1':
     dependencies:
