@@ -57,7 +57,7 @@ export class CalltreeView extends LitElement {
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
 
-  blockClearHighlights = false;
+  blockClearHighlights = true;
   searchString = '';
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
@@ -361,6 +361,7 @@ export class CalltreeView extends LitElement {
     if (clearHighlights) {
       newFindArgs.text = '';
     }
+
     if (newSearch || clearHighlights) {
       this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
@@ -377,8 +378,7 @@ export class CalltreeView extends LitElement {
     }
 
     // Highlight the current row and reset the previous or next depending on whether we are stepping forward or back.
-    const hasHighlights = Object.keys(this.findMap).length !== 0;
-    if (!hasHighlights) {
+    if (this.totalMatches <= 0) {
       return;
     }
     this.blockClearHighlights = true;
@@ -793,7 +793,7 @@ export class CalltreeView extends LitElement {
       });
 
       this.calltreeTable.on('renderStarted', () => {
-        if (!this.blockClearHighlights) {
+        if (!this.blockClearHighlights && this.totalMatches > 0) {
           this._resetFindWidget();
           this._clearSearchHighlights();
         }
@@ -810,11 +810,12 @@ export class CalltreeView extends LitElement {
   }
 
   private _clearSearchHighlights() {
-    this._find(
-      new CustomEvent('lv-find-close', {
-        detail: { text: '', count: 0, options: { matchCase: false } },
-      }),
-    );
+    this.findArgs.text = '';
+    this.findArgs.count = 0;
+    //@ts-expect-error This is a custom function added in by Find custom module
+    this.calltreeTable.clearFindHighlights(Object.values(this.findMap));
+    this.findMap = {};
+    this.totalMatches = 0;
   }
 
   private _expandCollapseAll(rows: RowComponent[], expand: boolean = true) {

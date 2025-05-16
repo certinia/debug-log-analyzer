@@ -62,7 +62,7 @@ export class DMLView extends LitElement {
   };
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
-  blockClearHighlights = false;
+  blockClearHighlights = true;
 
   constructor() {
     super();
@@ -196,6 +196,7 @@ export class DMLView extends LitElement {
     });
   }
 
+  // todo: fix search on grouped data
   _highlightMatches(highlightIndex: number) {
     if (!this.dmlTable?.element?.clientHeight) {
       return;
@@ -304,7 +305,7 @@ export class DMLView extends LitElement {
       selectableRows: 'highlight',
       dataTree: true,
       dataTreeBranchElement: false,
-      dataTreeStartExpanded: true,
+      dataTreeStartExpanded: false,
       columnDefaults: {
         title: 'default',
         resizable: true,
@@ -381,7 +382,9 @@ export class DMLView extends LitElement {
           row.normalizeHeight();
         }
 
-        formatter(row, this.findArgs);
+        requestAnimationFrame(() => {
+          formatter(row, this.findArgs);
+        });
       },
     });
 
@@ -391,9 +394,16 @@ export class DMLView extends LitElement {
         return;
       }
 
-      this.dmlTable?.blockRedraw();
       group.toggle();
-      this.dmlTable?.restoreRedraw();
+      if (this.dmlTable && group.isVisible()) {
+        this.dmlTable.blockRedraw();
+        for (const row of group.getRows()) {
+          if (row.getTreeChildren() && !row.isTreeExpanded()) {
+            row.treeExpand();
+          }
+        }
+        this.dmlTable.restoreRedraw();
+      }
     });
 
     this.dmlTable.on('rowClick', function (e, row) {
@@ -413,7 +423,7 @@ export class DMLView extends LitElement {
     });
 
     this.dmlTable.on('renderStarted', () => {
-      if (!this.blockClearHighlights) {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
         this._resetFindWidget();
         this._clearSearchHighlights();
       }
@@ -439,11 +449,12 @@ export class DMLView extends LitElement {
   }
 
   private _clearSearchHighlights() {
-    this._find(
-      new CustomEvent('lv-find-close', {
-        detail: { text: '', count: 0, options: { matchCase: false } },
-      }),
-    );
+    this.findArgs.text = '';
+    this.findArgs.count = 0;
+    //@ts-expect-error This is a custom function added in by Find custom module
+    this.dmlTable.clearFindHighlights(Object.values(this.findMap));
+    this.findMap = {};
+    this.totalMatches = 0;
   }
 
   _getTable() {
