@@ -16,6 +16,8 @@ export class Find extends Module {
     super(table);
     // @ts-expect-error registerTableFunction() needs adding to tabulator types
     this.registerTableFunction('find', this._find.bind(this));
+    // @ts-expect-error registerTableFunction() needs adding to tabulator types
+    this.registerTableFunction('clearFindHighlights', this._clearFindHighlights.bind(this));
   }
 
   initialize() {}
@@ -98,6 +100,16 @@ export class Find extends Module {
 
     result.totalMatches = totalMatches;
     return result;
+  }
+
+  _clearFindHighlights(rows: RowComponent[]) {
+    this.table.blockRedraw();
+    for (const row of rows) {
+      const data = row.getData();
+      data.highlightIndexes = [];
+      row.reformat();
+    }
+    this.table.restoreRedraw();
   }
 
   _countMatches(elem: Node, findArgs: FindArgs, regex: RegExp) {
@@ -201,25 +213,19 @@ export class Find extends Module {
 
 export function formatter(row: RowComponent, findArgs: FindArgs) {
   const { text, count } = findArgs;
-  if (!text || !count || !row.getData()) {
+  if (!text || !count || !row.getData() || !row.getData().highlightIndexes?.length) {
     return;
   }
-  requestAnimationFrame(() => {
-    const data = row.getData();
-    const highlights = {
-      indexes: data.highlightIndexes,
-      currentMatch: 0,
-    };
 
-    row.getCells().forEach((cell) => {
-      const cellElem = cell.getElement();
-      _highlightText(cellElem, findArgs, highlights);
-    });
+  const data = row.getData();
+  const highlights = {
+    indexes: data.highlightIndexes,
+    currentMatch: 0,
+  };
 
-    //@ts-expect-error This is private to tabulator, but we have no other choice atm.
-    if (row._getSelf().type === 'row') {
-      row.normalizeHeight();
-    }
+  row.getCells().forEach((cell) => {
+    const cellElem = cell.getElement();
+    _highlightText(cellElem, findArgs, highlights);
   });
 }
 

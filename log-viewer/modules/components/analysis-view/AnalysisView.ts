@@ -110,7 +110,7 @@ export class AnalysisView extends LitElement {
     options: { matchCase: false },
   };
   totalMatches = 0;
-  blockClearHighlights = false;
+  blockClearHighlights = true;
 
   constructor() {
     super();
@@ -239,8 +239,7 @@ export class AnalysisView extends LitElement {
       }
     }
 
-    const hasHighlights = Object.keys(this.findMap).length !== 0;
-    if (!hasHighlights) {
+    if (this.totalMatches <= 0) {
       return;
     }
     this.blockClearHighlights = true;
@@ -420,7 +419,7 @@ export class AnalysisView extends LitElement {
     });
 
     this.analysisTable.on('renderStarted', () => {
-      if (!this.blockClearHighlights) {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
         this._resetFindWidget();
         this._clearSearchHighlights();
       }
@@ -432,11 +431,12 @@ export class AnalysisView extends LitElement {
   }
 
   _clearSearchHighlights() {
-    this._find(
-      new CustomEvent('lv-find-close', {
-        detail: { text: '', count: 0, options: { matchCase: false } },
-      }),
-    );
+    this.findArgs.text = '';
+    this.findArgs.count = 0;
+    //@ts-expect-error This is a custom function added in by Find custom module
+    this.analysisTable.clearFindHighlights(Object.values(this.findMap));
+    this.findMap = {};
+    this.totalMatches = 0;
   }
 }
 export class Metric {
