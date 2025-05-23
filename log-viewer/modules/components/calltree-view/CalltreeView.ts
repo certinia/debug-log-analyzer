@@ -413,11 +413,18 @@ export class CalltreeView extends LitElement {
   }
 
   _showDetailsFilter = (data: CalltreeRow) => {
+    const excludedTypes = new Set<string>([
+      'CUMULATIVE_LIMIT_USAGE',
+      'LIMIT_USAGE_FOR_NS',
+      'CUMULATIVE_PROFILING',
+      'CUMULATIVE_PROFILING_BEGIN',
+    ]);
+
     return this._deepFilter(
       data,
       (rowData) => {
         const logLine = rowData.originalData;
-        return logLine.duration.total > 0 || logLine.exitTypes.length > 0 || logLine.discontinuity;
+        return logLine.duration.total > 0 || logLine.exitTypes.length > 0 || logLine.discontinuity || !!(logLine.type && excludedTypes.has(logLine.type));
       },
       {
         filterCache: this.showDetailsFilterCache,
@@ -426,7 +433,7 @@ export class CalltreeView extends LitElement {
   };
 
   _debugFilter = (data: CalltreeRow) => {
-    const debugValues = [
+    const debugValues =  new Set<string>([
       'USER_DEBUG',
       'DATAWEAVE_USER_DEBUG',
       'USER_DEBUG_FINER',
@@ -436,11 +443,11 @@ export class CalltreeView extends LitElement {
       'USER_DEBUG_INFO',
       'USER_DEBUG_WARN',
       'USER_DEBUG_ERROR',
-    ];
+    ]);
     return this._deepFilter(
       data,
       (rowData) => {
-        return debugValues.includes(rowData.originalData.type || '');
+        return !!(rowData.originalData.type && debugValues.has(rowData.originalData.type));
       },
       {
         filterCache: this.debugOnlyFilterCache,
