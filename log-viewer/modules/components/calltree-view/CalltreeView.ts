@@ -27,7 +27,8 @@ import { progressFormatter } from '../../datagrid/format/Progress.js';
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
-import { ApexLog, LogLine, TimedNode, type LogEventType } from '../../parsers/ApexLogParser.js';
+import type { ApexLog, LogEvent } from '../../parsers/LogEvents.js';
+import type { LogEventType } from '../../parsers/types.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 import { isVisible } from '../../Util.js';
@@ -220,7 +221,7 @@ export class CalltreeView extends LitElement {
 
   _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
 
-  _getAllTypes(data: LogLine[]): string[] {
+  _getAllTypes(data: LogEvent[]): string[] {
     const flattened = this._flatten(data);
     const types = new Set<string>();
     for (const line of flattened) {
@@ -229,7 +230,7 @@ export class CalltreeView extends LitElement {
     return Array.from(types).sort();
   }
 
-  _flat(arr: LogLine[], target: LogLine[]) {
+  _flat(arr: LogEvent[], target: LogEvent[]) {
     arr.forEach((el) => {
       target.push(el);
       if (el.children.length > 0) {
@@ -238,8 +239,8 @@ export class CalltreeView extends LitElement {
     });
   }
 
-  _flatten(arr: LogLine[]) {
-    const flattened: LogLine[] = [];
+  _flatten(arr: LogEvent[]) {
+    const flattened: LogEvent[] = [];
     this._flat(arr, flattened);
     return flattened;
   }
@@ -835,7 +836,7 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  private _toCallTree(nodes: LogLine[]): CalltreeRow[] | undefined {
+  private _toCallTree(nodes: LogEvent[]): CalltreeRow[] | undefined {
     const len = nodes.length;
     if (!len) {
       return undefined;
@@ -882,7 +883,7 @@ export class CalltreeView extends LitElement {
       if (!row) {
         break;
       }
-      const node = (row.getData() as CalltreeRow).originalData as TimedNode;
+      const node = (row.getData() as CalltreeRow).originalData as LogEvent;
 
       // Return True if the element is present in the middle.
       const endTime = node.exitStamp ?? node.timestamp;
@@ -908,7 +909,7 @@ export class CalltreeView extends LitElement {
 
 interface CalltreeRow {
   id: string;
-  originalData: LogLine;
+  originalData: LogEvent;
   _children: CalltreeRow[] | undefined | null;
   text: string;
   duration: CountTotals;

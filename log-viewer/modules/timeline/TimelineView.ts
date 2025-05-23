@@ -5,8 +5,9 @@ import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { skeletonStyles } from '../components/skeleton/skeleton.styles.js';
+import type { ApexLog } from '../parsers/LogEvents.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { ApexLog, init as timelineInit, type TimelineGroup } from './Timeline.js';
+import { init as timelineInit, type TimelineGroup } from './Timeline.js';
 import './TimelineKey.js';
 
 @customElement('timeline-view')
