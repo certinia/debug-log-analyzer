@@ -185,7 +185,9 @@ export class AnalysisView extends LitElement {
     return (this.tableContainer ??= this.renderRoot?.querySelector('#analysis-table'));
   }
 
-  _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
+  _findEvt = ((event: FindEvt) => {
+    this._find(event);
+  }) as EventListener;
 
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
@@ -208,7 +210,7 @@ export class AnalysisView extends LitElement {
     });
   }
 
-  _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
     const isTableVisible = !!this.analysisTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
@@ -226,8 +228,8 @@ export class AnalysisView extends LitElement {
     }
     if (newSearch || clearHighlights) {
       this.blockClearHighlights = true;
-      //@ts-expect-error This is a custom function added in by Find custom module
-      const result = this.analysisTable.find(this.findArgs);
+      // @ts-expect-error This is a custom function added in by Find custom module
+      const result = await this.analysisTable?.find(this.findArgs);
       this.blockClearHighlights = false;
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;

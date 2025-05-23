@@ -252,7 +252,7 @@ export class SOQLView extends LitElement {
     this.oldIndex = highlightIndex;
   }
 
-  _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
     const isTableVisible = !!this.soqlTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
@@ -271,9 +271,9 @@ export class SOQLView extends LitElement {
     if (newSearch || clearHighlights) {
       this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
-      const result = this.soqlTable.find(this.findArgs);
+      const result = await this.soqlTable.find(this.findArgs);
       this.blockClearHighlights = false;
-      this.totalMatches = 0;
+      this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
       if (!clearHighlights) {

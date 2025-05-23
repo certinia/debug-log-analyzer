@@ -22,7 +22,7 @@ export class Find extends Module {
 
   initialize() {}
 
-  _find(findArgs: FindArgs) {
+  async _find(findArgs: FindArgs) {
     const result: { totalMatches: number; matchIndexes: { [key: number]: RowComponent } } = {
       totalMatches: 0,
       matchIndexes: {},
@@ -30,6 +30,7 @@ export class Find extends Module {
 
     this._clearMatches();
 
+    // We only do this when groups exist to get row order
     const flattenFromGrps = (row: GroupComponent): RowComponent[] => {
       const mergedArray: RowComponent[] = [];
       Array.prototype.push.apply(mergedArray, row.getRows());
