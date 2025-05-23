@@ -1520,6 +1520,8 @@ class LimitUsageForNSLine extends LogLine {
   }
 
   onAfter(parser: ApexLogParser, _next?: LogLine): void {
+    this.text = this.text.replace(/^\s+/gm, '');
+
     const matched = this.text.match(/Maximum CPU time: (\d+)/),
       cpuText = matched?.[1] || '0',
       cpuTime = parseInt(cpuText, 10) * 1000000; // convert from milli-seconds to nano-seconds
