@@ -191,7 +191,9 @@ export class SOQLView extends LitElement {
     this.soqlTable?.download('csv', 'soql.csv', { bom: true, delimiter: ',' });
   }
 
-  _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
+  _findEvt = ((event: FindEvt) => {
+    this._find(event);
+  }) as EventListener;
 
   _soqlGroupBy(event: Event) {
     if (!this.soqlTable) {

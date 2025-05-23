@@ -159,7 +159,9 @@ export class DMLView extends LitElement {
     this.dmlTable?.download('csv', 'dml.csv', { bom: true, delimiter: ',' });
   }
 
-  _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
+  _findEvt = ((event: FindEvt) => {
+    this._find(event);
+  }) as EventListener;
 
   _dmlGroupBy(event: Event) {
     const target = event.target as HTMLInputElement;
