@@ -206,21 +206,28 @@ export class Find extends Module {
 }
 
 export function formatter(row: RowComponent, findArgs: FindArgs) {
-  const { text, count } = findArgs;
-  if (!text || !count || !row.getData() || !row.getData().highlightIndexes?.length) {
+  const { text } = findArgs;
+  if (!text) {
+    return;
+  }
+  const data = row.getData();
+  if (!data || !data.highlightIndexes?.length) {
     return;
   }
 
-  const data = row.getData();
   const highlights = {
     indexes: data.highlightIndexes,
     currentMatch: 0,
   };
-
   row.getCells().forEach((cell) => {
     const cellElem = cell.getElement();
     _highlightText(cellElem, findArgs, highlights);
   });
+
+  //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+  if (row._getSelf().type === 'row') {
+    row.normalizeHeight();
+  }
 }
 
 function _highlightText(

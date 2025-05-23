@@ -313,8 +313,6 @@ export class SOQLView extends LitElement {
       }
     }
 
-    const soqlText = this.sortByFrequency(soqlData || [], 'soql');
-
     this.soqlTable = new Tabulator(soqlTableContainer, {
       height: '100%',
       rowKeyboardNavigation: true,
@@ -339,8 +337,6 @@ export class SOQLView extends LitElement {
       groupSort: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
-      groupBy: 'soql',
-      groupValues: [soqlText],
       groupToggleElement: false,
       selectableRows: 'highlight',
       selectableRowsCheck: function (row: RowComponent) {
@@ -507,9 +503,7 @@ export class SOQLView extends LitElement {
         const data = row.getData();
         if (data.isDetail && data.timestamp) {
           const detailContainer = this.createSOQLDetailPanel(data.timestamp, timestampToSOQl);
-
           row.getElement().replaceChildren(detailContainer);
-          row.normalizeHeight();
         }
 
         requestAnimationFrame(() => {
@@ -552,15 +546,32 @@ export class SOQLView extends LitElement {
       row.getCell('soql').getElement().style.height = origRowHeight + 'px';
     });
 
-    this.soqlTable.on('renderStarted', () => {
+    this.soqlTable.on('tableBuilt', () => {
+      const holder = this._getTableHolder();
+      holder.style.overflowAnchor = 'none';
+      //@ts-expect-error This is a custom function added in the GroupSort custom module
+      this.soqlTable?.setSortedGroupBy('soql');
+    });
+
+    this.soqlTable.on('dataSorted', () => {
       if (!this.blockClearHighlights && this.totalMatches > 0) {
         this._resetFindWidget();
         this._clearSearchHighlights();
       }
+    });
 
-      const holder = this._getTableHolder();
-      holder.style.minHeight = holder.clientHeight + 'px';
-      holder.style.overflowAnchor = 'none';
+    this.soqlTable.on('dataGrouped', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
+    });
+
+    this.soqlTable.on('dataFiltering', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
     });
 
     this.soqlTable.on('renderComplete', () => {
@@ -585,6 +596,12 @@ export class SOQLView extends LitElement {
     this.soqlTable.clearFindHighlights(Object.values(this.findMap));
     this.findMap = {};
     this.totalMatches = 0;
+
+    document.dispatchEvent(
+      new CustomEvent('db-find-results', {
+        detail: { totalMatches: this.totalMatches, type: 'dml' },
+      }),
+    );
   }
 
   _getTable() {
@@ -611,17 +628,6 @@ export class SOQLView extends LitElement {
     );
 
     return detailContainer;
-  }
-
-  sortByFrequency(dataArray: GridSOQLData[], field: keyof GridSOQLData) {
-    const map = new Map<unknown, number>();
-    dataArray.forEach((row) => {
-      const val = row[field];
-      map.set(val, (map.get(val) || 0) + 1);
-    });
-    const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
-
-    return [...newMap.keys()];
   }
 
   downlodEncoder(defaultFileName: string) {
