@@ -424,7 +424,12 @@ export class CalltreeView extends LitElement {
       data,
       (rowData) => {
         const logLine = rowData.originalData;
-        return logLine.duration.total > 0 || logLine.exitTypes.length > 0 || logLine.discontinuity || !!(logLine.type && excludedTypes.has(logLine.type));
+        return (
+          logLine.duration.total > 0 ||
+          logLine.exitTypes.length > 0 ||
+          logLine.discontinuity ||
+          !!(logLine.type && excludedTypes.has(logLine.type))
+        );
       },
       {
         filterCache: this.showDetailsFilterCache,
@@ -433,7 +438,7 @@ export class CalltreeView extends LitElement {
   };
 
   _debugFilter = (data: CalltreeRow) => {
-    const debugValues =  new Set<string>([
+    const debugValues = new Set<string>([
       'USER_DEBUG',
       'DATAWEAVE_USER_DEBUG',
       'USER_DEBUG_FINER',
@@ -558,6 +563,7 @@ export class CalltreeView extends LitElement {
       const selfTimeFilterCache = new Map<string, boolean>();
       const totalTimeFilterCache = new Map<string, boolean>();
       const namespaceFilterCache = new Map<string, boolean>();
+      const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
 
       let childIndent;
       this.calltreeTable = new Tabulator(callTreeTableContainer, {
@@ -613,10 +619,7 @@ export class CalltreeView extends LitElement {
               const row = cell.getRow();
               // @ts-expect-error: _row is private. This is temporary and I will patch the text wrap behaviour in the library.
               const dataTree = row._row.modules.dataTree;
-              if (!dataTree) {
-                return '';
-              }
-              const treeLevel = dataTree?.index;
+              const treeLevel = dataTree?.index ?? 0;
               childIndent ??= row.getTable().options.dataTreeChildIndent || 0;
               const levelIndent = treeLevel * childIndent;
               cellElem.style.paddingLeft = `${levelIndent + 4}px`;
@@ -632,13 +635,9 @@ export class CalltreeView extends LitElement {
                 return link;
               }
 
-              const excludedTypes: LogEventType[] = ['SOQL_EXECUTE_BEGIN', 'DML_BEGIN'];
-              text =
-                (node.type &&
-                  (!excludedTypes.includes(node.type) && node.type !== text
-                    ? node.type + ': '
-                    : '') + text) ||
-                '';
+              if (node.type && !excludedTypes.has(node.type) && node.type !== text) {
+                text = node.type + ': ' + text;
+              }
 
               const textSpan = document.createElement('span');
               textSpan.textContent = text;

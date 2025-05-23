@@ -1521,7 +1521,11 @@ class LimitUsageForNSLine extends LogLine {
 
   onAfter(parser: ApexLogParser, _next?: LogLine): void {
     this.namespace = this.text.slice(0, this.text.indexOf('\n')).replace(/\(|\)/g, '');
-    this.text = this.text.replace(/^\s+/gm, '');
+
+    this.text = this.text
+      .replace(/^\s+/gm, '')
+      .replaceAll('******* CLOSE TO LIMIT', '')
+      .replaceAll(' out of ', '/');
 
     const matched = this.text.match(/Maximum CPU time: (\d+)/),
       cpuText = matched?.[1] || '0',
