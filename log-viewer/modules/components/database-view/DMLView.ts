@@ -159,7 +159,9 @@ export class DMLView extends LitElement {
     this.dmlTable?.download('csv', 'dml.csv', { bom: true, delimiter: ',' });
   }
 
-  _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
+  _findEvt = ((event: FindEvt) => {
+    this._find(event);
+  }) as EventListener;
 
   _dmlGroupBy(event: Event) {
     const target = event.target as HTMLInputElement;
@@ -219,7 +221,7 @@ export class DMLView extends LitElement {
     this.oldIndex = highlightIndex;
   }
 
-  _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
     const isTableVisible = !!this.dmlTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
@@ -242,7 +244,7 @@ export class DMLView extends LitElement {
     if (newSearch || clearHighlights) {
       this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
-      const result = this.dmlTable.find(this.findArgs);
+      const result = await this.dmlTable.find(this.findArgs);
       this.blockClearHighlights = false;
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
@@ -270,7 +272,6 @@ export class DMLView extends LitElement {
         });
       }
     }
-    const dmlText = this.sortByFrequency(dmlData || [], 'dml');
 
     this.dmlTable = new Tabulator(dmlTableContainer, {
       height: '100%',
@@ -296,8 +297,6 @@ export class DMLView extends LitElement {
       groupSort: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
-      groupValues: [dmlText],
-      groupBy: ['dml'],
       groupToggleElement: false,
       selectableRowsCheck: function (row: RowComponent) {
         return !row.getData().isDetail;
@@ -379,7 +378,6 @@ export class DMLView extends LitElement {
         if (data.isDetail && data.timestamp) {
           const detailContainer = this.createDetailPanel(data.timestamp);
           row.getElement().replaceChildren(detailContainer);
-          row.normalizeHeight();
         }
 
         requestAnimationFrame(() => {
@@ -422,21 +420,38 @@ export class DMLView extends LitElement {
       row.getCell('dml').getElement().style.height = origRowHeight + 'px';
     });
 
-    this.dmlTable.on('renderStarted', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-
+    this.dmlTable.on('tableBuilt', () => {
       const holder = this._getTableHolder();
-      holder.style.minHeight = holder.clientHeight + 'px';
       holder.style.overflowAnchor = 'none';
+      //@ts-expect-error This is a custom function added in the GroupSort custom module
+      this.dmlTable?.setSortedGroupBy('dml');
     });
 
     this.dmlTable.on('renderComplete', () => {
       const holder = this._getTableHolder();
       const table = this._getTable();
       holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
+    });
+
+    this.dmlTable.on('dataSorted', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
+    });
+
+    this.dmlTable.on('dataGrouped', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
+    });
+
+    this.dmlTable.on('dataFiltering', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
     });
   }
 
@@ -455,6 +470,12 @@ export class DMLView extends LitElement {
     this.dmlTable.clearFindHighlights(Object.values(this.findMap));
     this.findMap = {};
     this.totalMatches = 0;
+
+    document.dispatchEvent(
+      new CustomEvent('db-find-results', {
+        detail: { totalMatches: this.totalMatches, type: 'dml' },
+      }),
+    );
   }
 
   _getTable() {
@@ -473,17 +494,6 @@ export class DMLView extends LitElement {
     render(html`<call-stack timestamp=${timestamp}></call-stack>`, detailContainer);
 
     return detailContainer;
-  }
-
-  sortByFrequency(dataArray: DMLRow[], field: keyof DMLRow) {
-    const map = new Map<unknown, number>();
-    dataArray.forEach((row) => {
-      const val = row[field];
-      map.set(val, (map.get(val) || 0) + 1);
-    });
-    const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
-
-    return [...newMap.keys()];
   }
 
   downlodEncoder(defaultFileName: string) {

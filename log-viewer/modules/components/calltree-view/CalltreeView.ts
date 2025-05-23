@@ -218,7 +218,9 @@ export class CalltreeView extends LitElement {
     `;
   }
 
-  _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
+  _findEvt = ((event: FindEvt) => {
+    this._find(event);
+  }) as EventListener;
 
   _getAllTypes(data: LogLine[]): string[] {
     const flattened = this._flatten(data);
@@ -345,7 +347,7 @@ export class CalltreeView extends LitElement {
     this.calltreeTable.goToRow(treeRow, { scrollIfVisible: true, focusRow: true });
   }
 
-  _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
     const isTableVisible = !!this.calltreeTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
@@ -365,7 +367,7 @@ export class CalltreeView extends LitElement {
     if (newSearch || clearHighlights) {
       this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
-      const result = this.calltreeTable.find(this.findArgs);
+      const result = await this.calltreeTable.find(this.findArgs);
       this.blockClearHighlights = false;
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
