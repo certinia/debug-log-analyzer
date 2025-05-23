@@ -1511,15 +1511,16 @@ class LimitUsageLine extends LogLine {
 }
 
 class LimitUsageForNSLine extends LogLine {
-  acceptsText = true;
-  namespace = 'default';
-
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.acceptsText = true;
+    this.namespace = 'default';
+
     this.text = parts[2] || '';
   }
 
   onAfter(parser: ApexLogParser, _next?: LogLine): void {
+    this.namespace = this.text.slice(0, this.text.indexOf('\n')).replace(/\(|\)/g, '');
     this.text = this.text.replace(/^\s+/gm, '');
 
     const matched = this.text.match(/Maximum CPU time: (\d+)/),
