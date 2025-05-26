@@ -15,7 +15,7 @@ import {
   vsCodeDropdown,
   vsCodeOption,
 } from '@vscode/webview-ui-toolkit';
-import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
+import { css, html, LitElement, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
@@ -24,6 +24,8 @@ import * as CommonModules from '../../datagrid/module/CommonModules.js';
 import MinMaxEditor from '../../datagrid/editors/MinMax.js';
 import MinMaxFilter from '../../datagrid/filters/MinMax.js';
 import { progressFormatter } from '../../datagrid/format/Progress.js';
+import { progressFormatterMS } from '../../datagrid/format/ProgressMS.js';
+
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
@@ -577,7 +579,7 @@ export class CalltreeView extends LitElement {
         //  custom property for module/MiddleRowFocus
         middleRowFocus: true,
         dataTree: true,
-        dataTreeChildColumnCalcs: true,
+        dataTreeChildColumnCalcs: true, // todo: fix
         dataTreeBranchElement: '<span/>',
         selectableRows: 1,
         // @ts-expect-error it is possible to pass a function to intitialFilter the types need updating
@@ -680,7 +682,7 @@ export class CalltreeView extends LitElement {
             title: 'Namespace',
             field: 'namespace',
             sorter: 'string',
-            width: 120,
+            width: 100,
             headerFilter: 'list',
             headerFilterFunc: this._namespaceFilter,
             headerFilterFuncParams: { filterCache: namespaceFilterCache },
@@ -697,9 +699,21 @@ export class CalltreeView extends LitElement {
             sorter: 'number',
             cssClass: 'number-cell',
             width: 60,
+            bottomCalc: 'max',
+            bottomCalcFormatter: progressFormatter,
+            bottomCalcFormatterParams: {
+              precision: 0,
+              totalValue: 100,
+              showPercentageText: false,
+            },
+            formatter: progressFormatter,
+            formatterParams: {
+              precision: 0,
+              totalValue: 100,
+              showPercentageText: false,
+            },
             hozAlign: 'right',
             headerHozAlign: 'right',
-            bottomCalc: 'max',
           },
           {
             title: 'SOQL Count',
@@ -707,9 +721,21 @@ export class CalltreeView extends LitElement {
             sorter: 'number',
             cssClass: 'number-cell',
             width: 60,
+            bottomCalc: 'max',
+            bottomCalcFormatter: progressFormatter,
+            bottomCalcFormatterParams: {
+              precision: 0,
+              totalValue: 100,
+              showPercentageText: false,
+            },
+            formatter: progressFormatter,
+            formatterParams: {
+              precision: 0,
+              totalValue: 100,
+              showPercentageText: false,
+            },
             hozAlign: 'right',
             headerHozAlign: 'right',
-            bottomCalc: 'max',
           },
           {
             title: 'Throws Count',
@@ -727,9 +753,21 @@ export class CalltreeView extends LitElement {
             sorter: 'number',
             cssClass: 'number-cell',
             width: 60,
+            bottomCalc: 'max',
+            bottomCalcFormatter: progressFormatter,
+            bottomCalcFormatterParams: {
+              precision: 0,
+              totalValue: 10000,
+              showPercentageText: false,
+            },
+            formatter: progressFormatter,
+            formatterParams: {
+              precision: 0,
+              totalValue: 10000,
+              showPercentageText: false,
+            },
             hozAlign: 'right',
             headerHozAlign: 'right',
-            bottomCalc: 'max',
           },
           {
             title: 'SOQL Rows',
@@ -737,9 +775,21 @@ export class CalltreeView extends LitElement {
             sorter: 'number',
             cssClass: 'number-cell',
             width: 60,
+            bottomCalc: 'max',
+            bottomCalcFormatter: progressFormatter,
+            bottomCalcFormatterParams: {
+              precision: 0,
+              totalValue: 50000,
+              showPercentageText: false,
+            },
+            formatter: progressFormatter,
+            formatterParams: {
+              precision: 0,
+              totalValue: 50000,
+              showPercentageText: false,
+            },
             hozAlign: 'right',
             headerHozAlign: 'right',
-            bottomCalc: 'max',
           },
           {
             title: 'Total Time (ms)',
@@ -749,13 +799,12 @@ export class CalltreeView extends LitElement {
             width: 150,
             hozAlign: 'right',
             headerHozAlign: 'right',
-            formatter: progressFormatter,
+            formatter: progressFormatterMS,
             formatterParams: {
-              thousand: false,
               precision: 3,
               totalValue: rootMethod.duration.total,
             },
-            bottomCalcFormatter: progressFormatter,
+            bottomCalcFormatter: progressFormatterMS,
             bottomCalc: 'max',
             bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
             headerFilter: MinMaxEditor,
@@ -773,10 +822,9 @@ export class CalltreeView extends LitElement {
             headerHozAlign: 'right',
             bottomCalc: 'sum',
             bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
-            bottomCalcFormatter: progressFormatter,
-            formatter: progressFormatter,
+            bottomCalcFormatter: progressFormatterMS,
+            formatter: progressFormatterMS,
             formatterParams: {
-              thousand: false,
               precision: 3,
               totalValue: rootMethod.duration.total,
             },
