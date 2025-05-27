@@ -39,10 +39,27 @@ export class ApexLogParser {
   parsingErrors: string[] = [];
   maxSizeTimestamp: number | null = null;
   reasons: Set<string> = new Set<string>();
-  cpuUsed = 0;
   lastTimestamp = 0;
   discontinuity = false;
   namespaces = new Set<string>();
+  governorLimits: GovernorLimits = {
+    totals: {
+      soqlQueries: { used: 0, limit: 0 },
+      soslQueries: { used: 0, limit: 0 },
+      queryRows: { used: 0, limit: 0 },
+      dmlStatements: { used: 0, limit: 0 },
+      publishImmediateDml: { used: 0, limit: 0 },
+      dmlRows: { used: 0, limit: 0 },
+      cpuTime: { used: 0, limit: 0 },
+      heapSize: { used: 0, limit: 0 },
+      callouts: { used: 0, limit: 0 },
+      emailInvocations: { used: 0, limit: 0 },
+      futureCalls: { used: 0, limit: 0 },
+      queueableJobsAddedToQueue: { used: 0, limit: 0 },
+      mobileApexPushCalls: { used: 0, limit: 0 },
+    },
+    limitsByNamespace: new Map<string, Limits>(),
+  };
 
   /**
    * Takes string input of a log and returns the ApexLog class, which represents a log tree
@@ -56,10 +73,31 @@ export class ApexLogParser {
     apexLog.debugLevels = this.getDebugLevels(debugLog);
     apexLog.logIssues = this.logIssues;
     apexLog.parsingErrors = this.parsingErrors;
-    apexLog.cpuTime = this.cpuUsed;
     apexLog.namespaces = Array.from(this.namespaces);
+    apexLog.governorLimits = this.governorLimits;
+
+    this.addGovernorLimits(apexLog);
 
     return apexLog;
+  }
+
+  private addGovernorLimits(apexLog: ApexLog) {
+    const totalLimits = apexLog.governorLimits.totals;
+    if (totalLimits) {
+      for (const limitsForNs of apexLog.governorLimits.limitsByNamespace.values()) {
+        for (const [key, value] of Object.entries(limitsForNs) as Array<
+          [keyof Limits, Limits[keyof Limits]]
+        >) {
+          if (!value) {
+            continue;
+          }
+
+          const currentLimit = totalLimits[key];
+          currentLimit.limit = value.limit;
+          currentLimit.used += value.used;
+        }
+      }
+    }
   }
 
   private parseLine(line: string, lastEntry: LogLine | null): LogLine | null {
@@ -483,6 +521,26 @@ export interface LogIssue {
   type: IssueType;
 }
 
+export interface Limits {
+  soqlQueries: { used: number; limit: number };
+  soslQueries: { used: number; limit: number };
+  queryRows: { used: number; limit: number };
+  dmlStatements: { used: number; limit: number };
+  publishImmediateDml: { used: number; limit: number };
+  dmlRows: { used: number; limit: number };
+  cpuTime: { used: number; limit: number };
+  heapSize: { used: number; limit: number };
+  callouts: { used: number; limit: number };
+  emailInvocations: { used: number; limit: number };
+  futureCalls: { used: number; limit: number };
+  queueableJobsAddedToQueue: { used: number; limit: number };
+  mobileApexPushCalls: { used: number; limit: number };
+}
+
+export interface GovernorLimits {
+  totals: Limits;
+  limitsByNamespace: Map<string, Limits>;
+}
 /**
  * All log lines extend this base class.
  */
@@ -801,11 +859,6 @@ export class ApexLog extends Method {
   public size = 0;
 
   /**
-   * The total CPU time consumed, in ms
-   */
-  public cpuTime: number = 0;
-
-  /**
    * The Apex Debug Logging Levels for the current log
    */
   public debugLevels: DebugLevel[] = [];
@@ -824,6 +877,25 @@ export class ApexLog extends Method {
    * Any issues that occurred during the parsing of the log, such as an unrecognized log event type.
    */
   public parsingErrors: string[] = [];
+
+  public governorLimits: GovernorLimits = {
+    totals: {
+      soqlQueries: { used: 0, limit: 0 },
+      soslQueries: { used: 0, limit: 0 },
+      queryRows: { used: 0, limit: 0 },
+      dmlStatements: { used: 0, limit: 0 },
+      publishImmediateDml: { used: 0, limit: 0 },
+      dmlRows: { used: 0, limit: 0 },
+      cpuTime: { used: 0, limit: 0 },
+      heapSize: { used: 0, limit: 0 },
+      callouts: { used: 0, limit: 0 },
+      emailInvocations: { used: 0, limit: 0 },
+      futureCalls: { used: 0, limit: 0 },
+      queueableJobsAddedToQueue: { used: 0, limit: 0 },
+      mobileApexPushCalls: { used: 0, limit: 0 },
+    },
+    limitsByNamespace: new Map<string, Limits>(),
+  };
 
   /**
    * The endtime with nodes of 0 duration excluded
@@ -1511,6 +1583,22 @@ class LimitUsageLine extends LogLine {
 }
 
 class LimitUsageForNSLine extends LogLine {
+  static limitsKeys = new Map<string, string>([
+    ['Number of SOQL queries', 'soqlQueries'],
+    ['Number of query rows', 'queryRows'],
+    ['Number of SOSL queries', 'soslQueries'],
+    ['Number of DML statements', 'dmlStatements'],
+    ['Number of Publish Immediate DML', 'publishImmediateDml'],
+    ['Number of DML rows', 'dmlRows'],
+    ['Maximum CPU time', 'cpuTime'],
+    ['Maximum heap size', 'heapSize'],
+    ['Number of callouts', 'callouts'],
+    ['Number of Email Invocations', 'emailInvocations'],
+    ['Number of future calls', 'futureCalls'],
+    ['Number of queueable jobs added to the queue', 'queueableJobsAddedToQueue'],
+    ['Number of Mobile Apex push calls', 'mobileApexPushCalls'],
+  ]);
+
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.acceptsText = true;
@@ -1520,20 +1608,52 @@ class LimitUsageForNSLine extends LogLine {
   }
 
   onAfter(parser: ApexLogParser, _next?: LogLine): void {
+    // Parse the namespace from the first line (before any newline)
     this.namespace = this.text.slice(0, this.text.indexOf('\n')).replace(/\(|\)/g, '');
 
-    this.text = this.text
+    // Clean up the text for easier parsing
+    const cleanedText = this.text
       .replace(/^\s+/gm, '')
       .replaceAll('******* CLOSE TO LIMIT', '')
       .replaceAll(' out of ', '/');
+    this.text = cleanedText;
 
-    const matched = this.text.match(/Maximum CPU time: (\d+)/),
-      cpuText = matched?.[1] || '0',
-      cpuTime = parseInt(cpuText, 10) * 1000000; // convert from milli-seconds to nano-seconds
+    // Split into lines and parse each line for limits
+    const lines = cleanedText.split('\n');
+    const limits: Limits = {
+      soqlQueries: { used: 0, limit: 0 },
+      soslQueries: { used: 0, limit: 0 },
+      queryRows: { used: 0, limit: 0 },
+      dmlStatements: { used: 0, limit: 0 },
+      publishImmediateDml: { used: 0, limit: 0 },
+      dmlRows: { used: 0, limit: 0 },
+      cpuTime: { used: 0, limit: 0 },
+      heapSize: { used: 0, limit: 0 },
+      callouts: { used: 0, limit: 0 },
+      emailInvocations: { used: 0, limit: 0 },
+      futureCalls: { used: 0, limit: 0 },
+      queueableJobsAddedToQueue: { used: 0, limit: 0 },
+      mobileApexPushCalls: { used: 0, limit: 0 },
+    };
 
-    if (!parser.cpuUsed || cpuTime > parser.cpuUsed) {
-      parser.cpuUsed = cpuTime;
+    for (const line of lines) {
+      // Match lines like: "Maximum CPU time: 15008/10000"
+      const match = line.match(/^(.+?):\s*([\d,]+)\/([\d,]+)/);
+      if (match) {
+        const key: keyof Limits = LimitUsageForNSLine.limitsKeys.get(
+          match[1]!.trim(),
+        ) as keyof Limits;
+        if (key) {
+          const used = parseInt(match[2]!.replace(/,/g, ''), 10);
+          const limit = parseInt(match[3]!.replace(/,/g, ''), 10);
+          if (key) {
+            limits[key] = { used, limit };
+          }
+        }
+      }
     }
+
+    parser.governorLimits.limitsByNamespace.set(this.namespace, limits);
   }
 }
 
