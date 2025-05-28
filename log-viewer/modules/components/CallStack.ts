@@ -27,6 +27,7 @@ export class CallStack extends LitElement {
         min-height: 1ch;
         max-height: 30vh;
         padding: 0px 5px 0px 5px;
+        white-space: normal;
       }
 
       :host(:hover) {
