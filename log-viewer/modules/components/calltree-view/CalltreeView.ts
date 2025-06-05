@@ -565,7 +565,9 @@ export class CalltreeView extends LitElement {
       const selfTimeFilterCache = new Map<string, boolean>();
       const totalTimeFilterCache = new Map<string, boolean>();
       const namespaceFilterCache = new Map<string, boolean>();
+
       const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
+      const governorLimits = rootMethod.governorLimits.totals;
 
       let childIndent;
       this.calltreeTable = new Tabulator(callTreeTableContainer, {
@@ -703,13 +705,13 @@ export class CalltreeView extends LitElement {
             bottomCalcFormatter: progressFormatter,
             bottomCalcFormatterParams: {
               precision: 0,
-              totalValue: 100,
+              totalValue: governorLimits.dmlStatements.limit,
               showPercentageText: false,
             },
             formatter: progressFormatter,
             formatterParams: {
               precision: 0,
-              totalValue: 100,
+              totalValue: governorLimits.dmlStatements.limit,
               showPercentageText: false,
             },
             hozAlign: 'right',
@@ -725,13 +727,13 @@ export class CalltreeView extends LitElement {
             bottomCalcFormatter: progressFormatter,
             bottomCalcFormatterParams: {
               precision: 0,
-              totalValue: 100,
+              totalValue: governorLimits.soqlQueries.limit,
               showPercentageText: false,
             },
             formatter: progressFormatter,
             formatterParams: {
               precision: 0,
-              totalValue: 100,
+              totalValue: governorLimits.soqlQueries.limit,
               showPercentageText: false,
             },
             hozAlign: 'right',
@@ -757,13 +759,13 @@ export class CalltreeView extends LitElement {
             bottomCalcFormatter: progressFormatter,
             bottomCalcFormatterParams: {
               precision: 0,
-              totalValue: 10000,
+              totalValue: governorLimits.dmlRows.limit,
               showPercentageText: false,
             },
             formatter: progressFormatter,
             formatterParams: {
               precision: 0,
-              totalValue: 10000,
+              totalValue: governorLimits.dmlRows.limit,
               showPercentageText: false,
             },
             hozAlign: 'right',
@@ -779,13 +781,13 @@ export class CalltreeView extends LitElement {
             bottomCalcFormatter: progressFormatter,
             bottomCalcFormatterParams: {
               precision: 0,
-              totalValue: 50000,
+              totalValue: governorLimits.queryRows.limit,
               showPercentageText: false,
             },
             formatter: progressFormatter,
             formatterParams: {
               precision: 0,
-              totalValue: 50000,
+              totalValue: governorLimits.queryRows.limit,
               showPercentageText: false,
             },
             hozAlign: 'right',
