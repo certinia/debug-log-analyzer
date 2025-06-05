@@ -648,7 +648,6 @@ function showTooltip(offsetX: number, offsetY: number, shouldIgnoreWidth: boolea
     showTooltipWithText(offsetX, offsetY, tooltipText, tooltip);
   }
 }
-
 function findTimelineTooltip(
   x: number,
   depth: number,
@@ -660,92 +659,109 @@ function findTimelineTooltip(
     canvas.classList.remove('timeline-hover', 'timeline-dragging');
     canvas.classList.add('timeline-event--hover');
 
-    const toolTip = document.createElement('div');
-    const brElem = document.createElement('br');
+    const rows = [];
+    if (target.type) {
+      rows.push({ label: 'type:', value: target.type.toString() });
+    }
 
-    toolTip.appendChild(document.createTextNode(target.type || ''));
-    toolTip.appendChild(brElem.cloneNode());
-    toolTip.appendChild(document.createTextNode(target.text + (target.suffix ?? '')));
-    if (target.timestamp) {
-      toolTip.appendChild(brElem.cloneNode());
-      toolTip.appendChild(document.createTextNode('timestamp: ' + target.timestamp));
-      if (target.exitStamp) {
-        toolTip.appendChild(document.createTextNode(' => ' + target.exitStamp));
-        toolTip.appendChild(brElem.cloneNode());
-        if (target.duration.total) {
-          toolTip.appendChild(
-            document.createTextNode(`total: ${formatDuration(target.duration.total)}`),
-          );
-        }
-
+    if (target.exitStamp) {
+      if (target.duration.total) {
+        let val = formatDuration(target.duration.total);
         if (target.cpuType === 'free') {
-          toolTip.appendChild(document.createTextNode(' (free)'));
+          val += ' (free)';
         } else if (target.duration.self) {
-          toolTip.appendChild(
-            document.createTextNode(` (self ${formatDuration(target.duration.self)})`),
-          );
+          val += ` (self ${formatDuration(target.duration.self)})`;
         }
 
-        if (target.dmlCount.total) {
-          toolTip.appendChild(brElem.cloneNode());
-          toolTip.appendChild(
-            document.createTextNode(`DML: ${target.dmlCount.total} (self ${target.dmlCount.self})`),
-          );
-        }
+        rows.push({ label: 'total:', value: val });
+      }
 
-        if (target.dmlRowCount.total) {
-          toolTip.appendChild(brElem.cloneNode());
-          toolTip.appendChild(
-            document.createTextNode(
-              `DML rows: ${target.dmlRowCount.total} (self ${target.dmlRowCount.self})`,
-            ),
-          );
-        }
+      if (target.dmlCount.total) {
+        rows.push({
+          label: 'DML:',
+          value: `${target.dmlCount.total} (self ${target.dmlCount.self})`,
+        });
+      }
 
-        if (target.soqlCount.total) {
-          toolTip.appendChild(brElem.cloneNode());
-          toolTip.appendChild(
-            document.createTextNode(
-              `SOQL: ${target.soqlCount.total} (self ${target.soqlCount.self})`,
-            ),
-          );
-        }
+      if (target.dmlRowCount.total) {
+        rows.push({
+          label: 'DML rows:',
+          value: `${target.dmlRowCount.total} (self ${target.dmlRowCount.self})`,
+        });
+      }
 
-        if (target.soqlRowCount.total) {
-          toolTip.appendChild(brElem.cloneNode());
-          toolTip.appendChild(
-            document.createTextNode(
-              `SOQL rows: ${target.soqlRowCount.total} (self ${target.soqlRowCount.self})`,
-            ),
-          );
-        }
+      if (target.soqlCount.total) {
+        rows.push({
+          label: 'SOQL:',
+          value: `${target.soqlCount.total} (self ${target.soqlCount.self})`,
+        });
+      }
 
-        if (target.soslCount.total) {
-          toolTip.appendChild(brElem.cloneNode());
-          toolTip.appendChild(
-            document.createTextNode(
-              `SOSL: ${target.soslCount.total} (self ${target.soslCount.self})`,
-            ),
-          );
-        }
+      if (target.soqlRowCount.total) {
+        rows.push({
+          label: 'SOQL rows:',
+          value: `${target.soqlRowCount.total} (self ${target.soqlRowCount.self})`,
+        });
+      }
 
-        if (target.soslRowCount.total) {
-          toolTip.appendChild(brElem.cloneNode());
-          toolTip.appendChild(
-            document.createTextNode(
-              `SOSL rows: ${target.soslRowCount.total} (self ${target.soslRowCount.self})`,
-            ),
-          );
-        }
+      if (target.soslCount.total) {
+        rows.push({
+          label: 'SOSL:',
+          value: `${target.soslCount.total} (self ${target.soslCount.self})`,
+        });
+      }
+
+      if (target.soslRowCount.total) {
+        rows.push({
+          label: 'SOSL rows:',
+          value: `${target.soslRowCount.total} (self ${target.soslRowCount.self})`,
+        });
       }
     }
 
-    return toolTip;
+    return createTooltip(
+      target.text + (target.suffix ?? ''),
+      rows,
+      keyMap.get(target.subCategory)?.fillColor || '',
+    );
   }
   canvas.classList.add('timeline-hover');
   canvas.classList.remove('timeline-event--hover');
 
   return null;
+}
+
+function createTooltip(title: string, rows: { label: string; value: string }[], color: string) {
+  const tooltipBody = document.createElement('div');
+  tooltipBody.className = 'timeline-tooltip';
+
+  if (color) {
+    tooltipBody.style.borderColor = color;
+  }
+
+  const header = document.createElement('div');
+  header.className = 'tooltip-header';
+  header.textContent = title;
+  tooltipBody.appendChild(header);
+
+  rows.forEach(({ label, value }) => {
+    const row = document.createElement('div');
+    row.className = 'tooltip-row';
+
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'tooltip-label';
+    labelDiv.textContent = label;
+
+    const valueDiv = document.createElement('div');
+    valueDiv.className = 'tooltip-value';
+    valueDiv.textContent = value;
+
+    row.appendChild(labelDiv);
+    row.appendChild(valueDiv);
+    tooltipBody.appendChild(row);
+  });
+
+  return tooltipBody;
 }
 
 function findTruncatedTooltip(x: number): HTMLDivElement | null {
@@ -754,9 +770,7 @@ function findTruncatedTooltip(x: number): HTMLDivElement | null {
     canvas.classList.remove('timeline-hover', 'timeline-dragging');
     canvas.classList.add('timeline-event--hover');
 
-    const toolTip = document.createElement('div');
-    toolTip.textContent = logIssue.summary;
-    return toolTip;
+    return createTooltip(logIssue.summary, [], truncationColors.get(logIssue.type) || '');
   }
   canvas.classList.add('timeline-hover');
   canvas.classList.remove('timeline-event--hover');
@@ -808,6 +822,10 @@ function showTooltipWithText(
     const yDelta = tooltip.offsetHeight - height + posTop;
     if (yDelta > 0) {
       posTop -= tooltip.offsetHeight + 4;
+    }
+
+    if (posTop < 0) {
+      posTop = 4;
     }
 
     if (xDelta > 0 || yDelta > 0) {

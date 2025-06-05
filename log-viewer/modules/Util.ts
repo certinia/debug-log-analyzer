@@ -8,7 +8,7 @@ export default function formatDuration(duration: number) {
   const textPadded = text.length < 4 ? '0000'.substring(text.length) + text : text; // length min = 4
   const millis = textPadded.slice(0, -3); // everything before last 3 chars
   const micros = textPadded.slice(-3); // last 3 chars
-  return `${millis}.${micros}ms`;
+  return `${millis}.${micros} ms`;
 }
 
 export function debounce<T extends unknown[]>(callBack: (...args: T) => unknown) {
