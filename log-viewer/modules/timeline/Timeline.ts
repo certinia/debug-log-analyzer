@@ -666,7 +666,7 @@ function findTimelineTooltip(
 
     if (target.exitStamp) {
       if (target.duration.total) {
-        let val = formatDuration(target.duration.total);
+        let val = formatDuration(target.duration.total, timelineRoot.duration.total);
         if (target.cpuType === 'free') {
           val += ' (free)';
         } else if (target.duration.self) {
@@ -676,45 +676,70 @@ function findTimelineTooltip(
         rows.push({ label: 'total:', value: val });
       }
 
+      const govLimits = timelineRoot.governorLimits.totals;
       if (target.dmlCount.total) {
         rows.push({
           label: 'DML:',
-          value: `${target.dmlCount.total} (self ${target.dmlCount.self})`,
+          value: formatLimit(
+            target.dmlCount.total,
+            target.dmlCount.self,
+            govLimits.dmlStatements.limit,
+          ),
         });
       }
 
       if (target.dmlRowCount.total) {
         rows.push({
           label: 'DML rows:',
-          value: `${target.dmlRowCount.total} (self ${target.dmlRowCount.self})`,
+          value: formatLimit(
+            target.dmlRowCount.total,
+            target.dmlRowCount.self,
+            govLimits.dmlRows.limit,
+          ),
         });
       }
 
       if (target.soqlCount.total) {
         rows.push({
           label: 'SOQL:',
-          value: `${target.soqlCount.total} (self ${target.soqlCount.self})`,
+          value: formatLimit(
+            target.soqlCount.total,
+            target.soqlCount.self,
+            govLimits.soqlQueries.limit,
+          ),
         });
       }
 
       if (target.soqlRowCount.total) {
         rows.push({
           label: 'SOQL rows:',
-          value: `${target.soqlRowCount.total} (self ${target.soqlRowCount.self})`,
+          value: formatLimit(
+            target.soqlRowCount.total,
+            target.soqlRowCount.self,
+            govLimits.queryRows.limit,
+          ),
         });
       }
 
       if (target.soslCount.total) {
         rows.push({
           label: 'SOSL:',
-          value: `${target.soslCount.total} (self ${target.soslCount.self})`,
+          value: formatLimit(
+            target.soslCount.total,
+            target.soslCount.self,
+            govLimits.soslQueries.limit,
+          ),
         });
       }
 
       if (target.soslRowCount.total) {
         rows.push({
           label: 'SOSL rows:',
-          value: `${target.soslRowCount.total} (self ${target.soslRowCount.self})`,
+          value: formatLimit(
+            target.soslRowCount.total,
+            target.soslRowCount.self,
+            govLimits.soslQueries.limit,
+          ),
         });
       }
     }
@@ -729,6 +754,11 @@ function findTimelineTooltip(
   canvas.classList.remove('timeline-event--hover');
 
   return null;
+}
+
+function formatLimit(val: number, self: number, total = 0) {
+  const outOf = total > 0 ? `/${total}` : '';
+  return `${val}${outOf} (self ${self})`;
 }
 
 function createTooltip(title: string, rows: { label: string; value: string }[], color: string) {

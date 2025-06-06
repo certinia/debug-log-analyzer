@@ -3,12 +3,13 @@
  */
 let requestId: number = 0;
 
-export default function formatDuration(duration: number) {
-  const text = `${~~(duration / 1000)}`; // convert from nano-seconds to micro-seconds
+export default function formatDuration(durationNs: number, totalNs = 0) {
+  const text = `${~~(durationNs / 1000)}`; // convert from nano-seconds to micro-seconds
   const textPadded = text.length < 4 ? '0000'.substring(text.length) + text : text; // length min = 4
   const millis = textPadded.slice(0, -3); // everything before last 3 chars
   const micros = textPadded.slice(-3); // last 3 chars
-  return `${millis}.${micros} ms`;
+  const suffix = totalNs > 0 ? `/${(totalNs / 1_000_000).toFixed(3)}` : '';
+  return `${millis}.${micros}${suffix} ms`;
 }
 
 export function debounce<T extends unknown[]>(callBack: (...args: T) => unknown) {
