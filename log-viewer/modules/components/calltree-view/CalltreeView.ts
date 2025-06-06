@@ -718,7 +718,8 @@ export class CalltreeView extends LitElement {
             hozAlign: 'right',
             headerHozAlign: 'right',
             tooltip(_event, cell, _onRender) {
-              return cell.getValue() + '/' + governorLimits.dmlStatements.limit;
+              const maxDmlStatements = governorLimits.dmlStatements.limit;
+              return cell.getValue() + maxDmlStatements > 0 ? '/' + maxDmlStatements : '';
             },
           },
           {
@@ -743,7 +744,8 @@ export class CalltreeView extends LitElement {
             hozAlign: 'right',
             headerHozAlign: 'right',
             tooltip(_event, cell, _onRender) {
-              return cell.getValue() + '/' + governorLimits.soqlQueries.limit;
+              const maxSoql = governorLimits.soqlQueries.limit;
+              return cell.getValue() + maxSoql > 0 ? '/' + maxSoql : '';
             },
           },
           {
@@ -778,7 +780,8 @@ export class CalltreeView extends LitElement {
             hozAlign: 'right',
             headerHozAlign: 'right',
             tooltip(_event, cell, _onRender) {
-              return cell.getValue() + '/' + governorLimits.dmlRows.limit;
+              const maxDmlRows = governorLimits.dmlRows.limit;
+              return cell.getValue() + maxDmlRows > 0 ? '/' + maxDmlRows : '';
             },
           },
           {
@@ -803,7 +806,8 @@ export class CalltreeView extends LitElement {
             hozAlign: 'right',
             headerHozAlign: 'right',
             tooltip(_event, cell, _onRender) {
-              return cell.getValue() + '/' + governorLimits.queryRows.limit;
+              const maxQueryRows = governorLimits.queryRows.limit;
+              return cell.getValue() + maxQueryRows > 0 ? '/' + maxQueryRows : '';
             },
           },
           {
