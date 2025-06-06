@@ -32,7 +32,7 @@ import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 import { ApexLog, LogLine, TimedNode, type LogEventType } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
-import { isVisible } from '../../Util.js';
+import formatDuration, { isVisible } from '../../Util.js';
 import '../skeleton/GridSkeleton.js';
 import { Find, formatter } from './module/Find.js';
 import { MiddleRowFocus } from './module/MiddleRowFocus.js';
@@ -583,6 +583,7 @@ export class CalltreeView extends LitElement {
         dataTree: true,
         dataTreeChildColumnCalcs: true, // todo: fix
         dataTreeBranchElement: '<span/>',
+        tooltipDelay: 100,
         selectableRows: 1,
         // @ts-expect-error it is possible to pass a function to intitialFilter the types need updating
         initialFilter: this._showDetailsFilter,
@@ -716,6 +717,9 @@ export class CalltreeView extends LitElement {
             },
             hozAlign: 'right',
             headerHozAlign: 'right',
+            tooltip(_event, cell, _onRender) {
+              return cell.getValue() + '/' + governorLimits.dmlStatements.limit;
+            },
           },
           {
             title: 'SOQL Count',
@@ -738,6 +742,9 @@ export class CalltreeView extends LitElement {
             },
             hozAlign: 'right',
             headerHozAlign: 'right',
+            tooltip(_event, cell, _onRender) {
+              return cell.getValue() + '/' + governorLimits.soqlQueries.limit;
+            },
           },
           {
             title: 'Throws Count',
@@ -770,6 +777,9 @@ export class CalltreeView extends LitElement {
             },
             hozAlign: 'right',
             headerHozAlign: 'right',
+            tooltip(_event, cell, _onRender) {
+              return cell.getValue() + '/' + governorLimits.dmlRows.limit;
+            },
           },
           {
             title: 'SOQL Rows',
@@ -792,6 +802,9 @@ export class CalltreeView extends LitElement {
             },
             hozAlign: 'right',
             headerHozAlign: 'right',
+            tooltip(_event, cell, _onRender) {
+              return cell.getValue() + '/' + governorLimits.queryRows.limit;
+            },
           },
           {
             title: 'Total Time (ms)',
@@ -813,6 +826,9 @@ export class CalltreeView extends LitElement {
             headerFilterFunc: MinMaxFilter,
             headerFilterFuncParams: { columnName: 'duration', filterCache: totalTimeFilterCache },
             headerFilterLiveFilter: false,
+            tooltip(_event, cell, _onRender) {
+              return formatDuration(cell.getValue(), rootMethod.duration.total);
+            },
           },
           {
             title: 'Self Time (ms)',
@@ -837,6 +853,9 @@ export class CalltreeView extends LitElement {
               filterCache: selfTimeFilterCache,
             },
             headerFilterLiveFilter: false,
+            tooltip(_event, cell, _onRender) {
+              return formatDuration(cell.getValue(), rootMethod.duration.total);
+            },
           },
         ],
       });

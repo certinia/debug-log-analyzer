@@ -16,7 +16,7 @@ import { globalStyles } from '../../styles/global.styles.js';
 
 // Tabulator custom modules, imports + styles
 import { Tabulator, type RowComponent } from 'tabulator-tables';
-import { isVisible } from '../../Util.js';
+import formatDuration, { isVisible } from '../../Util.js';
 import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
 import { progressFormatterMS } from '../../datagrid/format/ProgressMS.js';
 import { GroupCalcs } from '../../datagrid/groups/GroupCalcs.js';
@@ -320,6 +320,7 @@ export class AnalysisView extends LitElement {
         headerTooltip: true,
         headerWordWrap: true,
       },
+      tooltipDelay: 100,
       initialSort: [{ column: 'selfTime', dir: 'desc' }],
       headerSortElement: function (column, dir) {
         switch (dir) {
@@ -397,6 +398,9 @@ export class AnalysisView extends LitElement {
             totalValue: rootMethod.duration.total,
           },
           accessorDownload: NumberAccessor,
+          tooltip(_event, cell, _onRender) {
+            return formatDuration(cell.getValue(), rootMethod.duration.total);
+          },
         },
         {
           title: 'Self Time (ms)',
@@ -414,6 +418,9 @@ export class AnalysisView extends LitElement {
             totalValue: rootMethod.duration.total,
           },
           accessorDownload: NumberAccessor,
+          tooltip(_event, cell, _onRender) {
+            return formatDuration(cell.getValue(), rootMethod.duration.total);
+          },
         },
       ],
     });
