@@ -16,9 +16,9 @@ import { globalStyles } from '../../styles/global.styles.js';
 
 // Tabulator custom modules, imports + styles
 import { Tabulator, type RowComponent } from 'tabulator-tables';
-import { isVisible } from '../../Util.js';
+import formatDuration, { isVisible } from '../../Util.js';
 import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
-import { progressFormatter } from '../../datagrid/format/Progress.js';
+import { progressFormatterMS } from '../../datagrid/format/ProgressMS.js';
 import { GroupCalcs } from '../../datagrid/groups/GroupCalcs.js';
 import { GroupSort } from '../../datagrid/groups/GroupSort.js';
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
@@ -265,14 +265,14 @@ export class AnalysisView extends LitElement {
     if (!this._tableWrapper) {
       return;
     }
-    const metricList = groupMetrics(rootMethod);
 
     Tabulator.registerModule(Object.values(CommonModules));
     Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs, GroupSort]);
+
     this.analysisTable = new Tabulator(this._tableWrapper, {
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
-      data: metricList,
+      data: groupMetrics(rootMethod),
       layout: 'fitColumns',
       placeholder: 'No Analysis Available',
       columnCalcs: 'table',
@@ -320,6 +320,7 @@ export class AnalysisView extends LitElement {
         headerTooltip: true,
         headerWordWrap: true,
       },
+      tooltipDelay: 100,
       initialSort: [{ column: 'selfTime', dir: 'desc' }],
       headerSortElement: function (column, dir) {
         switch (dir) {
@@ -388,16 +389,18 @@ export class AnalysisView extends LitElement {
           width: 165,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          formatter: progressFormatter,
+          bottomCalc: callStackSum,
+          bottomCalcFormatter: progressFormatterMS,
+          bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
+          formatter: progressFormatterMS,
           formatterParams: {
-            thousand: false,
             precision: 3,
             totalValue: rootMethod.duration.total,
           },
           accessorDownload: NumberAccessor,
-          bottomCalcFormatter: progressFormatter,
-          bottomCalc: callStackSum,
-          bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
+          tooltip(_event, cell, _onRender) {
+            return formatDuration(cell.getValue(), rootMethod.duration.total);
+          },
         },
         {
           title: 'Self Time (ms)',
@@ -407,15 +410,17 @@ export class AnalysisView extends LitElement {
           hozAlign: 'right',
           headerHozAlign: 'right',
           bottomCalc: 'sum',
+          bottomCalcFormatter: progressFormatterMS,
           bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
-          formatter: progressFormatter,
+          formatter: progressFormatterMS,
           formatterParams: {
-            thousand: false,
             precision: 3,
             totalValue: rootMethod.duration.total,
           },
           accessorDownload: NumberAccessor,
-          bottomCalcFormatter: progressFormatter,
+          tooltip(_event, cell, _onRender) {
+            return formatDuration(cell.getValue(), rootMethod.duration.total);
+          },
         },
       ],
     });

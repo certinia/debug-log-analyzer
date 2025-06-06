@@ -1,5 +1,5 @@
 import type { LogLine } from '../../../parsers/ApexLogParser';
-import { type Metric } from '../AnalysisView.js';
+import type { Metric } from '../AnalysisView.js';
 
 export function callStackSum(_values: number[], data: Metric[], _calcParams: unknown) {
   const nodes: LogLine[] = [];
