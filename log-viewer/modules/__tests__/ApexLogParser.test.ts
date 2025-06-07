@@ -324,7 +324,7 @@ describe('parseLog tests', () => {
     const execEvent = apexLog.children[0] as MethodEntryLine;
     expect(execEvent.children[0]?.namespace).toBe('appirio_core');
   });
-  it('Limit Usage for NS provides cpuUsed', async () => {
+  it('Limit Usage for NS as child of CUMULATIVE_LIMIT_USAGE', async () => {
     const log =
       '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
       '14:29:44.163 (40163621912)|CUMULATIVE_LIMIT_USAGE\n' +
@@ -345,7 +345,6 @@ describe('parseLog tests', () => {
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
     const apexLog = parse(log);
-    expect(apexLog.cpuTime).toBe(4564000000);
     const execEvent = apexLog.children[0] as MethodEntryLine;
     expect(execEvent.children.length).toBe(1);
 
@@ -363,8 +362,6 @@ describe('parseLog tests', () => {
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED';
 
     const apexLog = parse(log);
-
-    expect(apexLog.cpuTime).toBe(0);
 
     const execEvent = apexLog.children[0] as MethodEntryLine;
     expect(execEvent.children.length).toBe(1);
@@ -1124,6 +1121,128 @@ describe('Recalculate durations tests', () => {
     node.recalculateDurations();
     expect(node.timestamp).toEqual(1);
     expect(node.duration).toEqual({ self: 2, total: 2 });
+  });
+});
+
+describe('Governor Limits Parsing', () => {
+  it('should parse LIMIT_USAGE_FOR_NS lines and populate governorLimits for multiple namespaces', () => {
+    const log = [
+      '09:18:22.6 (6574780)|EXECUTION_STARTED',
+      '12:43:02.105 (48105827767)|LIMIT_USAGE_FOR_NS|(default)|',
+      '  Number of SOQL queries: 17 out of 100',
+      '  Number of query rows: 121 out of 50000',
+      '  Number of SOSL queries: 3 out of 20',
+      '  Number of DML statements: 8 out of 150',
+      '  Number of Publish Immediate DML: 5 out of 150',
+      '  Number of DML rows: 113 out of 10000',
+      '  Maximum CPU time: 15008 out of 10000 ******* CLOSE TO LIMIT',
+      '  Maximum heap size: 300 out of 6000000',
+      '  Number of callouts: 2 out of 100',
+      '  Number of Email Invocations: 1 out of 10',
+      '  Number of future calls: 2 out of 50',
+      '  Number of queueable jobs added to the queue: 6 out of 50',
+      '  Number of Mobile Apex push calls: 1 out of 10',
+      '12:43:02.105 (48105827768)|LIMIT_USAGE_FOR_NS|myNS|',
+      '  Number of SOQL queries: 2 out of 100',
+      '  Number of query rows: 10 out of 50000',
+      '  Number of SOSL queries: 1 out of 20',
+      '  Number of DML statements: 1 out of 150',
+      '  Number of Publish Immediate DML: 0 out of 150',
+      '  Number of DML rows: 5 out of 10000',
+      '  Maximum CPU time: 2000 out of 10000',
+      '  Maximum heap size: 100 out of 6000000',
+      '  Number of callouts: 1 out of 100',
+      '  Number of Email Invocations: 5 out of 10',
+      '  Number of future calls: 2 out of 50',
+      '  Number of queueable jobs added to the queue: 3 out of 50',
+      '  Number of Mobile Apex push calls: 0 out of 10',
+      '09:19:13.82 (51595120059)|EXECUTION_FINISHED',
+    ].join('\n');
+
+    const apexLog = parse(log);
+
+    expect(apexLog.governorLimits).toBeDefined();
+    expect([...apexLog.governorLimits.byNamespace.keys()]).toEqual(['default', 'myNS']);
+
+    expect(apexLog.governorLimits.byNamespace.get('default')).toMatchObject({
+      soqlQueries: { used: 17, limit: 100 },
+      queryRows: { used: 121, limit: 50000 },
+      soslQueries: { used: 3, limit: 20 },
+      dmlStatements: { used: 8, limit: 150 },
+      publishImmediateDml: { used: 5, limit: 150 },
+      dmlRows: { used: 113, limit: 10000 },
+      cpuTime: { used: 15008, limit: 10000 },
+      heapSize: { used: 300, limit: 6000000 },
+      callouts: { used: 2, limit: 100 },
+      emailInvocations: { used: 1, limit: 10 },
+      futureCalls: { used: 2, limit: 50 },
+      queueableJobsAddedToQueue: { used: 6, limit: 50 },
+      mobileApexPushCalls: { used: 1, limit: 10 },
+    });
+
+    expect(apexLog.governorLimits.byNamespace.get('myNS')).toMatchObject({
+      soqlQueries: { used: 2, limit: 100 },
+      queryRows: { used: 10, limit: 50000 },
+      soslQueries: { used: 1, limit: 20 },
+      dmlStatements: { used: 1, limit: 150 },
+      publishImmediateDml: { used: 0, limit: 150 },
+      dmlRows: { used: 5, limit: 10000 },
+      cpuTime: { used: 2000, limit: 10000 },
+      heapSize: { used: 100, limit: 6000000 },
+      callouts: { used: 1, limit: 100 },
+      emailInvocations: { used: 5, limit: 10 },
+      futureCalls: { used: 2, limit: 50 },
+      queueableJobsAddedToQueue: { used: 3, limit: 50 },
+      mobileApexPushCalls: { used: 0, limit: 10 },
+    });
+
+    expect(apexLog.governorLimits).toMatchObject({
+      soqlQueries: { used: 19, limit: 100 },
+      queryRows: { used: 131, limit: 50000 },
+      soslQueries: { used: 4, limit: 20 },
+      dmlStatements: { used: 9, limit: 150 },
+      publishImmediateDml: { used: 5, limit: 150 },
+      dmlRows: { used: 118, limit: 10000 },
+      cpuTime: { used: 17008, limit: 10000 },
+      heapSize: { used: 400, limit: 6000000 },
+      callouts: { used: 3, limit: 100 },
+      emailInvocations: { used: 6, limit: 10 },
+      futureCalls: { used: 4, limit: 50 },
+      queueableJobsAddedToQueue: { used: 9, limit: 50 },
+      mobileApexPushCalls: { used: 1, limit: 10 },
+    });
+  });
+
+  it('should handle missing or partial LIMIT_USAGE_FOR_NS sections gracefully', () => {
+    const log = [
+      '09:18:22.6 (6574780)|EXECUTION_STARTED',
+      '12:43:02.105 (48105827767)|LIMIT_USAGE_FOR_NS|(default)|',
+      '  Number of SOQL queries: 5 out of 100',
+      '  Number of query rows: 10 out of 50000',
+      // missing other lines
+      '09:19:13.82 (51595120059)|EXECUTION_FINISHED',
+    ].join('\n');
+
+    const apexLog = parse(log);
+
+    expect(apexLog.governorLimits).toBeDefined();
+    const expected = {
+      soqlQueries: { used: 5, limit: 100 },
+      queryRows: { used: 10, limit: 50000 },
+      soslQueries: { used: 0, limit: 0 },
+      dmlStatements: { used: 0, limit: 0 },
+      publishImmediateDml: { used: 0, limit: 0 },
+      dmlRows: { used: 0, limit: 0 },
+      cpuTime: { used: 0, limit: 0 },
+      heapSize: { used: 0, limit: 0 },
+      callouts: { used: 0, limit: 0 },
+      emailInvocations: { used: 0, limit: 0 },
+      futureCalls: { used: 0, limit: 0 },
+      queueableJobsAddedToQueue: { used: 0, limit: 0 },
+      mobileApexPushCalls: { used: 0, limit: 0 },
+    };
+    expect(apexLog.governorLimits.byNamespace.get('default')).toMatchObject(expected);
+    expect(apexLog.governorLimits).toMatchObject(expected);
   });
 });
 
