@@ -719,7 +719,7 @@ export class CalltreeView extends LitElement {
             headerHozAlign: 'right',
             tooltip(_event, cell, _onRender) {
               const maxDmlStatements = governorLimits.dmlStatements.limit;
-              return cell.getValue() + maxDmlStatements > 0 ? '/' + maxDmlStatements : '';
+              return cell.getValue() + (maxDmlStatements > 0 ? '/' + maxDmlStatements : '');
             },
           },
           {
@@ -745,7 +745,7 @@ export class CalltreeView extends LitElement {
             headerHozAlign: 'right',
             tooltip(_event, cell, _onRender) {
               const maxSoql = governorLimits.soqlQueries.limit;
-              return cell.getValue() + maxSoql > 0 ? '/' + maxSoql : '';
+              return cell.getValue() + (maxSoql > 0 ? '/' + maxSoql : '');
             },
           },
           {
@@ -781,7 +781,7 @@ export class CalltreeView extends LitElement {
             headerHozAlign: 'right',
             tooltip(_event, cell, _onRender) {
               const maxDmlRows = governorLimits.dmlRows.limit;
-              return cell.getValue() + maxDmlRows > 0 ? '/' + maxDmlRows : '';
+              return cell.getValue() + (maxDmlRows > 0 ? '/' + maxDmlRows : '');
             },
           },
           {
@@ -807,7 +807,7 @@ export class CalltreeView extends LitElement {
             headerHozAlign: 'right',
             tooltip(_event, cell, _onRender) {
               const maxQueryRows = governorLimits.queryRows.limit;
-              return cell.getValue() + maxQueryRows > 0 ? '/' + maxQueryRows : '';
+              return cell.getValue() + (maxQueryRows > 0 ? '/' + maxQueryRows : '');
             },
           },
           {
