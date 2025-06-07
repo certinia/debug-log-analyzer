@@ -8,7 +8,7 @@ export default function formatDuration(durationNs: number, totalNs = 0) {
   const textPadded = text.length < 4 ? '0000'.substring(text.length) + text : text; // length min = 4
   const millis = textPadded.slice(0, -3); // everything before last 3 chars
   const micros = textPadded.slice(-3); // last 3 chars
-  const suffix = totalNs > 0 ? `/${(totalNs / 1_000_000).toFixed(3)}` : '';
+  const suffix = totalNs > 0 ? `/${Math.round(totalNs / 1_000_000)}` : '';
   return `${millis}.${micros}${suffix} ms`;
 }
 
