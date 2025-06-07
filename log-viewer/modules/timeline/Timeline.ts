@@ -676,7 +676,7 @@ function findTimelineTooltip(
         rows.push({ label: 'total:', value: val });
       }
 
-      const govLimits = timelineRoot.governorLimits.totals;
+      const govLimits = timelineRoot.governorLimits;
       if (target.dmlCount.total) {
         rows.push({
           label: 'DML:',

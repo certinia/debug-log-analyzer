@@ -567,7 +567,7 @@ export class CalltreeView extends LitElement {
       const namespaceFilterCache = new Map<string, boolean>();
 
       const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
-      const governorLimits = rootMethod.governorLimits.totals;
+      const governorLimits = rootMethod.governorLimits;
 
       let childIndent;
       this.calltreeTable = new Tabulator(callTreeTableContainer, {

@@ -1162,9 +1162,9 @@ describe('Governor Limits Parsing', () => {
     const apexLog = parse(log);
 
     expect(apexLog.governorLimits).toBeDefined();
-    expect([...apexLog.governorLimits.limitsByNamespace.keys()]).toEqual(['default', 'myNS']);
+    expect([...apexLog.governorLimits.byNamespace.keys()]).toEqual(['default', 'myNS']);
 
-    expect(apexLog.governorLimits.limitsByNamespace.get('default')).toMatchObject({
+    expect(apexLog.governorLimits.byNamespace.get('default')).toMatchObject({
       soqlQueries: { used: 17, limit: 100 },
       queryRows: { used: 121, limit: 50000 },
       soslQueries: { used: 3, limit: 20 },
@@ -1180,7 +1180,7 @@ describe('Governor Limits Parsing', () => {
       mobileApexPushCalls: { used: 1, limit: 10 },
     });
 
-    expect(apexLog.governorLimits.limitsByNamespace.get('myNS')).toMatchObject({
+    expect(apexLog.governorLimits.byNamespace.get('myNS')).toMatchObject({
       soqlQueries: { used: 2, limit: 100 },
       queryRows: { used: 10, limit: 50000 },
       soslQueries: { used: 1, limit: 20 },
@@ -1196,7 +1196,7 @@ describe('Governor Limits Parsing', () => {
       mobileApexPushCalls: { used: 0, limit: 10 },
     });
 
-    expect(apexLog.governorLimits.totals).toMatchObject({
+    expect(apexLog.governorLimits).toMatchObject({
       soqlQueries: { used: 19, limit: 100 },
       queryRows: { used: 131, limit: 50000 },
       soslQueries: { used: 4, limit: 20 },
@@ -1241,8 +1241,8 @@ describe('Governor Limits Parsing', () => {
       queueableJobsAddedToQueue: { used: 0, limit: 0 },
       mobileApexPushCalls: { used: 0, limit: 0 },
     };
-    expect(apexLog.governorLimits.limitsByNamespace.get('default')).toMatchObject(expected);
-    expect(apexLog.governorLimits.totals).toMatchObject(expected);
+    expect(apexLog.governorLimits.byNamespace.get('default')).toMatchObject(expected);
+    expect(apexLog.governorLimits).toMatchObject(expected);
   });
 });
 

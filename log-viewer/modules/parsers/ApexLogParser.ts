@@ -43,22 +43,20 @@ export class ApexLogParser {
   discontinuity = false;
   namespaces = new Set<string>();
   governorLimits: GovernorLimits = {
-    totals: {
-      soqlQueries: { used: 0, limit: 0 },
-      soslQueries: { used: 0, limit: 0 },
-      queryRows: { used: 0, limit: 0 },
-      dmlStatements: { used: 0, limit: 0 },
-      publishImmediateDml: { used: 0, limit: 0 },
-      dmlRows: { used: 0, limit: 0 },
-      cpuTime: { used: 0, limit: 0 },
-      heapSize: { used: 0, limit: 0 },
-      callouts: { used: 0, limit: 0 },
-      emailInvocations: { used: 0, limit: 0 },
-      futureCalls: { used: 0, limit: 0 },
-      queueableJobsAddedToQueue: { used: 0, limit: 0 },
-      mobileApexPushCalls: { used: 0, limit: 0 },
-    },
-    limitsByNamespace: new Map<string, Limits>(),
+    soqlQueries: { used: 0, limit: 0 },
+    soslQueries: { used: 0, limit: 0 },
+    queryRows: { used: 0, limit: 0 },
+    dmlStatements: { used: 0, limit: 0 },
+    publishImmediateDml: { used: 0, limit: 0 },
+    dmlRows: { used: 0, limit: 0 },
+    cpuTime: { used: 0, limit: 0 },
+    heapSize: { used: 0, limit: 0 },
+    callouts: { used: 0, limit: 0 },
+    emailInvocations: { used: 0, limit: 0 },
+    futureCalls: { used: 0, limit: 0 },
+    queueableJobsAddedToQueue: { used: 0, limit: 0 },
+    mobileApexPushCalls: { used: 0, limit: 0 },
+    byNamespace: new Map<string, Limits>(),
   };
 
   /**
@@ -82,9 +80,9 @@ export class ApexLogParser {
   }
 
   private addGovernorLimits(apexLog: ApexLog) {
-    const totalLimits = apexLog.governorLimits.totals;
+    const totalLimits = apexLog.governorLimits;
     if (totalLimits) {
-      for (const limitsForNs of apexLog.governorLimits.limitsByNamespace.values()) {
+      for (const limitsForNs of apexLog.governorLimits.byNamespace.values()) {
         for (const [key, value] of Object.entries(limitsForNs) as Array<
           [keyof Limits, Limits[keyof Limits]]
         >) {
@@ -537,9 +535,8 @@ export interface Limits {
   mobileApexPushCalls: { used: number; limit: number };
 }
 
-export interface GovernorLimits {
-  totals: Limits;
-  limitsByNamespace: Map<string, Limits>;
+export interface GovernorLimits extends Limits {
+  byNamespace: Map<string, Limits>;
 }
 /**
  * All log lines extend this base class.
@@ -879,22 +876,20 @@ export class ApexLog extends Method {
   public parsingErrors: string[] = [];
 
   public governorLimits: GovernorLimits = {
-    totals: {
-      soqlQueries: { used: 0, limit: 0 },
-      soslQueries: { used: 0, limit: 0 },
-      queryRows: { used: 0, limit: 0 },
-      dmlStatements: { used: 0, limit: 0 },
-      publishImmediateDml: { used: 0, limit: 0 },
-      dmlRows: { used: 0, limit: 0 },
-      cpuTime: { used: 0, limit: 0 },
-      heapSize: { used: 0, limit: 0 },
-      callouts: { used: 0, limit: 0 },
-      emailInvocations: { used: 0, limit: 0 },
-      futureCalls: { used: 0, limit: 0 },
-      queueableJobsAddedToQueue: { used: 0, limit: 0 },
-      mobileApexPushCalls: { used: 0, limit: 0 },
-    },
-    limitsByNamespace: new Map<string, Limits>(),
+    soqlQueries: { used: 0, limit: 0 },
+    soslQueries: { used: 0, limit: 0 },
+    queryRows: { used: 0, limit: 0 },
+    dmlStatements: { used: 0, limit: 0 },
+    publishImmediateDml: { used: 0, limit: 0 },
+    dmlRows: { used: 0, limit: 0 },
+    cpuTime: { used: 0, limit: 0 },
+    heapSize: { used: 0, limit: 0 },
+    callouts: { used: 0, limit: 0 },
+    emailInvocations: { used: 0, limit: 0 },
+    futureCalls: { used: 0, limit: 0 },
+    queueableJobsAddedToQueue: { used: 0, limit: 0 },
+    mobileApexPushCalls: { used: 0, limit: 0 },
+    byNamespace: new Map<string, Limits>(),
   };
 
   /**
@@ -1653,7 +1648,7 @@ class LimitUsageForNSLine extends LogLine {
       }
     }
 
-    parser.governorLimits.limitsByNamespace.set(this.namespace, limits);
+    parser.governorLimits.byNamespace.set(this.namespace, limits);
   }
 }
 
