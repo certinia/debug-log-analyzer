@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **🔼🔽 Grouped Row Sorting**: You can now sort grouped rows by clicking on the column headers ([#592]).
   - To sort a group by the number of items within the group click the Group Name column until the third sort state is shown.
 - **🔢 New Call Tree Columns**: The Rows column is replaced with the DML Rows and SOQL Rows columns ([#93]).
+- **⏱️ New Timeline Tooltip**: The tooltip is much easier to read a glance([#308]).
 - **⏱️ New Timeline Tooltip values**: The Rows count in the Timeline tooltip is now split into DML Rows and SOQL Rows ([#93]).
 - **📋💾 Table Actions**: Added options to Copy to Clipboard and Export to CSV directly from the table action buttons above the Analysis and Database tables ([#589]).
 
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **💎 Improved HiDPI Rendering**: Sharpened rendering for the timeline on HiDPI displays ([#588]).
 - **🔍 Call Tree Search**: Search in the Call Tree now only includes the visible filtered rows ([#539]).
 - **🎨 Search Input Styling:**: The grid search input fits into VS Code styles better ([#619]).
+  **📈 Call Tree Governor Limits:** The Call Tree now displays formatted governor limits for `CUMULATIVE_LIMIT_USAGE` events by default, as well as SOQL, SOSL, DML, and Method profiling events ([#309]).
 
 ### Fixed
 
@@ -397,6 +399,8 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#93]: https://github.com/certinia/debug-log-analyzer/issues/93
 [#539]: https://github.com/certinia/debug-log-analyzer/issues/539
 [#619]: https://github.com/certinia/debug-log-analyzer/issues/619
+[#308]: https://github.com/certinia/debug-log-analyzer/issues/308
+[#309]: https://github.com/certinia/debug-log-analyzer/issues/309
 
 <!-- 1.16.1 -->
 
