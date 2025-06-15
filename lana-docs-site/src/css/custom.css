@@ -42,3 +42,8 @@
 .header-github-link:hover::before {
   background-color: var(--ifm-navbar-link-hover-color);
 }
+
+div[class^='announcementBar_'] {
+  font-size: 20px;
+  font-weight: 700;
+}

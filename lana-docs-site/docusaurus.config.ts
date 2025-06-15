@@ -59,6 +59,12 @@ const config: Config = {
     ],
   ],
   themeConfig: {
+    announcementBar: {
+      id: 'lana-1.18', // Unique ID to prevent showing again if dismissed
+      content:
+        '🎉️ <b><a target="_blank" rel="noopener noreferrer" href="https://marketplace.visualstudio.com/items?itemName=financialforce.lana">Apex Log Analyzer v1.18</a> is out!<b>',
+      isCloseable: true,
+    },
     // Replace with your project's social card
     image: 'img/lana-timeline.png',
     navbar: {
