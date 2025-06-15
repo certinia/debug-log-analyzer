@@ -118,6 +118,14 @@ const config: Config = {
               label: 'Getting Started',
               to: 'docs/gettingstarted',
             },
+            {
+              label: 'Features',
+              to: 'docs/features',
+            },
+            {
+              label: 'Settings',
+              to: 'docs/settings',
+            },
           ],
         },
         {
