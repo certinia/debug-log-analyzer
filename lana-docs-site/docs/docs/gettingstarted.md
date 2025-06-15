@@ -1,8 +1,11 @@
 ---
-sidebar_position: 2
+sidebar_position: 1
+id: gettingstarted
+title: Getting Started
+descrition: A step-by-step guide to installing, configuring, and using the Apex Log Analyzer extension for Visual Studio Code to analyze Salesforce Apex debug logs efficiently.
+keywords: [salesforce, apex, vscode, logs, getting started, debug log analyzer, install]
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-timeline.png
 ---
-
-# Getting Started
 
 ## Installation
 

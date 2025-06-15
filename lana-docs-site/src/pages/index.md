@@ -5,13 +5,30 @@ description: Apex Log Analyzer is a blazing-fast VS Code extension for Salesforc
 slug: /
 sidebar_position: 1
 keywords:
-  - Salesforce
-  - Apex
-  - Debug Logs
-  - Performance Analysis
-  - Flame Chart
-  - Log Analyzer
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-preview.gif
+  [
+    salesforce,
+    apex,
+    debug logs,
+    performance analysis,
+    flame chart,
+    log analyzer,
+    vscode,
+    vscode,
+    logs,
+    apex log analysis,
+    visual studio code extension,
+    salesforce debugging,
+    apex logs,
+    salesforce tools,
+    salesforce extension,
+    salesforce log analyzer,
+    apex performance,
+    salesforce productivity,
+    salesforce troubleshooting,
+    salesforce log analysis,
+    apex code analysis,
+  ]
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-timeline.png
 hide_title: true
 hide_table_of_contents: true
 ---

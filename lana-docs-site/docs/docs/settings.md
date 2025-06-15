@@ -1,8 +1,21 @@
 ---
 sidebar_position: 3
+id: settings
+title: Settings
+description: How to configure and customize, Apex Log Analyzer VS Code extension for Salesforce developer.
+keywords:
+  [
+    salesforce,
+    apex,
+    log,
+    debug,
+    apex log analyzer settings,
+    vscode settings,
+    customize apex debug log analyzer,
+    salesforce log analysis,
+  ]
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-timeline.png
 ---
-
-# Settings
 
 ## Timeline color settings
 
