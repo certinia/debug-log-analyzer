@@ -84,8 +84,9 @@ const config: Config = {
         },
         {
           href: `https://github.com/${organizationName}/${projectName}`,
-          label: 'GitHub',
           position: 'right',
+          'aria-label': 'GitHub Repository',
+          className: 'header-github-link',
         },
         {
           type: 'search',
