@@ -25,3 +25,10 @@ With the `.log` file open in VSCode.
 ## Download a log
 
 1. Open command pallette (CMD/CTRL + Shift + P) -> 'Log: Retrieve Apex Log And Show Analysis
+
+## ⚙️ Recommended Debug Log Levels
+
+- Set `APEX_CODE` level to `FINE` or higher — lower levels may omit important execution details.
+- Be aware that higher debug levels introduce logging overhead, which can inflate recorded execution times.
+- Avoid truncated logs — they can result in incomplete or misleading analysis.
+- Recommended settings for a good balance of detail and performance: `APEX_CODE,FINE; APEX_PROFILING,FINE; CALLOUT,INFO; DB,FINEST; NBA,INFO; SYSTEM,DEBUG; VALIDATION,INFO; VISUALFORCE,FINE; WAVE,INFO; WORKFLOW,FINE`
