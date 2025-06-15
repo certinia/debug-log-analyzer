@@ -67,6 +67,14 @@ const config: Config = {
     },
     // Replace with your project's social card
     image: 'img/lana-timeline.png',
+    metadata: [
+      {
+        name: 'keywords',
+        content:
+          'salesforce, apex, vscode, log analyzer, debug log analyzer, debug logs, performance',
+      },
+      { name: 'author', content: 'Certinia' },
+    ],
     navbar: {
       title: 'Apex Log Analyzer for Salesforce',
       logo: {
