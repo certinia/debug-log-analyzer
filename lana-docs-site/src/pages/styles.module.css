@@ -6,7 +6,6 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4rem 1rem;
   text-align: center;
   background: linear-gradient(180deg, var(--ifm-background-color) 0%, transparent 100%);
 }
@@ -35,4 +34,86 @@
   margin-top: 3rem;
   border-radius: 0.5rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.featureOverview {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.card {
+  background: var(--ifm-color-emphasis-100);
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 12px;
+  box-shadow: var(--ifm-global-shadow-md);
+  padding: 1.5rem;
+  transition: transform 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+}
+
+.card__header h3 {
+  margin-top: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.card__body p {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.visualImpactSection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2rem;
+  padding: 2rem;
+  background-color: var(--ifm-color-emphasis-100);
+  border-radius: 16px;
+  box-shadow: var(--ifm-global-shadow-lg);
+}
+
+.visualContent {
+  flex: 1;
+  min-width: 300px;
+}
+
+.visualContent h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.visualContent p {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.visualContent ul {
+  margin-bottom: 1.5rem;
+  padding-left: 1.2rem;
+}
+
+.visualImage {
+  flex: 1;
+  min-width: 300px;
+  text-align: center;
+}
+
+.visualImage img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
 }
