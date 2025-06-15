@@ -1,13 +1,34 @@
 ---
-sidebar_position: 3
+sidebar_position: 2
 ---
 
 # Getting Started
 
+## Installation
+
+![install](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/install-lana.webp)
+
+Search for `Apex Log Analyzer` from the extensions side bar in VS Code and click `Install` or
+install from the VS Code market place by clicking install on [Visual Studio Code Market Place: Apex Log Analyzer](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
+
+### Pre-Release
+
+Click `Switch to Pre-Release Version` on the banner to get bleeding edge changes and help us to resolve bugs before the stable release.
+
+## View Analysis
+
+### Command Pallette
+
+Open command pallette (CMD/CTRL + Shift + P), paste `ext install financialforce.lana`, and press enter.
+
+```sh
+ext install financialforce.lana
+```
+
 Start the analysis either from a log you have already downloaded or by downloading a log from an org to view.
 On larger logs the analysis window make take a few seconds to appear.
 
-## From an Open Log File
+### From an Open Log File
 
 With the `.log` file open in VSCode.
 
@@ -22,7 +43,7 @@ With the `.log` file open in VSCode.
    or
 1. Right click editor tab -> 'Log: Show Apex Log Analysis'
 
-## Download a log
+### Download a log
 
 1. Open command pallette (CMD/CTRL + Shift + P) -> 'Log: Retrieve Apex Log And Show Analysis
 
