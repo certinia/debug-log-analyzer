@@ -59,8 +59,22 @@ const config: Config = {
     ],
   ],
   themeConfig: {
+    announcementBar: {
+      id: 'lana-1.18', // Unique ID to prevent showing again if dismissed
+      content:
+        '🎉️ <b><a target="_blank" rel="noopener noreferrer" href="https://marketplace.visualstudio.com/items?itemName=financialforce.lana">Apex Log Analyzer v1.18</a> is out!<b>',
+      isCloseable: true,
+    },
     // Replace with your project's social card
     image: 'img/lana-timeline.png',
+    metadata: [
+      {
+        name: 'keywords',
+        content:
+          'salesforce, apex, vscode, log analyzer, debug log analyzer, debug logs, performance',
+      },
+      { name: 'author', content: 'Certinia' },
+    ],
     navbar: {
       title: 'Apex Log Analyzer for Salesforce',
       logo: {
@@ -70,8 +84,8 @@ const config: Config = {
       },
       items: [
         {
-          type: 'docSidebar',
-          sidebarId: 'docSidebar',
+          type: 'doc',
+          docId: 'docs/features',
           position: 'left',
           label: 'Docs',
         },
@@ -84,8 +98,9 @@ const config: Config = {
         },
         {
           href: `https://github.com/${organizationName}/${projectName}`,
-          label: 'GitHub',
           position: 'right',
+          'aria-label': 'GitHub Repository',
+          className: 'header-github-link',
         },
         {
           type: 'search',
@@ -100,12 +115,16 @@ const config: Config = {
           title: 'Docs',
           items: [
             {
-              label: 'Introduction',
-              to: '/',
+              label: 'Getting Started',
+              to: 'docs/gettingstarted',
             },
             {
-              label: 'Installation',
-              to: 'docs/installation',
+              label: 'Features',
+              to: 'docs/features',
+            },
+            {
+              label: 'Settings',
+              to: 'docs/settings',
             },
           ],
         },
