@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
 trigger ContactTrigger on Contact (before insert, before update, after insert, after update) {
     if (Trigger.isBefore) {
         if (Trigger.isInsert) {

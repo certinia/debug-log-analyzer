@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
+
 public with sharing class AccountService {
 
     static Date KNOWN_MONDAY = Date.newInstance(2025, 6, 30);

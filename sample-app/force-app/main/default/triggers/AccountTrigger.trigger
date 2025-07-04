@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
 trigger AccountTrigger on Account (before insert, before update, after insert, after update) {
   AccountTriggerHandler handler = new AccountTriggerHandler();
     if (Trigger.isBefore) {

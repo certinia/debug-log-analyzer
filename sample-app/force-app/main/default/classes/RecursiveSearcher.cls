@@ -1,5 +1,6 @@
-// todo: gap before
-
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
 public class RecursiveSearcher {
       public RecursiveSearcher(){
 

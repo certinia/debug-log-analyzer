@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
 public with sharing class ContactTriggerHandler {
 
     public static void handleBeforeInsert(List<Contact> newContacts) {
