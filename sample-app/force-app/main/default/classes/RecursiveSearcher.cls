@@ -8,13 +8,13 @@ public class RecursiveSearcher {
 
       public void search(SimTree node) {
         Integer x = 0;
-        Integer timePerStatement = 600; // NOTE: 1000 is almost perfet 1ms for 1000 iterations
+        Integer timePerStatement = 400; // NOTE: 1000 is almost perfet 1ms for 1000 iterations
         Integer len = Math.max((Integer)(node.gapBeforeChildrenMillis * timePerStatement), timePerStatement);
 
         Long startTime = System.currentTimeMillis();
         Long endTime = startTime + node.gapBeforeChildrenMillis;
         while(System.currentTimeMillis() < endTime){
-          for(Integer i =0; i< len; i++ ){
+          for(Integer i =0; i < len; i++ ){
             x++;
           }
         }
@@ -28,7 +28,7 @@ public class RecursiveSearcher {
             startTime = System.currentTimeMillis();
             endTime = startTime + node.durationMillis;
             while(System.currentTimeMillis() < endTime){
-                for(Integer i =0; i < len;i++ ){
+                for(Integer i = 0; i < len;i++ ){
                   x++;
                 }
             }
@@ -38,7 +38,7 @@ public class RecursiveSearcher {
         endTime = startTime + node.gapAfterChildrenMillis;
         len = Math.max((Integer)(node.gapAfterChildrenMillis * timePerStatement), timePerStatement);
         while(System.currentTimeMillis() < endTime){
-          for(Integer i =0; i < len;i++ ){
+          for(Integer i = 0; i < len;i++ ){
             x++;
           }
         }

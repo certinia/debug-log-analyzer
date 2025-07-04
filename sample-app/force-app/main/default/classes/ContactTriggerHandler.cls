@@ -64,6 +64,6 @@ public with sharing class ContactTriggerHandler {
         }
         insert tasksToInsert;
 
-        new RecursiveSearcher().search(3, 8, 700);
+        new RecursiveSearcher().search(4, 8, 700);
       }
 }
