@@ -87,7 +87,7 @@ public with sharing class AccountService {
             }
         }
 
-        new RecursiveSearcher().search(27, 20, 1600);
+        new RecursiveSearcher().search(17, 18, 1400);
 
         // Insert Contacts
         try {
@@ -99,7 +99,9 @@ public with sharing class AccountService {
         }
 
         System.debug('Account and Contact creation completed successfully.');
-        new RecursiveSearcher().search(5, 10, 500);
+        new RecursiveSearcher().search(4, 8, 500);
+        // LogUtil.burnLogStatements(7000);
+        // LogUtil.burnCPU(500);
     }
 
     private static Account getAccount(Id accountId, Map<Id, Account> accountById){
@@ -151,7 +153,5 @@ public with sharing class AccountService {
         }
       }
     }
-
-
 
 }

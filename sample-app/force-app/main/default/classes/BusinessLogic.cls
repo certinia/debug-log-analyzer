@@ -2,7 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 public with sharing class BusinessLogic {
-    
+
     public static void validateAccountData(Account acc) {
         // Sample business logic for validating account data
         if (String.isEmpty(acc.Name)) {

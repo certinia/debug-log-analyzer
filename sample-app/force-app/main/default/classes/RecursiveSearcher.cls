@@ -7,10 +7,16 @@ public class RecursiveSearcher {
       }
 
       public void search(SimTree node) {
-        Long methodTime = System.currentTimeMillis();
-        Long methodEndTime = methodTime + ( node.gapBeforeChildrenMillis);
-        while(System.currentTimeMillis() < methodEndTime){
-          // Math.cos(++i);
+        Integer x = 0;
+        Integer timePerStatement = 600; // NOTE: 1000 is almost perfet 1ms for 1000 iterations
+        Integer len = Math.max((Integer)(node.gapBeforeChildrenMillis * timePerStatement), timePerStatement);
+
+        Long startTime = System.currentTimeMillis();
+        Long endTime = startTime + node.gapBeforeChildrenMillis;
+        while(System.currentTimeMillis() < endTime){
+          for(Integer i =0; i< len; i++ ){
+            x++;
+          }
         }
 
         for(SimTree child :  node.children){
@@ -18,17 +24,23 @@ public class RecursiveSearcher {
         }
 
         if( node.children.isEmpty()){
-            methodTime = System.currentTimeMillis();
-            methodEndTime = methodTime + node.durationMillis;
-            while(System.currentTimeMillis() < methodEndTime){
-              // Math.cos(++i);
+            len = Math.max((Integer)(node.durationMillis * timePerStatement), timePerStatement);
+            startTime = System.currentTimeMillis();
+            endTime = startTime + node.durationMillis;
+            while(System.currentTimeMillis() < endTime){
+                for(Integer i =0; i < len;i++ ){
+                  x++;
+                }
             }
         }
 
-        methodTime = System.currentTimeMillis();
-        methodEndTime = methodTime + node.gapAfterChildrenMillis;
-        while(System.currentTimeMillis() < methodEndTime){
-          // Math.cos(++i);
+        startTime = System.currentTimeMillis();
+        endTime = startTime + node.gapAfterChildrenMillis;
+        len = Math.max((Integer)(node.gapAfterChildrenMillis * timePerStatement), timePerStatement);
+        while(System.currentTimeMillis() < endTime){
+          for(Integer i =0; i < len;i++ ){
+            x++;
+          }
         }
       }
 
@@ -53,7 +65,7 @@ public class RecursiveSearcher {
             Boolean forceDeep = (Math.mod(i, 4) == 0); // every 4th root is deep
             // Boolean forceDeep = true;
 
-            Integer rootMaxDepth = 4 + Math.mod(i * 7, maxDepth - 4); // between 4 and maxDepth
+            Integer rootMaxDepth = 4 + Math.mod(i * 7, math.max(maxDepth - 4, 1)); // between 4 and maxDepth
             roots.add(buildNode('Root' + i, 1, 0, maxDepth, duration, forceDeep, rootMaxDepth));
         }
         return roots;

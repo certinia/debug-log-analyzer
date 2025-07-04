@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
+
 public with sharing class AccountTriggerHandler {
     public void handleBeforeInsert(List<Account> newAccounts) {
         for (Account acc : newAccounts) {
@@ -27,7 +31,7 @@ public with sharing class AccountTriggerHandler {
             BusinessLogic.validateAccountData(acc);
         }
 
-        new RecursiveSearcher().search(4, 15, 700);
+        new RecursiveSearcher().search(4, 9, 600);
     }
 
     public void handleAfterUpdate(List<Account> newAccounts, Map<Id, Account> oldAccountMap) {
