@@ -1,50 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
-    <actionCalls>
-        <name>Contact_Email</name>
-        <label>Contact Email</label>
-        <locationX>0</locationX>
-        <locationY>0</locationY>
-        <actionName>emailSimple</actionName>
-        <actionType>emailSimple</actionType>
-        <connector>
-            <targetReference>Set_Department</targetReference>
-        </connector>
-        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
-        <inputParameters>
-            <name>emailAddresses</name>
-            <value>
-                <elementReference>$User.Id</elementReference>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>senderType</name>
-            <value>
-                <stringValue>CurrentUser</stringValue>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>composeEmailContent</name>
-            <value>
-                <stringValue>True</stringValue>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>emailSubject</name>
-            <value>
-                <stringValue>{!$Record.Name} Updated</stringValue>
-            </value>
-        </inputParameters>
-        <inputParameters>
-            <name>emailBody</name>
-            <value>
-                <stringValue>&lt;p&gt;{!$Record.Name} has been Updated&lt;/p&gt;</stringValue>
-            </value>
-        </inputParameters>
-        <nameSegment>emailSimple</nameSegment>
-        <offset>0</offset>
-        <versionString>1.0.1</versionString>
-    </actionCalls>
     <apiVersion>64.0</apiVersion>
     <environments>Default</environments>
     <interviewLabel>Contact Insert + Update (DB) {!$Flow.CurrentDateTime}</interviewLabel>
@@ -85,7 +40,7 @@
         <locationX>0</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>Contact_Email</targetReference>
+            <targetReference>Set_Department</targetReference>
         </connector>
         <object>Contact</object>
         <recordTriggerType>CreateAndUpdate</recordTriggerType>
