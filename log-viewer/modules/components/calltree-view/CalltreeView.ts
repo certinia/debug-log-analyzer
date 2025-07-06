@@ -5,9 +5,6 @@
 // todo: improve scroll rows performance
 //
 //todo: ** future **
-//todo: show total and self as percentage of total? + do the same on the analysis view?
-//todo: add class to locate current tree for current log
-//todo: add filter on line type
 //todo: add filter on log level (fine, finer etc)
 import {
   provideVSCodeDesignSystem,
