@@ -18,7 +18,7 @@ Welcome to the development guide for the **Apex Log Analyzer** VS Code extension
 
 Before you start developing, make sure you have the following tools installed:
 
-- **Node.js** v16 or above: [Install Node.js](https://nodejs.org/en/)
+- **Node.js** v22 or above: [Install Node.js](https://nodejs.org/en/)
 - **[pnpm](https://pnpm.io/)**: This package manager will be used for installing dependencies
 - \*\*[VS Code](https://code.visualstudio.com/)
 
