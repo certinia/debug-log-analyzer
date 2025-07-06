@@ -16,9 +16,9 @@ import { globalStyles } from '../../styles/global.styles.js';
 
 // Tabulator custom modules, imports + styles
 import { Tabulator, type RowComponent } from 'tabulator-tables';
-import { isVisible } from '../../Util.js';
+import formatDuration, { isVisible } from '../../Util.js';
 import NumberAccessor from '../../datagrid/dataaccessor/Number.js';
-import { progressFormatter } from '../../datagrid/format/Progress.js';
+import { progressFormatterMS } from '../../datagrid/format/ProgressMS.js';
 import { GroupCalcs } from '../../datagrid/groups/GroupCalcs.js';
 import { GroupSort } from '../../datagrid/groups/GroupSort.js';
 import * as CommonModules from '../../datagrid/module/CommonModules.js';
@@ -110,6 +110,7 @@ export class AnalysisView extends LitElement {
     options: { matchCase: false },
   };
   totalMatches = 0;
+  blockClearHighlights = true;
 
   constructor() {
     super();
@@ -184,7 +185,9 @@ export class AnalysisView extends LitElement {
     return (this.tableContainer ??= this.renderRoot?.querySelector('#analysis-table'));
   }
 
-  _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
+  _findEvt = ((event: FindEvt) => {
+    this._find(event);
+  }) as EventListener;
 
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
@@ -207,7 +210,7 @@ export class AnalysisView extends LitElement {
     });
   }
 
-  _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
     const isTableVisible = !!this.analysisTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
@@ -224,8 +227,10 @@ export class AnalysisView extends LitElement {
       newFindArgs.text = '';
     }
     if (newSearch || clearHighlights) {
-      //@ts-expect-error This is a custom function added in by Find custom module
-      const result = this.analysisTable.find(this.findArgs);
+      this.blockClearHighlights = true;
+      // @ts-expect-error This is a custom function added in by Find custom module
+      const result = await this.analysisTable?.find(this.findArgs);
+      this.blockClearHighlights = false;
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
@@ -236,6 +241,11 @@ export class AnalysisView extends LitElement {
       }
     }
 
+    if (this.totalMatches <= 0) {
+      return;
+    }
+    this.blockClearHighlights = true;
+    this.analysisTable?.blockRedraw();
     const currentRow = this.findMap[this.findArgs.count];
     const rows = [
       currentRow,
@@ -247,20 +257,22 @@ export class AnalysisView extends LitElement {
     });
     //@ts-expect-error This is a custom function added in by RowNavigation custom module
     this.analysisTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
+    this.analysisTable?.restoreRedraw();
+    this.blockClearHighlights = false;
   }
 
   async _renderAnalysis(rootMethod: ApexLog) {
     if (!this._tableWrapper) {
       return;
     }
-    const metricList = groupMetrics(rootMethod);
 
     Tabulator.registerModule(Object.values(CommonModules));
     Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs, GroupSort]);
+
     this.analysisTable = new Tabulator(this._tableWrapper, {
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
-      data: metricList,
+      data: groupMetrics(rootMethod),
       layout: 'fitColumns',
       placeholder: 'No Analysis Available',
       columnCalcs: 'table',
@@ -308,6 +320,7 @@ export class AnalysisView extends LitElement {
         headerTooltip: true,
         headerWordWrap: true,
       },
+      tooltipDelay: 100,
       initialSort: [{ column: 'selfTime', dir: 'desc' }],
       headerSortElement: function (column, dir) {
         switch (dir) {
@@ -341,7 +354,6 @@ export class AnalysisView extends LitElement {
           headerSortStartingDir: 'desc',
           width: 150,
           sorter: 'string',
-          cssClass: 'datagrid-code-text',
           tooltip: true,
           headerFilter: 'list',
           headerFilterFunc: 'in',
@@ -351,7 +363,6 @@ export class AnalysisView extends LitElement {
             multiselect: true,
           },
           headerFilterLiveFilter: false,
-          variableHeight: true,
         },
         {
           title: 'Type',
@@ -360,12 +371,12 @@ export class AnalysisView extends LitElement {
           width: 150,
           sorter: 'string',
           tooltip: true,
-          cssClass: 'datagrid-code-text',
         },
         {
           title: 'Count',
           field: 'count',
           sorter: 'number',
+          cssClass: 'number-cell',
           width: 65,
           hozAlign: 'right',
           headerHozAlign: 'right',
@@ -378,16 +389,18 @@ export class AnalysisView extends LitElement {
           width: 165,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          formatter: progressFormatter,
+          bottomCalc: callStackSum,
+          bottomCalcFormatter: progressFormatterMS,
+          bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
+          formatter: progressFormatterMS,
           formatterParams: {
-            thousand: false,
             precision: 3,
             totalValue: rootMethod.duration.total,
           },
           accessorDownload: NumberAccessor,
-          bottomCalcFormatter: progressFormatter,
-          bottomCalc: callStackSum,
-          bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
+          tooltip(_event, cell, _onRender) {
+            return formatDuration(cell.getValue(), rootMethod.duration.total);
+          },
         },
         {
           title: 'Self Time (ms)',
@@ -397,22 +410,26 @@ export class AnalysisView extends LitElement {
           hozAlign: 'right',
           headerHozAlign: 'right',
           bottomCalc: 'sum',
+          bottomCalcFormatter: progressFormatterMS,
           bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
-          formatter: progressFormatter,
+          formatter: progressFormatterMS,
           formatterParams: {
-            thousand: false,
             precision: 3,
             totalValue: rootMethod.duration.total,
           },
           accessorDownload: NumberAccessor,
-          bottomCalcFormatter: progressFormatter,
+          tooltip(_event, cell, _onRender) {
+            return formatDuration(cell.getValue(), rootMethod.duration.total);
+          },
         },
       ],
     });
 
-    this.analysisTable.on('dataFiltering', () => {
-      this._resetFindWidget();
-      this._clearSearchHighlights();
+    this.analysisTable.on('renderStarted', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
     });
   }
 
@@ -421,11 +438,12 @@ export class AnalysisView extends LitElement {
   }
 
   _clearSearchHighlights() {
-    this._find(
-      new CustomEvent('lv-find-close', {
-        detail: { text: '', count: 0, options: { matchCase: false } },
-      }),
-    );
+    this.findArgs.text = '';
+    this.findArgs.count = 0;
+    //@ts-expect-error This is a custom function added in by Find custom module
+    this.analysisTable.clearFindHighlights(Object.values(this.findMap));
+    this.findMap = {};
+    this.totalMatches = 0;
   }
 }
 export class Metric {

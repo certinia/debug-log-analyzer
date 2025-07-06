@@ -1,13 +1,7 @@
 /*
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
-import {
-  Module,
-  type CellComponent,
-  type GroupComponent,
-  type RowComponent,
-  type Tabulator,
-} from 'tabulator-tables';
+import { Module, type GroupComponent, type RowComponent, type Tabulator } from 'tabulator-tables';
 
 export class Find extends Module {
   static moduleName = 'FindModule';
@@ -16,11 +10,13 @@ export class Find extends Module {
     super(table);
     // @ts-expect-error registerTableFunction() needs adding to tabulator types
     this.registerTableFunction('find', this._find.bind(this));
+    // @ts-expect-error registerTableFunction() needs adding to tabulator types
+    this.registerTableFunction('clearFindHighlights', this._clearFindHighlights.bind(this));
   }
 
   initialize() {}
 
-  _find(findArgs: FindArgs) {
+  async _find(findArgs: FindArgs) {
     const result: { totalMatches: number; matchIndexes: { [key: number]: RowComponent } } = {
       totalMatches: 0,
       matchIndexes: {},
@@ -28,6 +24,7 @@ export class Find extends Module {
 
     this._clearMatches();
 
+    // We only do this when groups exist to get row order
     const flattenFromGrps = (row: GroupComponent): RowComponent[] => {
       const mergedArray: RowComponent[] = [];
       Array.prototype.push.apply(mergedArray, row.getRows());
@@ -50,54 +47,63 @@ export class Find extends Module {
     const regex = new RegExp(searchString, `g${findArgs.options.matchCase ? '' : 'i'}`);
 
     tbl.blockRedraw();
-    let totalMatches = 0;
-    const rowsToReformat = [];
-    const len = flattenedRows.length;
-    for (let i = 0; i < len; i++) {
-      const row = flattenedRows[i];
-      if (!row) {
-        continue;
-      }
-
-      let clearHighlight = false;
+    for (const row of flattenedRows) {
       const data = row.getData();
-      if (data.highlightIndexes?.length) {
-        clearHighlight = true;
-        rowsToReformat.push(row);
-      }
-
-      data.highlightIndexes = [];
-
-      if (!searchString) {
-        continue;
-      }
-      let reformat = false;
-
-      row.getCells().forEach((cell: CellComponent) => {
-        const elem = cell.getElement();
-        const matchCount = this._countMatches(elem, findArgs, regex);
-        if (matchCount) {
-          const kLen = matchCount;
-          for (let k = 0; k < kLen; k++) {
-            totalMatches++;
-            data.highlightIndexes.push(totalMatches);
-            result.matchIndexes[totalMatches] = row;
-          }
-          reformat = true;
-        }
-      });
-
-      if (reformat && !clearHighlight) {
-        rowsToReformat.push(row);
+      if (data.highlightIndexes?.length > 0) {
+        data.highlightIndexes.length = 0;
+        row.reformat();
+      } else if (!data.highlightIndexes) {
+        data.highlightIndexes = [];
       }
     }
-    rowsToReformat.forEach((row) => {
-      row?.reformat();
-    });
     tbl.restoreRedraw();
+
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    let totalMatches = 0;
+    if (searchString) {
+      const rowsToReformat = new Set<RowComponent>();
+      const len = flattenedRows.length;
+      for (let i = 0; i < len; i++) {
+        const row = flattenedRows[i];
+        if (!row) {
+          continue;
+        }
+
+        const data = row.getData();
+        data.highlightIndexes = [];
+        row.getCells().forEach((cell) => {
+          const elem = cell.getElement();
+          const matchCount = this._countMatches(elem, findArgs, regex);
+          if (matchCount) {
+            const kLen = matchCount;
+            for (let k = 0; k < kLen; k++) {
+              totalMatches++;
+              data.highlightIndexes.push(totalMatches);
+              result.matchIndexes[totalMatches] = row;
+            }
+            rowsToReformat.add(row);
+          }
+        });
+      }
+      tbl.blockRedraw();
+      rowsToReformat.forEach((row) => {
+        row?.reformat();
+      });
+      tbl.restoreRedraw();
+    }
 
     result.totalMatches = totalMatches;
     return result;
+  }
+
+  _clearFindHighlights(rows: RowComponent[]) {
+    this.table.blockRedraw();
+    for (const row of rows) {
+      const data = row.getData();
+      data.highlightIndexes = [];
+      row.reformat();
+    }
+    this.table.restoreRedraw();
   }
 
   _countMatches(elem: Node, findArgs: FindArgs, regex: RegExp) {
@@ -200,27 +206,28 @@ export class Find extends Module {
 }
 
 export function formatter(row: RowComponent, findArgs: FindArgs) {
-  const { text, count } = findArgs;
-  if (!text || !count || !row.getData()) {
+  const { text } = findArgs;
+  if (!text) {
     return;
   }
-  requestAnimationFrame(() => {
-    const data = row.getData();
-    const highlights = {
-      indexes: data.highlightIndexes,
-      currentMatch: 0,
-    };
+  const data = row.getData();
+  if (!data || !data.highlightIndexes?.length) {
+    return;
+  }
 
-    row.getCells().forEach((cell) => {
-      const cellElem = cell.getElement();
-      _highlightText(cellElem, findArgs, highlights);
-    });
-
-    //@ts-expect-error This is private to tabulator, but we have no other choice atm.
-    if (row._getSelf().type === 'row') {
-      row.normalizeHeight();
-    }
+  const highlights = {
+    indexes: data.highlightIndexes,
+    currentMatch: 0,
+  };
+  row.getCells().forEach((cell) => {
+    const cellElem = cell.getElement();
+    _highlightText(cellElem, findArgs, highlights);
   });
+
+  //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+  if (row._getSelf().type === 'row') {
+    row.normalizeHeight();
+  }
 }
 
 function _highlightText(

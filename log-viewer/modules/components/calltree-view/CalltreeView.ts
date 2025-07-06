@@ -15,7 +15,7 @@ import {
   vsCodeDropdown,
   vsCodeOption,
 } from '@vscode/webview-ui-toolkit';
-import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
+import { css, html, LitElement, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
@@ -24,13 +24,15 @@ import * as CommonModules from '../../datagrid/module/CommonModules.js';
 import MinMaxEditor from '../../datagrid/editors/MinMax.js';
 import MinMaxFilter from '../../datagrid/filters/MinMax.js';
 import { progressFormatter } from '../../datagrid/format/Progress.js';
+import { progressFormatterMS } from '../../datagrid/format/ProgressMS.js';
+
 import { RowKeyboardNavigation } from '../../datagrid/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../datagrid/module/RowNavigation.js';
 import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 import { ApexLog, LogLine, TimedNode, type LogEventType } from '../../parsers/ApexLogParser.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
-import { isVisible } from '../../Util.js';
+import formatDuration, { isVisible } from '../../Util.js';
 import '../skeleton/GridSkeleton.js';
 import { Find, formatter } from './module/Find.js';
 import { MiddleRowFocus } from './module/MiddleRowFocus.js';
@@ -57,7 +59,7 @@ export class CalltreeView extends LitElement {
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
 
-  canClearSearchHighlights = false;
+  blockClearHighlights = true;
   searchString = '';
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
@@ -218,7 +220,9 @@ export class CalltreeView extends LitElement {
     `;
   }
 
-  _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
+  _findEvt = ((event: FindEvt) => {
+    this._find(event);
+  }) as EventListener;
 
   _getAllTypes(data: LogLine[]): string[] {
     const flattened = this._flatten(data);
@@ -345,12 +349,11 @@ export class CalltreeView extends LitElement {
     this.calltreeTable.goToRow(treeRow, { scrollIfVisible: true, focusRow: true });
   }
 
-  _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
     const isTableVisible = !!this.calltreeTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
     }
-    this.canClearSearchHighlights = false;
 
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
@@ -362,9 +365,12 @@ export class CalltreeView extends LitElement {
     if (clearHighlights) {
       newFindArgs.text = '';
     }
+
     if (newSearch || clearHighlights) {
+      this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
-      const result = this.calltreeTable.find(this.findArgs);
+      const result = await this.calltreeTable.find(this.findArgs);
+      this.blockClearHighlights = false;
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
@@ -375,6 +381,11 @@ export class CalltreeView extends LitElement {
       }
     }
 
+    // Highlight the current row and reset the previous or next depending on whether we are stepping forward or back.
+    if (this.totalMatches <= 0) {
+      return;
+    }
+    this.blockClearHighlights = true;
     this.calltreeTable?.blockRedraw();
     const currentRow = this.findMap[this.findArgs.count];
     const rows = [
@@ -391,7 +402,7 @@ export class CalltreeView extends LitElement {
       this.calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
     }
     this.calltreeTable?.restoreRedraw();
-    this.canClearSearchHighlights = true;
+    this.blockClearHighlights = false;
   }
 
   _highlight(inputString: string, substring: string) {
@@ -404,11 +415,23 @@ export class CalltreeView extends LitElement {
   }
 
   _showDetailsFilter = (data: CalltreeRow) => {
+    const excludedTypes = new Set<string>([
+      'CUMULATIVE_LIMIT_USAGE',
+      'LIMIT_USAGE_FOR_NS',
+      'CUMULATIVE_PROFILING',
+      'CUMULATIVE_PROFILING_BEGIN',
+    ]);
+
     return this._deepFilter(
       data,
       (rowData) => {
         const logLine = rowData.originalData;
-        return logLine.duration.total > 0 || logLine.exitTypes.length > 0 || logLine.discontinuity;
+        return (
+          logLine.duration.total > 0 ||
+          logLine.exitTypes.length > 0 ||
+          logLine.discontinuity ||
+          !!(logLine.type && excludedTypes.has(logLine.type))
+        );
       },
       {
         filterCache: this.showDetailsFilterCache,
@@ -417,7 +440,7 @@ export class CalltreeView extends LitElement {
   };
 
   _debugFilter = (data: CalltreeRow) => {
-    const debugValues = [
+    const debugValues = new Set<string>([
       'USER_DEBUG',
       'DATAWEAVE_USER_DEBUG',
       'USER_DEBUG_FINER',
@@ -427,11 +450,11 @@ export class CalltreeView extends LitElement {
       'USER_DEBUG_INFO',
       'USER_DEBUG_WARN',
       'USER_DEBUG_ERROR',
-    ];
+    ]);
     return this._deepFilter(
       data,
       (rowData) => {
-        return debugValues.includes(rowData.originalData.type || '');
+        return !!(rowData.originalData.type && debugValues.has(rowData.originalData.type));
       },
       {
         filterCache: this.debugOnlyFilterCache,
@@ -543,6 +566,9 @@ export class CalltreeView extends LitElement {
       const totalTimeFilterCache = new Map<string, boolean>();
       const namespaceFilterCache = new Map<string, boolean>();
 
+      const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
+      const governorLimits = rootMethod.governorLimits;
+
       let childIndent;
       this.calltreeTable = new Tabulator(callTreeTableContainer, {
         data: this._toCallTree(rootMethod.children),
@@ -555,8 +581,9 @@ export class CalltreeView extends LitElement {
         //  custom property for module/MiddleRowFocus
         middleRowFocus: true,
         dataTree: true,
-        dataTreeChildColumnCalcs: true,
+        dataTreeChildColumnCalcs: true, // todo: fix
         dataTreeBranchElement: '<span/>',
+        tooltipDelay: 100,
         selectableRows: 1,
         // @ts-expect-error it is possible to pass a function to intitialFilter the types need updating
         initialFilter: this._showDetailsFilter,
@@ -597,10 +624,7 @@ export class CalltreeView extends LitElement {
               const row = cell.getRow();
               // @ts-expect-error: _row is private. This is temporary and I will patch the text wrap behaviour in the library.
               const dataTree = row._row.modules.dataTree;
-              if (!dataTree) {
-                return '';
-              }
-              const treeLevel = dataTree?.index;
+              const treeLevel = dataTree?.index ?? 0;
               childIndent ??= row.getTable().options.dataTreeChildIndent || 0;
               const levelIndent = treeLevel * childIndent;
               cellElem.style.paddingLeft = `${levelIndent + 4}px`;
@@ -616,13 +640,9 @@ export class CalltreeView extends LitElement {
                 return link;
               }
 
-              const excludedTypes: LogEventType[] = ['SOQL_EXECUTE_BEGIN', 'DML_BEGIN'];
-              text =
-                (node.type &&
-                  (!excludedTypes.includes(node.type) && node.type !== text
-                    ? node.type + ': '
-                    : '') + text) ||
-                '';
+              if (node.type && !excludedTypes.has(node.type) && node.type !== text) {
+                text = node.type + ': ' + text;
+              }
 
               const textSpan = document.createElement('span');
               textSpan.textContent = text;
@@ -665,8 +685,7 @@ export class CalltreeView extends LitElement {
             title: 'Namespace',
             field: 'namespace',
             sorter: 'string',
-            width: 120,
-            cssClass: 'datagrid-code-text',
+            width: 100,
             headerFilter: 'list',
             headerFilterFunc: this._namespaceFilter,
             headerFilterFuncParams: { filterCache: namespaceFilterCache },
@@ -681,24 +700,59 @@ export class CalltreeView extends LitElement {
             title: 'DML Count',
             field: 'dmlCount.total',
             sorter: 'number',
+            cssClass: 'number-cell',
             width: 60,
+            bottomCalc: 'max',
+            bottomCalcFormatter: progressFormatter,
+            bottomCalcFormatterParams: {
+              precision: 0,
+              totalValue: governorLimits.dmlStatements.limit,
+              showPercentageText: false,
+            },
+            formatter: progressFormatter,
+            formatterParams: {
+              precision: 0,
+              totalValue: governorLimits.dmlStatements.limit,
+              showPercentageText: false,
+            },
             hozAlign: 'right',
             headerHozAlign: 'right',
-            bottomCalc: 'max',
+            tooltip(_event, cell, _onRender) {
+              const maxDmlStatements = governorLimits.dmlStatements.limit;
+              return cell.getValue() + (maxDmlStatements > 0 ? '/' + maxDmlStatements : '');
+            },
           },
           {
             title: 'SOQL Count',
             field: 'soqlCount.total',
             sorter: 'number',
+            cssClass: 'number-cell',
             width: 60,
+            bottomCalc: 'max',
+            bottomCalcFormatter: progressFormatter,
+            bottomCalcFormatterParams: {
+              precision: 0,
+              totalValue: governorLimits.soqlQueries.limit,
+              showPercentageText: false,
+            },
+            formatter: progressFormatter,
+            formatterParams: {
+              precision: 0,
+              totalValue: governorLimits.soqlQueries.limit,
+              showPercentageText: false,
+            },
             hozAlign: 'right',
             headerHozAlign: 'right',
-            bottomCalc: 'max',
+            tooltip(_event, cell, _onRender) {
+              const maxSoql = governorLimits.soqlQueries.limit;
+              return cell.getValue() + (maxSoql > 0 ? '/' + maxSoql : '');
+            },
           },
           {
             title: 'Throws Count',
             field: 'totalThrownCount',
             sorter: 'number',
+            cssClass: 'number-cell',
             width: 60,
             hozAlign: 'right',
             headerHozAlign: 'right',
@@ -708,19 +762,53 @@ export class CalltreeView extends LitElement {
             title: 'DML Rows',
             field: 'dmlRowCount.total',
             sorter: 'number',
+            cssClass: 'number-cell',
             width: 60,
+            bottomCalc: 'max',
+            bottomCalcFormatter: progressFormatter,
+            bottomCalcFormatterParams: {
+              precision: 0,
+              totalValue: governorLimits.dmlRows.limit,
+              showPercentageText: false,
+            },
+            formatter: progressFormatter,
+            formatterParams: {
+              precision: 0,
+              totalValue: governorLimits.dmlRows.limit,
+              showPercentageText: false,
+            },
             hozAlign: 'right',
             headerHozAlign: 'right',
-            bottomCalc: 'max',
+            tooltip(_event, cell, _onRender) {
+              const maxDmlRows = governorLimits.dmlRows.limit;
+              return cell.getValue() + (maxDmlRows > 0 ? '/' + maxDmlRows : '');
+            },
           },
           {
             title: 'SOQL Rows',
             field: 'soqlRowCount.total',
             sorter: 'number',
+            cssClass: 'number-cell',
             width: 60,
+            bottomCalc: 'max',
+            bottomCalcFormatter: progressFormatter,
+            bottomCalcFormatterParams: {
+              precision: 0,
+              totalValue: governorLimits.queryRows.limit,
+              showPercentageText: false,
+            },
+            formatter: progressFormatter,
+            formatterParams: {
+              precision: 0,
+              totalValue: governorLimits.queryRows.limit,
+              showPercentageText: false,
+            },
             hozAlign: 'right',
             headerHozAlign: 'right',
-            bottomCalc: 'max',
+            tooltip(_event, cell, _onRender) {
+              const maxQueryRows = governorLimits.queryRows.limit;
+              return cell.getValue() + (maxQueryRows > 0 ? '/' + maxQueryRows : '');
+            },
           },
           {
             title: 'Total Time (ms)',
@@ -730,19 +818,21 @@ export class CalltreeView extends LitElement {
             width: 150,
             hozAlign: 'right',
             headerHozAlign: 'right',
-            formatter: progressFormatter,
+            formatter: progressFormatterMS,
             formatterParams: {
-              thousand: false,
               precision: 3,
               totalValue: rootMethod.duration.total,
             },
-            bottomCalcFormatter: progressFormatter,
+            bottomCalcFormatter: progressFormatterMS,
             bottomCalc: 'max',
             bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
             headerFilter: MinMaxEditor,
             headerFilterFunc: MinMaxFilter,
             headerFilterFuncParams: { columnName: 'duration', filterCache: totalTimeFilterCache },
             headerFilterLiveFilter: false,
+            tooltip(_event, cell, _onRender) {
+              return formatDuration(cell.getValue(), rootMethod.duration.total);
+            },
           },
           {
             title: 'Self Time (ms)',
@@ -754,10 +844,9 @@ export class CalltreeView extends LitElement {
             headerHozAlign: 'right',
             bottomCalc: 'sum',
             bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
-            bottomCalcFormatter: progressFormatter,
-            formatter: progressFormatter,
+            bottomCalcFormatter: progressFormatterMS,
+            formatter: progressFormatterMS,
             formatterParams: {
-              thousand: false,
               precision: 3,
               totalValue: rootMethod.duration.total,
             },
@@ -768,18 +857,11 @@ export class CalltreeView extends LitElement {
               filterCache: selfTimeFilterCache,
             },
             headerFilterLiveFilter: false,
+            tooltip(_event, cell, _onRender) {
+              return formatDuration(cell.getValue(), rootMethod.duration.total);
+            },
           },
         ],
-      });
-
-      this.calltreeTable.on('dataFiltering', () => {
-        // With a datatree the dataFiltering event occurs multi times and we only want to call this once.
-        // We will reset the flag when the user next searches.
-        if (this.canClearSearchHighlights) {
-          this.canClearSearchHighlights = false;
-          this._resetFindWidget();
-          this._clearSearchHighlights();
-        }
       });
 
       this.calltreeTable.on('dataFiltered', () => {
@@ -789,6 +871,13 @@ export class CalltreeView extends LitElement {
         this.debugOnlyFilterCache.clear();
         this.showDetailsFilterCache.clear();
         this.typeFilterCache.clear();
+      });
+
+      this.calltreeTable.on('renderStarted', () => {
+        if (!this.blockClearHighlights && this.totalMatches > 0) {
+          this._resetFindWidget();
+          this._clearSearchHighlights();
+        }
       });
 
       this.calltreeTable.on('tableBuilt', () => {
@@ -802,11 +891,12 @@ export class CalltreeView extends LitElement {
   }
 
   private _clearSearchHighlights() {
-    this._find(
-      new CustomEvent('lv-find-close', {
-        detail: { text: '', count: 0, options: { matchCase: false } },
-      }),
-    );
+    this.findArgs.text = '';
+    this.findArgs.count = 0;
+    //@ts-expect-error This is a custom function added in by Find custom module
+    this.calltreeTable.clearFindHighlights(Object.values(this.findMap));
+    this.findMap = {};
+    this.totalMatches = 0;
   }
 
   private _expandCollapseAll(rows: RowComponent[], expand: boolean = true) {
