@@ -189,7 +189,7 @@
     "@salesforce/apex-node": "^1.6.2"
   },
   "devDependencies": {
-    "@types/node": "~20.14.8",
+    "@types/node": "~22.16.0",
     "@types/vscode": "~1.74.0",
     "@typescript-eslint/eslint-plugin": "^8.30.1",
     "@typescript-eslint/parser": "^8.30.1",
