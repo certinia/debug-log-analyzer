@@ -159,8 +159,8 @@ Or go to: `Preferences > Extensions > Apex Log Analyzer`.
 ## 📚 Documentation
 
 - [User Guide & Docs](https://certinia.github.io/debug-log-analyzer/)
-- [Contribute](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/CONTRIBUTING.md)
-- [Develop](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/DEVELOPING.md)
+- [Contribute](https://github.com/certinia/debug-log-analyzer/blob/main/CONTRIBUTING.md)
+- [Develop](https://github.com/certinia/debug-log-analyzer/blob/main/DEVELOPING.md)
 
 ## ❤️ Contributors
 
