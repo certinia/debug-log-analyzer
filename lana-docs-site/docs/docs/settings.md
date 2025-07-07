@@ -1,5 +1,4 @@
 ---
-sidebar_position: 3
 id: settings
 title: Settings
 description: How to configure and customize, Apex Log Analyzer VS Code extension for Salesforce developer.
@@ -14,7 +13,7 @@ keywords:
     customize apex debug log analyzer,
     salesforce log analysis,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
 ---
 
 ## Timeline color settings
@@ -22,7 +21,7 @@ image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/d
 The default colors shown on the timeline can be changed in the VSCode settings.\
 Either in the UI `preferences -> extensions -> Apex Log Analyzer`
 
-![color settings](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/settings-color-lana.webp)
+![Screenshot of Apex Log Analyzer VS Code extension color settings, showing customizable timeline colors for Salesforce debug log analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/settings-color-lana.webp)
 
 or
 

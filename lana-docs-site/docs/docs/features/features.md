@@ -2,7 +2,6 @@
 id: features
 title: ✨ Features
 description: Explore the key features of Apex Debug Log Analyzer for Salesforce, including Timeline/Flame Chart, Call Tree, Analysis, Database, and Find functionality.
-sidebar_position: 2
 keywords:
   [
     salesforce,
@@ -26,7 +25,7 @@ keywords:
     apex code analysis,
     salesforce best practices,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
 ---
 
 import DocCardList from '@theme/DocCardList';

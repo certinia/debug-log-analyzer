@@ -32,7 +32,7 @@ image: https://github.com/certinia/debug-log-analyzer/blob/main/lana/dist/v1.18/
 
 Show analysis of method calls by showing Self Time, Total Time, Count (number of times a method was called), name and type. Each column can be sorted ascending or descending by clicking the column header.
 
-![analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-analysis.png)
+![Analysis view screenshot showing method call metrics such as Self Time, Total Time, Count, Name, and Type](https://github.com/certinia/debug-log-analyzer/blob/main/lana/dist/v1.18/lana-analysis.png)
 
 ### Sort
 

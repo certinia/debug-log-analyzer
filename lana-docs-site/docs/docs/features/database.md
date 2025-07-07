@@ -2,7 +2,6 @@
 id: database
 title: Database
 description: Explore the key features of Apex Debug Log Analyzer for Salesforce, including Timeline/Flame Chart, Call Tree, Analysis, Database, and Find functionality.
-sidebar_position: 2
 keywords:
   [
     salesforce,
@@ -26,14 +25,14 @@ keywords:
     apex code analysis,
     salesforce best practices,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
 ---
 
 ## 💾 Database
 
 Shows the SOQL and DML that occurred the number of rows returned, the time taken and for SOQL the selectivity and number of aggregations.
 
-![database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-database.png)
+![Database view screenshot displaying SOQL and DML operations with row counts, execution times, selectivity indicators, and aggregation details for Salesforce log analysis.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-database.png)
 
 The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determine. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
 

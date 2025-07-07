@@ -25,14 +25,14 @@ keywords:
     apex code analysis,
     salesforce best practices,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
 ---
 
 ## 🔥 Timeline / Flame chart
 
 The Timeline shows a visualization of code execution during a request’s execution. Each color represents a different Salesforce event type e.g DB, Method, SOQL etc. The length of a bar relates to realtime taken, a longer bar means that method took longer.
 
-![timeline](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-timeline.png)
+![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png)
 
 ### Zoom + pan
 
@@ -47,7 +47,7 @@ Clicking an event in the Timeline will go to and select that event in the Call T
 
 ### Tooltip
 
-![tooltip](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-tooltip.webp)
+![Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-tooltip.webp)
 
 Hovering over an element provides information on the item. If you click on an item it will take you to that row in the Call Tree.
 

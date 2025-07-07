@@ -25,14 +25,14 @@ keywords:
     apex code analysis,
     salesforce best practices,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
 ---
 
 ## 🌳 Call Tree
 
 Shows the call stack which can be expanded and collapsed. Clicking on a link will take you to that line in the class if it can be found in the current open project.
 
-![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-calltree.png)
+![Call Tree Screenshot displaying an expandable and collapsible call stack with event types, method signatures, timing metrics, and aggregated DML, SOQL, Throws, and Row counts.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-calltree.png)
 
 Each row shows event type, details such as method signature, self and total time as well as aggregated DML, SOQL, Throws and Row counts.
 
