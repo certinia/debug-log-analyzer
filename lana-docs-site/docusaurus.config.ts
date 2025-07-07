@@ -85,7 +85,7 @@ const config: Config = {
       items: [
         {
           type: 'doc',
-          docId: 'docs/features',
+          docId: 'docs/features/features',
           position: 'left',
           label: 'Docs',
         },
