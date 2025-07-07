@@ -1,36 +1,37 @@
 ---
 id: database
 title: Database
-description: Explore the key features of Apex Debug Log Analyzer for Salesforce, including Timeline/Flame Chart, Call Tree, Analysis, Database, and Find functionality.
-keywords:
-  [
+description: Database insights help Salesforce developers analyze SOQL and DML operations, assess query selectivity, performance, and aggregations, and optimize Apex code using advanced sorting, grouping, filtering, call stack tracing, and CSV export tools.
+keywords: [
     salesforce,
     apex,
     vscode,
     logs,
-    features,
     debug log analyzer,
     salesforce development,
-    apex log analysis,
-    visual studio code extension,
-    salesforce debugging,
-    apex logs,
-    salesforce tools,
-    salesforce extension,
-    salesforce log analyzer,
-    apex performance,
-    salesforce productivity,
-    salesforce troubleshooting,
+    salesforce database analysis,
+    apex debug log analyzer,
+    salesforce log analyzer
+    SOQL performance,
+    DML operations,
+    aalesforce query selectivity,
+    apex code optimization,
     salesforce log analysis,
-    apex code analysis,
-    salesforce best practices,
+    OQL aggregation,
+    salesforce debugging tools,
+    visual Studio Code salesforce extension,
+    aalesforce developer productivity,
+    apex log analysis,
+    salesforce troubleshooting,
+    export salesforce logs CSV,
+    salesforce call stack tracing,
   ]
 image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
 ---
 
 ## 💾 Database
 
-Shows the SOQL and DML that occurred the number of rows returned, the time taken and for SOQL the selectivity and number of aggregations.
+Database insights help Salesforce developers analyze SOQL and DML operations, assess query selectivity, performance, and aggregations, and optimize Apex code using advanced sorting, grouping, filtering, call stack tracing, and CSV export tools.
 
 ![Database view screenshot displaying SOQL and DML operations with row counts, execution times, selectivity indicators, and aggregation details for Salesforce log analysis.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-database.png)
 

@@ -1,32 +1,35 @@
 ---
 id: find
 title: Find
-description: Explore the key features of Apex Debug Log Analyzer for Salesforce, including Timeline/Flame Chart, Call Tree, Analysis, Database, and Find functionality.
-keywords:
-  [
+description: The Find feature in Apex Debug Log Analyzer for Salesforce quickly searches, highlights, and navigates through debug logs. Discover how Find enhances productivity by supporting case-sensitive search, matching text in Timeline, Call Tree, Analysis, and Database views.
+keywords: [
     salesforce,
     apex,
+    apex logs
+    apex code analysis,
     vscode,
     logs,
-    features,
-    debug log analyzer,
-    salesforce development,
-    apex log analysis,
-    visual studio code extension,
-    salesforce debugging,
-    apex logs,
-    salesforce tools,
-    salesforce extension,
-    salesforce log analyzer,
-    apex performance,
-    salesforce productivity,
-    salesforce troubleshooting,
+    salesforce debug log analyzer,
+    apex log search,
+    find in debug logs,
+    salesforce log analyzer
     salesforce log analysis,
+    apex debugging tools,
+    vscode salesforce extension,
+    debug log navigation,
+    search,
+    timeline view salesforce logs,
+    call tree search,
+    salesforce productivity tools,
+    apex performance analysis,
+    salesforce troubleshooting,
+    salesforce log highlights,
     apex code analysis,
-    salesforce best practices,
   ]
 image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
 ---
+
+The Find feature in Apex Debug Log Analyzer for Salesforce quickly searches, highlights, and navigates through debug logs. Discover how Find enhances productivity by supporting case-sensitive search, matching text in Timeline, Call Tree, Analysis, and Database views.
 
 ## 🔍 Find
 

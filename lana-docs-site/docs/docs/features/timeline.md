@@ -1,36 +1,37 @@
 ---
 id: timeline
 title: Timeline
-description: Explore the key features of Apex Debug Log Analyzer for Salesforce, including Timeline/Flame Chart, Call Tree, Analysis, Database, and Find functionality.
+description: Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, and interact with detailed tooltips for efficient Salesforce Apex log analysis and debugging.
 keywords:
   [
     salesforce,
     apex,
     vscode,
     logs,
-    features,
-    debug log analyzer,
-    salesforce development,
-    apex log analysis,
-    visual studio code extension,
-    salesforce debugging,
-    apex logs,
-    salesforce tools,
-    salesforce extension,
     salesforce log analyzer,
     apex performance,
-    salesforce productivity,
-    salesforce troubleshooting,
-    salesforce log analysis,
-    apex code analysis,
-    salesforce best practices,
+    salesforce apex log analysis,
+    apex timeline visualization,
+    salesforce debug log analyzer,
+    apex performance bottlenecks,
+    salesforce flame chart,
+    apex code execution visualization,
+    salesforce event duration analysis,
+    apex debugging tools,
+    visual studio code salesforce extension,
+    salesforce log troubleshooting,
+    apex call tree navigation,
+    salesforce development productivity,
+    apex log performance analysis,
+    salesforce log event tooltips,
+    apex code profiling,
   ]
 image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
 ---
 
 ## 🔥 Timeline / Flame chart
 
-The Timeline shows a visualization of code execution during a request’s execution. Each color represents a different Salesforce event type e.g DB, Method, SOQL etc. The length of a bar relates to realtime taken, a longer bar means that method took longer.
+Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, and interact with detailed tooltips for efficient Salesforce apex log analysis and debugging.
 
 ![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png)
 

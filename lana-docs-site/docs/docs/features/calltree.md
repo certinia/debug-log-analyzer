@@ -1,28 +1,27 @@
 ---
 id: calltree
 title: Calltree
-description: Explore the key features of Apex Debug Log Analyzer for Salesforce, including Timeline/Flame Chart, Call Tree, Analysis, Database, and Find functionality.
+description: The Call Tree helps efficently visualize and navigate the call stack in Apex logs. Learn to expand and collapse method calls, sort and filter by execution metrics, and quickly jump to code locations in Visual Studio Code. Enhance your Salesforce debugging and performance analysis with detailed insights into DML, SOQL, and execution times.
 keywords:
   [
     salesforce,
     apex,
-    vscode,
-    logs,
-    features,
-    debug log analyzer,
-    salesforce development,
-    apex log analysis,
-    visual studio code extension,
-    salesforce debugging,
+    call tree,
     apex logs,
-    salesforce tools,
-    salesforce extension,
-    salesforce log analyzer,
+    debug log analyzer,
+    vscode extension,
+    salesforce debugging,
     apex performance,
-    salesforce productivity,
+    call stack visualization,
+    apex log analysis,
+    salesforce development tools,
+    DML analysis,
+    SOQL analysis,
     salesforce troubleshooting,
+    execution metrics,
+    salesforce productivity,
     salesforce log analysis,
-    apex code analysis,
+    Apex code navigation,
     salesforce best practices,
   ]
 image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
@@ -30,7 +29,7 @@ image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/d
 
 ## 🌳 Call Tree
 
-Shows the call stack which can be expanded and collapsed. Clicking on a link will take you to that line in the class if it can be found in the current open project.
+The Call Tree helps efficently visualize and navigate the call stack in Apex logs. Learn to expand and collapse method calls, sort and filter by execution metrics, and quickly jump to code locations in Visual Studio Code. Enhance your Salesforce debugging and performance analysis with detailed insights into DML, SOQL, and execution times.
 
 ![Call Tree Screenshot displaying an expandable and collapsible call stack with event types, method signatures, timing metrics, and aggregated DML, SOQL, Throws, and Row counts.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-calltree.png)
 

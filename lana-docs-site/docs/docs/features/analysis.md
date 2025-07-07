@@ -1,9 +1,14 @@
 ---
 id: analysis
 title: Analysis
-description: Show analysis of method calls by showing Self Time, Total Time, Count (number of times a method was called), name and type. Each column can be sorted ascending or descending by clicking the column header..
+description: Analyze Salesforce debug logs with detailed metrics on method calls, including Self Time, Total Time, Count, Name, and Type. Easily sort, filter, and group log events by namespace or type, and export or copy results for efficient troubleshooting and performance optimization.
 keywords:
   [
+    salesforce,
+    apex,
+    vscode,
+    logs,
+    debug log analyzer,
     method call analysis,
     self time,
     total time,
@@ -30,7 +35,7 @@ image: https://github.com/certinia/debug-log-analyzer/blob/main/lana/dist/v1.18/
 
 ## 🧠 Analysis
 
-Show analysis of method calls by showing Self Time, Total Time, Count (number of times a method was called), name and type. Each column can be sorted ascending or descending by clicking the column header.
+Analyze Salesforce debug logs with detailed metrics on method calls, including Self Time, Total Time, Count, Name, and Type. Easily sort, filter, and group log events by namespace or type, and export or copy results for efficient troubleshooting and performance optimization.
 
 ![Analysis view screenshot showing method call metrics such as Self Time, Total Time, Count, Name, and Type](https://github.com/certinia/debug-log-analyzer/blob/main/lana/dist/v1.18/lana-analysis.png)
 
