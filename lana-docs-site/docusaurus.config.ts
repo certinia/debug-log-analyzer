@@ -8,8 +8,8 @@ const projectName = 'debug-log-analyzer';
 const config: Config = {
   title: 'Apex Log Analyzer for Salesforce',
   tagline:
-    'Visualize code execution via a Flame graph and identify performance and SOQL/DML problems via Method and Database analysis',
-  favicon: '../../lana/certinia-icon-color.png',
+    'blazing-fast VS Code extension for Salesforce. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.',
+  favicon: 'img/favicon.svg',
 
   // Set the production url of your site here
   url: `https://${organizationName}.github.io`,
@@ -60,7 +60,7 @@ const config: Config = {
   ],
   themeConfig: {
     announcementBar: {
-      id: 'lana-1.18', // Unique ID to prevent showing again if dismissed
+      id: 'lana-1.18.0', // Unique ID to prevent showing again if dismissed
       content:
         '🎉️ <b><a target="_blank" rel="noopener noreferrer" href="https://marketplace.visualstudio.com/items?itemName=financialforce.lana">Apex Log Analyzer v1.18</a> is out!<b>',
       isCloseable: true,
@@ -71,7 +71,7 @@ const config: Config = {
       {
         name: 'keywords',
         content:
-          'salesforce, apex, vscode, log analyzer, debug log analyzer, debug logs, performance',
+          'salesforce, apex, vscode, log analyzer, debug log analyzer, debug logs, performance, salesforce debug logs',
       },
       { name: 'author', content: 'Certinia' },
     ],
@@ -85,11 +85,10 @@ const config: Config = {
       items: [
         {
           type: 'doc',
-          docId: 'docs/features',
+          docId: 'docs/features/features',
           position: 'left',
           label: 'Docs',
         },
-
         {
           type: 'docSidebar',
           sidebarId: 'communitySidebar',
@@ -119,12 +118,20 @@ const config: Config = {
               to: 'docs/gettingstarted',
             },
             {
+              label: 'Installation',
+              to: 'docs/gettingstarted#installation',
+            },
+            {
               label: 'Features',
               to: 'docs/features',
             },
             {
-              label: 'Settings',
-              to: 'docs/settings',
+              label: 'Timeline',
+              to: 'docs/features/timeline',
+            },
+            {
+              label: 'Analysis',
+              to: 'docs/features/analysis',
             },
           ],
         },
@@ -134,6 +141,10 @@ const config: Config = {
             {
               label: 'Support',
               to: 'community/support',
+            },
+            {
+              label: 'Feature Requests',
+              to: 'community/support#-feature-requests',
             },
             {
               label: 'Contributing',
@@ -153,8 +164,12 @@ const config: Config = {
               href: `https://github.com/${organizationName}/${projectName}`,
             },
             {
-              label: 'Twitter',
+              label: 'X (Twitter)',
               href: 'https://twitter.com/CertiniaInc',
+            },
+            {
+              label: 'Issues',
+              href: `https://github.com/${organizationName}/${projectName}/issues`,
             },
           ],
         },
