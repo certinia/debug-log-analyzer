@@ -60,7 +60,7 @@ const config: Config = {
   ],
   themeConfig: {
     announcementBar: {
-      id: 'lana-1.18', // Unique ID to prevent showing again if dismissed
+      id: 'lana-1.18.0', // Unique ID to prevent showing again if dismissed
       content:
         '🎉️ <b><a target="_blank" rel="noopener noreferrer" href="https://marketplace.visualstudio.com/items?itemName=financialforce.lana">Apex Log Analyzer v1.18</a> is out!<b>',
       isCloseable: true,
@@ -71,7 +71,7 @@ const config: Config = {
       {
         name: 'keywords',
         content:
-          'salesforce, apex, vscode, log analyzer, debug log analyzer, debug logs, performance',
+          'salesforce, apex, vscode, log analyzer, debug log analyzer, debug logs, performance, salesforce debug logs',
       },
       { name: 'author', content: 'Certinia' },
     ],
@@ -89,7 +89,6 @@ const config: Config = {
           position: 'left',
           label: 'Docs',
         },
-
         {
           type: 'docSidebar',
           sidebarId: 'communitySidebar',
@@ -119,12 +118,20 @@ const config: Config = {
               to: 'docs/gettingstarted',
             },
             {
-              label: 'Features',
-              to: 'docs/features',
+              label: 'Installation',
+              to: 'docs/gettingstarted#installation',
             },
             {
-              label: 'Settings',
-              to: 'docs/settings',
+              label: 'Features',
+              to: 'docs/features/features',
+            },
+            {
+              label: 'Timeline',
+              to: 'docs/features/timeline',
+            },
+            {
+              label: 'Analysis',
+              to: 'docs/features/analysis',
             },
           ],
         },
@@ -134,6 +141,10 @@ const config: Config = {
             {
               label: 'Support',
               to: 'community/support',
+            },
+            {
+              label: 'Feature Requests',
+              to: 'community/support#-feature-requests',
             },
             {
               label: 'Contributing',
@@ -153,8 +164,12 @@ const config: Config = {
               href: `https://github.com/${organizationName}/${projectName}`,
             },
             {
-              label: 'Twitter',
+              label: 'X (Twitter)',
               href: 'https://twitter.com/CertiniaInc',
+            },
+            {
+              label: 'Issues',
+              href: `https://github.com/${organizationName}/${projectName}/issues`,
             },
           ],
         },
