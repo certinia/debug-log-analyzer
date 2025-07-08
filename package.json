@@ -23,6 +23,7 @@
     "lint-staged": "^15.5.1",
     "prettier": "^3.5.3",
     "prettier-plugin-organize-imports": "^4.1.0",
+    "rolldown": "1.0.0-beta.24",
     "rollup": "^4.40.0",
     "rollup-plugin-copy": "^3.5.0",
     "rollup-plugin-polyfill-node": "^0.13.0",
