@@ -13,14 +13,15 @@ keywords:
     salesforce developer tools,
     salesfroce query optimization,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assests/v1.18/lana-database.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-database.png
+hide_title: true
 ---
 
 ## 💾 Database
 
 Database insights help Salesforce developers analyze SOQL and DML operations, assess query selectivity, performance, and aggregations, and optimize Apex code using advanced sorting, grouping, filtering, call stack tracing, and CSV export tools.
 
-![Database view screenshot displaying SOQL and DML operations with row counts, execution times, selectivity indicators, and aggregation details for Salesforce log analysis.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assests/v1.18/lana-database.png)
+![Database view screenshot displaying SOQL and DML operations with row counts, execution times, selectivity indicators, and aggregation details for Salesforce log analysis.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-database.png)
 
 The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determine. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
 

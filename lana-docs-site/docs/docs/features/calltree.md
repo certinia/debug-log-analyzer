@@ -13,14 +13,15 @@ keywords:
     visual studio code extension,
     salesforce developer tools,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assests/v1.18/lana-calltree.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-calltree.png
+hide_title: true
 ---
 
 ## 🌳 Call Tree
 
 The Call Tree helps efficently visualize and navigate the call stack in Salesfroce Apex debug logs. Learn to expand and collapse method calls, sort and filter by execution metrics, and quickly jump to code locations in Visual Studio Code. Enhance your Salesforce debugging and performance analysis with detailed insights into DML, SOQL, and execution times.
 
-![Call Tree Screenshot displaying an expandable and collapsible call stack with event types, method signatures, timing metrics, and aggregated DML, SOQL, Throws, and Row counts.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assests/v1.18/lana-calltree.png)
+![Call Tree Screenshot displaying an expandable and collapsible call stack with event types, method signatures, timing metrics, and aggregated DML, SOQL, Throws, and Row counts.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-calltree.png)
 
 Each row shows event type, details such as method signature, self and total time as well as aggregated DML, SOQL, Throws and Row counts.
 
