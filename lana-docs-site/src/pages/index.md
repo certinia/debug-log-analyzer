@@ -84,7 +84,7 @@ import styles from './styles.module.css';
           <h3>Fast Log Parsing</h3>
         </div>
         <div className="card__body">
-          <p>Processes massive Apex debug logs in milliseconds using a high-performance parser - no lag, no waiting.</p>
+          <p>Processes massive Apex debug logs in fast using a high-performance parser - no lag, no waiting.</p>
         </div>
       </div>
 
