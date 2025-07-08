@@ -33,7 +33,8 @@ src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/ass
 alt="Timeline screenshot showing highlighted search results and tooltip with event details"
 style={{
   width: '50%', height:'auto', maxWidth:'400px'
-}}/>
+}}
+loading="lazy"/>
 
 ### Call Tree
 
@@ -45,7 +46,8 @@ src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/ass
 alt="Call Tree view screenshot showing expanded parent nodes and highlighted search result"
 style={{
   width: '50%', height:'auto', maxWidth:'400px'
-}}/>
+}}
+loading="lazy"/>
 
 ### Analysis + Database
 
@@ -57,4 +59,5 @@ src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/ass
 alt="Analysis view screenshot showing expanded groups and highlighted search results"
 style={{
   width: '50%', height:'auto', maxWidth:'400px'
-}}/>
+}}
+loading="lazy"/>

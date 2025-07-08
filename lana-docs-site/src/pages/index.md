@@ -63,6 +63,7 @@ import styles from './styles.module.css';
   src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-preview.gif"
   alt="Animated preview of the Apex Log Analyzer VS Code extension visualizing Salesforce Apex logs with flame charts and call trees"
   className={styles.previewImg}
+  loading="lazy"
   />
 
   <div className={styles.featureOverview}>
@@ -120,7 +121,7 @@ import styles from './styles.module.css';
         <Link className="button button--secondary" to="/docs/features/timeline#-timeline--flame-chart">Learn More</Link>
       </div>
       <div className={styles.visualImage}>
-        <img src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png" alt="Flame chart of Apex log execution time" />
+        <img src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png" alt="Flame chart of Apex log execution time" loading="lazy" />
       </div>
     </section>
 
