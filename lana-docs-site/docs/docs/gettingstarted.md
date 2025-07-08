@@ -18,10 +18,15 @@ image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/a
 
 ## Installation
 
-![install](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-install.webp)
-
 Search for `Apex Log Analyzer` from the extensions side bar in VS Code and click `Install` or
 install from the VS Code market place by clicking install on [Visual Studio Code Market Place: Apex Log Analyzer](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
+
+<img
+src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-install.png"
+alt="Screenshot showing installing the apex log analyzer extension from vscode marketplace"
+style={{
+    width: '50%', height:'auto', maxWidth:'400px'
+  }}/>
 
 ### Pre-Release
 
