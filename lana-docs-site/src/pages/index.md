@@ -117,7 +117,7 @@ import styles from './styles.module.css';
           <li>🔎 Zoom & pan into areas of interest</li>
           <li>⏱ Time-based scaling to pinpoint slowdowns</li>
         </ul>
-        <Link className="button button--secondary" to="/docs/features#-timeline--flame-chart">Learn More</Link>
+        <Link className="button button--secondary" to="/docs/features/timeline#-timeline--flame-chart">Learn More</Link>
       </div>
       <div className={styles.visualImage}>
         <img src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-timeline.png" alt="Flame chart of Apex log execution time" />
