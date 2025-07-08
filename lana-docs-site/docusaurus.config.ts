@@ -144,7 +144,7 @@ const config: Config = {
             },
             {
               label: 'Feature Requests',
-              to: 'community/support#-feature-requests',
+              to: 'community/support#feature-requests',
             },
             {
               label: 'Contributing',
