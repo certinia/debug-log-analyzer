@@ -67,7 +67,7 @@ const config: Config = {
       isCloseable: true,
     },
     // Replace with your project's social card
-    image: 'img/lana-timeline.png',
+    image: `https://raw.githubusercontent.com/${organizationName}/${projectName}/main/lana/assets/v1.18/lana-preview.gif`,
     metadata: [
       {
         name: 'keywords',
@@ -145,7 +145,7 @@ const config: Config = {
             },
             {
               label: 'Feature Requests',
-              to: 'community/support#-feature-requests',
+              to: 'community/support#feature-requests',
             },
             {
               label: 'Contributing',
