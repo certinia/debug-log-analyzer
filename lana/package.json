@@ -1,7 +1,7 @@
 {
   "name": "lana",
   "displayName": "Apex Log Analyzer",
-  "version": "1.16.1",
+  "version": "1.18.0",
   "description": "Salesforce Apex Debug Log Analyzer: Blazing-fast VS Code extension for Salesforce. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.",
   "keywords": [
     "analysis",
