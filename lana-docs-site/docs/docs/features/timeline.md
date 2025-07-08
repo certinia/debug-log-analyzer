@@ -11,14 +11,14 @@ keywords:
     salesforce debugging,
     apex performance analysis,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assests/v1.18/lana-timeline.png
 ---
 
 ## 🔥 Timeline / Flame chart
 
 Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, and interact with detailed tooltips for efficient Salesforce apex log analysis and debugging.
 
-![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png)
+![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assests/v1.18/lana-timeline.png)
 
 ### Zoom + pan
 
@@ -33,7 +33,7 @@ Clicking an event in the Timeline will go to and select that event in the Call T
 
 ### Tooltip
 
-![Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-tooltip.webp)
+![Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assests/v1.18/lana-timeline-tooltip.pmg)
 
 Hovering over an element provides information on the item. If you click on an item it will take you to that row in the Call Tree.
 

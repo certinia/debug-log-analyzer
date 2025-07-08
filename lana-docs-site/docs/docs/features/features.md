@@ -13,7 +13,7 @@ keywords:
     apex log analyzer features,
     apex debug log analzyer for salesforce feature overview,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assests/v1.18/lana-timeline.png
 ---
 
 import DocCardList from '@theme/DocCardList';

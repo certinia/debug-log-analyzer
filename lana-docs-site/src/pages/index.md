@@ -28,7 +28,7 @@ keywords:
     salesforce log analysis,
     apex code analysis,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assests/v1.18/lana-timeline.png
 hide_title: true
 hide_table_of_contents: true
 ---
@@ -60,7 +60,7 @@ import styles from './styles.module.css';
   </div>
 
 <img
-  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-preview.gif"
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assests/v1.18/lana-preview.gif"
   alt="Animated preview of the Apex Log Analyzer VS Code extension visualizing Salesforce Apex logs with flame charts and call trees"
   className={styles.previewImg}
   />
@@ -120,7 +120,7 @@ import styles from './styles.module.css';
         <Link className="button button--secondary" to="/docs/features/timeline#-timeline--flame-chart">Learn More</Link>
       </div>
       <div className={styles.visualImage}>
-        <img src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/images/lana-timeline.png" alt="Flame chart of Apex log execution time" />
+        <img src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assests/v1.18/lana-timeline.png" alt="Flame chart of Apex log execution time" />
       </div>
     </section>
 
