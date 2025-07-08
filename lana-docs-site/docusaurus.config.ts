@@ -123,7 +123,7 @@ const config: Config = {
             },
             {
               label: 'Features',
-              to: 'docs/features/features',
+              to: 'docs/features',
             },
             {
               label: 'Timeline',

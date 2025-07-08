@@ -21,7 +21,6 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       link: { type: 'doc', id: 'docs/features/features' },
       items: [
-        // 'docs/features',
         'docs/features/timeline',
         'docs/features/calltree',
         'docs/features/analysis',
