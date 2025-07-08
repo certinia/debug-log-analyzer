@@ -4,27 +4,12 @@ title: Timeline
 description: Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, and interact with detailed tooltips for efficient Salesforce Apex log analysis and debugging.
 keywords:
   [
-    salesforce,
-    apex,
-    vscode,
-    logs,
-    salesforce log analyzer,
-    apex performance,
     salesforce apex log analysis,
-    apex timeline visualization,
-    salesforce debug log analyzer,
-    apex performance bottlenecks,
-    salesforce flame chart,
-    apex code execution visualization,
-    salesforce event duration analysis,
-    apex debugging tools,
-    visual studio code salesforce extension,
-    salesforce log troubleshooting,
-    apex call tree navigation,
-    salesforce development productivity,
-    apex log performance analysis,
-    salesforce log event tooltips,
-    apex code profiling,
+    flame chart visualization,
+    apex debug log analyzer,
+    code execution profiling,
+    salesforce debugging,
+    apex performance analysis,
   ]
 image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
 ---

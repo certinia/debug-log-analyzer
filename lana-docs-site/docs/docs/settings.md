@@ -4,14 +4,11 @@ title: Settings
 description: How to configure and customize, Apex Log Analyzer VS Code extension for Salesforce developer.
 keywords:
   [
-    salesforce,
-    apex,
-    log,
-    debug,
+    configure apex log analyzer,
+    vscode extension,
+    debug log customization,
+    salesforce developer tools,
     apex log analyzer settings,
-    vscode settings,
-    customize apex debug log analyzer,
-    salesforce log analysis,
   ]
 image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
 ---

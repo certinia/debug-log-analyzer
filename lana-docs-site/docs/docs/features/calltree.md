@@ -4,32 +4,21 @@ title: Calltree
 description: The Call Tree helps efficently visualize and navigate the call stack in Apex logs. Learn to expand and collapse method calls, sort and filter by execution metrics, and quickly jump to code locations in Visual Studio Code. Enhance your Salesforce debugging and performance analysis with detailed insights into DML, SOQL, and execution times.
 keywords:
   [
-    salesforce,
-    apex,
-    call tree,
-    apex logs,
+    salesforce apex debugging,
+    apex call stack visualization,
     debug log analyzer,
-    vscode extension,
-    salesforce debugging,
-    apex performance,
-    call stack visualization,
-    apex log analysis,
-    salesforce development tools,
-    DML analysis,
-    SOQL analysis,
-    salesforce troubleshooting,
-    execution metrics,
-    salesforce productivity,
-    salesforce log analysis,
-    Apex code navigation,
-    salesforce best practices,
+    salesforce performance analysis,
+    apex code profiling,
+    dml soql insights,
+    visual studio code extension,
+    salesforce developer tools,
   ]
 image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
 ---
 
 ## 🌳 Call Tree
 
-The Call Tree helps efficently visualize and navigate the call stack in Apex logs. Learn to expand and collapse method calls, sort and filter by execution metrics, and quickly jump to code locations in Visual Studio Code. Enhance your Salesforce debugging and performance analysis with detailed insights into DML, SOQL, and execution times.
+The Call Tree helps efficently visualize and navigate the call stack in Salesfroce Apex debug logs. Learn to expand and collapse method calls, sort and filter by execution metrics, and quickly jump to code locations in Visual Studio Code. Enhance your Salesforce debugging and performance analysis with detailed insights into DML, SOQL, and execution times.
 
 ![Call Tree Screenshot displaying an expandable and collapsible call stack with event types, method signatures, timing metrics, and aggregated DML, SOQL, Throws, and Row counts.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-calltree.png)
 

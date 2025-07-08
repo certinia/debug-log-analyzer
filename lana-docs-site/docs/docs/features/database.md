@@ -2,29 +2,16 @@
 id: database
 title: Database
 description: Database insights help Salesforce developers analyze SOQL and DML operations, assess query selectivity, performance, and aggregations, and optimize Apex code using advanced sorting, grouping, filtering, call stack tracing, and CSV export tools.
-keywords: [
-    salesforce,
-    apex,
-    vscode,
-    logs,
-    debug log analyzer,
-    salesforce development,
+keywords:
+  [
     salesforce database analysis,
-    apex debug log analyzer,
-    salesforce log analyzer
-    SOQL performance,
-    DML operations,
-    aalesforce query selectivity,
-    apex code optimization,
+    soql optimization,
+    dml performance,
+    apex query tuning,
     salesforce log analysis,
-    OQL aggregation,
-    salesforce debugging tools,
-    visual Studio Code salesforce extension,
-    aalesforce developer productivity,
-    apex log analysis,
-    salesforce troubleshooting,
-    export salesforce logs CSV,
-    salesforce call stack tracing,
+    database insights,
+    salesforce developer tools,
+    salesfroce query optimization,
   ]
 image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/dist/v1.18/lana-timeline.png
 ---

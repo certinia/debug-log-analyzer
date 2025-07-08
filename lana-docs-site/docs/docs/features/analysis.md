@@ -4,31 +4,13 @@ title: Analysis
 description: Analyze Salesforce debug logs with detailed metrics on method calls, including Self Time, Total Time, Count, Name, and Type. Easily sort, filter, and group log events by namespace or type, and export or copy results for efficient troubleshooting and performance optimization.
 keywords:
   [
-    salesforce,
-    apex,
-    vscode,
-    logs,
-    debug log analyzer,
-    method call analysis,
-    self time,
-    total time,
-    method count,
-    apex log analysis,
-    salesforce debug logs,
-    salesforce log analyzer,
-    apex performance,
-    salesforce development tools,
-    visual studio code extension,
-    debug log analyzer,
-    salesforce productivity,
-    log event filtering,
-    group by namespace,
-    group by type,
-    export to csv,
-    copy to clipboard,
+    salesforce debug log analysis,
+    apex performance metrics,
     salesforce troubleshooting,
-    apex code analysis,
-    salesforce best practices,
+    apex log analyzer,
+    salesforce performance optimization,
+    filter salesforce logs,
+    salesforce developer tools,
   ]
 image: https://github.com/certinia/debug-log-analyzer/blob/main/lana/dist/v1.18/lana-analysis.png
 ---
