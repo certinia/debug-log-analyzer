@@ -39,7 +39,8 @@ src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/ass
 alt="Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts"
 style={{
   width: '50%', height:'auto', maxWidth:'400px'
-}}/>
+}}
+loading="lazy"/>
 
 Hovering over an element provides information on the item. If you click on an item it will take you to that row in the Call Tree.
 

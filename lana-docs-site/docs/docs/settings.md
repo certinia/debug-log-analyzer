@@ -23,7 +23,8 @@ src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/ass
 alt="Screenshot of Apex Log Analyzer VS Code extension color settings, showing customizable timeline colors for Salesforce debug log analysis"
 style={{
   width: '50%', height:'auto', maxWidth:'400px'
-}}/>
+}}
+loading="lazy"/>
 
 or
 

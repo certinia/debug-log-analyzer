@@ -26,7 +26,8 @@ src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/ass
 alt="Screenshot showing installing the apex log analyzer extension from vscode marketplace"
 style={{
     width: '50%', height:'auto', maxWidth:'400px'
-  }}/>
+  }}
+loading="lazy"/>
 
 ### Pre-Release
 
@@ -57,7 +58,8 @@ With the `.log` file open in VSCode.
    alt="Screenshot showing the Log: Show Apex Log Analysis code lense in a log file"
    style={{
        width: '50%', height:'auto', maxWidth:'400px'
-     }}/>\
+     }}
+   loading="lazy"/>\
    or
 1. Right click -> 'Log: Show Apex Log Analysis'
    or
