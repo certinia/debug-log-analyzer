@@ -7,6 +7,7 @@ tsconfig.json
 tsconfig-dev.json
 node_modules
 rollup.config.mjs
+tsconfig.tsbuildinfo
 
 dist/
 log-viewer/
