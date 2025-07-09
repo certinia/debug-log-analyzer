@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.18.1] 2025-07-09
+
+### Fixed
+
+- Remove assests from the published extension
+
+## [1.18.0] 2025-07-09
 
 ### Added
 
@@ -22,8 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **✂️ Copy Text in Views**: You can now highlight and copy text from the Call Tree, Analysis, and Database views without the text clearing immediately after highlighting ([#504]).
 - **💎 Improved HiDPI Rendering**: Sharpened rendering for the timeline on HiDPI displays ([#588]).
 - **🔍 Call Tree Search**: Search in the Call Tree now only includes the visible filtered rows ([#539]).
-- **🎨 Search Input Styling:**: The grid search input fits into VS Code styles better ([#619]).
-  **📈 Call Tree Governor Limits:** The Call Tree now displays formatted governor limits for `CUMULATIVE_LIMIT_USAGE` events by default, as well as SOQL, SOSL, DML, and Method profiling events ([#309]).
+- **📈 Call Tree Governor Limits:** The Call Tree now displays formatted governor limits for `CUMULATIVE_LIMIT_USAGE` events by default, as well as SOQL, SOSL, DML, and Method profiling events ([#309]).
+- **📖 [Documentation site](https://certinia.github.io/debug-log-analyzer) updates** ([#616]).
+- **🎨 Table Dropdown Styling:**: The style of grid dropdowns matches VS Code better ([#619]).
 
 ### Fixed
 
@@ -386,8 +393,9 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Add explorer menu item.
 - Provide more information when selecting log to download.
 
-<!-- Unreleased -->
+<!-- v1.18.0 -->
 
+[#616]: https://github.com/certinia/debug-log-analyzer/issues/616
 [#504]: https://github.com/certinia/debug-log-analyzer/issues/504
 [#581]: https://github.com/certinia/debug-log-analyzer/issues/581
 [#582]: https://github.com/certinia/debug-log-analyzer/issues/582
