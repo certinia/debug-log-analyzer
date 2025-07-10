@@ -36,6 +36,7 @@ const config: Config = {
   },
 
   future: {
+    v4: true,
     // eslint-disable-next-line @typescript-eslint/naming-convention
     experimental_faster: true,
   },
