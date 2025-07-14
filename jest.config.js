@@ -1,4 +1,5 @@
-module.exports = {
+/** @type {import('@jest/types').Config.InitialOptions} */
+export default {
   projects: [
     {
       displayName: 'log-viewer',
