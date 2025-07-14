@@ -2,14 +2,7 @@
   "description": "LogViewer",
   "name": "log-viewer",
   "private": true,
-  "scripts": {
-    "build": "rollup -c rollup.config.mjs",
-    "lint": "concurrently 'eslint modules --ext ts' 'npm run tsc:lint'",
-    "watch": "rollup -w -c rollup.config.mjs",
-    "web": "http-server",
-    "debug": "concurrently 'pnpm:web' 'pnpm:watch'",
-    "tsc:lint": "tsc --noemit --skipLibCheck"
-  },
+  "scripts": {},
   "version": "0.1.0",
   "dependencies": {
     "@apexdevtools/apex-parser": "^4.4.0",
