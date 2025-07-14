@@ -172,15 +172,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "pnpm run compile",
-    "compile": "pnpm -w run build",
-    "local-compile": "rm -rf out && rollup -c rollup.config.mjs",
-    "watch": "rollup -w -c rollup.config.mjs",
-    "pretest": "pnpm run compile && pnpm run lint",
-    "lint": "concurrently 'eslint src --ext ts' 'tsc --noemit --skipLibCheck'",
-    "log-viewer": "pnpm run log-viewer-build && pnpm run log-viewer-copy",
-    "log-viewer-build": "(cd ../log-viewer; pnpm ci && pnpm run build)",
-    "log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/."
+    "vscode:prepublish": "rm -rf out && pnpm -w run build"
   },
   "dependencies": {
     "@apexdevtools/apex-ls": "^5.9.0",
