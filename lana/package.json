@@ -175,7 +175,6 @@
     "vscode:prepublish": "pnpm run compile",
     "compile": "pnpm -w run build",
     "local-compile": "rm -rf out && rollup -c rollup.config.mjs",
-    "prettier-format": "prettier 'src/**/*.ts' --write",
     "watch": "rollup -w -c rollup.config.mjs",
     "pretest": "pnpm run compile && pnpm run lint",
     "lint": "concurrently 'eslint src --ext ts' 'tsc --noemit --skipLibCheck'",
