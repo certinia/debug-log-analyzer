@@ -1,16 +1,10 @@
-.vscode/
-.github/
-
-.gitignore
-BUILDING.md
-tsconfig.json
-tsconfig-dev.json
-node_modules
-rollup.config.mjs
-tsconfig.tsbuildinfo
-
-dist/
-log-viewer/
-!log-viewer/dist/
-!log-viewer/index.html
-src/
+// Ignore all files in the extension folder
+**
+// inlcude only the following in the extension
+!.vscodeignore
+!out/
+!package.json
+!CHANGELOG.md
+!README.md
+!LICENSE.txt
+!certinia-icon-color.png
