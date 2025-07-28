@@ -6,50 +6,45 @@ import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
 import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
 
-// Rollup plugins
-// import commonjs from '@rollup/plugin-commonjs';
-
 const production = process.env.NODE_ENV === 'production';
 console.log('Package mode:', production ? 'production' : 'development');
 export default defineConfig([
   {
     input: './lana/src/Main.ts',
     output: {
-      format: 'cjs',
+      format: 'esm',
       dir: './lana/out',
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
     },
+    platform: 'node',
     external: ['vscode'],
     resolve: { tsconfigFilename: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json' },
     plugins: [
-      // nodeResolve({ preferBuiltins: true, dedupe: ['@salesforce/core'] }),
-      // commonjs(),
-      // json(),
-      // swc(
-      //   defineRollupSwcOption({
-      //     include: /\.[mc]?[jt]sx?$/,
-      //     exclude: 'node_modules',
-      //     tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
-      //     jsc: {
-      //       minify: {
-      //         compress: production,
-      //         mangle: production
-      //           ? {
-      //               keep_classnames: true,
-      //             }
-      //           : false,
-      //       },
-      //     },
-      //   }),
-      // ),
+      swc(
+        defineRollupSwcOption({
+          include: /\.[mc]?[jt]sx?$/,
+          exclude: 'node_modules',
+          tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
+          jsc: {
+            minify: {
+              compress: production,
+              mangle: production
+                ? {
+                    keep_classnames: true,
+                  }
+                : false,
+            },
+          },
+        }),
+      ),
     ],
   },
   {
     input: { bundle: './log-viewer/modules/Main.ts' },
     output: [
       {
-        format: 'es',
+        format: 'esm',
         dir: './log-viewer/out',
         chunkFileNames: 'log-viewer-[name].js',
         sourcemap: false,

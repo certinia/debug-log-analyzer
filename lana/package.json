@@ -172,7 +172,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "rm -rf out && pnpm -w run build:fast"
+    "vscode:prepublish": "rm -rf out && pnpm -w run build"
   },
   "dependencies": {
     "@apexdevtools/apex-ls": "^5.9.0",
