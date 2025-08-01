@@ -172,17 +172,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "pnpm run compile",
-    "compile": "pnpm -w run build",
-    "local-compile": "rm -rf out && rollup -c rollup.config.mjs",
-    "prettier-format": "prettier 'src/**/*.ts' --write",
-    "watch": "rollup -w -c rollup.config.mjs",
-    "pretest": "pnpm run compile && pnpm run lint",
-    "lint": "concurrently 'eslint src --ext ts' 'pnpm run tsc:lint'",
-    "log-viewer": "pnpm run log-viewer-build && pnpm run log-viewer-copy",
-    "log-viewer-build": "(cd ../log-viewer; pnpm ci && pnpm run build)",
-    "log-viewer-copy": "mkdir -p out; cp ../log-viewer/out/index.html out/. && cp ../log-viewer/out/bundle.js out/.",
-    "tsc:lint": "tsc --noemit --skipLibCheck"
+    "vscode:prepublish": "rm -rf out && pnpm -w run build"
   },
   "dependencies": {
     "@apexdevtools/apex-ls": "^5.9.0",
@@ -191,10 +181,11 @@
     "@salesforce/apex-node": "^1.6.2"
   },
   "devDependencies": {
-    "@types/node": "~22.16.0",
+    "@types/node": "~22.16.3",
     "@types/vscode": "~1.99.1",
-    "@typescript-eslint/eslint-plugin": "^8.30.1",
-    "@typescript-eslint/parser": "^8.30.1",
+    "@typescript-eslint/eslint-plugin": "^8.36.0",
+    "@typescript-eslint/parser": "^8.36.0",
+    "concurrently": "^9.2.0",
     "typescript": "^5.8.3",
     "antlr4ts": "0.5.0-alpha.4"
   }

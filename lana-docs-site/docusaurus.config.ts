@@ -9,7 +9,7 @@ const config: Config = {
   title: 'Apex Log Analyzer for Salesforce',
   tagline:
     'blazing-fast VS Code extension for Salesforce. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.',
-  favicon: 'img/favicon.svg',
+  favicon: '/img/favicon.svg',
 
   // Set the production url of your site here
   url: `https://${organizationName}.github.io`,
@@ -36,6 +36,7 @@ const config: Config = {
   },
 
   future: {
+    v4: true,
     // eslint-disable-next-line @typescript-eslint/naming-convention
     experimental_faster: true,
   },
