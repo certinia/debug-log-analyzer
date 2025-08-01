@@ -630,7 +630,6 @@ export class CalltreeView extends LitElement {
               const node = (cell.getData() as CalltreeRow).originalData;
               let text = node.text;
               if (node.hasValidSymbols) {
-                text += node.lineNumber ? `:${node.lineNumber}` : '';
                 const link = document.createElement('a');
                 link.setAttribute('href', '#!');
                 link.textContent = text;
