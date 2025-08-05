@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
 import type {
   ApexParserVisitor,
   ClassDeclarationContext,
@@ -91,6 +94,6 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
   }
 
   private isAnonNode(node: ApexNode) {
-    return node.nature !== null;
+    return !!node.nature;
   }
 }

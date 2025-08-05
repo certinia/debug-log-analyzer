@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
 import { ApexLexer, ApexParser, CaseInsensitiveInputStream } from '@apexdevtools/apex-parser';
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 import { ApexNature, ApexVisitor, type ApexMethodNode, type ApexNode } from './ApexVisitor';
