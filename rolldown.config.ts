@@ -1,8 +1,10 @@
 import { defineConfig } from 'rolldown';
 
-// Rollup plugins
+// rolldown plugins
+import nodePolyfills from '@rolldown/plugin-node-polyfills';
+
+// rollup plugins
 import copy from 'rollup-plugin-copy';
-import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
 import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
 
@@ -41,7 +43,7 @@ export default defineConfig([
     plugins: [swc(getSwcOptions('./lana'))],
   },
   {
-    input: { bundle: './log-viewer/src/Main.ts' },
+    input: { bundle: './log-viewer/modules/Main.ts' },
     output: [
       {
         format: 'esm',
