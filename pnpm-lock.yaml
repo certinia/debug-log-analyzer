@@ -194,8 +194,8 @@ importers:
         version: 6.3.1
     devDependencies:
       '@types/tabulator-tables':
-        specifier: ^6.2.7
-        version: 6.2.7
+        specifier: ^6.2.9
+        version: 6.2.9
       postcss:
         specifier: ^8.5.6
         version: 8.5.6
@@ -2567,8 +2567,8 @@ packages:
   '@types/stack-utils@2.0.3':
     resolution: {integrity: sha512-9aEbYZ3TbYMznPdcdr3SmIrLXwC/AKZXQeCf9Pgao5CKb8CyHuEX5jzWPTkvregvhRJHcpRO6BFoGW9ycaOkYw==}
 
-  '@types/tabulator-tables@6.2.7':
-    resolution: {integrity: sha512-c4itwLSnOwb+hj3mZl3QZSVrAHZb2XL9hUj2UsP5vkqPzZpKM1Iiak4GGVfv1cXHwqmj1igEEdG59V69KsKyGw==}
+  '@types/tabulator-tables@6.2.9':
+    resolution: {integrity: sha512-u4AlO6z54njaeeLFSlwuqpKSCdUko0O0x47UolLNmwA8AhamSl9x7wziN+mo6Q0ca4g/V0FuhqIO9yXvaBh69A==}
 
   '@types/tough-cookie@4.0.5':
     resolution: {integrity: sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==}
@@ -11005,7 +11005,7 @@ snapshots:
 
   '@types/stack-utils@2.0.3': {}
 
-  '@types/tabulator-tables@6.2.7': {}
+  '@types/tabulator-tables@6.2.9': {}
 
   '@types/tough-cookie@4.0.5': {}
 
