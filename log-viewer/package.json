@@ -15,6 +15,6 @@
     "@types/tabulator-tables": "^6.2.7",
     "postcss": "^8.5.6",
     "sass": "~1.78.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.2"
   }
 }
