@@ -20,6 +20,14 @@ export function parseApex(apexCode: string): ApexNode {
 }
 
 export function getMethodLine(rootNode: ApexNode, symbols: string[]): number {
+  if (symbols[0] === rootNode.name) {
+    symbols = symbols.slice(1);
+  }
+
+  if (!symbols.length) {
+    return 1;
+  }
+
   let line = 1;
   let currentRoot: ApexNode | undefined = rootNode;
 
@@ -28,49 +36,32 @@ export function getMethodLine(rootNode: ApexNode, symbols: string[]): number {
       return;
     }
 
-    if (!symbol.includes('(')) {
-      currentRoot =
-        findNodesByProperties(currentRoot, { name: symbol, nature: ApexNature.class })[0] ??
-        undefined;
+    if (isClassSymbol(symbol)) {
+      currentRoot = findClassNode(currentRoot, symbol);
     } else {
-      const [methodName, params] = symbol.split('(');
-      line =
-        findNodesByProperties(currentRoot, {
-          name: methodName,
-          nature: ApexNature.method,
-          params: params?.replace(')', '').trim(),
-        })[0]?.line ?? 1;
+      line = findMethodNode(currentRoot, symbol)?.line ?? 1;
     }
   });
 
   return line;
 }
 
-function findNodesByProperties(
-  root: ApexNode,
-  props: Partial<ApexNode | ApexMethodNode>,
-): ApexNode[] {
-  const matches: ApexNode[] = [];
+function isClassSymbol(symbol: string): boolean {
+  return !symbol.includes('(');
+}
 
-  function isMatch(node: ApexNode): boolean {
-    for (const key in props) {
-      const typedKey = key as keyof (ApexNode | ApexMethodNode);
-      if (props[typedKey] !== undefined && node[typedKey] !== props[typedKey]) {
-        return false;
-      }
-    }
+function findClassNode(root: ApexNode, symbol: string): ApexNode | undefined {
+  return root.children?.find((child) => child.name === symbol && child.nature === ApexNature.class);
+}
 
-    return true;
-  }
+function findMethodNode(root: ApexNode, symbol: string): ApexMethodNode | undefined {
+  const [methodName, params] = symbol.split('(');
+  const paramStr = params?.replace(')', '').trim();
 
-  function traverse(node: ApexNode) {
-    if (isMatch(node)) {
-      matches.push(node);
-    }
-    node.children?.forEach(traverse);
-  }
-
-  traverse(root);
-
-  return matches;
+  return root.children?.find(
+    (child) =>
+      child.name === methodName &&
+      child.nature === ApexNature.method &&
+      (paramStr === undefined || (child as ApexMethodNode).params === paramStr),
+  ) as ApexMethodNode;
 }

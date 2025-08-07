@@ -60,9 +60,8 @@ export class OpenFileInPackage {
     const document = await workspace.openTextDocument(uri);
 
     const parsedRoot = parseApex(document.getText());
-    const symbols = parts.slice(1);
 
-    const lineNumber = getMethodLine(parsedRoot, symbols);
+    const lineNumber = getMethodLine(parsedRoot, parts);
     const zeroIndexedLineNumber = lineNumber - 1;
 
     const pos = new Position(zeroIndexedLineNumber, 0);
