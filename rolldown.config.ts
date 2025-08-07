@@ -1,10 +1,30 @@
 import { defineConfig } from 'rolldown';
 
-// Rollup plugins
+// rolldown plugins
+import nodePolyfills from '@rolldown/plugin-node-polyfills';
+
+// rollup plugins
 import copy from 'rollup-plugin-copy';
-import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
 import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
+
+const getSwcOptions = (dirPath: string) =>
+  defineRollupSwcOption({
+    include: /\.[mc]?[jt]sx?$/,
+    exclude: 'node_modules',
+    tsconfig: production ? `${dirPath}/tsconfig.json` : `${dirPath}/tsconfig-dev.json`,
+    jsc: {
+      transform: { useDefineForClassFields: false },
+      minify: {
+        compress: production,
+        mangle: production
+          ? {
+              keepClassNames: true,
+            }
+          : false,
+      },
+    },
+  });
 
 const production = process.env.NODE_ENV === 'production';
 console.log('Package mode:', production ? 'production' : 'development');
@@ -20,25 +40,7 @@ export default defineConfig([
     platform: 'node',
     external: ['vscode'],
     resolve: { tsconfigFilename: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json' },
-    plugins: [
-      swc(
-        defineRollupSwcOption({
-          include: /\.[mc]?[jt]sx?$/,
-          exclude: 'node_modules',
-          tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
-          jsc: {
-            minify: {
-              compress: production,
-              mangle: production
-                ? {
-                    keep_classnames: true,
-                  }
-                : false,
-            },
-          },
-        }),
-      ),
-    ],
+    plugins: [swc(getSwcOptions('./lana'))],
   },
   {
     input: { bundle: './log-viewer/modules/Main.ts' },
@@ -64,25 +66,7 @@ export default defineConfig([
         extensions: ['.css', '.scss'],
         minimize: true,
       }),
-      swc(
-        defineRollupSwcOption({
-          // All options are optional
-          include: /\.[mc]?[jt]sx?$/,
-          exclude: 'node_modules',
-          tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
-          jsc: {
-            transform: { useDefineForClassFields: false },
-            minify: {
-              compress: production,
-              mangle: production
-                ? {
-                    keep_classnames: true,
-                  }
-                : false,
-            },
-          },
-        }),
-      ),
+      swc(getSwcOptions('./log-viewer')),
       copy({
         hook: 'closeBundle',
         targets: [
