@@ -1,24 +1,12 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-/* eslint-disable @typescript-eslint/naming-convention */
 import { getMethodLine, parseApex } from '../ApexParser/ApexSymbolLocator';
 import { ApexVisitor, type ApexNode } from '../ApexParser/ApexVisitor';
 
 jest.mock('../ApexParser/ApexVisitor');
-jest.mock('@apexdevtools/apex-parser', () => {
-  return {
-    ApexLexer: jest.fn(),
-    ApexParser: jest.fn().mockImplementation(() => ({
-      compilationUnit: jest.fn(),
-    })),
-    CaseInsensitiveInputStream: jest.fn(),
-  };
-});
-jest.mock('antlr4ts', () => ({
-  CharStreams: { fromString: jest.fn() },
-  CommonTokenStream: jest.fn(),
-}));
+jest.mock('@apexdevtools/apex-parser');
+jest.mock('antlr4ts');
 
 describe('ApexSymbolLocator', () => {
   const mockAST = {
