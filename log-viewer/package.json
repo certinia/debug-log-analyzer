@@ -12,11 +12,9 @@
     "tabulator-tables": "^6.3.1"
   },
   "devDependencies": {
-    "@types/tabulator-tables": "^6.2.7",
-    "@typescript-eslint/eslint-plugin": "^8.36.0",
-    "@typescript-eslint/parser": "^8.36.0",
+    "@types/tabulator-tables": "^6.2.9",
     "postcss": "^8.5.6",
     "sass": "~1.78.0",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.2"
   }
 }
