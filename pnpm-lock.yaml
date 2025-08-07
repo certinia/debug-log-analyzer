@@ -25,6 +25,9 @@ importers:
       '@eslint/js':
         specifier: ^9.32.0
         version: 9.32.0
+      '@rolldown/plugin-node-polyfills':
+        specifier: ^1.0.0
+        version: 1.0.0
       '@rollup/plugin-commonjs':
         specifier: ^28.0.6
         version: 28.0.6(rollup@4.46.2)
@@ -1905,6 +1908,9 @@ packages:
     resolution: {integrity: sha512-3zMICWwpZh1jrkkKDYIUCx/2wY3PXLICAS0AnbeLlhzfWPhCcpNK9eKhiTlLAZyTp+3kyipoi/ZSVIh+WDnBpQ==}
     cpu: [x64]
     os: [win32]
+
+  '@rolldown/plugin-node-polyfills@1.0.0':
+    resolution: {integrity: sha512-JUmEhvz+B6+0AaeUGvZ7SnJec7wpwYqZ+FcAng1I3UVGYKA1uSmE1H4vKHUewU665Nb37znDd9N4o/iImmKeVg==}
 
   '@rolldown/pluginutils@1.0.0-beta.31':
     resolution: {integrity: sha512-IaDZ9NhjOIOkYtm+hH0GX33h3iVZ2OeSUnFF0+7Z4+1GuKs4Kj5wK3+I2zNV9IPLfqV4XlwWif8SXrZNutxciQ==}
@@ -10392,6 +10398,8 @@ snapshots:
 
   '@rolldown/binding-win32-x64-msvc@1.0.0-beta.31':
     optional: true
+
+  '@rolldown/plugin-node-polyfills@1.0.0': {}
 
   '@rolldown/pluginutils@1.0.0-beta.31': {}
 
