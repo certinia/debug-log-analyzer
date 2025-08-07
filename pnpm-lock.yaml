@@ -110,8 +110,8 @@ importers:
   lana:
     dependencies:
       '@apexdevtools/apex-ls':
-        specifier: ^5.9.0
-        version: 5.9.0
+        specifier: ^5.10.0
+        version: 5.10.0
       '@apexdevtools/sfdx-auth-helper':
         specifier: ^2.1.0
         version: 2.1.0
@@ -291,8 +291,8 @@ packages:
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
 
-  '@apexdevtools/apex-ls@5.9.0':
-    resolution: {integrity: sha512-X15n0N15A3LWQ1bfAZwl/d57nPFBaUCgzti/qQAdMmNeZJmCJiAk7pEk8j3Ap+0bkMbtgmgp4aRIBpuhjN8n5Q==}
+  '@apexdevtools/apex-ls@5.10.0':
+    resolution: {integrity: sha512-xc9yRYKBRKgTvG1xeINDDwi3iY9/f92BpCGKlpsQpS17CSh9ioAetkiryvzLHiOn3ru8YGvqdBD8FNAheC+Rdg==}
     engines: {node: '>=14.0.0'}
 
   '@apexdevtools/apex-parser@4.3.1':
@@ -935,10 +935,6 @@ packages:
     engines: {node: '>=6.9.0'}
     peerDependencies:
       '@babel/core': ^7.0.0-0
-
-  '@babel/runtime-corejs3@7.27.0':
-    resolution: {integrity: sha512-UWjX6t+v+0ckwZ50Y5ShZLnlk95pP5MyW/pon9tiYzl3+18pkTHTFNTKr7rQbfRXPkowt2QAn30o1b6oswszew==}
-    engines: {node: '>=6.9.0'}
 
   '@babel/runtime-corejs3@7.28.2':
     resolution: {integrity: sha512-FVFaVs2/dZgD3Y9ZD+AKNKjyGKzwu0C54laAXWUXgLcVXcCX6YZ6GhK2cp7FogSN2OA0Fu+QT8dP3FUdo9ShSQ==}
@@ -2154,8 +2150,8 @@ packages:
   '@salesforce/kit@3.2.3':
     resolution: {integrity: sha512-X8rZouLt06dxRkn+uYTwywWDS/NqZ783AyomGqgtWdUxF61EOJvu0ehtcYeutx9Ng08uuZ+s6wNvWiDsdhUcPg==}
 
-  '@salesforce/schemas@1.9.0':
-    resolution: {integrity: sha512-LiN37zG5ODT6z70sL1fxF7BQwtCX9JOWofSU8iliSNIM+WDEeinnoFtVqPInRSNt8I0RiJxIKCrqstsmQRBNvA==}
+  '@salesforce/schemas@1.9.1':
+    resolution: {integrity: sha512-9I8kZBYT7HFXsbz2ukkSyZDRPjSsfRyx3pKGCsjWe2av8wuNm6tYUnmuXzMH5JoVSu3MvtOeIlwp5fFURdsNjg==}
 
   '@salesforce/ts-types@2.0.12':
     resolution: {integrity: sha512-BIJyduJC18Kc8z+arUm5AZ9VkPRyw1KKAm+Tk+9LT99eOzhNilyfKzhZ4t+tG2lIGgnJpmytZfVDZ0e2kFul8g==}
@@ -3437,9 +3433,6 @@ packages:
   core-js-compat@3.45.0:
     resolution: {integrity: sha512-gRoVMBawZg0OnxaVv3zpqLLxaHmsubEGyTnqdpI/CEBvX4JadI1dMSHxagThprYRtSVbuQxvi6iUatdPxohHpA==}
 
-  core-js-pure@3.41.0:
-    resolution: {integrity: sha512-71Gzp96T9YPk63aUvE5Q5qP+DryB4ZloUZPSOebGM88VNw8VNfvdA7z6kGA8iGOTEzAomsRidp4jXSmUIJsL+Q==}
-
   core-js-pure@3.45.0:
     resolution: {integrity: sha512-OtwjqcDpY2X/eIIg1ol/n0y/X8A9foliaNt1dSK0gV3J2/zw+89FcNG3mPK+N8YWts4ZFUPxnrAzsxs/lf8yDA==}
 
@@ -4105,6 +4098,10 @@ packages:
     resolution: {integrity: sha512-kRrIg4be8VNYhycS2PY//hpBJSzZPr/DBbcy9VWelhZMW3KhyLkQR0HL0k0MNpmVoNFF4EdfMFkNAWjTP65g6w==}
     engines: {node: '>=0.8.0'}
 
+  faye@1.4.1:
+    resolution: {integrity: sha512-Cg/khikhqlvumHO3efwx2tps2ZgQRjUMrO24G0quz7MMzRYYaEjU224YFXOeuPIvanRegIchVxj6pmHK1W0ikA==}
+    engines: {node: '>=0.8.0'}
+
   fb-watchman@2.0.2:
     resolution: {integrity: sha512-p5161BqbuCaSnB8jIbzQHOlpgsPmK5rJVDfDKO91Axs5NC1uu3HRQm6wt9cd9/+GtQQIO53JdGXXoyDpTAsgYA==}
 
@@ -4186,8 +4183,8 @@ packages:
     resolution: {integrity: sha512-yDYSgNMraqvnxiEXO4hi88+YZxaHC6QKzb5N84iRCTDeRO7ZALpir/lVmf/uXUhnwUr2O4HU8s/n6x+yNjQkHw==}
     engines: {node: '>= 14.17'}
 
-  form-data@4.0.2:
-    resolution: {integrity: sha512-hGfm/slu0ZabnNt4oaRZ6uREyfCj6P4fT/n6A1rGV+Z0VdGXjfOhVUpkn6qVQONHGIFwmveGXyDs75+nr6FM8w==}
+  form-data@4.0.4:
+    resolution: {integrity: sha512-KrGhL9Q4zjj0kiUt5OO4Mr/A/jlI2jDYs5eHBpYHPcBEVSiipAvn2Ko2HnPe20rmcuuvMHNdZFp+4IlGTMF0Ow==}
     engines: {node: '>= 6'}
 
   format@0.2.2:
@@ -5014,8 +5011,8 @@ packages:
   jszip@3.10.1:
     resolution: {integrity: sha512-xXDvecyTpGLrqFrvkrUSoxxfJI5AH7U8zxxtVclpsUtMCq4JQ290LY8AW5c7Ggnr/Y/oK+bQMbqK2qmtk3pN4g==}
 
-  jwa@1.4.1:
-    resolution: {integrity: sha512-qiLX/xhEEFKUAJ6FiBMbes3w9ATzyk5W7Hvzpa/SLYdxNtng+gcurvrI7TbACjIXlsJyr05/S1oUhZrc63evQA==}
+  jwa@1.4.2:
+    resolution: {integrity: sha512-eeH5JO+21J78qMvTIDdBXidBd6nG2kZjg5Ohz/1fpa28Z4CcsWUzJ1ZZyFq/3z3N17aZy+ZuBoHljASbL1WfOw==}
 
   jws@3.2.2:
     resolution: {integrity: sha512-YHlZCB6lMTllWDtSPHz/ZXTsi8S00usEV6v1tjq8tOUZzw7DpSDWVXjXDre6ed1w/pd495ODpHZYSdkRTsa0HA==}
@@ -5552,8 +5549,8 @@ packages:
     resolution: {integrity: sha512-at/ZndSy3xEGJ8i0ygALh8ru9qy7gWW1cmkaqBN29JmMlIvM//MEO9y1sk/avxuwnPcfhkejkLsuPxH81BrkSg==}
     engines: {node: '>=0.8.0'}
 
-  nan@2.22.2:
-    resolution: {integrity: sha512-DANghxFkS1plDdRsX0X9pm0Z6SJNN6gBdtXfanwoZ8hooC5gosGFSBGRYHUVPz1asKA/kMRqDRdHrluZ61SpBQ==}
+  nan@2.23.0:
+    resolution: {integrity: sha512-1UxuyYGdoQHcGg87Lkqm3FzefucTa0NAiOcuRsDmysep3c1LVCRK2krrUDafMWtjSG04htvAmvg96+SDknOmgQ==}
 
   nano-spawn@1.0.2:
     resolution: {integrity: sha512-21t+ozMQDAL/UGgQVBbZ/xXvNO10++ZPuTmKRO8k9V3AClVRht49ahtDjfY8l1q6nSHOrE5ASfthzH3ol6R/hg==}
@@ -6642,9 +6639,6 @@ packages:
 
   regenerator-runtime@0.13.11:
     resolution: {integrity: sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==}
-
-  regenerator-runtime@0.14.1:
-    resolution: {integrity: sha512-dYnhHh0nJoMfnkZs6GmmhFknAGRrLznOu5nc9ML+EJxGvrx6H7teuevqVqCuPcPK//3eDrrjQhehXVx9cnkGdw==}
 
   regexpu-core@6.2.0:
     resolution: {integrity: sha512-H66BPQMrv+V16t8xtmq+UC0CBpiTBA60V8ibS1QVReIp8T1z8hwFxqcGzm9K6lgsN7sB5edVH8a+ze6Fqm4weA==}
@@ -7868,7 +7862,7 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.12
       '@jridgewell/trace-mapping': 0.3.29
 
-  '@apexdevtools/apex-ls@5.9.0':
+  '@apexdevtools/apex-ls@5.10.0':
     dependencies:
       '@apexdevtools/apex-parser': 4.3.1
       '@apexdevtools/vf-parser': 1.1.0
@@ -8699,11 +8693,6 @@ snapshots:
       '@babel/plugin-transform-typescript': 7.28.0(@babel/core@7.28.0)
     transitivePeerDependencies:
       - supports-color
-
-  '@babel/runtime-corejs3@7.27.0':
-    dependencies:
-      core-js-pure: 3.41.0
-      regenerator-runtime: 0.14.1
 
   '@babel/runtime-corejs3@7.28.2':
     dependencies:
@@ -10642,14 +10631,14 @@ snapshots:
     dependencies:
       '@salesforce/bunyan': 2.0.0(patch_hash=87fc9fb354d512b35022ce352e5932d281653338f098cf6916f71ee5e80dbcb5)
       '@salesforce/kit': 3.2.3
-      '@salesforce/schemas': 1.9.0
+      '@salesforce/schemas': 1.9.1
       '@salesforce/ts-types': 2.0.12
       '@types/semver': 7.7.0
       ajv: 8.17.1
       change-case: 4.1.2
       debug: 3.2.7
-      faye: 1.4.0
-      form-data: 4.0.2
+      faye: 1.4.1
+      form-data: 4.0.4
       js2xmlparser: 4.0.2
       jsforce: 2.0.0-beta.29
       jsonwebtoken: 9.0.1
@@ -10664,7 +10653,7 @@ snapshots:
     dependencies:
       '@salesforce/ts-types': 2.0.12
 
-  '@salesforce/schemas@1.9.0': {}
+  '@salesforce/schemas@1.9.1': {}
 
   '@salesforce/ts-types@2.0.12': {}
 
@@ -12056,8 +12045,6 @@ snapshots:
     dependencies:
       browserslist: 4.25.1
 
-  core-js-pure@3.41.0: {}
-
   core-js-pure@3.45.0: {}
 
   core-js@3.45.0: {}
@@ -12437,7 +12424,7 @@ snapshots:
 
   dtrace-provider@0.6.0:
     dependencies:
-      nan: 2.22.2
+      nan: 2.23.0
     optional: true
 
   dunder-proto@1.0.1:
@@ -12793,6 +12780,15 @@ snapshots:
       tough-cookie: 5.1.2
       tunnel-agent: 0.6.0
 
+  faye@1.4.1:
+    dependencies:
+      asap: 2.0.6
+      csprng: 0.1.2
+      faye-websocket: 0.11.4
+      safe-buffer: 5.2.1
+      tough-cookie: 5.1.2
+      tunnel-agent: 0.6.0
+
   fb-watchman@2.0.2:
     dependencies:
       bser: 2.1.1
@@ -12875,11 +12871,12 @@ snapshots:
 
   form-data-encoder@2.1.4: {}
 
-  form-data@4.0.2:
+  form-data@4.0.4:
     dependencies:
       asynckit: 0.4.0
       combined-stream: 1.0.8
       es-set-tostringtag: 2.1.0
+      hasown: 2.0.2
       mime-types: 2.1.35
 
   format@0.2.2: {}
@@ -13975,7 +13972,7 @@ snapshots:
   jsforce@2.0.0-beta.29:
     dependencies:
       '@babel/runtime': 7.28.2
-      '@babel/runtime-corejs3': 7.27.0
+      '@babel/runtime-corejs3': 7.28.2
       '@types/node': 12.20.55
       abort-controller: 3.0.0
       base64url: 3.0.1
@@ -13983,8 +13980,8 @@ snapshots:
       core-js: 3.45.0
       csv-parse: 4.16.3
       csv-stringify: 5.6.5
-      faye: 1.4.0
-      form-data: 4.0.2
+      faye: 1.4.1
+      form-data: 4.0.4
       fs-extra: 8.1.0
       https-proxy-agent: 5.0.1
       inquirer: 7.3.3
@@ -14036,7 +14033,7 @@ snapshots:
       readable-stream: 2.3.8
       setimmediate: 1.0.5
 
-  jwa@1.4.1:
+  jwa@1.4.2:
     dependencies:
       buffer-equal-constant-time: 1.0.1
       ecdsa-sig-formatter: 1.0.11
@@ -14044,7 +14041,7 @@ snapshots:
 
   jws@3.2.2:
     dependencies:
-      jwa: 1.4.1
+      jwa: 1.4.2
       safe-buffer: 5.2.1
 
   keyv@4.5.4:
@@ -14844,7 +14841,7 @@ snapshots:
       rimraf: 2.4.5
     optional: true
 
-  nan@2.22.2:
+  nan@2.23.0:
     optional: true
 
   nano-spawn@1.0.2: {}
@@ -15948,8 +15945,6 @@ snapshots:
   regenerate@1.4.2: {}
 
   regenerator-runtime@0.13.11: {}
-
-  regenerator-runtime@0.14.1: {}
 
   regexpu-core@6.2.0:
     dependencies:
