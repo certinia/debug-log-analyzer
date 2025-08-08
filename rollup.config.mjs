@@ -44,7 +44,7 @@ export default [
     ],
   },
   {
-    input: { bundle: './log-viewer/modules/Main.ts' },
+    input: { bundle: './log-viewer/src/Main.ts' },
     output: [
       {
         format: 'es',
