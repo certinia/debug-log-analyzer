@@ -42,7 +42,7 @@ const config: Config = {
       attributes: {
         rel: 'icon',
         type: 'image/svg+xml',
-        href: '/favicon.svg',
+        href: `/${projectName}/favicon.svg`,
       },
     },
     {
@@ -50,7 +50,7 @@ const config: Config = {
       attributes: {
         rel: 'icon',
         type: 'image/x-icon',
-        href: '/favicon.ico', // fallback for older browsers
+        href: `/${projectName}/favicon.ico'`, // fallback for older browsers
       },
     },
     {
@@ -58,7 +58,7 @@ const config: Config = {
       attributes: {
         rel: 'apple-touch-icon', // Apple touch icon for better mobile display
         sizes: '180x180',
-        href: '/favicon.png',
+        href: `/${projectName}/favicon.png`,
       },
     },
   ],
