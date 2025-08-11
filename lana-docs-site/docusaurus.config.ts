@@ -50,7 +50,7 @@ const config: Config = {
       attributes: {
         rel: 'icon',
         type: 'image/x-icon',
-        href: `/${projectName}/favicon.ico'`, // fallback for older browsers
+        href: `/${projectName}/favicon.ico`, // fallback for older browsers
       },
     },
     {
