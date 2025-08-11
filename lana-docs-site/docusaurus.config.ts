@@ -6,27 +6,26 @@ const organizationName = 'certinia';
 const projectName = 'debug-log-analyzer';
 
 const config: Config = {
+  future: {
+    v4: true,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    experimental_faster: true,
+  },
   title: 'Apex Log Analyzer for Salesforce',
   tagline:
     'blazing-fast VS Code extension for Salesforce. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.',
-  favicon: '/favicon.svg',
-
   // Set the production url of your site here
   url: `https://${organizationName}.github.io`,
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: `/${projectName}/`,
-
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: organizationName, // Usually your GitHub org/user name.
   projectName: projectName, // Usually your repo name.
-
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
-
   trailingSlash: false,
-
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
   // may want to replace "en" with "zh-Hans".
@@ -34,13 +33,35 @@ const config: Config = {
     defaultLocale: 'en',
     locales: ['en'],
   },
-
-  future: {
-    v4: true,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    experimental_faster: true,
-  },
-
+  favicon: '/favicon.svg',
+  // Enhanced head tags for better search engine recognition
+  // Multiple favicon formats for better compatibility
+  headTags: [
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'icon',
+        type: 'image/svg+xml',
+        href: '/favicon.svg',
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'icon',
+        type: 'image/x-icon',
+        href: '/favicon.ico', // fallback for older browsers
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'apple-touch-icon', // Apple touch icon for better mobile display
+        sizes: '180x180',
+        href: '/favicon.png',
+      },
+    },
+  ],
   presets: [
     [
       'classic',
