@@ -73,7 +73,7 @@ export class SOQLView extends LitElement {
   };
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
-  canClearHighlights = false;
+  blockClearHighlights = true;
 
   get _soqlTableWrapper(): HTMLDivElement | null {
     return this.renderRoot?.querySelector('#db-soql-table') ?? null;
@@ -191,7 +191,9 @@ export class SOQLView extends LitElement {
     this.soqlTable?.download('csv', 'soql.csv', { bom: true, delimiter: ',' });
   }
 
-  _findEvt = ((event: FindEvt) => this._find(event)) as EventListener;
+  _findEvt = ((event: FindEvt) => {
+    this._find(event);
+  }) as EventListener;
 
   _soqlGroupBy(event: Event) {
     if (!this.soqlTable) {
@@ -235,6 +237,8 @@ export class SOQLView extends LitElement {
 
     this.findArgs.count = highlightIndex;
     const currentRow = this.findMap[highlightIndex];
+    this.blockClearHighlights = true;
+    this.soqlTable.blockRedraw();
     const rows = [currentRow, this.findMap[this.oldIndex]];
     rows.forEach((row) => {
       row?.reformat();
@@ -244,17 +248,17 @@ export class SOQLView extends LitElement {
       //@ts-expect-error This is a custom function added in by RowNavigation custom module
       this.soqlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
     }
+    this.soqlTable.restoreRedraw();
+    this.blockClearHighlights = false;
 
     this.oldIndex = highlightIndex;
   }
 
-  _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
+  async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
     const isTableVisible = !!this.soqlTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
     }
-
-    this.canClearHighlights = true;
 
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
     const newSearch =
@@ -267,9 +271,11 @@ export class SOQLView extends LitElement {
       newFindArgs.text = '';
     }
     if (newSearch || clearHighlights) {
+      this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
-      const result = this.soqlTable.find(this.findArgs);
-      this.totalMatches = 0;
+      const result = await this.soqlTable.find(this.findArgs);
+      this.blockClearHighlights = false;
+      this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
       if (!clearHighlights) {
@@ -280,8 +286,6 @@ export class SOQLView extends LitElement {
         );
       }
     }
-
-    this.canClearHighlights = false;
   }
 
   _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
@@ -309,8 +313,6 @@ export class SOQLView extends LitElement {
       }
     }
 
-    const soqlText = this.sortByFrequency(soqlData || [], 'soql');
-
     this.soqlTable = new Tabulator(soqlTableContainer, {
       height: '100%',
       rowKeyboardNavigation: true,
@@ -335,8 +337,6 @@ export class SOQLView extends LitElement {
       groupSort: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
-      groupBy: 'soql',
-      groupValues: [soqlText],
       groupToggleElement: false,
       selectableRows: 'highlight',
       selectableRowsCheck: function (row: RowComponent) {
@@ -344,7 +344,7 @@ export class SOQLView extends LitElement {
       },
       dataTree: true,
       dataTreeBranchElement: false,
-      dataTreeStartExpanded: true,
+      dataTreeStartExpanded: false,
       columnDefaults: {
         title: 'default',
         resizable: true,
@@ -450,7 +450,6 @@ export class SOQLView extends LitElement {
           title: 'Namespace',
           field: 'namespace',
           sorter: 'string',
-          cssClass: 'datagrid-code-text',
           width: 120,
           headerFilter: 'list',
           headerFilterFunc: 'in',
@@ -465,6 +464,7 @@ export class SOQLView extends LitElement {
           title: 'Row Count',
           field: 'rowCount',
           sorter: 'number',
+          cssClass: 'number-cell',
           width: 100,
           hozAlign: 'right',
           headerHozAlign: 'right',
@@ -474,6 +474,7 @@ export class SOQLView extends LitElement {
           title: 'Time Taken (ms)',
           field: 'timeTaken',
           sorter: 'number',
+          cssClass: 'number-cell',
           width: 120,
           hozAlign: 'right',
           headerHozAlign: 'right',
@@ -491,6 +492,7 @@ export class SOQLView extends LitElement {
           title: 'Aggregations',
           field: 'aggregations',
           sorter: 'number',
+          cssClass: 'number-cell',
           width: 100,
           hozAlign: 'right',
           headerHozAlign: 'right',
@@ -501,12 +503,12 @@ export class SOQLView extends LitElement {
         const data = row.getData();
         if (data.isDetail && data.timestamp) {
           const detailContainer = this.createSOQLDetailPanel(data.timestamp, timestampToSOQl);
-
           row.getElement().replaceChildren(detailContainer);
-          row.normalizeHeight();
         }
 
-        formatter(row, this.findArgs);
+        requestAnimationFrame(() => {
+          formatter(row, this.findArgs);
+        });
       },
     });
 
@@ -515,10 +517,17 @@ export class SOQLView extends LitElement {
       if (type === 'Range') {
         return;
       }
-
-      this.soqlTable?.blockRedraw();
       group.toggle();
-      this.soqlTable?.restoreRedraw();
+
+      if (this.soqlTable && group.isVisible()) {
+        this.soqlTable.blockRedraw();
+        for (const row of group.getRows()) {
+          if (row.getTreeChildren() && !row.isTreeExpanded()) {
+            row.treeExpand();
+          }
+        }
+        this.soqlTable.restoreRedraw();
+      }
     });
 
     this.soqlTable.on('rowClick', function (e, row) {
@@ -537,17 +546,32 @@ export class SOQLView extends LitElement {
       row.getCell('soql').getElement().style.height = origRowHeight + 'px';
     });
 
-    this.soqlTable.on('dataFiltering', () => {
-      if (this.canClearHighlights) {
+    this.soqlTable.on('tableBuilt', () => {
+      const holder = this._getTableHolder();
+      holder.style.overflowAnchor = 'none';
+      //@ts-expect-error This is a custom function added in the GroupSort custom module
+      this.soqlTable?.setSortedGroupBy('soql');
+    });
+
+    this.soqlTable.on('dataSorted', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
         this._resetFindWidget();
         this._clearSearchHighlights();
       }
     });
 
-    this.soqlTable.on('renderStarted', () => {
-      const holder = this._getTableHolder();
-      holder.style.minHeight = holder.clientHeight + 'px';
-      holder.style.overflowAnchor = 'none';
+    this.soqlTable.on('dataGrouped', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
+    });
+
+    this.soqlTable.on('dataFiltering', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
     });
 
     this.soqlTable.on('renderComplete', () => {
@@ -566,9 +590,16 @@ export class SOQLView extends LitElement {
   }
 
   _clearSearchHighlights() {
-    this._find(
-      new CustomEvent('lv-find-close', {
-        detail: { text: '', count: 0, options: { matchCase: false } },
+    this.findArgs.text = '';
+    this.findArgs.count = 0;
+    //@ts-expect-error This is a custom function added in by Find custom module
+    this.soqlTable.clearFindHighlights(Object.values(this.findMap));
+    this.findMap = {};
+    this.totalMatches = 0;
+
+    document.dispatchEvent(
+      new CustomEvent('db-find-results', {
+        detail: { totalMatches: this.totalMatches, type: 'dml' },
       }),
     );
   }
@@ -597,17 +628,6 @@ export class SOQLView extends LitElement {
     );
 
     return detailContainer;
-  }
-
-  sortByFrequency(dataArray: GridSOQLData[], field: keyof GridSOQLData) {
-    const map = new Map<unknown, number>();
-    dataArray.forEach((row) => {
-      const val = row[field];
-      map.set(val, (map.get(val) || 0) + 1);
-    });
-    const newMap = new Map([...map.entries()].sort((a, b) => b[1] - a[1]));
-
-    return [...newMap.keys()];
   }
 
   downlodEncoder(defaultFileName: string) {

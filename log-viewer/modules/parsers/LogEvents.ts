@@ -5,6 +5,8 @@
 import type { ApexLogParser, DebugLevel } from './ApexLogParser';
 import type {
   CPUType,
+  GovernorLimits,
+  Limits,
   LineNumber,
   LogEventType,
   LogIssue,
@@ -309,11 +311,6 @@ export class ApexLog extends Method {
   public size = 0;
 
   /**
-   * The total CPU time consumed, in ms
-   */
-  public cpuTime: number = 0;
-
-  /**
    * The Apex Debug Logging Levels for the current log
    */
   public debugLevels: DebugLevel[] = [];
@@ -332,6 +329,23 @@ export class ApexLog extends Method {
    * Any issues that occurred during the parsing of the log, such as an unrecognized log event type.
    */
   public parsingErrors: string[] = [];
+
+  public governorLimits: GovernorLimits = {
+    soqlQueries: { used: 0, limit: 0 },
+    soslQueries: { used: 0, limit: 0 },
+    queryRows: { used: 0, limit: 0 },
+    dmlStatements: { used: 0, limit: 0 },
+    publishImmediateDml: { used: 0, limit: 0 },
+    dmlRows: { used: 0, limit: 0 },
+    cpuTime: { used: 0, limit: 0 },
+    heapSize: { used: 0, limit: 0 },
+    callouts: { used: 0, limit: 0 },
+    emailInvocations: { used: 0, limit: 0 },
+    futureCalls: { used: 0, limit: 0 },
+    queueableJobsAddedToQueue: { used: 0, limit: 0 },
+    mobileApexPushCalls: { used: 0, limit: 0 },
+    byNamespace: new Map<string, Limits>(),
+  };
 
   /**
    * The endtime with nodes of 0 duration excluded
@@ -564,7 +578,7 @@ export class MethodExitLine extends LogEvent {
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[4] ?? parts[3] ?? this.text;
 
-    /*A method will end with ')'. Without that this it represents the first reference to a class, outer or inner. One of the few reliable ways to determine valid namespaces. The first reference to a export class (outer or inner) will always have an METHOD_EXIT containing the Outer export class name with namespace if present. Other events will follow, CONSTRUCTOR_ENTRY etc. But this case will only ever have 2 parts ns.Outer even if the first reference was actually an inner export class e.g new ns.Outer.Inner();*/
+    /*A method will end with ')'. Without that this it represents the first reference to a class, outer or inner. One of the few reliable ways to determine valid namespaces. The first reference to a class (outer or inner) will always have an METHOD_EXIT containing the Outer class name with namespace if present. Other events will follow, CONSTRUCTOR_ENTRY etc. But this case will only ever have 2 parts ns.Outer even if the first reference was actually an inner class e.g new ns.Outer.Inner();*/
     // If does not end in ) then we have a reference to the class, either via outer or inner.
     if (!this.text.endsWith(')')) {
       // if there is a . the we have a namespace e.g ns.Outer
@@ -1019,22 +1033,77 @@ export class LimitUsageLine extends LogEvent {
 }
 
 export class LimitUsageForNSLine extends LogEvent {
-  acceptsText = true;
-  namespace = 'default';
+  static limitsKeys = new Map<string, string>([
+    ['Number of SOQL queries', 'soqlQueries'],
+    ['Number of query rows', 'queryRows'],
+    ['Number of SOSL queries', 'soslQueries'],
+    ['Number of DML statements', 'dmlStatements'],
+    ['Number of Publish Immediate DML', 'publishImmediateDml'],
+    ['Number of DML rows', 'dmlRows'],
+    ['Maximum CPU time', 'cpuTime'],
+    ['Maximum heap size', 'heapSize'],
+    ['Number of callouts', 'callouts'],
+    ['Number of Email Invocations', 'emailInvocations'],
+    ['Number of future calls', 'futureCalls'],
+    ['Number of queueable jobs added to the queue', 'queueableJobsAddedToQueue'],
+    ['Number of Mobile Apex push calls', 'mobileApexPushCalls'],
+  ]);
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.acceptsText = true;
+    this.namespace = 'default';
+
     this.text = parts[2] || '';
   }
 
   onAfter(parser: ApexLogParser, _next?: LogEvent): void {
-    const matched = this.text.match(/Maximum CPU time: (\d+)/),
-      cpuText = matched?.[1] || '0',
-      cpuTime = parseInt(cpuText, 10) * 1000000; // convert from milli-seconds to nano-seconds
+    // Parse the namespace from the first line (before any newline)
+    this.namespace = this.text.slice(0, this.text.indexOf('\n')).replace(/\(|\)/g, '');
 
-    if (!parser.cpuUsed || cpuTime > parser.cpuUsed) {
-      parser.cpuUsed = cpuTime;
+    // Clean up the text for easier parsing
+    const cleanedText = this.text
+      .replace(/^\s+/gm, '')
+      .replaceAll('******* CLOSE TO LIMIT', '')
+      .replaceAll(' out of ', '/');
+    this.text = cleanedText;
+
+    // Split into lines and parse each line for limits
+    const lines = cleanedText.split('\n');
+    const limits: Limits = {
+      soqlQueries: { used: 0, limit: 0 },
+      soslQueries: { used: 0, limit: 0 },
+      queryRows: { used: 0, limit: 0 },
+      dmlStatements: { used: 0, limit: 0 },
+      publishImmediateDml: { used: 0, limit: 0 },
+      dmlRows: { used: 0, limit: 0 },
+      cpuTime: { used: 0, limit: 0 },
+      heapSize: { used: 0, limit: 0 },
+      callouts: { used: 0, limit: 0 },
+      emailInvocations: { used: 0, limit: 0 },
+      futureCalls: { used: 0, limit: 0 },
+      queueableJobsAddedToQueue: { used: 0, limit: 0 },
+      mobileApexPushCalls: { used: 0, limit: 0 },
+    };
+
+    for (const line of lines) {
+      // Match lines like: "Maximum CPU time: 15008/10000"
+      const match = line.match(/^(.+?):\s*([\d,]+)\/([\d,]+)/);
+      if (match) {
+        const key: keyof Limits = LimitUsageForNSLine.limitsKeys.get(
+          match[1]!.trim(),
+        ) as keyof Limits;
+        if (key) {
+          const used = parseInt(match[2]!.replace(/,/g, ''), 10);
+          const limit = parseInt(match[3]!.replace(/,/g, ''), 10);
+          if (key) {
+            limits[key] = { used, limit };
+          }
+        }
+      }
     }
+
+    parser.governorLimits.byNamespace.set(this.namespace, limits);
   }
 }
 

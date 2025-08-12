@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.18.1] 2025-07-09
+
+### Fixed
+
+- Remove assests from the published extension
+
+## [1.18.0] 2025-07-09
 
 ### Added
 
@@ -13,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **🔼🔽 Grouped Row Sorting**: You can now sort grouped rows by clicking on the column headers ([#592]).
   - To sort a group by the number of items within the group click the Group Name column until the third sort state is shown.
 - **🔢 New Call Tree Columns**: The Rows column is replaced with the DML Rows and SOQL Rows columns ([#93]).
+- **⏱️ New Timeline Tooltip**: The tooltip is much easier to read a glance([#308]).
 - **⏱️ New Timeline Tooltip values**: The Rows count in the Timeline tooltip is now split into DML Rows and SOQL Rows ([#93]).
 - **📋💾 Table Actions**: Added options to Copy to Clipboard and Export to CSV directly from the table action buttons above the Analysis and Database tables ([#589]).
 
@@ -21,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **✂️ Copy Text in Views**: You can now highlight and copy text from the Call Tree, Analysis, and Database views without the text clearing immediately after highlighting ([#504]).
 - **💎 Improved HiDPI Rendering**: Sharpened rendering for the timeline on HiDPI displays ([#588]).
 - **🔍 Call Tree Search**: Search in the Call Tree now only includes the visible filtered rows ([#539]).
+- **📈 Call Tree Governor Limits:** The Call Tree now displays formatted governor limits for `CUMULATIVE_LIMIT_USAGE` events by default, as well as SOQL, SOSL, DML, and Method profiling events ([#309]).
+- **📖 [Documentation site](https://certinia.github.io/debug-log-analyzer) updates** ([#616]).
+- **🎨 Table Dropdown Styling:**: The style of grid dropdowns matches VS Code better ([#619]).
 
 ### Fixed
 
@@ -383,8 +393,9 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Add explorer menu item.
 - Provide more information when selecting log to download.
 
-<!-- Unreleased -->
+<!-- v1.18.0 -->
 
+[#616]: https://github.com/certinia/debug-log-analyzer/issues/616
 [#504]: https://github.com/certinia/debug-log-analyzer/issues/504
 [#581]: https://github.com/certinia/debug-log-analyzer/issues/581
 [#582]: https://github.com/certinia/debug-log-analyzer/issues/582
@@ -395,6 +406,9 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#592]: https://github.com/certinia/debug-log-analyzer/issues/592
 [#93]: https://github.com/certinia/debug-log-analyzer/issues/93
 [#539]: https://github.com/certinia/debug-log-analyzer/issues/539
+[#619]: https://github.com/certinia/debug-log-analyzer/issues/619
+[#308]: https://github.com/certinia/debug-log-analyzer/issues/308
+[#309]: https://github.com/certinia/debug-log-analyzer/issues/309
 
 <!-- 1.16.1 -->
 

@@ -18,12 +18,33 @@ export type LogSubCategory =
   | 'Flow'
   | 'Workflow';
 
+export interface Limits {
+  soqlQueries: { used: number; limit: number };
+  soslQueries: { used: number; limit: number };
+  queryRows: { used: number; limit: number };
+  dmlStatements: { used: number; limit: number };
+  publishImmediateDml: { used: number; limit: number };
+  dmlRows: { used: number; limit: number };
+  cpuTime: { used: number; limit: number };
+  heapSize: { used: number; limit: number };
+  callouts: { used: number; limit: number };
+  emailInvocations: { used: number; limit: number };
+  futureCalls: { used: number; limit: number };
+  queueableJobsAddedToQueue: { used: number; limit: number };
+  mobileApexPushCalls: { used: number; limit: number };
+}
+
+export interface GovernorLimits extends Limits {
+  byNamespace: Map<string, Limits>;
+}
+
 export interface LogIssue {
   startTime?: number;
   summary: string;
   description: string;
   type: IssueType;
 }
+
 export type LogLineConstructor<P, T> = new (parser: P, parts: string[]) => T;
 
 export type LogEventType = (typeof _logEventNames)[number];

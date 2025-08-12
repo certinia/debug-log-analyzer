@@ -84,10 +84,6 @@ export class DatabaseView extends LitElement {
   };
 
   _findResults = (e: CustomEvent<{ totalMatches: number; type: 'dml' | 'soql' }>) => {
-    if (!this.shadowRoot?.host.clientHeight) {
-      return;
-    }
-
     if (e.detail.type === 'dml') {
       this.dmlMatches = e.detail.totalMatches;
     } else if (e.detail.type === 'soql') {

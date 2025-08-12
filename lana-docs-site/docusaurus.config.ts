@@ -6,27 +6,26 @@ const organizationName = 'certinia';
 const projectName = 'debug-log-analyzer';
 
 const config: Config = {
+  future: {
+    v4: true,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    experimental_faster: true,
+  },
   title: 'Apex Log Analyzer for Salesforce',
   tagline:
-    'Visualize code execution via a Flame graph and identify performance and SOQL/DML problems via Method and Database analysis',
-  favicon: '../../lana/certinia-icon-color.png',
-
+    'blazing-fast VS Code extension for Salesforce. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.',
   // Set the production url of your site here
   url: `https://${organizationName}.github.io`,
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: `/${projectName}/`,
-
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: organizationName, // Usually your GitHub org/user name.
   projectName: projectName, // Usually your repo name.
-
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
-
   trailingSlash: false,
-
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
   // may want to replace "en" with "zh-Hans".
@@ -34,12 +33,35 @@ const config: Config = {
     defaultLocale: 'en',
     locales: ['en'],
   },
-
-  future: {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    experimental_faster: true,
-  },
-
+  favicon: '/favicon.svg',
+  // Enhanced head tags for better search engine recognition
+  // Multiple favicon formats for better compatibility
+  headTags: [
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'icon',
+        type: 'image/svg+xml',
+        href: `/${projectName}/favicon.svg`,
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'icon',
+        type: 'image/x-icon',
+        href: `/${projectName}/favicon.ico`, // fallback for older browsers
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'apple-touch-icon', // Apple touch icon for better mobile display
+        sizes: '180x180',
+        href: `/${projectName}/favicon.png`,
+      },
+    },
+  ],
   presets: [
     [
       'classic',
@@ -59,8 +81,22 @@ const config: Config = {
     ],
   ],
   themeConfig: {
+    announcementBar: {
+      id: 'lana-1.18.0', // Unique ID to prevent showing again if dismissed
+      content:
+        '🎉️ <b><a target="_blank" rel="noopener noreferrer" href="https://marketplace.visualstudio.com/items?itemName=financialforce.lana">Apex Log Analyzer v1.18</a> is out!<b>',
+      isCloseable: true,
+    },
     // Replace with your project's social card
-    image: 'img/lana-timeline.png',
+    image: `https://raw.githubusercontent.com/${organizationName}/${projectName}/main/lana/assets/v1.18/lana-preview.gif`,
+    metadata: [
+      {
+        name: 'keywords',
+        content:
+          'salesforce, apex, vscode, log analyzer, debug log analyzer, debug logs, performance, salesforce debug logs',
+      },
+      { name: 'author', content: 'Certinia' },
+    ],
     navbar: {
       title: 'Apex Log Analyzer for Salesforce',
       logo: {
@@ -70,12 +106,11 @@ const config: Config = {
       },
       items: [
         {
-          type: 'docSidebar',
-          sidebarId: 'docSidebar',
+          type: 'doc',
+          docId: 'docs/features/features',
           position: 'left',
           label: 'Docs',
         },
-
         {
           type: 'docSidebar',
           sidebarId: 'communitySidebar',
@@ -84,8 +119,9 @@ const config: Config = {
         },
         {
           href: `https://github.com/${organizationName}/${projectName}`,
-          label: 'GitHub',
           position: 'right',
+          'aria-label': 'GitHub Repository',
+          className: 'header-github-link',
         },
         {
           type: 'search',
@@ -100,12 +136,24 @@ const config: Config = {
           title: 'Docs',
           items: [
             {
-              label: 'Introduction',
-              to: '/',
+              label: 'Getting Started',
+              to: 'docs/gettingstarted',
             },
             {
               label: 'Installation',
-              to: 'docs/installation',
+              to: 'docs/gettingstarted#installation',
+            },
+            {
+              label: 'Features',
+              to: 'docs/features',
+            },
+            {
+              label: 'Timeline',
+              to: 'docs/features/timeline',
+            },
+            {
+              label: 'Analysis',
+              to: 'docs/features/analysis',
             },
           ],
         },
@@ -115,6 +163,10 @@ const config: Config = {
             {
               label: 'Support',
               to: 'community/support',
+            },
+            {
+              label: 'Feature Requests',
+              to: 'community/support#feature-requests',
             },
             {
               label: 'Contributing',
@@ -134,8 +186,12 @@ const config: Config = {
               href: `https://github.com/${organizationName}/${projectName}`,
             },
             {
-              label: 'Twitter',
+              label: 'X (Twitter)',
               href: 'https://twitter.com/CertiniaInc',
+            },
+            {
+              label: 'Issues',
+              href: `https://github.com/${organizationName}/${projectName}/issues`,
             },
           ],
         },

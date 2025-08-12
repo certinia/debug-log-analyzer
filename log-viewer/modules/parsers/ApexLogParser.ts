@@ -4,7 +4,7 @@
 
 import { ApexLog, type LogEvent } from './LogEvents.js';
 import { getLogEventClass } from './LogLineMapping.js';
-import type { IssueType, LogEventType, LogIssue } from './types.js';
+import type { GovernorLimits, IssueType, Limits, LogEventType, LogIssue } from './types.js';
 
 const typePattern = /^[A-Z_]*$/,
   settingsPattern = /^\d+\.\d+\sAPEX_CODE,\w+;APEX_PROFILING,.+$/m;
@@ -31,10 +31,25 @@ export class ApexLogParser {
   parsingErrors: string[] = [];
   maxSizeTimestamp: number | null = null;
   reasons: Set<string> = new Set<string>();
-  cpuUsed = 0;
   lastTimestamp = 0;
   discontinuity = false;
   namespaces = new Set<string>();
+  governorLimits: GovernorLimits = {
+    soqlQueries: { used: 0, limit: 0 },
+    soslQueries: { used: 0, limit: 0 },
+    queryRows: { used: 0, limit: 0 },
+    dmlStatements: { used: 0, limit: 0 },
+    publishImmediateDml: { used: 0, limit: 0 },
+    dmlRows: { used: 0, limit: 0 },
+    cpuTime: { used: 0, limit: 0 },
+    heapSize: { used: 0, limit: 0 },
+    callouts: { used: 0, limit: 0 },
+    emailInvocations: { used: 0, limit: 0 },
+    futureCalls: { used: 0, limit: 0 },
+    queueableJobsAddedToQueue: { used: 0, limit: 0 },
+    mobileApexPushCalls: { used: 0, limit: 0 },
+    byNamespace: new Map<string, Limits>(),
+  };
 
   /**
    * Takes string input of a log and returns the ApexLog class, which represents a log tree
@@ -48,10 +63,31 @@ export class ApexLogParser {
     apexLog.debugLevels = this.getDebugLevels(debugLog);
     apexLog.logIssues = this.logIssues;
     apexLog.parsingErrors = this.parsingErrors;
-    apexLog.cpuTime = this.cpuUsed;
     apexLog.namespaces = Array.from(this.namespaces);
+    apexLog.governorLimits = this.governorLimits;
+
+    this.addGovernorLimits(apexLog);
 
     return apexLog;
+  }
+
+  private addGovernorLimits(apexLog: ApexLog) {
+    const totalLimits = apexLog.governorLimits;
+    if (totalLimits) {
+      for (const limitsForNs of apexLog.governorLimits.byNamespace.values()) {
+        for (const [key, value] of Object.entries(limitsForNs) as Array<
+          [keyof Limits, Limits[keyof Limits]]
+        >) {
+          if (!value) {
+            continue;
+          }
+
+          const currentLimit = totalLimits[key];
+          currentLimit.limit = value.limit;
+          currentLimit.used += value.used;
+        }
+      }
+    }
   }
 
   private parseLine(line: string, lastEntry: LogEvent | null): LogEvent | null {
