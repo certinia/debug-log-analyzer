@@ -18,13 +18,12 @@ import { Item, Options, QuickPick } from './QuickPick.js';
 import { getMethodLine, parseApex } from '../salesforce/ApexParser/ApexSymbolLocator.js';
 
 export class OpenFileInPackage {
-  static async openFileForSymbol(context: Context, name: string): Promise<void> {
-    const parts = name.split('.');
-
-    if (!parts?.length || parts.length < 2) {
+  static async openFileForSymbol(context: Context, symbolName: string): Promise<void> {
+    if (!symbolName?.length) {
       return;
     }
 
+    const parts = symbolName.split('.');
     const fileName = parts[0];
 
     const paths = await context.findSymbol(fileName as string);
