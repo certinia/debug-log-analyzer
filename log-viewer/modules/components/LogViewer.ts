@@ -4,7 +4,8 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { ApexLog, parse } from '../parsers/ApexLogParser.js';
+import { parse } from '../parsers/ApexLogParser.js';
+import { type ApexLog } from '../parsers/LogEvents.js';
 import { vscodeMessenger } from '../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../styles/global.styles.js';
 import type { TimelineGroup } from '../timeline/Timeline.js';

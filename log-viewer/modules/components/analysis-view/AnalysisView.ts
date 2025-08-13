@@ -10,7 +10,7 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { ApexLog, LogLine } from '../../parsers/ApexLogParser.js';
+import type { ApexLog, LogEvent } from '../../parsers/LogEvents.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../../styles/global.styles.js';
 
@@ -453,16 +453,16 @@ export class Metric {
   totalTime = 0;
   selfTime = 0;
   namespace;
-  nodes: LogLine[] = [];
+  nodes: LogEvent[] = [];
 
-  constructor(node: LogLine) {
+  constructor(node: LogEvent) {
     this.name = node.text;
     this.type = node.type;
     this.namespace = node.namespace;
   }
 }
 
-function groupMetrics(root: LogLine) {
+function groupMetrics(root: LogEvent) {
   const methodMap: Map<string, Metric> = new Map();
 
   for (const child of root.children) {
@@ -473,7 +473,7 @@ function groupMetrics(root: LogLine) {
   return Array.from(methodMap.values());
 }
 
-function addNodeToMap(map: Map<string, Metric>, node: LogLine) {
+function addNodeToMap(map: Map<string, Metric>, node: LogEvent) {
   if (node.duration.total) {
     const key = node.namespace + node.text;
     let metric = map.get(key);
