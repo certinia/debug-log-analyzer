@@ -190,7 +190,7 @@ export class ApexLogParser {
     const lineIter = new LineIterator(lineGenerator);
 
     while ((line = lineIter.fetch())) {
-      if (line.exitTypes.length) {
+      if (!line.isDetail) {
         this.parseTree(line, lineIter, stack);
       }
       line.parent = rootMethod;
@@ -252,7 +252,7 @@ export class ApexLogParser {
         nextLine.parent = currentLine;
         currentLine.children.push(nextLine);
 
-        if (nextLine.exitTypes.length) {
+        if (!nextLine.isDetail) {
           this.parseTree(nextLine, lineIter, stack);
         }
       }
@@ -400,7 +400,7 @@ export class ApexLogParser {
         continue;
       }
       const isPkgType = child.type === 'ENTERING_MANAGED_PKG';
-      if (lastPkg) {
+      if (lastPkg && !child.isDetail) {
         if (isPkgType && child.namespace === lastPkg.namespace) {
           // combine adjacent (like) packages
           lastPkg.exitStamp = child.exitStamp || child.timestamp;
@@ -412,7 +412,7 @@ export class ApexLogParser {
         }
       }
 
-      if (child.exitTypes.length) {
+      if (!child.isDetail) {
         this.insertPackageWrappers(child);
       }
 

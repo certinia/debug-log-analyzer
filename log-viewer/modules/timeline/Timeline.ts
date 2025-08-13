@@ -263,7 +263,7 @@ function nodesToRectangles(rootNodes: LogEvent[]) {
       }
 
       for (const child of node.children) {
-        if (child.exitTypes.length) {
+        if (!child.isDetail) {
           nextLevel.push(child);
         }
       }
@@ -648,7 +648,7 @@ function findTimelineTooltip(
 ): HTMLDivElement | null {
   const target = findByPosition(timelineRoot.children, 0, x, depth, shouldIgnoreWidth);
 
-  if (target) {
+  if (target && !target.isDetail) {
     canvas.classList.remove('timeline-hover', 'timeline-dragging');
     canvas.classList.add('timeline-event--hover');
 
