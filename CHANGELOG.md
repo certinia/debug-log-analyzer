@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- **Call Tree Go To**: Go-to links in call tree now navigate to method definition instead of where method was called from ([#632] [#200])
+
 ## [1.18.1] 2025-07-09
 
 ### Fixed
@@ -392,6 +398,11 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Misc Visual tweaks.
 - Add explorer menu item.
 - Provide more information when selecting log to download.
+
+<!-- unreleased -->
+
+[#632]: https://github.com/certinia/debug-log-analyzer/issues/632
+[#200]: https://github.com/certinia/debug-log-analyzer/issues/200
 
 <!-- v1.18.0 -->
 

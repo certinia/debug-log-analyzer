@@ -66,14 +66,9 @@ export class LogView {
           }
 
           case 'openType': {
-            const { typeName } = <{ typeName: string; text: string }>payload;
-            if (typeName) {
-              const [className, lineNumber] = typeName.split('-');
-              let line;
-              if (lineNumber) {
-                line = parseInt(lineNumber);
-              }
-              OpenFileInPackage.openFileForSymbol(context, className || '', line);
+            const symbol = <string>payload;
+            if (symbol) {
+              OpenFileInPackage.openFileForSymbol(context, symbol);
             }
             break;
           }
