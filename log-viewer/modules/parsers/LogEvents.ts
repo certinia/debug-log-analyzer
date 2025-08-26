@@ -307,6 +307,10 @@ export class ApexLog extends LogEvent {
   text = 'LOG_ROOT';
   timestamp = 0;
   exitStamp = 0;
+  exitTypes = [];
+  subCategory: LogSubCategory = '';
+  cpuType: CPUType = '';
+
   /**
    * The size of the log, in bytes
    */
@@ -355,7 +359,7 @@ export class ApexLog extends LogEvent {
   executionEndTime = 0;
 
   constructor(parser: ApexLogParser) {
-    super(parser, null, [], 'Code Unit', '');
+    super(parser, null);
   }
 
   setTimes() {
@@ -426,11 +430,10 @@ export function parseRows(text: string | null | undefined): number {
 /* Log line entry Parsers */
 
 export class BulkHeapAllocateLine extends LogEvent {
-  logCategory: 'Apex Code';
+  logCategory = 'Apex Code';
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = parts[2] || '';
-    this.logCategory = 'Apex Code';
   }
 }
 
@@ -492,7 +495,7 @@ export class ConstructorEntryLine extends LogEvent {
 
     const constructorParts = (className ?? '').split('.');
     possibleNs = constructorParts[0] || '';
-    // inmner export class with a namespace
+    // inner  class with a namespace
     if (constructorParts.length === 3) {
       return possibleNs;
     }
@@ -523,13 +526,14 @@ export class MethodEntryLine extends LogEvent {
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['METHOD_EXIT'], 'Method', 'method');
-    this.lineNumber = this.parseLineNumber(parts[2]);
-    this.text = parts[4] || this.type || this.text;
+    const [, , lineNumber, , methodName] = parts;
+    this.lineNumber = this.parseLineNumber(lineNumber);
+    this.text = methodName || this.type || this.text;
     if (this.text.indexOf('System.Type.forName(') !== -1) {
       // assume we are not charged for export class loading (or at least not lengthy remote-loading / compiling)
       this.cpuType = 'loading';
     } else {
-      const possibleNs = this._parseMethodNamespace(parts[4]);
+      const possibleNs = this._parseMethodNamespace(methodName);
       if (possibleNs) {
         this.namespace = possibleNs;
       }
@@ -810,7 +814,6 @@ export class DMLBeginLine extends LogEvent {
     self: 1,
     total: 1,
   };
-
   namespace = 'default';
 
   constructor(parser: ApexLogParser, parts: string[]) {
@@ -921,15 +924,15 @@ export class SOQLExecuteExplainLine extends LogEvent {
 }
 
 export class SOSLExecuteBeginLine extends LogEvent {
+  soslCount = {
+    self: 1,
+    total: 1,
+  };
+
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['SOSL_EXECUTE_END'], 'SOQL', 'free');
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = `SOSL: ${parts[3]}`;
-
-    this.soslCount = {
-      self: 1,
-      total: 1,
-    };
   }
 
   onEnd(end: SOSLExecuteEndLine, _stack: LogEvent[]): void {
@@ -1051,11 +1054,11 @@ export class LimitUsageForNSLine extends LogEvent {
     ['Number of Mobile Apex push calls', 'mobileApexPushCalls'],
   ]);
 
+  namespace = 'default';
+
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.acceptsText = true;
-    this.namespace = 'default';
-
     this.text = parts[2] || '';
   }
 
