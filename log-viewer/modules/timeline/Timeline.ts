@@ -263,7 +263,7 @@ function nodesToRectangles(rootNodes: LogEvent[]) {
       }
 
       for (const child of node.children) {
-        if (!child.isDetail) {
+        if (child.isParent) {
           nextLevel.push(child);
         }
       }
