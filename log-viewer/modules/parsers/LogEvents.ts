@@ -220,7 +220,7 @@ export abstract class LogEvent {
   constructor(
     parser: ApexLogParser,
     parts: string[] | null,
-    exitTypes?: string[],
+    exitTypes?: LogEventType[],
     timelineKey?: LogSubCategory,
     cpuType?: CPUType,
   ) {
@@ -233,7 +233,7 @@ export abstract class LogEvent {
     }
 
     if (exitTypes) {
-      this.exitTypes = exitTypes as LogEventType[];
+      this.exitTypes = exitTypes;
       this.isDetail = false;
     }
 
