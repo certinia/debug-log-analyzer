@@ -34,7 +34,7 @@ export class DatabaseAccess {
     const len = children.length;
     for (let i = 0; i < len; ++i) {
       const child = children[i];
-      if (child && !child.isDetail) {
+      if (child?.isParent) {
         stack.push(child);
         if (child.timestamp === timestamp) {
           return stack;
@@ -61,7 +61,7 @@ export class DatabaseAccess {
         results.push(child);
       }
 
-      if (child && !child.isDetail) {
+      if (child?.isParent) {
         Array.prototype.push.apply(results, this.getSOQLLines(child));
       }
     }
@@ -80,7 +80,7 @@ export class DatabaseAccess {
         results.push(child);
       }
 
-      if (child && !child.isDetail) {
+      if (child?.isParent) {
         // results = results.concat(this.getDMLLines(child));
         Array.prototype.push.apply(results, this.getDMLLines(child));
       }

@@ -1264,7 +1264,7 @@ describe('Line Type Tests', () => {
         'Rows:5',
       ]) as LogEvent;
 
-      if (!line.isDetail) {
+      if (line.isParent) {
         line.exitTypes.forEach((exitType) => {
           const exitCls = lineTypeMap.get(exitType);
           expect(exitCls).not.toBe(null);

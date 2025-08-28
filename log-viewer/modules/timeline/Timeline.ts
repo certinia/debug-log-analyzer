@@ -648,7 +648,7 @@ function findTimelineTooltip(
 ): HTMLDivElement | null {
   const target = findByPosition(timelineRoot.children, 0, x, depth, shouldIgnoreWidth);
 
-  if (target && !target.isDetail) {
+  if (target?.isParent) {
     canvas.classList.remove('timeline-hover', 'timeline-dragging');
     canvas.classList.add('timeline-event--hover');
 
