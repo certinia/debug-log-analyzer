@@ -424,7 +424,7 @@ describe('parseLog tests', () => {
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
     const apexLog = parse(log);
-    const execEvent = apexLog.children[0] as MethodEntryLine;
+    const execEvent = <MethodEntryLine>apexLog.children[0];
     expect(execEvent).toBeInstanceOf(ExecutionStartedLine);
 
     expect(execEvent.children.length).toEqual(1);
@@ -437,7 +437,7 @@ describe('parseLog tests', () => {
       soqlCount: { self: 1, total: 1 },
     });
 
-    const soqlExplain = soqlLine.children[0] as SOQLExecuteExplainLine;
+    const soqlExplain = soqlLine.children[0];
     expect(soqlExplain).toMatchObject({
       parent: soqlLine,
       type: 'SOQL_EXECUTE_EXPLAIN',

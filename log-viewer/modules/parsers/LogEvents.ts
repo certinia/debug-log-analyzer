@@ -830,6 +830,7 @@ export class IdeasQueryExecuteLine extends LogEvent {
 
 export class SOQLExecuteBeginLine extends LogEvent {
   aggregations = 0;
+  children: SOQLExecuteExplainLine[] = [];
   soqlCount = {
     self: 1,
     total: 1,

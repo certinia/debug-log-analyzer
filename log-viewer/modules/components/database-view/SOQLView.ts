@@ -32,11 +32,7 @@ import dataGridStyles from '../../datagrid/style/DataGrid.scss';
 // others
 import { DatabaseAccess } from '../../Database.js';
 import { isVisible } from '../../Util.js';
-import type {
-  ApexLog,
-  SOQLExecuteBeginLine,
-  SOQLExecuteExplainLine,
-} from '../../parsers/LogEvents.js';
+import type { ApexLog, SOQLExecuteBeginLine } from '../../parsers/LogEvents.js';
 import { vscodeMessenger } from '../../services/VSCodeExtensionMessenger.js';
 import codiconStyles from '../../styles/codicon.css';
 import { globalStyles } from '../../styles/global.styles.js';
@@ -298,7 +294,7 @@ export class SOQLView extends LitElement {
     const soqlData: GridSOQLData[] = [];
     if (soqlLines) {
       for (const soql of soqlLines) {
-        const explainLine = soql.children[0] as SOQLExecuteExplainLine;
+        const explainLine = soql.children[0];
         soqlData.push({
           isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
           relativeCost: explainLine?.relativeCost,
