@@ -206,9 +206,9 @@ export function getLogEventClass(
   const logType = lineTypeMap.get(eventName);
   if (logType) {
     return logType;
-  } else if (basicLogEvents.indexOf(eventName) !== -1) {
+  } else if (basicLogEvents.has(eventName)) {
     return BasicLogLine;
-  } else if (basicExitLogEvents.indexOf(eventName) !== -1) {
+  } else if (basicExitLogEvents.has(eventName)) {
     return BasicExitLine;
   }
 
@@ -388,7 +388,7 @@ export const lineTypeMap: ReadonlyMap<
   ['DUPLICATE_DETECTION_MATCH_INVOCATION_SUMMARY', DuplicateDetectionSummary],
 ]);
 
-const basicLogEvents: LogEventType[] = [
+const basicLogEvents = new Set<string>([
   'BULK_COUNTABLE_STATEMENT_EXECUTE',
   'TEMPLATE_PROCESSING_ERROR',
   'EXTERNAL_SERVICE_REQUEST',
@@ -451,9 +451,9 @@ const basicLogEvents: LogEventType[] = [
   'JSON_DIFF_SUMMARY',
   'JSON_DIFF_DETAIL',
   'MATCH_ENGINE_INVOCATION',
-];
+]);
 
-const basicExitLogEvents: LogEventType[] = [
+const basicExitLogEvents = new Set<string>([
   'FLOW_START_INTERVIEW_END',
   'VF_DESERIALIZE_VIEWSTATE_END',
   'VF_SERIALIZE_VIEWSTATE_END',
@@ -476,4 +476,4 @@ const basicExitLogEvents: LogEventType[] = [
   'SESSION_CACHE_PUT_END',
   'SESSION_CACHE_GET_END',
   'SESSION_CACHE_REMOVE_END',
-];
+]);

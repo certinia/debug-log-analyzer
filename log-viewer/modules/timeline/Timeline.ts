@@ -148,13 +148,13 @@ let ctx: CanvasRenderingContext2D | null;
 let isVisible = false;
 let realHeight = 0;
 let scaleFont: string,
-  maxY: number,
   displayHeight: number,
   displayWidth: number,
   timelineRoot: ApexLog,
   lastMouseX: number,
   lastMouseY: number,
   dpr = window.devicePixelRatio || 1;
+let maxY: number;
 
 let searchString: string = '';
 let matchIndex: number | null = null;
@@ -167,14 +167,14 @@ let totalMatches = 0;
 
 function getMaxDepth(nodes: LogEvent[]): number {
   let maxDepth = 0;
-  let currentLevel = nodes.filter((n) => n.exitTypes.length);
+  let currentLevel = nodes.filter((n) => n.duration && n.children.length);
 
   while (currentLevel.length) {
     maxDepth++;
     const nextLevel: LogEvent[] = [];
     for (const node of currentLevel) {
       for (const child of node.children) {
-        if (child.exitTypes.length) {
+        if (child.duration && child.children.length) {
           nextLevel.push(child);
         }
       }
@@ -252,18 +252,18 @@ function drawScale(ctx: CanvasRenderingContext2D) {
 function nodesToRectangles(rootNodes: LogEvent[]) {
   // seed depth 0
   let depth = 0;
-  let currentLevel = rootNodes.filter((n) => n.exitTypes.length);
+  let currentLevel = rootNodes.filter((n) => n.duration && n.children.length);
 
   while (currentLevel.length) {
     const nextLevel: LogEvent[] = [];
 
     for (const node of currentLevel) {
-      if (node.subCategory && node.duration) {
+      if (node.duration && node.subCategory) {
         addToRectQueue(node, depth);
       }
 
       for (const child of node.children) {
-        if (child.isParent) {
+        if (child.duration && child.children.length) {
           nextLevel.push(child);
         }
       }
@@ -317,7 +317,7 @@ function addToRectQueue(node: LogEvent, y: number) {
 }
 
 function hasFindMatch(node: LogEvent) {
-  if (!searchString || !node) {
+  if (!searchString) {
     return false;
   }
 
