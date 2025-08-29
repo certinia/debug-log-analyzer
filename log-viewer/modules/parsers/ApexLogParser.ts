@@ -330,24 +330,27 @@ export class ApexLogParser {
     const result = new Map<number, LogEvent[]>();
 
     let currentDepth = 0;
-
-    let currentNodes = nodes;
+    let currentNodes = nodes.filter((n) => n.children.length);
     let len = currentNodes.length;
     while (len) {
-      result.set(currentDepth, currentNodes);
+      result.set(currentDepth++, currentNodes);
 
       const children: LogEvent[] = [];
       while (len--) {
         const node = currentNodes[len];
-        if (node?.children) {
-          node.children.forEach((c) => {
-            if (c.children.length) {
-              children.push(c);
-            }
-          });
+        if (!node?.children) {
+          continue;
+        }
+
+        let i = node.children.length;
+        while (i--) {
+          const c = node.children[i];
+          if (c?.children.length) {
+            children.push(c);
+          }
         }
       }
-      currentDepth++;
+
       currentNodes = children;
       len = currentNodes.length;
     }
@@ -367,11 +370,23 @@ export class ApexLogParser {
     const nodesByDepth = this.flattenByDepth(nodes);
     let depth = nodesByDepth.size;
     while (depth--) {
-      const nds = nodesByDepth.get(depth) ?? [];
+      const nds = nodesByDepth.get(depth);
+      if (!nds) {
+        continue;
+      }
       let i = nds.length;
       while (i--) {
         const parent = nds[i];
-        parent?.children.forEach((child) => {
+        if (!parent?.children) {
+          continue;
+        }
+
+        let j = parent.children.length;
+        while (j--) {
+          const child = parent.children[j];
+          if (!child) {
+            continue;
+          }
           parent.dmlCount.total += child.dmlCount.total;
           parent.soqlCount.total += child.soqlCount.total;
           parent.soslCount.total += child.soslCount.total;
@@ -380,10 +395,10 @@ export class ApexLogParser {
           parent.soslRowCount.total += child.soslRowCount.total;
           parent.duration.self -= child.duration.total;
           parent.totalThrownCount += child.totalThrownCount;
-        });
+        }
       }
-      nodesByDepth.delete(depth);
     }
+    nodesByDepth.clear();
   }
 
   private insertPackageWrappers(node: LogEvent) {
