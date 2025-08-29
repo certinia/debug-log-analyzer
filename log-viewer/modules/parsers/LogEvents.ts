@@ -20,8 +20,6 @@ import type {
 export abstract class LogEvent {
   logParser: ApexLogParser;
 
-  // common metadata (available for all lines)
-
   parent: LogEvent | null = null;
 
   /**
@@ -44,7 +42,6 @@ export abstract class LogEvent {
    */
   text = '';
 
-  // optional metadata
   /**
    * Should this log entry pull in following text lines (as the log entry can contain newlines)?
    */
@@ -217,13 +214,15 @@ export abstract class LogEvent {
    */
   exitTypes: LogEventType[] = [];
 
-  constructor(parser: ApexLogParser, parts: string[] | null) {
+  constructor(parser: ApexLogParser, parts: string[]) {
     this.logParser = parser;
     // Now set actual values from parts
-    if (parts) {
-      const [timeData, type] = parts;
+    const [timeData, type] = parts;
+    if (type) {
       this.text = this.type = type as LogEventType;
-      this.timestamp = timeData ? this.parseTimestamp(timeData) : 0;
+    }
+    if (timeData) {
+      this.timestamp = this.parseTimestamp(timeData);
     }
   }
 
@@ -268,7 +267,7 @@ export class DurationLogEvent extends LogEvent {
   isParent = true;
   constructor(
     parser: ApexLogParser,
-    parts: string[] | null,
+    parts: string[],
     exitTypes: LogEventType[],
     subCategory: LogSubCategory,
     cpuType: CPUType,
@@ -347,7 +346,7 @@ export class ApexLog extends LogEvent {
   executionEndTime = 0;
 
   constructor(parser: ApexLogParser) {
-    super(parser, null);
+    super(parser, []);
   }
 
   setTimes() {
@@ -517,7 +516,7 @@ export class MethodEntryLine extends DurationLogEvent {
     const [, , lineNumber, , methodName] = parts;
     this.lineNumber = this.parseLineNumber(lineNumber);
     this.text = methodName || this.type || this.text;
-    if (this.text.indexOf('System.Type.forName(') !== -1) {
+    if (this.text.startsWith('System.Type.forName(')) {
       // assume we are not charged for export class loading (or at least not lengthy remote-loading / compiling)
       this.cpuType = 'loading';
     } else {
