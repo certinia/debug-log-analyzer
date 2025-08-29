@@ -92,7 +92,6 @@ export class ApexLogParser {
 
   private parseLine(line: string, lastEntry: LogEvent | null): LogEvent | null {
     const parts = line.split('|');
-
     const type = parts[1] ?? '';
 
     const metaCtor = getLogEventClass(type as LogEventType);
@@ -140,16 +139,15 @@ export class ApexLogParser {
   }
 
   private *generateLogLines(log: string): Generator<LogEvent> {
-    const start = log.search(/^\d{2}:\d{2}:\d{2}.\d{1} \(\d+\)\|EXECUTION_STARTED$/m);
-    if (start > -1) {
-      log = log.slice(start);
+    let startIndex = log.search(/^\d{2}:\d{2}:\d{2}.\d{1} \(\d+\)\|EXECUTION_STARTED$/m);
+    if (startIndex === -1) {
+      startIndex = 0;
     }
 
-    const hascrlf = log.indexOf('\r\n') > -1;
+    const hascrlf = log.indexOf('\r\n', startIndex) > -1;
     let lastEntry = null;
     let lfIndex = null;
-    let eolIndex = (lfIndex = log.indexOf('\n'));
-    let startIndex = 0;
+    let eolIndex = (lfIndex = log.indexOf('\n', startIndex));
     let crlfIndex = -1;
 
     while (eolIndex !== -1) {
