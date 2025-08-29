@@ -6,7 +6,7 @@ import { LogEvent } from '../../parsers/LogEvents.js';
 import { SOQLLinter } from '../../soql/SOQLLinter.js';
 
 class DummySOQLLine extends LogEvent {
-  constructor(parser: ApexLogParser, parts: string[] | null) {
+  constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.subCategory = 'Code Unit';
     this.cpuType = 'method';
