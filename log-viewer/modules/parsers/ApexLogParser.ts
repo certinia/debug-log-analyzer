@@ -196,7 +196,7 @@ export class ApexLogParser {
     }
 
     rootMethod.setTimes();
-    this.insertPackageWrappers(rootMethod);
+    this.mergeManagedPackageEvents(rootMethod);
     this.aggregateTotals([rootMethod]);
     return rootMethod;
   }
@@ -401,45 +401,70 @@ export class ApexLogParser {
     nodesByDepth.clear();
   }
 
-  private insertPackageWrappers(node: LogEvent) {
-    const children = node.children;
-    let lastPkg: LogEvent | null = null;
+  private mergeManagedPackageEvents(root: LogEvent) {
+    const stack: LogEvent[] = [root];
 
-    const newChildren: LogEvent[] = [];
-    const len = children.length;
-    for (let i = 0; i < len; i++) {
-      const child = children[i];
-      if (!child) {
-        continue;
-      }
-      const isPkgType = child.type === 'ENTERING_MANAGED_PKG';
-      if (lastPkg && child.isParent) {
-        if (isPkgType && child.namespace === lastPkg.namespace) {
-          // combine adjacent (like) packages
-          lastPkg.exitStamp = child.exitStamp || child.timestamp;
-          continue; // skip any more child processing (it's gone)
-        } else if (!isPkgType && child.exitStamp) {
-          // we are done merging adjacent `ENTERING_MANAGED_PKG` of the same namesapce
-          lastPkg.recalculateDurations();
-          lastPkg = null;
+    while (stack.length) {
+      const node = stack.pop()!;
+      const children = node.children;
+      const len = children.length;
+      let write = 0;
+      let lastPkg: LogEvent | null = null;
+
+      for (let i = 0; i < len; i++) {
+        const child = children[i];
+        if (!child) {
+          continue;
         }
+
+        const isPkg = child.type === 'ENTERING_MANAGED_PKG';
+        if (lastPkg && child.isParent) {
+          // merge consecutive pkg events (same namespace)
+          if (isPkg && child.namespace === lastPkg.namespace) {
+            lastPkg.exitStamp = child.exitStamp || child.timestamp;
+
+            // Currently pkg events can not have children (no exit event) but if they ever do we need to move the children to the lastPkg event. The commented code below does that.
+
+            // // Move children from the discarded package to the kept package
+            // for (const childOfDiscarded of child.children) {
+            //   childOfDiscarded.parent = lastPkg;
+            //   lastPkg.children.push(childOfDiscarded);
+
+            //   // If the moved child is also a parent, we need to process it recursively
+            //   if (childOfDiscarded.isParent) {
+            //     stack.push(childOfDiscarded);
+            //   }
+            // }
+
+            continue; // skip writing this child
+          } else if (!isPkg && child.exitStamp) {
+            // pkg merge sequence ends
+            lastPkg.recalculateDurations();
+            lastPkg = null;
+          }
+        }
+
+        // First timing we see a pkg event or found a pkg event with a different namespace
+        if (isPkg) {
+          // done merging to the last pkg event, make sure the durations are correct
+          lastPkg?.recalculateDurations();
+          lastPkg = child;
+        }
+
+        if (child.isParent) {
+          stack.push(child);
+        }
+
+        // keep this child by rewriting in place
+        children[write++] = child;
       }
 
-      if (child.isParent) {
-        this.insertPackageWrappers(child);
-      }
-
-      // It is a ENTERING_MANAGED_PKG line that does not match the last one
-      // or we have not come across a ENTERING_MANAGED_PKG line yet.
-      if (isPkgType) {
+      // truncate array to new length
+      if (write < children.length) {
+        children.length = write;
         lastPkg?.recalculateDurations();
-        lastPkg = child;
       }
-      newChildren.push(child);
     }
-
-    lastPkg?.recalculateDurations();
-    node.children = newChildren;
   }
 
   public addLogIssue(startTime: number, summary: string, description: string, type: IssueType) {
