@@ -25,9 +25,7 @@ export class LogViewer extends LitElement {
   @property()
   logDuration: number | null = null;
   @property()
-  logStatus = 'Processing...';
-  @property()
-  notifications: Notification[] = [];
+  notifications: Notification[] | null = null;
   @property()
   parserIssues: Notification[] = [];
   @property()
@@ -63,7 +61,6 @@ export class LogViewer extends LitElement {
       .logPath=${this.logPath}
       .logSize=${this.logSize}
       .logDuration=${this.logDuration}
-      .logStatus=${this.logStatus}
       .notifications=${this.notifications}
       .parserIssues=${this.parserIssues}
       .timelineRoot=${this.timelineRoot}
@@ -84,7 +81,7 @@ export class LogViewer extends LitElement {
     this.timelineRoot = apexLog;
     this.logDuration = apexLog.duration.total;
 
-    const localNotifications = Array.from(this.notifications);
+    const localNotifications = Array.from(this.notifications ?? []);
     apexLog.logIssues.forEach((element) => {
       const severity = this.toSeverity(element.type);
 
@@ -98,7 +95,6 @@ export class LogViewer extends LitElement {
     this.notifications = localNotifications;
 
     this.parserIssues = this.parserIssuesToMessages(apexLog);
-    this.logStatus = 'Ready';
   }
 
   async _readLog(logUri: string): Promise<string> {
@@ -131,7 +127,7 @@ export class LogViewer extends LitElement {
     logMessage.summary = 'Could not read log';
     logMessage.message = msg;
     logMessage.severity = 'Error';
-    this.notifications.push(logMessage);
+    this.notifications = [logMessage];
     return '';
   }
 

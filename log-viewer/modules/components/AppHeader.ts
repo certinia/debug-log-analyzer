@@ -36,9 +36,7 @@ export class AppHeader extends LitElement {
   @property()
   logDuration = null;
   @property()
-  logStatus = 'Processing...';
-  @property()
-  notifications: Notification[] = [];
+  notifications: Notification[] | null = null;
   @property()
   parserIssues: Notification[] = [];
   @property()
@@ -104,7 +102,6 @@ export class AppHeader extends LitElement {
         .logPath=${this.logPath}
         .logSize=${this.logSize}
         .logDuration=${this.logDuration}
-        .logStatus=${this.logStatus}
         .notifications=${this.notifications}
         .parserIssues=${this.parserIssues}
       ></nav-bar>

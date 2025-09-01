@@ -33,10 +33,7 @@ export class NavBar extends LitElement {
   logDuration = null;
 
   @property()
-  logStatus = 'Processing...';
-
-  @property()
-  notifications: Notification[] = [];
+  notifications: Notification[] | null = null;
 
   @property()
   parserIssues: Notification[] = [];
@@ -98,13 +95,6 @@ export class NavBar extends LitElement {
     const sizeText = this._toSize(this.logSize),
       elapsedText = this._toDuration(this.logDuration);
 
-    const status =
-      this.notifications.length > 0
-        ? 'failure'
-        : this.logStatus !== 'Processing...'
-          ? 'success'
-          : '';
-
     return html`
       <div class="navbar">
         <div class="navbar--left">
@@ -112,7 +102,6 @@ export class NavBar extends LitElement {
             <log-title logName="${this.logName}" logPath="${this.logPath}"></log-title>
             <badge-base .isloading="${!sizeText}">${sizeText}</badge-base>
             <badge-base .isloading="${!elapsedText}">${elapsedText}</badge-base>
-            <badge-base status="${status}">${this.logStatus}</badge-base>
             <notification-tag .notifications="${this.notifications}"></notification-tag>
           </div>
         </div>
@@ -143,7 +132,7 @@ export class NavBar extends LitElement {
       return '';
     }
 
-    return (duration / 1_000_000_000).toFixed(3) + 's';
+    return (duration / 1_000_000_000).toFixed(3) + ' s';
   }
 
   _toSize(fileSize: number | null) {
@@ -151,6 +140,6 @@ export class NavBar extends LitElement {
       return '';
     }
 
-    return (fileSize / 1000000).toFixed(2) + ' MB';
+    return (fileSize / 1_000_000).toFixed(2) + ' MB';
   }
 }
