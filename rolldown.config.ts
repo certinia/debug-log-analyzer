@@ -37,9 +37,9 @@ export default defineConfig([
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
     },
+    tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
     platform: 'node',
     external: ['vscode'],
-    resolve: { tsconfigFilename: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json' },
     plugins: [swc(getSwcOptions('./lana'))],
   },
   {
@@ -54,12 +54,7 @@ export default defineConfig([
     ],
     platform: 'browser',
     keepNames: true,
-    resolve: {
-      tsconfigFilename: production
-        ? './log-viewer/tsconfig.json'
-        : './log-viewer/tsconfig-dev.json',
-    },
-    transform: { typescript: {} },
+    tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
     plugins: [
       nodePolyfills(),
       postcss({
