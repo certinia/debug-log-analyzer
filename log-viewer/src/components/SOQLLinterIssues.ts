@@ -5,7 +5,7 @@ import { LitElement, css, html, type PropertyValues, type TemplateResult } from 
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { DatabaseAccess } from '../Database.js';
-import { SOQLExecuteBeginLine, SOQLExecuteExplainLine } from '../parsers/ApexLogParser.js';
+import type { SOQLExecuteBeginLine } from '../parsers/LogEvents.js';
 import {
   SEVERITY_TYPES,
   SOQLLinter,
@@ -93,7 +93,7 @@ export class SOQLLinterIssues extends LitElement {
   getIssuesFromSOQLLine(soqlLine: SOQLExecuteBeginLine | null): SOQLLinterRule[] {
     const soqlIssues = [];
     if (soqlLine) {
-      const explain = soqlLine.children[0] as SOQLExecuteExplainLine;
+      const explain = soqlLine.children[0];
       if (explain?.relativeCost && explain.relativeCost > 1) {
         soqlIssues.push(new ExplainLineSelectivityRule(explain.relativeCost));
       }

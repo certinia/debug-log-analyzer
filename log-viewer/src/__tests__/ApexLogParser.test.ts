@@ -2,21 +2,25 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import {
-  ApexLogParser,
   CodeUnitStartedLine,
   ExecutionStartedLine,
-  LogLine,
-  Method,
+  LogEvent,
   MethodEntryLine,
   SOQLExecuteBeginLine,
   SOQLExecuteExplainLine,
-  TimedNode,
-  lineTypeMap,
-  parse,
   parseObjectNamespace,
   parseRows,
   parseVfNamespace,
-} from '../parsers/ApexLogParser.js';
+} from '../parsers/LogEvents.js';
+import { lineTypeMap } from '../parsers/LogLineMapping.js';
+
+import { ApexLogParser, parse } from '../parsers/ApexLogParser.js';
+
+class DummyLine extends LogEvent {
+  constructor(parser: ApexLogParser, parts: string[]) {
+    super(parser, parts);
+  }
+}
 
 describe('parseObjectNamespace tests', () => {
   it('Should consider no separator to be unmanaged', () => {
@@ -79,14 +83,14 @@ describe('Pseudo EXIT events', () => {
     expect(log1.children.length).toEqual(4);
     expect(log1.duration).toEqual({ self: 0, total: 3 });
 
-    const approval1 = log1.children[0] as Method;
+    const approval1 = log1.children[0];
     expect(approval1).toMatchObject({
       type: 'WF_APPROVAL_SUBMIT',
       timestamp: 1,
       duration: { self: 1, total: 1 },
     });
 
-    const processFound1 = log1.children[1] as Method;
+    const processFound1 = log1.children[1];
     expect(processFound1).toMatchObject({
       parent: log1,
       type: 'WF_PROCESS_FOUND',
@@ -94,7 +98,7 @@ describe('Pseudo EXIT events', () => {
       duration: { self: 1, total: 1 },
     });
 
-    const approval2 = log1.children[2] as Method;
+    const approval2 = log1.children[2];
     expect(approval2).toMatchObject({
       parent: log1,
       type: 'WF_APPROVAL_SUBMIT',
@@ -102,7 +106,7 @@ describe('Pseudo EXIT events', () => {
       duration: { self: 1, total: 1 },
     });
 
-    const processFound2 = log1.children[3] as Method;
+    const processFound2 = log1.children[3];
     expect(processFound2).toMatchObject({
       parent: log1,
       type: 'WF_PROCESS_FOUND',
@@ -125,22 +129,22 @@ describe('Pseudo EXIT events', () => {
     expect(log1.children.length).toEqual(1);
     expect(log1.duration).toEqual({ self: 0, total: 6 });
 
-    const children = (log1.children[0] as Method).children;
+    const children = log1.children[0]?.children ?? [];
     expect(children.length).toEqual(4);
 
-    const child1 = children[0] as Method;
+    const child1 = children[0]!;
     expect(child1.timestamp).toEqual(2);
     expect(child1.exitStamp).toEqual(3);
 
-    const child2 = children[1] as Method;
+    const child2 = children[1]!;
     expect(child2.timestamp).toEqual(3);
     expect(child2.exitStamp).toEqual(4);
 
-    const child3 = children[2] as Method;
+    const child3 = children[2]!;
     expect(child3.timestamp).toEqual(4);
     expect(child3.exitStamp).toEqual(5);
 
-    const child4 = children[3] as Method;
+    const child4 = children[3]!;
     expect(child4.timestamp).toEqual(5);
     expect(child4.exitStamp).toEqual(6);
   });
@@ -157,18 +161,18 @@ describe('Pseudo EXIT events', () => {
     expect(log1.children.length).toEqual(1);
     expect(log1.duration).toEqual({ self: 0, total: 4 });
 
-    const children = (log1.children[0] as Method).children;
+    const children = log1.children[0]?.children ?? [];
     expect(children.length).toEqual(3);
 
-    const child1 = children[0] as Method;
+    const child1 = children[0]!;
     expect(child1.timestamp).toEqual(2);
     expect(child1.exitStamp).toEqual(3);
 
-    const child2 = children[1] as Method;
+    const child2 = children[1]!;
     expect(child2.timestamp).toEqual(3);
     expect(child2.exitStamp).toEqual(4);
 
-    const child3 = children[2] as Method;
+    const child3 = children[2]!;
     expect(child3.timestamp).toEqual(4);
     expect(child3.exitStamp).toEqual(5);
   });
@@ -204,7 +208,7 @@ describe('parseLog tests', () => {
     expect(logLines.length).toEqual(1);
     expect(logLines[0]).toBeInstanceOf(ExecutionStartedLine);
 
-    const firstChildren = (logLines[0] as Method).children;
+    const firstChildren = logLines[0]?.children ?? [];
     expect(firstChildren.length).toEqual(1);
     expect(firstChildren[0]).toBeInstanceOf(CodeUnitStartedLine);
   });
@@ -222,7 +226,7 @@ describe('parseLog tests', () => {
     expect(apexLog.children.length).toEqual(1);
     expect(apexLog.children[0]).toBeInstanceOf(ExecutionStartedLine);
 
-    const firstChildren = (apexLog.children[0] as Method).children;
+    const firstChildren = apexLog.children[0]?.children ?? [];
     expect(firstChildren.length).toEqual(1);
     expect(firstChildren[0]).toBeInstanceOf(CodeUnitStartedLine);
   });
@@ -237,7 +241,7 @@ describe('parseLog tests', () => {
     expect(apexLog.children.length).toBe(1);
     expect(apexLog.children[0]).toBeInstanceOf(ExecutionStartedLine);
 
-    const firstChildren = (apexLog.children[0] as Method).children;
+    const firstChildren = apexLog.children[0]?.children ?? [];
     expect(firstChildren[0]).toBeInstanceOf(CodeUnitStartedLine);
   });
 
@@ -403,7 +407,7 @@ describe('parseLog tests', () => {
 
     const apexLog = parse(log);
 
-    const methods = apexLog.children as Method[];
+    const methods = apexLog.children;
     expect(methods.length).toBe(24);
     methods.forEach((line) => {
       expect(line.exitTypes.length).toBe(0);
@@ -420,7 +424,7 @@ describe('parseLog tests', () => {
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
     const apexLog = parse(log);
-    const execEvent = apexLog.children[0] as MethodEntryLine;
+    const execEvent = <MethodEntryLine>apexLog.children[0];
     expect(execEvent).toBeInstanceOf(ExecutionStartedLine);
 
     expect(execEvent.children.length).toEqual(1);
@@ -433,7 +437,7 @@ describe('parseLog tests', () => {
       soqlCount: { self: 1, total: 1 },
     });
 
-    const soqlExplain = soqlLine.children[0] as SOQLExecuteExplainLine;
+    const soqlExplain = soqlLine.children[0];
     expect(soqlExplain).toMatchObject({
       parent: soqlLine,
       type: 'SOQL_EXECUTE_EXPLAIN',
@@ -461,7 +465,7 @@ describe('getRootMethod tests', () => {
 
     const apexLog = parse(log);
 
-    const timedLogLines = apexLog.children as TimedNode[];
+    const timedLogLines = apexLog.children;
     expect(timedLogLines.length).toBe(1);
     const startLine = timedLogLines[0];
     expect(startLine?.type).toBe('EXECUTION_STARTED');
@@ -475,7 +479,7 @@ describe('getRootMethod tests', () => {
     });
 
     expect(unitStart.children.length).toBe(1);
-    const interViewsBegin = unitStart.children[0] as TimedNode;
+    const interViewsBegin = unitStart.children[0]!;
     expect(interViewsBegin).toMatchObject({
       parent: unitStart,
       type: 'FLOW_START_INTERVIEWS_BEGIN',
@@ -505,7 +509,7 @@ describe('getRootMethod tests', () => {
 
     const apexLog = parse(log);
 
-    const timedLogLines = apexLog.children as TimedNode[];
+    const timedLogLines = apexLog.children;
     expect(timedLogLines.length).toBe(1);
     const startLine = timedLogLines[0];
     expect(startLine?.type).toBe('EXECUTION_STARTED');
@@ -516,7 +520,7 @@ describe('getRootMethod tests', () => {
     expect(unitStart.codeUnitType).toBe('Flow');
 
     expect(unitStart.children.length).toBe(1);
-    const interViewsBegin = unitStart.children[0] as TimedNode;
+    const interViewsBegin = unitStart.children[0]!;
     expect(interViewsBegin.type).toBe('FLOW_START_INTERVIEWS_BEGIN');
     expect(interViewsBegin.text).toBe('FLOW_START_INTERVIEWS : Example Flow');
     expect(interViewsBegin.suffix).toBe(' (Flow)');
@@ -544,7 +548,7 @@ describe('getRootMethod tests', () => {
 
     const apexLog = parse(log);
 
-    const timedLogLines = apexLog.children as TimedNode[];
+    const timedLogLines = apexLog.children;
     expect(timedLogLines.length).toBe(1);
     const startLine = timedLogLines[0];
     expect(startLine?.type).toBe('EXECUTION_STARTED');
@@ -555,17 +559,17 @@ describe('getRootMethod tests', () => {
     expect(unitStart.codeUnitType).toBe('Workflow');
 
     expect(unitStart.children.length).toBe(1);
-    const pbBegin = unitStart.children[0] as TimedNode;
+    const pbBegin = unitStart.children[0]!;
     expect(pbBegin.type).toBe('FLOW_START_INTERVIEWS_BEGIN');
     expect(pbBegin.text).toBe('FLOW_START_INTERVIEWS : Example Process Builder');
     expect(pbBegin.suffix).toBe(' (Process Builder)');
 
     expect(pbBegin.children.length).toBe(1);
-    const pbDetail = pbBegin.children[0] as TimedNode;
+    const pbDetail = pbBegin.children[0]!;
     expect(pbDetail.type).toBe('FLOW_START_INTERVIEW_BEGIN');
     expect(pbDetail.text).toBe('Example Process Builder');
 
-    const interViewsBegin = pbDetail.children[0] as TimedNode;
+    const interViewsBegin = pbDetail.children[0]!;
     expect(interViewsBegin.type).toBe('FLOW_START_INTERVIEWS_BEGIN');
     expect(interViewsBegin.text).toBe('FLOW_START_INTERVIEWS : Example Flow');
     expect(interViewsBegin.suffix).toBe(' (Flow)');
@@ -640,9 +644,9 @@ describe('getRootMethod tests', () => {
     expect(apexLog.exitStamp).toBe(1100);
     expect(apexLog.executionEndTime).toBe(1100);
 
-    const rootChildren = apexLog.children as Method[];
+    const rootChildren = apexLog.children;
     const executionStarted = rootChildren[0];
-    const executionChildren = executionStarted?.children as Method[];
+    const executionChildren = executionStarted?.children ?? [];
     expect(executionChildren.length).toBe(5);
 
     expect(executionChildren[0]).toMatchObject({
@@ -1115,7 +1119,8 @@ describe('namespace tests', () => {
 describe('Recalculate durations tests', () => {
   it('Recalculates parent node', () => {
     const parser = new ApexLogParser();
-    const node = new Method(parser, ['14:32:07.563 (1)', 'DUMMY'], [], 'Method', '');
+    const node = new DummyLine(parser, ['14:32:07.563 (1)', 'DUMMY']);
+    node.subCategory = 'Method';
     node.exitStamp = 3;
 
     node.recalculateDurations();
@@ -1249,7 +1254,7 @@ describe('Governor Limits Parsing', () => {
 describe('Line Type Tests', () => {
   it('Lines referenced by exitTypes should be exits', () => {
     const parser = new ApexLogParser();
-    for (const [key, lineType] of lineTypeMap) {
+    for (const lineType of Object.values(lineTypeMap)) {
       const line = new lineType(parser, [
         '14:32:07.563 (17358806534)',
         'DUMMY',
@@ -1257,12 +1262,9 @@ describe('Line Type Tests', () => {
         'Rows:3',
         '',
         'Rows:5',
-      ]) as LogLine;
-      if (line instanceof Method) {
-        expect(line.exitTypes).not.toBe(null);
-        if (line.isExit) {
-          expect(line.exitTypes).toEqual([key]);
-        }
+      ]) as LogEvent;
+
+      if (line.isParent) {
         line.exitTypes.forEach((exitType) => {
           const exitCls = lineTypeMap.get(exitType);
           expect(exitCls).not.toBe(null);
@@ -1274,7 +1276,7 @@ describe('Line Type Tests', () => {
               'Rows:3',
               '',
               'Rows:5',
-            ]) as LogLine;
+            ]) as LogEvent;
             expect(exitLine.isExit).toBe(true);
           }
         });
