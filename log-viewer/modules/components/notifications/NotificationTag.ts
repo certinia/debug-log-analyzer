@@ -20,12 +20,18 @@ export class NotificationTag extends LitElement {
   open = false;
 
   @property()
-  notifications: Notification[] = [];
+  notifications: Notification[] | null = null;
 
   colorStyles = new Map([
     ['Error', 'error'],
     ['Warning', 'warning'],
     ['Info', 'info'],
+  ]);
+
+  sortOrder = new Map([
+    ['Error', 0],
+    ['Warning', 1],
+    ['Info', 2],
   ]);
 
   constructor() {
@@ -127,16 +133,14 @@ export class NotificationTag extends LitElement {
   ];
 
   render() {
+    if (!this.notifications) {
+      return html`<badge-base .isloading=${true}></badge-base>`;
+    }
+
     const status = this.notifications.length > 0 ? 'failure' : 'success';
 
-    const sortOrder = new Map([
-      ['Error', 0],
-      ['Warning', 1],
-      ['Info', 2],
-    ]);
-
     this.notifications.sort((a, b) => {
-      return (sortOrder.get(a.severity) || 0) - (sortOrder.get(b.severity) || 0);
+      return (this.sortOrder.get(a.severity) || 0) - (this.sortOrder.get(b.severity) || 0);
     });
 
     const messages: TemplateResult[] = [];
