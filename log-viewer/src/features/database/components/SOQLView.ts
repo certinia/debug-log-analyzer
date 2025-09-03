@@ -17,30 +17,30 @@ import {
 } from 'tabulator-tables';
 
 //tabulator custom modules
-import { GroupCalcs } from '../../../ui/datagrid/groups/GroupCalcs.js';
-import { GroupSort } from '../../../ui/datagrid/groups/GroupSort.js';
-import * as CommonModules from '../../../ui/datagrid/module/CommonModules.js';
-import { RowKeyboardNavigation } from '../../../ui/datagrid/module/RowKeyboardNavigation.js';
-import { RowNavigation } from '../../../ui/datagrid/module/RowNavigation.js';
+import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
+import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
+import * as CommonModules from '../../../tabulator/module/CommonModules.js';
+import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
+import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import { Find, formatter } from '../../call-tree/services/Find.js';
 
 // tabulator others
-import NumberAccessor from '../../../ui/datagrid/dataaccessor/Number.js';
-import Number from '../../../ui/datagrid/format/Number.js';
-import dataGridStyles from '../../../ui/datagrid/style/DataGrid.scss';
+import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
+import Number from '../../../tabulator/format/Number.js';
+import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // others
 import type { ApexLog, SOQLExecuteBeginLine } from '../../../core/log-parser/LogEvents.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
-import codiconStyles from '../../../ui/styles/codicon.css';
-import { globalStyles } from '../../../ui/styles/global.styles.js';
+import codiconStyles from '../../../styles/codicon.css';
+import { globalStyles } from '../../../styles/global.styles.js';
 import { DatabaseAccess } from '../services/Database.js';
 import databaseViewStyles from './DatabaseView.scss';
 
 // lit components
-import '../../../ui/components/CallStack.js';
-import '../../../ui/components/datagrid-filter-bar.js';
+import '../../../components/CallStack.js';
+import '../../../components/datagrid-filter-bar.js';
 import './DatabaseSOQLDetailPanel.js';
 import './DatabaseSection.js';
 

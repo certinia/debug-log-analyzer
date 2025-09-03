@@ -13,24 +13,24 @@ import { customElement, property } from 'lit/decorators.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import formatDuration, { isVisible } from '../../../core/utility/Util.js';
-import NumberAccessor from '../../../ui/datagrid/dataaccessor/Number.js';
-import { progressFormatterMS } from '../../../ui/datagrid/format/ProgressMS.js';
-import { GroupCalcs } from '../../../ui/datagrid/groups/GroupCalcs.js';
-import { GroupSort } from '../../../ui/datagrid/groups/GroupSort.js';
-import * as CommonModules from '../../../ui/datagrid/module/CommonModules.js';
-import { RowKeyboardNavigation } from '../../../ui/datagrid/module/RowKeyboardNavigation.js';
-import { RowNavigation } from '../../../ui/datagrid/module/RowNavigation.js';
-import dataGridStyles from '../../../ui/datagrid/style/DataGrid.scss';
-import { globalStyles } from '../../../ui/styles/global.styles.js';
+import { globalStyles } from '../../../styles/global.styles.js';
+import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
+import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
+import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
+import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
+import * as CommonModules from '../../../tabulator/module/CommonModules.js';
+import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
+import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
+import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 // Tabulator custom modules, imports + styles
 import { Tabulator, type RowComponent } from 'tabulator-tables';
-import codiconStyles from '../../../ui/styles/codicon.css';
+import codiconStyles from '../../../styles/codicon.css';
 import { Find, formatter } from '../../call-tree/services/Find.js';
 import { callStackSum } from '../services/CallStackSum.js';
 
 // Components
-import '../../../ui/components/GridSkeleton.js';
-import '../../../ui/components/datagrid-filter-bar.js';
+import '../../../components/GridSkeleton.js';
+import '../../../components/datagrid-filter-bar.js';
 
 provideVSCodeDesignSystem().register(
   vsCodeButton(),

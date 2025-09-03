@@ -5,8 +5,8 @@ import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
-import { globalStyles } from '../../../ui/styles/global.styles.js';
-import { skeletonStyles } from '../../../ui/styles/skeleton.styles.js';
+import { globalStyles } from '../../../styles/global.styles.js';
+import { skeletonStyles } from '../../../styles/skeleton.styles.js';
 import { init as timelineInit, type TimelineGroup } from '../services/Timeline.js';
 import './TimelineKey.js';
 

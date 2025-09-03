@@ -4,18 +4,18 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { parse } from '../core/log-parser/ApexLogParser.js';
-import { type ApexLog } from '../core/log-parser/LogEvents.js';
-import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
+import { parse } from '../../core/log-parser/ApexLogParser.js';
+import { type ApexLog } from '../../core/log-parser/LogEvents.js';
+import { vscodeMessenger } from '../../core/messaging/VSCodeExtensionMessenger.js';
+import { globalStyles } from '../../styles/global.styles.js';
 import {
   Notification,
   type NotificationSeverity,
-} from '../features/notifications/components/NotificationPanel.js';
-import type { TimelineGroup } from '../features/timeline/services/Timeline.js';
-import { globalStyles } from '../ui/styles/global.styles.js';
+} from '../notifications/components/NotificationPanel.js';
+import type { TimelineGroup } from '../timeline/services/Timeline.js';
 import './AppHeader.js';
 
-import { keyMap, setColors } from '../features/timeline/services/Timeline.js';
+import { keyMap, setColors } from '../timeline/services/Timeline.js';
 
 @customElement('log-viewer')
 export class LogViewer extends LitElement {

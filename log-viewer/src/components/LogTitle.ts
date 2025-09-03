@@ -5,7 +5,7 @@ import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-tool
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { vscodeMessenger } from '../../core/messaging/VSCodeExtensionMessenger.js';
+import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
 

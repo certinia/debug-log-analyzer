@@ -3,7 +3,7 @@
  */
 import { html, render } from 'lit';
 
-import './app/LogViewer';
+import './features/app/LogViewer';
 
 function onInit(): void {
   render(html`<log-viewer></log-viewer>`, document.body);

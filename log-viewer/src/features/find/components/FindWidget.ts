@@ -3,9 +3,9 @@
 import { provideVSCodeDesignSystem, vsCodeTextField } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import '../../../ui/components/VsIconCheckbox.js';
-import codiconStyles from '../../../ui/styles/codicon.css';
-import { globalStyles } from '../../../ui/styles/global.styles.js';
+import '../../../components/VsIconCheckbox.js';
+import codiconStyles from '../../../styles/codicon.css';
+import { globalStyles } from '../../../styles/global.styles.js';
 
 provideVSCodeDesignSystem().register(vsCodeTextField());
 

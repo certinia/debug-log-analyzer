@@ -4,7 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { DebugLevel } from '../../core/log-parser/ApexLogParser.js';
+import { DebugLevel } from '../core/log-parser/ApexLogParser.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
 

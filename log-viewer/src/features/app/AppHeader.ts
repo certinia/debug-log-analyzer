@@ -10,18 +10,18 @@ import {
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import type { ApexLog } from '../core/log-parser/LogEvents.js';
-import '../features/analysis/components/AnalysisView.js';
-import '../features/call-tree/components/CalltreeView';
-import '../features/database/components/DatabaseView.js';
-import '../features/find/components/FindWidget.js';
-import { Notification } from '../features/notifications/components/NotificationPanel.js';
-import '../features/timeline/components/TimelineView.js';
-import type { TimelineGroup } from '../features/timeline/services/Timeline.js';
-import '../ui/components/LogLevels.js';
-import '../ui/components/NavBar.js';
-import codiconStyles from '../ui/styles/codicon.css';
-import { globalStyles } from '../ui/styles/global.styles.js';
+import '../../components/LogLevels.js';
+import '../../components/NavBar.js';
+import type { ApexLog } from '../../core/log-parser/LogEvents.js';
+import codiconStyles from '../../styles/codicon.css';
+import { globalStyles } from '../../styles/global.styles.js';
+import '../analysis/components/AnalysisView.js';
+import '../call-tree/components/CalltreeView.js';
+import '../database/components/DatabaseView.js';
+import '../find/components/FindWidget.js';
+import { Notification } from '../notifications/components/NotificationPanel.js';
+import '../timeline/components/TimelineView.js';
+import type { TimelineGroup } from '../timeline/services/Timeline.js';
 
 provideVSCodeDesignSystem().register(vsCodePanelTab(), vsCodePanelView(), vsCodePanels());
 

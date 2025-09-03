@@ -5,9 +5,9 @@ import { provideVSCodeDesignSystem, vsCodeButton, vsCodeDivider } from '@vscode/
 import { LitElement, css, html, unsafeCSS, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import codiconStyles from '../../../ui/styles/codicon.css';
-import { globalStyles } from '../../../ui/styles/global.styles.js';
-import { notificationStyles } from '../../../ui/styles/notification.styles.js';
+import codiconStyles from '../../../styles/codicon.css';
+import { globalStyles } from '../../../styles/global.styles.js';
+import { notificationStyles } from '../../../styles/notification.styles.js';
 import './NotificationPanel.js';
 
 provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider());

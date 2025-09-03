@@ -5,11 +5,11 @@ import { provideVSCodeDesignSystem, vsCodeButton, vsCodeTag } from '@vscode/webv
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { vscodeMessenger } from '../../core/messaging/VSCodeExtensionMessenger.js';
-import '../../features/notifications/components/NotificationButton.js';
-import '../../features/notifications/components/NotificationPanel.js';
-import { Notification } from '../../features/notifications/components/NotificationPanel.js';
-import '../../features/notifications/components/NotificationTag.js';
+import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
+import '../features/notifications/components/NotificationButton.js';
+import '../features/notifications/components/NotificationPanel.js';
+import { Notification } from '../features/notifications/components/NotificationPanel.js';
+import '../features/notifications/components/NotificationTag.js';
 import codiconStyles from '../styles/codicon.css';
 import { globalStyles } from '../styles/global.styles.js';
 import { notificationStyles } from '../styles/notification.styles.js';

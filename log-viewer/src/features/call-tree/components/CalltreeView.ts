@@ -11,22 +11,22 @@ import { css, html, LitElement, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
-import * as CommonModules from '../../../ui/datagrid/module/CommonModules.js';
+import * as CommonModules from '../../../tabulator/module/CommonModules.js';
 
-import MinMaxEditor from '../../../ui/datagrid/editors/MinMax.js';
-import MinMaxFilter from '../../../ui/datagrid/filters/MinMax.js';
-import { progressFormatter } from '../../../ui/datagrid/format/Progress.js';
-import { progressFormatterMS } from '../../../ui/datagrid/format/ProgressMS.js';
+import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
+import MinMaxFilter from '../../../tabulator/filters/MinMax.js';
+import { progressFormatter } from '../../../tabulator/format/Progress.js';
+import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 
+import '../../../components/GridSkeleton.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type { LogEventType } from '../../../core/log-parser/types.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import formatDuration, { isVisible } from '../../../core/utility/Util.js';
-import '../../../ui/components/GridSkeleton.js';
-import { RowKeyboardNavigation } from '../../../ui/datagrid/module/RowKeyboardNavigation.js';
-import { RowNavigation } from '../../../ui/datagrid/module/RowNavigation.js';
-import dataGridStyles from '../../../ui/datagrid/style/DataGrid.scss';
-import { globalStyles } from '../../../ui/styles/global.styles.js';
+import { globalStyles } from '../../../styles/global.styles.js';
+import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
+import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
+import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import { Find, formatter } from '../services/Find.js';
 import { MiddleRowFocus } from '../services/MiddleRowFocus.js';
 
