@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { DatabaseAccess } from '../Database.js';
-import { parse } from '../parsers/ApexLogParser.js';
+import { parse } from '../core/log-parser/ApexLogParser.js';
+import { DatabaseAccess } from '../features/database/services/Database.js';
 
 describe('Analyse database tests', () => {
   it('Only DML and SOQL are collected', async () => {

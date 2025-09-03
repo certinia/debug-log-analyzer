@@ -11,10 +11,10 @@ import {
   parseObjectNamespace,
   parseRows,
   parseVfNamespace,
-} from '../parsers/LogEvents.js';
-import { lineTypeMap } from '../parsers/LogLineMapping.js';
+} from '../core/log-parser/LogEvents.js';
+import { lineTypeMap } from '../core/log-parser/LogLineMapping.js';
 
-import { ApexLogParser, parse } from '../parsers/ApexLogParser.js';
+import { ApexLogParser, parse } from '../core/log-parser/ApexLogParser.js';
 
 class DummyLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
