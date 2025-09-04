@@ -10,6 +10,12 @@ import {
 import { CharStreams } from 'antlr4ts';
 import { ApexNature, ApexVisitor, type ApexMethodNode, type ApexNode } from './ApexVisitor';
 
+export type SymbolLocation = {
+  line: number;
+  isExactMatch: boolean;
+  missingSymbol?: string;
+};
+
 export function parseApex(apexCode: string): ApexNode {
   const parser = new ApexParser(
     new CommonTokenStream(
@@ -19,31 +25,43 @@ export function parseApex(apexCode: string): ApexNode {
   return new ApexVisitor().visit(parser.compilationUnit());
 }
 
-export function getMethodLine(rootNode: ApexNode, symbols: string[]): number {
+export function getMethodLine(rootNode: ApexNode, symbols: string[]): SymbolLocation {
+  const result: SymbolLocation = { line: 1, isExactMatch: true };
+
   if (symbols[0] === rootNode.name) {
     symbols = symbols.slice(1);
   }
 
   if (!symbols.length) {
-    return 1;
+    return result;
   }
 
-  let line = 1;
   let currentRoot: ApexNode | undefined = rootNode;
 
   for (const symbol of symbols) {
-    if (!currentRoot) {
-      break;
-    }
-
     if (isClassSymbol(symbol)) {
       currentRoot = findClassNode(currentRoot, symbol);
+
+      if (!currentRoot) {
+        result.isExactMatch = false;
+        result.missingSymbol = symbol;
+        break;
+      }
     } else {
-      line = findMethodNode(currentRoot, symbol)?.line ?? 1;
+      const methodNode = findMethodNode(currentRoot, symbol);
+
+      if (!methodNode) {
+        result.line = currentRoot.line ?? 1;
+        result.isExactMatch = false;
+        result.missingSymbol = symbol;
+        break;
+      }
+
+      result.line = methodNode.line;
     }
   }
 
-  return line;
+  return result;
 }
 
 function isClassSymbol(symbol: string): boolean {

@@ -7,7 +7,6 @@ import {
   Selection,
   Uri,
   ViewColumn,
-  commands,
   workspace,
   type TextDocumentShowOptions,
 } from 'vscode';
@@ -60,8 +59,14 @@ export class OpenFileInPackage {
 
     const parsedRoot = parseApex(document.getText());
 
-    const lineNumber = getMethodLine(parsedRoot, parts);
-    const zeroIndexedLineNumber = lineNumber - 1;
+    const symbolLocation = getMethodLine(parsedRoot, parts);
+
+    if (!symbolLocation.isExactMatch) {
+      context.display.showErrorMessage(
+        `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${fileName}'`,
+      );
+    }
+    const zeroIndexedLineNumber = symbolLocation.line - 1;
 
     const pos = new Position(zeroIndexedLineNumber, 0);
 
@@ -72,6 +77,6 @@ export class OpenFileInPackage {
       selection: new Selection(pos, pos),
     };
 
-    commands.executeCommand('vscode.open', Uri.file(path), options);
+    context.display.showFile(path, options);
   }
 }

@@ -59,6 +59,7 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
       nature: ApexNature.class,
       name: ctx.id().Identifier()?.toString() ?? '',
       children: ctx.children?.length ? this.visitChildren(ctx).children : [],
+      line: ctx.start.line,
     };
   }
 
