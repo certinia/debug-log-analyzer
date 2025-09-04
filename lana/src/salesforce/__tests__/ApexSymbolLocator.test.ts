@@ -6,12 +6,12 @@ import { ApexVisitor, type ApexNode } from '../ApexParser/ApexVisitor';
 
 jest.mock('../ApexParser/ApexVisitor');
 jest.mock('@apexdevtools/apex-parser');
-jest.mock('antlr4ts');
 
 describe('ApexSymbolLocator', () => {
   const mockAST = {
     nature: 'Class',
     name: 'MyClass',
+    line: 1,
     children: [
       {
         nature: 'Method',
@@ -34,6 +34,7 @@ describe('ApexSymbolLocator', () => {
       {
         nature: 'Class',
         name: 'Inner',
+        line: 5,
         children: [
           {
             nature: 'Method',
@@ -69,33 +70,48 @@ describe('ApexSymbolLocator', () => {
     });
 
     it('should find method line for top-level method', () => {
-      const line = getMethodLine(root, ['MyClass', 'foo()']);
-      expect(line).toBe(2);
+      const result = getMethodLine(root, ['MyClass', 'foo()']);
+      expect(result.line).toBe(2);
+      expect(result.isExactMatch).toBe(true);
     });
 
     it('should find method line for method with params', () => {
-      const line = getMethodLine(root, ['MyClass', 'bar(Integer)']);
-      expect(line).toBe(3);
+      const result = getMethodLine(root, ['MyClass', 'bar(Integer)']);
+      expect(result.line).toBe(3);
+      expect(result.isExactMatch).toBe(true);
     });
 
     it('should find method line for overloaded method', () => {
-      const line = getMethodLine(root, ['MyClass', 'bar(Integer, Integer)']);
-      expect(line).toBe(4);
+      const result = getMethodLine(root, ['MyClass', 'bar(Integer, Integer)']);
+      expect(result.line).toBe(4);
+      expect(result.isExactMatch).toBe(true);
     });
 
     it('should find method line for inner class method', () => {
-      const line = getMethodLine(root, ['MyClass', 'Inner', 'bar(Integer)']);
-      expect(line).toBe(6);
+      const result = getMethodLine(root, ['MyClass', 'Inner', 'bar(Integer)']);
+      expect(result.line).toBe(6);
+      expect(result.isExactMatch).toBe(true);
     });
 
     it('should handle symbol not found', () => {
-      const line = getMethodLine(root, ['MyClass', 'notFound()']);
-      expect(line).toBe(1);
+      const result = getMethodLine(root, ['MyClass', 'notFound()']);
+      expect(result.line).toBe(1);
+      expect(result.isExactMatch).toBe(false);
+      expect(result.missingSymbol).toBe('notFound()');
+    });
+
+    it('should handle symbol not found on inner class', () => {
+      const result = getMethodLine(root, ['MyClass', 'Inner', 'notFound()']);
+      expect(result.line).toBe(5);
+      expect(result.isExactMatch).toBe(false);
+      expect(result.missingSymbol).toBe('notFound()');
     });
 
     it('should handle missing class', () => {
-      const line = getMethodLine(root, ['NotAClass', 'foo()']);
-      expect(line).toBe(1);
+      const result = getMethodLine(root, ['NotAClass', 'foo()']);
+      expect(result.line).toBe(1);
+      expect(result.isExactMatch).toBe(false);
+      expect(result.missingSymbol).toBe('NotAClass');
     });
   });
 });

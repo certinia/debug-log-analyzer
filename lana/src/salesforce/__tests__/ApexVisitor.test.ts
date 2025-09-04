@@ -28,6 +28,7 @@ describe('ApexVisitor', () => {
         getChild: jest.fn().mockReturnValue({
           accept: jest.fn().mockReturnValue({ nature: ApexNature.method, name: 'foo' }),
         }),
+        start: { line: 5 },
       };
       visitor.visitChildren = jest
         .fn()
@@ -37,6 +38,7 @@ describe('ApexVisitor', () => {
 
       expect(node.nature).toBe(ApexNature.class);
       expect(node.name).toBe('MyClass');
+      expect(node.line).toBe(5);
       expect(node.children).toEqual([{ nature: ApexNature.method, name: 'foo' }]);
     });
 
@@ -46,12 +48,14 @@ describe('ApexVisitor', () => {
           Identifier: () => undefined,
         }),
         children: [],
+        start: { line: 10 },
       };
       visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
 
       const node = visitor.visitClassDeclaration(ctx as any);
 
       expect(node.name).toBe('');
+      expect(node.line).toBe(10);
     });
 
     it('should handle missing children', () => {
@@ -60,11 +64,13 @@ describe('ApexVisitor', () => {
           Identifier: () => ({ toString: () => 'NoChildren' }),
         }),
         children: undefined,
+        start: { line: 15 },
       };
 
       const node = visitor.visitClassDeclaration(ctx as any);
 
       expect(node.children).toEqual([]);
+      expect(node.line).toBe(15);
     });
   });
 
