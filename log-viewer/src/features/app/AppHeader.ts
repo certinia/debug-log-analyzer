@@ -10,18 +10,22 @@ import {
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
+import type { ApexLog } from '../../core/log-parser/LogEvents.js';
+import { Notification } from '../notifications/components/NotificationPanel.js';
+import type { TimelineGroup } from '../timeline/services/Timeline.js';
+
+// web components
 import '../../components/LogLevels.js';
 import '../../components/NavBar.js';
-import type { ApexLog } from '../../core/log-parser/LogEvents.js';
-import codiconStyles from '../../styles/codicon.css';
-import { globalStyles } from '../../styles/global.styles.js';
 import '../analysis/components/AnalysisView.js';
 import '../call-tree/components/CalltreeView.js';
 import '../database/components/DatabaseView.js';
 import '../find/components/FindWidget.js';
-import { Notification } from '../notifications/components/NotificationPanel.js';
 import '../timeline/components/TimelineView.js';
-import type { TimelineGroup } from '../timeline/services/Timeline.js';
+
+// styles
+import codiconStyles from '../../styles/codicon.css';
+import { globalStyles } from '../../styles/global.styles.js';
 
 provideVSCodeDesignSystem().register(vsCodePanelTab(), vsCodePanelView(), vsCodePanels());
 

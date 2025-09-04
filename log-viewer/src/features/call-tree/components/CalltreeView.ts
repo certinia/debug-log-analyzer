@@ -11,24 +11,29 @@ import { css, html, LitElement, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
-import * as CommonModules from '../../../tabulator/module/CommonModules.js';
 
-import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
-import MinMaxFilter from '../../../tabulator/filters/MinMax.js';
-import { progressFormatter } from '../../../tabulator/format/Progress.js';
-import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-
-import '../../../components/GridSkeleton.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type { LogEventType } from '../../../core/log-parser/types.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import formatDuration, { isVisible } from '../../../core/utility/Util.js';
-import { globalStyles } from '../../../styles/global.styles.js';
+
+// Tabulator custom modules, imports + styles
+import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
+import MinMaxFilter from '../../../tabulator/filters/MinMax.js';
+import { progressFormatter } from '../../../tabulator/format/Progress.js';
+import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
+import * as CommonModules from '../../../tabulator/module/CommonModules.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import { Find, formatter } from '../services/Find.js';
 import { MiddleRowFocus } from '../services/MiddleRowFocus.js';
+
+// styles
+import { globalStyles } from '../../../styles/global.styles.js';
+
+// web components
+import '../../../components/GridSkeleton.js';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
 

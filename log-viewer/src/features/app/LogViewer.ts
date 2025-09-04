@@ -7,15 +7,18 @@ import { customElement, property } from 'lit/decorators.js';
 import { parse } from '../../core/log-parser/ApexLogParser.js';
 import { type ApexLog } from '../../core/log-parser/LogEvents.js';
 import { vscodeMessenger } from '../../core/messaging/VSCodeExtensionMessenger.js';
-import { globalStyles } from '../../styles/global.styles.js';
 import {
   Notification,
   type NotificationSeverity,
 } from '../notifications/components/NotificationPanel.js';
 import type { TimelineGroup } from '../timeline/services/Timeline.js';
-import './AppHeader.js';
-
 import { keyMap, setColors } from '../timeline/services/Timeline.js';
+
+// styles
+import { globalStyles } from '../../styles/global.styles.js';
+
+// web components
+import './AppHeader.js';
 
 @customElement('log-viewer')
 export class LogViewer extends LitElement {

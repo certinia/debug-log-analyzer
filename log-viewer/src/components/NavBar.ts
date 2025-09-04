@@ -6,13 +6,17 @@ import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
-import '../features/notifications/components/NotificationButton.js';
-import '../features/notifications/components/NotificationPanel.js';
 import { Notification } from '../features/notifications/components/NotificationPanel.js';
-import '../features/notifications/components/NotificationTag.js';
+
+// styles
 import codiconStyles from '../styles/codicon.css';
 import { globalStyles } from '../styles/global.styles.js';
 import { notificationStyles } from '../styles/notification.styles.js';
+
+// web components
+import '../features/notifications/components/NotificationButton.js';
+import '../features/notifications/components/NotificationPanel.js';
+import '../features/notifications/components/NotificationTag.js';
 import './BadgeBase.js';
 import './LogTitle.js';
 

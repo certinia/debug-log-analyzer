@@ -16,29 +16,28 @@ import {
   type RowComponent,
 } from 'tabulator-tables';
 
-//tabulator custom modules
+import type { ApexLog, SOQLExecuteBeginLine } from '../../../core/log-parser/LogEvents.js';
+import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { isVisible } from '../../../core/utility/Util.js';
+import { DatabaseAccess } from '../services/Database.js';
+
+// Tabulator custom modules, imports + styles
+import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
+import Number from '../../../tabulator/format/Number.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
+import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import { Find, formatter } from '../../call-tree/services/Find.js';
 
-// tabulator others
-import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
-import Number from '../../../tabulator/format/Number.js';
-import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
-
-// others
-import type { ApexLog, SOQLExecuteBeginLine } from '../../../core/log-parser/LogEvents.js';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { isVisible } from '../../../core/utility/Util.js';
+// styles
 import codiconStyles from '../../../styles/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
-import { DatabaseAccess } from '../services/Database.js';
 import databaseViewStyles from './DatabaseView.scss';
 
-// lit components
+// web components
 import '../../../components/CallStack.js';
 import '../../../components/datagrid-filter-bar.js';
 import './DatabaseSOQLDetailPanel.js';

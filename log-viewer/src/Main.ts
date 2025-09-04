@@ -3,6 +3,7 @@
  */
 import { html, render } from 'lit';
 
+// web components
 import './features/app/LogViewer';
 
 function onInit(): void {

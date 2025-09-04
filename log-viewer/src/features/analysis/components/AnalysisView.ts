@@ -10,10 +10,14 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { Tabulator, type RowComponent } from 'tabulator-tables';
+
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import formatDuration, { isVisible } from '../../../core/utility/Util.js';
-import { globalStyles } from '../../../styles/global.styles.js';
+import { callStackSum } from '../services/CallStackSum.js';
+
+// Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
@@ -22,11 +26,11 @@ import * as CommonModules from '../../../tabulator/module/CommonModules.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
-// Tabulator custom modules, imports + styles
-import { Tabulator, type RowComponent } from 'tabulator-tables';
-import codiconStyles from '../../../styles/codicon.css';
 import { Find, formatter } from '../../call-tree/services/Find.js';
-import { callStackSum } from '../services/CallStackSum.js';
+
+// styles
+import codiconStyles from '../../../styles/codicon.css';
+import { globalStyles } from '../../../styles/global.styles.js';
 
 // Components
 import '../../../components/GridSkeleton.js';

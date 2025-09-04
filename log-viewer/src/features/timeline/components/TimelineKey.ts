@@ -4,8 +4,11 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { globalStyles } from '../../../styles/global.styles.js';
 import { type TimelineGroup } from '../services/Timeline.js';
+
+// styles
+import { globalStyles } from '../../../styles/global.styles.js';
+
 @customElement('timeline-key')
 export class Timelinekey extends LitElement {
   @property()

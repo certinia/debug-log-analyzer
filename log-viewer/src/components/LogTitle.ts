@@ -6,6 +6,7 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
+// styles
 import { globalStyles } from '../styles/global.styles.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
 

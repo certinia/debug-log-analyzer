@@ -4,8 +4,12 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import '../../../components/BadgeBase.js';
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+
+// web components
+import '../../../components/BadgeBase.js';
+
+// styles
 import { globalStyles } from '../../../styles/global.styles.js';
 
 @customElement('database-section')

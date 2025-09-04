@@ -5,9 +5,13 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import '../../../components/CallStack.js';
 import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
+
+// styles
 import { globalStyles } from '../../../styles/global.styles.js';
+
+// web components
+import '../../../components/CallStack.js';
 import './DMLView.js';
 import './DatabaseSOQLDetailPanel.js';
 import './DatabaseSection.js';

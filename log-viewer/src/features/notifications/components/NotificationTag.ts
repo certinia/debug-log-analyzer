@@ -5,11 +5,15 @@ import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-tool
 import { LitElement, css, html, unsafeCSS, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import '../../../components/BadgeBase.js';
+import { goToRow } from '../../call-tree/components/CalltreeView.js';
+
+// styles
 import codiconStyles from '../../../styles/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { notificationStyles } from '../../../styles/notification.styles.js';
-import { goToRow } from '../../call-tree/components/CalltreeView.js';
+
+// web components
+import '../../../components/BadgeBase.js';
 import './NotificationPanel.js';
 
 provideVSCodeDesignSystem().register(vsCodeButton());

@@ -7,6 +7,8 @@ import { customElement, property } from 'lit/decorators.js';
 import type { LogEvent } from '../core/log-parser/LogEvents.js';
 import { goToRow } from '../features/call-tree/components/CalltreeView.js';
 import { DatabaseAccess } from '../features/database/services/Database.js';
+
+// styles
 import { globalStyles } from '../styles/global.styles.js';
 
 @customElement('call-stack')
