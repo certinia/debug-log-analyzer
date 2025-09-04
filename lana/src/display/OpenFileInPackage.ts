@@ -18,12 +18,12 @@ import { getMethodLine, parseApex } from '../salesforce/ApexParser/ApexSymbolLoc
 
 export class OpenFileInPackage {
   static async openFileForSymbol(context: Context, symbolName: string): Promise<void> {
-    if (!symbolName?.length) {
+    if (!symbolName?.trim()) {
       return;
     }
 
     const parts = symbolName.split('.');
-    const fileName = parts[0];
+    const fileName = parts[0]?.trim();
 
     const paths = await context.findSymbol(fileName as string);
     if (!paths.length) {
