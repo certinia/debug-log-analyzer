@@ -31,9 +31,9 @@ export function getMethodLine(rootNode: ApexNode, symbols: string[]): number {
   let line = 1;
   let currentRoot: ApexNode | undefined = rootNode;
 
-  symbols.forEach((symbol) => {
+  for (const symbol of symbols) {
     if (!currentRoot) {
-      return;
+      break;
     }
 
     if (isClassSymbol(symbol)) {
@@ -41,7 +41,7 @@ export function getMethodLine(rootNode: ApexNode, symbols: string[]): number {
     } else {
       line = findMethodNode(currentRoot, symbol)?.line ?? 1;
     }
-  });
+  }
 
   return line;
 }
