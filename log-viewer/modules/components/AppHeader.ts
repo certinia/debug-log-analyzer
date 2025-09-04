@@ -10,9 +10,10 @@ import {
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
+import type { ApexLog } from '../parsers/LogEvents.js';
 import codiconStyles from '../styles/codicon.css';
 import { globalStyles } from '../styles/global.styles.js';
-import { ApexLog, type TimelineGroup } from '../timeline/Timeline.js';
+import type { TimelineGroup } from '../timeline/Timeline.js';
 import '../timeline/TimelineView.js';
 import './analysis-view/AnalysisView.js';
 import './calltree-view/CalltreeView';
@@ -35,9 +36,7 @@ export class AppHeader extends LitElement {
   @property()
   logDuration = null;
   @property()
-  logStatus = 'Processing...';
-  @property()
-  notifications: Notification[] = [];
+  notifications: Notification[] | null = null;
   @property()
   parserIssues: Notification[] = [];
   @property()
@@ -103,7 +102,6 @@ export class AppHeader extends LitElement {
         .logPath=${this.logPath}
         .logSize=${this.logSize}
         .logDuration=${this.logDuration}
-        .logStatus=${this.logStatus}
         .notifications=${this.notifications}
         .parserIssues=${this.parserIssues}
       ></nav-bar>

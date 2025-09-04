@@ -1,9 +1,14 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { ApexLog, DMLBeginLine, Method, SOQLExecuteBeginLine } from './parsers/ApexLogParser.js';
+import {
+  type ApexLog,
+  DMLBeginLine,
+  type LogEvent,
+  SOQLExecuteBeginLine,
+} from './parsers/LogEvents.js';
 
-export type Stack = Method[];
+export type Stack = LogEvent[];
 
 export class DatabaseAccess {
   private static _instance: DatabaseAccess | null = null;
@@ -23,13 +28,13 @@ export class DatabaseAccess {
   public getStack(
     timestamp: number,
     stack: Stack = [],
-    line: Method = DatabaseAccess._treeRoot,
+    line: LogEvent = DatabaseAccess._treeRoot,
   ): Stack {
     const children = line.children;
     const len = children.length;
     for (let i = 0; i < len; ++i) {
       const child = children[i];
-      if (child instanceof Method) {
+      if (child?.isParent) {
         stack.push(child);
         if (child.timestamp === timestamp) {
           return stack;
@@ -45,7 +50,7 @@ export class DatabaseAccess {
     return [];
   }
 
-  public getSOQLLines(line: Method = DatabaseAccess._treeRoot): SOQLExecuteBeginLine[] {
+  public getSOQLLines(line: LogEvent = DatabaseAccess._treeRoot): SOQLExecuteBeginLine[] {
     const results: SOQLExecuteBeginLine[] = [];
 
     const children = line.children;
@@ -56,7 +61,7 @@ export class DatabaseAccess {
         results.push(child);
       }
 
-      if (child instanceof Method) {
+      if (child?.isParent) {
         Array.prototype.push.apply(results, this.getSOQLLines(child));
       }
     }
@@ -64,7 +69,7 @@ export class DatabaseAccess {
     return results;
   }
 
-  public getDMLLines(line: Method = DatabaseAccess._treeRoot): DMLBeginLine[] {
+  public getDMLLines(line: LogEvent = DatabaseAccess._treeRoot): DMLBeginLine[] {
     const results: DMLBeginLine[] = [];
 
     const children = line.children;
@@ -75,7 +80,7 @@ export class DatabaseAccess {
         results.push(child);
       }
 
-      if (child instanceof Method) {
+      if (child?.isParent) {
         // results = results.concat(this.getDMLLines(child));
         Array.prototype.push.apply(results, this.getDMLLines(child));
       }

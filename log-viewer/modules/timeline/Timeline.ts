@@ -4,16 +4,8 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import formatDuration, { debounce } from '../Util.js';
 import { goToRow } from '../components/calltree-view/CalltreeView.js';
-import {
-  ApexLog,
-  LogLine,
-  Method,
-  TimedNode,
-  type LogIssue,
-  type LogSubCategory,
-} from '../parsers/ApexLogParser.js';
-
-export { ApexLog };
+import type { ApexLog, LogEvent } from '../parsers/LogEvents.js';
+import type { LogIssue, LogSubCategory } from '../parsers/types.js';
 
 export interface TimelineGroup {
   label: string;
@@ -156,13 +148,13 @@ let ctx: CanvasRenderingContext2D | null;
 let isVisible = false;
 let realHeight = 0;
 let scaleFont: string,
-  maxY: number,
   displayHeight: number,
   displayWidth: number,
   timelineRoot: ApexLog,
   lastMouseX: number,
   lastMouseY: number,
   dpr = window.devicePixelRatio || 1;
+let maxY: number;
 
 let searchString: string = '';
 let matchIndex: number | null = null;
@@ -173,16 +165,16 @@ let findArgs: { text: string; count: number; options: { matchCase: boolean } } =
 };
 let totalMatches = 0;
 
-function getMaxDepth(nodes: LogLine[]): number {
+function getMaxDepth(nodes: LogEvent[]): number {
   let maxDepth = 0;
-  let currentLevel = nodes.filter((n) => n.exitTypes.length);
+  let currentLevel = nodes.filter((n) => n.duration && n.children.length);
 
   while (currentLevel.length) {
     maxDepth++;
-    const nextLevel: LogLine[] = [];
+    const nextLevel: LogEvent[] = [];
     for (const node of currentLevel) {
       for (const child of node.children) {
-        if (child.exitTypes.length) {
+        if (child.duration && child.children.length) {
           nextLevel.push(child);
         }
       }
@@ -257,20 +249,21 @@ function drawScale(ctx: CanvasRenderingContext2D) {
   ctx.stroke();
 }
 
-function nodesToRectangles(rootNodes: Method[]) {
+function nodesToRectangles(rootNodes: LogEvent[]) {
+  // seed depth 0
   let depth = 0;
-  let currentLevel = rootNodes.filter((n) => n.exitTypes.length);
+  let currentLevel = rootNodes.filter((n) => n.duration && n.children.length);
 
   while (currentLevel.length) {
-    const nextLevel: Method[] = [];
+    const nextLevel: LogEvent[] = [];
 
     for (const node of currentLevel) {
-      if (node.subCategory && node.duration) {
+      if (node.duration && node.subCategory) {
         addToRectQueue(node, depth);
       }
 
       for (const child of node.children) {
-        if (child instanceof Method) {
+        if (child.duration && child.children.length) {
           nextLevel.push(child);
         }
       }
@@ -297,14 +290,14 @@ let currentFindMatchColor = '#9e6a03';
  * @param node The node to be rendered
  * @param y The call depth of the node
  */
-function addToRectQueue(node: Method, y: number) {
+function addToRectQueue(node: LogEvent, y: number) {
   const {
     subCategory: subCategory,
     timestamp: x,
     duration: { total: w },
   } = node;
-  let borderColor = '';
 
+  let borderColor = '';
   if (hasFindMatch(node)) {
     borderColor = findMatchColor;
   }
@@ -323,15 +316,15 @@ function addToRectQueue(node: Method, y: number) {
   borders.push(rect);
 }
 
-function hasFindMatch(node: Method) {
-  if (!searchString || !node) {
+function hasFindMatch(node: LogEvent) {
+  if (!searchString) {
     return false;
   }
 
-  const nodeType = node.type ?? '';
+  const nodeType = node.type;
   const matchType = findArgs.options.matchCase
-    ? nodeType.includes(searchString)
-    : nodeType.toLowerCase().includes(searchString);
+    ? nodeType?.includes(searchString)
+    : nodeType?.toLowerCase().includes(searchString);
   if (matchType) {
     return matchType;
   }
@@ -560,7 +553,7 @@ export function init(timelineContainer: HTMLDivElement, rootMethod: ApexLog) {
   onInitTimeline();
 
   calculateSizes();
-  nodesToRectangles(timelineRoot.children as Method[]);
+  nodesToRectangles(timelineRoot.children);
   if (ctx) {
     requestAnimationFrame(drawTimeLine);
   }
@@ -593,12 +586,12 @@ function drawTimeLine() {
 }
 
 function findByPosition(
-  nodes: LogLine[],
+  nodes: LogEvent[],
   depth: number,
   x: number,
   targetDepth: number,
   shouldIgnoreWidth: boolean,
-): LogLine | null {
+): LogEvent | null {
   if (!nodes) {
     return null;
   }
@@ -655,7 +648,7 @@ function findTimelineTooltip(
 ): HTMLDivElement | null {
   const target = findByPosition(timelineRoot.children, 0, x, depth, shouldIgnoreWidth);
 
-  if (target && target instanceof TimedNode) {
+  if (target?.isParent) {
     canvas.classList.remove('timeline-hover', 'timeline-dragging');
     canvas.classList.add('timeline-event--hover');
 
@@ -897,13 +890,7 @@ function onClickCanvas(): void {
   const isClick = mouseDownPosition.x === lastMouseX && mouseDownPosition.y === lastMouseY;
   if (!dragging && isClick) {
     const depth = getDepth(lastMouseY);
-    let timeStamp = findByPosition(
-      timelineRoot.children as TimedNode[],
-      0,
-      lastMouseX,
-      depth,
-      false,
-    )?.timestamp;
+    let timeStamp = findByPosition(timelineRoot.children, 0, lastMouseX, depth, false)?.timestamp;
 
     if (!timeStamp) {
       timeStamp = findLogIssue(lastMouseX)?.startTime;
@@ -1022,7 +1009,7 @@ function _findOnTimeline(
   if (newSearch || clearHighlights) {
     rectRenderQueue.clear();
     borderRenderQueue.clear();
-    nodesToRectangles(timelineRoot.children as Method[]);
+    nodesToRectangles(timelineRoot.children);
     const findResults = borderRenderQueue.get(findMatchColor) || [];
     totalMatches = findResults.length;
 
