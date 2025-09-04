@@ -23,17 +23,11 @@ export default {
       ...defaultConfig,
       displayName: 'log-viewer',
       rootDir: '<rootDir>/log-viewer',
-      transformIgnorePatterns: [ 
+      transformIgnorePatterns: [
         // allow lit/@lit transformation
         '<rootDir>/node_modules/(?!@?lit)',
       ],
       testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/out/'],
-    },
-    {
-      ...defaultConfig,
-      displayName: 'modules',
-      rootDir: '<rootDir>/modules',
-      testPathIgnorePatterns: ['<rootDir>/node_modules/'],
     },
   ],
 };
