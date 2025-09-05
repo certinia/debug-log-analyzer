@@ -14,8 +14,10 @@ const defaultConfig = {
       },
     ],
   },
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/out/'],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
 };
+
 /** @type {import('@jest/types').Config.InitialOptions} */
 export default {
   projects: [
@@ -23,11 +25,15 @@ export default {
       ...defaultConfig,
       displayName: 'log-viewer',
       rootDir: '<rootDir>/log-viewer',
+    },
+    {
+      ...defaultConfig,
+      displayName: 'lana',
+      rootDir: '<rootDir>/lana',
       transformIgnorePatterns: [
         // allow lit/@lit transformation
         '<rootDir>/node_modules/(?!@?lit)',
       ],
-      testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/out/'],
     },
   ],
 };

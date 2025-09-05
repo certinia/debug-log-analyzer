@@ -631,7 +631,6 @@ export class CalltreeView extends LitElement {
               const node = (cell.getData() as CalltreeRow).originalData;
               let text = node.text;
               if (node.hasValidSymbols) {
-                text += node.lineNumber ? `:${node.lineNumber}` : '';
                 const link = document.createElement('a');
                 link.setAttribute('href', '#!');
                 link.textContent = text;
@@ -658,23 +657,7 @@ export class CalltreeView extends LitElement {
               }
               const node = (cell.getData() as CalltreeRow).originalData;
               if (node.hasValidSymbols) {
-                const text = node.text;
-                const lineNumber = node.lineNumber ? '-' + node.lineNumber : '';
-                const bracketIndex = text.indexOf('(');
-                const qname = bracketIndex > -1 ? text.substring(0, bracketIndex) : text;
-
-                let typeName;
-                if (node.type === 'METHOD_ENTRY') {
-                  const lastDot = qname.lastIndexOf('.');
-                  typeName = text.substring(0, lastDot) + lineNumber;
-                } else {
-                  typeName = qname + lineNumber;
-                }
-
-                vscodeMessenger.send<VSCodeApexSymbol>('openType', {
-                  typeName: typeName,
-                  text: text,
-                });
+                vscodeMessenger.send<string>('openType', node.text);
               }
             },
             widthGrow: 5,
@@ -1006,10 +989,5 @@ export async function goToRow(timestamp: number) {
     new CustomEvent('calltree-go-to-row', { detail: { timestamp: timestamp } }),
   );
 }
-
-type VSCodeApexSymbol = {
-  typeName: string;
-  text: string;
-};
 
 type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

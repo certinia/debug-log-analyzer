@@ -1,0 +1,95 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
+import type {
+  ApexParserVisitor,
+  ClassDeclarationContext,
+  FormalParametersContext,
+  MethodDeclarationContext,
+} from '@apexdevtools/apex-parser';
+import type { ErrorNode, ParseTree, RuleNode, TerminalNode } from 'antlr4ts/tree';
+
+type ApexNature = 'Class' | 'Method';
+
+export interface ApexNode {
+  nature?: ApexNature;
+  name?: string;
+  children?: ApexNode[];
+  line?: number;
+}
+
+export type ApexMethodNode = ApexNode & {
+  nature: 'Method';
+  params: string;
+  line: number;
+};
+
+type VisitableApex = ParseTree & {
+  accept<Result>(visitor: ApexParserVisitor<Result>): Result;
+};
+
+export class ApexVisitor implements ApexParserVisitor<ApexNode> {
+  visit(ctx: ParseTree): ApexNode {
+    return ctx ? (ctx as VisitableApex).accept(this) : {};
+  }
+
+  visitChildren(ctx: RuleNode): ApexNode {
+    const children: ApexNode[] = [];
+
+    for (let index = 0; index < ctx.childCount; index++) {
+      const child = ctx.getChild(index);
+      const node = this.visit(child);
+      if (!node) {
+        continue;
+      }
+
+      this.forNode(node, (anon) => children.push(anon));
+    }
+
+    return { children };
+  }
+
+  visitClassDeclaration(ctx: ClassDeclarationContext): ApexNode {
+    return {
+      nature: 'Class',
+      name: ctx.id().Identifier()?.toString() ?? '',
+      children: ctx.children?.length ? this.visitChildren(ctx).children : [],
+      line: ctx.start.line,
+    };
+  }
+
+  visitMethodDeclaration(ctx: MethodDeclarationContext): ApexMethodNode {
+    return {
+      nature: 'Method',
+      name: ctx.id().Identifier()?.toString() ?? '',
+      children: ctx.children?.length ? this.visitChildren(ctx).children : [],
+      params: this.getParameters(ctx.formalParameters()),
+      line: ctx.start.line,
+    };
+  }
+
+  visitTerminal(_ctx: TerminalNode): ApexNode {
+    return {};
+  }
+
+  visitErrorNode(_ctx: ErrorNode): ApexNode {
+    return {};
+  }
+
+  private getParameters(ctx: FormalParametersContext): string {
+    const paramsList = ctx.formalParameterList()?.formalParameter();
+    return paramsList?.map((param) => param.typeRef().typeName(0)?.text).join(', ') ?? '';
+  }
+
+  private forNode(node: ApexNode, anonHandler: (n: ApexNode) => void) {
+    if (this.isAnonNode(node)) {
+      anonHandler(node);
+    } else if (node.children?.length) {
+      node.children.forEach((child) => anonHandler(child));
+    }
+  }
+
+  private isAnonNode(node: ApexNode) {
+    return !!node.nature;
+  }
+}
