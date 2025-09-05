@@ -3,7 +3,7 @@
     "lib": ["ES2022", "dom", "DOM.Iterable"],
 
     "outDir": "out",
-    "rootDir": "./modules",
+    "rootDir": "./src",
 
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -37,6 +37,6 @@
     "removeComments": true,
     "sourceMap": false
   },
-  "include": ["./modules/**/*.ts", "declarations.d.ts"],
+  "include": ["./src/**/*.ts", "declarations.d.ts"],
   "exclude": ["**/node_modules", "**/.*/"]
 }

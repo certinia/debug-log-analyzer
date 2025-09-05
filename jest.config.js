@@ -14,10 +14,6 @@ const defaultConfig = {
       },
     ],
   },
-  transformIgnorePatterns: [
-    // allow lit/@lit transformation
-    '<rootDir>/node_modules/(?!@?lit)',
-  ],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/out/'],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
 };
@@ -34,6 +30,10 @@ export default {
       ...defaultConfig,
       displayName: 'lana',
       rootDir: '<rootDir>/lana',
+      transformIgnorePatterns: [
+        // allow lit/@lit transformation
+        '<rootDir>/node_modules/(?!@?lit)',
+      ],
     },
   ],
 };
