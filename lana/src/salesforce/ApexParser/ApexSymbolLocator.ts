@@ -8,7 +8,7 @@ import {
   CommonTokenStream,
 } from '@apexdevtools/apex-parser';
 import { CharStreams } from 'antlr4ts';
-import { ApexNature, ApexVisitor, type ApexMethodNode, type ApexNode } from './ApexVisitor';
+import { ApexVisitor, type ApexMethodNode, type ApexNode } from './ApexVisitor';
 
 export type SymbolLocation = {
   line: number;
@@ -69,7 +69,7 @@ function isClassSymbol(symbol: string): boolean {
 }
 
 function findClassNode(root: ApexNode, symbol: string): ApexNode | undefined {
-  return root.children?.find((child) => child.name === symbol && child.nature === ApexNature.class);
+  return root.children?.find((child) => child.name === symbol && child.nature === 'Class');
 }
 
 function findMethodNode(root: ApexNode, symbol: string): ApexMethodNode | undefined {
@@ -79,7 +79,7 @@ function findMethodNode(root: ApexNode, symbol: string): ApexMethodNode | undefi
   return root.children?.find(
     (child) =>
       child.name === methodName &&
-      child.nature === ApexNature.method &&
+      child.nature === 'Method' &&
       (paramStr === undefined || (child as ApexMethodNode).params === paramStr),
   ) as ApexMethodNode;
 }

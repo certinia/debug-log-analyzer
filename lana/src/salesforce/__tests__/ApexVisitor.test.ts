@@ -3,7 +3,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/naming-convention */
-import { ApexNature, ApexVisitor } from '../ApexParser/ApexVisitor';
+import { ApexVisitor } from '../ApexParser/ApexVisitor';
 
 jest.mock('@apexdevtools/apex-parser');
 jest.mock('antlr4ts/tree');
@@ -26,20 +26,20 @@ describe('ApexVisitor', () => {
           return 1;
         },
         getChild: jest.fn().mockReturnValue({
-          accept: jest.fn().mockReturnValue({ nature: ApexNature.method, name: 'foo' }),
+          accept: jest.fn().mockReturnValue({ nature: 'Method', name: 'foo' }),
         }),
         start: { line: 5 },
       };
       visitor.visitChildren = jest
         .fn()
-        .mockReturnValue({ children: [{ nature: ApexNature.method, name: 'foo' }] });
+        .mockReturnValue({ children: [{ nature: 'Method', name: 'foo' }] });
 
       const node = visitor.visitClassDeclaration(ctx as any);
 
-      expect(node.nature).toBe(ApexNature.class);
+      expect(node.nature).toBe('Class');
       expect(node.name).toBe('MyClass');
       expect(node.line).toBe(5);
-      expect(node.children).toEqual([{ nature: ApexNature.method, name: 'foo' }]);
+      expect(node.children).toEqual([{ nature: 'Method', name: 'foo' }]);
     });
 
     it('should handle missing Identifier', () => {
@@ -95,7 +95,7 @@ describe('ApexVisitor', () => {
 
       const node = visitor.visitMethodDeclaration(ctx as any);
 
-      expect(node.nature).toBe(ApexNature.method);
+      expect(node.nature).toBe('Method');
       expect(node.name).toBe('myMethod');
       expect(node.params).toBe('Integer, String');
       expect(node.line).toBe(42);

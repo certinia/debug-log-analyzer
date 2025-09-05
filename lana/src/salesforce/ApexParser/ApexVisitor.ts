@@ -9,22 +9,17 @@ import type {
 } from '@apexdevtools/apex-parser';
 import type { ErrorNode, ParseTree, RuleNode, TerminalNode } from 'antlr4ts/tree';
 
-export enum ApexNature {
-  class = 'Class',
-  method = 'Method',
-}
-
-type ApexMemberNature = ApexNature.class | ApexNature.method;
+type ApexNature = 'Class' | 'Method';
 
 export interface ApexNode {
-  nature?: ApexMemberNature;
+  nature?: ApexNature;
   name?: string;
   children?: ApexNode[];
   line?: number;
 }
 
 export type ApexMethodNode = ApexNode & {
-  nature: ApexNature.method;
+  nature: 'Method';
   params: string;
   line: number;
 };
@@ -56,7 +51,7 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
 
   visitClassDeclaration(ctx: ClassDeclarationContext): ApexNode {
     return {
-      nature: ApexNature.class,
+      nature: 'Class',
       name: ctx.id().Identifier()?.toString() ?? '',
       children: ctx.children?.length ? this.visitChildren(ctx).children : [],
       line: ctx.start.line,
@@ -65,7 +60,7 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
 
   visitMethodDeclaration(ctx: MethodDeclarationContext): ApexMethodNode {
     return {
-      nature: ApexNature.method,
+      nature: 'Method',
       name: ctx.id().Identifier()?.toString() ?? '',
       children: ctx.children?.length ? this.visitChildren(ctx).children : [],
       params: this.getParameters(ctx.formalParameters()),
