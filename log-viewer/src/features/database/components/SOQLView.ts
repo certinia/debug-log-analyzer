@@ -27,10 +27,10 @@ import Number from '../../../tabulator/format/Number.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
+import { Find, formatter } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
-import { Find, formatter } from '../../call-tree/services/Find.js';
 
 // styles
 import codiconStyles from '../../../styles/codicon.css';

@@ -23,11 +23,11 @@ import MinMaxFilter from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
+import { Find, formatter } from '../../../tabulator/module/Find.js';
+import { MiddleRowFocus } from '../../../tabulator/module/MiddleRowFocus.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
-import { Find, formatter } from '../services/Find.js';
-import { MiddleRowFocus } from '../services/MiddleRowFocus.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
