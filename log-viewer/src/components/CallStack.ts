@@ -62,23 +62,24 @@ export class CallStack extends LitElement {
   ];
 
   render() {
-    const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() || [];
-    if (stack.length) {
-      const details = stack.slice(this.startDepth, this.endDepth).map((entry) => {
-        return this.lineLink(entry);
-      });
-
-      if (details.length === 1) {
-        return details;
-      }
-
-      return html` <details>
-        <summary>${details[0]}</summary>
-        <div class="callstack">${details.slice(1, -1)}</div>
-      </details>`;
-    } else {
+    const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() ?? [];
+    if (!stack.length) {
       return html` <div class="callstack__item">No call stack available</div>`;
     }
+
+    const details = stack.slice(this.startDepth, this.endDepth).map((entry) => {
+      return this.lineLink(entry);
+    });
+
+    if (details.length === 1) {
+      return details;
+    }
+
+    const [first, ...rest] = details;
+    return html` <details>
+      <summary>${first}</summary>
+      <div class="callstack">${rest}</div>
+    </details>`;
   }
 
   private lineLink(line: LogEvent) {
