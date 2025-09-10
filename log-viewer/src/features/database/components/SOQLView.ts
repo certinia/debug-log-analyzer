@@ -72,7 +72,7 @@ export class SOQLView extends LitElement {
   blockClearHighlights = true;
 
   get _soqlTableWrapper(): HTMLDivElement | null {
-    return this.renderRoot?.querySelector('#db-soql-table') ?? null;
+    return this.renderRoot?.querySelector('#db-soql-table');
   }
 
   constructor() {
@@ -211,7 +211,7 @@ export class SOQLView extends LitElement {
       const treeRoot = this.timelineRoot;
       const tableWrapper = this._soqlTableWrapper;
       if (tableWrapper && treeRoot && isVisible) {
-        this.soqlLines = (await DatabaseAccess.create(treeRoot)).getSOQLLines() || [];
+        this.soqlLines = (await DatabaseAccess.create(treeRoot)).getSOQLLines();
 
         Tabulator.registerModule(Object.values(CommonModules));
         Tabulator.registerModule([
