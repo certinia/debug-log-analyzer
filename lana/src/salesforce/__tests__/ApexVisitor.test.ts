@@ -84,8 +84,8 @@ describe('ApexVisitor', () => {
         formalParameters: () => ({
           formalParameterList: () => ({
             formalParameter: () => [
-              { typeRef: () => ({ typeName: () => ({ text: 'Integer' }) }) },
-              { typeRef: () => ({ typeName: () => ({ text: 'String' }) }) },
+              { typeRef: () => ({ text: 'Integer' }) },
+              { typeRef: () => ({ text: 'String' }) },
             ],
           }),
         }),
