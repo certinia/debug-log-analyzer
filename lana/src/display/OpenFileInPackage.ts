@@ -22,7 +22,7 @@ export class OpenFileInPackage {
       return;
     }
 
-    const parts = symbolName.split('.');
+    const parts = this.getSymbolParts(symbolName);
     const fileName = parts[0]?.trim();
 
     const paths = await context.findSymbol(fileName as string);
@@ -78,5 +78,21 @@ export class OpenFileInPackage {
     };
 
     context.display.showFile(path, options);
+  }
+
+  private static getSymbolParts(symbol: string): string[] {
+    const openingParentheses = symbol.indexOf('(');
+
+    if (openingParentheses === -1) {
+      return symbol.split('.');
+    }
+
+    const path = symbol.slice(0, openingParentheses);
+    const params = symbol.slice(openingParentheses);
+
+    const parts = path.split('.');
+    parts[parts.length - 1] += params;
+
+    return parts;
   }
 }
