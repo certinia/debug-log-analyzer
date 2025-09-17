@@ -32,17 +32,28 @@ describe('ApexSymbolLocator', () => {
         line: 4,
       },
       {
+        nature: 'Method',
+        name: 'baz',
+        params: 'MyClass.Inner, MyClass.InnerTwo',
+        line: 5,
+      },
+      {
         nature: 'Class',
         name: 'Inner',
-        line: 5,
+        line: 6,
         children: [
           {
             nature: 'Method',
             name: 'bar',
             params: 'Integer',
-            line: 6,
+            line: 7,
           },
         ],
+      },
+      {
+        nature: 'Class',
+        name: 'InnerTwo',
+        line: 8,
       },
     ],
   };
@@ -89,7 +100,7 @@ describe('ApexSymbolLocator', () => {
 
     it('should find method line for inner class method', () => {
       const result = getMethodLine(root, ['MyClass', 'Inner', 'bar(Integer)']);
-      expect(result.line).toBe(6);
+      expect(result.line).toBe(7);
       expect(result.isExactMatch).toBe(true);
     });
 
@@ -102,7 +113,7 @@ describe('ApexSymbolLocator', () => {
 
     it('should handle symbol not found on inner class', () => {
       const result = getMethodLine(root, ['MyClass', 'Inner', 'notFound()']);
-      expect(result.line).toBe(5);
+      expect(result.line).toBe(6);
       expect(result.isExactMatch).toBe(false);
       expect(result.missingSymbol).toBe('notFound()');
     });
@@ -112,6 +123,32 @@ describe('ApexSymbolLocator', () => {
       expect(result.line).toBe(1);
       expect(result.isExactMatch).toBe(false);
       expect(result.missingSymbol).toBe('NotAClass');
+    });
+  });
+
+  describe('fuzzy parameter matching', () => {
+    let root: ApexNode;
+
+    beforeEach(() => {
+      root = parseApex('');
+    });
+
+    it('should find method when fully qualified inner class passed', () => {
+      const result = getMethodLine(root, ['MyClass', 'baz(MyClass.Inner, MyClass.InnerTwo)']);
+      expect(result.line).toBe(5);
+      expect(result.isExactMatch).toBe(true);
+    });
+
+    it('should find method when short form passed', () => {
+      const result = getMethodLine(root, ['MyClass', 'baz(Inner, InnerTwo)']);
+      expect(result.line).toBe(5);
+      expect(result.isExactMatch).toBe(true);
+    });
+
+    it('should find method when mixed fully qualified and short form passed', () => {
+      const result = getMethodLine(root, ['MyClass', 'baz(MyClass.Inner, InnerTwo)']);
+      expect(result.line).toBe(5);
+      expect(result.isExactMatch).toBe(true);
     });
   });
 });
