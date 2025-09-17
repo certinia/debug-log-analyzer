@@ -76,10 +76,21 @@ function findMethodNode(root: ApexNode, symbol: string): ApexMethodNode | undefi
   const [methodName, params] = symbol.split('(');
   const paramStr = params?.replace(')', '').trim();
 
+  const rootName = root.name!;
+
   return root.children?.find(
     (child) =>
       child.name === methodName &&
       child.nature === 'Method' &&
-      (paramStr === undefined || (child as ApexMethodNode).params === paramStr),
+      (paramStr === undefined ||
+        matchesUnqualified(rootName, (child as ApexMethodNode).params, paramStr)),
   ) as ApexMethodNode;
+}
+
+function matchesUnqualified(qualifierString: string, str1: string, str2: string): boolean {
+  const regex = new RegExp(`\\b(?:${qualifierString}|System)\\.`, 'gi');
+  const unqualifiedStr1 = str1.replace(regex, '');
+  const unqualifiedStr2 = str2.replace(regex, '');
+
+  return unqualifiedStr1 === unqualifiedStr2;
 }
