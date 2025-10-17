@@ -252,7 +252,7 @@ function drawScale(ctx: CanvasRenderingContext2D) {
 function nodesToRectangles(rootNodes: LogEvent[]) {
   // seed depth 0
   let depth = 0;
-  let currentLevel = rootNodes.filter((n) => n.duration && n.children.length);
+  let currentLevel = rootNodes.filter((n) => n.duration);
 
   while (currentLevel.length) {
     const nextLevel: LogEvent[] = [];
@@ -263,7 +263,7 @@ function nodesToRectangles(rootNodes: LogEvent[]) {
       }
 
       for (const child of node.children) {
-        if (child.duration && child.children.length) {
+        if (child.duration) {
           nextLevel.push(child);
         }
       }
