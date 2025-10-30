@@ -10,7 +10,7 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { Tabulator, type RowComponent } from 'tabulator-tables';
+import { Tabulator, type GlobalTooltipOption, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
