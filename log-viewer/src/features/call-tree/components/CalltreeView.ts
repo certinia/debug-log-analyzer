@@ -15,7 +15,7 @@ import { Tabulator, type RowComponent } from 'tabulator-tables';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type { LogEventType } from '../../../core/log-parser/types.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import formatDuration, { isVisible } from '../../../core/utility/Util.js';
+import { formatDuration, isVisible } from '../../../core/utility/Util.js';
 
 // Tabulator custom modules, imports + styles
 import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
@@ -812,7 +812,7 @@ export class CalltreeView extends LitElement {
             headerFilterFuncParams: { columnName: 'duration', filterCache: totalTimeFilterCache },
             headerFilterLiveFilter: false,
             tooltip(_event, cell, _onRender) {
-              return formatDuration(cell.getValue(), rootMethod.duration.total);
+              return formatDuration(cell.getValue());
             },
           },
           {
@@ -839,7 +839,7 @@ export class CalltreeView extends LitElement {
             },
             headerFilterLiveFilter: false,
             tooltip(_event, cell, _onRender) {
-              return formatDuration(cell.getValue(), rootMethod.duration.total);
+              return formatDuration(cell.getValue());
             },
           },
         ],

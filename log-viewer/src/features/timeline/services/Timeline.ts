@@ -4,7 +4,7 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type { LogIssue, LogSubCategory } from '../../../core/log-parser/types.js';
-import formatDuration, { debounce } from '../../../core/utility/Util.js';
+import { debounce, formatDuration } from '../../../core/utility/Util.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
 
 export interface TimelineGroup {
@@ -659,7 +659,7 @@ function findTimelineTooltip(
 
     if (target.exitStamp) {
       if (target.duration.total) {
-        let val = formatDuration(target.duration.total, timelineRoot.duration.total);
+        let val = formatDuration(target.duration.total);
         if (target.cpuType === 'free') {
           val += ' (free)';
         } else if (target.duration.self) {

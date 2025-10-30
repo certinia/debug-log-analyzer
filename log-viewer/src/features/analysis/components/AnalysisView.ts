@@ -14,7 +14,7 @@ import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import formatDuration, { isVisible } from '../../../core/utility/Util.js';
+import { formatDuration, isVisible } from '../../../core/utility/Util.js';
 import { callStackSum } from '../services/CallStackSum.js';
 
 // Tabulator custom modules, imports + styles
@@ -272,6 +272,11 @@ export class AnalysisView extends LitElement {
     Tabulator.registerModule(Object.values(CommonModules));
     Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs, GroupSort]);
 
+    const durationFormatterParams = { totalValue: rootMethod.duration.total };
+    const tooltipContent: GlobalTooltipOption = (_event, cell, _onRender) => {
+      return formatDuration(cell.getValue());
+    };
+
     this.analysisTable = new Tabulator(this._tableWrapper, {
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
@@ -394,16 +399,11 @@ export class AnalysisView extends LitElement {
           headerHozAlign: 'right',
           bottomCalc: callStackSum,
           bottomCalcFormatter: progressFormatterMS,
-          bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
+          bottomCalcFormatterParams: durationFormatterParams,
           formatter: progressFormatterMS,
-          formatterParams: {
-            precision: 3,
-            totalValue: rootMethod.duration.total,
-          },
+          formatterParams: durationFormatterParams,
           accessorDownload: NumberAccessor,
-          tooltip(_event, cell, _onRender) {
-            return formatDuration(cell.getValue(), rootMethod.duration.total);
-          },
+          tooltip: tooltipContent,
         },
         {
           title: 'Self Time (ms)',
@@ -414,16 +414,11 @@ export class AnalysisView extends LitElement {
           headerHozAlign: 'right',
           bottomCalc: 'sum',
           bottomCalcFormatter: progressFormatterMS,
-          bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
+          bottomCalcFormatterParams: durationFormatterParams,
           formatter: progressFormatterMS,
-          formatterParams: {
-            precision: 3,
-            totalValue: rootMethod.duration.total,
-          },
+          formatterParams: durationFormatterParams,
           accessorDownload: NumberAccessor,
-          tooltip(_event, cell, _onRender) {
-            return formatDuration(cell.getValue(), rootMethod.duration.total);
-          },
+          tooltip: tooltipContent,
         },
       ],
     });
