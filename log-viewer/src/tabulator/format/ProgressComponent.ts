@@ -2,18 +2,18 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 
-export function progressComponent(
-  value: number,
-  totalValue: number,
-  options: { showPercentageText?: boolean; precision?: number } = {
-    showPercentageText: true,
-    precision: 3,
-  },
-) {
-  const roundedValue = `${(value || 0).toFixed(options.precision ?? 3)}`;
+type ProgressOptions = {
+  showPercentageText?: boolean;
+  precision?: number;
+};
+
+export function progressComponent(value: number, totalValue: number, options: ProgressOptions) {
+  const { showPercentageText = true, precision = 2 } = options;
+
+  const roundedValue = (value || 0).toFixed(precision);
 
   if (totalValue !== undefined && totalValue !== null) {
-    const showPercent = options.showPercentageText ?? true;
+    const showPercent = showPercentageText ?? true;
     const percentComplete =
       totalValue !== 0 ? (Math.round((value / totalValue) * 100) / 100) * 100 : 0;
 

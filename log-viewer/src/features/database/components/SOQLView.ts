@@ -477,12 +477,12 @@ export class SOQLView extends LitElement {
           formatter: Number,
           formatterParams: {
             thousand: false,
-            precision: 3,
+            precision: 2,
           },
           accessorDownload: NumberAccessor,
           bottomCalcFormatter: Number,
           bottomCalc: 'sum',
-          bottomCalcFormatterParams: { precision: 3 },
+          bottomCalcFormatterParams: { precision: 2 },
         },
         {
           title: 'Aggregations',
