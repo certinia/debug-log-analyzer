@@ -4,8 +4,10 @@ import { themes as prismThemes } from 'prism-react-renderer';
 
 const organizationName = 'certinia';
 const projectName = 'debug-log-analyzer';
+const siteUrl = `https://${organizationName}.github.io`;
 
-const config: Config = {
+//certinia.github.io/debug-log-analyzer/favicon.svg
+https: const config: Config = {
   future: {
     v4: true,
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -15,7 +17,7 @@ const config: Config = {
   tagline:
     'blazing-fast VS Code extension for Salesforce. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.',
   // Set the production url of your site here
-  url: `https://${organizationName}.github.io`,
+  url: siteUrl,
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: `/${projectName}/`,
@@ -33,7 +35,7 @@ const config: Config = {
     defaultLocale: 'en',
     locales: ['en'],
   },
-  favicon: '/favicon.svg',
+  favicon: `${siteUrl}/favicon.svg`,
   // Enhanced head tags for better search engine recognition
   // Multiple favicon formats for better compatibility
   headTags: [
@@ -42,7 +44,7 @@ const config: Config = {
       attributes: {
         rel: 'icon',
         type: 'image/svg+xml',
-        href: `/${projectName}/favicon.svg`,
+        href: `${siteUrl}/favicon.svg`,
       },
     },
     {
@@ -50,7 +52,7 @@ const config: Config = {
       attributes: {
         rel: 'icon',
         type: 'image/x-icon',
-        href: `/${projectName}/favicon.ico`, // fallback for older browsers
+        href: `${siteUrl}/favicon.ico`, // fallback for older browsers
       },
     },
     {
@@ -58,7 +60,7 @@ const config: Config = {
       attributes: {
         rel: 'apple-touch-icon', // Apple touch icon for better mobile display
         sizes: '180x180',
-        href: `/${projectName}/favicon.png`,
+        href: `${siteUrl}/favicon.png`,
       },
     },
   ],
