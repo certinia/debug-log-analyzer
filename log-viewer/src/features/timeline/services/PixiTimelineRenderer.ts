@@ -242,8 +242,8 @@ export class PixiTimelineRenderer {
       await this.app.init({
         width,
         height,
-        backgroundColor: 0xffffff,
         antialias: false, // Disabled for performance per PixiJS guide
+        backgroundAlpha: 0,
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
       });
