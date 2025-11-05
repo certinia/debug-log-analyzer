@@ -35,7 +35,7 @@ export class EventBatchRenderer {
     this.container = container;
 
     // Create Graphics objects for each batch
-    for (const [category, batch] of batches) {
+    for (const [category, _batch] of batches) {
       const gfx = new PIXI.Graphics();
       this.graphics.set(category, gfx);
       container.addChild(gfx);
@@ -117,19 +117,21 @@ export class EventBatchRenderer {
     bounds: ViewportBounds,
   ): void {
     for (const event of events) {
-      if (!event.duration || !event.subCategory) {
+      const { duration, subCategory } = event;
+      if (!duration.total || !subCategory) {
         continue;
       }
 
       // Calculate rectangle position and size
-      const x = event.timestamp * viewport.zoom;
-      const width = event.duration.total * viewport.zoom;
+      const { timestamp, children } = event;
+      const x = timestamp * viewport.zoom;
+      const width = duration.total * viewport.zoom;
       const y = depth * TIMELINE_CONSTANTS.EVENT_HEIGHT;
 
       // Check if rectangle is visible (frustum culling)
       if (this.isRectangleVisible(event, depth, width, bounds)) {
         // Add to batch for this category
-        const batch = this.batches.get(event.subCategory);
+        const batch = this.batches.get(subCategory);
         if (batch) {
           const rect: RenderRectangle = {
             x,
@@ -140,11 +142,11 @@ export class EventBatchRenderer {
           };
           batch.rectangles.push(rect);
         }
-      }
 
-      // Recurse into children
-      if (event.children && event.children.length > 0) {
-        this.collectVisibleRectangles(event.children, depth + 1, viewport, bounds);
+        // Recurse into children
+        if (children && children.length > 0) {
+          this.collectVisibleRectangles(children, depth + 1, viewport, bounds);
+        }
       }
     }
   }
@@ -185,7 +187,9 @@ export class EventBatchRenderer {
    */
   private renderBatch(category: string, batch: RenderBatch): void {
     const gfx = this.graphics.get(category);
-    if (!gfx) return;
+    if (!gfx) {
+      return;
+    }
 
     // Clear previous drawings
     gfx.clear();

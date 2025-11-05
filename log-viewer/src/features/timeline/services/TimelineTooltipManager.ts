@@ -128,7 +128,9 @@ export class TimelineTooltipManager {
    * Display tooltip with event information.
    */
   private displayTooltip(event: LogEvent, mouseX: number, mouseY: number): void {
-    if (!this.tooltipElement) return;
+    if (!this.tooltipElement) {
+      return;
+    }
 
     // Generate tooltip content
     const content = this.generateTooltipContent(event);
@@ -200,7 +202,9 @@ export class TimelineTooltipManager {
    * Position tooltip relative to mouse, with boundary detection.
    */
   private positionTooltip(mouseX: number, mouseY: number): void {
-    if (!this.tooltipElement) return;
+    if (!this.tooltipElement) {
+      return;
+    }
 
     const containerRect = this.container.getBoundingClientRect();
     const tooltipRect = this.tooltipElement.getBoundingClientRect();

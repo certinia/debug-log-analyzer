@@ -114,9 +114,12 @@ export class PixiTimelineRenderer {
     this.performInitialRender();
     const renderTime = performance.now() - startTime;
 
+    // Log performance metrics (disabled in production via build config)
+    // eslint-disable-next-line no-console
     console.log(
       `Timeline initialized: ${events.length} root events, ${this.index.eventCount} total events, max depth: ${this.index.maxDepth}`,
     );
+    // eslint-disable-next-line no-console
     console.log(`Initial render completed in ${renderTime.toFixed(2)}ms (target: <2000ms)`);
   }
 
@@ -253,6 +256,7 @@ export class PixiTimelineRenderer {
         this.container.appendChild(this.app.canvas);
       }
 
+      // eslint-disable-next-line no-console
       console.log('PixiJS Application initialized with WebGL renderer');
     } catch (error) {
       throw new TimelineError(
@@ -270,7 +274,9 @@ export class PixiTimelineRenderer {
    * Matches Canvas2D approach (Timeline.ts:527-531).
    */
   private setupCoordinateSystem(): void {
-    if (!this.app) return;
+    if (!this.app) {
+      return;
+    }
 
     const stage = this.app.stage;
 
@@ -280,6 +286,7 @@ export class PixiTimelineRenderer {
     // Invert Y-axis (flip upside down)
     stage.scale.y = -1;
 
+    // eslint-disable-next-line no-console
     console.log('Coordinate system: (0,0) at bottom-left, Y-axis inverted');
   }
 
@@ -320,6 +327,7 @@ export class PixiTimelineRenderer {
       },
     );
 
+    // eslint-disable-next-line no-console
     console.log('Interaction handler initialized (zoom/pan enabled)');
   }
 
@@ -337,6 +345,7 @@ export class PixiTimelineRenderer {
       cursorOffset: 10,
     });
 
+    // eslint-disable-next-line no-console
     console.log('Tooltip manager initialized');
   }
 
@@ -380,7 +389,9 @@ export class PixiTimelineRenderer {
    * Initialize timeline state.
    */
   private initializeState(events: LogEvent[]): void {
-    if (!this.viewport) return;
+    if (!this.viewport) {
+      return;
+    }
 
     const batches = new Map();
 
@@ -452,6 +463,7 @@ export class PixiTimelineRenderer {
     }
 
     // Fallback to black
+    // eslint-disable-next-line no-console
     console.warn(`Unrecognized color format: ${cssColor}, using black`);
     return 0x000000;
   }

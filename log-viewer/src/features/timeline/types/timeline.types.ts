@@ -156,7 +156,9 @@ export interface TimelineOptions {
 
 /**
  * Timeline rendering constants.
+ * Using UPPER_CASE naming for constants (standard convention).
  */
+/* eslint-disable @typescript-eslint/naming-convention */
 export const TIMELINE_CONSTANTS = {
   /** Height of each event rectangle in pixels. */
   EVENT_HEIGHT: 15,
@@ -189,6 +191,7 @@ export const TIMELINE_CONSTANTS = {
     RESIZE_DELAY_MS: 200,
   },
 } as const;
+/* eslint-enable @typescript-eslint/naming-convention */
 
 // ============================================================================
 // ERROR HANDLING
