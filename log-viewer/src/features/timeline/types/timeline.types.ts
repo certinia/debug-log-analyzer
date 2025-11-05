@@ -180,8 +180,8 @@ export const TIMELINE_CONSTANTS = {
     'System Method': '#5C3444',
   } as TimelineColorMap,
 
-  /** Maximum zoom level (0.001ms visible width in nanoseconds). */
-  MAX_ZOOM_NS: 1_000_000,
+  /** Maximum zoom level (0.01ms = 10 microsecond visible width in nanoseconds). */
+  MAX_ZOOM_NS: 10_000,
 
   /** Target performance thresholds. */
   PERFORMANCE_TARGETS: {

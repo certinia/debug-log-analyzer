@@ -11,6 +11,7 @@
 
 import * as PIXI from 'pixi.js';
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+import { AxisRenderer } from '../graphics/AxisRenderer.js';
 import { EventBatchRenderer } from '../graphics/EventBatchRenderer.js';
 import type { TimelineOptions, TimelineState, ViewportState } from '../types/timeline.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
@@ -27,6 +28,9 @@ export class PixiTimelineRenderer {
   private state: TimelineState | null = null;
   private options: TimelineOptions = {};
   private batchRenderer: EventBatchRenderer | null = null;
+  private axisRenderer: AxisRenderer | null = null;
+  private worldContainer: PIXI.Container | null = null; // Container for world-space content (affected by pan/zoom)
+  private uiContainer: PIXI.Container | null = null; // Container for screen-space UI (not affected by pan/zoom)
   private renderLoopId: number | null = null;
   private interactionHandler: TimelineInteractionHandler | null = null;
   private tooltipManager: TimelineTooltipManager | null = null;
@@ -95,9 +99,23 @@ export class PixiTimelineRenderer {
     // Initialize state
     this.initializeState(events);
 
-    // Create batch renderer
-    if (this.app && this.state) {
-      this.batchRenderer = new EventBatchRenderer(this.app.stage, this.state.batches);
+    // Create axis renderer FIRST (so it renders behind event rectangles)
+    // Axis lines go in world container, labels go in UI container
+    if (this.worldContainer && this.uiContainer) {
+      this.axisRenderer = new AxisRenderer(this.worldContainer, {
+        height: 30,
+        lineColor: 0x808080, // Medium gray for light/dark theme compatibility
+        textColor: '#808080', // Medium gray for light/dark theme compatibility
+        fontSize: 11,
+        minLabelSpacing: 120, // Increased from 80 to require more zoom for fine granularity
+      });
+      // Set up screen-space container for labels
+      this.axisRenderer.setScreenSpaceContainer(this.uiContainer);
+    }
+
+    // Create batch renderer AFTER axis (so rectangles render on top)
+    if (this.worldContainer && this.state) {
+      this.batchRenderer = new EventBatchRenderer(this.worldContainer, this.state.batches);
     }
 
     // Setup interaction handler
@@ -149,6 +167,12 @@ export class PixiTimelineRenderer {
     if (this.batchRenderer) {
       this.batchRenderer.destroy();
       this.batchRenderer = null;
+    }
+
+    // Clean up axis renderer
+    if (this.axisRenderer) {
+      this.axisRenderer.destroy();
+      this.axisRenderer = null;
     }
 
     if (this.app) {
@@ -221,11 +245,13 @@ export class PixiTimelineRenderer {
     // This scales everything proportionally by the resize ratio
     this.viewport.setStateForResize(newZoom, newOffsetX, newOffsetY);
 
-    // Update coordinate system origin (bottom-left)
-    this.app.stage.position.set(
-      this.app.stage.position.x,
-      newHeight, // Update Y origin to new height
-    );
+    // Update world container origin (bottom-left)
+    if (this.worldContainer) {
+      this.worldContainer.position.set(
+        this.worldContainer.position.x,
+        newHeight, // Update Y origin to new height
+      );
+    }
 
     // Trigger re-render
     this.requestRender();
@@ -270,8 +296,9 @@ export class PixiTimelineRenderer {
   /**
    * Setup coordinate system: (0, 0) at bottom-left, Y-axis pointing up.
    *
-   * Based on research.md decision: Use Y-axis inversion via Container.scale.
-   * Matches Canvas2D approach (Timeline.ts:527-531).
+   * Creates two containers:
+   * - worldContainer: Affected by pan/zoom transforms (for events and axis lines)
+   * - uiContainer: Screen-space UI (for axis labels, not affected by transforms)
    */
   private setupCoordinateSystem(): void {
     if (!this.app) {
@@ -280,14 +307,23 @@ export class PixiTimelineRenderer {
 
     const stage = this.app.stage;
 
+    // Create world-space container (will be transformed for pan/zoom)
+    this.worldContainer = new PIXI.Container();
     // Move origin to bottom-left
-    stage.position.set(0, this.app.screen.height);
-
+    this.worldContainer.position.set(0, this.app.screen.height);
     // Invert Y-axis (flip upside down)
-    stage.scale.y = -1;
+    this.worldContainer.scale.y = -1;
+    stage.addChild(this.worldContainer);
+
+    // Create screen-space UI container (not affected by pan/zoom)
+    // This stays at top-left with normal Y-axis (pointing down)
+    this.uiContainer = new PIXI.Container();
+    this.uiContainer.position.set(0, 0);
+    this.uiContainer.scale.set(1, 1);
+    stage.addChild(this.uiContainer);
 
     // eslint-disable-next-line no-console
-    console.log('Coordinate system: (0,0) at bottom-left, Y-axis inverted');
+    console.log('Coordinate system: worldContainer with inverted Y, uiContainer in screen space');
   }
 
   /**
@@ -513,7 +549,7 @@ export class PixiTimelineRenderer {
    * Only visible events within viewport bounds are rendered.
    */
   private render(): void {
-    if (!this.batchRenderer || !this.state || !this.viewport || !this.app) {
+    if (!this.batchRenderer || !this.state || !this.viewport || !this.app || !this.worldContainer) {
       return;
     }
 
@@ -523,15 +559,21 @@ export class PixiTimelineRenderer {
     // Update state viewport (sync)
     this.state.viewport = viewportState;
 
-    // Update stage position to reflect viewport offset (pan)
-    // Stage X moves opposite to offsetX (scrolling right = moving stage left)
-    // Stage Y: Keep bottom-left origin (already set during init) plus vertical offset
-    this.app.stage.position.set(
+    // Update world container position to reflect viewport offset (pan)
+    // World X moves opposite to offsetX (scrolling right = moving world left)
+    // World Y: Keep bottom-left origin (already set during init) plus vertical offset
+    this.worldContainer.position.set(
       -viewportState.offsetX,
       this.app.screen.height + viewportState.offsetY,
     );
 
-    // Render visible events using batch renderer
+    // Render time axis FIRST (so lines appear behind rectangles)
+    // Labels are rendered in screen space (uiContainer), so they stay stable
+    if (this.axisRenderer) {
+      this.axisRenderer.render(viewportState);
+    }
+
+    // Render visible events using batch renderer (on top of axis)
     // EventBatchRenderer handles:
     // - View frustum culling
     // - Category-based batching
