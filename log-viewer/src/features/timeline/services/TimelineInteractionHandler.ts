@@ -1,0 +1,469 @@
+/*
+ * Copyright (c) 2020 Certinia Inc. All rights reserved.
+ */
+
+/**
+ * TimelineInteractionHandler
+ *
+ * Handles user interactions (wheel, mouse, keyboard) for timeline navigation.
+ * Manages zoom (wheel), pan (drag), and event selection.
+ */
+
+import type { TimelineViewport } from './TimelineViewport.js';
+
+/**
+ * Configuration for interaction behavior.
+ */
+export interface InteractionOptions {
+  /** Enable zoom via mouse wheel. Default: true */
+  enableZoom?: boolean;
+
+  /** Enable pan via mouse drag. Default: true */
+  enablePan?: boolean;
+
+  /** Zoom sensitivity multiplier. Default: 1.0 */
+  zoomSensitivity?: number;
+
+  /** Invert zoom direction. Default: false */
+  invertZoom?: boolean;
+}
+
+/**
+ * Callback for interaction events.
+ */
+export interface InteractionCallbacks {
+  /** Called when viewport changes (zoom or pan). */
+  onViewportChange?: () => void;
+
+  /** Called when mouse position changes over timeline. */
+  onMouseMove?: (x: number, y: number) => void;
+
+  /** Called when mouse clicks on timeline. */
+  onClick?: (x: number, y: number) => void;
+}
+
+export class TimelineInteractionHandler {
+  private canvas: HTMLCanvasElement;
+  private viewport: TimelineViewport;
+  private options: Required<InteractionOptions>;
+  private callbacks: InteractionCallbacks;
+
+  // Interaction state
+  private isDragging = false;
+  private lastMouseX = 0;
+  private lastMouseY = 0;
+  private lastTouchX = 0;
+  private lastTouchY = 0;
+
+  // Event listener references for cleanup
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private boundHandlers: Map<string, any> = new Map();
+
+  constructor(
+    canvas: HTMLCanvasElement,
+    viewport: TimelineViewport,
+    options: InteractionOptions = {},
+    callbacks: InteractionCallbacks = {},
+  ) {
+    this.canvas = canvas;
+    this.viewport = viewport;
+    this.callbacks = callbacks;
+
+    // Apply default options
+    this.options = {
+      enableZoom: options.enableZoom ?? true,
+      enablePan: options.enablePan ?? true,
+      zoomSensitivity: options.zoomSensitivity ?? 1.0,
+      invertZoom: options.invertZoom ?? false,
+    };
+
+    this.attachEventListeners();
+  }
+
+  /**
+   * Clean up event listeners.
+   */
+  public destroy(): void {
+    this.detachEventListeners();
+  }
+
+  // ============================================================================
+  // EVENT LISTENER SETUP
+  // ============================================================================
+
+  /**
+   * Attach event listeners to canvas.
+   */
+  private attachEventListeners(): void {
+    // Wheel for zoom
+    if (this.options.enableZoom) {
+      const wheelHandler = this.handleWheel.bind(this);
+      this.canvas.addEventListener('wheel', wheelHandler, { passive: false });
+      this.boundHandlers.set('wheel', wheelHandler);
+    }
+
+    // Mouse events for pan and selection
+    if (this.options.enablePan) {
+      const mouseDownHandler = this.handleMouseDown.bind(this);
+      const mouseMoveHandler = this.handleMouseMove.bind(this);
+      const mouseUpHandler = this.handleMouseUp.bind(this);
+
+      this.canvas.addEventListener('mousedown', mouseDownHandler);
+      document.addEventListener('mousemove', mouseMoveHandler);
+      document.addEventListener('mouseup', mouseUpHandler);
+
+      this.boundHandlers.set('mousedown', mouseDownHandler);
+      this.boundHandlers.set('mousemove', mouseMoveHandler);
+      this.boundHandlers.set('mouseup', mouseUpHandler);
+
+      // Touch events for swipe/pan on touch devices
+      const touchStartHandler = this.handleTouchStart.bind(this);
+      const touchMoveHandler = this.handleTouchMove.bind(this);
+      const touchEndHandler = this.handleTouchEnd.bind(this);
+
+      this.canvas.addEventListener('touchstart', touchStartHandler, { passive: false });
+      this.canvas.addEventListener('touchmove', touchMoveHandler, { passive: false });
+      this.canvas.addEventListener('touchend', touchEndHandler);
+
+      this.boundHandlers.set('touchstart', touchStartHandler);
+      this.boundHandlers.set('touchmove', touchMoveHandler);
+      this.boundHandlers.set('touchend', touchEndHandler);
+    }
+
+    // Click for event selection
+    const clickHandler = this.handleClick.bind(this);
+    this.canvas.addEventListener('click', clickHandler);
+    this.boundHandlers.set('click', clickHandler);
+  }
+
+  /**
+   * Remove event listeners from canvas.
+   */
+  private detachEventListeners(): void {
+    if (this.options.enableZoom) {
+      const wheelHandler = this.boundHandlers.get('wheel');
+      if (wheelHandler) {
+        this.canvas.removeEventListener('wheel', wheelHandler);
+      }
+    }
+
+    if (this.options.enablePan) {
+      const mouseDownHandler = this.boundHandlers.get('mousedown');
+      const mouseMoveHandler = this.boundHandlers.get('mousemove');
+      const mouseUpHandler = this.boundHandlers.get('mouseup');
+
+      if (mouseDownHandler) {
+        this.canvas.removeEventListener('mousedown', mouseDownHandler);
+      }
+      if (mouseMoveHandler) {
+        document.removeEventListener('mousemove', mouseMoveHandler);
+      }
+      if (mouseUpHandler) {
+        document.removeEventListener('mouseup', mouseUpHandler);
+      }
+
+      // Remove touch event listeners
+      const touchStartHandler = this.boundHandlers.get('touchstart');
+      const touchMoveHandler = this.boundHandlers.get('touchmove');
+      const touchEndHandler = this.boundHandlers.get('touchend');
+
+      if (touchStartHandler) {
+        this.canvas.removeEventListener('touchstart', touchStartHandler);
+      }
+      if (touchMoveHandler) {
+        this.canvas.removeEventListener('touchmove', touchMoveHandler);
+      }
+      if (touchEndHandler) {
+        this.canvas.removeEventListener('touchend', touchEndHandler);
+      }
+    }
+
+    const clickHandler = this.boundHandlers.get('click');
+    if (clickHandler) {
+      this.canvas.removeEventListener('click', clickHandler);
+    }
+
+    this.boundHandlers.clear();
+  }
+
+  // ============================================================================
+  // EVENT HANDLERS
+  // ============================================================================
+
+  /**
+   * Handle wheel event for zoom and horizontal pan.
+   *
+   * Implements:
+   * - Vertical wheel (deltaY): Mouse-anchored zoom
+   * - Horizontal wheel (deltaX): Pan (trackpad swipe left/right)
+   * - Mouse cursor position remains over the same timeline point during zoom
+   * - Prevents page scroll
+   */
+  private handleWheel(event: WheelEvent): void {
+    event.preventDefault();
+
+    // Handle horizontal pan (trackpad swipe left/right)
+    if (Math.abs(event.deltaX) > Math.abs(event.deltaY) && this.options.enablePan) {
+      // Horizontal wheel event detected - treat as pan
+      const changed = this.viewport.panBy(event.deltaX, 0);
+
+      // Notify callback if viewport changed
+      if (changed && this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange();
+      }
+      return;
+    }
+
+    // Handle vertical zoom
+    if (!this.options.enableZoom) {
+      return;
+    }
+
+    // Get mouse position relative to canvas
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+
+    // Calculate zoom delta
+    // deltaY is positive when scrolling down, negative when scrolling up
+    // Standard behavior: scroll up = zoom in, scroll down = zoom out
+    let zoomDelta = -event.deltaY;
+
+    // Apply zoom inversion if enabled
+    if (this.options.invertZoom) {
+      zoomDelta = -zoomDelta;
+    }
+
+    // Normalize wheel delta (different browsers report different scales)
+    // Use deltaMode to handle different units (pixels, lines, pages)
+    let normalizedDelta = zoomDelta;
+    if (event.deltaMode === 1) {
+      // Lines - multiply by typical line height
+      normalizedDelta *= 15;
+    } else if (event.deltaMode === 2) {
+      // Pages - multiply by typical page height
+      normalizedDelta *= 800;
+    }
+
+    // Calculate zoom factor
+    // Use exponential scaling for smooth zoom feel
+    const zoomFactor = 1 + normalizedDelta * 0.001 * this.options.zoomSensitivity;
+
+    // Get current zoom and calculate new zoom
+    const currentState = this.viewport.getState();
+    const newZoom = currentState.zoom * zoomFactor;
+
+    // Apply zoom with mouse position as anchor
+    const changed = this.viewport.setZoom(newZoom, mouseX);
+
+    // Notify callback if viewport changed
+    if (changed && this.callbacks.onViewportChange) {
+      this.callbacks.onViewportChange();
+    }
+  }
+
+  /**
+   * Handle mouse down - start drag operation.
+   */
+  private handleMouseDown(event: MouseEvent): void {
+    if (!this.options.enablePan) {
+      return;
+    }
+
+    // Only handle left mouse button
+    if (event.button !== 0) {
+      return;
+    }
+
+    this.isDragging = true;
+    this.lastMouseX = event.clientX;
+    this.lastMouseY = event.clientY;
+
+    // Change cursor to grabbing
+    this.canvas.style.cursor = 'grabbing';
+  }
+
+  /**
+   * Handle mouse move - perform drag or update hover state.
+   */
+  private handleMouseMove(event: MouseEvent): void {
+    if (this.isDragging && this.options.enablePan) {
+      // Calculate delta from last position
+      const deltaX = event.clientX - this.lastMouseX;
+      const deltaY = event.clientY - this.lastMouseY;
+
+      // Update pan (note: negative delta because we're dragging the viewport)
+      const changed = this.viewport.panBy(-deltaX, -deltaY);
+
+      // Update last position
+      this.lastMouseX = event.clientX;
+      this.lastMouseY = event.clientY;
+
+      // Notify callback if viewport changed
+      if (changed && this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange();
+      }
+    } else {
+      // Not dragging - update mouse position for hover effects
+      const rect = this.canvas.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+
+      if (this.callbacks.onMouseMove) {
+        this.callbacks.onMouseMove(mouseX, mouseY);
+      }
+    }
+  }
+
+  /**
+   * Handle mouse up - end drag operation.
+   */
+  private handleMouseUp(_event: MouseEvent): void {
+    if (!this.isDragging) {
+      return;
+    }
+
+    this.isDragging = false;
+
+    // Restore cursor
+    this.canvas.style.cursor = 'grab';
+  }
+
+  /**
+   * Handle click - event selection.
+   */
+  private handleClick(event: MouseEvent): void {
+    // Only handle if not dragging (to avoid firing click after drag)
+    if (this.isDragging) {
+      return;
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    if (this.callbacks.onClick) {
+      this.callbacks.onClick(mouseX, mouseY);
+    }
+  }
+
+  // ============================================================================
+  // TOUCH EVENT HANDLERS
+  // ============================================================================
+
+  /**
+   * Handle touch start - begin swipe/pan gesture.
+   */
+  private handleTouchStart(event: TouchEvent): void {
+    event.preventDefault(); // Prevent default touch behavior (scrolling)
+
+    if (!this.options.enablePan || event.touches.length === 0) {
+      return;
+    }
+
+    // Only handle single-finger touch for pan
+    if (event.touches.length === 1) {
+      const touch = event.touches[0];
+      if (!touch) {
+        return;
+      }
+
+      this.isDragging = true;
+      this.lastTouchX = touch.clientX;
+      this.lastTouchY = touch.clientY;
+
+      // Change cursor to grabbing
+      this.canvas.style.cursor = 'grabbing';
+    }
+  }
+
+  /**
+   * Handle touch move - perform swipe/pan gesture.
+   */
+  private handleTouchMove(event: TouchEvent): void {
+    event.preventDefault(); // Prevent default touch behavior (scrolling)
+
+    if (!this.isDragging || !this.options.enablePan || event.touches.length === 0) {
+      return;
+    }
+
+    // Only handle single-finger touch for pan
+    if (event.touches.length === 1) {
+      const touch = event.touches[0];
+      if (!touch) {
+        return;
+      }
+
+      // Calculate delta from last position
+      const deltaX = touch.clientX - this.lastTouchX;
+      const deltaY = touch.clientY - this.lastTouchY;
+
+      // Update pan (note: negative delta because we're dragging the viewport)
+      // Same behavior as mouse drag: swipe right = content moves right
+      const changed = this.viewport.panBy(-deltaX, -deltaY);
+
+      // Update last position
+      this.lastTouchX = touch.clientX;
+      this.lastTouchY = touch.clientY;
+
+      // Notify callback if viewport changed
+      if (changed && this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange();
+      }
+    }
+  }
+
+  /**
+   * Handle touch end - end swipe/pan gesture.
+   */
+  private handleTouchEnd(_event: TouchEvent): void {
+    if (!this.isDragging) {
+      return;
+    }
+
+    this.isDragging = false;
+
+    // Restore cursor
+    this.canvas.style.cursor = 'grab';
+  }
+
+  // ============================================================================
+  // PUBLIC API
+  // ============================================================================
+
+  /**
+   * Enable or disable zoom interaction.
+   */
+  public setZoomEnabled(enabled: boolean): void {
+    if (this.options.enableZoom === enabled) {
+      return;
+    }
+
+    this.options.enableZoom = enabled;
+
+    // Reattach listeners
+    this.detachEventListeners();
+    this.attachEventListeners();
+  }
+
+  /**
+   * Enable or disable pan interaction.
+   */
+  public setPanEnabled(enabled: boolean): void {
+    if (this.options.enablePan === enabled) {
+      return;
+    }
+
+    this.options.enablePan = enabled;
+
+    // Reattach listeners
+    this.detachEventListeners();
+    this.attachEventListeners();
+  }
+
+  /**
+   * Set zoom sensitivity.
+   */
+  public setZoomSensitivity(sensitivity: number): void {
+    this.options.zoomSensitivity = Math.max(0.1, Math.min(10, sensitivity));
+  }
+}

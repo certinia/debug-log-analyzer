@@ -2,9 +2,10 @@
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
 import { LitElement, css, html, type PropertyValues } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
+import { getSettings } from '../../settings/Settings.js';
 import { init as timelineInit, type TimelineGroup } from '../services/Timeline.js';
 
 // styles
@@ -12,6 +13,7 @@ import { globalStyles } from '../../../styles/global.styles.js';
 import { skeletonStyles } from '../../../styles/skeleton.styles.js';
 
 // web components
+import '../components/TimelineViewV2.js';
 import './TimelineKey.js';
 
 @customElement('timeline-view')
@@ -21,23 +23,14 @@ export class TimelineView extends LitElement {
   @property()
   timelineKeys: TimelineGroup[] = [];
 
-  get _timelineContainer(): HTMLDivElement | null {
-    return this.renderRoot?.querySelector('#timeline-container') ?? null;
-  }
+  @state()
+  private isNewTimelineEnabled: boolean | null = null;
+
+  @query('#timeline-container')
+  private tlContainer!: HTMLDivElement;
 
   constructor() {
     super();
-  }
-
-  updated(changedProperties: PropertyValues): void {
-    const timlineRoot = changedProperties.has('timelineRoot');
-    if (this.timelineRoot && timlineRoot) {
-      const timelineContainer = this._timelineContainer;
-
-      if (timelineContainer) {
-        timelineInit(timelineContainer, this.timelineRoot);
-      }
-    }
   }
 
   static styles = [
@@ -163,13 +156,32 @@ export class TimelineView extends LitElement {
     `,
   ];
 
+  async connectedCallback() {
+    super.connectedCallback();
+    const settings = await getSettings();
+    this.isNewTimelineEnabled = settings.timeline.experimental.timeline;
+  }
+
+  updated(changedProps: PropertyValues) {
+    if (changedProps.has('timelineRoot') || changedProps.has('isNewTimelineEnabled')) {
+      if (!this.isNewTimelineEnabled && this.timelineRoot) {
+        timelineInit(this.tlContainer, this.timelineRoot);
+      }
+    }
+  }
+
   render() {
-    const skeleton = !this.timelineRoot
-      ? this._getSkeletonTimeline()
-      : html`<canvas id="timeline" class="timeline-hover"></canvas>`;
+    let timelineBody;
+    if (!this.timelineRoot || this.isNewTimelineEnabled === null) {
+      timelineBody = this._getSkeletonTimeline();
+    } else if (this.isNewTimelineEnabled) {
+      timelineBody = html`<timeline-view-v2 .rootLog=${this.timelineRoot}></timeline-view-v2>`;
+    } else {
+      timelineBody = html`<canvas id="timeline" class="timeline-hover"></canvas>`;
+    }
 
     return html`
-      <div id="timeline-container">${skeleton}</div>
+      <div id="timeline-container">${timelineBody}</div>
       <timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>
     `;
   }
