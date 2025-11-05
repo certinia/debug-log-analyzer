@@ -164,6 +164,9 @@ export const TIMELINE_CONSTANTS = {
   /** Minimum rectangle width in pixels before culling. */
   MIN_RECT_SIZE: 0.05,
 
+  /** Gap between rectangles in pixels (negative space separation). */
+  RECT_GAP: 1,
+
   /** Default color map (matches current Canvas2D colors). */
   DEFAULT_COLORS: {
     'Code Unit': '#88AE58',

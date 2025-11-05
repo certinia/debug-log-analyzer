@@ -197,15 +197,25 @@ export class EventBatchRenderer {
     // Set fill style for this batch
     gfx.setFillStyle({ color: batch.color });
 
-    // Draw all rectangles in this batch
+    // Draw all rectangles in this batch with negative space separation
+    const gap = TIMELINE_CONSTANTS.RECT_GAP;
+    const halfGap = gap / 2;
+
     for (const rect of batch.rectangles) {
       // Don't render if width is too small (already filtered in culling)
       if (rect.width < TIMELINE_CONSTANTS.MIN_RECT_SIZE) {
         continue;
       }
 
-      // Draw filled rectangle
-      gfx.rect(rect.x, rect.y, rect.width, rect.height);
+      // Apply gap to create separation between rectangles
+      // Reduce width and height by gap, and offset position by half gap
+      const gappedX = rect.x + halfGap;
+      const gappedY = rect.y + halfGap;
+      const gappedWidth = Math.max(0, rect.width - gap);
+      const gappedHeight = Math.max(0, rect.height - gap);
+
+      // Draw filled rectangle with gaps
+      gfx.rect(gappedX, gappedY, gappedWidth, gappedHeight);
       gfx.fill();
     }
   }
