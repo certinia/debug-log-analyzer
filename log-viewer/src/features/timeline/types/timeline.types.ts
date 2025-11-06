@@ -164,7 +164,7 @@ export const TIMELINE_CONSTANTS = {
   EVENT_HEIGHT: 15,
 
   /** Minimum rectangle width in pixels before culling. */
-  MIN_RECT_SIZE: 0.05,
+  MIN_RECT_SIZE: 0.5,
 
   /** Gap between rectangles in pixels (negative space separation). */
   RECT_GAP: 1,
