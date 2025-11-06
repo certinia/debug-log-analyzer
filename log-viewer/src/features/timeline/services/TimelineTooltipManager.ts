@@ -99,12 +99,17 @@ export class TimelineTooltipManager {
       return;
     }
 
-    // New tooltip - apply delay
+    // New tooltip - apply delay or show immediately if delay is 0
     this.currentEvent = event;
-    this.showTimeout = window.setTimeout(() => {
+
+    if (this.options.showDelay === 0) {
       this.displayTooltip(event, mouseX, mouseY);
-      this.showTimeout = null;
-    }, this.options.showDelay);
+    } else {
+      this.showTimeout = window.setTimeout(() => {
+        this.displayTooltip(event, mouseX, mouseY);
+        this.showTimeout = null;
+      }, this.options.showDelay);
+    }
   }
 
   /**
