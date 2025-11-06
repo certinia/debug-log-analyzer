@@ -9,37 +9,47 @@
  * Handles tooltip positioning, content generation, and visibility.
  */
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
+import { formatDuration } from '../../../core/utility/Util.js';
 
 /**
  * Configuration options for tooltip behavior.
  */
 export interface TooltipOptions {
-  /** Delay before showing tooltip in milliseconds. Default: 100ms */
-  showDelay?: number;
-
   /** Whether to flip tooltip position if it goes off-screen. Default: true */
-  enableFlip?: boolean;
+  enableFlip: boolean;
 
   /** Offset from cursor in pixels. Default: 10px */
-  cursorOffset?: number;
+  cursorOffset: number;
+
+  categoryColors: Record<string, string>;
+
+  apexLog?: ApexLog | null;
 }
 
 export class TimelineTooltipManager {
   private container: HTMLElement;
   private tooltipElement: HTMLElement | null = null;
   private showTimeout: number | null = null;
-  private options: Required<TooltipOptions>;
+  private options: TooltipOptions;
   private currentEvent: LogEvent | null = null;
 
-  constructor(container: HTMLElement, options: TooltipOptions = {}) {
+  constructor(
+    container: HTMLElement,
+    options: TooltipOptions = {
+      categoryColors: {},
+      cursorOffset: 10,
+      enableFlip: true,
+    },
+  ) {
     this.container = container;
 
     // Apply default options
     this.options = {
-      showDelay: options.showDelay ?? 100,
-      enableFlip: options.enableFlip ?? true,
-      cursorOffset: options.cursorOffset ?? 10,
+      enableFlip: options.enableFlip,
+      cursorOffset: options.cursorOffset,
+      categoryColors: options.categoryColors,
+      apexLog: options.apexLog,
     };
 
     this.createTooltipElement();
@@ -50,23 +60,7 @@ export class TimelineTooltipManager {
    */
   private createTooltipElement(): void {
     this.tooltipElement = document.createElement('div');
-    this.tooltipElement.className = 'timeline-tooltip';
-    this.tooltipElement.style.cssText = `
-      position: absolute;
-      display: none;
-      background: var(--vscode-editorHoverWidget-background, #252526);
-      border: 1px solid var(--vscode-editorHoverWidget-border, #454545);
-      border-radius: 3px;
-      padding: 8px 12px;
-      font-family: var(--vscode-font-family);
-      font-size: 12px;
-      color: var(--vscode-editorHoverWidget-foreground, #cccccc);
-      z-index: 1000;
-      pointer-events: none;
-      max-width: 400px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    `;
-
+    this.tooltipElement.id = 'timeline-tooltip';
     this.container.appendChild(this.tooltipElement);
   }
 
@@ -102,26 +96,13 @@ export class TimelineTooltipManager {
     // New tooltip - apply delay or show immediately if delay is 0
     this.currentEvent = event;
 
-    if (this.options.showDelay === 0) {
-      this.displayTooltip(event, mouseX, mouseY);
-    } else {
-      this.showTimeout = window.setTimeout(() => {
-        this.displayTooltip(event, mouseX, mouseY);
-        this.showTimeout = null;
-      }, this.options.showDelay);
-    }
+    this.displayTooltip(event, mouseX, mouseY);
   }
 
   /**
    * Hide tooltip immediately.
    */
   public hide(): void {
-    // Cancel any pending show
-    if (this.showTimeout !== null) {
-      clearTimeout(this.showTimeout);
-      this.showTimeout = null;
-    }
-
     if (this.tooltipElement) {
       this.tooltipElement.style.display = 'none';
     }
@@ -139,7 +120,13 @@ export class TimelineTooltipManager {
 
     // Generate tooltip content
     const content = this.generateTooltipContent(event);
-    this.tooltipElement.innerHTML = content;
+    // Clear existing content and append new content
+    while (this.tooltipElement.firstChild) {
+      this.tooltipElement.removeChild(this.tooltipElement.firstChild);
+    }
+    if (content) {
+      this.tooltipElement.appendChild(content);
+    }
 
     // Show tooltip
     this.tooltipElement.style.display = 'block';
@@ -148,59 +135,139 @@ export class TimelineTooltipManager {
     this.positionTooltip(mouseX, mouseY);
   }
 
-  /**
-   * Generate HTML content for tooltip based on event data.
-   */
-  private generateTooltipContent(event: LogEvent): string {
-    const parts: string[] = [];
-
-    // Event type
-    if (event.type) {
-      parts.push(
-        `<div style="font-weight: 600; margin-bottom: 4px;">${this.escapeHtml(event.type)}</div>`,
-      );
-    }
-
-    // Event category
-    if (event.subCategory) {
-      parts.push(
-        `<div style="color: var(--vscode-descriptionForeground, #999); margin-bottom: 4px;">${this.escapeHtml(event.subCategory)}</div>`,
-      );
-    }
-
-    // Duration
-    if (event.duration) {
-      const durationMs = (event.duration.total / 1_000_000).toFixed(3);
-      parts.push(
-        `<div style="margin-bottom: 4px;"><strong>Duration:</strong> ${durationMs}ms</div>`,
-      );
-
-      if (event.duration.self !== undefined) {
-        const selfMs = (event.duration.self / 1_000_000).toFixed(3);
-        parts.push(`<div style="margin-bottom: 4px;"><strong>Self:</strong> ${selfMs}ms</div>`);
+  private generateTooltipContent(event: LogEvent): HTMLDivElement | null {
+    if (event?.isParent) {
+      const rows = [];
+      if (event.type) {
+        rows.push({ label: 'type:', value: event.type.toString() });
       }
-    }
 
-    // Timestamp
-    const timestampMs = (event.timestamp / 1_000_000).toFixed(3);
-    parts.push(`<div style="margin-bottom: 4px;"><strong>Start:</strong> ${timestampMs}ms</div>`);
+      if (event.exitStamp) {
+        if (event.duration.total) {
+          let val = formatDuration(event.duration.total);
+          if (event.cpuType === 'free') {
+            val += ' (free)';
+          } else if (event.duration.self) {
+            val += ` (self ${formatDuration(event.duration.self)})`;
+          }
 
-    // Line number
-    if (event.lineNumber) {
-      parts.push(
-        `<div style="margin-bottom: 4px;"><strong>Line:</strong> ${event.lineNumber}</div>`,
+          rows.push({ label: 'total:', value: val });
+        }
+
+        const govLimits = this.options.apexLog?.governorLimits;
+        if (event.dmlCount.total) {
+          rows.push({
+            label: 'DML:',
+            value: this.formatLimit(
+              event.dmlCount.total,
+              event.dmlCount.self,
+              govLimits?.dmlStatements.limit,
+            ),
+          });
+        }
+
+        if (event.dmlRowCount.total) {
+          rows.push({
+            label: 'DML rows:',
+            value: this.formatLimit(
+              event.dmlRowCount.total,
+              event.dmlRowCount.self,
+              govLimits?.dmlRows.limit,
+            ),
+          });
+        }
+
+        if (event.soqlCount.total) {
+          rows.push({
+            label: 'SOQL:',
+            value: this.formatLimit(
+              event.soqlCount.total,
+              event.soqlCount.self,
+              govLimits?.soqlQueries.limit,
+            ),
+          });
+        }
+
+        if (event.soqlRowCount.total) {
+          rows.push({
+            label: 'SOQL rows:',
+            value: this.formatLimit(
+              event.soqlRowCount.total,
+              event.soqlRowCount.self,
+              govLimits?.queryRows.limit,
+            ),
+          });
+        }
+
+        if (event.soslCount.total) {
+          rows.push({
+            label: 'SOSL:',
+            value: this.formatLimit(
+              event.soslCount.total,
+              event.soslCount.self,
+              govLimits?.soslQueries.limit,
+            ),
+          });
+        }
+
+        if (event.soslRowCount.total) {
+          rows.push({
+            label: 'SOSL rows:',
+            value: this.formatLimit(
+              event.soslRowCount.total,
+              event.soslRowCount.self,
+              govLimits?.soslQueries.limit,
+            ),
+          });
+        }
+      }
+
+      return this.createTooltip(
+        event.text + (event.suffix ?? ''),
+        rows,
+        this.options.categoryColors[event.subCategory] || '',
       );
     }
 
-    // Event text (truncated if too long)
-    if (event.text) {
-      const text = event.text.length > 100 ? event.text.substring(0, 100) + '...' : event.text;
-      parts.push(
-        `<div style="margin-top: 8px; color: var(--vscode-descriptionForeground, #999); font-size: 11px;">${this.escapeHtml(text)}</div>`,
-      );
+    return null;
+  }
+
+  private formatLimit(val: number, self: number, total = 0) {
+    const outOf = total > 0 ? `/${total}` : '';
+    return `${val}${outOf} (self ${self})`;
+  }
+
+  private createTooltip(title: string, rows: { label: string; value: string }[], color: string) {
+    const tooltipBody = document.createElement('div');
+    tooltipBody.className = 'timeline-tooltip';
+
+    if (color) {
+      tooltipBody.style.borderColor = color;
     }
 
-    return parts.join('');
+    const header = document.createElement('div');
+    header.className = 'tooltip-header';
+    header.textContent = title;
+    tooltipBody.appendChild(header);
+
+    rows.forEach(({ label, value }) => {
+      const row = document.createElement('div');
+      row.className = 'tooltip-row';
+
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'tooltip-label';
+      labelDiv.textContent = label;
+
+      const valueDiv = document.createElement('div');
+      valueDiv.className = 'tooltip-value';
+      valueDiv.textContent = value;
+
+      row.appendChild(labelDiv);
+      row.appendChild(valueDiv);
+      tooltipBody.appendChild(row);
+    });
+
+    return tooltipBody;
   }
 
   /**
@@ -239,26 +306,9 @@ export class TimelineTooltipManager {
   }
 
   /**
-   * Escape HTML special characters to prevent XSS.
-   */
-  private escapeHtml(unsafe: string): string {
-    return unsafe
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
-
-  /**
    * Clean up tooltip element.
    */
   public destroy(): void {
-    if (this.showTimeout !== null) {
-      clearTimeout(this.showTimeout);
-      this.showTimeout = null;
-    }
-
     if (this.tooltipElement && this.tooltipElement.parentNode) {
       this.tooltipElement.parentNode.removeChild(this.tooltipElement);
     }

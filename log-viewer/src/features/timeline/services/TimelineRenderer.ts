@@ -3,14 +3,14 @@
  */
 
 /**
- * PixiTimelineRenderer
+ * TimelineRenderer
  *
  * Core rendering engine for PixiJS-based timeline visualization.
  * Manages PixiJS Application, coordinate system, and render loop.
  */
 
 import * as PIXI from 'pixi.js';
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { AxisRenderer } from '../graphics/AxisRenderer.js';
 import { EventBatchRenderer } from '../graphics/EventBatchRenderer.js';
 import type { TimelineOptions, TimelineState, ViewportState } from '../types/timeline.types.js';
@@ -20,7 +20,7 @@ import { TimelineInteractionHandler } from './TimelineInteractionHandler.js';
 import { TimelineTooltipManager } from './TimelineTooltipManager.js';
 import { TimelineViewport } from './TimelineViewport.js';
 
-export class PixiTimelineRenderer {
+export class TimelineRenderer {
   private app: PIXI.Application | null = null;
   private container: HTMLElement | null = null;
   private viewport: TimelineViewport | null = null;
@@ -34,6 +34,7 @@ export class PixiTimelineRenderer {
   private renderLoopId: number | null = null;
   private interactionHandler: TimelineInteractionHandler | null = null;
   private tooltipManager: TimelineTooltipManager | null = null;
+  private apexLog: ApexLog | null = null;
 
   /**
    * Initialize the timeline renderer.
@@ -44,6 +45,7 @@ export class PixiTimelineRenderer {
    */
   public async init(
     container: HTMLElement,
+    apexLog: ApexLog,
     events: LogEvent[],
     options: TimelineOptions = {},
   ): Promise<void> {
@@ -67,6 +69,7 @@ export class PixiTimelineRenderer {
       );
     }
 
+    this.apexLog = apexLog;
     this.container = container;
     this.options = options;
 
@@ -376,9 +379,13 @@ export class PixiTimelineRenderer {
     }
 
     this.tooltipManager = new TimelineTooltipManager(this.container, {
-      showDelay: 100,
       enableFlip: true,
       cursorOffset: 10,
+      categoryColors: {
+        ...TIMELINE_CONSTANTS.DEFAULT_COLORS,
+        ...this.options.colors,
+      },
+      apexLog: this.apexLog,
     });
 
     // eslint-disable-next-line no-console

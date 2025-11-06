@@ -9,56 +9,60 @@
  * Provides integration layer between application and PixiTimelineRenderer.
  */
 
-import { css, html, LitElement, type PropertyValues } from 'lit';
+import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { getSettings } from '../../settings/Settings.js';
-import { PixiTimelineRenderer } from '../services/PixiTimelineRenderer.js';
+import { TimelineRenderer } from '../services/TimelineRenderer.js';
+import { tooltipStyles } from '../styles/timeline.css.js';
 import type { TimelineOptions, ViewportState } from '../types/timeline.types.js';
 import { TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
 
 @customElement('timeline-view-v2')
 export class TimelineViewV2 extends LitElement {
-  static styles = css`
-    :host {
-      display: block;
-      width: 100%;
-      height: 100%;
-      position: relative;
-      overflow: hidden;
-    }
+  static styles = [
+    unsafeCSS(tooltipStyles),
+    css`
+      :host {
+        display: block;
+        width: 100%;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+      }
 
-    .timeline-container {
-      width: 100%;
-      height: 100%;
-      position: relative;
-    }
+      .timeline-container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
 
-    .error-message {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 20px;
-      background: #ffebee;
-      border: 1px solid #ef5350;
-      border-radius: 4px;
-      color: #c62828;
-      font-family: monospace;
-      max-width: 80%;
-      text-align: center;
-    }
+      .error-message {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 20px;
+        background: #ffebee;
+        border: 1px solid #ef5350;
+        border-radius: 4px;
+        color: #c62828;
+        font-family: monospace;
+        max-width: 80%;
+        text-align: center;
+      }
 
-    .loading-message {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 20px;
-      color: #666;
-      font-family: monospace;
-    }
-  `;
+      .loading-message {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 20px;
+        color: #666;
+        font-family: monospace;
+      }
+    `,
+  ];
 
   // ============================================================================
   // PROPERTIES
@@ -90,7 +94,7 @@ export class TimelineViewV2 extends LitElement {
   @state()
   private isLoading = false;
 
-  private renderer: PixiTimelineRenderer | null = null;
+  private renderer: TimelineRenderer | null = null;
   private containerRef: HTMLElement | null = null;
   private resizeObserver: ResizeObserver | null = null;
 
@@ -148,7 +152,7 @@ export class TimelineViewV2 extends LitElement {
    * Initialize PixiJS timeline renderer.
    */
   private async initializeTimeline(): Promise<void> {
-    if (!this.containerRef) {
+    if (!this.containerRef || !this.rootLog) {
       return;
     }
 
@@ -178,10 +182,10 @@ export class TimelineViewV2 extends LitElement {
       };
 
       // Create new renderer
-      this.renderer = new PixiTimelineRenderer();
+      this.renderer = new TimelineRenderer();
 
       // Initialize with events and options
-      await this.renderer.init(this.containerRef, events, optionsWithColors);
+      await this.renderer.init(this.containerRef, this.rootLog, events, optionsWithColors);
 
       this.isInitialized = true;
       this.isLoading = false;
