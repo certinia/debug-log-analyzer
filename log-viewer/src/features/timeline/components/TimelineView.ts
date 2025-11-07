@@ -42,6 +42,7 @@ export class TimelineView extends LitElement {
         flex-direction: column;
         flex: 1;
         position: relative;
+        width: 100%;
         height: 80%;
       }
 

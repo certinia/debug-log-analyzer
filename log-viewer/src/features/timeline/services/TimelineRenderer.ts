@@ -209,8 +209,9 @@ export class TimelineRenderer {
   }
 
   /**
-   * Handle window resize - scale zoom proportionally to maintain visible content.
-   * Rectangles scale by the resize ratio, keeping all visible content on screen.
+   * Handle window resize - preserve horizontal time range while scaling content.
+   * Per T101: Maintain the same time span visible before/after resize.
+   * Rectangles and axis elements scale proportionally to new dimensions.
    *
    * @param newWidth - New canvas width
    * @param newHeight - New canvas height
@@ -230,44 +231,37 @@ export class TimelineRenderer {
     // Get current viewport state before resize
     const oldState = this.viewport.getState();
     const oldWidth = oldState.displayWidth;
-    const oldHeight = oldState.displayHeight;
 
-    // Calculate resize ratio
-    const widthRatio = newWidth / oldWidth;
-    const heightRatio = newHeight / oldHeight;
+    // Calculate the current visible time range (what we want to preserve)
+    const visibleTimeStart = oldState.offsetX / oldState.zoom;
+    const visibleTimeEnd = (oldState.offsetX + oldWidth) / oldState.zoom;
+    const visibleTimeRange = visibleTimeEnd - visibleTimeStart;
+
+    // Calculate the current visible vertical range (world Y coordinates)
+    // With offsetY <= 0, worldYBottom = -offsetY
+    const visibleWorldYBottom = -oldState.offsetY;
 
     // Resize PixiJS renderer
     this.app.renderer.resize(newWidth, newHeight);
 
-    // Update viewport dimensions first
-    this.viewport.resize(newWidth, newHeight);
+    // Calculate new zoom to preserve the same time range
+    // zoom = pixels / time, so for same time range: zoom = newWidth / timeRange
+    const newZoom = newWidth / visibleTimeRange;
 
-    // Scale zoom and offset by resize ratio to maintain visual scale
-    const newZoom = oldState.zoom * widthRatio;
-    const newOffsetX = oldState.offsetX * widthRatio;
-    const newOffsetY = oldState.offsetY * heightRatio;
+    // Calculate new offsetX to maintain the same start time
+    const newOffsetX = visibleTimeStart * newZoom;
 
-    // Directly set the state to preserve visible content
-    // This scales everything proportionally by the resize ratio
-    this.viewport.setStateForResize(newZoom, newOffsetX, newOffsetY);
+    // For vertical: Keep the same worldY at the bottom of the viewport
+    // This prevents jumps by maintaining the same vertical reference point
+    // newOffsetY = -visibleWorldYBottom maintains the same bottom reference
+    const newOffsetY = -visibleWorldYBottom;
 
-    // Update axis container origin (bottom-left)
-    if (this.axisContainer) {
-      this.axisContainer.position.set(
-        this.axisContainer.position.x,
-        newHeight, // Update Y origin to new height
-      );
-    }
+    // Update viewport state to preserve the time range
+    // This updates dimensions, zoom, and offsets all at once without clamping zoom
+    this.viewport.setStateForResize(newWidth, newHeight, newZoom, newOffsetX, newOffsetY);
 
-    // Update world container origin (bottom-left)
-    if (this.worldContainer) {
-      this.worldContainer.position.set(
-        this.worldContainer.position.x,
-        newHeight, // Update Y origin to new height
-      );
-    }
-
-    // Trigger re-render
+    // Request re-render on next frame to prevent flickering
+    // The render loop will handle it smoothly
     this.requestRender();
   }
 

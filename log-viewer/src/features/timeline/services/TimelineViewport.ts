@@ -171,11 +171,23 @@ export class TimelineViewport {
   /**
    * Set viewport state directly for resize operations.
    * This bypasses normal clamping to allow preserving visible content during resize.
+   * @param width - New display width
+   * @param height - New display height
    * @param zoom - New zoom level
    * @param offsetX - New horizontal offset
    * @param offsetY - New vertical offset
    */
-  public setStateForResize(zoom: number, offsetX: number, offsetY: number): void {
+  public setStateForResize(
+    width: number,
+    height: number,
+    zoom: number,
+    offsetX: number,
+    offsetY: number,
+  ): void {
+    // Update dimensions first
+    this.state.displayWidth = width;
+    this.state.displayHeight = height;
+
     // Don't clamp zoom - allow any zoom level to preserve visible content
     this.state.zoom = zoom;
 
