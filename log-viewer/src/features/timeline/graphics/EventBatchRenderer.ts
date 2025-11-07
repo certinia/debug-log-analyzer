@@ -84,15 +84,27 @@ export class EventBatchRenderer {
 
   /**
    * Calculate viewport bounds for culling.
+   *
+   * With offsetY <= 0 (negative when scrolled down):
+   * - worldContainer.y = screen.height - offsetY
+   * - When offsetY = 0: see depths 0 to displayHeight/HEIGHT
+   * - When offsetY = -100: scrolled down, see higher depths
    */
   private calculateBounds(viewport: ViewportState): ViewportBounds {
     const timeStart = viewport.offsetX / viewport.zoom;
     const timeEnd = (viewport.offsetX + viewport.displayWidth) / viewport.zoom;
 
-    const depthStart = Math.floor(viewport.offsetY / TIMELINE_CONSTANTS.EVENT_HEIGHT);
-    const depthEnd = Math.ceil(
-      (viewport.offsetY + viewport.displayHeight) / TIMELINE_CONSTANTS.EVENT_HEIGHT,
-    );
+    // World Y coordinates of visible region
+    // With scale.y = -1 flip and container.y = screen.height - offsetY:
+    // Screen renders worldY in range [-offsetY, screen.height - offsetY]
+    const worldYBottom = -viewport.offsetY; // Visible at screen bottom (lower depths)
+    const worldYTop = -viewport.offsetY + viewport.displayHeight; // Visible at screen top (higher depths)
+
+    // Convert to depth levels (depth 0 is at worldY = 0)
+    // An event at depth D occupies worldY = [D * HEIGHT, (D+1) * HEIGHT]
+    // Use floor for both to include only depths that are at least partially visible
+    const depthStart = Math.floor(worldYBottom / TIMELINE_CONSTANTS.EVENT_HEIGHT);
+    const depthEnd = Math.floor(worldYTop / TIMELINE_CONSTANTS.EVENT_HEIGHT);
 
     return {
       timeStart,
@@ -142,11 +154,11 @@ export class EventBatchRenderer {
           };
           batch.rectangles.push(rect);
         }
+      }
 
-        // Recurse into children
-        if (children && children.length > 0) {
-          this.collectVisibleRectangles(children, depth + 1, viewport, bounds);
-        }
+      // Recurse into children
+      if (children && children.length > 0) {
+        this.collectVisibleRectangles(children, depth + 1, viewport, bounds);
       }
     }
   }
@@ -175,7 +187,6 @@ export class EventBatchRenderer {
 
     // Minimum size filter (skip sub-pixel rectangles)
     const isSizeValid = width >= TIMELINE_CONSTANTS.MIN_RECT_SIZE;
-
     return horizontalOverlap && verticalOverlap && isSizeValid;
   }
 

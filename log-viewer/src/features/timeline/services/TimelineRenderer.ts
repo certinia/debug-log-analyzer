@@ -30,6 +30,7 @@ export class TimelineRenderer {
   private batchRenderer: EventBatchRenderer | null = null;
   private axisRenderer: AxisRenderer | null = null;
   private worldContainer: PIXI.Container | null = null; // Container for world-space content (affected by pan/zoom)
+  private axisContainer: PIXI.Container | null = null; // Container for axis lines (only affected by horizontal pan)
   private uiContainer: PIXI.Container | null = null; // Container for screen-space UI (not affected by pan/zoom)
   private renderLoopId: number | null = null;
   private interactionHandler: TimelineInteractionHandler | null = null;
@@ -57,9 +58,11 @@ export class TimelineRenderer {
       );
     }
 
-    if (!events || !Array.isArray(events) || events.length === 0) {
-      throw new TimelineError(TimelineErrorCode.INVALID_EVENT_DATA, 'Events array cannot be empty');
+    if (!events || !Array.isArray(events)) {
+      throw new TimelineError(TimelineErrorCode.INVALID_EVENT_DATA, 'Events must be an array');
     }
+
+    // T107: Allow empty events array - will show time axis only (clarification from 2025-11-07)
 
     // Check WebGL availability
     if (!this.isWebGLAvailable()) {
@@ -103,9 +106,9 @@ export class TimelineRenderer {
     this.initializeState(events);
 
     // Create axis renderer FIRST (so it renders behind event rectangles)
-    // Axis lines go in world container, labels go in UI container
-    if (this.worldContainer && this.uiContainer) {
-      this.axisRenderer = new AxisRenderer(this.worldContainer, {
+    // Axis lines go in axis container (only horizontal pan), labels go in UI container
+    if (this.axisContainer && this.uiContainer) {
+      this.axisRenderer = new AxisRenderer(this.axisContainer, {
         height: 30,
         lineColor: 0x808080, // Medium gray for light/dark theme compatibility
         textColor: '#808080', // Medium gray for light/dark theme compatibility
@@ -248,6 +251,14 @@ export class TimelineRenderer {
     // This scales everything proportionally by the resize ratio
     this.viewport.setStateForResize(newZoom, newOffsetX, newOffsetY);
 
+    // Update axis container origin (bottom-left)
+    if (this.axisContainer) {
+      this.axisContainer.position.set(
+        this.axisContainer.position.x,
+        newHeight, // Update Y origin to new height
+      );
+    }
+
     // Update world container origin (bottom-left)
     if (this.worldContainer) {
       this.worldContainer.position.set(
@@ -299,8 +310,9 @@ export class TimelineRenderer {
   /**
    * Setup coordinate system: (0, 0) at bottom-left, Y-axis pointing up.
    *
-   * Creates two containers:
-   * - worldContainer: Affected by pan/zoom transforms (for events and axis lines)
+   * Creates three containers:
+   * - worldContainer: Affected by both horizontal and vertical pan/zoom (for events)
+   * - axisContainer: Only affected by horizontal pan (for axis lines)
    * - uiContainer: Screen-space UI (for axis labels, not affected by transforms)
    */
   private setupCoordinateSystem(): void {
@@ -309,6 +321,15 @@ export class TimelineRenderer {
     }
 
     const stage = this.app.stage;
+
+    // Create axis container (only affected by horizontal pan, not vertical)
+    // This ensures axis lines stay fixed vertically when panning vertically
+    this.axisContainer = new PIXI.Container();
+    // Move origin to bottom-left
+    this.axisContainer.position.set(0, this.app.screen.height);
+    // Invert Y-axis (flip upside down)
+    this.axisContainer.scale.y = -1;
+    stage.addChild(this.axisContainer);
 
     // Create world-space container (will be transformed for pan/zoom)
     this.worldContainer = new PIXI.Container();
@@ -326,7 +347,9 @@ export class TimelineRenderer {
     stage.addChild(this.uiContainer);
 
     // eslint-disable-next-line no-console
-    console.log('Coordinate system: worldContainer with inverted Y, uiContainer in screen space');
+    console.log(
+      'Coordinate system: axisContainer (horizontal pan only), worldContainer (full pan/zoom), uiContainer (screen space)',
+    );
   }
 
   /**
@@ -413,6 +436,11 @@ export class TimelineRenderer {
       // Show tooltip for this event
       this.tooltipManager.show(event, screenX, screenY);
 
+      // Update cursor to pointer when over an event
+      if (this.interactionHandler) {
+        this.interactionHandler.updateCursor(true);
+      }
+
       // Call external callback if provided
       if (this.options.onEventHover) {
         this.options.onEventHover(event);
@@ -420,6 +448,11 @@ export class TimelineRenderer {
     } else {
       // Hide tooltip when not over an event
       this.tooltipManager.hide();
+
+      // Update cursor to grab when not over an event
+      if (this.interactionHandler) {
+        this.interactionHandler.updateCursor(false);
+      }
 
       // Call external callback with null
       if (this.options.onEventHover) {
@@ -566,12 +599,18 @@ export class TimelineRenderer {
     // Update state viewport (sync)
     this.state.viewport = viewportState;
 
+    // Update axis container position (only horizontal offset, no vertical)
+    if (this.axisContainer) {
+      this.axisContainer.position.set(-viewportState.offsetX, this.app.screen.height);
+    }
+
     // Update world container position to reflect viewport offset (pan)
     // World X moves opposite to offsetX (scrolling right = moving world left)
-    // World Y: Keep bottom-left origin (already set during init) plus vertical offset
+    // World Y: Subtract offsetY because increasing offsetY should move content up on screen
+    // With inverted Y-axis, reducing container.y moves the bottom-left origin down, pushing content up
     this.worldContainer.position.set(
       -viewportState.offsetX,
-      this.app.screen.height + viewportState.offsetY,
+      this.app.screen.height - viewportState.offsetY,
     );
 
     // Render time axis FIRST (so lines appear behind rectangles)

@@ -48,15 +48,26 @@ export class TimelineViewport {
 
   /**
    * Calculate viewport bounds for culling.
+   *
+   * With coordinate system where offsetY <= 0:
+   * - offsetY = 0: bottom (depth 0) at bottom of viewport
+   * - offsetY < 0: scrolled down to reveal higher depths
    */
   public getBounds(): ViewportBounds {
     const timeStart = this.state.offsetX / this.state.zoom;
     const timeEnd = (this.state.offsetX + this.state.displayWidth) / this.state.zoom;
 
-    const depthStart = Math.floor(this.state.offsetY / TIMELINE_CONSTANTS.EVENT_HEIGHT);
-    const depthEnd = Math.ceil(
-      (this.state.offsetY + this.state.displayHeight) / TIMELINE_CONSTANTS.EVENT_HEIGHT,
-    );
+    // World Y coordinates of visible region
+    // With scale.y = -1 flip and container.y = screen.height - offsetY:
+    // Screen renders worldY in range [-offsetY, screen.height - offsetY]
+    const worldYBottom = -this.state.offsetY; // Visible at screen bottom (lower depths)
+    const worldYTop = -this.state.offsetY + this.state.displayHeight; // Visible at screen top (higher depths)
+
+    // Convert to depth levels (depth 0 is at worldY = 0)
+    // An event at depth D occupies worldY = [D * HEIGHT, (D+1) * HEIGHT]
+    // Use floor for both to include only depths that are at least partially visible
+    const depthStart = Math.floor(worldYBottom / TIMELINE_CONSTANTS.EVENT_HEIGHT);
+    const depthEnd = Math.floor(worldYTop / TIMELINE_CONSTANTS.EVENT_HEIGHT);
 
     return {
       timeStart,
@@ -228,33 +239,61 @@ export class TimelineViewport {
 
   /**
    * Clamp vertical offset to valid range.
+   *
+   * Vertical offset behavior (worldContainer.y = screen.height - offsetY):
+   * - offsetY = 0: Default view (bottom row at bottom of viewport)
+   * - offsetY < 0: Scrolled down (negative offset moves content down to reveal top depths)
+   * - offsetY > 0: Would scroll up (not allowed - prevents bottom from moving off bottom)
+   *
+   * Constraints:
+   * - Maximum offsetY = 0: Bottom row cannot move up beyond bottom of viewport
+   * - Minimum offsetY: Allow scrolling down until top is 4 event heights below top edge (T098)
    */
   private clampOffsetY(offsetY: number): number {
     const realHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT * this.maxDepth;
-    const maxVertOffset = realHeight - this.state.displayHeight + this.state.displayHeight / 4;
 
-    // Allow scrolling up to see top of deep stacks, but not beyond bottom
-    const minOffset = -Math.max(0, maxVertOffset);
+    // Maximum offset = 0: prevents bottom row from moving off bottom
     const maxOffset = 0;
+
+    // Minimum offset: allow scrolling until top row is 4 EVENT_HEIGHT below top
+    // maxVertOffset = how much we can scroll down
+    // realHeight - displayHeight = amount content exceeds viewport
+    // + 4 * EVENT_HEIGHT = extra padding at top (per clarification 2025-11-07)
+    const maxVertOffset = Math.max(
+      0,
+      realHeight - this.state.displayHeight + 4 * TIMELINE_CONSTANTS.EVENT_HEIGHT,
+    );
+    const minOffset = -maxVertOffset;
 
     return Math.max(minOffset, Math.min(maxOffset, offsetY));
   }
 
   /**
    * Convert screen Y coordinate to depth level.
+   *
+   * With offsetY <= 0 and worldContainer.y = screen.height - offsetY:
+   * - screenY = 0 is top of viewport
+   * - screenY = displayHeight is bottom of viewport
    */
   public screenYToDepth(screenY: number): number {
-    const y = this.state.displayHeight - screenY - this.state.offsetY;
-    const realHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT * this.maxDepth;
-    return Math.floor((y / realHeight) * this.maxDepth);
+    // World Y visible at bottom of screen (screenY = displayHeight)
+    const worldYBottom = -this.state.offsetY;
+
+    // World Y at this screen position
+    // screenY increases downward, worldY increases upward
+    const worldY = worldYBottom + (this.state.displayHeight - screenY);
+
+    return Math.floor(worldY / TIMELINE_CONSTANTS.EVENT_HEIGHT);
   }
 
   /**
    * Convert depth level to screen Y coordinate.
    */
   public depthToScreenY(depth: number): number {
-    const realHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT * this.maxDepth;
-    const y = (depth / this.maxDepth) * realHeight;
-    return this.state.displayHeight - this.state.offsetY - y;
+    const worldY = depth * TIMELINE_CONSTANTS.EVENT_HEIGHT;
+    const worldYBottom = -this.state.offsetY;
+
+    // Screen Y distance from bottom
+    return this.state.displayHeight - (worldY - worldYBottom);
   }
 }

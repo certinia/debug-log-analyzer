@@ -40,6 +40,9 @@ export interface InteractionCallbacks {
 
   /** Called when mouse clicks on timeline. */
   onClick?: (x: number, y: number) => void;
+
+  /** Called when hover state over event changes. Returns true if over an event. */
+  onHoverChange?: (isOverEvent: boolean) => void;
 }
 
 export class TimelineInteractionHandler {
@@ -54,6 +57,7 @@ export class TimelineInteractionHandler {
   private lastMouseY = 0;
   private lastTouchX = 0;
   private lastTouchY = 0;
+  private isOverEvent = false;
 
   // Event listener references for cleanup
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -398,7 +402,6 @@ export class TimelineInteractionHandler {
       const deltaY = touch.clientY - this.lastTouchY;
 
       // Update pan (note: negative delta because we're dragging the viewport)
-      // Same behavior as mouse drag: swipe right = content moves right
       const changed = this.viewport.panBy(-deltaX, -deltaY);
 
       // Update last position
@@ -465,5 +468,21 @@ export class TimelineInteractionHandler {
    */
   public setZoomSensitivity(sensitivity: number): void {
     this.options.zoomSensitivity = Math.max(0.1, Math.min(10, sensitivity));
+  }
+
+  /**
+   * Update cursor based on hover state over events.
+   * @param isOverEvent - Whether cursor is over an event
+   */
+  public updateCursor(isOverEvent: boolean): void {
+    if (this.isDragging) {
+      // Don't change cursor while dragging
+      return;
+    }
+
+    if (isOverEvent !== this.isOverEvent) {
+      this.isOverEvent = isOverEvent;
+      this.canvas.style.cursor = isOverEvent ? 'pointer' : 'grab';
+    }
   }
 }
