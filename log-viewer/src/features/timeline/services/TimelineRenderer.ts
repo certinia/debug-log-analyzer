@@ -120,8 +120,9 @@ export class TimelineRenderer {
     }
 
     // Create batch renderer AFTER axis (so rectangles render on top)
+    // Pass events to constructor for pre-computation optimization
     if (this.worldContainer && this.state) {
-      this.batchRenderer = new EventBatchRenderer(this.worldContainer, this.state.batches);
+      this.batchRenderer = new EventBatchRenderer(this.worldContainer, this.state.batches, events);
     }
 
     // Setup interaction handler
@@ -618,6 +619,6 @@ export class TimelineRenderer {
     // - View frustum culling
     // - Category-based batching
     // - GPU-accelerated drawing
-    this.batchRenderer.render(this.state.events, viewportState);
+    this.batchRenderer.render(viewportState);
   }
 }

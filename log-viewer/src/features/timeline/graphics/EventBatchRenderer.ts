@@ -24,12 +24,32 @@ import type {
 } from '../types/timeline.types.js';
 import { TIMELINE_CONSTANTS } from '../types/timeline.types.js';
 
+/**
+ * Pre-computed event rectangle with fixed properties.
+ * Stored once at construction to avoid recalculating every frame.
+ */
+interface PrecomputedRect {
+  timeStart: number; // timestamp in nanoseconds
+  timeEnd: number; // exitStamp in nanoseconds
+  depth: number; // call stack depth
+  duration: number; // duration in nanoseconds
+  category: string; // event category
+  eventRef: LogEvent; // reference to original event
+}
+
 export class EventBatchRenderer {
   private batches: Map<string, RenderBatch>;
   private graphics: Map<string, PIXI.Graphics>;
   private container: PIXI.Container;
 
-  constructor(container: PIXI.Container, batches: Map<string, RenderBatch>) {
+  // Performance optimization: pre-computed flat list of all rectangles
+  private allRects: PrecomputedRect[] = [];
+
+  // Spatial index: rectangles grouped by depth for faster vertical culling
+  private rectsByDepth: Map<number, PrecomputedRect[]> = new Map();
+  private maxDepth = 0;
+
+  constructor(container: PIXI.Container, batches: Map<string, RenderBatch>, events: LogEvent[]) {
     this.batches = batches;
     this.graphics = new Map();
     this.container = container;
@@ -40,14 +60,68 @@ export class EventBatchRenderer {
       this.graphics.set(category, gfx);
       container.addChild(gfx);
     }
+
+    // Pre-compute all rectangles once at construction
+    this.precomputeRectangles(events);
+  }
+
+  /**
+   * Pre-compute all event rectangles once at construction.
+   * Creates a flat array and spatial index for fast culling during render.
+   */
+  private precomputeRectangles(events: LogEvent[]): void {
+    this.allRects = [];
+    this.rectsByDepth.clear();
+    this.maxDepth = 0;
+
+    // Recursively flatten event tree
+    this.flattenEvents(events, 0);
+  }
+
+  /**
+   * Recursively flatten event tree into pre-computed rectangles.
+   */
+  private flattenEvents(events: LogEvent[], depth: number): void {
+    for (const event of events) {
+      const { duration, subCategory, timestamp, children } = event;
+
+      if (duration.total && subCategory) {
+        const rect: PrecomputedRect = {
+          timeStart: timestamp,
+          timeEnd: event.exitStamp ?? timestamp,
+          depth,
+          duration: duration.total,
+          category: subCategory,
+          eventRef: event,
+        };
+
+        this.allRects.push(rect);
+
+        // Add to spatial index by depth
+        if (!this.rectsByDepth.has(depth)) {
+          this.rectsByDepth.set(depth, []);
+        }
+        this.rectsByDepth.get(depth)!.push(rect);
+
+        // Track max depth
+        if (depth > this.maxDepth) {
+          this.maxDepth = depth;
+        }
+      }
+
+      // Recurse into children
+      if (children && children.length > 0) {
+        this.flattenEvents(children, depth + 1);
+      }
+    }
   }
 
   /**
    * Render all visible events grouped by category.
    *
-   * Implements view frustum culling: only renders events within viewport bounds.
+   * Optimized: Uses pre-computed rectangles and spatial index for fast culling.
    */
-  public render(events: LogEvent[], viewport: ViewportState): void {
+  public render(viewport: ViewportState): void {
     const bounds = this.calculateBounds(viewport);
 
     // Clear all batches
@@ -56,8 +130,42 @@ export class EventBatchRenderer {
       batch.isDirty = true;
     }
 
-    // Collect visible rectangles grouped by category
-    this.collectVisibleRectangles(events, 0, viewport, bounds);
+    // Fast path: iterate only depths that are visible
+    for (let depth = bounds.depthStart; depth <= bounds.depthEnd; depth++) {
+      const rectsAtDepth = this.rectsByDepth.get(depth);
+      if (!rectsAtDepth) {
+        continue;
+      }
+
+      // Check each rectangle at this depth
+      for (const rect of rectsAtDepth) {
+        // Calculate screen-space width for size culling
+        const screenWidth = rect.duration * viewport.zoom;
+
+        // Skip if too small to render
+        if (screenWidth < TIMELINE_CONSTANTS.MIN_RECT_SIZE) {
+          continue;
+        }
+
+        // Horizontal overlap check
+        if (rect.timeStart >= bounds.timeEnd || rect.timeEnd <= bounds.timeStart) {
+          continue;
+        }
+
+        // Visible! Add to batch
+        const batch = this.batches.get(rect.category);
+        if (batch) {
+          const renderRect: RenderRectangle = {
+            x: rect.timeStart * viewport.zoom,
+            y: rect.depth * TIMELINE_CONSTANTS.EVENT_HEIGHT,
+            width: screenWidth,
+            height: TIMELINE_CONSTANTS.EVENT_HEIGHT,
+            eventRef: rect.eventRef,
+          };
+          batch.rectangles.push(renderRect);
+        }
+      }
+    }
 
     // Render each batch
     for (const [category, batch] of this.batches) {
@@ -112,82 +220,6 @@ export class EventBatchRenderer {
       depthStart,
       depthEnd,
     };
-  }
-
-  /**
-   * Recursively collect visible event rectangles.
-   *
-   * Implements hierarchical culling:
-   * 1. Check if event is within viewport bounds
-   * 2. If visible, add to appropriate batch
-   * 3. Recurse into children
-   */
-  private collectVisibleRectangles(
-    events: LogEvent[],
-    depth: number,
-    viewport: ViewportState,
-    bounds: ViewportBounds,
-  ): void {
-    for (const event of events) {
-      const { duration, subCategory } = event;
-      if (!duration.total || !subCategory) {
-        continue;
-      }
-
-      // Calculate rectangle position and size
-      const { timestamp, children } = event;
-      const x = timestamp * viewport.zoom;
-      const width = duration.total * viewport.zoom;
-      const y = depth * TIMELINE_CONSTANTS.EVENT_HEIGHT;
-
-      // Check if rectangle is visible (frustum culling)
-      if (this.isRectangleVisible(event, depth, width, bounds)) {
-        // Add to batch for this category
-        const batch = this.batches.get(subCategory);
-        if (batch) {
-          const rect: RenderRectangle = {
-            x,
-            y,
-            width,
-            height: TIMELINE_CONSTANTS.EVENT_HEIGHT,
-            eventRef: event,
-          };
-          batch.rectangles.push(rect);
-        }
-      }
-
-      // Recurse into children
-      if (children && children.length > 0) {
-        this.collectVisibleRectangles(children, depth + 1, viewport, bounds);
-      }
-    }
-  }
-
-  /**
-   * Check if rectangle is visible within viewport bounds.
-   *
-   * Culls rectangles that are:
-   * 1. Outside horizontal bounds (time range)
-   * 2. Outside vertical bounds (depth range)
-   * 3. Too small to render (< MIN_RECT_SIZE pixels)
-   */
-  private isRectangleVisible(
-    event: LogEvent,
-    depth: number,
-    width: number,
-    bounds: ViewportBounds,
-  ): boolean {
-    // Horizontal overlap
-    const eventTimeStart = event.timestamp;
-    const eventTimeEnd = event.exitStamp ?? event.timestamp;
-    const horizontalOverlap = eventTimeStart < bounds.timeEnd && eventTimeEnd > bounds.timeStart;
-
-    // Vertical overlap
-    const verticalOverlap = depth >= bounds.depthStart && depth <= bounds.depthEnd;
-
-    // Minimum size filter (skip sub-pixel rectangles)
-    const isSizeValid = width >= TIMELINE_CONSTANTS.MIN_RECT_SIZE;
-    return horizontalOverlap && verticalOverlap && isSizeValid;
   }
 
   /**
