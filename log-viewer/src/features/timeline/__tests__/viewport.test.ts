@@ -40,7 +40,7 @@ describe('TimelineViewport', () => {
 
       // Default zoom should fit totalDuration in displayWidth
       const expectedZoom = DISPLAY_WIDTH / TOTAL_DURATION;
-      expect(state.zoom).toBeCloseTo(expectedZoom, 10);
+      expect(state.zoom).toBe(expectedZoom);
     });
 
     it('should initialize with zero offsets', () => {
@@ -199,7 +199,7 @@ describe('TimelineViewport', () => {
     it('should calculate correct depth bounds', () => {
       const bounds = viewport.getBounds();
 
-      expect(bounds.depthStart).toBe(0);
+      expect(bounds.depthStart).toBeCloseTo(0, 10);
       const expectedDepthEnd = Math.ceil(DISPLAY_HEIGHT / TIMELINE_CONSTANTS.EVENT_HEIGHT);
       expect(bounds.depthEnd).toBe(expectedDepthEnd);
     });
@@ -391,7 +391,7 @@ describe('TimelineViewport', () => {
       const vp = new TimelineViewport(DISPLAY_WIDTH, DISPLAY_HEIGHT, TOTAL_DURATION, 0);
       const bounds = vp.getBounds();
 
-      expect(bounds.depthStart).toBe(0);
+      expect(bounds.depthStart).toBeCloseTo(0, 10);
       expect(bounds.depthEnd).toBeGreaterThanOrEqual(0);
     });
   });
