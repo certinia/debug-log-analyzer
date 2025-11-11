@@ -161,17 +161,7 @@ export class TimelineRenderer {
     this.startRenderLoop();
 
     // Measure initial render time
-    const startTime = performance.now();
     this.performInitialRender();
-    const renderTime = performance.now() - startTime;
-
-    // Log performance metrics (disabled in production via build config)
-    // eslint-disable-next-line no-console
-    console.log(
-      `Timeline initialized: ${events.length} root events, ${this.index.eventCount} total events, max depth: ${this.index.maxDepth}`,
-    );
-    // eslint-disable-next-line no-console
-    console.log(`Initial render completed in ${renderTime.toFixed(2)}ms (target: <2000ms)`);
   }
 
   /**
@@ -272,8 +262,6 @@ export class TimelineRenderer {
 
     // Validate dimensions
     if (newWidth <= 0 || newHeight <= 0) {
-      // eslint-disable-next-line no-console
-      console.warn('Invalid resize dimensions:', newWidth, newHeight);
       return;
     }
 
@@ -414,11 +402,6 @@ export class TimelineRenderer {
     this.uiContainer.position.set(0, 0);
     this.uiContainer.scale.set(1, 1);
     stage.addChild(this.uiContainer);
-
-    // eslint-disable-next-line no-console
-    console.log(
-      'Coordinate system: truncationContainer (z:0, h-pan only), axisContainer (z:1, h-pan only), worldContainer (z:2, full pan/zoom), uiContainer (z:3, screen space)',
-    );
   }
 
   /**
@@ -457,9 +440,6 @@ export class TimelineRenderer {
         },
       },
     );
-
-    // eslint-disable-next-line no-console
-    console.log('Interaction handler initialized (zoom/pan enabled)');
   }
 
   /**
@@ -479,9 +459,6 @@ export class TimelineRenderer {
       },
       apexLog: this.apexLog,
     });
-
-    // eslint-disable-next-line no-console
-    console.log('Tooltip manager initialized');
   }
 
   /**
@@ -627,9 +604,6 @@ export class TimelineRenderer {
       return (r << 16) | (g << 8) | b;
     }
 
-    // Fallback to black
-    // eslint-disable-next-line no-console
-    console.warn(`Unrecognized color format: ${cssColor}, using black`);
     return 0x000000;
   }
 

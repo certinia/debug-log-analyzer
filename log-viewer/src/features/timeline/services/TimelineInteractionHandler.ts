@@ -60,8 +60,18 @@ export class TimelineInteractionHandler {
   private isOverEvent = false;
 
   // Event listener references for cleanup
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private boundHandlers: Map<string, any> = new Map();
+
+  // Stores handlers; supports registering subtype-specific handlers (e.g. MouseEvent, WheelEvent)
+  // by casting to the base Event signature internally.
+  private boundHandlers: Map<string, (e: Event) => void> = new Map();
+
+  /**
+   * Register an event handler that may use a more specific Event subtype.
+   * Stored internally as (e: Event) => void for uniform cleanup.
+   */
+  private registerBoundHandler<E extends Event>(key: string, handler: (e: E) => void): void {
+    this.boundHandlers.set(key, handler as (e: Event) => void);
+  }
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -103,7 +113,7 @@ export class TimelineInteractionHandler {
     if (this.options.enableZoom) {
       const wheelHandler = this.handleWheel.bind(this);
       this.canvas.addEventListener('wheel', wheelHandler, { passive: false });
-      this.boundHandlers.set('wheel', wheelHandler);
+      this.registerBoundHandler('wheel', wheelHandler);
     }
 
     // Mouse events for pan and selection
@@ -115,10 +125,9 @@ export class TimelineInteractionHandler {
       this.canvas.addEventListener('mousedown', mouseDownHandler);
       document.addEventListener('mousemove', mouseMoveHandler);
       document.addEventListener('mouseup', mouseUpHandler);
-
-      this.boundHandlers.set('mousedown', mouseDownHandler);
-      this.boundHandlers.set('mousemove', mouseMoveHandler);
-      this.boundHandlers.set('mouseup', mouseUpHandler);
+      this.registerBoundHandler('mousedown', mouseDownHandler);
+      this.registerBoundHandler('mousemove', mouseMoveHandler);
+      this.registerBoundHandler('mouseup', mouseUpHandler);
 
       // Touch events for swipe/pan on touch devices
       const touchStartHandler = this.handleTouchStart.bind(this);
@@ -129,15 +138,15 @@ export class TimelineInteractionHandler {
       this.canvas.addEventListener('touchmove', touchMoveHandler, { passive: false });
       this.canvas.addEventListener('touchend', touchEndHandler);
 
-      this.boundHandlers.set('touchstart', touchStartHandler);
-      this.boundHandlers.set('touchmove', touchMoveHandler);
-      this.boundHandlers.set('touchend', touchEndHandler);
+      this.registerBoundHandler('touchstart', touchStartHandler);
+      this.registerBoundHandler('touchmove', touchMoveHandler);
+      this.registerBoundHandler('touchend', touchEndHandler);
     }
 
     // Click for event selection
     const clickHandler = this.handleClick.bind(this);
     this.canvas.addEventListener('click', clickHandler);
-    this.boundHandlers.set('click', clickHandler);
+    this.registerBoundHandler('click', clickHandler);
   }
 
   /**
