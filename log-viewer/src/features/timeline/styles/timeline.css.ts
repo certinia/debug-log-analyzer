@@ -28,6 +28,7 @@ export const tooltipStyles = `
         overflow: hidden;
         text-overflow: ellipsis;
         line-height: 1em;
+        white-space: pre-wrap;
       }
 
       .tooltip-row {
@@ -52,7 +53,7 @@ export const tooltipStyles = `
         font-family: monospace;
         opacity: 0.9;
         text-align: right;
-        white-space: nowrap;
+        white-space: pre-wrap;
         color: var(--vscode-descriptionForeground, #999)
       }
 `;

@@ -17,6 +17,7 @@ import { TimelineRenderer } from '../services/TimelineRenderer.js';
 import { tooltipStyles } from '../styles/timeline.css.js';
 import type { TimelineOptions, ViewportState } from '../types/timeline.types.js';
 import { TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
+import { extractTruncationMarkers } from '../utils/truncation-utils.js';
 
 @customElement('timeline-view-v2')
 export class TimelineViewV2 extends LitElement {
@@ -183,11 +184,20 @@ export class TimelineViewV2 extends LitElement {
         colors: customColors,
       };
 
+      // Extract truncation markers from log
+      const truncationMarkers = extractTruncationMarkers(this.rootLog);
+
       // Create new renderer
       this.renderer = new TimelineRenderer();
 
-      // Initialize with events and options
-      await this.renderer.init(this.containerRef, this.rootLog, events, optionsWithColors);
+      // Initialize with events, truncation markers, and options
+      await this.renderer.init(
+        this.containerRef,
+        this.rootLog,
+        events,
+        truncationMarkers,
+        optionsWithColors,
+      );
 
       this.isInitialized = true;
       this.isLoading = false;

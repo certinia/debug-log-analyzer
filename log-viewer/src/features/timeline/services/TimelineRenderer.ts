@@ -14,7 +14,13 @@ import { Ticker } from 'pixi.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { AxisRenderer } from '../graphics/AxisRenderer.js';
 import { EventBatchRenderer } from '../graphics/EventBatchRenderer.js';
-import type { TimelineOptions, TimelineState, ViewportState } from '../types/timeline.types.js';
+import { TruncationIndicatorRenderer } from '../graphics/TruncationIndicatorRenderer.js';
+import type {
+  TimelineOptions,
+  TimelineState,
+  TruncationMarker,
+  ViewportState,
+} from '../types/timeline.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineInteractionHandler } from './TimelineInteractionHandler.js';
@@ -30,25 +36,31 @@ export class TimelineRenderer {
   private options: TimelineOptions = {};
   private batchRenderer: EventBatchRenderer | null = null;
   private axisRenderer: AxisRenderer | null = null;
+  private truncationRenderer: TruncationIndicatorRenderer | null = null;
   private worldContainer: PIXI.Container | null = null; // Container for world-space content (affected by pan/zoom)
   private axisContainer: PIXI.Container | null = null; // Container for axis lines (only affected by horizontal pan)
+  private truncationContainer: PIXI.Container | null = null; // Container for truncation indicators (behind axis and events)
   private uiContainer: PIXI.Container | null = null; // Container for screen-space UI (not affected by pan/zoom)
   private renderLoopId: number | null = null;
   private interactionHandler: TimelineInteractionHandler | null = null;
   private tooltipManager: TimelineTooltipManager | null = null;
   private apexLog: ApexLog | null = null;
+  private readonly truncationMarkers: TruncationMarker[] = []; // Truncation indicators for visualization
 
   /**
    * Initialize the timeline renderer.
    *
    * @param container - HTML element to render into
+   * @param apexLog - Parsed Apex log with metadata
    * @param events - Array of log events to visualize
+   * @param truncationMarkers - Array of truncation markers extracted from log
    * @param options - Optional configuration
    */
   public async init(
     container: HTMLElement,
     apexLog: ApexLog,
     events: LogEvent[],
+    truncationMarkers: TruncationMarker[] = [],
     options: TimelineOptions = {},
   ): Promise<void> {
     // Validate inputs
@@ -76,6 +88,9 @@ export class TimelineRenderer {
     this.apexLog = apexLog;
     this.container = container;
     this.options = options;
+
+    // Store truncation markers for rendering
+    (this.truncationMarkers as TruncationMarker[]).push(...truncationMarkers);
 
     // Get container dimensions
     const { width, height } = container.getBoundingClientRect();
@@ -106,7 +121,17 @@ export class TimelineRenderer {
     // Initialize state
     this.initializeState(events);
 
-    // Create axis renderer FIRST (so it renders behind event rectangles)
+    // Create truncation renderer FIRST (renders behind axis and events)
+    // Only render if we have truncation markers
+    if (this.truncationContainer && this.truncationMarkers.length > 0) {
+      this.truncationRenderer = new TruncationIndicatorRenderer(
+        this.truncationContainer,
+        this.viewport,
+        this.truncationMarkers,
+      );
+    }
+
+    // Create axis renderer SECOND (so it renders behind event rectangles but on top of truncation)
     // Axis lines go in axis container (only horizontal pan), labels go in UI container
     if (this.axisContainer && this.uiContainer) {
       this.axisRenderer = new AxisRenderer(this.axisContainer, {
@@ -120,7 +145,7 @@ export class TimelineRenderer {
       this.axisRenderer.setScreenSpaceContainer(this.uiContainer);
     }
 
-    // Create batch renderer AFTER axis (so rectangles render on top)
+    // Create batch renderer LAST (so rectangles render on top of everything)
     // Pass events to constructor for pre-computation optimization
     if (this.worldContainer && this.state) {
       this.batchRenderer = new EventBatchRenderer(this.worldContainer, this.state.batches, events);
@@ -181,6 +206,12 @@ export class TimelineRenderer {
     if (this.axisRenderer) {
       this.axisRenderer.destroy();
       this.axisRenderer = null;
+    }
+
+    // Clean up truncation renderer
+    if (this.truncationRenderer) {
+      this.truncationRenderer.destroy();
+      this.truncationRenderer = null;
     }
 
     if (this.app) {
@@ -338,9 +369,10 @@ export class TimelineRenderer {
   /**
    * Setup coordinate system: (0, 0) at bottom-left, Y-axis pointing up.
    *
-   * Creates three containers:
-   * - worldContainer: Affected by both horizontal and vertical pan/zoom (for events)
+   * Creates four containers (in z-order from back to front):
+   * - truncationContainer: Truncation indicators (only horizontal pan, behind axis)
    * - axisContainer: Only affected by horizontal pan (for axis lines)
+   * - worldContainer: Affected by both horizontal and vertical pan/zoom (for events)
    * - uiContainer: Screen-space UI (for axis labels, not affected by transforms)
    */
   private setupCoordinateSystem(): void {
@@ -349,6 +381,15 @@ export class TimelineRenderer {
     }
 
     const stage = this.app.stage;
+
+    // Create truncation container FIRST (renders behind everything)
+    // Only affected by horizontal pan (like axis), not vertical
+    this.truncationContainer = new PIXI.Container();
+    // Move origin to bottom-left
+    this.truncationContainer.position.set(0, this.app.screen.height);
+    // Invert Y-axis (flip upside down)
+    this.truncationContainer.scale.y = -1;
+    stage.addChild(this.truncationContainer);
 
     // Create axis container (only affected by horizontal pan, not vertical)
     // This ensures axis lines stay fixed vertically when panning vertically
@@ -376,7 +417,7 @@ export class TimelineRenderer {
 
     // eslint-disable-next-line no-console
     console.log(
-      'Coordinate system: axisContainer (horizontal pan only), worldContainer (full pan/zoom), uiContainer (screen space)',
+      'Coordinate system: truncationContainer (z:0, h-pan only), axisContainer (z:1, h-pan only), worldContainer (z:2, full pan/zoom), uiContainer (z:3, screen space)',
     );
   }
 
@@ -444,11 +485,22 @@ export class TimelineRenderer {
   }
 
   /**
-   * Handle mouse move - show tooltip for event at position.
+   * Handle mouse move - show tooltip for event or truncation marker at position.
+   *
+   * Priority order:
+   * 1. Check for truncation markers first (background layer)
+   * 2. Check for events (foreground layer)
+   * 3. Hide tooltip if nothing is hit
    */
   private handleMouseMove(screenX: number, screenY: number): void {
     if (!this.viewport || !this.index || !this.tooltipManager) {
       return;
+    }
+
+    // T015: Check for truncation markers first
+    let truncationMarker = null;
+    if (this.truncationRenderer) {
+      truncationMarker = this.truncationRenderer.hitTest(screenX, screenY);
     }
 
     // Get viewport state
@@ -460,6 +512,7 @@ export class TimelineRenderer {
     // Find event at position using binary search
     const event = this.index.findEventAtPosition(screenX, screenY, viewportState, depth, false);
 
+    // Priority: Events take precedence over truncation markers
     if (event) {
       // Show tooltip for this event
       this.tooltipManager.show(event, screenX, screenY);
@@ -473,11 +526,19 @@ export class TimelineRenderer {
       if (this.options.onEventHover) {
         this.options.onEventHover(event);
       }
+    } else if (truncationMarker) {
+      // T016: Show tooltip for truncation marker (implemented in next task)
+      this.tooltipManager.showTruncation(truncationMarker, screenX, screenY);
+
+      // Update cursor to help/question when over truncation marker
+      if (this.interactionHandler) {
+        this.interactionHandler.updateCursor(true); // Keep grab cursor for now
+      }
     } else {
-      // Hide tooltip when not over an event
+      // Hide tooltip when not over anything
       this.tooltipManager.hide();
 
-      // Update cursor to grab when not over an event
+      // Update cursor to grab when not over anything
       if (this.interactionHandler) {
         this.interactionHandler.updateCursor(false);
       }
@@ -618,6 +679,11 @@ export class TimelineRenderer {
     // Update state viewport (sync)
     this.state.viewport = viewportState;
 
+    // Update truncation container position (only horizontal offset, no vertical - like axis)
+    if (this.truncationContainer) {
+      this.truncationContainer.position.set(-viewportState.offsetX, this.app.screen.height);
+    }
+
     // Update axis container position (only horizontal offset, no vertical)
     if (this.axisContainer) {
       this.axisContainer.position.set(-viewportState.offsetX, this.app.screen.height);
@@ -632,7 +698,12 @@ export class TimelineRenderer {
       this.app.screen.height - viewportState.offsetY,
     );
 
-    // Render time axis FIRST (so lines appear behind rectangles)
+    // Render truncation indicators FIRST (behind axis and events)
+    if (this.truncationRenderer) {
+      this.truncationRenderer.render();
+    }
+
+    // Render time axis SECOND (on top of truncation, behind rectangles)
     // Labels are rendered in screen space (uiContainer), so they stay stable
     if (this.axisRenderer) {
       this.axisRenderer.render(viewportState);

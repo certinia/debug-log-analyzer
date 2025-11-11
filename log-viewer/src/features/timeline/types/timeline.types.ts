@@ -221,3 +221,90 @@ export class TimelineError extends Error {
     this.name = 'TimelineError';
   }
 }
+
+// ============================================================================
+// TRUNCATION VISUALIZATION
+// ============================================================================
+
+/**
+ * Truncation type enumeration.
+ * Represents the three states of log truncation in Salesforce debug logs.
+ * Order represents severity for stacking: error > unexpected > skip
+ */
+export type TruncationType = 'error' | 'skip' | 'unexpected';
+
+/**
+ * Represents a time range in the log where truncation occurred.
+ * Extracted from ApexLog.logIssues during timeline initialization.
+ */
+export interface TruncationMarker {
+  /**
+   * Type of truncation event.
+   * - 'error': Critical system error causing truncation (highest severity)
+   * - 'skip': Intentional content omission (e.g., "*** Skipped 500 lines")
+   * - 'unexpected': Anomalous truncation (e.g., incomplete log entry)
+   */
+  type: TruncationType;
+
+  /**
+   */
+  summary: string;
+
+  /**
+   * Time position (in nanoseconds) where truncation began.
+   * Must be >= 0. Maps to the timestamp when the truncation marker was
+   * encountered in the log file.
+   */
+  startTime: number;
+
+  /**
+   * Optional additional context about the truncation.
+   * May include error messages, reason codes, line numbers, or other diagnostic info.
+   */
+  metadata?: string;
+}
+
+/**
+ * Type guard to check if a string is a valid TruncationType.
+ */
+export function isTruncationType(value: string): value is TruncationType {
+  return value === 'error' || value === 'skip' || value === 'unexpected';
+}
+
+/**
+ * Color mapping for truncation types.
+ * Values are PixiJS numeric color codes (0xRRGGBB format).
+ * Alpha channel (0.2) applied separately during rendering via TRUNCATION_ALPHA.
+ */
+/* eslint-disable @typescript-eslint/naming-convention */
+export const TRUNCATION_COLORS: Record<TruncationType, number> = {
+  error: 0xff8080, // rgba(255, 128, 128, 0.2) - light red
+  skip: 0x1e80ff, // rgba(30, 128, 255, 0.2) - light blue
+  unexpected: 0x8080ff, // rgba(128, 128, 255, 0.2) - light purple
+} as const;
+/* eslint-enable @typescript-eslint/naming-convention */
+
+/**
+ * Transparency level for all truncation indicators.
+ * Applied uniformly to ensure indicators remain in background.
+ */
+export const TRUNCATION_ALPHA = 0.2;
+
+/**
+ * Severity levels in ascending order (lowest to highest).
+ * Used for z-index stacking when indicators overlap.
+ * Render order: unexpected first (bottom layer) → unexpected → error (top layer).
+ */
+export const SEVERITY_ORDER: readonly TruncationType[] = ['unexpected', 'skip', 'error'] as const;
+
+/**
+ * Maps truncation type to severity rank (higher = more severe).
+ * Used for sorting and prioritization logic during hit testing.
+ */
+/* eslint-disable @typescript-eslint/naming-convention */
+export const SEVERITY_RANK: Record<TruncationType, number> = {
+  skip: 1,
+  unexpected: 2,
+  error: 3,
+} as const;
+/* eslint-enable @typescript-eslint/naming-convention */

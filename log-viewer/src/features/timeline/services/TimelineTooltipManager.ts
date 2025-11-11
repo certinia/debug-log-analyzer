@@ -11,6 +11,7 @@
 
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { formatDuration } from '../../../core/utility/Util.js';
+import type { TruncationMarker } from '../types/timeline.types.js';
 
 /**
  * Configuration options for tooltip behavior.
@@ -30,9 +31,9 @@ export interface TooltipOptions {
 export class TimelineTooltipManager {
   private container: HTMLElement;
   private tooltipElement: HTMLElement | null = null;
-  private showTimeout: number | null = null;
   private options: TooltipOptions;
   private currentEvent: LogEvent | null = null;
+  private currentTruncationMarker: TruncationMarker | null = null;
 
   constructor(
     container: HTMLElement,
@@ -71,12 +72,6 @@ export class TimelineTooltipManager {
    * @param mouseY - Mouse Y position relative to container
    */
   public show(event: LogEvent, mouseX: number, mouseY: number): void {
-    // Cancel any pending show
-    if (this.showTimeout !== null) {
-      clearTimeout(this.showTimeout);
-      this.showTimeout = null;
-    }
-
     // If tooltip is already visible, update immediately (no delay between events)
     const wasVisible = this.tooltipElement?.style.display === 'block';
 
@@ -100,6 +95,36 @@ export class TimelineTooltipManager {
   }
 
   /**
+   * Show tooltip for a truncation marker at the specified mouse position.
+   * @param marker - Truncation marker to display tooltip for
+   * @param mouseX - Mouse X position relative to container
+   * @param mouseY - Mouse Y position relative to container
+   */
+  public showTruncation(marker: TruncationMarker, mouseX: number, mouseY: number): void {
+    // If tooltip is already visible, update immediately
+    const wasVisible = this.tooltipElement?.style.display === 'block';
+
+    // If different marker and tooltip is visible, update immediately
+    if (wasVisible && this.currentTruncationMarker !== marker) {
+      this.currentEvent = null; // Clear event state
+      this.currentTruncationMarker = marker;
+      this.displayTruncationTooltip(marker, mouseX, mouseY);
+      return;
+    }
+
+    // If same marker and visible, just update position
+    if (this.currentTruncationMarker === marker && wasVisible) {
+      this.positionTooltip(mouseX, mouseY);
+      return;
+    }
+
+    // New tooltip - show immediately
+    this.currentEvent = null;
+    this.currentTruncationMarker = marker;
+    this.displayTruncationTooltip(marker, mouseX, mouseY);
+  }
+
+  /**
    * Hide tooltip immediately.
    */
   public hide(): void {
@@ -108,6 +133,7 @@ export class TimelineTooltipManager {
     }
 
     this.currentEvent = null;
+    this.currentTruncationMarker = null;
   }
 
   /**
@@ -133,6 +159,83 @@ export class TimelineTooltipManager {
 
     // Position tooltip
     this.positionTooltip(mouseX, mouseY);
+  }
+
+  /**
+   * Display tooltip with truncation marker information.
+   */
+  private displayTruncationTooltip(marker: TruncationMarker, mouseX: number, mouseY: number): void {
+    if (!this.tooltipElement) {
+      return;
+    }
+
+    // Generate tooltip content
+    const content = this.generateTruncationTooltipContent(marker);
+
+    // Clear existing content and append new content
+    while (this.tooltipElement.firstChild) {
+      this.tooltipElement.removeChild(this.tooltipElement.firstChild);
+    }
+    if (content) {
+      this.tooltipElement.appendChild(content);
+    }
+
+    // Show tooltip
+    this.tooltipElement.style.display = 'block';
+
+    // Position tooltip
+    this.positionTooltip(mouseX, mouseY);
+  }
+
+  /**
+   * Generate tooltip content for truncation marker.
+   */
+  private generateTruncationTooltipContent(marker: TruncationMarker): HTMLDivElement | null {
+    const rows: { label: string; value: string }[] = [];
+    const color = this.getTruncationColor(marker.type);
+    return this.createTooltip(marker.summary, marker.metadata, rows, color);
+  }
+
+  /**
+   * Get human-readable label for truncation type.
+   */
+  private getTruncationTypeLabel(type: string): string {
+    switch (type) {
+      case 'error':
+        return 'Error';
+      case 'skip':
+        return 'Skipped Lines';
+      case 'unexpected':
+        return 'Unexpected Truncation';
+      default:
+        return type;
+    }
+  }
+
+  /**
+   * Format nanoseconds as milliseconds for display.
+   */
+  private formatNanoseconds(ns: number): string {
+    const ms = ns / 1_000_000;
+    return `${ms.toFixed(2)}ms`;
+  }
+
+  /**
+   * T017: Get CSS color string for truncation type tooltip borders.
+   * Converts PixiJS numeric colors (0xRRGGBB) to CSS hex strings (#RRGGBB).
+   */
+  private getTruncationColor(type: string): string {
+    // Map truncation types to CSS colors matching TRUNCATION_COLORS
+    switch (type) {
+      case 'error':
+        return '#ff808033'; // rgba(255, 128, 128, 0.2)
+      case 'skip':
+        return '#1e80ff33'; // rgba(30, 128, 255, 0.2)
+      case 'unexpected':
+        return '#8080ff33'; // rgba(128, 128, 255, 0.2)
+      default:
+        return '#999999'; // Gray fallback
+    }
   }
 
   private generateTooltipContent(event: LogEvent): HTMLDivElement | null {
@@ -223,6 +326,7 @@ export class TimelineTooltipManager {
       }
 
       return this.createTooltip(
+        '',
         event.text + (event.suffix ?? ''),
         rows,
         this.options.categoryColors[event.subCategory] || '',
@@ -237,7 +341,12 @@ export class TimelineTooltipManager {
     return `${val}${outOf} (self ${self})`;
   }
 
-  private createTooltip(title: string, rows: { label: string; value: string }[], color: string) {
+  private createTooltip(
+    title: string,
+    description = '',
+    rows: { label: string; value: string }[],
+    color: string,
+  ) {
     const tooltipBody = document.createElement('div');
     tooltipBody.className = 'timeline-tooltip';
 
@@ -245,10 +354,17 @@ export class TimelineTooltipManager {
       tooltipBody.style.borderColor = color;
     }
 
-    const header = document.createElement('div');
-    header.className = 'tooltip-header';
-    header.textContent = title;
-    tooltipBody.appendChild(header);
+    if (title) {
+      const header = document.createElement('div');
+      header.className = 'tooltip-header';
+      header.textContent = title;
+      tooltipBody.appendChild(header);
+    }
+
+    const descriptionDiv = document.createElement('div');
+    descriptionDiv.className = 'tooltip-header';
+    descriptionDiv.textContent = description;
+    tooltipBody.appendChild(descriptionDiv);
 
     rows.forEach(({ label, value }) => {
       const row = document.createElement('div');
@@ -277,6 +393,13 @@ export class TimelineTooltipManager {
     if (!this.tooltipElement) {
       return;
     }
+
+    // Reset width to allow natural sizing based on content
+    this.tooltipElement.style.width = 'auto';
+
+    // Force reflow to recalculate dimensions after content change
+    // This ensures getBoundingClientRect() returns accurate dimensions
+    // void this.tooltipElement.offsetHeight;
 
     const containerRect = this.container.getBoundingClientRect();
     const tooltipRect = this.tooltipElement.getBoundingClientRect();
@@ -315,5 +438,6 @@ export class TimelineTooltipManager {
 
     this.tooltipElement = null;
     this.currentEvent = null;
+    this.currentTruncationMarker = null;
   }
 }
