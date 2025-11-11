@@ -10,6 +10,7 @@
  */
 
 import * as PIXI from 'pixi.js';
+import { Ticker } from 'pixi.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { AxisRenderer } from '../graphics/AxisRenderer.js';
 import { EventBatchRenderer } from '../graphics/EventBatchRenderer.js';
@@ -202,10 +203,26 @@ export class TimelineRenderer {
 
   /**
    * Request a redraw on next frame.
+   *
+   * Uses on-demand rendering: only schedules requestAnimationFrame when needed.
+   * Prevents duplicate frame requests using renderLoopId guard.
    */
   public requestRender(): void {
-    if (this.state) {
-      this.state.needsRender = true;
+    if (!this.state) {
+      return;
+    }
+
+    this.state.needsRender = true;
+
+    // Only schedule a render if one isn't already pending
+    if (this.renderLoopId === null) {
+      this.renderLoopId = requestAnimationFrame(() => {
+        if (this.state && this.state.needsRender) {
+          this.render();
+          this.state.needsRender = false;
+        }
+        this.renderLoopId = null; // Ready for next request
+      });
     }
   }
 
@@ -275,6 +292,15 @@ export class TimelineRenderer {
    */
   private async setupPixiApplication(width: number, height: number): Promise<void> {
     try {
+      // Disable automatic tickers to prevent auto-rendering and event management
+      const ticker = Ticker.shared;
+      ticker.autoStart = false;
+      ticker.stop();
+
+      const sysTicker = Ticker.system;
+      sysTicker.autoStart = false;
+      sysTicker.stop();
+
       this.app = new PIXI.Application();
 
       await this.app.init({
@@ -284,19 +310,26 @@ export class TimelineRenderer {
         backgroundAlpha: 0,
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
+        autoStart: false,
       });
+
+      // Explicitly stop the ticker to prevent any automatic rendering
+      // autoStart: false prevents the app's ticker from starting, but we also
+      // need to ensure the ticker is completely stopped for on-demand rendering
+      this.app.ticker.stop();
+
+      // Disable automatic hit testing since we do manual hit detection
+      // This prevents expensive automatic hit testing and event processing
+      this.app.stage.eventMode = 'none';
 
       // Append canvas to container
       if (this.container && this.app.canvas) {
         this.container.appendChild(this.app.canvas);
       }
-
-      // eslint-disable-next-line no-console
-      console.log('PixiJS Application initialized with WebGL renderer');
     } catch (error) {
       throw new TimelineError(
         TimelineErrorCode.RENDER_FAILED,
-        'Failed to initialize PixiJS Application',
+        'Failed to initialize Timeline',
         error,
       );
     }
@@ -544,24 +577,15 @@ export class TimelineRenderer {
   // ============================================================================
 
   /**
-   * Start the render loop using requestAnimationFrame.
+   * Start the render loop using on-demand requestAnimationFrame.
    *
-   * Uses dirty flag optimization: only re-renders when needsRender is true.
-   * This prevents unnecessary GPU work on static frames.
+   * Instead of polling every frame, this method sets up a single-shot render
+   * that only executes when requestRender() is called. This prevents unnecessary
+   * CPU usage when the timeline is idle (no zoom, pan, or resize).
    */
   private startRenderLoop(): void {
-    const renderFrame = (): void => {
-      if (this.state && this.state.needsRender) {
-        this.render();
-        this.state.needsRender = false;
-      }
-
-      // Continue loop
-      this.renderLoopId = requestAnimationFrame(renderFrame);
-    };
-
-    // Start loop
-    this.renderLoopId = requestAnimationFrame(renderFrame);
+    // Nothing to do - render loop now operates on-demand via requestRender()
+    // This is intentionally empty; rendering happens via scheduleRender()
   }
 
   /**
@@ -614,11 +638,16 @@ export class TimelineRenderer {
       this.axisRenderer.render(viewportState);
     }
 
-    // Render visible events using batch renderer (on top of axis)
+    // Render visible events using batch renderer LAST (on top of everything)
     // EventBatchRenderer handles:
     // - View frustum culling
     // - Category-based batching
     // - GPU-accelerated drawing
     this.batchRenderer.render(viewportState);
+
+    // IMPORTANT: Explicitly render the PixiJS stage to the canvas
+    // Required because autoStart: false disables automatic rendering
+    // This is what actually displays the scene on screen
+    this.app.render();
   }
 }
