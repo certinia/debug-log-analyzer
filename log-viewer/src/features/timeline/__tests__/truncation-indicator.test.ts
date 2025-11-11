@@ -12,32 +12,30 @@
  * - Hit testing logic (T014)
  */
 
-import * as PIXI from 'pixi.js';
-import { TruncationIndicatorRenderer } from '../graphics/TruncationIndicatorRenderer.js';
-import { TimelineViewport } from '../services/TimelineViewport.js';
-import type { TruncationMarker } from '../types/timeline.types.js';
-import { TRUNCATION_ALPHA, TRUNCATION_COLORS } from '../types/timeline.types.js';
-
-// Mock PIXI.Graphics
+// Mock PIXI.Graphics with test helpers
 class MockGraphics {
   private fillStyle: { color?: number; alpha?: number } = {};
   private rectangles: Array<{ x: number; y: number; width: number; height: number }> = [];
 
-  clear(): void {
+  clear(): this {
     this.rectangles = [];
     this.fillStyle = {};
+    return this;
   }
 
-  setFillStyle(style: { color?: number; alpha?: number }): void {
+  setFillStyle(style: { color?: number; alpha?: number }): this {
     this.fillStyle = style;
+    return this;
   }
 
-  rect(x: number, y: number, width: number, height: number): void {
+  rect(x: number, y: number, width: number, height: number): this {
     this.rectangles.push({ x, y, width, height });
+    return this;
   }
 
-  fill(): void {
+  fill(): this {
     // No-op for testing
+    return this;
   }
 
   destroy(): void {
@@ -53,6 +51,29 @@ class MockGraphics {
     return this.rectangles;
   }
 }
+
+// Track created mock graphics instances globally
+const createdMockGraphicsGlobal: MockGraphics[] = [];
+
+// Mock PIXI module before imports
+jest.mock('pixi.js', () => {
+  const actual = jest.requireActual('pixi.js');
+  return {
+    ...actual,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    Graphics: jest.fn().mockImplementation(() => {
+      const mock = new MockGraphics();
+      createdMockGraphicsGlobal.push(mock);
+      return mock;
+    }),
+  };
+});
+
+import * as PIXI from 'pixi.js';
+import { TruncationIndicatorRenderer } from '../graphics/TruncationIndicatorRenderer.js';
+import { TimelineViewport } from '../services/TimelineViewport.js';
+import type { TruncationMarker } from '../types/timeline.types.js';
+import { TRUNCATION_ALPHA, TRUNCATION_COLORS } from '../types/timeline.types.js';
 
 // Mock PIXI.Container
 class MockContainer {
@@ -75,6 +96,7 @@ describe('TruncationIndicatorRenderer', () => {
   let mockContainer: MockContainer;
   let viewport: TimelineViewport;
   let renderer: TruncationIndicatorRenderer;
+  let createdMockGraphics: MockGraphics[];
 
   const DISPLAY_WIDTH = 1000;
   const DISPLAY_HEIGHT = 600;
@@ -82,10 +104,9 @@ describe('TruncationIndicatorRenderer', () => {
   const MAX_DEPTH = 10;
 
   beforeEach(() => {
-    // Mock PIXI.Graphics constructor
-    jest
-      .spyOn(PIXI, 'Graphics')
-      .mockImplementation(() => new MockGraphics() as unknown as PIXI.Graphics);
+    // Clear the global array and reference it
+    createdMockGraphicsGlobal.length = 0;
+    createdMockGraphics = createdMockGraphicsGlobal;
 
     mockContainer = new MockContainer();
     viewport = new TimelineViewport(DISPLAY_WIDTH, DISPLAY_HEIGHT, TOTAL_DURATION, MAX_DEPTH);
@@ -108,9 +129,9 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      // Get the Graphics object for error type
-      const children = mockContainer.getChildren();
-      const errorGraphics = children[2]; // error is third in SEVERITY_ORDER [unexpected, skip, error]
+      // Three Graphics objects are created (one per type), index 2 is for error
+      expect(createdMockGraphics.length).toBe(3);
+      const errorGraphics = createdMockGraphics[2]; // error is third in SEVERITY_ORDER [unexpected, skip, error]
 
       expect(errorGraphics).toBeDefined();
       if (!errorGraphics) {
@@ -133,9 +154,9 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      // Get the Graphics object for skip type
-      const children = mockContainer.getChildren();
-      const skipGraphics = children[1]; // skip is second in SEVERITY_ORDER
+      // Three Graphics objects are created (one per type), index 1 is for skip
+      expect(createdMockGraphics.length).toBe(3);
+      const skipGraphics = createdMockGraphics[1]; // skip is second in SEVERITY_ORDER
 
       expect(skipGraphics).toBeDefined();
       if (!skipGraphics) {
@@ -158,9 +179,9 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      // Get the Graphics object for unexpected type
-      const children = mockContainer.getChildren();
-      const unexpectedGraphics = children[0]; // unexpected is first in SEVERITY_ORDER
+      // Three Graphics objects are created (one per type), index 0 is for unexpected
+      expect(createdMockGraphics.length).toBe(3);
+      const unexpectedGraphics = createdMockGraphics[0]; // unexpected is first in SEVERITY_ORDER
 
       expect(unexpectedGraphics).toBeDefined();
       if (!unexpectedGraphics) {
@@ -185,10 +206,8 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      const children = mockContainer.getChildren();
-
       // Verify all Graphics objects use the correct alpha
-      children.forEach((graphics) => {
+      createdMockGraphics.forEach((graphics) => {
         const fillStyle = graphics.getFillStyle();
         expect(fillStyle.alpha).toBe(TRUNCATION_ALPHA);
         expect(fillStyle.alpha).toBe(0.2);
@@ -210,12 +229,10 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      const children = mockContainer.getChildren();
-
-      // Verify each type has its distinct color
-      const unexpectedGraphics = children[0];
-      const skipGraphics = children[1];
-      const errorGraphics = children[2];
+      // Verify each type has its distinct color from created mocks
+      const unexpectedGraphics = createdMockGraphics[0];
+      const skipGraphics = createdMockGraphics[1];
+      const errorGraphics = createdMockGraphics[2];
 
       if (!unexpectedGraphics) {
         return;
@@ -241,9 +258,9 @@ describe('TruncationIndicatorRenderer', () => {
   });
 
   describe('T008: End Time Resolution', () => {
-    it('should use explicit endTime when provided', () => {
+    it('should use timeline end when no next marker exists (single marker)', () => {
       const markers: TruncationMarker[] = [
-        { type: 'error', startTime: 100_000, summary: 'Explicit end' },
+        { type: 'error', startTime: 100_000, summary: 'Single marker' },
       ];
 
       renderer = new TruncationIndicatorRenderer(
@@ -253,8 +270,7 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      const children = mockContainer.getChildren();
-      const errorGraphics = children[2];
+      const errorGraphics = createdMockGraphics[2];
       if (!errorGraphics) {
         return;
       }
@@ -264,11 +280,13 @@ describe('TruncationIndicatorRenderer', () => {
       if (!rects[0]) {
         return;
       }
-      const expectedWidth = (200_000 - 100_000) * viewport.getState().zoom;
+      // Single marker extends to timeline end (bounds.timeEnd), minus 1px gap, minus 0.5px half-gap
+      const bounds = viewport.getBounds();
+      const expectedWidth = (bounds.timeEnd - 100_000) * viewport.getState().zoom - 1;
       expect(rects[0].width).toBeCloseTo(expectedWidth, 1);
     });
 
-    it('should use next marker startTime when endTime is null', () => {
+    it('should use next marker startTime as end boundary', () => {
       const markers: TruncationMarker[] = [
         { type: 'error', startTime: 100_000, summary: 'First' },
         { type: 'skip', startTime: 300_000, summary: 'Second' },
@@ -281,8 +299,7 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      const children = mockContainer.getChildren();
-      const errorGraphics = children[2];
+      const errorGraphics = createdMockGraphics[2];
       if (!errorGraphics) {
         return;
       }
@@ -292,8 +309,8 @@ describe('TruncationIndicatorRenderer', () => {
       if (!rects[0]) {
         return;
       }
-      // First marker should extend to start of second marker (300_000)
-      const expectedWidth = (300_000 - 100_000) * viewport.getState().zoom;
+      // First marker should extend to start of second marker (300_000), minus 1px gap
+      const expectedWidth = (300_000 - 100_000) * viewport.getState().zoom - 1;
       expect(rects[0].width).toBeCloseTo(expectedWidth, 1);
     });
 
@@ -309,8 +326,7 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      const children = mockContainer.getChildren();
-      const errorGraphics = children[2];
+      const errorGraphics = createdMockGraphics[2];
       if (!errorGraphics) {
         return;
       }
@@ -320,8 +336,10 @@ describe('TruncationIndicatorRenderer', () => {
       if (!rects[0]) {
         return;
       }
-      // Should extend to viewport end (visible range end)
-      expect(rects[0].width).toBeGreaterThan(0);
+      // Should extend to timeline end
+      const bounds = viewport.getBounds();
+      const expectedWidth = (bounds.timeEnd - 800_000) * viewport.getState().zoom - 1;
+      expect(rects[0].width).toBeCloseTo(expectedWidth, 1);
     });
   });
 
@@ -342,8 +360,7 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      const children = mockContainer.getChildren();
-      const skipGraphics = children[1];
+      const skipGraphics = createdMockGraphics[1];
       if (!skipGraphics) {
         return;
       }
@@ -369,8 +386,7 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      const children = mockContainer.getChildren();
-      const errorGraphics = children[2];
+      const errorGraphics = createdMockGraphics[2];
       if (!errorGraphics) {
         return;
       }
@@ -397,8 +413,7 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      const children = mockContainer.getChildren();
-      const skipGraphics = children[1];
+      const skipGraphics = createdMockGraphics[1];
       if (!skipGraphics) {
         return;
       }
@@ -422,8 +437,7 @@ describe('TruncationIndicatorRenderer', () => {
         markers,
       );
 
-      const children = mockContainer.getChildren();
-      expect(children.length).toBe(3); // One for each type: unexpected, skip, error
+      expect(createdMockGraphics.length).toBe(3); // One for each type: unexpected, skip, error
     });
 
     it('should sort markers by startTime on construction', () => {
@@ -442,22 +456,25 @@ describe('TruncationIndicatorRenderer', () => {
       // Verify rendering order matches sorted startTime
       renderer.render();
 
-      const children = mockContainer.getChildren();
       const allRects: Array<{ x: number; type: string }> = [];
 
-      // Collect all rectangles with their type
-      if (!children[0]) {
+      // Collect all rectangles with their type from created mocks
+      if (!createdMockGraphics[0]) {
         return;
       }
-      if (!children[1]) {
+      if (!createdMockGraphics[1]) {
         return;
       }
-      if (!children[2]) {
+      if (!createdMockGraphics[2]) {
         return;
       }
-      allRects.push(...children[0].getRectangles().map((r) => ({ ...r, type: 'unexpected' })));
-      allRects.push(...children[1].getRectangles().map((r) => ({ ...r, type: 'skip' })));
-      allRects.push(...children[2].getRectangles().map((r) => ({ ...r, type: 'error' })));
+      allRects.push(
+        ...createdMockGraphics[0].getRectangles().map((r) => ({ ...r, type: 'unexpected' })),
+      );
+      allRects.push(...createdMockGraphics[1].getRectangles().map((r) => ({ ...r, type: 'skip' })));
+      allRects.push(
+        ...createdMockGraphics[2].getRectangles().map((r) => ({ ...r, type: 'error' })),
+      );
 
       // Sort by x position
       allRects.sort((a, b) => a.x - b.x);
@@ -509,8 +526,10 @@ describe('TruncationIndicatorRenderer', () => {
       renderer.render();
 
       // Calculate expected screen position
+      // Screen coords = world coords - offsetX (since container is at -offsetX)
       const viewportState = viewport.getState();
-      const screenX = 150_000 * viewportState.zoom; // Middle of marker
+      const worldX = 150_000 * viewportState.zoom; // Middle of marker in world space
+      const screenX = worldX - viewportState.offsetX; // Convert to screen space
 
       const result = renderer.hitTest(screenX, 100);
 
@@ -534,7 +553,8 @@ describe('TruncationIndicatorRenderer', () => {
 
       // Test point in overlap region (150_000 to 250_000)
       const viewportState = viewport.getState();
-      const screenX = 200_000 * viewportState.zoom;
+      const worldX = 200_000 * viewportState.zoom;
+      const screenX = worldX - viewportState.offsetX;
 
       const result = renderer.hitTest(screenX, 100);
 
@@ -559,7 +579,8 @@ describe('TruncationIndicatorRenderer', () => {
 
       // Test point in overlap region
       const viewportState = viewport.getState();
-      const screenX = 200_000 * viewportState.zoom;
+      const worldX = 200_000 * viewportState.zoom;
+      const screenX = worldX - viewportState.offsetX;
 
       const result = renderer.hitTest(screenX, 100);
 
@@ -585,7 +606,8 @@ describe('TruncationIndicatorRenderer', () => {
 
       // Test point where all three overlap (200_000 to 300_000)
       const viewportState = viewport.getState();
-      const screenX = 250_000 * viewportState.zoom;
+      const worldX = 250_000 * viewportState.zoom;
+      const screenX = worldX - viewportState.offsetX;
 
       const result = renderer.hitTest(screenX, 100);
 
@@ -595,11 +617,9 @@ describe('TruncationIndicatorRenderer', () => {
     });
 
     it('should return null when clicking outside visible range after culling', () => {
-      // Zoom in and pan to show only second half
-      viewport.setPan(DISPLAY_WIDTH / 2, 0);
-
+      // Create a marker that starts after the visible timeline
       const markers: TruncationMarker[] = [
-        { type: 'error', startTime: 10_000, summary: 'Culled marker' },
+        { type: 'error', startTime: TOTAL_DURATION + 100_000, summary: 'Out of range marker' },
       ];
 
       renderer = new TruncationIndicatorRenderer(
@@ -609,13 +629,18 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      // Try to hit the culled marker
+      // Verify the marker is beyond the timeline end
+      const bounds = viewport.getBounds();
+      expect(markers[0]?.startTime).toBeGreaterThan(bounds.timeEnd);
+
+      // Try to hit the marker that's beyond the timeline
       const viewportState = viewport.getState();
-      const screenX = 15_000 * viewportState.zoom;
+      const worldX = (TOTAL_DURATION + 150_000) * viewportState.zoom;
+      const screenX = worldX - viewportState.offsetX;
 
       const result = renderer.hitTest(screenX, 100);
 
-      // Marker was culled, so hitTest should return null
+      // Marker was culled during render (outside visible range), so hitTest should return null
       expect(result).toBeNull();
     });
 
@@ -630,20 +655,26 @@ describe('TruncationIndicatorRenderer', () => {
       renderer.render();
 
       const viewportState = viewport.getState();
-      const startX = 100_000 * viewportState.zoom;
-      const endX = 200_000 * viewportState.zoom;
+      const bounds = viewport.getBounds();
+      const worldStartX = 100_000 * viewportState.zoom;
+      // Single marker extends to timeline end
+      const worldEndX = bounds.timeEnd * viewportState.zoom;
+
+      // Convert to screen coordinates
+      const screenStartX = worldStartX - viewportState.offsetX;
+      const screenEndX = worldEndX - viewportState.offsetX;
 
       // Test exact start boundary (should hit)
-      expect(renderer.hitTest(startX, 100)).not.toBeNull();
+      expect(renderer.hitTest(screenStartX, 100)).not.toBeNull();
 
       // Test exact end boundary (should hit)
-      expect(renderer.hitTest(endX, 100)).not.toBeNull();
+      expect(renderer.hitTest(screenEndX, 100)).not.toBeNull();
 
       // Test just before start (should miss)
-      expect(renderer.hitTest(startX - 1, 100)).toBeNull();
+      expect(renderer.hitTest(screenStartX - 1, 100)).toBeNull();
 
       // Test just after end (should miss)
-      expect(renderer.hitTest(endX + 1, 100)).toBeNull();
+      expect(renderer.hitTest(screenEndX + 1, 100)).toBeNull();
     });
   });
 

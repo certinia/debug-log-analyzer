@@ -313,9 +313,6 @@ export class TimelineViewV2 extends LitElement {
    * Handle initialization errors.
    */
   private handleError(error: unknown): void {
-    // eslint-disable-next-line no-console
-    console.error('Timeline initialization error:', error);
-
     this.isLoading = false;
     this.isInitialized = false;
 
@@ -359,12 +356,5 @@ export class TimelineViewV2 extends LitElement {
         ${this.errorMessage ? html`<div class="error-message">${this.errorMessage}</div>` : ''}
       </div>
     `;
-  }
-}
-
-declare global {
-  interface HTMLElementTagNameMap {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    'timeline-view-v2': TimelineViewV2;
   }
 }
