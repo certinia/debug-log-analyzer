@@ -69,7 +69,6 @@ Ensure reliability across VS Code versions and diverse Salesforce log formats.
 ### Code Quality
 
 - Prettier and ESLint enforced via pre-commit hooks
-- Use conventional commit messages
 - Justify new dependencies; avoid duplication
 - Code reviews check readability and functionality
 
@@ -82,6 +81,14 @@ Follow Semantic Versioning (MAJOR.MINOR.PATCH):
 - **PATCH**: Bug fixes, performance improvements
 
 All releases include CHANGELOG updates. Breaking changes require migration guides.
+
+### Git Workflow
+
+Main branch: main
+Feature branches: feat-description
+Defect branches: bug-description
+Use conventional commit messages
+IMPORTANT: NEVER reference Anthropic or Claude in commit messages (per global guidelines)
 
 ---
 
