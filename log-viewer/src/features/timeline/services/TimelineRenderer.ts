@@ -14,6 +14,7 @@ import { Ticker } from 'pixi.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { AxisRenderer } from '../graphics/AxisRenderer.js';
 import { EventBatchRenderer } from '../graphics/EventBatchRenderer.js';
+import { EventMeshRenderer } from '../graphics/EventMeshRenderer.js';
 import { TruncationIndicatorRenderer } from '../graphics/TruncationIndicatorRenderer.js';
 import type {
   TimelineOptions,
@@ -22,6 +23,7 @@ import type {
   ViewportState,
 } from '../types/timeline.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
+import { checkWebGL2Support } from '../utils/webgl-check.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineInteractionHandler } from './TimelineInteractionHandler.js';
 import { TimelineTooltipManager } from './TimelineTooltipManager.js';
@@ -34,9 +36,12 @@ export class TimelineRenderer {
   private index: TimelineEventIndex | null = null;
   private state: TimelineState | null = null;
   private options: TimelineOptions = {};
-  private batchRenderer: EventBatchRenderer | null = null;
+  private batchRenderer: EventBatchRenderer | EventMeshRenderer | null = null;
   private axisRenderer: AxisRenderer | null = null;
   private truncationRenderer: TruncationIndicatorRenderer | null = null;
+
+  // Feature flag: Use mesh-based rendering (default: true for better performance)
+  private useMeshRenderer = true;
   private worldContainer: PIXI.Container | null = null; // Container for world-space content (affected by pan/zoom)
   private axisContainer: PIXI.Container | null = null; // Container for axis lines (only affected by horizontal pan)
   private truncationContainer: PIXI.Container | null = null; // Container for truncation indicators (behind axis and events)
@@ -148,7 +153,24 @@ export class TimelineRenderer {
     // Create batch renderer LAST (so rectangles render on top of everything)
     // Pass events to constructor for pre-computation optimization
     if (this.worldContainer && this.state) {
-      this.batchRenderer = new EventBatchRenderer(this.worldContainer, this.state.batches, events);
+      if (this.useMeshRenderer && checkWebGL2Support().supported) {
+        // Use mesh-based rendering for better performance (GPU vertex buffers)
+        // Use canvas dimensions (physical pixels with device pixel ratio)
+        this.batchRenderer = new EventMeshRenderer({
+          container: this.worldContainer,
+          batches: this.state.batches,
+          events,
+          viewport: this.viewport.getState(),
+          index: this.index,
+        });
+      } else {
+        // Fallback to Graphics-based rendering
+        this.batchRenderer = new EventBatchRenderer(
+          this.worldContainer,
+          this.state.batches,
+          events,
+        );
+      }
     }
 
     // Setup interaction handler
