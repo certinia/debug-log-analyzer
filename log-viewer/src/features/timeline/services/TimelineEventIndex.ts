@@ -16,13 +16,11 @@ export class TimelineEventIndex {
   private rootEvents: LogEvent[];
   private _maxDepth: number;
   private _totalDuration: number;
-  private _eventCount: number;
 
   constructor(events: LogEvent[]) {
     this.rootEvents = events;
     this._maxDepth = this.calculateMaxDepth(events);
     this._totalDuration = this.calculateTotalDuration(events);
-    this._eventCount = this.countEvents(events);
   }
 
   /**
@@ -37,13 +35,6 @@ export class TimelineEventIndex {
    */
   public get totalDuration(): number {
     return this._totalDuration;
-  }
-
-  /**
-   * Get total number of events.
-   */
-  public get eventCount(): number {
-    return this._eventCount;
   }
 
   /**
@@ -197,20 +188,18 @@ export class TimelineEventIndex {
    */
   private calculateMaxDepth(events: LogEvent[]): number {
     let maxDepth = 0;
-    let currentLevel = events.filter((e) => e.duration && e.children && e.children.length > 0);
+    let currentLevel = events.filter((n) => n.duration && n.children.length);
 
-    while (currentLevel.length > 0) {
+    while (currentLevel.length) {
       maxDepth++;
       const nextLevel: LogEvent[] = [];
-
-      for (const event of currentLevel) {
-        for (const child of event.children) {
-          if (child.duration && child.children && child.children.length > 0) {
+      for (const node of currentLevel) {
+        for (const child of node.children) {
+          if (child.duration && child.children.length) {
             nextLevel.push(child);
           }
         }
       }
-
       currentLevel = nextLevel;
     }
 
@@ -226,26 +215,18 @@ export class TimelineEventIndex {
     }
 
     let maxExitStamp = 0;
-    for (const event of events) {
+    const len = events.length - 1;
+    for (let i = len; i >= 0; i--) {
+      const event = events[i];
+      if (!event) {
+        continue;
+      }
       const exitStamp = event.exitStamp ?? event.timestamp;
-      if (exitStamp > maxExitStamp) {
-        maxExitStamp = exitStamp;
+      if (exitStamp <= maxExitStamp) {
+        break;
       }
+      maxExitStamp = exitStamp;
     }
-
     return maxExitStamp;
-  }
-
-  /**
-   * Count total number of events recursively.
-   */
-  private countEvents(events: LogEvent[]): number {
-    let count = events.length;
-    for (const event of events) {
-      if (event.children && event.children.length > 0) {
-        count += this.countEvents(event.children);
-      }
-    }
-    return count;
   }
 }

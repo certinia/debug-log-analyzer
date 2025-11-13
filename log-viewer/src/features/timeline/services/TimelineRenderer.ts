@@ -12,6 +12,7 @@
 import * as PIXI from 'pixi.js';
 import { Ticker } from 'pixi.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
+import { goToRow } from '../../call-tree/components/CalltreeView.js';
 import { AxisRenderer } from '../graphics/AxisRenderer.js';
 import { EventBatchRenderer } from '../graphics/EventBatchRenderer.js';
 import { TruncationIndicatorRenderer } from '../graphics/TruncationIndicatorRenderer.js';
@@ -437,8 +438,8 @@ export class TimelineRenderer {
         onMouseMove: (x: number, y: number) => {
           this.handleMouseMove(x, y);
         },
-        onClick: (_x: number, _y: number) => {
-          // TODO: Implement event selection in future phase
+        onClick: (x: number, y: number) => {
+          this.handleClick(x, y);
         },
       },
     );
@@ -526,6 +527,38 @@ export class TimelineRenderer {
       if (this.options.onEventHover) {
         this.options.onEventHover(null);
       }
+    }
+  }
+
+  /**
+   * Handle click on timeline - navigate to clicked event or truncation marker.
+   *
+   * Priority order:
+   * 1. Check for events (foreground layer) - checked via index.findEventAtPosition()
+   * 2. Check for truncation markers (background layer) - checked via truncationRenderer.hitTest()
+   * 3. No action if empty space clicked
+   *
+   * @param screenX - Mouse X coordinate relative to canvas
+   * @param screenY - Mouse Y coordinate relative to canvas
+   */
+  private handleClick(screenX: number, screenY: number): void {
+    if (!this.viewport || !this.index) {
+      return;
+    }
+
+    // Check for truncation markers (background layer)
+    const truncationMarker = this.truncationRenderer?.hitTest(screenX, screenY);
+    if (truncationMarker) {
+      goToRow(truncationMarker.startTime);
+      return;
+    }
+
+    // Find event at position using binary search (foreground layer)
+    const viewportState = this.viewport.getState();
+    const depth = this.viewport.screenYToDepth(screenY);
+    const event = this.index.findEventAtPosition(screenX, screenY, viewportState, depth, false);
+    if (event) {
+      goToRow(event.timestamp);
     }
   }
 

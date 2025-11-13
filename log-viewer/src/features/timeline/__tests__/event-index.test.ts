@@ -92,25 +92,6 @@ describe('TimelineEventIndex', () => {
       // Total duration should be max exitStamp
       expect(index.totalDuration).toBe(700); // 500 + 200
     });
-
-    it('should calculate event count correctly for flat structure', () => {
-      const events = [createEvent(0, 100), createEvent(200, 100), createEvent(400, 100)];
-
-      const index = new TimelineEventIndex(events);
-
-      expect(index.eventCount).toBe(3);
-    });
-
-    it('should calculate event count correctly for nested structure', () => {
-      const child1 = createEvent(50, 20);
-      const child2 = createEvent(80, 10);
-      const parent = createEvent(0, 100, [child1, child2]);
-      const events = [parent];
-
-      const index = new TimelineEventIndex(events);
-
-      expect(index.eventCount).toBe(3); // parent + 2 children
-    });
   });
 
   describe('findEventAtPosition - binary search', () => {
@@ -424,24 +405,6 @@ describe('TimelineEventIndex', () => {
 
       expect(index.maxDepth).toBe(0);
       expect(index.totalDuration).toBe(0);
-      expect(index.eventCount).toBe(0);
-    });
-
-    it('should handle events without duration', () => {
-      const event = {
-        timestamp: 0,
-        text: 'No duration',
-        lineNumber: 0,
-        category: 'Method',
-        subcategory: 'Method',
-        children: [],
-      } as unknown as LogEvent;
-
-      const events = [event];
-      const index = new TimelineEventIndex(events);
-
-      // Should not crash
-      expect(index.eventCount).toBe(1);
     });
 
     it('should handle multiple events at same timestamp', () => {
