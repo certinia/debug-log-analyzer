@@ -350,6 +350,7 @@ export class TimelineRenderer {
         antialias: false, // Disabled for performance per PixiJS guide
         backgroundAlpha: 0,
         resolution: window.devicePixelRatio || 1,
+        roundPixels: true, // Prevent sub-pixel rendering artifacts
         autoDensity: true,
         autoStart: false,
       });
@@ -414,8 +415,8 @@ export class TimelineRenderer {
     this.worldContainer = new PIXI.Container();
     // Move origin to bottom-left
     this.worldContainer.position.set(0, this.app.screen.height);
-    // Invert Y-axis (flip upside down)
-    this.worldContainer.scale.y = -1;
+    // Invert Y-axis (flip upside down), X-scale will be set per frame for zoom
+    this.worldContainer.scale.set(1, -1);
     stage.addChild(this.worldContainer);
 
     // Create screen-space UI container (not affected by pan/zoom)
@@ -671,28 +672,27 @@ export class TimelineRenderer {
 
     // Get current viewport state
     const viewportState = this.viewport.getState();
+    const { offsetX } = viewportState;
 
     // Update state viewport (sync)
     this.state.viewport = viewportState;
 
+    const screenHeight = this.app.screen.height;
     // Update truncation container position (only horizontal offset, no vertical - like axis)
     if (this.truncationContainer) {
-      this.truncationContainer.position.set(-viewportState.offsetX, this.app.screen.height);
+      this.truncationContainer.position.set(-offsetX, screenHeight);
     }
 
     // Update axis container position (only horizontal offset, no vertical)
     if (this.axisContainer) {
-      this.axisContainer.position.set(-viewportState.offsetX, this.app.screen.height);
+      this.axisContainer.position.set(-offsetX, screenHeight);
     }
 
     // Update world container position to reflect viewport offset (pan)
     // World X moves opposite to offsetX (scrolling right = moving world left)
     // World Y: Subtract offsetY because increasing offsetY should move content up on screen
     // With inverted Y-axis, reducing container.y moves the bottom-left origin down, pushing content up
-    this.worldContainer.position.set(
-      -viewportState.offsetX,
-      this.app.screen.height - viewportState.offsetY,
-    );
+    this.worldContainer.position.set(-offsetX, screenHeight - viewportState.offsetY);
 
     // Render truncation indicators FIRST (behind axis and events)
     if (this.truncationRenderer) {
