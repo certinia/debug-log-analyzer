@@ -76,24 +76,12 @@ export class EventBatchRenderer {
 
   /**
    * Iteratively flatten event tree into pre-computed rectangles.
-   *
-   * Performance optimizations:
-   * - Iterative approach eliminates recursion stack overhead
-   * - Parallel arrays instead of objects reduces allocations by ~60%
-   * - Group by category (not depth) for direct batch access during render
-   * - Object pooling: Pre-allocate renderRect for each event (reused every frame)
-   * - Indexed for-loops with length caching
-   * - Minimal property accesses via destructuring
-   *
-   * Benchmarks (500k events, depth 20):
-   * - Recursive: ~150ms, 20 stack frames, many temp objects
-   * - Iterative (objects): ~100ms, ~20 stack object allocations
-   * - Iterative (parallel arrays): ~80ms, zero object allocations ⚡
-   * - With object pooling: ~80ms construction + ~3ms per render frame ⚡⚡⚡
    */
   private flattenEvents(events: LogEvent[], startDepth: number): void {
-    // Parallel arrays for stack (avoids object allocations)
-    // Use two arrays instead of array of objects for better cache locality
+    // Pre-allocate category arrays and cache them to avoid Map.get() calls
+    for (const category of this.batches.keys()) {
+      this.rectsByCategory.set(category, []);
+    }
 
     const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
 
@@ -106,6 +94,7 @@ export class EventBatchRenderer {
       stackSize--;
       const currentEvents = stackEvents[stackSize]!;
       const depth = stackDepths[stackSize]!;
+      const depthY = depth * eventHeight;
 
       // Process all events at current depth
       const len = currentEvents.length;
@@ -115,32 +104,25 @@ export class EventBatchRenderer {
 
         // Check if this event should be rendered
         if (duration.total && subCategory) {
-          // Pre-fetch or create the category array once per category
-          let rects = this.rectsByCategory.get(subCategory);
-          if (!rects) {
-            rects = [];
-            this.rectsByCategory.set(subCategory, rects);
-          }
-
-          // Create rectangle with pre-destructured values AND pre-allocated renderRect
-          // The renderRect object is created once here and reused every frame in render()
-          const rect: PrecomputedRect = {
-            timeStart: timestamp,
-            timeEnd: exitStamp ?? timestamp,
-            depth,
-            duration: duration.total,
-            category: subCategory,
-            eventRef: event,
-            renderRect: {
-              x: 0,
-              y: depth * eventHeight,
-              width: 0,
-              height: eventHeight,
+          const rects = this.rectsByCategory.get(subCategory);
+          if (rects) {
+            // Inline object creation for better optimization
+            rects.push({
+              timeStart: timestamp,
+              timeEnd: exitStamp ?? timestamp,
+              depth,
+              duration: duration.total,
+              category: subCategory,
               eventRef: event,
-            },
-          };
-
-          rects.push(rect);
+              renderRect: {
+                x: 0,
+                y: depthY,
+                width: 0,
+                height: eventHeight,
+                eventRef: event,
+              },
+            });
+          }
         }
 
         // Push children onto parallel stacks for processing at depth + 1
@@ -156,16 +138,6 @@ export class EventBatchRenderer {
   /**
    * Render all visible events grouped by category.
    *
-   * Performance optimizations:
-   * - Category-based index: Iterate 5-10 categories instead of 10-50+ depths
-   * - Object pooling: Reuse pre-allocated renderRect objects (zero allocations per frame)
-   * - In-place updates: Update rectangle properties instead of creating new objects
-   * - Direct batch access: No Map.get() lookups in hot path
-   *
-   * Benchmarks (500k events, typical viewport):
-   * - Original (depth-based + new objects): ~30ms
-   * - Category-based (new objects): ~5ms
-   * - Object pooling (reused objects): ~3ms ⚡⚡⚡
    */
   public render(viewport: ViewportState): void {
     const bounds = this.calculateBounds(viewport);
@@ -185,6 +157,10 @@ export class EventBatchRenderer {
     // Directly access batch without Map.get() lookup
     for (const [category, rectangles] of this.rectsByCategory) {
       const batch = this.batches.get(category)!;
+      if (!batch) {
+        continue;
+      }
+
       const newRectangles = [];
       // Indexed loop with length caching
       const len = rectangles.length;
