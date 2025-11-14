@@ -175,7 +175,7 @@
     "vscode:prepublish": "rm -rf out && pnpm -w run build"
   },
   "dependencies": {
-    "@apexdevtools/apex-ls": "^5.10.0",
+    "@apexdevtools/apex-ls": "^6.0.1",
     "@apexdevtools/apex-parser": "^4.4.0",
     "@apexdevtools/sfdx-auth-helper": "^2.1.0",
     "@salesforce/apex-node": "^1.6.2"
