@@ -1,8 +1,7 @@
 version: 2
 updates:
-  - package-ecosystem: npm
-    directory: /
-    target-branch: main
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
-      interval: daily
+      interval: 'daily' # Check the npm registry for updates every day (weekdays)
     versioning-strategy: increase
