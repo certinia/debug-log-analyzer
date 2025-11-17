@@ -184,25 +184,39 @@ export class TimelineEventIndex {
 
   /**
    * Calculate maximum nesting depth.
-   * Based on Timeline.ts:168-186.
    */
   private calculateMaxDepth(events: LogEvent[]): number {
     let maxDepth = 0;
-    let currentLevel = events.filter((n) => n.duration && n.children.length);
+    let currentLevel = [];
+    let nextLevel: LogEvent[] = [];
+
+    for (const child of events) {
+      if (child.duration && child.children.length) {
+        currentLevel.push(child);
+      }
+    }
 
     while (currentLevel.length) {
       maxDepth++;
-      const nextLevel: LogEvent[] = [];
-      for (const node of currentLevel) {
-        for (const child of node.children) {
-          if (child.duration && child.children.length) {
+
+      for (let i = 0; i < currentLevel.length; i++) {
+        const children = currentLevel[i]!.children;
+        const childLen = children.length;
+        for (let j = 0; j < childLen; j++) {
+          const child = children[j];
+          if (child?.duration && child.children.length > 0) {
             nextLevel.push(child);
           }
         }
       }
+
+      const temp = currentLevel;
       currentLevel = nextLevel;
+      nextLevel = temp;
+      nextLevel.length = 0;
     }
 
+    console.log('', maxDepth);
     return maxDepth;
   }
 
