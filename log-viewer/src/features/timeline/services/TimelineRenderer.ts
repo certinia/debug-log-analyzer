@@ -25,6 +25,7 @@ import type {
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineInteractionHandler } from './TimelineInteractionHandler.js';
+import { TimelineResizeHandler } from './TimelineResizeHandler.js';
 import { TimelineTooltipManager } from './TimelineTooltipManager.js';
 import { TimelineViewport } from './TimelineViewport.js';
 
@@ -35,9 +36,12 @@ export class TimelineRenderer {
   private index: TimelineEventIndex | null = null;
   private state: TimelineState | null = null;
   private options: TimelineOptions = {};
+
   private batchRenderer: EventBatchRenderer | null = null;
   private axisRenderer: AxisRenderer | null = null;
   private truncationRenderer: TruncationIndicatorRenderer | null = null;
+
+  private resizeHandler: TimelineResizeHandler | null = null;
 
   private worldContainer: PIXI.Container | null = null; // Container for world-space content (affected by pan/zoom)
   private axisContainer: PIXI.Container | null = null; // Container for axis lines (only affected by horizontal pan)
@@ -157,6 +161,9 @@ export class TimelineRenderer {
     // Setup tooltip manager
     this.setupTooltipManager();
 
+    this.resizeHandler = new TimelineResizeHandler(container, this);
+    this.resizeHandler.setupResizeObserver();
+
     // Measure initial render time
     this.requestRender();
   }
@@ -199,6 +206,11 @@ export class TimelineRenderer {
     if (this.truncationRenderer) {
       this.truncationRenderer.destroy();
       this.truncationRenderer = null;
+    }
+
+    if (this.resizeHandler) {
+      this.resizeHandler.destroy();
+      this.resizeHandler = null;
     }
 
     if (this.app) {
