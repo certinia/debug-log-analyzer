@@ -16,12 +16,7 @@
 
 import * as PIXI from 'pixi.js';
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type {
-  RenderBatch,
-  RenderRectangle,
-  ViewportBounds,
-  ViewportState,
-} from '../types/timeline.types.js';
+import type { RenderBatch, ViewportBounds, ViewportState } from '../types/timeline.types.js';
 import { TIMELINE_CONSTANTS } from '../types/timeline.types.js';
 
 /**
@@ -35,7 +30,10 @@ interface PrecomputedRect {
   duration: number; // duration in nanoseconds
   category: string; // event category
   eventRef: LogEvent; // reference to original event
-  renderRect: RenderRectangle; // Pre-allocated render rectangle (reused every frame)
+  x: number; // screen X position (updated every frame)
+  y: number; // screen Y position (fixed)
+  width: number; // screen width (updated every frame)
+  height: number; // screen height (fixed)
 }
 
 export class EventBatchRenderer {
@@ -114,13 +112,10 @@ export class EventBatchRenderer {
               duration: duration.total,
               category: subCategory,
               eventRef: event,
-              renderRect: {
-                x: 0,
-                y: depthY,
-                width: 0,
-                height: eventHeight,
-                eventRef: event,
-              },
+              x: 0,
+              y: depthY,
+              width: 0,
+              height: eventHeight,
             });
           }
         }
@@ -142,61 +137,67 @@ export class EventBatchRenderer {
   public render(viewport: ViewportState): void {
     const bounds = this.calculateBounds(viewport);
 
-    // Cache frequently accessed values outside loops
+    // Cache all frequently accessed values as primitives
     const zoom = viewport.zoom;
-    const { timeStart: boundsTimeStart, timeEnd: boundsTimeEnd, depthStart, depthEnd } = bounds;
+    const boundsTimeStart = bounds.timeStart;
+    const boundsTimeEnd = bounds.timeEnd;
+    const depthStart = bounds.depthStart;
+    const depthEnd = bounds.depthEnd;
     const minRectSize = TIMELINE_CONSTANTS.MIN_RECT_SIZE;
 
-    // Clear all batches
+    // Clear all batches - reuse existing arrays instead of creating new ones
     for (const batch of this.batches.values()) {
-      batch.rectangles = [];
+      batch.rectangles.length = 0;
       batch.isDirty = true;
     }
 
-    // Fast path: iterate categories (5-10) instead of depths (10-50+)
-    // Directly access batch without Map.get() lookup
+    // Iterate categories - cache batch lookup outside inner loop
     for (const [category, rectangles] of this.rectsByCategory) {
-      const batch = this.batches.get(category)!;
+      const batch = this.batches.get(category);
       if (!batch) {
         continue;
       }
 
-      const newRectangles = [];
-      // Indexed loop with length caching
+      // Reuse batch.rectangles array instead of temp array
+      const batchRects = batch.rectangles;
       const len = rectangles.length;
+
       for (let i = 0; i < len; i++) {
         const rect = rectangles[i]!;
-        const { duration, depth, timeStart, timeEnd, renderRect } = rect;
 
-        // Horizontal overlap check with destructured bounds
-        if (timeStart >= boundsTimeEnd || timeEnd <= boundsTimeStart) {
+        // Direct property access - avoid destructuring
+        const rectTimeStart = rect.timeStart;
+        const rectTimeEnd = rect.timeEnd;
+        const rectDepth = rect.depth;
+        const rectDuration = rect.duration;
+
+        // Horizontal overlap check
+        if (rectTimeStart >= boundsTimeEnd || rectTimeEnd <= boundsTimeStart) {
           continue;
         }
 
-        // Depth culling: skip if outside visible vertical range
-        if (depth < depthStart || depth > depthEnd) {
+        // Depth culling
+        if (rectDepth < depthStart || rectDepth > depthEnd) {
           continue;
         }
 
-        // Calculate screen-space width for size culling
-        const screenWidth = duration * zoom;
+        // Calculate screen-space width
+        const screenWidth = rectDuration * zoom;
 
-        // Skip if too small to render
+        // Size culling
         if (screenWidth < minRectSize) {
           continue;
         }
 
-        // Visible! Update pre-allocated renderRect in-place (zero allocations)
-        renderRect.x = timeStart * zoom;
-        renderRect.width = screenWidth;
-        // eventRef already set during precompute, no need to update
+        // Update rect in-place - zero allocations
+        rect.x = rectTimeStart * zoom;
+        rect.width = screenWidth;
 
-        newRectangles.push(renderRect);
+        batchRects.push(rect);
       }
-      batch.rectangles = newRectangles;
     }
 
-    // Render each batch
+    // Render dirty batches
     for (const [category, batch] of this.batches) {
       if (batch.isDirty) {
         this.renderBatch(category, batch);
