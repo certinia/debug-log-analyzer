@@ -77,10 +77,8 @@ export class TimelineRenderer {
       throw new TimelineError(TimelineErrorCode.INVALID_EVENT_DATA, 'Events must be an array');
     }
 
-    // T107: Allow empty events array - will show time axis only (clarification from 2025-11-07)
-
     // Check WebGL availability
-    if (!this.isWebGLAvailable()) {
+    if (!PIXI.isWebGLSupported()) {
       throw new TimelineError(
         TimelineErrorCode.WEBGL_UNAVAILABLE,
         'WebGL is required but not available in this browser',
@@ -589,21 +587,6 @@ export class TimelineRenderer {
       needsRender: true,
       isInitialized: true,
     };
-  }
-
-  /**
-   * Check if WebGL is available.
-   */
-  private isWebGLAvailable(): boolean {
-    try {
-      const canvas = document.createElement('canvas');
-      return !!(
-        window.WebGLRenderingContext &&
-        (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
-      );
-    } catch {
-      return false;
-    }
   }
 
   /**
