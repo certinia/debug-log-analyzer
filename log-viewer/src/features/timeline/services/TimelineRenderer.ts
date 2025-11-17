@@ -159,11 +159,8 @@ export class TimelineRenderer {
     // Setup tooltip manager
     this.setupTooltipManager();
 
-    // Start render loop
-    this.startRenderLoop();
-
     // Measure initial render time
-    this.performInitialRender();
+    this.requestRender();
   }
 
   /**
@@ -312,48 +309,38 @@ export class TimelineRenderer {
    * Setup PixiJS Application with WebGL renderer.
    */
   private async setupPixiApplication(width: number, height: number): Promise<void> {
-    try {
-      // Disable automatic tickers to prevent auto-rendering and event management
-      const ticker = Ticker.shared;
-      ticker.autoStart = false;
-      ticker.stop();
+    // Disable automatic tickers to prevent auto-rendering and event management
+    const ticker = Ticker.shared;
+    ticker.autoStart = false;
+    ticker.stop();
 
-      const sysTicker = Ticker.system;
-      sysTicker.autoStart = false;
-      sysTicker.stop();
+    const sysTicker = Ticker.system;
+    sysTicker.autoStart = false;
+    sysTicker.stop();
 
-      this.app = new PIXI.Application();
+    this.app = new PIXI.Application();
+    await this.app.init({
+      width,
+      height,
+      antialias: false, // Disabled for performance per PixiJS guide
+      backgroundAlpha: 0,
+      resolution: window.devicePixelRatio || 1,
+      roundPixels: true, // Prevent sub-pixel rendering artifacts
+      autoDensity: true,
+      autoStart: false,
+    });
 
-      await this.app.init({
-        width,
-        height,
-        antialias: false, // Disabled for performance per PixiJS guide
-        backgroundAlpha: 0,
-        resolution: window.devicePixelRatio || 1,
-        roundPixels: true, // Prevent sub-pixel rendering artifacts
-        autoDensity: true,
-        autoStart: false,
-      });
+    // Explicitly stop the ticker to prevent any automatic rendering
+    // autoStart: false prevents the app's ticker from starting, but we also
+    // need to ensure the ticker is completely stopped for on-demand rendering
+    this.app.ticker.stop();
 
-      // Explicitly stop the ticker to prevent any automatic rendering
-      // autoStart: false prevents the app's ticker from starting, but we also
-      // need to ensure the ticker is completely stopped for on-demand rendering
-      this.app.ticker.stop();
+    // Disable automatic expensive hit testing + event processing since we do manual hit detection
+    this.app.stage.eventMode = 'none';
 
-      // Disable automatic hit testing since we do manual hit detection
-      // This prevents expensive automatic hit testing and event processing
-      this.app.stage.eventMode = 'none';
-
-      // Append canvas to container
-      if (this.container && this.app.canvas) {
-        this.container.appendChild(this.app.canvas);
-      }
-    } catch (error) {
-      throw new TimelineError(
-        TimelineErrorCode.RENDER_FAILED,
-        'Failed to initialize Timeline',
-        error,
-      );
+    // Append canvas to container
+    if (this.container && this.app.canvas) {
+      this.container.appendChild(this.app.canvas);
     }
   }
 
@@ -644,32 +631,7 @@ export class TimelineRenderer {
 
   // ============================================================================
   // RENDER LOOP
-  // ============================================================================
-
-  /**
-   * Start the render loop using on-demand requestAnimationFrame.
-   *
-   * Instead of polling every frame, this method sets up a single-shot render
-   * that only executes when requestRender() is called. This prevents unnecessary
-   * CPU usage when the timeline is idle (no zoom, pan, or resize).
-   */
-  private startRenderLoop(): void {
-    // Nothing to do - render loop now operates on-demand via requestRender()
-    // This is intentionally empty; rendering happens via scheduleRender()
-  }
-
-  /**
-   * Perform initial render to display all events.
-   *
-   * Called once during initialization to measure render time.
-   */
-  private performInitialRender(): void {
-    if (this.state) {
-      this.state.needsRender = true;
-      this.render();
-      this.state.needsRender = false;
-    }
-  }
+  // ============================================================================2
 
   /**
    * Core render method: renders visible events using EventBatchRenderer.
