@@ -2,18 +2,24 @@
  * Setup ResizeObserver to handle window resize with debouncing.
  */
 
-import type { TimelineRenderer } from './TimelineRenderer';
+/**
+ * Interface for objects that can handle resize events.
+ * Implemented by both FlameChart and TimelineRenderer.
+ */
+export interface IResizable {
+  resize(width: number, height: number): void;
+}
 
 export class TimelineResizeHandler {
   private resizeObserver: ResizeObserver | null = null;
   private containerRef: HTMLElement;
-  private renderer: TimelineRenderer | null = null;
+  private renderer: IResizable | null = null;
 
   private resizeDebounceFrameId: number | null = null;
   private lastResizeWidth = 0;
   private lastResizeHeight = 0;
 
-  constructor(containerRef: HTMLElement, renderer: TimelineRenderer) {
+  constructor(containerRef: HTMLElement, renderer: IResizable) {
     this.containerRef = containerRef;
     this.renderer = renderer;
   }

@@ -13,9 +13,9 @@ import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { getSettings } from '../../settings/Settings.js';
-import { TimelineRenderer } from '../optimised/TimelineRenderer.js';
+import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import { tooltipStyles } from '../styles/timeline.css.js';
-import type { TimelineOptions, ViewportState } from '../types/timeline.types.js';
+import type { TimelineOptions } from '../types/timeline.types.js';
 import { TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
 import { extractMarkers } from '../utils/marker-utils.js';
 
@@ -94,7 +94,7 @@ export class TimelineViewV2 extends LitElement {
   @state()
   private isLoading = false;
 
-  private renderer: TimelineRenderer | null = null;
+  private apexLogTimeline: ApexLogTimeline | null = null;
   private containerRef: HTMLElement | null = null;
 
   // ============================================================================
@@ -181,10 +181,10 @@ export class TimelineViewV2 extends LitElement {
       const truncationMarkers = extractMarkers(this.rootLog);
 
       // Create new renderer
-      this.renderer = new TimelineRenderer();
+      this.apexLogTimeline = new ApexLogTimeline();
 
       // Initialize with events, truncation markers, and options
-      await this.renderer.init(
+      await this.apexLogTimeline.init(
         this.containerRef,
         this.rootLog,
         events,
@@ -222,9 +222,9 @@ export class TimelineViewV2 extends LitElement {
    */
   private cleanup(): void {
     // Destroy renderer
-    if (this.renderer) {
-      this.renderer.destroy();
-      this.renderer = null;
+    if (this.apexLogTimeline) {
+      this.apexLogTimeline.destroy();
+      this.apexLogTimeline = null;
     }
 
     this.isInitialized = false;
@@ -248,26 +248,6 @@ export class TimelineViewV2 extends LitElement {
     } else {
       this.errorMessage = 'Unknown error occurred';
     }
-  }
-
-  // ============================================================================
-  // PUBLIC API
-  // ============================================================================
-
-  /**
-   * Get current viewport state.
-   * Useful for debugging or external integrations.
-   */
-  public getViewport(): ViewportState | null {
-    return this.renderer?.getViewport() ?? null;
-  }
-
-  /**
-   * Request a redraw on next frame.
-   * Useful after programmatic state changes.
-   */
-  public requestRender(): void {
-    this.renderer?.requestRender();
   }
 
   // ============================================================================
