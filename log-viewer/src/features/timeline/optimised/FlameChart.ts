@@ -73,7 +73,7 @@ export class FlameChart {
   public async init(
     container: HTMLElement,
     events: LogEvent[],
-    truncationMarkers: TimelineMarker[] = [],
+    markers: TimelineMarker[] = [],
     options: TimelineOptions = {},
     callbacks: FlameChartCallbacks = {},
   ): Promise<void> {
@@ -102,7 +102,7 @@ export class FlameChart {
     this.callbacks = callbacks;
 
     // Store truncation markers for rendering
-    (this.truncationMarkers as TimelineMarker[]).push(...truncationMarkers);
+    this.truncationMarkers.push(...markers);
 
     // Get container dimensions
     const { width, height } = container.getBoundingClientRect();

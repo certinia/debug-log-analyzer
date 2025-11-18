@@ -15,6 +15,7 @@
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
 import type { TimelineMarker, TimelineOptions, ViewportState } from '../types/timeline.types.js';
+import { extractMarkers } from '../utils/marker-utils.js';
 import { FlameChart } from './FlameChart.js';
 import { TimelineTooltipManager } from './TimelineTooltipManager.js';
 
@@ -34,8 +35,6 @@ export class ApexLogTimeline {
   public async init(
     container: HTMLElement,
     apexLog: ApexLog,
-    events: LogEvent[],
-    truncationMarkers: TimelineMarker[] = [],
     options: TimelineOptions = {},
   ): Promise<void> {
     this.apexLog = apexLog;
@@ -51,8 +50,11 @@ export class ApexLogTimeline {
       apexLog: apexLog,
     });
 
+    const markers = extractMarkers(this.apexLog);
+    const frames = this.extractEvents();
+
     // Initialize FlameChart with Apex-specific callbacks
-    await this.flamechart.init(container, events, truncationMarkers, options, {
+    await this.flamechart.init(container, frames, markers, options, {
       onMouseMove: (screenX, screenY, event, marker) => {
         this.handleMouseMove(screenX, screenY, event, marker);
       },
@@ -155,5 +157,19 @@ export class ApexLogTimeline {
     if (event) {
       goToRow(event.timestamp);
     }
+  }
+
+  /**
+   * Extract events array from rootLog.
+   * Handles the conversion from ApexLog structure to LogEvent array.
+   */
+  private extractEvents(): LogEvent[] {
+    if (!this.apexLog) {
+      return [];
+    }
+
+    // ApexLog extends LogEvent, which has a children property
+    // containing the hierarchical event structure
+    return this.apexLog.children || [];
   }
 }

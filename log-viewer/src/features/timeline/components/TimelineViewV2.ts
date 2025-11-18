@@ -11,13 +11,12 @@
 
 import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
 import { getSettings } from '../../settings/Settings.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import { tooltipStyles } from '../styles/timeline.css.js';
 import type { TimelineOptions } from '../types/timeline.types.js';
 import { TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
-import { extractMarkers } from '../utils/marker-utils.js';
 
 @customElement('timeline-view-v2')
 export class TimelineViewV2 extends LitElement {
@@ -156,10 +155,9 @@ export class TimelineViewV2 extends LitElement {
     this.cleanup();
 
     // Extract events from rootLog
-    const events = this.extractEvents();
-    if (!events || events.length === 0) {
+    if (this.rootLog.duration.total === 0) {
       this.isLoading = false;
-      this.errorMessage = 'No events to display';
+      this.errorMessage = 'Nothing to show';
       return;
     }
 
@@ -177,40 +175,14 @@ export class TimelineViewV2 extends LitElement {
         colors: customColors,
       };
 
-      // Extract truncation markers from log
-      const truncationMarkers = extractMarkers(this.rootLog);
-
-      // Create new renderer
       this.apexLogTimeline = new ApexLogTimeline();
-
-      // Initialize with events, truncation markers, and options
-      await this.apexLogTimeline.init(
-        this.containerRef,
-        this.rootLog,
-        events,
-        truncationMarkers,
-        optionsWithColors,
-      );
+      await this.apexLogTimeline.init(this.containerRef, this.rootLog, optionsWithColors);
 
       this.isInitialized = true;
       this.isLoading = false;
     } catch (error) {
       this.handleError(error);
     }
-  }
-
-  /**
-   * Extract events array from rootLog.
-   * Handles the conversion from ApexLog structure to LogEvent array.
-   */
-  private extractEvents(): LogEvent[] {
-    if (!this.rootLog) {
-      return [];
-    }
-
-    // ApexLog extends LogEvent, which has a children property
-    // containing the hierarchical event structure
-    return this.rootLog.children || [];
   }
 
   // ============================================================================
