@@ -3,19 +3,19 @@
  */
 
 /**
- * Truncation Utilities
+ * Marker Utilities
  *
- * Helper functions for extracting and validating truncation markers from ApexLog.
+ * Helper functions for extracting and validating  markers from ApexLog.
  */
 
 import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
-import type { TruncationMarker } from '../types/timeline.types.js';
-import { isTruncationType } from '../types/timeline.types.js';
+import type { TimelineMarker } from '../types/timeline.types.js';
+import { isMarkerType } from '../types/timeline.types.js';
 
 /**
- * Extracts truncation markers from ApexLog.logIssues array.
+ * Extracts markers from ApexLog.logIssues array.
  *
- * Transforms parser's LogIssue format to TruncationMarker format for timeline rendering.
+ * Transforms parser's LogIssue format to Marker format for timeline rendering.
  * Validates marker data and filters out invalid entries.
  *
  * Mapping rules:
@@ -24,18 +24,18 @@ import { isTruncationType } from '../types/timeline.types.js';
  * - 'error' → error (system errors)
  *
  * @param log - Parsed Apex log containing logIssues array
- * @returns Array of validated TruncationMarker objects
+ * @returns Array of validated Marker objects
  */
-export function extractTruncationMarkers(log: ApexLog): TruncationMarker[] {
+export function extractMarkers(log: ApexLog): TimelineMarker[] {
   if (!log.logIssues || log.logIssues.length === 0) {
     return [];
   }
 
-  const markers: TruncationMarker[] = [];
+  const markers: TimelineMarker[] = [];
 
   for (const issue of log.logIssues) {
     // Validate type using type guard
-    if (!isTruncationType(issue.type)) {
+    if (!isMarkerType(issue.type)) {
       continue;
     }
 
@@ -44,8 +44,7 @@ export function extractTruncationMarkers(log: ApexLog): TruncationMarker[] {
       continue;
     }
 
-    // Create TruncationMarker
-    const marker: TruncationMarker = {
+    const marker: TimelineMarker = {
       type: issue.type,
       startTime: issue.startTime,
       summary: issue.summary,
@@ -62,14 +61,14 @@ export function extractTruncationMarkers(log: ApexLog): TruncationMarker[] {
 }
 
 /**
- * Validates a single truncation marker.
+ * Validates a single  marker.
  * Used for runtime validation and testing.
  *
  * @param marker - Marker to validate
  * @returns True if marker is valid, false otherwise
  */
-export function validateTruncationMarker(marker: TruncationMarker): boolean {
-  if (!isTruncationType(marker.type)) {
+export function validateMarker(marker: TimelineMarker): boolean {
+  if (!isMarkerType(marker.type)) {
     return false;
   }
 

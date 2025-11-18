@@ -3,27 +3,27 @@
  */
 
 /**
- * TruncationIndicatorRenderer
+ * TimelineMarkerRenderer
  *
- * Renders truncation indicators as vertical bands behind the timeline.
+ * Renders marker indicators as vertical bands behind the timeline.
  * Handles time-range visualization, viewport culling, and severity-based stacking.
  */
 
 import * as PIXI from 'pixi.js';
-import type { TruncationMarker, TruncationType } from '../types/timeline.types.js';
+import type { MarkerType, TimelineMarker } from '../types/timeline.types.js';
 import {
+  MARKER_ALPHA,
+  MARKER_COLORS,
   SEVERITY_ORDER,
   SEVERITY_RANK,
-  TRUNCATION_ALPHA,
-  TRUNCATION_COLORS,
 } from '../types/timeline.types.js';
 import type { TimelineViewport } from './TimelineViewport.js';
 
 /**
- * Internal representation of a truncation indicator's visual state.
+ * Internal representation of a marker indicator's visual state.
  */
-interface TruncationIndicator {
-  marker: TruncationMarker;
+interface MarkerIndicator {
+  marker: TimelineMarker;
   resolvedEndTime: number;
   screenStartX: number;
   screenEndX: number;
@@ -33,7 +33,7 @@ interface TruncationIndicator {
 }
 
 /**
- * Renders truncation indicators as semi-transparent vertical bands.
+ * Renders marker indicators as semi-transparent vertical bands.
  *
  * Architecture:
  * - Creates 3 Graphics objects (one per severity level) for proper z-index stacking
@@ -41,21 +41,21 @@ interface TruncationIndicator {
  * - Culls off-screen indicators for performance
  * - Calculates end times for markers with null endTime
  */
-export class TruncationIndicatorRenderer {
+export class TimelineMarkerRenderer {
   private container: PIXI.Container;
   private viewport: TimelineViewport;
-  private markers: readonly TruncationMarker[];
-  private graphicsBySeverity: Map<TruncationType, PIXI.Graphics> = new Map();
-  private visibleIndicators: TruncationIndicator[] = [];
+  private markers: readonly TimelineMarker[];
+  private graphicsBySeverity: Map<MarkerType, PIXI.Graphics> = new Map();
+  private visibleIndicators: MarkerIndicator[] = [];
 
   /**
-   * Creates a new TruncationIndicatorRenderer.
+   * Creates a new TimelineMarkerRenderer.
    *
    * @param container - PixiJS container to render into (should be at z-index 0)
    * @param viewport - Viewport manager for coordinate transforms
-   * @param markers - Array of truncation markers from parser
+   * @param markers - Array of markers from parser
    */
-  constructor(container: PIXI.Container, viewport: TimelineViewport, markers: TruncationMarker[]) {
+  constructor(container: PIXI.Container, viewport: TimelineViewport, markers: TimelineMarker[]) {
     this.container = container;
     this.viewport = viewport;
 
@@ -145,13 +145,13 @@ export class TruncationIndicatorRenderer {
       }
 
       // Create indicator record
-      const indicator: TruncationIndicator = {
+      const indicator: MarkerIndicator = {
         marker,
         resolvedEndTime,
         screenStartX: worldStartX,
         screenEndX: worldEndX,
         screenWidth: worldWidth,
-        color: TRUNCATION_COLORS[marker.type],
+        color: MARKER_COLORS[marker.type],
         isVisible: true,
       };
 
@@ -178,10 +178,10 @@ export class TruncationIndicatorRenderer {
       const viewportState = this.viewport.getState();
       graphics.setFillStyle({
         color: indicator.color,
-        alpha: TRUNCATION_ALPHA,
+        alpha: MARKER_ALPHA,
       });
 
-      // Apply gap to create separation between adjacent truncation markers
+      // Apply gap to create separation between adjacent markers
       const gappedX = indicator.screenStartX + halfGap;
       const gappedWidth = Math.max(0, indicator.screenWidth - gap);
 
@@ -196,7 +196,7 @@ export class TruncationIndicatorRenderer {
   }
 
   /**
-   * Tests if a screen coordinate intersects any truncation indicator.
+   * Tests if a screen coordinate intersects any indicator.
    *
    * Used for hover detection. Returns marker with highest severity when multiple overlap.
    *
@@ -211,14 +211,14 @@ export class TruncationIndicatorRenderer {
    * @param _screenY - Mouse Y coordinate in pixels (unused - indicators span full height)
    * @returns Marker under cursor (highest severity if multiple), or null if no hit
    */
-  public hitTest(screenX: number, _screenY: number): TruncationMarker | null {
+  public hitTest(screenX: number, _screenY: number): TimelineMarker | null {
     // Convert screen coordinates to world coordinates
     // Container is positioned at -offsetX, so add offsetX to convert screen to world
     const viewportState = this.viewport.getState();
     const worldX = screenX + viewportState.offsetX;
 
     // Collect all indicators under cursor
-    const hits: TruncationMarker[] = [];
+    const hits: TimelineMarker[] = [];
 
     for (const indicator of this.visibleIndicators) {
       // AABB collision test: check if world X coordinate falls within indicator bounds
@@ -243,12 +243,12 @@ export class TruncationIndicatorRenderer {
   }
 
   /**
-   * Updates the truncation markers and triggers re-render.
+   * Updates the markers and triggers re-render.
    *
-   * @param markers - New array of truncation markers
+   * @param markers - New array of markers
    */
-  public updateMarkers(markers: readonly TruncationMarker[]): void {
-    (this.markers as TruncationMarker[]) = [...markers].sort((a, b) => a.startTime - b.startTime);
+  public updateMarkers(markers: readonly TimelineMarker[]): void {
+    (this.markers as TimelineMarker[]) = [...markers].sort((a, b) => a.startTime - b.startTime);
     this.visibleIndicators = [];
   }
 

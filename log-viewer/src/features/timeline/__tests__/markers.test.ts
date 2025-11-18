@@ -70,10 +70,10 @@ jest.mock('pixi.js', () => {
 });
 
 import * as PIXI from 'pixi.js';
+import { TimelineMarkerRenderer } from '../optimised/TimelineMarkerRenderer.js';
 import { TimelineViewport } from '../optimised/TimelineViewport.js';
-import { TruncationIndicatorRenderer } from '../optimised/TruncationIndicatorRenderer.js';
-import type { TruncationMarker } from '../types/timeline.types.js';
-import { TRUNCATION_ALPHA, TRUNCATION_COLORS } from '../types/timeline.types.js';
+import type { TimelineMarker } from '../types/timeline.types.js';
+import { MARKER_ALPHA, MARKER_COLORS } from '../types/timeline.types.js';
 
 // Mock PIXI.Container
 class MockContainer {
@@ -95,7 +95,7 @@ class MockContainer {
 describe('TruncationIndicatorRenderer', () => {
   let mockContainer: MockContainer;
   let viewport: TimelineViewport;
-  let renderer: TruncationIndicatorRenderer;
+  let renderer: TimelineMarkerRenderer;
   let createdMockGraphics: MockGraphics[];
 
   const DISPLAY_WIDTH = 1000;
@@ -118,11 +118,11 @@ describe('TruncationIndicatorRenderer', () => {
 
   describe('T013: Color Accuracy Verification', () => {
     it('should render error markers with color 0xFF8080', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'error', startTime: 100_000, summary: 'Test error' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -138,16 +138,16 @@ describe('TruncationIndicatorRenderer', () => {
         return;
       }
       const fillStyle = errorGraphics.getFillStyle();
-      expect(fillStyle.color).toBe(TRUNCATION_COLORS.error);
+      expect(fillStyle.color).toBe(MARKER_COLORS.error);
       expect(fillStyle.color).toBe(0xff8080);
     });
 
     it('should render skip markers with color 0x1E80FF', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'skip', startTime: 100_000, summary: 'Test skip' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -163,16 +163,16 @@ describe('TruncationIndicatorRenderer', () => {
         return;
       }
       const fillStyle = skipGraphics.getFillStyle();
-      expect(fillStyle.color).toBe(TRUNCATION_COLORS.skip);
+      expect(fillStyle.color).toBe(MARKER_COLORS.skip);
       expect(fillStyle.color).toBe(0x1e80ff);
     });
 
     it('should render unexpected markers with color 0x8080FF', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'unexpected', startTime: 100_000, summary: 'Test unexpected' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -188,18 +188,18 @@ describe('TruncationIndicatorRenderer', () => {
         return;
       }
       const fillStyle = unexpectedGraphics.getFillStyle();
-      expect(fillStyle.color).toBe(TRUNCATION_COLORS.unexpected);
+      expect(fillStyle.color).toBe(MARKER_COLORS.unexpected);
       expect(fillStyle.color).toBe(0x8080ff);
     });
 
     it('should use alpha 0.2 for all truncation types', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'error', startTime: 100_000, summary: 'Error' },
         { type: 'skip', startTime: 300_000, summary: 'Skip' },
         { type: 'unexpected', startTime: 500_000, summary: 'Unexpected' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -209,20 +209,20 @@ describe('TruncationIndicatorRenderer', () => {
       // Verify all Graphics objects use the correct alpha
       createdMockGraphics.forEach((graphics) => {
         const fillStyle = graphics.getFillStyle();
-        expect(fillStyle.alpha).toBe(TRUNCATION_ALPHA);
+        expect(fillStyle.alpha).toBe(MARKER_ALPHA);
         expect(fillStyle.alpha).toBe(0.2);
       });
     });
 
     it('should render distinct colors for each type in a mixed log', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'error', startTime: 100_000, summary: 'Error 1' },
         { type: 'skip', startTime: 200_000, summary: 'Skip 1' },
         { type: 'unexpected', startTime: 300_000, summary: 'Unexpected 1' },
         { type: 'error', startTime: 400_000, summary: 'Error 2' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -259,11 +259,11 @@ describe('TruncationIndicatorRenderer', () => {
 
   describe('T008: End Time Resolution', () => {
     it('should use timeline end when no next marker exists (single marker)', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'error', startTime: 100_000, summary: 'Single marker' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -287,12 +287,12 @@ describe('TruncationIndicatorRenderer', () => {
     });
 
     it('should use next marker startTime as end boundary', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'error', startTime: 100_000, summary: 'First' },
         { type: 'skip', startTime: 300_000, summary: 'Second' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -315,11 +315,11 @@ describe('TruncationIndicatorRenderer', () => {
     });
 
     it('should use timeline end when no next marker exists', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'error', startTime: 800_000, summary: 'Last marker' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -348,12 +348,12 @@ describe('TruncationIndicatorRenderer', () => {
       // Set viewport to show only second half
       viewport.setPan(DISPLAY_WIDTH / 2, 0);
 
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'error', startTime: 10_000, summary: 'Too early' },
         { type: 'skip', startTime: 600_000, summary: 'Visible' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -374,12 +374,12 @@ describe('TruncationIndicatorRenderer', () => {
       // Reset to default view
       viewport.reset();
 
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'error', startTime: 100_000, summary: 'Visible' },
         { type: 'skip', startTime: 2_000_000, summary: 'Too late' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -401,12 +401,12 @@ describe('TruncationIndicatorRenderer', () => {
       const currentZoom = viewport.getState().zoom;
       viewport.setZoom(currentZoom * 0.001);
 
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'error', startTime: 100_000, summary: 'Too small' },
         { type: 'skip', startTime: 200_000, summary: 'Large enough' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -429,9 +429,9 @@ describe('TruncationIndicatorRenderer', () => {
 
   describe('Initialization', () => {
     it('should create Graphics objects for each severity level', () => {
-      const markers: TruncationMarker[] = [];
+      const markers: TimelineMarker[] = [];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -441,13 +441,13 @@ describe('TruncationIndicatorRenderer', () => {
     });
 
     it('should sort markers by startTime on construction', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'error', startTime: 300_000, summary: 'Third' },
         { type: 'skip', startTime: 100_000, summary: 'First' },
         { type: 'unexpected', startTime: 200_000, summary: 'Second' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -498,9 +498,9 @@ describe('TruncationIndicatorRenderer', () => {
 
   describe('T014: Hit Testing', () => {
     it('should return null when no indicators are hit', () => {
-      const markers: TruncationMarker[] = [{ type: 'error', startTime: 100_000, summary: 'Test' }];
+      const markers: TimelineMarker[] = [{ type: 'error', startTime: 100_000, summary: 'Test' }];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -514,11 +514,11 @@ describe('TruncationIndicatorRenderer', () => {
     });
 
     it('should return marker when cursor is within bounds', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'error', startTime: 100_000, summary: 'Error marker' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -539,12 +539,12 @@ describe('TruncationIndicatorRenderer', () => {
     });
 
     it('should return error marker when error and skip overlap', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'skip', startTime: 100_000, summary: 'Skip' },
         { type: 'error', startTime: 150_000, summary: 'Error' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -565,12 +565,12 @@ describe('TruncationIndicatorRenderer', () => {
     });
 
     it('should return unexpected marker when unexpected and skip overlap', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'skip', startTime: 100_000, summary: 'Skip' },
         { type: 'unexpected', startTime: 150_000, summary: 'Unexpected' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -591,13 +591,13 @@ describe('TruncationIndicatorRenderer', () => {
     });
 
     it('should prioritize error > unexpected > skip when all three overlap', () => {
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'skip', startTime: 100_000, summary: 'Skip' },
         { type: 'unexpected', startTime: 150_000, summary: 'Unexpected' },
         { type: 'error', startTime: 200_000, summary: 'Error' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -618,11 +618,11 @@ describe('TruncationIndicatorRenderer', () => {
 
     it('should return null when clicking outside visible range after culling', () => {
       // Create a marker that starts after the visible timeline
-      const markers: TruncationMarker[] = [
+      const markers: TimelineMarker[] = [
         { type: 'error', startTime: TOTAL_DURATION + 100_000, summary: 'Out of range marker' },
       ];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -645,9 +645,9 @@ describe('TruncationIndicatorRenderer', () => {
     });
 
     it('should test at exact start and end boundaries', () => {
-      const markers: TruncationMarker[] = [{ type: 'error', startTime: 100_000, summary: 'Test' }];
+      const markers: TimelineMarker[] = [{ type: 'error', startTime: 100_000, summary: 'Test' }];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,
@@ -680,9 +680,9 @@ describe('TruncationIndicatorRenderer', () => {
 
   describe('Cleanup', () => {
     it('should destroy Graphics objects on destroy()', () => {
-      const markers: TruncationMarker[] = [{ type: 'error', startTime: 100_000, summary: 'Test' }];
+      const markers: TimelineMarker[] = [{ type: 'error', startTime: 100_000, summary: 'Test' }];
 
-      renderer = new TruncationIndicatorRenderer(
+      renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
         viewport,
         markers,

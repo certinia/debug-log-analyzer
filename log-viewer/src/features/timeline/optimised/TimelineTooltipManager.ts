@@ -11,7 +11,7 @@
 
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { formatDuration } from '../../../core/utility/Util.js';
-import type { TruncationMarker } from '../types/timeline.types.js';
+import type { TimelineMarker } from '../types/timeline.types.js';
 
 /**
  * Configuration options for tooltip behavior.
@@ -33,7 +33,7 @@ export class TimelineTooltipManager {
   private tooltipElement: HTMLElement | null = null;
   private options: TooltipOptions;
   private currentEvent: LogEvent | null = null;
-  private currentTruncationMarker: TruncationMarker | null = null;
+  private currentTruncationMarker: TimelineMarker | null = null;
 
   constructor(
     container: HTMLElement,
@@ -100,7 +100,7 @@ export class TimelineTooltipManager {
    * @param mouseX - Mouse X position relative to container
    * @param mouseY - Mouse Y position relative to container
    */
-  public showTruncation(marker: TruncationMarker, mouseX: number, mouseY: number): void {
+  public showTruncation(marker: TimelineMarker, mouseX: number, mouseY: number): void {
     // If tooltip is already visible, update immediately
     const wasVisible = this.tooltipElement?.style.display === 'block';
 
@@ -164,7 +164,7 @@ export class TimelineTooltipManager {
   /**
    * Display tooltip with truncation marker information.
    */
-  private displayTruncationTooltip(marker: TruncationMarker, mouseX: number, mouseY: number): void {
+  private displayTruncationTooltip(marker: TimelineMarker, mouseX: number, mouseY: number): void {
     if (!this.tooltipElement) {
       return;
     }
@@ -190,7 +190,7 @@ export class TimelineTooltipManager {
   /**
    * Generate tooltip content for truncation marker.
    */
-  private generateTruncationTooltipContent(marker: TruncationMarker): HTMLDivElement | null {
+  private generateTruncationTooltipContent(marker: TimelineMarker): HTMLDivElement | null {
     const rows: { label: string; value: string }[] = [];
     const color = this.getTruncationColor(marker.type);
     return this.createTooltip(marker.summary, marker.metadata, rows, color);

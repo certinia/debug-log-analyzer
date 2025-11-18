@@ -14,9 +14,9 @@ import { Ticker } from 'pixi.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
 import type {
+  TimelineMarker,
   TimelineOptions,
   TimelineState,
-  TruncationMarker,
   ViewportState,
 } from '../types/timeline.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
@@ -24,10 +24,10 @@ import { AxisRenderer } from './AxisRenderer.js';
 import { EventBatchRenderer } from './EventBatchRenderer.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineInteractionHandler } from './TimelineInteractionHandler.js';
+import { TimelineMarkerRenderer } from './TimelineMarkerRenderer.js';
 import { TimelineResizeHandler } from './TimelineResizeHandler.js';
 import { TimelineTooltipManager } from './TimelineTooltipManager.js';
 import { TimelineViewport } from './TimelineViewport.js';
-import { TruncationIndicatorRenderer } from './TruncationIndicatorRenderer.js';
 
 export class TimelineRenderer {
   private app: PIXI.Application | null = null;
@@ -39,7 +39,7 @@ export class TimelineRenderer {
 
   private batchRenderer: EventBatchRenderer | null = null;
   private axisRenderer: AxisRenderer | null = null;
-  private truncationRenderer: TruncationIndicatorRenderer | null = null;
+  private truncationRenderer: TimelineMarkerRenderer | null = null;
 
   private resizeHandler: TimelineResizeHandler | null = null;
 
@@ -51,7 +51,7 @@ export class TimelineRenderer {
   private interactionHandler: TimelineInteractionHandler | null = null;
   private tooltipManager: TimelineTooltipManager | null = null;
   private apexLog: ApexLog | null = null;
-  private readonly truncationMarkers: TruncationMarker[] = []; // Truncation indicators for visualization
+  private readonly truncationMarkers: TimelineMarker[] = []; // Truncation indicators for visualization
 
   /**
    * Initialize the timeline renderer.
@@ -66,7 +66,7 @@ export class TimelineRenderer {
     container: HTMLElement,
     apexLog: ApexLog,
     events: LogEvent[],
-    truncationMarkers: TruncationMarker[] = [],
+    truncationMarkers: TimelineMarker[] = [],
     options: TimelineOptions = {},
   ): Promise<void> {
     // Validate inputs
@@ -94,7 +94,7 @@ export class TimelineRenderer {
     this.options = options;
 
     // Store truncation markers for rendering
-    (this.truncationMarkers as TruncationMarker[]).push(...truncationMarkers);
+    (this.truncationMarkers as TimelineMarker[]).push(...truncationMarkers);
 
     // Get container dimensions
     const { width, height } = container.getBoundingClientRect();
@@ -128,7 +128,7 @@ export class TimelineRenderer {
     // Create truncation renderer FIRST (renders behind axis and events)
     // Only render if we have truncation markers
     if (this.truncationContainer && this.truncationMarkers.length > 0) {
-      this.truncationRenderer = new TruncationIndicatorRenderer(
+      this.truncationRenderer = new TimelineMarkerRenderer(
         this.truncationContainer,
         this.viewport,
         this.truncationMarkers,
