@@ -32,7 +32,7 @@ Handle large Salesforce debug logs (10MB+, 100k+ lines) efficiently without bloc
 
 **Rules:**
 
-- Visualizations render within 2 seconds for logs <5MB
+- Parse log and render with given time for logs >10MB (3 seconds), > 20mb(5 seconds), < 5mb (1 second)
 - Operations >100ms show progress indicators
 - No synchronous operations blocking extension host >50ms
 - Profile and benchmark performance-critical paths
