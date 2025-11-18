@@ -11,7 +11,6 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { Ticker } from 'pixi.js';
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type {
   TimelineMarker,
@@ -55,17 +54,17 @@ export class FlameChart {
 
   private batchRenderer: EventBatchRenderer | null = null;
   private axisRenderer: AxisRenderer | null = null;
-  private truncationRenderer: TimelineMarkerRenderer | null = null;
+  private markerRenderer: TimelineMarkerRenderer | null = null;
   private resizeHandler: TimelineResizeHandler | null = null;
 
   private worldContainer: PIXI.Container | null = null;
   private axisContainer: PIXI.Container | null = null;
-  private truncationContainer: PIXI.Container | null = null;
+  private markerContainer: PIXI.Container | null = null;
   private uiContainer: PIXI.Container | null = null;
   private renderLoopId: number | null = null;
   private interactionHandler: TimelineInteractionHandler | null = null;
 
-  private readonly truncationMarkers: TimelineMarker[] = [];
+  private readonly markers: TimelineMarker[] = [];
 
   /**
    * Initialize the flamechart renderer.
@@ -102,7 +101,7 @@ export class FlameChart {
     this.callbacks = callbacks;
 
     // Store truncation markers for rendering
-    this.truncationMarkers.push(...markers);
+    this.markers.push(...markers);
 
     // Get container dimensions
     const { width, height } = container.getBoundingClientRect();
@@ -134,11 +133,11 @@ export class FlameChart {
     this.initializeState(events);
 
     // Create truncation renderer FIRST (renders behind axis and events)
-    if (this.truncationContainer && this.truncationMarkers.length > 0) {
-      this.truncationRenderer = new TimelineMarkerRenderer(
-        this.truncationContainer,
+    if (this.markerContainer && this.markers.length > 0) {
+      this.markerRenderer = new TimelineMarkerRenderer(
+        this.markerContainer,
         this.viewport,
-        this.truncationMarkers,
+        this.markers,
       );
     }
 
@@ -198,9 +197,9 @@ export class FlameChart {
     }
 
     // Clean up truncation renderer
-    if (this.truncationRenderer) {
-      this.truncationRenderer.destroy();
-      this.truncationRenderer = null;
+    if (this.markerRenderer) {
+      this.markerRenderer.destroy();
+      this.markerRenderer = null;
     }
 
     if (this.resizeHandler) {
@@ -284,11 +283,11 @@ export class FlameChart {
   // ============================================================================
 
   private async setupPixiApplication(width: number, height: number): Promise<void> {
-    const ticker = Ticker.shared;
+    const ticker = PIXI.Ticker.shared;
     ticker.autoStart = false;
     ticker.stop();
 
-    const sysTicker = Ticker.system;
+    const sysTicker = PIXI.Ticker.system;
     sysTicker.autoStart = false;
     sysTicker.stop();
 
@@ -319,10 +318,10 @@ export class FlameChart {
 
     const stage = this.app.stage;
 
-    this.truncationContainer = new PIXI.Container();
-    this.truncationContainer.position.set(0, this.app.screen.height);
-    this.truncationContainer.scale.y = -1;
-    stage.addChild(this.truncationContainer);
+    this.markerContainer = new PIXI.Container();
+    this.markerContainer.position.set(0, this.app.screen.height);
+    this.markerContainer.scale.y = -1;
+    stage.addChild(this.markerContainer);
 
     this.axisContainer = new PIXI.Container();
     this.axisContainer.position.set(0, this.app.screen.height);
@@ -377,7 +376,7 @@ export class FlameChart {
     }
 
     // Check for truncation markers
-    const truncationMarker = this.truncationRenderer?.hitTest(screenX, screenY) ?? null;
+    const marker = this.markerRenderer?.hitTest(screenX, screenY) ?? null;
 
     // Find event at position
     const viewportState = this.viewport.getState();
@@ -386,12 +385,12 @@ export class FlameChart {
 
     // Update cursor
     if (this.interactionHandler) {
-      this.interactionHandler.updateCursor(event !== null || truncationMarker !== null);
+      this.interactionHandler.updateCursor(event !== null || marker !== null);
     }
 
     // Notify callback
     if (this.callbacks.onMouseMove) {
-      this.callbacks.onMouseMove(screenX, screenY, event, truncationMarker);
+      this.callbacks.onMouseMove(screenX, screenY, event, marker);
     }
   }
 
@@ -401,7 +400,7 @@ export class FlameChart {
     }
 
     // Check for truncation markers
-    const truncationMarker = this.truncationRenderer?.hitTest(screenX, screenY) ?? null;
+    const truncationMarker = this.markerRenderer?.hitTest(screenX, screenY) ?? null;
 
     // Find event at position
     const viewportState = this.viewport.getState();
@@ -485,8 +484,8 @@ export class FlameChart {
 
     const screenHeight = this.app.screen.height;
 
-    if (this.truncationContainer) {
-      this.truncationContainer.position.set(-offsetX, screenHeight);
+    if (this.markerContainer) {
+      this.markerContainer.position.set(-offsetX, screenHeight);
     }
 
     if (this.axisContainer) {
@@ -495,8 +494,8 @@ export class FlameChart {
 
     this.worldContainer.position.set(-offsetX, screenHeight - viewportState.offsetY);
 
-    if (this.truncationRenderer) {
-      this.truncationRenderer.render();
+    if (this.markerRenderer) {
+      this.markerRenderer.render();
     }
 
     if (this.axisRenderer) {
