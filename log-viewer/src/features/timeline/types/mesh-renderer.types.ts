@@ -15,7 +15,7 @@
  */
 
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type { TimelineEventIndex } from '../services/TimelineEventIndex.js';
+import type { TimelineEventIndex } from '../optimised/TimelineEventIndex.js';
 import type { ViewportState } from './timeline.types.js';
 
 // ============================================================================

@@ -70,8 +70,8 @@ jest.mock('pixi.js', () => {
 });
 
 import * as PIXI from 'pixi.js';
-import { TruncationIndicatorRenderer } from '../graphics/TruncationIndicatorRenderer.js';
-import { TimelineViewport } from '../services/TimelineViewport.js';
+import { TimelineViewport } from '../optimised/TimelineViewport.js';
+import { TruncationIndicatorRenderer } from '../optimised/TruncationIndicatorRenderer.js';
 import type { TruncationMarker } from '../types/timeline.types.js';
 import { TRUNCATION_ALPHA, TRUNCATION_COLORS } from '../types/timeline.types.js';
 

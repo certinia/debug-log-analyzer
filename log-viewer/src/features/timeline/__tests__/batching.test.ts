@@ -15,7 +15,7 @@
 import * as PIXI from 'pixi.js';
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type { LogSubCategory } from '../../../core/log-parser/types.js';
-import { EventBatchRenderer } from '../graphics/EventBatchRenderer.js';
+import { EventBatchRenderer } from '../optimised/EventBatchRenderer.js';
 import type { RenderBatch, ViewportState } from '../types/timeline.types.js';
 import { TIMELINE_CONSTANTS } from '../types/timeline.types.js';
 

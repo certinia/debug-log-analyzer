@@ -17,7 +17,7 @@
  */
 
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
-import { TimelineTooltipManager } from '../services/TimelineTooltipManager.js';
+import { TimelineTooltipManager } from '../optimised/TimelineTooltipManager.js';
 
 describe('TimelineTooltipManager', () => {
   let container: HTMLElement;

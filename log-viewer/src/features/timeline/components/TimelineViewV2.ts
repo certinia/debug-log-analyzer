@@ -13,7 +13,7 @@ import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { getSettings } from '../../settings/Settings.js';
-import { TimelineRenderer } from '../services/TimelineRenderer.js';
+import { TimelineRenderer } from '../optimised/TimelineRenderer.js';
 import { tooltipStyles } from '../styles/timeline.css.js';
 import type { TimelineOptions, ViewportState } from '../types/timeline.types.js';
 import { TimelineError, TimelineErrorCode } from '../types/timeline.types.js';

@@ -13,7 +13,7 @@
  */
 
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
-import { TimelineEventIndex } from '../services/TimelineEventIndex.js';
+import { TimelineEventIndex } from '../optimised/TimelineEventIndex.js';
 import type { ViewportState } from '../types/timeline.types.js';
 
 describe('TimelineEventIndex', () => {

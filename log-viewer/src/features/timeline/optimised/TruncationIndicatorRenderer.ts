@@ -10,7 +10,6 @@
  */
 
 import * as PIXI from 'pixi.js';
-import type { TimelineViewport } from '../services/TimelineViewport.js';
 import type { TruncationMarker, TruncationType } from '../types/timeline.types.js';
 import {
   SEVERITY_ORDER,
@@ -18,6 +17,7 @@ import {
   TRUNCATION_ALPHA,
   TRUNCATION_COLORS,
 } from '../types/timeline.types.js';
+import type { TimelineViewport } from './TimelineViewport.js';
 
 /**
  * Internal representation of a truncation indicator's visual state.

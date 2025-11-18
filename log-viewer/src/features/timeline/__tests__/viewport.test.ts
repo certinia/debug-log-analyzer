@@ -12,7 +12,7 @@
  * - Window resize handling
  */
 
-import { TimelineViewport } from '../services/TimelineViewport.js';
+import { TimelineViewport } from '../optimised/TimelineViewport.js';
 import { TIMELINE_CONSTANTS } from '../types/timeline.types.js';
 
 describe('TimelineViewport', () => {

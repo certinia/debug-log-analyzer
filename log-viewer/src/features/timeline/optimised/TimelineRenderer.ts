@@ -13,9 +13,6 @@ import * as PIXI from 'pixi.js';
 import { Ticker } from 'pixi.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
-import { AxisRenderer } from '../graphics/AxisRenderer.js';
-import { EventBatchRenderer } from '../graphics/EventBatchRenderer.js';
-import { TruncationIndicatorRenderer } from '../graphics/TruncationIndicatorRenderer.js';
 import type {
   TimelineOptions,
   TimelineState,
@@ -23,11 +20,14 @@ import type {
   ViewportState,
 } from '../types/timeline.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
+import { AxisRenderer } from './AxisRenderer.js';
+import { EventBatchRenderer } from './EventBatchRenderer.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineInteractionHandler } from './TimelineInteractionHandler.js';
 import { TimelineResizeHandler } from './TimelineResizeHandler.js';
 import { TimelineTooltipManager } from './TimelineTooltipManager.js';
 import { TimelineViewport } from './TimelineViewport.js';
+import { TruncationIndicatorRenderer } from './TruncationIndicatorRenderer.js';
 
 export class TimelineRenderer {
   private app: PIXI.Application | null = null;
