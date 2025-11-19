@@ -62,34 +62,33 @@ export class CallStack extends LitElement {
   ];
 
   render() {
-    const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() || [];
-    if (stack.length) {
-      const details = stack.slice(this.startDepth, this.endDepth).map((entry) => {
-        return this.lineLink(entry);
-      });
-
-      if (details.length === 1) {
-        return details;
-      }
-
-      return html` <details>
-        <summary>${details[0]}</summary>
-        <div class="callstack">${details.slice(1, -1)}</div>
-      </details>`;
-    } else {
-      return html` <div class="callstack__item">No call stack available</div>`;
+    const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() ?? [];
+    if (!stack.length) {
+      return html`<div class="callstack__item">No call stack available</div>`;
     }
+
+    const details = stack.slice(this.startDepth, this.endDepth).map((entry) => {
+      return this.lineLink(entry);
+    });
+
+    if (details.length === 1) {
+      return details;
+    }
+
+    const [first, ...rest] = details;
+    return html`<details>
+      <summary>${first}</summary>
+      <div class="callstack">${rest}</div>
+    </details>`;
   }
 
   private lineLink(line: LogEvent) {
-    return html`
-      <a
-        @click=${this.onCallerClick}
-        class="callstack__item code_text"
-        data-timestamp="${line.timestamp}"
-        >${line.text}</a
-      >
-    `;
+    return html`<a
+      @click=${this.onCallerClick}
+      class="callstack__item code_text"
+      data-timestamp="${line.timestamp}"
+      >${line.text}</a
+    >`;
   }
 
   private onCallerClick(evt: Event) {
