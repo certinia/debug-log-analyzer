@@ -16,7 +16,7 @@ import './TimelineFlameChart.js';
 import './TimelineKey.js';
 
 @customElement('timeline-legacy')
-export class TimelineView extends LitElement {
+export class TimelineLegacy extends LitElement {
   @property()
   apexLog: ApexLog | null = null;
 

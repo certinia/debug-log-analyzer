@@ -14,7 +14,7 @@ import { globalStyles } from '../../../styles/global.styles.js';
 // web components
 import './TimelineFlameChart.js';
 import './TimelineKey.js';
-import './Timelinelegacy.js';
+import './TimelineLegacy.js';
 import './TimelineSkeleton.js';
 
 @customElement('timeline-view')
