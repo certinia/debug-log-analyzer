@@ -3,7 +3,7 @@
  */
 
 /**
- * TimelineViewV2
+ * TimelineFlameChart
  *
  * Lit web component wrapping PixiJS timeline renderer.
  * Provides integration layer between application and PixiTimelineRenderer.
@@ -11,15 +11,18 @@
 
 import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+
 import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
 import { getSettings } from '../../settings/Settings.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
-import { tooltipStyles } from '../styles/timeline.css.js';
+
 import type { TimelineOptions } from '../types/timeline.types.js';
 import { TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
 
-@customElement('timeline-view-v2')
-export class TimelineViewV2 extends LitElement {
+import { tooltipStyles } from '../styles/timeline.css.js';
+
+@customElement('timeline-flame-chart')
+export class TimelineFlameChart extends LitElement {
   static styles = [
     unsafeCSS(tooltipStyles),
     css`
@@ -72,7 +75,7 @@ export class TimelineViewV2 extends LitElement {
    * Existing property for compatibility with current application.
    */
   @property({ type: Object })
-  rootLog: ApexLog | null = null;
+  apexLog: ApexLog | null = null;
 
   /**
    * Optional configuration options.
@@ -131,8 +134,8 @@ export class TimelineViewV2 extends LitElement {
   override updated(changedProperties: PropertyValues): void {
     super.updated(changedProperties);
 
-    // Re-initialize if rootLog or options change
-    if (changedProperties.has('rootLog') || changedProperties.has('options')) {
+    // Re-initialize if apexLog or options change
+    if (changedProperties.has('apexLog') || changedProperties.has('options')) {
       if (this.isInitialized && this.containerRef) {
         this.initializeTimeline();
       }
@@ -147,15 +150,14 @@ export class TimelineViewV2 extends LitElement {
    * Initialize PixiJS timeline renderer.
    */
   private async initializeTimeline(): Promise<void> {
-    if (!this.containerRef || !this.rootLog) {
+    if (!this.containerRef || !this.apexLog) {
       return;
     }
 
     // Clean up existing renderer
     this.cleanup();
 
-    // Extract events from rootLog
-    if (this.rootLog.duration.total === 0) {
+    if (this.apexLog.duration.total === 0) {
       this.isLoading = false;
       this.errorMessage = 'Nothing to show';
       return;
@@ -176,7 +178,7 @@ export class TimelineViewV2 extends LitElement {
       };
 
       this.apexLogTimeline = new ApexLogTimeline();
-      await this.apexLogTimeline.init(this.containerRef, this.rootLog, optionsWithColors);
+      await this.apexLogTimeline.init(this.containerRef, this.apexLog, optionsWithColors);
 
       this.isInitialized = true;
       this.isLoading = false;
