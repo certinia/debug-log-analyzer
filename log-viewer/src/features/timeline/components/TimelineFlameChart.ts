@@ -10,14 +10,14 @@
  */
 
 import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
 import { getSettings } from '../../settings/Settings.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 
 import type { TimelineOptions } from '../types/timeline.types.js';
-import { TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
+import { TimelineError } from '../types/timeline.types.js';
 
 import { tooltipStyles } from '../styles/timeline.css.js';
 
@@ -93,58 +93,22 @@ export class TimelineFlameChart extends LitElement {
   @state()
   private errorMessage: string | null = null;
 
-  @state()
-  private isLoading = false;
-
   private apexLogTimeline: ApexLogTimeline | null = null;
-  private containerRef: HTMLElement | null = null;
 
-  // ============================================================================
-  // LIFECYCLE
-  // ============================================================================
-
-  override connectedCallback(): void {
-    super.connectedCallback();
-    this.isLoading = true;
-  }
-
-  override disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this.cleanup();
-  }
-
-  override firstUpdated(): void {
-    // Get container reference
-    this.containerRef = this.shadowRoot?.querySelector('.timeline-container') as HTMLElement;
-
-    if (!this.containerRef) {
-      this.handleError(
-        new TimelineError(
-          TimelineErrorCode.INVALID_CONTAINER,
-          'Failed to find timeline container element',
-        ),
-      );
-      return;
-    }
-
-    // Initialize timeline once DOM is ready
-    this.initializeTimeline();
-  }
+  @query('.timeline-container')
+  private containerRef!: HTMLElement;
 
   override updated(changedProperties: PropertyValues): void {
     super.updated(changedProperties);
 
     // Re-initialize if apexLog or options change
-    if (changedProperties.has('apexLog') || changedProperties.has('options')) {
-      if (this.isInitialized && this.containerRef) {
-        this.initializeTimeline();
-      }
+    if (
+      (changedProperties.has('apexLog') || changedProperties.has('options')) &&
+      this.containerRef
+    ) {
+      this.initializeTimeline();
     }
   }
-
-  // ============================================================================
-  // INITIALIZATION
-  // ============================================================================
 
   /**
    * Initialize PixiJS timeline renderer.
@@ -158,13 +122,11 @@ export class TimelineFlameChart extends LitElement {
     this.cleanup();
 
     if (this.apexLog.duration.total === 0) {
-      this.isLoading = false;
       this.errorMessage = 'Nothing to show';
       return;
     }
 
     try {
-      this.isLoading = true;
       this.errorMessage = null;
 
       // Fetch settings for custom colors
@@ -179,9 +141,6 @@ export class TimelineFlameChart extends LitElement {
 
       this.apexLogTimeline = new ApexLogTimeline();
       await this.apexLogTimeline.init(this.containerRef, this.apexLog, optionsWithColors);
-
-      this.isInitialized = true;
-      this.isLoading = false;
     } catch (error) {
       this.handleError(error);
     }
@@ -200,8 +159,6 @@ export class TimelineFlameChart extends LitElement {
       this.apexLogTimeline.destroy();
       this.apexLogTimeline = null;
     }
-
-    this.isInitialized = false;
   }
 
   // ============================================================================
@@ -212,9 +169,6 @@ export class TimelineFlameChart extends LitElement {
    * Handle initialization errors.
    */
   private handleError(error: unknown): void {
-    this.isLoading = false;
-    this.isInitialized = false;
-
     if (error instanceof TimelineError) {
       this.errorMessage = `${error.code}: ${error.message}`;
     } else if (error instanceof Error) {
@@ -231,7 +185,6 @@ export class TimelineFlameChart extends LitElement {
   override render() {
     return html`
       <div class="timeline-container">
-        ${this.isLoading ? html`<div class="loading-message">Initializing timeline...</div>` : ''}
         ${this.errorMessage ? html`<div class="error-message">${this.errorMessage}</div>` : ''}
       </div>
     `;
