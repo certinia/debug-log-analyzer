@@ -58,6 +58,7 @@ export class TimelineInteractionHandler {
   private lastTouchX = 0;
   private lastTouchY = 0;
   private isOverEvent = false;
+  private isMouseDown = false;
 
   // Event listener references for cleanup
 
@@ -288,6 +289,7 @@ export class TimelineInteractionHandler {
     }
 
     this.isDragging = true;
+    this.isMouseDown = true;
     this.lastMouseX = event.clientX;
     this.lastMouseY = event.clientY;
 
@@ -300,6 +302,9 @@ export class TimelineInteractionHandler {
    */
   private handleMouseMove(event: MouseEvent): void {
     if (this.isDragging && this.options.enablePan) {
+      // Clear click flag since we're dragging
+      this.isMouseDown = false;
+
       // Calculate delta from last position
       const deltaX = event.clientX - this.lastMouseX;
       const deltaY = event.clientY - this.lastMouseY;
@@ -337,18 +342,20 @@ export class TimelineInteractionHandler {
 
     this.isDragging = false;
 
-    // Restore cursor
-    this.canvas.style.cursor = 'grab';
+    // Restore cursor based on whether we're over an event
+    this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
   }
 
   /**
    * Handle click - event selection.
    */
   private handleClick(event: MouseEvent): void {
-    // Only handle if not dragging (to avoid firing click after drag)
-    if (this.isDragging) {
+    // Only fire click if mousedown occurred without dragging
+    if (!this.isMouseDown) {
       return;
     }
+
+    this.isMouseDown = false;
 
     const rect = this.canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
