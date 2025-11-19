@@ -216,7 +216,6 @@ export class TimelineEventIndex {
       nextLevel.length = 0;
     }
 
-    console.log('', maxDepth);
     return maxDepth;
   }
 
