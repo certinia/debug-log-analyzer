@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
+
 export const tooltipStyles = `
    #timeline-tooltip {
         display: none;

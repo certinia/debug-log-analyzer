@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
+
 /**
  * Setup ResizeObserver to handle window resize with debouncing.
  */

@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
+
 import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 
