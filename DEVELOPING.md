@@ -53,7 +53,7 @@ You can build the extension and prepare it for local development, run the watche
    To build the extension without minification and then watch for file changes in the `lana` and `log-viewer` source, rebuilding incrementally, for a fast dev experience, use:
 
 ```bash
-pnpm run watch
+pnpm watch
 ```
 
 2. **Development Build:**
@@ -61,7 +61,7 @@ pnpm run watch
    To build the extension without minification (fast for local development), use:
 
 ```bash
-pnpm run build:dev
+pnpm build:dev
 ```
 
 3. **Production Build:**
@@ -69,8 +69,17 @@ pnpm run build:dev
    To create a production-ready build with minification, use:
 
 ```bash
-pnpm run build
+pnpm build
 ```
+
+### **(Experimental)**
+
+The following commands are also available and use [rolldown](https://rolldown.rs/) as a replacement for rollup.
+The are faster but since rolldown is beta something do not work correctly e.g css bundling in js.
+
+1. pnpm watch:fast
+1. pnpm build:dev:fast
+1. pnpm build:fast
 
 ## 🚀 Running the Extension Locally
 
@@ -93,7 +102,7 @@ Run Tests Locally:
 If you have added or modified tests, you can run them with:
 
 ```zsh
-pnpm run test
+pnpm test
 ```
 
 or run the tests from the test explorer in VScode

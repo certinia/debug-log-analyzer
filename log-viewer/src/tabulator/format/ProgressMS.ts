@@ -10,14 +10,11 @@ export function progressFormatterMS(
   formatterParams: ProgressParams,
   _onRendered: EmptyCallback,
 ) {
-  const value = (cell.getValue() || 0) / 1000000;
+  const value = (cell.getValue() || 0) / 1_000_000;
   const totalVal = formatterParams.totalValue ?? 0;
-  const totalValAsMs = totalVal > 0 ? totalVal / 1000000 : 0;
+  const totalValAsMs = totalVal > 0 ? totalVal / 1_000_000 : 0;
 
-  return progressComponent(value, totalValAsMs, {
-    showPercentageText: formatterParams.showPercentageText,
-    precision: formatterParams.precision,
-  });
+  return progressComponent(value, totalValAsMs, formatterParams);
 }
 
 export interface ProgressParams {

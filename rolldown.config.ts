@@ -8,6 +8,12 @@ import copy from 'rollup-plugin-copy';
 import postcss from 'rollup-plugin-postcss';
 import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
 
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const getSwcOptions = (dirPath: string) =>
   defineRollupSwcOption({
     include: /\.[mc]?[jt]sx?$/,
@@ -53,7 +59,13 @@ export default defineConfig([
       },
     ],
     platform: 'browser',
+    resolve: {
+      alias: { eventemitter3: path.resolve(__dirname, 'node_modules/eventemitter3/index.js') },
+    },
     keepNames: true,
+    moduleTypes: {
+      '.css': 'js',
+    },
     tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
     plugins: [
       nodePolyfills(),

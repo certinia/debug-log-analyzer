@@ -1,11 +1,17 @@
 // Rollup plugins
+import alias from '@rollup/plugin-alias';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
+import path from 'path';
 import copy from 'rollup-plugin-copy';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
 import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const production = process.env.NODE_ENV === 'production';
 console.log('Package mode:', production ? 'production' : 'development');
@@ -54,7 +60,18 @@ export default [
       },
     ],
     plugins: [
-      nodeResolve({ browser: true, preferBuiltins: false }),
+      alias({
+        entries: [
+          {
+            find: 'eventemitter3',
+            replacement: path.resolve(__dirname, 'node_modules/eventemitter3/index.js'),
+          },
+        ],
+      }),
+      nodeResolve({
+        browser: true,
+        preferBuiltins: false,
+      }),
       commonjs(),
       nodePolyfills(),
       swc(

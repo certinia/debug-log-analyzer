@@ -21,10 +21,10 @@ import Number from '../../../tabulator/format/Number.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
+import { Find, formatter } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
-import { Find, formatter } from '../../call-tree/services/Find.js';
 
 // styles
 import codiconStyles from '../../../styles/codicon.css';
@@ -365,12 +365,12 @@ export class DMLView extends LitElement {
           formatter: Number,
           formatterParams: {
             thousand: false,
-            precision: 3,
+            precision: 2,
           },
           accessorDownload: NumberAccessor,
           bottomCalcFormatter: Number,
           bottomCalc: 'sum',
-          bottomCalcFormatterParams: { precision: 3 },
+          bottomCalcFormatterParams: { precision: 2 },
         },
       ],
       rowFormatter: (row) => {

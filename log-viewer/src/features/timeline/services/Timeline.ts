@@ -4,7 +4,7 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type { LogIssue, LogSubCategory } from '../../../core/log-parser/types.js';
-import formatDuration, { debounce } from '../../../core/utility/Util.js';
+import { debounce, formatDuration } from '../../../core/utility/Util.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
 
 export interface TimelineGroup {
@@ -141,7 +141,7 @@ class State {
 const state = new State();
 
 let tooltip: HTMLDivElement;
-let container: HTMLDivElement;
+let container: HTMLElement;
 let canvas: HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D | null;
 
@@ -252,7 +252,7 @@ function drawScale(ctx: CanvasRenderingContext2D) {
 function nodesToRectangles(rootNodes: LogEvent[]) {
   // seed depth 0
   let depth = 0;
-  let currentLevel = rootNodes.filter((n) => n.duration && n.children.length);
+  let currentLevel = rootNodes.filter((n) => n.duration);
 
   while (currentLevel.length) {
     const nextLevel: LogEvent[] = [];
@@ -263,7 +263,7 @@ function nodesToRectangles(rootNodes: LogEvent[]) {
       }
 
       for (const child of node.children) {
-        if (child.duration && child.children.length) {
+        if (child.duration) {
           nextLevel.push(child);
         }
       }
@@ -545,7 +545,7 @@ function resizeFont() {
   scaleFont = state.zoom > 0.0000004 ? 'normal 16px serif' : 'normal 8px serif';
 }
 
-export function init(timelineContainer: HTMLDivElement, rootMethod: ApexLog) {
+export function init(timelineContainer: HTMLElement, rootMethod: ApexLog) {
   container = timelineContainer;
   canvas = timelineContainer.querySelector('#timeline')!;
   ctx = canvas.getContext('2d'); // can never be null since context (2d) is a supported type.
@@ -659,7 +659,7 @@ function findTimelineTooltip(
 
     if (target.exitStamp) {
       if (target.duration.total) {
-        let val = formatDuration(target.duration.total, timelineRoot.duration.total);
+        let val = formatDuration(target.duration.total);
         if (target.cpuType === 'free') {
           val += ' (free)';
         } else if (target.duration.self) {
