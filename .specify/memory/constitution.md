@@ -32,7 +32,7 @@ Handle large Salesforce debug logs (10MB+, 100k+ lines) efficiently without bloc
 
 **Rules:**
 
-- Visualizations render within 2 seconds for logs <5MB
+- Parse log and render with given time for logs >10MB (3 seconds), > 20mb(5 seconds), < 5mb (1 second)
 - Operations >100ms show progress indicators
 - No synchronous operations blocking extension host >50ms
 - Profile and benchmark performance-critical paths
@@ -69,9 +69,19 @@ Ensure reliability across VS Code versions and diverse Salesforce log formats.
 ### Code Quality
 
 - Prettier and ESLint enforced via pre-commit hooks
-- Use conventional commit messages
 - Justify new dependencies; avoid duplication
 - Code reviews check readability and functionality
+
+### Commit Workflow
+
+**Manual Control Required:**
+
+- AI assistants and automated tools MUST NOT create commits without explicit user approval
+- Users retain final control over what gets committed and when
+- Commit messages should follow conventional commit format but require human review
+- Pre-commit hooks may modify files (formatting, linting) but the commit decision remains manual
+
+**Why:** Developers need to review changes holistically before committing. Automatic commits can bundle unrelated work or bypass important review steps.
 
 ### Releases
 
@@ -83,6 +93,14 @@ Follow Semantic Versioning (MAJOR.MINOR.PATCH):
 
 All releases include CHANGELOG updates. Breaking changes require migration guides.
 
+### Git Workflow
+
+Main branch: main
+Feature branches: feat-description
+Defect branches: bug-description
+Use conventional commit messages
+IMPORTANT: NEVER reference Anthropic or Claude in commit messages (per global guidelines)
+
 ---
 
-**Version**: 2.0.0 | **Last Updated**: 2025-11-04
+**Version**: 2.1.0 | **Ratified**: 2025-11-04 | **Last Amended**: 2025-11-10

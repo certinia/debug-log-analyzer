@@ -165,8 +165,18 @@
               "description": "Hex color for System Method timeline events."
             }
           },
+          "title": "Timeline Event Colors",
           "description": "Colors used for each event type on the Timeline",
           "additionalProperties": false
+        },
+        "lana.timeline.experimental.timeline": {
+          "title": "Enable the new experimental Timeline",
+          "type": "boolean",
+          "default": false,
+          "description": "Enables the faster experimental Timeline",
+          "tags": [
+            "experimental"
+          ]
         }
       }
     }

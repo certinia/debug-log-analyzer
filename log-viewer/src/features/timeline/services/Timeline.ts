@@ -141,7 +141,7 @@ class State {
 const state = new State();
 
 let tooltip: HTMLDivElement;
-let container: HTMLDivElement;
+let container: HTMLElement;
 let canvas: HTMLCanvasElement;
 let ctx: CanvasRenderingContext2D | null;
 
@@ -545,7 +545,7 @@ function resizeFont() {
   scaleFont = state.zoom > 0.0000004 ? 'normal 16px serif' : 'normal 8px serif';
 }
 
-export function init(timelineContainer: HTMLDivElement, rootMethod: ApexLog) {
+export function init(timelineContainer: HTMLElement, rootMethod: ApexLog) {
   container = timelineContainer;
   canvas = timelineContainer.querySelector('#timeline')!;
   ctx = canvas.getContext('2d'); // can never be null since context (2d) is a supported type.
