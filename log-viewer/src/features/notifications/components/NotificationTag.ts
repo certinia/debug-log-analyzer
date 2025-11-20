@@ -57,8 +57,8 @@ export class NotificationTag extends LitElement {
 
       .icon {
         position: relative;
-        width: 32px;
-        height: 32px;
+        width: 22px;
+        height: 22px;
       }
       .icon-svg {
         width: 20px;
@@ -66,8 +66,8 @@ export class NotificationTag extends LitElement {
       }
 
       .icon-button {
-        width: 32px;
-        height: 32px;
+        width: 22px;
+        height: 22px;
       }
 
       .codicon.icon {

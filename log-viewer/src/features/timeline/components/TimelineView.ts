@@ -40,7 +40,8 @@ export class TimelineView extends LitElement {
         flex: 1;
         position: relative;
         width: 100%;
-        height: 80%;
+        min-height: 80%;
+        max-height: 100%;
       }
     `,
   ];

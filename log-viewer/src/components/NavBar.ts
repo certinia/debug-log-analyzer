@@ -48,12 +48,20 @@ export class NavBar extends LitElement {
     unsafeCSS(codiconStyles),
     css`
       :host {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
         color: var(--vscode-editor-foreground);
         ${notificationStyles}
       }
 
+      vscode-button {
+        height: 22px;
+        width: 22px;
+      }
+
       .navbar {
-        padding-top: 4px;
+        padding-right: 4px;
         display: flex;
         gap: 10px;
       }
@@ -64,12 +72,14 @@ export class NavBar extends LitElement {
         position: relative;
         align-items: center;
       }
+
       .navbar--right {
         display: flex;
         flex: 1 1 auto;
         justify-content: flex-end;
         align-items: center;
         display: flex;
+        gap: 4px;
       }
 
       .log__information {
@@ -79,19 +89,7 @@ export class NavBar extends LitElement {
         white-space: nowrap;
         align-items: center;
         font-size: 1rem;
-        padding: 4px 0px 4px 0px;
-        gap: 5px;
-      }
-
-      .icon-button {
-        width: 32px;
-        height: 32px;
-      }
-
-      .codicon.icon {
-        font-size: 22px;
-        width: 20px;
-        height: 20px;
+        gap: 4px;
       }
     `,
   ];
@@ -115,13 +113,12 @@ export class NavBar extends LitElement {
           <vscode-button
             appearance="icon"
             aria-label="Help"
-            class="icon-button"
             title="Help"
             @click=${() => {
               vscodeMessenger.send('openHelp');
             }}
           >
-            <span class="codicon icon codicon-question"</span>
+            <span class="codicon codicon-question"</span>
           </vscode-button>
         </div>
       </div>

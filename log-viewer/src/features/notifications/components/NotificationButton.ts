@@ -43,30 +43,30 @@ export class NotificationButton extends LitElement {
     unsafeCSS(codiconStyles),
     css`
       :host {
-        top: 32px;
-        right: 0px;
         ${notificationStyles}
       }
 
-      .icon-button {
-        width: 32px;
-        height: 32px;
+      vscode-button {
+        height: 22px;
+        width: 22px;
       }
 
       .badge-indicator {
         color: rgb(255, 255, 255);
         background-color: rgb(0, 120, 212);
         position: absolute;
-        bottom: 18px;
-        left: 18px;
+        top: 10px;
+        left: 10px;
         font-size: 9px;
         font-weight: 600;
-        min-width: 8px;
-        height: 16px;
-        line-height: 16px;
-        padding: 0px 4px;
-        border-radius: 20px;
+        min-width: 13px;
+        height: 13px;
+        line-height: 13px;.
+        padding: 0px 2px;
+        border-radius: 16px;
         text-align: center;
+        box-sizing: border-box;
+        display: inline-block;
       }
 
       .notification-panel {
@@ -77,12 +77,7 @@ export class NotificationButton extends LitElement {
 
       .menu-container {
         position: relative;
-      }
-
-      .codicon.icon {
-        font-size: 22px;
-        width: 20px;
-        height: 20px;
+        display: inline-flex;
       }
 
       .notification {
@@ -144,18 +139,17 @@ export class NotificationButton extends LitElement {
 
     const indicator =
       this.notifications.length > 0
-        ? html`<div class="badge-indicator">${this.notifications.length}</div>`
+        ? html` <div class="badge-indicator">${this.notifications.length}</div> `
         : html``;
 
     return html`<div class="menu-container">
       <vscode-button
         appearance="icon"
-        class="icon-button"
         aria-label="Notifications"
         title="Notifications"
         @click="${this._toggleNotifications}"
       >
-        <span class="codicon icon codicon-bell"></span>
+        <span class="codicon codicon-bell"></span>
         ${indicator}
       </vscode-button>
       <notification-panel class="notification-panel" .open="${this.open}">

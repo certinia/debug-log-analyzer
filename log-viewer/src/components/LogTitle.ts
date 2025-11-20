@@ -34,8 +34,8 @@ export class LogTitle extends LitElement {
         min-height: 1rem;
       }
       .title-item {
-        padding-block: 6px;
-        padding-inline: 8px;
+        padding-block: 4px;
+        padding-inline: 6px;
         background: var(--button-icon-background, rgba(90, 93, 94, 0.31));
         border-radius: var(--button-icon-corner-radius, 5px);
         font-weight: var(--text-weight-semibold, 600);

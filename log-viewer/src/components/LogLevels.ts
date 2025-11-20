@@ -28,7 +28,6 @@ export class LogLevels extends LitElement {
         flex-wrap: wrap;
         gap: 4px;
         align-items: center;
-        padding: 4px 0;
         min-height: 27px;
       }
       .setting {

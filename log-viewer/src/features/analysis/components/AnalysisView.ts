@@ -80,7 +80,7 @@ export class AnalysisView extends LitElement {
 
       .filter-container {
         display: flex;
-        gap: 5px;
+        gap: 4px;
       }
 
       .dropdown-container {
