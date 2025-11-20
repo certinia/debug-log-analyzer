@@ -1,20 +1,19 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { sep } from 'path';
 import {
+  commands,
   Position,
   Selection,
-  Uri,
   ViewColumn,
   workspace,
   type TextDocumentShowOptions,
 } from 'vscode';
 
 import { Context } from '../Context.js';
-import { Item, Options, QuickPick } from './QuickPick.js';
 
 import { getMethodLine, parseApex } from '../salesforce/ApexParser/ApexSymbolLocator.js';
+import { parseSymbol } from '../salesforce/codesymbol/ApexSymbolParser.js';
 
 export class OpenFileInPackage {
   static async openFileForSymbol(context: Context, symbolName: string): Promise<void> {
@@ -22,49 +21,27 @@ export class OpenFileInPackage {
       return;
     }
 
-    const parts = this.getSymbolParts(symbolName);
-    const fileName = parts[0]?.trim();
+    const apexSymbol = parseSymbol(symbolName, context.workspaceManager.getAllProjects());
 
-    const paths = await context.findSymbol(fileName as string);
+    const paths = await context.findSymbol(apexSymbol);
+
     if (!paths.length) {
       return;
     }
 
-    const matchingWs = context.workspaces.filter((ws) => {
-      const found = paths.findIndex((p) => p.startsWith(ws.path()));
-      if (found > -1) {
-        return ws;
-      }
-    });
-
-    const [wsPath] =
-      matchingWs.length > 1
-        ? await QuickPick.pick(
-            matchingWs.map((p) => new Item(p.name(), p.path(), '')),
-            new Options('Select a workspace:'),
-          )
-        : [new Item(matchingWs[0]?.name() || '', matchingWs[0]?.path() || '', '')];
-    if (!wsPath) {
-      return;
-    }
-
-    const wsPathTrimmed = wsPath.description.trim();
-    const path =
-      paths.find((e) => {
-        return e.startsWith(wsPathTrimmed + sep);
-      }) || '';
-
-    const uri = Uri.file(path);
+    // TODO: implement quickpick
+    const uri = paths[0]!;
     const document = await workspace.openTextDocument(uri);
 
     const parsedRoot = parseApex(document.getText());
 
-    const symbolLocation = getMethodLine(parsedRoot, parts);
+    const symbolLocation = getMethodLine(parsedRoot, apexSymbol);
 
     if (!symbolLocation.isExactMatch) {
       context.display.showErrorMessage(
-        `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${fileName}'`,
+        `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${apexSymbol.outerClass}'`,
       );
+      return;
     }
     const zeroIndexedLineNumber = symbolLocation.line - 1;
 
@@ -77,22 +54,6 @@ export class OpenFileInPackage {
       selection: new Selection(pos, pos),
     };
 
-    context.display.showFile(path, options);
-  }
-
-  private static getSymbolParts(symbol: string): string[] {
-    const openingParentheses = symbol.indexOf('(');
-
-    if (openingParentheses === -1) {
-      return symbol.split('.');
-    }
-
-    const path = symbol.slice(0, openingParentheses);
-    const params = symbol.slice(openingParentheses);
-
-    const parts = path.split('.');
-    parts[parts.length - 1] += params;
-
-    return parts;
+    commands.executeCommand('vscode.open', paths[0], options);
   }
 }

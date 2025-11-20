@@ -8,6 +8,7 @@ import {
   CommonTokenStream,
 } from '@apexdevtools/apex-parser';
 import { CharStreams } from 'antlr4ts';
+import type { ApexSymbol } from '../codesymbol/ApexSymbolParser';
 import { ApexVisitor, type ApexMethodNode, type ApexNode } from './ApexVisitor';
 
 export type SymbolLocation = {
@@ -25,70 +26,74 @@ export function parseApex(apexCode: string): ApexNode {
   return new ApexVisitor().visit(parser.compilationUnit());
 }
 
-export function getMethodLine(rootNode: ApexNode, symbols: string[]): SymbolLocation {
+export function getMethodLine(rootNode: ApexNode, apexSymbol: ApexSymbol): SymbolLocation {
   const result: SymbolLocation = { line: 1, isExactMatch: true };
-
-  if (symbols[0] === rootNode.name) {
-    symbols = symbols.slice(1);
-  }
-
-  if (!symbols.length) {
-    return result;
-  }
 
   let currentRoot: ApexNode | undefined = rootNode;
 
-  for (const symbol of symbols) {
-    if (isClassSymbol(symbol)) {
-      currentRoot = findClassNode(currentRoot, symbol);
+  currentRoot = findClassNode(currentRoot, apexSymbol.outerClass);
 
-      if (!currentRoot) {
-        result.isExactMatch = false;
-        result.missingSymbol = symbol;
-        break;
-      }
-    } else {
-      const methodNode = findMethodNode(currentRoot, symbol);
+  if (!currentRoot) {
+    result.isExactMatch = false;
+    result.missingSymbol = apexSymbol.outerClass;
+    return result;
+  }
 
-      if (!methodNode) {
-        result.line = currentRoot.line ?? 1;
-        result.isExactMatch = false;
-        result.missingSymbol = symbol;
-        break;
-      }
+  if (apexSymbol.innerClass) {
+    currentRoot = findClassNode(currentRoot, apexSymbol.innerClass);
 
-      result.line = methodNode.line;
+    if (!currentRoot) {
+      result.isExactMatch = false;
+      result.missingSymbol = apexSymbol.innerClass;
+      return result;
     }
   }
 
-  return result;
-}
+  const methodNode = findMethodNode(currentRoot, apexSymbol);
 
-function isClassSymbol(symbol: string): boolean {
-  return !symbol.includes('(');
+  if (!methodNode) {
+    result.line = currentRoot.line ?? 1;
+    result.isExactMatch = false;
+    result.missingSymbol = apexSymbol.method + '(' + apexSymbol.parameters + ')';
+    return result;
+  }
+
+  result.line = methodNode.line;
+
+  return result;
 }
 
 function findClassNode(root: ApexNode, symbol: string): ApexNode | undefined {
   return root.children?.find((child) => child.name === symbol && child.nature === 'Class');
 }
 
-function findMethodNode(root: ApexNode, symbol: string): ApexMethodNode | undefined {
-  const [methodName, params] = symbol.split('(');
-  const paramStr = params?.replace(')', '').trim();
-
+function findMethodNode(root: ApexNode, apexSymbol: ApexSymbol): ApexMethodNode | undefined {
   const rootName = root.name!;
 
   return root.children?.find(
     (child) =>
-      child.name === methodName &&
+      child.name === apexSymbol.method &&
       child.nature === 'Method' &&
-      (paramStr === undefined ||
-        matchesUnqualified(rootName, (child as ApexMethodNode).params, paramStr)),
+      (apexSymbol.parameters === '' ||
+        matchesUnqualified(
+          rootName,
+          (child as ApexMethodNode).params,
+          apexSymbol.parameters,
+          apexSymbol.namespace,
+        )),
   ) as ApexMethodNode;
 }
 
-function matchesUnqualified(qualifierString: string, str1: string, str2: string): boolean {
-  const regex = new RegExp(`\\b(?:${qualifierString}|System)\\.`, 'gi');
+function matchesUnqualified(
+  qualifierString: string,
+  str1: string,
+  str2: string,
+  namespace: string | null,
+): boolean {
+  const regex = new RegExp(
+    `\\b(?:${qualifierString}${namespace ? '|' + namespace : ''}|System)\\.`,
+    'gi',
+  );
   const unqualifiedStr1 = str1.replace(regex, '');
   const unqualifiedStr2 = str2.replace(regex, '');
 
