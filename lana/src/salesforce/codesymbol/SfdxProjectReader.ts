@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { RelativePattern, workspace, type WorkspaceFolder } from 'vscode';
+import { RelativePattern, Uri, workspace, type WorkspaceFolder } from 'vscode';
 
 export interface SfdxProject {
   readonly name: string | null;
@@ -24,7 +24,17 @@ export async function getProjects(workspaceFolder: WorkspaceFolder): Promise<Sfd
     try {
       const document = await workspace.openTextDocument(uri);
       const content = document.getText();
-      projects.push(JSON.parse(content) as SfdxProject);
+      const rawProject = JSON.parse(content) as SfdxProject;
+
+      const project: SfdxProject = {
+        ...rawProject,
+        packageDirectories: rawProject.packageDirectories.map((pkg) => ({
+          ...pkg,
+          path: Uri.joinPath(uri, pkg.path).path.replace(/\/sfdx-project.json/i, ''),
+        })),
+      };
+
+      projects.push(project);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.warn(`Failed to parse sfdx-project.json at ${uri.fsPath}:`, error);

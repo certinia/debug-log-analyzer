@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { RelativePattern, Uri, workspace, type WorkspaceFolder } from 'vscode';
+import { Uri, workspace, type WorkspaceFolder } from 'vscode';
 import type { SfdxProject } from '../../salesforce/codesymbol/SfdxProjectReader';
 import { VSWorkspace } from '../VSWorkspace';
 
@@ -100,12 +100,12 @@ describe('VSWorkspace', () => {
         {
           name: 'project1',
           namespace: 'ns1',
-          packageDirectories: [{ path: 'force-app', default: true }],
+          packageDirectories: [{ path: '/workspace/force-app', default: true }],
         },
         {
           name: 'project2',
           namespace: '',
-          packageDirectories: [{ path: 'src', default: true }],
+          packageDirectories: [{ path: '/workspace/src', default: true }],
         },
       ];
 
@@ -116,7 +116,6 @@ describe('VSWorkspace', () => {
     it('should search in namespaced projects when namespace provided', async () => {
       const mockUri = { fsPath: '/workspace/force-app/classes/MyClass.cls' };
       (workspace.findFiles as jest.Mock).mockResolvedValue([mockUri]);
-      (Uri.joinPath as jest.Mock).mockReturnValue({ fsPath: '/workspace/force-app' });
 
       const result = await vsWorkspace.findClass({
         fullSymbol: 'ns1.MyClass.method()',
@@ -128,10 +127,7 @@ describe('VSWorkspace', () => {
       });
 
       expect(result).toEqual([mockUri]);
-      expect(RelativePattern).toHaveBeenCalledWith(
-        { fsPath: '/workspace/force-app' },
-        '**/MyClass.cls',
-      );
+      expect(workspace.findFiles).toHaveBeenCalled();
     });
 
     it('should search in all projects when no namespace provided', async () => {

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { RelativePattern, workspace, type WorkspaceFolder } from 'vscode';
+import { RelativePattern, Uri, workspace, type WorkspaceFolder } from 'vscode';
 import { getProjects } from '../codesymbol/SfdxProjectReader';
 
 jest.mock('vscode');
@@ -38,10 +38,18 @@ describe('getProjects', () => {
     (workspace.openTextDocument as jest.Mock).mockResolvedValue({
       getText: () => JSON.stringify(mockProjectContent),
     });
+    (Uri.joinPath as jest.Mock).mockReturnValue({
+      path: '/workspace/force-app/sfdx-project.json',
+    });
 
     const result = await getProjects(mockWorkspaceFolder);
 
-    expect(result).toEqual([mockProjectContent]);
+    const expectedProjectContent = {
+      name: 'my-project',
+      namespace: 'myns',
+      packageDirectories: [{ path: '/workspace/force-app', default: true }],
+    };
+    expect(result).toEqual([expectedProjectContent]);
   });
 
   it('should parse multiple sfdx-project.json files', async () => {
@@ -58,6 +66,7 @@ describe('getProjects', () => {
     (workspace.openTextDocument as jest.Mock)
       .mockResolvedValueOnce({ getText: () => JSON.stringify(mockProjects[0]) })
       .mockResolvedValueOnce({ getText: () => JSON.stringify(mockProjects[1]) });
+    (Uri.joinPath as jest.Mock).mockReturnValue({ path: '/workspace/sfdx-project.json' });
 
     const result = await getProjects(mockWorkspaceFolder);
 

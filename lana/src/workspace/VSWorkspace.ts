@@ -56,9 +56,9 @@ export class VSWorkspace {
 
     for (const project of projects) {
       for (const packageDir of project.packageDirectories) {
-        const searchPath = Uri.joinPath(this.workspaceFolder.uri, packageDir.path);
-        const pattern = new RelativePattern(searchPath, `**/${classFileName}`);
+        const pattern = new RelativePattern(packageDir.path, `**/${classFileName}`);
         const foundFiles = await workspace.findFiles(pattern);
+
         uris.push(...foundFiles);
       }
     }
