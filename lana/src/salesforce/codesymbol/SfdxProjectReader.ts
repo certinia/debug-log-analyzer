@@ -25,8 +25,9 @@ export async function getProjects(workspaceFolder: WorkspaceFolder): Promise<Sfd
       const document = await workspace.openTextDocument(uri);
       const content = document.getText();
       projects.push(JSON.parse(content) as SfdxProject);
-    } catch {
-      // Skip invalid JSON files
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn(`Failed to parse sfdx-project.json at ${uri.fsPath}:`, error);
     }
   }
 
