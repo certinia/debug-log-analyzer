@@ -21,6 +21,7 @@ export class OpenFileInPackage {
       return;
     }
 
+    await context.workspaceManager.refreshWorkspaceProjectInfo();
     const apexSymbol = parseSymbol(symbolName, context.workspaceManager.getAllProjects());
 
     const paths = await context.findSymbol(apexSymbol);
@@ -39,9 +40,8 @@ export class OpenFileInPackage {
 
     if (!symbolLocation.isExactMatch) {
       context.display.showErrorMessage(
-        `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${apexSymbol.outerClass}'`,
+        `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${apexSymbol.fullSymbol}'`,
       );
-      return;
     }
     const zeroIndexedLineNumber = symbolLocation.line - 1;
 

@@ -17,8 +17,6 @@ export class VSWorkspaceManager {
   }
 
   async findSymbol(apexSymbol: ApexSymbol): Promise<Uri[]> {
-    await this.refreshWorkspaceProjectInfo();
-
     return await this.symbolFinder.findSymbol(this, apexSymbol);
   }
 
@@ -36,7 +34,7 @@ export class VSWorkspaceManager {
     return this.workspaceFolders.flatMap((folder) => folder.getProjectsForNamespace(namespace));
   }
 
-  private async refreshWorkspaceProjectInfo() {
+  async refreshWorkspaceProjectInfo() {
     await Promise.all(this.workspaceFolders.map((folder) => folder.parseSfdxProjects()));
   }
 }

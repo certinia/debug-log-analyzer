@@ -68,7 +68,9 @@ function findClassNode(root: ApexNode, symbol: string): ApexNode | undefined {
 }
 
 function findMethodNode(root: ApexNode, apexSymbol: ApexSymbol): ApexMethodNode | undefined {
-  const rootName = root.name!;
+  const qualifierString = apexSymbol.namespace
+    ? `${apexSymbol.namespace}|${apexSymbol.outerClass}`
+    : apexSymbol.outerClass;
 
   return root.children?.find(
     (child) =>
@@ -76,24 +78,15 @@ function findMethodNode(root: ApexNode, apexSymbol: ApexSymbol): ApexMethodNode 
       child.nature === 'Method' &&
       (apexSymbol.parameters === '' ||
         matchesUnqualified(
-          rootName,
+          qualifierString,
           (child as ApexMethodNode).params,
           apexSymbol.parameters,
-          apexSymbol.namespace,
         )),
   ) as ApexMethodNode;
 }
 
-function matchesUnqualified(
-  qualifierString: string,
-  str1: string,
-  str2: string,
-  namespace: string | null,
-): boolean {
-  const regex = new RegExp(
-    `\\b(?:${qualifierString}${namespace ? '|' + namespace : ''}|System)\\.`,
-    'gi',
-  );
+function matchesUnqualified(qualifierString: string, str1: string, str2: string): boolean {
+  const regex = new RegExp(`\\b(?:${qualifierString}|System)\\.`, 'gi');
   const unqualifiedStr1 = str1.replace(regex, '');
   const unqualifiedStr2 = str2.replace(regex, '');
 

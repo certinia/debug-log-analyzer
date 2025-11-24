@@ -30,9 +30,7 @@ export class Context {
     const path = await this.workspaceManager.findSymbol(apexSymbol);
 
     if (!path.length) {
-      this.display.showErrorMessage(
-        `Type '${apexSymbol.namespace ? apexSymbol.namespace + '.' : ''}${apexSymbol.outerClass}' was not found in workspace`,
-      );
+      this.display.showErrorMessage(`Type '${apexSymbol.fullSymbol}' was not found in workspace`);
     }
     return path;
   }

@@ -18,7 +18,6 @@ export async function getProjects(workspaceFolder: WorkspaceFolder): Promise<Sfd
   const projects: SfdxProject[] = [];
 
   const relativePattern = new RelativePattern(workspaceFolder, '**/sfdx-project.json');
-  // TODO: Check if any node modules use sfdx-project.json files
   const sfdxProjectUris = await workspace.findFiles(relativePattern, '**/node_modules/**');
 
   for (const uri of sfdxProjectUris) {

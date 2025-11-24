@@ -1,6 +1,7 @@
 import type { SfdxProject } from './SfdxProjectReader';
 
 export type ApexSymbol = {
+  fullSymbol: string;
   namespace: string | null;
   outerClass: string;
   innerClass: string | null;
@@ -23,6 +24,7 @@ export function parseSymbol(symbol: string, projects: SfdxProject[]): ApexSymbol
   const paramStr = params?.replace(')', '').trim();
 
   return {
+    fullSymbol: symbol,
     namespace: hasNamespace ? symbolParts[0] : null,
     outerClass: hasNamespace ? symbolParts[1] : symbolParts[0],
     innerClass:

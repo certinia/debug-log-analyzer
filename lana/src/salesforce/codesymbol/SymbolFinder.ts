@@ -13,6 +13,8 @@ export class SymbolFinder {
       ? workspaceManager.getWorkspaceForNamespacedProjects(apexSymbol.namespace)
       : workspaceManager.workspaceFolders;
 
+    // Quick-pick here to choose from valid projects???
+
     return await this.getClassFilepaths(matchingFolders, apexSymbol);
   }
 
