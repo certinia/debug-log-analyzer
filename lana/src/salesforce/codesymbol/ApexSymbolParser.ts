@@ -14,7 +14,7 @@ type ApexSymbolParts = [string, string, string?, string?];
 export function parseSymbol(symbol: string, projects: SfdxProject[]): ApexSymbol {
   const symbolParts = getSymbolParts(symbol);
 
-  if (!symbolParts?.length) {
+  if (!symbolParts?.length || symbolParts.length < 2) {
     throw new Error(`Invalid symbol: ${symbol}`);
   }
 
@@ -23,16 +23,15 @@ export function parseSymbol(symbol: string, projects: SfdxProject[]): ApexSymbol
   const [methodName, params] = symbolParts[symbolParts.length - 1]!.split('(') as [string, string];
   const paramStr = params?.replace(')', '').trim();
 
+  const namespace = hasNamespace ? symbolParts[0] : null;
+  const outerClass = hasNamespace ? symbolParts[1] : symbolParts[0];
+  const innerClass = getInnerClass(symbolParts, hasNamespace);
+
   return {
     fullSymbol: symbol,
-    namespace: hasNamespace ? symbolParts[0] : null,
-    outerClass: hasNamespace ? symbolParts[1] : symbolParts[0],
-    innerClass:
-      hasNamespace && symbolParts.length === 4
-        ? symbolParts[2]!
-        : !hasNamespace && symbolParts.length === 3
-          ? symbolParts[1]
-          : null,
+    namespace,
+    outerClass,
+    innerClass,
     method: methodName,
     parameters: paramStr,
   };
@@ -60,4 +59,16 @@ function symbolHasNamespace(projects: SfdxProject[], symbolParts: ApexSymbolPart
 
 function findNamespacedProject(projects: SfdxProject[], namespace: string) {
   return projects.filter((project) => project.namespace === namespace);
+}
+
+function getInnerClass(symbolParts: ApexSymbolParts, hasNamespace: boolean): string | null {
+  if (hasNamespace && symbolParts.length === 4) {
+    return symbolParts[2]!;
+  }
+
+  if (!hasNamespace && symbolParts.length === 3) {
+    return symbolParts[1]!;
+  }
+
+  return null;
 }
