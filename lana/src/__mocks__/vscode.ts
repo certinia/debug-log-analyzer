@@ -16,6 +16,9 @@ export const workspace = {
   findFiles: jest.fn(),
   openTextDocument: jest.fn(),
   workspaceFolders: [],
+  asRelativePath: jest.fn((uri: { fsPath: string } | string) =>
+    typeof uri === 'string' ? uri : uri.fsPath,
+  ),
 };
 
 export const window = {

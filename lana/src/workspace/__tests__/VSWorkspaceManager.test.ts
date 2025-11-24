@@ -125,11 +125,11 @@ describe('VSWorkspaceManager', () => {
       };
 
       const manager = new VSWorkspaceManager();
-      manager.symbolFinder.findSymbol = jest.fn().mockResolvedValue([mockUri]);
+      manager.symbolFinder.findSymbol = jest.fn().mockResolvedValue(mockUri);
 
       const result = await manager.findSymbol(mockSymbol);
 
-      expect(result).toEqual([mockUri]);
+      expect(result).toEqual(mockUri);
       expect(manager.symbolFinder.findSymbol).toHaveBeenCalledWith(manager, mockSymbol);
     });
   });
