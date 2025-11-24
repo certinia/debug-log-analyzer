@@ -31,7 +31,9 @@ export function getMethodLine(rootNode: ApexNode, apexSymbol: ApexSymbol): Symbo
 
   let currentRoot: ApexNode | undefined = rootNode;
 
-  currentRoot = findClassNode(currentRoot, apexSymbol.outerClass);
+  if (currentRoot.name !== apexSymbol.outerClass) {
+    currentRoot = findClassNode(currentRoot, apexSymbol.outerClass);
+  }
 
   if (!currentRoot) {
     result.isExactMatch = false;

@@ -3,6 +3,24 @@
  */
 import { getMethodLine, parseApex } from '../ApexParser/ApexSymbolLocator';
 import { ApexVisitor, type ApexNode } from '../ApexParser/ApexVisitor';
+import type { ApexSymbol } from '../codesymbol/ApexSymbolParser';
+
+function createSymbol(opts: {
+  namespace?: string | null;
+  outerClass: string;
+  innerClass?: string | null;
+  method: string;
+  parameters?: string;
+}): ApexSymbol {
+  return {
+    fullSymbol: 'testSymbol',
+    namespace: opts.namespace ?? null,
+    outerClass: opts.outerClass,
+    innerClass: opts.innerClass ?? null,
+    method: opts.method,
+    parameters: opts.parameters ?? '',
+  };
+}
 
 jest.mock('../ApexParser/ApexVisitor');
 jest.mock('@apexdevtools/apex-parser');
@@ -81,45 +99,65 @@ describe('ApexSymbolLocator', () => {
     });
 
     it('should find method line for top-level method', () => {
-      const result = getMethodLine(root, ['MyClass', 'foo()']);
+      const result = getMethodLine(root, createSymbol({ outerClass: 'MyClass', method: 'foo' }));
       expect(result.line).toBe(2);
       expect(result.isExactMatch).toBe(true);
     });
 
     it('should find method line for method with params', () => {
-      const result = getMethodLine(root, ['MyClass', 'bar(Integer)']);
+      const result = getMethodLine(
+        root,
+        createSymbol({ outerClass: 'MyClass', method: 'bar', parameters: 'Integer' }),
+      );
       expect(result.line).toBe(3);
       expect(result.isExactMatch).toBe(true);
     });
 
     it('should find method line for overloaded method', () => {
-      const result = getMethodLine(root, ['MyClass', 'bar(Integer, Integer)']);
+      const result = getMethodLine(
+        root,
+        createSymbol({ outerClass: 'MyClass', method: 'bar', parameters: 'Integer, Integer' }),
+      );
       expect(result.line).toBe(4);
       expect(result.isExactMatch).toBe(true);
     });
 
     it('should find method line for inner class method', () => {
-      const result = getMethodLine(root, ['MyClass', 'Inner', 'bar(Integer)']);
+      const result = getMethodLine(
+        root,
+        createSymbol({
+          outerClass: 'MyClass',
+          innerClass: 'Inner',
+          method: 'bar',
+          parameters: 'Integer',
+        }),
+      );
       expect(result.line).toBe(7);
       expect(result.isExactMatch).toBe(true);
     });
 
     it('should handle symbol not found', () => {
-      const result = getMethodLine(root, ['MyClass', 'notFound()']);
+      const result = getMethodLine(
+        root,
+        createSymbol({ outerClass: 'MyClass', method: 'notFound' }),
+      );
       expect(result.line).toBe(1);
       expect(result.isExactMatch).toBe(false);
       expect(result.missingSymbol).toBe('notFound()');
     });
 
     it('should handle symbol not found on inner class', () => {
-      const result = getMethodLine(root, ['MyClass', 'Inner', 'notFound()']);
+      const result = getMethodLine(
+        root,
+        createSymbol({ outerClass: 'MyClass', innerClass: 'Inner', method: 'notFound' }),
+      );
       expect(result.line).toBe(6);
       expect(result.isExactMatch).toBe(false);
       expect(result.missingSymbol).toBe('notFound()');
     });
 
     it('should handle missing class', () => {
-      const result = getMethodLine(root, ['NotAClass', 'foo()']);
+      const result = getMethodLine(root, createSymbol({ outerClass: 'NotAClass', method: 'foo' }));
       expect(result.line).toBe(1);
       expect(result.isExactMatch).toBe(false);
       expect(result.missingSymbol).toBe('NotAClass');
@@ -134,19 +172,36 @@ describe('ApexSymbolLocator', () => {
     });
 
     it('should find method when fully qualified inner class passed', () => {
-      const result = getMethodLine(root, ['MyClass', 'baz(MyClass.Inner, MyClass.InnerTwo)']);
+      const result = getMethodLine(
+        root,
+        createSymbol({
+          outerClass: 'MyClass',
+          method: 'baz',
+          parameters: 'MyClass.Inner, MyClass.InnerTwo',
+        }),
+      );
       expect(result.line).toBe(5);
       expect(result.isExactMatch).toBe(true);
     });
 
     it('should find method when short form passed', () => {
-      const result = getMethodLine(root, ['MyClass', 'baz(Inner, InnerTwo)']);
+      const result = getMethodLine(
+        root,
+        createSymbol({ outerClass: 'MyClass', method: 'baz', parameters: 'Inner, InnerTwo' }),
+      );
       expect(result.line).toBe(5);
       expect(result.isExactMatch).toBe(true);
     });
 
     it('should find method when mixed fully qualified and short form passed', () => {
-      const result = getMethodLine(root, ['MyClass', 'baz(MyClass.Inner, InnerTwo)']);
+      const result = getMethodLine(
+        root,
+        createSymbol({
+          outerClass: 'MyClass',
+          method: 'baz',
+          parameters: 'MyClass.Inner, InnerTwo',
+        }),
+      );
       expect(result.line).toBe(5);
       expect(result.isExactMatch).toBe(true);
     });
