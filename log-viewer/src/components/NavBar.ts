@@ -6,6 +6,7 @@ import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
+import { formatDuration } from '../core/utility/Util.js';
 import { Notification } from '../features/notifications/components/NotificationPanel.js';
 
 // styles
@@ -97,7 +98,7 @@ export class NavBar extends LitElement {
 
   render() {
     const sizeText = this._toSize(this.logSize),
-      elapsedText = this._toDuration(this.logDuration);
+      elapsedText = this._formatDuration(this.logDuration);
 
     return html`
       <div class="navbar">
@@ -131,12 +132,12 @@ export class NavBar extends LitElement {
     vscodeMessenger.send('openPath', this.logPath);
   }
 
-  _toDuration(duration: number | null) {
+  _formatDuration(duration: number | null) {
     if (!duration && duration !== 0) {
       return '';
     }
 
-    return (duration / 1_000_000_000).toFixed(3) + ' s';
+    return formatDuration(duration);
   }
 
   _toSize(fileSize: number | null) {

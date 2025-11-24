@@ -72,7 +72,7 @@ export class SOQLView extends LitElement {
   blockClearHighlights = true;
 
   get _soqlTableWrapper(): HTMLDivElement | null {
-    return this.renderRoot?.querySelector('#db-soql-table') ?? null;
+    return this.renderRoot?.querySelector('#db-soql-table');
   }
 
   constructor() {
@@ -211,7 +211,7 @@ export class SOQLView extends LitElement {
       const treeRoot = this.timelineRoot;
       const tableWrapper = this._soqlTableWrapper;
       if (tableWrapper && treeRoot && isVisible) {
-        this.soqlLines = (await DatabaseAccess.create(treeRoot)).getSOQLLines() || [];
+        this.soqlLines = (await DatabaseAccess.create(treeRoot)).getSOQLLines();
 
         Tabulator.registerModule(Object.values(CommonModules));
         Tabulator.registerModule([
@@ -477,12 +477,12 @@ export class SOQLView extends LitElement {
           formatter: Number,
           formatterParams: {
             thousand: false,
-            precision: 3,
+            precision: 2,
           },
           accessorDownload: NumberAccessor,
           bottomCalcFormatter: Number,
           bottomCalc: 'sum',
-          bottomCalcFormatterParams: { precision: 3 },
+          bottomCalcFormatterParams: { precision: 2 },
         },
         {
           title: 'Aggregations',

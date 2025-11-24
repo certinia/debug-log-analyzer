@@ -7,10 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart that is up to **7X faster**. ([#446] [#251])
+  - Enable it via **Settings -> Apex Log Analyzer -> Timeline -> Experimental -> Timeline**.
+  - Generally Improved performance, especially for large logs.
+  - Zoom and pan functionalities are now **7X faster**.
+  - Time axis scales better, with larger gaps between the markers on longer logs.
+
 ### Changed
 
 - 🎯 **Call Tree Go To**: Go-to links in call tree now navigate to method definition instead of where method was called from ([#632] [#200])
-- ⚡ **Log parsing**: improved performance ([#552])
+- ⚡ **Log Parsing**: Improved performance ([#552])
+- ✨ **Duration Formatting**: Human-readable duration formatting in tooltips (30000 ms -> 30s and 0.01 ms -> 10 µs) ([#671])
+- 🎯 **Number Precision**: Total and Self Time column precision changed to 2 decimal places for improved readability ([#671])
 
 ## [1.18.1] 2025-07-09
 
@@ -402,6 +412,9 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#446]: https://github.com/certinia/debug-log-analyzer/issues/446
+[#251]: https://github.com/certinia/debug-log-analyzer/issues/251
+[#671]: https://github.com/certinia/debug-log-analyzer/issues/671
 [#632]: https://github.com/certinia/debug-log-analyzer/issues/632
 [#200]: https://github.com/certinia/debug-log-analyzer/issues/200
 [#552]: https://github.com/certinia/debug-log-analyzer/issues/552

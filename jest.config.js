@@ -15,6 +15,7 @@ const defaultConfig = {
     ],
   },
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/out/'],
+  testMatch: ['**/?(*.)+(spec|test).ts'],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
 };
 
@@ -25,6 +26,10 @@ export default {
       ...defaultConfig,
       displayName: 'log-viewer',
       rootDir: '<rootDir>/log-viewer',
+      transformIgnorePatterns: [
+        // allow transformation of pixi.js and its dependencies
+        '<rootDir>/node_modules/(?!pixi\\.js)',
+      ],
     },
     {
       ...defaultConfig,
@@ -36,4 +41,5 @@ export default {
       ],
     },
   ],
+  slowTestThreshold: 1,
 };

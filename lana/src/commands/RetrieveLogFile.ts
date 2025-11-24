@@ -82,13 +82,62 @@ export class RetrieveLogFile {
       })
       .map((r) => {
         const name = `${r.LogUser.Name} - ${r.Operation}`;
-        const description = `${(r.LogLength / 1024).toFixed(2)} KB ${r.DurationMilliseconds} ms`;
+        const description = `${(r.LogLength / 1024).toFixed(2)} KB ${this.formatDuration(r.DurationMilliseconds)}`;
         const detail = `${new Date(r.StartTime).toLocaleString()} - ${r.Status} - ${r.Id}`;
         return new DebugLogItem(name, description, detail, r.Id);
       });
 
     const [selectedLog] = await QuickPick.pick(items, new Options('Select a logfile'));
     return selectedLog?.logId || null;
+  }
+
+  /**
+   * Formats a duration in milliseconds into a human-readable string.
+   *
+   * The function automatically selects the most appropriate unit (milliseconds, seconds, or minutes)
+   * based on the duration value and applies appropriate precision rounding.
+   *
+   * @param ms - The duration in milliseconds to format
+   * @returns A formatted string representing the duration with appropriate units:
+   *   - Values < 1000ms: returns in milliseconds (e.g., "1.23 ms", "45.6 ms", "789 ms")
+   *   - Values < 60s: returns in seconds (e.g., "1.23 s", "45.6 s")
+   *   - Values >= 60s: returns in minutes and seconds (e.g., "2m", "2m 30s", "5m 15.5s")
+   *
+   * @example
+   * formatDuration(500)      // "500 ms"
+   * formatDuration(1500)     // "1.5 s"
+   * formatDuration(120000)   // "2m"
+   * formatDuration(150000)   // "2m 30s"
+   */
+  private static formatDuration(ms: number) {
+    if (!ms) {
+      return '0 ms';
+    }
+
+    if (ms < 1000) {
+      const precision = ms < 10 ? 100 : ms < 100 ? 10 : 1;
+      return `${this._round(ms, precision)} ms`;
+    }
+
+    const s = ms / 1000;
+    if (s < 60) {
+      const precision = s < 10 ? 100 : s < 100 ? 10 : 1;
+      return `${this._round(s, precision)} s`;
+    }
+
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+
+    if (sec === 0) {
+      return `${m}m`;
+    }
+
+    const secStr = sec === Math.floor(sec) ? `${sec}s` : `${this._round(sec, 10)}s`;
+    return `${m}m ${secStr}`;
+  }
+
+  private static _round(value: number, precision: number): number {
+    return Math.round(value * precision) / precision;
   }
 
   private static getLogFilePath(ws: string, fileId: string): string {

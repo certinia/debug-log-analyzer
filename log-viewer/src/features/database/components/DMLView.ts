@@ -170,7 +170,7 @@ export class DMLView extends LitElement {
   }
 
   get _dmlTableWrapper(): HTMLDivElement | null {
-    return this.renderRoot?.querySelector('#db-dml-table') ?? null;
+    return this.renderRoot?.querySelector('#db-dml-table');
   }
 
   _appendTableWhenVisible() {
@@ -183,7 +183,7 @@ export class DMLView extends LitElement {
       const tableWrapper = this._dmlTableWrapper;
       if (tableWrapper && treeRoot && isVisible) {
         const dbAccess = await DatabaseAccess.create(treeRoot);
-        this.dmlLines = dbAccess.getDMLLines() || [];
+        this.dmlLines = dbAccess.getDMLLines();
 
         Tabulator.registerModule(Object.values(CommonModules));
         Tabulator.registerModule([
@@ -365,12 +365,12 @@ export class DMLView extends LitElement {
           formatter: Number,
           formatterParams: {
             thousand: false,
-            precision: 3,
+            precision: 2,
           },
           accessorDownload: NumberAccessor,
           bottomCalcFormatter: Number,
           bottomCalc: 'sum',
-          bottomCalcFormatterParams: { precision: 3 },
+          bottomCalcFormatterParams: { precision: 2 },
         },
       ],
       rowFormatter: (row) => {

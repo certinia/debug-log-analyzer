@@ -1,23 +1,76 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-let requestId: number = 0;
 
-export default function formatDuration(durationNs: number, totalNs = 0) {
-  const text = `${~~(durationNs / 1000)}`; // convert from nano-seconds to micro-seconds
-  const textPadded = text.length < 4 ? '0000'.substring(text.length) + text : text; // length min = 4
-  const millis = textPadded.slice(0, -3); // everything before last 3 chars
-  const micros = textPadded.slice(-3); // last 3 chars
-  const suffix = totalNs > 0 ? `/${Math.round(totalNs / 1_000_000)}` : '';
-  return `${millis}.${micros}${suffix} ms`;
+/**
+ * Formats a duration in nanoseconds into a human-readable string.
+ *
+ * Automatically selects the most appropriate unit (microseconds, milliseconds, seconds, or minutes)
+ * based on the magnitude of the duration. Applies appropriate precision for each unit.
+ *
+ * @param ns - The duration in nanoseconds to format
+ * @returns A formatted string representing the duration with appropriate units:
+ * - Microseconds (µs) for durations < 0.1ms
+ * - Milliseconds (ms) for durations < 1000ms
+ * - Seconds (s) for durations < 60s
+ * - Minutes and seconds (e.g., "2m 30s") for durations ≥ 60s
+ *
+ * @example
+ * ```typescript
+ * formatDuration(5000);        // "5 µs"
+ * formatDuration(1500000);     // "1.5 ms"
+ * formatDuration(2500000000);  // "2.5 s"
+ * formatDuration(90000000000); // "1m 30s"
+ * ```
+ */
+export function formatDuration(ns: number) {
+  if (!ns) {
+    return '0 ms';
+  }
+
+  const ms = ns / 1e6;
+
+  // microseconds (< 0.01 ms)
+  if (ms < 0.1) {
+    const us = ns / 1e3;
+    const precision = us < 10 ? 100 : us < 100 ? 10 : 1;
+    return `${round(us, precision)} µs`;
+  }
+
+  if (ms < 1000) {
+    const precision = ms < 10 ? 100 : ms < 100 ? 10 : 1;
+    return `${round(ms, precision)} ms`;
+  }
+
+  const s = ms / 1000;
+  if (s < 60) {
+    const precision = s < 10 ? 100 : s < 100 ? 10 : 1;
+    return `${round(s, precision)} s`;
+  }
+
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+
+  if (sec === 0) {
+    return `${m}m`;
+  }
+
+  const secStr = sec === Math.floor(sec) ? `${sec}s` : `${round(sec, 10)}s`;
+  return `${m}m ${secStr}`;
+}
+
+function round(value: number, precision: number): number {
+  return Math.round(value * precision) / precision;
 }
 
 export function debounce<T extends unknown[]>(callBack: (...args: T) => unknown) {
-  if (requestId) {
-    window.cancelAnimationFrame(requestId);
-  }
+  let requestId: number = 0;
 
   return (...args: T) => {
+    if (requestId) {
+      window.cancelAnimationFrame(requestId);
+    }
+
     requestId = window.requestAnimationFrame(() => {
       callBack(...args);
     });

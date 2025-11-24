@@ -10,12 +10,13 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { Tabulator, type RowComponent } from 'tabulator-tables';
+import { Tabulator, type GlobalTooltipOption, type RowComponent } from 'tabulator-tables';
 
-import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import formatDuration, { isVisible } from '../../../core/utility/Util.js';
-import { callStackSum } from '../services/CallStackSum.js';
+import { formatDuration, isVisible } from '../../../core/utility/Util.js';
+import { sumRootNodesOnly } from '../services/CallStackSum.js';
+import { group } from '../services/RowGrouper.js';
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
@@ -272,10 +273,15 @@ export class AnalysisView extends LitElement {
     Tabulator.registerModule(Object.values(CommonModules));
     Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs, GroupSort]);
 
+    const durationFormatterParams = { totalValue: rootMethod.duration.total };
+    const tooltipContent: GlobalTooltipOption = (_event, cell, _onRender) => {
+      return formatDuration(cell.getValue());
+    };
+
     this.analysisTable = new Tabulator(this._tableWrapper, {
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
-      data: groupMetrics(rootMethod),
+      data: group(rootMethod),
       layout: 'fitColumns',
       placeholder: 'No Analysis Available',
       columnCalcs: 'table',
@@ -392,18 +398,13 @@ export class AnalysisView extends LitElement {
           width: 165,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          bottomCalc: callStackSum,
+          bottomCalc: sumRootNodesOnly,
           bottomCalcFormatter: progressFormatterMS,
-          bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
+          bottomCalcFormatterParams: durationFormatterParams,
           formatter: progressFormatterMS,
-          formatterParams: {
-            precision: 3,
-            totalValue: rootMethod.duration.total,
-          },
+          formatterParams: durationFormatterParams,
           accessorDownload: NumberAccessor,
-          tooltip(_event, cell, _onRender) {
-            return formatDuration(cell.getValue(), rootMethod.duration.total);
-          },
+          tooltip: tooltipContent,
         },
         {
           title: 'Self Time (ms)',
@@ -414,16 +415,11 @@ export class AnalysisView extends LitElement {
           headerHozAlign: 'right',
           bottomCalc: 'sum',
           bottomCalcFormatter: progressFormatterMS,
-          bottomCalcFormatterParams: { precision: 3, totalValue: rootMethod.duration.total },
+          bottomCalcFormatterParams: durationFormatterParams,
           formatter: progressFormatterMS,
-          formatterParams: {
-            precision: 3,
-            totalValue: rootMethod.duration.total,
-          },
+          formatterParams: durationFormatterParams,
           accessorDownload: NumberAccessor,
-          tooltip(_event, cell, _onRender) {
-            return formatDuration(cell.getValue(), rootMethod.duration.total);
-          },
+          tooltip: tooltipContent,
         },
       ],
     });
@@ -447,54 +443,6 @@ export class AnalysisView extends LitElement {
     this.analysisTable.clearFindHighlights(Object.values(this.findMap));
     this.findMap = {};
     this.totalMatches = 0;
-  }
-}
-export class Metric {
-  name: string;
-  type;
-  count = 0;
-  totalTime = 0;
-  selfTime = 0;
-  namespace;
-  nodes: LogEvent[] = [];
-
-  constructor(node: LogEvent) {
-    this.name = node.text;
-    this.type = node.type;
-    this.namespace = node.namespace;
-  }
-}
-
-function groupMetrics(root: LogEvent) {
-  const methodMap: Map<string, Metric> = new Map();
-
-  for (const child of root.children) {
-    if (child.duration.total) {
-      addNodeToMap(methodMap, child);
-    }
-  }
-  return Array.from(methodMap.values());
-}
-
-function addNodeToMap(map: Map<string, Metric>, node: LogEvent) {
-  if (node.duration.total) {
-    const key = node.namespace + node.text;
-    let metric = map.get(key);
-    if (!metric) {
-      metric = new Metric(node);
-      map.set(key, metric);
-    }
-
-    ++metric.count;
-    metric.totalTime += node.duration.total;
-    metric.selfTime += node.duration.self;
-    metric.nodes.push(node);
-  }
-
-  for (const child of node.children) {
-    if (child.duration.total) {
-      addNodeToMap(map, child);
-    }
   }
 }
 
