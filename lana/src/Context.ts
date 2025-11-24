@@ -26,12 +26,13 @@ export class Context {
     WhatsNewNotification.apply(this);
   }
 
-  async findSymbol(apexSymbol: ApexSymbol): Promise<Uri[]> {
+  async findSymbol(apexSymbol: ApexSymbol): Promise<Uri | null> {
     const path = await this.workspaceManager.findSymbol(apexSymbol);
 
-    if (!path.length) {
+    if (!path) {
       this.display.showErrorMessage(`Type '${apexSymbol.fullSymbol}' was not found in workspace`);
     }
+
     return path;
   }
 }

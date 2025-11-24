@@ -24,14 +24,12 @@ export class OpenFileInPackage {
     await context.workspaceManager.refreshWorkspaceProjectInfo();
     const apexSymbol = parseSymbol(symbolName, context.workspaceManager.getAllProjects());
 
-    const paths = await context.findSymbol(apexSymbol);
+    const uri = await context.findSymbol(apexSymbol);
 
-    if (!paths.length) {
+    if (!uri) {
       return;
     }
 
-    // TODO: implement quickpick
-    const uri = paths[0]!;
     const document = await workspace.openTextDocument(uri);
 
     const parsedRoot = parseApex(document.getText());
@@ -54,6 +52,6 @@ export class OpenFileInPackage {
       selection: new Selection(pos, pos),
     };
 
-    commands.executeCommand('vscode.open', paths[0], options);
+    commands.executeCommand('vscode.open', uri, options);
   }
 }

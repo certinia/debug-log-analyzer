@@ -16,7 +16,7 @@ export class VSWorkspaceManager {
     }
   }
 
-  async findSymbol(apexSymbol: ApexSymbol): Promise<Uri[]> {
+  async findSymbol(apexSymbol: ApexSymbol): Promise<Uri | null> {
     return await this.symbolFinder.findSymbol(this, apexSymbol);
   }
 
