@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
 import type { SfdxProject } from './SfdxProject';
 
 export type ApexSymbol = {

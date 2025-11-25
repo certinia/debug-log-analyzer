@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
 import path from 'path';
 import { RelativePattern, Uri, workspace } from 'vscode';
 

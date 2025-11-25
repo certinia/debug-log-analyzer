@@ -2,7 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { RelativePattern, Uri, workspace, type WorkspaceFolder } from 'vscode';
-import { getProjects } from '../codesymbol/SfdxProjectReader';
+import { getProjects } from '../SfdxProjectReader';
 
 jest.mock('vscode');
 

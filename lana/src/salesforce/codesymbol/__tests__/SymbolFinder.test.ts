@@ -2,16 +2,16 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import type { Uri, WorkspaceFolder } from 'vscode';
-import { QuickPick } from '../../display/QuickPick';
-import { VSWorkspace } from '../../workspace/VSWorkspace';
-import { VSWorkspaceManager } from '../../workspace/VSWorkspaceManager';
-import type { ApexSymbol } from '../codesymbol/ApexSymbolParser';
-import { findSymbol } from '../codesymbol/SymbolFinder';
+import { QuickPick } from '../../../display/QuickPick';
+import { VSWorkspace } from '../../../workspace/VSWorkspace';
+import { VSWorkspaceManager } from '../../../workspace/VSWorkspaceManager';
+import type { ApexSymbol } from '../ApexSymbolParser';
+import { findSymbol } from '../SymbolFinder';
 
 jest.mock('vscode');
-jest.mock('../../display/QuickPick');
-jest.mock('../../workspace/VSWorkspace');
-jest.mock('../../workspace/VSWorkspaceManager');
+jest.mock('../../../display/QuickPick');
+jest.mock('../../../workspace/VSWorkspace');
+jest.mock('../../../workspace/VSWorkspaceManager');
 
 function createSymbol(opts: { namespace?: string | null; outerClass: string }): ApexSymbol {
   return {

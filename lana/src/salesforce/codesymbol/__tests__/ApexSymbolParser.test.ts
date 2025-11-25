@@ -1,10 +1,10 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { parseSymbol, type ApexSymbol } from '../codesymbol/ApexSymbolParser';
-import { SfdxProject } from '../codesymbol/SfdxProject';
+import { parseSymbol, type ApexSymbol } from '../ApexSymbolParser';
+import { SfdxProject } from '../SfdxProject';
 
-jest.mock('../codesymbol/SfdxProject');
+jest.mock('../SfdxProject');
 
 function createProject(namespace: string): SfdxProject {
   return new SfdxProject('test-project', namespace, [{ path: 'force-app', default: true }]);

@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
 import { Uri, workspace } from 'vscode';
 import type { ApexSymbol } from '../salesforce/codesymbol/ApexSymbolParser';
 import type { SfdxProject } from '../salesforce/codesymbol/SfdxProject';
