@@ -21,7 +21,7 @@ export class OpenFileInPackage {
       return;
     }
 
-    await context.workspaceManager.refreshWorkspaceProjectInfo();
+    await context.workspaceManager.initialiseWorkspaceProjectInfo();
     const apexSymbol = parseSymbol(symbolName, context.workspaceManager.getAllProjects());
 
     const uri = await context.findSymbol(apexSymbol);

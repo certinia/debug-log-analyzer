@@ -1,4 +1,4 @@
-import type { SfdxProject } from './SfdxProjectReader';
+import type { SfdxProject } from './SfdxProject';
 
 export type ApexSymbol = {
   fullSymbol: string;

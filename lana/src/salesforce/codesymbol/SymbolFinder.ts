@@ -18,34 +18,32 @@ class ClassItem extends Item {
   }
 }
 
-export class SymbolFinder {
-  async findSymbol(
-    workspaceManager: VSWorkspaceManager,
-    apexSymbol: ApexSymbol,
-  ): Promise<Uri | null> {
-    const matchingFolders = apexSymbol.namespace
-      ? workspaceManager.getWorkspaceForNamespacedProjects(apexSymbol.namespace)
-      : workspaceManager.workspaceFolders;
+export async function findSymbol(
+  workspaceManager: VSWorkspaceManager,
+  apexSymbol: ApexSymbol,
+): Promise<Uri | null> {
+  const matchingFolders = apexSymbol.namespace
+    ? workspaceManager.getWorkspaceForNamespacedProjects(apexSymbol.namespace)
+    : workspaceManager.workspaceFolders;
 
-    const paths = await this.getClassFilepaths(matchingFolders, apexSymbol);
+  const paths = getClassFilepaths(matchingFolders, apexSymbol);
 
-    if (!paths.length) {
-      return null;
-    }
-
-    if (paths.length === 1) {
-      return paths[0]!;
-    }
-
-    const selected = await QuickPick.pick(
-      paths.map((uri) => new ClassItem(uri, apexSymbol.outerClass)),
-      new Options('Select a class:'),
-    );
-
-    return selected.length ? selected[0]!.uri : null;
+  if (!paths.length) {
+    return null;
   }
 
-  private async getClassFilepaths(folders: VSWorkspace[], apexSymbol: ApexSymbol): Promise<Uri[]> {
-    return (await Promise.all(folders.map((folder) => folder.findClass(apexSymbol)))).flat();
+  if (paths.length === 1) {
+    return paths[0]!;
   }
+
+  const selected = await QuickPick.pick(
+    paths.map((uri) => new ClassItem(uri, apexSymbol.outerClass)),
+    new Options('Select a class:'),
+  );
+
+  return selected.length ? selected[0]!.uri : null;
+}
+
+function getClassFilepaths(folders: VSWorkspace[], apexSymbol: ApexSymbol): Uri[] {
+  return folders.map((folder) => folder.findClass(apexSymbol)).flat();
 }

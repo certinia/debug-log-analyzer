@@ -1,9 +1,10 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { RelativePattern, Uri, workspace, type WorkspaceFolder } from 'vscode';
+import { Uri, type WorkspaceFolder } from 'vscode';
 import type { ApexSymbol } from '../salesforce/codesymbol/ApexSymbolParser';
-import { getProjects, type SfdxProject } from '../salesforce/codesymbol/SfdxProjectReader';
+import type { SfdxProject } from '../salesforce/codesymbol/SfdxProject';
+import { getProjects } from '../salesforce/codesymbol/SfdxProjectReader';
 
 export class VSWorkspace {
   workspaceFolder: WorkspaceFolder;
@@ -22,6 +23,8 @@ export class VSWorkspace {
 
   async parseSfdxProjects() {
     const sfdxProjects = await getProjects(this.workspaceFolder);
+
+    await Promise.all(sfdxProjects.map((sfdxProject) => sfdxProject.buildClassIndex()));
 
     this.sfdxProjectsByNamespace = sfdxProjects.reduce(
       (projectsByNamespace, project) => {
@@ -46,23 +49,11 @@ export class VSWorkspace {
     return Object.values(this.sfdxProjectsByNamespace).flat();
   }
 
-  async findClass(apexSymbol: ApexSymbol): Promise<Uri[]> {
+  findClass(apexSymbol: ApexSymbol): Uri[] {
     const projects = apexSymbol.namespace
       ? this.getProjectsForNamespace(apexSymbol.namespace)
       : this.getAllProjects();
 
-    const classFileName = `${apexSymbol.outerClass}.cls`;
-    const uris: Uri[] = [];
-
-    for (const project of projects) {
-      for (const packageDir of project.packageDirectories) {
-        const pattern = new RelativePattern(packageDir.path, `**/${classFileName}`);
-        const foundFiles = await workspace.findFiles(pattern);
-
-        uris.push(...foundFiles);
-      }
-    }
-
-    return uris;
+    return projects.flatMap((project) => project.findClass(apexSymbol.outerClass));
   }
 }

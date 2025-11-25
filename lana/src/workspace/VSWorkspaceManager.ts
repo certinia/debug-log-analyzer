@@ -1,11 +1,10 @@
 import { Uri, workspace } from 'vscode';
 import type { ApexSymbol } from '../salesforce/codesymbol/ApexSymbolParser';
-import type { SfdxProject } from '../salesforce/codesymbol/SfdxProjectReader';
-import { SymbolFinder } from '../salesforce/codesymbol/SymbolFinder';
+import type { SfdxProject } from '../salesforce/codesymbol/SfdxProject';
+import { findSymbol } from '../salesforce/codesymbol/SymbolFinder';
 import { VSWorkspace } from './VSWorkspace';
 
 export class VSWorkspaceManager {
-  symbolFinder = new SymbolFinder();
   workspaceFolders: VSWorkspace[] = [];
 
   constructor() {
@@ -17,7 +16,7 @@ export class VSWorkspaceManager {
   }
 
   async findSymbol(apexSymbol: ApexSymbol): Promise<Uri | null> {
-    return await this.symbolFinder.findSymbol(this, apexSymbol);
+    return await findSymbol(this, apexSymbol);
   }
 
   getAllProjects(): SfdxProject[] {
@@ -30,11 +29,11 @@ export class VSWorkspaceManager {
     );
   }
 
-  getProjectsForNamespace(namespace: string): SfdxProject[] {
-    return this.workspaceFolders.flatMap((folder) => folder.getProjectsForNamespace(namespace));
-  }
-
-  async refreshWorkspaceProjectInfo() {
-    await Promise.all(this.workspaceFolders.map((folder) => folder.parseSfdxProjects()));
+  async initialiseWorkspaceProjectInfo(forceRefresh = false) {
+    await Promise.all(
+      this.workspaceFolders
+        .filter((folder) => forceRefresh || !folder.getAllProjects().length)
+        .map((folder) => folder.parseSfdxProjects()),
+    );
   }
 }
