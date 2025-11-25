@@ -1,12 +1,14 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { Uri, workspace, type WorkspaceFolder } from 'vscode';
-import type { SfdxProject } from '../../salesforce/codesymbol/SfdxProjectReader';
+import { Uri, type WorkspaceFolder } from 'vscode';
+import { SfdxProject } from '../../salesforce/codesymbol/SfdxProject';
+import { getProjects } from '../../salesforce/codesymbol/SfdxProjectReader';
 import { VSWorkspace } from '../VSWorkspace';
 
 jest.mock('vscode');
 jest.mock('../../salesforce/codesymbol/SfdxProjectReader');
+jest.mock('../../salesforce/codesymbol/SfdxProject');
 
 describe('VSWorkspace', () => {
   const mockWorkspaceFolder = {
@@ -36,12 +38,11 @@ describe('VSWorkspace', () => {
 
   describe('parseSfdxProjects', () => {
     it('should group projects by namespace', async () => {
-      const { getProjects } = await import('../../salesforce/codesymbol/SfdxProjectReader');
-      const mockProjects: SfdxProject[] = [
-        { name: 'project1', namespace: 'ns1', packageDirectories: [] },
-        { name: 'project2', namespace: 'ns1', packageDirectories: [] },
-        { name: 'project3', namespace: 'ns2', packageDirectories: [] },
-        { name: 'project4', namespace: '', packageDirectories: [] },
+      const mockProjects = [
+        new SfdxProject('project1', 'ns1', []),
+        new SfdxProject('project2', 'ns1', []),
+        new SfdxProject('project3', 'ns2', []),
+        new SfdxProject('project4', '', []),
       ];
 
       (getProjects as jest.Mock).mockResolvedValue(mockProjects);
@@ -51,6 +52,7 @@ describe('VSWorkspace', () => {
       expect(vsWorkspace.getProjectsForNamespace('ns1')).toHaveLength(2);
       expect(vsWorkspace.getProjectsForNamespace('ns2')).toHaveLength(1);
       expect(vsWorkspace.getProjectsForNamespace('')).toHaveLength(1);
+      expect(mockProjects[0]!.buildClassIndex).toHaveBeenCalled();
     });
   });
 
@@ -60,15 +62,11 @@ describe('VSWorkspace', () => {
     });
 
     it('should return projects matching the namespace', async () => {
-      const { getProjects } = await import('../../salesforce/codesymbol/SfdxProjectReader');
-      const ns1Projects: SfdxProject[] = [
-        { name: 'project1', namespace: 'ns1', packageDirectories: [] },
-        { name: 'project2', namespace: 'ns1', packageDirectories: [] },
+      const ns1Projects = [
+        new SfdxProject('project1', 'ns1', []),
+        new SfdxProject('project2', 'ns1', []),
       ];
-      const mockProjects: SfdxProject[] = [
-        ...ns1Projects,
-        { name: 'project3', namespace: 'ns2', packageDirectories: [] },
-      ];
+      const mockProjects = [...ns1Projects, new SfdxProject('project3', 'ns2', [])];
 
       (getProjects as jest.Mock).mockResolvedValue(mockProjects);
       await vsWorkspace.parseSfdxProjects();
@@ -79,10 +77,9 @@ describe('VSWorkspace', () => {
 
   describe('getAllProjects', () => {
     it('should return all projects across namespaces', async () => {
-      const { getProjects } = await import('../../salesforce/codesymbol/SfdxProjectReader');
-      const mockProjects: SfdxProject[] = [
-        { name: 'project1', namespace: 'ns1', packageDirectories: [] },
-        { name: 'project2', namespace: 'ns2', packageDirectories: [] },
+      const mockProjects = [
+        new SfdxProject('project1', 'ns1', []),
+        new SfdxProject('project2', 'ns2', []),
       ];
 
       (getProjects as jest.Mock).mockResolvedValue(mockProjects);
@@ -94,30 +91,24 @@ describe('VSWorkspace', () => {
   });
 
   describe('findClass', () => {
-    beforeEach(async () => {
-      const { getProjects } = await import('../../salesforce/codesymbol/SfdxProjectReader');
-      const mockProjects: SfdxProject[] = [
-        {
-          name: 'project1',
-          namespace: 'ns1',
-          packageDirectories: [{ path: '/workspace/force-app', default: true }],
-        },
-        {
-          name: 'project2',
-          namespace: '',
-          packageDirectories: [{ path: '/workspace/src', default: true }],
-        },
-      ];
+    let mockProject1: SfdxProject;
+    let mockProject2: SfdxProject;
 
-      (getProjects as jest.Mock).mockResolvedValue(mockProjects);
+    beforeEach(async () => {
+      mockProject1 = new SfdxProject('project1', 'ns1', [
+        { path: '/workspace/force-app', default: true },
+      ]);
+      mockProject2 = new SfdxProject('project2', '', [{ path: '/workspace/src', default: true }]);
+
+      (getProjects as jest.Mock).mockResolvedValue([mockProject1, mockProject2]);
       await vsWorkspace.parseSfdxProjects();
     });
 
-    it('should search in namespaced projects when namespace provided', async () => {
-      const mockUri = { fsPath: '/workspace/force-app/classes/MyClass.cls' };
-      (workspace.findFiles as jest.Mock).mockResolvedValue([mockUri]);
+    it('should search in namespaced projects when namespace provided', () => {
+      const mockUri = { fsPath: '/workspace/force-app/classes/MyClass.cls' } as Uri;
+      (mockProject1.findClass as jest.Mock).mockReturnValue([mockUri]);
 
-      const result = await vsWorkspace.findClass({
+      const result = vsWorkspace.findClass({
         fullSymbol: 'ns1.MyClass.method()',
         namespace: 'ns1',
         outerClass: 'MyClass',
@@ -127,14 +118,17 @@ describe('VSWorkspace', () => {
       });
 
       expect(result).toEqual([mockUri]);
-      expect(workspace.findFiles).toHaveBeenCalled();
+      expect(mockProject1.findClass).toHaveBeenCalledWith('MyClass');
+      expect(mockProject2.findClass).not.toHaveBeenCalled();
     });
 
-    it('should search in all projects when no namespace provided', async () => {
-      (workspace.findFiles as jest.Mock).mockResolvedValue([]);
-      (Uri.joinPath as jest.Mock).mockReturnValue({ fsPath: '/workspace/src' });
+    it('should search in all projects when no namespace provided', () => {
+      const mockUri1 = { fsPath: '/workspace/force-app/classes/MyClass.cls' } as Uri;
+      const mockUri2 = { fsPath: '/workspace/src/classes/MyClass.cls' } as Uri;
+      (mockProject1.findClass as jest.Mock).mockReturnValue([mockUri1]);
+      (mockProject2.findClass as jest.Mock).mockReturnValue([mockUri2]);
 
-      await vsWorkspace.findClass({
+      const result = vsWorkspace.findClass({
         fullSymbol: 'MyClass.method()',
         namespace: null,
         outerClass: 'MyClass',
@@ -143,7 +137,9 @@ describe('VSWorkspace', () => {
         parameters: '',
       });
 
-      expect(workspace.findFiles).toHaveBeenCalled();
+      expect(result).toEqual([mockUri1, mockUri2]);
+      expect(mockProject1.findClass).toHaveBeenCalledWith('MyClass');
+      expect(mockProject2.findClass).toHaveBeenCalledWith('MyClass');
     });
   });
 });

@@ -1,15 +1,17 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type { Uri } from 'vscode';
+import type { Uri, WorkspaceFolder } from 'vscode';
 import { QuickPick } from '../../display/QuickPick';
-import type { VSWorkspace } from '../../workspace/VSWorkspace';
-import type { VSWorkspaceManager } from '../../workspace/VSWorkspaceManager';
+import { VSWorkspace } from '../../workspace/VSWorkspace';
+import { VSWorkspaceManager } from '../../workspace/VSWorkspaceManager';
 import type { ApexSymbol } from '../codesymbol/ApexSymbolParser';
-import { SymbolFinder } from '../codesymbol/SymbolFinder';
+import { findSymbol } from '../codesymbol/SymbolFinder';
 
 jest.mock('vscode');
 jest.mock('../../display/QuickPick');
+jest.mock('../../workspace/VSWorkspace');
+jest.mock('../../workspace/VSWorkspaceManager');
 
 function createSymbol(opts: { namespace?: string | null; outerClass: string }): ApexSymbol {
   return {
@@ -27,27 +29,25 @@ function createMockUri(path: string): Uri {
 }
 
 function createMockWorkspace(findClassResult: Uri[]): VSWorkspace {
-  return {
-    findClass: jest.fn().mockResolvedValue(findClassResult),
-  } as unknown as VSWorkspace;
+  const mockWorkspaceFolder = { uri: { fsPath: '/test' }, name: 'test' } as WorkspaceFolder;
+  const workspace = new VSWorkspace(mockWorkspaceFolder);
+  (workspace.findClass as jest.Mock).mockReturnValue(findClassResult);
+  return workspace;
 }
 
 function createMockManager(
   workspaceFolders: VSWorkspace[],
   namespacedWorkspaces: VSWorkspace[] = [],
 ): VSWorkspaceManager {
-  return {
-    workspaceFolders,
-    getWorkspaceForNamespacedProjects: jest.fn().mockReturnValue(namespacedWorkspaces),
-  } as unknown as VSWorkspaceManager;
+  const manager = new VSWorkspaceManager();
+  manager.workspaceFolders = workspaceFolders;
+  (manager.getWorkspaceForNamespacedProjects as jest.Mock).mockReturnValue(namespacedWorkspaces);
+  return manager;
 }
 
 describe('SymbolFinder', () => {
-  let symbolFinder: SymbolFinder;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    symbolFinder = new SymbolFinder();
   });
 
   describe('findSymbol', () => {
@@ -56,7 +56,7 @@ describe('SymbolFinder', () => {
       const manager = createMockManager([mockWorkspace]);
       const symbol = createSymbol({ outerClass: 'MyClass' });
 
-      const result = await symbolFinder.findSymbol(manager, symbol);
+      const result = await findSymbol(manager, symbol);
 
       expect(result).toBeNull();
     });
@@ -67,7 +67,7 @@ describe('SymbolFinder', () => {
       const manager = createMockManager([mockWorkspace]);
       const symbol = createSymbol({ outerClass: 'MyClass' });
 
-      const result = await symbolFinder.findSymbol(manager, symbol);
+      const result = await findSymbol(manager, symbol);
 
       expect(result).toBe(mockUri);
       expect(QuickPick.pick).not.toHaveBeenCalled();
@@ -82,7 +82,7 @@ describe('SymbolFinder', () => {
 
       (QuickPick.pick as jest.Mock).mockResolvedValue([{ uri: mockUri1 }]);
 
-      const result = await symbolFinder.findSymbol(manager, symbol);
+      const result = await findSymbol(manager, symbol);
 
       expect(result).toBe(mockUri1);
       expect(QuickPick.pick).toHaveBeenCalledWith(
@@ -103,7 +103,7 @@ describe('SymbolFinder', () => {
 
       (QuickPick.pick as jest.Mock).mockResolvedValue([]);
 
-      const result = await symbolFinder.findSymbol(manager, symbol);
+      const result = await findSymbol(manager, symbol);
 
       expect(result).toBeNull();
     });
@@ -115,7 +115,7 @@ describe('SymbolFinder', () => {
       const manager = createMockManager([regularWorkspace], [namespacedWorkspace]);
       const symbol = createSymbol({ namespace: 'ns', outerClass: 'MyClass' });
 
-      const result = await symbolFinder.findSymbol(manager, symbol);
+      const result = await findSymbol(manager, symbol);
 
       expect(result).toBe(mockUri);
       expect(manager.getWorkspaceForNamespacedProjects).toHaveBeenCalledWith('ns');
@@ -130,7 +130,7 @@ describe('SymbolFinder', () => {
       const manager = createMockManager([mockWorkspace1, mockWorkspace2]);
       const symbol = createSymbol({ outerClass: 'MyClass' });
 
-      const result = await symbolFinder.findSymbol(manager, symbol);
+      const result = await findSymbol(manager, symbol);
 
       expect(result).toBe(mockUri);
       expect(manager.getWorkspaceForNamespacedProjects).not.toHaveBeenCalled();

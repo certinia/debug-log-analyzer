@@ -44,12 +44,12 @@ describe('getProjects', () => {
 
     const result = await getProjects(mockWorkspaceFolder);
 
-    const expectedProjectContent = {
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
       name: 'my-project',
       namespace: 'myns',
       packageDirectories: [{ path: '/workspace/force-app', default: true }],
-    };
-    expect(result).toEqual([expectedProjectContent]);
+    });
   });
 
   it('should parse multiple sfdx-project.json files', async () => {
@@ -70,7 +70,9 @@ describe('getProjects', () => {
 
     const result = await getProjects(mockWorkspaceFolder);
 
-    expect(result).toEqual(mockProjects);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject(mockProjects[0]!);
+    expect(result[1]).toMatchObject(mockProjects[1]!);
   });
 
   it('should skip invalid JSON files and log warning', async () => {
@@ -105,10 +107,12 @@ describe('getProjects', () => {
     (workspace.openTextDocument as jest.Mock)
       .mockResolvedValueOnce({ getText: () => 'invalid json' })
       .mockResolvedValueOnce({ getText: () => JSON.stringify(validProject) });
+    (Uri.joinPath as jest.Mock).mockReturnValue({ path: '/workspace/sfdx-project.json' });
 
     const result = await getProjects(mockWorkspaceFolder);
 
-    expect(result).toEqual([validProject]);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject(validProject);
     expect(consoleSpy).toHaveBeenCalled();
 
     consoleSpy.mockRestore();

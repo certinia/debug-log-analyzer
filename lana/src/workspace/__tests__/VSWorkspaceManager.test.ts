@@ -2,12 +2,15 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { workspace } from 'vscode';
-import type { SfdxProject } from '../../salesforce/codesymbol/SfdxProjectReader';
+import { SfdxProject } from '../../salesforce/codesymbol/SfdxProject';
+import { findSymbol } from '../../salesforce/codesymbol/SymbolFinder';
 import { VSWorkspace } from '../VSWorkspace';
 import { VSWorkspaceManager } from '../VSWorkspaceManager';
 
 jest.mock('vscode');
 jest.mock('../VSWorkspace');
+jest.mock('../../salesforce/codesymbol/SfdxProject');
+jest.mock('../../salesforce/codesymbol/SymbolFinder');
 
 describe('VSWorkspaceManager', () => {
   beforeEach(() => {
@@ -26,7 +29,6 @@ describe('VSWorkspaceManager', () => {
       const manager = new VSWorkspaceManager();
 
       expect(manager.workspaceFolders).toHaveLength(2);
-      expect(VSWorkspace).toHaveBeenCalledTimes(2);
     });
 
     it('should handle no workspace folders', () => {
@@ -38,12 +40,8 @@ describe('VSWorkspaceManager', () => {
 
   describe('getAllProjects', () => {
     it('should aggregate projects from all workspaces', () => {
-      const mockProjects1: SfdxProject[] = [
-        { name: 'p1', namespace: 'ns1', packageDirectories: [] },
-      ];
-      const mockProjects2: SfdxProject[] = [
-        { name: 'p2', namespace: 'ns2', packageDirectories: [] },
-      ];
+      const mockProjects1 = [new SfdxProject('p1', 'ns1', [])];
+      const mockProjects2 = [new SfdxProject('p2', 'ns2', [])];
 
       const mockWorkspace1 = { getAllProjects: jest.fn().mockReturnValue(mockProjects1) };
       const mockWorkspace2 = { getAllProjects: jest.fn().mockReturnValue(mockProjects2) };
@@ -76,36 +74,21 @@ describe('VSWorkspaceManager', () => {
     });
   });
 
-  describe('getProjectsForNamespace', () => {
-    it('should aggregate namespaced projects from all workspaces', () => {
-      const mockProjects1 = [{ name: 'p1', namespace: 'ns1' }];
-      const mockProjects2 = [{ name: 'p2', namespace: 'ns1' }];
-
+  describe('initialiseWorkspaceProjectInfo', () => {
+    it('should call parseSfdxProjects on all workspaces', async () => {
       const mockWorkspace1 = {
-        getProjectsForNamespace: jest.fn().mockReturnValue(mockProjects1),
+        getAllProjects: jest.fn().mockReturnValue([]),
+        parseSfdxProjects: jest.fn().mockResolvedValue(undefined),
       };
       const mockWorkspace2 = {
-        getProjectsForNamespace: jest.fn().mockReturnValue(mockProjects2),
+        getAllProjects: jest.fn().mockReturnValue([]),
+        parseSfdxProjects: jest.fn().mockResolvedValue(undefined),
       };
 
       const manager = new VSWorkspaceManager();
       manager.workspaceFolders = [mockWorkspace1, mockWorkspace2] as unknown as VSWorkspace[];
 
-      const result = manager.getProjectsForNamespace('ns1');
-
-      expect(result).toEqual([...mockProjects1, ...mockProjects2]);
-    });
-  });
-
-  describe('refreshWorkspaceProjectInfo', () => {
-    it('should call parseSfdxProjects on all workspaces', async () => {
-      const mockWorkspace1 = { parseSfdxProjects: jest.fn().mockResolvedValue(undefined) };
-      const mockWorkspace2 = { parseSfdxProjects: jest.fn().mockResolvedValue(undefined) };
-
-      const manager = new VSWorkspaceManager();
-      manager.workspaceFolders = [mockWorkspace1, mockWorkspace2] as unknown as VSWorkspace[];
-
-      await manager.refreshWorkspaceProjectInfo();
+      await manager.initialiseWorkspaceProjectInfo();
 
       expect(mockWorkspace1.parseSfdxProjects).toHaveBeenCalled();
       expect(mockWorkspace2.parseSfdxProjects).toHaveBeenCalled();
@@ -123,14 +106,14 @@ describe('VSWorkspaceManager', () => {
         method: 'method',
         parameters: '',
       };
+      (findSymbol as jest.Mock).mockResolvedValueOnce(mockUri);
 
       const manager = new VSWorkspaceManager();
-      manager.symbolFinder.findSymbol = jest.fn().mockResolvedValue(mockUri);
 
       const result = await manager.findSymbol(mockSymbol);
 
+      expect(findSymbol).toHaveBeenCalledWith(manager, mockSymbol);
       expect(result).toEqual(mockUri);
-      expect(manager.symbolFinder.findSymbol).toHaveBeenCalledWith(manager, mockSymbol);
     });
   });
 });

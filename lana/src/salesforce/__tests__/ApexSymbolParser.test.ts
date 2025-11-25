@@ -2,14 +2,12 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { parseSymbol, type ApexSymbol } from '../codesymbol/ApexSymbolParser';
-import type { SfdxProject } from '../codesymbol/SfdxProjectReader';
+import { SfdxProject } from '../codesymbol/SfdxProject';
+
+jest.mock('../codesymbol/SfdxProject');
 
 function createProject(namespace: string): SfdxProject {
-  return {
-    name: 'test-project',
-    namespace,
-    packageDirectories: [{ path: 'force-app', default: true }],
-  };
+  return new SfdxProject('test-project', namespace, [{ path: 'force-app', default: true }]);
 }
 
 describe('parseSymbol', () => {
