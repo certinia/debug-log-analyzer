@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⚡ **Log Parsing**: Improved performance ([#552])
 - ✨ **Duration Formatting**: Human-readable duration formatting in tooltips (30000 ms -> 30s and 0.01 ms -> 10 µs) ([#671])
 - 🎯 **Number Precision**: Total and Self Time column precision changed to 2 decimal places for improved readability ([#671])
+- 🎨 Navigation Bar: Redesigned to better match VS Code’s look and feel ([#694])
 
 ## [1.18.1] 2025-07-09
 
@@ -412,6 +413,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#694]: https://github.com/certinia/debug-log-analyzer/issues/694
 [#446]: https://github.com/certinia/debug-log-analyzer/issues/446
 [#251]: https://github.com/certinia/debug-log-analyzer/issues/251
 [#671]: https://github.com/certinia/debug-log-analyzer/issues/671
