@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-toolkit';
+import { provideVSCodeDesignSystem, vsCodeBadge, vsCodeButton } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
@@ -18,7 +18,7 @@ import '../features/notifications/components/NotificationPanel.js';
 import './BadgeBase.js';
 import './Divider.js';
 
-provideVSCodeDesignSystem().register(vsCodeButton());
+provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeBadge());
 
 @customElement('log-problems')
 export class NotificationTag extends LitElement {
@@ -97,7 +97,10 @@ export class NotificationTag extends LitElement {
         border-radius: 4px;
       }
 
-      .badge-indicator {
+      .badge-indicator::part(control) {
+        --design-unit: 0;
+        --border-width: 0;
+
         color: rgb(255, 255, 255);
         background-color: rgb(0, 120, 212);
         position: absolute;
@@ -111,8 +114,6 @@ export class NotificationTag extends LitElement {
         padding: 0 2px;
         border-radius: 16px;
         text-align: center;
-        display: inline-block;
-        box-sizing: border-box;
       }
 
       .text-container {
@@ -151,7 +152,8 @@ export class NotificationTag extends LitElement {
     }
 
     const count = this.notifications.length;
-    const badge = count > 0 ? html`<div class="badge-indicator">${count}</div>` : '';
+    const badge =
+      count > 0 ? html`<vscode-badge class="badge-indicator">${count}</vscode-badge>` : '';
     const title = count === 0 ? 'No Problems' : `${count} Problem${count === 1 ? '' : 's'}`;
 
     const messages = this._renderNotificationMessages();

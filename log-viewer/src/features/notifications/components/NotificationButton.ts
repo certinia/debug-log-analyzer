@@ -1,7 +1,12 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeButton, vsCodeDivider } from '@vscode/webview-ui-toolkit';
+import {
+  provideVSCodeDesignSystem,
+  vsCodeBadge,
+  vsCodeButton,
+  vsCodeDivider,
+} from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
@@ -13,7 +18,7 @@ import { notificationStyles } from '../../../styles/notification.styles.js';
 // web components
 import './NotificationPanel.js';
 
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider());
+provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider(), vsCodeBadge());
 
 @customElement('notification-button')
 export class NotificationButton extends LitElement {
@@ -51,7 +56,10 @@ export class NotificationButton extends LitElement {
         width: 22px;
       }
 
-      .badge-indicator {
+      .badge-indicator::part(control) {
+        --design-unit: 0;
+        --border-width: 0;
+
         color: rgb(255, 255, 255);
         background-color: rgb(0, 120, 212);
         position: absolute;
@@ -139,7 +147,7 @@ export class NotificationButton extends LitElement {
 
     const indicator =
       this.notifications.length > 0
-        ? html` <div class="badge-indicator">${this.notifications.length}</div> `
+        ? html`<vscode-badge class="badge-indicator">${this.notifications.length}</vscode-badge> `
         : html``;
 
     return html`<div class="menu-container">
