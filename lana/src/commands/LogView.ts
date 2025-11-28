@@ -159,7 +159,7 @@ export class LogView {
       requestId,
       cmd: 'fetchLog',
       payload: {
-        logName: filePath.name,
+        logName: filePath.base,
         logUri: logFilePath ? panel.webview.asWebviewUri(Uri.file(logFilePath)).toString(true) : '',
         logPath: logFilePath,
         logData: logData,
