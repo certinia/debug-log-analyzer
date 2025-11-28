@@ -1,6 +1,8 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
- */ import { LitElement, css, html } from 'lit';
+ */
+
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 @customElement('divider-line')
@@ -33,7 +35,6 @@ export class Divider extends LitElement {
     }
   `;
 
-  // Define the classes based on the component's orientation property
   render() {
     return html` <span class="divider"></span> `;
   }
