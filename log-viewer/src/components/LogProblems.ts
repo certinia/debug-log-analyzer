@@ -185,7 +185,7 @@ export class NotificationTag extends LitElement {
 
     const messages: TemplateResult[] = [];
     const sortedNotifications = [...this.notifications].sort((a, b) => {
-      return (sortOrder.get(a.severity) || 999) - (sortOrder.get(b.severity) || 999);
+      return (sortOrder.get(a.severity) ?? 1) - (sortOrder.get(b.severity) ?? 1);
     });
     const lastIndex = sortedNotifications.length - 1;
 
