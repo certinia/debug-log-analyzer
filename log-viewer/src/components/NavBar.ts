@@ -70,7 +70,6 @@ export class NavBar extends LitElement {
         font-family: var(--vscode-font-family);
         align-items: center;
         min-width: 0;
-        overflow: hidden;
       }
 
       .navbar--left {
@@ -79,7 +78,6 @@ export class NavBar extends LitElement {
         gap: 6px;
         min-width: 0;
         flex: 1 1 auto;
-        overflow: hidden;
       }
 
       .navbar--left-meta {
@@ -88,7 +86,6 @@ export class NavBar extends LitElement {
         gap: 6px;
         min-width: 0;
         flex: 0 1 auto;
-        overflow: hidden;
       }
 
       .navbar--right {

@@ -102,17 +102,17 @@ export class NotificationTag extends LitElement {
         background-color: rgb(0, 120, 212);
         position: absolute;
         top: 10px;
-        left: 10px;
+        right: 0;
         font-size: 9px;
         font-weight: 600;
-        min-width: 13px;
-        height: 13px;
-        line-height: 13px;
-        padding: 0px 2px;
+        min-width: 12px;
+        height: 12px;
+        line-height: 12px;
+        padding: 0 2px;
         border-radius: 16px;
         text-align: center;
-        box-sizing: border-box;
         display: inline-block;
+        box-sizing: border-box;
       }
 
       .text-container {
