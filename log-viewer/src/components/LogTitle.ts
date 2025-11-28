@@ -28,13 +28,13 @@ export class LogTitle extends LitElement {
     css`
       :host {
         --text-weight-semibold: 600;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         min-width: 4ch;
         min-height: 1rem;
       }
       .title-item {
-        padding-block: 4px;
+        padding-block: 2px;
         padding-inline: 6px;
         background: var(--button-icon-background, rgba(90, 93, 94, 0.31));
         border-radius: var(--button-icon-corner-radius, 5px);
@@ -45,6 +45,7 @@ export class LogTitle extends LitElement {
       }
 
       a {
+        color: var(--vscode-editor-foreground);
         &:hover {
           background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
         }
