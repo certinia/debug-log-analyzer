@@ -132,7 +132,7 @@ export class CalltreeView extends LitElement {
 
       .filter-container {
         display: flex;
-        gap: 5px;
+        gap: 4px;
       }
 
       .filter-section {

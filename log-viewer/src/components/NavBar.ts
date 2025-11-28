@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeButton, vsCodeTag } from '@vscode/webview-ui-toolkit';
+import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
@@ -17,11 +17,14 @@ import { notificationStyles } from '../styles/notification.styles.js';
 // web components
 import '../features/notifications/components/NotificationButton.js';
 import '../features/notifications/components/NotificationPanel.js';
-import '../features/notifications/components/NotificationTag.js';
 import './BadgeBase.js';
+import './Divider.js';
+import './DotSeparator.js';
+import './LogMeta.js';
+import './LogProblems.js';
 import './LogTitle.js';
 
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeTag());
+provideVSCodeDesignSystem().register(vsCodeButton());
 
 @customElement('nav-bar')
 export class NavBar extends LitElement {
@@ -48,50 +51,49 @@ export class NavBar extends LitElement {
     unsafeCSS(codiconStyles),
     css`
       :host {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
         color: var(--vscode-editor-foreground);
         ${notificationStyles}
       }
 
+      vscode-button {
+        height: 22px;
+        width: 22px;
+      }
+
       .navbar {
-        padding-top: 4px;
         display: flex;
-        gap: 10px;
+        gap: 8px;
+        justify-content: space-between;
+        font-family: var(--vscode-font-family);
+        align-items: center;
+        min-width: 0;
       }
 
       .navbar--left {
         display: flex;
-        width: 100%;
-        position: relative;
         align-items: center;
+        gap: 6px;
+        min-width: 0;
+        flex: 1 1 auto;
       }
+
+      .navbar--left-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        flex: 0 1 auto;
+      }
+
       .navbar--right {
         display: flex;
-        flex: 1 1 auto;
-        justify-content: flex-end;
         align-items: center;
-        display: flex;
-      }
-
-      .log__information {
-        display: flex;
-        width: 100%;
-        position: relative;
-        white-space: nowrap;
-        align-items: center;
-        font-size: 1rem;
-        padding: 4px 0px 4px 0px;
-        gap: 5px;
-      }
-
-      .icon-button {
-        width: 32px;
-        height: 32px;
-      }
-
-      .codicon.icon {
-        font-size: 22px;
-        width: 20px;
-        height: 20px;
+        gap: 4px;
+        padding-right: 4px;
+        flex: 0 0 auto;
       }
     `,
   ];
@@ -103,25 +105,25 @@ export class NavBar extends LitElement {
     return html`
       <div class="navbar">
         <div class="navbar--left">
-          <div class="log__information">
-            <log-title logName="${this.logName}" logPath="${this.logPath}"></log-title>
-            <badge-base .isloading="${!sizeText}">${sizeText}</badge-base>
-            <badge-base .isloading="${!elapsedText}">${elapsedText}</badge-base>
-            <notification-tag .notifications="${this.notifications}"></notification-tag>
+          <log-title logName="${this.logName}" logPath="${this.logPath}"></log-title>
+          <div class="navbar--left-meta">
+            <dot-separator></dot-separator>
+            <log-meta logFileSize="${sizeText}" logDuration="${elapsedText}"></log-meta>
+            <divider-line orientation="vertical"></divider-line>
+            <log-problems .notifications="${this.notifications}"></log-problems>
           </div>
         </div>
         <div class="navbar--right">
-        <notification-button .notifications="${this.parserIssues}"></notification-button>
+          <notification-button .notifications="${this.parserIssues}"></notification-button>
           <vscode-button
             appearance="icon"
             aria-label="Help"
-            class="icon-button"
             title="Help"
             @click=${() => {
               vscodeMessenger.send('openHelp');
             }}
           >
-            <span class="codicon icon codicon-question"</span>
+            <span class="codicon codicon-question"></span>
           </vscode-button>
         </div>
       </div>
@@ -145,6 +147,6 @@ export class NavBar extends LitElement {
       return '';
     }
 
-    return (fileSize / 1_000_000).toFixed(2) + ' MB';
+    return parseFloat((fileSize / 1_000_000).toFixed(2)) + ' MB';
   }
 }

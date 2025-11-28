@@ -1,7 +1,12 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeButton, vsCodeDivider } from '@vscode/webview-ui-toolkit';
+import {
+  provideVSCodeDesignSystem,
+  vsCodeBadge,
+  vsCodeButton,
+  vsCodeDivider,
+} from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
@@ -13,7 +18,7 @@ import { notificationStyles } from '../../../styles/notification.styles.js';
 // web components
 import './NotificationPanel.js';
 
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider());
+provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider(), vsCodeBadge());
 
 @customElement('notification-button')
 export class NotificationButton extends LitElement {
@@ -43,30 +48,33 @@ export class NotificationButton extends LitElement {
     unsafeCSS(codiconStyles),
     css`
       :host {
-        top: 32px;
-        right: 0px;
         ${notificationStyles}
       }
 
-      .icon-button {
-        width: 32px;
-        height: 32px;
+      vscode-button {
+        height: 22px;
+        width: 22px;
       }
 
-      .badge-indicator {
+      .badge-indicator::part(control) {
+        --design-unit: 0;
+        --border-width: 0;
+
         color: rgb(255, 255, 255);
         background-color: rgb(0, 120, 212);
         position: absolute;
-        bottom: 18px;
-        left: 18px;
+        top: 10px;
+        right: 0;
         font-size: 9px;
         font-weight: 600;
-        min-width: 8px;
-        height: 16px;
-        line-height: 16px;
-        padding: 0px 4px;
-        border-radius: 20px;
+        min-width: 12px;
+        height: 12px;
+        line-height: 12px;
+        padding: 0 2px;
+        border-radius: 16px;
         text-align: center;
+        display: inline-block;
+        box-sizing: border-box;
       }
 
       .notification-panel {
@@ -77,12 +85,7 @@ export class NotificationButton extends LitElement {
 
       .menu-container {
         position: relative;
-      }
-
-      .codicon.icon {
-        font-size: 22px;
-        width: 20px;
-        height: 20px;
+        display: inline-flex;
       }
 
       .notification {
@@ -144,18 +147,17 @@ export class NotificationButton extends LitElement {
 
     const indicator =
       this.notifications.length > 0
-        ? html`<div class="badge-indicator">${this.notifications.length}</div>`
+        ? html`<vscode-badge class="badge-indicator">${this.notifications.length}</vscode-badge> `
         : html``;
 
     return html`<div class="menu-container">
       <vscode-button
         appearance="icon"
-        class="icon-button"
         aria-label="Notifications"
         title="Notifications"
         @click="${this._toggleNotifications}"
       >
-        <span class="codicon icon codicon-bell"></span>
+        <span class="codicon codicon-bell"></span>
         ${indicator}
       </vscode-button>
       <notification-panel class="notification-panel" .open="${this.open}">
