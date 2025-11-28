@@ -33,6 +33,7 @@ export class LogTitle extends LitElement {
         min-width: 4ch;
         min-height: 1rem;
       }
+
       .title-item {
         padding-block: 2px;
         padding-inline: 6px;
@@ -44,10 +45,14 @@ export class LogTitle extends LitElement {
         text-overflow: ellipsis;
       }
 
-      a {
+      a.title-item {
         color: var(--vscode-editor-foreground);
-        &:hover {
+
+        &:hover,
+        &:active {
           background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
+          color: var(--vscode-editor-foreground);
+          text-decoration: none;
         }
       }
     `,
