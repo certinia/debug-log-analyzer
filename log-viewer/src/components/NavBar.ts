@@ -18,6 +18,7 @@ import { notificationStyles } from '../styles/notification.styles.js';
 import '../features/notifications/components/NotificationButton.js';
 import '../features/notifications/components/NotificationPanel.js';
 import './BadgeBase.js';
+import './Divider.js';
 import './DotSeparator.js';
 import './LogMeta.js';
 import './LogProblems.js';
@@ -63,23 +64,39 @@ export class NavBar extends LitElement {
       }
 
       .navbar {
-        display: inline-flex;
+        display: flex;
+        gap: 8px;
         justify-content: space-between;
         font-family: var(--vscode-font-family);
         align-items: center;
+        min-width: 0;
+        overflow: hidden;
       }
 
       .navbar--left {
-        display: inline-flex;
+        display: flex;
         align-items: center;
         gap: 6px;
+        min-width: 0;
+        flex: 1 1 auto;
+        overflow: hidden;
+      }
+
+      .navbar--left-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        flex: 0 1 auto;
+        overflow: hidden;
       }
 
       .navbar--right {
-        display: inline-flex;
+        display: flex;
         align-items: center;
         gap: 4px;
         padding-right: 4px;
+        flex: 0 0 auto;
       }
     `,
   ];
@@ -92,9 +109,12 @@ export class NavBar extends LitElement {
       <div class="navbar">
         <div class="navbar--left">
           <log-title logName="${this.logName}" logPath="${this.logPath}"></log-title>
-          <dot-separator></dot-separator>
-          <log-meta logFileSize="${sizeText}" logDuration="${elapsedText}"></log-meta>
-          <log-problems .notifications="${this.notifications}"></log-problems>
+          <div class="navbar--left-meta">
+            <dot-separator></dot-separator>
+            <log-meta logFileSize="${sizeText}" logDuration="${elapsedText}"></log-meta>
+            <divider-line orientation="vertical"></divider-line>
+            <log-problems .notifications="${this.notifications}"></log-problems>
+          </div>
         </div>
         <div class="navbar--right">
           <notification-button .notifications="${this.parserIssues}"></notification-button>

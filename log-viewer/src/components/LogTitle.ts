@@ -32,6 +32,9 @@ export class LogTitle extends LitElement {
         align-items: center;
         min-width: 4ch;
         min-height: 1rem;
+        max-width: 60ch;
+        flex: 0 1 auto;
+        overflow: hidden;
       }
 
       .title-item {
@@ -43,6 +46,10 @@ export class LogTitle extends LitElement {
         font-size: 1.1rem;
         overflow: hidden;
         text-overflow: ellipsis;
+        white-space: nowrap;
+        display: block;
+        width: 100%;
+        min-width: 4ch;
       }
 
       a.title-item {

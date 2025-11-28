@@ -57,6 +57,7 @@ export class NotificationTag extends LitElement {
       :host {
         ${notificationStyles}
         display: inline-flex;
+        flex: 0 0 auto;
       }
 
       .icon {

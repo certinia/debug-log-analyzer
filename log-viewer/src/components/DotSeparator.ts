@@ -10,6 +10,7 @@ export class DotSeparator extends LitElement {
     :host {
       color: var(--vscode-descriptionForeground, #999);
       opacity: 0.5;
+      flex: 0 0 auto;
     }
   `;
 

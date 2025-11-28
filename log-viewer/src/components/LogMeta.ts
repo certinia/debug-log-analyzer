@@ -15,6 +15,7 @@ export class LogMeta extends LitElement {
     css`
       :host {
         display: inline-flex;
+        flex: 0 0 auto;
       }
 
       .log__metadata {
