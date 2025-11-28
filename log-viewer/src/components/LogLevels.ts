@@ -3,6 +3,7 @@
  */
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 
 import { DebugLevel } from '../core/log-parser/ApexLogParser.js';
 
@@ -28,21 +29,25 @@ export class LogLevels extends LitElement {
         flex-wrap: wrap;
         gap: 4px;
         align-items: center;
-        min-height: 27px;
-      }
-      .setting {
-        display: inline-block;
         font-family: var(--vscode-editor-font-family);
-        background-color: var(--vscode-textBlockQuote-background);
-        font-size: 0.9em;
-        padding: 5px;
       }
+
+      vscode-tag::part(control) {
+        --badge-background: var(--vscode-textBlockQuote-background);
+        --button-border: none;
+        --badge-foreground: none;
+        font-family: var(--vscode-editor-font-family);
+        font-size: 0.9rem;
+      }
+
       .setting__title {
-        font-weight: bold;
+        font-weight: 600;
+        opacity: 0.9;
       }
 
       .setting__level {
-        color: #808080;
+        color: var(--vscode-descriptionForeground, #808080);
+        font-weight: 500;
       }
 
       .setting-skeleton {
@@ -57,20 +62,18 @@ export class LogLevels extends LitElement {
     if (!this.logSettings) {
       const logLevels = [];
       for (let i = 0; i < 8; i++) {
-        const levelHtml = html`<div class="setting-skeleton skeleton"></div>`;
-        logLevels.push(levelHtml);
+        logLevels.push(html`<div class="setting-skeleton skeleton"></div>`);
       }
-      return html`${logLevels}`;
+      return logLevels;
     }
 
-    const logLevels = [];
-    for (const { logCategory, logLevel } of this.logSettings) {
-      const levelHtml = html`<div class="setting">
-        <span class="setting__title">${logCategory}:</span>
-        <span class="setting__level">${logLevel}</span>
-      </div>`;
-      logLevels.push(levelHtml);
-    }
-    return html`${logLevels}`;
+    return html`${repeat(
+      this.logSettings,
+      ({ logCategory, logLevel }) =>
+        html`<vscode-tag>
+          <span class="setting__title">${logCategory}:</span>
+          <span class="setting__level">${logLevel}</span>
+        </vscode-tag>`,
+    )}`;
   }
 }
