@@ -2,13 +2,12 @@
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
 import { provideVSCodeDesignSystem, vsCodeBadge, vsCodeButton } from '@vscode/webview-ui-toolkit';
-import { LitElement, css, html, unsafeCSS, type TemplateResult } from 'lit';
+import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { goToRow } from '../features/call-tree/components/CalltreeView.js';
 
 // styles
-import codiconStyles from '../styles/codicon.css';
 import { globalStyles } from '../styles/global.styles.js';
 import { notificationStyles } from '../styles/notification.styles.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
@@ -17,6 +16,8 @@ import { skeletonStyles } from '../styles/skeleton.styles.js';
 import '../features/notifications/components/NotificationPanel.js';
 import './BadgeBase.js';
 import './Divider.js';
+import './IconButton.js';
+import './IconButtonSkeleton.js';
 
 provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeBadge());
 
@@ -51,7 +52,6 @@ export class NotificationTag extends LitElement {
 
   static styles = [
     globalStyles,
-    unsafeCSS(codiconStyles),
     skeletonStyles,
     css`
       :host {
@@ -60,25 +60,9 @@ export class NotificationTag extends LitElement {
         flex: 0 0 auto;
       }
 
-      .icon {
-        position: relative;
-        width: 22px;
-        height: 22px;
-      }
-
-      .codicon.icon {
-        font-size: 22px;
-        width: 20px;
-        height: 20px;
-      }
-
       .problems-container {
         position: relative;
         display: inline-flex;
-      }
-
-      .problems-icon {
-        color: var(--vscode-descriptionForeground);
       }
 
       .problems-panel {
@@ -95,25 +79,6 @@ export class NotificationTag extends LitElement {
         display: flex;
         gap: 8px;
         border-radius: 4px;
-      }
-
-      .badge-indicator::part(control) {
-        --design-unit: 0;
-        --border-width: 0;
-
-        color: rgb(255, 255, 255);
-        background-color: rgb(0, 120, 212);
-        position: absolute;
-        top: 10px;
-        right: 0;
-        font-size: 9px;
-        font-weight: 600;
-        min-width: 12px;
-        height: 12px;
-        line-height: 12px;
-        padding: 0 2px;
-        border-radius: 16px;
-        text-align: center;
       }
 
       .text-container {
@@ -147,27 +112,22 @@ export class NotificationTag extends LitElement {
 
   render() {
     if (!this.notifications) {
-      // todo: create icon skeleton component
-      return html` <span class="skeleton"></span>`;
+      return html`<icon-button-skeleton />`;
     }
 
-    const count = this.notifications.length;
-    const badge =
-      count > 0 ? html`<vscode-badge class="badge-indicator">${count}</vscode-badge>` : '';
+    const count = this.notifications.length || null;
     const title = count === 0 ? 'No Problems' : `${count} Problem${count === 1 ? '' : 's'}`;
-
     const messages = this._renderNotificationMessages();
 
     return html` <div class="problems-container">
-      <vscode-button
-        appearance="icon"
-        aria-label="${title}"
+      <icon-button
+        ariaLabel="${title}"
         title="${title}"
+        icon="codicon-warning"
+        .badgeCount="${count}"
         @click=${this._togglePanel}
-      >
-        <span class="codicon codicon-warning problems-icon"></span>
-        ${badge}
-      </vscode-button>
+      ></icon-button>
+
       <notification-panel class="problems-panel" .open="${this.open}">
         ${messages.length ? html`<div slot="items">${messages}</div>` : html``}
       </notification-panel>
