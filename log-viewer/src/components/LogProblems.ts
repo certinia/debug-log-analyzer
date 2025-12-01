@@ -55,6 +55,8 @@ export class NotificationTag extends LitElement {
     skeletonStyles,
     css`
       :host {
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+
         ${notificationStyles}
         display: inline-flex;
         flex: 0 0 auto;

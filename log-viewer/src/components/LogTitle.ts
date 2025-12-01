@@ -57,7 +57,7 @@ export class LogTitle extends LitElement {
 
         &:hover,
         &:active {
-          background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
+          background-color: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
           color: var(--vscode-editor-foreground);
           text-decoration: none;
         }

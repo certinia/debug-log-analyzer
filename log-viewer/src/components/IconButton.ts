@@ -18,6 +18,8 @@ export class IconButton extends LitElement {
     unsafeCSS(codiconStyles),
     css`
       vscode-button {
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+
         height: 22px;
         width: 22px;
       }
@@ -26,8 +28,8 @@ export class IconButton extends LitElement {
         --design-unit: 0;
         --border-width: 0;
 
-        color: rgb(255, 255, 255);
-        background-color: rgb(0, 120, 212);
+        background-color: var(--vscode-activityBarBadge-background);
+        color: var(--vscode-activityBarBadge-foreground);
         position: absolute;
         top: 10px;
         right: 0;
@@ -58,7 +60,6 @@ export class IconButton extends LitElement {
   title: string = 'Icon Button';
 
   render() {
-    console.log('Rendering IconButton with badgeCount:', this.badgeCount);
     const indicator =
       this.badgeCount !== null && this.badgeCount !== undefined
         ? html`<vscode-badge class="badge-indicator">${this.badgeCount}</vscode-badge> `

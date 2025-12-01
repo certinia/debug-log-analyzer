@@ -51,6 +51,8 @@ export class NavBar extends LitElement {
     unsafeCSS(codiconStyles),
     css`
       :host {
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+
         display: flex;
         flex-direction: column;
         justify-content: center;

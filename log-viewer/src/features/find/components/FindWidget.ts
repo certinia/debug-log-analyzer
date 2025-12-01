@@ -41,6 +41,8 @@ export class FindWidget extends LitElement {
     unsafeCSS(codiconStyles),
     css`
       :host {
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+
         font-size: 12px;
       }
 
