@@ -7,11 +7,10 @@ import {
   vsCodeButton,
   vsCodeDivider,
 } from '@vscode/webview-ui-toolkit';
-import { LitElement, css, html, unsafeCSS, type TemplateResult } from 'lit';
+import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 // styles
-import codiconStyles from '../../../styles/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { notificationStyles } from '../../../styles/notification.styles.js';
 
@@ -45,36 +44,9 @@ export class NotificationButton extends LitElement {
 
   static styles = [
     globalStyles,
-    unsafeCSS(codiconStyles),
     css`
       :host {
         ${notificationStyles}
-      }
-
-      vscode-button {
-        height: 22px;
-        width: 22px;
-      }
-
-      .badge-indicator::part(control) {
-        --design-unit: 0;
-        --border-width: 0;
-
-        color: rgb(255, 255, 255);
-        background-color: rgb(0, 120, 212);
-        position: absolute;
-        top: 10px;
-        right: 0;
-        font-size: 9px;
-        font-weight: 600;
-        min-width: 12px;
-        height: 12px;
-        line-height: 12px;
-        padding: 0 2px;
-        border-radius: 16px;
-        text-align: center;
-        display: inline-block;
-        box-sizing: border-box;
       }
 
       .notification-panel {
@@ -145,21 +117,16 @@ export class NotificationButton extends LitElement {
       }
     });
 
-    const indicator =
-      this.notifications.length > 0
-        ? html`<vscode-badge class="badge-indicator">${this.notifications.length}</vscode-badge> `
-        : html``;
-
+    const count = this.notifications.length || null;
     return html`<div class="menu-container">
-      <vscode-button
-        appearance="icon"
-        aria-label="Notifications"
+      <icon-button
+        ariaLabel="Notifications"
         title="Notifications"
-        @click="${this._toggleNotifications}"
-      >
-        <span class="codicon codicon-bell"></span>
-        ${indicator}
-      </vscode-button>
+        icon="codicon-bell"
+        .badgeCount="${count}"
+        @click=${this._toggleNotifications}
+      ></icon-button>
+
       <notification-panel class="notification-panel" .open="${this.open}">
         ${messages.length ? html`<div slot="items">${messages}</div>` : html``}
       </notification-panel>
