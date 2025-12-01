@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { parse } from '../../core/log-parser/ApexLogParser.js';
@@ -16,6 +16,7 @@ import type { TimelineGroup } from '../timeline/services/Timeline.js';
 import { keyMap, setColors } from '../timeline/services/Timeline.js';
 
 // styles
+import codiconStyles from '../../styles/codicon.css';
 import { globalStyles } from '../../styles/global.styles.js';
 
 // web components
@@ -45,6 +46,7 @@ export class LogViewer extends LitElement {
 
   static styles = [
     globalStyles,
+    unsafeCSS(codiconStyles),
     css`
       :host {
         display: flex;
