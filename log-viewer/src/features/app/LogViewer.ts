@@ -54,6 +54,7 @@ export class LogViewer extends LitElement {
         height: 100%;
         padding: 0px 8px 0px 8px;
 
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
         --panel-tab-active-foreground: var(--vscode-panelTitle-activeBorder);
         --panel-tab-selected-text: var(--vscode-panelTitle-activeForeground, #e7e7e7);
       }

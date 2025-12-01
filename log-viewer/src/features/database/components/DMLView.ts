@@ -92,6 +92,8 @@ export class DMLView extends LitElement {
     globalStyles,
     css`
       :host {
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+
         display: flex;
         flex-direction: column;
         width: 100%;

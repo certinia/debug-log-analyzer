@@ -100,6 +100,8 @@ export class CalltreeView extends LitElement {
     globalStyles,
     css`
       :host {
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+
         height: 100%;
         width: 100%;
         display: flex;
