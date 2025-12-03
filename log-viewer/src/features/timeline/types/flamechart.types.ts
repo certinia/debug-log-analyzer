@@ -11,6 +11,7 @@
 
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type { LogSubCategory } from '../../../core/log-parser/types.js';
+import type { PrecomputedRect } from '../optimised/RectangleManager.js';
 
 // ============================================================================
 // VIEWPORT STATE
@@ -56,6 +57,48 @@ export interface ViewportBounds {
 }
 
 // ============================================================================
+// GENERIC EVENT TYPES
+// ============================================================================
+
+/**
+ * Generic event interface for timeline visualization.
+ * Provides minimal properties needed for rendering and search,
+ * decoupled from specific log parser implementations.
+ */
+export interface EventNode {
+  /** Unique identifier for this event */
+  id: string;
+
+  /** Start time in nanoseconds */
+  timestamp: number;
+
+  /** Duration in nanoseconds */
+  duration: number;
+
+  /** Event type (e.g., 'METHOD_ENTRY', 'SOQL_EXECUTE') */
+  type: string;
+
+  /** Display text for event */
+  text: string;
+}
+
+/**
+ * Tree node wrapper for hierarchical event structures.
+ * Enables generic tree traversal without assuming specific
+ * event hierarchy implementation (e.g., event.children).
+ */
+export interface TreeNode<T extends EventNode> {
+  /** Event data */
+  data: T;
+
+  /** Child nodes (optional for leaf nodes) */
+  children?: TreeNode<T>[];
+
+  /** Depth in tree (0-indexed, optional for automatic calculation) */
+  depth?: number;
+}
+
+// ============================================================================
 // RENDERING STRUCTURES
 // ============================================================================
 
@@ -70,7 +113,7 @@ export interface RenderBatch {
   color: number;
 
   /** Rectangles to render (only visible events). */
-  rectangles: RenderRectangle[];
+  rectangles: PrecomputedRect[];
 
   /** Whether batch needs rebuilding. */
   isDirty: boolean;
@@ -143,6 +186,17 @@ export type TimelineColorMap = {
 export interface TimelineOptions {
   /** Custom colors for event categories. */
   colors?: TimelineColorMap;
+
+  /** Enable search functionality (default: false). */
+  enableSearch?: boolean;
+
+  /** Search configuration options. */
+  searchConfig?: {
+    /** Debounce delay for search in milliseconds (default: 300). */
+    debounceMs?: number;
+    /** Enable case-sensitive search (default: false). */
+    caseSensitive?: boolean;
+  };
 
   /** Event handlers for user interactions. */
   onEventClick?: (event: LogEvent) => void;
@@ -308,3 +362,62 @@ export const SEVERITY_RANK: Record<MarkerType, number> = {
   error: 3,
 } as const;
 /* eslint-enable @typescript-eslint/naming-convention */
+
+// ============================================================================
+// SEARCH & HIGHLIGHT
+// ============================================================================
+
+/**
+ * Represents a single event that matches search criteria.
+ * Cache structure to avoid re-searching during navigation.
+ */
+export interface SearchMatch {
+  /** Reference to the matching LogEvent. */
+  event: LogEvent;
+
+  /** Pre-computed rendering rectangle for this event. */
+  rect: PrecomputedRect;
+
+  /** Depth of event in call tree (0-indexed). */
+  depth: number;
+
+  /** Which field contained the match ('type' or 'text'). */
+  matchType: 'type' | 'text';
+}
+
+/**
+ * Search behavior options.
+ */
+export interface SearchOptions {
+  /** Case-sensitive matching. */
+  matchCase: boolean;
+}
+
+/**
+ * Payload for find/search CustomEvents (lv-find, lv-find-match, lv-find-close).
+ * Standardized communication between FindWidget and Timeline components.
+ */
+export interface FindEventDetail {
+  /** Search query text. */
+  text: string;
+
+  /**
+   * Match index for navigation (1-based).
+   * - For lv-find: Always 1 (start at first match)
+   * - For lv-find-match: Current match number (1 to totalMatches)
+   * - For lv-find-close: Always 0 (no active match)
+   */
+  count: number;
+
+  /** Search options. */
+  options: SearchOptions;
+}
+
+/**
+ * Payload for find results CustomEvent (lv-find-results).
+ * Timeline dispatches this after search completes.
+ */
+export interface FindResultsEventDetail {
+  /** Total number of matches found. */
+  totalMatches: number;
+}

@@ -16,12 +16,14 @@ import * as PIXI from 'pixi.js';
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type { LogSubCategory } from '../../../core/log-parser/types.js';
 import { EventBatchRenderer } from '../optimised/EventBatchRenderer.js';
-import type { RenderBatch, ViewportState } from '../types/timeline.types.js';
-import { TIMELINE_CONSTANTS } from '../types/timeline.types.js';
+import { RectangleManager } from '../optimised/RectangleManager.js';
+import type { RenderBatch, ViewportState } from '../types/flamechart.types.js';
+import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 
 describe('EventBatchRenderer', () => {
   let container: PIXI.Container;
   let renderer: EventBatchRenderer;
+  let rectangleManager: RectangleManager;
   let batches: Map<string, RenderBatch>;
 
   /**
@@ -67,6 +69,18 @@ describe('EventBatchRenderer', () => {
     };
   }
 
+  /**
+   * Helper to setup renderer and manager, and perform rendering
+   */
+  function setupAndRender(events: LogEvent[], viewport: ViewportState): void {
+    const categories = new Set(batches.keys());
+    rectangleManager = new RectangleManager(events, categories);
+    renderer = new EventBatchRenderer(container, batches);
+
+    const culledRects = rectangleManager.getCulledRectangles(viewport);
+    renderer.render(culledRects);
+  }
+
   beforeEach(() => {
     container = new PIXI.Container();
 
@@ -109,7 +123,7 @@ describe('EventBatchRenderer', () => {
 
   describe('initialization', () => {
     it('should create Graphics objects for each batch', () => {
-      renderer = new EventBatchRenderer(container, batches, []);
+      renderer = new EventBatchRenderer(container, batches);
 
       expect(container.children).toHaveLength(3);
       expect(container.children.every((child) => child instanceof PIXI.Graphics)).toBe(true);
@@ -117,7 +131,7 @@ describe('EventBatchRenderer', () => {
 
     it('should handle empty batches', () => {
       const emptyBatches = new Map<string, RenderBatch>();
-      renderer = new EventBatchRenderer(container, emptyBatches, []);
+      renderer = new EventBatchRenderer(container, emptyBatches);
 
       expect(container.children).toHaveLength(0);
     });
@@ -131,10 +145,8 @@ describe('EventBatchRenderer', () => {
         createEvent(400, 100, 'Method'),
       ];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       const viewport = createViewport();
-
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const methodBatch = batches.get('Method');
       const soqlBatch = batches.get('SOQL');
@@ -148,10 +160,8 @@ describe('EventBatchRenderer', () => {
       const parent = createEvent(0, 100, 'Method', [child]);
       const events = [parent];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       const viewport = createViewport();
-
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const methodBatch = batches.get('Method')!;
       const soqlBatch = batches.get('SOQL')!;
@@ -166,10 +176,8 @@ describe('EventBatchRenderer', () => {
         createEvent(200, 100, 'UnknownCategory' as LogSubCategory),
       ];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       const viewport = createViewport();
-
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const methodBatch = batches.get('Method');
 
@@ -187,8 +195,7 @@ describe('EventBatchRenderer', () => {
       ];
 
       const viewport = createViewport(1, 0, 0);
-      renderer = new EventBatchRenderer(container, batches, events);
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const methodBatch = batches.get('Method');
       expect(methodBatch?.rectangles).toHaveLength(3);
@@ -198,8 +205,7 @@ describe('EventBatchRenderer', () => {
       const events = [createEvent(0, 100, 'Method'), createEvent(200, 100, 'Method')];
 
       const viewport = createViewport(1, 150, 0);
-      renderer = new EventBatchRenderer(container, batches, events);
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const methodBatch = batches.get('Method');
       // First event should be culled, second should be visible
@@ -214,8 +220,7 @@ describe('EventBatchRenderer', () => {
       ];
 
       const viewport = createViewport(1, 0, 0, 1000);
-      renderer = new EventBatchRenderer(container, batches, events);
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const methodBatch = batches.get('Method');
       // Second event should be culled
@@ -229,8 +234,7 @@ describe('EventBatchRenderer', () => {
       ];
 
       const viewport = createViewport(1, 0, 0, 200);
-      renderer = new EventBatchRenderer(container, batches, events);
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const methodBatch = batches.get('Method');
       // Should be included even though only partially visible
@@ -246,8 +250,7 @@ describe('EventBatchRenderer', () => {
       const events = [level0];
 
       const viewport = createViewport();
-      renderer = new EventBatchRenderer(container, batches, events);
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       // All three events should be visible
       expect(batches.get('Method')?.rectangles).toHaveLength(1);
@@ -264,8 +267,7 @@ describe('EventBatchRenderer', () => {
       // Pan down so only depth 2+ is visible
       const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
       const viewport = createViewport(1, 0, eventHeight * 2.5);
-      renderer = new EventBatchRenderer(container, batches, events);
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       // Level 0 and 1 should be culled (depths < depthStart), level 2 should be visible
       const methodBatch = batches.get('Method');
@@ -291,8 +293,7 @@ describe('EventBatchRenderer', () => {
       // For depthEnd = 1: ceil(height / 15) = 1, so 0 < height <= 15
       const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
       const viewport = createViewport(1, 0, 0, 1000, eventHeight); // exactly 1 event height
-      renderer = new EventBatchRenderer(container, batches, events);
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       // With height = 15: depthEnd = ceil(15/15) = ceil(1) = 1
       // So depths 0 and 1 are visible (0 <= depth <= 1)
@@ -313,8 +314,7 @@ describe('EventBatchRenderer', () => {
 
       // At zoom=1, event width = 0.01px (< MIN_RECT_SIZE = 0.05)
       const viewport = createViewport(1, 0, 0);
-      renderer = new EventBatchRenderer(container, batches, events);
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const methodBatch = batches.get('Method');
       expect(methodBatch?.rectangles).toHaveLength(0);
@@ -326,8 +326,7 @@ describe('EventBatchRenderer', () => {
       ];
 
       const viewport = createViewport(1, 0, 0);
-      renderer = new EventBatchRenderer(container, batches, events);
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const methodBatch = batches.get('Method');
       expect(methodBatch?.rectangles).toHaveLength(1);
@@ -339,8 +338,7 @@ describe('EventBatchRenderer', () => {
       ];
 
       const viewport = createViewport(10, 0, 0);
-      renderer = new EventBatchRenderer(container, batches, events);
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const methodBatch = batches.get('Method');
       expect(methodBatch?.rectangles).toHaveLength(1);
@@ -354,10 +352,8 @@ describe('EventBatchRenderer', () => {
       const level0 = createEvent(0, 100, 'Method', [level1]);
       const events = [level0];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       const viewport = createViewport();
-
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const methodRect = batches.get('Method')?.rectangles[0];
       const soqlRect = batches.get('SOQL')?.rectangles[0];
@@ -375,11 +371,9 @@ describe('EventBatchRenderer', () => {
       const parent = createEvent(1500, 600, 'Method', [child]);
       const events = [parent];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       // Viewport shows time 0-1000, parent starts at 1500
       const viewport = createViewport(1, 0, 0, 1000);
-
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       // Both parent and child should be culled
       expect(batches.get('Method')?.rectangles).toHaveLength(0);
@@ -391,11 +385,9 @@ describe('EventBatchRenderer', () => {
       const parent = createEvent(400, 300, 'Method', [child]);
       const events = [parent];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       // Viewport shows time 0-600, parent extends to 700
       const viewport = createViewport(1, 0, 0, 600);
-
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       // Both should be visible
       expect(batches.get('Method')?.rectangles).toHaveLength(1);
@@ -407,10 +399,9 @@ describe('EventBatchRenderer', () => {
     it('should calculate correct rectangle positions with zoom', () => {
       const events = [createEvent(100, 50, 'Method')];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       const viewport = createViewport(2, 0, 0); // 2x zoom
 
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const rect = batches.get('Method')?.rectangles[0];
 
@@ -422,10 +413,8 @@ describe('EventBatchRenderer', () => {
     it('should calculate correct rectangle height', () => {
       const events = [createEvent(0, 100, 'Method')];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       const viewport = createViewport();
-
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const rect = batches.get('Method')?.rectangles[0];
 
@@ -436,10 +425,8 @@ describe('EventBatchRenderer', () => {
       const event = createEvent(0, 100, 'Method');
       const events = [event];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       const viewport = createViewport();
-
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       const rect = batches.get('Method')?.rectangles[0];
 
@@ -451,10 +438,8 @@ describe('EventBatchRenderer', () => {
     it('should mark batches as dirty during render', () => {
       const events = [createEvent(0, 100, 'Method')];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       const viewport = createViewport();
-
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       // After render, dirty flags should be cleared
       expect(batches.get('Method')?.isDirty).toBe(false);
@@ -463,16 +448,14 @@ describe('EventBatchRenderer', () => {
     it('should clear rectangles on each render', () => {
       const events = [createEvent(0, 100, 'Method'), createEvent(200, 100, 'Method')];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       const viewport = createViewport();
-
-      // First render
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
       expect(batches.get('Method')?.rectangles).toHaveLength(2);
 
       // Second render with different viewport (should recalculate)
       const viewport2 = createViewport(1, 150, 0); // Pan to cull first event
-      renderer.render(viewport2);
+      const culledRects2 = rectangleManager.getCulledRectangles(viewport2);
+      renderer.render(culledRects2);
       expect(batches.get('Method')?.rectangles).toHaveLength(1);
     });
   });
@@ -481,10 +464,8 @@ describe('EventBatchRenderer', () => {
     it('should handle empty event array', () => {
       const events: LogEvent[] = [];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       const viewport = createViewport();
-
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       for (const batch of batches.values()) {
         expect(batch.rectangles).toHaveLength(0);
@@ -507,11 +488,8 @@ describe('EventBatchRenderer', () => {
 
       const events = [event];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       const viewport = createViewport();
-
-      // Should not crash, and event should be skipped (zero duration)
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
 
       expect(batches.get('Method')?.rectangles).toHaveLength(0);
     });
@@ -519,18 +497,14 @@ describe('EventBatchRenderer', () => {
     it('should handle zero zoom gracefully', () => {
       const events = [createEvent(0, 100, 'Method')];
 
-      renderer = new EventBatchRenderer(container, batches, events);
       const viewport = createViewport(0, 0, 0);
-
-      // Should not crash
-      renderer.render(viewport);
+      setupAndRender(events, viewport);
     });
   });
 
   describe('cleanup', () => {
     it('should destroy all Graphics objects', () => {
-      const events = [createEvent(0, 100, 'Method')];
-      renderer = new EventBatchRenderer(container, batches, events);
+      renderer = new EventBatchRenderer(container, batches);
 
       const childrenCount = container.children.length;
       expect(childrenCount).toBeGreaterThan(0);
@@ -539,6 +513,44 @@ describe('EventBatchRenderer', () => {
       // After destruction, graphics are removed from their parent
       // Container should have no children
       expect(container.children.length).toBe(0);
+    });
+  });
+
+  describe('integration with search highlights', () => {
+    it('should cull small rectangles from EventBatchRenderer while SearchHighlightRenderer still renders them', () => {
+      // This test verifies that when rectangles are too small to be rendered by EventBatchRenderer
+      // (< MIN_RECT_SIZE = 0.5px), they are culled from the rendering, but this doesn't
+      // affect SearchHighlightRenderer's ability to render highlights for those events.
+
+      const events = [
+        createEvent(0, 100, 'Method'), // Will be culled when zoomed out
+      ];
+
+      // Zoom out so screenWidth = 100 * 0.002 = 0.2px (< MIN_RECT_SIZE = 0.5px)
+      const viewport = createViewport(0.002, 0, 0);
+      setupAndRender(events, viewport);
+
+      const methodBatch = batches.get('Method');
+
+      // Event should be culled by EventBatchRenderer (too small)
+      expect(methodBatch?.rectangles).toHaveLength(0);
+
+      // This confirms that EventBatchRenderer correctly culls small rectangles.
+      // SearchHighlightRenderer is tested separately to ensure it enforces minimum
+      // visible size (6px) for search highlights, independent of this culling.
+    });
+
+    it('should render events when they meet minimum size threshold after zoom', () => {
+      const events = [createEvent(0, 100, 'Method')];
+
+      // Zoom in so screenWidth = 100 * 0.01 = 1px (> MIN_RECT_SIZE = 0.5px)
+      const viewport = createViewport(0.01, 0, 0);
+      setupAndRender(events, viewport);
+
+      const methodBatch = batches.get('Method');
+
+      // Event should be rendered (meets minimum size)
+      expect(methodBatch?.rectangles).toHaveLength(1);
     });
   });
 });

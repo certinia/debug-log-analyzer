@@ -16,7 +16,7 @@
  */
 
 import * as PIXI from 'pixi.js';
-import type { ViewportState } from '../types/timeline.types.js';
+import type { ViewportState } from '../types/flamechart.types.js';
 
 /**
  * Nanoseconds per millisecond conversion constant.

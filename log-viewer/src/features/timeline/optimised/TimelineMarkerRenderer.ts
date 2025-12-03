@@ -10,13 +10,13 @@
  */
 
 import * as PIXI from 'pixi.js';
-import type { MarkerType, TimelineMarker } from '../types/timeline.types.js';
+import type { MarkerType, TimelineMarker } from '../types/flamechart.types.js';
 import {
   MARKER_ALPHA,
   MARKER_COLORS,
   SEVERITY_ORDER,
   SEVERITY_RANK,
-} from '../types/timeline.types.js';
+} from '../types/flamechart.types.js';
 import type { TimelineViewport } from './TimelineViewport.js';
 
 /**

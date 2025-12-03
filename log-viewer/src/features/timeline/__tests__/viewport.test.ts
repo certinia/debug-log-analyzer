@@ -13,7 +13,7 @@
  */
 
 import { TimelineViewport } from '../optimised/TimelineViewport.js';
-import { TIMELINE_CONSTANTS } from '../types/timeline.types.js';
+import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 
 describe('TimelineViewport', () => {
   const DISPLAY_WIDTH = 1000;

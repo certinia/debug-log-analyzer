@@ -10,11 +10,24 @@
  * - Tooltip generation for LogEvents
  * - Navigation to source (goToRow)
  * - External callbacks
+ *
+ * It should only be responsible for managing calls to FlameChart and wiring.
+ * It should NOT contain any rendering, rectangle computation, or search logic (all in FlameChart).
+ * FlameChart should remain agnostic of Apex-specifics e.g LogEvent structure and tooltips.
+ * LogEvent should only be referenced here in ApexLogTimeline to convert to generic EventNode for FlameChart and not in FlameChart or its dependencies.
  */
 
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
-import type { TimelineMarker, TimelineOptions, ViewportState } from '../types/timeline.types.js';
+import type {
+  EventNode,
+  FindEventDetail,
+  FindResultsEventDetail,
+  TimelineMarker,
+  TimelineOptions,
+  ViewportState,
+} from '../types/flamechart.types.js';
+import type { SearchCursor } from '../types/search.types.js';
 import { extractMarkers } from '../utils/marker-utils.js';
 import { FlameChart } from './FlameChart.js';
 import { TimelineTooltipManager } from './TimelineTooltipManager.js';
@@ -24,6 +37,9 @@ export class ApexLogTimeline {
   private tooltipManager: TimelineTooltipManager | null = null;
   private apexLog: ApexLog | null = null;
   private options: TimelineOptions = {};
+  private container: HTMLElement | null = null;
+  private events: LogEvent[] = [];
+  private searchCursor: SearchCursor<EventNode> | null = null;
 
   constructor() {
     this.flamechart = new FlameChart();
@@ -39,6 +55,7 @@ export class ApexLogTimeline {
   ): Promise<void> {
     this.apexLog = apexLog;
     this.options = options;
+    this.container = container;
 
     // Create tooltip manager for Apex-specific tooltips
     this.tooltipManager = new TimelineTooltipManager(container, {
@@ -51,28 +68,45 @@ export class ApexLogTimeline {
     });
 
     const markers = extractMarkers(this.apexLog);
-    const frames = this.extractEvents();
+    this.events = this.extractEvents();
 
     // Initialize FlameChart with Apex-specific callbacks
-    await this.flamechart.init(container, frames, markers, options, {
-      onMouseMove: (screenX, screenY, event, marker) => {
-        this.handleMouseMove(screenX, screenY, event, marker);
+    await this.flamechart.init(
+      container,
+      this.events,
+      markers,
+      { ...options, enableSearch: true }, // Enable search via options
+      {
+        onMouseMove: (screenX, screenY, event, marker) => {
+          this.handleMouseMove(screenX, screenY, event, marker);
+        },
+        onClick: (screenX, screenY, event, marker) => {
+          this.handleClick(screenX, screenY, event, marker);
+        },
+        onViewportChange: (viewport: ViewportState) => {
+          if (options.onViewportChange) {
+            options.onViewportChange(viewport);
+          }
+        },
+        onSearchNavigate: (event, screenX, screenY, depth) => {
+          this.handleSearchNavigate(event, screenX, screenY, depth);
+        },
       },
-      onClick: (screenX, screenY, event, marker) => {
-        this.handleClick(screenX, screenY, event, marker);
-      },
-      onViewportChange: (viewport: ViewportState) => {
-        if (options.onViewportChange) {
-          options.onViewportChange(viewport);
-        }
-      },
-    });
+    );
+
+    // Wire up search event listeners
+    this.enableSearch();
   }
 
   /**
    * Clean up resources.
    */
   public destroy(): void {
+    // Remove event listeners from document
+    document.removeEventListener('lv-find', this.handleFind);
+    document.removeEventListener('lv-find-match', this.handleFindMatch);
+    document.removeEventListener('lv-find-close', this.handleFindClose);
+
     this.flamechart.destroy();
     if (this.tooltipManager) {
       this.tooltipManager.destroy();
@@ -171,5 +205,130 @@ export class ApexLogTimeline {
     // ApexLog extends LogEvent, which has a children property
     // containing the hierarchical event structure
     return this.apexLog.children || [];
+  }
+
+  // ============================================================================
+  // SEARCH FUNCTIONALITY
+  // ============================================================================
+
+  /**
+   * Wire up search event listeners.
+   * Search is enabled via FlameChart options.
+   */
+  private enableSearch(): void {
+    // Wire up event listeners on document (FindWidget dispatches on document)
+    document.addEventListener('lv-find', this.handleFind);
+    document.addEventListener('lv-find-match', this.handleFindMatch);
+    document.addEventListener('lv-find-close', this.handleFindClose);
+  }
+
+  /**
+   * Handle lv-find event (new search initiated).
+   * Thin facade: converts search text to predicate function.
+   */
+  private handleFind = (event: Event): void => {
+    // Only process if this timeline instance is active
+    if (!this.container || !this.container.isConnected) {
+      return;
+    }
+
+    const customEvent = event as CustomEvent<FindEventDetail>;
+    const { text, options } = customEvent.detail;
+
+    // Convert search text to predicate function (thin facade)
+    const caseSensitive = options.matchCase;
+    const searchText = caseSensitive ? text : text.toLowerCase();
+    const predicate = (eventNode: EventNode) => {
+      const eventText = caseSensitive ? eventNode.text : eventNode.text.toLowerCase();
+      const eventType = caseSensitive ? eventNode.type : eventNode.type.toLowerCase();
+      return eventText.includes(searchText) || eventType.includes(searchText);
+    };
+
+    // Perform search using new API (map matchCase to caseSensitive)
+    this.searchCursor = this.flamechart.search(predicate, { caseSensitive });
+
+    if (!this.searchCursor) {
+      return;
+    }
+
+    // Dispatch results
+    this.dispatchFindResults(this.searchCursor.total);
+
+    // Navigate to first match (cursor handles centering, tooltip, and render)
+    if (this.searchCursor.total > 0) {
+      this.searchCursor.first();
+    }
+  };
+
+  /**
+   * Handle lv-find-match event (navigate to specific match).
+   */
+  private handleFindMatch = (event: Event): void => {
+    // Only process if this timeline instance is active
+    if (!this.container || !this.container.isConnected) {
+      return;
+    }
+
+    const customEvent = event as CustomEvent<FindEventDetail>;
+    const { count } = customEvent.detail;
+
+    // count is 1-based, convert to 0-based index
+    const index = count - 1;
+
+    // Cursor handles centering, tooltip, and render
+    this.searchCursor?.seek(index);
+  };
+
+  /**
+   * Handle lv-find-close event (clear search).
+   */
+  private handleFindClose = (): void => {
+    // Only process if this timeline instance is active
+    if (!this.container || !this.container.isConnected) {
+      return;
+    }
+
+    // Clear search cursor reference
+    this.searchCursor = null;
+
+    // Clear search state (FlameChart handles render)
+    this.flamechart.clearSearch();
+  };
+
+  /**
+   * Handle search navigation callback from FlameChart.
+   * Shows tooltip for the current search match.
+   */
+  private handleSearchNavigate(
+    eventNode: EventNode,
+    screenX: number,
+    screenY: number,
+    _depth: number,
+  ): void {
+    if (!this.tooltipManager) {
+      return;
+    }
+
+    // EventNode may have original LogEvent stored from tree conversion
+    const eventWithOriginal = eventNode as EventNode & { original?: LogEvent };
+    const logEvent = eventWithOriginal.original;
+
+    if (logEvent) {
+      this.tooltipManager.show(logEvent, screenX, screenY);
+    }
+  }
+
+  /**
+   * Dispatch lv-find-results event with match count.
+   */
+  private dispatchFindResults(totalMatches: number): void {
+    const detail: FindResultsEventDetail = { totalMatches };
+    const event = new CustomEvent('lv-find-results', {
+      detail,
+      bubbles: true,
+      composed: true,
+    });
+
+    document.dispatchEvent(event);
   }
 }

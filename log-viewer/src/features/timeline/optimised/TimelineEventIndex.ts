@@ -10,7 +10,7 @@
  */
 
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type { ViewportBounds, ViewportState } from '../types/timeline.types.js';
+import type { ViewportBounds, ViewportState } from '../types/flamechart.types.js';
 
 export class TimelineEventIndex {
   private rootEvents: LogEvent[];
