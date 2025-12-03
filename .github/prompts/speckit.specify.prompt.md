@@ -46,7 +46,7 @@ Given that feature description, do this:
    - Find the highest number N
    - Use N+1 for the new branch number
 
-   d. Run the script `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS"` with the calculated number and short-name:
+   d. Run the script `.specify/scripts/bash/create-new-feature.sh --json --no-branch "$ARGUMENTS"` with the calculated number and short-name:
    - Pass `--number N+1` and `--short-name "your-short-name"` along with the feature description
    - Bash example: `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS" --json --number 5 --short-name "user-auth" "Add user authentication"`
    - PowerShell example: `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS" -Json -Number 5 -ShortName "user-auth" "Add user authentication"`
@@ -182,7 +182,7 @@ Given that feature description, do this:
 
 7. Report completion with branch name, spec file path, checklist results, and readiness for the next phase (`/speckit.clarify` or `/speckit.plan`).
 
-**NOTE:** The script creates and checks out the new branch and initializes the spec file before writing.
++**NOTE:** The script creates and checks out the new branch and initializes the spec file before writing (unless `--no-branch` is used).
 
 ## General Guidelines
 
