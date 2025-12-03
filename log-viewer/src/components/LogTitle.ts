@@ -28,25 +28,38 @@ export class LogTitle extends LitElement {
     css`
       :host {
         --text-weight-semibold: 600;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         min-width: 4ch;
         min-height: 1rem;
+        max-width: 60ch;
+        flex: 0 1 auto;
+        overflow: hidden;
       }
+
       .title-item {
-        padding-block: 6px;
-        padding-inline: 8px;
+        padding-block: 2px;
+        padding-inline: 6px;
         background: var(--button-icon-background, rgba(90, 93, 94, 0.31));
         border-radius: var(--button-icon-corner-radius, 5px);
         font-weight: var(--text-weight-semibold, 600);
         font-size: 1.1rem;
         overflow: hidden;
         text-overflow: ellipsis;
+        white-space: nowrap;
+        display: block;
+        width: 100%;
+        min-width: 4ch;
       }
 
-      a {
-        &:hover {
-          background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
+      a.title-item {
+        color: var(--vscode-editor-foreground);
+
+        &:hover,
+        &:active {
+          background-color: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+          color: var(--vscode-editor-foreground);
+          text-decoration: none;
         }
       }
     `,

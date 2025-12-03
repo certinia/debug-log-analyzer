@@ -1,19 +1,23 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeButton, vsCodeDivider } from '@vscode/webview-ui-toolkit';
-import { LitElement, css, html, unsafeCSS, type TemplateResult } from 'lit';
+import {
+  provideVSCodeDesignSystem,
+  vsCodeBadge,
+  vsCodeButton,
+  vsCodeDivider,
+} from '@vscode/webview-ui-toolkit';
+import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 // styles
-import codiconStyles from '../../../styles/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { notificationStyles } from '../../../styles/notification.styles.js';
 
 // web components
 import './NotificationPanel.js';
 
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider());
+provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider(), vsCodeBadge());
 
 @customElement('notification-button')
 export class NotificationButton extends LitElement {
@@ -40,33 +44,9 @@ export class NotificationButton extends LitElement {
 
   static styles = [
     globalStyles,
-    unsafeCSS(codiconStyles),
     css`
       :host {
-        top: 32px;
-        right: 0px;
         ${notificationStyles}
-      }
-
-      .icon-button {
-        width: 32px;
-        height: 32px;
-      }
-
-      .badge-indicator {
-        color: rgb(255, 255, 255);
-        background-color: rgb(0, 120, 212);
-        position: absolute;
-        bottom: 18px;
-        left: 18px;
-        font-size: 9px;
-        font-weight: 600;
-        min-width: 8px;
-        height: 16px;
-        line-height: 16px;
-        padding: 0px 4px;
-        border-radius: 20px;
-        text-align: center;
       }
 
       .notification-panel {
@@ -77,12 +57,7 @@ export class NotificationButton extends LitElement {
 
       .menu-container {
         position: relative;
-      }
-
-      .codicon.icon {
-        font-size: 22px;
-        width: 20px;
-        height: 20px;
+        display: inline-flex;
       }
 
       .notification {
@@ -142,22 +117,16 @@ export class NotificationButton extends LitElement {
       }
     });
 
-    const indicator =
-      this.notifications.length > 0
-        ? html`<div class="badge-indicator">${this.notifications.length}</div>`
-        : html``;
-
+    const count = this.notifications.length || null;
     return html`<div class="menu-container">
-      <vscode-button
-        appearance="icon"
-        class="icon-button"
-        aria-label="Notifications"
+      <icon-button
+        ariaLabel="Notifications"
         title="Notifications"
-        @click="${this._toggleNotifications}"
-      >
-        <span class="codicon icon codicon-bell"></span>
-        ${indicator}
-      </vscode-button>
+        icon="codicon-bell"
+        .badgeCount="${count}"
+        @click=${this._toggleNotifications}
+      ></icon-button>
+
       <notification-panel class="notification-panel" .open="${this.open}">
         ${messages.length ? html`<div slot="items">${messages}</div>` : html``}
       </notification-panel>

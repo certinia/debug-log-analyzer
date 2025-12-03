@@ -52,6 +52,8 @@ export class AnalysisView extends LitElement {
     globalStyles,
     css`
       :host {
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+
         height: 100%;
         width: 100%;
         display: flex;
@@ -80,7 +82,7 @@ export class AnalysisView extends LitElement {
 
       .filter-container {
         display: flex;
-        gap: 5px;
+        gap: 4px;
       }
 
       .dropdown-container {
