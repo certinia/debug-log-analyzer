@@ -78,7 +78,7 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
 
   private getParameters(ctx: FormalParametersContext): string {
     const paramsList = ctx.formalParameterList()?.formalParameter();
-    return paramsList?.map((param) => param.typeRef().typeName(0)?.text).join(', ') ?? '';
+    return paramsList?.map((param) => param.typeRef().text).join(', ') ?? '';
   }
 
   private forNode(node: ApexNode, anonHandler: (n: ApexNode) => void) {
