@@ -394,7 +394,6 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   public search(predicate: (event: E) => boolean, options?: SearchOptions): SearchCursor<E> | null {
     if (!this.newSearchManager) {
-      console.warn('Search not enabled. Set enableSearch: true in options.');
       return null;
     }
 
