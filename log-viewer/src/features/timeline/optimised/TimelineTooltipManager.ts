@@ -11,7 +11,7 @@
 
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { formatDuration } from '../../../core/utility/Util.js';
-import type { TimelineMarker } from '../types/timeline.types.js';
+import type { TimelineMarker } from '../types/flamechart.types.js';
 
 /**
  * Configuration options for tooltip behavior.

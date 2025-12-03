@@ -9,8 +9,8 @@
  * Handles coordinate transformations and boundary constraints.
  */
 
-import type { ViewportBounds, ViewportState } from '../types/timeline.types.js';
-import { TIMELINE_CONSTANTS } from '../types/timeline.types.js';
+import type { ViewportBounds, ViewportState } from '../types/flamechart.types.js';
+import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 
 export class TimelineViewport {
   private state: ViewportState;
@@ -203,6 +203,63 @@ export class TimelineViewport {
     this.calculateDefaultZoom();
     this.state.offsetX = 0;
     this.state.offsetY = 0;
+  }
+
+  /**
+   * Center viewport on a specific event.
+   * Scrolls horizontally and vertically to center the event in the viewport.
+   * Only scrolls if event is off-screen or not fully visible.
+   *
+   * @param eventTimestamp - Event start time in nanoseconds
+   * @param eventDuration - Event duration in nanoseconds
+   * @param eventDepth - Event depth in call tree (0-indexed)
+   *
+   * Algorithm (from legacy Timeline.ts lines 1023-1041):
+   * - Calculate event midpoint in pixels
+   * - Check if event is off-screen
+   * - If off-screen: center event midpoint at screen center
+   * - Apply boundary constraints
+   * - Trigger viewport change notification
+   */
+  public centerOnEvent(eventTimestamp: number, eventDuration: number, eventDepth: number): void {
+    // ========== Horizontal Centering ==========
+
+    const eventX = eventTimestamp * this.state.zoom;
+    const eventWidth = eventDuration * this.state.zoom;
+    const eventMidpoint = eventX + eventWidth / 2;
+
+    // Check if off-screen (left or right)
+    const screenX = eventX - this.state.offsetX;
+    const isOffScreenHorizontal = screenX > this.state.displayWidth || screenX + eventWidth < 0;
+
+    if (isOffScreenHorizontal) {
+      // Center event midpoint at screen center
+      const newOffsetX = eventMidpoint - this.state.displayWidth / 2;
+
+      // Apply boundary constraints
+      this.state.offsetX = this.clampOffsetX(newOffsetX);
+    }
+
+    // ========== Vertical Centering ==========
+
+    const eventY = eventDepth * TIMELINE_CONSTANTS.EVENT_HEIGHT;
+
+    // Calculate screen Y position of event
+    const worldYBottom = -this.state.offsetY;
+    const screenY = this.state.displayHeight - (eventY - worldYBottom);
+
+    // Check if off-screen (top or bottom)
+    const isOffScreenVertical = screenY < 0 || screenY > this.state.displayHeight;
+
+    if (isOffScreenVertical) {
+      // Center event at vertical center
+      const targetWorldY = eventY; // World Y of event center
+      const newWorldYBottom = targetWorldY - this.state.displayHeight / 2;
+      const newOffsetY = -newWorldYBottom;
+
+      // Apply boundary constraints
+      this.state.offsetY = this.clampOffsetY(newOffsetY);
+    }
   }
 
   // ============================================================================

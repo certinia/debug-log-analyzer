@@ -12,8 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart that is up to **7X faster**. ([#446] [#251])
   - Enable it via **Settings -> Apex Log Analyzer -> Timeline -> Experimental -> Timeline**.
   - Generally Improved performance, especially for large logs.
-  - Zoom and pan functionalities are now **7X faster**.
-  - Time axis scales better, with larger gaps between the markers on longer logs.
+  - Zoom and pan are now **7X faster**.
+  - The Time axis scales more naturally when zooming, with larger gaps between the markers on longer logs.
+  - Search + highlight will grey out non matches to find matches more easily.
 
 ### Changed
 

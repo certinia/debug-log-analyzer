@@ -13,14 +13,23 @@
 import * as PIXI from 'pixi.js';
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type {
+  EventNode,
   TimelineMarker,
   TimelineOptions,
   TimelineState,
+  TreeNode,
   ViewportState,
-} from '../types/timeline.types.js';
-import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/timeline.types.js';
+} from '../types/flamechart.types.js';
+import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
+import type { SearchCursor, SearchMatch, SearchOptions } from '../types/search.types.js';
+import { logEventToTreeNode } from '../utils/tree-converter.js';
 import { AxisRenderer } from './AxisRenderer.js';
 import { EventBatchRenderer } from './EventBatchRenderer.js';
+import type { PrecomputedRect } from './RectangleManager.js';
+import { RectangleManager } from './RectangleManager.js';
+import { SearchHighlightRenderer } from './SearchHighlightRenderer.js';
+import { SearchManager } from './SearchManager.js';
+import { SearchStyleRenderer } from './SearchStyleRenderer.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineInteractionHandler } from './TimelineInteractionHandler.js';
 import { TimelineMarkerRenderer } from './TimelineMarkerRenderer.js';
@@ -41,9 +50,91 @@ export interface FlameChartCallbacks {
     marker: TimelineMarker | null,
   ) => void;
   onViewportChange?: (viewport: ViewportState) => void;
+  onSearchNavigate?: (event: EventNode, screenX: number, screenY: number, depth: number) => void;
 }
 
-export class FlameChart {
+/**
+ * FlameChartCursor - Cursor with automatic side effects
+ *
+ * Wraps SearchCursor to add automatic centering, rendering, and callback
+ * invocation when navigating between matches.
+ */
+class FlameChartCursor<E extends EventNode> implements SearchCursor<E> {
+  constructor(
+    private innerCursor: SearchCursor<E>,
+    private onNavigate: (match: SearchMatch<E>) => void,
+  ) {}
+
+  get matches(): ReadonlyArray<SearchMatch<E>> {
+    return this.innerCursor.matches;
+  }
+
+  get currentIndex(): number {
+    return this.innerCursor.currentIndex;
+  }
+
+  get total(): number {
+    return this.innerCursor.total;
+  }
+
+  next(): SearchMatch<E> | null {
+    const match = this.innerCursor.next();
+    if (match) {
+      this.onNavigate(match);
+    }
+    return match;
+  }
+
+  prev(): SearchMatch<E> | null {
+    const match = this.innerCursor.prev();
+    if (match) {
+      this.onNavigate(match);
+    }
+    return match;
+  }
+
+  first(): SearchMatch<E> | null {
+    const match = this.innerCursor.first();
+    if (match) {
+      this.onNavigate(match);
+    }
+    return match;
+  }
+
+  last(): SearchMatch<E> | null {
+    const match = this.innerCursor.last();
+    if (match) {
+      this.onNavigate(match);
+    }
+    return match;
+  }
+
+  seek(index: number): SearchMatch<E> | null {
+    const match = this.innerCursor.seek(index);
+    if (match) {
+      this.onNavigate(match);
+    }
+    return match;
+  }
+
+  getCurrent(): SearchMatch<E> | null {
+    return this.innerCursor.getCurrent();
+  }
+
+  hasNext(): boolean {
+    return this.innerCursor.hasNext();
+  }
+
+  hasPrev(): boolean {
+    return this.innerCursor.hasPrev();
+  }
+
+  getMatchedEventIds(): ReadonlySet<string> {
+    return this.innerCursor.getMatchedEventIds();
+  }
+}
+
+export class FlameChart<E extends EventNode = EventNode> {
   private app: PIXI.Application | null = null;
   private container: HTMLElement | null = null;
   private viewport: TimelineViewport | null = null;
@@ -52,10 +143,18 @@ export class FlameChart {
   private options: TimelineOptions = {};
   private callbacks: FlameChartCallbacks = {};
 
+  private rectangleManager: RectangleManager | null = null;
   private batchRenderer: EventBatchRenderer | null = null;
   private axisRenderer: AxisRenderer | null = null;
   private markerRenderer: TimelineMarkerRenderer | null = null;
   private resizeHandler: TimelineResizeHandler | null = null;
+
+  // New generic search system
+  private newSearchManager: SearchManager<E> | null = null;
+  private treeNodes: TreeNode<E>[] | null = null;
+
+  private searchStyleRenderer: SearchStyleRenderer | null = null;
+  private searchRenderer: SearchHighlightRenderer | null = null;
 
   private worldContainer: PIXI.Container | null = null;
   private axisContainer: PIXI.Container | null = null;
@@ -132,6 +231,9 @@ export class FlameChart {
     // Initialize state
     this.initializeState(events);
 
+    // Convert LogEvent to TreeNode structure for generic search
+    this.treeNodes = logEventToTreeNode(events) as unknown as TreeNode<E>[];
+
     // Create truncation renderer FIRST (renders behind axis and events)
     if (this.markerContainer && this.markers.length > 0) {
       this.markerRenderer = new TimelineMarkerRenderer(
@@ -153,9 +255,20 @@ export class FlameChart {
       this.axisRenderer.setScreenSpaceContainer(this.uiContainer);
     }
 
-    // Create batch renderer LAST
+    // Create RectangleManager (single source of truth for rectangle computation)
+    if (this.state) {
+      const categories = new Set(this.state.batches.keys());
+      this.rectangleManager = new RectangleManager(events, categories);
+    }
+
+    // Create batch renderer (pure rendering, receives rectangles from RectangleManager)
     if (this.worldContainer && this.state) {
-      this.batchRenderer = new EventBatchRenderer(this.worldContainer, this.state.batches, events);
+      this.batchRenderer = new EventBatchRenderer(this.worldContainer, this.state.batches);
+    }
+
+    // Create search style renderer (renders with desaturation for search mode)
+    if (this.worldContainer && this.state) {
+      this.searchStyleRenderer = new SearchStyleRenderer(this.worldContainer, this.state.batches);
     }
 
     // Setup interaction handler
@@ -163,6 +276,11 @@ export class FlameChart {
 
     this.resizeHandler = new TimelineResizeHandler(container, this);
     this.resizeHandler.setupResizeObserver();
+
+    // Initialize search if enabled via options
+    if (options.enableSearch) {
+      this.initializeSearch();
+    }
 
     // Initial render
     this.requestRender();
@@ -184,11 +302,24 @@ export class FlameChart {
       this.interactionHandler = null;
     }
 
-    // Clean up batch renderer
+    // Clean up search components
+    if (this.searchRenderer) {
+      this.searchRenderer.destroy();
+      this.searchRenderer = null;
+    }
+
+    if (this.searchStyleRenderer) {
+      this.searchStyleRenderer.destroy();
+      this.searchStyleRenderer = null;
+    }
+
+    // Clean up renderers
     if (this.batchRenderer) {
       this.batchRenderer.destroy();
       this.batchRenderer = null;
     }
+
+    this.rectangleManager = null;
 
     // Clean up axis renderer
     if (this.axisRenderer) {
@@ -223,6 +354,103 @@ export class FlameChart {
    */
   public getViewport(): ViewportState | null {
     return this.viewport ? this.viewport.getState() : null;
+  }
+
+  /**
+   * Initialize the new generic search system.
+   * Builds ID-based rectMap and creates SearchManager.
+   */
+  private initializeSearch(): void {
+    if (!this.rectangleManager || !this.treeNodes || !this.worldContainer) {
+      throw new Error('FlameChart must be initialized before enabling search');
+    }
+
+    // Build rectMap by ID from PrecomputedRect
+    const rectMap = new Map<string, PrecomputedRect>();
+    const logEventRectMap = this.rectangleManager.getRectMap();
+
+    for (const [_event, rect] of logEventRectMap.entries()) {
+      // Cast to PrecomputedRect to access the id field;
+      rectMap.set(rect.id, rect);
+    }
+
+    // Initialize new SearchManager
+    this.newSearchManager = new SearchManager(this.treeNodes, rectMap);
+
+    // Initialize search renderer (for borders/overlays on current match)
+    this.searchRenderer = new SearchHighlightRenderer(this.worldContainer);
+
+    // Ensure zIndex layering is honored for highlight graphics
+    this.worldContainer.sortableChildren = true;
+  }
+
+  /**
+   * Search events using predicate function.
+   * Returns FlameChartCursor that automatically handles centering, tooltips, and rendering.
+   *
+   * @param predicate - Function to test each event
+   * @param options - Search options (caseSensitive, matchWholeWord)
+   * @returns FlameChartCursor for navigating results, or null if search not enabled
+   */
+  public search(predicate: (event: E) => boolean, options?: SearchOptions): SearchCursor<E> | null {
+    if (!this.newSearchManager) {
+      console.warn('Search not enabled. Set enableSearch: true in options.');
+      return null;
+    }
+
+    const innerCursor = this.newSearchManager.search(predicate, options);
+
+    // Wrap with FlameChartCursor to add automatic side effects
+    return new FlameChartCursor(innerCursor, (match) => this.handleSearchNavigation(match));
+  }
+
+  /**
+   * Get current search cursor.
+   * @returns Current cursor or undefined if no active search
+   */
+  public getSearchCursor(): SearchCursor<E> | undefined {
+    return this.newSearchManager?.getCursor();
+  }
+
+  /**
+   * Clear current search and reset cursor.
+   */
+  public clearSearch(): void {
+    this.newSearchManager?.clear();
+    this.requestRender();
+  }
+
+  /**
+   * Handle search navigation side effects:
+   * - Center viewport on match
+   * - Call onSearchNavigate callback for application-specific logic (e.g., tooltips)
+   * - Request render
+   */
+  private handleSearchNavigation(match: SearchMatch<E>): void {
+    if (!this.viewport) {
+      return;
+    }
+
+    // Center viewport on the match
+    this.viewport.centerOnEvent(match.event.timestamp, match.event.duration, match.depth);
+
+    // Call application-specific callback (e.g., for showing tooltips)
+    if (this.callbacks.onSearchNavigate) {
+      const viewportState = this.viewport.getState();
+      const screenX = match.event.timestamp * viewportState.zoom - viewportState.offsetX;
+      const screenY = this.viewport.depthToScreenY(match.depth);
+      this.callbacks.onSearchNavigate(match.event, screenX, screenY, match.depth);
+    }
+
+    // Request render to show updated highlight
+    this.requestRender();
+  }
+
+  /**
+   * Get viewport manager instance.
+   */
+  public getViewportManager(): TimelineViewport | null {
+    return this.viewport;
   }
 
   /**
@@ -473,7 +701,14 @@ export class FlameChart {
   // ============================================================================
 
   private render(): void {
-    if (!this.batchRenderer || !this.state || !this.viewport || !this.app || !this.worldContainer) {
+    if (
+      !this.rectangleManager ||
+      !this.batchRenderer ||
+      !this.state ||
+      !this.viewport ||
+      !this.app ||
+      !this.worldContainer
+    ) {
       return;
     }
 
@@ -502,7 +737,35 @@ export class FlameChart {
       this.axisRenderer.render(viewportState);
     }
 
-    this.batchRenderer.render(viewportState);
+    const culledRects = this.rectangleManager.getCulledRectangles(viewportState);
+
+    // Render events (with or without search styling)
+    const cursor = this.newSearchManager?.getCursor();
+
+    if (cursor && cursor.total > 0) {
+      // Search mode: render with desaturation
+      const matchedEventIds = cursor.getMatchedEventIds();
+      this.searchStyleRenderer!.render(culledRects, matchedEventIds);
+
+      // Render highlight border for current match
+      this.searchRenderer!.render(cursor, viewportState);
+
+      // Clear normal renderer when in search mode
+      if (this.batchRenderer) {
+        this.batchRenderer.clear();
+      }
+    } else {
+      // Normal mode: render with original colors
+      this.batchRenderer.render(culledRects);
+
+      // Clear search overlays when not in search mode
+      if (this.searchStyleRenderer) {
+        this.searchStyleRenderer.clear();
+      }
+      if (this.searchRenderer) {
+        this.searchRenderer.clear();
+      }
+    }
 
     this.app.render();
   }

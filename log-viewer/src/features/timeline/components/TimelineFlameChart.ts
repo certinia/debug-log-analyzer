@@ -16,8 +16,8 @@ import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
 import { getSettings } from '../../settings/Settings.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 
-import type { TimelineOptions } from '../types/timeline.types.js';
-import { TimelineError } from '../types/timeline.types.js';
+import type { TimelineOptions } from '../types/flamechart.types.js';
+import { TimelineError } from '../types/flamechart.types.js';
 
 import { tooltipStyles } from '../styles/timeline.css.js';
 

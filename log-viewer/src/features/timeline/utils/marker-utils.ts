@@ -9,8 +9,8 @@
  */
 
 import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
-import type { TimelineMarker } from '../types/timeline.types.js';
-import { isMarkerType } from '../types/timeline.types.js';
+import type { TimelineMarker } from '../types/flamechart.types.js';
+import { isMarkerType } from '../types/flamechart.types.js';
 
 /**
  * Extracts markers from ApexLog.logIssues array.
