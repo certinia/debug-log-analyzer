@@ -30,6 +30,8 @@ import { RectangleManager } from './RectangleManager.js';
 import { SearchHighlightRenderer } from './SearchHighlightRenderer.js';
 import { SearchManager } from './SearchManager.js';
 import { SearchStyleRenderer } from './SearchStyleRenderer.js';
+import { SearchTextLabelRenderer } from './SearchTextLabelRenderer.js';
+import { TextLabelRenderer } from './TextLabelRenderer.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineInteractionHandler } from './TimelineInteractionHandler.js';
 import { TimelineMarkerRenderer } from './TimelineMarkerRenderer.js';
@@ -155,6 +157,8 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   private searchStyleRenderer: SearchStyleRenderer | null = null;
   private searchRenderer: SearchHighlightRenderer | null = null;
+  private textLabelRenderer: TextLabelRenderer | null = null;
+  private searchTextLabelRenderer: SearchTextLabelRenderer | null = null;
 
   private worldContainer: PIXI.Container | null = null;
   private axisContainer: PIXI.Container | null = null;
@@ -271,6 +275,18 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.searchStyleRenderer = new SearchStyleRenderer(this.worldContainer, this.state.batches);
     }
 
+    // Create text label renderer (renders method names on rectangles)
+    if (this.worldContainer) {
+      this.textLabelRenderer = new TextLabelRenderer(this.worldContainer);
+      await this.textLabelRenderer.loadFont();
+
+      this.searchTextLabelRenderer = new SearchTextLabelRenderer(this.worldContainer);
+      await this.searchTextLabelRenderer.loadFont();
+
+      // Enable zIndex sorting for proper layering
+      this.worldContainer.sortableChildren = true;
+    }
+
     // Setup interaction handler
     this.setupInteractionHandler();
 
@@ -311,6 +327,17 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.searchStyleRenderer) {
       this.searchStyleRenderer.destroy();
       this.searchStyleRenderer = null;
+    }
+
+    // Clean up text label renderer
+    if (this.searchTextLabelRenderer) {
+      this.searchTextLabelRenderer.destroy();
+      this.searchTextLabelRenderer = null;
+    }
+
+    if (this.textLabelRenderer) {
+      this.textLabelRenderer.destroy();
+      this.textLabelRenderer = null;
     }
 
     // Clean up renderers
@@ -501,8 +528,6 @@ export class FlameChart<E extends EventNode = EventNode> {
     const newOffsetY = -visibleWorldYBottom;
 
     this.viewport.setStateForResize(newWidth, newHeight, newZoom, newOffsetX, newOffsetY);
-
-    this.requestRender();
   }
 
   // ============================================================================
@@ -763,6 +788,30 @@ export class FlameChart<E extends EventNode = EventNode> {
       }
       if (this.searchRenderer) {
         this.searchRenderer.clear();
+      }
+    }
+
+    // Render text labels (with or without search styling)
+    if (cursor && cursor.total > 0) {
+      // Search mode: render with dimmed styling
+      const matchedEventIds = cursor.getMatchedEventIds();
+      if (this.searchTextLabelRenderer) {
+        this.searchTextLabelRenderer.render(culledRects, matchedEventIds, viewportState);
+      }
+
+      // Clear normal text renderer when in search mode
+      if (this.textLabelRenderer) {
+        this.textLabelRenderer.clear();
+      }
+    } else {
+      // Normal mode: render all visible text
+      if (this.textLabelRenderer) {
+        this.textLabelRenderer.render(culledRects, viewportState);
+      }
+
+      // Clear search text renderer when not in search mode
+      if (this.searchTextLabelRenderer) {
+        this.searchTextLabelRenderer.clear();
       }
     }
 
