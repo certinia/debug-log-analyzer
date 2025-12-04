@@ -344,6 +344,52 @@ export const MARKER_COLORS: Record<MarkerType, number> = {
  */
 export const MARKER_ALPHA = 0.2;
 
+// ============================================================================
+// TEXT LABEL CONSTANTS
+// ============================================================================
+
+/**
+ * Constants for text label rendering on timeline rectangles.
+ * Used by TextLabelRenderer for LOD-based visibility and truncation.
+ */
+/* eslint-disable @typescript-eslint/naming-convention */
+export const TEXT_LABEL_CONSTANTS = {
+  /** Minimum rectangle width (px) to display any text */
+  MIN_VISIBLE_WIDTH: 12,
+
+  /** Approximate character width in pixels for truncation calculation (at 10px monospace font) */
+  CHAR_WIDTH: 6,
+
+  /** Left padding inside rectangle (px) - visual indent from left edge */
+  PADDING_LEFT: 4,
+
+  /** Right padding inside rectangle (px) - visual indent from right edge */
+  PADDING_RIGHT: 4,
+
+  /** Ellipsis character for truncation */
+  ELLIPSIS: '…',
+
+  /** Minimum characters required to show text (1 char + ellipsis = 2) */
+  MIN_CHARS_WITH_ELLIPSIS: 1,
+
+  /** Z-index for text container (above rectangles) */
+  Z_INDEX: 10,
+
+  /** Font configuration */
+  FONT: {
+    /** Font family name for BitmapText */
+    FAMILY: 'timeline-mono',
+    /** Font size in pixels */
+    SIZE: 10,
+    /** Text color (white for contrast on all category colors) */
+    // COLOR: 0xffffff,
+    COLOR: 0xd7d7d7,
+    // COLOR: 0x333333,
+    // COLOR: 0x000000,
+  },
+} as const;
+/* eslint-enable @typescript-eslint/naming-convention */
+
 /**
  * Severity levels in ascending order (lowest to highest).
  * Used for z-index stacking when indicators overlap.
