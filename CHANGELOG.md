@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart that is up to **7X faster**. ([#446] [#251])
+- ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart that is up to **7X faster**. ([#446] [#251] [#92])
   - Enable it via **Settings -> Apex Log Analyzer -> Timeline -> Experimental -> Timeline**.
   - Generally Improved performance, especially for large logs.
   - Zoom and pan are now **7X faster**.
@@ -414,6 +414,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#92]: https://github.com/certinia/debug-log-analyzer/issues/92
 [#694]: https://github.com/certinia/debug-log-analyzer/issues/694
 [#446]: https://github.com/certinia/debug-log-analyzer/issues/446
 [#251]: https://github.com/certinia/debug-log-analyzer/issues/251
