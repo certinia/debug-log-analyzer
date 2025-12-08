@@ -106,6 +106,10 @@ export class TextLabelRenderer {
     const viewportLeftEdge = viewport.offsetX;
     const stickyLeftX = viewportLeftEdge + TEXT_LABEL_CONSTANTS.PADDING_LEFT;
 
+    const fontHeightAdjustment = 6;
+    const fontSize = TIMELINE_CONSTANTS.EVENT_HEIGHT - fontHeightAdjustment;
+    const fonyYPositionOffset = TIMELINE_CONSTANTS.EVENT_HEIGHT - fontHeightAdjustment / 2;
+
     // Process visible rectangles
     for (const rects of culledRects.values()) {
       for (const rect of rects) {
@@ -148,7 +152,7 @@ export class TextLabelRenderer {
             text: '',
             style: {
               fontFamily: TEXT_LABEL_CONSTANTS.FONT.FAMILY,
-              fontSize: TEXT_LABEL_CONSTANTS.FONT.SIZE,
+              fontSize: fontSize,
             },
           });
           // Compensate for worldContainer Y-axis inversion
@@ -161,7 +165,7 @@ export class TextLabelRenderer {
         label.text = truncated;
         label.x = labelX;
         // Position near top of rectangle (in inverted Y space)
-        label.y = rect.y + TIMELINE_CONSTANTS.EVENT_HEIGHT - 3;
+        label.y = rect.y + fonyYPositionOffset;
         label.visible = true;
       }
     }

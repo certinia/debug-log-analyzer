@@ -383,9 +383,10 @@ export const TEXT_LABEL_CONSTANTS = {
     SIZE: 10,
     /** Text color (white for contrast on all category colors) */
     // COLOR: 0xffffff,
-    COLOR: 0xd7d7d7,
+    // COLOR: 0xd7d7d7,
     // COLOR: 0x333333,
     // COLOR: 0x000000,
+    COLOR: 0xe3e3e3,
   },
 } as const;
 /* eslint-enable @typescript-eslint/naming-convention */
