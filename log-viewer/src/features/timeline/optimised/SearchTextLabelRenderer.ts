@@ -123,6 +123,10 @@ export class SearchTextLabelRenderer {
     renderMatched: boolean,
     alpha: number,
   ): void {
+    const fontHeightAdjustment = (TIMELINE_CONSTANTS.EVENT_HEIGHT - 4) / 2;
+    const fontSize = TIMELINE_CONSTANTS.EVENT_HEIGHT - fontHeightAdjustment;
+    const fontYPositionOffset = TIMELINE_CONSTANTS.EVENT_HEIGHT - fontHeightAdjustment / 2;
+
     for (const rects of culledRects.values()) {
       for (const rect of rects) {
         // Filter: only process matched or non-matched based on renderMatched flag
@@ -166,7 +170,7 @@ export class SearchTextLabelRenderer {
             text: '',
             style: {
               fontFamily: TEXT_LABEL_CONSTANTS.FONT.FAMILY,
-              fontSize: TEXT_LABEL_CONSTANTS.FONT.SIZE,
+              fontSize: fontSize,
             },
           });
           label.scale.y = -1; // Compensate for worldContainer Y-axis inversion
@@ -177,7 +181,7 @@ export class SearchTextLabelRenderer {
         // Update label
         label.text = truncated;
         label.x = labelX;
-        label.y = rect.y + TIMELINE_CONSTANTS.EVENT_HEIGHT - 3;
+        label.y = rect.y + fontYPositionOffset;
         label.alpha = alpha;
         label.visible = true;
       }

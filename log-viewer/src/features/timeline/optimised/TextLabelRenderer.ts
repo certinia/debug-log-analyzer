@@ -106,9 +106,9 @@ export class TextLabelRenderer {
     const viewportLeftEdge = viewport.offsetX;
     const stickyLeftX = viewportLeftEdge + TEXT_LABEL_CONSTANTS.PADDING_LEFT;
 
-    const fontHeightAdjustment = 6;
+    const fontHeightAdjustment = (TIMELINE_CONSTANTS.EVENT_HEIGHT - 4) / 2;
     const fontSize = TIMELINE_CONSTANTS.EVENT_HEIGHT - fontHeightAdjustment;
-    const fonyYPositionOffset = TIMELINE_CONSTANTS.EVENT_HEIGHT - fontHeightAdjustment / 2;
+    const fontYPositionOffset = TIMELINE_CONSTANTS.EVENT_HEIGHT - fontHeightAdjustment / 2;
 
     // Process visible rectangles
     for (const rects of culledRects.values()) {
@@ -165,7 +165,7 @@ export class TextLabelRenderer {
         label.text = truncated;
         label.x = labelX;
         // Position near top of rectangle (in inverted Y space)
-        label.y = rect.y + fonyYPositionOffset;
+        label.y = rect.y + fontYPositionOffset;
         label.visible = true;
       }
     }
