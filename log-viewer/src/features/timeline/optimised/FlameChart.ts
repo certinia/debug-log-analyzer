@@ -531,6 +531,8 @@ export class FlameChart<E extends EventNode = EventNode> {
     const newOffsetY = -visibleWorldYBottom;
 
     this.viewport.setStateForResize(newWidth, newHeight, newZoom, newOffsetX, newOffsetY);
+
+    this.requestRender();
   }
 
   // ============================================================================
