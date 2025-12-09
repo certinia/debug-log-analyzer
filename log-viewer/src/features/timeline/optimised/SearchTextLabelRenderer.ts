@@ -5,44 +5,48 @@
 /**
  * SearchTextLabelRenderer
  *
- * Renders text labels with search-aware styling.
- * Matched events: full opacity (alpha 1.0)
- * Non-matched events: dimmed (alpha 0.4)
+ * Renders text labels with search-aware styling using composition.
+ * Delegates matched event labels to TextLabelRenderer (full opacity).
+ * Renders non-matched event labels itself (dimmed at 0.4 alpha).
  *
- * Follows the same pattern as SearchStyleRenderer:
- * - Separate render passes for matched vs non-matched
- * - Lazy label creation, never destroyed
- * - clear() for mode switching
- * - destroy() for cleanup
+ * Architecture:
+ * - Uses TextLabelRenderer for matched text (full opacity 1.0)
+ * - Manages own container/labels for unmatched text (dimmed 0.4)
+ * - No font loading needed (shares font with TextLabelRenderer)
  */
 
-import { BitmapFont, BitmapText, Container } from 'pixi.js';
+import { BitmapText, Container } from 'pixi.js';
 import type { ViewportState } from '../types/flamechart.types.js';
 import { TEXT_LABEL_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import type { PrecomputedRect } from './RectangleManager.js';
+import type { TextLabelRenderer } from './TextLabelRenderer.js';
+
+/** Alpha value for dimmed (non-matched) labels */
+const DIMMED_ALPHA = 0.4;
 
 /**
  * SearchTextLabelRenderer
  *
  * Manages BitmapText labels for timeline events in search mode.
- * Renders matched events with full opacity, non-matched events dimmed.
+ * Renders matched events via TextLabelRenderer, non-matched events dimmed.
  */
 export class SearchTextLabelRenderer {
-  /** Container for all text labels */
+  /** Container for unmatched (dimmed) text labels */
   private container: Container;
 
-  /** Labels keyed by rectangle ID (created lazily, never destroyed) */
+  /** Labels for unmatched events keyed by rectangle ID */
   private labels: Map<string, BitmapText> = new Map();
-
-  /** Whether the font has been loaded/created */
-  private fontReady = false;
 
   /**
    * Create a new SearchTextLabelRenderer.
    *
    * @param parentContainer - The worldContainer to add labels to
+   * @param textLabelRenderer - TextLabelRenderer instance for rendering matched labels
    */
-  constructor(parentContainer: Container) {
+  constructor(
+    parentContainer: Container,
+    private textLabelRenderer: TextLabelRenderer,
+  ) {
     this.container = new Container();
     this.container.zIndex = TEXT_LABEL_CONSTANTS.Z_INDEX;
     this.container.label = 'SearchTextLabelRenderer';
@@ -50,33 +54,9 @@ export class SearchTextLabelRenderer {
   }
 
   /**
-   * Initialize the BitmapFont for rendering.
-   * Uses the same dynamic font creation as TextLabelRenderer.
-   *
-   * Must be called before render().
-   */
-  public async loadFont(): Promise<void> {
-    // Create BitmapFont dynamically from system font
-    const chars =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ._()<>[]{}:;,!@#$%^&*-+=/?\'"`\\|~…';
-
-    BitmapFont.install({
-      name: TEXT_LABEL_CONSTANTS.FONT.FAMILY,
-      style: {
-        fontFamily: 'monospace',
-        fontSize: TEXT_LABEL_CONSTANTS.FONT.SIZE * 2,
-        fill: TEXT_LABEL_CONSTANTS.FONT.COLOR,
-        fontWeight: 'lighter',
-      },
-      chars,
-    });
-
-    this.fontReady = true;
-  }
-
-  /**
    * Render text labels with search-aware styling.
-   * Two passes: matched events (full opacity), non-matched events (dimmed).
+   * Matched events are rendered by TextLabelRenderer (full opacity).
+   * Non-matched events are rendered here (dimmed).
    *
    * @param culledRects - Rectangles grouped by category (from RectangleManager)
    * @param matchedEventIds - Set of event IDs that match search
@@ -87,51 +67,63 @@ export class SearchTextLabelRenderer {
     matchedEventIds: ReadonlySet<string>,
     viewport: ViewportState,
   ): void {
-    if (!this.fontReady) {
-      return;
-    }
-
-    // Reset visibility for all existing labels
+    // Reset visibility for unmatched labels (managed by this renderer)
     for (const label of this.labels.values()) {
       label.visible = false;
     }
 
-    const viewportLeftEdge = viewport.offsetX;
+    // Render unmatched events (dimmed) - managed by this renderer
+    this.renderUnmatchedLabels(culledRects, matchedEventIds, viewport);
 
-    // First pass: Render matched events with full opacity
-    this.renderLabels(culledRects, viewport, viewportLeftEdge, matchedEventIds, true, 1.0);
-
-    // Second pass: Render non-matched events with dimmed opacity
-    this.renderLabels(culledRects, viewport, viewportLeftEdge, matchedEventIds, false, 0.4);
+    // Filter to matched rects only, then delegate to TextLabelRenderer
+    const matchedRects = this.filterMatchedRects(culledRects, matchedEventIds);
+    this.textLabelRenderer.render(matchedRects, viewport);
   }
 
   /**
-   * Render labels for either matched or non-matched events.
+   * Filter culledRects to only include rectangles that match the search.
+   *
+   * @param culledRects - All visible rectangles grouped by category
+   * @param matchedEventIds - Set of event IDs that match search
+   * @returns Filtered map containing only matched rectangles
+   */
+  private filterMatchedRects(
+    culledRects: Map<string, PrecomputedRect[]>,
+    matchedEventIds: ReadonlySet<string>,
+  ): Map<string, PrecomputedRect[]> {
+    const result = new Map<string, PrecomputedRect[]>();
+    for (const [category, rects] of culledRects) {
+      const matched = rects.filter((r) => matchedEventIds.has(r.id));
+      if (matched.length > 0) {
+        result.set(category, matched);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Render labels for non-matched events with dimmed opacity.
    *
    * @param culledRects - Rectangles grouped by category
-   * @param viewport - Current viewport state
-   * @param viewportLeftEdge - Left edge of viewport in world coordinates
    * @param matchedEventIds - Set of matched event IDs
-   * @param renderMatched - If true, render matched events; if false, render non-matched
-   * @param alpha - Opacity for rendered labels (1.0 = full, 0.4 = dimmed)
+   * @param viewport - Current viewport state
    */
-  private renderLabels(
+  private renderUnmatchedLabels(
     culledRects: Map<string, PrecomputedRect[]>,
-    viewport: ViewportState,
-    viewportLeftEdge: number,
     matchedEventIds: ReadonlySet<string>,
-    renderMatched: boolean,
-    alpha: number,
+    viewport: ViewportState,
   ): void {
+    const viewportLeftEdge = viewport.offsetX;
+    const stickyLeftX = viewportLeftEdge + TEXT_LABEL_CONSTANTS.PADDING_LEFT;
+
     const fontHeightAdjustment = (TIMELINE_CONSTANTS.EVENT_HEIGHT - 4) / 2;
     const fontSize = TIMELINE_CONSTANTS.EVENT_HEIGHT - fontHeightAdjustment;
     const fontYPositionOffset = TIMELINE_CONSTANTS.EVENT_HEIGHT - fontHeightAdjustment / 2;
 
     for (const rects of culledRects.values()) {
       for (const rect of rects) {
-        // Filter: only process matched or non-matched based on renderMatched flag
-        const isMatch = matchedEventIds.has(rect.id);
-        if (isMatch !== renderMatched) {
+        // Only process non-matched events
+        if (matchedEventIds.has(rect.id)) {
           continue;
         }
 
@@ -148,7 +140,6 @@ export class SearchTextLabelRenderer {
         // Calculate sticky label position
         const rectLeftX = rect.x + TEXT_LABEL_CONSTANTS.PADDING_LEFT;
         const rectRightX = rect.x + rect.width - TEXT_LABEL_CONSTANTS.PADDING_RIGHT;
-        const stickyLeftX = viewportLeftEdge + TEXT_LABEL_CONSTANTS.PADDING_LEFT;
         const labelX = Math.max(rectLeftX, stickyLeftX);
 
         // Calculate available width
@@ -182,15 +173,16 @@ export class SearchTextLabelRenderer {
         label.text = truncated;
         label.x = labelX;
         label.y = rect.y + fontYPositionOffset;
-        label.alpha = alpha;
+        label.alpha = DIMMED_ALPHA;
         label.visible = true;
       }
     }
   }
 
   /**
-   * Hide all labels (set visible = false).
+   * Hide all unmatched labels (set visible = false).
    * Called when switching to normal mode.
+   * Note: Does NOT clear TextLabelRenderer - FlameChart manages that separately.
    */
   public clear(): void {
     for (const label of this.labels.values()) {
@@ -201,6 +193,7 @@ export class SearchTextLabelRenderer {
   /**
    * Clean up all labels and remove from container.
    * Called when FlameChart is destroyed.
+   * Note: Does NOT destroy TextLabelRenderer (managed by FlameChart).
    */
   public destroy(): void {
     for (const label of this.labels.values()) {
@@ -212,7 +205,7 @@ export class SearchTextLabelRenderer {
 
   /**
    * Truncate text to fit within available width using middle truncation.
-   * Same logic as TextLabelRenderer.
+   * Preserves both the beginning and end of the text for better context.
    *
    * @param text - The text to truncate
    * @param availableWidth - Available width in pixels for the text

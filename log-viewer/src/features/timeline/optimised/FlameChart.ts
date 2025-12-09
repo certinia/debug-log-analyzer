@@ -280,8 +280,11 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.textLabelRenderer = new TextLabelRenderer(this.worldContainer);
       await this.textLabelRenderer.loadFont();
 
-      this.searchTextLabelRenderer = new SearchTextLabelRenderer(this.worldContainer);
-      await this.searchTextLabelRenderer.loadFont();
+      // SearchTextLabelRenderer uses composition - delegates matched labels to TextLabelRenderer
+      this.searchTextLabelRenderer = new SearchTextLabelRenderer(
+        this.worldContainer,
+        this.textLabelRenderer,
+      );
 
       // Enable zIndex sorting for proper layering
       this.worldContainer.sortableChildren = true;
@@ -793,15 +796,10 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Render text labels (with or without search styling)
     if (cursor && cursor.total > 0) {
-      // Search mode: render with dimmed styling
+      // Search mode: SearchTextLabelRenderer coordinates both matched and unmatched labels
       const matchedEventIds = cursor.getMatchedEventIds();
       if (this.searchTextLabelRenderer) {
         this.searchTextLabelRenderer.render(culledRects, matchedEventIds, viewportState);
-      }
-
-      // Clear normal text renderer when in search mode
-      if (this.textLabelRenderer) {
-        this.textLabelRenderer.clear();
       }
     } else {
       // Normal mode: render all visible text
