@@ -43,6 +43,9 @@ export interface InteractionCallbacks {
 
   /** Called when hover state over event changes. Returns true if over an event. */
   onHoverChange?: (isOverEvent: boolean) => void;
+
+  /** Called when mouse leaves the canvas. */
+  onMouseLeave?: () => void;
 }
 
 export class TimelineInteractionHandler {
@@ -124,8 +127,8 @@ export class TimelineInteractionHandler {
       const mouseUpHandler = this.handleMouseUp.bind(this);
 
       this.canvas.addEventListener('mousedown', mouseDownHandler);
-      document.addEventListener('mousemove', mouseMoveHandler);
-      document.addEventListener('mouseup', mouseUpHandler);
+      this.canvas.addEventListener('mousemove', mouseMoveHandler);
+      this.canvas.addEventListener('mouseup', mouseUpHandler);
       this.registerBoundHandler('mousedown', mouseDownHandler);
       this.registerBoundHandler('mousemove', mouseMoveHandler);
       this.registerBoundHandler('mouseup', mouseUpHandler);
@@ -148,6 +151,11 @@ export class TimelineInteractionHandler {
     const clickHandler = this.handleClick.bind(this);
     this.canvas.addEventListener('click', clickHandler);
     this.registerBoundHandler('click', clickHandler);
+
+    // Mouse leave for hiding tooltips
+    const mouseLeaveHandler = this.handleMouseLeave.bind(this);
+    this.canvas.addEventListener('mouseleave', mouseLeaveHandler);
+    this.registerBoundHandler('mouseleave', mouseLeaveHandler);
   }
 
   /**
@@ -170,10 +178,10 @@ export class TimelineInteractionHandler {
         this.canvas.removeEventListener('mousedown', mouseDownHandler);
       }
       if (mouseMoveHandler) {
-        document.removeEventListener('mousemove', mouseMoveHandler);
+        this.canvas.removeEventListener('mousemove', mouseMoveHandler);
       }
       if (mouseUpHandler) {
-        document.removeEventListener('mouseup', mouseUpHandler);
+        this.canvas.removeEventListener('mouseup', mouseUpHandler);
       }
 
       // Remove touch event listeners
@@ -195,6 +203,11 @@ export class TimelineInteractionHandler {
     const clickHandler = this.boundHandlers.get('click');
     if (clickHandler) {
       this.canvas.removeEventListener('click', clickHandler);
+    }
+
+    const mouseLeaveHandler = this.boundHandlers.get('mouseleave');
+    if (mouseLeaveHandler) {
+      this.canvas.removeEventListener('mouseleave', mouseLeaveHandler);
     }
 
     this.boundHandlers.clear();
@@ -363,6 +376,15 @@ export class TimelineInteractionHandler {
 
     if (this.callbacks.onClick) {
       this.callbacks.onClick(mouseX, mouseY);
+    }
+  }
+
+  /**
+   * Handle mouse leave - notify when cursor exits canvas.
+   */
+  private handleMouseLeave(_event: MouseEvent): void {
+    if (this.callbacks.onMouseLeave) {
+      this.callbacks.onMouseLeave();
     }
   }
 

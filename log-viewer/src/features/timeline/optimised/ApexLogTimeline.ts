@@ -228,12 +228,16 @@ export class ApexLogTimeline {
    */
   private handleFind = (event: Event): void => {
     // Only process if this timeline instance is active
-    if (!this.container || !this.container.isConnected) {
+    if (!this.container || !this.container.isConnected || !this.container.clientHeight) {
       return;
     }
 
     const customEvent = event as CustomEvent<FindEventDetail>;
     const { text, options } = customEvent.detail;
+    if (!text) {
+      this.handleFindClose();
+      return;
+    }
 
     // Convert search text to predicate function (thin facade)
     const caseSensitive = options.matchCase;
@@ -293,6 +297,8 @@ export class ApexLogTimeline {
 
     // Clear search state (FlameChart handles render)
     this.flamechart.clearSearch();
+
+    document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
   };
 
   /**
