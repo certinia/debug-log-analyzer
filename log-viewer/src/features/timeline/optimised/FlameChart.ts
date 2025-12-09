@@ -593,6 +593,11 @@ export class FlameChart<E extends EventNode = EventNode> {
         onClick: (x: number, y: number) => {
           this.handleClick(x, y);
         },
+        onMouseLeave: () => {
+          if (this.callbacks.onMouseMove) {
+            this.callbacks.onMouseMove(0, 0, null, null);
+          }
+        },
       },
     );
   }
