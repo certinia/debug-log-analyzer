@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { sep } from 'path';
+import { basename, sep } from 'path';
 import {
   Position,
   Selection,
@@ -63,7 +63,7 @@ export class OpenFileInPackage {
 
     if (!symbolLocation.isExactMatch) {
       context.display.showErrorMessage(
-        `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${fileName}'`,
+        `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${basename(path)}'`,
       );
     }
     const zeroIndexedLineNumber = symbolLocation.line - 1;
