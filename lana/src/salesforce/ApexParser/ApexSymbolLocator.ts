@@ -11,6 +11,7 @@ import { CharStreams } from 'antlr4ts';
 import { ApexVisitor, type ApexMethodNode, type ApexNode } from './ApexVisitor';
 
 export type SymbolLocation = {
+  character: number;
   line: number;
   isExactMatch: boolean;
   missingSymbol?: string;
@@ -26,7 +27,7 @@ export function parseApex(apexCode: string): ApexNode {
 }
 
 export function getMethodLine(rootNode: ApexNode, symbols: string[]): SymbolLocation {
-  const result: SymbolLocation = { line: 1, isExactMatch: true };
+  const result: SymbolLocation = { character: 0, line: 1, isExactMatch: true };
 
   if (symbols[0] === rootNode.name) {
     symbols = symbols.slice(1);
@@ -52,12 +53,14 @@ export function getMethodLine(rootNode: ApexNode, symbols: string[]): SymbolLoca
 
       if (!methodNode) {
         result.line = currentRoot.line ?? 1;
+        result.character = currentRoot.idCharacter ?? 0;
         result.isExactMatch = false;
         result.missingSymbol = symbol;
         break;
       }
 
       result.line = methodNode.line;
+      result.character = methodNode.idCharacter;
     }
   }
 

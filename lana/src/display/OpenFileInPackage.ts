@@ -22,10 +22,9 @@ export class OpenFileInPackage {
       return;
     }
 
-    const parts = symbolName.split('.');
-    const fileName = parts[0]?.trim();
+    const parts = symbolName.slice(0, symbolName.indexOf('('));
 
-    const paths = await context.findSymbol(fileName as string);
+    const paths = await context.findSymbol(parts);
     if (!paths.length) {
       return;
     }
@@ -59,7 +58,7 @@ export class OpenFileInPackage {
 
     const parsedRoot = parseApex(document.getText());
 
-    const symbolLocation = getMethodLine(parsedRoot, parts);
+    const symbolLocation = getMethodLine(parsedRoot, symbolName);
 
     if (!symbolLocation.isExactMatch) {
       context.display.showErrorMessage(
@@ -67,8 +66,9 @@ export class OpenFileInPackage {
       );
     }
     const zeroIndexedLineNumber = symbolLocation.line - 1;
+    const character = symbolLocation.character ?? 0;
 
-    const pos = new Position(zeroIndexedLineNumber, 0);
+    const pos = new Position(zeroIndexedLineNumber, character);
 
     const options: TextDocumentShowOptions = {
       preserveFocus: false,
