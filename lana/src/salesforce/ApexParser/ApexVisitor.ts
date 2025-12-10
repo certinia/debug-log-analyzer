@@ -18,7 +18,7 @@ type ApexNature = 'Class' | 'Method';
 export interface ApexNode {
   /** The type of Apex construct (Class or Method) */
   nature?: ApexNature;
-  /** The name of the class or method */
+  /** The name of the class or method, in lower case */
   name?: string;
   /** Child nodes (nested classes or methods) */
   children?: ApexNode[];
@@ -87,7 +87,7 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
 
     return {
       nature: 'Class',
-      name: ctx.id().Identifier()?.toString() ?? '',
+      name: ident.text.toLowerCase(),
       children: ctx.children?.length ? this.visitChildren(ctx).children : [],
       line: start.line,
       idCharacter: ident.start.charPositionInLine ?? 0,
@@ -100,7 +100,7 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
 
     return {
       nature: 'Method',
-      name: ctx.id().Identifier()?.toString() ?? '',
+      name: ident.text.toLowerCase(),
       children: ctx.children?.length ? this.visitChildren(ctx).children : [],
       params: this.getParameters(ctx.formalParameters()),
       line: start.line,
@@ -118,7 +118,11 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
 
   private getParameters(ctx: FormalParametersContext): string {
     const paramsList = ctx.formalParameterList()?.formalParameter();
-    return paramsList?.map((param) => param.typeRef().typeName(0)?.text).join(', ') ?? '';
+    return (
+      paramsList
+        ?.map((param) => param.typeRef().text.replaceAll(' ', '').toLowerCase())
+        .join(',') ?? ''
+    );
   }
 
   private forNode(node: ApexNode, anonHandler: (n: ApexNode) => void) {
