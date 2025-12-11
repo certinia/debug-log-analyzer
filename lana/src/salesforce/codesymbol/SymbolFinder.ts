@@ -41,6 +41,7 @@ export class SymbolFinder {
    */
   private findInWorkspace(ws: Workspace, symbol: string): string | null {
     const paths = ws.findType(symbol);
+
     if (paths.length === 0) {
       const parts = symbol.split('.');
       if (parts.length > 1) {
@@ -49,6 +50,7 @@ export class SymbolFinder {
       }
       return null;
     }
+
     return paths.find((path) => path.endsWith('.cls')) || null;
   }
 }

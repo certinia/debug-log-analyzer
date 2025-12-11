@@ -4,12 +4,13 @@
 import type {
   ApexParserVisitor,
   ClassDeclarationContext,
+  ConstructorDeclarationContext,
   FormalParametersContext,
   MethodDeclarationContext,
 } from '@apexdevtools/apex-parser';
 import type { ErrorNode, ParseTree, RuleNode, TerminalNode } from 'antlr4ts/tree';
 
-type ApexNature = 'Class' | 'Method';
+type ApexNature = 'Constructor' | 'Class' | 'Method';
 
 /**
  * Represents a node in the Apex syntax tree.
@@ -18,7 +19,7 @@ type ApexNature = 'Class' | 'Method';
 export interface ApexNode {
   /** The type of Apex construct (Class or Method) */
   nature?: ApexNature;
-  /** The name of the class or method, in lower case */
+  /** The name of the class or method */
   name?: string;
   /** Child nodes (nested classes or methods) */
   children?: ApexNode[];
@@ -41,19 +42,29 @@ export interface ApexClassNode extends ApexNode {
   idCharacter: number;
 }
 
-/**
- * Represents a method declaration node in the Apex syntax tree.
- * All properties are required (non-optional) to ensure complete method metadata.
- */
-export interface ApexMethodNode extends ApexNode {
+export interface ApexParamNode extends ApexNode {
   /** Indicates this node represents a method declaration */
-  nature: 'Method';
+  nature: 'Method' | 'Constructor';
   /** Comma-separated list of parameter types for the method */
   params: string;
   /** Line number where the method is declared */
   line: number;
   /** Character position of the method identifier on the line */
   idCharacter: number;
+}
+
+/**
+ * Represents a method declaration node in the Apex syntax tree.
+ * All properties are required (non-optional) to ensure complete method metadata.
+ */
+export interface ApexMethodNode extends ApexParamNode {
+  /** Indicates this node represents a method declaration */
+  nature: 'Method';
+}
+
+export interface ApexConstructorNode extends ApexParamNode {
+  /** Indicates this node represents a method declaration */
+  nature: 'Constructor';
 }
 
 type VisitableApex = ParseTree & {
@@ -87,10 +98,25 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
 
     return {
       nature: 'Class',
-      name: ident.text.toLowerCase(),
+      name: ident.text ?? '',
       children: ctx.children?.length ? this.visitChildren(ctx).children : [],
       line: start.line,
       idCharacter: ident.start.charPositionInLine ?? 0,
+    };
+  }
+
+  visitConstructorDeclaration(ctx: ConstructorDeclarationContext): ApexConstructorNode {
+    const { start } = ctx;
+    const idContexts = ctx.qualifiedName().id();
+    const constructorName = idContexts[idContexts.length - 1];
+
+    return {
+      nature: 'Constructor',
+      name: constructorName?.text ?? '',
+      children: ctx.children?.length ? this.visitChildren(ctx).children : [],
+      params: this.getParameters(ctx.formalParameters()),
+      line: start.line,
+      idCharacter: start.charPositionInLine ?? 0,
     };
   }
 
@@ -100,11 +126,11 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
 
     return {
       nature: 'Method',
-      name: ident.text.toLowerCase(),
+      name: ident.text ?? '',
       children: ctx.children?.length ? this.visitChildren(ctx).children : [],
       params: this.getParameters(ctx.formalParameters()),
       line: start.line,
-      idCharacter: ident.start.charPositionInLine,
+      idCharacter: ident.start.charPositionInLine ?? 0,
     };
   }
 
@@ -118,11 +144,7 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
 
   private getParameters(ctx: FormalParametersContext): string {
     const paramsList = ctx.formalParameterList()?.formalParameter();
-    return (
-      paramsList
-        ?.map((param) => param.typeRef().text.replaceAll(' ', '').toLowerCase())
-        .join(',') ?? ''
-    );
+    return paramsList?.map((param) => param.typeRef().text).join(',') ?? '';
   }
 
   private forNode(node: ApexNode, anonHandler: (n: ApexNode) => void) {

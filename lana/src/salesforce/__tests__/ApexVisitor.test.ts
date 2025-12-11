@@ -19,7 +19,8 @@ describe('ApexVisitor', () => {
     it('should return class node with name and children', () => {
       const ctx = {
         id: () => ({
-          Identifier: () => ({ toString: () => 'MyClass' }),
+          text: 'MyClass',
+          start: { charPositionInLine: 0 },
         }),
         children: [{}],
         get childCount() {
@@ -45,7 +46,8 @@ describe('ApexVisitor', () => {
     it('should handle missing Identifier', () => {
       const ctx = {
         id: () => ({
-          Identifier: () => undefined,
+          text: '',
+          start: { charPositionInLine: 0 },
         }),
         children: [],
         start: { line: 10 },
@@ -61,7 +63,8 @@ describe('ApexVisitor', () => {
     it('should handle missing children', () => {
       const ctx = {
         id: () => ({
-          Identifier: () => ({ toString: () => 'NoChildren' }),
+          text: 'NoChildren',
+          start: { charPositionInLine: 0 },
         }),
         children: undefined,
         start: { line: 15 },
@@ -78,14 +81,15 @@ describe('ApexVisitor', () => {
     it('should return method node with name, params, and line', () => {
       const ctx = {
         id: () => ({
-          Identifier: () => ({ toString: () => 'myMethod' }),
+          text: 'myMethod',
+          start: { charPositionInLine: 2 },
         }),
         children: [{}],
         formalParameters: () => ({
           formalParameterList: () => ({
             formalParameter: () => [
-              { typeRef: () => ({ typeName: () => ({ text: 'Integer' }) }) },
-              { typeRef: () => ({ typeName: () => ({ text: 'String' }) }) },
+              { typeRef: () => ({ text: 'Integer' }) },
+              { typeRef: () => ({ text: 'String' }) },
             ],
           }),
         }),
@@ -97,14 +101,15 @@ describe('ApexVisitor', () => {
 
       expect(node.nature).toBe('Method');
       expect(node.name).toBe('myMethod');
-      expect(node.params).toBe('Integer, String');
+      expect(node.params).toBe('Integer,String');
       expect(node.line).toBe(42);
     });
 
     it('should handle missing Identifier and params', () => {
       const ctx = {
         id: () => ({
-          Identifier: () => undefined,
+          text: '',
+          start: { charPositionInLine: 0 },
         }),
         children: [],
         formalParameters: () => ({
@@ -118,6 +123,79 @@ describe('ApexVisitor', () => {
 
       expect(node.name).toBe('');
       expect(node.params).toBe('');
+    });
+  });
+
+  describe('visitConstructorDeclaration', () => {
+    it('should return constructor node with name, params, and line', () => {
+      const ctx = {
+        qualifiedName: () => ({
+          id: () => [{ text: 'OuterClass' }, { text: 'MyConstructor' }],
+        }),
+        children: [{}],
+        formalParameters: () => ({
+          formalParameterList: () => ({
+            formalParameter: () => [
+              { typeRef: () => ({ text: 'String' }) },
+              { typeRef: () => ({ text: 'Integer' }) },
+            ],
+          }),
+        }),
+        start: { line: 20, charPositionInLine: 5 },
+      };
+      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+
+      const node = visitor.visitConstructorDeclaration(ctx as any);
+
+      expect(node.nature).toBe('Constructor');
+      expect(node.name).toBe('MyConstructor');
+      expect(node.params).toBe('String,Integer');
+      expect(node.line).toBe(20);
+      expect(node.idCharacter).toBe(5);
+    });
+
+    it('should handle constructor with no params', () => {
+      const ctx = {
+        qualifiedName: () => ({
+          id: () => [{ text: 'MyClass' }],
+        }),
+        children: [],
+        formalParameters: () => ({
+          formalParameterList: () => undefined,
+        }),
+        start: { line: 10, charPositionInLine: 2 },
+      };
+      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+
+      const node = visitor.visitConstructorDeclaration(ctx as any);
+
+      expect(node.nature).toBe('Constructor');
+      expect(node.name).toBe('MyClass');
+      expect(node.params).toBe('');
+      expect(node.line).toBe(10);
+    });
+
+    it('should handle nested class constructor', () => {
+      const ctx = {
+        qualifiedName: () => ({
+          id: () => [{ text: 'OuterClass' }, { text: 'InnerClass' }, { text: 'InnerClass' }],
+        }),
+        children: [{}],
+        formalParameters: () => ({
+          formalParameterList: () => ({
+            formalParameter: () => [{ typeRef: () => ({ text: 'Boolean' }) }],
+          }),
+        }),
+        start: { line: 35, charPositionInLine: 10 },
+      };
+      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+
+      const node = visitor.visitConstructorDeclaration(ctx as any);
+
+      expect(node.nature).toBe('Constructor');
+      expect(node.name).toBe('InnerClass');
+      expect(node.params).toBe('Boolean');
+      expect(node.line).toBe(35);
     });
   });
 

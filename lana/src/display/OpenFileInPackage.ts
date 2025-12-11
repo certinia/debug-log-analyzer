@@ -24,6 +24,7 @@ export class OpenFileInPackage {
 
     const parts = symbolName.slice(0, symbolName.indexOf('('));
 
+    // findSymbol displays an error message if not found, so no need to duplicate here but it would probably be better here.
     const paths = await context.findSymbol(parts);
     if (!paths.length) {
       return;
