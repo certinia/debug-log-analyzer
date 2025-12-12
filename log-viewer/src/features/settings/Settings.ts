@@ -15,7 +15,7 @@ export type LanaSettings = {
       SOQL: '#5D4963';
       'System Method': '#5C3444';
     };
-    experimental: { timeline: boolean };
+    legacy: boolean;
   };
 };
 

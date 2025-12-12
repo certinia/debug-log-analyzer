@@ -25,7 +25,7 @@ export class TimelineView extends LitElement {
   timelineKeys: TimelineGroup[] = [];
 
   @state()
-  private isNewTimelineEnabled: boolean | null = null;
+  private useLegacyTimeline: boolean | null = null;
 
   constructor() {
     super();
@@ -48,14 +48,14 @@ export class TimelineView extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
     const settings = await getSettings();
-    this.isNewTimelineEnabled = settings.timeline.experimental.timeline;
+    this.useLegacyTimeline = settings.timeline.legacy;
   }
 
   render() {
     let timelineBody;
-    if (!this.timelineRoot || this.isNewTimelineEnabled === null) {
+    if (!this.timelineRoot || this.useLegacyTimeline === null) {
       timelineBody = html`<timeline-skeleton></timeline-skeleton>`;
-    } else if (this.isNewTimelineEnabled) {
+    } else if (!this.useLegacyTimeline) {
       timelineBody = html`<timeline-flame-chart
         .apexLog=${this.timelineRoot}
       ></timeline-flame-chart>`;
