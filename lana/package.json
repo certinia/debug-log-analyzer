@@ -169,14 +169,11 @@
           "description": "Colors used for each event type on the Timeline",
           "additionalProperties": false
         },
-        "lana.timeline.experimental.timeline": {
-          "title": "Enable the new experimental Timeline",
+        "lana.timeline.legacy": {
+          "title": "Enable/ disable the legacy timeline. Default is false.",
           "type": "boolean",
           "default": false,
-          "description": "Enables the faster experimental Timeline",
-          "tags": [
-            "experimental"
-          ]
+          "description": "Enable/ disable the legacy timeline. Default is false."
         }
       }
     }
