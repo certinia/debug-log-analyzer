@@ -180,7 +180,7 @@
           "title": "Enable/ disable the legacy timeline. Default is false.",
           "type": "boolean",
           "default": false,
-          "description": "Enable/ disable the legacy timeline. Default is false."
+          "markdownDescription": "Enable/ disable the legacy timeline. Default is `false`."
         }
       }
     }
