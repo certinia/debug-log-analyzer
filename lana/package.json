@@ -132,37 +132,44 @@
             "Code Unit": {
               "type": "string",
               "default": "#88AE58",
-              "description": "Hex color for Code Unit timeline events."
+              "description": "Hex color for Code Unit timeline events.",
+              "format": "color-hex"
             },
             "Workflow": {
               "type": "string",
               "default": "#51A16E",
-              "description": "Hex color for Workflow timeline events."
+              "description": "Hex color for Workflow timeline events.",
+              "format": "color-hex"
             },
             "Method": {
               "type": "string",
               "default": "#2B8F81",
-              "description": "Hex color for Method timeline events."
+              "description": "Hex color for Method timeline events.",
+              "format": "color-hex"
             },
             "Flow": {
               "type": "string",
               "default": "#337986",
-              "description": "Hex color for Flow timeline events."
+              "description": "Hex color for Flow timeline events.",
+              "format": "color-hex"
             },
             "DML": {
               "type": "string",
               "default": "#285663",
-              "description": "Hex color for DML timeline events."
+              "description": "Hex color for DML timeline events.",
+              "format": "color-hex"
             },
             "SOQL": {
               "type": "string",
               "default": "#5D4963",
-              "description": "Hex color for SOQL timeline events."
+              "description": "Hex color for SOQL timeline events.",
+              "format": "color-hex"
             },
             "System Method": {
               "type": "string",
               "default": "#5C3444",
-              "description": "Hex color for System Method timeline events."
+              "description": "Hex color for System Method timeline events.",
+              "format": "color-hex"
             }
           },
           "title": "Timeline Event Colors",
