@@ -173,7 +173,7 @@
             }
           },
           "title": "Timeline Event Colors",
-          "description": "Colors used for each event type on the Timeline",
+          "description": "Hex colors used for each log event type on the legacy Timeline.",
           "additionalProperties": false
         },
         "lana.timeline.legacy": {
