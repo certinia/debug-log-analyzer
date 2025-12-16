@@ -115,9 +115,6 @@ importers:
 
   lana:
     dependencies:
-      '@apexdevtools/apex-ls':
-        specifier: ^5.10.0
-        version: 5.10.0
       '@apexdevtools/apex-parser':
         specifier: ^4.4.0
         version: 4.4.1
@@ -303,24 +300,12 @@ packages:
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
 
-  '@apexdevtools/apex-ls@5.10.0':
-    resolution: {integrity: sha512-xc9yRYKBRKgTvG1xeINDDwi3iY9/f92BpCGKlpsQpS17CSh9ioAetkiryvzLHiOn3ru8YGvqdBD8FNAheC+Rdg==}
-    engines: {node: '>=14.0.0'}
-
-  '@apexdevtools/apex-parser@4.3.1':
-    resolution: {integrity: sha512-RlaWpAFudE0GvUcim/xLBNw5ipNgT0Yd1eM7jeZJS0R9qn5DxeUGY3636zfgKgWkK04075y1fgNbPsIi/EjKiw==}
-    engines: {node: '>=8.0.0'}
-
   '@apexdevtools/apex-parser@4.4.1':
     resolution: {integrity: sha512-tLHQ8DkI7/aoL9nOax+Xb3OEXk8IK1mTIpcCBaBJ3kk0Mhy4ik9jfQVAoSxjbWo8aLrjz2E4jnjmSU1iZlEt+Q==}
     engines: {node: '>=8.0.0'}
 
   '@apexdevtools/sfdx-auth-helper@2.1.0':
     resolution: {integrity: sha512-D/oNZwxP4erngD007XgunMaVJdmUfptGhB02lboUvA8yIn2g1+CUPAeSaYhuZqD8reb3ezRdaSYuZo7AIOraGQ==}
-
-  '@apexdevtools/vf-parser@1.1.0':
-    resolution: {integrity: sha512-dP45Y3b4F0b8HosvGEMo6ugRx8yKhaz7h6eJh1cD/YvFxajk6x9Hfrtw63U2EKAstug6waBsT6QC7h+4USjBnA==}
-    engines: {node: '>=8.0.0'}
 
   '@asamuzakjp/css-color@3.2.0':
     resolution: {integrity: sha512-K1A6z8tS3XsmCMM86xoWdn7Fkdn9m6RSVtocUrJYIwZnFVkng/PvkEoWtOWmP+Scc6saYWHWZYbndEEXxl24jw==}
@@ -2880,11 +2865,6 @@ packages:
 
   '@webgpu/types@0.1.66':
     resolution: {integrity: sha512-YA2hLrwLpDsRueNDXIMqN9NTzD6bCDkuXbOSe0heS+f8YE8usA6Gbv1prj81pzVHrbaAma7zObnIC+I6/sXJgA==}
-
-  '@xmldom/xmldom@0.7.9':
-    resolution: {integrity: sha512-yceMpm/xd4W2a85iqZyO09gTnHvXF6pyiWjD2jcOJs7hRoZtNNOO1eJlhHj1ixA+xip2hOyGn+LgcvLCMo5zXA==}
-    engines: {node: '>=10.0.0'}
-    deprecated: this version is no longer supported, please update to at least 0.8.*
 
   '@xmldom/xmldom@0.8.11':
     resolution: {integrity: sha512-cQzWCtO6C8TQiYl1ruKNn2U6Ao4o4WBBcbL61yJl84x+j5sOWWFU9X7DpND8XZG3daDppSsigMdfAIl2upQBRw==}
@@ -7901,18 +7881,6 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.12
       '@jridgewell/trace-mapping': 0.3.29
 
-  '@apexdevtools/apex-ls@5.10.0':
-    dependencies:
-      '@apexdevtools/apex-parser': 4.3.1
-      '@apexdevtools/vf-parser': 1.1.0
-      '@xmldom/xmldom': 0.7.9
-      antlr4ts: 0.5.0-alpha.4
-
-  '@apexdevtools/apex-parser@4.3.1':
-    dependencies:
-      antlr4ts: 0.5.0-alpha.4
-      node-dir: 0.1.17
-
   '@apexdevtools/apex-parser@4.4.1':
     dependencies:
       antlr4ts: 0.5.0-alpha.4
@@ -7925,11 +7893,6 @@ snapshots:
     transitivePeerDependencies:
       - encoding
       - supports-color
-
-  '@apexdevtools/vf-parser@1.1.0':
-    dependencies:
-      antlr4ts: 0.5.0-alpha.4
-      node-dir: 0.1.17
 
   '@asamuzakjp/css-color@3.2.0':
     dependencies:
@@ -11439,8 +11402,6 @@ snapshots:
       '@xtuc/long': 4.2.2
 
   '@webgpu/types@0.1.66': {}
-
-  '@xmldom/xmldom@0.7.9': {}
 
   '@xmldom/xmldom@0.8.11': {}
 
