@@ -535,6 +535,28 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.requestRender();
   }
 
+  /**
+   * Update timeline colors and request a re-render.
+   * Updates batch colors and re-renders the timeline.
+   */
+  public setColors(colors: Record<string, string>): void {
+    if (!this.state) {
+      return;
+    }
+
+    // Update batch colors
+    for (const [category, batch] of this.state.batches) {
+      const colorValue = colors[category];
+      if (colorValue) {
+        batch.color = this.cssColorToPixi(colorValue);
+        batch.isDirty = true;
+      }
+    }
+
+    // Request re-render
+    this.requestRender();
+  }
+
   // ============================================================================
   // PRIVATE SETUP METHODS
   // ============================================================================

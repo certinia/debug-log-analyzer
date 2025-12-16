@@ -9,7 +9,6 @@ export type IssueType = 'unexpected' | 'error' | 'skip';
 export type LineNumber = number | 'EXTERNAL' | null; // an actual line-number or 'EXTERNAL'
 
 export type LogSubCategory =
-  | ''
   | 'Method'
   | 'System Method'
   | 'Code Unit'

@@ -6,6 +6,7 @@ import { vscodeMessenger } from '../../core/messaging/VSCodeExtensionMessenger.j
 /* eslint-disable @typescript-eslint/naming-convention */
 export type LanaSettings = {
   timeline: {
+    activeTheme: string;
     colors: {
       'Code Unit': '#88AE58';
       Workflow: '#51A16E';

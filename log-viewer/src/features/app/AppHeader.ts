@@ -12,7 +12,6 @@ import { customElement, property } from 'lit/decorators.js';
 
 import type { ApexLog } from '../../core/log-parser/LogEvents.js';
 import { Notification } from '../notifications/components/NotificationPanel.js';
-import type { TimelineGroup } from '../timeline/services/Timeline.js';
 
 // web components
 import '../../components/LogLevels.js';
@@ -45,8 +44,6 @@ export class AppHeader extends LitElement {
   parserIssues: Notification[] = [];
   @property()
   timelineRoot: ApexLog | null = null;
-  @property()
-  timelineKeys: TimelineGroup[] = [];
 
   static styles = [
     globalStyles,

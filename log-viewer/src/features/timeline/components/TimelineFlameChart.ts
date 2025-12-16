@@ -13,7 +13,6 @@ import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
-import { getSettings } from '../../settings/Settings.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 
 import type { TimelineOptions } from '../types/flamechart.types.js';
@@ -77,10 +76,13 @@ export class TimelineFlameChart extends LitElement {
   @property({ type: Object })
   apexLog: ApexLog | null = null;
 
+  @property()
+  themeName: string | null = null;
+
   /**
    * Optional configuration options.
    */
-  @property({ type: Object })
+  @state()
   options: TimelineOptions = {};
 
   // ============================================================================
@@ -108,6 +110,10 @@ export class TimelineFlameChart extends LitElement {
     ) {
       this.initializeTimeline();
     }
+
+    if (changedProperties.has('themeName') || changedProperties.has('themeName')) {
+      this.apexLogTimeline?.setTheme(this.themeName ?? '');
+    }
   }
 
   /**
@@ -129,18 +135,13 @@ export class TimelineFlameChart extends LitElement {
     try {
       this.errorMessage = null;
 
-      // Fetch settings for custom colors
-      const settings = await getSettings();
-      const customColors = settings.timeline.colors;
-
-      // Merge custom colors with options
-      const optionsWithColors: TimelineOptions = {
+      const optionsWithTheme = {
         ...this.options,
-        colors: customColors,
+        themeName: this.themeName,
       };
 
       this.apexLogTimeline = new ApexLogTimeline();
-      await this.apexLogTimeline.init(this.containerRef, this.apexLog, optionsWithColors);
+      await this.apexLogTimeline.init(this.containerRef, this.apexLog, optionsWithTheme);
     } catch (error) {
       this.handleError(error);
     }

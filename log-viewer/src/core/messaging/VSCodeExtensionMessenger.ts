@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
-class VSCodeExtensionMessenger {
+export class VSCodeExtensionMessenger {
   private static vscode: VSCodeAPI<unknown>;
   private static instance: VSCodeExtensionMessenger;
   private static listeners = new Map<string, ListenerType>();
@@ -71,7 +71,7 @@ class VSCodeExtensionMessenger {
     });
   }
 
-  private static listen<T>(callback: (event: MessageEvent<VSCodeMessage<T>>) => void): void {
+  public static listen<T>(callback: (event: MessageEvent<VSCodeMessage<T>>) => void): void {
     window.addEventListener('message', callback);
   }
 }
