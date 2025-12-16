@@ -63,6 +63,11 @@
         "command": "lana.showLogAnalysis",
         "title": "Log: Show Apex Log Analysis",
         "icon": "./certinia-icon-color.png"
+      },
+      {
+        "command": "lana.switchTimelineTheme",
+        "title": "Log: Timeline Theme",
+        "icon": "./certinia-icon-color.png"
       }
     ],
     "languages": [
@@ -117,8 +122,57 @@
       "type": "object",
       "title": "Apex Log Analyzer",
       "properties": {
+        "lana.timeline.activeTheme": {
+          "type": "string",
+          "default": "50 shades of green - classic",
+          "markdownDescription": "Select a timeline theme or enter the name of a custom theme defined in `#lana.timeline.customThemes#`",
+          "order": 0,
+          "anyOf": [
+            {
+              "enum": [
+                "50 shades of green - classic",
+                "50 Shades of green high contrast",
+                "Botanical Twilight /  50 Shades of green modern",
+                "Catppuccin Macchiato",
+                "Chrome Bright",
+                "Chrome Muted",
+                "Dracula",
+                "Dusty Aurora",
+                "Firefox",
+                "Firefox Dim",
+                "Flame",
+                "Forest Floor",
+                "Garish",
+                "Intellij",
+                "Material",
+                "Monokai Pro",
+                "Modern",
+                "Nord Artic Muted",
+                "Nordic",
+                "Okabe-Ito",
+                "Salesforce Lightning",
+                "Solarized High Contrast",
+                "Sunset Diverging"
+              ]
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "lana.timeline.legacy": {
+          "title": "Enable/ disable the legacy timeline. Default is false.",
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Enable/ disable the legacy timeline. Default is `false`.",
+          "order": 2
+        },
         "lana.timeline.colors": {
           "type": "object",
+          "title": "Timeline Event Colors",
+          "description": "Hex colors used for each log event type on the legacy Timeline.",
+          "additionalProperties": false,
+          "order": 3,
           "default": {
             "Code Unit": "#88AE58",
             "Workflow": "#51A16E",
@@ -171,16 +225,7 @@
               "description": "Hex color for System Method timeline events.",
               "format": "color-hex"
             }
-          },
-          "title": "Timeline Event Colors",
-          "description": "Hex colors used for each log event type on the legacy Timeline.",
-          "additionalProperties": false
-        },
-        "lana.timeline.legacy": {
-          "title": "Enable/ disable the legacy timeline. Default is false.",
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "Enable/ disable the legacy timeline. Default is `false`."
+          }
         }
       }
     }

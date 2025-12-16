@@ -19,6 +19,11 @@ interface WebViewLogFileRequest<T = unknown> {
 
 export class LogView {
   private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
+  private static currentPanel: WebviewPanel | undefined;
+
+  static getCurrentView() {
+    return LogView.currentPanel;
+  }
 
   static async createView(
     context: Context,
@@ -31,6 +36,7 @@ export class LogView {
       'Log: ' + logPath ? basename(logPath || '') : 'Untitled',
       [Uri.file(join(context.context.extensionPath, 'out')), Uri.file(dirname(logPath || ''))],
     );
+    this.currentPanel = panel;
 
     const logViewerRoot = join(context.context.extensionPath, 'out');
     const index = join(logViewerRoot, 'index.html');
