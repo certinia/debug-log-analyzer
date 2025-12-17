@@ -20,7 +20,7 @@ export interface TimelineColors {
   reserved3?: string; // Generic
 }
 
-export const DEFAULT_THEME = '50 shades of green - classic';
+export const DEFAULT_THEME_NAME = '50 shades of green - classic';
 
 export const THEMES: TimelineTheme[] = [
   {

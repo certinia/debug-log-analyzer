@@ -10,6 +10,7 @@ import { Uri, commands, window as vscWindow, workspace, type WebviewPanel } from
 import { Context } from '../Context.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
+import { getConfig } from '../workspace/AppConfig.js';
 
 interface WebViewLogFileRequest<T = unknown> {
   requestId: string;
@@ -88,7 +89,7 @@ export class LogView {
             panel.webview.postMessage({
               requestId,
               cmd: 'getConfig',
-              payload: workspace.getConfiguration('lana'),
+              payload: getConfig(),
             });
             break;
           }

@@ -9,8 +9,8 @@ import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensio
 import { getSettings } from '../../settings/Settings.js';
 import { type TimelineGroup, keyMap, setColors } from '../services/Timeline.js';
 
-import { DEFAULT_THEME, type TimelineColors } from '../themes/Themes.js';
-import { getTheme } from '../themes/ThemeSelector.js';
+import { DEFAULT_THEME_NAME, type TimelineColors } from '../themes/Themes.js';
+import { addCustomThemes, getTheme } from '../themes/ThemeSelector.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -20,6 +20,20 @@ import './TimelineFlameChart.js';
 import './TimelineKey.js';
 import './TimelineLegacy.js';
 import './TimelineSkeleton.js';
+
+/* eslint-disable @typescript-eslint/naming-convention */
+interface ThemeSettings {
+  [key: string]: {
+    'Code Unit': string;
+    Workflow: string;
+    Method: string;
+    Flow: string;
+    DML: string;
+    SOQL: string;
+    'System Method': string;
+  };
+}
+/* eslint-enable @typescript-eslint/naming-convention */
 
 @customElement('timeline-view')
 export class TimelineView extends LitElement {
@@ -59,17 +73,19 @@ export class TimelineView extends LitElement {
     VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
       const { cmd, payload } = event.data;
       if (cmd === 'switchTimelineTheme' && this.activeTheme !== payload.activeTheme) {
-        this.setTheme(payload.activeTheme ?? DEFAULT_THEME);
+        this.setTheme(payload.activeTheme ?? DEFAULT_THEME_NAME);
       }
     });
 
     getSettings().then((settings) => {
-      this.useLegacyTimeline = settings.timeline.legacy;
+      const { timeline } = settings;
+      this.useLegacyTimeline = timeline.legacy;
 
       if (!this.useLegacyTimeline) {
-        this.setTheme(settings.timeline.activeTheme ?? DEFAULT_THEME);
+        addCustomThemes(this.toTheme(timeline.customThemes));
+        this.setTheme(timeline.activeTheme ?? DEFAULT_THEME_NAME);
       } else {
-        setColors(settings.timeline.colors);
+        setColors(timeline.colors);
         this.timelineKeys = Array.from(keyMap.values());
       }
     });
@@ -96,8 +112,24 @@ export class TimelineView extends LitElement {
   }
 
   private setTheme(themeName: string) {
-    this.activeTheme = themeName ?? DEFAULT_THEME;
+    this.activeTheme = themeName ?? DEFAULT_THEME_NAME;
     this.timelineKeys = this.toTimelineKeys(getTheme(themeName));
+  }
+
+  private toTheme(themeSettings: ThemeSettings): { [key: string]: TimelineColors } {
+    const themes: { [key: string]: TimelineColors } = {};
+    for (const [name, colors] of Object.entries(themeSettings)) {
+      themes[name] = {
+        codeUnit: colors['Code Unit'],
+        workflow: colors.Workflow,
+        method: colors.Method,
+        flow: colors.Flow,
+        dml: colors.DML,
+        soql: colors.SOQL,
+        system: colors['System Method'],
+      };
+    }
+    return themes;
   }
 
   private toTimelineKeys(colors: TimelineColors): TimelineGroup[] {

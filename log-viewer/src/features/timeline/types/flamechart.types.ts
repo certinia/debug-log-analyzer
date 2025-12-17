@@ -112,6 +112,9 @@ export interface RenderBatch {
   /** PixiJS color value (0xRRGGBB). */
   color: number;
 
+  /** Alpha transparency (0-1). */
+  alpha?: number;
+
   /** Rectangles to render (only visible events). */
   rectangles: PrecomputedRect[];
 
@@ -386,7 +389,8 @@ export const TEXT_LABEL_CONSTANTS = {
     // COLOR: 0xd7d7d7,
     // COLOR: 0x333333,
     // COLOR: 0x000000,
-    COLOR: 0xe3e3e3,
+    DARK_THEME_COLOR: 0xe3e3e3,
+    LIGHT_THEME_COLOR: 0x1e1e1e,
   },
 } as const;
 /* eslint-enable @typescript-eslint/naming-convention */

@@ -122,7 +122,7 @@ export class EventBatchRenderer {
     }
 
     // Set fill style for this batch
-    gfx.setFillStyle({ color: batch.color });
+    gfx.setFillStyle({ color: batch.color, alpha: batch.alpha ?? 1 });
 
     // Draw all rectangles in this batch with negative space separation
     const gap = TIMELINE_CONSTANTS.RECT_GAP;

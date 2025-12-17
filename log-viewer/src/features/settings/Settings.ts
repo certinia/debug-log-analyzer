@@ -16,6 +16,17 @@ export type LanaSettings = {
       SOQL: '#5D4963';
       'System Method': '#5C3444';
     };
+    customThemes: {
+      [key: string]: {
+        'Code Unit': string;
+        Workflow: string;
+        Method: string;
+        Flow: string;
+        DML: string;
+        SOQL: string;
+        'System Method': string;
+      };
+    };
     legacy: boolean;
   };
 };

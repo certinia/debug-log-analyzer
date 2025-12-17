@@ -276,14 +276,16 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     // Create text label renderer (renders method names on rectangles)
-    if (this.worldContainer) {
+    if (this.worldContainer && this.state) {
       this.textLabelRenderer = new TextLabelRenderer(this.worldContainer);
       await this.textLabelRenderer.loadFont();
+      this.textLabelRenderer.setBatches(this.state.batches);
 
       // SearchTextLabelRenderer uses composition - delegates matched labels to TextLabelRenderer
       this.searchTextLabelRenderer = new SearchTextLabelRenderer(
         this.worldContainer,
         this.textLabelRenderer,
+        this.state.batches,
       );
 
       // Enable zIndex sorting for proper layering
@@ -548,7 +550,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     for (const [category, batch] of this.state.batches) {
       const colorValue = colors[category];
       if (colorValue) {
-        batch.color = this.cssColorToPixi(colorValue);
+        const parsed = this.cssColorToPixi(colorValue);
+        batch.color = parsed.color;
+        batch.alpha = parsed.alpha;
         batch.isDirty = true;
       }
     }
@@ -714,9 +718,11 @@ export class FlameChart<E extends EventNode = EventNode> {
     const categories = Object.keys(colors) as (keyof typeof colors)[];
 
     for (const category of categories) {
+      const parsed = this.cssColorToPixi(colors[category] || '#000000');
       batches.set(category, {
         category,
-        color: this.cssColorToPixi(colors[category] || '#000000'),
+        color: parsed.color,
+        alpha: parsed.alpha,
         rectangles: [],
         isDirty: true,
       });
@@ -736,20 +742,42 @@ export class FlameChart<E extends EventNode = EventNode> {
     };
   }
 
-  private cssColorToPixi(cssColor: string): number {
+  private cssColorToPixi(cssColor: string): { color: number; alpha: number } {
     if (cssColor.startsWith('#')) {
-      return parseInt(cssColor.slice(1), 16);
+      const hex = cssColor.slice(1);
+      if (hex.length === 8) {
+        const rgb = hex.slice(0, 6);
+        const a = parseInt(hex.slice(6, 8), 16) / 255;
+        return { color: parseInt(rgb, 16), alpha: a };
+      }
+      if (hex.length === 6) {
+        return { color: parseInt(hex, 16), alpha: 1 };
+      }
+      if (hex.length === 4) {
+        const r = hex[0]!;
+        const g = hex[1]!;
+        const b = hex[2]!;
+        const a = hex[3]!;
+        return { color: parseInt(r + r + g + g + b + b, 16), alpha: parseInt(a + a, 16) / 255 };
+      }
+      if (hex.length === 3) {
+        const r = hex[0]!;
+        const g = hex[1]!;
+        const b = hex[2]!;
+        return { color: parseInt(r + r + g + g + b + b, 16), alpha: 1 };
+      }
     }
 
-    const rgbMatch = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    const rgbMatch = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d*(?:\.\d+)?))?\)/);
     if (rgbMatch) {
       const r = parseInt(rgbMatch[1] ?? '0', 10);
       const g = parseInt(rgbMatch[2] ?? '0', 10);
       const b = parseInt(rgbMatch[3] ?? '0', 10);
-      return (r << 16) | (g << 8) | b;
+      const a = rgbMatch[4] ? parseFloat(rgbMatch[4]) : 1;
+      return { color: (r << 16) | (g << 8) | b, alpha: a };
     }
 
-    return 0x000000;
+    return { color: 0x000000, alpha: 1 };
   }
 
   // ============================================================================

@@ -63,6 +63,7 @@ export class ApexLogTimeline {
     this.container = container;
 
     const colorMap = this.themeToColors(options.themeName ?? '');
+    options.colors = colorMap;
 
     // Create tooltip manager for Apex-specific tooltips
     this.tooltipManager = new TimelineTooltipManager(container, {

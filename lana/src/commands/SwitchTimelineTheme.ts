@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { ConfigurationTarget, Uri, window, workspace } from 'vscode';
+import { Uri, window } from 'vscode';
 
 import { appName } from '../AppSettings.js';
 import { Context } from '../Context.js';
+import { getConfig, updateConfig } from '../workspace/AppConfig.js';
 import { Command } from './Command.js';
-
 import { LogView } from './LogView.js';
 
 export class SwitchTimelineTheme {
@@ -32,21 +32,22 @@ export class SwitchTimelineTheme {
   }
 
   private static async command(_context: Context, _uri: Uri): Promise<void> {
-    const config = workspace.getConfiguration('lana');
-    const customThemesNames = Object.keys(config.get('timeline.customThemes') || {});
-    const allThemeNames = new Set(THEMES.concat(customThemesNames));
+    const config = getConfig();
+    const customThemesNames = Object.keys(config.timeline.customThemes || {});
+    const allThemeNames = Array.from(new Set(THEMES.concat(customThemesNames))).sort();
 
-    // Create a QuickPick that allows custom text
-    const pick = window.createQuickPick();
-    const items = Array.from(allThemeNames).map((label) => ({
+    const items = allThemeNames.map((label) => ({
       label,
       description: label === DEFAULT_THEME ? 'default' : '',
     }));
+
+    // Create a QuickPick that allows custom text
+    const pick = window.createQuickPick();
     pick.items = items;
     pick.placeholder = 'Select Timeline Theme...';
 
     // Focus the currently active theme
-    let activeTheme = config.get<string>('timeline.activeTheme') || DEFAULT_THEME;
+    let activeTheme = config.timeline.activeTheme || DEFAULT_THEME;
     const activeItem = items.find((item) => item.label === activeTheme);
     if (activeItem) {
       pick.activeItems = [activeItem];
@@ -63,7 +64,7 @@ export class SwitchTimelineTheme {
       if (selectedTheme) {
         // Update the active theme in user settings on confirm
         activeTheme = selectedTheme;
-        await config.update('timeline.activeTheme', selectedTheme, ConfigurationTarget.Global);
+        await updateConfig('timeline.activeTheme', selectedTheme);
         pick.hide();
       }
     });
