@@ -117,4 +117,4 @@ const THEMES = [
   'Sunset Diverging',
 ].sort();
 
-const DEFAULT_THEME = '50 shades of green';
+const DEFAULT_THEME = '50 Shades of Green';

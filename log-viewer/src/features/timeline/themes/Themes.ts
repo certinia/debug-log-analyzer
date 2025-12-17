@@ -20,7 +20,7 @@ export interface TimelineColors {
   reserved3?: string; // Generic
 }
 
-export const DEFAULT_THEME_NAME = '50 shades of green';
+export const DEFAULT_THEME_NAME = '50 Shades of Green';
 export const THEMES: TimelineTheme[] = [
   {
     name: '50 Shades of Green Bright',
@@ -32,9 +32,9 @@ export const THEMES: TimelineTheme[] = [
       dml: '#00BCD4',
       soql: '#AB47BC',
       system: '#A1887F',
-      reserved1: '#', // Callouts
-      reserved2: '#', // Validation
-      reserved3: '#', // Generic
+      reserved1: '#FFA726',
+      reserved2: '#EF5350',
+      reserved3: '#78909C',
     },
   },
   {
@@ -47,9 +47,9 @@ export const THEMES: TimelineTheme[] = [
       dml: '#144652',
       soql: '#6D4C7D',
       system: '#5C3444',
-      reserved1: '#',
-      reserved2: '#',
-      reserved3: '#',
+      reserved1: '#CCA033',
+      reserved2: '#A84545',
+      reserved3: '#607D8B',
     },
   },
   {
