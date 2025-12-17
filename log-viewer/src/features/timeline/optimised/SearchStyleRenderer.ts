@@ -75,7 +75,13 @@ export class SearchStyleRenderer {
         continue;
       }
 
-      this.renderCategoryWithSearch(gfx, rectangles, batch.color, matchedEventIds);
+      this.renderCategoryWithSearch(
+        gfx,
+        rectangles,
+        batch.color,
+        batch.alpha ?? 1,
+        matchedEventIds,
+      );
     }
   }
 
@@ -110,12 +116,14 @@ export class SearchStyleRenderer {
    * @param gfx - Graphics object for this category
    * @param rectangles - Rectangles to render
    * @param originalColor - Original category color
+   * @param originalAlpha - Original category alpha
    * @param matchedEventIds - Set of matched event IDs
    */
   private renderCategoryWithSearch(
     gfx: PIXI.Graphics,
     rectangles: PrecomputedRect[],
     originalColor: number,
+    originalAlpha: number,
     matchedEventIds: ReadonlySet<string>,
   ): void {
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
@@ -135,7 +143,7 @@ export class SearchStyleRenderer {
       }
     }
     if (hasMatched) {
-      gfx.fill({ color: originalColor });
+      gfx.fill({ color: originalColor, alpha: originalAlpha });
     }
 
     // Draw non-matched events with greyscale
@@ -151,7 +159,7 @@ export class SearchStyleRenderer {
       }
     }
     if (hasNonMatched) {
-      gfx.fill({ color: greyColor });
+      gfx.fill({ color: greyColor, alpha: originalAlpha });
     }
   }
 

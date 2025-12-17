@@ -264,7 +264,7 @@ export class SearchHighlightRenderer {
 
   /**
    * Parse CSS color string to PixiJS numeric color.
-   * Handles hex format (#RRGGBB, #RRGGBBAA) and falls back to default.
+   * Handles hex format (#RGB, #RGBA, #RRGGBB, #RRGGBBAA) and falls back to default.
    *
    * @param cssColor - CSS color string
    * @returns PixiJS numeric color (0xRRGGBB)
@@ -282,6 +282,20 @@ export class SearchHighlightRenderer {
       }
       if (hex.length === 6) {
         return { color: parseInt(hex, 16), alpha: 1 };
+      }
+      if (hex.length === 4) {
+        const r = hex[0]!;
+        const g = hex[1]!;
+        const b = hex[2]!;
+        const a = hex[3]!;
+        const alpha = parseInt(a + a, 16) / 255;
+        return { color: parseInt(r + r + g + g + b + b, 16), alpha };
+      }
+      if (hex.length === 3) {
+        const r = hex[0]!;
+        const g = hex[1]!;
+        const b = hex[2]!;
+        return { color: parseInt(r + r + g + g + b + b, 16), alpha: 1 };
       }
     }
     // rgba() fallback
