@@ -94,29 +94,27 @@ export class SwitchTimelineTheme {
 // Note: Themes are defined in the log-viewer folder but there are no references to the files from here to maintain separation of concerns.
 // They are kept in sync manually.
 const THEMES = [
-  '50 shades of green - classic',
-  '50 Shades of green high contrast',
-  'Botanical Twilight /  50 Shades of green modern',
+  '50 Shades of Green Bright',
+  '50 Shades of Green',
+  'Botanical Twilight',
   'Catppuccin Macchiato',
-  'Chrome Bright',
-  'Chrome Muted',
+  'Chrome',
   'Dracula',
   'Dusty Aurora',
   'Firefox',
-  'Firefox Dim',
   'Flame',
   'Forest Floor',
   'Garish',
   'Intellij',
   'Material',
-  'Monokai Pro',
   'Modern',
-  'Nord Artic Muted',
+  'Monokai Pro',
+  'Nord Artic',
   'Nordic',
   'Okabe-Ito',
-  'Salesforce Lightning',
-  'Solarized High Contrast',
+  'Salesforce Light',
+  'Solarized',
   'Sunset Diverging',
 ].sort();
 
-const DEFAULT_THEME = '50 shades of green - classic';
+const DEFAULT_THEME = '50 shades of green';

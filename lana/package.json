@@ -124,34 +124,32 @@
       "properties": {
         "lana.timeline.activeTheme": {
           "type": "string",
-          "default": "50 shades of green - classic",
+          "default": "50 shades of green",
           "markdownDescription": "Select a timeline theme or enter the name of a custom theme defined in `#lana.timeline.customThemes#`",
           "order": 0,
           "anyOf": [
             {
               "enum": [
-                "50 shades of green - classic",
-                "50 Shades of green high contrast",
-                "Botanical Twilight /  50 Shades of green modern",
+                "50 Shades of Green Bright",
+                "50 Shades of Green",
+                "Botanical Twilight",
                 "Catppuccin Macchiato",
-                "Chrome Bright",
-                "Chrome Muted",
+                "Chrome",
                 "Dracula",
                 "Dusty Aurora",
                 "Firefox",
-                "Firefox Dim",
                 "Flame",
                 "Forest Floor",
                 "Garish",
                 "Intellij",
                 "Material",
-                "Monokai Pro",
                 "Modern",
-                "Nord Artic Muted",
+                "Monokai Pro",
+                "Nord Artic",
                 "Nordic",
                 "Okabe-Ito",
-                "Salesforce Lightning",
-                "Solarized High Contrast",
+                "Salesforce Light",
+                "Solarized",
                 "Sunset Diverging"
               ]
             },
