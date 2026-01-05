@@ -55,16 +55,16 @@ export const THEMES: TimelineTheme[] = [
   {
     name: 'Botanical Twilight',
     colors: {
-      codeUnit: '#354F52',
-      workflow: '#52796F',
-      method: '#5CA880',
-      flow: '#84A98C',
-      dml: '#9B72AA',
-      soql: '#C26D6D',
-      system: '#4A585F',
+      codeUnit: '#93B376',
+      workflow: '#5CA880',
+      method: '#708B91',
+      flow: '#458593',
+      dml: '#C26D6D',
+      soql: '#8D7494',
+      system: '#666266',
       reserved1: '#D4A76A',
       reserved2: '#A8C2BF',
-      reserved3: '#E0E1DD',
+      reserved3: '#566E7A',
     },
   },
   {
@@ -85,28 +85,28 @@ export const THEMES: TimelineTheme[] = [
   {
     name: 'Chrome',
     colors: {
-      codeUnit: '#D4AC0D',
-      workflow: '#48C9B0',
-      method: '#F0D574',
+      codeUnit: '#757575',
+      method: '#EBD272',
+      workflow: '#80CBC4',
       flow: '#5DADE2',
-      dml: '#A569BD',
-      soql: '#58D68D',
+      dml: '#AF7AC5',
+      soql: '#7DCEA0',
       system: '#E0E0E0',
-      reserved1: '#EC7063', // Callouts
-      reserved2: '#F5B041', // Validation
-      reserved3: '#566573', // Generic
+      reserved1: '#D98880',
+      reserved2: '#F0B27A',
+      reserved3: '#90A4AE',
     },
   },
   {
     name: 'Dracula',
     colors: {
-      codeUnit: '#bd93f9', // Purple
-      workflow: '#8be9fd', // Cyan
-      method: '#6272A4', // Comment Purple/Blue
-      flow: '#FF79C6', // Pink
-      dml: '#FFB86C', // Orange
-      soql: '#50FA7B', // Green
-      system: '#44475A', // Current Line (Gray)
+      codeUnit: '#bd93f9',
+      workflow: '#8be9fd',
+      method: '#6272A4',
+      flow: '#FF79C6',
+      dml: '#FFB86C',
+      soql: '#50FA7B',
+      system: '#44475A',
       reserved1: '#f1fa8c',
       reserved2: '#FF5555',
       reserved3: '#9580FF',
@@ -115,42 +115,42 @@ export const THEMES: TimelineTheme[] = [
   {
     name: 'Dusty Aurora',
     colors: {
-      codeUnit: '#6D4C41',
-      workflow: '#0097A7',
-      method: '#00796B',
-      flow: '#1976D2',
-      dml: '#F4511E',
-      soql: '#7B1FA2',
-      system: '#757575',
-      reserved1: '#C2185B',
-      reserved2: '#FBC02D',
-      reserved3: '#546E7A',
+      codeUnit: '#455A64',
+      workflow: '#8CBFA2',
+      method: '#56949C',
+      flow: '#7CA5C9',
+      dml: '#D68C79',
+      soql: '#A693BD',
+      system: '#8D8078',
+      reserved1: '#CDBD7A',
+      reserved2: '#D67E7E',
+      reserved3: '#90A4AE',
     },
   },
   {
     name: 'Firefox',
     colors: {
-      codeUnit: '#D7D7DB', // System Grey (Container)
-      workflow: '#C49FCF', // FIXED: Layout Purple (Corrected)
-      method: '#D5C266', // JS Yellow (Darker than Chrome)
-      flow: '#75B5AA', // Network Teal
-      dml: '#E37F81', // Red (GC/Error)
-      soql: '#8DC885', // Green (Graphics)
-      system: '#EFEFEF', // Background
-      reserved1: '#9A7FD5', // Extension Purple
-      reserved2: '#E8A956', // Orange
-      reserved3: '#596E7E', // Slate
+      codeUnit: '#B4B4B9',
+      workflow: '#C49FCF',
+      method: '#D5C266',
+      flow: '#75B5AA',
+      dml: '#E37F81',
+      soql: '#8DC885',
+      system: '#8F8585',
+      reserved1: '#8484D1',
+      reserved2: '#E8A956',
+      reserved3: '#5283A4',
     },
   },
   {
     name: 'Flame',
     colors: {
-      codeUnit: '#D84315', // Darkened Orange
-      workflow: '#689F38', // Darkened Green
-      method: '#FF8F00', // Darkened Amber
-      flow: '#FBC02D', // Darkened Yellow
-      dml: '#C2185B', // Darkened Pink
-      soql: '#0097A7', // Darkened Cyan
+      codeUnit: '#D84315',
+      workflow: '#689F38',
+      method: '#FF8F00',
+      flow: '#FBC02D',
+      dml: '#C2185B',
+      soql: '#0097A7',
       system: '#616161',
       reserved1: '#D32F2F',
       reserved2: '#AFB42B',
@@ -167,9 +167,9 @@ export const THEMES: TimelineTheme[] = [
       dml: '#F4A261',
       soql: '#E76F51',
       system: '#455A64',
-      reserved1: '#52796F',
-      reserved2: '#84A98C',
-      reserved3: '#CAD2C5',
+      reserved1: '#606C38',
+      reserved2: '#BC4749',
+      reserved3: '#9C6644',
     },
   },
   {
@@ -177,132 +177,117 @@ export const THEMES: TimelineTheme[] = [
     colors: {
       codeUnit: '#722ED1',
       workflow: '#52C41A',
-      method: '#1890FF', // Adjusted to standard Ant Design Blue for better contrast
+      method: '#1890FF',
       flow: '#13C2C2',
       dml: '#FA8C16',
       soql: '#EB2F96',
-      system: '#8C8C8C', // Darkened from #92A1B7 for white background visibility
+      system: '#8C8C8C',
       reserved1: '#F5222D',
       reserved2: '#FADB14',
-      reserved3: '#2F54EB', // Geek Blue
-    },
-  },
-  {
-    name: 'Intellij', // Corrected to match "Darcula" standard
-    colors: {
-      codeUnit: '#CC7832', // Keyword Orange (Hard)
-      workflow: '#9876AA', // Interface Purple
-      method: '#FFC66D', // Method Gold (The Classic look)
-      flow: '#6A8759', // String Green
-      dml: '#629755', // Comment Green
-      soql: '#6897BB', // Numeric Blue
-      system: '#808080', // Folded Text
-      reserved1: '#EF5350', // Error Red
-      reserved2: '#BBB529', // Search Result
-      reserved3: '#5C6BC0', // Local Variable
+      reserved3: '#2F54EB',
     },
   },
   {
     name: 'Material',
     colors: {
-      codeUnit: '#3949AB',
-      workflow: '#00897B',
-      method: '#546E7A',
-      flow: '#039BE5',
-      dml: '#FB8C00',
-      soql: '#43A047',
-      system: '#6D4C41',
-      reserved1: '#D81B60',
-      reserved2: '#E53935',
-      reserved3: '#FDD835',
+      codeUnit: '#BA68C8',
+      workflow: '#4FC3F7',
+      method: '#676E95',
+      flow: '#FFCC80',
+      dml: '#E57373',
+      soql: '#91B859',
+      system: '#A1887F',
+      reserved1: '#F48FB1',
+      reserved2: '#9FA8DA',
+      reserved3: '#80CBC4',
     },
   },
   {
     name: 'Modern',
     colors: {
-      codeUnit: '#2980B9',
-      workflow: '#16A085',
-      method: '#758EAA',
-      flow: '#27AE60',
-      dml: '#E67E22',
-      soql: '#9B59B6',
-      system: '#95A5A6',
-      reserved1: '#C0392B', // Callouts
-      reserved2: '#F39C12', // Validation
-      reserved3: '#2C3E50', // Generic
+      codeUnit: '#6E7599',
+      workflow: '#4A918E',
+      method: '#6A7B8C',
+      flow: '#C47C46',
+      dml: '#CC5E5E',
+      soql: '#5CA376',
+      system: '#948C84',
+      reserved1: '#B86B86',
+      reserved2: '#4D8CB0',
+      reserved3: '#756CA8',
     },
   },
   {
     name: 'Monokai Pro',
     colors: {
-      codeUnit: '#a9dc76',
-      workflow: '#fc9867',
-      method: '#78DCE8',
-      flow: '#AB9DF2',
-      dml: '#FF6188',
-      soql: '#ffd866',
-      system: '#727072',
-      reserved1: '#F92672',
-      reserved2: '#AE81FF',
-      reserved3: '#66D9EF',
+      codeUnit: '#9E86C8',
+      workflow: '#D4856A',
+      method: '#7B8CA6',
+      flow: '#F0A65F',
+      dml: '#D95C79',
+      soql: '#9CCF6A',
+      system: '#9E938D',
+      reserved1: '#DBC05E',
+      reserved2: '#5EC4CD',
+      reserved3: '#8F8B76',
     },
   },
   {
-    name: 'Nord Artic',
+    name: 'Nord',
+    colors: {
+      codeUnit: '#81a1c1',
+      workflow: '#b48ead',
+      method: '#5e81ac',
+      flow: '#d08770',
+      dml: '#bf616a',
+      soql: '#a3be8c',
+      system: '#4c566a',
+      reserved1: '#ebcb8b',
+      reserved2: '#88c0d0',
+      reserved3: '#8fbcbb',
+    },
+  },
+  {
+    name: 'Nord Forest',
     colors: {
       codeUnit: '#5E81AC',
-      workflow: '#8FBCBB',
-      method: '#76849D',
-      flow: '#B48EAD',
+      workflow: '#EBCB8B',
+      method: '#7B8C7C',
+      flow: '#BF616A',
       dml: '#D08770',
-      soql: '#A3BE8C',
-      system: '#434C5E',
-      reserved1: '#EBCB8B', // Callouts
-      reserved2: '#BF616A', // Validation
-      reserved3: '#88C0D0', // Generic
+      soql: '#B48EAD',
+      system: '#8C7B7E',
+      reserved1: '#687585',
+      reserved2: '#88C0D0',
+      reserved3: '#81A1C1',
     },
   },
   {
-    name: 'Nordic',
-    colors: {
-      codeUnit: '#B48EAD', // Purple
-      workflow: '#88C0D0', // Cyan
-      method: '#5E81AC', // Blue (Dominant)
-      flow: '#A3BE8C', // Green
-      dml: '#BF616A', // Red
-      soql: '#EBCB8B', // Yellow
-      system: '#4C566A', // Lighter Gray (Nord3) - Visible on Dark BG
-      reserved1: '#D08770', // Orange
-      reserved2: '#D98E48', // Darkened Orange
-      reserved3: '#5E81AC', // Blue (Replaced "Polar Night" BG color)
-    },
-  },
-  {
-    name: 'Okabe-Ito', // Accessibility Safe
+    name: 'Okabe-Ito',
     colors: {
       codeUnit: '#0072B2',
-      workflow: '#56B4E9',
-      method: '#888888',
-      flow: '#CC79A7',
-      dml: '#D55E00',
+      workflow: '#332288',
+      method: '#56B4E9',
+      flow: '#D55E00',
+      dml: '#CC79A7',
       soql: '#009E73',
-      system: '#555555',
-      reserved1: '#E69F00',
-      reserved2: '#F0E442',
-      reserved3: '#332288',
+      system: '#E69F00',
+      reserved1: '#882255',
+      reserved2: '#117733',
+      reserved3: '#AA4499',
     },
   },
   {
-    name: 'Salesforce Light', // Corrected for Visibility
+    name: 'Salesforce',
     colors: {
       codeUnit: '#0176D3',
-      workflow: '#706E6B',
+      workflow: '#9050E9',
       method: '#54698D',
-      flow: '#0B5CAB',
+      flow: '#584FB8',
       dml: '#DD7A01',
-      soql: '#04844B',
+      soql: '#0B5CAB',
       system: '#706E6B',
-      reserved1: '#7F8CED',
+      reserved1: '#4BCA81',
       reserved2: '#C23934',
       reserved3: '#005FB2',
     },
@@ -320,21 +305,6 @@ export const THEMES: TimelineTheme[] = [
       reserved1: '#D33682',
       reserved2: '#CB4B16',
       reserved3: '#93a1a1',
-    },
-  },
-  {
-    name: 'Sunset Diverging',
-    colors: {
-      codeUnit: '#455A64',
-      workflow: '#512DA8',
-      method: '#616161',
-      flow: '#C2185B',
-      dml: '#D32F2F',
-      soql: '#FBC02D',
-      system: '#5D4037',
-      reserved1: '#E64A19',
-      reserved2: '#7B1FA2',
-      reserved3: '#00796B',
     },
   },
 ];

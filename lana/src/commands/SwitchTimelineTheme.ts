@@ -105,16 +105,14 @@ const THEMES = [
   'Flame',
   'Forest Floor',
   'Garish',
-  'Intellij',
   'Material',
   'Modern',
   'Monokai Pro',
-  'Nord Artic',
-  'Nordic',
+  'Nord',
+  'Nord Forest',
   'Okabe-Ito',
-  'Salesforce Light',
+  'Salesforce',
   'Solarized',
-  'Sunset Diverging',
 ].sort();
 
 const DEFAULT_THEME = '50 Shades of Green';
