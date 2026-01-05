@@ -7,6 +7,11 @@ interface TimelineTheme {
   colors: TimelineColors;
 }
 
+/**
+ * Note: Eventual categories will be
+ * Apex , Code Unit, System, Automation, DML, SOQL, Validation, Callout, Visualforce
+ */
+
 export interface TimelineColors {
   codeUnit: string;
   workflow: string;
@@ -85,13 +90,13 @@ export const THEMES: TimelineTheme[] = [
   {
     name: 'Chrome',
     colors: {
-      codeUnit: '#757575',
+      codeUnit: '#7986CB',
       method: '#EBD272',
       workflow: '#80CBC4',
       flow: '#5DADE2',
       dml: '#AF7AC5',
       soql: '#7DCEA0',
-      system: '#E0E0E0',
+      system: '#CFD8DC',
       reserved1: '#D98880',
       reserved2: '#F0B27A',
       reserved3: '#90A4AE',
@@ -221,14 +226,14 @@ export const THEMES: TimelineTheme[] = [
     name: 'Monokai Pro',
     colors: {
       codeUnit: '#9E86C8',
-      workflow: '#D4856A',
+      workflow: '#FF6188',
       method: '#7B8CA6',
-      flow: '#F0A65F',
-      dml: '#D95C79',
-      soql: '#9CCF6A',
+      flow: '#FFD866',
+      dml: '#FC9867',
+      soql: '#A9DC76',
       system: '#9E938D',
-      reserved1: '#DBC05E',
-      reserved2: '#5EC4CD',
+      reserved1: '#AB9DF2',
+      reserved2: '#78DCE8',
       reserved3: '#8F8B76',
     },
   },
@@ -279,15 +284,16 @@ export const THEMES: TimelineTheme[] = [
   },
   {
     name: 'Salesforce',
+
     colors: {
       codeUnit: '#0176D3',
-      workflow: '#9050E9',
+      workflow: '#CE4A6B',
       method: '#54698D',
-      flow: '#584FB8',
-      dml: '#DD7A01',
-      soql: '#0B5CAB',
+      flow: '#9050E9',
+      dml: '#D68128',
+      soql: '#04844B',
       system: '#706E6B',
-      reserved1: '#4BCA81',
+      reserved1: '#D4B753',
       reserved2: '#C23934',
       reserved3: '#005FB2',
     },
