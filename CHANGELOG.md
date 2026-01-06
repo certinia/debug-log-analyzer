@@ -9,13 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart that is up to **7X faster**. ([#446] [#251] [#92])
-  - Enable it via **Settings -> Apex Log Analyzer -> Timeline -> Experimental -> Timeline**.
+- ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart that is up to **7X faster**. ([#446] [#251] [#92] [#564])
+  - Revert to the legacy timeline via **Settings -> Apex Log Analyzer -> Timeline -> Legacy**.
   - Generally Improved performance, especially for large logs.
   - Text labels on Timeline events.
   - Zoom and pan are now **7X faster**.
   - The Time axis scales more naturally when zooming, with larger gaps between the markers on longer logs.
   - Search + highlight will grey out non matches to find matches more easily.
+  - Added 18 timeline color themes and improved the default theme for better contrast and readability.
+  - Supply multiple custom themes via **Settings -> Apex Log Analyzer -> Timeline -> Custom Themes**.
+  - Change the active theme via the new **Command Palette** command **Log: Timeline Theme** or via **Settings -> Apex Log Analyzer -> Timeline -> Active Theme**.
 
 ### Changed
 
@@ -415,6 +418,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#564]: https://github.com/certinia/debug-log-analyzer/issues/564
 [#92]: https://github.com/certinia/debug-log-analyzer/issues/92
 [#694]: https://github.com/certinia/debug-log-analyzer/issues/694
 [#446]: https://github.com/certinia/debug-log-analyzer/issues/446
