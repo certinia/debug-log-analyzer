@@ -18,13 +18,13 @@ export type LanaSettings = {
     };
     customThemes: {
       [key: string]: {
-        'Code Unit': string;
-        Workflow: string;
-        Method: string;
-        Flow: string;
-        DML: string;
-        SOQL: string;
-        'System Method': string;
+        codeUnit: string;
+        workflow: string;
+        method: string;
+        flow: string;
+        dml: string;
+        soql: string;
+        system: string;
       };
     };
     legacy: boolean;

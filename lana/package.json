@@ -163,68 +163,68 @@
           "order": 1,
           "default": {
             "Custom": {
-              "Code Unit": "#88AE58",
-              "Workflow": "#51A16E",
-              "Method": "#2B8F81",
-              "Flow": "#337986",
-              "DML": "#285663",
-              "SOQL": "#5D4963",
-              "System Method": "#5C3444"
+              "codeUnit": "#88AE58",
+              "workflow": "#51A16E",
+              "method": "#2B8F81",
+              "flow": "#337986",
+              "dml": "#285663",
+              "soql": "#5D4963",
+              "system": "#5C3444"
             }
           },
           "additionalProperties": {
             "type": "object",
             "additionalProperties": false,
             "required": [
-              "Code Unit",
-              "Workflow",
-              "Method",
-              "Flow",
-              "DML",
-              "SOQL",
-              "System Method"
+              "codeUnit",
+              "workflow",
+              "method",
+              "flow",
+              "dml",
+              "soql",
+              "system"
             ],
             "properties": {
               "default": {
-                "Code Unit": "#88AE58",
-                "Workflow": "#51A16E",
-                "Method": "#2B8F81",
-                "Flow": "#337986",
-                "DML": "#285663",
-                "SOQL": "#5D4963",
-                "System Method": "#5C3444"
+                "codeUnit": "#88AE58",
+                "workflow": "#51A16E",
+                "method": "#2B8F81",
+                "flow": "#337986",
+                "dml": "#285663",
+                "soql": "#5D4963",
+                "system": "#5C3444"
               },
-              "Code Unit": {
+              "codeUnit": {
                 "type": "string",
                 "format": "color-hex",
                 "default": "#88AE58"
               },
-              "Workflow": {
+              "workflow": {
                 "type": "string",
                 "format": "color-hex",
                 "default": "#51A16E"
               },
-              "Method": {
+              "method": {
                 "type": "string",
                 "format": "color-hex",
                 "default": "#2B8F81"
               },
-              "Flow": {
+              "flow": {
                 "type": "string",
                 "format": "color-hex",
                 "default": "#337986"
               },
-              "DML": {
+              "dml": {
                 "type": "string",
                 "format": "color-hex",
                 "default": "#285663"
               },
-              "SOQL": {
+              "soql": {
                 "type": "string",
                 "format": "color-hex",
                 "default": "#5D4963"
               },
-              "System Method": {
+              "system": {
                 "type": "string",
                 "format": "color-hex",
                 "default": "#5C3444"

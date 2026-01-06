@@ -24,13 +24,13 @@ import './TimelineSkeleton.js';
 /* eslint-disable @typescript-eslint/naming-convention */
 interface ThemeSettings {
   [key: string]: {
-    'Code Unit': string;
-    Workflow: string;
-    Method: string;
-    Flow: string;
-    DML: string;
-    SOQL: string;
-    'System Method': string;
+    codeUnit: string;
+    workflow: string;
+    method: string;
+    flow: string;
+    dml: string;
+    soql: string;
+    system: string;
   };
 }
 /* eslint-enable @typescript-eslint/naming-convention */
@@ -120,13 +120,13 @@ export class TimelineView extends LitElement {
     const themes: { [key: string]: TimelineColors } = {};
     for (const [name, colors] of Object.entries(themeSettings)) {
       themes[name] = {
-        codeUnit: colors['Code Unit'],
-        workflow: colors.Workflow,
-        method: colors.Method,
-        flow: colors.Flow,
-        dml: colors.DML,
-        soql: colors.SOQL,
-        system: colors['System Method'],
+        codeUnit: colors.codeUnit,
+        workflow: colors.workflow,
+        method: colors.method,
+        flow: colors.flow,
+        dml: colors.dml,
+        soql: colors.soql,
+        system: colors.system,
       };
     }
     return themes;
