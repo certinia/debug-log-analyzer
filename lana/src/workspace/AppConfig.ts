@@ -12,10 +12,10 @@ interface Config {
       'Code Unit': '#88AE58';
       Workflow: '#51A16E';
       Method: '#2B8F81';
-      Flow: '#337986';
-      DML: '#285663';
-      SOQL: '#5D4963';
-      'System Method': '#5C3444';
+      Flow: '#5C8FA6';
+      DML: '#B06868';
+      SOQL: '#6D4C7D';
+      'System Method': '#8D6E63';
       /* eslint-enable @typescript-eslint/naming-convention */
     };
     customThemes: {
