@@ -73,7 +73,7 @@ export const THEMES: TimelineTheme[] = [
     },
   },
   {
-    name: 'Catppuccin Macchiato',
+    name: 'Catppuccin',
     colors: {
       codeUnit: '#8AADF4',
       workflow: '#94E2D5',
@@ -150,16 +150,16 @@ export const THEMES: TimelineTheme[] = [
   {
     name: 'Flame',
     colors: {
-      codeUnit: '#BF360C',
-      workflow: '#FF7043',
-      method: '#FB8C00',
-      flow: '#FFD740',
-      dml: '#D50000',
-      soql: '#F57F17',
-      system: '#FFAB91',
+      codeUnit: '#B71C1C',
+      workflow: '#E65100',
+      method: '#F57C00',
+      flow: '#FF7043',
+      dml: '#F44336',
+      soql: '#FFCA28',
+      system: '#8D6E63',
       reserved1: '#C2185B',
-      reserved2: '#7B1FA2',
-      reserved3: '#FFCA28',
+      reserved2: '#8E24AA',
+      reserved3: '#5D4037',
     },
   },
   {

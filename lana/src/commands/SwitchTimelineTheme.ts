@@ -97,7 +97,7 @@ const THEMES = [
   '50 Shades of Green Bright',
   '50 Shades of Green',
   'Botanical Twilight',
-  'Catppuccin Macchiato',
+  'Catppuccin',
   'Chrome',
   'Dracula',
   'Dusty Aurora',
