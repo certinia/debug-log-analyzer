@@ -22,7 +22,7 @@ export interface TimelineColors {
   system: string;
   reserved1?: string; // Callouts
   reserved2?: string; // Validation
-  reserved3?: string; // Generic
+  reserved3?: string; // Visualforce
 }
 
 export const DEFAULT_THEME_NAME = '50 Shades of Green';
@@ -150,16 +150,16 @@ export const THEMES: TimelineTheme[] = [
   {
     name: 'Flame',
     colors: {
-      codeUnit: '#D84315',
-      workflow: '#689F38',
-      method: '#FF8F00',
-      flow: '#FBC02D',
-      dml: '#C2185B',
-      soql: '#0097A7',
-      system: '#616161',
-      reserved1: '#D32F2F',
-      reserved2: '#AFB42B',
-      reserved3: '#455A64',
+      codeUnit: '#BF360C',
+      workflow: '#FF7043',
+      method: '#FB8C00',
+      flow: '#FFD740',
+      dml: '#D50000',
+      soql: '#F57F17',
+      system: '#FFAB91',
+      reserved1: '#C2185B',
+      reserved2: '#7B1FA2',
+      reserved3: '#FFCA28',
     },
   },
   {
@@ -183,13 +183,13 @@ export const THEMES: TimelineTheme[] = [
       codeUnit: '#722ED1',
       workflow: '#52C41A',
       method: '#1890FF',
-      flow: '#13C2C2',
-      dml: '#FA8C16',
+      flow: '#00BCD4',
+      dml: '#FF9100',
       soql: '#EB2F96',
-      system: '#8C8C8C',
+      system: '#90A4AE',
       reserved1: '#F5222D',
-      reserved2: '#FADB14',
-      reserved3: '#2F54EB',
+      reserved2: '#FFC400',
+      reserved3: '#651FFF',
     },
   },
   {
