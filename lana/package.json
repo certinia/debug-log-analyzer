@@ -130,8 +130,8 @@
           "anyOf": [
             {
               "enum": [
-                "50 Shades of Green Bright",
                 "50 Shades of Green",
+                "50 Shades of Green Bright",
                 "Botanical Twilight",
                 "Catppuccin",
                 "Chrome",
