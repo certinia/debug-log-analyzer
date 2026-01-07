@@ -2,7 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 
-import { DEFAULT_THEME_NAME, THEMES, type TimelineColors } from './themes.js';
+import { DEFAULT_THEME_NAME, THEMES, type TimelineColors } from './Themes.js';
 const THEME_MAP = new Map<string, TimelineColors>(
   THEMES.map((theme) => [theme.name, theme.colors]),
 );
