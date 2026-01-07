@@ -10,6 +10,7 @@ import { Uri, commands, window as vscWindow, workspace, type WebviewPanel } from
 import { Context } from '../Context.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
+import { getConfig } from '../workspace/AppConfig.js';
 
 interface WebViewLogFileRequest<T = unknown> {
   requestId: string;
@@ -19,6 +20,11 @@ interface WebViewLogFileRequest<T = unknown> {
 
 export class LogView {
   private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
+  private static currentPanel: WebviewPanel | undefined;
+
+  static getCurrentView() {
+    return LogView.currentPanel;
+  }
 
   static async createView(
     context: Context,
@@ -31,6 +37,7 @@ export class LogView {
       'Log: ' + logPath ? basename(logPath || '') : 'Untitled',
       [Uri.file(join(context.context.extensionPath, 'out')), Uri.file(dirname(logPath || ''))],
     );
+    this.currentPanel = panel;
 
     const logViewerRoot = join(context.context.extensionPath, 'out');
     const index = join(logViewerRoot, 'index.html');
@@ -82,7 +89,7 @@ export class LogView {
             panel.webview.postMessage({
               requestId,
               cmd: 'getConfig',
-              payload: workspace.getConfiguration('lana'),
+              payload: getConfig(),
             });
             break;
           }

@@ -112,6 +112,9 @@ export interface RenderBatch {
   /** PixiJS color value (0xRRGGBB). */
   color: number;
 
+  /** Alpha transparency (0-1). */
+  alpha?: number;
+
   /** Rectangles to render (only visible events). */
   rectangles: PrecomputedRect[];
 
@@ -228,10 +231,10 @@ export const TIMELINE_CONSTANTS = {
     'Code Unit': '#88AE58',
     Workflow: '#51A16E',
     Method: '#2B8F81',
-    Flow: '#337986',
-    DML: '#285663',
-    SOQL: '#5D4963',
-    'System Method': '#5C3444',
+    Flow: '#5C8FA6',
+    DML: '#B06868',
+    SOQL: '#6D4C7D',
+    'System Method': '#8D6E63',
   } as TimelineColorMap,
 
   /** Maximum zoom level (0.01ms = 10 microsecond visible width in nanoseconds). */
@@ -386,7 +389,8 @@ export const TEXT_LABEL_CONSTANTS = {
     // COLOR: 0xd7d7d7,
     // COLOR: 0x333333,
     // COLOR: 0x000000,
-    COLOR: 0xe3e3e3,
+    DARK_THEME_COLOR: 0xe3e3e3,
+    LIGHT_THEME_COLOR: 0x1e1e1e,
   },
 } as const;
 /* eslint-enable @typescript-eslint/naming-convention */

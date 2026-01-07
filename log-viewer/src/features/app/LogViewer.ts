@@ -11,9 +11,6 @@ import {
   Notification,
   type NotificationSeverity,
 } from '../notifications/components/NotificationPanel.js';
-import { getSettings } from '../settings/Settings.js';
-import type { TimelineGroup } from '../timeline/services/Timeline.js';
-import { keyMap, setColors } from '../timeline/services/Timeline.js';
 
 // styles
 import codiconStyles from '../../styles/codicon.css';
@@ -38,8 +35,6 @@ export class LogViewer extends LitElement {
   parserIssues: Notification[] = [];
   @property()
   timelineRoot: ApexLog | null = null;
-  @property()
-  timelineKeys: TimelineGroup[] = [];
 
   @state()
   _selectedTab = 'timeline-tab';
@@ -92,11 +87,6 @@ export class LogViewer extends LitElement {
     document.addEventListener('show-tab', (e: Event) => {
       this._showTabEvent(e);
     });
-
-    getSettings().then((settings) => {
-      setColors(settings.timeline.colors);
-      this.timelineKeys = Array.from(keyMap.values());
-    });
   }
 
   render() {
@@ -108,7 +98,6 @@ export class LogViewer extends LitElement {
         .notifications=${this.notifications}
         .parserIssues=${this.parserIssues}
         .timelineRoot=${this.timelineRoot}
-        .timelineKeys=${this.timelineKeys}
       ></app-header>
 
       <vscode-panels activeid="${this._selectedTab}">
@@ -142,10 +131,7 @@ export class LogViewer extends LitElement {
         </vscode-panel-tab>
 
         <vscode-panel-view id="view1">
-          <timeline-view
-            .timelineRoot="${this.timelineRoot}"
-            .timelineKeys="${this.timelineKeys}"
-          ></timeline-view>
+          <timeline-view .timelineRoot="${this.timelineRoot}"></timeline-view>
         </vscode-panel-view>
         <vscode-panel-view id="view2">
           <call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view>

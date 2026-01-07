@@ -6,6 +6,7 @@ import { workspace, type ExtensionContext } from 'vscode';
 import { ShowAnalysisCodeLens } from './codelenses/ShowAnalysisCodeLens.js';
 import { RetrieveLogFile } from './commands/RetrieveLogFile.js';
 import { ShowLogAnalysis } from './commands/ShowLogAnalysis.js';
+import { SwitchTimelineTheme } from './commands/SwitchTimelineTheme.js';
 import { Display } from './display/Display.js';
 import { WhatsNewNotification } from './display/WhatsNewNotification.js';
 import { SymbolFinder } from './salesforce/codesymbol/SymbolFinder.js';
@@ -29,6 +30,7 @@ export class Context {
 
     RetrieveLogFile.apply(this);
     ShowLogAnalysis.apply(this);
+    SwitchTimelineTheme.apply(this);
     ShowAnalysisCodeLens.apply(this);
     WhatsNewNotification.apply(this);
   }

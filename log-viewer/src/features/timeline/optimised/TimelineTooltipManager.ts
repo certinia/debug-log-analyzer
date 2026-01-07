@@ -137,6 +137,13 @@ export class TimelineTooltipManager {
   }
 
   /**
+   * Update category colors (used when theme changes).
+   */
+  public updateCategoryColors(colors: Record<string, string>): void {
+    this.options.categoryColors = colors;
+  }
+
+  /**
    * Display tooltip with event information.
    */
   private displayTooltip(event: LogEvent, mouseX: number, mouseY: number): void {

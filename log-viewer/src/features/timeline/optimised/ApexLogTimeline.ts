@@ -19,6 +19,7 @@
 
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
+import { getTheme } from '../themes/ThemeSelector.js';
 import type {
   EventNode,
   FindEventDetail,
@@ -31,6 +32,10 @@ import type { SearchCursor } from '../types/search.types.js';
 import { extractMarkers } from '../utils/marker-utils.js';
 import { FlameChart } from './FlameChart.js';
 import { TimelineTooltipManager } from './TimelineTooltipManager.js';
+
+interface ApexTimelineOptions extends TimelineOptions {
+  themeName?: string | null;
+}
 
 export class ApexLogTimeline {
   private flamechart: FlameChart;
@@ -51,19 +56,20 @@ export class ApexLogTimeline {
   public async init(
     container: HTMLElement,
     apexLog: ApexLog,
-    options: TimelineOptions = {},
+    options: ApexTimelineOptions = {},
   ): Promise<void> {
     this.apexLog = apexLog;
     this.options = options;
     this.container = container;
 
+    const colorMap = this.themeToColors(options.themeName ?? '');
+    options.colors = colorMap;
+
     // Create tooltip manager for Apex-specific tooltips
     this.tooltipManager = new TimelineTooltipManager(container, {
       enableFlip: true,
       cursorOffset: 10,
-      categoryColors: {
-        ...options.colors,
-      },
+      categoryColors: colorMap,
       apexLog: apexLog,
     });
 
@@ -135,9 +141,41 @@ export class ApexLogTimeline {
     this.flamechart.resize(newWidth, newHeight);
   }
 
+  /**
+   * Set timeline theme by name and apply colors.
+   * Retrieves theme colors from ThemeSelector and updates FlameChart.
+   */
+  public setTheme(themeName: string): void {
+    const colorMap = this.themeToColors(themeName);
+
+    // Update FlameChart colors (handles re-render)
+    this.flamechart.setColors(colorMap);
+
+    // Update TooltipManager colors if available
+    if (this.tooltipManager) {
+      this.tooltipManager.updateCategoryColors(colorMap);
+    }
+  }
+
+  private themeToColors(themeName: string) {
+    const theme = getTheme(themeName);
+    // Convert TimelineColors keys to the format expected by FlameChart
+    /* eslint-disable @typescript-eslint/naming-convention */
+    return {
+      'Code Unit': theme.codeUnit,
+      Workflow: theme.workflow,
+      Method: theme.method,
+      Flow: theme.flow,
+      DML: theme.dml,
+      SOQL: theme.soql,
+      'System Method': theme.system,
+    };
+    /* eslint-enable @typescript-eslint/naming-convention */
+  }
+
   // ============================================================================
   // APEX-SPECIFIC HANDLERS
-  // ============================================================================
+  // ============================================================================}
 
   /**
    * Handle mouse move - show Apex-specific tooltips.
