@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { sep } from 'path';
+import { basename, sep } from 'path';
 import {
   Position,
   Selection,
@@ -22,10 +22,10 @@ export class OpenFileInPackage {
       return;
     }
 
-    const parts = symbolName.split('.');
-    const fileName = parts[0]?.trim();
+    const parts = symbolName.slice(0, symbolName.indexOf('('));
 
-    const paths = await context.findSymbol(fileName as string);
+    // findSymbol displays an error message if not found, so no need to duplicate here but it would probably be better here.
+    const paths = await context.findSymbol(parts);
     if (!paths.length) {
       return;
     }
@@ -59,16 +59,17 @@ export class OpenFileInPackage {
 
     const parsedRoot = parseApex(document.getText());
 
-    const symbolLocation = getMethodLine(parsedRoot, parts);
+    const symbolLocation = getMethodLine(parsedRoot, symbolName);
 
     if (!symbolLocation.isExactMatch) {
       context.display.showErrorMessage(
-        `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${fileName}'`,
+        `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${basename(path)}'`,
       );
     }
     const zeroIndexedLineNumber = symbolLocation.line - 1;
+    const character = symbolLocation.character ?? 0;
 
-    const pos = new Position(zeroIndexedLineNumber, 0);
+    const pos = new Position(zeroIndexedLineNumber, character);
 
     const options: TextDocumentShowOptions = {
       preserveFocus: false,
