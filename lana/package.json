@@ -31,7 +31,7 @@
   ],
   "type": "module",
   "main": "out/Main.js",
-  "icon": "certinia-icon-color.png",
+  "icon": "./certinia-icon-color.png",
   "galleryBanner": {
     "color": "#000000",
     "theme": "dark"
