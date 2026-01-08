@@ -32,11 +32,10 @@ export class LogView {
     logPath?: string,
     logData?: string,
   ): Promise<WebviewPanel> {
-    const panel = WebView.apply(
-      'logFile',
-      'Log: ' + logPath ? basename(logPath || '') : 'Untitled',
-      [Uri.file(join(context.context.extensionPath, 'out')), Uri.file(dirname(logPath || ''))],
-    );
+    const panel = WebView.apply('logFile', `Log: ${logPath ? basename(logPath) : 'Untitled'}`, [
+      Uri.file(join(context.context.extensionPath, 'out')),
+      Uri.file(dirname(logPath || '')),
+    ]);
     this.currentPanel = panel;
 
     const logViewerRoot = join(context.context.extensionPath, 'out');
