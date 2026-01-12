@@ -557,6 +557,9 @@ export class FlameChart<E extends EventNode = EventNode> {
       }
     }
 
+    // Rebuild batch colors cache (used by bucket color resolution)
+    this.state.batchColorsCache = this.buildBatchColorsCache(this.state.batches);
+
     // Request re-render
     this.requestRender();
   }
@@ -728,10 +731,14 @@ export class FlameChart<E extends EventNode = EventNode> {
       });
     }
 
+    // Build initial batch colors cache
+    const batchColorsCache = this.buildBatchColorsCache(batches);
+
     this.state = {
       events,
       viewport: this.viewport.getState(),
       batches,
+      batchColorsCache,
       interaction: {
         isDragging: false,
         lastMousePos: { x: 0, y: 0 },
@@ -740,6 +747,20 @@ export class FlameChart<E extends EventNode = EventNode> {
       needsRender: true,
       isInitialized: true,
     };
+  }
+
+  /**
+   * Build batch colors cache from batches map.
+   * Used for bucket color resolution without recreating Map every frame.
+   */
+  private buildBatchColorsCache(
+    batches: Map<string, { color: number; alpha?: number }>,
+  ): Map<string, { color: number; alpha?: number }> {
+    const cache = new Map<string, { color: number; alpha?: number }>();
+    for (const [category, batch] of batches) {
+      cache.set(category, { color: batch.color, alpha: batch.alpha });
+    }
+    return cache;
   }
 
   private cssColorToPixi(cssColor: string): { color: number; alpha: number } {
@@ -821,18 +842,10 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.axisRenderer.render(viewportState);
     }
 
-    // TODO: optimise by changing in setColors only
-    // Extract batch colors for bucket color resolution (theme support)
-    const batchColors = new Map(
-      [...this.state.batches].map(([cat, batch]) => [
-        cat,
-        { color: batch.color, alpha: batch.alpha },
-      ]),
-    );
-
+    // Use cached batch colors for bucket color resolution (built in setColors/init)
     const { visibleRects, buckets } = this.rectangleManager.getCulledRectangles(
       viewportState,
-      batchColors,
+      this.state.batchColorsCache,
     );
 
     // Render events (with or without search styling)

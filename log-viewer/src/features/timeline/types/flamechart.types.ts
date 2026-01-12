@@ -159,6 +159,9 @@ export interface TimelineState {
   /** Render batches (7 categories). */
   batches: Map<LogSubCategory, RenderBatch>;
 
+  /** Cached batch colors for bucket color resolution (performance optimization). */
+  batchColorsCache: Map<string, { color: number; alpha?: number }>;
+
   /** Interaction state. */
   interaction: {
     isDragging: boolean;

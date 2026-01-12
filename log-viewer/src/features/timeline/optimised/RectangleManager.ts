@@ -116,9 +116,10 @@ export class RectangleManager {
     const bounds = this.calculateBounds(viewport);
     const visibleRects = new Map<string, PrecomputedRect[]>();
 
-    // Bucket aggregation: Map<"depth-bucketIndex", bucket data>
+    // Bucket aggregation: Map<compositeKey, bucket data>
+    // Using integer key instead of string for performance: (depth << 24) | bucketIndex
     const bucketMap = new Map<
-      string,
+      number,
       {
         depth: number;
         bucketIndex: number;
@@ -161,8 +162,14 @@ export class RectangleManager {
         const rectDepth = rect.depth;
         const rectDuration = rect.duration;
 
-        // Horizontal overlap check
-        if (rectTimeStart >= boundsTimeEnd || rectTimeEnd <= boundsTimeStart) {
+        // Early exit: rectangles are sorted by timeStart, so if we've
+        // passed the viewport end, all remaining rectangles are also past it
+        if (rectTimeStart >= boundsTimeEnd) {
+          break;
+        }
+
+        // Skip rectangles that end before viewport starts
+        if (rectTimeEnd <= boundsTimeStart) {
           continue;
         }
 
@@ -183,7 +190,8 @@ export class RectangleManager {
         } else {
           // Sub-pixel event: aggregate into bucket
           const bucketIndex = Math.floor(rectTimeStart / bucketTimeWidth);
-          const bucketKey = `${rectDepth}-${bucketIndex}`;
+          // Composite integer key: depth in upper 8 bits, bucketIndex in lower 24 bits
+          const bucketKey = (rectDepth << 24) | (bucketIndex & 0xffffff);
 
           let bucket = bucketMap.get(bucketKey);
           if (!bucket) {
@@ -292,6 +300,12 @@ export class RectangleManager {
 
     // Flatten event tree into rectangles
     this.flattenEvents(events, 0);
+
+    // Sort rectangles by timeStart for early exit during culling
+    // This enables breaking out of the loop when we've passed the viewport
+    for (const rects of this.rectsByCategory.values()) {
+      rects.sort((a, b) => a.timeStart - b.timeStart);
+    }
   }
 
   /**

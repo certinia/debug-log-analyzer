@@ -14,9 +14,41 @@
  * - Sparse regions (1 event): faint (0.3 opacity)
  * - Dense regions (100+ events): prominent (0.9 opacity)
  * - Logarithmic scale makes intermediate densities visible
+ *
+ * Performance: Uses pre-computed lookup table for O(1) access.
  */
 
 import { BUCKET_CONSTANTS } from '../types/flamechart.types.js';
+
+// Pre-computed opacity lookup table for event counts 0-100
+// Avoids Math.log10() calls in hot render path
+const OPACITY_LUT = buildOpacityLUT();
+
+/**
+ * Build pre-computed opacity lookup table.
+ * Called once at module load time.
+ */
+function buildOpacityLUT(): number[] {
+  const { MIN, MAX, RANGE, SATURATION_COUNT } = BUCKET_CONSTANTS.OPACITY;
+  const lut: number[] = new Array(SATURATION_COUNT + 1);
+  const logMax = Math.log10(SATURATION_COUNT);
+
+  // Index 0 and 1: minimum opacity
+  lut[0] = MIN;
+  lut[1] = MIN;
+
+  // Indexes 2 to SATURATION_COUNT-1: logarithmic scaling
+  for (let i = 2; i < SATURATION_COUNT; i++) {
+    const logCount = Math.log10(i);
+    const normalizedLog = logCount / logMax;
+    lut[i] = MIN + RANGE * normalizedLog;
+  }
+
+  // Index SATURATION_COUNT: explicitly set to MAX to avoid floating point error
+  lut[SATURATION_COUNT] = MAX;
+
+  return lut;
+}
 
 /**
  * Calculate bucket opacity based on event count.
@@ -26,29 +58,20 @@ import { BUCKET_CONSTANTS } from '../types/flamechart.types.js';
  * - 10 events → 0.6 (medium visibility)
  * - 100 events → 0.9 (maximum, prominent)
  *
+ * Performance: O(1) lookup from pre-computed table.
+ *
  * @param eventCount - Number of events in the bucket
  * @returns Opacity value between 0.3 and 0.9
  */
 export function calculateOpacity(eventCount: number): number {
-  const { MIN, MAX, RANGE, SATURATION_COUNT } = BUCKET_CONSTANTS.OPACITY;
+  // Floor to handle fractional event counts (arrays use integer indices)
+  const count = Math.floor(eventCount);
 
-  // Handle edge cases
-  if (eventCount <= 1) {
-    return MIN;
+  // Fast path: use lookup table for common case (0-100 events)
+  if (count <= BUCKET_CONSTANTS.OPACITY.SATURATION_COUNT) {
+    return OPACITY_LUT[count] ?? BUCKET_CONSTANTS.OPACITY.MIN;
   }
 
-  if (eventCount >= SATURATION_COUNT) {
-    return MAX;
-  }
-
-  // Logarithmic scaling
-  // Formula: MIN + RANGE * log10(count) / log10(SATURATION_COUNT)
-  const logCount = Math.log10(eventCount);
-  const logMax = Math.log10(SATURATION_COUNT);
-  const normalizedLog = logCount / logMax;
-
-  const opacity = MIN + RANGE * normalizedLog;
-
-  // Clamp to valid range (should already be, but be safe)
-  return Math.min(MAX, Math.max(MIN, opacity));
+  // Saturated: return max opacity
+  return BUCKET_CONSTANTS.OPACITY.MAX;
 }

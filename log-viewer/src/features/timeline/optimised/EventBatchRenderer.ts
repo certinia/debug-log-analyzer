@@ -118,7 +118,7 @@ export class EventBatchRenderer {
    * Render a single batch (category) using PixiJS Graphics.
    *
    * Draws all rectangles for this category as a single Graphics object.
-   * PixiJS automatically batches small Graphics objects (<100 points).
+   * Performance: Uses single fill() call for entire batch instead of per-rectangle.
    */
   private renderBatch(category: string, batch: RenderBatch): void {
     const gfx = this.graphics.get(category);
@@ -133,25 +133,26 @@ export class EventBatchRenderer {
       return;
     }
 
-    // Set fill style for this batch
+    // Set fill style once for entire batch
     gfx.setFillStyle({ color: batch.color, alpha: batch.alpha ?? 1 });
 
-    // Draw all rectangles in this batch with negative space separation
+    // Pre-calculate constants outside loop
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
     const halfGap = gap / 2;
 
+    // Draw all rectangles in this batch
     for (const rect of batch.rectangles) {
       // Apply gap to create separation between rectangles
-      // Reduce width and height by gap, and offset position by half gap
       const gappedX = rect.x + halfGap;
       const gappedY = rect.y + halfGap;
       const gappedWidth = Math.max(0, rect.width - gap);
       const gappedHeight = Math.max(0, rect.height - gap);
 
-      // Draw filled rectangle with gaps
       gfx.rect(gappedX, gappedY, gappedWidth, gappedHeight);
-      gfx.fill();
     }
+
+    // Single fill for entire batch - much faster than per-rectangle fill
+    gfx.fill();
   }
 
   /**
@@ -160,6 +161,9 @@ export class EventBatchRenderer {
    * Each bucket is rendered as a 1px wide block with a 1px gap.
    * This creates a "barcode" visual effect when multiple buckets are adjacent.
    * Opacity varies by event count to show density.
+   *
+   * Performance: Groups buckets by color+opacity to minimize setFillStyle/fill calls.
+   * Instead of O(N) state changes, we have O(distinct color+opacity combinations).
    *
    * @param buckets - Aggregated pixel buckets to render
    */
@@ -170,26 +174,43 @@ export class EventBatchRenderer {
       return;
     }
 
+    // Group buckets by color+opacity for batched rendering
+    // This reduces state changes from O(N) to O(distinct combinations)
+    const groups = new Map<number, PixelBucket[]>();
+    for (const bucket of buckets) {
+      // Use composite key: color in upper bits, opacity (scaled to int) in lower bits
+      // Opacity is 0-1, scale to 0-1000 for sufficient precision
+      const opacityKey = Math.round(bucket.opacity * 1000);
+      const key = (bucket.color << 10) | opacityKey;
+
+      let group = groups.get(key);
+      if (!group) {
+        group = [];
+        groups.set(key, group);
+      }
+      group.push(bucket);
+    }
+
+    // Pre-calculate constants outside loops
     const blockWidth = BUCKET_CONSTANTS.BUCKET_BLOCK_WIDTH;
     const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
     const halfGap = gap / 2;
+    const gappedHeight = Math.max(0, eventHeight - gap);
 
-    // Draw each bucket as a 1px block
-    for (const bucket of buckets) {
-      // Set fill style with bucket's resolved color and density-based opacity
-      this.bucketGraphics.setFillStyle({
-        color: bucket.color,
-        alpha: bucket.opacity,
-      });
+    // Render each group with single setFillStyle + single fill
+    for (const group of groups.values()) {
+      const first = group[0]!;
+      this.bucketGraphics.setFillStyle({ color: first.color, alpha: first.opacity });
 
-      // Apply same gapping as normal rectangles for visual consistency
-      const gappedX = bucket.x + halfGap;
-      const gappedY = bucket.y + halfGap;
-      const gappedHeight = Math.max(0, eventHeight - gap);
+      // Draw all buckets in this color+opacity group
+      for (const bucket of group) {
+        const gappedX = bucket.x + halfGap;
+        const gappedY = bucket.y + halfGap;
+        this.bucketGraphics.rect(gappedX, gappedY, blockWidth, gappedHeight);
+      }
 
-      // Draw 1px wide block (gap is implicit - we just don't draw it)
-      this.bucketGraphics.rect(gappedX, gappedY, blockWidth, gappedHeight);
+      // Single fill for entire group
       this.bucketGraphics.fill();
     }
   }
