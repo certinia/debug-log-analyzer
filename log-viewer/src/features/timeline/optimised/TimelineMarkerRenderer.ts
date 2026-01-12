@@ -11,13 +11,19 @@
 
 import * as PIXI from 'pixi.js';
 import type { MarkerType, TimelineMarker } from '../types/flamechart.types.js';
-import {
-  MARKER_ALPHA,
-  MARKER_COLORS,
-  SEVERITY_ORDER,
-  SEVERITY_RANK,
-} from '../types/flamechart.types.js';
+import { MARKER_ALPHA, MARKER_COLORS, SEVERITY_ORDER, SEVERITY_RANK } from '../types/flamechart.types.js';
+import { blendWithBackground } from './BucketColorResolver.js';
 import type { TimelineViewport } from './TimelineViewport.js';
+
+/**
+ * Pre-blended opaque marker colors (MARKER_COLORS blended at MARKER_ALPHA opacity).
+ * Computed once at module load time for performance.
+ */
+const MARKER_COLORS_BLENDED: Record<MarkerType, number> = {
+  error: blendWithBackground(MARKER_COLORS.error, MARKER_ALPHA),
+  skip: blendWithBackground(MARKER_COLORS.skip, MARKER_ALPHA),
+  unexpected: blendWithBackground(MARKER_COLORS.unexpected, MARKER_ALPHA),
+};
 
 /**
  * Internal representation of a marker indicator's visual state.
@@ -144,14 +150,14 @@ export class TimelineMarkerRenderer {
         continue;
       }
 
-      // Create indicator record
+      // Create indicator record with pre-blended opaque color
       const indicator: MarkerIndicator = {
         marker,
         resolvedEndTime,
         screenStartX: worldStartX,
         screenEndX: worldEndX,
         screenWidth: worldWidth,
-        color: MARKER_COLORS[marker.type],
+        color: MARKER_COLORS_BLENDED[marker.type],
         isVisible: true,
       };
 
@@ -175,11 +181,9 @@ export class TimelineMarkerRenderer {
       }
 
       // Draw vertical band spanning full viewport height with negative space
+      // Color is pre-blended opaque (no alpha needed)
       const viewportState = this.viewport.getState();
-      graphics.setFillStyle({
-        color: indicator.color,
-        alpha: MARKER_ALPHA,
-      });
+      graphics.setFillStyle({ color: indicator.color });
 
       // Apply gap to create separation between adjacent markers
       const gappedX = indicator.screenStartX + halfGap;

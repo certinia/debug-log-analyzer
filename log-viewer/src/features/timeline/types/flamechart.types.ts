@@ -109,11 +109,8 @@ export interface RenderBatch {
   /** Event category this batch represents. */
   category: LogSubCategory;
 
-  /** PixiJS color value (0xRRGGBB). */
+  /** PixiJS color value (0xRRGGBB) - pre-blended opaque. */
   color: number;
-
-  /** Alpha transparency (0-1). */
-  alpha?: number;
 
   /** Rectangles to render (only visible events). */
   rectangles: PrecomputedRect[];
@@ -160,7 +157,7 @@ export interface TimelineState {
   batches: Map<LogSubCategory, RenderBatch>;
 
   /** Cached batch colors for bucket color resolution (performance optimization). */
-  batchColorsCache: Map<string, { color: number; alpha?: number }>;
+  batchColorsCache: Map<string, { color: number }>;
 
   /** Interaction state. */
   interaction: {
@@ -256,9 +253,7 @@ export interface PixelBucket {
   categoryStats: CategoryStats;
   /** Source event references for tooltip/click */
   eventRefs: LogEvent[];
-  /** Calculated opacity (0.3 - 0.9) */
-  opacity: number;
-  /** Resolved display color (hex number) */
+  /** Resolved display color (hex number) - pre-blended opaque color for rendering */
   color: number;
 }
 
@@ -605,3 +600,107 @@ export interface FindResultsEventDetail {
   /** Total number of matches found. */
   totalMatches: number;
 }
+
+// ============================================================================
+// TEMPORAL SEGMENT TREE TYPES
+// ============================================================================
+
+/**
+ * Node in the temporal segment tree.
+ *
+ * Leaf nodes represent individual events; branch nodes aggregate children.
+ * The tree is used for O(log n) viewport culling and bucket aggregation,
+ * replacing the per-frame O(n) iteration in RectangleManager.
+ *
+ * Key optimization: Pre-computed weighted colors and fill ratios enable
+ * instant bucket rendering without recalculating aggregates per frame.
+ */
+export interface SegmentNode {
+  // Time bounds (nanoseconds)
+  /** Start time of this node's span (nanoseconds) */
+  timeStart: number;
+  /** End time of this node's span (nanoseconds) */
+  timeEnd: number;
+
+  // Pre-computed aggregates
+  /** Time span = timeEnd - timeStart (nanoseconds) */
+  nodeSpan: number;
+  /** Sum of actual event durations within this node's span */
+  totalEventDuration: number;
+  /**
+   * Fill ratio = totalEventDuration / nodeSpan (0.0 to 1.0)
+   * Represents density - how much of the time span is filled with events.
+   * Used for brightness/opacity calculation.
+   */
+  fillRatio: number;
+
+  // Weighted color (for blending)
+  /**
+   * Weighted R component: sum(event.R * event.duration) / totalEventDuration
+   * Pre-computed for instant color resolution without per-frame calculation.
+   */
+  weightedColorR: number;
+  /** Weighted G component */
+  weightedColorG: number;
+  /** Weighted B component */
+  weightedColorB: number;
+
+  // Category statistics (for tooltips)
+  /** Per-category event counts and durations */
+  categoryStats: Map<string, CategoryAggregation>;
+  /** Winning category after priority/duration/count resolution */
+  dominantCategory: string;
+
+  // Event tracking
+  /** Total event count in this subtree */
+  eventCount: number;
+  /** For leaf nodes only: reference to source event */
+  eventRef?: LogEvent;
+  /** For leaf nodes only: direct reference to PrecomputedRect (avoids O(n) lookup) */
+  rectRef?: import('../optimised/RectangleManager.js').PrecomputedRect;
+
+  // Tree structure
+  /** Child nodes (null for leaf nodes) */
+  children: SegmentNode[] | null;
+  /** Whether this is a leaf node */
+  isLeaf: boolean;
+
+  // Y position (pre-computed based on depth)
+  /** Screen Y position = depth * EVENT_HEIGHT */
+  y: number;
+  /** Call stack depth (0-indexed) */
+  depth: number;
+}
+
+/**
+ * Result from segment tree query.
+ * Same shape as CulledRenderData for easy integration.
+ */
+export interface SegmentTreeQueryResult {
+  /** Events > threshold screen width - render as rectangles */
+  visibleRects: Map<string, PrecomputedRect[]>;
+  /** Aggregated nodes for events <= threshold - render as buckets */
+  buckets: PixelBucket[];
+  /** Render statistics */
+  stats: RenderStats;
+}
+
+/**
+ * Constants for segment tree construction and traversal.
+ */
+/* eslint-disable @typescript-eslint/naming-convention */
+export const SEGMENT_TREE_CONSTANTS = {
+  /**
+   * Branching factor for tree construction.
+   * 4 provides a good balance between tree height (log4(n) levels)
+   * and cache efficiency (4 children fit in a cache line).
+   */
+  BRANCHING_FACTOR: 4,
+
+  /**
+   * Minimum node span (nanoseconds) to avoid degenerate trees.
+   * Events shorter than this are treated as having this duration.
+   */
+  MIN_NODE_SPAN: 1,
+} as const;
+/* eslint-enable @typescript-eslint/naming-convention */

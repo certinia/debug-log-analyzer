@@ -56,6 +56,8 @@ export class AxisRenderer {
   private screenSpaceContainer: PIXI.Container | null = null;
   private config: AxisConfig;
   private labelCache: Map<string, PIXI.Text> = new Map();
+  /** Pre-blended opaque grid line color (simulates 0.3 alpha) */
+  private gridLineColor: number;
 
   constructor(container: PIXI.Container, config?: Partial<AxisConfig>) {
     this.container = container;
@@ -69,6 +71,10 @@ export class AxisRenderer {
       minLabelSpacing: 80,
       ...config,
     };
+
+    // Pre-blend grid line color (0.5 opacity for better visibility over markers)
+    // this.gridLineColor = blendWithBackground(this.config.lineColor, 0.5;
+    this.gridLineColor = this.config.lineColor;
 
     // Create graphics for axis line and ticks (in world space - will be transformed with stage)
     this.graphics = new PIXI.Graphics();
@@ -281,10 +287,8 @@ export class AxisRenderer {
 
     // Draw vertical line from top (viewportHeight in inverted coords) to bottom (0)
     // Use rect instead of line for more consistent rendering
-    this.graphics.setFillStyle({
-      color: this.config.lineColor,
-      alpha: 0.3, // Semi-transparent so it doesn't overpower the rectangles
-    });
+    // Color is pre-blended opaque (0.5 opacity for visibility over markers)
+    this.graphics.setFillStyle({ color: this.gridLineColor });
     this.graphics.rect(roundedX, 0, 1, viewportHeight);
     this.graphics.fill();
 

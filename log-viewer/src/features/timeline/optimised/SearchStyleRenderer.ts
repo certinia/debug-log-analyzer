@@ -24,6 +24,7 @@ import * as PIXI from 'pixi.js';
 import type { CategoryAggregation, PixelBucket, RenderBatch } from '../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import { resolveColor } from './BucketColorResolver.js';
+import { calculateBucketColor } from './BucketOpacity.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 
 /**
@@ -86,13 +87,7 @@ export class SearchStyleRenderer {
         continue;
       }
 
-      this.renderCategoryWithSearch(
-        gfx,
-        rectangles,
-        batch.color,
-        batch.alpha ?? 1,
-        matchedEventIds,
-      );
+      this.renderCategoryWithSearch(gfx, rectangles, batch.color, matchedEventIds);
     }
 
     // Render buckets with search-aware styling
@@ -133,21 +128,19 @@ export class SearchStyleRenderer {
    * @param gfx - Graphics object for this category
    * @param rectangles - Rectangles to render
    * @param originalColor - Original category color
-   * @param originalAlpha - Original category alpha
    * @param matchedEventIds - Set of matched event IDs
    */
   private renderCategoryWithSearch(
     gfx: PIXI.Graphics,
     rectangles: PrecomputedRect[],
     originalColor: number,
-    originalAlpha: number,
     matchedEventIds: ReadonlySet<string>,
   ): void {
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
     const halfGap = gap / 2;
     const greyColor = this.colorToGreyscale(originalColor);
 
-    // Draw matched events with original color
+    // Draw matched events with original color (opaque - no alpha)
     let hasMatched = false;
     for (const rect of rectangles) {
       if (matchedEventIds.has(rect.id)) {
@@ -160,10 +153,10 @@ export class SearchStyleRenderer {
       }
     }
     if (hasMatched) {
-      gfx.fill({ color: originalColor, alpha: originalAlpha });
+      gfx.fill({ color: originalColor });
     }
 
-    // Draw non-matched events with greyscale
+    // Draw non-matched events with greyscale (opaque - no alpha)
     let hasNonMatched = false;
     for (const rect of rectangles) {
       if (!matchedEventIds.has(rect.id)) {
@@ -176,7 +169,7 @@ export class SearchStyleRenderer {
       }
     }
     if (hasNonMatched) {
-      gfx.fill({ color: greyColor, alpha: originalAlpha });
+      gfx.fill({ color: greyColor });
     }
   }
 
@@ -211,11 +204,15 @@ export class SearchStyleRenderer {
     const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
     const halfGap = gap / 2;
+    const gappedHeight = Math.max(0, eventHeight - gap);
 
-    // Draw each bucket, checking if it contains any matched events
+    // Group buckets by display color for batched rendering (opaque - no alpha)
+    const colorGroups = new Map<number, PixelBucket[]>();
+
     for (const bucket of buckets) {
       // Find all matched events in this bucket and build category stats
       const matchedCategoryStats = new Map<string, CategoryAggregation>();
+      let matchedEventCount = 0;
 
       for (const event of bucket.eventRefs) {
         const key = `${event.timestamp}-${bucket.depth}`;
@@ -227,6 +224,7 @@ export class SearchStyleRenderer {
           }
           stats.count++;
           stats.totalDuration += event.duration?.total ?? 0;
+          matchedEventCount++;
         }
       }
 
@@ -238,22 +236,32 @@ export class SearchStyleRenderer {
           byCategory: matchedCategoryStats,
           dominantCategory: '',
         });
-        displayColor = colorResult.color;
+        // Use matched event count for blending (density of matched events)
+        displayColor = calculateBucketColor(colorResult.color, matchedEventCount);
       } else {
-        // No matches - desaturate the bucket's original color
+        // No matches - desaturate the bucket's pre-blended color
         displayColor = this.colorToGreyscale(bucket.color);
       }
 
-      this.bucketGraphics.setFillStyle({
-        color: displayColor,
-        alpha: bucket.opacity,
-      });
+      // Group by display color
+      let group = colorGroups.get(displayColor);
+      if (!group) {
+        group = [];
+        colorGroups.set(displayColor, group);
+      }
+      group.push(bucket);
+    }
 
-      const gappedX = bucket.x + halfGap;
-      const gappedY = bucket.y + halfGap;
-      const gappedHeight = Math.max(0, eventHeight - gap);
+    // Render each color group with single setFillStyle + single fill (opaque - no alpha)
+    for (const [color, group] of colorGroups) {
+      this.bucketGraphics.setFillStyle({ color });
 
-      this.bucketGraphics.rect(gappedX, gappedY, blockWidth, gappedHeight);
+      for (const bucket of group) {
+        const gappedX = bucket.x + halfGap;
+        const gappedY = bucket.y + halfGap;
+        this.bucketGraphics.rect(gappedX, gappedY, blockWidth, gappedHeight);
+      }
+
       this.bucketGraphics.fill();
     }
   }

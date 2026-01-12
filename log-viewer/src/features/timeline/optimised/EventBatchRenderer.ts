@@ -133,8 +133,8 @@ export class EventBatchRenderer {
       return;
     }
 
-    // Set fill style once for entire batch
-    gfx.setFillStyle({ color: batch.color, alpha: batch.alpha ?? 1 });
+    // Set fill style once for entire batch (opaque - no alpha)
+    gfx.setFillStyle({ color: batch.color });
 
     // Pre-calculate constants outside loop
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
@@ -160,10 +160,10 @@ export class EventBatchRenderer {
    *
    * Each bucket is rendered as a 1px wide block with a 1px gap.
    * This creates a "barcode" visual effect when multiple buckets are adjacent.
-   * Opacity varies by event count to show density.
+   * Color brightness varies by event count to show density (pre-blended opaque colors).
    *
-   * Performance: Groups buckets by color+opacity to minimize setFillStyle/fill calls.
-   * Instead of O(N) state changes, we have O(distinct color+opacity combinations).
+   * Performance: Groups buckets by color to minimize setFillStyle/fill calls.
+   * Instead of O(N) state changes, we have O(distinct colors).
    *
    * @param buckets - Aggregated pixel buckets to render
    */
@@ -174,19 +174,15 @@ export class EventBatchRenderer {
       return;
     }
 
-    // Group buckets by color+opacity for batched rendering
-    // This reduces state changes from O(N) to O(distinct combinations)
+    // Group buckets by color for batched rendering
+    // This reduces state changes from O(N) to O(distinct colors)
+    // Each bucket's color is already pre-blended with density-based opacity
     const groups = new Map<number, PixelBucket[]>();
     for (const bucket of buckets) {
-      // Use composite key: color in upper bits, opacity (scaled to int) in lower bits
-      // Opacity is 0-1, scale to 0-1000 for sufficient precision
-      const opacityKey = Math.round(bucket.opacity * 1000);
-      const key = (bucket.color << 10) | opacityKey;
-
-      let group = groups.get(key);
+      let group = groups.get(bucket.color);
       if (!group) {
         group = [];
-        groups.set(key, group);
+        groups.set(bucket.color, group);
       }
       group.push(bucket);
     }
@@ -198,12 +194,11 @@ export class EventBatchRenderer {
     const halfGap = gap / 2;
     const gappedHeight = Math.max(0, eventHeight - gap);
 
-    // Render each group with single setFillStyle + single fill
-    for (const group of groups.values()) {
-      const first = group[0]!;
-      this.bucketGraphics.setFillStyle({ color: first.color, alpha: first.opacity });
+    // Render each group with single setFillStyle + single fill (opaque - no alpha)
+    for (const [color, group] of groups) {
+      this.bucketGraphics.setFillStyle({ color });
 
-      // Draw all buckets in this color+opacity group
+      // Draw all buckets in this color group
       for (const bucket of group) {
         const gappedX = bucket.x + halfGap;
         const gappedY = bucket.y + halfGap;

@@ -34,7 +34,8 @@ import type {
 } from '../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import { resolveColor, type BatchColorInfo } from './BucketColorResolver.js';
-import { calculateOpacity } from './BucketOpacity.js';
+import { calculateBucketColor } from './BucketOpacity.js';
+import { TemporalSegmentTree } from './TemporalSegmentTree.js';
 
 /**
  * Pre-computed event rectangle with fixed and dynamic properties.
@@ -88,12 +89,25 @@ export class RectangleManager {
   /** Map from LogEvent to RenderRectangle for search functionality */
   private rectMap: Map<LogEvent, PrecomputedRect> = new Map();
 
+  /** Optional segment tree for O(log n) viewport culling */
+  private segmentTree?: TemporalSegmentTree;
+
+  /** Whether segment tree is enabled */
+  private useSegmentTree: boolean;
+
   /**
    * @param events - Event tree to pre-compute rectangles from
    * @param categories - Set of valid categories for spatial indexing
+   * @param useSegmentTree - Enable segment tree for O(log n) viewport culling (default: false)
    */
-  constructor(events: LogEvent[], categories: Set<string>) {
+  constructor(events: LogEvent[], categories: Set<string>, useSegmentTree = false) {
+    this.useSegmentTree = useSegmentTree;
     this.precomputeRectangles(events, categories);
+
+    // Build segment tree after rectangles are pre-computed
+    if (useSegmentTree) {
+      this.segmentTree = new TemporalSegmentTree(this.rectsByCategory);
+    }
   }
 
   /**
@@ -113,6 +127,12 @@ export class RectangleManager {
     viewport: ViewportState,
     batchColors?: Map<string, BatchColorInfo>,
   ): CulledRenderData {
+    // Use segment tree if enabled for O(log n) performance
+    if (this.segmentTree) {
+      return this.segmentTree.query(viewport, batchColors);
+    }
+
+    // Legacy O(n) implementation
     const bounds = this.calculateBounds(viewport);
     const visibleRects = new Map<string, PrecomputedRect[]>();
 
@@ -241,6 +261,10 @@ export class RectangleManager {
       // Resolve color and dominant category
       const colorResult = resolveColor(categoryStats, batchColors);
 
+      // Pre-compute opaque blended color based on event density
+      // This avoids runtime alpha blending for better GPU performance
+      const blendedColor = calculateBucketColor(colorResult.color, eventCount);
+
       const pixelBucket: PixelBucket = {
         id: `bucket-${key}`,
         x: bucket.timeStart * zoom,
@@ -254,8 +278,7 @@ export class RectangleManager {
           dominantCategory: colorResult.dominantCategory,
         },
         eventRefs: bucket.events,
-        opacity: calculateOpacity(eventCount),
-        color: colorResult.color,
+        color: blendedColor,
       };
 
       buckets.push(pixelBucket);
@@ -279,6 +302,27 @@ export class RectangleManager {
    */
   public getRectMap(): Map<LogEvent, PrecomputedRect> {
     return this.rectMap;
+  }
+
+  /**
+   * Update batch colors for segment tree (for theme changes).
+   *
+   * @param batchColors - New batch colors from theme
+   */
+  public setBatchColors(batchColors: Map<string, BatchColorInfo>): void {
+    if (this.segmentTree) {
+      this.segmentTree.setBatchColors(batchColors);
+    }
+  }
+
+  /**
+   * Get spatial index of rectangles by category.
+   * Used for search functionality and segment tree construction.
+   *
+   * @returns Map of category to rectangles
+   */
+  public getRectsByCategory(): Map<string, PrecomputedRect[]> {
+    return this.rectsByCategory;
   }
 
   // ============================================================================

@@ -19,6 +19,7 @@
  */
 
 import { BUCKET_CONSTANTS } from '../types/flamechart.types.js';
+import { blendWithBackground } from './BucketColorResolver.js';
 
 // Pre-computed opacity lookup table for event counts 0-100
 // Avoids Math.log10() calls in hot render path
@@ -74,4 +75,30 @@ export function calculateOpacity(eventCount: number): number {
 
   // Saturated: return max opacity
   return BUCKET_CONSTANTS.OPACITY.MAX;
+}
+
+/**
+ * Calculate blended bucket color based on event count.
+ *
+ * Returns an opaque color that simulates the appearance of the source color
+ * at density-based opacity, pre-blended with the background.
+ * This avoids runtime alpha blending for better GPU performance.
+ *
+ * Uses logarithmic scaling for density visualization:
+ * - 1 event → faint (mostly background)
+ * - 10 events → medium visibility
+ * - 100+ events → prominent (mostly source color)
+ *
+ * @param sourceColor - The source color (0xRRGGBB) from category resolution
+ * @param eventCount - Number of events in the bucket
+ * @param backgroundColor - Optional background color for blending (default: dark theme)
+ * @returns Opaque blended color (0xRRGGBB)
+ */
+export function calculateBucketColor(
+  sourceColor: number,
+  eventCount: number,
+  backgroundColor?: number,
+): number {
+  const opacity = calculateOpacity(eventCount);
+  return blendWithBackground(sourceColor, opacity, backgroundColor);
 }

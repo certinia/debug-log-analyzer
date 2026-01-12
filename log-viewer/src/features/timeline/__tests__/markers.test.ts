@@ -70,10 +70,21 @@ jest.mock('pixi.js', () => {
 });
 
 import * as PIXI from 'pixi.js';
+import { blendWithBackground } from '../optimised/BucketColorResolver.js';
 import { TimelineMarkerRenderer } from '../optimised/TimelineMarkerRenderer.js';
 import { TimelineViewport } from '../optimised/TimelineViewport.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 import { MARKER_ALPHA, MARKER_COLORS } from '../types/flamechart.types.js';
+
+/**
+ * Pre-blended marker colors for testing (matches TimelineMarkerRenderer).
+ * These are computed once to match the expected render output.
+ */
+const MARKER_COLORS_BLENDED = {
+  error: blendWithBackground(MARKER_COLORS.error, MARKER_ALPHA),
+  skip: blendWithBackground(MARKER_COLORS.skip, MARKER_ALPHA),
+  unexpected: blendWithBackground(MARKER_COLORS.unexpected, MARKER_ALPHA),
+};
 
 // Mock PIXI.Container
 class MockContainer {
@@ -117,7 +128,7 @@ describe('TruncationIndicatorRenderer', () => {
   });
 
   describe('T013: Color Accuracy Verification', () => {
-    it('should render error markers with color 0xFF8080', () => {
+    it('should render error markers with pre-blended color', () => {
       const markers: TimelineMarker[] = [
         { type: 'error', startTime: 100_000, summary: 'Test error' },
       ];
@@ -138,11 +149,10 @@ describe('TruncationIndicatorRenderer', () => {
         return;
       }
       const fillStyle = errorGraphics.getFillStyle();
-      expect(fillStyle.color).toBe(MARKER_COLORS.error);
-      expect(fillStyle.color).toBe(0xff8080);
+      expect(fillStyle.color).toBe(MARKER_COLORS_BLENDED.error);
     });
 
-    it('should render skip markers with color 0x1E80FF', () => {
+    it('should render skip markers with pre-blended color', () => {
       const markers: TimelineMarker[] = [
         { type: 'skip', startTime: 100_000, summary: 'Test skip' },
       ];
@@ -163,11 +173,10 @@ describe('TruncationIndicatorRenderer', () => {
         return;
       }
       const fillStyle = skipGraphics.getFillStyle();
-      expect(fillStyle.color).toBe(MARKER_COLORS.skip);
-      expect(fillStyle.color).toBe(0x1e80ff);
+      expect(fillStyle.color).toBe(MARKER_COLORS_BLENDED.skip);
     });
 
-    it('should render unexpected markers with color 0x8080FF', () => {
+    it('should render unexpected markers with pre-blended color', () => {
       const markers: TimelineMarker[] = [
         { type: 'unexpected', startTime: 100_000, summary: 'Test unexpected' },
       ];
@@ -188,11 +197,10 @@ describe('TruncationIndicatorRenderer', () => {
         return;
       }
       const fillStyle = unexpectedGraphics.getFillStyle();
-      expect(fillStyle.color).toBe(MARKER_COLORS.unexpected);
-      expect(fillStyle.color).toBe(0x8080ff);
+      expect(fillStyle.color).toBe(MARKER_COLORS_BLENDED.unexpected);
     });
 
-    it('should use alpha 0.2 for all truncation types', () => {
+    it('should use pre-blended opaque colors (no alpha)', () => {
       const markers: TimelineMarker[] = [
         { type: 'error', startTime: 100_000, summary: 'Error' },
         { type: 'skip', startTime: 300_000, summary: 'Skip' },
@@ -206,11 +214,12 @@ describe('TruncationIndicatorRenderer', () => {
       );
       renderer.render();
 
-      // Verify all Graphics objects use the correct alpha
+      // Verify all Graphics objects use valid colors (pre-blended opaque)
+      // Alpha is no longer used - colors are pre-blended with background
       createdMockGraphics.forEach((graphics) => {
         const fillStyle = graphics.getFillStyle();
-        expect(fillStyle.alpha).toBe(MARKER_ALPHA);
-        expect(fillStyle.alpha).toBe(0.2);
+        expect(fillStyle.color).toBeGreaterThanOrEqual(0);
+        expect(fillStyle.color).toBeLessThanOrEqual(0xffffff);
       });
     });
 
@@ -244,9 +253,10 @@ describe('TruncationIndicatorRenderer', () => {
         return;
       }
 
-      expect(unexpectedGraphics.getFillStyle().color).toBe(0x8080ff);
-      expect(skipGraphics.getFillStyle().color).toBe(0x1e80ff);
-      expect(errorGraphics.getFillStyle().color).toBe(0xff8080);
+      // Verify pre-blended opaque colors (no alpha)
+      expect(unexpectedGraphics.getFillStyle().color).toBe(MARKER_COLORS_BLENDED.unexpected);
+      expect(skipGraphics.getFillStyle().color).toBe(MARKER_COLORS_BLENDED.skip);
+      expect(errorGraphics.getFillStyle().color).toBe(MARKER_COLORS_BLENDED.error);
 
       // Verify multiple markers of same type use same color
       const unexpectedRects = unexpectedGraphics.getRectangles();

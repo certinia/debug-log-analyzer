@@ -52,11 +52,10 @@ export interface ColorResolutionResult {
 }
 
 /**
- * Color info passed from RenderBatch.
+ * Color info passed from RenderBatch (opaque colors only).
  */
 export interface BatchColorInfo {
   color: number;
-  alpha?: number;
 }
 
 /**
@@ -126,4 +125,51 @@ export function resolveColor(
     color,
     dominantCategory: winningCategory,
   };
+}
+
+// ============================================================================
+// COLOR BLENDING UTILITIES
+// ============================================================================
+
+/**
+ * Default dark theme background color for alpha blending.
+ * This is the standard VS Code dark theme background.
+ */
+const DEFAULT_BACKGROUND_COLOR = 0x1e1e1e;
+
+/**
+ * Blend a color with a background color based on opacity.
+ * Returns an opaque color that simulates the visual appearance of
+ * the original color at the given opacity over the background.
+ *
+ * Formula: result = foreground * alpha + background * (1 - alpha)
+ *
+ * @param foregroundColor - The foreground color (0xRRGGBB)
+ * @param opacity - Opacity value (0 to 1)
+ * @param backgroundColor - Background color to blend against (default: dark theme background)
+ * @returns Opaque blended color (0xRRGGBB)
+ */
+export function blendWithBackground(
+  foregroundColor: number,
+  opacity: number,
+  backgroundColor: number = DEFAULT_BACKGROUND_COLOR,
+): number {
+  // Extract RGB components from foreground
+  const fgR = (foregroundColor >> 16) & 0xff;
+  const fgG = (foregroundColor >> 8) & 0xff;
+  const fgB = foregroundColor & 0xff;
+
+  // Extract RGB components from background
+  const bgR = (backgroundColor >> 16) & 0xff;
+  const bgG = (backgroundColor >> 8) & 0xff;
+  const bgB = backgroundColor & 0xff;
+
+  // Blend each channel: result = fg * alpha + bg * (1 - alpha)
+  const invAlpha = 1 - opacity;
+  const resultR = Math.round(fgR * opacity + bgR * invAlpha);
+  const resultG = Math.round(fgG * opacity + bgG * invAlpha);
+  const resultB = Math.round(fgB * opacity + bgB * invAlpha);
+
+  // Combine back to a single color value
+  return (resultR << 16) | (resultG << 8) | resultB;
 }

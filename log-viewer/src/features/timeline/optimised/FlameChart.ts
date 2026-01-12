@@ -24,6 +24,7 @@ import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/f
 import type { SearchCursor, SearchMatch, SearchOptions } from '../types/search.types.js';
 import { logEventToTreeNode } from '../utils/tree-converter.js';
 import { AxisRenderer } from './AxisRenderer.js';
+import { blendWithBackground } from './BucketColorResolver.js';
 import { EventBatchRenderer } from './EventBatchRenderer.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 import { RectangleManager } from './RectangleManager.js';
@@ -262,7 +263,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Create RectangleManager (single source of truth for rectangle computation)
     if (this.state) {
       const categories = new Set(this.state.batches.keys());
-      this.rectangleManager = new RectangleManager(events, categories);
+      this.rectangleManager = new RectangleManager(events, categories, true);
     }
 
     // Create batch renderer (pure rendering, receives rectangles from RectangleManager)
@@ -546,13 +547,11 @@ export class FlameChart<E extends EventNode = EventNode> {
       return;
     }
 
-    // Update batch colors
+    // Update batch colors (pre-blended opaque)
     for (const [category, batch] of this.state.batches) {
       const colorValue = colors[category];
       if (colorValue) {
-        const parsed = this.cssColorToPixi(colorValue);
-        batch.color = parsed.color;
-        batch.alpha = parsed.alpha;
+        batch.color = this.cssColorToPixi(colorValue);
         batch.isDirty = true;
       }
     }
@@ -721,11 +720,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     const categories = Object.keys(colors) as (keyof typeof colors)[];
 
     for (const category of categories) {
-      const parsed = this.cssColorToPixi(colors[category] || '#000000');
       batches.set(category, {
         category,
-        color: parsed.color,
-        alpha: parsed.alpha,
+        color: this.cssColorToPixi(colors[category] || '#000000'),
         rectangles: [],
         isDirty: true,
       });
@@ -754,51 +751,65 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Used for bucket color resolution without recreating Map every frame.
    */
   private buildBatchColorsCache(
-    batches: Map<string, { color: number; alpha?: number }>,
-  ): Map<string, { color: number; alpha?: number }> {
-    const cache = new Map<string, { color: number; alpha?: number }>();
+    batches: Map<string, { color: number }>,
+  ): Map<string, { color: number }> {
+    const cache = new Map<string, { color: number }>();
     for (const [category, batch] of batches) {
-      cache.set(category, { color: batch.color, alpha: batch.alpha });
+      cache.set(category, { color: batch.color });
     }
     return cache;
   }
 
-  private cssColorToPixi(cssColor: string): { color: number; alpha: number } {
+  /**
+   * Parse CSS color string to PixiJS numeric color (opaque).
+   * If the color has alpha < 1, it will be pre-blended with the background
+   * to produce an opaque result for better GPU performance.
+   *
+   * @param cssColor - CSS color string (#RGB, #RGBA, #RRGGBB, #RRGGBBAA, rgb(), rgba())
+   * @returns Opaque PixiJS numeric color (0xRRGGBB)
+   */
+  private cssColorToPixi(cssColor: string): number {
+    let color = 0x000000;
+    let alpha = 1;
+
     if (cssColor.startsWith('#')) {
       const hex = cssColor.slice(1);
       if (hex.length === 8) {
         const rgb = hex.slice(0, 6);
-        const a = parseInt(hex.slice(6, 8), 16) / 255;
-        return { color: parseInt(rgb, 16), alpha: a };
-      }
-      if (hex.length === 6) {
-        return { color: parseInt(hex, 16), alpha: 1 };
-      }
-      if (hex.length === 4) {
+        alpha = parseInt(hex.slice(6, 8), 16) / 255;
+        color = parseInt(rgb, 16);
+      } else if (hex.length === 6) {
+        color = parseInt(hex, 16);
+      } else if (hex.length === 4) {
         const r = hex[0]!;
         const g = hex[1]!;
         const b = hex[2]!;
         const a = hex[3]!;
-        return { color: parseInt(r + r + g + g + b + b, 16), alpha: parseInt(a + a, 16) / 255 };
-      }
-      if (hex.length === 3) {
+        color = parseInt(r + r + g + g + b + b, 16);
+        alpha = parseInt(a + a, 16) / 255;
+      } else if (hex.length === 3) {
         const r = hex[0]!;
         const g = hex[1]!;
         const b = hex[2]!;
-        return { color: parseInt(r + r + g + g + b + b, 16), alpha: 1 };
+        color = parseInt(r + r + g + g + b + b, 16);
+      }
+    } else {
+      const rgbMatch = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d*(?:\.\d+)?))?\)/);
+      if (rgbMatch) {
+        const r = parseInt(rgbMatch[1] ?? '0', 10);
+        const g = parseInt(rgbMatch[2] ?? '0', 10);
+        const b = parseInt(rgbMatch[3] ?? '0', 10);
+        alpha = rgbMatch[4] ? parseFloat(rgbMatch[4]) : 1;
+        color = (r << 16) | (g << 8) | b;
       }
     }
 
-    const rgbMatch = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d*(?:\.\d+)?))?\)/);
-    if (rgbMatch) {
-      const r = parseInt(rgbMatch[1] ?? '0', 10);
-      const g = parseInt(rgbMatch[2] ?? '0', 10);
-      const b = parseInt(rgbMatch[3] ?? '0', 10);
-      const a = rgbMatch[4] ? parseFloat(rgbMatch[4]) : 1;
-      return { color: (r << 16) | (g << 8) | b, alpha: a };
+    // Pre-blend with background if color has alpha < 1
+    if (alpha < 1) {
+      return blendWithBackground(color, alpha);
     }
 
-    return { color: 0x000000, alpha: 1 };
+    return color;
   }
 
   // ============================================================================
