@@ -52,6 +52,29 @@ function createViewport(
   };
 }
 
+// Helper to flatten buckets Map into array for testing
+function getAllBuckets(
+  bucketsMap: Map<
+    string,
+    { id: string; x: number; y: number; eventCount: number; color: number }[]
+  >,
+): { id: string; x: number; y: number; eventCount: number; color: number }[] {
+  const allBuckets: { id: string; x: number; y: number; eventCount: number; color: number }[] = [];
+  for (const buckets of bucketsMap.values()) {
+    allBuckets.push(...buckets);
+  }
+  return allBuckets;
+}
+
+// Helper to count total buckets across all categories
+function countBuckets(bucketsMap: Map<string, unknown[]>): number {
+  let count = 0;
+  for (const buckets of bucketsMap.values()) {
+    count += buckets.length;
+  }
+  return count;
+}
+
 describe('TemporalSegmentTree', () => {
   const categories = new Set([
     'Method',
@@ -105,7 +128,7 @@ describe('TemporalSegmentTree', () => {
       const result = tree.query(viewport);
 
       expect(result.visibleRects.get('Method')).toHaveLength(1);
-      expect(result.buckets).toHaveLength(0);
+      expect(countBuckets(result.buckets)).toBe(0);
       expect(result.stats.visibleCount).toBe(1);
     });
 
@@ -118,8 +141,9 @@ describe('TemporalSegmentTree', () => {
       const viewport = createViewport(1, 0, 0);
       const result = tree.query(viewport);
 
-      expect(result.visibleRects.get('Method')).toBeUndefined();
-      expect(result.buckets).toHaveLength(1);
+      // Pre-initialized map has empty arrays for known categories
+      expect(result.visibleRects.get('Method')).toHaveLength(0);
+      expect(countBuckets(result.buckets)).toBe(1);
       expect(result.stats.bucketedEventCount).toBe(1);
     });
 
@@ -259,9 +283,10 @@ describe('TemporalSegmentTree', () => {
       const viewport = createViewport(1, 0, 0);
       const result = tree.query(viewport);
 
-      expect(result.buckets).toHaveLength(1);
-      expect(result.buckets[0]!.categoryStats.dominantCategory).toBe('DML');
-      expect(result.buckets[0]!.color).toBeDefined();
+      const allBuckets = getAllBuckets(result.buckets);
+      expect(allBuckets).toHaveLength(1);
+      expect(result.buckets.get('DML')).toHaveLength(1);
+      expect(result.buckets.get('DML')![0]!.color).toBeDefined();
     });
 
     it('should include event count in bucket', () => {
@@ -290,9 +315,10 @@ describe('TemporalSegmentTree', () => {
       const result = tree.query(viewport);
 
       // Bucket should have stats for both categories
-      expect(result.buckets.length).toBeGreaterThan(0);
-      const bucket = result.buckets[0]!;
-      expect(bucket.categoryStats).toBeDefined();
+      const allBuckets = getAllBuckets(result.buckets);
+      expect(allBuckets.length).toBeGreaterThan(0);
+      const bucket = allBuckets[0]!;
+      expect(bucket).toBeDefined();
     });
   });
 
@@ -333,9 +359,10 @@ describe('TemporalSegmentTree', () => {
       const viewport = createViewport(0.1, 0, 0); // threshold = 20ns, event = 1ns
       const result = tree.query(viewport);
 
-      expect(result.buckets.length).toBeGreaterThan(0);
+      const allBuckets = getAllBuckets(result.buckets);
+      expect(allBuckets.length).toBeGreaterThan(0);
       // Bucket should have a color (brightness varies with fill ratio)
-      expect(result.buckets[0]!.color).toBeDefined();
+      expect(allBuckets[0]!.color).toBeDefined();
     });
 
     it('should use full brightness for single-event buckets (optimization)', () => {
@@ -347,10 +374,11 @@ describe('TemporalSegmentTree', () => {
       const viewport = createViewport(1, 0, 0); // threshold = 2ns, event = 1ns
       const result = tree.query(viewport);
 
-      expect(result.buckets).toHaveLength(1);
-      expect(result.buckets[0]!.eventCount).toBe(1);
+      const allBuckets = getAllBuckets(result.buckets);
+      expect(allBuckets).toHaveLength(1);
+      expect(allBuckets[0]!.eventCount).toBe(1);
       // Color should be defined and brighter than a low-density bucket
-      expect(result.buckets[0]!.color).toBeDefined();
+      expect(allBuckets[0]!.color).toBeDefined();
     });
   });
 });

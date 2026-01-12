@@ -37,7 +37,7 @@ export class SearchStyleRenderer {
   private batches: Map<string, RenderBatch>;
   private graphics: Map<string, PIXI.Graphics>;
   private container: PIXI.Container;
-  /** Dedicated Graphics object for bucket rendering during search */
+  /** Dedicated Graphics object for bucket rendering (grouped by color) */
   private bucketGraphics: PIXI.Graphics;
 
   constructor(container: PIXI.Container, batches: Map<string, RenderBatch>) {
@@ -45,7 +45,7 @@ export class SearchStyleRenderer {
     this.graphics = new Map();
     this.container = container;
 
-    // Create Graphics objects for each batch
+    // Create Graphics objects for each batch (rectangles only)
     for (const [category, _batch] of batches) {
       const gfx = new PIXI.Graphics();
       this.graphics.set(category, gfx);
@@ -61,37 +61,27 @@ export class SearchStyleRenderer {
    * Render culled rectangles and buckets with search styling.
    * Matched events: original colors
    * Non-matched events: desaturated greyscale
-   * Buckets: always desaturated (aggregated events)
+   * Buckets: search-aware styling based on matched events
    *
    * @param culledRects - Rectangles grouped by category (from RectangleManager)
    * @param matchedEventIds - Set of event IDs that match search (retain original colors)
-   * @param buckets - Aggregated pixel buckets to render (always desaturated)
+   * @param buckets - Aggregated pixel buckets grouped by category
    */
   public render(
     culledRects: Map<string, PrecomputedRect[]>,
     matchedEventIds: ReadonlySet<string>,
-    buckets: PixelBucket[] = [],
+    buckets: Map<string, PixelBucket[]> = new Map(),
   ): void {
-    // Clear all graphics
-    for (const gfx of this.graphics.values()) {
-      gfx.clear();
-    }
-    this.bucketGraphics.clear();
-
-    // Render each category with search styling
-    for (const [category, rectangles] of culledRects) {
-      const batch = this.batches.get(category);
+    // Render rectangles per category with search styling
+    for (const [category, batch] of this.batches) {
       const gfx = this.graphics.get(category);
+      if (!gfx) continue;
 
-      if (!batch || !gfx || rectangles.length === 0) {
-        continue;
-      }
-
-      this.renderCategoryWithSearch(gfx, rectangles, batch.color, matchedEventIds);
+      const rectangles = culledRects.get(category);
+      this.renderRectsWithSearch(gfx, rectangles ?? [], batch.color, matchedEventIds);
     }
 
-    // Render buckets with search-aware styling
-    // Buckets containing matched events retain original color
+    // Render all buckets grouped by color (minimizes setFillStyle calls)
     this.renderBucketsWithSearch(buckets, matchedEventIds);
   }
 
@@ -122,20 +112,27 @@ export class SearchStyleRenderer {
   // ============================================================================
 
   /**
-   * Render a category split into matched and non-matched layers.
+   * Render a category's rectangles with search styling.
    * Chrome DevTools style: matched events keep original color, others desaturate.
    *
    * @param gfx - Graphics object for this category
-   * @param rectangles - Rectangles to render
+   * @param rectangles - Rectangles to render (events > 2px)
    * @param originalColor - Original category color
    * @param matchedEventIds - Set of matched event IDs
    */
-  private renderCategoryWithSearch(
+  private renderRectsWithSearch(
     gfx: PIXI.Graphics,
     rectangles: PrecomputedRect[],
     originalColor: number,
     matchedEventIds: ReadonlySet<string>,
   ): void {
+    // Clear previous drawings
+    gfx.clear();
+
+    if (rectangles.length === 0) {
+      return;
+    }
+
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
     const halfGap = gap / 2;
     const greyColor = this.colorToGreyscale(originalColor);
@@ -174,18 +171,29 @@ export class SearchStyleRenderer {
   }
 
   /**
-   * Render buckets with search-aware styling.
-   * Buckets containing matched events use the color of matched event categories
-   * (highest priority if multiple matches). Buckets without matches are desaturated.
+   * Render all buckets with search styling using a single Graphics object.
    *
-   * @param buckets - Pixel buckets to render
-   * @param matchedEventIds - Set of matched event IDs (format: "timestamp-depth-index")
+   * Groups ALL buckets by their computed display color (based on matched events)
+   * to minimize setFillStyle state changes for better PixiJS performance.
+   *
+   * @param buckets - Aggregated buckets grouped by category
+   * @param matchedEventIds - Set of matched event IDs
    */
   private renderBucketsWithSearch(
-    buckets: PixelBucket[],
+    buckets: Map<string, PixelBucket[]>,
     matchedEventIds: ReadonlySet<string>,
   ): void {
-    if (buckets.length === 0) {
+    this.bucketGraphics.clear();
+
+    // Collect all buckets from all categories
+    const allBuckets: PixelBucket[] = [];
+    for (const categoryBuckets of buckets.values()) {
+      for (const bucket of categoryBuckets) {
+        allBuckets.push(bucket);
+      }
+    }
+
+    if (allBuckets.length === 0) {
       return;
     }
 
@@ -195,22 +203,21 @@ export class SearchStyleRenderer {
     for (const matchedId of matchedEventIds) {
       const parts = matchedId.split('-');
       if (parts.length >= 2) {
-        // Store "timestamp-depth" for fast lookup
         matchedTimestampDepths.add(`${parts[0]}-${parts[1]}`);
       }
     }
 
-    const blockWidth = BUCKET_CONSTANTS.BUCKET_BLOCK_WIDTH;
-    const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
     const halfGap = gap / 2;
+    const blockWidth = BUCKET_CONSTANTS.BUCKET_BLOCK_WIDTH;
+    const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
     const gappedHeight = Math.max(0, eventHeight - gap);
 
-    // Group buckets by display color for batched rendering (opaque - no alpha)
+    // Group ALL buckets by display color for batched rendering
     const colorGroups = new Map<number, PixelBucket[]>();
 
-    for (const bucket of buckets) {
-      // Find all matched events in this bucket and build category stats
+    for (const bucket of allBuckets) {
+      // Find matched events in this bucket
       const matchedCategoryStats = new Map<string, CategoryAggregation>();
       let matchedEventCount = 0;
 
@@ -236,7 +243,6 @@ export class SearchStyleRenderer {
           byCategory: matchedCategoryStats,
           dominantCategory: '',
         });
-        // Use matched event count for blending (density of matched events)
         displayColor = calculateBucketColor(colorResult.color, matchedEventCount);
       } else {
         // No matches - desaturate the bucket's pre-blended color
@@ -252,7 +258,7 @@ export class SearchStyleRenderer {
       group.push(bucket);
     }
 
-    // Render each color group with single setFillStyle + single fill (opaque - no alpha)
+    // Render each color group with single setFillStyle + fill
     for (const [color, group] of colorGroups) {
       this.bucketGraphics.setFillStyle({ color });
 

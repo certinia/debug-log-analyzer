@@ -275,10 +275,10 @@ export interface RenderStats {
  * Return type from getCulledRectangles() with bucket support.
  */
 export interface CulledRenderData {
-  /** Events > 2px screen width - render normally */
+  /** Events > 2px screen width - render normally, keyed by category */
   visibleRects: Map<string, PrecomputedRect[]>;
-  /** Aggregated buckets for events ≤ 2px */
-  buckets: PixelBucket[];
+  /** Aggregated buckets for events ≤ 2px, keyed by category */
+  buckets: Map<string, PixelBucket[]>;
   /** Render statistics */
   stats: RenderStats;
 }
@@ -659,8 +659,8 @@ export interface SegmentNode {
 export interface SegmentTreeQueryResult {
   /** Events > threshold screen width - render as rectangles */
   visibleRects: Map<string, PrecomputedRect[]>;
-  /** Aggregated nodes for events <= threshold - render as buckets */
-  buckets: PixelBucket[];
+  /** Aggregated nodes for events <= threshold - render as buckets, keyed by category */
+  buckets: Map<string, PixelBucket[]>;
   /** Render statistics */
   stats: RenderStats;
 }

@@ -32,26 +32,14 @@ import {
   SEGMENT_TREE_CONSTANTS,
   TIMELINE_CONSTANTS,
 } from '../types/flamechart.types.js';
-import type { BatchColorInfo } from './BucketColorResolver.js';
+import {
+  CATEGORY_COLORS,
+  UNKNOWN_CATEGORY_COLOR,
+  type BatchColorInfo,
+} from './BucketColorResolver.js';
 import { calculateBucketColor } from './BucketOpacity.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 import { calculateViewportBounds } from './ViewportUtils.js';
-
-/**
- * Map category names to their hex colors.
- * Colors match TIMELINE_CONSTANTS.DEFAULT_COLORS but in numeric format.
- */
-const CATEGORY_COLORS: Record<string, number> = {
-  DML: 0xb06868,
-  SOQL: 0x6d4c7d,
-  Method: 0x2b8f81,
-  'Code Unit': 0x88ae58,
-  'System Method': 0x8d6e63,
-  Flow: 0x5c8fa6,
-  Workflow: 0x51a16e,
-};
-
-const UNKNOWN_CATEGORY_COLOR = 0x888888;
 
 /**
  * Priority map for category resolution (lower = higher priority).
@@ -111,9 +99,28 @@ export class TemporalSegmentTree {
   ): CulledRenderData {
     const effectiveBatchColors = batchColors ?? this.batchColors;
     const bounds = calculateViewportBounds(viewport);
-    const threshold = BUCKET_CONSTANTS.BUCKET_WIDTH / viewport.zoom; // T = 2px / zoom (ns)
+    // T = 2px / zoom (ns) - used for both threshold check and bucket width
+    const bucketTimeWidth = BUCKET_CONSTANTS.BUCKET_WIDTH / viewport.zoom;
+    const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
 
+    // Pre-initialize maps with known categories for O(1) lookup
+    // If a category returns undefined, it's unknown and can be skipped
     const visibleRects = new Map<string, PrecomputedRect[]>();
+    const bucketsByCategory = new Map<string, PixelBucket[]>();
+
+    // Cache base colors per category (computed once per category)
+    const categoryBaseColors = new Map<string, number>();
+
+    for (const category of BUCKET_CONSTANTS.CATEGORY_PRIORITY) {
+      visibleRects.set(category, []);
+      bucketsByCategory.set(category, []);
+      // Pre-cache base color for each known category
+      const baseColor =
+        effectiveBatchColors?.get(category)?.color ??
+        CATEGORY_COLORS[category] ??
+        UNKNOWN_CATEGORY_COLOR;
+      categoryBaseColors.set(category, baseColor);
+    }
 
     // Bucket aggregation map: keyed by (depth << 24) | bucketIndex
     // This matches the legacy RectangleManager approach for grid-aligned buckets
@@ -126,15 +133,16 @@ export class TemporalSegmentTree {
         timeEnd: number;
         eventCount: number;
         categoryStats: Map<string, CategoryAggregation>;
+        // Track dominant category during aggregation to avoid recomputation
+        dominantCategory: string;
+        dominantPriority: number;
+        dominantDuration: number;
+        dominantCount: number;
       }
     >();
 
     // Stats tracking - using mutable object to avoid callback overhead
     const stats = { visibleCount: 0, bucketedEventCount: 0 };
-
-    // Calculate bucket time width (how much time fits in 2 pixels)
-    const bucketTimeWidth = BUCKET_CONSTANTS.BUCKET_WIDTH / viewport.zoom;
-    const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
 
     // Query each visible depth level
     for (let depth = bounds.depthStart; depth <= bounds.depthEnd; depth++) {
@@ -145,7 +153,7 @@ export class TemporalSegmentTree {
         tree,
         bounds.timeStart,
         bounds.timeEnd,
-        threshold,
+        bucketTimeWidth, // threshold
         bucketTimeWidth,
         viewport,
         visibleRects,
@@ -154,24 +162,25 @@ export class TemporalSegmentTree {
       );
     }
 
-    // Convert bucket map to PixelBucket array
-    const buckets: PixelBucket[] = [];
+    // Single-pass: Convert bucketMap to PixelBuckets grouped by category
     let maxEventsPerBucket = 0;
+    let bucketCount = 0;
 
     for (const [key, bucket] of bucketMap) {
       maxEventsPerBucket = Math.max(maxEventsPerBucket, bucket.eventCount);
 
-      // Determine dominant category for color
-      const dominantCategory = this.resolveDominantCategory(bucket.categoryStats);
+      // Get pre-initialized category array (skip unknown categories)
+      const categoryBuckets = bucketsByCategory.get(bucket.dominantCategory);
+      if (!categoryBuckets) continue;
 
-      // Get color from dominant category and calculate opacity based on event count
-      const color =
-        effectiveBatchColors?.get(dominantCategory)?.color ??
-        CATEGORY_COLORS[dominantCategory] ??
-        UNKNOWN_CATEGORY_COLOR;
-      const finalColor = calculateBucketColor(color, bucket.eventCount);
+      // Get cached base color (skip unknown categories)
+      const baseColor = categoryBaseColors.get(bucket.dominantCategory);
+      if (baseColor === undefined) continue;
 
-      const pixelBucket: PixelBucket = {
+      // Only opacity calculation varies per bucket (based on eventCount)
+      const finalColor = calculateBucketColor(baseColor, bucket.eventCount);
+
+      categoryBuckets.push({
         id: `bucket-${key}`,
         // Grid-aligned X position: bucketIndex * BUCKET_WIDTH (always on 2px grid)
         x: bucket.bucketIndex * BUCKET_CONSTANTS.BUCKET_WIDTH,
@@ -182,24 +191,23 @@ export class TemporalSegmentTree {
         eventCount: bucket.eventCount,
         categoryStats: {
           byCategory: bucket.categoryStats,
-          dominantCategory,
+          dominantCategory: bucket.dominantCategory,
         },
         // Event refs are expensive to collect - leave empty for multi-event buckets
         eventRefs: [],
         color: finalColor,
-      };
-
-      buckets.push(pixelBucket);
+      });
+      bucketCount++;
     }
 
     const renderStats: RenderStats = {
       visibleCount: stats.visibleCount,
       bucketedEventCount: stats.bucketedEventCount,
-      bucketCount: buckets.length,
+      bucketCount,
       maxEventsPerBucket,
     };
 
-    return { visibleRects, buckets, stats: renderStats };
+    return { visibleRects, buckets: bucketsByCategory, stats: renderStats };
   }
 
   /**
@@ -409,6 +417,10 @@ export class TemporalSegmentTree {
         timeEnd: number;
         eventCount: number;
         categoryStats: Map<string, CategoryAggregation>;
+        dominantCategory: string;
+        dominantPriority: number;
+        dominantDuration: number;
+        dominantCount: number;
       }
     >,
     stats: { visibleCount: number; bucketedEventCount: number },
@@ -455,6 +467,8 @@ export class TemporalSegmentTree {
    * Aggregate a segment node into a grid-aligned bucket.
    * Multiple nodes that fall into the same grid cell are merged into one bucket.
    * This matches the legacy RectangleManager bucket behavior.
+   *
+   * PERF: Tracks dominant category incrementally to avoid recomputation.
    */
   private aggregateIntoBucket(
     node: SegmentNode,
@@ -468,6 +482,10 @@ export class TemporalSegmentTree {
         timeEnd: number;
         eventCount: number;
         categoryStats: Map<string, CategoryAggregation>;
+        dominantCategory: string;
+        dominantPriority: number;
+        dominantDuration: number;
+        dominantCount: number;
       }
     >,
   ): void {
@@ -478,6 +496,9 @@ export class TemporalSegmentTree {
 
     let bucket = bucketMap.get(bucketKey);
     if (!bucket) {
+      // Initialize with node's dominant category
+      const nodePriority = PRIORITY_MAP.get(node.dominantCategory) ?? Infinity;
+      const nodeStats = node.categoryStats.get(node.dominantCategory);
       bucket = {
         depth: node.depth,
         bucketIndex,
@@ -485,6 +506,10 @@ export class TemporalSegmentTree {
         timeEnd: (bucketIndex + 1) * bucketTimeWidth,
         eventCount: 0,
         categoryStats: new Map(),
+        dominantCategory: node.dominantCategory,
+        dominantPriority: nodePriority,
+        dominantDuration: nodeStats?.totalDuration ?? 0,
+        dominantCount: nodeStats?.count ?? 0,
       };
       bucketMap.set(bucketKey, bucket);
     }
@@ -492,17 +517,38 @@ export class TemporalSegmentTree {
     // Aggregate node stats into bucket
     bucket.eventCount += node.eventCount;
 
-    // Merge category stats
+    // Merge category stats and update dominant tracking
     for (const [category, stats] of node.categoryStats) {
       const existing = bucket.categoryStats.get(category);
+      let newDuration: number;
+      let newCount: number;
+
       if (existing) {
         existing.count += stats.count;
         existing.totalDuration += stats.totalDuration;
+        newDuration = existing.totalDuration;
+        newCount = existing.count;
       } else {
         bucket.categoryStats.set(category, {
           count: stats.count,
           totalDuration: stats.totalDuration,
         });
+        newDuration = stats.totalDuration;
+        newCount = stats.count;
+      }
+
+      // Update dominant category tracking incrementally
+      const priority = PRIORITY_MAP.get(category) ?? Infinity;
+      if (
+        priority < bucket.dominantPriority ||
+        (priority === bucket.dominantPriority &&
+          (newDuration > bucket.dominantDuration ||
+            (newDuration === bucket.dominantDuration && newCount > bucket.dominantCount)))
+      ) {
+        bucket.dominantCategory = category;
+        bucket.dominantPriority = priority;
+        bucket.dominantDuration = newDuration;
+        bucket.dominantCount = newCount;
       }
     }
   }
@@ -511,6 +557,7 @@ export class TemporalSegmentTree {
    * Add a leaf node as a visible rectangle.
    *
    * PERFORMANCE: Uses rectRef stored in leaf node instead of O(n) search.
+   * Uses pre-initialized map - unknown categories return undefined and are skipped.
    */
   private addVisibleRect(
     node: SegmentNode,
@@ -521,18 +568,15 @@ export class TemporalSegmentTree {
     const rect = node.rectRef;
     if (!rect) return;
 
+    // Get pre-initialized category group (skip unknown categories)
+    const group = visibleRects.get(node.dominantCategory);
+    if (!group) return;
+
     // Update screen coordinates
     // NOTE: Do NOT subtract viewport.offsetX here - renderer applies via container transform
     rect.x = rect.timeStart * viewport.zoom;
     rect.width = rect.duration * viewport.zoom;
 
-    // Add to category group
-    const category = node.dominantCategory;
-    let group = visibleRects.get(category);
-    if (!group) {
-      group = [];
-      visibleRects.set(category, group);
-    }
     group.push(rect);
   }
 

@@ -65,6 +65,24 @@ function cullRectanglesLegacy(
   return legacyCullRectangles(manager.getRectsByCategory(), viewport);
 }
 
+// Helper to flatten buckets Map into array for testing
+function getAllBuckets<T>(bucketsMap: Map<string, T[]>): T[] {
+  const allBuckets: T[] = [];
+  for (const buckets of bucketsMap.values()) {
+    allBuckets.push(...buckets);
+  }
+  return allBuckets;
+}
+
+// Helper to count total buckets across all categories
+function countBuckets(bucketsMap: Map<string, unknown[]>): number {
+  let count = 0;
+  for (const buckets of bucketsMap.values()) {
+    count += buckets.length;
+  }
+  return count;
+}
+
 describe('Legacy bucket aggregation', () => {
   const categories = new Set([
     'Method',
@@ -84,7 +102,7 @@ describe('Legacy bucket aggregation', () => {
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.visibleRects.get('Method')).toHaveLength(1);
-      expect(result.buckets).toHaveLength(0);
+      expect(countBuckets(result.buckets)).toBe(0);
       expect(result.stats.visibleCount).toBe(1);
       expect(result.stats.bucketedEventCount).toBe(0);
     });
@@ -95,8 +113,9 @@ describe('Legacy bucket aggregation', () => {
       const viewport = createViewport(1, 0, 0);
       const result = cullRectanglesLegacy(events, categories, viewport);
 
-      expect(result.visibleRects.get('Method')).toBeUndefined();
-      expect(result.buckets).toHaveLength(1);
+      // No visible rects (event is too small), so category has no entry
+      expect(result.visibleRects.has('Method')).toBe(false);
+      expect(countBuckets(result.buckets)).toBe(1);
       expect(result.stats.visibleCount).toBe(0);
       expect(result.stats.bucketedEventCount).toBe(1);
     });
@@ -125,8 +144,9 @@ describe('Legacy bucket aggregation', () => {
       const viewport = createViewport(1, 0, 0);
       const result = cullRectanglesLegacy(events, categories, viewport);
 
-      expect(result.buckets).toHaveLength(1);
-      const bucket = result.buckets[0]!;
+      const allBuckets = getAllBuckets(result.buckets);
+      expect(allBuckets).toHaveLength(1);
+      const bucket = allBuckets[0]!;
       // bucketIndex = floor(5 / 2) = 2
       // timeStart = 2 * 2 = 4
       // timeEnd = 3 * 2 = 6
@@ -140,9 +160,10 @@ describe('Legacy bucket aggregation', () => {
       const viewport = createViewport(1, 0, 0);
       const result = cullRectanglesLegacy(events, categories, viewport);
 
-      expect(result.buckets).toHaveLength(1);
-      expect(result.buckets[0]!.eventCount).toBe(2);
-      expect(result.buckets[0]!.eventRefs).toHaveLength(2);
+      const allBuckets = getAllBuckets(result.buckets);
+      expect(allBuckets).toHaveLength(1);
+      expect(allBuckets[0]!.eventCount).toBe(2);
+      expect(allBuckets[0]!.eventRefs).toHaveLength(2);
     });
 
     it('should create separate buckets for different time ranges', () => {
@@ -154,7 +175,7 @@ describe('Legacy bucket aggregation', () => {
       const viewport = createViewport(1, 0, 0);
       const result = cullRectanglesLegacy(events, categories, viewport);
 
-      expect(result.buckets).toHaveLength(2);
+      expect(countBuckets(result.buckets)).toBe(2);
     });
   });
 
@@ -168,9 +189,10 @@ describe('Legacy bucket aggregation', () => {
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       // Should have 2 buckets (one per depth)
-      expect(result.buckets).toHaveLength(2);
+      const allBuckets = getAllBuckets(result.buckets);
+      expect(allBuckets).toHaveLength(2);
 
-      const depths = result.buckets.map((b) => b.depth).sort();
+      const depths = allBuckets.map((b) => b.depth).sort();
       expect(depths).toEqual([0, 1]);
     });
 
@@ -179,7 +201,8 @@ describe('Legacy bucket aggregation', () => {
       const viewport = createViewport(1, 0, 0);
       const result = cullRectanglesLegacy(events, categories, viewport);
 
-      expect(result.buckets[0]!.y).toBe(0); // depth 0 * EVENT_HEIGHT
+      const allBuckets = getAllBuckets(result.buckets);
+      expect(allBuckets[0]!.y).toBe(0); // depth 0 * EVENT_HEIGHT
 
       // Test depth 1
       const child = createEvent(0, 1, 'SOQL');
@@ -190,7 +213,8 @@ describe('Legacy bucket aggregation', () => {
       const viewport2 = createViewport(0.5, 0, 0);
       const result2 = cullRectanglesLegacy(events2, categories, viewport2);
 
-      const childBucket = result2.buckets.find((b) => b.depth === 1);
+      const allBuckets2 = getAllBuckets(result2.buckets);
+      const childBucket = allBuckets2.find((b) => b.depth === 1);
       expect(childBucket?.y).toBe(TIMELINE_CONSTANTS.EVENT_HEIGHT);
     });
   });
@@ -207,8 +231,9 @@ describe('Legacy bucket aggregation', () => {
 
       // All 3 events at zoom=1 with duration 1ns are < 2px, so all bucketed
       // At bucket width 2ns, events at 0, 0.5, 1 are all in bucket index 0
-      expect(result.buckets.length).toBeGreaterThanOrEqual(1);
-      const bucket = result.buckets[0]!;
+      const allBuckets = getAllBuckets(result.buckets);
+      expect(allBuckets.length).toBeGreaterThanOrEqual(1);
+      const bucket = allBuckets[0]!;
 
       expect(bucket.categoryStats.byCategory.get('Method')?.count).toBe(2);
       expect(bucket.categoryStats.byCategory.get('SOQL')?.count).toBe(1);
@@ -219,7 +244,8 @@ describe('Legacy bucket aggregation', () => {
       const viewport = createViewport(1, 0, 0);
       const result = cullRectanglesLegacy(events, categories, viewport);
 
-      const bucket = result.buckets[0]!;
+      const allBuckets = getAllBuckets(result.buckets);
+      const bucket = allBuckets[0]!;
       expect(bucket.categoryStats.byCategory.get('Method')?.totalDuration).toBe(1.5);
     });
   });
@@ -230,7 +256,8 @@ describe('Legacy bucket aggregation', () => {
       const viewport = createViewport(1, 0, 0);
       const result = cullRectanglesLegacy(events, categories, viewport);
 
-      const bucket = result.buckets[0]!;
+      // Get bucket from DML category (dominant)
+      const bucket = result.buckets.get('DML')![0]!;
       expect(bucket.categoryStats.dominantCategory).toBe('DML');
       // Color should be a valid numeric color value (pre-blended from DML color)
       expect(bucket.color).toBeGreaterThanOrEqual(0);
@@ -242,7 +269,8 @@ describe('Legacy bucket aggregation', () => {
       const viewport = createViewport(1, 0, 0);
       const result = cullRectanglesLegacy(events, categories, viewport);
 
-      const bucket = result.buckets[0]!;
+      // Get bucket from SOQL category (dominant)
+      const bucket = result.buckets.get('SOQL')![0]!;
       expect(bucket.categoryStats.dominantCategory).toBe('SOQL');
     });
   });
@@ -254,8 +282,9 @@ describe('Legacy bucket aggregation', () => {
       const result = cullRectanglesLegacy(events, categories, viewport);
 
       // Color should be a valid numeric color value (pre-blended opaque)
-      expect(result.buckets[0]!.color).toBeGreaterThanOrEqual(0);
-      expect(result.buckets[0]!.color).toBeLessThanOrEqual(0xffffff);
+      const allBuckets = getAllBuckets(result.buckets);
+      expect(allBuckets[0]!.color).toBeGreaterThanOrEqual(0);
+      expect(allBuckets[0]!.color).toBeLessThanOrEqual(0xffffff);
     });
 
     it('should have different colors for different event counts (density visualization)', () => {
@@ -263,7 +292,8 @@ describe('Legacy bucket aggregation', () => {
       const singleEvent = [createEvent(0, 1, 'Method')];
       const singleViewport = createViewport(1, 0, 0);
       const singleResult = cullRectanglesLegacy(singleEvent, categories, singleViewport);
-      const singleBucketColor = singleResult.buckets[0]!.color;
+      const singleBuckets = getAllBuckets(singleResult.buckets);
+      const singleBucketColor = singleBuckets[0]!.color;
 
       // Create many events in same bucket
       const manyEvents: LogEvent[] = [];
@@ -272,7 +302,8 @@ describe('Legacy bucket aggregation', () => {
       }
       const manyViewport = createViewport(1, 0, 0);
       const manyResult = cullRectanglesLegacy(manyEvents, categories, manyViewport);
-      const manyBucketColor = manyResult.buckets[0]!.color;
+      const manyBuckets = getAllBuckets(manyResult.buckets);
+      const manyBucketColor = manyBuckets[0]!.color;
 
       // The colors should be different (more events = more saturated color)
       expect(manyBucketColor).not.toBe(singleBucketColor);
@@ -287,7 +318,8 @@ describe('Legacy bucket aggregation', () => {
       const viewport = createViewport(1, 0, 0);
       const result = cullRectanglesLegacy(events, categories, viewport);
 
-      const bucket = result.buckets[0]!;
+      const allBuckets = getAllBuckets(result.buckets);
+      const bucket = allBuckets[0]!;
       expect(bucket.eventRefs).toContain(event1);
       expect(bucket.eventRefs).toContain(event2);
     });

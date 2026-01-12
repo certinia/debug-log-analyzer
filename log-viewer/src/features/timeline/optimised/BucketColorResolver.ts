@@ -15,10 +15,13 @@ import type { CategoryStats } from '../types/flamechart.types.js';
 import { BUCKET_CONSTANTS } from '../types/flamechart.types.js';
 
 /**
- * Map category names to their hex colors.
+ * Map category names to their hex colors (numeric format).
  * Colors match TIMELINE_CONSTANTS.DEFAULT_COLORS but in numeric format.
+ *
+ * This is the single source of truth for category colors in numeric format.
+ * All timeline code should use this via import or batchColors from theme.
  */
-const CATEGORY_COLORS: Record<string, number> = {
+export const CATEGORY_COLORS: Record<string, number> = {
   DML: 0xb06868, // #B06868
   SOQL: 0x6d4c7d, // #6D4C7D
   Method: 0x2b8f81, // #2B8F81
@@ -31,7 +34,7 @@ const CATEGORY_COLORS: Record<string, number> = {
 /**
  * Default gray color for unknown categories.
  */
-const UNKNOWN_CATEGORY_COLOR = 0x888888;
+export const UNKNOWN_CATEGORY_COLOR = 0x888888;
 
 /**
  * Create a map of category name to priority index for fast lookup.

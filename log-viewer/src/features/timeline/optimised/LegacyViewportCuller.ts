@@ -157,8 +157,15 @@ export function legacyCullRectangles(
     }
   }
 
-  // Convert bucket map to PixelBucket array
-  const buckets: PixelBucket[] = [];
+  // Convert bucket map to PixelBuckets grouped by dominant category
+  const bucketsByCategory = new Map<string, PixelBucket[]>();
+
+  // Pre-initialize with known categories
+  for (const category of BUCKET_CONSTANTS.CATEGORY_PRIORITY) {
+    bucketsByCategory.set(category, []);
+  }
+
+  let bucketCount = 0;
   for (const [key, bucket] of bucketMap) {
     const eventCount = bucket.events.length;
     maxEventsPerBucket = Math.max(maxEventsPerBucket, eventCount);
@@ -192,15 +199,20 @@ export function legacyCullRectangles(
       color: blendedColor,
     };
 
-    buckets.push(pixelBucket);
+    // Add to category group (skip unknown categories)
+    const categoryBuckets = bucketsByCategory.get(colorResult.dominantCategory);
+    if (categoryBuckets) {
+      categoryBuckets.push(pixelBucket);
+      bucketCount++;
+    }
   }
 
   const stats: RenderStats = {
     visibleCount,
     bucketedEventCount,
-    bucketCount: buckets.length,
+    bucketCount,
     maxEventsPerBucket,
   };
 
-  return { visibleRects, buckets, stats };
+  return { visibleRects, buckets: bucketsByCategory, stats };
 }
