@@ -21,8 +21,9 @@
  */
 
 import * as PIXI from 'pixi.js';
-import type { RenderBatch } from '../types/flamechart.types.js';
-import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
+import type { CategoryAggregation, PixelBucket, RenderBatch } from '../types/flamechart.types.js';
+import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
+import { resolveColor } from './BucketColorResolver.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 
 /**
@@ -35,6 +36,8 @@ export class SearchStyleRenderer {
   private batches: Map<string, RenderBatch>;
   private graphics: Map<string, PIXI.Graphics>;
   private container: PIXI.Container;
+  /** Dedicated Graphics object for bucket rendering during search */
+  private bucketGraphics: PIXI.Graphics;
 
   constructor(container: PIXI.Container, batches: Map<string, RenderBatch>) {
     this.batches = batches;
@@ -47,24 +50,32 @@ export class SearchStyleRenderer {
       this.graphics.set(category, gfx);
       container.addChild(gfx);
     }
+
+    // Create dedicated Graphics for bucket rendering
+    this.bucketGraphics = new PIXI.Graphics();
+    container.addChild(this.bucketGraphics);
   }
 
   /**
-   * Render culled rectangles with search styling.
+   * Render culled rectangles and buckets with search styling.
    * Matched events: original colors
    * Non-matched events: desaturated greyscale
+   * Buckets: always desaturated (aggregated events)
    *
    * @param culledRects - Rectangles grouped by category (from RectangleManager)
    * @param matchedEventIds - Set of event IDs that match search (retain original colors)
+   * @param buckets - Aggregated pixel buckets to render (always desaturated)
    */
   public render(
     culledRects: Map<string, PrecomputedRect[]>,
     matchedEventIds: ReadonlySet<string>,
+    buckets: PixelBucket[] = [],
   ): void {
     // Clear all graphics
     for (const gfx of this.graphics.values()) {
       gfx.clear();
     }
+    this.bucketGraphics.clear();
 
     // Render each category with search styling
     for (const [category, rectangles] of culledRects) {
@@ -83,6 +94,10 @@ export class SearchStyleRenderer {
         matchedEventIds,
       );
     }
+
+    // Render buckets with search-aware styling
+    // Buckets containing matched events retain original color
+    this.renderBucketsWithSearch(buckets, matchedEventIds);
   }
 
   /**
@@ -93,6 +108,7 @@ export class SearchStyleRenderer {
     for (const gfx of this.graphics.values()) {
       gfx.clear();
     }
+    this.bucketGraphics.clear();
   }
 
   /**
@@ -103,6 +119,7 @@ export class SearchStyleRenderer {
       gfx.destroy();
     }
     this.graphics.clear();
+    this.bucketGraphics.destroy();
   }
 
   // ============================================================================
@@ -160,6 +177,84 @@ export class SearchStyleRenderer {
     }
     if (hasNonMatched) {
       gfx.fill({ color: greyColor, alpha: originalAlpha });
+    }
+  }
+
+  /**
+   * Render buckets with search-aware styling.
+   * Buckets containing matched events use the color of matched event categories
+   * (highest priority if multiple matches). Buckets without matches are desaturated.
+   *
+   * @param buckets - Pixel buckets to render
+   * @param matchedEventIds - Set of matched event IDs (format: "timestamp-depth-index")
+   */
+  private renderBucketsWithSearch(
+    buckets: PixelBucket[],
+    matchedEventIds: ReadonlySet<string>,
+  ): void {
+    if (buckets.length === 0) {
+      return;
+    }
+
+    // Build a lookup set of "timestamp-depth" for O(1) matching
+    // matchedEventIds format: "timestamp-depth-index"
+    const matchedTimestampDepths = new Set<string>();
+    for (const matchedId of matchedEventIds) {
+      const parts = matchedId.split('-');
+      if (parts.length >= 2) {
+        // Store "timestamp-depth" for fast lookup
+        matchedTimestampDepths.add(`${parts[0]}-${parts[1]}`);
+      }
+    }
+
+    const blockWidth = BUCKET_CONSTANTS.BUCKET_BLOCK_WIDTH;
+    const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
+    const gap = TIMELINE_CONSTANTS.RECT_GAP;
+    const halfGap = gap / 2;
+
+    // Draw each bucket, checking if it contains any matched events
+    for (const bucket of buckets) {
+      // Find all matched events in this bucket and build category stats
+      const matchedCategoryStats = new Map<string, CategoryAggregation>();
+
+      for (const event of bucket.eventRefs) {
+        const key = `${event.timestamp}-${bucket.depth}`;
+        if (matchedTimestampDepths.has(key) && event.subCategory) {
+          let stats = matchedCategoryStats.get(event.subCategory);
+          if (!stats) {
+            stats = { count: 0, totalDuration: 0 };
+            matchedCategoryStats.set(event.subCategory, stats);
+          }
+          stats.count++;
+          stats.totalDuration += event.duration?.total ?? 0;
+        }
+      }
+
+      let displayColor: number;
+
+      if (matchedCategoryStats.size > 0) {
+        // Resolve color from matched events using priority rules
+        const colorResult = resolveColor({
+          byCategory: matchedCategoryStats,
+          dominantCategory: '',
+        });
+        displayColor = colorResult.color;
+      } else {
+        // No matches - desaturate the bucket's original color
+        displayColor = this.colorToGreyscale(bucket.color);
+      }
+
+      this.bucketGraphics.setFillStyle({
+        color: displayColor,
+        alpha: bucket.opacity,
+      });
+
+      const gappedX = bucket.x + halfGap;
+      const gappedY = bucket.y + halfGap;
+      const gappedHeight = Math.max(0, eventHeight - gap);
+
+      this.bucketGraphics.rect(gappedX, gappedY, blockWidth, gappedHeight);
+      this.bucketGraphics.fill();
     }
   }
 

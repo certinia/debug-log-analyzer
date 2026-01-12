@@ -24,14 +24,16 @@
  */
 
 import * as PIXI from 'pixi.js';
-import type { RenderBatch } from '../types/flamechart.types.js';
-import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
+import type { PixelBucket, RenderBatch } from '../types/flamechart.types.js';
+import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 
 export class EventBatchRenderer {
   private batches: Map<string, RenderBatch>;
   private graphics: Map<string, PIXI.Graphics>;
   private container: PIXI.Container;
+  /** Dedicated Graphics object for bucket rendering */
+  private bucketGraphics: PIXI.Graphics;
 
   constructor(container: PIXI.Container, batches: Map<string, RenderBatch>) {
     this.batches = batches;
@@ -44,15 +46,20 @@ export class EventBatchRenderer {
       this.graphics.set(category, gfx);
       container.addChild(gfx);
     }
+
+    // Create dedicated Graphics for bucket rendering
+    this.bucketGraphics = new PIXI.Graphics();
+    container.addChild(this.bucketGraphics);
   }
 
   /**
-   * Render culled rectangles with original colors.
-   * Receives pre-culled rectangles from RectangleManager.
+   * Render culled rectangles and buckets.
+   * Receives pre-culled rectangles and aggregated buckets from RectangleManager.
    *
-   * @param culledRects - Rectangles grouped by category (from RectangleManager)
+   * @param culledRects - Rectangles grouped by category (events > 2px)
+   * @param buckets - Aggregated buckets for sub-pixel events (events ≤ 2px)
    */
-  public render(culledRects: Map<string, PrecomputedRect[]>): void {
+  public render(culledRects: Map<string, PrecomputedRect[]>, buckets: PixelBucket[]): void {
     // Clear all batches - reuse existing arrays
     for (const batch of this.batches.values()) {
       batch.rectangles.length = 0;
@@ -76,6 +83,9 @@ export class EventBatchRenderer {
         batch.isDirty = false;
       }
     }
+
+    // Render buckets with barcode pattern
+    this.renderBuckets(buckets);
   }
 
   /**
@@ -86,6 +96,7 @@ export class EventBatchRenderer {
     for (const gfx of this.graphics.values()) {
       gfx.clear();
     }
+    this.bucketGraphics.clear();
   }
 
   /**
@@ -96,6 +107,7 @@ export class EventBatchRenderer {
       gfx.destroy();
     }
     this.graphics.clear();
+    this.bucketGraphics.destroy();
   }
 
   // ============================================================================
@@ -139,6 +151,46 @@ export class EventBatchRenderer {
       // Draw filled rectangle with gaps
       gfx.rect(gappedX, gappedY, gappedWidth, gappedHeight);
       gfx.fill();
+    }
+  }
+
+  /**
+   * Render buckets with barcode pattern.
+   *
+   * Each bucket is rendered as a 1px wide block with a 1px gap.
+   * This creates a "barcode" visual effect when multiple buckets are adjacent.
+   * Opacity varies by event count to show density.
+   *
+   * @param buckets - Aggregated pixel buckets to render
+   */
+  private renderBuckets(buckets: PixelBucket[]): void {
+    this.bucketGraphics.clear();
+
+    if (buckets.length === 0) {
+      return;
+    }
+
+    const blockWidth = BUCKET_CONSTANTS.BUCKET_BLOCK_WIDTH;
+    const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
+    const gap = TIMELINE_CONSTANTS.RECT_GAP;
+    const halfGap = gap / 2;
+
+    // Draw each bucket as a 1px block
+    for (const bucket of buckets) {
+      // Set fill style with bucket's resolved color and density-based opacity
+      this.bucketGraphics.setFillStyle({
+        color: bucket.color,
+        alpha: bucket.opacity,
+      });
+
+      // Apply same gapping as normal rectangles for visual consistency
+      const gappedX = bucket.x + halfGap;
+      const gappedY = bucket.y + halfGap;
+      const gappedHeight = Math.max(0, eventHeight - gap);
+
+      // Draw 1px wide block (gap is implicit - we just don't draw it)
+      this.bucketGraphics.rect(gappedX, gappedY, blockWidth, gappedHeight);
+      this.bucketGraphics.fill();
     }
   }
 }

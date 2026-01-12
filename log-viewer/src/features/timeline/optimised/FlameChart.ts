@@ -821,15 +821,15 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.axisRenderer.render(viewportState);
     }
 
-    const culledRects = this.rectangleManager.getCulledRectangles(viewportState);
+    const { visibleRects, buckets } = this.rectangleManager.getCulledRectangles(viewportState);
 
     // Render events (with or without search styling)
     const cursor = this.newSearchManager?.getCursor();
 
     if (cursor && cursor.total > 0) {
-      // Search mode: render with desaturation
+      // Search mode: render with desaturation (including buckets)
       const matchedEventIds = cursor.getMatchedEventIds();
-      this.searchStyleRenderer!.render(culledRects, matchedEventIds);
+      this.searchStyleRenderer!.render(visibleRects, matchedEventIds, buckets);
 
       // Render highlight border for current match
       this.searchRenderer!.render(cursor, viewportState);
@@ -839,8 +839,8 @@ export class FlameChart<E extends EventNode = EventNode> {
         this.batchRenderer.clear();
       }
     } else {
-      // Normal mode: render with original colors
-      this.batchRenderer.render(culledRects);
+      // Normal mode: render with original colors and buckets
+      this.batchRenderer.render(visibleRects, buckets);
 
       // Clear search overlays when not in search mode
       if (this.searchStyleRenderer) {
@@ -856,12 +856,12 @@ export class FlameChart<E extends EventNode = EventNode> {
       // Search mode: SearchTextLabelRenderer coordinates both matched and unmatched labels
       const matchedEventIds = cursor.getMatchedEventIds();
       if (this.searchTextLabelRenderer) {
-        this.searchTextLabelRenderer.render(culledRects, matchedEventIds, viewportState);
+        this.searchTextLabelRenderer.render(visibleRects, matchedEventIds, viewportState);
       }
     } else {
       // Normal mode: render all visible text
       if (this.textLabelRenderer) {
-        this.textLabelRenderer.render(culledRects, viewportState);
+        this.textLabelRenderer.render(visibleRects, viewportState);
       }
 
       // Clear search text renderer when not in search mode

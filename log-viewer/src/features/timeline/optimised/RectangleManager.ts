@@ -22,8 +22,19 @@
  */
 
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type { RenderRectangle, ViewportBounds, ViewportState } from '../types/flamechart.types.js';
-import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
+import type {
+  CategoryAggregation,
+  CategoryStats,
+  CulledRenderData,
+  PixelBucket,
+  RenderRectangle,
+  RenderStats,
+  ViewportBounds,
+  ViewportState,
+} from '../types/flamechart.types.js';
+import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
+import { resolveColor } from './BucketColorResolver.js';
+import { calculateOpacity } from './BucketOpacity.js';
 
 /**
  * Pre-computed event rectangle with fixed and dynamic properties.
@@ -86,17 +97,33 @@ export class RectangleManager {
   }
 
   /**
-   * Get culled rectangles for current viewport.
-   * Runs viewport culling algorithm and returns rectangles ready for rendering.
+   * Get culled rectangles and buckets for current viewport.
+   * Runs viewport culling algorithm and returns data ready for rendering.
+   *
+   * Events > MIN_RECT_SIZE (2px) are returned as visible rectangles.
+   * Events ≤ MIN_RECT_SIZE are aggregated into time-aligned buckets.
    *
    * @param viewport - Current viewport state
-   * @returns Culled rectangles grouped by category and in flat array
+   * @returns CulledRenderData with visible rectangles, buckets, and stats
    *
    * Performance target: <10ms for 50,000 events
    */
-  public getCulledRectangles(viewport: ViewportState): Map<string, PrecomputedRect[]> {
+  public getCulledRectangles(viewport: ViewportState): CulledRenderData {
     const bounds = this.calculateBounds(viewport);
-    const byCategory = new Map<string, PrecomputedRect[]>();
+    const visibleRects = new Map<string, PrecomputedRect[]>();
+
+    // Bucket aggregation: Map<"depth-bucketIndex", bucket data>
+    const bucketMap = new Map<
+      string,
+      {
+        depth: number;
+        bucketIndex: number;
+        timeStart: number;
+        timeEnd: number;
+        events: LogEvent[];
+        categoryStats: Map<string, CategoryAggregation>;
+      }
+    >();
 
     // Cache frequently accessed values as primitives
     const zoom = viewport.zoom;
@@ -105,6 +132,16 @@ export class RectangleManager {
     const depthStart = bounds.depthStart;
     const depthEnd = bounds.depthEnd;
     const minRectSize = TIMELINE_CONSTANTS.MIN_RECT_SIZE;
+    const bucketWidth = BUCKET_CONSTANTS.BUCKET_WIDTH;
+    const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
+
+    // Calculate bucket time width (how much time fits in 2 pixels)
+    const bucketTimeWidth = bucketWidth / zoom;
+
+    // Stats tracking
+    let visibleCount = 0;
+    let bucketedEventCount = 0;
+    let maxEventsPerBucket = 0;
 
     // Cull rectangles for each category
     for (const [category, rectangles] of this.rectsByCategory) {
@@ -133,24 +170,93 @@ export class RectangleManager {
         // Calculate screen-space width
         const screenWidth = rectDuration * zoom;
 
-        // Size culling
-        if (screenWidth < minRectSize) {
-          continue;
+        if (screenWidth > minRectSize) {
+          // Visible rectangle: render normally
+          rect.x = rectTimeStart * zoom;
+          rect.width = screenWidth;
+          culled.push(rect);
+          visibleCount++;
+        } else {
+          // Sub-pixel event: aggregate into bucket
+          const bucketIndex = Math.floor(rectTimeStart / bucketTimeWidth);
+          const bucketKey = `${rectDepth}-${bucketIndex}`;
+
+          let bucket = bucketMap.get(bucketKey);
+          if (!bucket) {
+            bucket = {
+              depth: rectDepth,
+              bucketIndex,
+              timeStart: bucketIndex * bucketTimeWidth,
+              timeEnd: (bucketIndex + 1) * bucketTimeWidth,
+              events: [],
+              categoryStats: new Map(),
+            };
+            bucketMap.set(bucketKey, bucket);
+          }
+
+          // Add event to bucket
+          bucket.events.push(rect.eventRef);
+          bucketedEventCount++;
+
+          // Update category stats
+          let catStats = bucket.categoryStats.get(category);
+          if (!catStats) {
+            catStats = { count: 0, totalDuration: 0 };
+            bucket.categoryStats.set(category, catStats);
+          }
+          catStats.count++;
+          catStats.totalDuration += rectDuration;
         }
-
-        // Update rect screen position in-place (zero allocations)
-        rect.x = rectTimeStart * zoom;
-        rect.width = screenWidth;
-
-        culled.push(rect);
       }
 
       if (culled.length > 0) {
-        byCategory.set(category, culled);
+        visibleRects.set(category, culled);
       }
     }
 
-    return byCategory;
+    // Convert bucket map to PixelBucket array
+    const buckets: PixelBucket[] = [];
+    for (const [key, bucket] of bucketMap) {
+      const eventCount = bucket.events.length;
+      maxEventsPerBucket = Math.max(maxEventsPerBucket, eventCount);
+
+      // Build CategoryStats from aggregation
+      const categoryStats: CategoryStats = {
+        byCategory: bucket.categoryStats,
+        dominantCategory: '',
+      };
+
+      // Resolve color and dominant category
+      const colorResult = resolveColor(categoryStats);
+
+      const pixelBucket: PixelBucket = {
+        id: `bucket-${key}`,
+        x: bucket.timeStart * zoom,
+        y: bucket.depth * eventHeight,
+        timeStart: bucket.timeStart,
+        timeEnd: bucket.timeEnd,
+        depth: bucket.depth,
+        eventCount,
+        categoryStats: {
+          byCategory: bucket.categoryStats,
+          dominantCategory: colorResult.dominantCategory,
+        },
+        eventRefs: bucket.events,
+        opacity: calculateOpacity(eventCount),
+        color: colorResult.color,
+      };
+
+      buckets.push(pixelBucket);
+    }
+
+    const stats: RenderStats = {
+      visibleCount,
+      bucketedEventCount,
+      bucketCount: buckets.length,
+      maxEventsPerBucket,
+    };
+
+    return { visibleRects, buckets, stats };
   }
 
   /**

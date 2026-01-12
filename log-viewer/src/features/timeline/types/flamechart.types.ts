@@ -208,6 +208,84 @@ export interface TimelineOptions {
 }
 
 // ============================================================================
+// SUB-PIXEL BUCKET TYPES
+// ============================================================================
+
+/**
+ * Aggregated statistics for a single category within a bucket.
+ */
+export interface CategoryAggregation {
+  /** Number of events of this category */
+  count: number;
+  /** Total duration in nanoseconds */
+  totalDuration: number;
+}
+
+/**
+ * Statistics per category for color resolution.
+ */
+export interface CategoryStats {
+  /** Map of category name to aggregated stats */
+  byCategory: Map<string, CategoryAggregation>;
+  /** Winning category after priority/duration/count resolution */
+  dominantCategory: string;
+}
+
+/**
+ * A 2px-wide aggregation of sub-pixel events at a specific depth.
+ */
+export interface PixelBucket {
+  /** Unique identifier: bucket-{depth}-{bucketIndex} */
+  id: string;
+  /** Screen X position (timeStart * zoom - offsetX) */
+  x: number;
+  /** Screen Y position (depth * EVENT_HEIGHT) */
+  y: number;
+  /** Start time in nanoseconds (time-aligned boundary) */
+  timeStart: number;
+  /** End time in nanoseconds */
+  timeEnd: number;
+  /** Call stack depth (0-indexed) */
+  depth: number;
+  /** Number of aggregated events */
+  eventCount: number;
+  /** Per-category statistics */
+  categoryStats: CategoryStats;
+  /** Source event references for tooltip/click */
+  eventRefs: LogEvent[];
+  /** Calculated opacity (0.3 - 0.9) */
+  opacity: number;
+  /** Resolved display color (hex number) */
+  color: number;
+}
+
+/**
+ * Statistics about the current render pass.
+ */
+export interface RenderStats {
+  /** Events rendered normally (> 2px) */
+  visibleCount: number;
+  /** Events aggregated into buckets (≤ 2px) */
+  bucketedEventCount: number;
+  /** Number of buckets created */
+  bucketCount: number;
+  /** Max events in any single bucket */
+  maxEventsPerBucket: number;
+}
+
+/**
+ * Return type from getCulledRectangles() with bucket support.
+ */
+export interface CulledRenderData {
+  /** Events > 2px screen width - render normally */
+  visibleRects: Map<string, PrecomputedRect[]>;
+  /** Aggregated buckets for events ≤ 2px */
+  buckets: PixelBucket[];
+  /** Render statistics */
+  stats: RenderStats;
+}
+
+// ============================================================================
 // CONSTANTS
 // ============================================================================
 
@@ -220,8 +298,8 @@ export const TIMELINE_CONSTANTS = {
   /** Height of each event rectangle in pixels. */
   EVENT_HEIGHT: 15,
 
-  /** Minimum rectangle width in pixels before culling. */
-  MIN_RECT_SIZE: 0.5,
+  /** Minimum rectangle width in pixels before culling (events below this go to buckets). */
+  MIN_RECT_SIZE: 2,
 
   /** Gap between rectangles in pixels (negative space separation). */
   RECT_GAP: 1,
@@ -249,6 +327,58 @@ export const TIMELINE_CONSTANTS = {
   },
 } as const;
 /* eslint-enable @typescript-eslint/naming-convention */
+
+// ============================================================================
+// BUCKET RENDERING CONSTANTS
+// ============================================================================
+
+/**
+ * Constants for sub-pixel bucket rendering (barcode pattern).
+ */
+/* eslint-disable @typescript-eslint/naming-convention */
+export const BUCKET_CONSTANTS = {
+  /** Total bucket width in pixels (block + gap) */
+  BUCKET_WIDTH: 2,
+
+  /** Width of the rendered block within a bucket */
+  BUCKET_BLOCK_WIDTH: 1,
+
+  /** Gap after the block (implicit - just don't draw) */
+  BUCKET_GAP_WIDTH: 1,
+
+  /** Opacity settings for density visualization */
+  OPACITY: {
+    /** Minimum opacity for buckets with 1 event */
+    MIN: 0.3,
+    /** Maximum opacity for saturated buckets */
+    MAX: 0.9,
+    /** Opacity range (MAX - MIN) */
+    RANGE: 0.6,
+    /** Event count at which opacity saturates */
+    SATURATION_COUNT: 100,
+  },
+
+  /**
+   * Category priority order for bucket color resolution (highest priority first).
+   * When multiple categories exist in a bucket, highest priority wins.
+   * Tie-breakers: total duration → event count
+   */
+  CATEGORY_PRIORITY: [
+    'DML',
+    'SOQL',
+    'Method',
+    'Code Unit',
+    'System Method',
+    'Flow',
+    'Workflow',
+  ] as const,
+} as const;
+/* eslint-enable @typescript-eslint/naming-convention */
+
+/**
+ * Type for category names in priority order.
+ */
+export type BucketCategoryPriority = (typeof BUCKET_CONSTANTS.CATEGORY_PRIORITY)[number];
 
 // ============================================================================
 // ERROR HANDLING
