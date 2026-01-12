@@ -612,8 +612,8 @@ export interface FindResultsEventDetail {
  * The tree is used for O(log n) viewport culling and bucket aggregation,
  * replacing the per-frame O(n) iteration in RectangleManager.
  *
- * Key optimization: Pre-computed weighted colors and fill ratios enable
- * instant bucket rendering without recalculating aggregates per frame.
+ * Key optimization: Pre-computed category stats enable instant bucket
+ * rendering without recalculating aggregates per frame.
  */
 export interface SegmentNode {
   // Time bounds (nanoseconds)
@@ -622,30 +622,10 @@ export interface SegmentNode {
   /** End time of this node's span (nanoseconds) */
   timeEnd: number;
 
-  // Pre-computed aggregates
   /** Time span = timeEnd - timeStart (nanoseconds) */
   nodeSpan: number;
-  /** Sum of actual event durations within this node's span */
-  totalEventDuration: number;
-  /**
-   * Fill ratio = totalEventDuration / nodeSpan (0.0 to 1.0)
-   * Represents density - how much of the time span is filled with events.
-   * Used for brightness/opacity calculation.
-   */
-  fillRatio: number;
 
-  // Weighted color (for blending)
-  /**
-   * Weighted R component: sum(event.R * event.duration) / totalEventDuration
-   * Pre-computed for instant color resolution without per-frame calculation.
-   */
-  weightedColorR: number;
-  /** Weighted G component */
-  weightedColorG: number;
-  /** Weighted B component */
-  weightedColorB: number;
-
-  // Category statistics (for tooltips)
+  // Category statistics (for tooltips and color resolution)
   /** Per-category event counts and durations */
   categoryStats: Map<string, CategoryAggregation>;
   /** Winning category after priority/duration/count resolution */
@@ -657,7 +637,7 @@ export interface SegmentNode {
   /** For leaf nodes only: reference to source event */
   eventRef?: LogEvent;
   /** For leaf nodes only: direct reference to PrecomputedRect (avoids O(n) lookup) */
-  rectRef?: import('../optimised/RectangleManager.js').PrecomputedRect;
+  rectRef?: PrecomputedRect;
 
   // Tree structure
   /** Child nodes (null for leaf nodes) */

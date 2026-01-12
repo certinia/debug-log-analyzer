@@ -10,9 +10,9 @@
  *
  * Key concepts:
  * - Leaf nodes represent individual events
- * - Branch nodes aggregate children with pre-computed statistics
+ * - Branch nodes aggregate children with pre-computed category statistics
  * - Query traversal stops at nodes where nodeSpan <= threshold (2px / zoom)
- * - Pre-computed weighted colors enable instant bucket rendering
+ * - Pre-computed category stats enable instant bucket color resolution
  *
  * Memory usage: ~175MB for 500k events (tree + original rectangles)
  * Build time: O(n log n) for sorting + O(n) for tree construction
@@ -73,9 +73,6 @@ export class TemporalSegmentTree {
   /** Maximum depth in the tree */
   private maxDepth = 0;
 
-  /** Reference to original rectangles for visible rect queries */
-  private rectsByCategory: Map<string, PrecomputedRect[]>;
-
   /** Cached batch colors for theme support */
   private batchColors?: Map<string, BatchColorInfo>;
 
@@ -89,9 +86,8 @@ export class TemporalSegmentTree {
     rectsByCategory: Map<string, PrecomputedRect[]>,
     batchColors?: Map<string, BatchColorInfo>,
   ) {
-    this.rectsByCategory = rectsByCategory;
     this.batchColors = batchColors;
-    this.buildTrees();
+    this.buildTrees(rectsByCategory);
   }
 
   /**
@@ -133,9 +129,8 @@ export class TemporalSegmentTree {
       }
     >();
 
-    // Stats tracking
-    let visibleCount = 0;
-    let bucketedEventCount = 0;
+    // Stats tracking - using mutable object to avoid callback overhead
+    const stats = { visibleCount: 0, bucketedEventCount: 0 };
 
     // Calculate bucket time width (how much time fits in 2 pixels)
     const bucketTimeWidth = BUCKET_CONSTANTS.BUCKET_WIDTH / viewport.zoom;
@@ -155,12 +150,7 @@ export class TemporalSegmentTree {
         viewport,
         visibleRects,
         bucketMap,
-        (count) => {
-          visibleCount += count;
-        },
-        (count) => {
-          bucketedEventCount += count;
-        },
+        stats,
       );
     }
 
@@ -202,14 +192,14 @@ export class TemporalSegmentTree {
       buckets.push(pixelBucket);
     }
 
-    const stats: RenderStats = {
-      visibleCount,
-      bucketedEventCount,
+    const renderStats: RenderStats = {
+      visibleCount: stats.visibleCount,
+      bucketedEventCount: stats.bucketedEventCount,
       bucketCount: buckets.length,
       maxEventsPerBucket,
     };
 
-    return { visibleRects, buckets, stats };
+    return { visibleRects, buckets, stats: renderStats };
   }
 
   /**
@@ -226,11 +216,11 @@ export class TemporalSegmentTree {
   /**
    * Build segment trees for all depth levels.
    */
-  private buildTrees(): void {
+  private buildTrees(rectsByCategory: Map<string, PrecomputedRect[]>): void {
     // Group all rectangles by depth
     const rectsByDepth = new Map<number, PrecomputedRect[]>();
 
-    for (const rects of this.rectsByCategory.values()) {
+    for (const rects of rectsByCategory.values()) {
       for (const rect of rects) {
         let depthRects = rectsByDepth.get(rect.depth);
         if (!depthRects) {
@@ -277,9 +267,6 @@ export class TemporalSegmentTree {
    * Create a leaf node from a PrecomputedRect.
    */
   private createLeafNode(rect: PrecomputedRect, depth: number): SegmentNode {
-    const color = this.getCategoryColor(rect.category);
-    const [r, g, b] = this.extractRGB(color);
-
     const duration = Math.max(SEGMENT_TREE_CONSTANTS.MIN_NODE_SPAN, rect.duration);
 
     const categoryStats = new Map<string, CategoryAggregation>([
@@ -290,12 +277,6 @@ export class TemporalSegmentTree {
       timeStart: rect.timeStart,
       timeEnd: rect.timeEnd,
       nodeSpan: duration,
-      totalEventDuration: duration,
-      fillRatio: 1.0, // Leaf = 100% filled
-
-      weightedColorR: r,
-      weightedColorG: g,
-      weightedColorB: b,
 
       categoryStats,
       dominantCategory: rect.category,
@@ -314,6 +295,8 @@ export class TemporalSegmentTree {
 
   /**
    * Build tree from leaves using iterative bottom-up construction.
+   *
+   * PERF: Uses index-based iteration to avoid array allocations from slice().
    */
   private buildTreeFromLeaves(leaves: SegmentNode[]): SegmentNode {
     const { BRANCHING_FACTOR } = SEGMENT_TREE_CONSTANTS;
@@ -321,11 +304,15 @@ export class TemporalSegmentTree {
     let currentLevel = leaves;
 
     while (currentLevel.length > 1) {
-      const nextLevel: SegmentNode[] = [];
+      const levelLength = currentLevel.length;
+      // Pre-calculate next level size to avoid array resizing
+      const nextLevelSize = Math.ceil(levelLength / BRANCHING_FACTOR);
+      const nextLevel: SegmentNode[] = new Array(nextLevelSize);
+      let nextIdx = 0;
 
-      for (let i = 0; i < currentLevel.length; i += BRANCHING_FACTOR) {
-        const children = currentLevel.slice(i, i + BRANCHING_FACTOR);
-        nextLevel.push(this.createBranchNode(children));
+      for (let i = 0; i < levelLength; i += BRANCHING_FACTOR) {
+        const end = Math.min(i + BRANCHING_FACTOR, levelLength);
+        nextLevel[nextIdx++] = this.createBranchNodeFromRange(currentLevel, i, end);
       }
 
       currentLevel = nextLevel;
@@ -335,31 +322,28 @@ export class TemporalSegmentTree {
   }
 
   /**
-   * Create a branch node that aggregates children.
+   * Create a branch node from a range of children (avoids array allocation).
+   *
+   * PERF: Uses start/end indices instead of creating a sliced array.
    */
-  private createBranchNode(children: SegmentNode[]): SegmentNode {
-    const firstChild = children[0]!;
-    const lastChild = children[children.length - 1]!;
+  private createBranchNodeFromRange(
+    children: SegmentNode[],
+    start: number,
+    end: number,
+  ): SegmentNode {
+    const firstChild = children[start]!;
+    const lastChild = children[end - 1]!;
     const timeStart = firstChild.timeStart;
     const timeEnd = lastChild.timeEnd;
     const nodeSpan = Math.max(SEGMENT_TREE_CONSTANTS.MIN_NODE_SPAN, timeEnd - timeStart);
 
     // Aggregate statistics
-    let totalEventDuration = 0;
-    let totalWeightedR = 0;
-    let totalWeightedG = 0;
-    let totalWeightedB = 0;
     let totalEventCount = 0;
     const categoryStats = new Map<string, CategoryAggregation>();
 
-    for (const child of children) {
-      totalEventDuration += child.totalEventDuration;
+    for (let i = start; i < end; i++) {
+      const child = children[i]!;
       totalEventCount += child.eventCount;
-
-      // Weighted color accumulation
-      totalWeightedR += child.weightedColorR * child.totalEventDuration;
-      totalWeightedG += child.weightedColorG * child.totalEventDuration;
-      totalWeightedB += child.weightedColorB * child.totalEventDuration;
 
       // Merge category stats
       for (const [cat, stats] of child.categoryStats) {
@@ -373,34 +357,23 @@ export class TemporalSegmentTree {
       }
     }
 
-    // Normalize weighted colors
-    const weightedColorR = totalEventDuration > 0 ? totalWeightedR / totalEventDuration : 128;
-    const weightedColorG = totalEventDuration > 0 ? totalWeightedG / totalEventDuration : 128;
-    const weightedColorB = totalEventDuration > 0 ? totalWeightedB / totalEventDuration : 128;
-
-    // Calculate fill ratio (clamp to 1.0 for overlapping events)
-    const fillRatio = Math.min(1.0, totalEventDuration / nodeSpan);
-
     // Determine dominant category
     const dominantCategory = this.resolveDominantCategory(categoryStats);
+
+    // Store actual child references for tree traversal
+    const childNodes = children.slice(start, end);
 
     return {
       timeStart,
       timeEnd,
       nodeSpan,
-      totalEventDuration,
-      fillRatio,
-
-      weightedColorR,
-      weightedColorG,
-      weightedColorB,
 
       categoryStats,
       dominantCategory,
 
       eventCount: totalEventCount,
 
-      children,
+      children: childNodes,
       isLeaf: false,
 
       y: firstChild.y,
@@ -416,6 +389,8 @@ export class TemporalSegmentTree {
    * Recursive query traversal.
    * Stops at first node where nodeSpan <= threshold.
    * Aggregates nodes into grid-aligned buckets matching legacy behavior.
+   *
+   * PERF: Uses mutable stats object instead of callbacks to reduce overhead.
    */
   private queryNode(
     node: SegmentNode,
@@ -436,8 +411,7 @@ export class TemporalSegmentTree {
         categoryStats: Map<string, CategoryAggregation>;
       }
     >,
-    onVisibleRect: (count: number) => void,
-    onBucket: (eventCount: number) => void,
+    stats: { visibleCount: number; bucketedEventCount: number },
   ): void {
     // Early exit: node completely outside query range
     if (node.timeEnd <= queryStart || node.timeStart >= queryEnd) {
@@ -448,7 +422,7 @@ export class TemporalSegmentTree {
     if (node.nodeSpan <= threshold) {
       // Aggregate into grid-aligned bucket (matching legacy behavior)
       this.aggregateIntoBucket(node, bucketTimeWidth, bucketMap);
-      onBucket(node.eventCount);
+      stats.bucketedEventCount += node.eventCount;
       return;
     }
 
@@ -457,7 +431,7 @@ export class TemporalSegmentTree {
       // Leaf node larger than threshold = visible rectangle
       // Add to visible rects by finding the original PrecomputedRect
       this.addVisibleRect(node, viewport, visibleRects);
-      onVisibleRect(1);
+      stats.visibleCount++;
       return;
     }
 
@@ -472,8 +446,7 @@ export class TemporalSegmentTree {
         viewport,
         visibleRects,
         bucketMap,
-        onVisibleRect,
-        onBucket,
+        stats,
       );
     }
   }
@@ -566,22 +539,6 @@ export class TemporalSegmentTree {
   // ==========================================================================
   // UTILITY METHODS
   // ==========================================================================
-
-  /**
-   * Get color for a category.
-   */
-  private getCategoryColor(category: string): number {
-    return (
-      this.batchColors?.get(category)?.color ?? CATEGORY_COLORS[category] ?? UNKNOWN_CATEGORY_COLOR
-    );
-  }
-
-  /**
-   * Extract RGB components from a color.
-   */
-  private extractRGB(color: number): [number, number, number] {
-    return [(color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff];
-  }
 
   /**
    * Resolve dominant category from stats using priority order.
