@@ -5,11 +5,16 @@
 import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
 import type { LogSubCategory } from '../../../../core/log-parser/types.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
-import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
+import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
+import { legacyCullRectangles } from '../LegacyViewportCuller.js';
 import { RectangleManager } from '../RectangleManager.js';
 
 /**
- * Tests for RectangleManager bucket aggregation.
+ * Tests for legacy O(n) bucket aggregation.
+ *
+ * These tests use the LegacyViewportCuller to test the original bucket
+ * aggregation behavior. For production, RectangleManager uses TemporalSegmentTree
+ * which has O(log n) performance but doesn't store eventRefs in multi-event buckets.
  *
  * When events are smaller than MIN_RECT_SIZE (2px) at the current zoom level,
  * they are aggregated into time-aligned buckets for "barcode" rendering.
@@ -50,7 +55,17 @@ function createViewport(
   };
 }
 
-describe('RectangleManager bucket aggregation', () => {
+// Helper to cull rectangles using the legacy O(n) algorithm
+function cullRectanglesLegacy(
+  events: LogEvent[],
+  categories: Set<string>,
+  viewport: ViewportState,
+) {
+  const manager = new RectangleManager(events, categories);
+  return legacyCullRectangles(manager.getRectsByCategory(), viewport);
+}
+
+describe('Legacy bucket aggregation', () => {
   const categories = new Set([
     'Method',
     'SOQL',
@@ -65,10 +80,8 @@ describe('RectangleManager bucket aggregation', () => {
     it('should return events > 2px in visibleRects', () => {
       // Event with duration 3ns at zoom=1 gives 3px width (> MIN_RECT_SIZE)
       const events = [createEvent(0, 3, 'Method')];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.visibleRects.get('Method')).toHaveLength(1);
       expect(result.buckets).toHaveLength(0);
@@ -79,10 +92,8 @@ describe('RectangleManager bucket aggregation', () => {
     it('should aggregate events <= 2px into buckets', () => {
       // Event with duration 1ns at zoom=1 gives 1px width (<= MIN_RECT_SIZE)
       const events = [createEvent(0, 1, 'Method')];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.visibleRects.get('Method')).toBeUndefined();
       expect(result.buckets).toHaveLength(1);
@@ -97,10 +108,8 @@ describe('RectangleManager bucket aggregation', () => {
         createEvent(20, 3, 'SOQL'), // 3px at zoom=1 - visible
         createEvent(30, 0.5, 'SOQL'), // 0.5px at zoom=1 - bucketed
       ];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.visibleRects.get('Method')).toHaveLength(1);
       expect(result.visibleRects.get('SOQL')).toHaveLength(1);
@@ -113,10 +122,8 @@ describe('RectangleManager bucket aggregation', () => {
     it('should create time-aligned bucket boundaries', () => {
       // At zoom=1, bucket width is 2ns (2px / 1)
       const events = [createEvent(5, 1, 'Method')]; // Event at timestamp 5
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.buckets).toHaveLength(1);
       const bucket = result.buckets[0]!;
@@ -130,10 +137,8 @@ describe('RectangleManager bucket aggregation', () => {
     it('should group events in same time bucket together', () => {
       // Two events at timestamps 4 and 5 should be in same bucket (index 2, range [4,6))
       const events = [createEvent(4, 1, 'Method'), createEvent(5, 1, 'Method')];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.buckets).toHaveLength(1);
       expect(result.buckets[0]!.eventCount).toBe(2);
@@ -146,10 +151,8 @@ describe('RectangleManager bucket aggregation', () => {
         createEvent(0, 1, 'Method'), // bucket index 0
         createEvent(10, 1, 'Method'), // bucket index 5
       ];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.buckets).toHaveLength(2);
     });
@@ -161,10 +164,8 @@ describe('RectangleManager bucket aggregation', () => {
       const child = createEvent(0, 1, 'SOQL');
       const parent = createEvent(0, 1, 'Method', [child]);
       const events = [parent];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       // Should have 2 buckets (one per depth)
       expect(result.buckets).toHaveLength(2);
@@ -175,10 +176,8 @@ describe('RectangleManager bucket aggregation', () => {
 
     it('should set correct Y position based on depth', () => {
       const events = [createEvent(0, 1, 'Method')];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.buckets[0]!.y).toBe(0); // depth 0 * EVENT_HEIGHT
 
@@ -186,11 +185,10 @@ describe('RectangleManager bucket aggregation', () => {
       const child = createEvent(0, 1, 'SOQL');
       const parent = createEvent(0, 2, 'Method', [child]); // parent is visible
       const events2 = [parent];
-      const manager2 = new RectangleManager(events2, categories);
 
       // At zoom=0.5, parent (2ns) becomes 1px (bucketed), child (1ns) becomes 0.5px (bucketed)
       const viewport2 = createViewport(0.5, 0, 0);
-      const result2 = manager2.getCulledRectangles(viewport2);
+      const result2 = cullRectanglesLegacy(events2, categories, viewport2);
 
       const childBucket = result2.buckets.find((b) => b.depth === 1);
       expect(childBucket?.y).toBe(TIMELINE_CONSTANTS.EVENT_HEIGHT);
@@ -204,10 +202,8 @@ describe('RectangleManager bucket aggregation', () => {
         createEvent(1, 1, 'SOQL'),
         createEvent(0.5, 1, 'Method'),
       ];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       // All 3 events at zoom=1 with duration 1ns are < 2px, so all bucketed
       // At bucket width 2ns, events at 0, 0.5, 1 are all in bucket index 0
@@ -220,10 +216,8 @@ describe('RectangleManager bucket aggregation', () => {
 
     it('should track total duration per category', () => {
       const events = [createEvent(0, 1, 'Method'), createEvent(0.5, 0.5, 'Method')];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       const bucket = result.buckets[0]!;
       expect(bucket.categoryStats.byCategory.get('Method')?.totalDuration).toBe(1.5);
@@ -233,10 +227,8 @@ describe('RectangleManager bucket aggregation', () => {
   describe('bucket color resolution', () => {
     it('should prioritize DML over Method in mixed bucket', () => {
       const events = [createEvent(0, 1, 'Method'), createEvent(0.5, 1, 'DML')];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       const bucket = result.buckets[0]!;
       expect(bucket.categoryStats.dominantCategory).toBe('DML');
@@ -247,10 +239,8 @@ describe('RectangleManager bucket aggregation', () => {
 
     it('should prioritize SOQL over Method in mixed bucket', () => {
       const events = [createEvent(0, 1, 'Method'), createEvent(0.5, 1, 'SOQL')];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       const bucket = result.buckets[0]!;
       expect(bucket.categoryStats.dominantCategory).toBe('SOQL');
@@ -260,10 +250,8 @@ describe('RectangleManager bucket aggregation', () => {
   describe('bucket color blending', () => {
     it('should have a valid color for single event', () => {
       const events = [createEvent(0, 1, 'Method')];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       // Color should be a valid numeric color value (pre-blended opaque)
       expect(result.buckets[0]!.color).toBeGreaterThanOrEqual(0);
@@ -273,8 +261,8 @@ describe('RectangleManager bucket aggregation', () => {
     it('should have different colors for different event counts (density visualization)', () => {
       // Create a bucket with a single event
       const singleEvent = [createEvent(0, 1, 'Method')];
-      const singleManager = new RectangleManager(singleEvent, categories);
-      const singleResult = singleManager.getCulledRectangles(createViewport(1, 0, 0));
+      const singleViewport = createViewport(1, 0, 0);
+      const singleResult = cullRectanglesLegacy(singleEvent, categories, singleViewport);
       const singleBucketColor = singleResult.buckets[0]!.color;
 
       // Create many events in same bucket
@@ -282,8 +270,8 @@ describe('RectangleManager bucket aggregation', () => {
       for (let i = 0; i < 50; i++) {
         manyEvents.push(createEvent(i * 0.03, 0.01, 'Method')); // All in bucket index 0
       }
-      const manyManager = new RectangleManager(manyEvents, categories);
-      const manyResult = manyManager.getCulledRectangles(createViewport(1, 0, 0));
+      const manyViewport = createViewport(1, 0, 0);
+      const manyResult = cullRectanglesLegacy(manyEvents, categories, manyViewport);
       const manyBucketColor = manyResult.buckets[0]!.color;
 
       // The colors should be different (more events = more saturated color)
@@ -296,10 +284,8 @@ describe('RectangleManager bucket aggregation', () => {
       const event1 = createEvent(0, 1, 'Method');
       const event2 = createEvent(0.5, 1, 'Method');
       const events = [event1, event2];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       const bucket = result.buckets[0]!;
       expect(bucket.eventRefs).toContain(event1);
@@ -314,10 +300,8 @@ describe('RectangleManager bucket aggregation', () => {
         createEvent(10, 1, 'Method'), // bucketed
         createEvent(20, 1, 'SOQL'), // bucketed
       ];
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.stats.visibleCount).toBe(1);
       expect(result.stats.bucketedEventCount).toBe(2);
@@ -330,10 +314,8 @@ describe('RectangleManager bucket aggregation', () => {
       for (let i = 0; i < 5; i++) {
         events.push(createEvent(i * 0.3, 0.1, 'Method'));
       }
-      const manager = new RectangleManager(events, categories);
-
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = cullRectanglesLegacy(events, categories, viewport);
 
       expect(result.stats.maxEventsPerBucket).toBe(5);
     });

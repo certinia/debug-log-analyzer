@@ -5,7 +5,8 @@
 import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
 import type { LogSubCategory } from '../../../../core/log-parser/types.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
-import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
+import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
+import { legacyCullRectangles } from '../LegacyViewportCuller.js';
 import { RectangleManager } from '../RectangleManager.js';
 import { TemporalSegmentTree } from '../TemporalSegmentTree.js';
 
@@ -77,10 +78,7 @@ describe('TemporalSegmentTree', () => {
 
     it('should handle events at multiple depths', () => {
       const events = [
-        createEvent(0, 100, 'Method', [
-          createEvent(10, 30, 'SOQL'),
-          createEvent(50, 30, 'DML'),
-        ]),
+        createEvent(0, 100, 'Method', [createEvent(10, 30, 'SOQL'), createEvent(50, 30, 'DML')]),
       ];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
@@ -215,11 +213,7 @@ describe('TemporalSegmentTree', () => {
 
     it('should exclude events outside depth bounds', () => {
       const events = [
-        createEvent(0, 100, 'Method', [
-          createEvent(10, 80, 'SOQL', [
-            createEvent(20, 60, 'DML'),
-          ]),
-        ]),
+        createEvent(0, 100, 'Method', [createEvent(10, 80, 'SOQL', [createEvent(20, 60, 'DML')])]),
       ];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
@@ -248,10 +242,8 @@ describe('TemporalSegmentTree', () => {
       const resultLarge = tree.query(viewportLarge);
 
       // Smaller viewport should have fewer or equal events
-      const smallTotal =
-        resultSmall.stats.visibleCount + resultSmall.stats.bucketedEventCount;
-      const largeTotal =
-        resultLarge.stats.visibleCount + resultLarge.stats.bucketedEventCount;
+      const smallTotal = resultSmall.stats.visibleCount + resultSmall.stats.bucketedEventCount;
+      const largeTotal = resultLarge.stats.visibleCount + resultLarge.stats.bucketedEventCount;
 
       expect(smallTotal).toBeLessThanOrEqual(largeTotal);
       expect(largeTotal).toBe(3); // All 3 events visible
@@ -290,10 +282,7 @@ describe('TemporalSegmentTree', () => {
     });
 
     it('should include category stats for tooltips', () => {
-      const events = [
-        createEvent(0, 1, 'Method'),
-        createEvent(1, 1, 'SOQL'),
-      ];
+      const events = [createEvent(0, 1, 'Method'), createEvent(1, 1, 'SOQL')];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
@@ -316,18 +305,18 @@ describe('TemporalSegmentTree', () => {
         createEvent(40, 1, 'Method'),
       ];
 
-      // Legacy implementation
-      const legacyManager = new RectangleManager(events, categories, false);
+      // Both implementations now use segment tree (legacy is in LegacyViewportCuller)
+      // This test verifies the manager produces consistent results
+      const manager = new RectangleManager(events, categories);
       const viewport = createViewport(1, 0, 0);
-      const legacyResult = legacyManager.getCulledRectangles(viewport);
+      const result = manager.getCulledRectangles(viewport);
 
-      // Segment tree implementation
-      const treeManager = new RectangleManager(events, categories, true);
-      const treeResult = treeManager.getCulledRectangles(viewport);
+      // For comparison with legacy, use the legacy culler directly
+      const legacyResult = legacyCullRectangles(manager.getRectsByCategory(), viewport);
+      const treeResult = result;
 
       // Same total events
-      const legacyTotal =
-        legacyResult.stats.visibleCount + legacyResult.stats.bucketedEventCount;
+      const legacyTotal = legacyResult.stats.visibleCount + legacyResult.stats.bucketedEventCount;
       const treeTotal = treeResult.stats.visibleCount + treeResult.stats.bucketedEventCount;
 
       expect(treeTotal).toBe(legacyTotal);

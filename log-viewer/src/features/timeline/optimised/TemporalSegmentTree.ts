@@ -19,14 +19,12 @@
  * Query time: O(k log n) where k = number of visible nodes
  */
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type {
   CategoryAggregation,
   CulledRenderData,
   PixelBucket,
   RenderStats,
   SegmentNode,
-  ViewportBounds,
   ViewportState,
 } from '../types/flamechart.types.js';
 import {
@@ -34,9 +32,10 @@ import {
   SEGMENT_TREE_CONSTANTS,
   TIMELINE_CONSTANTS,
 } from '../types/flamechart.types.js';
-import type { PrecomputedRect } from './RectangleManager.js';
 import type { BatchColorInfo } from './BucketColorResolver.js';
 import { calculateBucketColor } from './BucketOpacity.js';
+import type { PrecomputedRect } from './RectangleManager.js';
+import { calculateViewportBounds } from './ViewportUtils.js';
 
 /**
  * Map category names to their hex colors.
@@ -115,7 +114,7 @@ export class TemporalSegmentTree {
     batchColors?: Map<string, BatchColorInfo>,
   ): CulledRenderData {
     const effectiveBatchColors = batchColors ?? this.batchColors;
-    const bounds = this.calculateBounds(viewport);
+    const bounds = calculateViewportBounds(viewport);
     const threshold = BUCKET_CONSTANTS.BUCKET_WIDTH / viewport.zoom; // T = 2px / zoom (ns)
 
     const visibleRects = new Map<string, PrecomputedRect[]>();
@@ -567,37 +566,6 @@ export class TemporalSegmentTree {
   // ==========================================================================
   // UTILITY METHODS
   // ==========================================================================
-
-  /**
-   * Calculate viewport bounds in timeline coordinates.
-   * Matches the legacy RectangleManager calculation for consistency.
-   */
-  private calculateBounds(viewport: ViewportState): ViewportBounds {
-    const { zoom, offsetX, offsetY, displayWidth, displayHeight } = viewport;
-    const { EVENT_HEIGHT } = TIMELINE_CONSTANTS;
-
-    // Time bounds
-    const timeStart = offsetX / zoom;
-    const timeEnd = (offsetX + displayWidth) / zoom;
-
-    // World Y coordinates of visible region
-    // With scale.y = -1 flip and container.y = screen.height - offsetY:
-    // Screen renders worldY in range [-offsetY, screen.height - offsetY]
-    const worldYBottom = -offsetY;
-    const worldYTop = -offsetY + displayHeight;
-
-    // Convert to depth levels (depth 0 is at worldY = 0)
-    // An event at depth D occupies worldY = [D * HEIGHT, (D+1) * HEIGHT]
-    const depthStart = Math.floor(worldYBottom / EVENT_HEIGHT);
-    const depthEnd = Math.floor(worldYTop / EVENT_HEIGHT);
-
-    return {
-      timeStart,
-      timeEnd,
-      depthStart,
-      depthEnd,
-    };
-  }
 
   /**
    * Get color for a category.

@@ -263,7 +263,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Create RectangleManager (single source of truth for rectangle computation)
     if (this.state) {
       const categories = new Set(this.state.batches.keys());
-      this.rectangleManager = new RectangleManager(events, categories, true);
+      this.rectangleManager = new RectangleManager(events, categories);
     }
 
     // Create batch renderer (pure rendering, receives rectangles from RectangleManager)

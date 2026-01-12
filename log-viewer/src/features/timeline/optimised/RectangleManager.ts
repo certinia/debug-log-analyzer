@@ -23,18 +23,12 @@
 
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type {
-  CategoryAggregation,
-  CategoryStats,
   CulledRenderData,
-  PixelBucket,
   RenderRectangle,
-  RenderStats,
-  ViewportBounds,
   ViewportState,
 } from '../types/flamechart.types.js';
-import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
-import { resolveColor, type BatchColorInfo } from './BucketColorResolver.js';
-import { calculateBucketColor } from './BucketOpacity.js';
+import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
+import type { BatchColorInfo } from './BucketColorResolver.js';
 import { TemporalSegmentTree } from './TemporalSegmentTree.js';
 
 /**
@@ -81,6 +75,9 @@ export interface PrecomputedRect extends RenderRectangle {
  *
  * Manages rectangle pre-computation, spatial indexing, and viewport culling.
  * Provides a clean API for renderers to consume rectangle data without coupling.
+ *
+ * Uses TemporalSegmentTree for O(log n) viewport culling.
+ * For O(n) legacy culling, use LegacyViewportCuller directly.
  */
 export class RectangleManager {
   /** Spatial index: all rectangles grouped by category */
@@ -89,209 +86,36 @@ export class RectangleManager {
   /** Map from LogEvent to RenderRectangle for search functionality */
   private rectMap: Map<LogEvent, PrecomputedRect> = new Map();
 
-  /** Optional segment tree for O(log n) viewport culling */
-  private segmentTree?: TemporalSegmentTree;
-
-  /** Whether segment tree is enabled */
-  private useSegmentTree: boolean;
+  /** Segment tree for O(log n) viewport culling */
+  private segmentTree: TemporalSegmentTree;
 
   /**
    * @param events - Event tree to pre-compute rectangles from
    * @param categories - Set of valid categories for spatial indexing
-   * @param useSegmentTree - Enable segment tree for O(log n) viewport culling (default: false)
    */
-  constructor(events: LogEvent[], categories: Set<string>, useSegmentTree = false) {
-    this.useSegmentTree = useSegmentTree;
+  constructor(events: LogEvent[], categories: Set<string>) {
     this.precomputeRectangles(events, categories);
-
-    // Build segment tree after rectangles are pre-computed
-    if (useSegmentTree) {
-      this.segmentTree = new TemporalSegmentTree(this.rectsByCategory);
-    }
+    this.segmentTree = new TemporalSegmentTree(this.rectsByCategory);
   }
 
   /**
    * Get culled rectangles and buckets for current viewport.
-   * Runs viewport culling algorithm and returns data ready for rendering.
+   * Uses TemporalSegmentTree for O(log n) performance.
    *
    * Events > MIN_RECT_SIZE (2px) are returned as visible rectangles.
-   * Events ≤ MIN_RECT_SIZE are aggregated into time-aligned buckets.
+   * Events <= MIN_RECT_SIZE are aggregated into time-aligned buckets.
    *
    * @param viewport - Current viewport state
    * @param batchColors - Optional colors from RenderBatch (for theme support)
    * @returns CulledRenderData with visible rectangles, buckets, and stats
    *
-   * Performance target: <10ms for 50,000 events
+   * Performance target: <5ms for 50,000 events
    */
   public getCulledRectangles(
     viewport: ViewportState,
     batchColors?: Map<string, BatchColorInfo>,
   ): CulledRenderData {
-    // Use segment tree if enabled for O(log n) performance
-    if (this.segmentTree) {
-      return this.segmentTree.query(viewport, batchColors);
-    }
-
-    // Legacy O(n) implementation
-    const bounds = this.calculateBounds(viewport);
-    const visibleRects = new Map<string, PrecomputedRect[]>();
-
-    // Bucket aggregation: Map<compositeKey, bucket data>
-    // Using integer key instead of string for performance: (depth << 24) | bucketIndex
-    const bucketMap = new Map<
-      number,
-      {
-        depth: number;
-        bucketIndex: number;
-        timeStart: number;
-        timeEnd: number;
-        events: LogEvent[];
-        categoryStats: Map<string, CategoryAggregation>;
-      }
-    >();
-
-    // Cache frequently accessed values as primitives
-    const zoom = viewport.zoom;
-    const boundsTimeStart = bounds.timeStart;
-    const boundsTimeEnd = bounds.timeEnd;
-    const depthStart = bounds.depthStart;
-    const depthEnd = bounds.depthEnd;
-    const minRectSize = TIMELINE_CONSTANTS.MIN_RECT_SIZE;
-    const bucketWidth = BUCKET_CONSTANTS.BUCKET_WIDTH;
-    const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
-
-    // Calculate bucket time width (how much time fits in 2 pixels)
-    const bucketTimeWidth = bucketWidth / zoom;
-
-    // Stats tracking
-    let visibleCount = 0;
-    let bucketedEventCount = 0;
-    let maxEventsPerBucket = 0;
-
-    // Cull rectangles for each category
-    for (const [category, rectangles] of this.rectsByCategory) {
-      const culled: PrecomputedRect[] = [];
-      const len = rectangles.length;
-
-      for (let i = 0; i < len; i++) {
-        const rect = rectangles[i]!;
-
-        // Direct property access - avoid destructuring for performance
-        const rectTimeStart = rect.timeStart;
-        const rectTimeEnd = rect.timeEnd;
-        const rectDepth = rect.depth;
-        const rectDuration = rect.duration;
-
-        // Early exit: rectangles are sorted by timeStart, so if we've
-        // passed the viewport end, all remaining rectangles are also past it
-        if (rectTimeStart >= boundsTimeEnd) {
-          break;
-        }
-
-        // Skip rectangles that end before viewport starts
-        if (rectTimeEnd <= boundsTimeStart) {
-          continue;
-        }
-
-        // Depth culling
-        if (rectDepth < depthStart || rectDepth > depthEnd) {
-          continue;
-        }
-
-        // Calculate screen-space width
-        const screenWidth = rectDuration * zoom;
-
-        if (screenWidth > minRectSize) {
-          // Visible rectangle: render normally
-          rect.x = rectTimeStart * zoom;
-          rect.width = screenWidth;
-          culled.push(rect);
-          visibleCount++;
-        } else {
-          // Sub-pixel event: aggregate into bucket
-          const bucketIndex = Math.floor(rectTimeStart / bucketTimeWidth);
-          // Composite integer key: depth in upper 8 bits, bucketIndex in lower 24 bits
-          const bucketKey = (rectDepth << 24) | (bucketIndex & 0xffffff);
-
-          let bucket = bucketMap.get(bucketKey);
-          if (!bucket) {
-            bucket = {
-              depth: rectDepth,
-              bucketIndex,
-              timeStart: bucketIndex * bucketTimeWidth,
-              timeEnd: (bucketIndex + 1) * bucketTimeWidth,
-              events: [],
-              categoryStats: new Map(),
-            };
-            bucketMap.set(bucketKey, bucket);
-          }
-
-          // Add event to bucket
-          bucket.events.push(rect.eventRef);
-          bucketedEventCount++;
-
-          // Update category stats
-          let catStats = bucket.categoryStats.get(category);
-          if (!catStats) {
-            catStats = { count: 0, totalDuration: 0 };
-            bucket.categoryStats.set(category, catStats);
-          }
-          catStats.count++;
-          catStats.totalDuration += rectDuration;
-        }
-      }
-
-      if (culled.length > 0) {
-        visibleRects.set(category, culled);
-      }
-    }
-
-    // Convert bucket map to PixelBucket array
-    const buckets: PixelBucket[] = [];
-    for (const [key, bucket] of bucketMap) {
-      const eventCount = bucket.events.length;
-      maxEventsPerBucket = Math.max(maxEventsPerBucket, eventCount);
-
-      // Build CategoryStats from aggregation
-      const categoryStats: CategoryStats = {
-        byCategory: bucket.categoryStats,
-        dominantCategory: '',
-      };
-
-      // Resolve color and dominant category
-      const colorResult = resolveColor(categoryStats, batchColors);
-
-      // Pre-compute opaque blended color based on event density
-      // This avoids runtime alpha blending for better GPU performance
-      const blendedColor = calculateBucketColor(colorResult.color, eventCount);
-
-      const pixelBucket: PixelBucket = {
-        id: `bucket-${key}`,
-        x: bucket.timeStart * zoom,
-        y: bucket.depth * eventHeight,
-        timeStart: bucket.timeStart,
-        timeEnd: bucket.timeEnd,
-        depth: bucket.depth,
-        eventCount,
-        categoryStats: {
-          byCategory: bucket.categoryStats,
-          dominantCategory: colorResult.dominantCategory,
-        },
-        eventRefs: bucket.events,
-        color: blendedColor,
-      };
-
-      buckets.push(pixelBucket);
-    }
-
-    const stats: RenderStats = {
-      visibleCount,
-      bucketedEventCount,
-      bucketCount: buckets.length,
-      maxEventsPerBucket,
-    };
-
-    return { visibleRects, buckets, stats };
+    return this.segmentTree.query(viewport, batchColors);
   }
 
   /**
@@ -414,35 +238,5 @@ export class RectangleManager {
         }
       }
     }
-  }
-
-  /**
-   * Calculate viewport bounds for culling.
-   * Converts viewport state to time/depth ranges for efficient overlap checks.
-   *
-   * @param viewport - Current viewport state
-   * @returns Culling bounds in timeline coordinates
-   */
-  private calculateBounds(viewport: ViewportState): ViewportBounds {
-    const timeStart = viewport.offsetX / viewport.zoom;
-    const timeEnd = (viewport.offsetX + viewport.displayWidth) / viewport.zoom;
-
-    // World Y coordinates of visible region
-    // With scale.y = -1 flip and container.y = screen.height - offsetY:
-    // Screen renders worldY in range [-offsetY, screen.height - offsetY]
-    const worldYBottom = -viewport.offsetY; // Visible at screen bottom (lower depths)
-    const worldYTop = -viewport.offsetY + viewport.displayHeight; // Visible at screen top (higher depths)
-
-    // Convert to depth levels (depth 0 is at worldY = 0)
-    // An event at depth D occupies worldY = [D * HEIGHT, (D+1) * HEIGHT]
-    const depthStart = Math.floor(worldYBottom / TIMELINE_CONSTANTS.EVENT_HEIGHT);
-    const depthEnd = Math.floor(worldYTop / TIMELINE_CONSTANTS.EVENT_HEIGHT);
-
-    return {
-      timeStart,
-      timeEnd,
-      depthStart,
-      depthEnd,
-    };
   }
 }
