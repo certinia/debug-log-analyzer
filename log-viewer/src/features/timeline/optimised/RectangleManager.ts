@@ -33,7 +33,7 @@ import type {
   ViewportState,
 } from '../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
-import { resolveColor } from './BucketColorResolver.js';
+import { resolveColor, type BatchColorInfo } from './BucketColorResolver.js';
 import { calculateOpacity } from './BucketOpacity.js';
 
 /**
@@ -104,11 +104,15 @@ export class RectangleManager {
    * Events ≤ MIN_RECT_SIZE are aggregated into time-aligned buckets.
    *
    * @param viewport - Current viewport state
+   * @param batchColors - Optional colors from RenderBatch (for theme support)
    * @returns CulledRenderData with visible rectangles, buckets, and stats
    *
    * Performance target: <10ms for 50,000 events
    */
-  public getCulledRectangles(viewport: ViewportState): CulledRenderData {
+  public getCulledRectangles(
+    viewport: ViewportState,
+    batchColors?: Map<string, BatchColorInfo>,
+  ): CulledRenderData {
     const bounds = this.calculateBounds(viewport);
     const visibleRects = new Map<string, PrecomputedRect[]>();
 
@@ -227,7 +231,7 @@ export class RectangleManager {
       };
 
       // Resolve color and dominant category
-      const colorResult = resolveColor(categoryStats);
+      const colorResult = resolveColor(categoryStats, batchColors);
 
       const pixelBucket: PixelBucket = {
         id: `bucket-${key}`,

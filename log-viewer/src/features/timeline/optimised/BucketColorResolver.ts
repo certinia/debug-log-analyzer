@@ -52,6 +52,14 @@ export interface ColorResolutionResult {
 }
 
 /**
+ * Color info passed from RenderBatch.
+ */
+export interface BatchColorInfo {
+  color: number;
+  alpha?: number;
+}
+
+/**
  * Resolve the display color for a bucket from its category statistics.
  *
  * Algorithm:
@@ -61,9 +69,13 @@ export interface ColorResolutionResult {
  * 4. Tie-break by event count (higher count wins)
  *
  * @param categoryStats - Statistics for all categories in the bucket
+ * @param batchColors - Optional colors from RenderBatch (for theme support)
  * @returns Color and dominant category
  */
-export function resolveColor(categoryStats: CategoryStats): ColorResolutionResult {
+export function resolveColor(
+  categoryStats: CategoryStats,
+  batchColors?: Map<string, BatchColorInfo>,
+): ColorResolutionResult {
   const { byCategory } = categoryStats;
 
   if (byCategory.size === 0) {
@@ -104,8 +116,11 @@ export function resolveColor(categoryStats: CategoryStats): ColorResolutionResul
     }
   }
 
-  // Get color for winning category
-  const color = CATEGORY_COLORS[winningCategory] ?? UNKNOWN_CATEGORY_COLOR;
+  // Get color for winning category (prefer batch colors for theme support)
+  const color =
+    batchColors?.get(winningCategory)?.color ??
+    CATEGORY_COLORS[winningCategory] ??
+    UNKNOWN_CATEGORY_COLOR;
 
   return {
     color,

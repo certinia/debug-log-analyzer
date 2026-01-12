@@ -821,7 +821,19 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.axisRenderer.render(viewportState);
     }
 
-    const { visibleRects, buckets } = this.rectangleManager.getCulledRectangles(viewportState);
+    // TODO: optimise by changing in setColors only
+    // Extract batch colors for bucket color resolution (theme support)
+    const batchColors = new Map(
+      [...this.state.batches].map(([cat, batch]) => [
+        cat,
+        { color: batch.color, alpha: batch.alpha },
+      ]),
+    );
+
+    const { visibleRects, buckets } = this.rectangleManager.getCulledRectangles(
+      viewportState,
+      batchColors,
+    );
 
     // Render events (with or without search styling)
     const cursor = this.newSearchManager?.getCursor();
