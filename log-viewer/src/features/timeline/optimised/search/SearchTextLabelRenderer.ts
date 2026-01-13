@@ -16,10 +16,10 @@
  */
 
 import { BitmapText, Container } from 'pixi.js';
-import type { RenderBatch, ViewportState } from '../types/flamechart.types.js';
-import { TEXT_LABEL_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
-import type { PrecomputedRect } from './RectangleManager.js';
-import type { TextLabelRenderer } from './TextLabelRenderer.js';
+import type { RenderBatch, ViewportState } from '../../types/flamechart.types.js';
+import { TEXT_LABEL_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
+import type { PrecomputedRect } from '../RectangleManager.js';
+import type { TextLabelRenderer } from '../TextLabelRenderer.js';
 
 /**
  * Dimmed text colors (pre-computed for opaque rendering).

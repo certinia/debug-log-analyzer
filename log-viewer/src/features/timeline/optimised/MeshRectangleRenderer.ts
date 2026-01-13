@@ -25,11 +25,11 @@
  */
 
 import { Container, Geometry, Mesh, Shader } from 'pixi.js';
-import type { PixelBucket, RenderBatch, ViewportState } from '../../types/flamechart.types.js';
-import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
-import type { PrecomputedRect } from '../RectangleManager.js';
+import type { PixelBucket, RenderBatch, ViewportState } from '../types/flamechart.types.js';
+import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import { RectangleGeometry, type ViewportTransform } from './RectangleGeometry.js';
-import { createRectangleShader } from './rectangleShader.js';
+import type { PrecomputedRect } from './RectangleManager.js';
+import { createRectangleShader } from './RectangleShader.js';
 
 export class MeshRectangleRenderer {
   private batches: Map<string, RenderBatch>;

@@ -1,17 +1,18 @@
 /*
- * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 
 /**
- * MeshSearchStyleRenderer
+ * SearchStyleRenderer
  *
- * Renders rectangles with search-aware styling using PixiJS Mesh (Chrome DevTools style).
+ * Renders rectangles with search-aware styling using PixiJS Sprites (Chrome DevTools style).
  * Matched events retain original colors, non-matched events are desaturated to greyscale.
  *
  * Performance optimizations:
- * - Single Mesh draw call for all rectangles
- * - Direct buffer updates (no scene graph overhead)
- * - Clip-space coordinates (no uniform binding overhead)
+ * - Uses SpritePool with shared 1x1 white texture for automatic GPU batching
+ * - Sprites are pooled and reused (no GC overhead after warmup)
+ * - Color applied via sprite.tint (efficient uniform update)
+ * - Single draw call for all sprites regardless of color variations
  *
  * Responsibilities:
  * - Render rectangles with search styling
@@ -25,59 +26,30 @@
  * - Implement search logic
  */
 
-import { Container, Geometry, Mesh, Shader } from 'pixi.js';
+import type { Container } from 'pixi.js';
 import type {
   CategoryAggregation,
   PixelBucket,
   RenderBatch,
-  ViewportState,
 } from '../../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import { resolveColor } from '../BucketColorResolver.js';
 import type { PrecomputedRect } from '../RectangleManager.js';
-import { RectangleGeometry, type ViewportTransform } from './RectangleGeometry.js';
-import { createRectangleShader } from './rectangleShader.js';
+import { SpritePool } from '../SpritePool.js';
 
 /**
- * MeshSearchStyleRenderer
+ * SearchStyleRenderer
  *
- * Pure rendering class for search-aware styling of timeline events using Mesh.
+ * Pure rendering class for search-aware styling of timeline events using sprites.
  * Receives pre-computed, culled rectangles and matched events set.
  */
-export class MeshSearchStyleRenderer {
+export class SearchStyleRenderer {
   private batches: Map<string, RenderBatch>;
-  private parentContainer: Container;
-  private geometry: RectangleGeometry;
-  private shader: Shader;
-  private mesh: Mesh<Geometry, Shader>;
-  private lastViewport: ViewportState | null = null;
+  private spritePool: SpritePool;
 
   constructor(container: Container, batches: Map<string, RenderBatch>) {
     this.batches = batches;
-    this.parentContainer = container;
-
-    // Create geometry and shader
-    this.geometry = new RectangleGeometry();
-    this.shader = createRectangleShader();
-
-    // Create mesh
-    this.mesh = new Mesh<Geometry, Shader>({
-      geometry: this.geometry.getGeometry(),
-      shader: this.shader,
-    });
-    this.mesh.label = 'MeshSearchStyleRenderer';
-    this.mesh.visible = false;
-
-    container.addChild(this.mesh);
-  }
-
-  /**
-   * Set the stage container for clip-space rendering.
-   * NOTE: With clip-space coordinates, we don't need to move to stage root.
-   * The mesh outputs directly to gl_Position, bypassing all container transforms.
-   */
-  public setStageContainer(_stage: Container): void {
-    // No-op: Keep mesh in worldContainer. Clip-space shader bypasses transforms anyway.
+    this.spritePool = new SpritePool(container);
   }
 
   /**
@@ -89,55 +61,22 @@ export class MeshSearchStyleRenderer {
    * @param culledRects - Rectangles grouped by category (from RectangleManager)
    * @param matchedEventIds - Set of event IDs that match search (retain original colors)
    * @param buckets - Aggregated pixel buckets grouped by category
-   * @param viewport - Current viewport state for coordinate transforms
+   * @param _viewport - Unused, for API compatibility with mesh renderer
    */
   public render(
     culledRects: Map<string, PrecomputedRect[]>,
     matchedEventIds: ReadonlySet<string>,
     buckets: Map<string, PixelBucket[]> = new Map(),
-    viewport?: ViewportState,
+    _viewport?: unknown,
   ): void {
-    // Use provided viewport or fall back to stored one
-    const vp = viewport || this.lastViewport;
-    if (!vp) {
-      return;
-    }
-    this.lastViewport = vp;
-
-    // Count total rectangles needed
-    let totalRects = 0;
-    for (const rectangles of culledRects.values()) {
-      totalRects += rectangles.length;
-    }
-    for (const categoryBuckets of buckets.values()) {
-      totalRects += categoryBuckets.length;
-    }
-
-    // Early exit if nothing to render
-    if (totalRects === 0) {
-      this.geometry.setDrawCount(0);
-      this.mesh.visible = false;
-      return;
-    }
-
-    // Ensure buffer capacity
-    this.geometry.ensureCapacity(totalRects);
-
-    // Create viewport transform for coordinate conversion
-    const viewportTransform: ViewportTransform = {
-      offsetX: vp.offsetX,
-      offsetY: vp.offsetY,
-      displayWidth: vp.displayWidth,
-      displayHeight: vp.displayHeight,
-    };
+    // Release all sprites back to pool for reuse
+    this.spritePool.releaseAll();
 
     // Pre-calculate constants outside loops
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
     const halfGap = gap / 2;
 
-    let rectIndex = 0;
-
-    // Write rectangles per category with search styling
+    // Render rectangles per category with search styling
     for (const [category, rectangles] of culledRects) {
       const batch = this.batches.get(category);
       if (!batch) {
@@ -148,44 +87,33 @@ export class MeshSearchStyleRenderer {
       const greyColor = this.colorToGreyscale(originalColor);
 
       for (const rect of rectangles) {
+        const sprite = this.spritePool.acquire();
+        sprite.position.set(rect.x + halfGap, rect.y + halfGap);
+        sprite.width = Math.max(0, rect.width - gap);
+        sprite.height = Math.max(0, rect.height - gap);
+
         // Use original color for matched events, greyscale for non-matched
-        const color = matchedEventIds.has(rect.id) ? originalColor : greyColor;
-
-        const x = rect.x + halfGap;
-        const y = rect.y + halfGap;
-        const width = Math.max(0, rect.width - gap);
-        const height = Math.max(0, rect.height - gap);
-
-        if (width > 0 && height > 0) {
-          this.geometry.writeRectangle(rectIndex, x, y, width, height, color, viewportTransform);
-          rectIndex++;
-        }
+        sprite.tint = matchedEventIds.has(rect.id) ? originalColor : greyColor;
       }
     }
 
-    // Write all buckets with search styling
-    rectIndex = this.writeBucketsWithSearch(buckets, matchedEventIds, rectIndex, viewportTransform);
-
-    // Set draw count and make visible
-    this.geometry.setDrawCount(rectIndex);
-    this.mesh.visible = true;
+    // Render all buckets with search styling
+    this.renderBucketsWithSearch(buckets, matchedEventIds);
   }
 
   /**
-   * Clear all rendered content (hide the mesh).
+   * Clear all sprites (hide them).
    * Called when exiting search mode to return to normal rendering.
    */
   public clear(): void {
-    this.geometry.setDrawCount(0);
-    this.mesh.visible = false;
+    this.spritePool.releaseAll();
   }
 
   /**
-   * Clean up resources.
+   * Clean up sprite pool.
    */
   public destroy(): void {
-    this.geometry.destroy();
-    this.mesh.destroy();
+    this.spritePool.destroy();
   }
 
   // ============================================================================
@@ -193,7 +121,7 @@ export class MeshSearchStyleRenderer {
   // ============================================================================
 
   /**
-   * Write all buckets with search styling to geometry buffers.
+   * Render all buckets with search styling using sprites.
    *
    * Each bucket's color is determined by whether it contains matched events.
    * Buckets with matches use resolved color from matched events.
@@ -201,16 +129,11 @@ export class MeshSearchStyleRenderer {
    *
    * @param buckets - Aggregated buckets grouped by category
    * @param matchedEventIds - Set of matched event IDs
-   * @param startIndex - Starting rectangle index in the buffer
-   * @param viewportTransform - Transform for coordinate conversion
-   * @returns Next available rectangle index
    */
-  private writeBucketsWithSearch(
+  private renderBucketsWithSearch(
     buckets: Map<string, PixelBucket[]>,
     matchedEventIds: ReadonlySet<string>,
-    startIndex: number,
-    viewportTransform: ViewportTransform,
-  ): number {
+  ): void {
     // Build a lookup set of "timestamp-depth" for O(1) matching
     // matchedEventIds format: "timestamp-depth-index"
     const matchedTimestampDepths = new Set<string>();
@@ -228,9 +151,7 @@ export class MeshSearchStyleRenderer {
     const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
     const gappedHeight = Math.max(0, eventHeight - gap);
 
-    let rectIndex = startIndex;
-
-    // Write all buckets from all categories
+    // Render all buckets from all categories
     for (const categoryBuckets of buckets.values()) {
       for (const bucket of categoryBuckets) {
         // Find matched events in this bucket
@@ -262,20 +183,13 @@ export class MeshSearchStyleRenderer {
           displayColor = this.colorToGreyscale(bucket.color);
         }
 
-        this.geometry.writeRectangle(
-          rectIndex,
-          bucket.x + halfGap,
-          bucket.y + halfGap,
-          blockWidth,
-          gappedHeight,
-          displayColor,
-          viewportTransform,
-        );
-        rectIndex++;
+        const sprite = this.spritePool.acquire();
+        sprite.position.set(bucket.x + halfGap, bucket.y + halfGap);
+        sprite.width = blockWidth;
+        sprite.height = gappedHeight;
+        sprite.tint = displayColor;
       }
     }
-
-    return rectIndex;
   }
 
   /**

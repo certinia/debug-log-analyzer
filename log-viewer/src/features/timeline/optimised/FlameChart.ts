@@ -24,27 +24,27 @@ import type {
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
 import type { SearchCursor, SearchMatch, SearchOptions } from '../types/search.types.js';
 
-import { MeshAxisRenderer } from './mesh/MeshAxisRenderer.js';
-import { MeshMarkerRenderer } from './mesh/MeshMarkerRenderer.js';
-import { MeshRectangleRenderer } from './mesh/MeshRectangleRenderer.js';
-import { MeshSearchStyleRenderer } from './mesh/MeshSearchStyleRenderer.js';
+import { MeshMarkerRenderer } from './markers/MeshMarkerRenderer.js';
+import { MeshRectangleRenderer } from './MeshRectangleRenderer.js';
+import { MeshSearchStyleRenderer } from './search/MeshSearchStyleRenderer.js';
+import { MeshAxisRenderer } from './time-axis/MeshAxisRenderer.js';
 
-import { AxisRenderer } from './AxisRenderer.js';
 import { EventBatchRenderer } from './EventBatchRenderer.js';
-import { SearchHighlightRenderer } from './SearchHighlightRenderer.js';
-import { SearchStyleRenderer } from './SearchStyleRenderer.js';
-import { SearchTextLabelRenderer } from './SearchTextLabelRenderer.js';
+import { TimelineMarkerRenderer } from './markers/TimelineMarkerRenderer.js';
+import { SearchHighlightRenderer } from './search/SearchHighlightRenderer.js';
+import { SearchStyleRenderer } from './search/SearchStyleRenderer.js';
+import { SearchTextLabelRenderer } from './search/SearchTextLabelRenderer.js';
 import { TextLabelRenderer } from './TextLabelRenderer.js';
-import { TimelineMarkerRenderer } from './TimelineMarkerRenderer.js';
+import { AxisRenderer } from './time-axis/AxisRenderer.js';
 
 import { logEventToTreeNode } from '../utils/tree-converter.js';
 import { blendWithBackground } from './BucketColorResolver.js';
+import { TimelineInteractionHandler } from './interaction/TimelineInteractionHandler.js';
+import { TimelineResizeHandler } from './interaction/TimelineResizeHandler.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 import { RectangleManager } from './RectangleManager.js';
-import { SearchManager } from './SearchManager.js';
+import { SearchManager } from './search/SearchManager.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
-import { TimelineInteractionHandler } from './TimelineInteractionHandler.js';
-import { TimelineResizeHandler } from './TimelineResizeHandler.js';
 import { TimelineViewport } from './TimelineViewport.js';
 
 export interface FlameChartCallbacks {

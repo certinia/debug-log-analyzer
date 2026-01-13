@@ -9,7 +9,7 @@
  * Manages zoom (wheel), pan (drag), and event selection.
  */
 
-import type { TimelineViewport } from './TimelineViewport.js';
+import type { TimelineViewport } from '../TimelineViewport.js';
 
 /**
  * Configuration for interaction behavior.

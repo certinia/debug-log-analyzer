@@ -10,11 +10,11 @@
  */
 
 import * as PIXI from 'pixi.js';
-import type { EventNode, ViewportState } from '../types/flamechart.types.js';
-import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
-import type { SearchCursor, SearchMatch } from '../types/search.types.js';
-import { blendWithBackground } from './BucketColorResolver.js';
-import type { PrecomputedRect } from './RectangleManager.js';
+import type { EventNode, ViewportState } from '../../types/flamechart.types.js';
+import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
+import type { SearchCursor, SearchMatch } from '../../types/search.types.js';
+import { blendWithBackground } from '../BucketColorResolver.js';
+import type { PrecomputedRect } from '../RectangleManager.js';
 
 /**
  * Culling bounds derived from viewport.

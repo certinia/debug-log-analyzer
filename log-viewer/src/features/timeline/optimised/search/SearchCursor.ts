@@ -9,8 +9,8 @@
  * Provides array-like access with next/prev/first/last navigation.
  */
 
-import type { EventNode } from '../types/flamechart.types.js';
-import type { SearchCursor, SearchMatch } from '../types/search.types.js';
+import type { EventNode } from '../../types/flamechart.types.js';
+import type { SearchCursor, SearchMatch } from '../../types/search.types.js';
 
 export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
   private _currentIndex: number;

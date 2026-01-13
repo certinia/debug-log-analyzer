@@ -1,28 +1,30 @@
 /*
- * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
 /**
- * AxisRenderer
+ * MeshAxisRenderer
  *
- * Renders time scale axis with dynamic labels and tick marks using PixiJS Sprites.
+ * Renders time scale axis with dynamic labels and tick marks using PixiJS Mesh.
  * Adapts tick density and label precision based on zoom level.
  *
  * Performance optimizations:
- * - Uses SpritePool for grid lines (automatic GPU batching)
- * - Sprites are pooled and reused (no GC overhead after warmup)
+ * - Single Mesh draw call for all grid lines
+ * - Direct buffer updates (no scene graph overhead)
+ * - Clip-space coordinates (no uniform binding overhead)
  * - Labels use PIXI.Text (optimal for dynamic text with caching)
  *
  * Tick levels (zoom-dependent):
  * - Seconds: Major ticks at 1s, 2s, 5s, 10s intervals
  * - Milliseconds: Major ticks at 1ms, 2ms, 5ms, 10ms intervals
- * - Microseconds: Major ticks at 1μs, 2μs, 5μs, 10μs intervals
+ * - Microseconds: Major ticks at 1us, 2us, 5us, 10us intervals
  * - Nanoseconds: Major ticks at 1ns, 2ns, 5ns, 10ns intervals
  */
 
-import { Container, Text } from 'pixi.js';
-import type { ViewportState } from '../types/flamechart.types.js';
-import { SpritePool } from './SpritePool.js';
+import { Container, Geometry, Mesh, Shader, Text } from 'pixi.js';
+import type { ViewportState } from '../../types/flamechart.types.js';
+import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
+import { createRectangleShader } from '../RectangleShader.js';
 
 /**
  * Nanoseconds per millisecond conversion constant.
@@ -55,9 +57,11 @@ interface TickInterval {
   skipFactor: number;
 }
 
-export class AxisRenderer {
-  private container: Container;
-  private spritePool: SpritePool;
+export class MeshAxisRenderer {
+  private parentContainer: Container;
+  private geometry: RectangleGeometry;
+  private shader: Shader;
+  private mesh: Mesh<Geometry, Shader>;
   private labelsContainer: Container;
   private screenSpaceContainer: Container | null = null;
   private config: AxisConfig;
@@ -66,7 +70,7 @@ export class AxisRenderer {
   private gridLineColor: number;
 
   constructor(container: Container, config?: Partial<AxisConfig>) {
-    this.container = container;
+    this.parentContainer = container;
 
     // Default configuration
     this.config = {
@@ -80,11 +84,29 @@ export class AxisRenderer {
 
     this.gridLineColor = this.config.lineColor;
 
-    // Create sprite pool for grid lines (in world space - will be transformed with stage)
-    this.spritePool = new SpritePool(container);
+    // Create geometry and shader for grid lines
+    this.geometry = new RectangleGeometry();
+    this.shader = createRectangleShader();
+
+    // Create mesh
+    this.mesh = new Mesh<Geometry, Shader>({
+      geometry: this.geometry.getGeometry(),
+      shader: this.shader,
+    });
+    this.mesh.label = 'MeshAxisRenderer';
+    container.addChild(this.mesh);
 
     // Labels container - will be added to screen space container when provided
     this.labelsContainer = new Container();
+  }
+
+  /**
+   * Set the stage container for clip-space rendering.
+   * NOTE: With clip-space coordinates, we don't need to move to stage root.
+   * The mesh outputs directly to gl_Position, bypassing all container transforms.
+   */
+  public setStageContainer(_stage: Container): void {
+    // No-op: Keep mesh in axisContainer. Clip-space shader bypasses transforms anyway.
   }
 
   /**
@@ -112,8 +134,7 @@ export class AxisRenderer {
    * @param viewport - Current viewport state
    */
   public render(viewport: ViewportState): void {
-    // Release all sprites back to pool
-    this.spritePool.releaseAll();
+    // Clear previous frame
     this.clearLabels();
 
     // Calculate visible time range
@@ -131,7 +152,8 @@ export class AxisRenderer {
    * Clean up resources.
    */
   public destroy(): void {
-    this.spritePool.destroy();
+    this.geometry.destroy();
+    this.mesh.destroy();
     this.labelsContainer.destroy();
     this.labelCache.clear();
   }
@@ -253,6 +275,22 @@ export class AxisRenderer {
     // Track rendered pixel positions to prevent duplicates
     const renderedPixels = new Set<number>();
 
+    // Count ticks for buffer allocation
+    const maxTicks = lastTickIndex - firstTickIndex + 1;
+    this.geometry.ensureCapacity(maxTicks);
+
+    // Create viewport transform for coordinate conversion
+    // Note: offsetY is 0 because axis grid lines should span full screen height
+    // regardless of vertical panning
+    const viewportTransform: ViewportTransform = {
+      offsetX: viewport.offsetX,
+      offsetY: 0, // Full-height elements ignore Y pan
+      displayWidth: viewport.displayWidth,
+      displayHeight: viewport.displayHeight,
+    };
+
+    let rectIndex = 0;
+
     // Render all ticks in range
     for (let i = firstTickIndex; i <= lastTickIndex; i++) {
       const time = i * tickInterval.interval;
@@ -271,49 +309,42 @@ export class AxisRenderer {
       // This ensures labels stay consistent when panning
       const shouldShowLabel = i % tickInterval.skipFactor === 0;
 
-      this.renderVerticalLine(screenX, viewport.displayHeight, time, shouldShowLabel, viewport);
-    }
-  }
+      // Draw vertical line as 1px wide rectangle (full height)
+      this.geometry.writeRectangle(
+        rectIndex,
+        pixelX,
+        0,
+        1,
+        viewport.displayHeight,
+        this.gridLineColor,
+        viewportTransform,
+      );
+      rectIndex++;
 
-  /**
-   * Render a vertical line from top to bottom with optional label at top.
-   */
-  private renderVerticalLine(
-    screenX: number,
-    viewportHeight: number,
-    timeNs: number,
-    showLabel: boolean,
-    viewport: ViewportState,
-  ): void {
-    // Round screen position to prevent sub-pixel rendering issues
-    const roundedX = Math.round(screenX);
+      // Add label at top if requested
+      if (shouldShowLabel && this.screenSpaceContainer) {
+        const timeMs = time / NS_PER_MS;
+        const labelText = this.formatMilliseconds(timeMs);
 
-    // Draw vertical line using sprite (1px wide, full height)
-    const sprite = this.spritePool.acquire();
-    sprite.position.set(roundedX, 0);
-    sprite.width = 1;
-    sprite.height = viewportHeight;
-    sprite.tint = this.gridLineColor;
+        // Only show label if not empty (skip zero)
+        if (labelText) {
+          const label = this.getOrCreateLabel(labelText);
 
-    // Add label at top if requested
-    if (showLabel && this.screenSpaceContainer) {
-      const timeMs = timeNs / NS_PER_MS;
-      const labelText = this.formatMilliseconds(timeMs);
+          // Calculate screen-space X position (accounting for stage pan)
+          // screenX is in world space, need to convert to screen space
+          const screenSpaceX = screenX - viewport.offsetX;
 
-      // Only show label if not empty (skip zero)
-      if (labelText) {
-        const label = this.getOrCreateLabel(labelText);
-
-        // Calculate screen-space X position (accounting for stage pan)
-        // screenX is in world space, need to convert to screen space
-        const screenSpaceX = screenX - viewport.offsetX;
-
-        // Position label in screen space (top-left origin, Y pointing down)
-        label.x = screenSpaceX - 3; // 3px to the left of line
-        label.y = 5; // 5px from top
-        label.anchor.set(1, 0); // Right-align to line, align top
+          // Position label in screen space (top-left origin, Y pointing down)
+          label.x = screenSpaceX - 3; // 3px to the left of line
+          label.y = 5; // 5px from top
+          label.anchor.set(1, 0); // Right-align to line, align top
+        }
       }
     }
+
+    // Set draw count and make visible
+    this.geometry.setDrawCount(rectIndex);
+    this.mesh.visible = true;
   }
 
   // ============================================================================

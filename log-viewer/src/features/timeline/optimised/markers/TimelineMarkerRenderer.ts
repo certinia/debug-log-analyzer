@@ -1,27 +1,25 @@
 /*
- * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 
 /**
- * MeshMarkerRenderer
+ * TimelineMarkerRenderer
  *
- * Renders marker indicators as vertical bands behind the timeline using PixiJS Mesh.
+ * Renders marker indicators as vertical bands behind the timeline using PixiJS Sprites.
  * Handles time-range visualization, viewport culling, and severity-based stacking.
  *
  * Performance optimizations:
- * - Single Mesh draw call for all markers
- * - Direct buffer updates (no scene graph overhead)
- * - Clip-space coordinates (no uniform binding overhead)
- * - Pre-blended opaque colors (no alpha blending)
+ * - Uses SpritePool with shared 1x1 white texture for automatic GPU batching
+ * - Sprites are pooled and reused (no GC overhead after warmup)
+ * - Color applied via sprite.tint (pre-blended opaque colors)
  */
 
-import { Container, Geometry, Mesh, Shader } from 'pixi.js';
+import type { Container } from 'pixi.js';
 import type { MarkerType, TimelineMarker } from '../../types/flamechart.types.js';
 import { MARKER_ALPHA, MARKER_COLORS, SEVERITY_RANK } from '../../types/flamechart.types.js';
 import { blendWithBackground } from '../BucketColorResolver.js';
+import { SpritePool } from '../SpritePool.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
-import { RectangleGeometry, type ViewportTransform } from './RectangleGeometry.js';
-import { createRectangleShader } from './rectangleShader.js';
 
 /**
  * Pre-blended opaque marker colors (MARKER_COLORS blended at MARKER_ALPHA opacity).
@@ -47,32 +45,30 @@ interface MarkerIndicator {
 }
 
 /**
- * Renders marker indicators as semi-transparent vertical bands using Mesh.
+ * Renders marker indicators as semi-transparent vertical bands using sprites.
  *
  * Architecture:
- * - Uses single Mesh for efficient rendering
- * - Renders in severity order (skip -> unexpected -> error) via z-ordering
+ * - Uses single SpritePool for efficient rendering
+ * - Renders in severity order (skip → unexpected → error) via z-ordering
  * - Culls off-screen indicators for performance
  * - Calculates end times for markers with null endTime
  */
-export class MeshMarkerRenderer {
-  private parentContainer: Container;
+export class TimelineMarkerRenderer {
+  private container: Container;
   private viewport: TimelineViewport;
   private markers: readonly TimelineMarker[];
-  private geometry: RectangleGeometry;
-  private shader: Shader;
-  private mesh: Mesh<Geometry, Shader>;
+  private spritePool: SpritePool;
   private visibleIndicators: MarkerIndicator[] = [];
 
   /**
-   * Creates a new MeshMarkerRenderer.
+   * Creates a new TimelineMarkerRenderer.
    *
    * @param container - PixiJS container to render into (should be at z-index 0)
    * @param viewport - Viewport manager for coordinate transforms
    * @param markers - Array of markers from parser
    */
   constructor(container: Container, viewport: TimelineViewport, markers: TimelineMarker[]) {
-    this.parentContainer = container;
+    this.container = container;
     this.viewport = viewport;
 
     // Sort markers by startTime for efficient end time resolution
@@ -83,27 +79,8 @@ export class MeshMarkerRenderer {
       return SEVERITY_RANK[b.type] - SEVERITY_RANK[a.type];
     });
 
-    // Create geometry and shader
-    this.geometry = new RectangleGeometry();
-    this.shader = createRectangleShader();
-
-    // Create mesh
-    this.mesh = new Mesh<Geometry, Shader>({
-      geometry: this.geometry.getGeometry(),
-      shader: this.shader,
-    });
-    this.mesh.label = 'MeshMarkerRenderer';
-
-    container.addChild(this.mesh);
-  }
-
-  /**
-   * Set the stage container for clip-space rendering.
-   * NOTE: With clip-space coordinates, we don't need to move to stage root.
-   * The mesh outputs directly to gl_Position, bypassing all container transforms.
-   */
-  public setStageContainer(_stage: Container): void {
-    // No-op: Keep mesh in markerContainer. Clip-space shader bypasses transforms anyway.
+    // Create sprite pool for marker rendering
+    this.spritePool = new SpritePool(container);
   }
 
   /**
@@ -112,8 +89,8 @@ export class MeshMarkerRenderer {
    * Algorithm:
    * 1. Cull markers outside viewport
    * 2. Resolve end times with overlap prevention
-   * 3. Transform to clip-space coordinates
-   * 4. Render as mesh geometry
+   * 3. Transform to screen coordinates
+   * 4. Render as sprites with tinted colors
    *
    * Overlap behavior:
    * - Higher priority marker takes precedence (error > unexpected > skip)
@@ -122,18 +99,18 @@ export class MeshMarkerRenderer {
    * Performance: <10ms target for typical logs (<10 markers)
    */
   public render(): void {
+    // Release all sprites back to pool
+    this.spritePool.releaseAll();
+
     // Early exit if no markers
     if (this.markers.length === 0) {
       this.visibleIndicators = [];
-      this.geometry.setDrawCount(0);
-      this.mesh.visible = false;
       return;
     }
 
     // Get viewport bounds for culling
     const bounds = this.viewport.getBounds();
     const timelineEndTime = bounds.timeEnd; // Use viewport end as timeline end
-    const viewportState = this.viewport.getState();
 
     // Process all markers (typically <10 for typical logs)
     this.visibleIndicators = [];
@@ -154,7 +131,8 @@ export class MeshMarkerRenderer {
       }
 
       // T010: Transform to world coordinates for rendering
-      // World coordinates = time * zoom (no offset - we handle that in clip-space conversion)
+      // World coordinates = time * zoom (no offset - container handles transform)
+      const viewportState = this.viewport.getState();
       const worldStartX = marker.startTime * viewportState.zoom;
       const worldEndX = resolvedEndTime * viewportState.zoom;
       const worldWidth = worldEndX - worldStartX;
@@ -178,55 +156,24 @@ export class MeshMarkerRenderer {
       this.visibleIndicators.push(indicator);
     }
 
-    // Early exit if no visible indicators
-    if (this.visibleIndicators.length === 0) {
-      this.geometry.setDrawCount(0);
-      this.mesh.visible = false;
-      return;
-    }
-
-    // Ensure buffer capacity
-    this.geometry.ensureCapacity(this.visibleIndicators.length);
-
-    // Create viewport transform for coordinate conversion
-    // Note: offsetY is 0 because markers should span full screen height
-    // regardless of vertical panning
-    const viewportTransform: ViewportTransform = {
-      offsetX: viewportState.offsetX,
-      offsetY: 0, // Full-height elements ignore Y pan
-      displayWidth: viewportState.displayWidth,
-      displayHeight: viewportState.displayHeight,
-    };
-
     // Apply 1px gap for negative space separation between adjacent markers
     const gap = 1;
     const halfGap = gap / 2;
+    const viewportState = this.viewport.getState();
 
-    // Draw all indicators as rectangles
-    let rectIndex = 0;
+    // Draw all indicators as sprites
     for (const indicator of this.visibleIndicators) {
+      const sprite = this.spritePool.acquire();
+
       // Apply gap to create separation between adjacent markers
       const gappedX = indicator.screenStartX + halfGap;
       const gappedWidth = Math.max(0, indicator.screenWidth - gap);
 
-      if (gappedWidth > 0) {
-        // Full height markers (from y=0 to displayHeight)
-        this.geometry.writeRectangle(
-          rectIndex,
-          gappedX,
-          0,
-          gappedWidth,
-          viewportState.displayHeight,
-          indicator.color,
-          viewportTransform,
-        );
-        rectIndex++;
-      }
+      sprite.position.set(gappedX, 0);
+      sprite.width = gappedWidth;
+      sprite.height = viewportState.displayHeight;
+      sprite.tint = indicator.color;
     }
-
-    // Set draw count and make visible
-    this.geometry.setDrawCount(rectIndex);
-    this.mesh.visible = true;
   }
 
   /**
@@ -287,12 +234,11 @@ export class MeshMarkerRenderer {
   }
 
   /**
-   * Cleans up mesh and removes from container.
+   * Cleans up sprite pool and removes from container.
    * Must be called before discarding the renderer.
    */
   public destroy(): void {
-    this.geometry.destroy();
-    this.mesh.destroy();
-    this.parentContainer.destroy();
+    this.spritePool.destroy();
+    this.container.destroy();
   }
 }

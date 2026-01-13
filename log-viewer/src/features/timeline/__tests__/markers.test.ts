@@ -68,7 +68,7 @@ jest.mock('pixi.js', () => {
 
 import * as PIXI from 'pixi.js';
 import { blendWithBackground } from '../optimised/BucketColorResolver.js';
-import { TimelineMarkerRenderer } from '../optimised/TimelineMarkerRenderer.js';
+import { TimelineMarkerRenderer } from '../optimised/markers/TimelineMarkerRenderer.js';
 import { TimelineViewport } from '../optimised/TimelineViewport.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 import { MARKER_ALPHA, MARKER_COLORS } from '../types/flamechart.types.js';
