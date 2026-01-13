@@ -5,17 +5,18 @@
 /**
  * EventBatchRenderer
  *
- * Pure rectangle rendering for timeline events.
+ * Pure rectangle rendering for timeline events using PixiJS Sprites.
  * Receives pre-computed, culled rectangles and renders them with original colors.
  *
- * Based on PixiJS performance guide:
- * - Small Graphics objects (rectangles) are as fast as Sprites
- * - Graphics objects are batched when under 100 points
- * - Grouping similar object types is faster (category-based batching)
+ * Performance optimizations:
+ * - Uses SpritePool with shared 1x1 white texture for automatic GPU batching
+ * - Sprites are pooled and reused (no GC overhead after warmup)
+ * - Color applied via sprite.tint (efficient uniform update, no state changes)
+ * - Single draw call for all sprites regardless of color variations
  *
  * Responsibilities:
  * - Render rectangles with their original colors
- * - Manage PixiJS Graphics objects for each category
+ * - Render buckets (sub-pixel aggregated events)
  *
  * Does NOT:
  * - Pre-compute rectangles (done by RectangleManager)
@@ -23,33 +24,19 @@
  * - Handle search logic (done by SearchStyleRenderer)
  */
 
-import * as PIXI from 'pixi.js';
+import type { Container } from 'pixi.js';
 import type { PixelBucket, RenderBatch } from '../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import type { PrecomputedRect } from './RectangleManager.js';
+import { SpritePool } from './SpritePool.js';
 
 export class EventBatchRenderer {
   private batches: Map<string, RenderBatch>;
-  private graphics: Map<string, PIXI.Graphics>;
-  private container: PIXI.Container;
-  /** Dedicated Graphics object for bucket rendering (grouped by color) */
-  private bucketGraphics: PIXI.Graphics;
+  private spritePool: SpritePool;
 
-  constructor(container: PIXI.Container, batches: Map<string, RenderBatch>) {
+  constructor(container: Container, batches: Map<string, RenderBatch>) {
     this.batches = batches;
-    this.graphics = new Map();
-    this.container = container;
-
-    // Create Graphics objects for each batch (rectangles only)
-    for (const [category, _batch] of batches) {
-      const gfx = new PIXI.Graphics();
-      this.graphics.set(category, gfx);
-      container.addChild(gfx);
-    }
-
-    // Create dedicated Graphics for bucket rendering
-    this.bucketGraphics = new PIXI.Graphics();
-    container.addChild(this.bucketGraphics);
+    this.spritePool = new SpritePool(container);
   }
 
   /**
@@ -59,59 +46,68 @@ export class EventBatchRenderer {
    *
    * @param culledRects - Rectangles grouped by category (events > 2px)
    * @param buckets - Aggregated buckets grouped by category (events ≤ 2px)
+   * @param _viewport - Unused, for API compatibility with mesh renderer
    */
   public render(
     culledRects: Map<string, PrecomputedRect[]>,
     buckets: Map<string, PixelBucket[]>,
+    _viewport?: unknown,
   ): void {
-    // Clear all batches - reuse existing arrays
+    // Release all sprites back to pool for reuse
+    this.spritePool.releaseAll();
+
+    // Clear all batches and populate from culled rectangles
+    // (maintains backward compatibility for tests and debugging)
     for (const batch of this.batches.values()) {
       batch.rectangles.length = 0;
       batch.isDirty = true;
     }
 
-    // Populate batches from culled rectangles
-    for (const [category, rectangles] of culledRects) {
-      const batch = this.batches.get(category);
-      if (batch) {
-        for (const rect of rectangles) {
-          batch.rectangles.push(rect);
-        }
-      }
-    }
+    // Pre-calculate constants outside loops
+    const gap = TIMELINE_CONSTANTS.RECT_GAP;
+    const halfGap = gap / 2;
 
     // Render rectangles per category
-    for (const [category, batch] of this.batches) {
-      if (batch.isDirty) {
-        this.renderBatch(category, batch);
-        batch.isDirty = false;
+    for (const [category, rectangles] of culledRects) {
+      const batch = this.batches.get(category);
+      if (!batch) {
+        continue;
       }
+
+      const color = batch.color;
+
+      for (const rect of rectangles) {
+        // Store in batch for backward compatibility
+        batch.rectangles.push(rect);
+
+        // Render as sprite
+        const sprite = this.spritePool.acquire();
+        sprite.position.set(rect.x + halfGap, rect.y + halfGap);
+        sprite.width = Math.max(0, rect.width - gap);
+        sprite.height = Math.max(0, rect.height - gap);
+        sprite.tint = color;
+      }
+
+      batch.isDirty = false;
     }
 
-    // Render all buckets grouped by color (minimizes setFillStyle calls)
+    // Render all buckets
     this.renderBuckets(buckets);
   }
 
   /**
-   * Clear all graphics without destroying them.
+   * Clear all sprites (hide them).
    * Called when switching to search mode.
    */
   public clear(): void {
-    for (const gfx of this.graphics.values()) {
-      gfx.clear();
-    }
-    this.bucketGraphics.clear();
+    this.spritePool.releaseAll();
   }
 
   /**
-   * Clean up Graphics objects.
+   * Clean up sprite pool.
    */
   public destroy(): void {
-    for (const gfx of this.graphics.values()) {
-      gfx.destroy();
-    }
-    this.graphics.clear();
-    this.bucketGraphics.destroy();
+    this.spritePool.destroy();
   }
 
   // ============================================================================
@@ -119,70 +115,14 @@ export class EventBatchRenderer {
   // ============================================================================
 
   /**
-   * Render a single batch (category) using PixiJS Graphics.
+   * Render all buckets using sprites.
    *
-   * Draws all rectangles for this category as a single Graphics object.
-   * Performance: Uses single setFillStyle + fill() call per category.
-   *
-   * @param category - Category name
-   * @param batch - RenderBatch with rectangles and color
-   */
-  private renderBatch(category: string, batch: RenderBatch): void {
-    const gfx = this.graphics.get(category);
-    if (!gfx) {
-      return;
-    }
-
-    // Clear previous drawings
-    gfx.clear();
-
-    if (batch.rectangles.length === 0) {
-      return;
-    }
-
-    // Pre-calculate constants outside loops
-    const gap = TIMELINE_CONSTANTS.RECT_GAP;
-    const halfGap = gap / 2;
-
-    // Render rectangles (events > 2px) with batch color
-    gfx.setFillStyle({ color: batch.color });
-
-    for (const rect of batch.rectangles) {
-      const gappedX = rect.x + halfGap;
-      const gappedY = rect.y + halfGap;
-      const gappedWidth = Math.max(0, rect.width - gap);
-      const gappedHeight = Math.max(0, rect.height - gap);
-
-      gfx.rect(gappedX, gappedY, gappedWidth, gappedHeight);
-    }
-
-    gfx.fill();
-  }
-
-  /**
-   * Render all buckets grouped by color using a single Graphics object.
-   *
-   * Buckets have density-based colors (opacity pre-blended), so colors vary
-   * even within the same category. Grouping ALL buckets by color minimizes
-   * setFillStyle state changes for better PixiJS performance.
+   * Buckets have density-based colors (opacity pre-blended into the color).
+   * Each bucket gets its own sprite with the appropriate tint.
    *
    * @param buckets - Aggregated buckets grouped by category
    */
   private renderBuckets(buckets: Map<string, PixelBucket[]>): void {
-    this.bucketGraphics.clear();
-
-    // Collect all buckets from all categories
-    const allBuckets: PixelBucket[] = [];
-    for (const categoryBuckets of buckets.values()) {
-      for (const bucket of categoryBuckets) {
-        allBuckets.push(bucket);
-      }
-    }
-
-    if (allBuckets.length === 0) {
-      return;
-    }
-
     // Pre-calculate constants outside loops
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
     const halfGap = gap / 2;
@@ -190,29 +130,15 @@ export class EventBatchRenderer {
     const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
     const gappedHeight = Math.max(0, eventHeight - gap);
 
-    // Group ALL buckets by color to minimize setFillStyle state changes
-    // Color varies by event count (density-based opacity pre-blended)
-    const colorGroups = new Map<number, PixelBucket[]>();
-    for (const bucket of allBuckets) {
-      let group = colorGroups.get(bucket.color);
-      if (!group) {
-        group = [];
-        colorGroups.set(bucket.color, group);
+    // Render all buckets from all categories
+    for (const categoryBuckets of buckets.values()) {
+      for (const bucket of categoryBuckets) {
+        const sprite = this.spritePool.acquire();
+        sprite.position.set(bucket.x + halfGap, bucket.y + halfGap);
+        sprite.width = blockWidth;
+        sprite.height = gappedHeight;
+        sprite.tint = bucket.color;
       }
-      group.push(bucket);
-    }
-
-    // Render each color group with single setFillStyle + fill
-    for (const [color, group] of colorGroups) {
-      this.bucketGraphics.setFillStyle({ color });
-
-      for (const bucket of group) {
-        const gappedX = bucket.x + halfGap;
-        const gappedY = bucket.y + halfGap;
-        this.bucketGraphics.rect(gappedX, gappedY, blockWidth, gappedHeight);
-      }
-
-      this.bucketGraphics.fill();
     }
   }
 }

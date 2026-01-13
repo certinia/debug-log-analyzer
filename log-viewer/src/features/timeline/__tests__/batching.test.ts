@@ -122,19 +122,19 @@ describe('EventBatchRenderer', () => {
   });
 
   describe('initialization', () => {
-    it('should create Graphics objects for each batch plus one for buckets', () => {
+    it('should create a SpritePool container', () => {
       renderer = new EventBatchRenderer(container, batches);
 
-      // 3 category batches + 1 dedicated bucket Graphics = 4 total
-      expect(container.children).toHaveLength(4);
-      expect(container.children.every((child) => child instanceof PIXI.Graphics)).toBe(true);
+      // SpritePool creates a container for sprites
+      expect(container.children).toHaveLength(1);
+      expect(container.children[0] instanceof PIXI.Container).toBe(true);
     });
 
-    it('should create only bucket Graphics with empty batches', () => {
+    it('should create SpritePool container with empty batches', () => {
       const emptyBatches = new Map<string, RenderBatch>();
       renderer = new EventBatchRenderer(container, emptyBatches);
 
-      // No category batches but still 1 dedicated bucket Graphics
+      // SpritePool container is still created
       expect(container.children).toHaveLength(1);
     });
   });
@@ -506,14 +506,14 @@ describe('EventBatchRenderer', () => {
   });
 
   describe('cleanup', () => {
-    it('should destroy all Graphics objects', () => {
+    it('should destroy SpritePool and remove all children', () => {
       renderer = new EventBatchRenderer(container, batches);
 
       const childrenCount = container.children.length;
       expect(childrenCount).toBeGreaterThan(0);
 
       renderer.destroy();
-      // After destruction, graphics are removed from their parent
+      // After destruction, SpritePool container is removed
       // Container should have no children
       expect(container.children.length).toBe(0);
     });

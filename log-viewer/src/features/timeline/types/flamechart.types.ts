@@ -201,6 +201,14 @@ export interface TimelineOptions {
     caseSensitive?: boolean;
   };
 
+  /**
+   * Renderer type: 'sprite' or 'mesh'.
+   * - 'sprite': Uses SpritePool with shared texture (proven approach)
+   * - 'mesh': Uses custom mesh with vertex colors (potentially faster for large datasets)
+   * Default: 'mesh' for testing, can be changed to 'sprite' for comparison.
+   */
+  renderer?: 'sprite' | 'mesh';
+
   /** Event handlers for user interactions. */
   onEventClick?: (event: LogEvent) => void;
   onEventHover?: (event: LogEvent | null) => void;

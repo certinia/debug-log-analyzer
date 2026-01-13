@@ -14,6 +14,7 @@ import * as PIXI from 'pixi.js';
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type {
   EventNode,
+  PixelBucket,
   TimelineMarker,
   TimelineOptions,
   TimelineState,
@@ -22,20 +23,27 @@ import type {
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
 import type { SearchCursor, SearchMatch, SearchOptions } from '../types/search.types.js';
-import { logEventToTreeNode } from '../utils/tree-converter.js';
+
+import { MeshAxisRenderer } from './mesh/MeshAxisRenderer.js';
+import { MeshMarkerRenderer } from './mesh/MeshMarkerRenderer.js';
+import { MeshRectangleRenderer } from './mesh/MeshRectangleRenderer.js';
+import { MeshSearchStyleRenderer } from './mesh/MeshSearchStyleRenderer.js';
+
 import { AxisRenderer } from './AxisRenderer.js';
-import { blendWithBackground } from './BucketColorResolver.js';
 import { EventBatchRenderer } from './EventBatchRenderer.js';
-import type { PrecomputedRect } from './RectangleManager.js';
-import { RectangleManager } from './RectangleManager.js';
 import { SearchHighlightRenderer } from './SearchHighlightRenderer.js';
-import { SearchManager } from './SearchManager.js';
 import { SearchStyleRenderer } from './SearchStyleRenderer.js';
 import { SearchTextLabelRenderer } from './SearchTextLabelRenderer.js';
 import { TextLabelRenderer } from './TextLabelRenderer.js';
+import { TimelineMarkerRenderer } from './TimelineMarkerRenderer.js';
+
+import { logEventToTreeNode } from '../utils/tree-converter.js';
+import { blendWithBackground } from './BucketColorResolver.js';
+import type { PrecomputedRect } from './RectangleManager.js';
+import { RectangleManager } from './RectangleManager.js';
+import { SearchManager } from './SearchManager.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineInteractionHandler } from './TimelineInteractionHandler.js';
-import { TimelineMarkerRenderer } from './TimelineMarkerRenderer.js';
 import { TimelineResizeHandler } from './TimelineResizeHandler.js';
 import { TimelineViewport } from './TimelineViewport.js';
 
@@ -147,16 +155,16 @@ export class FlameChart<E extends EventNode = EventNode> {
   private callbacks: FlameChartCallbacks = {};
 
   private rectangleManager: RectangleManager | null = null;
-  private batchRenderer: EventBatchRenderer | null = null;
-  private axisRenderer: AxisRenderer | null = null;
-  private markerRenderer: TimelineMarkerRenderer | null = null;
+  private batchRenderer: EventBatchRenderer | MeshRectangleRenderer | null = null;
+  private axisRenderer: AxisRenderer | MeshAxisRenderer | null = null;
+  private markerRenderer: TimelineMarkerRenderer | MeshMarkerRenderer | null = null;
   private resizeHandler: TimelineResizeHandler | null = null;
 
   // New generic search system
   private newSearchManager: SearchManager<E> | null = null;
   private treeNodes: TreeNode<E>[] | null = null;
 
-  private searchStyleRenderer: SearchStyleRenderer | null = null;
+  private searchStyleRenderer: SearchStyleRenderer | MeshSearchStyleRenderer | null = null;
   private searchRenderer: SearchHighlightRenderer | null = null;
   private textLabelRenderer: TextLabelRenderer | null = null;
   private searchTextLabelRenderer: SearchTextLabelRenderer | null = null;
@@ -169,6 +177,11 @@ export class FlameChart<E extends EventNode = EventNode> {
   private interactionHandler: TimelineInteractionHandler | null = null;
 
   private readonly markers: TimelineMarker[] = [];
+
+  /** Current buckets from last render pass (for bucket hit detection) */
+  private currentBuckets: Map<string, PixelBucket[]> = new Map();
+  /** Current visible rects from last render pass (for hit detection) */
+  private currentVisibleRects: Map<string, PrecomputedRect[]> = new Map();
 
   /**
    * Initialize the flamechart renderer.
@@ -239,24 +252,40 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Convert LogEvent to TreeNode structure for generic search
     this.treeNodes = logEventToTreeNode(events) as unknown as TreeNode<E>[];
 
+    // Determine renderer type: mesh is default for testing
+    const useMeshRenderer = options.renderer !== 'sprite';
+
     // Create truncation renderer FIRST (renders behind axis and events)
     if (this.markerContainer && this.markers.length > 0) {
-      this.markerRenderer = new TimelineMarkerRenderer(
-        this.markerContainer,
-        this.viewport,
-        this.markers,
-      );
+      if (useMeshRenderer) {
+        this.markerRenderer = new MeshMarkerRenderer(
+          this.markerContainer,
+          this.viewport,
+          this.markers,
+        );
+      } else {
+        this.markerRenderer = new TimelineMarkerRenderer(
+          this.markerContainer,
+          this.viewport,
+          this.markers,
+        );
+      }
     }
 
     // Create axis renderer SECOND
     if (this.axisContainer && this.uiContainer) {
-      this.axisRenderer = new AxisRenderer(this.axisContainer, {
+      const axisConfig = {
         height: 30,
         lineColor: 0x808080,
         textColor: '#808080',
         fontSize: 11,
         minLabelSpacing: 120,
-      });
+      };
+      if (useMeshRenderer) {
+        this.axisRenderer = new MeshAxisRenderer(this.axisContainer, axisConfig);
+      } else {
+        this.axisRenderer = new AxisRenderer(this.axisContainer, axisConfig);
+      }
       this.axisRenderer.setScreenSpaceContainer(this.uiContainer);
     }
 
@@ -268,12 +297,23 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Create batch renderer (pure rendering, receives rectangles from RectangleManager)
     if (this.worldContainer && this.state) {
-      this.batchRenderer = new EventBatchRenderer(this.worldContainer, this.state.batches);
+      if (useMeshRenderer) {
+        this.batchRenderer = new MeshRectangleRenderer(this.worldContainer, this.state.batches);
+      } else {
+        this.batchRenderer = new EventBatchRenderer(this.worldContainer, this.state.batches);
+      }
     }
 
     // Create search style renderer (renders with desaturation for search mode)
     if (this.worldContainer && this.state) {
-      this.searchStyleRenderer = new SearchStyleRenderer(this.worldContainer, this.state.batches);
+      if (useMeshRenderer) {
+        this.searchStyleRenderer = new MeshSearchStyleRenderer(
+          this.worldContainer,
+          this.state.batches,
+        );
+      } else {
+        this.searchStyleRenderer = new SearchStyleRenderer(this.worldContainer, this.state.batches);
+      }
     }
 
     // Create text label renderer (renders method names on rectangles)
@@ -291,6 +331,23 @@ export class FlameChart<E extends EventNode = EventNode> {
 
       // Enable zIndex sorting for proper layering
       this.worldContainer.sortableChildren = true;
+    }
+
+    // For mesh renderers, move meshes to stage root for clip-space rendering
+    if (useMeshRenderer && this.app) {
+      const stage = this.app.stage;
+      if (this.batchRenderer && 'setStageContainer' in this.batchRenderer) {
+        (this.batchRenderer as MeshRectangleRenderer).setStageContainer(stage);
+      }
+      if (this.searchStyleRenderer && 'setStageContainer' in this.searchStyleRenderer) {
+        (this.searchStyleRenderer as MeshSearchStyleRenderer).setStageContainer(stage);
+      }
+      if (this.markerRenderer && 'setStageContainer' in this.markerRenderer) {
+        (this.markerRenderer as MeshMarkerRenderer).setStageContainer(stage);
+      }
+      if (this.axisRenderer && 'setStageContainer' in this.axisRenderer) {
+        (this.axisRenderer as MeshAxisRenderer).setStageContainer(stage);
+      }
     }
 
     // Setup interaction handler
@@ -1022,13 +1079,17 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.state.batchColorsCache,
     );
 
+    // Store for hit detection in handleMouseMove
+    this.currentVisibleRects = visibleRects;
+    this.currentBuckets = buckets;
+
     // Render events (with or without search styling)
     const cursor = this.newSearchManager?.getCursor();
 
     if (cursor && cursor.total > 0) {
       // Search mode: render with desaturation (including buckets)
       const matchedEventIds = cursor.getMatchedEventIds();
-      this.searchStyleRenderer!.render(visibleRects, matchedEventIds, buckets);
+      this.searchStyleRenderer!.render(visibleRects, matchedEventIds, buckets, viewportState);
 
       // Render highlight border for current match
       this.searchRenderer!.render(cursor, viewportState);
@@ -1039,7 +1100,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       }
     } else {
       // Normal mode: render with original colors and buckets
-      this.batchRenderer.render(visibleRects, buckets);
+      this.batchRenderer.render(visibleRects, buckets, viewportState);
 
       // Clear search overlays when not in search mode
       if (this.searchStyleRenderer) {

@@ -5,8 +5,13 @@
 /**
  * AxisRenderer
  *
- * Renders time scale axis with dynamic labels and tick marks.
+ * Renders time scale axis with dynamic labels and tick marks using PixiJS Sprites.
  * Adapts tick density and label precision based on zoom level.
+ *
+ * Performance optimizations:
+ * - Uses SpritePool for grid lines (automatic GPU batching)
+ * - Sprites are pooled and reused (no GC overhead after warmup)
+ * - Labels use PIXI.Text (optimal for dynamic text with caching)
  *
  * Tick levels (zoom-dependent):
  * - Seconds: Major ticks at 1s, 2s, 5s, 10s intervals
@@ -15,8 +20,9 @@
  * - Nanoseconds: Major ticks at 1ns, 2ns, 5ns, 10ns intervals
  */
 
-import * as PIXI from 'pixi.js';
+import { Container, Text } from 'pixi.js';
 import type { ViewportState } from '../types/flamechart.types.js';
+import { SpritePool } from './SpritePool.js';
 
 /**
  * Nanoseconds per millisecond conversion constant.
@@ -50,16 +56,16 @@ interface TickInterval {
 }
 
 export class AxisRenderer {
-  private container: PIXI.Container;
-  private graphics: PIXI.Graphics;
-  private labelsContainer: PIXI.Container;
-  private screenSpaceContainer: PIXI.Container | null = null;
+  private container: Container;
+  private spritePool: SpritePool;
+  private labelsContainer: Container;
+  private screenSpaceContainer: Container | null = null;
   private config: AxisConfig;
-  private labelCache: Map<string, PIXI.Text> = new Map();
-  /** Pre-blended opaque grid line color (simulates 0.3 alpha) */
+  private labelCache: Map<string, Text> = new Map();
+  /** Grid line color */
   private gridLineColor: number;
 
-  constructor(container: PIXI.Container, config?: Partial<AxisConfig>) {
+  constructor(container: Container, config?: Partial<AxisConfig>) {
     this.container = container;
 
     // Default configuration
@@ -72,23 +78,20 @@ export class AxisRenderer {
       ...config,
     };
 
-    // Pre-blend grid line color (0.5 opacity for better visibility over markers)
-    // this.gridLineColor = blendWithBackground(this.config.lineColor, 0.5;
     this.gridLineColor = this.config.lineColor;
 
-    // Create graphics for axis line and ticks (in world space - will be transformed with stage)
-    this.graphics = new PIXI.Graphics();
-    this.container.addChild(this.graphics);
+    // Create sprite pool for grid lines (in world space - will be transformed with stage)
+    this.spritePool = new SpritePool(container);
 
     // Labels container - will be added to screen space container when provided
-    this.labelsContainer = new PIXI.Container();
+    this.labelsContainer = new Container();
   }
 
   /**
    * Set the screen-space container for labels (not affected by stage transforms).
    * This container should be added directly to app.stage at root level.
    */
-  public setScreenSpaceContainer(container: PIXI.Container): void {
+  public setScreenSpaceContainer(container: Container): void {
     this.screenSpaceContainer = container;
 
     // Move labels to screen space container
@@ -109,8 +112,8 @@ export class AxisRenderer {
    * @param viewport - Current viewport state
    */
   public render(viewport: ViewportState): void {
-    // Clear previous rendering
-    this.graphics.clear();
+    // Release all sprites back to pool
+    this.spritePool.releaseAll();
     this.clearLabels();
 
     // Calculate visible time range
@@ -128,7 +131,7 @@ export class AxisRenderer {
    * Clean up resources.
    */
   public destroy(): void {
-    this.graphics.destroy();
+    this.spritePool.destroy();
     this.labelsContainer.destroy();
     this.labelCache.clear();
   }
@@ -285,12 +288,12 @@ export class AxisRenderer {
     // Round screen position to prevent sub-pixel rendering issues
     const roundedX = Math.round(screenX);
 
-    // Draw vertical line from top (viewportHeight in inverted coords) to bottom (0)
-    // Use rect instead of line for more consistent rendering
-    // Color is pre-blended opaque (0.5 opacity for visibility over markers)
-    this.graphics.setFillStyle({ color: this.gridLineColor });
-    this.graphics.rect(roundedX, 0, 1, viewportHeight);
-    this.graphics.fill();
+    // Draw vertical line using sprite (1px wide, full height)
+    const sprite = this.spritePool.acquire();
+    sprite.position.set(roundedX, 0);
+    sprite.width = 1;
+    sprite.height = viewportHeight;
+    sprite.tint = this.gridLineColor;
 
     // Add label at top if requested
     if (showLabel && this.screenSpaceContainer) {
@@ -321,11 +324,11 @@ export class AxisRenderer {
    * Get or create a PIXI.Text label from cache.
    * Reuses labels to avoid constant object creation.
    */
-  private getOrCreateLabel(text: string): PIXI.Text {
+  private getOrCreateLabel(text: string): Text {
     let label = this.labelCache.get(text);
 
     if (!label) {
-      label = new PIXI.Text({
+      label = new Text({
         text,
         style: {
           fontFamily: 'monospace',
