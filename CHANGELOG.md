@@ -9,16 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart that is up to **7X faster**. ([#446] [#251] [#92] [#564])
-  - Revert to the legacy timeline via **Settings -> Apex Log Analyzer -> Timeline -> Legacy**.
-  - Generally Improved performance, especially for large logs.
-  - Text labels on Timeline events.
-  - Zoom and pan are now **7X faster**.
-  - The Time axis scales more naturally when zooming, with larger gaps between the markers on longer logs.
-  - Search + highlight will grey out non matches to find matches more easily.
-  - Added 18 timeline color themes and improved the default theme for better contrast and readability.
-  - Supply multiple custom themes via **Settings -> Apex Log Analyzer -> Timeline -> Custom Themes**.
-  - Change the active theme via the new **Command Palette** command **Log: Timeline Theme** or via **Settings -> Apex Log Analyzer -> Timeline -> Active Theme**.
+- ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart built for massive logs and up to **7X faster**. ([#446] [#251] [#92] [#564])
+  - Toggle the legacy timeline anytime via **Settings -> Apex Log Analyzer -> Timeline -> Legacy**.
+  - Improved performance to handle huge Apex debug logs.
+  - Dynamic labels on Timeline events for faster log scanning.
+  - Zoom + pan are **7X faster** with smoother motion.
+  - Time axis auto-spaces markers intelligently and more naturally as you zoom.
+  - Search + highlight dims non-matches for fast scanning.
+  - 18 curated timeline themes plus the default theme has been improved for better contrast and readability.
+  - Add your own multiple custom themes via **Settings -> Apex Log Analyzer -> Timeline -> Custom Themes**.
+  - Fast theme switching via **Command Palette**: **Log: Timeline Theme** or **Settings -> Apex Log Analyzer -> Timeline -> Active Theme**.
+  - Adaptive level-of-detail bucketing reveals richer timeline detail as you zoom while keeping keeping the view clean and fast.
 
 ### Changed
 
