@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
 /**
@@ -37,7 +37,6 @@ import {
   UNKNOWN_CATEGORY_COLOR,
   type BatchColorInfo,
 } from './BucketColorResolver.js';
-import { calculateBucketColor } from './BucketOpacity.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 import { calculateViewportBounds } from './ViewportUtils.js';
 
@@ -177,9 +176,6 @@ export class TemporalSegmentTree {
       const baseColor = categoryBaseColors.get(bucket.dominantCategory);
       if (baseColor === undefined) continue;
 
-      // Only opacity calculation varies per bucket (based on eventCount)
-      const finalColor = calculateBucketColor(baseColor, bucket.eventCount);
-
       categoryBuckets.push({
         id: `bucket-${key}`,
         // Grid-aligned X position: bucketIndex * BUCKET_WIDTH (always on 2px grid)
@@ -195,7 +191,7 @@ export class TemporalSegmentTree {
         },
         // Event refs are expensive to collect - leave empty for multi-event buckets
         eventRefs: [],
-        color: finalColor,
+        color: baseColor,
       });
       bucketCount++;
     }

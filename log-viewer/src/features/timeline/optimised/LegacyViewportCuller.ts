@@ -24,7 +24,6 @@ import type {
 } from '../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import { resolveColor, type BatchColorInfo } from './BucketColorResolver.js';
-import { calculateBucketColor } from './BucketOpacity.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 import { calculateViewportBounds } from './ViewportUtils.js';
 
@@ -178,11 +177,6 @@ export function legacyCullRectangles(
 
     // Resolve color and dominant category
     const colorResult = resolveColor(categoryStats, batchColors);
-
-    // Pre-compute opaque blended color based on event density
-    // This avoids runtime alpha blending for better GPU performance
-    const blendedColor = calculateBucketColor(colorResult.color, eventCount);
-
     const pixelBucket: PixelBucket = {
       id: `bucket-${key}`,
       x: bucket.timeStart * zoom,
@@ -196,7 +190,7 @@ export function legacyCullRectangles(
         dominantCategory: colorResult.dominantCategory,
       },
       eventRefs: bucket.events,
-      color: blendedColor,
+      color: colorResult.color,
     };
 
     // Add to category group (skip unknown categories)

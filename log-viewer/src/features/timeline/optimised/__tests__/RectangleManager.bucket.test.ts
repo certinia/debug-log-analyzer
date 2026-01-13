@@ -287,7 +287,10 @@ describe('Legacy bucket aggregation', () => {
       expect(allBuckets[0]!.color).toBeLessThanOrEqual(0xffffff);
     });
 
-    it('should have different colors for different event counts (density visualization)', () => {
+    it('should have same colors regardless of event count (density visualization disabled)', () => {
+      // NOTE: Density-based opacity is currently disabled because it makes parent
+      // events appear dimmer than child events. All buckets now render at full color.
+
       // Create a bucket with a single event
       const singleEvent = [createEvent(0, 1, 'Method')];
       const singleViewport = createViewport(1, 0, 0);
@@ -305,8 +308,8 @@ describe('Legacy bucket aggregation', () => {
       const manyBuckets = getAllBuckets(manyResult.buckets);
       const manyBucketColor = manyBuckets[0]!.color;
 
-      // The colors should be different (more events = more saturated color)
-      expect(manyBucketColor).not.toBe(singleBucketColor);
+      // Colors should be the same (density visualization disabled)
+      expect(manyBucketColor).toBe(singleBucketColor);
     });
   });
 
