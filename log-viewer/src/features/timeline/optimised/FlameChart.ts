@@ -665,13 +665,44 @@ export class FlameChart<E extends EventNode = EventNode> {
       return;
     }
 
-    // Check for truncation markers
-    const marker = this.markerRenderer?.hitTest(screenX, screenY) ?? null;
-
-    // Find event at position
     const viewportState = this.viewport.getState();
     const depth = this.viewport.screenYToDepth(screenY);
-    const event = this.index.findEventAtPosition(screenX, screenY, viewportState, depth, false);
+
+    // Check if depth is within valid bounds (0 to maxDepth)
+    const maxDepth = this.index.maxDepth;
+    const isValidDepth = depth >= 0 && depth <= maxDepth;
+
+    let event: LogEvent | null = null;
+    let isOverBucketOrEvent = false;
+
+    if (isValidDepth) {
+      // Priority 1: Check visible rectangles from last render (in sync with display)
+      event = this.findVisibleRectAtPosition(screenX, depth, viewportState);
+
+      // Priority 2: If no visible rect, check event index (for wider search)
+      if (!event) {
+        event = this.index.findEventAtPosition(screenX, screenY, viewportState, depth, false);
+      }
+
+      isOverBucketOrEvent = event !== null;
+
+      // Priority 3: If no event found, check if we're over a bucket at this depth
+      if (!event) {
+        const bucketResult = this.findBucketAtPosition(screenX, depth, viewportState);
+        if (bucketResult) {
+          isOverBucketOrEvent = true;
+          // Find nearest event from bucket's eventRefs (X direction only, same depth)
+          event = this.findNearestEventInBucket(bucketResult.bucket, screenX, viewportState);
+        }
+      }
+    }
+
+    // Priority 4: Only show truncation marker if NOT over any event/bucket area
+    // Truncation markers should only show when hovering empty space
+    let marker: TimelineMarker | null = null;
+    if (!isOverBucketOrEvent) {
+      marker = this.markerRenderer?.hitTest(screenX, screenY) ?? null;
+    }
 
     // Update cursor
     if (this.interactionHandler) {
@@ -684,18 +715,150 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
   }
 
+  /**
+   * Find visible rectangle at screen position from last render pass.
+   * This ensures hit detection is in sync with what's actually displayed.
+   *
+   * @returns Event reference if found, null otherwise
+   */
+  private findVisibleRectAtPosition(
+    screenX: number,
+    depth: number,
+    viewport: ViewportState,
+  ): LogEvent | null {
+    for (const categoryRects of this.currentVisibleRects.values()) {
+      for (const rect of categoryRects) {
+        // Check depth match
+        if (rect.depth !== depth) {
+          continue;
+        }
+
+        // Calculate screen X position
+        const rectScreenX = rect.timeStart * viewport.zoom - viewport.offsetX;
+        const rectScreenEnd = rect.timeEnd * viewport.zoom - viewport.offsetX;
+
+        // Check if mouse X is within rect bounds
+        if (screenX >= rectScreenX && screenX <= rectScreenEnd) {
+          return rect.eventRef;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Find bucket at screen position, if any.
+   * @returns Bucket and its screen bounds, or null if not over a bucket
+   */
+  private findBucketAtPosition(
+    screenX: number,
+    depth: number,
+    viewport: ViewportState,
+  ): { bucket: PixelBucket; screenX: number; screenWidth: number } | null {
+    // Buckets are stored in currentBuckets from the last render pass
+    for (const categoryBuckets of this.currentBuckets.values()) {
+      for (const bucket of categoryBuckets) {
+        // Check if bucket is at the target depth
+        if (bucket.depth !== depth) {
+          continue;
+        }
+
+        // Calculate bucket screen position
+        const bucketScreenX = bucket.timeStart * viewport.zoom - viewport.offsetX;
+        const bucketScreenEnd = bucket.timeEnd * viewport.zoom - viewport.offsetX;
+
+        // Check if mouse X is within bucket bounds
+        if (screenX >= bucketScreenX && screenX <= bucketScreenEnd) {
+          return {
+            bucket,
+            screenX: bucketScreenX,
+            screenWidth: bucketScreenEnd - bucketScreenX,
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Find the nearest event in a bucket based on X distance.
+   * Only considers events at the same depth (bucket.depth).
+   *
+   * @param bucket - The bucket containing aggregated events
+   * @param screenX - Mouse X position in screen coordinates
+   * @param viewport - Current viewport state
+   * @returns Nearest event, or null if bucket is empty
+   */
+  private findNearestEventInBucket(
+    bucket: PixelBucket,
+    screenX: number,
+    viewport: ViewportState,
+  ): LogEvent | null {
+    if (bucket.eventRefs.length === 0) {
+      return null;
+    }
+
+    // Convert screen X to time
+    const mouseTime = (screenX + viewport.offsetX) / viewport.zoom;
+
+    let nearestEvent: LogEvent | null = null;
+    let nearestDistance = Infinity;
+
+    for (const event of bucket.eventRefs) {
+      // Calculate event center time
+      const eventCenterTime = event.timestamp + (event.duration?.total ?? 0) / 2;
+      const distance = Math.abs(eventCenterTime - mouseTime);
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestEvent = event;
+      }
+    }
+
+    return nearestEvent;
+  }
+
   private handleClick(screenX: number, screenY: number): void {
     if (!this.viewport || !this.index) {
       return;
     }
 
-    // Check for truncation markers
-    const truncationMarker = this.markerRenderer?.hitTest(screenX, screenY) ?? null;
-
-    // Find event at position
     const viewportState = this.viewport.getState();
     const depth = this.viewport.screenYToDepth(screenY);
-    const event = this.index.findEventAtPosition(screenX, screenY, viewportState, depth, false);
+
+    // Check if depth is within valid bounds
+    const maxDepth = this.index.maxDepth;
+    const isValidDepth = depth >= 0 && depth <= maxDepth;
+
+    let event: LogEvent | null = null;
+    let isOverBucketOrEvent = false;
+
+    if (isValidDepth) {
+      // Priority 1: Check visible rectangles from last render
+      event = this.findVisibleRectAtPosition(screenX, depth, viewportState);
+
+      // Priority 2: If no visible rect, check event index
+      if (!event) {
+        event = this.index.findEventAtPosition(screenX, screenY, viewportState, depth, false);
+      }
+
+      isOverBucketOrEvent = event !== null;
+
+      // Priority 3: If no event found, check if we're over a bucket
+      if (!event) {
+        const bucketResult = this.findBucketAtPosition(screenX, depth, viewportState);
+        if (bucketResult) {
+          isOverBucketOrEvent = true;
+          event = this.findNearestEventInBucket(bucketResult.bucket, screenX, viewportState);
+        }
+      }
+    }
+
+    // Priority 4: Only show truncation marker if NOT over any event/bucket area
+    let truncationMarker: TimelineMarker | null = null;
+    if (!isOverBucketOrEvent) {
+      truncationMarker = this.markerRenderer?.hitTest(screenX, screenY) ?? null;
+    }
 
     // Notify callback
     if (this.callbacks.onClick) {

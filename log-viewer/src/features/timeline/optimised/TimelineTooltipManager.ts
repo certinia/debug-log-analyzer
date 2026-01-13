@@ -78,6 +78,7 @@ export class TimelineTooltipManager {
     // If different event and tooltip is visible, update immediately
     if (wasVisible && this.currentEvent !== event) {
       this.currentEvent = event;
+      this.currentTruncationMarker = null; // Clear truncation state when showing event
       this.displayTooltip(event, mouseX, mouseY);
       return;
     }
@@ -90,6 +91,7 @@ export class TimelineTooltipManager {
 
     // New tooltip - apply delay or show immediately if delay is 0
     this.currentEvent = event;
+    this.currentTruncationMarker = null; // Clear truncation state when showing event
 
     this.displayTooltip(event, mouseX, mouseY);
   }
