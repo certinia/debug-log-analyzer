@@ -22,8 +22,14 @@
  */
 
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type { RenderRectangle, ViewportBounds, ViewportState } from '../types/flamechart.types.js';
+import type {
+  CulledRenderData,
+  RenderRectangle,
+  ViewportState,
+} from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
+import type { BatchColorInfo } from './BucketColorResolver.js';
+import { TemporalSegmentTree } from './TemporalSegmentTree.js';
 
 /**
  * Pre-computed event rectangle with fixed and dynamic properties.
@@ -69,6 +75,9 @@ export interface PrecomputedRect extends RenderRectangle {
  *
  * Manages rectangle pre-computation, spatial indexing, and viewport culling.
  * Provides a clean API for renderers to consume rectangle data without coupling.
+ *
+ * Uses TemporalSegmentTree for O(log n) viewport culling.
+ * For O(n) legacy culling, use LegacyViewportCuller directly.
  */
 export class RectangleManager {
   /** Spatial index: all rectangles grouped by category */
@@ -77,80 +86,36 @@ export class RectangleManager {
   /** Map from LogEvent to RenderRectangle for search functionality */
   private rectMap: Map<LogEvent, PrecomputedRect> = new Map();
 
+  /** Segment tree for O(log n) viewport culling */
+  private segmentTree: TemporalSegmentTree;
+
   /**
    * @param events - Event tree to pre-compute rectangles from
    * @param categories - Set of valid categories for spatial indexing
    */
   constructor(events: LogEvent[], categories: Set<string>) {
     this.precomputeRectangles(events, categories);
+    this.segmentTree = new TemporalSegmentTree(this.rectsByCategory);
   }
 
   /**
-   * Get culled rectangles for current viewport.
-   * Runs viewport culling algorithm and returns rectangles ready for rendering.
+   * Get culled rectangles and buckets for current viewport.
+   * Uses TemporalSegmentTree for O(log n) performance.
+   *
+   * Events > MIN_RECT_SIZE (2px) are returned as visible rectangles.
+   * Events <= MIN_RECT_SIZE are aggregated into time-aligned buckets.
    *
    * @param viewport - Current viewport state
-   * @returns Culled rectangles grouped by category and in flat array
+   * @param batchColors - Optional colors from RenderBatch (for theme support)
+   * @returns CulledRenderData with visible rectangles, buckets, and stats
    *
-   * Performance target: <10ms for 50,000 events
+   * Performance target: <5ms for 50,000 events
    */
-  public getCulledRectangles(viewport: ViewportState): Map<string, PrecomputedRect[]> {
-    const bounds = this.calculateBounds(viewport);
-    const byCategory = new Map<string, PrecomputedRect[]>();
-
-    // Cache frequently accessed values as primitives
-    const zoom = viewport.zoom;
-    const boundsTimeStart = bounds.timeStart;
-    const boundsTimeEnd = bounds.timeEnd;
-    const depthStart = bounds.depthStart;
-    const depthEnd = bounds.depthEnd;
-    const minRectSize = TIMELINE_CONSTANTS.MIN_RECT_SIZE;
-
-    // Cull rectangles for each category
-    for (const [category, rectangles] of this.rectsByCategory) {
-      const culled: PrecomputedRect[] = [];
-      const len = rectangles.length;
-
-      for (let i = 0; i < len; i++) {
-        const rect = rectangles[i]!;
-
-        // Direct property access - avoid destructuring for performance
-        const rectTimeStart = rect.timeStart;
-        const rectTimeEnd = rect.timeEnd;
-        const rectDepth = rect.depth;
-        const rectDuration = rect.duration;
-
-        // Horizontal overlap check
-        if (rectTimeStart >= boundsTimeEnd || rectTimeEnd <= boundsTimeStart) {
-          continue;
-        }
-
-        // Depth culling
-        if (rectDepth < depthStart || rectDepth > depthEnd) {
-          continue;
-        }
-
-        // Calculate screen-space width
-        const screenWidth = rectDuration * zoom;
-
-        // Size culling
-        if (screenWidth < minRectSize) {
-          continue;
-        }
-
-        // Update rect screen position in-place (zero allocations)
-        rect.x = rectTimeStart * zoom;
-        rect.width = screenWidth;
-
-        culled.push(rect);
-      }
-
-      if (culled.length > 0) {
-        byCategory.set(category, culled);
-      }
-    }
-
-    return byCategory;
+  public getCulledRectangles(
+    viewport: ViewportState,
+    batchColors?: Map<string, BatchColorInfo>,
+  ): CulledRenderData {
+    return this.segmentTree.query(viewport, batchColors);
   }
 
   /**
@@ -161,6 +126,27 @@ export class RectangleManager {
    */
   public getRectMap(): Map<LogEvent, PrecomputedRect> {
     return this.rectMap;
+  }
+
+  /**
+   * Update batch colors for segment tree (for theme changes).
+   *
+   * @param batchColors - New batch colors from theme
+   */
+  public setBatchColors(batchColors: Map<string, BatchColorInfo>): void {
+    if (this.segmentTree) {
+      this.segmentTree.setBatchColors(batchColors);
+    }
+  }
+
+  /**
+   * Get spatial index of rectangles by category.
+   * Used for search functionality and segment tree construction.
+   *
+   * @returns Map of category to rectangles
+   */
+  public getRectsByCategory(): Map<string, PrecomputedRect[]> {
+    return this.rectsByCategory;
   }
 
   // ============================================================================
@@ -182,6 +168,12 @@ export class RectangleManager {
 
     // Flatten event tree into rectangles
     this.flattenEvents(events, 0);
+
+    // Sort rectangles by timeStart for early exit during culling
+    // This enables breaking out of the loop when we've passed the viewport
+    for (const rects of this.rectsByCategory.values()) {
+      rects.sort((a, b) => a.timeStart - b.timeStart);
+    }
   }
 
   /**
@@ -246,35 +238,5 @@ export class RectangleManager {
         }
       }
     }
-  }
-
-  /**
-   * Calculate viewport bounds for culling.
-   * Converts viewport state to time/depth ranges for efficient overlap checks.
-   *
-   * @param viewport - Current viewport state
-   * @returns Culling bounds in timeline coordinates
-   */
-  private calculateBounds(viewport: ViewportState): ViewportBounds {
-    const timeStart = viewport.offsetX / viewport.zoom;
-    const timeEnd = (viewport.offsetX + viewport.displayWidth) / viewport.zoom;
-
-    // World Y coordinates of visible region
-    // With scale.y = -1 flip and container.y = screen.height - offsetY:
-    // Screen renders worldY in range [-offsetY, screen.height - offsetY]
-    const worldYBottom = -viewport.offsetY; // Visible at screen bottom (lower depths)
-    const worldYTop = -viewport.offsetY + viewport.displayHeight; // Visible at screen top (higher depths)
-
-    // Convert to depth levels (depth 0 is at worldY = 0)
-    // An event at depth D occupies worldY = [D * HEIGHT, (D+1) * HEIGHT]
-    const depthStart = Math.floor(worldYBottom / TIMELINE_CONSTANTS.EVENT_HEIGHT);
-    const depthEnd = Math.floor(worldYTop / TIMELINE_CONSTANTS.EVENT_HEIGHT);
-
-    return {
-      timeStart,
-      timeEnd,
-      depthStart,
-      depthEnd,
-    };
   }
 }

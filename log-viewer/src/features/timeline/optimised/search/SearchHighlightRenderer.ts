@@ -10,10 +10,11 @@
  */
 
 import * as PIXI from 'pixi.js';
-import type { EventNode, ViewportState } from '../types/flamechart.types.js';
-import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
-import type { SearchCursor, SearchMatch } from '../types/search.types.js';
-import type { PrecomputedRect } from './RectangleManager.js';
+import type { EventNode, ViewportState } from '../../types/flamechart.types.js';
+import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
+import type { SearchCursor, SearchMatch } from '../../types/search.types.js';
+import { blendWithBackground } from '../BucketColorResolver.js';
+import type { PrecomputedRect } from '../RectangleManager.js';
 
 /**
  * Culling bounds derived from viewport.
@@ -33,15 +34,17 @@ interface CullingBounds {
 }
 
 /**
- * Highlight colors from VS Code theme.
+ * Highlight colors from VS Code theme (pre-blended opaque).
  */
 interface HighlightColors {
-  /** Color (0xRRGGBB) and alpha for all matches. */
-  matchColor: number;
-  matchAlpha: number;
-  /** Color (0xRRGGBB) and alpha for current match. */
+  /** Source color for current match (0xRRGGBB) - used for border. */
   currentMatchColor: number;
-  currentMatchAlpha: number;
+  /** Pre-blended opaque color for small event solid fill (0.6 opacity). */
+  smallEventFillColor: number;
+  /** Pre-blended opaque color for overlay fill (0.3 opacity). */
+  overlayFillColor: number;
+  /** Pre-blended opaque color for border stroke (0.9 opacity). */
+  borderStrokeColor: number;
 }
 
 /**
@@ -121,32 +124,26 @@ export class SearchHighlightRenderer {
 
     // Use different rendering based on whether minimum width is applied
     if (screenWidth < MIN_HIGHLIGHT_WIDTH) {
-      // Small event: solid fill with border color, no gap
+      // Small event: solid fill with pre-blended color (simulates 0.6 opacity)
       // This makes the expanded highlight more prominent and avoids visual complexity
       this.currentMatchGraphics.rect(centeredX, screenY, visibleWidth, screenHeight);
-      this.currentMatchGraphics.fill({
-        color: this.colors.currentMatchColor,
-        alpha: 0.6, // Solid fill for visibility
-      });
+      this.currentMatchGraphics.fill({ color: this.colors.smallEventFillColor });
     } else {
-      // Normal event: semi-transparent overlay with border (original style)
+      // Normal event: overlay with border (pre-blended opaque colors)
       const halfGap = TIMELINE_CONSTANTS.RECT_GAP / 2;
       const gappedWidth = Math.max(2, visibleWidth - TIMELINE_CONSTANTS.RECT_GAP);
       const gappedHeight = screenHeight - TIMELINE_CONSTANTS.RECT_GAP;
 
-      // Semi-transparent overlay
+      // Overlay fill with pre-blended color (simulates 0.3 opacity)
       this.currentMatchGraphics.rect(
         centeredX + halfGap,
         screenY + halfGap,
         gappedWidth,
         gappedHeight,
       );
-      this.currentMatchGraphics.fill({
-        color: this.colors.currentMatchColor,
-        alpha: 0.3, // Increased from 0.15 for better visibility
-      });
+      this.currentMatchGraphics.fill({ color: this.colors.overlayFillColor });
 
-      // Internal border
+      // Internal border with pre-blended color (simulates 0.9 opacity)
       const borderInset = 1;
       const borderX = centeredX + halfGap + borderInset;
       const borderY = screenY + halfGap + borderInset;
@@ -157,8 +154,7 @@ export class SearchHighlightRenderer {
         this.currentMatchGraphics.rect(borderX, borderY, borderWidth, borderHeight);
         this.currentMatchGraphics.stroke({
           width: 1,
-          color: this.colors.currentMatchColor,
-          alpha: 0.9, // Increased from 0.6 for more visible border
+          color: this.colors.borderStrokeColor,
         });
       }
     }
@@ -242,10 +238,10 @@ export class SearchHighlightRenderer {
   }
 
   /**
-   * Extract highlight colors from CSS variables.
+   * Extract highlight colors from CSS variables and pre-blend for opaque rendering.
    * Falls back to defaults if CSS variables not available.
    *
-   * @returns Highlight colors as PixiJS numeric values
+   * @returns Highlight colors as pre-blended opaque PixiJS numeric values
    */
   private extractColors(): HighlightColors {
     const computedStyle = getComputedStyle(document.documentElement);
@@ -254,59 +250,61 @@ export class SearchHighlightRenderer {
       computedStyle.getPropertyValue('--vscode-editor-findMatchBackground').trim() || '#ff9632';
 
     const c = this.parseColor(currentMatchColorStr);
+    const sourceColor = c.color;
+
+    // Pre-blend colors with background for opaque rendering
     return {
-      matchColor: 0x000000, // Unused in Chrome DevTools style
-      matchAlpha: 0,
-      currentMatchColor: c.color,
-      currentMatchAlpha: 0.15,
+      currentMatchColor: sourceColor,
+      smallEventFillColor: blendWithBackground(sourceColor, 0.6),
+      overlayFillColor: blendWithBackground(sourceColor, 0.3),
+      borderStrokeColor: blendWithBackground(sourceColor, 0.9),
     };
   }
 
   /**
-   * Parse CSS color string to PixiJS numeric color.
-   * Handles hex format (#RGB, #RGBA, #RRGGBB, #RRGGBBAA) and falls back to default.
+   * Parse CSS color string to PixiJS numeric color (RGB only, ignoring alpha).
+   * Handles hex format (#RGB, #RGBA, #RRGGBB, #RRGGBBAA) and rgb(a) formats.
+   * Alpha is intentionally ignored - highlight opacities are fixed for visibility.
    *
    * @param cssColor - CSS color string
    * @returns PixiJS numeric color (0xRRGGBB)
    */
-  private parseColor(cssColor: string): { color: number; alpha: number } {
+  private parseColor(cssColor: string): { color: number } {
     if (!cssColor) {
-      return { color: 0xea5c00, alpha: 0.35 };
+      return { color: 0xea5c00 };
     }
     if (cssColor.startsWith('#')) {
       const hex = cssColor.slice(1);
       if (hex.length === 8) {
+        // #RRGGBBAA - extract RGB, ignore alpha
         const rgb = hex.slice(0, 6);
-        const a = parseInt(hex.slice(6, 8), 16) / 255;
-        return { color: parseInt(rgb, 16), alpha: a };
+        return { color: parseInt(rgb, 16) };
       }
       if (hex.length === 6) {
-        return { color: parseInt(hex, 16), alpha: 1 };
+        return { color: parseInt(hex, 16) };
       }
       if (hex.length === 4) {
+        // #RGBA - extract RGB, ignore alpha
         const r = hex[0]!;
         const g = hex[1]!;
         const b = hex[2]!;
-        const a = hex[3]!;
-        const alpha = parseInt(a + a, 16) / 255;
-        return { color: parseInt(r + r + g + g + b + b, 16), alpha };
+        return { color: parseInt(r + r + g + g + b + b, 16) };
       }
       if (hex.length === 3) {
         const r = hex[0]!;
         const g = hex[1]!;
         const b = hex[2]!;
-        return { color: parseInt(r + r + g + g + b + b, 16), alpha: 1 };
+        return { color: parseInt(r + r + g + g + b + b, 16) };
       }
     }
-    // rgba() fallback
+    // rgba() fallback - ignore alpha
     const rgba = cssColor.match(/rgba?\((\d+),(\d+),(\d+)(?:,(\d*(?:\.\d+)?))?\)/);
     if (rgba) {
       const r = parseInt(rgba[1]!, 10);
       const g = parseInt(rgba[2]!, 10);
       const b = parseInt(rgba[3]!, 10);
-      const a = rgba[4] ? parseFloat(rgba[4]!) : 1;
-      return { color: (r << 16) | (g << 8) | b, alpha: a };
+      return { color: (r << 16) | (g << 8) | b };
     }
-    return { color: 0xea5c00, alpha: 0.35 };
+    return { color: 0xea5c00 };
   }
 }

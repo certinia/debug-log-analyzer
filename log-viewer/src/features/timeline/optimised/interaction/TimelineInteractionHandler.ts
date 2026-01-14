@@ -9,7 +9,7 @@
  * Manages zoom (wheel), pan (drag), and event selection.
  */
 
-import type { TimelineViewport } from './TimelineViewport.js';
+import type { TimelineViewport } from '../TimelineViewport.js';
 
 /**
  * Configuration for interaction behavior.
@@ -348,7 +348,7 @@ export class TimelineInteractionHandler {
   /**
    * Handle mouse up - end drag operation.
    */
-  private handleMouseUp(_event: MouseEvent): void {
+  private handleMouseUp(event: MouseEvent): void {
     if (!this.isDragging) {
       return;
     }
@@ -357,6 +357,16 @@ export class TimelineInteractionHandler {
 
     // Restore cursor based on whether we're over an event
     this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+
+    // Update mouse position for hover effects after drag ends
+    // This ensures tooltip state is updated immediately when panning stops
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    if (this.callbacks.onMouseMove) {
+      this.callbacks.onMouseMove(mouseX, mouseY);
+    }
   }
 
   /**
@@ -380,9 +390,18 @@ export class TimelineInteractionHandler {
   }
 
   /**
-   * Handle mouse leave - notify when cursor exits canvas.
+   * Handle mouse leave - end drag and notify when cursor exits canvas.
    */
   private handleMouseLeave(_event: MouseEvent): void {
+    // End any active drag operation when cursor leaves canvas
+    if (this.isDragging) {
+      this.isDragging = false;
+      this.canvas.style.cursor = 'grab';
+    }
+
+    // Reset mouse down state
+    this.isMouseDown = false;
+
     if (this.callbacks.onMouseLeave) {
       this.callbacks.onMouseLeave();
     }
@@ -465,6 +484,16 @@ export class TimelineInteractionHandler {
 
     // Restore cursor
     this.canvas.style.cursor = 'grab';
+
+    // Update position for hover effects after touch ends
+    // Use last tracked touch position since changedTouches may not have coordinates
+    if (this.callbacks.onMouseMove) {
+      const rect = this.canvas.getBoundingClientRect();
+      // Use the last known touch position converted to canvas coordinates
+      const mouseX = this.lastTouchX - rect.left;
+      const mouseY = this.lastTouchY - rect.top;
+      this.callbacks.onMouseMove(mouseX, mouseY);
+    }
   }
 
   // ============================================================================

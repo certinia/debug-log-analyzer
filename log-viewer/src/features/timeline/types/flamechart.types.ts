@@ -109,11 +109,8 @@ export interface RenderBatch {
   /** Event category this batch represents. */
   category: LogSubCategory;
 
-  /** PixiJS color value (0xRRGGBB). */
+  /** PixiJS color value (0xRRGGBB) - pre-blended opaque. */
   color: number;
-
-  /** Alpha transparency (0-1). */
-  alpha?: number;
 
   /** Rectangles to render (only visible events). */
   rectangles: PrecomputedRect[];
@@ -159,6 +156,9 @@ export interface TimelineState {
   /** Render batches (7 categories). */
   batches: Map<LogSubCategory, RenderBatch>;
 
+  /** Cached batch colors for bucket color resolution (performance optimization). */
+  batchColorsCache: Map<string, { color: number }>;
+
   /** Interaction state. */
   interaction: {
     isDragging: boolean;
@@ -201,10 +201,94 @@ export interface TimelineOptions {
     caseSensitive?: boolean;
   };
 
+  /**
+   * Renderer type: 'sprite' or 'mesh'.
+   * - 'sprite': Uses SpritePool with shared texture (proven approach)
+   * - 'mesh': Uses custom mesh with vertex colors (potentially faster for large datasets)
+   * Default: 'mesh' for testing, can be changed to 'sprite' for comparison.
+   */
+  renderer?: 'sprite' | 'mesh';
+
   /** Event handlers for user interactions. */
   onEventClick?: (event: LogEvent) => void;
   onEventHover?: (event: LogEvent | null) => void;
   onViewportChange?: (viewport: ViewportState) => void;
+}
+
+// ============================================================================
+// SUB-PIXEL BUCKET TYPES
+// ============================================================================
+
+/**
+ * Aggregated statistics for a single category within a bucket.
+ */
+export interface CategoryAggregation {
+  /** Number of events of this category */
+  count: number;
+  /** Total duration in nanoseconds */
+  totalDuration: number;
+}
+
+/**
+ * Statistics per category for color resolution.
+ */
+export interface CategoryStats {
+  /** Map of category name to aggregated stats */
+  byCategory: Map<string, CategoryAggregation>;
+  /** Winning category after priority/duration/count resolution */
+  dominantCategory: string;
+}
+
+/**
+ * A 2px-wide aggregation of sub-pixel events at a specific depth.
+ */
+export interface PixelBucket {
+  /** Unique identifier: bucket-{depth}-{bucketIndex} */
+  id: string;
+  /** Screen X position (timeStart * zoom - offsetX) */
+  x: number;
+  /** Screen Y position (depth * EVENT_HEIGHT) */
+  y: number;
+  /** Start time in nanoseconds (time-aligned boundary) */
+  timeStart: number;
+  /** End time in nanoseconds */
+  timeEnd: number;
+  /** Call stack depth (0-indexed) */
+  depth: number;
+  /** Number of aggregated events */
+  eventCount: number;
+  /** Per-category statistics */
+  categoryStats: CategoryStats;
+  /** Source event references for tooltip/click */
+  eventRefs: LogEvent[];
+  /** Resolved display color (hex number) - pre-blended opaque color for rendering */
+  color: number;
+}
+
+/**
+ * Statistics about the current render pass.
+ */
+export interface RenderStats {
+  /** Events rendered normally (> 2px) */
+  visibleCount: number;
+  /** Events aggregated into buckets (≤ 2px) */
+  bucketedEventCount: number;
+  /** Number of buckets created */
+  bucketCount: number;
+  /** Max events in any single bucket */
+  maxEventsPerBucket: number;
+}
+
+/**
+ * Return type from getCulledRectangles() with bucket support.
+ */
+export interface CulledRenderData {
+  /** Events > 2px screen width - render normally, keyed by category */
+  visibleRects: Map<string, PrecomputedRect[]>;
+  /** Aggregated buckets for events ≤ 2px, keyed by category */
+  buckets: Map<string, PixelBucket[]>;
+  /** Render statistics */
+  stats: RenderStats;
 }
 
 // ============================================================================
@@ -220,8 +304,8 @@ export const TIMELINE_CONSTANTS = {
   /** Height of each event rectangle in pixels. */
   EVENT_HEIGHT: 15,
 
-  /** Minimum rectangle width in pixels before culling. */
-  MIN_RECT_SIZE: 0.5,
+  /** Minimum rectangle width in pixels before culling (events below this go to buckets). */
+  MIN_RECT_SIZE: 2,
 
   /** Gap between rectangles in pixels (negative space separation). */
   RECT_GAP: 1,
@@ -249,6 +333,58 @@ export const TIMELINE_CONSTANTS = {
   },
 } as const;
 /* eslint-enable @typescript-eslint/naming-convention */
+
+// ============================================================================
+// BUCKET RENDERING CONSTANTS
+// ============================================================================
+
+/**
+ * Constants for sub-pixel bucket rendering (barcode pattern).
+ */
+/* eslint-disable @typescript-eslint/naming-convention */
+export const BUCKET_CONSTANTS = {
+  /** Total bucket width in pixels (block + gap) */
+  BUCKET_WIDTH: 2,
+
+  /** Width of the rendered block within a bucket */
+  BUCKET_BLOCK_WIDTH: 1,
+
+  /** Gap after the block (implicit - just don't draw) */
+  BUCKET_GAP_WIDTH: 1,
+
+  /** Opacity settings for density visualization */
+  OPACITY: {
+    /** Minimum opacity for buckets with 1 event */
+    MIN: 0.3,
+    /** Maximum opacity for saturated buckets */
+    MAX: 0.9,
+    /** Opacity range (MAX - MIN) */
+    RANGE: 0.6,
+    /** Event count at which opacity saturates */
+    SATURATION_COUNT: 100,
+  },
+
+  /**
+   * Category priority order for bucket color resolution (highest priority first).
+   * When multiple categories exist in a bucket, highest priority wins.
+   * Tie-breakers: total duration → event count
+   */
+  CATEGORY_PRIORITY: [
+    'DML',
+    'SOQL',
+    'Method',
+    'Code Unit',
+    'System Method',
+    'Flow',
+    'Workflow',
+  ] as const,
+} as const;
+/* eslint-enable @typescript-eslint/naming-convention */
+
+/**
+ * Type for category names in priority order.
+ */
+export type BucketCategoryPriority = (typeof BUCKET_CONSTANTS.CATEGORY_PRIORITY)[number];
 
 // ============================================================================
 // ERROR HANDLING
@@ -472,3 +608,89 @@ export interface FindResultsEventDetail {
   /** Total number of matches found. */
   totalMatches: number;
 }
+
+// ============================================================================
+// TEMPORAL SEGMENT TREE TYPES
+// ============================================================================
+
+/**
+ * Node in the temporal segment tree.
+ *
+ * Leaf nodes represent individual events; branch nodes aggregate children.
+ * The tree is used for O(log n) viewport culling and bucket aggregation,
+ * replacing the per-frame O(n) iteration in RectangleManager.
+ *
+ * Key optimization: Pre-computed category stats enable instant bucket
+ * rendering without recalculating aggregates per frame.
+ */
+export interface SegmentNode {
+  // Time bounds (nanoseconds)
+  /** Start time of this node's span (nanoseconds) */
+  timeStart: number;
+  /** End time of this node's span (nanoseconds) */
+  timeEnd: number;
+
+  /** Time span = timeEnd - timeStart (nanoseconds) */
+  nodeSpan: number;
+
+  // Category statistics (for tooltips and color resolution)
+  /** Per-category event counts and durations */
+  categoryStats: Map<string, CategoryAggregation>;
+  /** Winning category after priority/duration/count resolution */
+  dominantCategory: string;
+  /** Pre-computed priority for dominantCategory (avoids map lookup during query) */
+  dominantPriority: number;
+
+  // Event tracking
+  /** Total event count in this subtree */
+  eventCount: number;
+  /** For leaf nodes only: reference to source event */
+  eventRef?: LogEvent;
+  /** For leaf nodes only: direct reference to PrecomputedRect (avoids O(n) lookup) */
+  rectRef?: PrecomputedRect;
+
+  // Tree structure
+  /** Child nodes (null for leaf nodes) */
+  children: SegmentNode[] | null;
+  /** Whether this is a leaf node */
+  isLeaf: boolean;
+
+  // Y position (pre-computed based on depth)
+  /** Screen Y position = depth * EVENT_HEIGHT */
+  y: number;
+  /** Call stack depth (0-indexed) */
+  depth: number;
+}
+
+/**
+ * Result from segment tree query.
+ * Same shape as CulledRenderData for easy integration.
+ */
+export interface SegmentTreeQueryResult {
+  /** Events > threshold screen width - render as rectangles */
+  visibleRects: Map<string, PrecomputedRect[]>;
+  /** Aggregated nodes for events <= threshold - render as buckets, keyed by category */
+  buckets: Map<string, PixelBucket[]>;
+  /** Render statistics */
+  stats: RenderStats;
+}
+
+/**
+ * Constants for segment tree construction and traversal.
+ */
+/* eslint-disable @typescript-eslint/naming-convention */
+export const SEGMENT_TREE_CONSTANTS = {
+  /**
+   * Branching factor for tree construction.
+   * 4 provides a good balance between tree height (log4(n) levels)
+   * and cache efficiency (4 children fit in a cache line).
+   */
+  BRANCHING_FACTOR: 4,
+
+  /**
+   * Minimum node span (nanoseconds) to avoid degenerate trees.
+   * Events shorter than this are treated as having this duration.
+   */
+  MIN_NODE_SPAN: 1,
+} as const;
+/* eslint-enable @typescript-eslint/naming-convention */

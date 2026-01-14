@@ -77,8 +77,8 @@ describe('EventBatchRenderer', () => {
     rectangleManager = new RectangleManager(events, categories);
     renderer = new EventBatchRenderer(container, batches);
 
-    const culledRects = rectangleManager.getCulledRectangles(viewport);
-    renderer.render(culledRects);
+    const { visibleRects, buckets } = rectangleManager.getCulledRectangles(viewport);
+    renderer.render(visibleRects, buckets);
   }
 
   beforeEach(() => {
@@ -122,18 +122,20 @@ describe('EventBatchRenderer', () => {
   });
 
   describe('initialization', () => {
-    it('should create Graphics objects for each batch', () => {
+    it('should create a SpritePool container', () => {
       renderer = new EventBatchRenderer(container, batches);
 
-      expect(container.children).toHaveLength(3);
-      expect(container.children.every((child) => child instanceof PIXI.Graphics)).toBe(true);
+      // SpritePool creates a container for sprites
+      expect(container.children).toHaveLength(1);
+      expect(container.children[0] instanceof PIXI.Container).toBe(true);
     });
 
-    it('should handle empty batches', () => {
+    it('should create SpritePool container with empty batches', () => {
       const emptyBatches = new Map<string, RenderBatch>();
       renderer = new EventBatchRenderer(container, emptyBatches);
 
-      expect(container.children).toHaveLength(0);
+      // SpritePool container is still created
+      expect(container.children).toHaveLength(1);
     });
   });
 
@@ -322,7 +324,7 @@ describe('EventBatchRenderer', () => {
 
     it('should render events that meet minimum size threshold', () => {
       const events = [
-        createEvent(0, 1, 'Method'), // Width = 1px at zoom=1
+        createEvent(0, 3, 'Method'), // Width = 3px at zoom=1 (> MIN_RECT_SIZE = 2px)
       ];
 
       const viewport = createViewport(1, 0, 0);
@@ -454,8 +456,9 @@ describe('EventBatchRenderer', () => {
 
       // Second render with different viewport (should recalculate)
       const viewport2 = createViewport(1, 150, 0); // Pan to cull first event
-      const culledRects2 = rectangleManager.getCulledRectangles(viewport2);
-      renderer.render(culledRects2);
+      const { visibleRects: visibleRects2, buckets: buckets2 } =
+        rectangleManager.getCulledRectangles(viewport2);
+      renderer.render(visibleRects2, buckets2);
       expect(batches.get('Method')?.rectangles).toHaveLength(1);
     });
   });
@@ -503,14 +506,14 @@ describe('EventBatchRenderer', () => {
   });
 
   describe('cleanup', () => {
-    it('should destroy all Graphics objects', () => {
+    it('should destroy SpritePool and remove all children', () => {
       renderer = new EventBatchRenderer(container, batches);
 
       const childrenCount = container.children.length;
       expect(childrenCount).toBeGreaterThan(0);
 
       renderer.destroy();
-      // After destruction, graphics are removed from their parent
+      // After destruction, SpritePool container is removed
       // Container should have no children
       expect(container.children.length).toBe(0);
     });
@@ -541,9 +544,9 @@ describe('EventBatchRenderer', () => {
     });
 
     it('should render events when they meet minimum size threshold after zoom', () => {
-      const events = [createEvent(0, 100, 'Method')];
+      const events = [createEvent(0, 300, 'Method')];
 
-      // Zoom in so screenWidth = 100 * 0.01 = 1px (> MIN_RECT_SIZE = 0.5px)
+      // Zoom in so screenWidth = 300 * 0.01 = 3px (> MIN_RECT_SIZE = 2px)
       const viewport = createViewport(0.01, 0, 0);
       setupAndRender(events, viewport);
 

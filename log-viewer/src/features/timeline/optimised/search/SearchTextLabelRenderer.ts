@@ -7,22 +7,26 @@
  *
  * Renders text labels with search-aware styling using composition.
  * Delegates matched event labels to TextLabelRenderer (full opacity).
- * Renders non-matched event labels itself (dimmed at 0.4 alpha).
+ * Renders non-matched event labels itself with muted colors (no alpha).
  *
  * Architecture:
- * - Uses TextLabelRenderer for matched text (full opacity 1.0)
- * - Manages own container/labels for unmatched text (dimmed 0.4)
+ * - Uses TextLabelRenderer for matched text (original bright colors)
+ * - Manages own container/labels for unmatched text (muted colors)
  * - No font loading needed (shares font with TextLabelRenderer)
  */
 
 import { BitmapText, Container } from 'pixi.js';
-import type { RenderBatch, ViewportState } from '../types/flamechart.types.js';
-import { TEXT_LABEL_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
-import type { PrecomputedRect } from './RectangleManager.js';
-import type { TextLabelRenderer } from './TextLabelRenderer.js';
+import type { RenderBatch, ViewportState } from '../../types/flamechart.types.js';
+import { TEXT_LABEL_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
+import type { PrecomputedRect } from '../RectangleManager.js';
+import type { TextLabelRenderer } from '../TextLabelRenderer.js';
 
-/** Alpha value for dimmed (non-matched) labels */
-const DIMMED_ALPHA = 0.4;
+/**
+ * Dimmed text colors (pre-computed for opaque rendering).
+ * These approximate the visual appearance of TEXT_LABEL_CONSTANTS.FONT colors at 0.4 alpha.
+ */
+const DIMMED_DARK_THEME_COLOR = 0x6b6b6b; // Dimmed light text for dark backgrounds
+const DIMMED_LIGHT_THEME_COLOR = 0x9e9e9e; // Dimmed dark text for light backgrounds
 
 /**
  * SearchTextLabelRenderer
@@ -179,12 +183,11 @@ export class SearchTextLabelRenderer {
         label.text = truncated;
         label.x = labelX;
         label.y = rect.y + fontYPositionOffset;
-        label.alpha = DIMMED_ALPHA;
 
-        // Apply contrasting text color based on background
+        // Apply dimmed contrasting text color based on background (opaque - no alpha)
         const batch = this.batches.get(rect.category);
         if (batch) {
-          label.tint = this.getContrastingTextColor(batch.color);
+          label.tint = this.getDimmedContrastingTextColor(batch.color);
         }
 
         label.visible = true;
@@ -249,13 +252,14 @@ export class SearchTextLabelRenderer {
   }
 
   /**
-   * Calculate contrasting text color based on background luminance.
+   * Calculate dimmed contrasting text color based on background luminance.
    * Uses W3C relative luminance formula for accessibility compliance.
+   * Returns a muted color instead of using alpha for dimming.
    *
    * @param bgColor - Background color in PixiJS format (0xRRGGBB)
-   * @returns Dark text color for light backgrounds, light text color for dark backgrounds
+   * @returns Dimmed text color for better performance (opaque - no alpha)
    */
-  private getContrastingTextColor(bgColor: number): number {
+  private getDimmedContrastingTextColor(bgColor: number): number {
     const r = ((bgColor >> 16) & 0xff) / 255;
     const g = ((bgColor >> 8) & 0xff) / 255;
     const b = (bgColor & 0xff) / 255;
@@ -268,10 +272,8 @@ export class SearchTextLabelRenderer {
     // W3C relative luminance formula
     const luminance = 0.2126 * rLin + 0.7152 * gLin + 0.0722 * bLin;
 
-    // Use dark text for light backgrounds, light text for dark backgrounds
+    // Use dimmed colors based on background luminance (opaque - no alpha)
     // Threshold of 0.179 corresponds to ~50% perceived brightness
-    return luminance > 0.179
-      ? TEXT_LABEL_CONSTANTS.FONT.LIGHT_THEME_COLOR
-      : TEXT_LABEL_CONSTANTS.FONT.DARK_THEME_COLOR;
+    return luminance > 0.179 ? DIMMED_LIGHT_THEME_COLOR : DIMMED_DARK_THEME_COLOR;
   }
 }

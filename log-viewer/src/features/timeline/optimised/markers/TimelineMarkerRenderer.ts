@@ -5,19 +5,31 @@
 /**
  * TimelineMarkerRenderer
  *
- * Renders marker indicators as vertical bands behind the timeline.
+ * Renders marker indicators as vertical bands behind the timeline using PixiJS Sprites.
  * Handles time-range visualization, viewport culling, and severity-based stacking.
+ *
+ * Performance optimizations:
+ * - Uses SpritePool with shared 1x1 white texture for automatic GPU batching
+ * - Sprites are pooled and reused (no GC overhead after warmup)
+ * - Color applied via sprite.tint (pre-blended opaque colors)
  */
 
-import * as PIXI from 'pixi.js';
-import type { MarkerType, TimelineMarker } from '../types/flamechart.types.js';
-import {
-  MARKER_ALPHA,
-  MARKER_COLORS,
-  SEVERITY_ORDER,
-  SEVERITY_RANK,
-} from '../types/flamechart.types.js';
-import type { TimelineViewport } from './TimelineViewport.js';
+import type { Container } from 'pixi.js';
+import type { MarkerType, TimelineMarker } from '../../types/flamechart.types.js';
+import { MARKER_ALPHA, MARKER_COLORS, SEVERITY_RANK } from '../../types/flamechart.types.js';
+import { blendWithBackground } from '../BucketColorResolver.js';
+import { SpritePool } from '../SpritePool.js';
+import type { TimelineViewport } from '../TimelineViewport.js';
+
+/**
+ * Pre-blended opaque marker colors (MARKER_COLORS blended at MARKER_ALPHA opacity).
+ * Computed once at module load time for performance.
+ */
+const MARKER_COLORS_BLENDED: Record<MarkerType, number> = {
+  error: blendWithBackground(MARKER_COLORS.error, MARKER_ALPHA),
+  skip: blendWithBackground(MARKER_COLORS.skip, MARKER_ALPHA),
+  unexpected: blendWithBackground(MARKER_COLORS.unexpected, MARKER_ALPHA),
+};
 
 /**
  * Internal representation of a marker indicator's visual state.
@@ -33,19 +45,19 @@ interface MarkerIndicator {
 }
 
 /**
- * Renders marker indicators as semi-transparent vertical bands.
+ * Renders marker indicators as semi-transparent vertical bands using sprites.
  *
  * Architecture:
- * - Creates 3 Graphics objects (one per severity level) for proper z-index stacking
- * - Renders in SEVERITY_ORDER (skip → unexpected → error) so error appears on top
+ * - Uses single SpritePool for efficient rendering
+ * - Renders in severity order (skip → unexpected → error) via z-ordering
  * - Culls off-screen indicators for performance
  * - Calculates end times for markers with null endTime
  */
 export class TimelineMarkerRenderer {
-  private container: PIXI.Container;
+  private container: Container;
   private viewport: TimelineViewport;
   private markers: readonly TimelineMarker[];
-  private graphicsBySeverity: Map<MarkerType, PIXI.Graphics> = new Map();
+  private spritePool: SpritePool;
   private visibleIndicators: MarkerIndicator[] = [];
 
   /**
@@ -55,7 +67,7 @@ export class TimelineMarkerRenderer {
    * @param viewport - Viewport manager for coordinate transforms
    * @param markers - Array of markers from parser
    */
-  constructor(container: PIXI.Container, viewport: TimelineViewport, markers: TimelineMarker[]) {
+  constructor(container: Container, viewport: TimelineViewport, markers: TimelineMarker[]) {
     this.container = container;
     this.viewport = viewport;
 
@@ -67,20 +79,8 @@ export class TimelineMarkerRenderer {
       return SEVERITY_RANK[b.type] - SEVERITY_RANK[a.type];
     });
 
-    this.initialize();
-  }
-
-  /**
-   * Initializes Graphics objects for each severity level.
-   * Creates in SEVERITY_ORDER so error renders last (on top).
-   */
-  private initialize(): void {
-    // Import constants at runtime to avoid circular dependency
-    for (const type of SEVERITY_ORDER) {
-      const graphics = new PIXI.Graphics();
-      this.graphicsBySeverity.set(type, graphics);
-      this.container.addChild(graphics);
-    }
+    // Create sprite pool for marker rendering
+    this.spritePool = new SpritePool(container);
   }
 
   /**
@@ -90,7 +90,7 @@ export class TimelineMarkerRenderer {
    * 1. Cull markers outside viewport
    * 2. Resolve end times with overlap prevention
    * 3. Transform to screen coordinates
-   * 4. Group by type and draw rectangles
+   * 4. Render as sprites with tinted colors
    *
    * Overlap behavior:
    * - Higher priority marker takes precedence (error > unexpected > skip)
@@ -99,10 +99,8 @@ export class TimelineMarkerRenderer {
    * Performance: <10ms target for typical logs (<10 markers)
    */
   public render(): void {
-    // Clear all Graphics objects
-    for (const graphics of this.graphicsBySeverity.values()) {
-      graphics.clear();
-    }
+    // Release all sprites back to pool
+    this.spritePool.releaseAll();
 
     // Early exit if no markers
     if (this.markers.length === 0) {
@@ -144,54 +142,37 @@ export class TimelineMarkerRenderer {
         continue;
       }
 
-      // Create indicator record
+      // Create indicator record with pre-blended opaque color
       const indicator: MarkerIndicator = {
         marker,
         resolvedEndTime,
         screenStartX: worldStartX,
         screenEndX: worldEndX,
         screenWidth: worldWidth,
-        color: MARKER_COLORS[marker.type],
+        color: MARKER_COLORS_BLENDED[marker.type],
         isVisible: true,
       };
 
       this.visibleIndicators.push(indicator);
     }
 
-    // T010: Draw rectangles - no overlaps now, all markers can be drawn
-    for (const graphics of this.graphicsBySeverity.values()) {
-      graphics.clear();
-    }
-
-    // Draw all indicators (overlap prevention already handled above)
     // Apply 1px gap for negative space separation between adjacent markers
     const gap = 1;
     const halfGap = gap / 2;
+    const viewportState = this.viewport.getState();
 
+    // Draw all indicators as sprites
     for (const indicator of this.visibleIndicators) {
-      const graphics = this.graphicsBySeverity.get(indicator.marker.type);
-      if (!graphics) {
-        continue;
-      }
-
-      // Draw vertical band spanning full viewport height with negative space
-      const viewportState = this.viewport.getState();
-      graphics.setFillStyle({
-        color: indicator.color,
-        alpha: MARKER_ALPHA,
-      });
+      const sprite = this.spritePool.acquire();
 
       // Apply gap to create separation between adjacent markers
       const gappedX = indicator.screenStartX + halfGap;
       const gappedWidth = Math.max(0, indicator.screenWidth - gap);
 
-      graphics.rect(
-        gappedX,
-        0, // Start at top of timeline
-        gappedWidth,
-        viewportState.displayHeight, // Span full height
-      );
-      graphics.fill();
+      sprite.position.set(gappedX, 0);
+      sprite.width = gappedWidth;
+      sprite.height = viewportState.displayHeight;
+      sprite.tint = indicator.color;
     }
   }
 
@@ -253,13 +234,11 @@ export class TimelineMarkerRenderer {
   }
 
   /**
-   * Cleans up GPU resources and removes from container.
+   * Cleans up sprite pool and removes from container.
    * Must be called before discarding the renderer.
    */
   public destroy(): void {
-    for (const graphics of this.graphicsBySeverity.values()) {
-      graphics.destroy();
-    }
+    this.spritePool.destroy();
     this.container.destroy();
   }
 }

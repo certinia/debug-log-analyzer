@@ -15,9 +15,9 @@
  * - Track current search state
  */
 
-import type { EventNode, TreeNode } from '../types/flamechart.types.js';
-import type { SearchCursor, SearchMatch, SearchOptions } from '../types/search.types.js';
-import type { PrecomputedRect } from './RectangleManager.js';
+import type { EventNode, TreeNode } from '../../types/flamechart.types.js';
+import type { SearchCursor, SearchMatch, SearchOptions } from '../../types/search.types.js';
+import type { PrecomputedRect } from '../RectangleManager.js';
 import { SearchCursorImpl } from './SearchCursor.js';
 
 export class SearchManager<E extends EventNode> {
