@@ -56,10 +56,10 @@ function createViewport(
 function getAllBuckets(
   bucketsMap: Map<
     string,
-    { id: string; x: number; y: number; eventCount: number; color: number }[]
+    { id: number; x: number; y: number; eventCount: number; color: number }[]
   >,
-): { id: string; x: number; y: number; eventCount: number; color: number }[] {
-  const allBuckets: { id: string; x: number; y: number; eventCount: number; color: number }[] = [];
+): { id: number; x: number; y: number; eventCount: number; color: number }[] {
+  const allBuckets: { id: number; x: number; y: number; eventCount: number; color: number }[] = [];
   for (const buckets of bucketsMap.values()) {
     allBuckets.push(...buckets);
   }

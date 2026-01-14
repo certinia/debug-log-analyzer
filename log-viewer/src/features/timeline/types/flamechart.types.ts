@@ -638,6 +638,8 @@ export interface SegmentNode {
   categoryStats: Map<string, CategoryAggregation>;
   /** Winning category after priority/duration/count resolution */
   dominantCategory: string;
+  /** Pre-computed priority for dominantCategory (avoids map lookup during query) */
+  dominantPriority: number;
 
   // Event tracking
   /** Total event count in this subtree */

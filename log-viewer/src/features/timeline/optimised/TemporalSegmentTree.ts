@@ -53,6 +53,17 @@ const PRIORITY_MAP = new Map<string, number>(
  * Manages separate trees per depth level for efficient viewport culling.
  * Each depth level has its own independent time series of events.
  */
+/** Bucket type used during aggregation */
+type AggregationBucket = {
+  depth: number;
+  bucketIndex: number;
+  timeStart: number;
+  timeEnd: number;
+  eventCount: number;
+  categoryStats: Map<string, CategoryAggregation>;
+  dominantCategory: string; // Resolved after all nodes aggregated
+};
+
 export class TemporalSegmentTree {
   /** Tree root per depth level: Map<depth, rootNode> */
   private treesByDepth: Map<number, SegmentNode> = new Map();
@@ -123,35 +134,21 @@ export class TemporalSegmentTree {
 
     // Bucket aggregation map: keyed by (depth << 24) | bucketIndex
     // This matches the legacy RectangleManager approach for grid-aligned buckets
-    const bucketMap = new Map<
-      number,
-      {
-        depth: number;
-        bucketIndex: number;
-        timeStart: number;
-        timeEnd: number;
-        eventCount: number;
-        categoryStats: Map<string, CategoryAggregation>;
-        // Track dominant category during aggregation to avoid recomputation
-        dominantCategory: string;
-        dominantPriority: number;
-        dominantDuration: number;
-        dominantCount: number;
-      }
-    >();
+    const bucketMap = new Map<number, AggregationBucket>();
 
     // Stats tracking - using mutable object to avoid callback overhead
     const stats = { visibleCount: 0, bucketedEventCount: 0 };
 
     // Query each visible depth level
-    for (let depth = bounds.depthStart; depth <= bounds.depthEnd; depth++) {
+    const { depthStart, depthEnd, timeStart, timeEnd } = bounds;
+    for (let depth = depthStart; depth <= depthEnd; depth++) {
       const tree = this.treesByDepth.get(depth);
       if (!tree) continue;
 
       this.queryNode(
         tree,
-        bounds.timeStart,
-        bounds.timeEnd,
+        timeStart,
+        timeEnd,
         bucketTimeWidth, // threshold
         bucketTimeWidth,
         viewport,
@@ -161,33 +158,39 @@ export class TemporalSegmentTree {
       );
     }
 
-    // Single-pass: Convert bucketMap to PixelBuckets grouped by category
+    // Convert bucketMap to PixelBuckets grouped by category
+    // Resolve dominant category for each bucket from its aggregated stats
     let maxEventsPerBucket = 0;
     let bucketCount = 0;
 
     for (const [key, bucket] of bucketMap) {
-      maxEventsPerBucket = Math.max(maxEventsPerBucket, bucket.eventCount);
+      const { eventCount, categoryStats } = bucket;
+      maxEventsPerBucket = Math.max(maxEventsPerBucket, eventCount);
+
+      // Resolve dominant category from aggregated stats
+      const dominantCategory = this.resolveDominantCategory(categoryStats);
 
       // Get pre-initialized category array (skip unknown categories)
-      const categoryBuckets = bucketsByCategory.get(bucket.dominantCategory);
+      const categoryBuckets = bucketsByCategory.get(dominantCategory);
       if (!categoryBuckets) continue;
 
       // Get cached base color (skip unknown categories)
-      const baseColor = categoryBaseColors.get(bucket.dominantCategory);
+      const baseColor = categoryBaseColors.get(dominantCategory);
       if (baseColor === undefined) continue;
 
+      const { bucketIndex, depth, timeStart, timeEnd } = bucket;
       categoryBuckets.push({
         id: `bucket-${key}`,
         // Grid-aligned X position: bucketIndex * BUCKET_WIDTH (always on 2px grid)
-        x: bucket.bucketIndex * BUCKET_CONSTANTS.BUCKET_WIDTH,
-        y: bucket.depth * eventHeight,
-        timeStart: bucket.timeStart,
-        timeEnd: bucket.timeEnd,
-        depth: bucket.depth,
-        eventCount: bucket.eventCount,
+        x: bucketIndex * BUCKET_CONSTANTS.BUCKET_WIDTH,
+        y: depth * eventHeight,
+        timeStart,
+        timeEnd,
+        depth,
+        eventCount,
         categoryStats: {
-          byCategory: bucket.categoryStats,
-          dominantCategory: bucket.dominantCategory,
+          byCategory: categoryStats,
+          dominantCategory,
         },
         // Event refs are expensive to collect - leave empty for multi-event buckets
         eventRefs: [],
@@ -257,11 +260,10 @@ export class TemporalSegmentTree {
       return null;
     }
 
-    // Sort by timestamp (O(n log n))
-    const sorted = [...rects].sort((a, b) => a.timeStart - b.timeStart);
-
     // Create leaf nodes (O(n))
-    const leaves = sorted.map((rect) => this.createLeafNode(rect, depth));
+    const leaves = rects
+      .map((rect) => this.createLeafNode(rect, depth))
+      .sort((a, b) => a.timeStart - b.timeStart);
 
     // Build tree bottom-up
     return this.buildTreeFromLeaves(leaves);
@@ -284,6 +286,8 @@ export class TemporalSegmentTree {
 
       categoryStats,
       dominantCategory: rect.category,
+      // PERF: Pre-compute priority to avoid PRIORITY_MAP lookups during query
+      dominantPriority: PRIORITY_MAP.get(rect.category) ?? Infinity,
 
       eventCount: 1,
       eventRef: rect.eventRef,
@@ -363,6 +367,8 @@ export class TemporalSegmentTree {
 
     // Determine dominant category
     const dominantCategory = this.resolveDominantCategory(categoryStats);
+    // PERF: Pre-compute priority to avoid PRIORITY_MAP lookups during query
+    const dominantPriority = PRIORITY_MAP.get(dominantCategory) ?? Infinity;
 
     // Store actual child references for tree traversal
     const childNodes = children.slice(start, end);
@@ -374,6 +380,7 @@ export class TemporalSegmentTree {
 
       categoryStats,
       dominantCategory,
+      dominantPriority,
 
       eventCount: totalEventCount,
 
@@ -390,100 +397,75 @@ export class TemporalSegmentTree {
   // ==========================================================================
 
   /**
-   * Recursive query traversal.
+   * Iterative query traversal using explicit stack.
    * Stops at first node where nodeSpan <= threshold.
    * Aggregates nodes into grid-aligned buckets matching legacy behavior.
    *
-   * PERF: Uses mutable stats object instead of callbacks to reduce overhead.
+   * PERF: Eliminates recursion overhead - no function calls, stack frames, or parameter copying.
    */
   private queryNode(
-    node: SegmentNode,
+    root: SegmentNode,
     queryStart: number,
     queryEnd: number,
     threshold: number,
     bucketTimeWidth: number,
     viewport: ViewportState,
     visibleRects: Map<string, PrecomputedRect[]>,
-    bucketMap: Map<
-      number,
-      {
-        depth: number;
-        bucketIndex: number;
-        timeStart: number;
-        timeEnd: number;
-        eventCount: number;
-        categoryStats: Map<string, CategoryAggregation>;
-        dominantCategory: string;
-        dominantPriority: number;
-        dominantDuration: number;
-        dominantCount: number;
-      }
-    >,
+    bucketMap: Map<number, AggregationBucket>,
     stats: { visibleCount: number; bucketedEventCount: number },
   ): void {
-    // Early exit: node completely outside query range
-    if (node.timeEnd <= queryStart || node.timeStart >= queryEnd) {
-      return;
+    // PERF: Use explicit stack instead of recursion
+    const stack: SegmentNode[] = [root];
+
+    let bucketedEventCount = 0;
+    let visibleCount = 0;
+
+    while (stack.length > 0) {
+      const node = stack.pop()!;
+
+      // Early exit: node completely outside query range
+      const { timeStart, timeEnd } = node;
+      if (timeEnd <= queryStart || timeStart >= queryEnd) {
+        continue;
+      }
+
+      // Check if this node should be rendered as a bucket
+      if (node.nodeSpan <= threshold) {
+        // Aggregate into grid-aligned bucket (matching legacy behavior)
+        this.aggregateIntoBucket(node, bucketTimeWidth, bucketMap);
+        bucketedEventCount += node.eventCount;
+        continue;
+      }
+
+      // Node too large to be a bucket
+      if (node.isLeaf) {
+        // Leaf node larger than threshold = visible rectangle
+        this.addVisibleRect(node, viewport, visibleRects);
+        ++visibleCount;
+        continue;
+      }
+
+      // Branch node: push children onto stack (reverse order for left-to-right processing)
+      const children = node.children!;
+      const len = children.length;
+      for (let i = len - 1; i >= 0; i--) {
+        stack.push(children[i]!);
+      }
     }
 
-    // Check if this node should be rendered as a bucket
-    if (node.nodeSpan <= threshold) {
-      // Aggregate into grid-aligned bucket (matching legacy behavior)
-      this.aggregateIntoBucket(node, bucketTimeWidth, bucketMap);
-      stats.bucketedEventCount += node.eventCount;
-      return;
-    }
-
-    // Node too large to be a bucket
-    if (node.isLeaf) {
-      // Leaf node larger than threshold = visible rectangle
-      // Add to visible rects by finding the original PrecomputedRect
-      this.addVisibleRect(node, viewport, visibleRects);
-      stats.visibleCount++;
-      return;
-    }
-
-    // Branch node: recurse into children
-    for (const child of node.children!) {
-      this.queryNode(
-        child,
-        queryStart,
-        queryEnd,
-        threshold,
-        bucketTimeWidth,
-        viewport,
-        visibleRects,
-        bucketMap,
-        stats,
-      );
-    }
+    stats.bucketedEventCount += bucketedEventCount;
+    stats.visibleCount += visibleCount;
   }
 
   /**
    * Aggregate a segment node into a grid-aligned bucket.
    * Multiple nodes that fall into the same grid cell are merged into one bucket.
-   * This matches the legacy RectangleManager bucket behavior.
-   *
-   * PERF: Tracks dominant category incrementally to avoid recomputation.
+   * Dominant category is resolved after all nodes are aggregated.
    */
   private aggregateIntoBucket(
     node: SegmentNode,
     bucketTimeWidth: number,
-    bucketMap: Map<
-      number,
-      {
-        depth: number;
-        bucketIndex: number;
-        timeStart: number;
-        timeEnd: number;
-        eventCount: number;
-        categoryStats: Map<string, CategoryAggregation>;
-        dominantCategory: string;
-        dominantPriority: number;
-        dominantDuration: number;
-        dominantCount: number;
-      }
-    >,
+    bucketMap: Map<number, AggregationBucket>,
   ): void {
     // Calculate grid-aligned bucket index (same as legacy)
     const bucketIndex = Math.floor(node.timeStart / bucketTimeWidth);
@@ -492,9 +474,6 @@ export class TemporalSegmentTree {
 
     let bucket = bucketMap.get(bucketKey);
     if (!bucket) {
-      // Initialize with node's dominant category
-      const nodePriority = PRIORITY_MAP.get(node.dominantCategory) ?? Infinity;
-      const nodeStats = node.categoryStats.get(node.dominantCategory);
       bucket = {
         depth: node.depth,
         bucketIndex,
@@ -502,10 +481,7 @@ export class TemporalSegmentTree {
         timeEnd: (bucketIndex + 1) * bucketTimeWidth,
         eventCount: 0,
         categoryStats: new Map(),
-        dominantCategory: node.dominantCategory,
-        dominantPriority: nodePriority,
-        dominantDuration: nodeStats?.totalDuration ?? 0,
-        dominantCount: nodeStats?.count ?? 0,
+        dominantCategory: '', // Resolved after all nodes aggregated
       };
       bucketMap.set(bucketKey, bucket);
     }
@@ -513,38 +489,17 @@ export class TemporalSegmentTree {
     // Aggregate node stats into bucket
     bucket.eventCount += node.eventCount;
 
-    // Merge category stats and update dominant tracking
+    // Merge category stats
     for (const [category, stats] of node.categoryStats) {
       const existing = bucket.categoryStats.get(category);
-      let newDuration: number;
-      let newCount: number;
-
       if (existing) {
         existing.count += stats.count;
         existing.totalDuration += stats.totalDuration;
-        newDuration = existing.totalDuration;
-        newCount = existing.count;
       } else {
         bucket.categoryStats.set(category, {
           count: stats.count,
           totalDuration: stats.totalDuration,
         });
-        newDuration = stats.totalDuration;
-        newCount = stats.count;
-      }
-
-      // Update dominant category tracking incrementally
-      const priority = PRIORITY_MAP.get(category) ?? Infinity;
-      if (
-        priority < bucket.dominantPriority ||
-        (priority === bucket.dominantPriority &&
-          (newDuration > bucket.dominantDuration ||
-            (newDuration === bucket.dominantDuration && newCount > bucket.dominantCount)))
-      ) {
-        bucket.dominantCategory = category;
-        bucket.dominantPriority = priority;
-        bucket.dominantDuration = newDuration;
-        bucket.dominantCount = newCount;
       }
     }
   }
