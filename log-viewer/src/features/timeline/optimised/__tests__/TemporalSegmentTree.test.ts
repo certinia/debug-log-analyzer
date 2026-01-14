@@ -4,7 +4,7 @@
 
 import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
 import type { LogSubCategory } from '../../../../core/log-parser/types.js';
-import type { ViewportState } from '../../types/flamechart.types.js';
+import type { PixelBucket, ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import { legacyCullRectangles } from '../LegacyViewportCuller.js';
 import { RectangleManager } from '../RectangleManager.js';
@@ -53,13 +53,8 @@ function createViewport(
 }
 
 // Helper to flatten buckets Map into array for testing
-function getAllBuckets(
-  bucketsMap: Map<
-    string,
-    { id: number; x: number; y: number; eventCount: number; color: number }[]
-  >,
-): { id: number; x: number; y: number; eventCount: number; color: number }[] {
-  const allBuckets: { id: number; x: number; y: number; eventCount: number; color: number }[] = [];
+function getAllBuckets(bucketsMap: Map<string, PixelBucket[]>): PixelBucket[] {
+  const allBuckets: PixelBucket[] = [];
   for (const buckets of bucketsMap.values()) {
     allBuckets.push(...buckets);
   }
