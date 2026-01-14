@@ -176,3 +176,63 @@ export function blendWithBackground(
   // Combine back to a single color value
   return (resultR << 16) | (resultG << 8) | resultB;
 }
+
+/**
+ * Parse CSS color string to PixiJS numeric color (opaque).
+ * If the color has alpha < 1, it will be pre-blended with the background
+ * to produce an opaque result for better GPU performance.
+ *
+ * Supported formats:
+ * - #RGB (3 hex digits)
+ * - #RGBA (4 hex digits)
+ * - #RRGGBB (6 hex digits)
+ * - #RRGGBBAA (8 hex digits)
+ * - rgb(r, g, b)
+ * - rgba(r, g, b, a)
+ *
+ * @param cssColor - CSS color string
+ * @returns Opaque PixiJS numeric color (0xRRGGBB)
+ */
+export function cssColorToPixi(cssColor: string): number {
+  let color = 0x000000;
+  let alpha = 1;
+
+  if (cssColor.startsWith('#')) {
+    const hex = cssColor.slice(1);
+    if (hex.length === 8) {
+      const rgb = hex.slice(0, 6);
+      alpha = parseInt(hex.slice(6, 8), 16) / 255;
+      color = parseInt(rgb, 16);
+    } else if (hex.length === 6) {
+      color = parseInt(hex, 16);
+    } else if (hex.length === 4) {
+      const r = hex[0]!;
+      const g = hex[1]!;
+      const b = hex[2]!;
+      const a = hex[3]!;
+      color = parseInt(r + r + g + g + b + b, 16);
+      alpha = parseInt(a + a, 16) / 255;
+    } else if (hex.length === 3) {
+      const r = hex[0]!;
+      const g = hex[1]!;
+      const b = hex[2]!;
+      color = parseInt(r + r + g + g + b + b, 16);
+    }
+  } else {
+    const rgbMatch = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d*(?:\.\d+)?))?\)/);
+    if (rgbMatch) {
+      const r = parseInt(rgbMatch[1] ?? '0', 10);
+      const g = parseInt(rgbMatch[2] ?? '0', 10);
+      const b = parseInt(rgbMatch[3] ?? '0', 10);
+      alpha = rgbMatch[4] ? parseFloat(rgbMatch[4]) : 1;
+      color = (r << 16) | (g << 8) | b;
+    }
+  }
+
+  // Pre-blend with background if color has alpha < 1
+  if (alpha < 1) {
+    return blendWithBackground(color, alpha);
+  }
+
+  return color;
+}

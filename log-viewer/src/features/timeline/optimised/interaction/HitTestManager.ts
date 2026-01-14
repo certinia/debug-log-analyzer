@@ -1,0 +1,246 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
+
+/**
+ * HitTestManager
+ *
+ * Handles hit detection for mouse interactions on the timeline.
+ * Determines which event, bucket, or marker is under the mouse cursor.
+ *
+ * Priority order for hit detection:
+ * 1. Visible rectangles from the last render pass
+ * 2. Events from the event index
+ * 3. Buckets (aggregated sub-pixel events)
+ * 4. Timeline markers (only if not over events/buckets)
+ */
+
+import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
+import type { PixelBucket, TimelineMarker, ViewportState } from '../../types/flamechart.types.js';
+import type { PrecomputedRect } from '../RectangleManager.js';
+import type { TimelineEventIndex } from '../TimelineEventIndex.js';
+
+/**
+ * Interface for marker renderers that support hit testing.
+ */
+export interface MarkerHitTestable {
+  hitTest(screenX: number, screenY: number): TimelineMarker | null;
+}
+
+/**
+ * Result of a hit test operation.
+ */
+export interface HitTestResult {
+  /** The event at the hit position, if any */
+  event: LogEvent | null;
+  /** The marker at the hit position, if any (only set if no event/bucket) */
+  marker: TimelineMarker | null;
+  /** Whether the cursor is over an event or bucket area */
+  isOverEventArea: boolean;
+}
+
+/**
+ * Configuration for HitTestManager.
+ */
+export interface HitTestConfig {
+  /** Event index for spatial queries */
+  index: TimelineEventIndex;
+  /** Current visible rectangles from last render pass */
+  visibleRects: Map<string, PrecomputedRect[]>;
+  /** Current buckets from last render pass */
+  buckets: Map<string, PixelBucket[]>;
+  /** Optional marker renderer for hit testing markers */
+  markerRenderer?: MarkerHitTestable | null;
+}
+
+export class HitTestManager {
+  private index: TimelineEventIndex;
+  private visibleRects: Map<string, PrecomputedRect[]>;
+  private buckets: Map<string, PixelBucket[]>;
+  private markerRenderer: MarkerHitTestable | null;
+
+  constructor(config: HitTestConfig) {
+    this.index = config.index;
+    this.visibleRects = config.visibleRects;
+    this.buckets = config.buckets;
+    this.markerRenderer = config.markerRenderer ?? null;
+  }
+
+  /**
+   * Update visible rectangles from last render pass.
+   */
+  public setVisibleRects(rects: Map<string, PrecomputedRect[]>): void {
+    this.visibleRects = rects;
+  }
+
+  /**
+   * Update buckets from last render pass.
+   */
+  public setBuckets(buckets: Map<string, PixelBucket[]>): void {
+    this.buckets = buckets;
+  }
+
+  /**
+   * Update marker renderer reference.
+   */
+  public setMarkerRenderer(renderer: MarkerHitTestable | null): void {
+    this.markerRenderer = renderer;
+  }
+
+  /**
+   * Perform hit test at screen coordinates.
+   *
+   * @param screenX - Mouse X coordinate in screen space
+   * @param screenY - Mouse Y coordinate in screen space
+   * @param depth - Depth level at the Y position
+   * @param viewport - Current viewport state
+   * @param maxDepth - Maximum depth in the timeline
+   * @returns Hit test result with event, marker, and area info
+   */
+  public hitTest(
+    screenX: number,
+    screenY: number,
+    depth: number,
+    viewport: ViewportState,
+    maxDepth: number,
+  ): HitTestResult {
+    // Check if depth is within valid bounds (0 to maxDepth)
+    const isValidDepth = depth >= 0 && depth <= maxDepth;
+
+    let event: LogEvent | null = null;
+    let isOverEventArea = false;
+
+    if (isValidDepth) {
+      // Priority 1: Check visible rectangles from last render (in sync with display)
+      event = this.findVisibleRectAtPosition(screenX, depth, viewport);
+
+      // Priority 2: If no visible rect, check event index (for wider search)
+      if (!event) {
+        event = this.index.findEventAtPosition(screenX, screenY, viewport, depth, false);
+      }
+
+      isOverEventArea = event !== null;
+
+      // Priority 3: If no event found, check if we're over a bucket at this depth
+      if (!event) {
+        const bucketResult = this.findBucketAtPosition(screenX, depth, viewport);
+        if (bucketResult) {
+          isOverEventArea = true;
+          // Find nearest event from bucket's eventRefs (X direction only, same depth)
+          event = this.findNearestEventInBucket(bucketResult.bucket, screenX, viewport);
+        }
+      }
+    }
+
+    // Priority 4: Only show marker if NOT over any event/bucket area
+    // Markers should only show when hovering empty space
+    let marker: TimelineMarker | null = null;
+    if (!isOverEventArea && this.markerRenderer) {
+      marker = this.markerRenderer.hitTest(screenX, screenY);
+    }
+
+    return { event, marker, isOverEventArea };
+  }
+
+  /**
+   * Find visible rectangle at screen position from last render pass.
+   * This ensures hit detection is in sync with what's actually displayed.
+   *
+   * @returns Event reference if found, null otherwise
+   */
+  private findVisibleRectAtPosition(
+    screenX: number,
+    depth: number,
+    viewport: ViewportState,
+  ): LogEvent | null {
+    for (const categoryRects of this.visibleRects.values()) {
+      for (const rect of categoryRects) {
+        // Check depth match
+        if (rect.depth !== depth) {
+          continue;
+        }
+
+        // Calculate screen X position
+        const rectScreenX = rect.timeStart * viewport.zoom - viewport.offsetX;
+        const rectScreenEnd = rect.timeEnd * viewport.zoom - viewport.offsetX;
+
+        // Check if mouse X is within rect bounds
+        if (screenX >= rectScreenX && screenX <= rectScreenEnd) {
+          return rect.eventRef;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Find bucket at screen position, if any.
+   * @returns Bucket and its screen bounds, or null if not over a bucket
+   */
+  private findBucketAtPosition(
+    screenX: number,
+    depth: number,
+    viewport: ViewportState,
+  ): { bucket: PixelBucket; screenX: number; screenWidth: number } | null {
+    for (const categoryBuckets of this.buckets.values()) {
+      for (const bucket of categoryBuckets) {
+        // Check if bucket is at the target depth
+        if (bucket.depth !== depth) {
+          continue;
+        }
+
+        // Calculate bucket screen position
+        const bucketScreenX = bucket.timeStart * viewport.zoom - viewport.offsetX;
+        const bucketScreenEnd = bucket.timeEnd * viewport.zoom - viewport.offsetX;
+
+        // Check if mouse X is within bucket bounds
+        if (screenX >= bucketScreenX && screenX <= bucketScreenEnd) {
+          return {
+            bucket,
+            screenX: bucketScreenX,
+            screenWidth: bucketScreenEnd - bucketScreenX,
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Find the nearest event in a bucket based on X distance.
+   * Only considers events at the same depth (bucket.depth).
+   *
+   * @param bucket - The bucket containing aggregated events
+   * @param screenX - Mouse X position in screen coordinates
+   * @param viewport - Current viewport state
+   * @returns Nearest event, or null if bucket is empty
+   */
+  private findNearestEventInBucket(
+    bucket: PixelBucket,
+    screenX: number,
+    viewport: ViewportState,
+  ): LogEvent | null {
+    if (bucket.eventRefs.length === 0) {
+      return null;
+    }
+
+    // Convert screen X to time
+    const mouseTime = (screenX + viewport.offsetX) / viewport.zoom;
+
+    let nearestEvent: LogEvent | null = null;
+    let nearestDistance = Infinity;
+
+    for (const event of bucket.eventRefs) {
+      // Calculate event center time
+      const eventCenterTime = event.timestamp + (event.duration?.total ?? 0) / 2;
+      const distance = Math.abs(eventCenterTime - mouseTime);
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestEvent = event;
+      }
+    }
+
+    return nearestEvent;
+  }
+}

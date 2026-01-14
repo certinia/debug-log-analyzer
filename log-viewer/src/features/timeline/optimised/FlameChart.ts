@@ -14,7 +14,6 @@ import * as PIXI from 'pixi.js';
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type {
   EventNode,
-  PixelBucket,
   TimelineMarker,
   TimelineOptions,
   TimelineState,
@@ -38,11 +37,13 @@ import { TextLabelRenderer } from './TextLabelRenderer.js';
 import { AxisRenderer } from './time-axis/AxisRenderer.js';
 
 import { logEventToTreeNode } from '../utils/tree-converter.js';
-import { blendWithBackground } from './BucketColorResolver.js';
+import { cssColorToPixi } from './BucketColorResolver.js';
+import { HitTestManager } from './interaction/HitTestManager.js';
 import { TimelineInteractionHandler } from './interaction/TimelineInteractionHandler.js';
 import { TimelineResizeHandler } from './interaction/TimelineResizeHandler.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 import { RectangleManager } from './RectangleManager.js';
+import { FlameChartCursor } from './search/FlameChartCursor.js';
 import { SearchManager } from './search/SearchManager.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineViewport } from './TimelineViewport.js';
@@ -62,87 +63,6 @@ export interface FlameChartCallbacks {
   ) => void;
   onViewportChange?: (viewport: ViewportState) => void;
   onSearchNavigate?: (event: EventNode, screenX: number, screenY: number, depth: number) => void;
-}
-
-/**
- * FlameChartCursor - Cursor with automatic side effects
- *
- * Wraps SearchCursor to add automatic centering, rendering, and callback
- * invocation when navigating between matches.
- */
-class FlameChartCursor<E extends EventNode> implements SearchCursor<E> {
-  constructor(
-    private innerCursor: SearchCursor<E>,
-    private onNavigate: (match: SearchMatch<E>) => void,
-  ) {}
-
-  get matches(): ReadonlyArray<SearchMatch<E>> {
-    return this.innerCursor.matches;
-  }
-
-  get currentIndex(): number {
-    return this.innerCursor.currentIndex;
-  }
-
-  get total(): number {
-    return this.innerCursor.total;
-  }
-
-  next(): SearchMatch<E> | null {
-    const match = this.innerCursor.next();
-    if (match) {
-      this.onNavigate(match);
-    }
-    return match;
-  }
-
-  prev(): SearchMatch<E> | null {
-    const match = this.innerCursor.prev();
-    if (match) {
-      this.onNavigate(match);
-    }
-    return match;
-  }
-
-  first(): SearchMatch<E> | null {
-    const match = this.innerCursor.first();
-    if (match) {
-      this.onNavigate(match);
-    }
-    return match;
-  }
-
-  last(): SearchMatch<E> | null {
-    const match = this.innerCursor.last();
-    if (match) {
-      this.onNavigate(match);
-    }
-    return match;
-  }
-
-  seek(index: number): SearchMatch<E> | null {
-    const match = this.innerCursor.seek(index);
-    if (match) {
-      this.onNavigate(match);
-    }
-    return match;
-  }
-
-  getCurrent(): SearchMatch<E> | null {
-    return this.innerCursor.getCurrent();
-  }
-
-  hasNext(): boolean {
-    return this.innerCursor.hasNext();
-  }
-
-  hasPrev(): boolean {
-    return this.innerCursor.hasPrev();
-  }
-
-  getMatchedEventIds(): ReadonlySet<string> {
-    return this.innerCursor.getMatchedEventIds();
-  }
 }
 
 export class FlameChart<E extends EventNode = EventNode> {
@@ -178,10 +98,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   private readonly markers: TimelineMarker[] = [];
 
-  /** Current buckets from last render pass (for bucket hit detection) */
-  private currentBuckets: Map<string, PixelBucket[]> = new Map();
-  /** Current visible rects from last render pass (for hit detection) */
-  private currentVisibleRects: Map<string, PrecomputedRect[]> = new Map();
+  private hitTestManager: HitTestManager | null = null;
 
   /**
    * Initialize the flamechart renderer.
@@ -350,6 +267,14 @@ export class FlameChart<E extends EventNode = EventNode> {
       }
     }
 
+    // Create hit test manager for mouse interactions
+    this.hitTestManager = new HitTestManager({
+      index: this.index,
+      visibleRects: new Map(),
+      buckets: new Map(),
+      markerRenderer: this.markerRenderer,
+    });
+
     // Setup interaction handler
     this.setupInteractionHandler();
 
@@ -427,6 +352,8 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.resizeHandler.destroy();
       this.resizeHandler = null;
     }
+
+    this.hitTestManager = null;
 
     if (this.app) {
       this.app.destroy(true, { children: true, texture: true });
@@ -608,7 +535,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     for (const [category, batch] of this.state.batches) {
       const colorValue = colors[category];
       if (colorValue) {
-        batch.color = this.cssColorToPixi(colorValue);
+        batch.color = cssColorToPixi(colorValue);
         batch.isDirty = true;
       }
     }
@@ -718,48 +645,21 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   private handleMouseMove(screenX: number, screenY: number): void {
-    if (!this.viewport || !this.index) {
+    if (!this.viewport || !this.index || !this.hitTestManager) {
       return;
     }
 
     const viewportState = this.viewport.getState();
     const depth = this.viewport.screenYToDepth(screenY);
-
-    // Check if depth is within valid bounds (0 to maxDepth)
     const maxDepth = this.index.maxDepth;
-    const isValidDepth = depth >= 0 && depth <= maxDepth;
 
-    let event: LogEvent | null = null;
-    let isOverBucketOrEvent = false;
-
-    if (isValidDepth) {
-      // Priority 1: Check visible rectangles from last render (in sync with display)
-      event = this.findVisibleRectAtPosition(screenX, depth, viewportState);
-
-      // Priority 2: If no visible rect, check event index (for wider search)
-      if (!event) {
-        event = this.index.findEventAtPosition(screenX, screenY, viewportState, depth, false);
-      }
-
-      isOverBucketOrEvent = event !== null;
-
-      // Priority 3: If no event found, check if we're over a bucket at this depth
-      if (!event) {
-        const bucketResult = this.findBucketAtPosition(screenX, depth, viewportState);
-        if (bucketResult) {
-          isOverBucketOrEvent = true;
-          // Find nearest event from bucket's eventRefs (X direction only, same depth)
-          event = this.findNearestEventInBucket(bucketResult.bucket, screenX, viewportState);
-        }
-      }
-    }
-
-    // Priority 4: Only show truncation marker if NOT over any event/bucket area
-    // Truncation markers should only show when hovering empty space
-    let marker: TimelineMarker | null = null;
-    if (!isOverBucketOrEvent) {
-      marker = this.markerRenderer?.hitTest(screenX, screenY) ?? null;
-    }
+    const { event, marker } = this.hitTestManager.hitTest(
+      screenX,
+      screenY,
+      depth,
+      viewportState,
+      maxDepth,
+    );
 
     // Update cursor
     if (this.interactionHandler) {
@@ -772,154 +672,26 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
   }
 
-  /**
-   * Find visible rectangle at screen position from last render pass.
-   * This ensures hit detection is in sync with what's actually displayed.
-   *
-   * @returns Event reference if found, null otherwise
-   */
-  private findVisibleRectAtPosition(
-    screenX: number,
-    depth: number,
-    viewport: ViewportState,
-  ): LogEvent | null {
-    for (const categoryRects of this.currentVisibleRects.values()) {
-      for (const rect of categoryRects) {
-        // Check depth match
-        if (rect.depth !== depth) {
-          continue;
-        }
-
-        // Calculate screen X position
-        const rectScreenX = rect.timeStart * viewport.zoom - viewport.offsetX;
-        const rectScreenEnd = rect.timeEnd * viewport.zoom - viewport.offsetX;
-
-        // Check if mouse X is within rect bounds
-        if (screenX >= rectScreenX && screenX <= rectScreenEnd) {
-          return rect.eventRef;
-        }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Find bucket at screen position, if any.
-   * @returns Bucket and its screen bounds, or null if not over a bucket
-   */
-  private findBucketAtPosition(
-    screenX: number,
-    depth: number,
-    viewport: ViewportState,
-  ): { bucket: PixelBucket; screenX: number; screenWidth: number } | null {
-    // Buckets are stored in currentBuckets from the last render pass
-    for (const categoryBuckets of this.currentBuckets.values()) {
-      for (const bucket of categoryBuckets) {
-        // Check if bucket is at the target depth
-        if (bucket.depth !== depth) {
-          continue;
-        }
-
-        // Calculate bucket screen position
-        const bucketScreenX = bucket.timeStart * viewport.zoom - viewport.offsetX;
-        const bucketScreenEnd = bucket.timeEnd * viewport.zoom - viewport.offsetX;
-
-        // Check if mouse X is within bucket bounds
-        if (screenX >= bucketScreenX && screenX <= bucketScreenEnd) {
-          return {
-            bucket,
-            screenX: bucketScreenX,
-            screenWidth: bucketScreenEnd - bucketScreenX,
-          };
-        }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Find the nearest event in a bucket based on X distance.
-   * Only considers events at the same depth (bucket.depth).
-   *
-   * @param bucket - The bucket containing aggregated events
-   * @param screenX - Mouse X position in screen coordinates
-   * @param viewport - Current viewport state
-   * @returns Nearest event, or null if bucket is empty
-   */
-  private findNearestEventInBucket(
-    bucket: PixelBucket,
-    screenX: number,
-    viewport: ViewportState,
-  ): LogEvent | null {
-    if (bucket.eventRefs.length === 0) {
-      return null;
-    }
-
-    // Convert screen X to time
-    const mouseTime = (screenX + viewport.offsetX) / viewport.zoom;
-
-    let nearestEvent: LogEvent | null = null;
-    let nearestDistance = Infinity;
-
-    for (const event of bucket.eventRefs) {
-      // Calculate event center time
-      const eventCenterTime = event.timestamp + (event.duration?.total ?? 0) / 2;
-      const distance = Math.abs(eventCenterTime - mouseTime);
-
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestEvent = event;
-      }
-    }
-
-    return nearestEvent;
-  }
-
   private handleClick(screenX: number, screenY: number): void {
-    if (!this.viewport || !this.index) {
+    if (!this.viewport || !this.index || !this.hitTestManager) {
       return;
     }
 
     const viewportState = this.viewport.getState();
     const depth = this.viewport.screenYToDepth(screenY);
-
-    // Check if depth is within valid bounds
     const maxDepth = this.index.maxDepth;
-    const isValidDepth = depth >= 0 && depth <= maxDepth;
 
-    let event: LogEvent | null = null;
-    let isOverBucketOrEvent = false;
-
-    if (isValidDepth) {
-      // Priority 1: Check visible rectangles from last render
-      event = this.findVisibleRectAtPosition(screenX, depth, viewportState);
-
-      // Priority 2: If no visible rect, check event index
-      if (!event) {
-        event = this.index.findEventAtPosition(screenX, screenY, viewportState, depth, false);
-      }
-
-      isOverBucketOrEvent = event !== null;
-
-      // Priority 3: If no event found, check if we're over a bucket
-      if (!event) {
-        const bucketResult = this.findBucketAtPosition(screenX, depth, viewportState);
-        if (bucketResult) {
-          isOverBucketOrEvent = true;
-          event = this.findNearestEventInBucket(bucketResult.bucket, screenX, viewportState);
-        }
-      }
-    }
-
-    // Priority 4: Only show truncation marker if NOT over any event/bucket area
-    let truncationMarker: TimelineMarker | null = null;
-    if (!isOverBucketOrEvent) {
-      truncationMarker = this.markerRenderer?.hitTest(screenX, screenY) ?? null;
-    }
+    const { event, marker } = this.hitTestManager.hitTest(
+      screenX,
+      screenY,
+      depth,
+      viewportState,
+      maxDepth,
+    );
 
     // Notify callback
     if (this.callbacks.onClick) {
-      this.callbacks.onClick(screenX, screenY, event, truncationMarker);
+      this.callbacks.onClick(screenX, screenY, event, marker);
     }
   }
 
@@ -942,7 +714,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     for (const category of categories) {
       batches.set(category, {
         category,
-        color: this.cssColorToPixi(colors[category] || '#000000'),
+        color: cssColorToPixi(colors[category] || '#000000'),
         rectangles: [],
         isDirty: true,
       });
@@ -978,58 +750,6 @@ export class FlameChart<E extends EventNode = EventNode> {
       cache.set(category, { color: batch.color });
     }
     return cache;
-  }
-
-  /**
-   * Parse CSS color string to PixiJS numeric color (opaque).
-   * If the color has alpha < 1, it will be pre-blended with the background
-   * to produce an opaque result for better GPU performance.
-   *
-   * @param cssColor - CSS color string (#RGB, #RGBA, #RRGGBB, #RRGGBBAA, rgb(), rgba())
-   * @returns Opaque PixiJS numeric color (0xRRGGBB)
-   */
-  private cssColorToPixi(cssColor: string): number {
-    let color = 0x000000;
-    let alpha = 1;
-
-    if (cssColor.startsWith('#')) {
-      const hex = cssColor.slice(1);
-      if (hex.length === 8) {
-        const rgb = hex.slice(0, 6);
-        alpha = parseInt(hex.slice(6, 8), 16) / 255;
-        color = parseInt(rgb, 16);
-      } else if (hex.length === 6) {
-        color = parseInt(hex, 16);
-      } else if (hex.length === 4) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        const a = hex[3]!;
-        color = parseInt(r + r + g + g + b + b, 16);
-        alpha = parseInt(a + a, 16) / 255;
-      } else if (hex.length === 3) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        color = parseInt(r + r + g + g + b + b, 16);
-      }
-    } else {
-      const rgbMatch = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d*(?:\.\d+)?))?\)/);
-      if (rgbMatch) {
-        const r = parseInt(rgbMatch[1] ?? '0', 10);
-        const g = parseInt(rgbMatch[2] ?? '0', 10);
-        const b = parseInt(rgbMatch[3] ?? '0', 10);
-        alpha = rgbMatch[4] ? parseFloat(rgbMatch[4]) : 1;
-        color = (r << 16) | (g << 8) | b;
-      }
-    }
-
-    // Pre-blend with background if color has alpha < 1
-    if (alpha < 1) {
-      return blendWithBackground(color, alpha);
-    }
-
-    return color;
   }
 
   // ============================================================================
@@ -1079,9 +799,11 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.state.batchColorsCache,
     );
 
-    // Store for hit detection in handleMouseMove
-    this.currentVisibleRects = visibleRects;
-    this.currentBuckets = buckets;
+    // Update hit test manager with current render data
+    if (this.hitTestManager) {
+      this.hitTestManager.setVisibleRects(visibleRects);
+      this.hitTestManager.setBuckets(buckets);
+    }
 
     // Render events (with or without search styling)
     const cursor = this.newSearchManager?.getCursor();
