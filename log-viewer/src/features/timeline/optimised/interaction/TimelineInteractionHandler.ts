@@ -218,16 +218,38 @@ export class TimelineInteractionHandler {
   // ============================================================================
 
   /**
-   * Handle wheel event for zoom and horizontal pan.
+   * Handle wheel event for zoom and pan.
    *
    * Implements:
-   * - Vertical wheel (deltaY): Mouse-anchored zoom
+   * - Shift + wheel: Vertical pan (scroll up/down in stack depth) - respects natural scrolling
+   * - Alt/Option + wheel: Horizontal pan (scroll left/right in time)
    * - Horizontal wheel (deltaX): Pan (trackpad swipe left/right)
+   * - Vertical wheel (deltaY): Mouse-anchored zoom
    * - Mouse cursor position remains over the same timeline point during zoom
    * - Prevents page scroll
    */
   private handleWheel(event: WheelEvent): void {
     event.preventDefault();
+
+    // Shift + wheel = Vertical pan (stack depth)
+    // Uses deltaY directly for natural scrolling feel (scroll down = view moves down)
+    if (event.shiftKey && this.options.enablePan) {
+      const changed = this.viewport.panBy(0, event.deltaY);
+      if (changed && this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange();
+      }
+      return;
+    }
+
+    // Alt/Option + wheel = Horizontal pan (time axis)
+    // Uses deltaY as horizontal movement (since wheel primarily produces deltaY)
+    if (event.altKey && this.options.enablePan) {
+      const changed = this.viewport.panBy(-event.deltaY, 0);
+      if (changed && this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange();
+      }
+      return;
+    }
 
     // Handle horizontal pan (trackpad swipe left/right)
     if (Math.abs(event.deltaX) > Math.abs(event.deltaY) && this.options.enablePan) {

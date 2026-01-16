@@ -39,6 +39,7 @@ import { AxisRenderer } from './time-axis/AxisRenderer.js';
 import { logEventToTreeNode } from '../utils/tree-converter.js';
 import { cssColorToPixi } from './BucketColorResolver.js';
 import { HitTestManager } from './interaction/HitTestManager.js';
+import { KEYBOARD_CONSTANTS, KeyboardHandler } from './interaction/KeyboardHandler.js';
 import { TimelineInteractionHandler } from './interaction/TimelineInteractionHandler.js';
 import { TimelineResizeHandler } from './interaction/TimelineResizeHandler.js';
 import type { PrecomputedRect } from './RectangleManager.js';
@@ -95,6 +96,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   private uiContainer: PIXI.Container | null = null;
   private renderLoopId: number | null = null;
   private interactionHandler: TimelineInteractionHandler | null = null;
+  private keyboardHandler: KeyboardHandler | null = null;
 
   private readonly markers: TimelineMarker[] = [];
 
@@ -278,6 +280,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Setup interaction handler
     this.setupInteractionHandler();
 
+    // Setup keyboard handler
+    this.setupKeyboardHandler();
+
     this.resizeHandler = new TimelineResizeHandler(container, this);
     this.resizeHandler.setupResizeObserver();
 
@@ -304,6 +309,12 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.interactionHandler) {
       this.interactionHandler.destroy();
       this.interactionHandler = null;
+    }
+
+    // Clean up keyboard handler
+    if (this.keyboardHandler) {
+      this.keyboardHandler.destroy();
+      this.keyboardHandler = null;
     }
 
     // Clean up search components
@@ -642,6 +653,71 @@ export class FlameChart<E extends EventNode = EventNode> {
         },
       },
     );
+  }
+
+  private setupKeyboardHandler(): void {
+    if (!this.container || !this.viewport || !this.app?.canvas) {
+      return;
+    }
+
+    const canvas = this.app.canvas as HTMLCanvasElement;
+
+    // Make container focusable for keyboard events
+    this.container.setAttribute('tabindex', '0');
+    this.container.style.outline = 'none'; // Remove focus outline
+
+    // Auto-focus on click
+    canvas.addEventListener('mousedown', () => {
+      this.container?.focus();
+    });
+
+    this.keyboardHandler = new KeyboardHandler(this.container, this.viewport, {
+      onPan: (deltaX: number, deltaY: number) => {
+        if (this.viewport?.panBy(deltaX, deltaY)) {
+          this.requestRender();
+          if (this.callbacks.onViewportChange && this.viewport) {
+            this.callbacks.onViewportChange(this.viewport.getState());
+          }
+        }
+      },
+      onZoom: (direction: 'in' | 'out') => {
+        if (!this.viewport) {
+          return;
+        }
+
+        const factor =
+          direction === 'in' ? KEYBOARD_CONSTANTS.zoomFactor : 1 / KEYBOARD_CONSTANTS.zoomFactor;
+
+        // Zoom to viewport center (selection anchoring is a Phase 2 feature)
+        if (this.viewport.zoomByFactor(factor)) {
+          this.requestRender();
+          if (this.callbacks.onViewportChange) {
+            this.callbacks.onViewportChange(this.viewport.getState());
+          }
+        }
+      },
+      onResetZoom: () => {
+        if (!this.viewport) {
+          return;
+        }
+        this.viewport.resetZoom();
+        this.requestRender();
+        if (this.callbacks.onViewportChange) {
+          this.callbacks.onViewportChange(this.viewport.getState());
+        }
+      },
+      onEscape: () => {
+        // Phase 1: Just clear search if active
+        // Phase 2 will add frame deselection
+        this.clearSearch();
+      },
+      onShiftHeld: (_held: boolean) => {
+        // Phase 1: No-op - hints overlay is a bonus feature
+        // Can be implemented later with ShortcutHintsOverlay component
+      },
+    });
+
+    this.keyboardHandler.attach();
   }
 
   private handleMouseMove(screenX: number, screenY: number): void {

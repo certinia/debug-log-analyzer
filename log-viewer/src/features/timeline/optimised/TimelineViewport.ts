@@ -206,6 +206,25 @@ export class TimelineViewport {
   }
 
   /**
+   * Alias for reset() - resets zoom to show all content.
+   * Used by keyboard handler for Home/0 key.
+   */
+  public resetZoom(): void {
+    this.reset();
+  }
+
+  /**
+   * Zoom by a factor with optional anchor point.
+   * @param factor - Multiplier for current zoom (>1 zooms in, <1 zooms out)
+   * @param anchorX - Screen X coordinate to keep stable (optional, defaults to center)
+   * @returns true if zoom changed
+   */
+  public zoomByFactor(factor: number, anchorX?: number): boolean {
+    const newZoom = this.state.zoom * factor;
+    return this.setZoom(newZoom, anchorX);
+  }
+
+  /**
    * Center viewport on a specific event.
    * Scrolls horizontally and vertically to center the event in the viewport.
    * Only scrolls if event is off-screen or not fully visible.
