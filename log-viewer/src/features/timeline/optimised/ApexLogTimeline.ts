@@ -30,6 +30,7 @@ import type {
 } from '../types/flamechart.types.js';
 import type { SearchCursor } from '../types/search.types.js';
 import { extractMarkers } from '../utils/marker-utils.js';
+import { logEventToTreeNode } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
 import { TimelineTooltipManager } from './TimelineTooltipManager.js';
 
@@ -76,10 +77,17 @@ export class ApexLogTimeline {
     const markers = extractMarkers(this.apexLog);
     this.events = this.extractEvents();
 
+    // Convert LogEvent to TreeNode structure for search and navigation
+    // This is Apex-specific: filters out 0-duration events that are invisible
+    // Also builds navigation maps during traversal to avoid duplicate O(n) work
+    const { treeNodes, maps } = logEventToTreeNode(this.events);
+
     // Initialize FlameChart with Apex-specific callbacks
     await this.flamechart.init(
       container,
       this.events,
+      treeNodes,
+      maps,
       markers,
       { ...options, enableSearch: true }, // Enable search via options
       {

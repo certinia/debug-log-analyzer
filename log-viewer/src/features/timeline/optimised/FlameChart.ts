@@ -22,6 +22,7 @@ import type {
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
 import type { SearchCursor, SearchMatch, SearchOptions } from '../types/search.types.js';
+import type { NavigationMaps } from '../utils/tree-converter.js';
 
 import { MeshMarkerRenderer } from './markers/MeshMarkerRenderer.js';
 import { MeshRectangleRenderer } from './MeshRectangleRenderer.js';
@@ -36,7 +37,6 @@ import { SearchTextLabelRenderer } from './search/SearchTextLabelRenderer.js';
 import { TextLabelRenderer } from './TextLabelRenderer.js';
 import { AxisRenderer } from './time-axis/AxisRenderer.js';
 
-import { logEventToTreeNode } from '../utils/tree-converter.js';
 import { cssColorToPixi } from './BucketColorResolver.js';
 import { HitTestManager } from './interaction/HitTestManager.js';
 import {
@@ -120,10 +120,20 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   /**
    * Initialize the flamechart renderer.
+   *
+   * @param container - HTML element to render into
+   * @param events - Array of LogEvent objects for rendering
+   * @param treeNodes - Pre-converted TreeNode structure for navigation/search (from logEventToTreeNode)
+   * @param maps - Pre-built navigation maps from tree conversion
+   * @param markers - Timeline markers (truncation regions, etc.)
+   * @param options - Rendering options
+   * @param callbacks - Event callbacks
    */
   public async init(
     container: HTMLElement,
     events: LogEvent[],
+    treeNodes: TreeNode<E>[],
+    maps: NavigationMaps,
     markers: TimelineMarker[] = [],
     options: TimelineOptions = {},
     callbacks: FlameChartCallbacks = {},
@@ -184,11 +194,12 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Initialize state
     this.initializeState(events);
 
-    // Convert LogEvent to TreeNode structure for generic search
-    this.treeNodes = logEventToTreeNode(events) as unknown as TreeNode<E>[];
+    // Store pre-converted TreeNode structure for search and navigation
+    this.treeNodes = treeNodes;
 
     // Initialize selection manager for frame selection and traversal
-    this.selectionManager = new SelectionManager<E>(this.treeNodes);
+    // Pass pre-built maps to avoid duplicate O(n) traversal
+    this.selectionManager = new SelectionManager<E>(this.treeNodes, maps);
 
     // Initialize viewport animator for smooth transitions
     this.viewportAnimator = new ViewportAnimator();

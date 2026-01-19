@@ -17,6 +17,7 @@
 
 import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
 import type { EventNode, TreeNode } from '../../types/flamechart.types.js';
+import type { NavigationMaps } from '../../utils/tree-converter.js';
 import type { FrameNavDirection } from '../interaction/KeyboardHandler.js';
 import { TreeNavigator } from './TreeNavigator.js';
 
@@ -28,12 +29,13 @@ export class SelectionManager<E extends EventNode> {
   private navigator: TreeNavigator;
 
   /**
-   * Create a SelectionManager from tree nodes.
+   * Create a SelectionManager from tree nodes and pre-built maps.
    *
    * @param treeNodes - Root-level TreeNodes to navigate
+   * @param maps - Pre-built navigation maps from tree conversion
    */
-  constructor(treeNodes: TreeNode<E>[]) {
-    this.navigator = new TreeNavigator(treeNodes as TreeNode<EventNode>[]);
+  constructor(treeNodes: TreeNode<E>[], maps: NavigationMaps) {
+    this.navigator = new TreeNavigator(treeNodes as TreeNode<EventNode>[], maps);
   }
 
   /**
@@ -56,6 +58,9 @@ export class SelectionManager<E extends EventNode> {
    * Navigate from current selection in the specified direction.
    * Returns the new node if navigation was successful, null if at boundary.
    *
+   * For left/right navigation: tries siblings first, then falls back to
+   * cross-parent navigation at the same depth (Chrome DevTools behavior).
+   *
    * @param direction - Navigation direction ('up', 'down', 'left', 'right')
    * @returns New selected node, or null if at boundary or no selection
    */
@@ -77,10 +82,18 @@ export class SelectionManager<E extends EventNode> {
         nextNode = this.navigator.getParent(currentNode);
         break;
       case 'left':
+        // Try sibling first, then cross-parent at same depth
         nextNode = this.navigator.getPrevSibling(currentNode);
+        if (!nextNode) {
+          nextNode = this.navigator.getPrevAtDepth(currentNode);
+        }
         break;
       case 'right':
+        // Try sibling first, then cross-parent at same depth
         nextNode = this.navigator.getNextSibling(currentNode);
+        if (!nextNode) {
+          nextNode = this.navigator.getNextAtDepth(currentNode);
+        }
         break;
     }
 

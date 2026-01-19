@@ -18,6 +18,7 @@
 
 import { TreeNavigator } from '../optimised/selection/TreeNavigator.js';
 import type { EventNode, TreeNode } from '../types/flamechart.types.js';
+import type { NavigationMaps } from '../utils/tree-converter.js';
 
 describe('TreeNavigator', () => {
   /**
@@ -48,6 +49,53 @@ describe('TreeNavigator', () => {
     };
   }
 
+  /**
+   * Helper to build NavigationMaps from root nodes (for testing).
+   * Mimics what logEventToTreeNode does during production.
+   */
+  function buildMapsFromNodes(rootNodes: TreeNode<EventNode>[]): NavigationMaps {
+    const maps: NavigationMaps = {
+      originalMap: new Map(),
+      nodeMap: new Map(),
+      parentMap: new Map(),
+      siblingMap: new Map(),
+      depthMap: new Map(),
+      depthLookup: new Map(),
+    };
+
+    function processNode(
+      node: TreeNode<EventNode>,
+      parent: TreeNode<EventNode> | null,
+      siblings: TreeNode<EventNode>[],
+      siblingIndex: number,
+    ): void {
+      const depth = node.depth ?? 0;
+      maps.nodeMap.set(node.data.id, node);
+      maps.parentMap.set(node.data.id, parent);
+      maps.siblingMap.set(node.data.id, { index: siblingIndex, siblings });
+      maps.depthLookup.set(node.data.id, depth);
+
+      let nodesAtDepth = maps.depthMap.get(depth);
+      if (!nodesAtDepth) {
+        nodesAtDepth = [];
+        maps.depthMap.set(depth, nodesAtDepth);
+      }
+      nodesAtDepth.push(node);
+
+      if (node.children) {
+        for (let i = 0; i < node.children.length; i++) {
+          processNode(node.children[i]!, node, node.children, i);
+        }
+      }
+    }
+
+    for (let i = 0; i < rootNodes.length; i++) {
+      processNode(rootNodes[i]!, null, rootNodes, i);
+    }
+
+    return maps;
+  }
+
   describe('basic tree structure', () => {
     // Tree structure:
     //   root1 (id: 1)
@@ -70,7 +118,8 @@ describe('TreeNavigator', () => {
       root1 = createNode(createEvent('1'), [child1, child2], 0);
       root2 = createNode(createEvent('2'), undefined, 0);
 
-      navigator = new TreeNavigator([root1, root2]);
+      const rootNodes = [root1, root2];
+      navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
     });
 
     describe('findById', () => {
@@ -169,14 +218,16 @@ describe('TreeNavigator', () => {
 
   describe('edge cases', () => {
     it('should handle empty tree', () => {
-      const navigator = new TreeNavigator([]);
+      const rootNodes: TreeNode<EventNode>[] = [];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
 
       expect(navigator.findById('1')).toBeNull();
     });
 
     it('should handle single node tree', () => {
       const singleNode = createNode(createEvent('1'));
-      const navigator = new TreeNavigator([singleNode]);
+      const rootNodes = [singleNode];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
 
       expect(navigator.findById('1')).toBe(singleNode);
       expect(navigator.getParent(singleNode)).toBeNull();
@@ -187,7 +238,8 @@ describe('TreeNavigator', () => {
 
     it('should handle nodes with empty children array', () => {
       const nodeWithEmptyChildren = createNode(createEvent('1'), []);
-      const navigator = new TreeNavigator([nodeWithEmptyChildren]);
+      const rootNodes = [nodeWithEmptyChildren];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
 
       expect(navigator.getFirstChild(nodeWithEmptyChildren)).toBeNull();
     });
@@ -200,7 +252,8 @@ describe('TreeNavigator', () => {
       const level2 = createNode(createEvent('2'), [level3], 1);
       const level1 = createNode(createEvent('1'), [level2], 0);
 
-      const navigator = new TreeNavigator([level1]);
+      const rootNodes = [level1];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
 
       // Navigate down
       expect(navigator.getFirstChild(level1)).toBe(level2);
@@ -223,7 +276,8 @@ describe('TreeNavigator', () => {
       const sibling3 = createNode(createEvent('3'));
       const sibling4 = createNode(createEvent('4'));
 
-      const navigator = new TreeNavigator([sibling1, sibling2, sibling3, sibling4]);
+      const rootNodes = [sibling1, sibling2, sibling3, sibling4];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
 
       // Forward traversal
       expect(navigator.getNextSibling(sibling1)).toBe(sibling2);
@@ -258,7 +312,8 @@ describe('TreeNavigator', () => {
       const c = createNode(createEvent('c'), [f], 1);
       const a = createNode(createEvent('a'), [b, c], 0);
 
-      const navigator = new TreeNavigator([a]);
+      const rootNodes = [a];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
 
       // Siblings at different levels
       expect(navigator.getNextSibling(d)).toBe(e);
@@ -272,6 +327,161 @@ describe('TreeNavigator', () => {
       // Cross-branch - siblings should only be in same parent
       expect(navigator.getNextSibling(b)).toBe(c);
       expect(navigator.getPrevSibling(c)).toBe(b);
+    });
+  });
+
+  describe('cross-parent navigation (getNextAtDepth/getPrevAtDepth)', () => {
+    /**
+     * Helper to create an event with specific timestamp and duration
+     */
+    function createTimedEvent(id: string, timestamp: number, duration: number): EventNode {
+      return {
+        id,
+        timestamp,
+        duration,
+        type: 'METHOD_ENTRY',
+        text: `Event ${id}`,
+      };
+    }
+
+    it('should navigate to next frame at same depth across parents', () => {
+      // Timeline visualization:
+      // Depth 0: [─────────A─────────]        [───────B───────]
+      // Depth 1: [──C──][──D──]               [──E──][──F──]
+      //
+      // At D, getNextAtDepth should return E (cross-parent)
+
+      const c = createNode(createTimedEvent('c', 0, 100), undefined, 1);
+      const d = createNode(createTimedEvent('d', 100, 100), undefined, 1);
+      const e = createNode(createTimedEvent('e', 300, 100), undefined, 1);
+      const f = createNode(createTimedEvent('f', 400, 100), undefined, 1);
+      const a = createNode(createTimedEvent('a', 0, 200), [c, d], 0);
+      const b = createNode(createTimedEvent('b', 300, 200), [e, f], 0);
+
+      const rootNodes = [a, b];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
+
+      // D's next sibling is null (last sibling in parent A)
+      expect(navigator.getNextSibling(d)).toBeNull();
+
+      // But getNextAtDepth should find E (first child of B, same depth)
+      expect(navigator.getNextAtDepth(d)).toBe(e);
+
+      // E's next at depth should be F
+      expect(navigator.getNextAtDepth(e)).toBe(f);
+
+      // F is last at this depth
+      expect(navigator.getNextAtDepth(f)).toBeNull();
+    });
+
+    it('should navigate to prev frame at same depth across parents', () => {
+      // Same structure as above
+      const c = createNode(createTimedEvent('c', 0, 100), undefined, 1);
+      const d = createNode(createTimedEvent('d', 100, 100), undefined, 1);
+      const e = createNode(createTimedEvent('e', 300, 100), undefined, 1);
+      const f = createNode(createTimedEvent('f', 400, 100), undefined, 1);
+      const a = createNode(createTimedEvent('a', 0, 200), [c, d], 0);
+      const b = createNode(createTimedEvent('b', 300, 200), [e, f], 0);
+
+      const rootNodes = [a, b];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
+
+      // E's prev sibling is null (first sibling in parent B)
+      expect(navigator.getPrevSibling(e)).toBeNull();
+
+      // But getPrevAtDepth should find D (last child of A, same depth)
+      expect(navigator.getPrevAtDepth(e)).toBe(d);
+
+      // D's prev at depth should be C
+      expect(navigator.getPrevAtDepth(d)).toBe(c);
+
+      // C is first at this depth
+      expect(navigator.getPrevAtDepth(c)).toBeNull();
+    });
+
+    it('should return null when already at first/last of depth', () => {
+      const a = createNode(createTimedEvent('a', 0, 100), undefined, 0);
+      const b = createNode(createTimedEvent('b', 200, 100), undefined, 0);
+
+      const rootNodes = [a, b];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
+
+      expect(navigator.getPrevAtDepth(a)).toBeNull();
+      expect(navigator.getNextAtDepth(b)).toBeNull();
+    });
+
+    it('should handle gaps between frames correctly', () => {
+      // Timeline with gaps:
+      // Depth 0: [──A──]        [──B──]        [──C──]
+      //           0-100         300-400        600-700
+
+      const a = createNode(createTimedEvent('a', 0, 100), undefined, 0);
+      const b = createNode(createTimedEvent('b', 300, 100), undefined, 0);
+      const c = createNode(createTimedEvent('c', 600, 100), undefined, 0);
+
+      const rootNodes = [a, b, c];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
+
+      expect(navigator.getNextAtDepth(a)).toBe(b);
+      expect(navigator.getNextAtDepth(b)).toBe(c);
+      expect(navigator.getPrevAtDepth(c)).toBe(b);
+      expect(navigator.getPrevAtDepth(b)).toBe(a);
+    });
+
+    it('should handle multiple depths independently', () => {
+      // Timeline:
+      // Depth 0: [─────────────ROOT─────────────]
+      // Depth 1: [──A──]        [──B──]
+      // Depth 2: [─X─]          [─Y─]
+
+      const x = createNode(createTimedEvent('x', 0, 50), undefined, 2);
+      const y = createNode(createTimedEvent('y', 300, 50), undefined, 2);
+      const a = createNode(createTimedEvent('a', 0, 100), [x], 1);
+      const b = createNode(createTimedEvent('b', 300, 100), [y], 1);
+      const root = createNode(createTimedEvent('root', 0, 500), [a, b], 0);
+
+      const rootNodes = [root];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
+
+      // At depth 1, A -> B
+      expect(navigator.getNextAtDepth(a)).toBe(b);
+      expect(navigator.getPrevAtDepth(b)).toBe(a);
+
+      // At depth 2, X -> Y (cross-parent)
+      expect(navigator.getNextAtDepth(x)).toBe(y);
+      expect(navigator.getPrevAtDepth(y)).toBe(x);
+    });
+
+    it('should not skip overlapping frames at same depth', () => {
+      // Overlapping scenario (shouldn't happen in practice but test the algorithm)
+      // Depth 0: [──A──]
+      //              [──B──]  (overlaps with A)
+      //                   [──C──]
+
+      const a = createNode(createTimedEvent('a', 0, 100), undefined, 0);
+      const b = createNode(createTimedEvent('b', 50, 100), undefined, 0); // overlaps with A
+      const c = createNode(createTimedEvent('c', 150, 100), undefined, 0);
+
+      const rootNodes = [a, b, c];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
+
+      // From A (ends at 100), next should be C (starts at 150), not B (starts at 50 which is < 100)
+      // Actually B starts at 50 which is before A ends, but B ends at 150
+      // The algorithm finds first node that STARTS after current ENDS
+      // A ends at 100, so we look for nodes starting > 100
+      // B starts at 50, C starts at 150
+      // So getNextAtDepth(a) should return c
+      expect(navigator.getNextAtDepth(a)).toBe(c);
+    });
+
+    it('should handle single node at depth', () => {
+      const single = createNode(createTimedEvent('single', 0, 100), undefined, 0);
+
+      const rootNodes = [single];
+      const navigator = new TreeNavigator(rootNodes, buildMapsFromNodes(rootNodes));
+
+      expect(navigator.getNextAtDepth(single)).toBeNull();
+      expect(navigator.getPrevAtDepth(single)).toBeNull();
     });
   });
 });

@@ -6,39 +6,23 @@
  * TreeNavigator
  *
  * Provides tree traversal for flame chart frame selection.
- * Builds parent and sibling lookup maps during construction
- * to enable O(1) navigation operations.
+ * Uses pre-built navigation maps for O(1) lookup operations.
  *
- * Since TreeNode only has children references (no parent),
- * this class builds the necessary reverse mappings.
+ * Maps are built during tree conversion (logEventToTreeNode) to avoid
+ * duplicate O(n) traversal work.
  */
 
 import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
 import type { EventNode, TreeNode } from '../../types/flamechart.types.js';
-
-/**
- * Extended EventNode with optional original LogEvent reference.
- */
-interface EventNodeWithOriginal extends EventNode {
-  original?: LogEvent;
-}
-
-/**
- * Stores sibling information for a node.
- */
-interface SiblingInfo {
-  /** Index in parent's children array (or root array) */
-  index: number;
-  /** Reference to siblings array (parent.children or root array) */
-  siblings: TreeNode<EventNode>[];
-}
+import type { NavigationMaps, SiblingInfo } from '../../utils/tree-converter.js';
 
 /**
  * TreeNavigator enables parent/child/sibling traversal of TreeNode structures.
  *
  * Usage:
  * ```typescript
- * const navigator = new TreeNavigator(rootNodes);
+ * const { treeNodes, maps } = logEventToTreeNode(events);
+ * const navigator = new TreeNavigator(treeNodes, maps);
  *
  * // Find a node by its event ID
  * const node = navigator.findById('event-123');
@@ -56,25 +40,42 @@ interface SiblingInfo {
  */
 export class TreeNavigator {
   /** Maps event ID to its TreeNode */
-  private nodeMap: Map<string, TreeNode<EventNode>> = new Map();
+  private nodeMap: Map<string, TreeNode<EventNode>>;
 
   /** Maps event ID to its parent TreeNode (null for root nodes) */
-  private parentMap: Map<string, TreeNode<EventNode> | null> = new Map();
+  private parentMap: Map<string, TreeNode<EventNode> | null>;
 
   /** Maps event ID to sibling info for efficient sibling navigation */
-  private siblingMap: Map<string, SiblingInfo> = new Map();
+  private siblingMap: Map<string, SiblingInfo>;
 
   /** Maps original LogEvent to TreeNode for hit test lookup */
-  private originalMap: Map<LogEvent, TreeNode<EventNode>> = new Map();
+  private originalMap: Map<LogEvent, TreeNode<EventNode>>;
+
+  /** Maps depth to nodes at that depth, sorted by timestamp for cross-parent navigation */
+  private depthMap: Map<number, TreeNode<EventNode>[]>;
+
+  /** Maps event ID to its depth for quick lookup */
+  private depthLookup: Map<string, number>;
 
   /**
-   * Construct a TreeNavigator from root nodes.
-   * Builds all lookup maps during construction.
+   * Construct a TreeNavigator from pre-built navigation maps.
+   * Maps are built during tree conversion (logEventToTreeNode).
    *
-   * @param rootNodes - Array of root-level TreeNodes
+   * @param rootNodes - Array of root-level TreeNodes (unused, kept for API compatibility)
+   * @param maps - Pre-built navigation maps from tree conversion
    */
-  constructor(rootNodes: TreeNode<EventNode>[]) {
-    this.buildMaps(rootNodes);
+  constructor(_rootNodes: TreeNode<EventNode>[], maps: NavigationMaps) {
+    this.originalMap = maps.originalMap;
+    this.nodeMap = maps.nodeMap;
+    this.parentMap = maps.parentMap;
+    this.siblingMap = maps.siblingMap;
+    this.depthMap = maps.depthMap;
+    this.depthLookup = maps.depthLookup;
+
+    // Sort each depth array by timestamp for efficient binary search
+    for (const nodesAtDepth of this.depthMap.values()) {
+      nodesAtDepth.sort((a, b) => a.data.timestamp - b.data.timestamp);
+    }
   }
 
   /**
@@ -202,63 +203,100 @@ export class TreeNavigator {
   }
 
   /**
-   * Build all lookup maps by traversing the tree.
+   * Get the next node at the same depth (cross-parent navigation).
+   * Used when getNextSibling() returns null to continue navigation
+   * to frames with different parents.
    *
-   * @param rootNodes - Array of root-level TreeNodes
+   * @param node - Current node
+   * @returns Next node at same depth, or null if at end
    */
-  private buildMaps(rootNodes: TreeNode<EventNode>[]): void {
-    // Process root nodes (parent is null, siblings are the root array)
-    for (let i = 0; i < rootNodes.length; i++) {
-      const node = rootNodes[i];
-      if (!node) continue;
-
-      this.nodeMap.set(node.data.id, node);
-      this.parentMap.set(node.data.id, null);
-      this.siblingMap.set(node.data.id, {
-        index: i,
-        siblings: rootNodes,
-      });
-
-      // Map original LogEvent if available
-      const nodeData = node.data as EventNodeWithOriginal;
-      if (nodeData.original) {
-        this.originalMap.set(nodeData.original, node);
-      }
-
-      // Recursively process children
-      this.processChildren(node);
+  public getNextAtDepth(node: TreeNode<EventNode>): TreeNode<EventNode> | null {
+    const depth = this.depthLookup.get(node.data.id);
+    if (depth === undefined) {
+      return null;
     }
+
+    const nodesAtDepth = this.depthMap.get(depth);
+    if (!nodesAtDepth || nodesAtDepth.length === 0) {
+      return null;
+    }
+
+    // Binary search for first node that starts at or after current node ends
+    // Using < (not <=) to include adjacent frames where one ends exactly where next starts
+    const nodeEnd = node.data.timestamp + node.data.duration;
+    let left = 0;
+    let right = nodesAtDepth.length;
+
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      const midNode = nodesAtDepth[mid]!;
+      if (midNode.data.timestamp < nodeEnd) {
+        left = mid + 1;
+      } else {
+        right = mid;
+      }
+    }
+
+    // left is now the index of the first node starting at or after nodeEnd
+    if (left >= nodesAtDepth.length) {
+      return null;
+    }
+
+    const candidate = nodesAtDepth[left];
+    // Make sure we don't return the same node
+    if (candidate && candidate.data.id !== node.data.id) {
+      return candidate;
+    }
+    return null;
   }
 
   /**
-   * Recursively process children of a node.
+   * Get the previous node at the same depth (cross-parent navigation).
+   * Used when getPrevSibling() returns null to continue navigation
+   * to frames with different parents.
    *
-   * @param parent - Parent node whose children to process
+   * @param node - Current node
+   * @returns Previous node at same depth, or null if at start
    */
-  private processChildren(parent: TreeNode<EventNode>): void {
-    if (!parent.children || parent.children.length === 0) {
-      return;
+  public getPrevAtDepth(node: TreeNode<EventNode>): TreeNode<EventNode> | null {
+    const depth = this.depthLookup.get(node.data.id);
+    if (depth === undefined) {
+      return null;
     }
 
-    for (let i = 0; i < parent.children.length; i++) {
-      const child = parent.children[i];
-      if (!child) continue;
+    const nodesAtDepth = this.depthMap.get(depth);
+    if (!nodesAtDepth || nodesAtDepth.length === 0) {
+      return null;
+    }
 
-      this.nodeMap.set(child.data.id, child);
-      this.parentMap.set(child.data.id, parent);
-      this.siblingMap.set(child.data.id, {
-        index: i,
-        siblings: parent.children,
-      });
+    // Binary search for last node that ends at or before current node starts
+    // Using <= to include adjacent frames where one ends exactly where next starts
+    const nodeStart = node.data.timestamp;
+    let left = 0;
+    let right = nodesAtDepth.length;
 
-      // Map original LogEvent if available
-      const childData = child.data as EventNodeWithOriginal;
-      if (childData.original) {
-        this.originalMap.set(childData.original, child);
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      const midNode = nodesAtDepth[mid]!;
+      const midEnd = midNode.data.timestamp + midNode.data.duration;
+      if (midEnd <= nodeStart) {
+        left = mid + 1;
+      } else {
+        right = mid;
       }
-
-      // Recursively process grandchildren
-      this.processChildren(child);
     }
+
+    // left-1 is the index of the last node ending at or before nodeStart
+    const prevIndex = left - 1;
+    if (prevIndex < 0) {
+      return null;
+    }
+
+    const candidate = nodesAtDepth[prevIndex];
+    // Make sure we don't return the same node
+    if (candidate && candidate.data.id !== node.data.id) {
+      return candidate;
+    }
+    return null;
   }
 }

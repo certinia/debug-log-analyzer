@@ -18,6 +18,7 @@
 
 import { SelectionManager } from '../optimised/selection/SelectionManager.js';
 import type { EventNode, TreeNode } from '../types/flamechart.types.js';
+import type { NavigationMaps } from '../utils/tree-converter.js';
 
 describe('SelectionManager', () => {
   /**
@@ -48,6 +49,53 @@ describe('SelectionManager', () => {
     };
   }
 
+  /**
+   * Helper to build NavigationMaps from root nodes (for testing).
+   * Mimics what logEventToTreeNode does during production.
+   */
+  function buildMapsFromNodes(rootNodes: TreeNode<EventNode>[]): NavigationMaps {
+    const maps: NavigationMaps = {
+      originalMap: new Map(),
+      nodeMap: new Map(),
+      parentMap: new Map(),
+      siblingMap: new Map(),
+      depthMap: new Map(),
+      depthLookup: new Map(),
+    };
+
+    function processNode(
+      node: TreeNode<EventNode>,
+      parent: TreeNode<EventNode> | null,
+      siblings: TreeNode<EventNode>[],
+      siblingIndex: number,
+    ): void {
+      const depth = node.depth ?? 0;
+      maps.nodeMap.set(node.data.id, node);
+      maps.parentMap.set(node.data.id, parent);
+      maps.siblingMap.set(node.data.id, { index: siblingIndex, siblings });
+      maps.depthLookup.set(node.data.id, depth);
+
+      let nodesAtDepth = maps.depthMap.get(depth);
+      if (!nodesAtDepth) {
+        nodesAtDepth = [];
+        maps.depthMap.set(depth, nodesAtDepth);
+      }
+      nodesAtDepth.push(node);
+
+      if (node.children) {
+        for (let i = 0; i < node.children.length; i++) {
+          processNode(node.children[i]!, node, node.children, i);
+        }
+      }
+    }
+
+    for (let i = 0; i < rootNodes.length; i++) {
+      processNode(rootNodes[i]!, null, rootNodes, i);
+    }
+
+    return maps;
+  }
+
   describe('selection lifecycle', () => {
     let manager: SelectionManager<EventNode>;
     let node1: TreeNode<EventNode>;
@@ -56,7 +104,8 @@ describe('SelectionManager', () => {
     beforeEach(() => {
       node1 = createNode(createEvent('1'));
       node2 = createNode(createEvent('2'));
-      manager = new SelectionManager([node1, node2]);
+      const rootNodes = [node1, node2];
+      manager = new SelectionManager(rootNodes, buildMapsFromNodes(rootNodes));
     });
 
     it('should have no selection initially', () => {
@@ -117,7 +166,8 @@ describe('SelectionManager', () => {
       root1 = createNode(createEvent('1'), [child1, child2], 0);
       root2 = createNode(createEvent('2'), undefined, 0);
 
-      manager = new SelectionManager([root1, root2]);
+      const rootNodes = [root1, root2];
+      manager = new SelectionManager(rootNodes, buildMapsFromNodes(rootNodes));
     });
 
     it('should return null when navigating with no selection', () => {
@@ -233,7 +283,8 @@ describe('SelectionManager', () => {
       const child = createNode(createEvent('11'), undefined, 1);
       node1 = createNode(createEvent('1'), [child], 0);
       node2 = createNode(createEvent('2'), undefined, 0);
-      manager = new SelectionManager([node1, node2]);
+      const rootNodes = [node1, node2];
+      manager = new SelectionManager(rootNodes, buildMapsFromNodes(rootNodes));
     });
 
     it('should find node by id', () => {
@@ -254,7 +305,8 @@ describe('SelectionManager', () => {
 
   describe('empty tree', () => {
     it('should handle empty tree', () => {
-      const manager = new SelectionManager<EventNode>([]);
+      const rootNodes: TreeNode<EventNode>[] = [];
+      const manager = new SelectionManager<EventNode>(rootNodes, buildMapsFromNodes(rootNodes));
 
       expect(manager.hasSelection()).toBe(false);
       expect(manager.getSelected()).toBeNull();
