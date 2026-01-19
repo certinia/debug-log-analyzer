@@ -97,6 +97,12 @@ export class ApexLogTimeline {
         onSearchNavigate: (event, screenX, screenY, depth) => {
           this.handleSearchNavigate(event, screenX, screenY, depth);
         },
+        onSelect: (eventNode) => {
+          this.handleSelect(eventNode);
+        },
+        onJumpToCallTree: (eventNode) => {
+          this.handleJumpToCallTree(eventNode);
+        },
       },
     );
 
@@ -211,12 +217,13 @@ export class ApexLogTimeline {
   }
 
   /**
-   * Handle click - navigate to Apex log event or marker.
+   * Handle click - navigate to marker, select frame (but don't navigate).
+   * Click on frame selects it only. Use J key to navigate to call tree.
    */
   private handleClick(
-    screenX: number,
-    screenY: number,
-    event: LogEvent | null,
+    _screenX: number,
+    _screenY: number,
+    _event: LogEvent | null,
     marker: TimelineMarker | null,
   ): void {
     // Navigate to truncation marker if clicked
@@ -225,10 +232,34 @@ export class ApexLogTimeline {
       return;
     }
 
-    // Navigate to event if clicked
-    if (event) {
-      goToRow(event.timestamp);
+    // Frame click is handled by FlameChart's selection system (via onSelect callback)
+    // No longer auto-navigate to call tree on click - use J key for explicit navigation
+  }
+
+  /**
+   * Handle selection change from FlameChart.
+   * Selection only updates visual state, does not navigate call tree.
+   * Use J key for explicit "jump to call tree" action.
+   */
+  private handleSelect(eventNode: EventNode | null): void {
+    if (!eventNode) {
+      // Selection cleared - hide tooltip
+      if (this.tooltipManager) {
+        this.tooltipManager.hide();
+      }
+      return;
     }
+
+    // Selection only - no auto-navigation to call tree
+    // User can press J to explicitly jump to call tree
+  }
+
+  /**
+   * Handle J key "Jump to Call Tree" action.
+   * Navigates call tree to the selected frame.
+   */
+  private handleJumpToCallTree(eventNode: EventNode): void {
+    goToRow(eventNode.timestamp);
   }
 
   /**

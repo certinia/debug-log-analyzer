@@ -46,6 +46,9 @@ export interface InteractionCallbacks {
 
   /** Called when mouse leaves the canvas. */
   onMouseLeave?: () => void;
+
+  /** Called when drag operation starts (mouse or touch). */
+  onDragStart?: () => void;
 }
 
 export class TimelineInteractionHandler {
@@ -231,10 +234,17 @@ export class TimelineInteractionHandler {
   private handleWheel(event: WheelEvent): void {
     event.preventDefault();
 
-    // Shift + wheel = Vertical pan (stack depth)
-    // Uses deltaY directly for natural scrolling feel (scroll down = view moves down)
+    // Shift + wheel/swipe = Force pan (skip zoom, useful when frame is selected)
+    // Choose horizontal or vertical pan based on dominant delta direction
     if (event.shiftKey && this.options.enablePan) {
-      const changed = this.viewport.panBy(0, event.deltaY);
+      let changed: boolean;
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+        // Horizontal swipe with Shift = horizontal pan
+        changed = this.viewport.panBy(event.deltaX, 0);
+      } else {
+        // Vertical wheel with Shift = vertical pan (stack depth)
+        changed = this.viewport.panBy(0, event.deltaY);
+      }
       if (changed && this.callbacks.onViewportChange) {
         this.callbacks.onViewportChange();
       }
@@ -304,6 +314,12 @@ export class TimelineInteractionHandler {
     // Apply zoom with mouse position as anchor
     const changed = this.viewport.setZoom(newZoom, mouseX);
 
+    // Reset mouseDown flag during zoom to prevent accidental selection
+    // (trackpad gestures can sometimes trigger concurrent click events)
+    if (changed) {
+      this.isMouseDown = false;
+    }
+
     // Notify callback if viewport changed
     if (changed && this.callbacks.onViewportChange) {
       this.callbacks.onViewportChange();
@@ -327,6 +343,9 @@ export class TimelineInteractionHandler {
     this.isMouseDown = true;
     this.lastMouseX = event.clientX;
     this.lastMouseY = event.clientY;
+
+    // Notify callback that drag started (used to cancel keyboard animations)
+    this.callbacks.onDragStart?.();
 
     // Change cursor to grabbing
     this.canvas.style.cursor = 'grabbing';
@@ -453,6 +472,9 @@ export class TimelineInteractionHandler {
       this.isDragging = true;
       this.lastTouchX = touch.clientX;
       this.lastTouchY = touch.clientY;
+
+      // Notify callback that drag started (used to cancel keyboard animations)
+      this.callbacks.onDragStart?.();
 
       // Change cursor to grabbing
       this.canvas.style.cursor = 'grabbing';

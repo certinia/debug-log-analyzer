@@ -24,6 +24,11 @@ export const KEYBOARD_CONSTANTS = {
 } as const;
 
 /**
+ * Navigation direction for frame traversal.
+ */
+export type FrameNavDirection = 'up' | 'down' | 'left' | 'right';
+
+/**
  * Callbacks for keyboard events.
  */
 export interface KeyboardCallbacks {
@@ -41,6 +46,25 @@ export interface KeyboardCallbacks {
 
   /** Called when Shift key hold state changes (for hints overlay). */
   onShiftHeld?: (held: boolean) => void;
+
+  /**
+   * Called when arrow key is pressed for frame navigation.
+   * In a flame chart (depth 0 at bottom, children visually above):
+   * - up: Navigate to child frame (visually up, deeper in call stack)
+   * - down: Navigate to parent frame (visually down, shallower in call stack)
+   * - left: Navigate to previous sibling frame
+   * - right: Navigate to next sibling frame
+   *
+   * Returns true if navigation was handled (frame was selected),
+   * false to fall through to pan behavior.
+   */
+  onFrameNav?: (direction: FrameNavDirection) => boolean;
+
+  /**
+   * Called when J key is pressed for "Jump to Call Tree".
+   * Navigates the call tree to the currently selected frame.
+   */
+  onJumpToCallTree?: () => void;
 }
 
 /**
@@ -148,6 +172,11 @@ export class KeyboardHandler {
       event.preventDefault();
       return;
     }
+
+    if (this.handleJumpKey(event)) {
+      event.preventDefault();
+      return;
+    }
   }
 
   /**
@@ -164,7 +193,8 @@ export class KeyboardHandler {
   /**
    * Handle pan keys.
    * - Shift + Arrow keys: Always pan (even when frame selected)
-   * - Arrow keys without Shift: Pan (Phase 2 will change this to frame navigation when selected)
+   * - Arrow keys without Shift: Frame navigation if onFrameNav is provided and returns true,
+   *   otherwise falls through to pan
    * - A/D: Horizontal pan (left/right)
    * @returns true if event was handled
    */
@@ -183,10 +213,35 @@ export class KeyboardHandler {
       return true;
     }
 
-    // Arrow keys: pan when Shift is held OR when no frame is selected
-    // Phase 2 will add: if (!shiftKey && hasSelectedFrame) return false; // let frame nav handle it
-    // For now, arrows always pan
+    // Arrow keys: Try frame navigation first (unless Shift is held)
+    // If onFrameNav returns true, navigation was handled; otherwise fall through to pan
+    if (!event.shiftKey && this.callbacks.onFrameNav) {
+      let direction: FrameNavDirection | null = null;
+      switch (event.key) {
+        case 'ArrowUp':
+          direction = 'up';
+          break;
+        case 'ArrowDown':
+          direction = 'down';
+          break;
+        case 'ArrowLeft':
+          direction = 'left';
+          break;
+        case 'ArrowRight':
+          direction = 'right';
+          break;
+      }
 
+      if (direction !== null) {
+        const handled = this.callbacks.onFrameNav(direction);
+        if (handled) {
+          return true;
+        }
+        // Fall through to pan if frame nav didn't handle it
+      }
+    }
+
+    // Arrow keys: pan when Shift is held OR when frame nav didn't handle it
     switch (event.key) {
       case 'ArrowLeft':
         this.callbacks.onPan?.(-stepX, 0);
@@ -255,6 +310,24 @@ export class KeyboardHandler {
   private handleEscapeKey(event: KeyboardEvent): boolean {
     if (event.key === 'Escape') {
       this.callbacks.onEscape?.();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Handle J key (Jump to Call Tree).
+   * Navigates call tree to currently selected frame.
+   * @returns true if event was handled
+   */
+  private handleJumpKey(event: KeyboardEvent): boolean {
+    // Don't handle if modifier keys are pressed (allow browser shortcuts)
+    if (event.ctrlKey || event.altKey || event.metaKey) {
+      return false;
+    }
+
+    if (event.key === 'j' || event.key === 'J') {
+      this.callbacks.onJumpToCallTree?.();
       return true;
     }
     return false;

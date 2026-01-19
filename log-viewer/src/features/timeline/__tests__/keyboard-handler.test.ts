@@ -50,6 +50,8 @@ describe('KeyboardHandler', () => {
       onResetZoom: jest.fn(),
       onEscape: jest.fn(),
       onShiftHeld: jest.fn(),
+      onFrameNav: jest.fn(),
+      onJumpToCallTree: jest.fn(),
     };
 
     handler = new KeyboardHandler(container, viewport, callbacks);
@@ -252,6 +254,65 @@ describe('KeyboardHandler', () => {
     });
   });
 
+  describe('frame navigation (onFrameNav)', () => {
+    it('should call onFrameNav with "up" on ArrowUp when handler returns true', () => {
+      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
+      dispatchKeyEvent('keydown', 'ArrowUp');
+
+      expect(callbacks.onFrameNav).toHaveBeenCalledWith('up');
+      expect(callbacks.onPan).not.toHaveBeenCalled();
+    });
+
+    it('should call onFrameNav with "down" on ArrowDown when handler returns true', () => {
+      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
+      dispatchKeyEvent('keydown', 'ArrowDown');
+
+      expect(callbacks.onFrameNav).toHaveBeenCalledWith('down');
+      expect(callbacks.onPan).not.toHaveBeenCalled();
+    });
+
+    it('should call onFrameNav with "left" on ArrowLeft when handler returns true', () => {
+      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
+      dispatchKeyEvent('keydown', 'ArrowLeft');
+
+      expect(callbacks.onFrameNav).toHaveBeenCalledWith('left');
+      expect(callbacks.onPan).not.toHaveBeenCalled();
+    });
+
+    it('should call onFrameNav with "right" on ArrowRight when handler returns true', () => {
+      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
+      dispatchKeyEvent('keydown', 'ArrowRight');
+
+      expect(callbacks.onFrameNav).toHaveBeenCalledWith('right');
+      expect(callbacks.onPan).not.toHaveBeenCalled();
+    });
+
+    it('should fall through to pan when onFrameNav returns false', () => {
+      (callbacks.onFrameNav as jest.Mock).mockReturnValue(false);
+      dispatchKeyEvent('keydown', 'ArrowLeft');
+
+      expect(callbacks.onFrameNav).toHaveBeenCalledWith('left');
+      expect(callbacks.onPan).toHaveBeenCalled();
+    });
+
+    it('should skip onFrameNav and pan directly when Shift is held', () => {
+      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
+      dispatchKeyEvent('keydown', 'ArrowLeft', { shiftKey: true });
+
+      expect(callbacks.onFrameNav).not.toHaveBeenCalled();
+      expect(callbacks.onPan).toHaveBeenCalled();
+    });
+
+    it('should not call onFrameNav for A/D keys', () => {
+      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
+      dispatchKeyEvent('keydown', 'a');
+      dispatchKeyEvent('keydown', 'd');
+
+      expect(callbacks.onFrameNav).not.toHaveBeenCalled();
+      expect(callbacks.onPan).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('shift hold detection', () => {
     beforeEach(() => {
       jest.useFakeTimers();
@@ -355,6 +416,44 @@ describe('KeyboardHandler', () => {
 
       // Should not have been called
       expect(callbacks.onShiftHeld).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('jump to call tree (J key)', () => {
+    it('should call onJumpToCallTree on J key', () => {
+      dispatchKeyEvent('keydown', 'j');
+
+      expect(callbacks.onJumpToCallTree).toHaveBeenCalled();
+    });
+
+    it('should call onJumpToCallTree on uppercase J key', () => {
+      dispatchKeyEvent('keydown', 'J');
+
+      expect(callbacks.onJumpToCallTree).toHaveBeenCalled();
+    });
+
+    it('should not call onJumpToCallTree when Ctrl is pressed', () => {
+      dispatchKeyEvent('keydown', 'j', { ctrlKey: true });
+
+      expect(callbacks.onJumpToCallTree).not.toHaveBeenCalled();
+    });
+
+    it('should not call onJumpToCallTree when Alt is pressed', () => {
+      dispatchKeyEvent('keydown', 'j', { altKey: true });
+
+      expect(callbacks.onJumpToCallTree).not.toHaveBeenCalled();
+    });
+
+    it('should not call onJumpToCallTree when Meta is pressed', () => {
+      dispatchKeyEvent('keydown', 'j', { metaKey: true });
+
+      expect(callbacks.onJumpToCallTree).not.toHaveBeenCalled();
+    });
+
+    it('should prevent default on J key', () => {
+      const event = dispatchKeyEvent('keydown', 'j');
+
+      expect(event.defaultPrevented).toBe(true);
     });
   });
 

@@ -281,6 +281,68 @@ export class TimelineViewport {
     }
   }
 
+  /**
+   * Set viewport offsets directly.
+   * Used by ViewportAnimator for smooth transitions.
+   *
+   * @param offsetX - Horizontal offset in pixels
+   * @param offsetY - Vertical offset in pixels
+   */
+  public setOffset(offsetX: number, offsetY: number): void {
+    this.state.offsetX = this.clampOffsetX(offsetX);
+    this.state.offsetY = this.clampOffsetY(offsetY);
+  }
+
+  /**
+   * Calculate target offsets to center on an event without applying them.
+   * Used by ViewportAnimator to determine animation target.
+   *
+   * @param eventTimestamp - Event start time in nanoseconds
+   * @param eventDuration - Event duration in nanoseconds
+   * @param eventDepth - Event depth in call tree (0-indexed)
+   * @returns Target offsets (clamped to valid range)
+   */
+  public calculateCenterOffset(
+    eventTimestamp: number,
+    eventDuration: number,
+    eventDepth: number,
+  ): { x: number; y: number } {
+    // ========== Horizontal Centering ==========
+    const eventX = eventTimestamp * this.state.zoom;
+    const eventWidth = eventDuration * this.state.zoom;
+    const eventMidpoint = eventX + eventWidth / 2;
+
+    // Check if off-screen (left or right)
+    const screenX = eventX - this.state.offsetX;
+    const isOffScreenHorizontal = screenX > this.state.displayWidth || screenX + eventWidth < 0;
+
+    let targetOffsetX = this.state.offsetX;
+    if (isOffScreenHorizontal) {
+      // Center event midpoint at screen center
+      targetOffsetX = this.clampOffsetX(eventMidpoint - this.state.displayWidth / 2);
+    }
+
+    // ========== Vertical Centering ==========
+    const eventY = eventDepth * TIMELINE_CONSTANTS.EVENT_HEIGHT;
+
+    // Calculate screen Y position of event
+    const worldYBottom = -this.state.offsetY;
+    const screenY = this.state.displayHeight - (eventY - worldYBottom);
+
+    // Check if off-screen (top or bottom)
+    const isOffScreenVertical = screenY < 0 || screenY > this.state.displayHeight;
+
+    let targetOffsetY = this.state.offsetY;
+    if (isOffScreenVertical) {
+      // Center event at vertical center
+      const targetWorldY = eventY;
+      const newWorldYBottom = targetWorldY - this.state.displayHeight / 2;
+      targetOffsetY = this.clampOffsetY(-newWorldYBottom);
+    }
+
+    return { x: targetOffsetX, y: targetOffsetY };
+  }
+
   // ============================================================================
   // PRIVATE HELPERS
   // ============================================================================
@@ -354,6 +416,34 @@ export class TimelineViewport {
     const minOffset = -maxVertOffset;
 
     return Math.max(minOffset, Math.min(maxOffset, offsetY));
+  }
+
+  /**
+   * Clamp offset values to valid range.
+   * Used by ViewportAnimator to ensure targets are within bounds.
+   *
+   * @param offsetX - Horizontal offset to clamp
+   * @param offsetY - Vertical offset to clamp
+   * @returns Clamped offset values
+   */
+  public clampOffset(offsetX: number, offsetY: number): { x: number; y: number } {
+    return {
+      x: this.clampOffsetX(offsetX),
+      y: this.clampOffsetY(offsetY),
+    };
+  }
+
+  /**
+   * Clamp zoom value to valid range.
+   * Used by ViewportAnimator to ensure target zoom is within bounds.
+   *
+   * @param zoom - Zoom level to clamp
+   * @returns Clamped zoom value
+   */
+  public clampZoom(zoom: number): number {
+    const minZoom = this.getMinZoom();
+    const maxZoom = this.getMaxZoom();
+    return Math.max(minZoom, Math.min(maxZoom, zoom));
   }
 
   /**

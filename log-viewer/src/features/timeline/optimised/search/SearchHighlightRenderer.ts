@@ -7,14 +7,19 @@
  *
  * Rendering layer for search highlights using PixiJS Graphics.
  * Draws borders and overlays for matched events with viewport culling.
+ *
+ * Uses shared HighlightRenderer for consistent styling with SelectionHighlightRenderer.
  */
 
 import * as PIXI from 'pixi.js';
 import type { EventNode, ViewportState } from '../../types/flamechart.types.js';
-import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { SearchCursor, SearchMatch } from '../../types/search.types.js';
-import { blendWithBackground } from '../BucketColorResolver.js';
 import type { PrecomputedRect } from '../RectangleManager.js';
+import {
+  extractHighlightColors,
+  renderHighlight,
+  type HighlightColors,
+} from '../rendering/HighlightRenderer.js';
 
 /**
  * Culling bounds derived from viewport.
@@ -31,20 +36,6 @@ interface CullingBounds {
 
   /** End depth (0-indexed). */
   depthEnd: number;
-}
-
-/**
- * Highlight colors from VS Code theme (pre-blended opaque).
- */
-interface HighlightColors {
-  /** Source color for current match (0xRRGGBB) - used for border. */
-  currentMatchColor: number;
-  /** Pre-blended opaque color for small event solid fill (0.6 opacity). */
-  smallEventFillColor: number;
-  /** Pre-blended opaque color for overlay fill (0.3 opacity). */
-  overlayFillColor: number;
-  /** Pre-blended opaque color for border stroke (0.9 opacity). */
-  borderStrokeColor: number;
 }
 
 /**
@@ -77,8 +68,8 @@ export class SearchHighlightRenderer {
     container.addChild(this.allMatchGraphics);
     container.addChild(this.currentMatchGraphics);
 
-    // Extract colors from CSS variables
-    this.colors = this.extractColors();
+    // Extract colors from shared utility
+    this.colors = extractHighlightColors();
   }
 
   /**
@@ -103,61 +94,15 @@ export class SearchHighlightRenderer {
       return;
     }
 
-    // Minimum visible highlight width in pixels
-    const MIN_HIGHLIGHT_WIDTH = 6;
-
-    // Calculate screen position from event data and current viewport (not from stale rect)
-    const event = currentMatch.event;
-    const screenX = event.timestamp * viewport.zoom;
-    const screenWidth = event.duration * viewport.zoom;
-    const screenY = currentMatch.depth * TIMELINE_CONSTANTS.EVENT_HEIGHT;
-    const screenHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
-
-    // Calculate event center point (always accurate regardless of zoom)
-    const eventCenterX = screenX + screenWidth / 2;
-
-    // Enforce minimum visible size for highlight
-    const visibleWidth = Math.max(screenWidth, MIN_HIGHLIGHT_WIDTH);
-
-    // Center the minimum-size highlight on the actual event position
-    const centeredX = eventCenterX - visibleWidth / 2;
-
-    // Use different rendering based on whether minimum width is applied
-    if (screenWidth < MIN_HIGHLIGHT_WIDTH) {
-      // Small event: solid fill with pre-blended color (simulates 0.6 opacity)
-      // This makes the expanded highlight more prominent and avoids visual complexity
-      this.currentMatchGraphics.rect(centeredX, screenY, visibleWidth, screenHeight);
-      this.currentMatchGraphics.fill({ color: this.colors.smallEventFillColor });
-    } else {
-      // Normal event: overlay with border (pre-blended opaque colors)
-      const halfGap = TIMELINE_CONSTANTS.RECT_GAP / 2;
-      const gappedWidth = Math.max(2, visibleWidth - TIMELINE_CONSTANTS.RECT_GAP);
-      const gappedHeight = screenHeight - TIMELINE_CONSTANTS.RECT_GAP;
-
-      // Overlay fill with pre-blended color (simulates 0.3 opacity)
-      this.currentMatchGraphics.rect(
-        centeredX + halfGap,
-        screenY + halfGap,
-        gappedWidth,
-        gappedHeight,
-      );
-      this.currentMatchGraphics.fill({ color: this.colors.overlayFillColor });
-
-      // Internal border with pre-blended color (simulates 0.9 opacity)
-      const borderInset = 1;
-      const borderX = centeredX + halfGap + borderInset;
-      const borderY = screenY + halfGap + borderInset;
-      const borderWidth = Math.max(0, gappedWidth - borderInset * 2);
-      const borderHeight = Math.max(0, gappedHeight - borderInset * 2);
-
-      if (borderWidth > 0 && borderHeight > 0) {
-        this.currentMatchGraphics.rect(borderX, borderY, borderWidth, borderHeight);
-        this.currentMatchGraphics.stroke({
-          width: 1,
-          color: this.colors.borderStrokeColor,
-        });
-      }
-    }
+    // Use shared highlight rendering logic
+    renderHighlight(
+      this.currentMatchGraphics,
+      currentMatch.event.timestamp,
+      currentMatch.event.duration,
+      currentMatch.depth,
+      viewport,
+      this.colors,
+    );
   }
 
   /**
@@ -235,76 +180,5 @@ export class SearchHighlightRenderer {
     // Always show current match highlight regardless of rect size
     // (don't check rect.width > 0 because EventBatchRenderer might cull small rects)
     return true;
-  }
-
-  /**
-   * Extract highlight colors from CSS variables and pre-blend for opaque rendering.
-   * Falls back to defaults if CSS variables not available.
-   *
-   * @returns Highlight colors as pre-blended opaque PixiJS numeric values
-   */
-  private extractColors(): HighlightColors {
-    const computedStyle = getComputedStyle(document.documentElement);
-
-    const currentMatchColorStr =
-      computedStyle.getPropertyValue('--vscode-editor-findMatchBackground').trim() || '#ff9632';
-
-    const c = this.parseColor(currentMatchColorStr);
-    const sourceColor = c.color;
-
-    // Pre-blend colors with background for opaque rendering
-    return {
-      currentMatchColor: sourceColor,
-      smallEventFillColor: blendWithBackground(sourceColor, 0.6),
-      overlayFillColor: blendWithBackground(sourceColor, 0.3),
-      borderStrokeColor: blendWithBackground(sourceColor, 0.9),
-    };
-  }
-
-  /**
-   * Parse CSS color string to PixiJS numeric color (RGB only, ignoring alpha).
-   * Handles hex format (#RGB, #RGBA, #RRGGBB, #RRGGBBAA) and rgb(a) formats.
-   * Alpha is intentionally ignored - highlight opacities are fixed for visibility.
-   *
-   * @param cssColor - CSS color string
-   * @returns PixiJS numeric color (0xRRGGBB)
-   */
-  private parseColor(cssColor: string): { color: number } {
-    if (!cssColor) {
-      return { color: 0xea5c00 };
-    }
-    if (cssColor.startsWith('#')) {
-      const hex = cssColor.slice(1);
-      if (hex.length === 8) {
-        // #RRGGBBAA - extract RGB, ignore alpha
-        const rgb = hex.slice(0, 6);
-        return { color: parseInt(rgb, 16) };
-      }
-      if (hex.length === 6) {
-        return { color: parseInt(hex, 16) };
-      }
-      if (hex.length === 4) {
-        // #RGBA - extract RGB, ignore alpha
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        return { color: parseInt(r + r + g + g + b + b, 16) };
-      }
-      if (hex.length === 3) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        return { color: parseInt(r + r + g + g + b + b, 16) };
-      }
-    }
-    // rgba() fallback - ignore alpha
-    const rgba = cssColor.match(/rgba?\((\d+),(\d+),(\d+)(?:,(\d*(?:\.\d+)?))?\)/);
-    if (rgba) {
-      const r = parseInt(rgba[1]!, 10);
-      const g = parseInt(rgba[2]!, 10);
-      const b = parseInt(rgba[3]!, 10);
-      return { color: (r << 16) | (g << 8) | b };
-    }
-    return { color: 0xea5c00 };
   }
 }

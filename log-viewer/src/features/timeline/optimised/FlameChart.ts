@@ -39,15 +39,22 @@ import { AxisRenderer } from './time-axis/AxisRenderer.js';
 import { logEventToTreeNode } from '../utils/tree-converter.js';
 import { cssColorToPixi } from './BucketColorResolver.js';
 import { HitTestManager } from './interaction/HitTestManager.js';
-import { KEYBOARD_CONSTANTS, KeyboardHandler } from './interaction/KeyboardHandler.js';
+import {
+  KEYBOARD_CONSTANTS,
+  KeyboardHandler,
+  type FrameNavDirection,
+} from './interaction/KeyboardHandler.js';
 import { TimelineInteractionHandler } from './interaction/TimelineInteractionHandler.js';
 import { TimelineResizeHandler } from './interaction/TimelineResizeHandler.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 import { RectangleManager } from './RectangleManager.js';
 import { FlameChartCursor } from './search/FlameChartCursor.js';
 import { SearchManager } from './search/SearchManager.js';
+import { SelectionHighlightRenderer } from './selection/SelectionHighlightRenderer.js';
+import { SelectionManager } from './selection/SelectionManager.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineViewport } from './TimelineViewport.js';
+import { ViewportAnimator } from './ViewportAnimator.js';
 
 export interface FlameChartCallbacks {
   onMouseMove?: (
@@ -64,6 +71,10 @@ export interface FlameChartCallbacks {
   ) => void;
   onViewportChange?: (viewport: ViewportState) => void;
   onSearchNavigate?: (event: EventNode, screenX: number, screenY: number, depth: number) => void;
+  /** Called when frame selection changes (click to select, arrow keys to navigate). */
+  onSelect?: (event: EventNode | null) => void;
+  /** Called when J key is pressed to jump to call tree for selected frame. */
+  onJumpToCallTree?: (event: EventNode) => void;
 }
 
 export class FlameChart<E extends EventNode = EventNode> {
@@ -101,6 +112,11 @@ export class FlameChart<E extends EventNode = EventNode> {
   private readonly markers: TimelineMarker[] = [];
 
   private hitTestManager: HitTestManager | null = null;
+
+  // Selection system
+  private selectionManager: SelectionManager<E> | null = null;
+  private selectionRenderer: SelectionHighlightRenderer | null = null;
+  private viewportAnimator: ViewportAnimator | null = null;
 
   /**
    * Initialize the flamechart renderer.
@@ -170,6 +186,12 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Convert LogEvent to TreeNode structure for generic search
     this.treeNodes = logEventToTreeNode(events) as unknown as TreeNode<E>[];
+
+    // Initialize selection manager for frame selection and traversal
+    this.selectionManager = new SelectionManager<E>(this.treeNodes);
+
+    // Initialize viewport animator for smooth transitions
+    this.viewportAnimator = new ViewportAnimator();
 
     // Determine renderer type: mesh is default for testing
     const useMeshRenderer = options.renderer !== 'sprite';
@@ -277,6 +299,11 @@ export class FlameChart<E extends EventNode = EventNode> {
       markerRenderer: this.markerRenderer,
     });
 
+    // Create selection highlight renderer
+    if (this.worldContainer) {
+      this.selectionRenderer = new SelectionHighlightRenderer(this.worldContainer);
+    }
+
     // Setup interaction handler
     this.setupInteractionHandler();
 
@@ -315,6 +342,19 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.keyboardHandler) {
       this.keyboardHandler.destroy();
       this.keyboardHandler = null;
+    }
+
+    // Clean up selection components
+    if (this.selectionRenderer) {
+      this.selectionRenderer.destroy();
+      this.selectionRenderer = null;
+    }
+    this.selectionManager = null;
+
+    // Clean up viewport animator
+    if (this.viewportAnimator) {
+      this.viewportAnimator.cancel();
+      this.viewportAnimator = null;
     }
 
     // Clean up search components
@@ -425,6 +465,12 @@ export class FlameChart<E extends EventNode = EventNode> {
       return null;
     }
 
+    // Clear selection when starting a new search to show search highlights
+    this.selectionManager?.clear();
+    if (this.selectionRenderer) {
+      this.selectionRenderer.clear();
+    }
+
     const innerCursor = this.newSearchManager.search(predicate, options);
 
     // Wrap with FlameChartCursor to add automatic side effects
@@ -441,6 +487,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   /**
    * Clear current search and reset cursor.
+   * If a frame is selected, selection highlight will automatically show via getHighlightMode().
    */
   public clearSearch(): void {
     this.newSearchManager?.clear();
@@ -449,6 +496,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   /**
    * Handle search navigation side effects:
+   * - Clear selection so search highlight shows via getHighlightMode()
    * - Center viewport on match
    * - Call onSearchNavigate callback for application-specific logic (e.g., tooltips)
    * - Request render
@@ -456,6 +504,12 @@ export class FlameChart<E extends EventNode = EventNode> {
   private handleSearchNavigation(match: SearchMatch<E>): void {
     if (!this.viewport) {
       return;
+    }
+
+    // Clear selection so search highlight shows
+    this.selectionManager?.clear();
+    if (this.selectionRenderer) {
+      this.selectionRenderer.clear();
     }
 
     // Center viewport on the match
@@ -651,6 +705,10 @@ export class FlameChart<E extends EventNode = EventNode> {
             this.callbacks.onMouseMove(0, 0, null, null);
           }
         },
+        onDragStart: () => {
+          // Cancel any keyboard pan animation when user starts dragging
+          this.viewportAnimator?.cancel();
+        },
       },
     );
   }
@@ -673,47 +731,60 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     this.keyboardHandler = new KeyboardHandler(this.container, this.viewport, {
       onPan: (deltaX: number, deltaY: number) => {
-        if (this.viewport?.panBy(deltaX, deltaY)) {
-          this.requestRender();
-          if (this.callbacks.onViewportChange && this.viewport) {
-            this.callbacks.onViewportChange(this.viewport.getState());
-          }
+        if (!this.viewport || !this.viewportAnimator) {
+          return;
         }
+
+        // Use animated pan via chase animation for smooth keyboard panning
+        this.viewportAnimator.addToTarget(this.viewport, deltaX, deltaY, () =>
+          this.notifyViewportChange(),
+        );
       },
       onZoom: (direction: 'in' | 'out') => {
-        if (!this.viewport) {
+        if (!this.viewport || !this.viewportAnimator) {
           return;
         }
 
         const factor =
           direction === 'in' ? KEYBOARD_CONSTANTS.zoomFactor : 1 / KEYBOARD_CONSTANTS.zoomFactor;
 
-        // Zoom to viewport center (selection anchoring is a Phase 2 feature)
-        if (this.viewport.zoomByFactor(factor)) {
-          this.requestRender();
-          if (this.callbacks.onViewportChange) {
-            this.callbacks.onViewportChange(this.viewport.getState());
-          }
-        }
+        // Use animated zoom via chase animation for smooth keyboard zooming
+        this.viewportAnimator.multiplyZoomTarget(this.viewport, factor, () =>
+          this.notifyViewportChange(),
+        );
       },
       onResetZoom: () => {
         if (!this.viewport) {
           return;
         }
+
+        // Cancel any keyboard pan animation since reset changes the entire viewport
+        this.viewportAnimator?.cancel();
+
         this.viewport.resetZoom();
-        this.requestRender();
-        if (this.callbacks.onViewportChange) {
-          this.callbacks.onViewportChange(this.viewport.getState());
-        }
+        this.notifyViewportChange();
       },
       onEscape: () => {
-        // Phase 1: Just clear search if active
-        // Phase 2 will add frame deselection
-        this.clearSearch();
+        // Clear selection first, then search
+        if (this.selectionManager?.hasSelection()) {
+          this.clearSelection();
+        } else {
+          this.clearSearch();
+        }
+      },
+      onFrameNav: (direction: FrameNavDirection) => {
+        return this.navigateFrame(direction);
       },
       onShiftHeld: (_held: boolean) => {
         // Phase 1: No-op - hints overlay is a bonus feature
         // Can be implemented later with ShortcutHintsOverlay component
+      },
+      onJumpToCallTree: () => {
+        // Jump to call tree for selected frame
+        const selectedNode = this.selectionManager?.getSelected();
+        if (selectedNode && this.callbacks.onJumpToCallTree) {
+          this.callbacks.onJumpToCallTree(selectedNode.data);
+        }
       },
     });
 
@@ -765,10 +836,193 @@ export class FlameChart<E extends EventNode = EventNode> {
       maxDepth,
     );
 
+    // Update selection based on click target
+    if (event) {
+      // Find the TreeNode for this LogEvent using original reference
+      const treeNode = this.selectionManager?.findByOriginal(event);
+      if (treeNode) {
+        this.selectFrame(treeNode);
+      }
+    } else if (!marker) {
+      // Clicked on empty space (not a marker) - clear selection
+      this.clearSelection();
+    }
+
     // Notify callback
     if (this.callbacks.onClick) {
       this.callbacks.onClick(screenX, screenY, event, marker);
     }
+  }
+
+  // ============================================================================
+  // PRIVATE HELPERS
+  // ============================================================================
+
+  /**
+   * Compute the current highlight mode based on actual state.
+   * Selection takes priority over search.
+   *
+   * @returns Current highlight mode
+   */
+  private getHighlightMode(): 'none' | 'search' | 'selection' {
+    if (this.selectionManager?.hasSelection()) {
+      return 'selection';
+    }
+    const cursor = this.newSearchManager?.getCursor();
+    if (cursor && cursor.total > 0) {
+      return 'search';
+    }
+    return 'none';
+  }
+
+  /**
+   * Notify viewport change and request render.
+   * Consolidates duplicated callback pattern.
+   */
+  private notifyViewportChange(): void {
+    this.requestRender();
+    if (this.callbacks.onViewportChange && this.viewport) {
+      this.callbacks.onViewportChange(this.viewport.getState());
+    }
+  }
+
+  // ============================================================================
+  // SELECTION METHODS
+  // ============================================================================
+
+  /**
+   * Select a frame (TreeNode).
+   * Updates visual highlight and notifies callback.
+   * Selection takes priority over search highlight (via getHighlightMode()).
+   *
+   * @param node - TreeNode to select
+   */
+  private selectFrame(node: TreeNode<E>): void {
+    this.selectionManager?.select(node);
+
+    // Update selection renderer
+    if (this.selectionRenderer) {
+      this.selectionRenderer.setSelection(node as TreeNode<EventNode>);
+    }
+
+    // Notify callback
+    if (this.callbacks.onSelect) {
+      this.callbacks.onSelect(node.data);
+    }
+
+    this.requestRender();
+  }
+
+  /**
+   * Clear the current selection.
+   * If search has matches, search highlight will automatically show via getHighlightMode().
+   */
+  private clearSelection(): void {
+    if (!this.selectionManager?.hasSelection()) {
+      return;
+    }
+
+    this.selectionManager.clear();
+
+    // Clear selection renderer
+    if (this.selectionRenderer) {
+      this.selectionRenderer.clear();
+    }
+
+    // Notify callback
+    if (this.callbacks.onSelect) {
+      this.callbacks.onSelect(null);
+    }
+
+    this.requestRender();
+  }
+
+  /**
+   * Navigate frame selection using tree navigation.
+   * Called by keyboard handler for arrow key navigation.
+   *
+   * @param direction - Navigation direction
+   * @returns true if navigation was handled (selection changed or stayed at boundary)
+   */
+  private navigateFrame(direction: FrameNavDirection): boolean {
+    // No navigation if nothing is selected
+    if (!this.selectionManager?.hasSelection()) {
+      return false;
+    }
+
+    // Navigate and get the new node (or null if at boundary)
+    const nextNode = this.selectionManager.navigate(direction);
+
+    // If navigation found a valid node, update renderer and center viewport
+    if (nextNode) {
+      // Update selection renderer
+      if (this.selectionRenderer) {
+        this.selectionRenderer.setSelection(nextNode as TreeNode<EventNode>);
+      }
+
+      // Notify callback
+      if (this.callbacks.onSelect) {
+        this.callbacks.onSelect(nextNode.data);
+      }
+
+      // Always request render to show updated selection highlight
+      // (centerOnSelectedFrame only renders if viewport moves)
+      this.requestRender();
+
+      // Auto-center viewport on the newly selected frame
+      this.centerOnSelectedFrame();
+    }
+
+    // Return true if we have a selection (even if we couldn't navigate further)
+    // This prevents falling through to pan when at a boundary (e.g., at root)
+    return true;
+  }
+
+  /**
+   * Center viewport on the currently selected frame.
+   * Uses smooth animation when navigating to off-screen frames.
+   */
+  private centerOnSelectedFrame(): void {
+    const selectedNode = this.selectionManager?.getSelected();
+    if (!selectedNode || !this.viewport) {
+      return;
+    }
+
+    const event = selectedNode.data;
+    const depth = selectedNode.depth ?? 0;
+
+    // Calculate target offset (without applying it)
+    const targetOffset = this.viewport.calculateCenterOffset(
+      event.timestamp,
+      event.duration,
+      depth,
+    );
+
+    // Check if viewport needs to move
+    const currentState = this.viewport.getState();
+    const needsAnimation =
+      Math.abs(targetOffset.x - currentState.offsetX) > 1 ||
+      Math.abs(targetOffset.y - currentState.offsetY) > 1;
+
+    if (needsAnimation && this.viewportAnimator) {
+      // Animate to target position (300ms)
+      this.viewportAnimator.animate(this.viewport, targetOffset.x, targetOffset.y, 300, () =>
+        this.notifyViewportChange(),
+      );
+    } else if (needsAnimation) {
+      // Fallback: instant move if no animator
+      this.viewport.centerOnEvent(event.timestamp, event.duration, depth);
+      this.notifyViewportChange();
+    }
+  }
+
+  /**
+   * Get the currently selected node.
+   *
+   * @returns Currently selected TreeNode, or null if none
+   */
+  public getSelectedNode(): TreeNode<E> | null {
+    return this.selectionManager?.getSelected() ?? null;
   }
 
   private initializeState(events: LogEvent[]): void {
@@ -889,9 +1143,6 @@ export class FlameChart<E extends EventNode = EventNode> {
       const matchedEventIds = cursor.getMatchedEventIds();
       this.searchStyleRenderer!.render(visibleRects, matchedEventIds, buckets, viewportState);
 
-      // Render highlight border for current match
-      this.searchRenderer!.render(cursor, viewportState);
-
       // Clear normal renderer when in search mode
       if (this.batchRenderer) {
         this.batchRenderer.clear();
@@ -903,9 +1154,6 @@ export class FlameChart<E extends EventNode = EventNode> {
       // Clear search overlays when not in search mode
       if (this.searchStyleRenderer) {
         this.searchStyleRenderer.clear();
-      }
-      if (this.searchRenderer) {
-        this.searchRenderer.clear();
       }
     }
 
@@ -926,6 +1174,22 @@ export class FlameChart<E extends EventNode = EventNode> {
       if (this.searchTextLabelRenderer) {
         this.searchTextLabelRenderer.clear();
       }
+    }
+
+    // Render only ONE highlight based on computed mode (selection takes priority)
+    const highlightMode = this.getHighlightMode();
+    if (highlightMode === 'selection') {
+      // Selection highlight mode: show selection highlight
+      this.selectionRenderer?.render(viewportState);
+      this.searchRenderer?.clear();
+    } else if (highlightMode === 'search') {
+      // Search highlight mode: show search match highlight
+      this.searchRenderer!.render(cursor!, viewportState);
+      this.selectionRenderer?.clear();
+    } else {
+      // No active highlight mode: clear both
+      this.searchRenderer?.clear();
+      this.selectionRenderer?.clear();
     }
 
     this.app.render();
