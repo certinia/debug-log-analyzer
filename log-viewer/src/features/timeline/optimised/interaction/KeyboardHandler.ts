@@ -65,6 +65,12 @@ export interface KeyboardCallbacks {
    * Navigates the call tree to the currently selected frame.
    */
   onJumpToCallTree?: () => void;
+
+  /**
+   * Called when Enter or Z key is pressed for "Focus" (zoom to fit).
+   * Zooms the viewport to fit the currently selected frame with padding.
+   */
+  onFocus?: () => void;
 }
 
 /**
@@ -174,6 +180,11 @@ export class KeyboardHandler {
     }
 
     if (this.handleJumpKey(event)) {
+      event.preventDefault();
+      return;
+    }
+
+    if (this.handleFocusKeys(event)) {
       event.preventDefault();
       return;
     }
@@ -328,6 +339,23 @@ export class KeyboardHandler {
 
     if (event.key === 'j' || event.key === 'J') {
       this.callbacks.onJumpToCallTree?.();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Handle Enter/Z keys (Focus - zoom to fit selected frame).
+   * @returns true if event was handled
+   */
+  private handleFocusKeys(event: KeyboardEvent): boolean {
+    // Don't handle if modifier keys are pressed (allow browser shortcuts)
+    if (event.ctrlKey || event.altKey || event.metaKey) {
+      return false;
+    }
+
+    if (event.key === 'Enter' || event.key === 'z' || event.key === 'Z') {
+      this.callbacks.onFocus?.();
       return true;
     }
     return false;

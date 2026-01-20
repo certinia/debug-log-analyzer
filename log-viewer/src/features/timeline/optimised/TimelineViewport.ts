@@ -225,6 +225,44 @@ export class TimelineViewport {
   }
 
   /**
+   * Focus viewport on a specific event by zooming to fit it with padding.
+   * Calculates optimal zoom level to fit the frame with 10% padding on each side,
+   * then centers the viewport on the event.
+   *
+   * @param eventTimestamp - Event start time in nanoseconds
+   * @param eventDuration - Event duration in nanoseconds
+   * @param eventDepth - Event depth in call tree (0-indexed)
+   */
+  public focusOnEvent(eventTimestamp: number, eventDuration: number, eventDepth: number): void {
+    // Calculate zoom to fit frame with 10% padding on each side (20% total)
+    const padding = 0.1;
+    const targetTimeWidth = eventDuration * (1 + padding * 2);
+
+    // Calculate new zoom level (pixels per nanosecond)
+    const newZoom = this.state.displayWidth / targetTimeWidth;
+
+    // Clamp to valid zoom range
+    const clampedZoom = Math.max(this.getMinZoom(), Math.min(this.getMaxZoom(), newZoom));
+
+    // Apply new zoom
+    this.state.zoom = clampedZoom;
+
+    // Calculate target offsets to center the event
+    const eventX = eventTimestamp * this.state.zoom;
+    const eventWidth = eventDuration * this.state.zoom;
+    const eventMidpoint = eventX + eventWidth / 2;
+
+    // Center event midpoint at screen center
+    const newOffsetX = eventMidpoint - this.state.displayWidth / 2;
+    this.state.offsetX = this.clampOffsetX(newOffsetX);
+
+    // Center vertically on the event depth
+    const eventY = eventDepth * TIMELINE_CONSTANTS.EVENT_HEIGHT;
+    const newWorldYBottom = eventY - this.state.displayHeight / 2;
+    this.state.offsetY = this.clampOffsetY(-newWorldYBottom);
+  }
+
+  /**
    * Center viewport on a specific event.
    * Scrolls horizontally and vertically to center the event in the viewport.
    * Only scrolls if event is off-screen or not fully visible.

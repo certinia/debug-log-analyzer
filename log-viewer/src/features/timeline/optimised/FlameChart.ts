@@ -711,6 +711,9 @@ export class FlameChart<E extends EventNode = EventNode> {
         onClick: (x: number, y: number) => {
           this.handleClick(x, y);
         },
+        onDoubleClick: (x: number, y: number) => {
+          this.handleDoubleClick(x, y);
+        },
         onMouseLeave: () => {
           if (this.callbacks.onMouseMove) {
             this.callbacks.onMouseMove(0, 0, null, null);
@@ -797,6 +800,12 @@ export class FlameChart<E extends EventNode = EventNode> {
           this.callbacks.onJumpToCallTree(selectedNode.data);
         }
       },
+      onFocus: () => {
+        // Focus (zoom to fit) on selected frame
+        if (this.selectionManager?.hasSelection()) {
+          this.focusOnSelectedFrame();
+        }
+      },
     });
 
     this.keyboardHandler.attach();
@@ -863,6 +872,38 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.callbacks.onClick) {
       this.callbacks.onClick(screenX, screenY, event, marker);
     }
+  }
+
+  /**
+   * Handle double-click - focus (zoom to fit) on the clicked event.
+   * When clicking on a bucket, focuses on the same "best event" that the tooltip displays.
+   */
+  private handleDoubleClick(screenX: number, screenY: number): void {
+    if (!this.viewport || !this.index || !this.hitTestManager) {
+      return;
+    }
+
+    const viewportState = this.viewport.getState();
+    const depth = this.viewport.screenYToDepth(screenY);
+    const maxDepth = this.index.maxDepth;
+
+    const { event } = this.hitTestManager.hitTest(screenX, screenY, depth, viewportState, maxDepth);
+
+    if (!event) {
+      return;
+    }
+
+    // Find the TreeNode for this LogEvent
+    const treeNode = this.selectionManager?.findByOriginal(event);
+    if (!treeNode) {
+      return;
+    }
+
+    // Select the frame first (so it's highlighted after focus)
+    this.selectFrame(treeNode);
+
+    // Focus on the individual event (zoom to fit)
+    this.focusOnSelectedFrame();
   }
 
   // ============================================================================
@@ -1025,6 +1066,24 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.viewport.centerOnEvent(event.timestamp, event.duration, depth);
       this.notifyViewportChange();
     }
+  }
+
+  /**
+   * Focus viewport on the currently selected frame (zoom to fit).
+   * Calculates optimal zoom to fit the frame with padding.
+   */
+  private focusOnSelectedFrame(): void {
+    const selectedNode = this.selectionManager?.getSelected();
+    if (!selectedNode || !this.viewport) {
+      return;
+    }
+
+    const event = selectedNode.data;
+    const depth = selectedNode.depth ?? 0;
+
+    // Focus on the event (zoom to fit with padding)
+    this.viewport.focusOnEvent(event.timestamp, event.duration, depth);
+    this.notifyViewportChange();
   }
 
   /**

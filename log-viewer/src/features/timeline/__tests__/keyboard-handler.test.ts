@@ -52,6 +52,7 @@ describe('KeyboardHandler', () => {
       onShiftHeld: jest.fn(),
       onFrameNav: jest.fn(),
       onJumpToCallTree: jest.fn(),
+      onFocus: jest.fn(),
     };
 
     handler = new KeyboardHandler(container, viewport, callbacks);
@@ -457,6 +458,55 @@ describe('KeyboardHandler', () => {
     });
   });
 
+  describe('focus keys (Enter / Z)', () => {
+    it('should call onFocus on Enter key', () => {
+      dispatchKeyEvent('keydown', 'Enter');
+
+      expect(callbacks.onFocus).toHaveBeenCalled();
+    });
+
+    it('should call onFocus on z key', () => {
+      dispatchKeyEvent('keydown', 'z');
+
+      expect(callbacks.onFocus).toHaveBeenCalled();
+    });
+
+    it('should call onFocus on Z key', () => {
+      dispatchKeyEvent('keydown', 'Z');
+
+      expect(callbacks.onFocus).toHaveBeenCalled();
+    });
+
+    it('should not call onFocus when Ctrl is pressed', () => {
+      dispatchKeyEvent('keydown', 'Enter', { ctrlKey: true });
+      dispatchKeyEvent('keydown', 'z', { ctrlKey: true });
+
+      expect(callbacks.onFocus).not.toHaveBeenCalled();
+    });
+
+    it('should not call onFocus when Alt is pressed', () => {
+      dispatchKeyEvent('keydown', 'Enter', { altKey: true });
+      dispatchKeyEvent('keydown', 'z', { altKey: true });
+
+      expect(callbacks.onFocus).not.toHaveBeenCalled();
+    });
+
+    it('should not call onFocus when Meta is pressed', () => {
+      dispatchKeyEvent('keydown', 'Enter', { metaKey: true });
+      dispatchKeyEvent('keydown', 'z', { metaKey: true });
+
+      expect(callbacks.onFocus).not.toHaveBeenCalled();
+    });
+
+    it('should prevent default on Enter/Z keys', () => {
+      const enterEvent = dispatchKeyEvent('keydown', 'Enter');
+      const zEvent = dispatchKeyEvent('keydown', 'z');
+
+      expect(enterEvent.defaultPrevented).toBe(true);
+      expect(zEvent.defaultPrevented).toBe(true);
+    });
+  });
+
   describe('unhandled keys', () => {
     it('should not prevent default on unhandled keys', () => {
       const event = dispatchKeyEvent('keydown', 'x');
@@ -466,13 +516,13 @@ describe('KeyboardHandler', () => {
 
     it('should not call callbacks on unhandled keys', () => {
       dispatchKeyEvent('keydown', 'x');
-      dispatchKeyEvent('keydown', 'Enter');
       dispatchKeyEvent('keydown', 'Tab');
 
       expect(callbacks.onPan).not.toHaveBeenCalled();
       expect(callbacks.onZoom).not.toHaveBeenCalled();
       expect(callbacks.onResetZoom).not.toHaveBeenCalled();
       expect(callbacks.onEscape).not.toHaveBeenCalled();
+      expect(callbacks.onFocus).not.toHaveBeenCalled();
     });
   });
 

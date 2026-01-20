@@ -395,4 +395,85 @@ describe('TimelineViewport', () => {
       expect(bounds.depthEnd).toBeGreaterThanOrEqual(0);
     });
   });
+
+  describe('focusOnEvent', () => {
+    it('should zoom to fit event with 10% padding', () => {
+      const eventTimestamp = 200_000; // 0.2ms
+      const eventDuration = 100_000; // 0.1ms
+      const eventDepth = 3;
+
+      viewport.focusOnEvent(eventTimestamp, eventDuration, eventDepth);
+
+      const state = viewport.getState();
+
+      // Expected zoom: displayWidth / (duration * 1.2)
+      // 10% padding on each side means total width is 1.2x the event duration
+      const expectedZoom = DISPLAY_WIDTH / (eventDuration * 1.2);
+      expect(state.zoom).toBeCloseTo(expectedZoom, 5);
+    });
+
+    it('should center horizontally on event', () => {
+      const eventTimestamp = 200_000;
+      const eventDuration = 100_000;
+      const eventDepth = 3;
+
+      viewport.focusOnEvent(eventTimestamp, eventDuration, eventDepth);
+
+      const state = viewport.getState();
+
+      // Event center in pixels = (timestamp + duration/2) * zoom
+      const eventCenterX = (eventTimestamp + eventDuration / 2) * state.zoom;
+
+      // Viewport center should be near event center
+      const viewportCenterX = state.offsetX + DISPLAY_WIDTH / 2;
+      expect(viewportCenterX).toBeCloseTo(eventCenterX, 0);
+    });
+
+    it('should center vertically on event depth', () => {
+      const eventTimestamp = 200_000;
+      const eventDuration = 100_000;
+      const eventDepth = 5;
+
+      viewport.focusOnEvent(eventTimestamp, eventDuration, eventDepth);
+
+      // After focus, the event depth should be centered in the viewport
+      const bounds = viewport.getBounds();
+      const visibleDepths = bounds.depthEnd - bounds.depthStart;
+
+      // The event depth should be roughly in the middle of visible range
+      const expectedCenter = eventDepth;
+      const actualCenter = (bounds.depthStart + bounds.depthEnd) / 2;
+
+      // Allow some margin because of rounding and clamping
+      expect(Math.abs(actualCenter - expectedCenter)).toBeLessThan(visibleDepths / 2 + 1);
+    });
+
+    it('should clamp zoom to maximum when event is very small', () => {
+      const eventTimestamp = 200_000;
+      const eventDuration = 10; // Very small duration (10 nanoseconds)
+      const eventDepth = 3;
+
+      viewport.focusOnEvent(eventTimestamp, eventDuration, eventDepth);
+
+      const state = viewport.getState();
+      const maxZoom = DISPLAY_WIDTH / TIMELINE_CONSTANTS.MAX_ZOOM_NS;
+
+      // Zoom should be clamped to maximum
+      expect(state.zoom).toBeCloseTo(maxZoom, 5);
+    });
+
+    it('should clamp zoom to minimum when event spans entire timeline', () => {
+      const eventTimestamp = 0;
+      const eventDuration = TOTAL_DURATION * 2; // Event larger than timeline
+      const eventDepth = 3;
+
+      viewport.focusOnEvent(eventTimestamp, eventDuration, eventDepth);
+
+      const state = viewport.getState();
+      const minZoom = DISPLAY_WIDTH / TOTAL_DURATION;
+
+      // Zoom should be clamped to minimum
+      expect(state.zoom).toBeCloseTo(minZoom, 5);
+    });
+  });
 });

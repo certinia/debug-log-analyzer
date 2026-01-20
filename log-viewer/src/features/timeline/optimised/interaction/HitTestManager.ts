@@ -16,7 +16,13 @@
  */
 
 import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
-import type { PixelBucket, TimelineMarker, ViewportState } from '../../types/flamechart.types.js';
+import {
+  BUCKET_CONSTANTS,
+  type PixelBucket,
+  type TimelineMarker,
+  type ViewportBounds,
+  type ViewportState,
+} from '../../types/flamechart.types.js';
 import type { PrecomputedRect } from '../RectangleManager.js';
 import type { TimelineEventIndex } from '../TimelineEventIndex.js';
 
@@ -126,8 +132,8 @@ export class HitTestManager {
         const bucketResult = this.findBucketAtPosition(screenX, depth, viewport);
         if (bucketResult) {
           isOverEventArea = true;
-          // Find nearest event from bucket's eventRefs (X direction only, same depth)
-          event = this.findNearestEventInBucket(bucketResult.bucket, screenX, viewport);
+          // Find best event from bucket using priority and duration
+          event = this.findBestEventInBucket(bucketResult.bucket);
         }
       }
     }
@@ -175,6 +181,7 @@ export class HitTestManager {
 
   /**
    * Find bucket at screen position, if any.
+   * Uses the bucket's pre-computed x position (same as rendering) for accurate hit detection.
    * @returns Bucket and its screen bounds, or null if not over a bucket
    */
   private findBucketAtPosition(
@@ -189,16 +196,16 @@ export class HitTestManager {
           continue;
         }
 
-        // Calculate bucket screen position
-        const bucketScreenX = bucket.timeStart * viewport.zoom - viewport.offsetX;
-        const bucketScreenEnd = bucket.timeEnd * viewport.zoom - viewport.offsetX;
+        // Use pre-computed x position (grid-aligned, matches rendering)
+        const bucketScreenX = bucket.x - viewport.offsetX;
+        const bucketScreenEnd = bucketScreenX + BUCKET_CONSTANTS.BUCKET_WIDTH;
 
         // Check if mouse X is within bucket bounds
         if (screenX >= bucketScreenX && screenX <= bucketScreenEnd) {
           return {
             bucket,
             screenX: bucketScreenX,
-            screenWidth: bucketScreenEnd - bucketScreenX,
+            screenWidth: BUCKET_CONSTANTS.BUCKET_WIDTH,
           };
         }
       }
@@ -207,40 +214,62 @@ export class HitTestManager {
   }
 
   /**
-   * Find the nearest event in a bucket based on X distance.
-   * Only considers events at the same depth (bucket.depth).
+   * Find the best event in a bucket using priority and duration.
+   *
+   * Selection strategy:
+   * 1. Highest priority category wins (DML > SOQL > Method > etc.)
+   * 2. For same priority, longest duration wins
    *
    * @param bucket - The bucket containing aggregated events
-   * @param screenX - Mouse X position in screen coordinates
-   * @param viewport - Current viewport state
-   * @returns Nearest event, or null if bucket is empty
+   * @returns Best event based on priority/duration, or null if bucket is empty
    */
-  private findNearestEventInBucket(
-    bucket: PixelBucket,
-    screenX: number,
-    viewport: ViewportState,
-  ): LogEvent | null {
-    if (bucket.eventRefs.length === 0) {
+  private findBestEventInBucket(bucket: PixelBucket): LogEvent | null {
+    let events = bucket.eventRefs;
+
+    // If eventRefs is empty (TemporalSegmentTree optimization), query the index
+    if (events.length === 0) {
+      const bounds: ViewportBounds = {
+        timeStart: bucket.timeStart,
+        timeEnd: bucket.timeEnd,
+        depthStart: bucket.depth,
+        depthEnd: bucket.depth,
+      };
+      events = this.index.findEventsInRegion(bounds);
+    }
+
+    if (events.length === 0) {
       return null;
     }
 
-    // Convert screen X to time
-    const mouseTime = (screenX + viewport.offsetX) / viewport.zoom;
+    // Single event - return it directly
+    if (events.length === 1) {
+      return events[0] ?? null;
+    }
 
-    let nearestEvent: LogEvent | null = null;
-    let nearestDistance = Infinity;
+    // Build priority map for O(1) lookup
+    const priorityMap = new Map<string, number>();
+    BUCKET_CONSTANTS.CATEGORY_PRIORITY.forEach((cat, i) => priorityMap.set(cat, i));
 
-    for (const event of bucket.eventRefs) {
-      // Calculate event center time
-      const eventCenterTime = event.timestamp + (event.duration?.total ?? 0) / 2;
-      const distance = Math.abs(eventCenterTime - mouseTime);
+    let bestEvent: LogEvent | null = null;
+    let bestPriority = Infinity;
+    let bestDuration = -1;
 
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestEvent = event;
+    for (const event of events) {
+      const priority = priorityMap.get(event.subCategory) ?? Infinity;
+      const duration = event.duration?.total ?? 0;
+
+      // Priority wins first (lower index = higher priority)
+      if (priority < bestPriority) {
+        bestEvent = event;
+        bestPriority = priority;
+        bestDuration = duration;
+      } else if (priority === bestPriority && duration > bestDuration) {
+        // Same priority: longest duration wins
+        bestEvent = event;
+        bestDuration = duration;
       }
     }
 
-    return nearestEvent;
+    return bestEvent;
   }
 }

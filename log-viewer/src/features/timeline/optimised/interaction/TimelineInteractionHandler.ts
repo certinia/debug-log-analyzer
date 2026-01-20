@@ -41,6 +41,9 @@ export interface InteractionCallbacks {
   /** Called when mouse clicks on timeline. */
   onClick?: (x: number, y: number) => void;
 
+  /** Called when mouse double-clicks on timeline. */
+  onDoubleClick?: (x: number, y: number) => void;
+
   /** Called when hover state over event changes. Returns true if over an event. */
   onHoverChange?: (isOverEvent: boolean) => void;
 
@@ -65,6 +68,13 @@ export class TimelineInteractionHandler {
   private lastTouchY = 0;
   private isOverEvent = false;
   private isMouseDown = false;
+
+  // Double-click detection state
+  private lastClickTime = 0;
+  private lastClickX = 0;
+  private lastClickY = 0;
+  private static readonly DOUBLE_CLICK_THRESHOLD = 300; // ms
+  private static readonly DOUBLE_CLICK_DISTANCE = 5; // px
 
   // Event listener references for cleanup
 
@@ -411,7 +421,7 @@ export class TimelineInteractionHandler {
   }
 
   /**
-   * Handle click - event selection.
+   * Handle click - event selection and double-click detection.
    */
   private handleClick(event: MouseEvent): void {
     // Only fire click if mousedown occurred without dragging
@@ -425,8 +435,34 @@ export class TimelineInteractionHandler {
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
 
-    if (this.callbacks.onClick) {
-      this.callbacks.onClick(mouseX, mouseY);
+    const currentTime = Date.now();
+
+    // Check for double-click
+    const timeSinceLastClick = currentTime - this.lastClickTime;
+    const distanceX = Math.abs(mouseX - this.lastClickX);
+    const distanceY = Math.abs(mouseY - this.lastClickY);
+    const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+
+    const isDoubleClick =
+      timeSinceLastClick < TimelineInteractionHandler.DOUBLE_CLICK_THRESHOLD &&
+      distance < TimelineInteractionHandler.DOUBLE_CLICK_DISTANCE;
+
+    if (isDoubleClick) {
+      // Reset click state to prevent triple-click being detected as double
+      this.lastClickTime = 0;
+
+      if (this.callbacks.onDoubleClick) {
+        this.callbacks.onDoubleClick(mouseX, mouseY);
+      }
+    } else {
+      // Single click - update tracking state
+      this.lastClickTime = currentTime;
+      this.lastClickX = mouseX;
+      this.lastClickY = mouseY;
+
+      if (this.callbacks.onClick) {
+        this.callbacks.onClick(mouseX, mouseY);
+      }
     }
   }
 
