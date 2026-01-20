@@ -71,6 +71,11 @@ export interface KeyboardCallbacks {
    * Zooms the viewport to fit the currently selected frame with padding.
    */
   onFocus?: () => void;
+
+  /**
+   * Called when Ctrl/Cmd+C is pressed to copy the selected frame name.
+   */
+  onCopy?: () => void;
 }
 
 /**
@@ -185,6 +190,11 @@ export class KeyboardHandler {
     }
 
     if (this.handleFocusKeys(event)) {
+      event.preventDefault();
+      return;
+    }
+
+    if (this.handleCopyKey(event)) {
       event.preventDefault();
       return;
     }
@@ -356,6 +366,24 @@ export class KeyboardHandler {
 
     if (event.key === 'Enter' || event.key === 'z' || event.key === 'Z') {
       this.callbacks.onFocus?.();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Handle Ctrl/Cmd+C key (Copy selected frame name).
+   * @returns true if event was handled
+   */
+  private handleCopyKey(event: KeyboardEvent): boolean {
+    // Only handle Ctrl+C (Windows/Linux) or Cmd+C (Mac)
+    const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+    if (!isCtrlOrCmd || event.altKey) {
+      return false;
+    }
+
+    if (event.key === 'c' || event.key === 'C') {
+      this.callbacks.onCopy?.();
       return true;
     }
     return false;

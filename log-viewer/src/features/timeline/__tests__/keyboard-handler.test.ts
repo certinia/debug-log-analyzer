@@ -53,6 +53,7 @@ describe('KeyboardHandler', () => {
       onFrameNav: jest.fn(),
       onJumpToCallTree: jest.fn(),
       onFocus: jest.fn(),
+      onCopy: jest.fn(),
     };
 
     handler = new KeyboardHandler(container, viewport, callbacks);
@@ -504,6 +505,44 @@ describe('KeyboardHandler', () => {
 
       expect(enterEvent.defaultPrevented).toBe(true);
       expect(zEvent.defaultPrevented).toBe(true);
+    });
+  });
+
+  describe('Copy (Ctrl/Cmd+C)', () => {
+    it('should call onCopy on Ctrl+C', () => {
+      dispatchKeyEvent('keydown', 'c', { ctrlKey: true });
+
+      expect(callbacks.onCopy).toHaveBeenCalled();
+    });
+
+    it('should call onCopy on Cmd+C (Mac)', () => {
+      dispatchKeyEvent('keydown', 'c', { metaKey: true });
+
+      expect(callbacks.onCopy).toHaveBeenCalled();
+    });
+
+    it('should call onCopy on uppercase C', () => {
+      dispatchKeyEvent('keydown', 'C', { ctrlKey: true });
+
+      expect(callbacks.onCopy).toHaveBeenCalled();
+    });
+
+    it('should not call onCopy without modifier', () => {
+      dispatchKeyEvent('keydown', 'c');
+
+      expect(callbacks.onCopy).not.toHaveBeenCalled();
+    });
+
+    it('should not call onCopy with Alt modifier', () => {
+      dispatchKeyEvent('keydown', 'c', { ctrlKey: true, altKey: true });
+
+      expect(callbacks.onCopy).not.toHaveBeenCalled();
+    });
+
+    it('should prevent default on Ctrl/Cmd+C', () => {
+      const event = dispatchKeyEvent('keydown', 'c', { ctrlKey: true });
+
+      expect(event.defaultPrevented).toBe(true);
     });
   });
 

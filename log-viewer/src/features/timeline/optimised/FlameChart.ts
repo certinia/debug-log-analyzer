@@ -75,6 +75,16 @@ export interface FlameChartCallbacks {
   onSelect?: (event: EventNode | null) => void;
   /** Called when J key is pressed to jump to call tree for selected frame. */
   onJumpToCallTree?: (event: EventNode) => void;
+  /** Called when right-click occurs on an event. Passes screen coords for tooltip and client coords for menu positioning. */
+  onContextMenu?: (
+    event: EventNode,
+    screenX: number,
+    screenY: number,
+    clientX: number,
+    clientY: number,
+  ) => void;
+  /** Called when Ctrl/Cmd+C is pressed to copy selected frame. */
+  onCopy?: (event: EventNode) => void;
 }
 
 export class FlameChart<E extends EventNode = EventNode> {
@@ -723,6 +733,9 @@ export class FlameChart<E extends EventNode = EventNode> {
           // Cancel any keyboard pan animation when user starts dragging
           this.viewportAnimator?.cancel();
         },
+        onContextMenu: (screenX: number, screenY: number, clientX: number, clientY: number) => {
+          this.handleContextMenu(screenX, screenY, clientX, clientY);
+        },
       },
     );
   }
@@ -804,6 +817,13 @@ export class FlameChart<E extends EventNode = EventNode> {
         // Focus (zoom to fit) on selected frame
         if (this.selectionManager?.hasSelection()) {
           this.focusOnSelectedFrame();
+        }
+      },
+      onCopy: () => {
+        // Copy selected frame name
+        const selectedNode = this.selectionManager?.getSelected();
+        if (selectedNode && this.callbacks.onCopy) {
+          this.callbacks.onCopy(selectedNode.data);
         }
       },
     });
@@ -904,6 +924,53 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Focus on the individual event (zoom to fit)
     this.focusOnSelectedFrame();
+  }
+
+  /**
+   * Handle right-click (context menu) on an event.
+   * Selects the event and notifies the callback with client coordinates for menu positioning.
+   *
+   * @param screenX - Canvas-relative X coordinate (for hit testing)
+   * @param screenY - Canvas-relative Y coordinate (for hit testing)
+   * @param clientX - Client X coordinate (for menu positioning, from original event)
+   * @param clientY - Client Y coordinate (for menu positioning, from original event)
+   */
+  private handleContextMenu(
+    screenX: number,
+    screenY: number,
+    clientX: number,
+    clientY: number,
+  ): void {
+    if (!this.viewport || !this.index || !this.hitTestManager) {
+      return;
+    }
+
+    const viewportState = this.viewport.getState();
+    const depth = this.viewport.screenYToDepth(screenY);
+    const maxDepth = this.index.maxDepth;
+
+    // Use screenX/screenY for hit testing
+    const { event } = this.hitTestManager.hitTest(screenX, screenY, depth, viewportState, maxDepth);
+
+    if (!event) {
+      return;
+    }
+
+    // Find the TreeNode for this LogEvent
+    const treeNode = this.selectionManager?.findByOriginal(event);
+    if (!treeNode) {
+      return;
+    }
+
+    // Select the frame (so it's highlighted when menu appears)
+    this.selectFrame(treeNode);
+
+    // Notify callback with selected event data
+    // - screenX/screenY: canvas-relative coordinates for tooltip positioning (same as hover)
+    // - clientX/clientY: window coordinates for context menu positioning
+    if (this.callbacks.onContextMenu) {
+      this.callbacks.onContextMenu(treeNode.data, screenX, screenY, clientX, clientY);
+    }
   }
 
   // ============================================================================

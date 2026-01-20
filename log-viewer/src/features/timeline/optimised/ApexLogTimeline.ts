@@ -17,7 +17,9 @@
  * LogEvent should only be referenced here in ApexLogTimeline to convert to generic EventNode for FlameChart and not in FlameChart or its dependencies.
  */
 
+import { ContextMenu, type ContextMenuItem } from '../../../components/ContextMenu.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
+import { formatDuration } from '../../../core/utility/Util.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
 import { getTheme } from '../themes/ThemeSelector.js';
 import type {
@@ -41,11 +43,13 @@ interface ApexTimelineOptions extends TimelineOptions {
 export class ApexLogTimeline {
   private flamechart: FlameChart;
   private tooltipManager: TimelineTooltipManager | null = null;
+  private contextMenu: ContextMenu | null = null;
   private apexLog: ApexLog | null = null;
   private options: TimelineOptions = {};
   private container: HTMLElement | null = null;
   private events: LogEvent[] = [];
   private searchCursor: SearchCursor<EventNode> | null = null;
+  private selectedEventForContextMenu: EventNode | null = null;
 
   constructor() {
     this.flamechart = new FlameChart();
@@ -111,8 +115,26 @@ export class ApexLogTimeline {
         onJumpToCallTree: (eventNode) => {
           this.handleJumpToCallTree(eventNode);
         },
+        onContextMenu: (eventNode, screenX, screenY, clientX, clientY) => {
+          this.handleContextMenu(eventNode, screenX, screenY, clientX, clientY);
+        },
+        onCopy: (eventNode) => {
+          this.copyToClipboard(eventNode.text);
+        },
       },
     );
+
+    // Create context menu Lit element (using constructor ensures custom element is registered)
+    this.contextMenu = new ContextMenu();
+    container.appendChild(this.contextMenu);
+
+    // Listen for context menu events
+    this.contextMenu.addEventListener('menu-select', ((e: CustomEvent) => {
+      this.handleContextMenuSelect(e.detail.itemId);
+    }) as EventListener);
+    this.contextMenu.addEventListener('menu-close', () => {
+      this.selectedEventForContextMenu = null;
+    });
 
     // Wire up search event listeners
     this.enableSearch();
@@ -131,6 +153,10 @@ export class ApexLogTimeline {
     if (this.tooltipManager) {
       this.tooltipManager.destroy();
       this.tooltipManager = null;
+    }
+    if (this.contextMenu) {
+      this.contextMenu.remove();
+      this.contextMenu = null;
     }
   }
 
@@ -204,6 +230,11 @@ export class ApexLogTimeline {
       return;
     }
 
+    // Don't update tooltip while context menu is open
+    if (this.contextMenu?.isVisible()) {
+      return;
+    }
+
     // Priority: Events take precedence over truncation markers
     if (event) {
       this.tooltipManager.show(event, screenX, screenY);
@@ -268,6 +299,181 @@ export class ApexLogTimeline {
    */
   private handleJumpToCallTree(eventNode: EventNode): void {
     goToRow(eventNode.timestamp);
+  }
+
+  /**
+   * Handle right-click context menu request.
+   *
+   * @param eventNode - The event node that was right-clicked
+   * @param screenX - Canvas-relative X coordinate (for tooltip positioning, same as hover)
+   * @param screenY - Canvas-relative Y coordinate (for tooltip positioning, same as hover)
+   * @param clientX - Window X coordinate (for context menu positioning)
+   * @param clientY - Window Y coordinate (for context menu positioning)
+   */
+  private handleContextMenu(
+    eventNode: EventNode,
+    screenX: number,
+    screenY: number,
+    clientX: number,
+    clientY: number,
+  ): void {
+    if (!this.contextMenu) {
+      return;
+    }
+
+    // Store selected event for menu actions
+    this.selectedEventForContextMenu = eventNode;
+
+    // Show tooltip for the right-clicked frame using screen coords (same as hover)
+    if (this.tooltipManager) {
+      const eventWithOriginal = eventNode as EventNode & { original?: LogEvent };
+      const logEvent = eventWithOriginal.original;
+      if (logEvent) {
+        this.tooltipManager.show(logEvent, screenX, screenY, { keepPosition: true });
+      }
+    }
+
+    // Build menu items
+    const items: ContextMenuItem[] = [
+      { id: 'show-in-call-tree', label: 'Show in Call Tree', shortcut: 'J' },
+      { id: 'separator-1', label: '', separator: true },
+      { id: 'copy-name', label: 'Copy Name', shortcut: this.getCopyShortcut() },
+      { id: 'copy-details', label: 'Copy Details' },
+      { id: 'copy-call-stack', label: 'Copy Call Stack' },
+    ];
+
+    // Use client coords for context menu (positioned in viewport)
+    this.contextMenu.show(items, clientX, clientY);
+  }
+
+  /**
+   * Handle context menu item selection.
+   */
+  private handleContextMenuSelect(itemId: string): void {
+    const event = this.selectedEventForContextMenu;
+    if (!event) {
+      return;
+    }
+
+    switch (itemId) {
+      case 'show-in-call-tree':
+        this.handleJumpToCallTree(event);
+        break;
+      case 'copy-name':
+        this.copyToClipboard(event.text);
+        break;
+      case 'copy-details':
+        this.copyToClipboard(this.formatEventDetails(event));
+        break;
+      case 'copy-call-stack':
+        this.copyToClipboard(this.formatCallStack(event));
+        break;
+    }
+  }
+
+  /**
+   * Copy text to clipboard.
+   */
+  private copyToClipboard(text: string): void {
+    navigator.clipboard.writeText(text).catch(() => {
+      // Silently fail - clipboard API may not be available in all contexts
+    });
+  }
+
+  /**
+   * Format event details for clipboard (similar to tooltip content).
+   */
+  private formatEventDetails(eventNode: EventNode): string {
+    // Access original LogEvent for full details
+    const logEvent = (eventNode as EventNode & { original?: LogEvent }).original;
+    if (!logEvent) {
+      // Fallback for nodes without original
+      return `Name: ${eventNode.text}\nType: ${eventNode.type}`;
+    }
+
+    const lines: string[] = [];
+    lines.push(`Name: ${logEvent.text}${logEvent.suffix ?? ''}`);
+
+    if (logEvent.type) {
+      lines.push(`Type: ${logEvent.type}`);
+    }
+
+    if (logEvent.exitStamp && logEvent.duration.total) {
+      let durationStr = formatDuration(logEvent.duration.total);
+      if (logEvent.cpuType === 'free') {
+        durationStr += ' (free)';
+      } else if (logEvent.duration.self) {
+        durationStr += ` (self ${formatDuration(logEvent.duration.self)})`;
+      }
+      lines.push(`Duration: ${durationStr}`);
+    }
+
+    // Add metrics (only if non-zero)
+    const govLimits = this.apexLog?.governorLimits;
+
+    if (logEvent.dmlCount.total) {
+      lines.push(`DML: ${this.formatLimit(logEvent.dmlCount, govLimits?.dmlStatements.limit)}`);
+    }
+    if (logEvent.dmlRowCount.total) {
+      lines.push(`DML Rows: ${this.formatLimit(logEvent.dmlRowCount, govLimits?.dmlRows.limit)}`);
+    }
+    if (logEvent.soqlCount.total) {
+      lines.push(`SOQL: ${this.formatLimit(logEvent.soqlCount, govLimits?.soqlQueries.limit)}`);
+    }
+    if (logEvent.soqlRowCount.total) {
+      lines.push(
+        `SOQL Rows: ${this.formatLimit(logEvent.soqlRowCount, govLimits?.queryRows.limit)}`,
+      );
+    }
+    if (logEvent.soslCount.total) {
+      lines.push(`SOSL: ${this.formatLimit(logEvent.soslCount, govLimits?.soslQueries.limit)}`);
+    }
+    if (logEvent.soslRowCount.total) {
+      lines.push(
+        `SOSL Rows: ${this.formatLimit(logEvent.soslRowCount, govLimits?.soslQueries.limit)}`,
+      );
+    }
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Format a metric with limit for clipboard.
+   */
+  private formatLimit(metric: { total: number; self: number }, limit?: number): string {
+    const outOf = limit ? `/${limit}` : '';
+    return `${metric.total}${outOf} (self ${metric.self})`;
+  }
+
+  /**
+   * Format call stack for clipboard.
+   * Builds the parent chain from root to the selected event.
+   */
+  private formatCallStack(eventNode: EventNode): string {
+    const logEvent = (eventNode as EventNode & { original?: LogEvent }).original;
+    if (!logEvent) {
+      return eventNode.text;
+    }
+
+    // Build call stack by traversing up parent chain
+    const stack: LogEvent[] = [];
+    let current: LogEvent | null = logEvent;
+    while (current?.type) {
+      stack.unshift(current); // Prepend to get root-first order
+      current = current.parent;
+    }
+
+    // Format as call stack (one entry per line)
+    return stack.map((event) => event.text + (event.suffix ?? '')).join('\n');
+  }
+
+  /**
+   * Get platform-specific copy shortcut.
+   */
+  private getCopyShortcut(): string {
+    // Use userAgent as fallback since navigator.platform is deprecated
+    const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    return isMac ? '\u2318C' : 'Ctrl+C';
   }
 
   /**

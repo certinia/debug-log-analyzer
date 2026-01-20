@@ -52,6 +52,14 @@ export interface InteractionCallbacks {
 
   /** Called when drag operation starts (mouse or touch). */
   onDragStart?: () => void;
+
+  /** Called when right-click (context menu) occurs on timeline.
+   * @param screenX - Canvas-relative X coordinate (for hit testing)
+   * @param screenY - Canvas-relative Y coordinate (for hit testing)
+   * @param clientX - Client X coordinate (for menu positioning)
+   * @param clientY - Client Y coordinate (for menu positioning)
+   */
+  onContextMenu?: (screenX: number, screenY: number, clientX: number, clientY: number) => void;
 }
 
 export class TimelineInteractionHandler {
@@ -169,6 +177,11 @@ export class TimelineInteractionHandler {
     const mouseLeaveHandler = this.handleMouseLeave.bind(this);
     this.canvas.addEventListener('mouseleave', mouseLeaveHandler);
     this.registerBoundHandler('mouseleave', mouseLeaveHandler);
+
+    // Context menu (right-click)
+    const contextMenuHandler = this.handleContextMenu.bind(this);
+    this.canvas.addEventListener('contextmenu', contextMenuHandler);
+    this.registerBoundHandler('contextmenu', contextMenuHandler);
   }
 
   /**
@@ -221,6 +234,11 @@ export class TimelineInteractionHandler {
     const mouseLeaveHandler = this.boundHandlers.get('mouseleave');
     if (mouseLeaveHandler) {
       this.canvas.removeEventListener('mouseleave', mouseLeaveHandler);
+    }
+
+    const contextMenuHandler = this.boundHandlers.get('contextmenu');
+    if (contextMenuHandler) {
+      this.canvas.removeEventListener('contextmenu', contextMenuHandler);
     }
 
     this.boundHandlers.clear();
@@ -464,6 +482,26 @@ export class TimelineInteractionHandler {
         this.callbacks.onClick(mouseX, mouseY);
       }
     }
+  }
+
+  /**
+   * Handle context menu (right-click).
+   * Passes both canvas-relative (for hit testing) and client coordinates (for menu positioning).
+   */
+  private handleContextMenu(event: MouseEvent): void {
+    // Prevent default browser context menu
+    event.preventDefault();
+
+    if (!this.callbacks.onContextMenu) {
+      return;
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    const screenX = event.clientX - rect.left; // Canvas-relative for hit test
+    const screenY = event.clientY - rect.top;
+
+    // Pass both coordinate systems: screen coords for hit test, client coords for menu positioning
+    this.callbacks.onContextMenu(screenX, screenY, event.clientX, event.clientY);
   }
 
   /**
