@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - 18 curated timeline themes plus the default theme has been improved for better contrast and readability.
     - Add your own multiple custom themes via **Settings -> Apex Log Analyzer -> Timeline -> Custom Themes**.
     - Fast theme switching via **Command Palette**: **Log: Timeline Theme** or **Settings -> Apex Log Analyzer -> Timeline -> Active Theme**.
-  - **Keyboard and Mouse Navigation**: Comprehensive interaction controls for the timeline. ([#573] [#366] [#353] [#296] [#295])
+  - **Keyboard and Mouse Navigation**: Comprehensive interaction controls for the timeline. ([#573] [#366] [#353] [#296] [#295] [#535])
     - **View Control**:
       - **Zoom**: Scroll wheel (mouse-anchored), or `W`/`S`/`+`/`-` keys.
       - **Horizontal Pan**: `Alt/Option+Scroll`, trackpad swipe, `A`/`D` keys, or click and drag.
@@ -441,6 +441,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#535]: https://github.com/certinia/debug-log-analyzer/issues/535
 [#295]: https://github.com/certinia/debug-log-analyzer/issues/295
 [#296]: https://github.com/certinia/debug-log-analyzer/issues/296
 [#353]: https://github.com/certinia/debug-log-analyzer/issues/353
