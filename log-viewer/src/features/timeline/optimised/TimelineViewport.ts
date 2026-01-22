@@ -206,6 +206,63 @@ export class TimelineViewport {
   }
 
   /**
+   * Alias for reset() - resets zoom to show all content.
+   * Used by keyboard handler for Home/0 key.
+   */
+  public resetZoom(): void {
+    this.reset();
+  }
+
+  /**
+   * Zoom by a factor with optional anchor point.
+   * @param factor - Multiplier for current zoom (>1 zooms in, <1 zooms out)
+   * @param anchorX - Screen X coordinate to keep stable (optional, defaults to center)
+   * @returns true if zoom changed
+   */
+  public zoomByFactor(factor: number, anchorX?: number): boolean {
+    const newZoom = this.state.zoom * factor;
+    return this.setZoom(newZoom, anchorX);
+  }
+
+  /**
+   * Focus viewport on a specific event by zooming to fit it with padding.
+   * Calculates optimal zoom level to fit the frame with 10% padding on each side,
+   * then centers the viewport on the event.
+   *
+   * @param eventTimestamp - Event start time in nanoseconds
+   * @param eventDuration - Event duration in nanoseconds
+   * @param eventDepth - Event depth in call tree (0-indexed)
+   */
+  public focusOnEvent(eventTimestamp: number, eventDuration: number, eventDepth: number): void {
+    // Calculate zoom to fit frame with 10% padding on each side (20% total)
+    const padding = 0.1;
+    const targetTimeWidth = eventDuration * (1 + padding * 2);
+
+    // Calculate new zoom level (pixels per nanosecond)
+    const newZoom = this.state.displayWidth / targetTimeWidth;
+
+    // Clamp to valid zoom range
+    const clampedZoom = Math.max(this.getMinZoom(), Math.min(this.getMaxZoom(), newZoom));
+
+    // Apply new zoom
+    this.state.zoom = clampedZoom;
+
+    // Calculate target offsets to center the event
+    const eventX = eventTimestamp * this.state.zoom;
+    const eventWidth = eventDuration * this.state.zoom;
+    const eventMidpoint = eventX + eventWidth / 2;
+
+    // Center event midpoint at screen center
+    const newOffsetX = eventMidpoint - this.state.displayWidth / 2;
+    this.state.offsetX = this.clampOffsetX(newOffsetX);
+
+    // Center vertically on the event depth
+    const eventY = eventDepth * TIMELINE_CONSTANTS.EVENT_HEIGHT;
+    const newWorldYBottom = eventY - this.state.displayHeight / 2;
+    this.state.offsetY = this.clampOffsetY(-newWorldYBottom);
+  }
+
+  /**
    * Center viewport on a specific event.
    * Scrolls horizontally and vertically to center the event in the viewport.
    * Only scrolls if event is off-screen or not fully visible.
@@ -260,6 +317,68 @@ export class TimelineViewport {
       // Apply boundary constraints
       this.state.offsetY = this.clampOffsetY(newOffsetY);
     }
+  }
+
+  /**
+   * Set viewport offsets directly.
+   * Used by ViewportAnimator for smooth transitions.
+   *
+   * @param offsetX - Horizontal offset in pixels
+   * @param offsetY - Vertical offset in pixels
+   */
+  public setOffset(offsetX: number, offsetY: number): void {
+    this.state.offsetX = this.clampOffsetX(offsetX);
+    this.state.offsetY = this.clampOffsetY(offsetY);
+  }
+
+  /**
+   * Calculate target offsets to center on an event without applying them.
+   * Used by ViewportAnimator to determine animation target.
+   *
+   * @param eventTimestamp - Event start time in nanoseconds
+   * @param eventDuration - Event duration in nanoseconds
+   * @param eventDepth - Event depth in call tree (0-indexed)
+   * @returns Target offsets (clamped to valid range)
+   */
+  public calculateCenterOffset(
+    eventTimestamp: number,
+    eventDuration: number,
+    eventDepth: number,
+  ): { x: number; y: number } {
+    // ========== Horizontal Centering ==========
+    const eventX = eventTimestamp * this.state.zoom;
+    const eventWidth = eventDuration * this.state.zoom;
+    const eventMidpoint = eventX + eventWidth / 2;
+
+    // Check if off-screen (left or right)
+    const screenX = eventX - this.state.offsetX;
+    const isOffScreenHorizontal = screenX > this.state.displayWidth || screenX + eventWidth < 0;
+
+    let targetOffsetX = this.state.offsetX;
+    if (isOffScreenHorizontal) {
+      // Center event midpoint at screen center
+      targetOffsetX = this.clampOffsetX(eventMidpoint - this.state.displayWidth / 2);
+    }
+
+    // ========== Vertical Centering ==========
+    const eventY = eventDepth * TIMELINE_CONSTANTS.EVENT_HEIGHT;
+
+    // Calculate screen Y position of event
+    const worldYBottom = -this.state.offsetY;
+    const screenY = this.state.displayHeight - (eventY - worldYBottom);
+
+    // Check if off-screen (top or bottom)
+    const isOffScreenVertical = screenY < 0 || screenY > this.state.displayHeight;
+
+    let targetOffsetY = this.state.offsetY;
+    if (isOffScreenVertical) {
+      // Center event at vertical center
+      const targetWorldY = eventY;
+      const newWorldYBottom = targetWorldY - this.state.displayHeight / 2;
+      targetOffsetY = this.clampOffsetY(-newWorldYBottom);
+    }
+
+    return { x: targetOffsetX, y: targetOffsetY };
   }
 
   // ============================================================================
@@ -338,6 +457,34 @@ export class TimelineViewport {
   }
 
   /**
+   * Clamp offset values to valid range.
+   * Used by ViewportAnimator to ensure targets are within bounds.
+   *
+   * @param offsetX - Horizontal offset to clamp
+   * @param offsetY - Vertical offset to clamp
+   * @returns Clamped offset values
+   */
+  public clampOffset(offsetX: number, offsetY: number): { x: number; y: number } {
+    return {
+      x: this.clampOffsetX(offsetX),
+      y: this.clampOffsetY(offsetY),
+    };
+  }
+
+  /**
+   * Clamp zoom value to valid range.
+   * Used by ViewportAnimator to ensure target zoom is within bounds.
+   *
+   * @param zoom - Zoom level to clamp
+   * @returns Clamped zoom value
+   */
+  public clampZoom(zoom: number): number {
+    const minZoom = this.getMinZoom();
+    const maxZoom = this.getMaxZoom();
+    return Math.max(minZoom, Math.min(maxZoom, zoom));
+  }
+
+  /**
    * Convert screen Y coordinate to depth level.
    *
    * With offsetY <= 0 and worldContainer.y = screen.height - offsetY:
@@ -364,5 +511,40 @@ export class TimelineViewport {
 
     // Screen Y distance from bottom
     return this.state.displayHeight - (worldY - worldYBottom);
+  }
+
+  /**
+   * Calculate X position at the center of the visible portion of a frame.
+   * When zoomed in on a wide frame, only part of the frame may be visible.
+   * This returns the center of that visible portion, clamped with padding.
+   *
+   * Used for tooltip positioning during navigation.
+   *
+   * @param timestamp - Frame/marker start time in nanoseconds
+   * @param duration - Frame duration in nanoseconds (0 for markers)
+   * @param padding - Padding from viewport edges (default 50px)
+   * @returns Screen X coordinate at center of visible frame portion
+   */
+  public calculateVisibleCenterX(
+    timestamp: number,
+    duration: number,
+    padding: number = 50,
+  ): number {
+    // Calculate frame bounds in screen coords
+    const frameStartX = timestamp * this.state.zoom - this.state.offsetX;
+    const frameEndX = (timestamp + duration) * this.state.zoom - this.state.offsetX;
+
+    // Calculate visible portion of frame (intersection with viewport)
+    const visibleStartX = Math.max(frameStartX, 0);
+    const visibleEndX = Math.min(frameEndX, this.state.displayWidth);
+
+    // Center of visible portion
+    const centerX = (visibleStartX + visibleEndX) / 2;
+
+    // Clamp with padding for tooltip visibility
+    const minX = padding;
+    const maxX = this.state.displayWidth - padding;
+
+    return Math.max(minX, Math.min(maxX, centerX));
   }
 }

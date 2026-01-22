@@ -9,25 +9,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **⚡ Performance**: Improved performance to handle huge Apex debug logs; Zoom + pan are **7X faster** with smoother motion; Adaptive level-of-detail bucketing reveals richer timeline detail as you zoom while keeping the view clean and fast.
+  - **Visual Display**: Dynamic labels on Timeline events for faster log scanning; Time axis auto-spaces markers intelligently and more naturally as you zoom; Search + highlight dims non-matches for fast scanning.
+
 - ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart built for massive logs and up to **7X faster**. ([#446] [#251] [#92] [#564])
-  - Toggle the legacy timeline anytime via **Settings -> Apex Log Analyzer -> Timeline -> Legacy**.
-  - Improved performance to handle huge Apex debug logs.
-  - Dynamic labels on Timeline events for faster log scanning.
-  - Zoom + pan are **7X faster** with smoother motion.
-  - Time axis auto-spaces markers intelligently and more naturally as you zoom.
-  - Search + highlight dims non-matches for fast scanning.
-  - 18 curated timeline themes plus the default theme has been improved for better contrast and readability.
-  - Add your own multiple custom themes via **Settings -> Apex Log Analyzer -> Timeline -> Custom Themes**.
-  - Fast theme switching via **Command Palette**: **Log: Timeline Theme** or **Settings -> Apex Log Analyzer -> Timeline -> Active Theme**.
-  - Adaptive level-of-detail bucketing reveals richer timeline detail as you zoom while keeping keeping the view clean and fast.
+  - **⚡ Performance**: Improved performance to handle huge Apex debug logs.
+    - Zoom + pan are **7X faster** with smoother motion.
+  - **Visual Display**:
+    - Adaptive level-of-detail bucketing reveals richer timeline detail as you zoom while keeping the view clean and fast.
+    - Dynamic labels on Timeline events for faster log scanning.
+    - Time axis auto-spaces markers intelligently and more naturally as you zoom.
+    - Search + highlight dims non-matches for fast scanning.
+  - **🎨 Themes**:
+    - 18 curated timeline themes plus the default theme has been improved for better contrast and readability.
+    - Add your own multiple custom themes via **Settings -> Apex Log Analyzer -> Timeline -> Custom Themes**.
+    - Fast theme switching via **Command Palette**: **Log: Timeline Theme** or **Settings -> Apex Log Analyzer -> Timeline -> Active Theme**.
+  - **Keyboard and Mouse Navigation**: Comprehensive interaction controls for the timeline. ([#573] [#366] [#353] [#296] [#295])
+    - **View Control**:
+      - **Zoom**: Scroll wheel (mouse-anchored), or `W`/`S`/`+`/`-` keys.
+      - **Horizontal Pan**: `Alt/Option+Scroll`, trackpad swipe, `A`/`D` keys, or click and drag.
+      - **Vertical Pan**: `Shift+Scroll` or `Shift+W`/`Shift+S` to pan through stack depth.
+      - **Reset Zoom**: Press `Home` or `0` to reset zoom and fit all content.
+    - **Frame Control**:
+      - **Frame Selection**: Click to select and highlight a frame without navigating away.
+      - **Frame Navigation**: Arrow keys traverse the call stack (Up=child, Down=parent, Left/Right=siblings).
+      - **Focus/Zoom to Frame**: Double-click or press `Enter`/`Z` to zoom and fit the selected frame.
+    - **Navigation & Actions**:
+      - **Jump to Call Tree**: Press `J` or `Cmd/Ctrl+Click` to navigate to the frame in the Call Tree.
+      - **Context Menu**: Right-click for Go to Source, Copy Name, Copy Details, and Copy Call Stack.
+      - **Copy**: `Cmd/Ctrl+C` copies the selected frame name.
+      - **Marker Navigation**: Click markers to select; arrow Left/Right to navigate between markers.
+      - **Clear Selection**: Press `Escape` to deselect the current frame or marker.
+  - **Legacy Support**: Toggle the legacy timeline anytime via **Settings -> Apex Log Analyzer -> Timeline -> Legacy**.
 
 ### Changed
 
 - 🎯 **Call Tree Go To**: Go-to links in call tree now navigate to method definition instead of where method was called from ([#632] [#200])
+- 🔍 **Search Navigation**: `Shift+Enter` navigates to the previous search result; hold `Enter` to continuously navigate.
 - ⚡ **Log Parsing**: Improved performance ([#552])
 - ✨ **Duration Formatting**: Human-readable duration formatting in tooltips (30000 ms -> 30s and 0.01 ms -> 10 µs) ([#671])
 - 🎯 **Number Precision**: Total and Self Time column precision changed to 2 decimal places for improved readability ([#671])
-- 🎨 Navigation Bar: Redesigned to better match VS Code’s look and feel ([#694])
+- 🎨 **Navigation Bar**: Redesigned to better match VS Code’s look and feel ([#694])
 
 ## [1.18.1] 2025-07-09
 
@@ -419,6 +441,11 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#295]: https://github.com/certinia/debug-log-analyzer/issues/295
+[#296]: https://github.com/certinia/debug-log-analyzer/issues/296
+[#353]: https://github.com/certinia/debug-log-analyzer/issues/353
+[#366]: https://github.com/certinia/debug-log-analyzer/issues/366
+[#573]: https://github.com/certinia/debug-log-analyzer/issues/573
 [#564]: https://github.com/certinia/debug-log-analyzer/issues/564
 [#92]: https://github.com/certinia/debug-log-analyzer/issues/92
 [#694]: https://github.com/certinia/debug-log-analyzer/issues/694

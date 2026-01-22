@@ -31,18 +31,75 @@ To revert to the legacy timeline, navigate to **Settings → Apex Log Analyzer �
 
 ### Zoom + Pan
 
-- **Scroll up and down** with the mouse to zoom in and out to an accuracy of 0.001ms. Time markers are shown with a ms time value and white line (e.g., 9600.001 ms).
-- When zooming, the mouse pointer position is kept on screen.
-- **Scroll left and right** on the mouse to move the timeline left or right when zoomed.
-- **Click and drag** to move the timeline around both in the x and y direction when zoomed.
+| Action           | Mouse                                          | Keyboard               |
+| ---------------- | ---------------------------------------------- | ---------------------- |
+| Zoom In/Out      | Scroll wheel (mouse-anchored)                  | `W` / `S` or `+` / `-` |
+| Pan Horizontally | `Alt/Option` + Scroll, Trackpad swipe, or Drag | `A` / `D`              |
+| Pan Vertically   | `Shift` + Scroll or Drag                       | `Shift+W` / `Shift+S`  |
+| Reset Zoom       | —                                              | `Home` or `0`          |
+
+- When zooming, the mouse pointer position is kept on screen (mouse-anchored zoom).
+- Trackpad users can swipe left/right for natural horizontal panning.
+- Time markers are shown with a ms time value (e.g., 9600.001 ms).
+
+### Frame Selection
+
+Click on any event to **select** and highlight it. Selection enables keyboard navigation through the call stack.
+
+| Action              | Mouse             | Keyboard                     |
+| ------------------- | ----------------- | ---------------------------- |
+| Select Frame        | Click             | —                            |
+| Clear Selection     | Click empty space | `Escape`                     |
+| Navigate to Parent  | —                 | `Arrow Down`                 |
+| Navigate to Child   | —                 | `Arrow Up`                   |
+| Navigate to Sibling | —                 | `Arrow Left` / `Arrow Right` |
+| Focus/Zoom to Frame | Double-click      | `Enter` or `Z`               |
+
+:::tip Arrow Key Behavior
+When no frame is selected, arrow keys pan the viewport. When a frame is selected, arrow keys navigate the call stack. Hold `Shift` to always pan.
+:::
 
 ### Go to Call Tree
 
-Clicking an event in the Timeline will navigate to and select that event in the Call Tree.
+| Action            | Mouse              | Keyboard |
+| ----------------- | ------------------ | -------- |
+| Jump to Call Tree | `Cmd/Ctrl` + Click | `J`      |
+| Show Context Menu | Right-click        | —        |
+
+Use `J` or `Cmd/Ctrl+Click` to navigate to the selected frame in the Call Tree. Right-click opens a context menu with additional actions.
+
+### Context Menu
+
+Right-click on any frame to access:
+
+- **Show in Call Tree** (`J`) — Navigate to the frame in the Call Tree
+- **Go to Source** — Jump to the source method in your project (when available)
+- **Zoom to Frame** (`Z`) — Zoom and center the selected frame
+- **Copy Name** (`Cmd/Ctrl+C`) — Copy the frame name to clipboard
+- **Copy Details** — Copy tooltip information
+- **Copy Call Stack** — Copy the full call stack
+
+Right-click on empty space shows **Reset Zoom** (`0`).
+
+### Markers
+
+Log issue markers (truncation, errors, etc.) can be selected and navigated:
+
+| Action            | Mouse              | Keyboard                                            |
+| ----------------- | ------------------ | --------------------------------------------------- |
+| Select Marker     | Click              | —                                                   |
+| Navigate Markers  | —                  | `Arrow Left` / `Arrow Right` (when marker selected) |
+| Jump to Call Tree | `Cmd/Ctrl` + Click | `J`                                                 |
 
 ### Search + Highlight
 
-The timeline supports search functionality that greys out non-matching events, making it easier to find specific matches visually.
+The timeline supports search functionality that dims non-matching events, making it easier to find specific matches visually.
+
+| Action                | Keyboard                      |
+| --------------------- | ----------------------------- |
+| Next Match            | `Enter`                       |
+| Previous Match        | `Shift+Enter`                 |
+| Continuous Navigation | Hold `Enter` or `Shift+Enter` |
 
 ## Tooltip
 
@@ -54,7 +111,7 @@ style={{
 }}
 loading="lazy"/>
 
-Hovering over an element displays detailed information about that event. Clicking on an item navigates to that row in the Call Tree.
+Hovering over an element displays detailed information about that event. Use `J` or `Cmd/Ctrl+Click` to navigate to the frame in the Call Tree.
 
 The tooltip provides the following information:
 

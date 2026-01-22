@@ -70,8 +70,15 @@ export class TimelineTooltipManager {
    * @param event - Event to display tooltip for
    * @param mouseX - Mouse X position relative to container
    * @param mouseY - Mouse Y position relative to container
+   * @param options - Optional settings
+   * @param options.keepPosition - If true and tooltip is already visible for this event, don't reposition
    */
-  public show(event: LogEvent, mouseX: number, mouseY: number): void {
+  public show(
+    event: LogEvent,
+    mouseX: number,
+    mouseY: number,
+    options?: { keepPosition?: boolean },
+  ): void {
     // If tooltip is already visible, update immediately (no delay between events)
     const wasVisible = this.tooltipElement?.style.display === 'block';
 
@@ -83,8 +90,11 @@ export class TimelineTooltipManager {
       return;
     }
 
-    // If same event and visible, just update position
+    // If same event and visible, optionally keep position unchanged
     if (this.currentEvent === event && wasVisible) {
+      if (options?.keepPosition) {
+        return;
+      }
       this.positionTooltip(mouseX, mouseY);
       return;
     }

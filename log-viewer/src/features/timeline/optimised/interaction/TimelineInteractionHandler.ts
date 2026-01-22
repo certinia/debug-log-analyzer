@@ -9,6 +9,7 @@
  * Manages zoom (wheel), pan (drag), and event selection.
  */
 
+import type { ModifierKeys } from '../../types/flamechart.types.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 
 /**
@@ -39,13 +40,27 @@ export interface InteractionCallbacks {
   onMouseMove?: (x: number, y: number) => void;
 
   /** Called when mouse clicks on timeline. */
-  onClick?: (x: number, y: number) => void;
+  onClick?: (x: number, y: number, modifiers?: ModifierKeys) => void;
+
+  /** Called when mouse double-clicks on timeline. */
+  onDoubleClick?: (x: number, y: number) => void;
 
   /** Called when hover state over event changes. Returns true if over an event. */
   onHoverChange?: (isOverEvent: boolean) => void;
 
   /** Called when mouse leaves the canvas. */
   onMouseLeave?: () => void;
+
+  /** Called when drag operation starts (mouse or touch). */
+  onDragStart?: () => void;
+
+  /** Called when right-click (context menu) occurs on timeline.
+   * @param screenX - Canvas-relative X coordinate (for hit testing)
+   * @param screenY - Canvas-relative Y coordinate (for hit testing)
+   * @param clientX - Client X coordinate (for menu positioning)
+   * @param clientY - Client Y coordinate (for menu positioning)
+   */
+  onContextMenu?: (screenX: number, screenY: number, clientX: number, clientY: number) => void;
 }
 
 export class TimelineInteractionHandler {
@@ -61,7 +76,19 @@ export class TimelineInteractionHandler {
   private lastTouchX = 0;
   private lastTouchY = 0;
   private isOverEvent = false;
-  private isMouseDown = false;
+
+  // Track if actual panning occurred during mousedown-to-mouseup (to distinguish click from drag)
+  private didPanDuringClick = false;
+  private mouseDownX = 0;
+  private mouseDownY = 0;
+  private static readonly DRAG_THRESHOLD = 3; // px - movement required to count as drag
+
+  // Double-click detection state
+  private lastClickTime = 0;
+  private lastClickX = 0;
+  private lastClickY = 0;
+  private static readonly DOUBLE_CLICK_THRESHOLD = 300; // ms
+  private static readonly DOUBLE_CLICK_DISTANCE = 5; // px
 
   // Event listener references for cleanup
 
@@ -156,6 +183,11 @@ export class TimelineInteractionHandler {
     const mouseLeaveHandler = this.handleMouseLeave.bind(this);
     this.canvas.addEventListener('mouseleave', mouseLeaveHandler);
     this.registerBoundHandler('mouseleave', mouseLeaveHandler);
+
+    // Context menu (right-click)
+    const contextMenuHandler = this.handleContextMenu.bind(this);
+    this.canvas.addEventListener('contextmenu', contextMenuHandler);
+    this.registerBoundHandler('contextmenu', contextMenuHandler);
   }
 
   /**
@@ -210,6 +242,11 @@ export class TimelineInteractionHandler {
       this.canvas.removeEventListener('mouseleave', mouseLeaveHandler);
     }
 
+    const contextMenuHandler = this.boundHandlers.get('contextmenu');
+    if (contextMenuHandler) {
+      this.canvas.removeEventListener('contextmenu', contextMenuHandler);
+    }
+
     this.boundHandlers.clear();
   }
 
@@ -218,16 +255,45 @@ export class TimelineInteractionHandler {
   // ============================================================================
 
   /**
-   * Handle wheel event for zoom and horizontal pan.
+   * Handle wheel event for zoom and pan.
    *
    * Implements:
-   * - Vertical wheel (deltaY): Mouse-anchored zoom
+   * - Shift + wheel: Vertical pan (scroll up/down in stack depth) - respects natural scrolling
+   * - Alt/Option + wheel: Horizontal pan (scroll left/right in time)
    * - Horizontal wheel (deltaX): Pan (trackpad swipe left/right)
+   * - Vertical wheel (deltaY): Mouse-anchored zoom
    * - Mouse cursor position remains over the same timeline point during zoom
    * - Prevents page scroll
    */
   private handleWheel(event: WheelEvent): void {
     event.preventDefault();
+
+    // Shift + wheel/swipe = Force pan (skip zoom, useful when frame is selected)
+    // Choose horizontal or vertical pan based on dominant delta direction
+    if (event.shiftKey && this.options.enablePan) {
+      let changed: boolean;
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+        // Horizontal swipe with Shift = horizontal pan
+        changed = this.viewport.panBy(event.deltaX, 0);
+      } else {
+        // Vertical wheel with Shift = vertical pan (stack depth)
+        changed = this.viewport.panBy(0, event.deltaY);
+      }
+      if (changed && this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange();
+      }
+      return;
+    }
+
+    // Alt/Option + wheel = Horizontal pan (time axis)
+    // Uses deltaY as horizontal movement (since wheel primarily produces deltaY)
+    if (event.altKey && this.options.enablePan) {
+      const changed = this.viewport.panBy(-event.deltaY, 0);
+      if (changed && this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange();
+      }
+      return;
+    }
 
     // Handle horizontal pan (trackpad swipe left/right)
     if (Math.abs(event.deltaX) > Math.abs(event.deltaY) && this.options.enablePan) {
@@ -282,6 +348,12 @@ export class TimelineInteractionHandler {
     // Apply zoom with mouse position as anchor
     const changed = this.viewport.setZoom(newZoom, mouseX);
 
+    // Mark as panning during zoom to prevent accidental selection
+    // (trackpad gestures can sometimes trigger concurrent click events)
+    if (changed) {
+      this.didPanDuringClick = true;
+    }
+
     // Notify callback if viewport changed
     if (changed && this.callbacks.onViewportChange) {
       this.callbacks.onViewportChange();
@@ -302,9 +374,11 @@ export class TimelineInteractionHandler {
     }
 
     this.isDragging = true;
-    this.isMouseDown = true;
+    this.didPanDuringClick = false; // Reset - will be set true if we actually pan
     this.lastMouseX = event.clientX;
     this.lastMouseY = event.clientY;
+    this.mouseDownX = event.clientX;
+    this.mouseDownY = event.clientY;
 
     // Change cursor to grabbing
     this.canvas.style.cursor = 'grabbing';
@@ -315,8 +389,23 @@ export class TimelineInteractionHandler {
    */
   private handleMouseMove(event: MouseEvent): void {
     if (this.isDragging && this.options.enablePan) {
-      // Clear click flag since we're dragging
-      this.isMouseDown = false;
+      // Check if we've moved enough to start actual panning (vs just a click with slight movement)
+      if (!this.didPanDuringClick) {
+        const distanceX = Math.abs(event.clientX - this.mouseDownX);
+        const distanceY = Math.abs(event.clientY - this.mouseDownY);
+        const distance = Math.max(distanceX, distanceY);
+
+        if (distance >= TimelineInteractionHandler.DRAG_THRESHOLD) {
+          // We've exceeded the drag threshold - this is a real drag, not a click
+          this.didPanDuringClick = true;
+
+          // Notify callback that drag started (used to cancel keyboard animations)
+          this.callbacks.onDragStart?.();
+        } else {
+          // Haven't moved enough yet - don't start panning
+          return;
+        }
+      }
 
       // Calculate delta from last position
       const deltaX = event.clientX - this.lastMouseX;
@@ -354,6 +443,7 @@ export class TimelineInteractionHandler {
     }
 
     this.isDragging = false;
+    // Note: didPanDuringClick is NOT reset here - it's read by handleClick which fires after mouseup
 
     // Restore cursor based on whether we're over an event
     this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
@@ -370,23 +460,76 @@ export class TimelineInteractionHandler {
   }
 
   /**
-   * Handle click - event selection.
+   * Handle click - event selection and double-click detection.
    */
   private handleClick(event: MouseEvent): void {
-    // Only fire click if mousedown occurred without dragging
-    if (!this.isMouseDown) {
+    // Skip click processing if we panned during this mousedown-click sequence
+    // (The click event fires after mouseup, so didPanDuringClick is still valid)
+    if (this.didPanDuringClick) {
       return;
     }
-
-    this.isMouseDown = false;
 
     const rect = this.canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
 
-    if (this.callbacks.onClick) {
-      this.callbacks.onClick(mouseX, mouseY);
+    const currentTime = Date.now();
+
+    // Check for double-click
+    const timeSinceLastClick = currentTime - this.lastClickTime;
+    const distanceX = Math.abs(mouseX - this.lastClickX);
+    const distanceY = Math.abs(mouseY - this.lastClickY);
+    const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+
+    const isDoubleClick =
+      timeSinceLastClick < TimelineInteractionHandler.DOUBLE_CLICK_THRESHOLD &&
+      distance < TimelineInteractionHandler.DOUBLE_CLICK_DISTANCE;
+
+    // Extract modifier keys from event
+    const modifiers: ModifierKeys = {
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+    };
+
+    if (isDoubleClick) {
+      // Reset click state to prevent triple-click being detected as double
+      this.lastClickTime = 0;
+
+      if (this.callbacks.onDoubleClick) {
+        this.callbacks.onDoubleClick(mouseX, mouseY);
+      }
+    } else {
+      // Single click - update tracking state
+      this.lastClickTime = currentTime;
+      this.lastClickX = mouseX;
+      this.lastClickY = mouseY;
+
+      if (this.callbacks.onClick) {
+        this.callbacks.onClick(mouseX, mouseY, modifiers);
+      }
     }
+  }
+
+  /**
+   * Handle context menu (right-click).
+   * Passes both canvas-relative (for hit testing) and client coordinates (for menu positioning).
+   */
+  private handleContextMenu(event: MouseEvent): void {
+    // Prevent default browser context menu
+    event.preventDefault();
+
+    if (!this.callbacks.onContextMenu) {
+      return;
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    const screenX = event.clientX - rect.left; // Canvas-relative for hit test
+    const screenY = event.clientY - rect.top;
+
+    // Pass both coordinate systems: screen coords for hit test, client coords for menu positioning
+    this.callbacks.onContextMenu(screenX, screenY, event.clientX, event.clientY);
   }
 
   /**
@@ -399,8 +542,8 @@ export class TimelineInteractionHandler {
       this.canvas.style.cursor = 'grab';
     }
 
-    // Reset mouse down state
-    this.isMouseDown = false;
+    // Mark as panned to prevent click from firing when mouse returns
+    this.didPanDuringClick = true;
 
     if (this.callbacks.onMouseLeave) {
       this.callbacks.onMouseLeave();
@@ -431,6 +574,9 @@ export class TimelineInteractionHandler {
       this.isDragging = true;
       this.lastTouchX = touch.clientX;
       this.lastTouchY = touch.clientY;
+
+      // Notify callback that drag started (used to cancel keyboard animations)
+      this.callbacks.onDragStart?.();
 
       // Change cursor to grabbing
       this.canvas.style.cursor = 'grabbing';

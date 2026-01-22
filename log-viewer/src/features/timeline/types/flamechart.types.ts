@@ -56,6 +56,24 @@ export interface ViewportBounds {
   depthEnd: number;
 }
 
+/**
+ * Modifier keys state from mouse/keyboard events.
+ * Used for Cmd/Ctrl+Click navigation.
+ */
+export interface ModifierKeys {
+  /** Meta key (Cmd on Mac). */
+  metaKey: boolean;
+
+  /** Ctrl key. */
+  ctrlKey: boolean;
+
+  /** Shift key. */
+  shiftKey: boolean;
+
+  /** Alt/Option key. */
+  altKey: boolean;
+}
+
 // ============================================================================
 // GENERIC EVENT TYPES
 // ============================================================================
@@ -431,6 +449,12 @@ export type MarkerType = 'error' | 'skip' | 'unexpected';
  * Extracted from ApexLog.logIssues during timeline initialization.
  */
 export interface TimelineMarker {
+  /**
+   * Unique identifier for this marker.
+   * Used for selection tracking and navigation.
+   */
+  id: string;
+
   /**
    * Type of marker
    * - 'error': Critical system error causing marker (highest severity)
