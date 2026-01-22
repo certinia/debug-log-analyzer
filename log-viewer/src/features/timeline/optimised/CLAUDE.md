@@ -47,6 +47,14 @@ The module follows a **pure orchestrator** pattern where FlameChart is a generic
 - Invoke callbacks, don't manage state
 - Examples: `KeyboardHandler`, `TimelineInteractionHandler`
 
+### TimelineViewport
+
+- Owns viewport state (zoom, pan, bounds)
+- All coordinate transformations and calculations
+- Screen-to-world and world-to-screen conversions
+- Tooltip positioning calculations (e.g., `calculateVisibleCenterX`)
+- FlameChart delegates coordinate math here, never implements it inline
+
 ## Key Design Patterns
 
 ### Computed State Over Tracked State
@@ -93,8 +101,17 @@ When adding a new feature:
    - Clean up in `destroy()`
 
 3. **FlameChart delegates, doesn't implement**
-   - FlameChart calls manager methods
-   - FlameChart doesn't contain feature logic
+   - FlameChart calls manager/viewport methods
+   - FlameChart doesn't contain feature logic or calculations
+
+   ```typescript
+   // GOOD: Delegate to TimelineViewport
+   const screenX = this.viewport.calculateVisibleCenterX(timestamp, duration);
+
+   // AVOID: Inline calculations in FlameChart
+   const frameCenterX = timestamp * zoom - offsetX;
+   const screenX = Math.max(50, Math.min(width - 50, frameCenterX));
+   ```
 
 ## File Structure
 

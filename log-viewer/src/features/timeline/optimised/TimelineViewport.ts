@@ -512,4 +512,39 @@ export class TimelineViewport {
     // Screen Y distance from bottom
     return this.state.displayHeight - (worldY - worldYBottom);
   }
+
+  /**
+   * Calculate X position at the center of the visible portion of a frame.
+   * When zoomed in on a wide frame, only part of the frame may be visible.
+   * This returns the center of that visible portion, clamped with padding.
+   *
+   * Used for tooltip positioning during navigation.
+   *
+   * @param timestamp - Frame/marker start time in nanoseconds
+   * @param duration - Frame duration in nanoseconds (0 for markers)
+   * @param padding - Padding from viewport edges (default 50px)
+   * @returns Screen X coordinate at center of visible frame portion
+   */
+  public calculateVisibleCenterX(
+    timestamp: number,
+    duration: number,
+    padding: number = 50,
+  ): number {
+    // Calculate frame bounds in screen coords
+    const frameStartX = timestamp * this.state.zoom - this.state.offsetX;
+    const frameEndX = (timestamp + duration) * this.state.zoom - this.state.offsetX;
+
+    // Calculate visible portion of frame (intersection with viewport)
+    const visibleStartX = Math.max(frameStartX, 0);
+    const visibleEndX = Math.min(frameEndX, this.state.displayWidth);
+
+    // Center of visible portion
+    const centerX = (visibleStartX + visibleEndX) / 2;
+
+    // Clamp with padding for tooltip visibility
+    const minX = padding;
+    const maxX = this.state.displayWidth - padding;
+
+    return Math.max(minX, Math.min(maxX, centerX));
+  }
 }

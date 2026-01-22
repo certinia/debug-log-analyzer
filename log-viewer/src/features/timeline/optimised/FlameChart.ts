@@ -74,6 +74,10 @@ export interface FlameChartCallbacks {
   ) => void;
   onViewportChange?: (viewport: ViewportState) => void;
   onSearchNavigate?: (event: EventNode, screenX: number, screenY: number, depth: number) => void;
+  /** Called when keyboard navigates to a frame (includes screen coords for tooltip). */
+  onFrameNavigate?: (event: EventNode, screenX: number, screenY: number, depth: number) => void;
+  /** Called when keyboard navigates to a marker (includes screen coords for tooltip). */
+  onMarkerNavigate?: (marker: TimelineMarker, screenX: number, screenY: number) => void;
   /** Called when frame selection changes (click to select, arrow keys to navigate). */
   onSelect?: (event: EventNode | null) => void;
   /** Called when marker selection changes (click to select, arrow keys to navigate). */
@@ -560,8 +564,10 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Call application-specific callback (e.g., for showing tooltips)
     if (this.callbacks.onSearchNavigate) {
-      const viewportState = this.viewport.getState();
-      const screenX = match.event.timestamp * viewportState.zoom - viewportState.offsetX;
+      const screenX = this.viewport.calculateVisibleCenterX(
+        match.event.timestamp,
+        match.event.duration,
+      );
       const screenY = this.viewport.depthToScreenY(match.depth);
       this.callbacks.onSearchNavigate(match.event, screenX, screenY, match.depth);
     }
@@ -1202,6 +1208,14 @@ export class FlameChart<E extends EventNode = EventNode> {
 
       // Auto-center viewport on the newly selected marker
       this.centerOnSelectedMarker();
+
+      // Notify navigation callback for tooltip
+      if (this.callbacks.onMarkerNavigate && this.viewport) {
+        const screenX = this.viewport.calculateVisibleCenterX(nextMarker.startTime, 0);
+        // Markers span full height - position tooltip near top of visible area
+        const screenY = 50;
+        this.callbacks.onMarkerNavigate(nextMarker, screenX, screenY);
+      }
     }
 
     // Return true if we have a marker selection (even if we couldn't navigate further)
@@ -1243,6 +1257,17 @@ export class FlameChart<E extends EventNode = EventNode> {
 
       // Auto-center viewport on the newly selected frame
       this.centerOnSelectedFrame();
+
+      // Notify navigation callback for tooltip (similar to search navigation)
+      if (this.callbacks.onFrameNavigate && this.viewport) {
+        const depth = nextNode.depth ?? 0;
+        const screenX = this.viewport.calculateVisibleCenterX(
+          nextNode.data.timestamp,
+          nextNode.data.duration,
+        );
+        const screenY = this.viewport.depthToScreenY(depth);
+        this.callbacks.onFrameNavigate(nextNode.data, screenX, screenY, depth);
+      }
     }
 
     // Return true if we have a selection (even if we couldn't navigate further)

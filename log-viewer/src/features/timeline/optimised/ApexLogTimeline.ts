@@ -112,6 +112,12 @@ export class ApexLogTimeline {
         onSearchNavigate: (event, screenX, screenY, depth) => {
           this.handleSearchNavigate(event, screenX, screenY, depth);
         },
+        onFrameNavigate: (event, screenX, screenY, _depth) => {
+          this.handleFrameNavigate(event, screenX, screenY);
+        },
+        onMarkerNavigate: (marker, screenX, screenY) => {
+          this.handleMarkerNavigate(marker, screenX, screenY);
+        },
         onSelect: (eventNode) => {
           this.handleSelect(eventNode);
         },
@@ -346,6 +352,33 @@ export class ApexLogTimeline {
 
     // Marker selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
+  }
+
+  /**
+   * Handle keyboard navigation to a frame.
+   * Shows tooltip for the navigated-to frame.
+   */
+  private handleFrameNavigate(event: EventNode, screenX: number, screenY: number): void {
+    if (!this.tooltipManager) {
+      return;
+    }
+
+    const eventWithOriginal = event as EventNode & { original?: LogEvent };
+    const logEvent = eventWithOriginal.original;
+    if (logEvent) {
+      this.tooltipManager.show(logEvent, screenX, screenY);
+    }
+  }
+
+  /**
+   * Handle keyboard navigation to a marker.
+   * Shows tooltip for the navigated-to marker.
+   */
+  private handleMarkerNavigate(marker: TimelineMarker, screenX: number, screenY: number): void {
+    if (!this.tooltipManager) {
+      return;
+    }
+    this.tooltipManager.showTruncation(marker, screenX, screenY);
   }
 
   /**
