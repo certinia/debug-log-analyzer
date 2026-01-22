@@ -21,7 +21,7 @@ export class FindWidget extends LitElement {
   @state() matchCase = false;
 
   lastMatch: string | null = null;
-  nextMatchDirection = true;
+  nextMatchDirection = true; // Remembers last direction: true=next, false=previous
 
   constructor() {
     super();
@@ -187,6 +187,7 @@ export class FindWidget extends LitElement {
   _matchCase() {
     this._resetCounts();
     this.matchCase = !this.matchCase;
+    this.nextMatchDirection = true; // Reset to forward direction
     this._triggerFind();
   }
 
@@ -202,15 +203,22 @@ export class FindWidget extends LitElement {
     const inputBox = this.inputbox;
     if (inputBox) {
       this.isVisble = true;
+      this.nextMatchDirection = true; // Reset to forward direction
       inputBox.focus();
       inputBox.select();
     }
   }
 
-  _previousMatch() {
+  /**
+   * Navigate to previous match.
+   * @param setDirection - If true, remembers this direction for Enter key. Button clicks pass true, Shift+Enter passes false.
+   */
+  _previousMatch(setDirection = true) {
     if (this.currentMatch !== null) {
       this.currentMatch--;
-      this.nextMatchDirection = false;
+      if (setDirection) {
+        this.nextMatchDirection = false;
+      }
       if (this.currentMatch < 1) {
         this.currentMatch = this.totalMatches;
       }
@@ -219,10 +227,16 @@ export class FindWidget extends LitElement {
     }
   }
 
-  _nextMatch() {
+  /**
+   * Navigate to next match.
+   * @param setDirection - If true, remembers this direction for Enter key. Button clicks pass true, Enter key passes false.
+   */
+  _nextMatch(setDirection = true) {
     if (this.currentMatch !== null) {
       this.currentMatch++;
-      this.nextMatchDirection = true;
+      if (setDirection) {
+        this.nextMatchDirection = true;
+      }
       if (this.currentMatch > this.totalMatches) {
         this.currentMatch = 1;
       }
@@ -246,12 +260,14 @@ export class FindWidget extends LitElement {
   }
 
   _keyPress(e: KeyboardEvent) {
-    if (e.repeat) {
+    // Allow Enter to repeat for holding, block other repeated keys
+    if (e.repeat && e.key !== 'Enter') {
       return;
     }
 
     if (e.key === 'f' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
       e.preventDefault();
+      this.nextMatchDirection = true; // Reset to forward direction
 
       if (!this.isVisble && !this.totalMatches) {
         this._triggerFind();
@@ -269,22 +285,27 @@ export class FindWidget extends LitElement {
 
     switch (e.key) {
       case 'Escape':
+        this.nextMatchDirection = true; // Reset to forward direction
         this._closeFind();
-
         break;
 
       case 'Enter': {
+        e.preventDefault(); // Prevent double-firing from input field
         if (this._hasMatchValueChanged() || !this.totalMatches) {
           this._triggerFind();
+        } else if (e.shiftKey) {
+          this._previousMatch(false); // Shift+Enter → always previous, don't change remembered direction
         } else if (this.nextMatchDirection) {
-          this._nextMatch();
+          this._nextMatch(false); // Enter → next (default direction)
         } else {
-          this._previousMatch();
+          this._previousMatch(false); // Enter → previous (if Prev button was last clicked)
         }
         break;
       }
 
       default:
+        // Any other key resets direction to forward
+        this.nextMatchDirection = true;
         break;
     }
   }
