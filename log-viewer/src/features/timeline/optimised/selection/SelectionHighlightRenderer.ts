@@ -61,20 +61,11 @@ export class SelectionHighlightRenderer {
   /** Graphics for marker selection highlight (renders behind frames) */
   private markerGraphics: PIXI.Graphics;
 
-  /** Currently selected node (frame) */
-  private selectedNode: TreeNode<EventNode> | null = null;
-
-  /** Currently selected marker */
-  private selectedMarker: TimelineMarker | null = null;
-
   /** All markers for duration calculation */
   private markers: TimelineMarker[] = [];
 
   /** Timeline end time for last marker duration calculation */
   private timelineEnd = 0;
-
-  /** Max depth in timeline for marker height calculation */
-  private maxDepth = 0;
 
   /** Highlight colors extracted from CSS variables (same as search) */
   private colors: HighlightColors;
@@ -98,83 +89,48 @@ export class SelectionHighlightRenderer {
   }
 
   /**
-   * Set the currently selected node (frame).
-   * Clears marker selection (mutually exclusive).
-   *
-   * @param node - TreeNode to select, or null to clear selection
-   */
-  public setSelection(node: TreeNode<EventNode> | null): void {
-    this.selectedNode = node;
-    this.selectedMarker = null; // Clear marker selection
-  }
-
-  /**
-   * Set the currently selected marker.
-   * Clears frame selection (mutually exclusive).
-   *
-   * @param marker - TimelineMarker to select, or null to clear selection
-   */
-  public setMarkerSelection(marker: TimelineMarker | null): void {
-    this.selectedMarker = marker;
-    this.selectedNode = null; // Clear frame selection
-  }
-
-  /**
    * Set markers array and timeline parameters for marker selection.
    * Required for calculating marker duration.
    *
    * @param markers - Array of timeline markers (sorted by startTime)
    * @param timelineEnd - End time of timeline in nanoseconds
-   * @param maxDepth - Maximum depth in timeline
    */
-  public setMarkerContext(markers: TimelineMarker[], timelineEnd: number, maxDepth: number): void {
+  public setMarkerContext(markers: TimelineMarker[], timelineEnd: number): void {
     this.markers = markers;
     this.timelineEnd = timelineEnd;
-    this.maxDepth = maxDepth;
-  }
-
-  /**
-   * Get the currently selected node (frame).
-   *
-   * @returns Currently selected TreeNode, or null if none
-   */
-  public getSelection(): TreeNode<EventNode> | null {
-    return this.selectedNode;
-  }
-
-  /**
-   * Get the currently selected marker.
-   *
-   * @returns Currently selected TimelineMarker, or null if none
-   */
-  public getMarkerSelection(): TimelineMarker | null {
-    return this.selectedMarker;
   }
 
   /**
    * Render the selection highlight (frame or marker).
+   * This renderer is stateless - selection state is passed in from SelectionManager.
    *
    * @param viewport - Viewport state for culling and transforms
+   * @param selectedNode - Currently selected frame node, or null
+   * @param selectedMarker - Currently selected marker, or null
    */
-  public render(viewport: ViewportState): void {
+  public render(
+    viewport: ViewportState,
+    selectedNode: TreeNode<EventNode> | null,
+    selectedMarker: TimelineMarker | null,
+  ): void {
     // Clear both graphics
     this.frameGraphics.clear();
     this.markerGraphics.clear();
 
     // Render marker selection if present (uses markerGraphics - behind frames)
-    if (this.selectedMarker) {
-      this.renderMarkerHighlight(viewport);
+    if (selectedMarker) {
+      this.renderMarkerHighlight(viewport, selectedMarker);
       return;
     }
 
     // Render frame selection if present (uses frameGraphics - on top of frames)
-    if (!this.selectedNode) {
+    if (!selectedNode) {
       return;
     }
 
     const bounds = this.calculateBounds(viewport);
-    const event = this.selectedNode.data;
-    const depth = this.selectedNode.depth ?? 0;
+    const event = selectedNode.data;
+    const depth = selectedNode.depth ?? 0;
 
     // Check visibility
     if (!this.isVisible(event, depth, bounds)) {
@@ -197,20 +153,17 @@ export class SelectionHighlightRenderer {
    * Markers render as full-height vertical bands that cover the entire viewport height.
    *
    * @param viewport - Viewport state for transforms
+   * @param selectedMarker - The marker to highlight
    */
-  private renderMarkerHighlight(viewport: ViewportState): void {
-    if (!this.selectedMarker) {
-      return;
-    }
-
+  private renderMarkerHighlight(viewport: ViewportState, selectedMarker: TimelineMarker): void {
     // Calculate marker duration (extends to next marker or timeline end)
-    const markerIndex = this.markers.findIndex((m) => m.id === this.selectedMarker!.id);
+    const markerIndex = this.markers.findIndex((m) => m.id === selectedMarker.id);
     const nextMarker = this.markers[markerIndex + 1];
     const markerEnd = nextMarker?.startTime ?? this.timelineEnd;
-    const duration = markerEnd - this.selectedMarker.startTime;
+    const duration = markerEnd - selectedMarker.startTime;
 
     // Calculate screen position
-    const screenX = this.selectedMarker.startTime * viewport.zoom;
+    const screenX = selectedMarker.startTime * viewport.zoom;
     const screenWidth = duration * viewport.zoom;
 
     // Full height to cover entire visible viewport regardless of pan position
@@ -253,8 +206,6 @@ export class SelectionHighlightRenderer {
   public clear(): void {
     this.frameGraphics.clear();
     this.markerGraphics.clear();
-    this.selectedNode = null;
-    this.selectedMarker = null;
   }
 
   /**

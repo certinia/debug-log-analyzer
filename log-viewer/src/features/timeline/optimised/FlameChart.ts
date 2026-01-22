@@ -344,11 +344,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.worldContainer) {
       this.selectionRenderer = new SelectionHighlightRenderer(this.worldContainer);
       // Set marker context for marker selection highlighting
-      this.selectionRenderer.setMarkerContext(
-        this.markers,
-        this.index.totalDuration,
-        this.index.maxDepth,
-      );
+      this.selectionRenderer.setMarkerContext(this.markers, this.index.totalDuration);
     }
 
     // Setup interaction handler
@@ -494,9 +490,6 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Initialize search renderer (for borders/overlays on current match)
     this.searchRenderer = new SearchHighlightRenderer(this.worldContainer);
-
-    // Ensure zIndex layering is honored for highlight graphics
-    this.worldContainer.sortableChildren = true;
   }
 
   /**
@@ -1105,11 +1098,6 @@ export class FlameChart<E extends EventNode = EventNode> {
   private selectFrame(node: TreeNode<E>): void {
     this.selectionManager?.select(node);
 
-    // Update selection renderer
-    if (this.selectionRenderer) {
-      this.selectionRenderer.setSelection(node as TreeNode<EventNode>);
-    }
-
     // Notify callback
     if (this.callbacks.onSelect) {
       this.callbacks.onSelect(node.data);
@@ -1158,11 +1146,6 @@ export class FlameChart<E extends EventNode = EventNode> {
   private selectMarker(marker: TimelineMarker): void {
     this.selectionManager?.selectMarker(marker);
 
-    // Update selection renderer
-    if (this.selectionRenderer) {
-      this.selectionRenderer.setMarkerSelection(marker);
-    }
-
     // Notify callback
     if (this.callbacks.onMarkerSelect) {
       this.callbacks.onMarkerSelect(marker);
@@ -1187,13 +1170,8 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Navigate and get the new marker (or null if at boundary)
     const nextMarker = this.selectionManager.navigateMarker(direction);
 
-    // If navigation found a valid marker, update renderer and center viewport
+    // If navigation found a valid marker, center viewport and notify
     if (nextMarker) {
-      // Update selection renderer
-      if (this.selectionRenderer) {
-        this.selectionRenderer.setMarkerSelection(nextMarker);
-      }
-
       // Notify callback
       if (this.callbacks.onMarkerSelect) {
         this.callbacks.onMarkerSelect(nextMarker);
@@ -1235,13 +1213,8 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Navigate and get the new node (or null if at boundary)
     const nextNode = this.selectionManager.navigate(direction);
 
-    // If navigation found a valid node, update renderer and center viewport
+    // If navigation found a valid node, center viewport and notify
     if (nextNode) {
-      // Update selection renderer
-      if (this.selectionRenderer) {
-        this.selectionRenderer.setSelection(nextNode as TreeNode<EventNode>);
-      }
-
       // Notify callback
       if (this.callbacks.onSelect) {
         this.callbacks.onSelect(nextNode.data);
@@ -1586,7 +1559,10 @@ export class FlameChart<E extends EventNode = EventNode> {
     const highlightMode = this.getHighlightMode();
     if (highlightMode === 'selection') {
       // Selection highlight mode: show selection highlight
-      this.selectionRenderer?.render(viewportState);
+      // Pass selection state from SelectionManager (single source of truth)
+      const selectedNode = this.selectionManager?.getSelected() as TreeNode<EventNode> | null;
+      const selectedMarker = this.selectionManager?.getSelectedMarker() ?? null;
+      this.selectionRenderer?.render(viewportState, selectedNode, selectedMarker);
       this.searchRenderer?.clear();
     } else if (highlightMode === 'search') {
       // Search highlight mode: show search match highlight
