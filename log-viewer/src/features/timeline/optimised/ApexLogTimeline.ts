@@ -19,6 +19,7 @@
 
 import { ContextMenu, type ContextMenuItem } from '../../../components/ContextMenu.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
+import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
 import { getTheme } from '../themes/ThemeSelector.js';
@@ -26,6 +27,7 @@ import type {
   EventNode,
   FindEventDetail,
   FindResultsEventDetail,
+  ModifierKeys,
   TimelineMarker,
   TimelineOptions,
   ViewportState,
@@ -99,8 +101,8 @@ export class ApexLogTimeline {
         onMouseMove: (screenX, screenY, event, marker) => {
           this.handleMouseMove(screenX, screenY, event, marker);
         },
-        onClick: (screenX, screenY, event, marker) => {
-          this.handleClick(screenX, screenY, event, marker);
+        onClick: (screenX, screenY, event, marker, modifiers) => {
+          this.handleClick(screenX, screenY, event, marker, modifiers);
         },
         onViewportChange: (viewport: ViewportState) => {
           if (options.onViewportChange) {
@@ -269,13 +271,28 @@ export class ApexLogTimeline {
   /**
    * Handle click - select frame or marker (but don't navigate).
    * Click on frame/marker selects it only. Use J key to navigate to call tree.
+   * Cmd/Ctrl+Click on frame navigates directly to call tree.
    */
   private handleClick(
     _screenX: number,
     _screenY: number,
-    _event: LogEvent | null,
-    _marker: TimelineMarker | null,
+    event: LogEvent | null,
+    marker: TimelineMarker | null,
+    modifiers?: ModifierKeys,
   ): void {
+    // Cmd/Ctrl+Click on a frame navigates directly to call tree
+    // Note: Only works on individual frames, not buckets (buckets are aggregated)
+    if (event && (modifiers?.metaKey || modifiers?.ctrlKey)) {
+      goToRow(event.timestamp);
+      return;
+    }
+
+    // Cmd/Ctrl+Click on a marker navigates directly to call tree
+    if (marker && (modifiers?.metaKey || modifiers?.ctrlKey)) {
+      goToRow(marker.startTime);
+      return;
+    }
+
     // Frame and marker clicks are handled by FlameChart's selection system
     // (via onSelect and onMarkerSelect callbacks)
     // No longer auto-navigate to call tree on click - use J key for explicit navigation
@@ -394,23 +411,29 @@ export class ApexLogTimeline {
     this.selectedEventForContextMenu = eventNode;
 
     // Show tooltip for the right-clicked frame using screen coords (same as hover)
-    if (this.tooltipManager) {
-      const eventWithOriginal = eventNode as EventNode & { original?: LogEvent };
-      const logEvent = eventWithOriginal.original;
-      if (logEvent) {
-        this.tooltipManager.show(logEvent, screenX, screenY, { keepPosition: true });
-      }
+    const eventWithOriginal = eventNode as EventNode & { original?: LogEvent };
+    const logEvent = eventWithOriginal.original;
+    if (this.tooltipManager && logEvent) {
+      this.tooltipManager.show(logEvent, screenX, screenY, { keepPosition: true });
     }
 
     // Build menu items
     const items: ContextMenuItem[] = [
       { id: 'show-in-call-tree', label: 'Show in Call Tree', shortcut: 'J' },
+    ];
+
+    // Add "Go to Source" only when hasValidSymbols is true
+    if (logEvent?.hasValidSymbols) {
+      items.push({ id: 'go-to-source', label: 'Go to Source' });
+    }
+
+    items.push(
       { id: 'zoom-to-frame', label: 'Zoom to Frame', shortcut: 'Z' },
       { id: 'separator-1', label: '', separator: true },
       { id: 'copy-name', label: 'Copy Name', shortcut: this.getCopyShortcut() },
       { id: 'copy-details', label: 'Copy Details' },
       { id: 'copy-call-stack', label: 'Copy Call Stack' },
-    ];
+    );
 
     // Use client coords for context menu (positioned in viewport)
     this.contextMenu.show(items, clientX, clientY);
@@ -516,6 +539,9 @@ export class ApexLogTimeline {
       case 'show-in-call-tree':
         this.handleJumpToCallTree(event);
         break;
+      case 'go-to-source':
+        this.handleGoToSource(event);
+        break;
       case 'zoom-to-frame':
         this.flamechart.focusOnSelectedFrame();
         break;
@@ -528,6 +554,18 @@ export class ApexLogTimeline {
       case 'copy-call-stack':
         this.copyToClipboard(this.formatCallStack(event));
         break;
+    }
+  }
+
+  /**
+   * Handle "Go to Source Code" action.
+   * Opens the source file in VS Code for methods with valid symbols.
+   */
+  private handleGoToSource(eventNode: EventNode): void {
+    const eventWithOriginal = eventNode as EventNode & { original?: LogEvent };
+    const logEvent = eventWithOriginal.original;
+    if (logEvent?.hasValidSymbols) {
+      vscodeMessenger.send<string>('openType', logEvent.text);
     }
   }
 

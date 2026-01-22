@@ -14,6 +14,7 @@ import * as PIXI from 'pixi.js';
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type {
   EventNode,
+  ModifierKeys,
   TimelineMarker,
   TimelineOptions,
   TimelineState,
@@ -69,6 +70,7 @@ export interface FlameChartCallbacks {
     screenY: number,
     event: LogEvent | null,
     marker: TimelineMarker | null,
+    modifiers?: ModifierKeys,
   ) => void;
   onViewportChange?: (viewport: ViewportState) => void;
   onSearchNavigate?: (event: EventNode, screenX: number, screenY: number, depth: number) => void;
@@ -738,8 +740,8 @@ export class FlameChart<E extends EventNode = EventNode> {
         onMouseMove: (x: number, y: number) => {
           this.handleMouseMove(x, y);
         },
-        onClick: (x: number, y: number) => {
-          this.handleClick(x, y);
+        onClick: (x: number, y: number, modifiers?: ModifierKeys) => {
+          this.handleClick(x, y, modifiers);
         },
         onDoubleClick: (x: number, y: number) => {
           this.handleDoubleClick(x, y);
@@ -898,7 +900,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
   }
 
-  private handleClick(screenX: number, screenY: number): void {
+  private handleClick(screenX: number, screenY: number, modifiers?: ModifierKeys): void {
     if (!this.viewport || !this.index || !this.hitTestManager) {
       return;
     }
@@ -932,7 +934,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Notify callback
     if (this.callbacks.onClick) {
-      this.callbacks.onClick(screenX, screenY, event, marker);
+      this.callbacks.onClick(screenX, screenY, event, marker, modifiers);
     }
   }
 

@@ -9,6 +9,7 @@
  * Manages zoom (wheel), pan (drag), and event selection.
  */
 
+import type { ModifierKeys } from '../../types/flamechart.types.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 
 /**
@@ -39,7 +40,7 @@ export interface InteractionCallbacks {
   onMouseMove?: (x: number, y: number) => void;
 
   /** Called when mouse clicks on timeline. */
-  onClick?: (x: number, y: number) => void;
+  onClick?: (x: number, y: number, modifiers?: ModifierKeys) => void;
 
   /** Called when mouse double-clicks on timeline. */
   onDoubleClick?: (x: number, y: number) => void;
@@ -465,6 +466,14 @@ export class TimelineInteractionHandler {
       timeSinceLastClick < TimelineInteractionHandler.DOUBLE_CLICK_THRESHOLD &&
       distance < TimelineInteractionHandler.DOUBLE_CLICK_DISTANCE;
 
+    // Extract modifier keys from event
+    const modifiers: ModifierKeys = {
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+    };
+
     if (isDoubleClick) {
       // Reset click state to prevent triple-click being detected as double
       this.lastClickTime = 0;
@@ -479,7 +488,7 @@ export class TimelineInteractionHandler {
       this.lastClickY = mouseY;
 
       if (this.callbacks.onClick) {
-        this.callbacks.onClick(mouseX, mouseY);
+        this.callbacks.onClick(mouseX, mouseY, modifiers);
       }
     }
   }

@@ -56,6 +56,24 @@ export interface ViewportBounds {
   depthEnd: number;
 }
 
+/**
+ * Modifier keys state from mouse/keyboard events.
+ * Used for Cmd/Ctrl+Click navigation.
+ */
+export interface ModifierKeys {
+  /** Meta key (Cmd on Mac). */
+  metaKey: boolean;
+
+  /** Ctrl key. */
+  ctrlKey: boolean;
+
+  /** Shift key. */
+  shiftKey: boolean;
+
+  /** Alt/Option key. */
+  altKey: boolean;
+}
+
 // ============================================================================
 // GENERIC EVENT TYPES
 // ============================================================================
