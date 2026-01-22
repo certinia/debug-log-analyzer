@@ -5,25 +5,44 @@
 /**
  * SelectionManager
  *
- * Owns selection state and logic for flame chart frame selection.
+ * Owns selection state and logic for flame chart selection (frames and markers).
  * Encapsulates TreeNavigator and provides a clean API for selection operations.
  *
  * Responsibilities:
- * - Owns selectedNode state
+ * - Owns selectedNode state (frame selection)
+ * - Owns selectedMarker state (marker selection)
  * - Owns TreeNavigator instance (internal)
  * - Provides selection lifecycle (select, clear, navigate)
  * - Maps LogEvent to TreeNode for hit test integration
+ *
+ * Selection is mutually exclusive: selecting a frame clears marker selection and vice versa.
  */
 
 import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
-import type { EventNode, TreeNode } from '../../types/flamechart.types.js';
+import type { EventNode, TimelineMarker, TreeNode } from '../../types/flamechart.types.js';
 import type { NavigationMaps } from '../../utils/tree-converter.js';
 import type { FrameNavDirection } from '../interaction/KeyboardHandler.js';
 import { TreeNavigator } from './TreeNavigator.js';
 
+/**
+ * Direction for marker navigation.
+ */
+export type MarkerNavDirection = 'left' | 'right';
+
+/**
+ * Selection type discriminator.
+ */
+export type SelectionType = 'none' | 'frame' | 'marker';
+
 export class SelectionManager<E extends EventNode> {
-  /** Currently selected node */
+  /** Currently selected node (frame) */
   private selectedNode: TreeNode<E> | null = null;
+
+  /** Currently selected marker */
+  private selectedMarker: TimelineMarker | null = null;
+
+  /** All markers for navigation (sorted by startTime) */
+  private markers: TimelineMarker[] = [];
 
   /** Tree navigator for traversal operations */
   private navigator: TreeNavigator;
@@ -39,19 +58,66 @@ export class SelectionManager<E extends EventNode> {
   }
 
   /**
-   * Select a tree node.
+   * Set the markers array for marker navigation.
+   * Markers should be sorted by startTime.
+   *
+   * @param markers - Array of timeline markers
+   */
+  public setMarkers(markers: TimelineMarker[]): void {
+    this.markers = markers;
+  }
+
+  /**
+   * Get all markers.
+   *
+   * @returns Array of timeline markers
+   */
+  public getMarkers(): TimelineMarker[] {
+    return this.markers;
+  }
+
+  /**
+   * Select a tree node (frame).
+   * Clears any marker selection (mutually exclusive).
    *
    * @param node - TreeNode to select
    */
   public select(node: TreeNode<E>): void {
     this.selectedNode = node;
+    this.selectedMarker = null; // Clear marker selection
   }
 
   /**
-   * Clear the current selection.
+   * Select a marker.
+   * Clears any frame selection (mutually exclusive).
+   *
+   * @param marker - TimelineMarker to select
+   */
+  public selectMarker(marker: TimelineMarker): void {
+    this.selectedMarker = marker;
+    this.selectedNode = null; // Clear frame selection
+  }
+
+  /**
+   * Clear the current selection (frame or marker).
    */
   public clear(): void {
     this.selectedNode = null;
+    this.selectedMarker = null;
+  }
+
+  /**
+   * Clear only the frame selection.
+   */
+  public clearFrame(): void {
+    this.selectedNode = null;
+  }
+
+  /**
+   * Clear only the marker selection.
+   */
+  public clearMarker(): void {
+    this.selectedMarker = null;
   }
 
   /**
@@ -106,7 +172,7 @@ export class SelectionManager<E extends EventNode> {
   }
 
   /**
-   * Get the currently selected node.
+   * Get the currently selected node (frame).
    *
    * @returns Currently selected TreeNode, or null if none
    */
@@ -115,12 +181,87 @@ export class SelectionManager<E extends EventNode> {
   }
 
   /**
-   * Check if there is an active selection.
+   * Get the currently selected marker.
    *
-   * @returns true if a node is selected
+   * @returns Currently selected TimelineMarker, or null if none
+   */
+  public getSelectedMarker(): TimelineMarker | null {
+    return this.selectedMarker;
+  }
+
+  /**
+   * Check if there is an active frame selection.
+   *
+   * @returns true if a frame node is selected
    */
   public hasSelection(): boolean {
     return this.selectedNode !== null;
+  }
+
+  /**
+   * Check if there is an active marker selection.
+   *
+   * @returns true if a marker is selected
+   */
+  public hasMarkerSelection(): boolean {
+    return this.selectedMarker !== null;
+  }
+
+  /**
+   * Check if there is any selection (frame or marker).
+   *
+   * @returns true if anything is selected
+   */
+  public hasAnySelection(): boolean {
+    return this.selectedNode !== null || this.selectedMarker !== null;
+  }
+
+  /**
+   * Get the current selection type.
+   *
+   * @returns 'none' | 'frame' | 'marker'
+   */
+  public getSelectionType(): SelectionType {
+    if (this.selectedNode !== null) {
+      return 'frame';
+    }
+    if (this.selectedMarker !== null) {
+      return 'marker';
+    }
+    return 'none';
+  }
+
+  /**
+   * Navigate between markers in the specified direction.
+   * Returns the new marker if navigation was successful, null if at boundary.
+   *
+   * @param direction - Navigation direction ('left' for previous, 'right' for next)
+   * @returns New selected marker, or null if at boundary or no marker selection
+   */
+  public navigateMarker(direction: MarkerNavDirection): TimelineMarker | null {
+    if (!this.selectedMarker || this.markers.length === 0) {
+      return null;
+    }
+
+    const currentIndex = this.markers.findIndex((m) => m.id === this.selectedMarker!.id);
+    if (currentIndex === -1) {
+      return null;
+    }
+
+    const nextIndex = direction === 'right' ? currentIndex + 1 : currentIndex - 1;
+
+    // Check boundaries (no wrapping)
+    if (nextIndex < 0 || nextIndex >= this.markers.length) {
+      return null;
+    }
+
+    const nextMarker = this.markers[nextIndex];
+    if (!nextMarker) {
+      return null;
+    }
+
+    this.selectedMarker = nextMarker;
+    return this.selectedMarker;
   }
 
   /**

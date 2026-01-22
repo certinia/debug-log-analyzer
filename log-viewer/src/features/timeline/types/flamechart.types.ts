@@ -432,6 +432,12 @@ export type MarkerType = 'error' | 'skip' | 'unexpected';
  */
 export interface TimelineMarker {
   /**
+   * Unique identifier for this marker.
+   * Used for selection tracking and navigation.
+   */
+  id: string;
+
+  /**
    * Type of marker
    * - 'error': Critical system error causing marker (highest severity)
    * - 'skip': Intentional content omission (e.g., "*** Skipped 500 lines")

@@ -50,6 +50,7 @@ export class ApexLogTimeline {
   private events: LogEvent[] = [];
   private searchCursor: SearchCursor<EventNode> | null = null;
   private selectedEventForContextMenu: EventNode | null = null;
+  private selectedMarkerForContextMenu: TimelineMarker | null = null;
 
   constructor() {
     this.flamechart = new FlameChart();
@@ -112,14 +113,23 @@ export class ApexLogTimeline {
         onSelect: (eventNode) => {
           this.handleSelect(eventNode);
         },
+        onMarkerSelect: (marker) => {
+          this.handleMarkerSelect(marker);
+        },
         onJumpToCallTree: (eventNode) => {
           this.handleJumpToCallTree(eventNode);
         },
-        onContextMenu: (eventNode, screenX, screenY, clientX, clientY) => {
-          this.handleContextMenu(eventNode, screenX, screenY, clientX, clientY);
+        onJumpToCallTreeForMarker: (marker) => {
+          this.handleJumpToCallTreeForMarker(marker);
+        },
+        onContextMenu: (target, screenX, screenY, clientX, clientY) => {
+          this.handleContextMenu(target, screenX, screenY, clientX, clientY);
         },
         onCopy: (eventNode) => {
           this.copyToClipboard(eventNode.text);
+        },
+        onCopyMarker: (marker) => {
+          this.copyToClipboard(marker.summary);
         },
       },
     );
@@ -134,6 +144,7 @@ export class ApexLogTimeline {
     }) as EventListener);
     this.contextMenu.addEventListener('menu-close', () => {
       this.selectedEventForContextMenu = null;
+      this.selectedMarkerForContextMenu = null;
     });
 
     // Wire up search event listeners
@@ -256,22 +267,17 @@ export class ApexLogTimeline {
   }
 
   /**
-   * Handle click - navigate to marker, select frame (but don't navigate).
-   * Click on frame selects it only. Use J key to navigate to call tree.
+   * Handle click - select frame or marker (but don't navigate).
+   * Click on frame/marker selects it only. Use J key to navigate to call tree.
    */
   private handleClick(
     _screenX: number,
     _screenY: number,
     _event: LogEvent | null,
-    marker: TimelineMarker | null,
+    _marker: TimelineMarker | null,
   ): void {
-    // Navigate to truncation marker if clicked
-    if (marker) {
-      goToRow(marker.startTime);
-      return;
-    }
-
-    // Frame click is handled by FlameChart's selection system (via onSelect callback)
+    // Frame and marker clicks are handled by FlameChart's selection system
+    // (via onSelect and onMarkerSelect callbacks)
     // No longer auto-navigate to call tree on click - use J key for explicit navigation
   }
 
@@ -302,15 +308,78 @@ export class ApexLogTimeline {
   }
 
   /**
+   * Handle J key "Jump to Call Tree" action for markers.
+   * Navigates call tree to the marker's start time.
+   */
+  private handleJumpToCallTreeForMarker(marker: TimelineMarker): void {
+    goToRow(marker.startTime);
+  }
+
+  /**
+   * Handle marker selection change from FlameChart.
+   */
+  private handleMarkerSelect(marker: TimelineMarker | null): void {
+    if (!marker) {
+      // Marker selection cleared - hide tooltip
+      if (this.tooltipManager) {
+        this.tooltipManager.hide();
+      }
+      return;
+    }
+
+    // Marker selection only - no auto-navigation to call tree
+    // User can press J to explicitly jump to call tree
+  }
+
+  /**
+   * Type guard to check if target is a TimelineMarker.
+   */
+  private isTimelineMarker(target: EventNode | TimelineMarker): target is TimelineMarker {
+    // TimelineMarker has 'type' as 'error' | 'skip' | 'unexpected'
+    // EventNode has 'type' as a string like 'METHOD_ENTRY', etc.
+    // TimelineMarker has 'summary', EventNode has 'text'
+    return 'summary' in target && 'startTime' in target && !('duration' in target);
+  }
+
+  /**
    * Handle right-click context menu request.
    *
-   * @param eventNode - The event node that was right-clicked
+   * @param target - The event node or marker that was right-clicked, or null for empty space
    * @param screenX - Canvas-relative X coordinate (for tooltip positioning, same as hover)
    * @param screenY - Canvas-relative Y coordinate (for tooltip positioning, same as hover)
    * @param clientX - Window X coordinate (for context menu positioning)
    * @param clientY - Window Y coordinate (for context menu positioning)
    */
   private handleContextMenu(
+    target: EventNode | TimelineMarker | null,
+    screenX: number,
+    screenY: number,
+    clientX: number,
+    clientY: number,
+  ): void {
+    if (!this.contextMenu) {
+      return;
+    }
+
+    if (!target) {
+      // Empty space context menu
+      this.showEmptySpaceContextMenu(clientX, clientY);
+      return;
+    }
+
+    if (this.isTimelineMarker(target)) {
+      // Marker context menu
+      this.showMarkerContextMenu(target, screenX, screenY, clientX, clientY);
+    } else {
+      // Frame context menu
+      this.showFrameContextMenu(target, screenX, screenY, clientX, clientY);
+    }
+  }
+
+  /**
+   * Show context menu for a frame (event node).
+   */
+  private showFrameContextMenu(
     eventNode: EventNode,
     screenX: number,
     screenY: number,
@@ -336,6 +405,7 @@ export class ApexLogTimeline {
     // Build menu items
     const items: ContextMenuItem[] = [
       { id: 'show-in-call-tree', label: 'Show in Call Tree', shortcut: 'J' },
+      { id: 'zoom-to-frame', label: 'Zoom to Frame', shortcut: 'Z' },
       { id: 'separator-1', label: '', separator: true },
       { id: 'copy-name', label: 'Copy Name', shortcut: this.getCopyShortcut() },
       { id: 'copy-details', label: 'Copy Details' },
@@ -347,9 +417,96 @@ export class ApexLogTimeline {
   }
 
   /**
+   * Show context menu for a marker.
+   */
+  private showMarkerContextMenu(
+    marker: TimelineMarker,
+    screenX: number,
+    screenY: number,
+    clientX: number,
+    clientY: number,
+  ): void {
+    if (!this.contextMenu) {
+      return;
+    }
+
+    // Store selected marker for menu actions
+    this.selectedMarkerForContextMenu = marker;
+    this.selectedEventForContextMenu = null;
+
+    // Show tooltip for the right-clicked marker using screen coords
+    if (this.tooltipManager) {
+      this.tooltipManager.showTruncation(marker, screenX, screenY);
+    }
+
+    // Build menu items for markers
+    const items: ContextMenuItem[] = [
+      { id: 'show-in-call-tree', label: 'Show in Call Tree', shortcut: 'J' },
+      { id: 'zoom-to-marker', label: 'Zoom to Marker', shortcut: 'Z' },
+      { id: 'separator-1', label: '', separator: true },
+      { id: 'copy-summary', label: 'Copy Summary', shortcut: this.getCopyShortcut() },
+      { id: 'copy-marker-details', label: 'Copy Details' },
+    ];
+
+    // Use client coords for context menu (positioned in viewport)
+    this.contextMenu.show(items, clientX, clientY);
+  }
+
+  /**
+   * Show context menu for empty space (viewport actions).
+   */
+  private showEmptySpaceContextMenu(clientX: number, clientY: number): void {
+    if (!this.contextMenu) {
+      return;
+    }
+
+    // Clear any stored references
+    this.selectedEventForContextMenu = null;
+    this.selectedMarkerForContextMenu = null;
+
+    // Hide tooltip since we're not over a frame or marker
+    if (this.tooltipManager) {
+      this.tooltipManager.hide();
+    }
+
+    // Build menu items for empty space
+    const items: ContextMenuItem[] = [{ id: 'reset-zoom', label: 'Reset Zoom', shortcut: '0' }];
+
+    // Use client coords for context menu (positioned in viewport)
+    this.contextMenu.show(items, clientX, clientY);
+  }
+
+  /**
    * Handle context menu item selection.
    */
   private handleContextMenuSelect(itemId: string): void {
+    // Handle viewport-level actions (don't require a selected event or marker)
+    if (itemId === 'reset-zoom') {
+      this.flamechart.resetZoom();
+      return;
+    }
+
+    // Handle marker-level actions (require a selected marker)
+    const marker = this.selectedMarkerForContextMenu;
+    if (marker) {
+      switch (itemId) {
+        case 'show-in-call-tree':
+          this.handleJumpToCallTreeForMarker(marker);
+          break;
+        case 'zoom-to-marker':
+          this.flamechart.focusOnSelectedMarker();
+          break;
+        case 'copy-summary':
+          this.copyToClipboard(marker.summary);
+          break;
+        case 'copy-marker-details':
+          this.copyToClipboard(this.formatMarkerDetails(marker));
+          break;
+      }
+      return;
+    }
+
+    // Handle frame-level actions (require a selected event)
     const event = this.selectedEventForContextMenu;
     if (!event) {
       return;
@@ -358,6 +515,9 @@ export class ApexLogTimeline {
     switch (itemId) {
       case 'show-in-call-tree':
         this.handleJumpToCallTree(event);
+        break;
+      case 'zoom-to-frame':
+        this.flamechart.focusOnSelectedFrame();
         break;
       case 'copy-name':
         this.copyToClipboard(event.text);
@@ -465,6 +625,23 @@ export class ApexLogTimeline {
 
     // Format as call stack (one entry per line)
     return stack.map((event) => event.text + (event.suffix ?? '')).join('\n');
+  }
+
+  /**
+   * Format marker details for clipboard.
+   * Includes summary, type, and optional metadata.
+   */
+  private formatMarkerDetails(marker: TimelineMarker): string {
+    const lines: string[] = [];
+
+    lines.push(`Summary: ${marker.summary}`);
+    lines.push(`Type: ${marker.type}`);
+
+    if (marker.metadata) {
+      lines.push(`Details: ${marker.metadata}`);
+    }
+
+    return lines.join('\n');
   }
 
   /**

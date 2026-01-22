@@ -33,6 +33,7 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
 
   const markers: TimelineMarker[] = [];
 
+  let markerIndex = 0;
   for (const issue of log.logIssues) {
     // Validate type using type guard
     if (!isMarkerType(issue.type)) {
@@ -45,6 +46,7 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
     }
 
     const marker: TimelineMarker = {
+      id: `marker-${markerIndex++}`,
       type: issue.type,
       startTime: issue.startTime,
       summary: issue.summary,
@@ -68,6 +70,10 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
  * @returns True if marker is valid, false otherwise
  */
 export function validateMarker(marker: TimelineMarker): boolean {
+  if (!marker.id) {
+    return false;
+  }
+
   if (!isMarkerType(marker.type)) {
     return false;
   }

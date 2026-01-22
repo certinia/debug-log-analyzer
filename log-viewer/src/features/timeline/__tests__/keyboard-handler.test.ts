@@ -50,6 +50,7 @@ describe('KeyboardHandler', () => {
       onResetZoom: jest.fn(),
       onEscape: jest.fn(),
       onShiftHeld: jest.fn(),
+      onMarkerNav: jest.fn(),
       onFrameNav: jest.fn(),
       onJumpToCallTree: jest.fn(),
       onFocus: jest.fn(),
@@ -193,12 +194,22 @@ describe('KeyboardHandler', () => {
       expect(callbacks.onZoom).toHaveBeenCalledWith('out');
     });
 
-    it('should zoom even when Shift is pressed', () => {
-      dispatchKeyEvent('keydown', 'w', { shiftKey: true });
+    it('should zoom with + and - even when Shift is pressed', () => {
+      // Note: Shift+w triggers vertical pan (not zoom) per design
       dispatchKeyEvent('keydown', '+', { shiftKey: true });
       dispatchKeyEvent('keydown', '-', { shiftKey: true });
 
-      expect(callbacks.onZoom).toHaveBeenCalledTimes(3);
+      expect(callbacks.onZoom).toHaveBeenCalledTimes(2);
+      expect(callbacks.onZoom).toHaveBeenCalledWith('in');
+      expect(callbacks.onZoom).toHaveBeenCalledWith('out');
+    });
+
+    it('should pan vertically with Shift+w/s instead of zoom', () => {
+      dispatchKeyEvent('keydown', 'w', { shiftKey: true });
+      dispatchKeyEvent('keydown', 's', { shiftKey: true });
+
+      expect(callbacks.onZoom).not.toHaveBeenCalled();
+      expect(callbacks.onPan).toHaveBeenCalledTimes(2);
     });
 
     it('should prevent default on handled zoom keys', () => {

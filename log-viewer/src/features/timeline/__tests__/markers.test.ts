@@ -127,7 +127,7 @@ describe('TimelineMarkerRenderer', () => {
   describe('T013: Color Accuracy Verification', () => {
     it('should render error markers with pre-blended color via sprite tint', () => {
       const markers: TimelineMarker[] = [
-        { type: 'error', startTime: 100_000, summary: 'Test error' },
+        { id: 'marker-error', type: 'error', startTime: 100_000, summary: 'Test error' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -146,7 +146,7 @@ describe('TimelineMarkerRenderer', () => {
 
     it('should render skip markers with pre-blended color via sprite tint', () => {
       const markers: TimelineMarker[] = [
-        { type: 'skip', startTime: 100_000, summary: 'Test skip' },
+        { id: 'marker-skip', type: 'skip', startTime: 100_000, summary: 'Test skip' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -165,7 +165,12 @@ describe('TimelineMarkerRenderer', () => {
 
     it('should render unexpected markers with pre-blended color via sprite tint', () => {
       const markers: TimelineMarker[] = [
-        { type: 'unexpected', startTime: 100_000, summary: 'Test unexpected' },
+        {
+          id: 'marker-unexpected',
+          type: 'unexpected',
+          startTime: 100_000,
+          summary: 'Test unexpected',
+        },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -186,8 +191,8 @@ describe('TimelineMarkerRenderer', () => {
   describe('T008: End Time Resolution Algorithm', () => {
     it('should resolve endTime to next marker startTime when null', () => {
       const markers: TimelineMarker[] = [
-        { type: 'skip', startTime: 100_000, summary: 'First' },
-        { type: 'error', startTime: 500_000, summary: 'Second' },
+        { id: 'marker-skip', type: 'skip', startTime: 100_000, summary: 'First' },
+        { id: 'marker-error', type: 'error', startTime: 500_000, summary: 'Second' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -209,7 +214,7 @@ describe('TimelineMarkerRenderer', () => {
 
     it('should resolve endTime to timeline end for last marker', () => {
       const markers: TimelineMarker[] = [
-        { type: 'error', startTime: 500_000, summary: 'Only marker' },
+        { id: 'marker-error', type: 'error', startTime: 500_000, summary: 'Only marker' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -227,9 +232,9 @@ describe('TimelineMarkerRenderer', () => {
 
     it('should handle multiple markers in sequence', () => {
       const markers: TimelineMarker[] = [
-        { type: 'skip', startTime: 100_000, summary: 'First' },
-        { type: 'unexpected', startTime: 300_000, summary: 'Second' },
-        { type: 'error', startTime: 600_000, summary: 'Third' },
+        { id: 'marker-skip', type: 'skip', startTime: 100_000, summary: 'First' },
+        { id: 'marker-unexpected', type: 'unexpected', startTime: 300_000, summary: 'Second' },
+        { id: 'marker-error', type: 'error', startTime: 600_000, summary: 'Third' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -249,7 +254,7 @@ describe('TimelineMarkerRenderer', () => {
   describe('T009: Viewport Culling Behavior', () => {
     it('should render only markers within viewport time range', () => {
       const markers: TimelineMarker[] = [
-        { type: 'error', startTime: 100_000, summary: 'In viewport' },
+        { id: 'marker-error', type: 'error', startTime: 100_000, summary: 'In viewport' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -268,8 +273,8 @@ describe('TimelineMarkerRenderer', () => {
     it('should cull markers entirely before viewport', () => {
       // Markers that end before the viewport starts should be culled
       const markers: TimelineMarker[] = [
-        { type: 'error', startTime: 100_000, summary: 'First marker' },
-        { type: 'skip', startTime: 200_000, summary: 'Second marker' },
+        { id: 'marker-error', type: 'error', startTime: 100_000, summary: 'First marker' },
+        { id: 'marker-skip', type: 'skip', startTime: 200_000, summary: 'Second marker' },
       ];
 
       // Zoom in 10x first (so we can actually pan)
@@ -310,7 +315,7 @@ describe('TimelineMarkerRenderer', () => {
       zoomedViewport.setZoom(0.1, 0);
 
       const markers: TimelineMarker[] = [
-        { type: 'error', startTime: 900_000, summary: 'After viewport' },
+        { id: 'marker-error', type: 'error', startTime: 900_000, summary: 'After viewport' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -330,8 +335,8 @@ describe('TimelineMarkerRenderer', () => {
 
     it('should render partially visible markers', () => {
       const markers: TimelineMarker[] = [
-        { type: 'skip', startTime: 100_000, summary: 'Extends into viewport' },
-        { type: 'error', startTime: 900_000, summary: 'Starts before end' },
+        { id: 'marker-skip', type: 'skip', startTime: 100_000, summary: 'Extends into viewport' },
+        { id: 'marker-error', type: 'error', startTime: 900_000, summary: 'Starts before end' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -350,8 +355,8 @@ describe('TimelineMarkerRenderer', () => {
     it('should not render markers with width < 1px', () => {
       // Create viewport with very small zoom so markers appear very narrow
       const markers: TimelineMarker[] = [
-        { type: 'skip', startTime: 100_000, summary: 'First' },
-        { type: 'error', startTime: 100_001, summary: 'Second (1ns later)' },
+        { id: 'marker-skip', type: 'skip', startTime: 100_000, summary: 'First' },
+        { id: 'marker-error', type: 'error', startTime: 100_001, summary: 'Second (1ns later)' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -385,9 +390,9 @@ describe('TimelineMarkerRenderer', () => {
 
     it('should sort markers by startTime on construction', () => {
       const markers: TimelineMarker[] = [
-        { type: 'error', startTime: 300_000, summary: 'Third' },
-        { type: 'skip', startTime: 100_000, summary: 'First' },
-        { type: 'unexpected', startTime: 200_000, summary: 'Second' },
+        { id: 'marker-error', type: 'error', startTime: 300_000, summary: 'Third' },
+        { id: 'marker-skip', type: 'skip', startTime: 100_000, summary: 'First' },
+        { id: 'marker-unexpected', type: 'unexpected', startTime: 200_000, summary: 'Second' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -417,7 +422,9 @@ describe('TimelineMarkerRenderer', () => {
 
   describe('T014: Hit Testing', () => {
     it('should return null when no indicators are hit', () => {
-      const markers: TimelineMarker[] = [{ type: 'error', startTime: 100_000, summary: 'Test' }];
+      const markers: TimelineMarker[] = [
+        { id: 'marker-error', type: 'error', startTime: 100_000, summary: 'Test' },
+      ];
 
       renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,
@@ -433,7 +440,7 @@ describe('TimelineMarkerRenderer', () => {
 
     it('should return marker when hit', () => {
       const markers: TimelineMarker[] = [
-        { type: 'error', startTime: 100_000, summary: 'Test error' },
+        { id: 'marker-error', type: 'error', startTime: 100_000, summary: 'Test error' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -459,8 +466,8 @@ describe('TimelineMarkerRenderer', () => {
       // Error: 200_000 to timeline end
       // At time 250_000, both markers overlap
       const markers: TimelineMarker[] = [
-        { type: 'skip', startTime: 100_000, summary: 'Skip marker' },
-        { type: 'error', startTime: 200_000, summary: 'Error marker' },
+        { id: 'marker-skip', type: 'skip', startTime: 100_000, summary: 'Skip marker' },
+        { id: 'marker-error', type: 'error', startTime: 200_000, summary: 'Error marker' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -493,7 +500,7 @@ describe('TimelineMarkerRenderer', () => {
 
     it('should work correctly with panned viewport', () => {
       const markers: TimelineMarker[] = [
-        { type: 'error', startTime: 500_000, summary: 'Test error' },
+        { id: 'marker-error', type: 'error', startTime: 500_000, summary: 'Test error' },
       ];
 
       // Pan viewport to show the marker area
@@ -517,7 +524,7 @@ describe('TimelineMarkerRenderer', () => {
 
     it('should ignore Y coordinate for full-height indicators', () => {
       const markers: TimelineMarker[] = [
-        { type: 'error', startTime: 100_000, summary: 'Test error' },
+        { id: 'marker-error', type: 'error', startTime: 100_000, summary: 'Test error' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -546,7 +553,7 @@ describe('TimelineMarkerRenderer', () => {
   describe('updateMarkers', () => {
     it('should update markers array', () => {
       const initialMarkers: TimelineMarker[] = [
-        { type: 'error', startTime: 100_000, summary: 'Initial' },
+        { id: 'marker-error', type: 'error', startTime: 100_000, summary: 'Initial' },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -561,8 +568,8 @@ describe('TimelineMarkerRenderer', () => {
       expect(visibleSprites.length).toBe(1);
 
       const newMarkers: TimelineMarker[] = [
-        { type: 'skip', startTime: 50_000, summary: 'New first' },
-        { type: 'error', startTime: 200_000, summary: 'New second' },
+        { id: 'marker-skip', type: 'skip', startTime: 50_000, summary: 'New first' },
+        { id: 'marker-error', type: 'error', startTime: 200_000, summary: 'New second' },
       ];
 
       renderer.updateMarkers(newMarkers);
@@ -582,7 +589,9 @@ describe('TimelineMarkerRenderer', () => {
 
   describe('destroy', () => {
     it('should clean up sprite pool', () => {
-      const markers: TimelineMarker[] = [{ type: 'error', startTime: 100_000, summary: 'Test' }];
+      const markers: TimelineMarker[] = [
+        { id: 'marker-error', type: 'error', startTime: 100_000, summary: 'Test' },
+      ];
 
       renderer = new TimelineMarkerRenderer(
         mockContainer as unknown as PIXI.Container,

@@ -29,6 +29,11 @@ export const KEYBOARD_CONSTANTS = {
 export type FrameNavDirection = 'up' | 'down' | 'left' | 'right';
 
 /**
+ * Navigation direction for marker traversal (horizontal only).
+ */
+export type MarkerNavDirection = 'left' | 'right';
+
+/**
  * Callbacks for keyboard events.
  */
 export interface KeyboardCallbacks {
@@ -61,8 +66,19 @@ export interface KeyboardCallbacks {
   onFrameNav?: (direction: FrameNavDirection) => boolean;
 
   /**
+   * Called when arrow key is pressed for marker navigation.
+   * Markers only support horizontal navigation (left/right).
+   * - left: Navigate to previous marker (by time)
+   * - right: Navigate to next marker (by time)
+   *
+   * Returns true if navigation was handled (marker was selected),
+   * false to fall through to frame navigation or pan behavior.
+   */
+  onMarkerNav?: (direction: MarkerNavDirection) => boolean;
+
+  /**
    * Called when J key is pressed for "Jump to Call Tree".
-   * Navigates the call tree to the currently selected frame.
+   * Navigates the call tree to the currently selected frame or marker.
    */
   onJumpToCallTree?: () => void;
 
@@ -215,9 +231,9 @@ export class KeyboardHandler {
 
   /**
    * Handle pan keys.
-   * - Shift + Arrow keys: Always pan (even when frame selected)
-   * - Arrow keys without Shift: Frame navigation if onFrameNav is provided and returns true,
-   *   otherwise falls through to pan
+   * - Shift + Arrow keys: Always pan (even when frame/marker selected)
+   * - Arrow keys without Shift: Marker navigation first (if marker selected),
+   *   then frame navigation, otherwise falls through to pan
    * - A/D: Horizontal pan (left/right)
    * @returns true if event was handled
    */
@@ -236,7 +252,29 @@ export class KeyboardHandler {
       return true;
     }
 
-    // Arrow keys: Try frame navigation first (unless Shift is held)
+    // Arrow keys: Try marker navigation first (unless Shift is held)
+    // Markers only support left/right navigation
+    if (!event.shiftKey && this.callbacks.onMarkerNav) {
+      let markerDirection: MarkerNavDirection | null = null;
+      switch (event.key) {
+        case 'ArrowLeft':
+          markerDirection = 'left';
+          break;
+        case 'ArrowRight':
+          markerDirection = 'right';
+          break;
+      }
+
+      if (markerDirection !== null) {
+        const handled = this.callbacks.onMarkerNav(markerDirection);
+        if (handled) {
+          return true;
+        }
+        // Fall through to frame nav or pan if marker nav didn't handle it
+      }
+    }
+
+    // Arrow keys: Try frame navigation (unless Shift is held)
     // If onFrameNav returns true, navigation was handled; otherwise fall through to pan
     if (!event.shiftKey && this.callbacks.onFrameNav) {
       let direction: FrameNavDirection | null = null;
