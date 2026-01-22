@@ -84,9 +84,11 @@ export interface KeyboardCallbacks {
  * Key Mappings:
  * - W / + / = : Zoom in
  * - S / - : Zoom out
+ * - Shift + W : Pan up (through stack depth)
+ * - Shift + S : Pan down (through stack depth)
  * - A : Pan left
  * - D : Pan right
- * - Arrow keys (no modifier): Pan in direction (when no frame selected)
+ * - Arrow keys (no modifier): Frame navigation (when frame selected), otherwise pan
  * - Shift + Arrow keys: Pan in direction (always, even with frame selected)
  * - Home / 0 : Reset zoom
  * - Escape : Cancel/deselect
@@ -283,11 +285,20 @@ export class KeyboardHandler {
 
   /**
    * Handle zoom keys (W / S / + / - / =).
-   * Works regardless of Shift key state.
+   * Shift + W/S = vertical pan (consistent with Shift + wheel behavior).
    * @returns true if event was handled
    */
   private handleZoomKeys(event: KeyboardEvent): boolean {
     const key = event.key.toLowerCase();
+
+    // Shift + W/S = vertical pan (up/down through stack depth)
+    if (event.shiftKey && (key === 'w' || key === 's')) {
+      const viewportState = this.viewport.getState();
+      const stepY = viewportState.displayHeight * KEYBOARD_CONSTANTS.panStepPercent;
+      const deltaY = key === 'w' ? -stepY : stepY;
+      this.callbacks.onPan?.(0, deltaY);
+      return true;
+    }
 
     switch (key) {
       case 'w':
