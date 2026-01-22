@@ -85,9 +85,14 @@ Use `Log: Retrieve Apex Log And Show Analysis` from the Command Palette.
 
 The Flame Chart view shows a timeline of the Salesforce Apex log execution — including methods, SOQL queries, DML operations, workflows, flows, and more.
 
-- **Zoom & Pan** – Navigate your logs down to 0.001 ms with precision zoom.
+- **⚡ Fast** – Blazing-fast zoom, pan, and rendering even on massive logs (500k+ lines).
+- **🎯 Frame Selection & Navigation** – Click to select frames, use arrow keys to navigate the call stack, double-click or press `Enter` to zoom and focus.
+- **Zoom & Pan** – Navigate your logs down to 0.001 ms with precision zoom. `W`/`S` keys or scroll wheel for zoom; `A`/`D` keys or drag for pan.
+- **Dynamic Labels** – Instantly see method names on timeline events for faster scanning.
+- **19 Curated Themes** – Choose from beautiful, optimized color themes or create your own via Settings.
+- **Smart Interaction** – Right-click for context actions; `Cmd/Ctrl+Click` to jump directly to the Call Tree; `Cmd/Ctrl+C` to copy frame names.
 - **Tooltips** – Hover for duration, event name, SOQL/DML/Exception counts, SOQL/DML rows, and more.
-- **Click to Navigate** – Click any event to instantly view it in the interactive Call Tree.
+- **Adaptive Detail** – Level-of-detail bucketing reveals richer detail as you zoom while keeping performance snappy.
 - **Stacked by Time** – See how execution time is distributed across nested method calls and system events.
 
 ![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png)
