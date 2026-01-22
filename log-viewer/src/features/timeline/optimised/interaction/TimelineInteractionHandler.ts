@@ -76,7 +76,12 @@ export class TimelineInteractionHandler {
   private lastTouchX = 0;
   private lastTouchY = 0;
   private isOverEvent = false;
-  private isMouseDown = false;
+
+  // Track if actual panning occurred during mousedown-to-mouseup (to distinguish click from drag)
+  private didPanDuringClick = false;
+  private mouseDownX = 0;
+  private mouseDownY = 0;
+  private static readonly DRAG_THRESHOLD = 3; // px - movement required to count as drag
 
   // Double-click detection state
   private lastClickTime = 0;
@@ -343,10 +348,10 @@ export class TimelineInteractionHandler {
     // Apply zoom with mouse position as anchor
     const changed = this.viewport.setZoom(newZoom, mouseX);
 
-    // Reset mouseDown flag during zoom to prevent accidental selection
+    // Mark as panning during zoom to prevent accidental selection
     // (trackpad gestures can sometimes trigger concurrent click events)
     if (changed) {
-      this.isMouseDown = false;
+      this.didPanDuringClick = true;
     }
 
     // Notify callback if viewport changed
@@ -369,12 +374,11 @@ export class TimelineInteractionHandler {
     }
 
     this.isDragging = true;
-    this.isMouseDown = true;
+    this.didPanDuringClick = false; // Reset - will be set true if we actually pan
     this.lastMouseX = event.clientX;
     this.lastMouseY = event.clientY;
-
-    // Notify callback that drag started (used to cancel keyboard animations)
-    this.callbacks.onDragStart?.();
+    this.mouseDownX = event.clientX;
+    this.mouseDownY = event.clientY;
 
     // Change cursor to grabbing
     this.canvas.style.cursor = 'grabbing';
@@ -385,8 +389,23 @@ export class TimelineInteractionHandler {
    */
   private handleMouseMove(event: MouseEvent): void {
     if (this.isDragging && this.options.enablePan) {
-      // Clear click flag since we're dragging
-      this.isMouseDown = false;
+      // Check if we've moved enough to start actual panning (vs just a click with slight movement)
+      if (!this.didPanDuringClick) {
+        const distanceX = Math.abs(event.clientX - this.mouseDownX);
+        const distanceY = Math.abs(event.clientY - this.mouseDownY);
+        const distance = Math.max(distanceX, distanceY);
+
+        if (distance >= TimelineInteractionHandler.DRAG_THRESHOLD) {
+          // We've exceeded the drag threshold - this is a real drag, not a click
+          this.didPanDuringClick = true;
+
+          // Notify callback that drag started (used to cancel keyboard animations)
+          this.callbacks.onDragStart?.();
+        } else {
+          // Haven't moved enough yet - don't start panning
+          return;
+        }
+      }
 
       // Calculate delta from last position
       const deltaX = event.clientX - this.lastMouseX;
@@ -424,6 +443,7 @@ export class TimelineInteractionHandler {
     }
 
     this.isDragging = false;
+    // Note: didPanDuringClick is NOT reset here - it's read by handleClick which fires after mouseup
 
     // Restore cursor based on whether we're over an event
     this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
@@ -443,12 +463,11 @@ export class TimelineInteractionHandler {
    * Handle click - event selection and double-click detection.
    */
   private handleClick(event: MouseEvent): void {
-    // Only fire click if mousedown occurred without dragging
-    if (!this.isMouseDown) {
+    // Skip click processing if we panned during this mousedown-click sequence
+    // (The click event fires after mouseup, so didPanDuringClick is still valid)
+    if (this.didPanDuringClick) {
       return;
     }
-
-    this.isMouseDown = false;
 
     const rect = this.canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
@@ -523,8 +542,8 @@ export class TimelineInteractionHandler {
       this.canvas.style.cursor = 'grab';
     }
 
-    // Reset mouse down state
-    this.isMouseDown = false;
+    // Mark as panned to prevent click from firing when mouse returns
+    this.didPanDuringClick = true;
 
     if (this.callbacks.onMouseLeave) {
       this.callbacks.onMouseLeave();
