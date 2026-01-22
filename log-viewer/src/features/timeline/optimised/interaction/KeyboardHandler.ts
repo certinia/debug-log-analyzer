@@ -19,8 +19,6 @@ export const KEYBOARD_CONSTANTS = {
   panStepPercent: 0.05,
   /** Zoom multiplier per keypress (reduced for smoother feel) */
   zoomFactor: 1.2,
-  /** Delay before showing shortcut hints overlay (ms) */
-  shiftHintDelay: 500,
 } as const;
 
 /**
@@ -48,9 +46,6 @@ export interface KeyboardCallbacks {
 
   /** Called when Escape key is pressed (cancel/deselect). */
   onEscape?: () => void;
-
-  /** Called when Shift key hold state changes (for hints overlay). */
-  onShiftHeld?: (held: boolean) => void;
 
   /**
    * Called when arrow key is pressed for frame navigation.
@@ -115,8 +110,6 @@ export class KeyboardHandler {
   private callbacks: KeyboardCallbacks;
 
   private isAttached = false;
-  private shiftHintTimeout: ReturnType<typeof setTimeout> | null = null;
-  private isShiftHeld = false;
 
   // Bound handlers for cleanup
   private boundKeyDown: (e: KeyboardEvent) => void;
@@ -159,7 +152,6 @@ export class KeyboardHandler {
 
     this.container.removeEventListener('keydown', this.boundKeyDown);
     this.container.removeEventListener('keyup', this.boundKeyUp);
-    this.clearShiftHintTimeout();
     this.isAttached = false;
   }
 
@@ -168,19 +160,12 @@ export class KeyboardHandler {
    */
   public destroy(): void {
     this.detach();
-    this.clearShiftHintTimeout();
   }
 
   /**
    * Handle keydown events.
    */
   private handleKeyDown(event: KeyboardEvent): void {
-    // Track Shift key for hints overlay
-    if (event.key === 'Shift' && !this.isShiftHeld) {
-      this.isShiftHeld = true;
-      this.startShiftHintTimeout();
-    }
-
     // Determine action based on key combination
     if (this.handlePanKeys(event)) {
       event.preventDefault();
@@ -221,12 +206,8 @@ export class KeyboardHandler {
   /**
    * Handle keyup events.
    */
-  private handleKeyUp(event: KeyboardEvent): void {
-    if (event.key === 'Shift') {
-      this.isShiftHeld = false;
-      this.clearShiftHintTimeout();
-      this.callbacks.onShiftHeld?.(false);
-    }
+  private handleKeyUp(_event: KeyboardEvent): void {
+    // No-op - reserved for future use
   }
 
   /**
@@ -436,27 +417,5 @@ export class KeyboardHandler {
       return true;
     }
     return false;
-  }
-
-  /**
-   * Start timeout for showing shift hints overlay.
-   */
-  private startShiftHintTimeout(): void {
-    this.clearShiftHintTimeout();
-    this.shiftHintTimeout = setTimeout(() => {
-      if (this.isShiftHeld) {
-        this.callbacks.onShiftHeld?.(true);
-      }
-    }, KEYBOARD_CONSTANTS.shiftHintDelay);
-  }
-
-  /**
-   * Clear shift hint timeout.
-   */
-  private clearShiftHintTimeout(): void {
-    if (this.shiftHintTimeout !== null) {
-      clearTimeout(this.shiftHintTimeout);
-      this.shiftHintTimeout = null;
-    }
   }
 }

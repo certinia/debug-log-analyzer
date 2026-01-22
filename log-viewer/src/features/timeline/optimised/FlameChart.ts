@@ -833,10 +833,6 @@ export class FlameChart<E extends EventNode = EventNode> {
       onFrameNav: (direction: FrameNavDirection) => {
         return this.navigateFrame(direction);
       },
-      onShiftHeld: (_held: boolean) => {
-        // Phase 1: No-op - hints overlay is a bonus feature
-        // Can be implemented later with ShortcutHintsOverlay component
-      },
       onJumpToCallTree: () => {
         // Jump to call tree for selected frame or marker
         const selectedNode = this.selectionManager?.getSelected();

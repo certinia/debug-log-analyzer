@@ -14,7 +14,6 @@
  * - Zoom via W/S and +/-/= keys
  * - Reset zoom via Home / 0 keys
  * - Escape key for cancel/deselect
- * - Shift hold detection for hints overlay
  */
 
 import {
@@ -49,7 +48,6 @@ describe('KeyboardHandler', () => {
       onZoom: jest.fn(),
       onResetZoom: jest.fn(),
       onEscape: jest.fn(),
-      onShiftHeld: jest.fn(),
       onMarkerNav: jest.fn(),
       onFrameNav: jest.fn(),
       onJumpToCallTree: jest.fn(),
@@ -326,44 +324,60 @@ describe('KeyboardHandler', () => {
     });
   });
 
-  describe('shift hold detection', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
+  describe('marker navigation (onMarkerNav)', () => {
+    it('should call onMarkerNav with "left" on ArrowLeft when handler returns true', () => {
+      (callbacks.onMarkerNav as jest.Mock).mockReturnValue(true);
+      dispatchKeyEvent('keydown', 'ArrowLeft');
+
+      expect(callbacks.onMarkerNav).toHaveBeenCalledWith('left');
+      expect(callbacks.onFrameNav).not.toHaveBeenCalled();
+      expect(callbacks.onPan).not.toHaveBeenCalled();
     });
 
-    afterEach(() => {
-      jest.useRealTimers();
+    it('should call onMarkerNav with "right" on ArrowRight when handler returns true', () => {
+      (callbacks.onMarkerNav as jest.Mock).mockReturnValue(true);
+      dispatchKeyEvent('keydown', 'ArrowRight');
+
+      expect(callbacks.onMarkerNav).toHaveBeenCalledWith('right');
+      expect(callbacks.onFrameNav).not.toHaveBeenCalled();
+      expect(callbacks.onPan).not.toHaveBeenCalled();
     });
 
-    it('should call onShiftHeld(true) after holding Shift for delay period', () => {
-      dispatchKeyEvent('keydown', 'Shift');
+    it('should fall through to frame nav when onMarkerNav returns false', () => {
+      (callbacks.onMarkerNav as jest.Mock).mockReturnValue(false);
+      (callbacks.onFrameNav as jest.Mock).mockReturnValue(true);
+      dispatchKeyEvent('keydown', 'ArrowLeft');
 
-      expect(callbacks.onShiftHeld).not.toHaveBeenCalled();
-
-      jest.advanceTimersByTime(KEYBOARD_CONSTANTS.shiftHintDelay);
-
-      expect(callbacks.onShiftHeld).toHaveBeenCalledWith(true);
+      expect(callbacks.onMarkerNav).toHaveBeenCalledWith('left');
+      expect(callbacks.onFrameNav).toHaveBeenCalledWith('left');
+      expect(callbacks.onPan).not.toHaveBeenCalled();
     });
 
-    it('should call onShiftHeld(false) when Shift is released', () => {
-      dispatchKeyEvent('keydown', 'Shift');
-      jest.advanceTimersByTime(KEYBOARD_CONSTANTS.shiftHintDelay);
+    it('should fall through to pan when both marker and frame nav return false', () => {
+      (callbacks.onMarkerNav as jest.Mock).mockReturnValue(false);
+      (callbacks.onFrameNav as jest.Mock).mockReturnValue(false);
+      dispatchKeyEvent('keydown', 'ArrowLeft');
 
-      dispatchKeyEvent('keyup', 'Shift');
-
-      expect(callbacks.onShiftHeld).toHaveBeenLastCalledWith(false);
+      expect(callbacks.onMarkerNav).toHaveBeenCalled();
+      expect(callbacks.onFrameNav).toHaveBeenCalled();
+      expect(callbacks.onPan).toHaveBeenCalled();
     });
 
-    it('should not call onShiftHeld(true) if Shift is released before delay', () => {
-      dispatchKeyEvent('keydown', 'Shift');
-      jest.advanceTimersByTime(KEYBOARD_CONSTANTS.shiftHintDelay - 100);
-      dispatchKeyEvent('keyup', 'Shift');
+    it('should skip marker nav and go directly to pan when Shift is held', () => {
+      (callbacks.onMarkerNav as jest.Mock).mockReturnValue(true);
+      dispatchKeyEvent('keydown', 'ArrowLeft', { shiftKey: true });
 
-      jest.advanceTimersByTime(200); // Past the original delay time
+      expect(callbacks.onMarkerNav).not.toHaveBeenCalled();
+      expect(callbacks.onFrameNav).not.toHaveBeenCalled();
+      expect(callbacks.onPan).toHaveBeenCalled();
+    });
 
-      // Should have been called once with false (on release), but not with true
-      expect(callbacks.onShiftHeld).toHaveBeenCalledTimes(1);
-      expect(callbacks.onShiftHeld).toHaveBeenCalledWith(false);
+    it('should not call onMarkerNav for ArrowUp/ArrowDown', () => {
+      (callbacks.onMarkerNav as jest.Mock).mockReturnValue(true);
+      dispatchKeyEvent('keydown', 'ArrowUp');
+      dispatchKeyEvent('keydown', 'ArrowDown');
+
+      expect(callbacks.onMarkerNav).not.toHaveBeenCalled();
     });
   });
 
@@ -420,15 +434,6 @@ describe('KeyboardHandler', () => {
       dispatchKeyEvent('keydown', 'w');
 
       expect(callbacks.onZoom).not.toHaveBeenCalled();
-    });
-
-    it('should clear shift hint timeout on destroy', () => {
-      dispatchKeyEvent('keydown', 'Shift');
-      handler.destroy();
-      jest.advanceTimersByTime(KEYBOARD_CONSTANTS.shiftHintDelay + 100);
-
-      // Should not have been called
-      expect(callbacks.onShiftHeld).not.toHaveBeenCalled();
     });
   });
 
