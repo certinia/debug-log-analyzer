@@ -1,7 +1,7 @@
 ---
 id: timeline
 title: Timeline
-description: Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, and interact with detailed tooltips for efficient Salesforce Apex log analysis and debugging.
+description: Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, measure time ranges, and interact with detailed tooltips for efficient Salesforce Apex log analysis and debugging.
 keywords:
   [
     salesforce apex log analysis,
@@ -10,6 +10,8 @@ keywords:
     code execution profiling,
     salesforce debugging,
     apex performance analysis,
+    measure time range,
+    area zoom selection,
   ]
 image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png
 hide_title: true
@@ -100,6 +102,38 @@ The timeline supports search functionality that dims non-matching events, making
 | Next Match            | `Enter`                       |
 | Previous Match        | `Shift+Enter`                 |
 | Continuous Navigation | Hold `Enter` or `Shift+Enter` |
+
+### Measurement & Zoom Tools
+
+#### Measure Range
+
+Use `Shift+Drag` to measure the duration between any two points on the timeline. This is useful for precisely measuring the time span of specific operations or groups of events.
+
+| Action              | Mouse/Keyboard                                      |
+| ------------------- | --------------------------------------------------- |
+| Create Measurement  | `Shift+Drag` on timeline                            |
+| Resize Measurement  | Drag the left or right edge of the measurement      |
+| Zoom to Measurement | Double-click inside measurement, or click zoom icon |
+| Clear Measurement   | `Escape` or click outside the measurement area      |
+
+The measurement overlay displays:
+
+- The time duration of the selected range
+- A zoom icon to quickly zoom to fit the measured area
+
+:::tip Resize Handles
+Hover near the edges of an existing measurement to see the resize cursor. Drag to adjust the measurement boundaries — edges can be dragged past each other to swap positions.
+:::
+
+#### Area Zoom
+
+Use `Alt/Option+Drag` to select a time range and instantly zoom to fit it. This provides a quick way to focus on a specific portion of the timeline.
+
+| Action    | Mouse/Keyboard                |
+| --------- | ----------------------------- |
+| Area Zoom | `Alt/Option+Drag` on timeline |
+
+Release the mouse button to zoom the viewport to fit the selected area exactly.
 
 ## Tooltip
 
