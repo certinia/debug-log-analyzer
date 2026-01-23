@@ -48,6 +48,7 @@ import {
 } from './interaction/KeyboardHandler.js';
 import { TimelineInteractionHandler } from './interaction/TimelineInteractionHandler.js';
 import { TimelineResizeHandler } from './interaction/TimelineResizeHandler.js';
+import { AreaZoomRenderer } from './measurement/AreaZoomRenderer.js';
 import { MeasurementManager, type MeasurementState } from './measurement/MeasurementManager.js';
 import { MeasureRangeRenderer } from './measurement/MeasureRangeRenderer.js';
 import type { PrecomputedRect } from './RectangleManager.js';
@@ -152,6 +153,10 @@ export class FlameChart<E extends EventNode = EventNode> {
   // Measurement system (Shift+drag to measure time range)
   private measurementManager: MeasurementManager | null = null;
   private measurementRenderer: MeasureRangeRenderer | null = null;
+
+  // Area zoom system (Alt+drag to zoom to area)
+  private areaZoomManager: MeasurementManager | null = null;
+  private areaZoomRenderer: AreaZoomRenderer | null = null;
 
   /**
    * Initialize the flamechart renderer.
@@ -358,7 +363,15 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Initialize measurement system (Shift+drag to measure time range)
     this.measurementManager = new MeasurementManager();
     if (this.worldContainer && this.container) {
-      this.measurementRenderer = new MeasureRangeRenderer(this.worldContainer, this.container);
+      this.measurementRenderer = new MeasureRangeRenderer(this.worldContainer, this.container, () =>
+        this.zoomToMeasurement(),
+      );
+    }
+
+    // Initialize area zoom system (Alt+drag to zoom to area)
+    this.areaZoomManager = new MeasurementManager();
+    if (this.worldContainer && this.container) {
+      this.areaZoomRenderer = new AreaZoomRenderer(this.worldContainer, this.container);
     }
 
     // Setup interaction handler
@@ -414,6 +427,13 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.measurementRenderer = null;
     }
     this.measurementManager = null;
+
+    // Clean up area zoom components
+    if (this.areaZoomRenderer) {
+      this.areaZoomRenderer.destroy();
+      this.areaZoomRenderer = null;
+    }
+    this.areaZoomManager = null;
 
     // Clean up viewport animator
     if (this.viewportAnimator) {
@@ -790,6 +810,18 @@ export class FlameChart<E extends EventNode = EventNode> {
         onMeasureCancel: () => {
           this.clearMeasurement();
         },
+        onAreaZoomStart: (screenX: number) => {
+          this.handleAreaZoomStart(screenX);
+        },
+        onAreaZoomUpdate: (screenX: number) => {
+          this.handleAreaZoomUpdate(screenX);
+        },
+        onAreaZoomEnd: () => {
+          this.handleAreaZoomEnd();
+        },
+        onAreaZoomCancel: () => {
+          this.clearAreaZoom();
+        },
       },
     );
   }
@@ -985,10 +1017,24 @@ export class FlameChart<E extends EventNode = EventNode> {
   /**
    * Handle double-click - focus (zoom to fit) on the clicked event or marker.
    * When clicking on a bucket, focuses on the same "best event" that the tooltip displays.
+   * If double-click is inside a measurement range, zooms to the measurement.
    */
   private handleDoubleClick(screenX: number, screenY: number): void {
     if (!this.viewport || !this.index || !this.hitTestManager) {
       return;
+    }
+
+    // Check if double-click is inside measurement range first
+    if (this.measurementManager?.hasMeasurement()) {
+      const measurement = this.measurementManager.getState();
+      if (measurement) {
+        const clickTime = this.screenXToTime(screenX);
+        if (clickTime >= measurement.startTime && clickTime <= measurement.endTime) {
+          // Zoom to measurement range
+          this.zoomToMeasurement();
+          return;
+        }
+      }
     }
 
     const viewportState = this.viewport.getState();
@@ -1201,6 +1247,119 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   public hasMeasurement(): boolean {
     return this.measurementManager?.hasMeasurement() ?? false;
+  }
+
+  // ============================================================================
+  // AREA ZOOM HANDLERS
+  // ============================================================================
+
+  /**
+   * Handle area zoom start (Alt+drag began).
+   * Clears any existing measurement.
+   */
+  private handleAreaZoomStart(screenX: number): void {
+    if (!this.areaZoomManager) {
+      return;
+    }
+
+    // Clear measurement when starting area zoom (they can't coexist visually)
+    this.clearMeasurement();
+
+    // Clear search when starting area zoom
+    this.clearSearch();
+
+    // Start area zoom - clamp to timeline bounds
+    const timeNs = this.screenXToTime(screenX);
+    const clampedTime = Math.max(0, Math.min(this.index?.totalDuration ?? Infinity, timeNs));
+    this.areaZoomManager.start(clampedTime);
+
+    this.requestRender();
+  }
+
+  /**
+   * Handle area zoom update (Alt+drag continuing).
+   */
+  private handleAreaZoomUpdate(screenX: number): void {
+    if (!this.areaZoomManager) {
+      return;
+    }
+
+    // Clamp to timeline bounds (0 to totalDuration)
+    const timeNs = this.screenXToTime(screenX);
+    const clampedTime = Math.max(0, Math.min(this.index?.totalDuration ?? Infinity, timeNs));
+    this.areaZoomManager.update(clampedTime);
+
+    this.requestRender();
+  }
+
+  /**
+   * Handle area zoom end (mouse released after drag).
+   * Zooms to the selected area and clears the overlay.
+   */
+  private handleAreaZoomEnd(): void {
+    if (!this.areaZoomManager || !this.viewport || !this.index) {
+      this.clearAreaZoom();
+      return;
+    }
+
+    const state = this.areaZoomManager.getState();
+    if (state && state.endTime - state.startTime > 0) {
+      // Zoom to the selected area (exact fit, no padding)
+      const middleDepth = Math.floor(this.index.maxDepth / 2);
+      this.viewport.focusOnEvent(
+        state.startTime,
+        state.endTime - state.startTime,
+        middleDepth,
+        0, // 100% zoom, no padding
+      );
+
+      this.notifyViewportChange();
+    }
+
+    // Clear the area zoom overlay
+    this.clearAreaZoom();
+  }
+
+  /**
+   * Clear the current area zoom overlay.
+   */
+  private clearAreaZoom(): void {
+    if (!this.areaZoomManager) {
+      return;
+    }
+
+    this.areaZoomManager.clear();
+    this.areaZoomRenderer?.clear();
+
+    this.requestRender();
+  }
+
+  /**
+   * Zoom to fit the current measurement range.
+   * Used by double-click inside measurement and zoom icon in label.
+   */
+  public zoomToMeasurement(): void {
+    if (!this.measurementManager?.hasMeasurement() || !this.viewport || !this.index) {
+      return;
+    }
+
+    const measurement = this.measurementManager.getState();
+    if (!measurement) {
+      return;
+    }
+
+    // Use middle depth for vertical centering
+    const middleDepth = Math.floor(this.index.maxDepth / 2);
+
+    // Focus on the measurement range (zoom to fit exactly, no padding)
+    this.viewport.focusOnEvent(
+      measurement.startTime,
+      measurement.endTime - measurement.startTime,
+      middleDepth,
+      0, // 100% zoom, no padding
+    );
+
+    this.notifyViewportChange();
   }
 
   // ============================================================================
@@ -1732,6 +1891,11 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Render measurement overlay (if active)
     if (this.measurementRenderer && this.measurementManager) {
       this.measurementRenderer.render(viewportState, this.measurementManager.getState());
+    }
+
+    // Render area zoom overlay (if active)
+    if (this.areaZoomRenderer && this.areaZoomManager) {
+      this.areaZoomRenderer.render(viewportState, this.areaZoomManager.getState());
     }
 
     this.app.render();

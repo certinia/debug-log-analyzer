@@ -77,6 +77,22 @@ export interface InteractionCallbacks {
 
   /** Called when measurement is cancelled (shift/mouse released without drag). */
   onMeasureCancel?: () => void;
+
+  /** Called when Alt+drag area zoom starts.
+   * @param screenX - Canvas-relative X coordinate
+   */
+  onAreaZoomStart?: (screenX: number) => void;
+
+  /** Called during Alt+drag to update area zoom selection.
+   * @param screenX - Canvas-relative X coordinate
+   */
+  onAreaZoomUpdate?: (screenX: number) => void;
+
+  /** Called when Alt+drag ends and area zoom should be applied. */
+  onAreaZoomEnd?: () => void;
+
+  /** Called when area zoom is cancelled (alt released without drag). */
+  onAreaZoomCancel?: () => void;
 }
 
 export class TimelineInteractionHandler {
@@ -104,6 +120,12 @@ export class TimelineInteractionHandler {
   private measureStartX = 0;
   private didMeasureDrag = false; // Track if actual drag occurred during measurement
   private lastMeasureScreenX = 0; // Track last mouse position for auto-scroll updates
+
+  // Area zoom mode state (Alt+drag)
+  private isAreaZooming = false;
+  private areaZoomStartX = 0;
+  private didAreaZoomDrag = false; // Track if actual drag occurred during area zoom
+  private lastAreaZoomScreenX = 0; // Track last mouse position for auto-scroll updates
 
   // Auto-scroll state for measurement
   private static readonly EDGE_ZONE = 50; // px from edge to trigger auto-scroll
@@ -401,8 +423,9 @@ export class TimelineInteractionHandler {
   }
 
   /**
-   * Handle mouse down - start drag or measurement operation.
+   * Handle mouse down - start drag, measurement, or area zoom operation.
    * Shift+drag starts measurement mode instead of panning.
+   * Alt+drag starts area zoom mode instead of panning.
    */
   private handleMouseDown(event: MouseEvent): void {
     // Only handle left mouse button
@@ -412,6 +435,20 @@ export class TimelineInteractionHandler {
 
     const rect = this.canvas.getBoundingClientRect();
     const screenX = event.clientX - rect.left;
+
+    // Check for Alt+drag to start area zoom (check before Shift since Alt takes priority)
+    if (event.altKey && this.callbacks.onAreaZoomStart) {
+      this.isAreaZooming = true;
+      this.areaZoomStartX = screenX;
+      this.didAreaZoomDrag = false; // Reset drag flag
+      this.mouseDownX = event.clientX;
+      this.mouseDownY = event.clientY;
+      this.canvas.style.cursor = 'zoom-in';
+
+      // Call onAreaZoomStart immediately (show range on alt+click)
+      this.callbacks.onAreaZoomStart(screenX);
+      return;
+    }
 
     // Check for Shift+drag to start measurement
     if (event.shiftKey && this.callbacks.onMeasureStart) {
@@ -443,12 +480,42 @@ export class TimelineInteractionHandler {
   }
 
   /**
-   * Handle mouse move - perform drag, measurement, or update hover state.
+   * Handle mouse move - perform drag, measurement, area zoom, or update hover state.
    */
   private handleMouseMove(event: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
     const screenX = event.clientX - rect.left;
     const screenY = event.clientY - rect.top;
+
+    // Handle area zoom mode
+    if (this.isAreaZooming) {
+      // Track if we've dragged enough to count as a real drag (vs just a click)
+      if (!this.didAreaZoomDrag) {
+        const distanceX = Math.abs(event.clientX - this.mouseDownX);
+        const distanceY = Math.abs(event.clientY - this.mouseDownY);
+        const distance = Math.max(distanceX, distanceY);
+
+        if (distance >= TimelineInteractionHandler.DRAG_THRESHOLD) {
+          this.didAreaZoomDrag = true;
+        }
+      }
+
+      // Update area zoom position and track for auto-scroll
+      this.lastAreaZoomScreenX = screenX;
+      this.callbacks.onAreaZoomUpdate?.(screenX);
+
+      // Auto-scroll when dragging near viewport edges
+      const viewportState = this.viewport.getState();
+      if (screenX < TimelineInteractionHandler.EDGE_ZONE) {
+        this.startAutoScroll('left', 'areaZoom');
+      } else if (screenX > viewportState.displayWidth - TimelineInteractionHandler.EDGE_ZONE) {
+        this.startAutoScroll('right', 'areaZoom');
+      } else {
+        this.stopAutoScroll();
+      }
+
+      return;
+    }
 
     // Handle measurement mode
     if (this.isMeasuring) {
@@ -470,9 +537,9 @@ export class TimelineInteractionHandler {
       // Auto-scroll when dragging near viewport edges
       const viewportState = this.viewport.getState();
       if (screenX < TimelineInteractionHandler.EDGE_ZONE) {
-        this.startAutoScroll('left');
+        this.startAutoScroll('left', 'measure');
       } else if (screenX > viewportState.displayWidth - TimelineInteractionHandler.EDGE_ZONE) {
-        this.startAutoScroll('right');
+        this.startAutoScroll('right', 'measure');
       } else {
         this.stopAutoScroll();
       }
@@ -523,12 +590,31 @@ export class TimelineInteractionHandler {
   }
 
   /**
-   * Handle mouse up - end drag or measurement operation.
+   * Handle mouse up - end drag, measurement, or area zoom operation.
    */
   private handleMouseUp(event: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
+
+    // Handle area zoom mode end
+    if (this.isAreaZooming) {
+      this.isAreaZooming = false;
+      this.stopAutoScroll();
+
+      // If drag occurred, apply the zoom; otherwise cancel it
+      if (this.didAreaZoomDrag) {
+        this.callbacks.onAreaZoomEnd?.();
+        // IMPORTANT: Set this flag to skip the click event that fires after mouseup
+        this.didPanDuringClick = true;
+      } else {
+        this.callbacks.onAreaZoomCancel?.();
+      }
+
+      // Restore cursor
+      this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+      return;
+    }
 
     // Handle measurement mode end
     if (this.isMeasuring) {
@@ -640,32 +726,24 @@ export class TimelineInteractionHandler {
   }
 
   /**
-   * Handle keyup event - detect shift release during measurement.
+   * Handle keyup event.
+   * Note: Measurement and area zoom only end on mouse up, not key release.
+   * This allows users to release Shift/Alt while still holding mouse button.
    */
-  private handleKeyUp(event: KeyboardEvent): void {
-    if (event.key === 'Shift' && this.isMeasuring) {
-      this.isMeasuring = false;
-      this.stopAutoScroll();
-
-      // If drag occurred, persist the measurement; otherwise cancel it
-      if (this.didMeasureDrag) {
-        this.callbacks.onMeasureEnd?.();
-        // IMPORTANT: Set this flag to skip click processing
-        this.didPanDuringClick = true;
-      } else {
-        this.callbacks.onMeasureCancel?.();
-      }
-
-      this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
-    }
+  private handleKeyUp(_event: KeyboardEvent): void {
+    // No-op: Measurement and area zoom only end on mouse up, not key release
+    // This allows users to release Shift/Alt while still holding mouse button
   }
 
   /**
    * Start auto-scrolling the viewport in the given direction.
-   * During measurement, updates the measurement boundary after each pan
+   * During measurement or area zoom, updates the boundary after each pan
    * so it moves smoothly with the viewport.
+   *
+   * @param direction - Scroll direction
+   * @param mode - Which mode triggered the auto-scroll ('measure' or 'areaZoom')
    */
-  private startAutoScroll(direction: 'left' | 'right'): void {
+  private startAutoScroll(direction: 'left' | 'right', mode?: 'measure' | 'areaZoom'): void {
     if (this.autoScrollId !== null) {
       return; // Already scrolling
     }
@@ -683,8 +761,13 @@ export class TimelineInteractionHandler {
 
         // During measurement, update the boundary position after pan
         // The screenX stays the same but the TIME at that screenX has changed
-        if (this.isMeasuring) {
+        if (mode === 'measure' && this.isMeasuring) {
           this.callbacks.onMeasureUpdate?.(this.lastMeasureScreenX);
+        }
+
+        // During area zoom, update the boundary position after pan
+        if (mode === 'areaZoom' && this.isAreaZooming) {
+          this.callbacks.onAreaZoomUpdate?.(this.lastAreaZoomScreenX);
         }
       }
 
@@ -706,26 +789,43 @@ export class TimelineInteractionHandler {
 
   /**
    * Handle mouse leave - end drag and notify when cursor exits canvas.
-   * Note: Measurement does NOT end on mouse leave - only on mouse up or shift release.
+   * Note: Measurement and area zoom do NOT end on mouse leave - only on mouse up or key release.
    */
   private handleMouseLeave(event: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const viewportState = this.viewport.getState();
+
+    // If area zooming and mouse left on left/right edge, update to edge and start auto-scroll
+    if (this.isAreaZooming) {
+      // Determine which edge the mouse left from and update area zoom to that edge
+      if (mouseX <= 0) {
+        // Mouse left on left side - update to left edge (0) and start auto-scroll left
+        this.lastAreaZoomScreenX = 0;
+        this.callbacks.onAreaZoomUpdate?.(0);
+        this.startAutoScroll('left', 'areaZoom');
+      } else if (mouseX >= viewportState.displayWidth) {
+        // Mouse left on right side - update to right edge and start auto-scroll right
+        this.lastAreaZoomScreenX = viewportState.displayWidth;
+        this.callbacks.onAreaZoomUpdate?.(viewportState.displayWidth);
+        this.startAutoScroll('right', 'areaZoom');
+      }
+      // If mouse left top/bottom, just keep the current position
+    }
+
     // If measuring and mouse left on left/right edge, update measurement to edge and start auto-scroll
     if (this.isMeasuring) {
-      const rect = this.canvas.getBoundingClientRect();
-      const mouseX = event.clientX - rect.left;
-      const viewportState = this.viewport.getState();
-
       // Determine which edge the mouse left from and update measurement to that edge
       if (mouseX <= 0) {
         // Mouse left on left side - update to left edge (0) and start auto-scroll left
         this.lastMeasureScreenX = 0;
         this.callbacks.onMeasureUpdate?.(0);
-        this.startAutoScroll('left');
+        this.startAutoScroll('left', 'measure');
       } else if (mouseX >= viewportState.displayWidth) {
         // Mouse left on right side - update to right edge and start auto-scroll right
         this.lastMeasureScreenX = viewportState.displayWidth;
         this.callbacks.onMeasureUpdate?.(viewportState.displayWidth);
-        this.startAutoScroll('right');
+        this.startAutoScroll('right', 'measure');
       }
       // If mouse left top/bottom, just keep the current position
     }

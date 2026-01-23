@@ -226,16 +226,22 @@ export class TimelineViewport {
 
   /**
    * Focus viewport on a specific event by zooming to fit it with padding.
-   * Calculates optimal zoom level to fit the frame with 10% padding on each side,
+   * Calculates optimal zoom level to fit the frame with padding on each side,
    * then centers the viewport on the event.
    *
    * @param eventTimestamp - Event start time in nanoseconds
    * @param eventDuration - Event duration in nanoseconds
    * @param eventDepth - Event depth in call tree (0-indexed)
+   * @param padding - Padding ratio on each side (default 0.1 = 10% on each side, 20% total).
+   *                  Use 0 for exact 100% zoom (measurement/area zoom).
    */
-  public focusOnEvent(eventTimestamp: number, eventDuration: number, eventDepth: number): void {
-    // Calculate zoom to fit frame with 10% padding on each side (20% total)
-    const padding = 0.1;
+  public focusOnEvent(
+    eventTimestamp: number,
+    eventDuration: number,
+    eventDepth: number,
+    padding: number = 0.1,
+  ): void {
+    // Calculate zoom to fit frame with padding on each side
     const targetTimeWidth = eventDuration * (1 + padding * 2);
 
     // Calculate new zoom level (pixels per nanosecond)
