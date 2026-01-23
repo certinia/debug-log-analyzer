@@ -93,6 +93,18 @@ export interface InteractionCallbacks {
 
   /** Called when area zoom is cancelled (alt released without drag). */
   onAreaZoomCancel?: () => void;
+
+  /** Called when resize of measurement edge starts. */
+  onResizeStart?: (screenX: number, edge: 'left' | 'right') => void;
+
+  /** Called during resize drag. */
+  onResizeUpdate?: (screenX: number) => void;
+
+  /** Called when resize ends. */
+  onResizeEnd?: () => void;
+
+  /** Check if mouse is over a measurement resize edge. Returns edge name or null. */
+  getMeasurementResizeEdge?: (screenX: number) => 'left' | 'right' | null;
 }
 
 export class TimelineInteractionHandler {
@@ -126,6 +138,15 @@ export class TimelineInteractionHandler {
   private areaZoomStartX = 0;
   private didAreaZoomDrag = false; // Track if actual drag occurred during area zoom
   private lastAreaZoomScreenX = 0; // Track last mouse position for auto-scroll updates
+
+  // Resize mode state (drag existing measurement edge)
+  private isResizing = false;
+  private resizeEdge: 'left' | 'right' | null = null;
+  private didResizeDrag = false; // Track if actual drag occurred during resize
+  private lastResizeScreenX = 0; // Track last mouse position for auto-scroll updates
+
+  // Threshold for hitting resize handle
+  private static readonly RESIZE_HANDLE_THRESHOLD = 8; // px from edge
 
   // Auto-scroll state for measurement
   private static readonly EDGE_ZONE = 50; // px from edge to trigger auto-scroll
@@ -450,6 +471,21 @@ export class TimelineInteractionHandler {
       return;
     }
 
+    // Check for click on measurement resize edge (before Shift+drag check)
+    const resizeEdge = this.callbacks.getMeasurementResizeEdge?.(screenX);
+    if (resizeEdge && this.callbacks.onResizeStart) {
+      this.isResizing = true;
+      this.resizeEdge = resizeEdge;
+      this.didResizeDrag = false; // Reset drag flag
+      this.mouseDownX = event.clientX;
+      this.mouseDownY = event.clientY;
+      this.canvas.style.cursor = 'ew-resize';
+
+      // Call onResizeStart immediately
+      this.callbacks.onResizeStart(screenX, resizeEdge);
+      return;
+    }
+
     // Check for Shift+drag to start measurement
     if (event.shiftKey && this.callbacks.onMeasureStart) {
       this.isMeasuring = true;
@@ -510,6 +546,36 @@ export class TimelineInteractionHandler {
         this.startAutoScroll('left', 'areaZoom');
       } else if (screenX > viewportState.displayWidth - TimelineInteractionHandler.EDGE_ZONE) {
         this.startAutoScroll('right', 'areaZoom');
+      } else {
+        this.stopAutoScroll();
+      }
+
+      return;
+    }
+
+    // Handle resize mode (dragging measurement edge)
+    if (this.isResizing) {
+      // Track if we've dragged enough to count as a real drag (vs just a click)
+      if (!this.didResizeDrag) {
+        const distanceX = Math.abs(event.clientX - this.mouseDownX);
+        const distanceY = Math.abs(event.clientY - this.mouseDownY);
+        const distance = Math.max(distanceX, distanceY);
+
+        if (distance >= TimelineInteractionHandler.DRAG_THRESHOLD) {
+          this.didResizeDrag = true;
+        }
+      }
+
+      // Update resize position and track for auto-scroll
+      this.lastResizeScreenX = screenX;
+      this.callbacks.onResizeUpdate?.(screenX);
+
+      // Auto-scroll when dragging near viewport edges
+      const viewportState = this.viewport.getState();
+      if (screenX < TimelineInteractionHandler.EDGE_ZONE) {
+        this.startAutoScroll('left', 'resize');
+      } else if (screenX > viewportState.displayWidth - TimelineInteractionHandler.EDGE_ZONE) {
+        this.startAutoScroll('right', 'resize');
       } else {
         this.stopAutoScroll();
       }
@@ -586,6 +652,15 @@ export class TimelineInteractionHandler {
       if (this.callbacks.onMouseMove) {
         this.callbacks.onMouseMove(screenX, screenY);
       }
+
+      // Check for resize handle hover and update cursor
+      const resizeEdge = this.callbacks.getMeasurementResizeEdge?.(screenX) ?? null;
+      if (resizeEdge) {
+        this.canvas.style.cursor = 'ew-resize';
+      } else if (this.canvas.style.cursor === 'ew-resize') {
+        // Reset cursor when leaving resize zone
+        this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+      }
     }
   }
 
@@ -610,6 +685,25 @@ export class TimelineInteractionHandler {
       } else {
         this.callbacks.onAreaZoomCancel?.();
       }
+
+      // Restore cursor
+      this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+      return;
+    }
+
+    // Handle resize mode end
+    if (this.isResizing) {
+      this.isResizing = false;
+      this.stopAutoScroll();
+
+      // If drag occurred, finalize the resize
+      if (this.didResizeDrag) {
+        this.callbacks.onResizeEnd?.();
+        // IMPORTANT: Set this flag to skip the click event that fires after mouseup
+        this.didPanDuringClick = true;
+      }
+
+      this.resizeEdge = null;
 
       // Restore cursor
       this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
@@ -737,13 +831,16 @@ export class TimelineInteractionHandler {
 
   /**
    * Start auto-scrolling the viewport in the given direction.
-   * During measurement or area zoom, updates the boundary after each pan
+   * During measurement, area zoom, or resize, updates the boundary after each pan
    * so it moves smoothly with the viewport.
    *
    * @param direction - Scroll direction
-   * @param mode - Which mode triggered the auto-scroll ('measure' or 'areaZoom')
+   * @param mode - Which mode triggered the auto-scroll ('measure', 'areaZoom', or 'resize')
    */
-  private startAutoScroll(direction: 'left' | 'right', mode?: 'measure' | 'areaZoom'): void {
+  private startAutoScroll(
+    direction: 'left' | 'right',
+    mode?: 'measure' | 'areaZoom' | 'resize',
+  ): void {
     if (this.autoScrollId !== null) {
       return; // Already scrolling
     }
@@ -768,6 +865,11 @@ export class TimelineInteractionHandler {
         // During area zoom, update the boundary position after pan
         if (mode === 'areaZoom' && this.isAreaZooming) {
           this.callbacks.onAreaZoomUpdate?.(this.lastAreaZoomScreenX);
+        }
+
+        // During resize, update the boundary position after pan
+        if (mode === 'resize' && this.isResizing) {
+          this.callbacks.onResizeUpdate?.(this.lastResizeScreenX);
         }
       }
 
@@ -809,6 +911,23 @@ export class TimelineInteractionHandler {
         this.lastAreaZoomScreenX = viewportState.displayWidth;
         this.callbacks.onAreaZoomUpdate?.(viewportState.displayWidth);
         this.startAutoScroll('right', 'areaZoom');
+      }
+      // If mouse left top/bottom, just keep the current position
+    }
+
+    // If resizing and mouse left on left/right edge, update resize to edge and start auto-scroll
+    if (this.isResizing) {
+      // Determine which edge the mouse left from and update resize to that edge
+      if (mouseX <= 0) {
+        // Mouse left on left side - update to left edge (0) and start auto-scroll left
+        this.lastResizeScreenX = 0;
+        this.callbacks.onResizeUpdate?.(0);
+        this.startAutoScroll('left', 'resize');
+      } else if (mouseX >= viewportState.displayWidth) {
+        // Mouse left on right side - update to right edge and start auto-scroll right
+        this.lastResizeScreenX = viewportState.displayWidth;
+        this.callbacks.onResizeUpdate?.(viewportState.displayWidth);
+        this.startAutoScroll('right', 'resize');
       }
       // If mouse left top/bottom, just keep the current position
     }
@@ -982,8 +1101,8 @@ export class TimelineInteractionHandler {
    * @param isOverEvent - Whether cursor is over an event
    */
   public updateCursor(isOverEvent: boolean): void {
-    if (this.isDragging) {
-      // Don't change cursor while dragging
+    if (this.isDragging || this.isResizing) {
+      // Don't change cursor while dragging or resizing
       return;
     }
 

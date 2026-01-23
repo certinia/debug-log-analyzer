@@ -69,6 +69,23 @@ export class MeasurementManager {
   }
 
   /**
+   * Set both edges of the measurement (for resize operations).
+   * Stores raw values - getState() handles normalization.
+   *
+   * @param time1 - First time value (dragged edge position)
+   * @param time2 - Second time value (anchor edge position)
+   */
+  public setEdges(time1: number, time2: number): void {
+    if (!this.state) {
+      return;
+    }
+
+    this.state.startTime = time1;
+    this.state.endTime = time2;
+    // getState() normalizes so startTime <= endTime for display
+  }
+
+  /**
    * Clear the measurement entirely.
    */
   public clear(): void {

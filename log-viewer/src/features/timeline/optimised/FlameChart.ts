@@ -158,6 +158,10 @@ export class FlameChart<E extends EventNode = EventNode> {
   private areaZoomManager: MeasurementManager | null = null;
   private areaZoomRenderer: AreaZoomRenderer | null = null;
 
+  // Resize state (drag existing measurement edge)
+  private resizeEdge: 'left' | 'right' | null = null;
+  private resizeAnchorTime: number | null = null; // The fixed edge during resize
+
   /**
    * Initialize the flamechart renderer.
    *
@@ -822,6 +826,18 @@ export class FlameChart<E extends EventNode = EventNode> {
         onAreaZoomCancel: () => {
           this.clearAreaZoom();
         },
+        onResizeStart: (screenX: number, edge: 'left' | 'right') => {
+          this.handleResizeStart(screenX, edge);
+        },
+        onResizeUpdate: (screenX: number) => {
+          this.handleResizeUpdate(screenX);
+        },
+        onResizeEnd: () => {
+          this.handleResizeEnd();
+        },
+        getMeasurementResizeEdge: (screenX: number) => {
+          return this.getMeasurementResizeEdge(screenX);
+        },
       },
     );
   }
@@ -1330,6 +1346,92 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     this.areaZoomManager.clear();
     this.areaZoomRenderer?.clear();
+
+    this.requestRender();
+  }
+
+  // ============================================================================
+  // RESIZE HANDLERS (drag existing measurement edge)
+  // ============================================================================
+
+  /**
+   * Check if screenX is near a measurement resize edge.
+   * Returns 'left' or 'right' if near an edge, null otherwise.
+   */
+  private getMeasurementResizeEdge(screenX: number): 'left' | 'right' | null {
+    if (!this.measurementManager?.hasMeasurement() || !this.viewport) {
+      return null;
+    }
+
+    const measurement = this.measurementManager.getState();
+    if (!measurement || measurement.isActive) {
+      // Only finished measurements can be resized
+      return null;
+    }
+
+    const viewportState = this.viewport.getState();
+    const screenStartX = measurement.startTime * viewportState.zoom - viewportState.offsetX;
+    const screenEndX = measurement.endTime * viewportState.zoom - viewportState.offsetX;
+
+    const threshold = 8; // px
+    if (Math.abs(screenX - screenStartX) <= threshold) {
+      return 'left';
+    }
+    if (Math.abs(screenX - screenEndX) <= threshold) {
+      return 'right';
+    }
+    return null;
+  }
+
+  /**
+   * Handle resize start (click on measurement edge).
+   */
+  private handleResizeStart(_screenX: number, edge: 'left' | 'right'): void {
+    if (!this.measurementManager) {
+      return;
+    }
+
+    const measurement = this.measurementManager.getState();
+    if (!measurement) {
+      return;
+    }
+
+    this.resizeEdge = edge;
+    // Store the anchor (the edge NOT being dragged)
+    this.resizeAnchorTime = edge === 'left' ? measurement.endTime : measurement.startTime;
+
+    this.requestRender();
+  }
+
+  /**
+   * Handle resize update (dragging measurement edge).
+   */
+  private handleResizeUpdate(screenX: number): void {
+    if (!this.measurementManager || this.resizeAnchorTime === null) {
+      return;
+    }
+
+    const timeNs = this.screenXToTime(screenX);
+    const clampedTime = Math.max(0, Math.min(this.index?.totalDuration ?? Infinity, timeNs));
+
+    // Update measurement using anchor - dragged time becomes one edge, anchor is the other
+    this.measurementManager.setEdges(clampedTime, this.resizeAnchorTime);
+
+    // Notify callback
+    this.callbacks.onMeasurementChange?.(this.measurementManager.getState());
+
+    this.requestRender();
+  }
+
+  /**
+   * Handle resize end (mouse released after dragging edge).
+   */
+  private handleResizeEnd(): void {
+    this.resizeEdge = null;
+    this.resizeAnchorTime = null;
+
+    // Notify callback with final measurement state
+    this.callbacks.onMeasurementChange?.(this.measurementManager?.getState() ?? null);
 
     this.requestRender();
   }
