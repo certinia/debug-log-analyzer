@@ -61,6 +61,22 @@ export interface InteractionCallbacks {
    * @param clientY - Client Y coordinate (for menu positioning)
    */
   onContextMenu?: (screenX: number, screenY: number, clientX: number, clientY: number) => void;
+
+  /** Called when Shift+drag measurement starts.
+   * @param screenX - Canvas-relative X coordinate
+   */
+  onMeasureStart?: (screenX: number) => void;
+
+  /** Called during Shift+drag measurement to update end position.
+   * @param screenX - Canvas-relative X coordinate
+   */
+  onMeasureUpdate?: (screenX: number) => void;
+
+  /** Called when Shift+drag measurement ends (mouse released after drag). */
+  onMeasureEnd?: () => void;
+
+  /** Called when measurement is cancelled (shift/mouse released without drag). */
+  onMeasureCancel?: () => void;
 }
 
 export class TimelineInteractionHandler {
@@ -82,6 +98,17 @@ export class TimelineInteractionHandler {
   private mouseDownX = 0;
   private mouseDownY = 0;
   private static readonly DRAG_THRESHOLD = 3; // px - movement required to count as drag
+
+  // Measurement mode state (Shift+drag)
+  private isMeasuring = false;
+  private measureStartX = 0;
+  private didMeasureDrag = false; // Track if actual drag occurred during measurement
+  private lastMeasureScreenX = 0; // Track last mouse position for auto-scroll updates
+
+  // Auto-scroll state for measurement
+  private static readonly EDGE_ZONE = 50; // px from edge to trigger auto-scroll
+  private static readonly AUTO_SCROLL_SPEED = 10; // px per frame
+  private autoScrollId: number | null = null;
 
   // Double-click detection state
   private lastClickTime = 0;
@@ -188,6 +215,11 @@ export class TimelineInteractionHandler {
     const contextMenuHandler = this.handleContextMenu.bind(this);
     this.canvas.addEventListener('contextmenu', contextMenuHandler);
     this.registerBoundHandler('contextmenu', contextMenuHandler);
+
+    // Keyup for shift release during measurement
+    const keyUpHandler = this.handleKeyUp.bind(this);
+    document.addEventListener('keyup', keyUpHandler);
+    this.registerBoundHandler('keyup', keyUpHandler);
   }
 
   /**
@@ -247,7 +279,15 @@ export class TimelineInteractionHandler {
       this.canvas.removeEventListener('contextmenu', contextMenuHandler);
     }
 
+    const keyUpHandler = this.boundHandlers.get('keyup');
+    if (keyUpHandler) {
+      document.removeEventListener('keyup', keyUpHandler);
+    }
+
     this.boundHandlers.clear();
+
+    // Clean up auto-scroll
+    this.stopAutoScroll();
   }
 
   // ============================================================================
@@ -361,15 +401,33 @@ export class TimelineInteractionHandler {
   }
 
   /**
-   * Handle mouse down - start drag operation.
+   * Handle mouse down - start drag or measurement operation.
+   * Shift+drag starts measurement mode instead of panning.
    */
   private handleMouseDown(event: MouseEvent): void {
-    if (!this.options.enablePan) {
+    // Only handle left mouse button
+    if (event.button !== 0) {
       return;
     }
 
-    // Only handle left mouse button
-    if (event.button !== 0) {
+    const rect = this.canvas.getBoundingClientRect();
+    const screenX = event.clientX - rect.left;
+
+    // Check for Shift+drag to start measurement
+    if (event.shiftKey && this.callbacks.onMeasureStart) {
+      this.isMeasuring = true;
+      this.measureStartX = screenX;
+      this.didMeasureDrag = false; // Reset drag flag
+      this.mouseDownX = event.clientX;
+      this.mouseDownY = event.clientY;
+      this.canvas.style.cursor = 'col-resize';
+
+      // Call onMeasureStart immediately (show range on shift+click)
+      this.callbacks.onMeasureStart(screenX);
+      return;
+    }
+
+    if (!this.options.enablePan) {
       return;
     }
 
@@ -385,9 +443,43 @@ export class TimelineInteractionHandler {
   }
 
   /**
-   * Handle mouse move - perform drag or update hover state.
+   * Handle mouse move - perform drag, measurement, or update hover state.
    */
   private handleMouseMove(event: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const screenX = event.clientX - rect.left;
+    const screenY = event.clientY - rect.top;
+
+    // Handle measurement mode
+    if (this.isMeasuring) {
+      // Track if we've dragged enough to count as a real drag (vs just a click)
+      if (!this.didMeasureDrag) {
+        const distanceX = Math.abs(event.clientX - this.mouseDownX);
+        const distanceY = Math.abs(event.clientY - this.mouseDownY);
+        const distance = Math.max(distanceX, distanceY);
+
+        if (distance >= TimelineInteractionHandler.DRAG_THRESHOLD) {
+          this.didMeasureDrag = true;
+        }
+      }
+
+      // Update measurement position and track for auto-scroll
+      this.lastMeasureScreenX = screenX;
+      this.callbacks.onMeasureUpdate?.(screenX);
+
+      // Auto-scroll when dragging near viewport edges
+      const viewportState = this.viewport.getState();
+      if (screenX < TimelineInteractionHandler.EDGE_ZONE) {
+        this.startAutoScroll('left');
+      } else if (screenX > viewportState.displayWidth - TimelineInteractionHandler.EDGE_ZONE) {
+        this.startAutoScroll('right');
+      } else {
+        this.stopAutoScroll();
+      }
+
+      return;
+    }
+
     if (this.isDragging && this.options.enablePan) {
       // Check if we've moved enough to start actual panning (vs just a click with slight movement)
       if (!this.didPanDuringClick) {
@@ -424,20 +516,39 @@ export class TimelineInteractionHandler {
       }
     } else {
       // Not dragging - update mouse position for hover effects
-      const rect = this.canvas.getBoundingClientRect();
-      const mouseX = event.clientX - rect.left;
-      const mouseY = event.clientY - rect.top;
-
       if (this.callbacks.onMouseMove) {
-        this.callbacks.onMouseMove(mouseX, mouseY);
+        this.callbacks.onMouseMove(screenX, screenY);
       }
     }
   }
 
   /**
-   * Handle mouse up - end drag operation.
+   * Handle mouse up - end drag or measurement operation.
    */
   private handleMouseUp(event: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Handle measurement mode end
+    if (this.isMeasuring) {
+      this.isMeasuring = false;
+      this.stopAutoScroll();
+
+      // If drag occurred, persist the measurement; otherwise cancel it
+      if (this.didMeasureDrag) {
+        this.callbacks.onMeasureEnd?.();
+        // IMPORTANT: Set this flag to skip the click event that fires after mouseup
+        this.didPanDuringClick = true;
+      } else {
+        this.callbacks.onMeasureCancel?.();
+      }
+
+      // Restore cursor
+      this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+      return;
+    }
+
     if (!this.isDragging) {
       return;
     }
@@ -450,10 +561,6 @@ export class TimelineInteractionHandler {
 
     // Update mouse position for hover effects after drag ends
     // This ensures tooltip state is updated immediately when panning stops
-    const rect = this.canvas.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-
     if (this.callbacks.onMouseMove) {
       this.callbacks.onMouseMove(mouseX, mouseY);
     }
@@ -533,9 +640,96 @@ export class TimelineInteractionHandler {
   }
 
   /**
-   * Handle mouse leave - end drag and notify when cursor exits canvas.
+   * Handle keyup event - detect shift release during measurement.
    */
-  private handleMouseLeave(_event: MouseEvent): void {
+  private handleKeyUp(event: KeyboardEvent): void {
+    if (event.key === 'Shift' && this.isMeasuring) {
+      this.isMeasuring = false;
+      this.stopAutoScroll();
+
+      // If drag occurred, persist the measurement; otherwise cancel it
+      if (this.didMeasureDrag) {
+        this.callbacks.onMeasureEnd?.();
+        // IMPORTANT: Set this flag to skip click processing
+        this.didPanDuringClick = true;
+      } else {
+        this.callbacks.onMeasureCancel?.();
+      }
+
+      this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+    }
+  }
+
+  /**
+   * Start auto-scrolling the viewport in the given direction.
+   * During measurement, updates the measurement boundary after each pan
+   * so it moves smoothly with the viewport.
+   */
+  private startAutoScroll(direction: 'left' | 'right'): void {
+    if (this.autoScrollId !== null) {
+      return; // Already scrolling
+    }
+
+    const scroll = () => {
+      const delta =
+        direction === 'left'
+          ? -TimelineInteractionHandler.AUTO_SCROLL_SPEED
+          : TimelineInteractionHandler.AUTO_SCROLL_SPEED;
+      const changed = this.viewport.panBy(delta, 0);
+
+      if (changed) {
+        // Notify viewport change
+        this.callbacks.onViewportChange?.();
+
+        // During measurement, update the boundary position after pan
+        // The screenX stays the same but the TIME at that screenX has changed
+        if (this.isMeasuring) {
+          this.callbacks.onMeasureUpdate?.(this.lastMeasureScreenX);
+        }
+      }
+
+      this.autoScrollId = requestAnimationFrame(scroll);
+    };
+
+    this.autoScrollId = requestAnimationFrame(scroll);
+  }
+
+  /**
+   * Stop auto-scrolling the viewport.
+   */
+  private stopAutoScroll(): void {
+    if (this.autoScrollId !== null) {
+      cancelAnimationFrame(this.autoScrollId);
+      this.autoScrollId = null;
+    }
+  }
+
+  /**
+   * Handle mouse leave - end drag and notify when cursor exits canvas.
+   * Note: Measurement does NOT end on mouse leave - only on mouse up or shift release.
+   */
+  private handleMouseLeave(event: MouseEvent): void {
+    // If measuring and mouse left on left/right edge, update measurement to edge and start auto-scroll
+    if (this.isMeasuring) {
+      const rect = this.canvas.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const viewportState = this.viewport.getState();
+
+      // Determine which edge the mouse left from and update measurement to that edge
+      if (mouseX <= 0) {
+        // Mouse left on left side - update to left edge (0) and start auto-scroll left
+        this.lastMeasureScreenX = 0;
+        this.callbacks.onMeasureUpdate?.(0);
+        this.startAutoScroll('left');
+      } else if (mouseX >= viewportState.displayWidth) {
+        // Mouse left on right side - update to right edge and start auto-scroll right
+        this.lastMeasureScreenX = viewportState.displayWidth;
+        this.callbacks.onMeasureUpdate?.(viewportState.displayWidth);
+        this.startAutoScroll('right');
+      }
+      // If mouse left top/bottom, just keep the current position
+    }
+
     // End any active drag operation when cursor leaves canvas
     if (this.isDragging) {
       this.isDragging = false;

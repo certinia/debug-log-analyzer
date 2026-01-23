@@ -48,6 +48,8 @@ import {
 } from './interaction/KeyboardHandler.js';
 import { TimelineInteractionHandler } from './interaction/TimelineInteractionHandler.js';
 import { TimelineResizeHandler } from './interaction/TimelineResizeHandler.js';
+import { MeasurementManager, type MeasurementState } from './measurement/MeasurementManager.js';
+import { MeasureRangeRenderer } from './measurement/MeasureRangeRenderer.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 import { RectangleManager } from './RectangleManager.js';
 import { FlameChartCursor } from './search/FlameChartCursor.js';
@@ -102,6 +104,8 @@ export interface FlameChartCallbacks {
   onCopy?: (event: EventNode) => void;
   /** Called when Ctrl/Cmd+C is pressed to copy selected marker. */
   onCopyMarker?: (marker: TimelineMarker) => void;
+  /** Called when measurement state changes (started, updated, finished, cleared). */
+  onMeasurementChange?: (measurement: MeasurementState | null) => void;
 }
 
 export class FlameChart<E extends EventNode = EventNode> {
@@ -144,6 +148,10 @@ export class FlameChart<E extends EventNode = EventNode> {
   private selectionManager: SelectionManager<E> | null = null;
   private selectionRenderer: SelectionHighlightRenderer | null = null;
   private viewportAnimator: ViewportAnimator | null = null;
+
+  // Measurement system (Shift+drag to measure time range)
+  private measurementManager: MeasurementManager | null = null;
+  private measurementRenderer: MeasureRangeRenderer | null = null;
 
   /**
    * Initialize the flamechart renderer.
@@ -347,6 +355,12 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.selectionRenderer.setMarkerContext(this.markers, this.index.totalDuration);
     }
 
+    // Initialize measurement system (Shift+drag to measure time range)
+    this.measurementManager = new MeasurementManager();
+    if (this.worldContainer && this.container) {
+      this.measurementRenderer = new MeasureRangeRenderer(this.worldContainer, this.container);
+    }
+
     // Setup interaction handler
     this.setupInteractionHandler();
 
@@ -393,6 +407,13 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.selectionRenderer = null;
     }
     this.selectionManager = null;
+
+    // Clean up measurement components
+    if (this.measurementRenderer) {
+      this.measurementRenderer.destroy();
+      this.measurementRenderer = null;
+    }
+    this.measurementManager = null;
 
     // Clean up viewport animator
     if (this.viewportAnimator) {
@@ -757,6 +778,18 @@ export class FlameChart<E extends EventNode = EventNode> {
         onContextMenu: (screenX: number, screenY: number, clientX: number, clientY: number) => {
           this.handleContextMenu(screenX, screenY, clientX, clientY);
         },
+        onMeasureStart: (screenX: number) => {
+          this.handleMeasureStart(screenX);
+        },
+        onMeasureUpdate: (screenX: number) => {
+          this.handleMeasureUpdate(screenX);
+        },
+        onMeasureEnd: () => {
+          this.handleMeasureEnd();
+        },
+        onMeasureCancel: () => {
+          this.clearMeasurement();
+        },
       },
     );
   }
@@ -813,8 +846,10 @@ export class FlameChart<E extends EventNode = EventNode> {
         this.notifyViewportChange();
       },
       onEscape: () => {
-        // Clear selection first (frame or marker), then search
-        if (this.selectionManager?.hasAnySelection()) {
+        // Clear in order: measurement → selection → search
+        if (this.measurementManager?.hasMeasurement()) {
+          this.clearMeasurement();
+        } else if (this.selectionManager?.hasAnySelection()) {
           this.clearSelection();
         } else {
           this.clearSearch();
@@ -923,7 +958,21 @@ export class FlameChart<E extends EventNode = EventNode> {
       // Clicked on a marker - select it
       this.selectMarker(marker);
     } else {
-      // Clicked on empty space - clear selection
+      // Clicked on empty space - check if inside measurement area
+      if (this.measurementManager?.hasMeasurement()) {
+        const measurement = this.measurementManager.getState();
+        if (measurement) {
+          const clickTime = this.screenXToTime(screenX);
+          const isInsideMeasurement =
+            clickTime >= measurement.startTime && clickTime <= measurement.endTime;
+          if (!isInsideMeasurement) {
+            // Clicked outside measurement - clear it
+            this.clearMeasurement();
+            return;
+          }
+          // Clicked inside measurement - don't clear, allow frame selection below
+        }
+      }
       this.clearSelection();
     }
 
@@ -1053,6 +1102,108 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   // ============================================================================
+  // MEASUREMENT HANDLERS
+  // ============================================================================
+
+  /**
+   * Convert screen X coordinate to timeline time in nanoseconds.
+   */
+  private screenXToTime(screenX: number): number {
+    if (!this.viewport) {
+      return 0;
+    }
+    const viewportState = this.viewport.getState();
+    // screenX is relative to canvas, offsetX is the viewport scroll position
+    return (screenX + viewportState.offsetX) / viewportState.zoom;
+  }
+
+  /**
+   * Handle measurement start (Shift+drag began).
+   * Clears any existing selection (measurement and selection are mutually exclusive).
+   */
+  private handleMeasureStart(screenX: number): void {
+    if (!this.measurementManager) {
+      return;
+    }
+
+    // DON'T clear selection - measurement and selection can coexist
+
+    // Clear search when starting measurement (search highlights conflict with measurement overlay)
+    this.clearSearch();
+
+    // Start measurement - clamp to timeline bounds
+    const timeNs = this.screenXToTime(screenX);
+    const clampedTime = Math.max(0, Math.min(this.index?.totalDuration ?? Infinity, timeNs));
+    this.measurementManager.start(clampedTime);
+
+    // Notify callback
+    this.callbacks.onMeasurementChange?.(this.measurementManager.getState());
+
+    this.requestRender();
+  }
+
+  /**
+   * Handle measurement update (Shift+drag continuing).
+   */
+  private handleMeasureUpdate(screenX: number): void {
+    if (!this.measurementManager) {
+      return;
+    }
+
+    // Clamp to timeline bounds (0 to totalDuration)
+    const timeNs = this.screenXToTime(screenX);
+    const clampedTime = Math.max(0, Math.min(this.index?.totalDuration ?? Infinity, timeNs));
+    this.measurementManager.update(clampedTime);
+
+    // Notify callback
+    this.callbacks.onMeasurementChange?.(this.measurementManager.getState());
+
+    this.requestRender();
+  }
+
+  /**
+   * Handle measurement end (mouse released).
+   * Measurement persists until cleared.
+   */
+  private handleMeasureEnd(): void {
+    if (!this.measurementManager) {
+      return;
+    }
+
+    this.measurementManager.finish();
+
+    // Notify callback
+    this.callbacks.onMeasurementChange?.(this.measurementManager.getState());
+
+    this.requestRender();
+  }
+
+  /**
+   * Clear the current measurement.
+   * Called when user presses Escape, clicks elsewhere, or starts a new selection.
+   */
+  public clearMeasurement(): void {
+    if (!this.measurementManager?.hasMeasurement()) {
+      return;
+    }
+
+    this.measurementManager.clear();
+    this.measurementRenderer?.clear();
+
+    // Notify callback
+    this.callbacks.onMeasurementChange?.(null);
+
+    this.requestRender();
+  }
+
+  /**
+   * Check if there is an active measurement.
+   */
+  public hasMeasurement(): boolean {
+    return this.measurementManager?.hasMeasurement() ?? false;
+  }
+
+  // ============================================================================
   // PRIVATE HELPERS
   // ============================================================================
 
@@ -1096,6 +1247,8 @@ export class FlameChart<E extends EventNode = EventNode> {
    * @param node - TreeNode to select
    */
   private selectFrame(node: TreeNode<E>): void {
+    // DON'T clear measurement - selection and measurement can coexist
+
     this.selectionManager?.select(node);
 
     // Notify callback
@@ -1144,6 +1297,8 @@ export class FlameChart<E extends EventNode = EventNode> {
    * @param marker - TimelineMarker to select
    */
   private selectMarker(marker: TimelineMarker): void {
+    // DON'T clear measurement - selection and measurement can coexist
+
     this.selectionManager?.selectMarker(marker);
 
     // Notify callback
@@ -1572,6 +1727,11 @@ export class FlameChart<E extends EventNode = EventNode> {
       // No active highlight mode: clear both
       this.searchRenderer?.clear();
       this.selectionRenderer?.clear();
+    }
+
+    // Render measurement overlay (if active)
+    if (this.measurementRenderer && this.measurementManager) {
+      this.measurementRenderer.render(viewportState, this.measurementManager.getState());
     }
 
     this.app.render();
