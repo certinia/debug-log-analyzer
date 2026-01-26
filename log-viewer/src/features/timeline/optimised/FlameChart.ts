@@ -384,11 +384,13 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     // Create hit test manager for mouse interactions
+    // Pass rectangleManager for O(log n) hit testing queries
     this.hitTestManager = new HitTestManager({
       index: this.index,
       visibleRects: new Map(),
       buckets: new Map(),
       markerRenderer: this.markerRenderer,
+      rectangleManager: this.rectangleManager,
     });
 
     // Create selection highlight renderer
@@ -1206,11 +1208,12 @@ export class FlameChart<E extends EventNode = EventNode> {
       containerHeight,
     );
 
-    // Initialize density query (leverages RectangleManager's spatial index)
+    // Initialize density query (leverages RectangleManager's segment tree for O(B×log N) performance)
     this.minimapDensityQuery = new MinimapDensityQuery(
       this.rectangleManager.getRectsByCategory(),
       this.index.totalDuration,
       this.index.maxDepth,
+      this.rectangleManager.getSegmentTree(),
     );
 
     // Create minimap container on minimap app's stage

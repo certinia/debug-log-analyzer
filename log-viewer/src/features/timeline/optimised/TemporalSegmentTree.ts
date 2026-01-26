@@ -19,6 +19,7 @@
  * Query time: O(k log n) where k = number of visible nodes
  */
 
+import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type {
   CategoryAggregation,
   CulledRenderData,
@@ -214,6 +215,163 @@ export class TemporalSegmentTree {
    */
   public getMaxDepth(): number {
     return this.maxDepth;
+  }
+
+  /**
+   * Query events within a specific time and depth region.
+   * Used for hit testing when bucket eventRefs are empty.
+   * O(log n + k) complexity where k = events in region.
+   *
+   * @param timeStart - Start time in nanoseconds
+   * @param timeEnd - End time in nanoseconds
+   * @param depthStart - Minimum depth (inclusive)
+   * @param depthEnd - Maximum depth (inclusive)
+   * @returns Array of LogEvent references in the region
+   */
+  public queryEventsInRegion(
+    timeStart: number,
+    timeEnd: number,
+    depthStart: number,
+    depthEnd: number,
+  ): LogEvent[] {
+    const results: LogEvent[] = [];
+
+    for (let depth = depthStart; depth <= depthEnd; depth++) {
+      const tree = this.treesByDepth.get(depth);
+      if (!tree) {
+        continue;
+      }
+
+      this.collectEventsFromNode(tree, timeStart, timeEnd, results);
+    }
+
+    return results;
+  }
+
+  /**
+   * Collect events from a tree node that overlap with the query time range.
+   * Recursive traversal with early exit for non-overlapping nodes.
+   */
+  private collectEventsFromNode(
+    node: SegmentNode,
+    queryStart: number,
+    queryEnd: number,
+    results: LogEvent[],
+  ): void {
+    // Early exit: no overlap
+    if (node.timeEnd <= queryStart || node.timeStart >= queryEnd) {
+      return;
+    }
+
+    // Leaf with event ref: add to results
+    if (node.isLeaf && node.eventRef) {
+      results.push(node.eventRef);
+      return;
+    }
+
+    // Branch: recurse into children
+    if (node.children) {
+      for (const child of node.children) {
+        this.collectEventsFromNode(child, queryStart, queryEnd, results);
+      }
+    }
+  }
+
+  /**
+   * Stats returned from queryBucketStats for minimap density computation.
+   */
+  public queryBucketStats(
+    timeStart: number,
+    timeEnd: number,
+  ): {
+    maxDepth: number;
+    eventCount: number;
+    selfDurationSum: number;
+    categoryWeights: Map<string, { weightedTime: number; maxDepth: number }>;
+  } {
+    let maxDepth = 0;
+    let eventCount = 0;
+    let selfDurationSum = 0;
+    const categoryWeights = new Map<string, { weightedTime: number; maxDepth: number }>();
+
+    // Query each depth level
+    for (const [depth, tree] of this.treesByDepth) {
+      this.aggregateStatsFromNode(
+        tree,
+        timeStart,
+        timeEnd,
+        depth,
+        categoryWeights,
+        (d, count, selfDur) => {
+          if (d > maxDepth) {
+            maxDepth = d;
+          }
+          eventCount += count;
+          selfDurationSum += selfDur;
+        },
+      );
+    }
+
+    return { maxDepth, eventCount, selfDurationSum, categoryWeights };
+  }
+
+  /**
+   * Aggregate stats from a tree node for minimap density computation.
+   * Uses depth² weighting to ensure deeper frames dominate.
+   */
+  private aggregateStatsFromNode(
+    node: SegmentNode,
+    queryStart: number,
+    queryEnd: number,
+    depth: number,
+    categoryWeights: Map<string, { weightedTime: number; maxDepth: number }>,
+    onStats: (depth: number, count: number, selfDuration: number) => void,
+  ): void {
+    // Early exit: no overlap
+    if (node.timeEnd <= queryStart || node.timeStart >= queryEnd) {
+      return;
+    }
+
+    // Leaf node: aggregate its stats
+    if (node.isLeaf && node.rectRef) {
+      const rect = node.rectRef;
+
+      // Calculate visible time within query range
+      const overlapStart = Math.max(rect.timeStart, queryStart);
+      const overlapEnd = Math.min(rect.timeEnd, queryEnd);
+      const visibleTime = overlapEnd - overlapStart;
+
+      // Calculate overlap ratio for proportional self-duration attribution
+      const rectDuration = rect.timeEnd - rect.timeStart;
+      const overlapRatio = rectDuration > 0 ? visibleTime / rectDuration : 0;
+      const proportionalSelfDuration = rect.selfDuration * overlapRatio;
+
+      // Depth² weighting for category dominance
+      const depthWeight = (depth + 1) * (depth + 1);
+      const weightedTime = visibleTime * depthWeight;
+
+      // Update category weights
+      const category = rect.category;
+      const existing = categoryWeights.get(category);
+      if (existing) {
+        existing.weightedTime += weightedTime;
+        if (depth > existing.maxDepth) {
+          existing.maxDepth = depth;
+        }
+      } else {
+        categoryWeights.set(category, { weightedTime, maxDepth: depth });
+      }
+
+      onStats(depth, 1, proportionalSelfDuration);
+      return;
+    }
+
+    // Branch node: recurse into children
+    if (node.children) {
+      for (const child of node.children) {
+        this.aggregateStatsFromNode(child, queryStart, queryEnd, depth, categoryWeights, onStats);
+      }
+    }
   }
 
   // ==========================================================================
