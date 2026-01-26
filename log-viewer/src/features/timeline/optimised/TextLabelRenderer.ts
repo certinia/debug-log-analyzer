@@ -68,8 +68,9 @@ export class TextLabelRenderer {
     // Create BitmapFont dynamically from system font
     // This avoids the need for pre-generated MSDF font files
     // Character set: alphanumeric + common programming symbols
+    // Character set: alphanumeric + common programming symbols + time units (µ for microseconds)
     const chars =
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ._()<>[]{}:;,!@#$%^&*-+=/?\'"`\\|~…';
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ._()<>[]{}:;,!@#$%^&*-+=/?\'"`\\|~…µ';
 
     BitmapFont.install({
       name: TEXT_LABEL_CONSTANTS.FONT.FAMILY,

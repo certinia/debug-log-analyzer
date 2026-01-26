@@ -166,11 +166,14 @@ export class SelectionHighlightRenderer {
     const screenX = selectedMarker.startTime * viewport.zoom;
     const screenWidth = duration * viewport.zoom;
 
-    // Full height to cover entire visible viewport regardless of pan position
-    // Use a large height that extends beyond any reasonable viewport
-    // Start from well above visible area and extend well below
-    const screenY = -viewport.displayHeight;
-    const screenHeight = viewport.displayHeight * 3;
+    // Full height to cover entire visible viewport regardless of vertical pan position
+    // Account for offsetY so marker selection stays fixed on screen when panning
+    // The worldContainer has scale.y = -1 and position based on offsetY
+    // Visible world Y range is approximately [-offsetY, displayHeight - offsetY]
+    // Add buffer to extend beyond visible area
+    const buffer = viewport.displayHeight;
+    const screenY = -viewport.offsetY - buffer;
+    const screenHeight = viewport.displayHeight + buffer * 2;
 
     // Enforce minimum visible width for narrow markers
     const visibleWidth = Math.max(screenWidth, MIN_HIGHLIGHT_WIDTH);
@@ -206,6 +209,13 @@ export class SelectionHighlightRenderer {
   public clear(): void {
     this.frameGraphics.clear();
     this.markerGraphics.clear();
+  }
+
+  /**
+   * Refresh colors from CSS variables (e.g., after VS Code theme change).
+   */
+  public refreshColors(): void {
+    this.colors = extractHighlightColors();
   }
 
   /**

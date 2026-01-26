@@ -66,6 +66,7 @@ describe('SearchHighlightRenderer', () => {
       timeEnd: timestamp + duration,
       depth,
       duration,
+      selfDuration: duration,
       category: 'Method',
     };
     return {

@@ -53,6 +53,14 @@ describe('KeyboardHandler', () => {
       onJumpToCallTree: jest.fn(),
       onFocus: jest.fn(),
       onCopy: jest.fn(),
+      // Minimap keyboard callbacks
+      isInMinimapArea: jest.fn().mockReturnValue(false),
+      onMinimapPanViewport: jest.fn(),
+      onMinimapPanDepth: jest.fn(),
+      onMinimapZoom: jest.fn(),
+      onMinimapJumpStart: jest.fn(),
+      onMinimapJumpEnd: jest.fn(),
+      onMinimapResetZoom: jest.fn(),
     };
 
     handler = new KeyboardHandler(container, viewport, callbacks);
