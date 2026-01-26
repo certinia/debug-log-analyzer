@@ -189,6 +189,10 @@ export class FlameChart<E extends EventNode = EventNode> {
   private minimapMouseX = 0;
   private minimapMouseY = 0;
 
+  // Vertical offset from container top to main timeline canvas (minimap height + gap)
+  // Used to convert canvas-relative coordinates to container-relative for tooltip positioning
+  private mainTimelineYOffset = 0;
+
   /**
    * Initialize the flamechart renderer.
    *
@@ -252,6 +256,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Viewport needs the available height for main timeline (excluding minimap + gap)
     const minimapHeight = calculateMinimapHeight(height);
     const mainTimelineHeight = height - minimapHeight - MINIMAP_GAP;
+
+    // Store offset for converting canvas-relative to container-relative coordinates
+    this.mainTimelineYOffset = minimapHeight + MINIMAP_GAP;
 
     // Create viewport manager with adjusted height for main timeline area
     this.viewport = new TimelineViewport(
@@ -682,7 +689,8 @@ export class FlameChart<E extends EventNode = EventNode> {
         match.event.timestamp,
         match.event.duration,
       );
-      const screenY = this.viewport.depthToScreenY(match.depth);
+      // Convert canvas-relative to container-relative for tooltip positioning
+      const screenY = this.viewport.depthToScreenY(match.depth) + this.mainTimelineYOffset;
       this.callbacks.onSearchNavigate(match.event, screenX, screenY, match.depth);
     }
 
@@ -742,6 +750,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Calculate new minimap and main timeline heights
     const minimapHeight = calculateMinimapHeight(newHeight);
     const mainTimelineHeight = newHeight - minimapHeight - MINIMAP_GAP;
+
+    // Update offset for converting canvas-relative to container-relative coordinates
+    this.mainTimelineYOffset = minimapHeight + MINIMAP_GAP;
 
     // Resize minimap app
     if (this.minimapApp) {
@@ -1469,9 +1480,10 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.interactionHandler.updateCursor(event !== null || marker !== null);
     }
 
-    // Notify callback
+    // Notify callback with container-relative coordinates
+    // (screenY is canvas-relative, add minimap offset for container-relative positioning)
     if (this.callbacks.onMouseMove) {
-      this.callbacks.onMouseMove(screenX, screenY, event, marker);
+      this.callbacks.onMouseMove(screenX, screenY + this.mainTimelineYOffset, event, marker);
     }
   }
 
@@ -1521,9 +1533,9 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.clearSelection();
     }
 
-    // Notify callback
+    // Notify callback with container-relative coordinates
     if (this.callbacks.onClick) {
-      this.callbacks.onClick(screenX, screenY, event, marker, modifiers);
+      this.callbacks.onClick(screenX, screenY + this.mainTimelineYOffset, event, marker, modifiers);
     }
   }
 
@@ -1634,10 +1646,16 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.selectFrame(treeNode);
 
       // Notify callback with selected event data
-      // - screenX/screenY: canvas-relative coordinates for tooltip positioning (same as hover)
+      // - screenX/screenY: container-relative coordinates for tooltip positioning
       // - clientX/clientY: window coordinates for context menu positioning
       if (this.callbacks.onContextMenu) {
-        this.callbacks.onContextMenu(treeNode.data, screenX, screenY, clientX, clientY);
+        this.callbacks.onContextMenu(
+          treeNode.data,
+          screenX,
+          screenY + this.mainTimelineYOffset,
+          clientX,
+          clientY,
+        );
       }
       return;
     }
@@ -1649,14 +1667,26 @@ export class FlameChart<E extends EventNode = EventNode> {
 
       // Notify callback with selected marker data
       if (this.callbacks.onContextMenu) {
-        this.callbacks.onContextMenu(marker, screenX, screenY, clientX, clientY);
+        this.callbacks.onContextMenu(
+          marker,
+          screenX,
+          screenY + this.mainTimelineYOffset,
+          clientX,
+          clientY,
+        );
       }
       return;
     }
 
     // Empty space click - notify callback with null
     if (this.callbacks.onContextMenu) {
-      this.callbacks.onContextMenu(null, screenX, screenY, clientX, clientY);
+      this.callbacks.onContextMenu(
+        null,
+        screenX,
+        screenY + this.mainTimelineYOffset,
+        clientX,
+        clientY,
+      );
     }
   }
 
@@ -2100,7 +2130,8 @@ export class FlameChart<E extends EventNode = EventNode> {
       if (this.callbacks.onMarkerNavigate && this.viewport) {
         const screenX = this.viewport.calculateVisibleCenterX(nextMarker.startTime, 0);
         // Markers span full height - position tooltip near top of visible area
-        const screenY = 50;
+        // Add offset to convert canvas-relative to container-relative
+        const screenY = 50 + this.mainTimelineYOffset;
         this.callbacks.onMarkerNavigate(nextMarker, screenX, screenY);
       }
     }
@@ -2147,7 +2178,8 @@ export class FlameChart<E extends EventNode = EventNode> {
           nextNode.data.timestamp,
           nextNode.data.duration,
         );
-        const screenY = this.viewport.depthToScreenY(depth);
+        // Convert canvas-relative to container-relative for tooltip positioning
+        const screenY = this.viewport.depthToScreenY(depth) + this.mainTimelineYOffset;
         this.callbacks.onFrameNavigate(nextNode.data, screenX, screenY, depth);
       }
     }
