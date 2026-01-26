@@ -35,8 +35,8 @@ import type { MinimapManager, MinimapSelection } from './MinimapManager.js';
 /**
  * Opacity constants for density visualization (logarithmic scale).
  */
-const MIN_OPACITY = 0.4;
-const MAX_OPACITY = 0.9;
+const MIN_OPACITY = 0.5;
+const MAX_OPACITY = 1.0;
 const SATURATION_COUNT = 100;
 
 /**
@@ -55,6 +55,15 @@ const EDGE_HANDLE_WIDTH = 2;
 const CURSOR_LINE_WIDTH = 1;
 const CURSOR_LINE_COLOR = 0xffffff;
 const CURSOR_LINE_OPACITY = 0.6;
+
+/**
+ * Sparkline visualization constants.
+ * Semi-transparent white fill provides a subtle overlay showing execution intensity.
+ * Works on any category color as a subtle "highlight" effect.
+ */
+const SPARKLINE_FILL_COLOR = 0xffffff; // White
+const SPARKLINE_FILL_OPACITY = 0.2; // Subtle overlay
+const SPARKLINE_MIN_HEIGHT_PX = 2;
 
 /**
  * Default colors extracted from CSS variables (VS Code theme compatible).
@@ -89,6 +98,9 @@ export class MinimapRenderer {
 
   /** Marker bands from main timeline. */
   private markerGraphics: PIXI.Graphics;
+
+  /** Sparkline graph for self-duration intensity. */
+  private sparklineGraphics: PIXI.Graphics;
 
   /** Time axis renderer (static). */
   private axisRenderer: MinimapAxisRenderer;
@@ -153,11 +165,13 @@ export class MinimapRenderer {
     // Static graphics layers
     this.backgroundGraphics = new PIXI.Graphics();
     this.skylineGraphics = new PIXI.Graphics();
+    this.sparklineGraphics = new PIXI.Graphics();
     this.markerGraphics = new PIXI.Graphics();
 
     // Add static layers to static container
     this.staticContainer.addChild(this.backgroundGraphics);
     this.staticContainer.addChild(this.skylineGraphics);
+    this.staticContainer.addChild(this.sparklineGraphics);
     this.staticContainer.addChild(this.markerGraphics);
 
     // Axis renderer (renders into static container)
@@ -270,6 +284,7 @@ export class MinimapRenderer {
     // Clear static graphics
     this.backgroundGraphics.clear();
     this.skylineGraphics.clear();
+    this.sparklineGraphics.clear();
     this.markerGraphics.clear();
 
     // Render background
@@ -277,6 +292,9 @@ export class MinimapRenderer {
 
     // Render skyline area chart
     this.renderSkyline(manager, densityData, batchColors, minimapHeight);
+
+    // Render sparkline (self-duration intensity)
+    this.renderSparkline(manager, densityData, minimapHeight);
 
     // Render markers
     this.renderMarkers(manager, markers, minimapHeight);
@@ -378,7 +396,7 @@ export class MinimapRenderer {
 
     // Axis is at TOP - chart area is below it
     const axisHeight = this.axisRenderer.getHeight();
-    const chartTop = axisHeight; // Chart starts below axis
+    const _chartTop = axisHeight; // Chart starts below axis (unused, kept for documentation)
     const chartHeight = minimapHeight - axisHeight;
     const chartBottom = minimapHeight; // Chart ends at bottom of minimap
 
@@ -474,6 +492,60 @@ export class MinimapRenderer {
     // Logarithmic curve: log10(x * 9 + 1) maps 0-1 to 0-1 with log shape
     const logScale = Math.log10(normalized * 9 + 1);
     return MIN_OPACITY + (MAX_OPACITY - MIN_OPACITY) * logScale;
+  }
+
+  /**
+   * Render sparkline showing execution intensity (self-duration / wall-clock time).
+   * Draws a semi-transparent filled area as a subtle overlay showing CPU activity concentration.
+   */
+  private renderSparkline(
+    manager: MinimapManager,
+    densityData: MinimapDensityData,
+    minimapHeight: number,
+  ): void {
+    const state = manager.getState();
+    const { buckets } = densityData;
+
+    const axisHeight = this.axisRenderer.getHeight();
+    const chartHeight = minimapHeight - axisHeight;
+    const chartBottom = minimapHeight;
+
+    if (buckets.length === 0 || chartHeight <= 0) {
+      return;
+    }
+
+    const bucketWidth = state.displayWidth / buckets.length;
+
+    // Build polygon points: start at bottom-left, trace top curve, end at bottom-right
+    const polygonPoints: number[] = [];
+
+    // Start at baseline (bottom-left)
+    polygonPoints.push(0, chartBottom);
+
+    // Trace intensity curve left-to-right
+    for (let i = 0; i < buckets.length; i++) {
+      const bucket = buckets[i]!;
+      const x = i * bucketWidth + bucketWidth / 2;
+
+      // Calculate intensity: selfDuration / bucketTimeWidth (0-1, can exceed 1)
+      const bucketTimeWidth = bucket.timeEnd - bucket.timeStart;
+      const intensity =
+        bucketTimeWidth > 0 ? Math.min(1, bucket.selfDurationSum / bucketTimeWidth) : 0;
+
+      // Apply minimum floor (2px)
+      const minRatio = SPARKLINE_MIN_HEIGHT_PX / chartHeight;
+      const heightRatio = Math.max(minRatio, intensity);
+
+      const y = chartBottom - heightRatio * chartHeight;
+      polygonPoints.push(x, y);
+    }
+
+    // Close at baseline (bottom-right)
+    polygonPoints.push(state.displayWidth, chartBottom);
+
+    // Draw filled polygon
+    this.sparklineGraphics.poly(polygonPoints);
+    this.sparklineGraphics.fill({ color: SPARKLINE_FILL_COLOR, alpha: SPARKLINE_FILL_OPACITY });
   }
 
   /**
@@ -738,6 +810,7 @@ export class MinimapRenderer {
   public clear(): void {
     this.backgroundGraphics.clear();
     this.skylineGraphics.clear();
+    this.sparklineGraphics.clear();
     this.markerGraphics.clear();
     this.curtainGraphics.clear();
     this.lensGraphics.clear();
@@ -752,6 +825,7 @@ export class MinimapRenderer {
     // Destroy static content
     this.backgroundGraphics.destroy();
     this.skylineGraphics.destroy();
+    this.sparklineGraphics.destroy();
     this.markerGraphics.destroy();
     this.axisRenderer.destroy();
     this.staticContainer.destroy();

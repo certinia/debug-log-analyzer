@@ -39,6 +39,9 @@ export interface MinimapDensityBucket {
 
   /** Dominant category for color resolution. */
   dominantCategory: string;
+
+  /** Sum of self-durations for events in this bucket (for sparkline). */
+  selfDurationSum: number;
 }
 
 /**
@@ -182,6 +185,7 @@ export class MinimapDensityQuery {
     const bucketTimeWidth = this.totalDuration / bucketCount;
     const maxDepths = new Uint16Array(bucketCount);
     const eventCounts = new Uint32Array(bucketCount);
+    const selfDurationSums = new Float64Array(bucketCount);
     // Category stats: for each bucket, track category -> depth-weighted visible time
     const categoryStats: Map<string, CategoryBucketStats>[] = new Array(bucketCount);
     for (let i = 0; i < bucketCount; i++) {
@@ -212,8 +216,14 @@ export class MinimapDensityQuery {
           // Calculate actual visible time of this rect within this bucket.
           const bucketStart = b * bucketTimeWidth;
           const bucketEnd = (b + 1) * bucketTimeWidth;
-          const visibleTime =
-            Math.min(rect.timeEnd, bucketEnd) - Math.max(rect.timeStart, bucketStart);
+          const overlapStart = Math.max(rect.timeStart, bucketStart);
+          const overlapEnd = Math.min(rect.timeEnd, bucketEnd);
+          const visibleTime = overlapEnd - overlapStart;
+
+          // Calculate overlap ratio for proportional self-duration attribution
+          const rectDuration = rect.timeEnd - rect.timeStart;
+          const overlapRatio = rectDuration > 0 ? visibleTime / rectDuration : 0;
+          selfDurationSums[b]! += rect.selfDuration * overlapRatio;
 
           // Combined weighting: depth² × category weight
           // - Depth²: deeper frames (visually on top) dominate their parents
@@ -264,6 +274,7 @@ export class MinimapDensityQuery {
         maxDepth: maxDepths[i]!,
         eventCount,
         dominantCategory,
+        selfDurationSum: selfDurationSums[i]!,
       };
     }
 
