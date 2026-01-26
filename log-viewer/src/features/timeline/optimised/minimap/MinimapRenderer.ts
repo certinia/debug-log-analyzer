@@ -344,15 +344,17 @@ export class MinimapRenderer {
     // Position after content is rendered (need label dimensions)
     requestAnimationFrame(() => {
       const labelWidth = this.labelElement.offsetWidth;
+      const labelHeight = this.labelElement.offsetHeight;
       const containerWidth = this.htmlContainer.offsetWidth;
+      const minimapHeight = manager.getState().height;
       const padding = 4;
 
       // Horizontal: center on lens, clamp to viewport
       let left = lensCenterX - labelWidth / 2;
       left = Math.max(padding, Math.min(containerWidth - labelWidth - padding, left));
 
-      // Vertical: inside the lens at top edge
-      const top = lensY1 + padding;
+      // Vertical: center within the entire minimap
+      const top = (minimapHeight - labelHeight) / 2;
 
       this.labelElement.style.left = `${left}px`;
       this.labelElement.style.top = `${top}px`;
