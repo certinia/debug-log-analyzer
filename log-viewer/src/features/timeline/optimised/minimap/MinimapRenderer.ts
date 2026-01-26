@@ -35,8 +35,8 @@ import type { MinimapManager, MinimapSelection } from './MinimapManager.js';
 /**
  * Opacity constants for density visualization (logarithmic scale).
  */
-const MIN_OPACITY = 0.3;
-const MAX_OPACITY = 0.9;
+const MIN_OPACITY = 0.4;
+const MAX_OPACITY = 0.7;
 const SATURATION_COUNT = 100;
 
 /**
@@ -463,7 +463,7 @@ export class MinimapRenderer {
 
   /**
    * Calculate opacity based on event count using logarithmic scale.
-   * 1 event = 30%, 100+ events = 90%.
+   * 1 event = ~41%, 100+ events = ~70%.
    */
   private calculateDensityOpacity(eventCount: number): number {
     if (eventCount <= 0) {

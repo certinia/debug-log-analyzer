@@ -59,18 +59,35 @@ export interface MinimapDensityData {
 }
 
 /**
- * Priority map for category resolution.
- * DML and SOQL have highest priority (most important to highlight).
+ * Category weights for importance-based resolution.
+ * DML/SOQL are boosted to highlight database operations even when partially
+ * covered by less important children. Other categories have uniform weight
+ * so depth becomes the deciding factor among them.
+ *
+ * Balance: DML at 2.5x means it can win over a Method child 1-2 levels deeper,
+ * but a child 5+ levels deeper will still dominate (depth² wins at larger gaps).
  */
-const CATEGORY_PRIORITY: Record<string, number> = {
-  DML: 0,
-  SOQL: 1,
-  Method: 2,
-  'Code Unit': 3,
-  'System Method': 4,
-  Flow: 5,
-  Workflow: 6,
+const CATEGORY_WEIGHTS: Record<string, number> = {
+  DML: 2.5,
+  SOQL: 2.5,
+  Method: 1.0,
+  'Code Unit': 1.0,
+  'System Method': 1.0,
+  Flow: 1.0,
+  Workflow: 1.0,
 };
+
+/**
+ * Category stats for a single bucket, tracking depth-weighted visible time.
+ * Depth weighting ensures deeper frames (visually on top in the flame chart)
+ * dominate the color resolution.
+ */
+interface CategoryBucketStats {
+  /** Combined depth + category weighted visible time */
+  weightedTime: number;
+  /** Maximum depth seen for this category (tiebreaker) */
+  maxDepth: number;
+}
 
 export class MinimapDensityQuery {
   /** All rectangles grouped by category from RectangleManager. */
@@ -165,8 +182,8 @@ export class MinimapDensityQuery {
     const bucketTimeWidth = this.totalDuration / bucketCount;
     const maxDepths = new Uint16Array(bucketCount);
     const eventCounts = new Uint32Array(bucketCount);
-    // Category stats: for each bucket, track category -> duration
-    const categoryStats: Map<string, number>[] = new Array(bucketCount);
+    // Category stats: for each bucket, track category -> depth-weighted visible time
+    const categoryStats: Map<string, CategoryBucketStats>[] = new Array(bucketCount);
     for (let i = 0; i < bucketCount; i++) {
       categoryStats[i] = new Map();
     }
@@ -192,10 +209,38 @@ export class MinimapDensityQuery {
           // Increment event count
           eventCounts[b]!++;
 
-          // Accumulate category self-time (excludes children to show actual bottlenecks)
+          // Calculate actual visible time of this rect within this bucket.
+          const bucketStart = b * bucketTimeWidth;
+          const bucketEnd = (b + 1) * bucketTimeWidth;
+          const visibleTime =
+            Math.min(rect.timeEnd, bucketEnd) - Math.max(rect.timeStart, bucketStart);
+
+          // Combined weighting: depth² × category weight
+          // - Depth²: deeper frames (visually on top) dominate their parents
+          // - Category weight: important operations (DML/SOQL) get a 2.5x boost
+          //
+          // Example: DML at depth 1 (100ms) vs Method at depth 2 (100ms)
+          //   DML:    100 × 4 × 2.5 = 1000
+          //   Method: 100 × 9 × 1.0 = 900  → DML wins (important category)
+          //
+          // Example: DML at depth 5 (100ms) vs Flow at depth 12 (100ms)
+          //   DML:  100 × 36 × 2.5 = 9000
+          //   Flow: 100 × 169 × 1.0 = 16900 → Flow wins (much deeper)
+          const depthWeight = (rect.depth + 1) * (rect.depth + 1);
+          const categoryWeight = CATEGORY_WEIGHTS[rect.category] ?? 1.0;
+          const weightedTime = visibleTime * depthWeight * categoryWeight;
+
+          // Accumulate depth-weighted visible time for category resolution
           const catStats = categoryStats[b]!;
-          const existing = catStats.get(rect.category) ?? 0;
-          catStats.set(rect.category, existing + rect.selfDuration);
+          const existing = catStats.get(rect.category);
+          if (existing) {
+            existing.weightedTime += weightedTime;
+            if (rect.depth > existing.maxDepth) {
+              existing.maxDepth = rect.depth;
+            }
+          } else {
+            catStats.set(rect.category, { weightedTime, maxDepth: rect.depth });
+          }
         }
       }
     }
@@ -231,29 +276,32 @@ export class MinimapDensityQuery {
   }
 
   /**
-   * Resolve dominant category from self-time stats.
-   * Categories with most exclusive time win; priority is tiebreaker.
+   * Resolve dominant category from combined depth + category weighted stats.
    *
-   * This ensures actual bottlenecks are highlighted - a 1ms DML that triggers
-   * a 100ms SOQL will show as SOQL (the actual work), not DML.
+   * The category with the highest weighted score wins, where:
+   *   score = visibleTime × depth² × categoryWeight
+   *
+   * This balances two concerns:
+   * - Deeper frames (visually on top) generally dominate their parents
+   * - Important categories (DML/SOQL at 2.5x) can win over shallow children
+   *
+   * In case of a tie, the category with the deepest frame wins.
    */
-  private resolveDominantCategory(categoryDurations: Map<string, number>): string {
+  private resolveDominantCategory(categoryStats: Map<string, CategoryBucketStats>): string {
     let winningCategory = 'Method'; // Default
-    let winningDuration = -1;
-    let winningPriority = Infinity;
+    let winningScore = -1;
+    let winningMaxDepth = -1;
 
-    for (const [category, duration] of categoryDurations) {
-      const priority = CATEGORY_PRIORITY[category] ?? Infinity;
-
-      // Primary: highest self-time wins
-      if (duration > winningDuration) {
+    for (const [category, stats] of categoryStats) {
+      // Primary: highest depth-weighted time
+      // Secondary: deepest frame (tiebreaker)
+      if (
+        stats.weightedTime > winningScore ||
+        (stats.weightedTime === winningScore && stats.maxDepth > winningMaxDepth)
+      ) {
         winningCategory = category;
-        winningDuration = duration;
-        winningPriority = priority;
-      } else if (duration === winningDuration && priority < winningPriority) {
-        // Tiebreaker: higher priority (lower number) wins
-        winningCategory = category;
-        winningPriority = priority;
+        winningScore = stats.weightedTime;
+        winningMaxDepth = stats.maxDepth;
       }
     }
 

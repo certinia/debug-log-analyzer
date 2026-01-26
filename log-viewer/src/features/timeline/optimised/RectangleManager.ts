@@ -48,8 +48,11 @@ export interface PrecomputedRect extends RenderRectangle {
   /** Call stack depth (fixed) */
   depth: number;
 
-  /** Duration in nanoseconds (fixed) */
+  /** Total duration in nanoseconds including children (fixed) */
   duration: number;
+
+  /** Self duration in nanoseconds excluding children (fixed, for category resolution) */
+  selfDuration: number;
 
   /** Event category for color batching (fixed) */
   category: string;
@@ -216,6 +219,7 @@ export class RectangleManager {
               timeEnd: exitStamp ?? timestamp,
               depth,
               duration: duration.total,
+              selfDuration: duration.self,
               category: subCategory,
               eventRef: event,
               x: 0,
