@@ -58,19 +58,17 @@ const CURSOR_LINE_OPACITY = 0.6;
 
 /**
  * Sparkline visualization constants.
- * Semi-transparent white fill provides a subtle overlay showing execution intensity.
- * Works on any category color as a subtle "highlight" effect.
+ * Orange/amber color conveys "execution heat" and provides universal contrast
+ * on both light and dark backgrounds without theme detection.
  */
-const SPARKLINE_FILL_COLOR = 0xffffff; // White
-const SPARKLINE_FILL_OPACITY = 0.2; // Subtle overlay
+const SPARKLINE_FILL_COLOR = 0xff8800; // Orange/amber - universal visibility
+const SPARKLINE_FILL_OPACITY = 0.25; // Slightly higher opacity for visibility
 const SPARKLINE_MIN_HEIGHT_PX = 2;
 
 /**
  * Default colors extracted from CSS variables (VS Code theme compatible).
  */
 interface MinimapColors {
-  /** Background color for the minimap. */
-  background: number;
   /** Curtain overlay color. */
   curtain: number;
   /** Lens border color. */
@@ -287,9 +285,6 @@ export class MinimapRenderer {
     this.sparklineGraphics.clear();
     this.markerGraphics.clear();
 
-    // Render background
-    this.renderBackground(displayWidth, minimapHeight);
-
     // Render skyline area chart
     this.renderSkyline(manager, densityData, batchColors, minimapHeight);
 
@@ -367,14 +362,6 @@ export class MinimapRenderer {
     if (cursorTimeNs !== null) {
       this.renderCursorLine(manager, cursorTimeNs, minimapHeight);
     }
-  }
-
-  /**
-   * Render background.
-   */
-  private renderBackground(displayWidth: number, minimapHeight: number): void {
-    this.backgroundGraphics.rect(0, 0, displayWidth, minimapHeight);
-    this.backgroundGraphics.fill({ color: this.colors.background, alpha: 1 });
   }
 
   /**
@@ -740,9 +727,6 @@ export class MinimapRenderer {
   private extractColors(): MinimapColors {
     const computedStyle = getComputedStyle(document.documentElement);
 
-    // Background - use editor background or darker variant
-    const bgStr = computedStyle.getPropertyValue('--vscode-editor-background').trim() || '#1e1e1e';
-
     // Curtain - slightly lighter than background for visibility
     const curtainStr =
       computedStyle.getPropertyValue('--vscode-editorWidget-background').trim() || '#252526';
@@ -751,7 +735,6 @@ export class MinimapRenderer {
     const borderStr = computedStyle.getPropertyValue('--vscode-focusBorder').trim() || '#007fd4';
 
     return {
-      background: this.parseColorToHex(bgStr),
       curtain: this.parseColorToHex(curtainStr),
       lensBorder: this.parseColorToHex(borderStr),
       edgeHandle: this.parseColorToHex(borderStr),
