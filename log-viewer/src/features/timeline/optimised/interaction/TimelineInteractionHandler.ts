@@ -103,6 +103,9 @@ export interface InteractionCallbacks {
   /** Called when resize ends. */
   onResizeEnd?: () => void;
 
+  /** Called when resize is cancelled (e.g., via Escape key). */
+  onResizeCancel?: () => void;
+
   /** Check if mouse is over a measurement resize edge. Returns edge name or null. */
   getMeasurementResizeEdge?: (screenX: number) => 'left' | 'right' | null;
 }
@@ -148,10 +151,14 @@ export class TimelineInteractionHandler {
   // Threshold for hitting resize handle
   private static readonly RESIZE_HANDLE_THRESHOLD = 8; // px from edge
 
-  // Auto-scroll state for measurement
+  // Auto-scroll state for measurement/areaZoom/resize
   private static readonly EDGE_ZONE = 50; // px from edge to trigger auto-scroll
   private static readonly AUTO_SCROLL_SPEED = 10; // px per frame
   private autoScrollId: number | null = null;
+  private autoScrollYId: number | null = null;
+  private lastMeasureScreenY = 0; // Track Y for vertical auto-scroll
+  private lastAreaZoomScreenY = 0;
+  private lastResizeScreenY = 0;
 
   // Double-click detection state
   private lastClickTime = 0;
@@ -263,6 +270,11 @@ export class TimelineInteractionHandler {
     const keyUpHandler = this.handleKeyUp.bind(this);
     document.addEventListener('keyup', keyUpHandler);
     this.registerBoundHandler('keyup', keyUpHandler);
+
+    // Keydown for Escape to cancel measure/area zoom
+    const keyDownHandler = this.handleKeyDown.bind(this);
+    document.addEventListener('keydown', keyDownHandler);
+    this.registerBoundHandler('keydown', keyDownHandler);
   }
 
   /**
@@ -327,10 +339,16 @@ export class TimelineInteractionHandler {
       document.removeEventListener('keyup', keyUpHandler);
     }
 
+    const keyDownHandler = this.boundHandlers.get('keydown');
+    if (keyDownHandler) {
+      document.removeEventListener('keydown', keyDownHandler);
+    }
+
     this.boundHandlers.clear();
 
     // Clean up auto-scroll
     this.stopAutoScroll();
+    this.stopAutoScrollY();
   }
 
   // ============================================================================
@@ -538,9 +556,10 @@ export class TimelineInteractionHandler {
 
       // Update area zoom position and track for auto-scroll
       this.lastAreaZoomScreenX = screenX;
+      this.lastAreaZoomScreenY = screenY;
       this.callbacks.onAreaZoomUpdate?.(screenX);
 
-      // Auto-scroll when dragging near viewport edges
+      // Auto-scroll when dragging near viewport edges (X direction)
       const viewportState = this.viewport.getState();
       if (screenX < TimelineInteractionHandler.EDGE_ZONE) {
         this.startAutoScroll('left', 'areaZoom');
@@ -548,6 +567,15 @@ export class TimelineInteractionHandler {
         this.startAutoScroll('right', 'areaZoom');
       } else {
         this.stopAutoScroll();
+      }
+
+      // Auto-scroll when dragging near viewport edges (Y direction)
+      if (screenY < TimelineInteractionHandler.EDGE_ZONE) {
+        this.startAutoScrollY('up');
+      } else if (screenY > viewportState.displayHeight - TimelineInteractionHandler.EDGE_ZONE) {
+        this.startAutoScrollY('down');
+      } else {
+        this.stopAutoScrollY();
       }
 
       return;
@@ -568,9 +596,10 @@ export class TimelineInteractionHandler {
 
       // Update resize position and track for auto-scroll
       this.lastResizeScreenX = screenX;
+      this.lastResizeScreenY = screenY;
       this.callbacks.onResizeUpdate?.(screenX);
 
-      // Auto-scroll when dragging near viewport edges
+      // Auto-scroll when dragging near viewport edges (X direction)
       const viewportState = this.viewport.getState();
       if (screenX < TimelineInteractionHandler.EDGE_ZONE) {
         this.startAutoScroll('left', 'resize');
@@ -578,6 +607,15 @@ export class TimelineInteractionHandler {
         this.startAutoScroll('right', 'resize');
       } else {
         this.stopAutoScroll();
+      }
+
+      // Auto-scroll when dragging near viewport edges (Y direction)
+      if (screenY < TimelineInteractionHandler.EDGE_ZONE) {
+        this.startAutoScrollY('up');
+      } else if (screenY > viewportState.displayHeight - TimelineInteractionHandler.EDGE_ZONE) {
+        this.startAutoScrollY('down');
+      } else {
+        this.stopAutoScrollY();
       }
 
       return;
@@ -598,9 +636,10 @@ export class TimelineInteractionHandler {
 
       // Update measurement position and track for auto-scroll
       this.lastMeasureScreenX = screenX;
+      this.lastMeasureScreenY = screenY;
       this.callbacks.onMeasureUpdate?.(screenX);
 
-      // Auto-scroll when dragging near viewport edges
+      // Auto-scroll when dragging near viewport edges (X direction)
       const viewportState = this.viewport.getState();
       if (screenX < TimelineInteractionHandler.EDGE_ZONE) {
         this.startAutoScroll('left', 'measure');
@@ -608,6 +647,15 @@ export class TimelineInteractionHandler {
         this.startAutoScroll('right', 'measure');
       } else {
         this.stopAutoScroll();
+      }
+
+      // Auto-scroll when dragging near viewport edges (Y direction)
+      if (screenY < TimelineInteractionHandler.EDGE_ZONE) {
+        this.startAutoScrollY('up');
+      } else if (screenY > viewportState.displayHeight - TimelineInteractionHandler.EDGE_ZONE) {
+        this.startAutoScrollY('down');
+      } else {
+        this.stopAutoScrollY();
       }
 
       return;
@@ -676,6 +724,7 @@ export class TimelineInteractionHandler {
     if (this.isAreaZooming) {
       this.isAreaZooming = false;
       this.stopAutoScroll();
+      this.stopAutoScrollY();
 
       // If drag occurred, apply the zoom; otherwise cancel it
       if (this.didAreaZoomDrag) {
@@ -695,6 +744,7 @@ export class TimelineInteractionHandler {
     if (this.isResizing) {
       this.isResizing = false;
       this.stopAutoScroll();
+      this.stopAutoScrollY();
 
       // If drag occurred, finalize the resize
       if (this.didResizeDrag) {
@@ -714,6 +764,7 @@ export class TimelineInteractionHandler {
     if (this.isMeasuring) {
       this.isMeasuring = false;
       this.stopAutoScroll();
+      this.stopAutoScrollY();
 
       // If drag occurred, persist the measurement; otherwise cancel it
       if (this.didMeasureDrag) {
@@ -830,6 +881,50 @@ export class TimelineInteractionHandler {
   }
 
   /**
+   * Handle keydown event.
+   * Escape cancels active measure or area zoom operations.
+   */
+  private handleKeyDown(event: KeyboardEvent): void {
+    if (event.key !== 'Escape') {
+      return;
+    }
+
+    // Cancel area zoom if active
+    if (this.isAreaZooming) {
+      this.isAreaZooming = false;
+      this.stopAutoScroll();
+      this.stopAutoScrollY();
+      this.callbacks.onAreaZoomCancel?.();
+      this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+      event.preventDefault();
+      return;
+    }
+
+    // Cancel measurement if active
+    if (this.isMeasuring) {
+      this.isMeasuring = false;
+      this.stopAutoScroll();
+      this.stopAutoScrollY();
+      this.callbacks.onMeasureCancel?.();
+      this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+      event.preventDefault();
+      return;
+    }
+
+    // Cancel resize if active
+    if (this.isResizing) {
+      this.isResizing = false;
+      this.stopAutoScroll();
+      this.stopAutoScrollY();
+      this.callbacks.onResizeCancel?.();
+      this.resizeEdge = null;
+      this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+      event.preventDefault();
+      return;
+    }
+  }
+
+  /**
    * Start auto-scrolling the viewport in the given direction.
    * During measurement, area zoom, or resize, updates the boundary after each pan
    * so it moves smoothly with the viewport.
@@ -880,12 +975,51 @@ export class TimelineInteractionHandler {
   }
 
   /**
-   * Stop auto-scrolling the viewport.
+   * Stop auto-scrolling the viewport (X direction).
    */
   private stopAutoScroll(): void {
     if (this.autoScrollId !== null) {
       cancelAnimationFrame(this.autoScrollId);
       this.autoScrollId = null;
+    }
+  }
+
+  /**
+   * Start auto-scrolling the viewport vertically when mouse is near top/bottom edge.
+   * Used during measurement, area zoom, and resize operations.
+   *
+   * @param direction - Scroll direction ('up' or 'down')
+   */
+  private startAutoScrollY(direction: 'up' | 'down'): void {
+    if (this.autoScrollYId !== null) {
+      return; // Already scrolling
+    }
+
+    const scroll = () => {
+      const delta =
+        direction === 'up'
+          ? -TimelineInteractionHandler.AUTO_SCROLL_SPEED
+          : TimelineInteractionHandler.AUTO_SCROLL_SPEED;
+      const changed = this.viewport.panBy(0, delta);
+
+      if (changed) {
+        // Notify viewport change
+        this.callbacks.onViewportChange?.();
+      }
+
+      this.autoScrollYId = requestAnimationFrame(scroll);
+    };
+
+    this.autoScrollYId = requestAnimationFrame(scroll);
+  }
+
+  /**
+   * Stop auto-scrolling the viewport (Y direction).
+   */
+  private stopAutoScrollY(): void {
+    if (this.autoScrollYId !== null) {
+      cancelAnimationFrame(this.autoScrollYId);
+      this.autoScrollYId = null;
     }
   }
 
