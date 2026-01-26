@@ -63,6 +63,25 @@ function round(value: number, precision: number): number {
   return Math.round(value * precision) / precision;
 }
 
+/**
+ * Formats a time range showing start and end times with an arrow separator.
+ *
+ * Used by measurement overlay and minimap lens labels for consistent formatting.
+ *
+ * @param startTimeNs - Start time in nanoseconds
+ * @param endTimeNs - End time in nanoseconds
+ * @returns Formatted string like "1.2 s → 3.7 s"
+ *
+ * @example
+ * ```typescript
+ * formatTimeRange(1200000000, 3700000000);  // "1.2 s → 3.7 s"
+ * formatTimeRange(0, 150000000);            // "0 ms → 150 ms"
+ * ```
+ */
+export function formatTimeRange(startTimeNs: number, endTimeNs: number): string {
+  return `${formatDuration(startTimeNs)} → ${formatDuration(endTimeNs)}`;
+}
+
 export function debounce<T extends unknown[]>(callBack: (...args: T) => unknown) {
   let requestId: number = 0;
 

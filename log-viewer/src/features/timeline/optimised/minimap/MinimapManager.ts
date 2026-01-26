@@ -468,6 +468,34 @@ export class MinimapManager {
     }
   }
 
+  /**
+   * Check if a point is inside the viewport lens area.
+   * Used to determine if tooltip should be shown.
+   *
+   * @param screenX - Screen X coordinate in minimap space
+   * @param screenY - Screen Y coordinate in minimap space
+   * @returns True if the point is inside the lens bounds
+   */
+  public isPointInsideLens(screenX: number, screenY: number): boolean {
+    // Get lens X bounds
+    const lensX1 = this.timeToMinimapX(this.selection.startTime);
+    const lensX2 = this.timeToMinimapX(this.selection.endTime);
+
+    // Check X bounds first (quick rejection)
+    if (screenX < lensX1 || screenX > lensX2) {
+      return false;
+    }
+
+    // Get lens Y bounds (inverted: depthEnd is top, depthStart is bottom)
+    const chartTop = AXIS_HEIGHT;
+    const chartBottom = this.state.height;
+    const lensY1 = Math.max(chartTop, this.depthToMinimapY(this.selection.depthEnd)); // Top of lens
+    const lensY2 = Math.min(chartBottom, this.depthToMinimapY(this.selection.depthStart)); // Bottom of lens
+
+    // Check Y bounds
+    return screenY >= lensY1 && screenY <= lensY2;
+  }
+
   // ============================================================================
   // RESIZE HANDLING
   // ============================================================================

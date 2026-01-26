@@ -177,6 +177,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   private minimapInteractionHandler: MinimapInteractionHandler | null = null;
   private minimapContainer: PIXI.Container | null = null;
   private minimapDensityQuery: MinimapDensityQuery | null = null;
+  private minimapDiv: HTMLElement | null = null; // HTML container for lens label
 
   // Cursor mirroring system (bidirectional cursor line between main and minimap)
   private cursorTimeNs: number | null = null; // Current cursor position in nanoseconds
@@ -184,6 +185,9 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   // Minimap keyboard support - tracks if mouse is in minimap area
   private isMouseInMinimap = false;
+  // Minimap mouse position for lens tooltip detection
+  private minimapMouseX = 0;
+  private minimapMouseY = 0;
 
   /**
    * Initialize the flamechart renderer.
@@ -827,8 +831,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.wrapper.style.cssText = 'display:flex;flex-direction:column;width:100%;height:100%';
 
     // Minimap container (fixed height)
-    const minimapDiv = document.createElement('div');
-    minimapDiv.style.cssText = `height:${minimapHeight}px;width:100%;flex-shrink:0`;
+    // Store reference for HTML label positioning
+    this.minimapDiv = document.createElement('div');
+    this.minimapDiv.style.cssText = `height:${minimapHeight}px;width:100%;flex-shrink:0;position:relative`;
 
     // Gap element
     const gapDiv = document.createElement('div');
@@ -838,7 +843,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     const mainDiv = document.createElement('div');
     mainDiv.style.cssText = 'flex:1;width:100%;min-height:0';
 
-    this.wrapper.append(minimapDiv, gapDiv, mainDiv);
+    this.wrapper.append(this.minimapDiv, gapDiv, mainDiv);
 
     if (this.container) {
       this.container.appendChild(this.wrapper);
@@ -858,7 +863,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     });
     this.minimapApp.ticker.stop();
     this.minimapApp.stage.eventMode = 'none';
-    minimapDiv.appendChild(this.minimapApp.canvas);
+    this.minimapDiv.appendChild(this.minimapApp.canvas);
 
     // Create main timeline app
     this.app = new PIXI.Application();
@@ -1212,8 +1217,8 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.minimapContainer = new PIXI.Container();
     this.minimapApp.stage.addChild(this.minimapContainer);
 
-    // Initialize minimap renderer
-    this.minimapRenderer = new MinimapRenderer(this.minimapContainer);
+    // Initialize minimap renderer with HTML container for lens label
+    this.minimapRenderer = new MinimapRenderer(this.minimapContainer, this.minimapDiv!);
 
     // Set PIXI renderer for texture caching (static content optimization)
     this.minimapRenderer.setRenderer(this.minimapApp.renderer as PIXI.Renderer);
@@ -1264,12 +1269,17 @@ export class FlameChart<E extends EventNode = EventNode> {
         },
       );
 
-      // Track mouse enter/leave for keyboard support
+      // Track mouse enter/leave/move for keyboard support and lens tooltip
       minimapCanvas.addEventListener('mouseenter', () => {
         this.isMouseInMinimap = true;
       });
       minimapCanvas.addEventListener('mouseleave', () => {
         this.isMouseInMinimap = false;
+      });
+      minimapCanvas.addEventListener('mousemove', (event) => {
+        const rect = minimapCanvas.getBoundingClientRect();
+        this.minimapMouseX = event.clientX - rect.left;
+        this.minimapMouseY = event.clientY - rect.top;
       });
 
       // Focus container on minimap mousedown for keyboard support
@@ -2513,13 +2523,19 @@ export class FlameChart<E extends EventNode = EventNode> {
       // Query density data (cached unless display width changed)
       const densityData = this.minimapDensityQuery.query(viewportState.displayWidth);
 
-      // Render minimap with density, markers, and cursor
+      // Render minimap with density, markers, cursor, and interaction state
+      // Show lens label only when hovering over the lens area or dragging
+      const isHoveringLens =
+        this.isMouseInMinimap &&
+        this.minimapManager.isPointInsideLens(this.minimapMouseX, this.minimapMouseY);
+      const isInteracting = isHoveringLens || this.minimapManager.isDragging();
       this.minimapRenderer.render(
         this.minimapManager,
         densityData,
         this.markers,
         this.state.batchColorsCache,
         this.cursorTimeNs,
+        isInteracting,
       );
 
       // Render minimap app

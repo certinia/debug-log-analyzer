@@ -26,6 +26,7 @@
  */
 
 import * as PIXI from 'pixi.js';
+import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.js';
 import type { TimelineMarker } from '../../types/flamechart.types.js';
 import { MARKER_COLORS } from '../../types/flamechart.types.js';
 import { MinimapAxisRenderer } from './MinimapAxisRenderer.js';
@@ -123,6 +124,16 @@ export class MinimapRenderer {
   private cursorLineGraphics: PIXI.Graphics;
 
   // ============================================================================
+  // HTML LABEL (styled like MeasureRangeRenderer tooltip)
+  // ============================================================================
+
+  /** HTML container for label positioning. */
+  private htmlContainer: HTMLElement;
+
+  /** HTML label element for lens time info. */
+  private labelElement: HTMLDivElement;
+
+  // ============================================================================
   // OTHER STATE
   // ============================================================================
 
@@ -134,8 +145,12 @@ export class MinimapRenderer {
 
   /**
    * @param parentContainer - PIXI container to add minimap graphics to
+   * @param htmlContainer - HTML element for positioning the lens label
    */
-  constructor(parentContainer: PIXI.Container) {
+  constructor(parentContainer: PIXI.Container, htmlContainer: HTMLElement) {
+    // Store HTML container for label positioning
+    this.htmlContainer = htmlContainer;
+
     // Create main container at top of stage
     this.container = new PIXI.Container();
     this.container.position.set(0, 0);
@@ -183,6 +198,36 @@ export class MinimapRenderer {
 
     // Extract colors from CSS variables
     this.colors = this.extractColors();
+
+    // Create HTML label for lens time info
+    this.labelElement = this.createLabelElement();
+    htmlContainer.appendChild(this.labelElement);
+  }
+
+  /**
+   * Create the HTML label element with styling (matches MeasureRangeRenderer).
+   */
+  private createLabelElement(): HTMLDivElement {
+    const label = document.createElement('div');
+    label.className = 'minimap-lens-label';
+    label.style.cssText = `
+      position: absolute;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+      border-radius: 4px;
+      background: color-mix(in srgb, var(--vscode-editorWidget-background, #252526) 85%, transparent);
+      border: 1px solid var(--vscode-editorWidget-border, #454545);
+      color: var(--vscode-editorWidget-foreground, #cccccc);
+      font-family: var(--vscode-font-family, sans-serif);
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    `;
+    return label;
   }
 
   /**
@@ -220,6 +265,7 @@ export class MinimapRenderer {
    * @param markers - Timeline markers to display
    * @param batchColors - Category colors from theme
    * @param cursorTimeNs - Cursor position in nanoseconds (null to hide cursor line)
+   * @param isInteracting - Whether user is hovering or dragging (shows lens label)
    */
   public render(
     manager: MinimapManager,
@@ -227,6 +273,7 @@ export class MinimapRenderer {
     markers: TimelineMarker[],
     batchColors: Map<string, { color: number }>,
     cursorTimeNs: number | null,
+    isInteracting: boolean,
   ): void {
     const state = manager.getState();
     const selection = manager.getSelection();
@@ -249,6 +296,67 @@ export class MinimapRenderer {
 
     // Always render dynamic content
     this.renderDynamicContent(manager, selection, cursorTimeNs);
+
+    // Update lens label visibility and content
+    this.updateLensLabel(manager, selection, isInteracting);
+  }
+
+  /**
+   * Update lens label visibility and content.
+   * Shows duration and time range when user is interacting with minimap.
+   * Label is positioned above the lens, centered horizontally on the lens.
+   *
+   * @param manager - MinimapManager for coordinate calculations
+   * @param selection - Current lens selection
+   * @param isInteracting - True if hovering or dragging
+   */
+  private updateLensLabel(
+    manager: MinimapManager,
+    selection: Readonly<MinimapSelection>,
+    isInteracting: boolean,
+  ): void {
+    if (!isInteracting) {
+      this.labelElement.style.display = 'none';
+      return;
+    }
+
+    // Format content
+    const duration = selection.endTime - selection.startTime;
+    const durationStr = formatDuration(duration);
+    const rangeStr = formatTimeRange(selection.startTime, selection.endTime);
+
+    this.labelElement.innerHTML = `
+      <div style="text-align: center;">
+        <div style="font-size: 14px; font-weight: 600;">${durationStr}</div>
+        <div style="font-size: 11px; opacity: 0.8; margin-top: 2px;">${rangeStr}</div>
+      </div>
+    `;
+    this.labelElement.style.display = 'flex';
+
+    // Calculate lens pixel bounds
+    const lensX1 = manager.timeToMinimapX(selection.startTime);
+    const lensX2 = manager.timeToMinimapX(selection.endTime);
+    const axisHeight = this.axisRenderer.getHeight();
+    const lensY1 = Math.max(axisHeight, manager.depthToMinimapY(selection.depthEnd));
+
+    const lensCenterX = (lensX1 + lensX2) / 2;
+
+    // Position after content is rendered (need label dimensions)
+    requestAnimationFrame(() => {
+      const labelWidth = this.labelElement.offsetWidth;
+      const containerWidth = this.htmlContainer.offsetWidth;
+      const padding = 4;
+
+      // Horizontal: center on lens, clamp to viewport
+      let left = lensCenterX - labelWidth / 2;
+      left = Math.max(padding, Math.min(containerWidth - labelWidth - padding, left));
+
+      // Vertical: inside the lens at top edge
+      const top = lensY1 + padding;
+
+      this.labelElement.style.left = `${left}px`;
+      this.labelElement.style.top = `${top}px`;
+    });
   }
 
   /**
@@ -754,6 +862,9 @@ export class MinimapRenderer {
     this.lensGraphics.destroy();
     this.cursorLineGraphics.destroy();
     this.dynamicContainer.destroy();
+
+    // Remove HTML label
+    this.labelElement.remove();
 
     // Destroy main container
     this.container.destroy();
