@@ -36,7 +36,7 @@ import type { MinimapManager, MinimapSelection } from './MinimapManager.js';
  * Opacity constants for density visualization (logarithmic scale).
  */
 const MIN_OPACITY = 0.4;
-const MAX_OPACITY = 0.7;
+const MAX_OPACITY = 0.9;
 const SATURATION_COUNT = 100;
 
 /**
