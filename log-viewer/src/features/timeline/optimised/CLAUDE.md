@@ -6,6 +6,51 @@ This module implements the high-performance flame chart visualization for Apex d
 
 The module follows a **pure orchestrator** pattern where FlameChart is a generic coordinator that delegates all feature-specific logic to dedicated classes.
 
+## Dependency Boundaries
+
+**Critical: Files in `timeline/optimised/` must NOT import directly from outside the `timeline/` folder.**
+
+The only exception is `ApexLogTimeline.ts`, which serves as the adapter layer converting Apex-specific types to generic timeline types.
+
+### Import Rules
+
+```typescript
+// GOOD: Import from types file (the boundary)
+import type { LogEvent } from '../types/flamechart.types.js';
+
+// BAD: Direct import from outside timeline folder
+import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+```
+
+The `flamechart.types.ts` file re-exports necessary types from external modules, keeping dependencies contained at the boundary.
+
+## Spatial Queries: Use TemporalSegmentTree
+
+**Always use TemporalSegmentTree (via RectangleManager) for frame queries. Never traverse the event tree directly.**
+
+### Available Query Methods
+
+| Method                                 | Use Case                       | Complexity   |
+| -------------------------------------- | ------------------------------ | ------------ |
+| `query(viewport)`                      | Viewport culling for rendering | O(k log n)   |
+| `queryEventsInRegion(time, depth)`     | Hit testing, spatial lookups   | O(log n + k) |
+| `queryBucketStats(timeStart, timeEnd)` | Minimap density computation    | O(log n)     |
+
+### Access Pattern
+
+```typescript
+// Via RectangleManager (preferred)
+const events = rectangleManager.queryEventsInRegion(timeStart, timeEnd, depthStart, depthEnd);
+
+// Direct tree access (for specialized queries)
+const tree = rectangleManager.getSegmentTree();
+const stats = tree.queryBucketStats(timeStart, timeEnd);
+```
+
+### Why Not TimelineEventIndex?
+
+`TimelineEventIndex.findEventsInRegion()` does O(n) full tree traversal. Use it only as a fallback when TemporalSegmentTree is unavailable.
+
 ## Class Responsibilities
 
 ### FlameChart (Orchestrator)

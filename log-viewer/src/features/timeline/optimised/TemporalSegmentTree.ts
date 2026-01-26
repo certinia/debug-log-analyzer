@@ -5,8 +5,17 @@
 /**
  * Temporal Segment Tree
  *
+ * The primary spatial index for efficient frame queries in the timeline.
+ * Use this tree (via RectangleManager) for all spatial queries instead of
+ * traversing the event tree directly.
+ *
  * A pre-computed tree structure for O(log n) viewport culling and bucket aggregation.
  * Replaces the per-frame O(n) iteration in RectangleManager.getCulledRectangles().
+ *
+ * Key capabilities:
+ * - Viewport culling: query() returns visible rectangles and buckets
+ * - Spatial queries: queryEventsInRegion() for hit testing (O(log n + k))
+ * - Density stats: queryBucketStats() for minimap visualization (O(log n))
  *
  * Key concepts:
  * - Leaf nodes represent individual events
@@ -19,10 +28,10 @@
  * Query time: O(k log n) where k = number of visible nodes
  */
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type {
   CategoryAggregation,
   CulledRenderData,
+  LogEvent,
   PixelBucket,
   RenderStats,
   SegmentNode,
