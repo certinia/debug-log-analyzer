@@ -297,11 +297,14 @@ export class TemporalSegmentTree {
     eventCount: number;
     selfDurationSum: number;
     categoryWeights: Map<string, { weightedTime: number; maxDepth: number }>;
+    frames: Array<{ timeStart: number; timeEnd: number; depth: number; category: string }>;
   } {
     let maxDepth = 0;
     let eventCount = 0;
     let selfDurationSum = 0;
     const categoryWeights = new Map<string, { weightedTime: number; maxDepth: number }>();
+    const frames: Array<{ timeStart: number; timeEnd: number; depth: number; category: string }> =
+      [];
 
     // Query each depth level
     for (const [depth, tree] of this.treesByDepth) {
@@ -311,6 +314,7 @@ export class TemporalSegmentTree {
         timeEnd,
         depth,
         categoryWeights,
+        frames,
         (d, count, selfDur) => {
           if (d > maxDepth) {
             maxDepth = d;
@@ -321,12 +325,12 @@ export class TemporalSegmentTree {
       );
     }
 
-    return { maxDepth, eventCount, selfDurationSum, categoryWeights };
+    return { maxDepth, eventCount, selfDurationSum, categoryWeights, frames };
   }
 
   /**
    * Aggregate stats from a tree node for minimap density computation.
-   * Uses depth² weighting to ensure deeper frames dominate.
+   * Collects frame references for skyline computation.
    */
   private aggregateStatsFromNode(
     node: SegmentNode,
@@ -334,6 +338,7 @@ export class TemporalSegmentTree {
     queryEnd: number,
     depth: number,
     categoryWeights: Map<string, { weightedTime: number; maxDepth: number }>,
+    frames: Array<{ timeStart: number; timeEnd: number; depth: number; category: string }>,
     onStats: (depth: number, count: number, selfDuration: number) => void,
   ): void {
     // Early exit: no overlap
@@ -355,9 +360,9 @@ export class TemporalSegmentTree {
       const overlapRatio = rectDuration > 0 ? visibleTime / rectDuration : 0;
       const proportionalSelfDuration = rect.selfDuration * overlapRatio;
 
-      // Depth² weighting for category dominance
+      // Depth² weighting for category dominance (still used for fallback stats)
       const depthWeight = (depth + 1) * (depth + 1);
-      const weightedTime = visibleTime * depthWeight;
+      const weightedTime = proportionalSelfDuration * depthWeight;
 
       // Update category weights
       const category = rect.category;
@@ -371,6 +376,14 @@ export class TemporalSegmentTree {
         categoryWeights.set(category, { weightedTime, maxDepth: depth });
       }
 
+      // Collect frame for skyline computation
+      frames.push({
+        timeStart: rect.timeStart,
+        timeEnd: rect.timeEnd,
+        depth,
+        category,
+      });
+
       onStats(depth, 1, proportionalSelfDuration);
       return;
     }
@@ -378,7 +391,15 @@ export class TemporalSegmentTree {
     // Branch node: recurse into children
     if (node.children) {
       for (const child of node.children) {
-        this.aggregateStatsFromNode(child, queryStart, queryEnd, depth, categoryWeights, onStats);
+        this.aggregateStatsFromNode(
+          child,
+          queryStart,
+          queryEnd,
+          depth,
+          categoryWeights,
+          frames,
+          onStats,
+        );
       }
     }
   }

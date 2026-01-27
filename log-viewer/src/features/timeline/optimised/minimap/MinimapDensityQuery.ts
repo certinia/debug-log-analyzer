@@ -82,15 +82,23 @@ const CATEGORY_WEIGHTS: Record<string, number> = {
 };
 
 /**
- * Category stats for a single bucket, tracking depth-weighted visible time.
- * Depth weighting ensures deeper frames (visually on top in the flame chart)
- * dominate the color resolution.
+ * Frame data needed for skyline computation.
  */
-interface CategoryBucketStats {
-  /** Combined depth + category weighted visible time */
-  weightedTime: number;
-  /** Maximum depth seen for this category (tiebreaker) */
-  maxDepth: number;
+interface SkylineFrame {
+  timeStart: number;
+  timeEnd: number;
+  depth: number;
+  category: string;
+}
+
+/**
+ * Event for sweep line algorithm in skyline computation.
+ */
+interface SkylineEvent {
+  time: number;
+  isStart: boolean;
+  depth: number;
+  category: string;
 }
 
 export class MinimapDensityQuery {
@@ -177,7 +185,8 @@ export class MinimapDensityQuery {
 
   /**
    * Compute density data by aggregating rectangles into buckets.
-   * Uses a single pass through all rectangles for efficiency.
+   * Uses skyline algorithm to determine which category is "on top" (deepest)
+   * at each moment within each bucket.
    *
    * @param bucketCount - Number of output buckets
    * @returns MinimapDensityData
@@ -197,10 +206,11 @@ export class MinimapDensityQuery {
     const maxDepths = new Uint16Array(bucketCount);
     const eventCounts = new Uint32Array(bucketCount);
     const selfDurationSums = new Float64Array(bucketCount);
-    // Category stats: for each bucket, track category -> depth-weighted visible time
-    const categoryStats: Map<string, CategoryBucketStats>[] = new Array(bucketCount);
+
+    // Collect frames per bucket for skyline computation
+    const framesPerBucket: SkylineFrame[][] = new Array(bucketCount);
     for (let i = 0; i < bucketCount; i++) {
-      categoryStats[i] = new Map();
+      framesPerBucket[i] = [];
     }
 
     // Single pass through all rectangles
@@ -224,44 +234,23 @@ export class MinimapDensityQuery {
           // Increment event count
           eventCounts[b]!++;
 
-          // Calculate actual visible time of this rect within this bucket.
+          // Calculate overlap ratio for proportional self-duration attribution
           const bucketStart = b * bucketTimeWidth;
           const bucketEnd = (b + 1) * bucketTimeWidth;
           const overlapStart = Math.max(rect.timeStart, bucketStart);
           const overlapEnd = Math.min(rect.timeEnd, bucketEnd);
           const visibleTime = overlapEnd - overlapStart;
-
-          // Calculate overlap ratio for proportional self-duration attribution
           const rectDuration = rect.timeEnd - rect.timeStart;
           const overlapRatio = rectDuration > 0 ? visibleTime / rectDuration : 0;
           selfDurationSums[b]! += rect.selfDuration * overlapRatio;
 
-          // Combined weighting: depth² × category weight
-          // - Depth²: deeper frames (visually on top) dominate their parents
-          // - Category weight: important operations (DML/SOQL) get a 2.5x boost
-          //
-          // Example: DML at depth 1 (100ms) vs Method at depth 2 (100ms)
-          //   DML:    100 × 4 × 2.5 = 1000
-          //   Method: 100 × 9 × 1.0 = 900  → DML wins (important category)
-          //
-          // Example: DML at depth 5 (100ms) vs Flow at depth 12 (100ms)
-          //   DML:  100 × 36 × 2.5 = 9000
-          //   Flow: 100 × 169 × 1.0 = 16900 → Flow wins (much deeper)
-          const depthWeight = (rect.depth + 1) * (rect.depth + 1);
-          const categoryWeight = CATEGORY_WEIGHTS[rect.category] ?? 1.0;
-          const weightedTime = visibleTime * depthWeight * categoryWeight;
-
-          // Accumulate depth-weighted visible time for category resolution
-          const catStats = categoryStats[b]!;
-          const existing = catStats.get(rect.category);
-          if (existing) {
-            existing.weightedTime += weightedTime;
-            if (rect.depth > existing.maxDepth) {
-              existing.maxDepth = rect.depth;
-            }
-          } else {
-            catStats.set(rect.category, { weightedTime, maxDepth: rect.depth });
-          }
+          // Collect frame for skyline computation
+          framesPerBucket[b]!.push({
+            timeStart: rect.timeStart,
+            timeEnd: rect.timeEnd,
+            depth: rect.depth,
+            category: rect.category,
+          });
         }
       }
     }
@@ -276,12 +265,26 @@ export class MinimapDensityQuery {
         maxEventCount = eventCount;
       }
 
-      // Resolve dominant category
-      const dominantCategory = this.resolveDominantCategory(categoryStats[i]!);
+      const bucketStart = i * bucketTimeWidth;
+      const bucketEnd = (i + 1) * bucketTimeWidth;
+      const bucketFrames = framesPerBucket[i]!;
+
+      // Resolve dominant category using skyline algorithm
+      let dominantCategory: string;
+      if (bucketFrames.length === 0) {
+        dominantCategory = 'Method';
+      } else if (bucketFrames.length === 1 || this.allSameCategory(bucketFrames)) {
+        // Single category: no competition needed
+        dominantCategory = bucketFrames[0]!.category;
+      } else {
+        // Multiple categories: compute skyline to find "on top" time per category
+        const onTopTime = this.computeSkyline(bucketFrames, bucketStart, bucketEnd);
+        dominantCategory = this.resolveCategoryFromSkyline(onTopTime);
+      }
 
       buckets[i] = {
-        timeStart: i * bucketTimeWidth,
-        timeEnd: (i + 1) * bucketTimeWidth,
+        timeStart: bucketStart,
+        timeEnd: bucketEnd,
         maxDepth: maxDepths[i]!,
         eventCount,
         dominantCategory,
@@ -300,7 +303,7 @@ export class MinimapDensityQuery {
   /**
    * Compute density data using O(B×log N) tree-based queries.
    * Queries the segment tree once per bucket instead of iterating all rectangles.
-   * This avoids the O(N×B) worst case where wide rectangles span all buckets.
+   * Uses skyline algorithm to determine which category is "on top" (deepest).
    *
    * @param bucketCount - Number of output buckets
    * @returns MinimapDensityData
@@ -324,16 +327,25 @@ export class MinimapDensityQuery {
       const timeStart = i * bucketTimeWidth;
       const timeEnd = (i + 1) * bucketTimeWidth;
 
-      // Query tree for stats in this bucket's time range
+      // Query tree for stats and frames in this bucket's time range
       const stats = this.segmentTree.queryBucketStats(timeStart, timeEnd);
 
       if (stats.eventCount > maxEventCount) {
         maxEventCount = stats.eventCount;
       }
 
-      // Apply category weights and resolve dominant category
-      const weightedStats = this.applyWeightsToTreeStats(stats.categoryWeights);
-      const dominantCategory = this.resolveDominantCategory(weightedStats);
+      // Resolve dominant category using skyline algorithm
+      let dominantCategory: string;
+      if (stats.frames.length === 0) {
+        dominantCategory = 'Method';
+      } else if (stats.frames.length === 1 || this.allSameCategory(stats.frames)) {
+        // Single category: no competition needed
+        dominantCategory = stats.frames[0]!.category;
+      } else {
+        // Multiple categories: compute skyline to find "on top" time per category
+        const onTopTime = this.computeSkyline(stats.frames, timeStart, timeEnd);
+        dominantCategory = this.resolveCategoryFromSkyline(onTopTime);
+      }
 
       buckets[i] = {
         timeStart,
@@ -354,52 +366,117 @@ export class MinimapDensityQuery {
   }
 
   /**
-   * Apply category weights to tree-based stats.
-   * The tree returns depth-weighted time; we need to multiply by category weights.
+   * Compute "on top" time per category using skyline algorithm.
+   * For each time point, determines which category is deepest (visually on top).
+   *
+   * @param frames - Frames overlapping the bucket
+   * @param bucketStart - Bucket start time
+   * @param bucketEnd - Bucket end time
+   * @returns Map of category -> "on top" time in nanoseconds
    */
-  private applyWeightsToTreeStats(
-    treeStats: Map<string, { weightedTime: number; maxDepth: number }>,
-  ): Map<string, CategoryBucketStats> {
-    const result = new Map<string, CategoryBucketStats>();
+  private computeSkyline(
+    frames: SkylineFrame[],
+    bucketStart: number,
+    bucketEnd: number,
+  ): Map<string, number> {
+    const onTopTime = new Map<string, number>();
 
-    for (const [category, stats] of treeStats) {
-      const categoryWeight = CATEGORY_WEIGHTS[category] ?? 1.0;
-      result.set(category, {
-        weightedTime: stats.weightedTime * categoryWeight,
-        maxDepth: stats.maxDepth,
-      });
+    if (frames.length === 0) return onTopTime;
+
+    if (frames.length === 1) {
+      // Single frame: it's on top for its overlap with bucket
+      const f = frames[0]!;
+      const overlap = Math.min(f.timeEnd, bucketEnd) - Math.max(f.timeStart, bucketStart);
+      if (overlap > 0) {
+        onTopTime.set(f.category, overlap);
+      }
+      return onTopTime;
     }
 
-    return result;
+    // Build events for sweep line
+    const events: SkylineEvent[] = [];
+    for (const f of frames) {
+      const start = Math.max(f.timeStart, bucketStart);
+      const end = Math.min(f.timeEnd, bucketEnd);
+      if (start < end) {
+        events.push({ time: start, isStart: true, depth: f.depth, category: f.category });
+        events.push({ time: end, isStart: false, depth: f.depth, category: f.category });
+      }
+    }
+
+    if (events.length === 0) return onTopTime;
+
+    // Sort: by time, then ends before starts at same time
+    events.sort((a, b) => a.time - b.time || (a.isStart ? 1 : -1));
+
+    // Sweep line with active frames tracked by depth
+    // Use array of {depth, category} to handle multiple frames at same depth
+    const active: Array<{ depth: number; category: string }> = [];
+    let prevTime = bucketStart;
+    let prevDeepest = -1;
+    let prevCategory = '';
+
+    for (const event of events) {
+      // Accumulate time for previous deepest category
+      if (prevDeepest >= 0 && event.time > prevTime) {
+        const duration = event.time - prevTime;
+        onTopTime.set(prevCategory, (onTopTime.get(prevCategory) ?? 0) + duration);
+      }
+
+      // Update active set
+      if (event.isStart) {
+        active.push({ depth: event.depth, category: event.category });
+      } else {
+        // Remove the first matching entry (handles duplicates correctly)
+        const idx = active.findIndex(
+          (a) => a.depth === event.depth && a.category === event.category,
+        );
+        if (idx !== -1) {
+          active.splice(idx, 1);
+        }
+      }
+
+      // Find new deepest
+      prevTime = event.time;
+      prevDeepest = -1;
+      prevCategory = '';
+      for (const a of active) {
+        if (a.depth > prevDeepest) {
+          prevDeepest = a.depth;
+          prevCategory = a.category;
+        }
+      }
+    }
+
+    return onTopTime;
   }
 
   /**
-   * Resolve dominant category from combined depth + category weighted stats.
-   *
-   * The category with the highest weighted score wins, where:
-   *   score = visibleTime × depth² × categoryWeight
-   *
-   * This balances two concerns:
-   * - Deeper frames (visually on top) generally dominate their parents
-   * - Important categories (DML/SOQL at 2.5x) can win over shallow children
-   *
-   * In case of a tie, the category with the deepest frame wins.
+   * Check if all frames in array have the same category.
    */
-  private resolveDominantCategory(categoryStats: Map<string, CategoryBucketStats>): string {
-    let winningCategory = 'Method'; // Default
-    let winningScore = -1;
-    let winningMaxDepth = -1;
+  private allSameCategory(frames: SkylineFrame[]): boolean {
+    if (frames.length <= 1) return true;
+    const firstCategory = frames[0]!.category;
+    for (let i = 1; i < frames.length; i++) {
+      if (frames[i]!.category !== firstCategory) return false;
+    }
+    return true;
+  }
 
-    for (const [category, stats] of categoryStats) {
-      // Primary: highest depth-weighted time
-      // Secondary: deepest frame (tiebreaker)
-      if (
-        stats.weightedTime > winningScore ||
-        (stats.weightedTime === winningScore && stats.maxDepth > winningMaxDepth)
-      ) {
+  /**
+   * Resolve dominant category from "on top" time using category weights.
+   * The category with highest (onTopTime × categoryWeight) wins.
+   */
+  private resolveCategoryFromSkyline(onTopTime: Map<string, number>): string {
+    let winningCategory = 'Method';
+    let winningScore = -1;
+
+    for (const [category, time] of onTopTime) {
+      const weight = CATEGORY_WEIGHTS[category] ?? 1.0;
+      const score = time * weight;
+      if (score > winningScore) {
+        winningScore = score;
         winningCategory = category;
-        winningScore = stats.weightedTime;
-        winningMaxDepth = stats.maxDepth;
       }
     }
 
