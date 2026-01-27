@@ -22,19 +22,15 @@ import type {
   ViewportState,
 } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS, TimelineError, TimelineErrorCode } from '../types/flamechart.types.js';
-import type { SearchCursor, SearchMatch, SearchOptions } from '../types/search.types.js';
+import type { SearchCursor, SearchOptions } from '../types/search.types.js';
 import type { NavigationMaps } from '../utils/tree-converter.js';
 
 import { MeshMarkerRenderer } from './markers/MeshMarkerRenderer.js';
 import { MeshRectangleRenderer } from './MeshRectangleRenderer.js';
-import { MeshSearchStyleRenderer } from './search/MeshSearchStyleRenderer.js';
 import { MeshAxisRenderer } from './time-axis/MeshAxisRenderer.js';
 
 import { EventBatchRenderer } from './EventBatchRenderer.js';
 import { TimelineMarkerRenderer } from './markers/TimelineMarkerRenderer.js';
-import { SearchHighlightRenderer } from './search/SearchHighlightRenderer.js';
-import { SearchStyleRenderer } from './search/SearchStyleRenderer.js';
-import { SearchTextLabelRenderer } from './search/SearchTextLabelRenderer.js';
 import { TextLabelRenderer } from './TextLabelRenderer.js';
 import { AxisRenderer } from './time-axis/AxisRenderer.js';
 
@@ -49,12 +45,8 @@ import {
 import { TimelineInteractionHandler } from './interaction/TimelineInteractionHandler.js';
 import { TimelineResizeHandler } from './interaction/TimelineResizeHandler.js';
 import type { MeasurementState } from './measurement/MeasurementManager.js';
-import type { PrecomputedRect } from './RectangleManager.js';
 import { RectangleManager } from './RectangleManager.js';
 import { CursorLineRenderer } from './rendering/CursorLineRenderer.js';
-import { FlameChartCursor } from './search/FlameChartCursor.js';
-import { SearchCursorImpl } from './search/SearchCursor.js';
-import { SearchManager } from './search/SearchManager.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineViewport } from './TimelineViewport.js';
 import { ViewportAnimator } from './ViewportAnimator.js';
@@ -68,6 +60,7 @@ import {
   MinimapOrchestrator,
 } from './orchestrators/MinimapOrchestrator.js';
 
+import { SearchOrchestrator } from './orchestrators/SearchOrchestrator.js';
 import { SelectionOrchestrator } from './orchestrators/SelectionOrchestrator.js';
 
 export interface FlameChartCallbacks {
@@ -134,14 +127,12 @@ export class FlameChart<E extends EventNode = EventNode> {
   private markerRenderer: TimelineMarkerRenderer | MeshMarkerRenderer | null = null;
   private resizeHandler: TimelineResizeHandler | null = null;
 
-  // New generic search system
-  private newSearchManager: SearchManager<E> | null = null;
+  // Search orchestrator (owns search state and rendering)
+  private searchOrchestrator: SearchOrchestrator<E> | null = null;
   private treeNodes: TreeNode<E>[] | null = null;
 
-  private searchStyleRenderer: SearchStyleRenderer | MeshSearchStyleRenderer | null = null;
-  private searchRenderer: SearchHighlightRenderer | null = null;
+  // Text label renderer (used in normal mode, shared with search orchestrator)
   private textLabelRenderer: TextLabelRenderer | null = null;
-  private searchTextLabelRenderer: SearchTextLabelRenderer | null = null;
 
   private worldContainer: PIXI.Container | null = null;
   private axisContainer: PIXI.Container | null = null;
@@ -316,30 +307,11 @@ export class FlameChart<E extends EventNode = EventNode> {
       }
     }
 
-    // Create search style renderer (renders with desaturation for search mode)
-    if (this.worldContainer && this.state) {
-      if (useMeshRenderer) {
-        this.searchStyleRenderer = new MeshSearchStyleRenderer(
-          this.worldContainer,
-          this.state.batches,
-        );
-      } else {
-        this.searchStyleRenderer = new SearchStyleRenderer(this.worldContainer, this.state.batches);
-      }
-    }
-
     // Create text label renderer (renders method names on rectangles)
     if (this.worldContainer && this.state) {
       this.textLabelRenderer = new TextLabelRenderer(this.worldContainer);
       await this.textLabelRenderer.loadFont();
       this.textLabelRenderer.setBatches(this.state.batches);
-
-      // SearchTextLabelRenderer uses composition - delegates matched labels to TextLabelRenderer
-      this.searchTextLabelRenderer = new SearchTextLabelRenderer(
-        this.worldContainer,
-        this.textLabelRenderer,
-        this.state.batches,
-      );
 
       // Enable zIndex sorting for proper layering
       this.worldContainer.sortableChildren = true;
@@ -350,9 +322,6 @@ export class FlameChart<E extends EventNode = EventNode> {
       const stage = this.app.stage;
       if (this.batchRenderer && 'setStageContainer' in this.batchRenderer) {
         (this.batchRenderer as MeshRectangleRenderer).setStageContainer(stage);
-      }
-      if (this.searchStyleRenderer && 'setStageContainer' in this.searchStyleRenderer) {
-        (this.searchStyleRenderer as MeshSearchStyleRenderer).setStageContainer(stage);
       }
       if (this.markerRenderer && 'setStageContainer' in this.markerRenderer) {
         (this.markerRenderer as MeshMarkerRenderer).setStageContainer(stage);
@@ -398,7 +367,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Initialize search if enabled via options
     if (options.enableSearch) {
-      this.initializeSearch();
+      this.setupSearch(useMeshRenderer);
     }
 
     // Initial render
@@ -457,23 +426,13 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.viewportAnimator = null;
     }
 
-    // Clean up search components
-    if (this.searchRenderer) {
-      this.searchRenderer.destroy();
-      this.searchRenderer = null;
+    // Clean up search orchestrator
+    if (this.searchOrchestrator) {
+      this.searchOrchestrator.destroy();
+      this.searchOrchestrator = null;
     }
 
-    if (this.searchStyleRenderer) {
-      this.searchStyleRenderer.destroy();
-      this.searchStyleRenderer = null;
-    }
-
-    // Clean up text label renderer
-    if (this.searchTextLabelRenderer) {
-      this.searchTextLabelRenderer.destroy();
-      this.searchTextLabelRenderer = null;
-    }
-
+    // Clean up text label renderer (used in normal mode)
     if (this.textLabelRenderer) {
       this.textLabelRenderer.destroy();
       this.textLabelRenderer = null;
@@ -532,28 +491,54 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
-   * Initialize the new generic search system.
-   * Builds ID-based rectMap and creates SearchManager.
+   * Setup search orchestrator for find and navigation functionality.
+   *
+   * @param useMeshRenderer - Whether to use mesh-based renderers
    */
-  private initializeSearch(): void {
-    if (!this.rectangleManager || !this.treeNodes || !this.worldContainer) {
+  private setupSearch(useMeshRenderer: boolean): void {
+    if (
+      !this.rectangleManager ||
+      !this.treeNodes ||
+      !this.worldContainer ||
+      !this.state ||
+      !this.textLabelRenderer ||
+      !this.viewport
+    ) {
       throw new Error('FlameChart must be initialized before enabling search');
     }
 
-    // Build rectMap by ID from PrecomputedRect
-    const rectMap = new Map<string, PrecomputedRect>();
-    const logEventRectMap = this.rectangleManager.getRectMap();
+    // Create search orchestrator with callbacks
+    this.searchOrchestrator = new SearchOrchestrator<E>({
+      onSearchNavigate: (event: EventNode, screenX: number, screenY: number, depth: number) => {
+        this.callbacks.onSearchNavigate?.(event, screenX, screenY, depth);
+      },
+      onCenterOnMatch: (timestamp: number, duration: number, depth: number) => {
+        this.viewport?.centerOnEvent(timestamp, duration, depth);
+      },
+      onClearSelection: () => {
+        this.selectionOrchestrator?.clearSelection();
+      },
+      requestRender: () => {
+        this.requestRender();
+      },
+    });
 
-    for (const [_event, rect] of logEventRectMap.entries()) {
-      // Cast to PrecomputedRect to access the id field;
-      rectMap.set(rect.id, rect);
+    // Initialize the orchestrator
+    this.searchOrchestrator.init(
+      this.worldContainer,
+      this.treeNodes,
+      this.rectangleManager,
+      this.state.batches,
+      this.textLabelRenderer,
+      useMeshRenderer,
+      this.viewport,
+      this.mainTimelineYOffset,
+    );
+
+    // For mesh renderers, set stage container for clip-space rendering
+    if (useMeshRenderer && this.app) {
+      this.searchOrchestrator.setStageContainer(this.app.stage);
     }
-
-    // Initialize new SearchManager
-    this.newSearchManager = new SearchManager(this.treeNodes, rectMap);
-
-    // Initialize search renderer (for borders/overlays on current match)
-    this.searchRenderer = new SearchHighlightRenderer(this.worldContainer);
   }
 
   /**
@@ -565,23 +550,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * @returns FlameChartCursor for navigating results, or null if search not enabled
    */
   public search(predicate: (event: E) => boolean, options?: SearchOptions): SearchCursor<E> | null {
-    if (!this.newSearchManager) {
-      return null;
-    }
-
-    // Clear selection when starting a new search to show search highlights
-    this.selectionOrchestrator?.clearSelection();
-
-    const innerCursor = this.newSearchManager.search(predicate, options);
-
-    // Wrap with FlameChartCursor to add automatic side effects
-    return new FlameChartCursor(innerCursor, (match) => {
-      // Restore cursor if it was cleared (e.g., by Escape key)
-      if (!this.newSearchManager?.getCursor()) {
-        this.newSearchManager?.setCursor(innerCursor as SearchCursorImpl<E>);
-      }
-      this.handleSearchNavigation(match);
-    });
+    return this.searchOrchestrator?.search(predicate, options) ?? null;
   }
 
   /**
@@ -589,7 +558,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * @returns Current cursor or undefined if no active search
    */
   public getSearchCursor(): SearchCursor<E> | undefined {
-    return this.newSearchManager?.getCursor();
+    return this.searchOrchestrator?.getCursor();
   }
 
   /**
@@ -597,41 +566,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * If a frame is selected, selection highlight will automatically show via getHighlightMode().
    */
   public clearSearch(): void {
-    this.newSearchManager?.clear();
-    this.requestRender();
-  }
-
-  /**
-   * Handle search navigation side effects:
-   * - Clear selection so search highlight shows via getHighlightMode()
-   * - Center viewport on match
-   * - Call onSearchNavigate callback for application-specific logic (e.g., tooltips)
-   * - Request render
-   */
-  private handleSearchNavigation(match: SearchMatch<E>): void {
-    if (!this.viewport) {
-      return;
-    }
-
-    // Clear selection so search highlight shows
-    this.selectionOrchestrator?.clearSelection();
-
-    // Center viewport on the match
-    this.viewport.centerOnEvent(match.event.timestamp, match.event.duration, match.depth);
-
-    // Call application-specific callback (e.g., for showing tooltips)
-    if (this.callbacks.onSearchNavigate) {
-      const screenX = this.viewport.calculateVisibleCenterX(
-        match.event.timestamp,
-        match.event.duration,
-      );
-      // Convert canvas-relative to container-relative for tooltip positioning
-      const screenY = this.viewport.depthToScreenY(match.depth) + this.mainTimelineYOffset;
-      this.callbacks.onSearchNavigate(match.event, screenX, screenY, match.depth);
-    }
-
-    // Request render to show updated highlight
-    this.requestRender();
+    this.searchOrchestrator?.clearSearch();
   }
 
   /**
@@ -690,8 +625,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Update offset for converting canvas-relative to container-relative coordinates
     this.mainTimelineYOffset = minimapHeight + MINIMAP_GAP;
 
-    // Update selection orchestrator with new offset
+    // Update orchestrators with new offset
     this.selectionOrchestrator?.setMainTimelineYOffset(this.mainTimelineYOffset);
+    this.searchOrchestrator?.setMainTimelineYOffset(this.mainTimelineYOffset);
 
     // Resize minimap orchestrator
     if (this.minimapOrchestrator) {
@@ -1540,8 +1476,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.selectionOrchestrator?.hasAnySelection()) {
       return 'selection';
     }
-    const cursor = this.newSearchManager?.getCursor();
-    if (cursor && cursor.total > 0) {
+    if (this.searchOrchestrator?.isActive()) {
       return 'search';
     }
     return 'none';
@@ -1723,13 +1658,15 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.hitTestManager.setBuckets(buckets);
     }
 
-    // Render events (with or without search styling)
-    const cursor = this.newSearchManager?.getCursor();
+    // Build render context for orchestrators
+    const searchRenderContext = { viewportState, visibleRects, buckets };
 
-    if (cursor) {
+    // Render events (with or without search styling)
+    const hasActiveSearch = this.searchOrchestrator?.hasCursor() ?? false;
+
+    if (hasActiveSearch) {
       // Search mode: render with desaturation (including buckets)
-      const matchedEventIds = cursor.getMatchedEventIds();
-      this.searchStyleRenderer!.render(visibleRects, matchedEventIds, buckets, viewportState);
+      this.searchOrchestrator!.renderStyledEvents(searchRenderContext);
 
       // Clear normal renderer when in search mode
       if (this.batchRenderer) {
@@ -1740,18 +1677,13 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.batchRenderer.render(visibleRects, buckets, viewportState);
 
       // Clear search overlays when not in search mode
-      if (this.searchStyleRenderer) {
-        this.searchStyleRenderer.clear();
-      }
+      this.searchOrchestrator?.clearStyledEvents();
     }
 
     // Render text labels (with or without search styling)
-    if (cursor) {
+    if (hasActiveSearch) {
       // Search mode: SearchTextLabelRenderer coordinates both matched and unmatched labels
-      const matchedEventIds = cursor.getMatchedEventIds();
-      if (this.searchTextLabelRenderer) {
-        this.searchTextLabelRenderer.render(visibleRects, matchedEventIds, viewportState);
-      }
+      this.searchOrchestrator!.renderStyledLabels(searchRenderContext);
     } else {
       // Normal mode: render all visible text
       if (this.textLabelRenderer) {
@@ -1759,9 +1691,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       }
 
       // Clear search text renderer when not in search mode
-      if (this.searchTextLabelRenderer) {
-        this.searchTextLabelRenderer.clear();
-      }
+      this.searchOrchestrator?.clearStyledLabels();
     }
 
     // Render only ONE highlight based on computed mode (selection takes priority)
@@ -1769,14 +1699,14 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (highlightMode === 'selection') {
       // Selection highlight mode: show selection highlight via orchestrator
       this.selectionOrchestrator?.render({ viewportState });
-      this.searchRenderer?.clear();
+      this.searchOrchestrator?.clearHighlight();
     } else if (highlightMode === 'search') {
       // Search highlight mode: show search match highlight
-      this.searchRenderer!.render(cursor!, viewportState);
+      this.searchOrchestrator!.renderHighlight(viewportState);
       this.selectionOrchestrator?.clearRender();
     } else {
       // No active highlight mode: clear both
-      this.searchRenderer?.clear();
+      this.searchOrchestrator?.clearHighlight();
       this.selectionOrchestrator?.clearRender();
     }
 
