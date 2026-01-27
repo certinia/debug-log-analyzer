@@ -53,6 +53,7 @@ import type { PrecomputedRect } from './RectangleManager.js';
 import { RectangleManager } from './RectangleManager.js';
 import { CursorLineRenderer } from './rendering/CursorLineRenderer.js';
 import { FlameChartCursor } from './search/FlameChartCursor.js';
+import { SearchCursorImpl } from './search/SearchCursor.js';
 import { SearchManager } from './search/SearchManager.js';
 import { SelectionHighlightRenderer } from './selection/SelectionHighlightRenderer.js';
 import { SelectionManager } from './selection/SelectionManager.js';
@@ -61,12 +62,13 @@ import { TimelineViewport } from './TimelineViewport.js';
 import { ViewportAnimator } from './ViewportAnimator.js';
 
 // Orchestrators (own domain-specific state and rendering)
+import { MeasurementOrchestrator } from './orchestrators/MeasurementOrchestrator.js';
+
 import {
   calculateMinimapHeight,
-  MeasurementOrchestrator,
   MINIMAP_GAP,
   MinimapOrchestrator,
-} from './orchestrators/index.js';
+} from './orchestrators/MinimapOrchestrator.js';
 
 export interface FlameChartCallbacks {
   onMouseMove?: (
@@ -589,7 +591,13 @@ export class FlameChart<E extends EventNode = EventNode> {
     const innerCursor = this.newSearchManager.search(predicate, options);
 
     // Wrap with FlameChartCursor to add automatic side effects
-    return new FlameChartCursor(innerCursor, (match) => this.handleSearchNavigation(match));
+    return new FlameChartCursor(innerCursor, (match) => {
+      // Restore cursor if it was cleared (e.g., by Escape key)
+      if (!this.newSearchManager?.getCursor()) {
+        this.newSearchManager?.setCursor(innerCursor as SearchCursorImpl<E>);
+      }
+      this.handleSearchNavigation(match);
+    });
   }
 
   /**
@@ -1932,7 +1940,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Render events (with or without search styling)
     const cursor = this.newSearchManager?.getCursor();
 
-    if (cursor && cursor.total > 0) {
+    if (cursor) {
       // Search mode: render with desaturation (including buckets)
       const matchedEventIds = cursor.getMatchedEventIds();
       this.searchStyleRenderer!.render(visibleRects, matchedEventIds, buckets, viewportState);
@@ -1952,7 +1960,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     // Render text labels (with or without search styling)
-    if (cursor && cursor.total > 0) {
+    if (cursor) {
       // Search mode: SearchTextLabelRenderer coordinates both matched and unmatched labels
       const matchedEventIds = cursor.getMatchedEventIds();
       if (this.searchTextLabelRenderer) {

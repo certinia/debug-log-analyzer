@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Visual Display**: Dynamic labels on Timeline events for faster log scanning; Time axis auto-spaces markers intelligently and more naturally as you zoom; Search + highlight dims non-matches for fast scanning.
 
 - ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart built for massive logs and up to **7X faster**. ([#446] [#251] [#92] [#564])
+  - Full feature parity with the original Timeline including:
+    - Zoom and pan navigation (mouse + keyboard)
+    - Search with result highlighting
+    - Frame tooltips on hover
+    - Markers for errors, skipped lines, and truncation
+    - Click to navigate to Call Tree (now on key press of `J` or `Cmd/Ctrl+Click`)
   - **⚡ Performance**: Improved performance to handle huge Apex debug logs.
     - Zoom + pan are **7X faster** with smoother motion.
   - **Visual Display**:

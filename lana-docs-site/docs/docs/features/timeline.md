@@ -65,7 +65,7 @@ When no frame is selected, arrow keys pan the viewport. When a frame is selected
 
 | Action            | Mouse              | Keyboard |
 | ----------------- | ------------------ | -------- |
-| Jump to Call Tree | `Cmd/Ctrl` + Click | `J`      |
+| Show in Call Tree | `Cmd/Ctrl` + Click | `J`      |
 | Show Context Menu | Right-click        | —        |
 
 Use `J` or `Cmd/Ctrl+Click` to navigate to the selected frame in the Call Tree. Right-click opens a context menu with additional actions.

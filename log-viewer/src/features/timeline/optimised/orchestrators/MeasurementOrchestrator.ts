@@ -279,8 +279,8 @@ export class MeasurementOrchestrator {
       return;
     }
 
-    // Clear search when starting measurement
-    this.callbacks.onClearSearch();
+    // DON'T clear selection - measurement and selection can coexist
+    // DON'T clear search - search and measurement can coexist
 
     // Start measurement - clamp to timeline bounds
     const timeNs = this.screenXToTime(screenX);
@@ -339,9 +339,6 @@ export class MeasurementOrchestrator {
 
     // Clear measurement when starting area zoom
     this.clearMeasurement();
-
-    // Clear search
-    this.callbacks.onClearSearch();
 
     // Start area zoom - clamp to timeline bounds
     const timeNs = this.screenXToTime(screenX);
