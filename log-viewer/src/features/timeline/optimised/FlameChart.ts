@@ -54,6 +54,7 @@ import { MeasureRangeRenderer } from './measurement/MeasureRangeRenderer.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 import { RectangleManager } from './RectangleManager.js';
 import { FlameChartCursor } from './search/FlameChartCursor.js';
+import { SearchCursorImpl } from './search/SearchCursor.js';
 import { SearchManager } from './search/SearchManager.js';
 import { SelectionHighlightRenderer } from './selection/SelectionHighlightRenderer.js';
 import { SelectionManager } from './selection/SelectionManager.js';
@@ -559,7 +560,13 @@ export class FlameChart<E extends EventNode = EventNode> {
     const innerCursor = this.newSearchManager.search(predicate, options);
 
     // Wrap with FlameChartCursor to add automatic side effects
-    return new FlameChartCursor(innerCursor, (match) => this.handleSearchNavigation(match));
+    return new FlameChartCursor(innerCursor, (match) => {
+      // Restore cursor if it was cleared (e.g., by Escape key)
+      if (!this.newSearchManager?.getCursor()) {
+        this.newSearchManager?.setCursor(innerCursor as SearchCursorImpl<E>);
+      }
+      this.handleSearchNavigation(match);
+    });
   }
 
   /**
@@ -1189,9 +1196,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     // DON'T clear selection - measurement and selection can coexist
-
-    // Clear search when starting measurement (search highlights conflict with measurement overlay)
-    this.clearSearch();
+    // DON'T clear search - search and measurement can coexist
 
     // Start measurement - clamp to timeline bounds
     const timeNs = this.screenXToTime(screenX);
@@ -1280,9 +1285,6 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Clear measurement when starting area zoom (they can't coexist visually)
     this.clearMeasurement();
-
-    // Clear search when starting area zoom
-    this.clearSearch();
 
     // Start area zoom - clamp to timeline bounds
     const timeNs = this.screenXToTime(screenX);
@@ -1933,7 +1935,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Render events (with or without search styling)
     const cursor = this.newSearchManager?.getCursor();
 
-    if (cursor && cursor.total > 0) {
+    if (cursor) {
       // Search mode: render with desaturation (including buckets)
       const matchedEventIds = cursor.getMatchedEventIds();
       this.searchStyleRenderer!.render(visibleRects, matchedEventIds, buckets, viewportState);
@@ -1953,7 +1955,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     // Render text labels (with or without search styling)
-    if (cursor && cursor.total > 0) {
+    if (cursor) {
       // Search mode: SearchTextLabelRenderer coordinates both matched and unmatched labels
       const matchedEventIds = cursor.getMatchedEventIds();
       if (this.searchTextLabelRenderer) {
