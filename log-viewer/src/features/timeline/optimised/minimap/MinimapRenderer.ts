@@ -27,8 +27,9 @@
 
 import * as PIXI from 'pixi.js';
 import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.js';
-import type { TimelineMarker } from '../../types/flamechart.types.js';
-import { MARKER_COLORS } from '../../types/flamechart.types.js';
+import type { MarkerType, TimelineMarker } from '../../types/flamechart.types.js';
+import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
+import { blendWithBackground } from '../BucketColorResolver.js';
 import { MinimapAxisRenderer } from './MinimapAxisRenderer.js';
 import type { MinimapDensityData } from './MinimapDensityQuery.js';
 import type { MinimapManager, MinimapSelection } from './MinimapManager.js';
@@ -39,6 +40,16 @@ import type { MinimapManager, MinimapSelection } from './MinimapManager.js';
 const MIN_OPACITY = 0.5;
 const MAX_OPACITY = 1.0;
 const SATURATION_COUNT = 100;
+
+/**
+ * Pre-blended opaque marker colors (MARKER_COLORS blended at MARKER_ALPHA opacity).
+ * Computed once at module load time for performance.
+ */
+const MINIMAP_MARKER_COLORS_BLENDED: Record<MarkerType, number> = {
+  error: blendWithBackground(MARKER_COLORS.error, MARKER_ALPHA),
+  skip: blendWithBackground(MARKER_COLORS.skip, MARKER_ALPHA),
+  unexpected: blendWithBackground(MARKER_COLORS.unexpected, MARKER_ALPHA),
+};
 
 /**
  * Curtain overlay opacity (outside viewport lens).
@@ -165,16 +176,22 @@ export class MinimapRenderer {
 
     // Static graphics layers
     this.backgroundGraphics = new PIXI.Graphics();
-    this.skylineGraphics = new PIXI.Graphics();
     this.markerGraphics = new PIXI.Graphics();
+    this.skylineGraphics = new PIXI.Graphics();
 
-    // Add static layers to static container
+    // Create axis renderer (doesn't add to parent - we control layer order)
+    this.axisRenderer = new MinimapAxisRenderer();
+
+    // Add static layers in correct order (back to front):
+    // 1. Background
+    // 2. Markers
+    // 3. Axis (tick lines and labels - labels are in strip above chart area)
+    // 4. Skyline
     this.staticContainer.addChild(this.backgroundGraphics);
-    this.staticContainer.addChild(this.skylineGraphics);
     this.staticContainer.addChild(this.markerGraphics);
-
-    // Axis renderer (renders into static container)
-    this.axisRenderer = new MinimapAxisRenderer(this.staticContainer);
+    this.staticContainer.addChild(this.axisRenderer.getTickGraphics());
+    this.staticContainer.addChild(this.axisRenderer.getLabelsContainer());
+    this.staticContainer.addChild(this.skylineGraphics);
 
     // ============================================================================
     // DYNAMIC CONTENT SETUP
@@ -575,6 +592,7 @@ export class MinimapRenderer {
 
   /**
    * Render markers as colored vertical bands.
+   * Uses pre-blended opaque colors and 1px gaps between adjacent markers.
    */
   private renderMarkers(
     manager: MinimapManager,
@@ -588,6 +606,11 @@ export class MinimapRenderer {
     const chartTop = axisHeight;
     const chartHeight = minimapHeight - axisHeight;
 
+    // Apply 1px gap for negative space separation between adjacent markers
+    // Same approach as TimelineMarkerRenderer: 0.5px inset from each edge
+    const gap = 1;
+    const halfGap = gap / 2;
+
     for (let i = 0; i < markers.length; i++) {
       const marker = markers[i]!;
 
@@ -599,12 +622,18 @@ export class MinimapRenderer {
       const endTime = nextMarker?.startTime ?? state.totalDuration;
       const endX = manager.timeToMinimapX(endTime);
 
-      // Get marker color
-      const color = MARKER_COLORS[marker.type] ?? 0x808080;
+      // Get pre-blended opaque marker color
+      const color = MINIMAP_MARKER_COLORS_BLENDED[marker.type] ?? 0x808080;
+
+      // Apply gap to create separation between adjacent markers
+      const gappedStartX = startX + halfGap;
+      const gappedWidth = Math.max(0, endX - startX - gap);
 
       // Draw marker band (full height of chart area below axis)
-      this.markerGraphics.rect(startX, chartTop, Math.max(1, endX - startX), chartHeight);
-      this.markerGraphics.fill({ color, alpha: 0.3 });
+      if (gappedWidth > 0) {
+        this.markerGraphics.rect(gappedStartX, chartTop, gappedWidth, chartHeight);
+        this.markerGraphics.fill({ color, alpha: 1.0 });
+      }
     }
   }
 

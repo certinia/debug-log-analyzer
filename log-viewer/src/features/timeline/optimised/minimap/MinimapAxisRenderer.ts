@@ -55,7 +55,6 @@ const DEFAULT_CONFIG: MinimapAxisConfig = {
 };
 
 export class MinimapAxisRenderer {
-  private container: Container;
   private config: MinimapAxisConfig;
 
   /** Graphics object for tick lines */
@@ -69,23 +68,36 @@ export class MinimapAxisRenderer {
   private activeLabelCount = 0;
 
   /**
-   * @param parentContainer - PIXI container to add axis graphics to
+   * Creates the axis renderer without adding to any parent container.
+   * Caller is responsible for adding getTickGraphics() and getLabelsContainer()
+   * to their container in the desired layer order.
+   *
    * @param config - Optional configuration overrides
    */
-  constructor(parentContainer: Container, config?: Partial<MinimapAxisConfig>) {
+  constructor(config?: Partial<MinimapAxisConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-
-    // Create container for axis content
-    this.container = new Container();
-    parentContainer.addChild(this.container);
 
     // Create graphics for tick lines
     this.tickGraphics = new Graphics();
-    this.container.addChild(this.tickGraphics);
 
     // Create container for labels
     this.labelsContainer = new Container();
-    this.container.addChild(this.labelsContainer);
+  }
+
+  /**
+   * Get the tick graphics object for adding to a parent container.
+   * This should be added BELOW the skyline in the layer order.
+   */
+  public getTickGraphics(): Graphics {
+    return this.tickGraphics;
+  }
+
+  /**
+   * Get the labels container for adding to a parent container.
+   * This should be added ABOVE the skyline in the layer order.
+   */
+  public getLabelsContainer(): Container {
+    return this.labelsContainer;
   }
 
   /**
@@ -235,7 +247,6 @@ export class MinimapAxisRenderer {
     }
     this.labelPool = [];
     this.labelsContainer.destroy();
-    this.container.destroy();
   }
 
   // ============================================================================
