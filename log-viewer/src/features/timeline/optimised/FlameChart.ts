@@ -1608,136 +1608,156 @@ export class FlameChart<E extends EventNode = EventNode> {
   // RENDER LOOP
   // ============================================================================
 
+  /**
+   * Main render loop - coordinates all rendering phases.
+   * Simplified to ~50 lines by delegating to helper methods and orchestrators.
+   */
   private render(): void {
-    if (
-      !this.rectangleManager ||
-      !this.batchRenderer ||
-      !this.state ||
-      !this.viewport ||
-      !this.app ||
-      !this.worldContainer
-    ) {
+    if (!this.canRender()) {
       return;
     }
 
-    const viewportState = this.viewport.getState();
-    const { offsetX } = viewportState;
+    const viewportState = this.viewport!.getState();
+    this.state!.viewport = viewportState;
 
-    this.state.viewport = viewportState;
+    // Phase 1: Position containers and render background layers
+    this.renderBackground(viewportState);
 
-    const screenHeight = this.app.screen.height;
-
-    // Main timeline has its own canvas - position at bottom of canvas (no minimap offset)
-    if (this.markerContainer) {
-      this.markerContainer.position.set(-offsetX, screenHeight);
-    }
-
-    if (this.axisContainer) {
-      this.axisContainer.position.set(-offsetX, screenHeight);
-    }
-
-    this.worldContainer.position.set(-offsetX, screenHeight - viewportState.offsetY);
-
-    if (this.markerRenderer) {
-      this.markerRenderer.render();
-    }
-
-    if (this.axisRenderer) {
-      this.axisRenderer.render(viewportState);
-    }
-
-    // Use cached batch colors for bucket color resolution (built in setColors/init)
-    const { visibleRects, buckets } = this.rectangleManager.getCulledRectangles(
+    // Phase 2: Cull visible rectangles and update hit testing
+    const { visibleRects, buckets } = this.rectangleManager!.getCulledRectangles(
       viewportState,
-      this.state.batchColorsCache,
+      this.state!.batchColorsCache,
     );
+    this.hitTestManager?.setVisibleRects(visibleRects);
+    this.hitTestManager?.setBuckets(buckets);
 
-    // Update hit test manager with current render data
-    if (this.hitTestManager) {
-      this.hitTestManager.setVisibleRects(visibleRects);
-      this.hitTestManager.setBuckets(buckets);
-    }
+    // Phase 3: Render events and labels (search mode vs normal mode)
+    const searchContext = { viewportState, visibleRects, buckets };
+    this.renderEventsAndLabels(viewportState, visibleRects, buckets, searchContext);
 
-    // Build render context for orchestrators
-    const searchRenderContext = { viewportState, visibleRects, buckets };
+    // Phase 4: Render highlights (selection or search, mutually exclusive)
+    this.renderHighlights(viewportState);
 
-    // Render events (with or without search styling)
+    // Phase 5: Render overlays (measurement, cursor line)
+    this.renderOverlays(viewportState);
+
+    // Phase 6: Render main timeline canvas
+    this.app!.render();
+
+    // Phase 7: Render minimap
+    this.renderMinimap(viewportState);
+  }
+
+  /**
+   * Check if render prerequisites are met.
+   */
+  private canRender(): boolean {
+    return !!(
+      this.rectangleManager &&
+      this.batchRenderer &&
+      this.state &&
+      this.viewport &&
+      this.app &&
+      this.worldContainer
+    );
+  }
+
+  /**
+   * Position containers and render background layers (markers, axis).
+   */
+  private renderBackground(viewportState: ViewportState): void {
+    const { offsetX } = viewportState;
+    const screenHeight = this.app!.screen.height;
+
+    // Position containers (main timeline has its own canvas - position at bottom)
+    this.markerContainer?.position.set(-offsetX, screenHeight);
+    this.axisContainer?.position.set(-offsetX, screenHeight);
+    this.worldContainer!.position.set(-offsetX, screenHeight - viewportState.offsetY);
+
+    // Render background layers
+    this.markerRenderer?.render();
+    this.axisRenderer?.render(viewportState);
+  }
+
+  /**
+   * Render events and labels with appropriate styling (search mode vs normal mode).
+   */
+  private renderEventsAndLabels(
+    viewportState: ViewportState,
+    visibleRects: Map<string, import('./RectangleManager.js').PrecomputedRect[]>,
+    buckets: Map<string, import('../types/flamechart.types.js').PixelBucket[]>,
+    searchContext: {
+      viewportState: ViewportState;
+      visibleRects: typeof visibleRects;
+      buckets: typeof buckets;
+    },
+  ): void {
     const hasActiveSearch = this.searchOrchestrator?.hasCursor() ?? false;
 
     if (hasActiveSearch) {
-      // Search mode: render with desaturation (including buckets)
-      this.searchOrchestrator!.renderStyledEvents(searchRenderContext);
-
-      // Clear normal renderer when in search mode
-      if (this.batchRenderer) {
-        this.batchRenderer.clear();
-      }
+      // Search mode: render with desaturation
+      this.searchOrchestrator!.renderStyledEvents(searchContext);
+      this.searchOrchestrator!.renderStyledLabels(searchContext);
+      this.batchRenderer?.clear();
     } else {
-      // Normal mode: render with original colors and buckets
-      this.batchRenderer.render(visibleRects, buckets, viewportState);
-
-      // Clear search overlays when not in search mode
+      // Normal mode: render with original colors
+      this.batchRenderer!.render(visibleRects, buckets, viewportState);
+      this.textLabelRenderer?.render(visibleRects, viewportState);
       this.searchOrchestrator?.clearStyledEvents();
-    }
-
-    // Render text labels (with or without search styling)
-    if (hasActiveSearch) {
-      // Search mode: SearchTextLabelRenderer coordinates both matched and unmatched labels
-      this.searchOrchestrator!.renderStyledLabels(searchRenderContext);
-    } else {
-      // Normal mode: render all visible text
-      if (this.textLabelRenderer) {
-        this.textLabelRenderer.render(visibleRects, viewportState);
-      }
-
-      // Clear search text renderer when not in search mode
       this.searchOrchestrator?.clearStyledLabels();
     }
+  }
 
-    // Render only ONE highlight based on computed mode (selection takes priority)
+  /**
+   * Render highlights (selection or search, mutually exclusive).
+   */
+  private renderHighlights(viewportState: ViewportState): void {
     const highlightMode = this.getHighlightMode();
+
     if (highlightMode === 'selection') {
-      // Selection highlight mode: show selection highlight via orchestrator
       this.selectionOrchestrator?.render({ viewportState });
       this.searchOrchestrator?.clearHighlight();
     } else if (highlightMode === 'search') {
-      // Search highlight mode: show search match highlight
-      this.searchOrchestrator!.renderHighlight(viewportState);
+      this.searchOrchestrator?.renderHighlight(viewportState);
       this.selectionOrchestrator?.clearRender();
     } else {
-      // No active highlight mode: clear both
       this.searchOrchestrator?.clearHighlight();
       this.selectionOrchestrator?.clearRender();
     }
+  }
 
-    // Render measurement and area zoom overlays via orchestrator
-    if (this.measurementOrchestrator) {
-      this.measurementOrchestrator.render({ viewportState });
-    }
+  /**
+   * Render overlays (measurement, cursor line).
+   */
+  private renderOverlays(viewportState: ViewportState): void {
+    // Measurement and area zoom overlays
+    this.measurementOrchestrator?.render({ viewportState });
 
-    // Render cursor line on main timeline (bidirectional cursor mirroring)
-    // Cursor time is owned by the minimap orchestrator
+    // Cursor line (bidirectional cursor mirroring with minimap)
     if (this.cursorLineRenderer && this.minimapOrchestrator) {
       const cursorTimeNs = this.minimapOrchestrator.getCursorTimeNs();
       this.cursorLineRenderer.render(viewportState, cursorTimeNs);
     }
+  }
 
-    // Render main timeline
-    this.app.render();
-
-    // Render minimap via orchestrator
-    if (this.minimapOrchestrator) {
-      const bounds = this.viewport.getBounds();
-      this.minimapOrchestrator.render({
-        viewportState,
-        viewportBounds: {
-          depthStart: bounds.depthStart,
-          depthEnd: bounds.depthEnd,
-        },
-        markers: this.markers,
-        batchColors: this.state.batchColorsCache,
-        cursorTimeNs: this.minimapOrchestrator.getCursorTimeNs(),
-      });
+  /**
+   * Render minimap via orchestrator.
+   */
+  private renderMinimap(viewportState: ViewportState): void {
+    if (!this.minimapOrchestrator || !this.viewport || !this.state) {
+      return;
     }
+
+    const bounds = this.viewport.getBounds();
+    this.minimapOrchestrator.render({
+      viewportState,
+      viewportBounds: {
+        depthStart: bounds.depthStart,
+        depthEnd: bounds.depthEnd,
+      },
+      markers: this.markers,
+      batchColors: this.state.batchColorsCache,
+      cursorTimeNs: this.minimapOrchestrator.getCursorTimeNs(),
+    });
   }
 }
