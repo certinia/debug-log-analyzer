@@ -261,6 +261,10 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
 
     const innerCursor = this.searchManager.search(predicate, options);
 
+    // Request render to update display with new search state
+    // (especially important when search returns 0 results to clear old highlights)
+    this.callbacks.requestRender();
+
     // Wrap with FlameChartCursor to add automatic side effects
     return new FlameChartCursor(innerCursor, (match) => {
       // Restore cursor if it was cleared (e.g., by Escape key)
