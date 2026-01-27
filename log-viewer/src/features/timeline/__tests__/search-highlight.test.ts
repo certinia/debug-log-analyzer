@@ -95,6 +95,14 @@ describe('SearchHighlightRenderer', () => {
       hasNext: jest.fn(() => currentIndex < matches.length - 1),
       hasPrev: jest.fn(() => currentIndex > 0),
       getMatchedEventIds: jest.fn(() => new Set(matches.map((m) => m.event.id))),
+      getMatchedEventsInfo: jest.fn(() =>
+        matches.map((m) => ({
+          timestamp: m.event.timestamp,
+          duration: m.event.duration,
+          depth: m.depth,
+          category: m.event.subCategory ?? '',
+        })),
+      ),
     };
   };
 

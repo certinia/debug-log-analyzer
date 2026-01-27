@@ -10,7 +10,7 @@
  */
 
 import type { EventNode } from '../../types/flamechart.types.js';
-import type { SearchCursor, SearchMatch } from '../../types/search.types.js';
+import type { MatchedEventInfo, SearchCursor, SearchMatch } from '../../types/search.types.js';
 
 export class FlameChartCursor<E extends EventNode> implements SearchCursor<E> {
   constructor(
@@ -84,5 +84,9 @@ export class FlameChartCursor<E extends EventNode> implements SearchCursor<E> {
 
   getMatchedEventIds(): ReadonlySet<string> {
     return this.innerCursor.getMatchedEventIds();
+  }
+
+  getMatchedEventsInfo(): ReadonlyArray<MatchedEventInfo> {
+    return this.innerCursor.getMatchedEventsInfo();
   }
 }

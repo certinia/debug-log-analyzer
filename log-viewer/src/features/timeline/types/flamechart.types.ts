@@ -104,6 +104,9 @@ export interface EventNode {
 
   /** Display text for event */
   text: string;
+
+  /** Optional subcategory for color resolution (e.g., 'Method', 'SOQL', 'DML') */
+  subCategory?: string;
 }
 
 /**

@@ -304,11 +304,13 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     }
 
     const matchedEventIds = cursor.getMatchedEventIds();
+    const matchedEventsInfo = cursor.getMatchedEventsInfo();
     this.searchStyleRenderer.render(
       context.visibleRects,
       matchedEventIds,
       context.buckets,
       context.viewportState,
+      matchedEventsInfo,
     );
   }
 

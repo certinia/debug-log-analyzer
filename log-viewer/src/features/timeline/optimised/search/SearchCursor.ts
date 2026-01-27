@@ -10,7 +10,7 @@
  */
 
 import type { EventNode } from '../../types/flamechart.types.js';
-import type { SearchCursor, SearchMatch } from '../../types/search.types.js';
+import type { MatchedEventInfo, SearchCursor, SearchMatch } from '../../types/search.types.js';
 
 export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
   private _currentIndex: number;
@@ -90,5 +90,14 @@ export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
 
   getMatchedEventIds(): ReadonlySet<string> {
     return new Set(this._matches.map((m) => m.event.id));
+  }
+
+  getMatchedEventsInfo(): ReadonlyArray<MatchedEventInfo> {
+    return this._matches.map((m) => ({
+      timestamp: m.event.timestamp,
+      duration: m.event.duration ?? 0,
+      depth: m.depth,
+      category: m.event.subCategory ?? '',
+    }));
   }
 }
