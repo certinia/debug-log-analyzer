@@ -20,12 +20,19 @@ export class TimelineResizeHandler {
   private renderer: IResizable | null = null;
 
   private resizeDebounceFrameId: number | null = null;
-  private lastResizeWidth = 0;
-  private lastResizeHeight = 0;
+  private lastResizeWidth: number;
+  private lastResizeHeight: number;
 
   constructor(containerRef: HTMLElement, renderer: IResizable) {
     this.containerRef = containerRef;
     this.renderer = renderer;
+
+    // Pre-populate with current size so initial ResizeObserver callback is skipped.
+    // This prevents double render on init: FlameChart.init() calls requestRender(),
+    // and ResizeObserver fires immediately on observe() with the same dimensions.
+    const rect = containerRef.getBoundingClientRect();
+    this.lastResizeWidth = Math.round(rect.width);
+    this.lastResizeHeight = Math.round(rect.height);
   }
 
   public setupResizeObserver(): void {
