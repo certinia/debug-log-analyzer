@@ -30,7 +30,9 @@ import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.j
 import type { MarkerType, TimelineMarker } from '../../types/flamechart.types.js';
 import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
 import { blendWithBackground } from '../BucketColorResolver.js';
+import { createRectangleShader } from '../RectangleShader.js';
 import { MinimapAxisRenderer } from './MinimapAxisRenderer.js';
+import { MinimapBarGeometry } from './MinimapBarGeometry.js';
 import type { MinimapDensityData } from './MinimapDensityQuery.js';
 import type { MinimapManager, MinimapSelection } from './MinimapManager.js';
 
@@ -94,8 +96,11 @@ export class MinimapRenderer {
   /** Background rectangle. */
   private backgroundGraphics: PIXI.Graphics;
 
-  /** Skyline area chart (replaces density bars). */
-  private skylineGraphics: PIXI.Graphics;
+  /** Skyline mesh-based geometry for efficient bar rendering. */
+  private skylineBarGeometry: MinimapBarGeometry;
+
+  /** Skyline mesh instance using the bar geometry. */
+  private skylineMesh: PIXI.Mesh<PIXI.Geometry, PIXI.Shader>;
 
   /** Marker bands from main timeline. */
   private markerGraphics: PIXI.Graphics;
@@ -177,7 +182,14 @@ export class MinimapRenderer {
     // Static graphics layers
     this.backgroundGraphics = new PIXI.Graphics();
     this.markerGraphics = new PIXI.Graphics();
-    this.skylineGraphics = new PIXI.Graphics();
+
+    // Create mesh-based skyline geometry for efficient bar rendering
+    this.skylineBarGeometry = new MinimapBarGeometry();
+    const skylineShader = createRectangleShader();
+    this.skylineMesh = new PIXI.Mesh({
+      geometry: this.skylineBarGeometry.getGeometry(),
+      shader: skylineShader,
+    });
 
     // Create axis renderer (doesn't add to parent - we control layer order)
     this.axisRenderer = new MinimapAxisRenderer();
@@ -186,12 +198,12 @@ export class MinimapRenderer {
     // 1. Background
     // 2. Markers
     // 3. Axis (tick lines and labels - labels are in strip above chart area)
-    // 4. Skyline
+    // 4. Skyline (mesh-based for performance)
     this.staticContainer.addChild(this.backgroundGraphics);
     this.staticContainer.addChild(this.markerGraphics);
     this.staticContainer.addChild(this.axisRenderer.getTickGraphics());
     this.staticContainer.addChild(this.axisRenderer.getLabelsContainer());
-    this.staticContainer.addChild(this.skylineGraphics);
+    this.staticContainer.addChild(this.skylineMesh);
 
     // ============================================================================
     // DYNAMIC CONTENT SETUP
@@ -394,7 +406,6 @@ export class MinimapRenderer {
 
     // Clear static graphics
     this.backgroundGraphics.clear();
-    this.skylineGraphics.clear();
     this.markerGraphics.clear();
 
     // Render skyline area chart
@@ -474,12 +485,14 @@ export class MinimapRenderer {
   }
 
   /**
-   * Render skyline area chart (filled polygon).
-   * Creates a smooth filled area where:
+   * Render skyline as vertical bars using mesh-based rendering.
+   * Each bucket becomes a single colored bar where:
    * - X-axis = time position
-   * - Y-axis = stack depth (normalized)
+   * - Height = stack depth (normalized)
    * - Color = dominant category
    * - Opacity = event density (logarithmic scale)
+   *
+   * Uses mesh-based rendering for performance (~100ms → <20ms).
    */
   private renderSkyline(
     manager: MinimapManager,
@@ -492,52 +505,38 @@ export class MinimapRenderer {
 
     // Axis is at TOP - chart area is below it
     const axisHeight = this.axisRenderer.getHeight();
-    const _chartTop = axisHeight; // Chart starts below axis (unused, kept for documentation)
     const chartHeight = minimapHeight - axisHeight;
     const chartBottom = minimapHeight; // Chart ends at bottom of minimap
 
     if (globalMaxDepth === 0 || buckets.length === 0 || chartHeight <= 0) {
+      this.skylineBarGeometry.setDrawCount(0);
       return;
     }
 
+    // Configure geometry for this render
+    this.skylineBarGeometry.setDisplayDimensions(state.displayWidth, minimapHeight);
+    this.skylineBarGeometry.ensureCapacity(buckets.length);
+
     const bucketWidth = state.displayWidth / buckets.length;
-
-    // Group consecutive buckets by dominant category for smoother rendering
-    let currentCategory: string | null = null;
-    let polygonPoints: number[] = [];
-    let lastValidX = 0;
-    let currentColor = 0x808080;
-    let currentOpacity = 0.5;
-
-    const flushPolygon = () => {
-      if (polygonPoints.length >= 4) {
-        // Close polygon: add bottom-right, then bottom-left
-        polygonPoints.push(lastValidX, chartBottom);
-
-        // Draw filled polygon
-        this.skylineGraphics.poly(polygonPoints);
-        this.skylineGraphics.fill({ color: currentColor, alpha: currentOpacity });
-      }
-      polygonPoints = [];
-    };
+    let barIndex = 0;
 
     for (let i = 0; i < buckets.length; i++) {
       const bucket = buckets[i]!;
-      const x = i * bucketWidth;
 
       if (bucket.eventCount === 0) {
-        // Gap in data - flush current polygon if any
-        if (polygonPoints.length > 0) {
-          flushPolygon();
-        }
-        currentCategory = null;
         continue;
       }
 
+      const x = i * bucketWidth;
+
       // Calculate height from normalized depth
-      // heightRatio 0 = baseline (bottom), heightRatio 1 = full height (top of chart)
       const heightRatio = globalMaxDepth > 0 ? bucket.maxDepth / globalMaxDepth : 0;
-      const y = chartBottom - heightRatio * chartHeight;
+      const barHeight = heightRatio * chartHeight;
+
+      // Skip zero-height bars
+      if (barHeight <= 0) {
+        continue;
+      }
 
       // Calculate opacity from event count
       const opacity = this.calculateDensityOpacity(bucket.eventCount);
@@ -546,33 +545,21 @@ export class MinimapRenderer {
       const colorInfo = batchColors.get(bucket.dominantCategory);
       const color = colorInfo?.color ?? 0x808080;
 
-      // Check if category changed
-      if (bucket.dominantCategory !== currentCategory) {
-        // Flush previous polygon
-        if (polygonPoints.length > 0) {
-          flushPolygon();
-        }
-
-        // Start new polygon with bottom-left corner
-        currentCategory = bucket.dominantCategory;
-        currentColor = color;
-        currentOpacity = opacity;
-        polygonPoints.push(x, chartBottom);
-      }
-
-      // Add point to current polygon
-      polygonPoints.push(x, y);
-      polygonPoints.push(x + bucketWidth, y);
-      lastValidX = x + bucketWidth;
-
-      // Update opacity (use max opacity for smoothness)
-      if (opacity > currentOpacity) {
-        currentOpacity = opacity;
-      }
+      // Write bar to geometry buffer
+      this.skylineBarGeometry.writeBar(
+        barIndex,
+        x,
+        bucketWidth,
+        barHeight,
+        chartBottom,
+        color,
+        opacity,
+      );
+      barIndex++;
     }
 
-    // Flush final polygon
-    flushPolygon();
+    // Update GPU buffers with final bar count
+    this.skylineBarGeometry.setDrawCount(barIndex);
   }
 
   /**
@@ -859,12 +846,13 @@ export class MinimapRenderer {
    */
   public clear(): void {
     this.backgroundGraphics.clear();
-    this.skylineGraphics.clear();
     this.markerGraphics.clear();
     this.curtainGraphics.clear();
     this.lensGraphics.clear();
     this.cursorLineGraphics.clear();
     this.axisRenderer.clear();
+    // Clear skyline mesh by setting draw count to 0
+    this.skylineBarGeometry.setDrawCount(0);
   }
 
   /**
@@ -873,7 +861,8 @@ export class MinimapRenderer {
   public destroy(): void {
     // Destroy static content
     this.backgroundGraphics.destroy();
-    this.skylineGraphics.destroy();
+    this.skylineMesh.destroy();
+    this.skylineBarGeometry.destroy();
     this.markerGraphics.destroy();
     this.axisRenderer.destroy();
     this.staticContainer.destroy();

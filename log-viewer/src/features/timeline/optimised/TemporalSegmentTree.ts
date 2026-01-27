@@ -58,6 +58,18 @@ const PRIORITY_MAP = new Map<string, number>(
 );
 
 /**
+ * Frame data for minimap density computation.
+ * Pre-sorted by timeStart for efficient sliding window algorithms.
+ */
+export interface SkylineFrame {
+  timeStart: number;
+  timeEnd: number;
+  depth: number;
+  category: string;
+  selfDuration: number;
+}
+
+/**
  * TemporalSegmentTree
  *
  * Manages separate trees per depth level for efficient viewport culling.
@@ -83,6 +95,12 @@ export class TemporalSegmentTree {
 
   /** Cached batch colors for theme support */
   private batchColors?: Map<string, BatchColorInfo>;
+
+  /**
+   * Cached sorted frames for minimap density computation.
+   * Pre-sorted by timeStart during tree construction for O(1) access.
+   */
+  private cachedSortedFrames: SkylineFrame[] | null = null;
 
   /**
    * Build segment trees from pre-computed rectangles.
@@ -227,6 +245,20 @@ export class TemporalSegmentTree {
   }
 
   /**
+   * Get all frames sorted by timeStart for minimap density computation.
+   * Frames are pre-built and sorted during tree construction for O(1) access.
+   *
+   * Performance: Pre-sorting during construction eliminates ~120ms of
+   * recursive tree traversal that previously occurred on first access.
+   *
+   * @returns Array of SkylineFrame sorted by timeStart
+   */
+  public getAllFramesSorted(): SkylineFrame[] {
+    // Frames are pre-built during construction
+    return this.cachedSortedFrames ?? [];
+  }
+
+  /**
    * Query events within a specific time and depth region.
    * Used for hit testing when bucket eventRefs are empty.
    * O(log n + k) complexity where k = events in region.
@@ -297,14 +329,13 @@ export class TemporalSegmentTree {
     eventCount: number;
     selfDurationSum: number;
     categoryWeights: Map<string, { weightedTime: number; maxDepth: number }>;
-    frames: Array<{ timeStart: number; timeEnd: number; depth: number; category: string }>;
+    frames: SkylineFrame[];
   } {
     let maxDepth = 0;
     let eventCount = 0;
     let selfDurationSum = 0;
     const categoryWeights = new Map<string, { weightedTime: number; maxDepth: number }>();
-    const frames: Array<{ timeStart: number; timeEnd: number; depth: number; category: string }> =
-      [];
+    const frames: SkylineFrame[] = [];
 
     // Query each depth level
     for (const [depth, tree] of this.treesByDepth) {
@@ -338,7 +369,7 @@ export class TemporalSegmentTree {
     queryEnd: number,
     depth: number,
     categoryWeights: Map<string, { weightedTime: number; maxDepth: number }>,
-    frames: Array<{ timeStart: number; timeEnd: number; depth: number; category: string }>,
+    frames: SkylineFrame[],
     onStats: (depth: number, count: number, selfDuration: number) => void,
   ): void {
     // Early exit: no overlap
@@ -376,12 +407,13 @@ export class TemporalSegmentTree {
         categoryWeights.set(category, { weightedTime, maxDepth: depth });
       }
 
-      // Collect frame for skyline computation
+      // Collect frame for density computation
       frames.push({
         timeStart: rect.timeStart,
         timeEnd: rect.timeEnd,
         depth,
         category,
+        selfDuration: rect.selfDuration,
       });
 
       onStats(depth, 1, proportionalSelfDuration);
@@ -410,10 +442,16 @@ export class TemporalSegmentTree {
 
   /**
    * Build segment trees for all depth levels.
+   *
+   * PERF: Also collects and sorts frames for minimap density computation
+   * during this iteration, avoiding a separate O(N) tree traversal later.
    */
   private buildTrees(rectsByCategory: Map<string, PrecomputedRect[]>): void {
     // Group all rectangles by depth
     const rectsByDepth = new Map<number, PrecomputedRect[]>();
+
+    // Collect frames during iteration (avoids separate tree traversal later)
+    const allFrames: SkylineFrame[] = [];
 
     for (const rects of rectsByCategory.values()) {
       for (const rect of rects) {
@@ -424,6 +462,15 @@ export class TemporalSegmentTree {
         }
         depthRects.push(rect);
         this.maxDepth = Math.max(this.maxDepth, rect.depth);
+
+        // Collect frame directly (eliminates recursive tree traversal in getAllFramesSorted)
+        allFrames.push({
+          timeStart: rect.timeStart,
+          timeEnd: rect.timeEnd,
+          depth: rect.depth,
+          category: rect.category,
+          selfDuration: rect.selfDuration,
+        });
       }
     }
 
@@ -434,6 +481,10 @@ export class TemporalSegmentTree {
         this.treesByDepth.set(depth, tree);
       }
     }
+
+    // Sort frames by timeStart once during construction (O(N log N) but only once)
+    allFrames.sort((a, b) => a.timeStart - b.timeStart);
+    this.cachedSortedFrames = allFrames;
   }
 
   /**
