@@ -362,7 +362,11 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Setup keyboard handler
     this.setupKeyboardHandler();
 
-    this.resizeHandler = new TimelineResizeHandler(container, this);
+    // Pass the same dimensions that init() used to create the viewport.
+    // This ensures ResizeObserver's initial callback (which fires with current container
+    // dimensions) is correctly skipped, even if DOM manipulation during init caused
+    // a layout shift that changed the container size.
+    this.resizeHandler = new TimelineResizeHandler(container, this, width, height);
     this.resizeHandler.setupResizeObserver();
 
     // Initialize search if enabled via options

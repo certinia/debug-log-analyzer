@@ -23,16 +23,37 @@ export class TimelineResizeHandler {
   private lastResizeWidth: number;
   private lastResizeHeight: number;
 
-  constructor(containerRef: HTMLElement, renderer: IResizable) {
+  /**
+   * @param containerRef - The container element to observe for resize
+   * @param renderer - The resizable component to notify on resize
+   * @param initialWidth - Initial width used by init (pass to ensure consistency)
+   * @param initialHeight - Initial height used by init (pass to ensure consistency)
+   */
+  constructor(
+    containerRef: HTMLElement,
+    renderer: IResizable,
+    initialWidth?: number,
+    initialHeight?: number,
+  ) {
     this.containerRef = containerRef;
     this.renderer = renderer;
 
-    // Pre-populate with current size so initial ResizeObserver callback is skipped.
+    // Pre-populate with the SAME dimensions that init() used.
     // This prevents double render on init: FlameChart.init() calls requestRender(),
     // and ResizeObserver fires immediately on observe() with the same dimensions.
-    const rect = containerRef.getBoundingClientRect();
-    this.lastResizeWidth = Math.round(rect.width);
-    this.lastResizeHeight = Math.round(rect.height);
+    //
+    // IMPORTANT: We must use the same dimensions that init() used to create the viewport,
+    // not re-read from the container. DOM manipulation during init (adding canvases)
+    // can cause layout shifts that change container dimensions between when init()
+    // reads them and when this constructor runs.
+
+    // Fallback to reading from container (legacy behavior)
+    const { width, height } =
+      initialWidth && initialHeight
+        ? { width: initialWidth, height: initialHeight }
+        : containerRef.getBoundingClientRect();
+    this.lastResizeWidth = Math.round(width);
+    this.lastResizeHeight = Math.round(height);
   }
 
   public setupResizeObserver(): void {
