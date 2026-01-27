@@ -420,25 +420,28 @@ export type BucketCategoryPriority = (typeof BUCKET_CONSTANTS.CATEGORY_PRIORITY)
 /**
  * Timeline-specific error types.
  */
-export enum TimelineErrorCode {
-  WEBGL_UNAVAILABLE = 'WEBGL_UNAVAILABLE',
-  INVALID_CONTAINER = 'INVALID_CONTAINER',
-  INVALID_EVENT_DATA = 'INVALID_EVENT_DATA',
-  RENDER_FAILED = 'RENDER_FAILED',
-  INTERNAL_ERROR = 'INTERNAL_ERROR',
-}
+export const TimelineErrorCode = {
+  WEBGL_UNAVAILABLE: 'WEBGL_UNAVAILABLE',
+  INVALID_CONTAINER: 'INVALID_CONTAINER',
+  INVALID_EVENT_DATA: 'INVALID_EVENT_DATA',
+  RENDER_FAILED: 'RENDER_FAILED',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+} as const;
+
+export type TimelineErrorCode = (typeof TimelineErrorCode)[keyof typeof TimelineErrorCode];
 
 /**
  * Custom error class for timeline-specific errors.
  */
 export class TimelineError extends Error {
-  constructor(
-    public code: TimelineErrorCode,
-    message: string,
-    public details?: unknown,
-  ) {
+  public code: TimelineErrorCode;
+  public details?: unknown;
+
+  constructor(code: TimelineErrorCode, message: string, details?: unknown) {
     super(message);
     this.name = 'TimelineError';
+    this.code = code;
+    this.details = details;
   }
 }
 

@@ -64,7 +64,7 @@ export class LogView {
           }
 
           case 'openPath': {
-            const filePath = <string>payload;
+            const filePath = payload as string;
             if (filePath) {
               context.display.showFile(filePath);
             }
@@ -72,7 +72,7 @@ export class LogView {
           }
 
           case 'openType': {
-            const symbol = <string>payload;
+            const symbol = payload as string;
             if (symbol) {
               OpenFileInPackage.openFileForSymbol(context, symbol);
             }
@@ -94,9 +94,10 @@ export class LogView {
           }
 
           case 'saveFile': {
-            const { fileContent, options } = <
-              { fileContent: string; options: { defaultFileName?: string } }
-            >payload;
+            const { fileContent, options } = payload as {
+              fileContent: string;
+              options: { defaultFileName?: string };
+            };
 
             if (fileContent && options?.defaultFileName) {
               const defaultWorkspace = (workspace.workspaceFolders || [])[0];
@@ -116,7 +117,7 @@ export class LogView {
           }
 
           case 'showError': {
-            const { text } = <{ text: string }>payload;
+            const { text } = payload as { text: string };
             if (text) {
               vscWindow.showErrorMessage(text);
             }

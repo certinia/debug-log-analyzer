@@ -13,10 +13,13 @@ import type { EventNode } from '../../types/flamechart.types.js';
 import type { MatchedEventInfo, SearchCursor, SearchMatch } from '../../types/search.types.js';
 
 export class FlameChartCursor<E extends EventNode> implements SearchCursor<E> {
-  constructor(
-    private innerCursor: SearchCursor<E>,
-    private onNavigate: (match: SearchMatch<E>) => void,
-  ) {}
+  private innerCursor: SearchCursor<E>;
+  private onNavigate: (match: SearchMatch<E>) => void;
+
+  constructor(innerCursor: SearchCursor<E>, onNavigate: (match: SearchMatch<E>) => void) {
+    this.innerCursor = innerCursor;
+    this.onNavigate = onNavigate;
+  }
 
   get matches(): ReadonlyArray<SearchMatch<E>> {
     return this.innerCursor.matches;
