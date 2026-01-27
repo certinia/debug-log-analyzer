@@ -48,9 +48,7 @@ import {
 } from './interaction/KeyboardHandler.js';
 import { TimelineInteractionHandler } from './interaction/TimelineInteractionHandler.js';
 import { TimelineResizeHandler } from './interaction/TimelineResizeHandler.js';
-import { AreaZoomRenderer } from './measurement/AreaZoomRenderer.js';
-import { MeasurementManager, type MeasurementState } from './measurement/MeasurementManager.js';
-import { MeasureRangeRenderer } from './measurement/MeasureRangeRenderer.js';
+import type { MeasurementState } from './measurement/MeasurementManager.js';
 import type { PrecomputedRect } from './RectangleManager.js';
 import { RectangleManager } from './RectangleManager.js';
 import { CursorLineRenderer } from './rendering/CursorLineRenderer.js';
@@ -62,11 +60,13 @@ import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineViewport } from './TimelineViewport.js';
 import { ViewportAnimator } from './ViewportAnimator.js';
 
-// Minimap imports
-import { MinimapDensityQuery } from './minimap/MinimapDensityQuery.js';
-import { MinimapInteractionHandler } from './minimap/MinimapInteractionHandler.js';
-import { MINIMAP_GAP, MinimapManager, calculateMinimapHeight } from './minimap/MinimapManager.js';
-import { MinimapRenderer } from './minimap/MinimapRenderer.js';
+// Orchestrators (own domain-specific state and rendering)
+import {
+  calculateMinimapHeight,
+  MeasurementOrchestrator,
+  MINIMAP_GAP,
+  MinimapOrchestrator,
+} from './orchestrators/index.js';
 
 export interface FlameChartCallbacks {
   onMouseMove?: (
@@ -118,7 +118,6 @@ export interface FlameChartCallbacks {
 
 export class FlameChart<E extends EventNode = EventNode> {
   private app: PIXI.Application | null = null; // Main timeline
-  private minimapApp: PIXI.Application | null = null; // Minimap
   private container: HTMLElement | null = null;
   private wrapper: HTMLDivElement | null = null;
   private viewport: TimelineViewport | null = null;
@@ -159,35 +158,15 @@ export class FlameChart<E extends EventNode = EventNode> {
   private selectionRenderer: SelectionHighlightRenderer | null = null;
   private viewportAnimator: ViewportAnimator | null = null;
 
-  // Measurement system (Shift+drag to measure time range)
-  private measurementManager: MeasurementManager | null = null;
-  private measurementRenderer: MeasureRangeRenderer | null = null;
+  // Measurement orchestrator (owns measurement and area zoom state, rendering)
+  private measurementOrchestrator: MeasurementOrchestrator | null = null;
 
-  // Area zoom system (Alt+drag to zoom to area)
-  private areaZoomManager: MeasurementManager | null = null;
-  private areaZoomRenderer: AreaZoomRenderer | null = null;
+  // Minimap orchestrator (owns all minimap state, rendering, and interaction)
+  private minimapOrchestrator: MinimapOrchestrator | null = null;
+  private minimapDiv: HTMLElement | null = null; // HTML container for minimap canvas
 
-  // Resize state (drag existing measurement edge)
-  private resizeEdge: 'left' | 'right' | null = null;
-  private resizeAnchorTime: number | null = null; // The fixed edge during resize
-
-  // Minimap system (Chrome DevTools-style overview with viewport lens)
-  private minimapManager: MinimapManager | null = null;
-  private minimapRenderer: MinimapRenderer | null = null;
-  private minimapInteractionHandler: MinimapInteractionHandler | null = null;
-  private minimapContainer: PIXI.Container | null = null;
-  private minimapDensityQuery: MinimapDensityQuery | null = null;
-  private minimapDiv: HTMLElement | null = null; // HTML container for lens label
-
-  // Cursor mirroring system (bidirectional cursor line between main and minimap)
-  private cursorTimeNs: number | null = null; // Current cursor position in nanoseconds
-  private cursorLineRenderer: CursorLineRenderer | null = null; // Renders cursor on main timeline
-
-  // Minimap keyboard support - tracks if mouse is in minimap area
-  private isMouseInMinimap = false;
-  // Minimap mouse position for lens tooltip detection
-  private minimapMouseX = 0;
-  private minimapMouseY = 0;
+  // Cursor line renderer for main timeline (bidirectional cursor mirroring)
+  private cursorLineRenderer: CursorLineRenderer | null = null;
 
   // Vertical offset from container top to main timeline canvas (minimap height + gap)
   // Used to convert canvas-relative coordinates to container-relative for tooltip positioning
@@ -407,27 +386,16 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.selectionRenderer.setMarkerContext(this.markers, this.index.totalDuration);
     }
 
-    // Initialize measurement system (Shift+drag to measure time range)
-    this.measurementManager = new MeasurementManager();
-    if (this.worldContainer && this.container) {
-      this.measurementRenderer = new MeasureRangeRenderer(this.worldContainer, this.container, () =>
-        this.zoomToMeasurement(),
-      );
-    }
-
-    // Initialize area zoom system (Alt+drag to zoom to area)
-    this.areaZoomManager = new MeasurementManager();
-    if (this.worldContainer && this.container) {
-      this.areaZoomRenderer = new AreaZoomRenderer(this.worldContainer, this.container);
-    }
+    // Initialize measurement orchestrator (owns measurement and area zoom)
+    this.setupMeasurement();
 
     // Initialize cursor line renderer (for bidirectional cursor mirroring)
     if (this.uiContainer) {
       this.cursorLineRenderer = new CursorLineRenderer(this.uiContainer);
     }
 
-    // Initialize minimap system
-    this.setupMinimap();
+    // Initialize minimap orchestrator
+    await this.setupMinimap();
 
     // Setup interaction handler
     this.setupInteractionHandler();
@@ -476,19 +444,11 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
     this.selectionManager = null;
 
-    // Clean up measurement components
-    if (this.measurementRenderer) {
-      this.measurementRenderer.destroy();
-      this.measurementRenderer = null;
+    // Clean up measurement orchestrator
+    if (this.measurementOrchestrator) {
+      this.measurementOrchestrator.destroy();
+      this.measurementOrchestrator = null;
     }
-    this.measurementManager = null;
-
-    // Clean up area zoom components
-    if (this.areaZoomRenderer) {
-      this.areaZoomRenderer.destroy();
-      this.areaZoomRenderer = null;
-    }
-    this.areaZoomManager = null;
 
     // Clean up cursor line renderer
     if (this.cursorLineRenderer) {
@@ -496,18 +456,11 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.cursorLineRenderer = null;
     }
 
-    // Clean up minimap components
-    if (this.minimapInteractionHandler) {
-      this.minimapInteractionHandler.destroy();
-      this.minimapInteractionHandler = null;
+    // Clean up minimap orchestrator
+    if (this.minimapOrchestrator) {
+      this.minimapOrchestrator.destroy();
+      this.minimapOrchestrator = null;
     }
-    if (this.minimapRenderer) {
-      this.minimapRenderer.destroy();
-      this.minimapRenderer = null;
-    }
-    this.minimapManager = null;
-    this.minimapDensityQuery = null;
-    this.minimapContainer = null;
 
     // Clean up viewport animator
     if (this.viewportAnimator) {
@@ -563,12 +516,6 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     this.hitTestManager = null;
-
-    // Destroy minimap app first
-    if (this.minimapApp) {
-      this.minimapApp.destroy(true, { children: true, texture: true });
-      this.minimapApp = null;
-    }
 
     // Destroy main app
     if (this.app) {
@@ -754,9 +701,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Update offset for converting canvas-relative to container-relative coordinates
     this.mainTimelineYOffset = minimapHeight + MINIMAP_GAP;
 
-    // Resize minimap app
-    if (this.minimapApp) {
-      this.minimapApp.renderer.resize(newWidth, minimapHeight);
+    // Resize minimap orchestrator
+    if (this.minimapOrchestrator) {
+      this.minimapOrchestrator.resize(newWidth, newHeight);
     }
 
     // Resize main timeline app
@@ -774,22 +721,8 @@ export class FlameChart<E extends EventNode = EventNode> {
     const newOffsetX = visibleTimeStart * newZoom;
     const newOffsetY = -visibleWorldYBottom;
 
-    // Update minimap manager for new dimensions
-    if (this.minimapManager) {
-      this.minimapManager.resize(newWidth, newHeight);
-    }
-
     // Update viewport with main timeline dimensions only
     this.viewport.setStateForResize(newWidth, mainTimelineHeight, newZoom, newOffsetX, newOffsetY);
-
-    // No minimap offset needed for axis or mesh renderers - separate canvases
-
-    if (this.minimapDensityQuery) {
-      this.minimapDensityQuery.invalidateCache();
-    }
-    if (this.minimapRenderer) {
-      this.minimapRenderer.invalidateStatic();
-    }
 
     this.requestRender();
   }
@@ -816,7 +749,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.state.batchColorsCache = this.buildBatchColorsCache(this.state.batches);
 
     // Invalidate minimap static content to re-render with new colors
-    this.minimapRenderer?.invalidateStatic();
+    this.minimapOrchestrator?.invalidateCache();
 
     // Request re-render
     this.requestRender();
@@ -862,21 +795,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.container.appendChild(this.wrapper);
     }
 
-    // Create minimap app
-    this.minimapApp = new PIXI.Application();
-    await this.minimapApp.init({
-      width,
-      height: minimapHeight,
-      antialias: false,
-      backgroundAlpha: 0,
-      resolution: window.devicePixelRatio || 1,
-      roundPixels: true,
-      autoDensity: true,
-      autoStart: false,
-    });
-    this.minimapApp.ticker.stop();
-    this.minimapApp.stage.eventMode = 'none';
-    this.minimapDiv.appendChild(this.minimapApp.canvas);
+    // Minimap app is created by MinimapOrchestrator in setupMinimap()
 
     // Create main timeline app
     this.app = new PIXI.Application();
@@ -959,7 +878,8 @@ export class FlameChart<E extends EventNode = EventNode> {
         },
         onMouseLeave: () => {
           // Clear cursor position when mouse leaves main timeline
-          this.cursorTimeNs = null;
+          // Cursor is now managed by the minimap orchestrator
+          this.minimapOrchestrator?.setCursorFromMainTimeline(null);
           this.requestRender();
 
           if (this.callbacks.onMouseMove) {
@@ -973,41 +893,42 @@ export class FlameChart<E extends EventNode = EventNode> {
         onContextMenu: (screenX: number, screenY: number, clientX: number, clientY: number) => {
           this.handleContextMenu(screenX, screenY, clientX, clientY);
         },
+        // Measurement callbacks (delegated to MeasurementOrchestrator)
         onMeasureStart: (screenX: number) => {
-          this.handleMeasureStart(screenX);
+          this.measurementOrchestrator?.handleMeasureStart(screenX);
         },
         onMeasureUpdate: (screenX: number) => {
-          this.handleMeasureUpdate(screenX);
+          this.measurementOrchestrator?.handleMeasureUpdate(screenX);
         },
         onMeasureEnd: () => {
-          this.handleMeasureEnd();
+          this.measurementOrchestrator?.handleMeasureEnd();
         },
         onMeasureCancel: () => {
-          this.clearMeasurement();
+          this.measurementOrchestrator?.clearMeasurement();
         },
         onAreaZoomStart: (screenX: number) => {
-          this.handleAreaZoomStart(screenX);
+          this.measurementOrchestrator?.handleAreaZoomStart(screenX);
         },
         onAreaZoomUpdate: (screenX: number) => {
-          this.handleAreaZoomUpdate(screenX);
+          this.measurementOrchestrator?.handleAreaZoomUpdate(screenX);
         },
         onAreaZoomEnd: () => {
-          this.handleAreaZoomEnd();
+          this.measurementOrchestrator?.handleAreaZoomEnd();
         },
         onAreaZoomCancel: () => {
-          this.clearAreaZoom();
+          this.measurementOrchestrator?.clearAreaZoom();
         },
         onResizeStart: (screenX: number, edge: 'left' | 'right') => {
-          this.handleResizeStart(screenX, edge);
+          this.measurementOrchestrator?.handleResizeStart(screenX, edge);
         },
         onResizeUpdate: (screenX: number) => {
-          this.handleResizeUpdate(screenX);
+          this.measurementOrchestrator?.handleResizeUpdate(screenX);
         },
         onResizeEnd: () => {
-          this.handleResizeEnd();
+          this.measurementOrchestrator?.handleResizeEnd();
         },
         getMeasurementResizeEdge: (screenX: number) => {
-          return this.getMeasurementResizeEdge(screenX);
+          return this.measurementOrchestrator?.getMeasurementResizeEdge(screenX) ?? null;
         },
       },
     );
@@ -1066,8 +987,8 @@ export class FlameChart<E extends EventNode = EventNode> {
       },
       onEscape: () => {
         // Clear in order: measurement → selection → search
-        if (this.measurementManager?.hasMeasurement()) {
-          this.clearMeasurement();
+        if (this.measurementOrchestrator?.hasMeasurement()) {
+          this.measurementOrchestrator.clearMeasurement();
         } else if (this.selectionManager?.hasAnySelection()) {
           this.clearSelection();
         } else {
@@ -1117,8 +1038,8 @@ export class FlameChart<E extends EventNode = EventNode> {
         }
       },
 
-      // Minimap keyboard callbacks
-      isInMinimapArea: () => this.isMouseInMinimap,
+      // Minimap keyboard callbacks (delegated to MinimapOrchestrator)
+      isInMinimapArea: () => this.minimapOrchestrator?.isMouseInMinimapArea() ?? false,
 
       onMinimapPanViewport: (deltaTimeNs: number) => {
         if (!this.viewport || !this.viewportAnimator) {
@@ -1129,7 +1050,6 @@ export class FlameChart<E extends EventNode = EventNode> {
         const deltaX = deltaTimeNs * viewportState.zoom;
 
         // Use animated pan via chase animation for smooth keyboard panning
-        // (same as main timeline keyboard pan)
         this.viewportAnimator.addToTarget(this.viewport, deltaX, 0, () =>
           this.notifyViewportChange(),
         );
@@ -1140,7 +1060,6 @@ export class FlameChart<E extends EventNode = EventNode> {
           return;
         }
         // Use animated pan via chase animation for smooth keyboard panning
-        // (same as main timeline keyboard pan)
         this.viewportAnimator.addToTarget(this.viewport, 0, deltaY, () =>
           this.notifyViewportChange(),
         );
@@ -1161,34 +1080,11 @@ export class FlameChart<E extends EventNode = EventNode> {
       },
 
       onMinimapJumpStart: () => {
-        if (!this.viewport || !this.minimapManager) {
-          return;
-        }
-
-        // Get current selection width and move to start
-        const selection = this.minimapManager.getSelection();
-        const duration = selection.endTime - selection.startTime;
-
-        // Set selection to start of timeline
-        this.minimapManager.setSelection(0, duration);
-        const newSelection = this.minimapManager.getSelection();
-        this.handleMinimapSelectionChange(newSelection.startTime, newSelection.endTime);
+        this.minimapOrchestrator?.handleJumpStart();
       },
 
       onMinimapJumpEnd: () => {
-        if (!this.viewport || !this.minimapManager || !this.index) {
-          return;
-        }
-
-        // Get current selection width and move to end
-        const selection = this.minimapManager.getSelection();
-        const duration = selection.endTime - selection.startTime;
-
-        // Set selection to end of timeline
-        const totalDuration = this.index.totalDuration;
-        this.minimapManager.setSelection(totalDuration - duration, totalDuration);
-        const newSelection = this.minimapManager.getSelection();
-        this.handleMinimapSelectionChange(newSelection.startTime, newSelection.endTime);
+        this.minimapOrchestrator?.handleJumpEnd();
       },
 
       onMinimapResetZoom: () => {
@@ -1200,262 +1096,115 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
-   * Setup minimap system for Chrome DevTools-style overview navigation.
+   * Setup minimap orchestrator for Chrome DevTools-style overview navigation.
    */
-  private setupMinimap(): void {
-    if (!this.minimapApp || !this.index || !this.rectangleManager || !this.viewport) {
+  private async setupMinimap(): Promise<void> {
+    if (!this.index || !this.rectangleManager || !this.viewport || !this.minimapDiv) {
       return;
     }
 
-    const { displayWidth } = this.viewport.getState();
-    // Use full original container height for minimap sizing calculations
     const containerHeight = this.container?.getBoundingClientRect().height ?? 0;
+    const { displayWidth } = this.viewport.getState();
 
-    // Initialize minimap manager (state and coordinate transforms)
-    this.minimapManager = new MinimapManager(
-      this.index.totalDuration,
-      this.index.maxDepth,
+    // Create minimap orchestrator with callbacks
+    this.minimapOrchestrator = new MinimapOrchestrator({
+      onViewportChange: (zoom: number, offsetX: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        const viewportState = this.viewport.getState();
+        this.viewport.setZoom(zoom);
+        this.viewport.setOffset(offsetX, viewportState.offsetY);
+        this.notifyViewportChange();
+      },
+      onZoom: (factor: number, anchorTimeNs: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        // Convert anchor time to screen X in main viewport
+        const viewportState = this.viewport.getState();
+        const anchorScreenX = anchorTimeNs * viewportState.zoom - viewportState.offsetX;
+        // Apply zoom with anchor
+        this.viewport.zoomByFactor(factor, anchorScreenX);
+        this.notifyViewportChange();
+      },
+      onDepthPan: (deltaY: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        const viewportState = this.viewport.getState();
+        const newOffsetY = viewportState.offsetY + deltaY;
+        this.viewport.setOffset(viewportState.offsetX, newOffsetY);
+        this.notifyViewportChange();
+      },
+      onCursorMove: (_timeNs: number | null) => {
+        // Cursor is now managed by the orchestrator
+        // The orchestrator updates its internal cursorTimeNs state
+      },
+      requestRender: () => {
+        this.requestRender();
+      },
+      onResetZoom: () => {
+        this.resetZoom();
+      },
+    });
+
+    // Initialize the orchestrator
+    await this.minimapOrchestrator.init(
+      this.minimapDiv,
       displayWidth,
       containerHeight,
+      this.index,
+      this.rectangleManager,
+      this.viewport,
     );
 
-    // Initialize density query (leverages RectangleManager's segment tree for O(B×log N) performance)
-    this.minimapDensityQuery = new MinimapDensityQuery(
-      this.rectangleManager.getRectsByCategory(),
-      this.index.totalDuration,
-      this.index.maxDepth,
-      this.rectangleManager.getSegmentTree(),
-    );
-
-    // Create minimap container on minimap app's stage
-    this.minimapContainer = new PIXI.Container();
-    this.minimapApp.stage.addChild(this.minimapContainer);
-
-    // Initialize minimap renderer with HTML container for lens label
-    this.minimapRenderer = new MinimapRenderer(this.minimapContainer, this.minimapDiv!);
-
-    // Set PIXI renderer for texture caching (static content optimization)
-    this.minimapRenderer.setRenderer(this.minimapApp.renderer as PIXI.Renderer);
-
-    // Initialize minimap interaction handler with minimap canvas
-    if (this.minimapApp.canvas) {
-      const minimapCanvas = this.minimapApp.canvas as HTMLCanvasElement;
-
-      this.minimapInteractionHandler = new MinimapInteractionHandler(
-        minimapCanvas,
-        this.minimapManager,
-        {
-          onSelectionChange: (startTime: number, endTime: number) => {
-            this.handleMinimapSelectionChange(startTime, endTime);
-          },
-          onZoom: (factor: number, anchorTimeNs: number) => {
-            this.handleMinimapZoom(factor, anchorTimeNs);
-          },
-          onResetView: () => {
-            this.resetZoom();
-          },
-          onCursorMove: (timeNs: number | null) => {
-            // Minimap cursor → update cursor position for both views
-            // cursorTimeNs is used by both minimap and main timeline cursor renderers
-            this.cursorTimeNs = timeNs;
-            this.requestRender();
-          },
-          onHorizontalPan: (deltaPixels: number) => {
-            // Convert pixels to time using main viewport zoom (not minimap scale)
-            // This makes minimap pan feel the same speed as main timeline pan
-            if (!this.viewport || !this.minimapManager) {
-              return;
-            }
-            const viewportState = this.viewport.getState();
-            const deltaTime = deltaPixels / viewportState.zoom;
-            this.minimapManager.moveSelection(deltaTime);
-            const selection = this.minimapManager.getSelection();
-            this.handleMinimapSelectionChange(selection.startTime, selection.endTime);
-          },
-          onDepthPan: (deltaY: number) => {
-            // Y drag during Shift+move pans the main viewport vertically (depth)
-            this.handleMinimapDepthPan(deltaY, true); // Drag: scaled for 1:1 mouse tracking
-          },
-          onDepthPositionStart: (minimapY: number) => {
-            // Position lens at initial Y when 'create' drag starts
-            this.handleMinimapDepthPositionStart(minimapY);
-          },
-        },
-      );
-
-      // Track mouse enter/leave/move for keyboard support and lens tooltip
-      minimapCanvas.addEventListener('mouseenter', () => {
-        this.isMouseInMinimap = true;
-      });
-      minimapCanvas.addEventListener('mouseleave', () => {
-        this.isMouseInMinimap = false;
-      });
-      minimapCanvas.addEventListener('mousemove', (event) => {
-        const rect = minimapCanvas.getBoundingClientRect();
-        this.minimapMouseX = event.clientX - rect.left;
-        this.minimapMouseY = event.clientY - rect.top;
-      });
-
-      // Focus container on minimap mousedown for keyboard support
-      minimapCanvas.addEventListener('mousedown', () => {
+    // Focus container on minimap mousedown for keyboard support
+    const minimapApp = this.minimapOrchestrator.getApp();
+    if (minimapApp?.canvas) {
+      minimapApp.canvas.addEventListener('mousedown', () => {
         this.container?.focus();
       });
     }
   }
 
   /**
-   * Handle minimap selection change (user created/moved/resized selection).
-   * Updates main viewport to match the selection.
+   * Setup measurement orchestrator for Shift+drag measurement and Alt+drag area zoom.
    */
-  private handleMinimapSelectionChange(startTime: number, endTime: number): void {
-    if (!this.viewport) {
+  private setupMeasurement(): void {
+    if (!this.worldContainer || !this.container || !this.viewport || !this.index) {
       return;
     }
 
-    const viewportState = this.viewport.getState();
-    const duration = endTime - startTime;
+    // Create measurement orchestrator with callbacks
+    this.measurementOrchestrator = new MeasurementOrchestrator({
+      onZoomToRange: (startTime: number, duration: number, middleDepth: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        // Focus on the range (zoom to fit exactly, no padding)
+        this.viewport.focusOnEvent(startTime, duration, middleDepth, 0);
+        this.notifyViewportChange();
+      },
+      onMeasurementChange: (measurement: MeasurementState | null) => {
+        this.callbacks.onMeasurementChange?.(measurement);
+      },
+      requestRender: () => {
+        this.requestRender();
+      },
+      onClearSearch: () => {
+        this.clearSearch();
+      },
+    });
 
-    if (duration <= 0) {
-      return;
-    }
-
-    // Calculate new zoom to fit selection
-    const newZoom = viewportState.displayWidth / duration;
-    const newOffsetX = startTime * newZoom;
-
-    // Apply zoom and offset
-    this.viewport.setZoom(newZoom);
-    this.viewport.setOffset(newOffsetX, viewportState.offsetY);
-
-    this.notifyViewportChange();
-  }
-
-  /**
-   * Handle minimap zoom (wheel event on minimap).
-   * Zooms both minimap and main viewport at the anchor point.
-   */
-  private handleMinimapZoom(factor: number, anchorTimeNs: number): void {
-    if (!this.viewport) {
-      return;
-    }
-
-    // Convert anchor time to screen X in main viewport
-    const viewportState = this.viewport.getState();
-    const anchorScreenX = anchorTimeNs * viewportState.zoom - viewportState.offsetX;
-
-    // Apply zoom with anchor
-    this.viewport.zoomByFactor(factor, anchorScreenX);
-
-    this.notifyViewportChange();
-  }
-
-  /**
-   * Handle minimap depth pan (Y drag during move/create operation).
-   * Scrolls the main viewport vertically to show different depth levels.
-   *
-   * Direct manipulation: input direction matches lens visual movement.
-   * Positive deltaY (drag down) → lens moves down visually
-   * Negative deltaY (drag up) → lens moves up visually
-   *
-   * @param deltaY - Pixel delta from input
-   * @param scaled - If true, scale deltaY so lens follows mouse 1:1 (for drag).
-   *                 If false, use deltaY directly as viewport pixels (for keyboard).
-   */
-  private handleMinimapDepthPan(deltaY: number, scaled: boolean): void {
-    if (!this.viewport) {
-      return;
-    }
-
-    let effectiveDelta = deltaY;
-
-    if (scaled && this.minimapManager && this.index) {
-      // Scale deltaY so lens follows mouse 1:1 on minimap
-      // Minimap compresses the full depth range into a small chart area
-      const minimapChartHeight = this.minimapManager.getChartHeight();
-      const totalDepthHeight = (this.index.maxDepth + 1) * TIMELINE_CONSTANTS.EVENT_HEIGHT;
-      const scale = minimapChartHeight > 0 ? totalDepthHeight / minimapChartHeight : 1;
-      // Apply slight damping (0.9) for smoother feel
-      effectiveDelta = deltaY * scale * 0.9;
-    }
-
-    // Direct manipulation: add deltaY so drag direction matches lens movement
-    const viewportState = this.viewport.getState();
-    const newOffsetY = viewportState.offsetY + effectiveDelta;
-
-    // Apply new offset (viewport clamps to valid bounds)
-    this.viewport.setOffset(viewportState.offsetX, newOffsetY);
-
-    this.notifyViewportChange();
-  }
-
-  /**
-   * Handle initial depth positioning when 'create' drag starts on minimap.
-   * Positions the lens so it starts at the clicked Y position.
-   *
-   * @param minimapY - Y coordinate in minimap where drag started
-   */
-  private handleMinimapDepthPositionStart(minimapY: number): void {
-    if (!this.viewport || !this.minimapManager || !this.index) {
-      return;
-    }
-
-    const chartHeight = this.minimapManager.getChartHeight();
-    const minimapHeight = this.minimapManager.getHeight();
-    const axisHeight = minimapHeight - chartHeight;
-    const maxDepth = this.index.maxDepth;
-    const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
-    const viewportState = this.viewport.getState();
-
-    // Edge snap threshold (pixels from edge to trigger snap)
-    const SNAP_THRESHOLD = 8;
-
-    // Calculate the visible depth range (how many depths fit in viewport)
-    const visibleDepths = viewportState.displayHeight / eventHeight;
-
-    // Clamp minimapY to chart area
-    const chartTop = axisHeight;
-    const chartBottom = minimapHeight;
-    const clampedY = Math.max(chartTop, Math.min(chartBottom, minimapY));
-
-    // Calculate depth at click position
-    // Top of chart (chartTop) = maxDepth, bottom of chart (chartBottom) = depth 0
-    const yRatio = (clampedY - chartTop) / chartHeight;
-    const clickDepth = maxDepth * (1 - yRatio);
-
-    // Determine which edge of the lens should be at the click position
-    // If clicking in top half of chart → position lens TOP at click (show high depths)
-    // If clicking in bottom half → position lens BOTTOM at click (show low depths)
-    const isTopHalf = yRatio < 0.5;
-
-    let targetDepth: number;
-    if (isTopHalf) {
-      // Click near top: lens top edge at click, so bottom of visible range is clickDepth - visibleDepths
-      // But we want the TOP of the lens at clickDepth, so the viewport shows clickDepth at top
-      targetDepth = clickDepth - visibleDepths;
-    } else {
-      // Click near bottom: lens bottom edge at click, viewport shows clickDepth at bottom
-      targetDepth = clickDepth;
-    }
-
-    // Apply edge snapping
-    const distFromTop = clampedY - chartTop;
-    const distFromBottom = chartBottom - clampedY;
-
-    if (distFromTop < SNAP_THRESHOLD) {
-      // Snap to top: show maximum depths (lens at very top)
-      targetDepth = maxDepth - visibleDepths;
-    } else if (distFromBottom < SNAP_THRESHOLD) {
-      // Snap to bottom: show depth 0 (lens at very bottom)
-      targetDepth = 0;
-    }
-
-    // Convert target depth to offsetY
-    // offsetY = -depth * eventHeight (negative because offsetY <= 0)
-    const newOffsetY = -Math.max(0, targetDepth) * eventHeight;
-
-    // Apply new offset (viewport clamps to valid bounds)
-    this.viewport.setOffset(viewportState.offsetX, newOffsetY);
-    this.notifyViewportChange();
+    // Initialize the orchestrator
+    this.measurementOrchestrator.init(
+      this.worldContainer,
+      this.container,
+      this.viewport,
+      this.index.totalDuration,
+      this.index.maxDepth,
+    );
   }
 
   private handleMouseMove(screenX: number, screenY: number): void {
@@ -1516,19 +1265,13 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.selectMarker(marker);
     } else {
       // Clicked on empty space - check if inside measurement area
-      if (this.measurementManager?.hasMeasurement()) {
-        const measurement = this.measurementManager.getState();
-        if (measurement) {
-          const clickTime = this.screenXToTime(screenX);
-          const isInsideMeasurement =
-            clickTime >= measurement.startTime && clickTime <= measurement.endTime;
-          if (!isInsideMeasurement) {
-            // Clicked outside measurement - clear it
-            this.clearMeasurement();
-            return;
-          }
-          // Clicked inside measurement - don't clear, allow frame selection below
+      if (this.measurementOrchestrator?.hasMeasurement()) {
+        if (!this.measurementOrchestrator.isInsideMeasurement(screenX)) {
+          // Clicked outside measurement - clear it
+          this.measurementOrchestrator.clearMeasurement();
+          return;
         }
+        // Clicked inside measurement - don't clear, allow frame selection below
       }
       this.clearSelection();
     }
@@ -1550,15 +1293,11 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     // Check if double-click is inside measurement range first
-    if (this.measurementManager?.hasMeasurement()) {
-      const measurement = this.measurementManager.getState();
-      if (measurement) {
-        const clickTime = this.screenXToTime(screenX);
-        if (clickTime >= measurement.startTime && clickTime <= measurement.endTime) {
-          // Zoom to measurement range
-          this.zoomToMeasurement();
-          return;
-        }
+    if (this.measurementOrchestrator?.hasMeasurement()) {
+      if (this.measurementOrchestrator.isInsideMeasurement(screenX)) {
+        // Zoom to measurement range
+        this.measurementOrchestrator.zoomToMeasurement();
+        return;
       }
     }
 
@@ -1694,273 +1433,23 @@ export class FlameChart<E extends EventNode = EventNode> {
   // MEASUREMENT HANDLERS
   // ============================================================================
 
-  /**
-   * Convert screen X coordinate to timeline time in nanoseconds.
-   */
-  private screenXToTime(screenX: number): number {
-    if (!this.viewport) {
-      return 0;
-    }
-    const viewportState = this.viewport.getState();
-    // screenX is relative to canvas, offsetX is the viewport scroll position
-    return (screenX + viewportState.offsetX) / viewportState.zoom;
-  }
-
-  /**
-   * Handle measurement start (Shift+drag began).
-   * Clears any existing selection (measurement and selection are mutually exclusive).
-   */
-  private handleMeasureStart(screenX: number): void {
-    if (!this.measurementManager) {
-      return;
-    }
-
-    // DON'T clear selection - measurement and selection can coexist
-
-    // Clear search when starting measurement (search highlights conflict with measurement overlay)
-    this.clearSearch();
-
-    // Start measurement - clamp to timeline bounds
-    const timeNs = this.screenXToTime(screenX);
-    const clampedTime = Math.max(0, Math.min(this.index?.totalDuration ?? Infinity, timeNs));
-    this.measurementManager.start(clampedTime);
-
-    // Notify callback
-    this.callbacks.onMeasurementChange?.(this.measurementManager.getState());
-
-    this.requestRender();
-  }
-
-  /**
-   * Handle measurement update (Shift+drag continuing).
-   */
-  private handleMeasureUpdate(screenX: number): void {
-    if (!this.measurementManager) {
-      return;
-    }
-
-    // Clamp to timeline bounds (0 to totalDuration)
-    const timeNs = this.screenXToTime(screenX);
-    const clampedTime = Math.max(0, Math.min(this.index?.totalDuration ?? Infinity, timeNs));
-    this.measurementManager.update(clampedTime);
-
-    // Notify callback
-    this.callbacks.onMeasurementChange?.(this.measurementManager.getState());
-
-    this.requestRender();
-  }
-
-  /**
-   * Handle measurement end (mouse released).
-   * Measurement persists until cleared.
-   */
-  private handleMeasureEnd(): void {
-    if (!this.measurementManager) {
-      return;
-    }
-
-    this.measurementManager.finish();
-
-    // Notify callback
-    this.callbacks.onMeasurementChange?.(this.measurementManager.getState());
-
-    this.requestRender();
-  }
+  // ============================================================================
+  // MEASUREMENT API (delegated to MeasurementOrchestrator)
+  // ============================================================================
 
   /**
    * Clear the current measurement.
    * Called when user presses Escape, clicks elsewhere, or starts a new selection.
    */
   public clearMeasurement(): void {
-    if (!this.measurementManager?.hasMeasurement()) {
-      return;
-    }
-
-    this.measurementManager.clear();
-    this.measurementRenderer?.clear();
-
-    // Notify callback
-    this.callbacks.onMeasurementChange?.(null);
-
-    this.requestRender();
+    this.measurementOrchestrator?.clearMeasurement();
   }
 
   /**
    * Check if there is an active measurement.
    */
   public hasMeasurement(): boolean {
-    return this.measurementManager?.hasMeasurement() ?? false;
-  }
-
-  // ============================================================================
-  // AREA ZOOM HANDLERS
-  // ============================================================================
-
-  /**
-   * Handle area zoom start (Alt+drag began).
-   * Clears any existing measurement.
-   */
-  private handleAreaZoomStart(screenX: number): void {
-    if (!this.areaZoomManager) {
-      return;
-    }
-
-    // Clear measurement when starting area zoom (they can't coexist visually)
-    this.clearMeasurement();
-
-    // Clear search when starting area zoom
-    this.clearSearch();
-
-    // Start area zoom - clamp to timeline bounds
-    const timeNs = this.screenXToTime(screenX);
-    const clampedTime = Math.max(0, Math.min(this.index?.totalDuration ?? Infinity, timeNs));
-    this.areaZoomManager.start(clampedTime);
-
-    this.requestRender();
-  }
-
-  /**
-   * Handle area zoom update (Alt+drag continuing).
-   */
-  private handleAreaZoomUpdate(screenX: number): void {
-    if (!this.areaZoomManager) {
-      return;
-    }
-
-    // Clamp to timeline bounds (0 to totalDuration)
-    const timeNs = this.screenXToTime(screenX);
-    const clampedTime = Math.max(0, Math.min(this.index?.totalDuration ?? Infinity, timeNs));
-    this.areaZoomManager.update(clampedTime);
-
-    this.requestRender();
-  }
-
-  /**
-   * Handle area zoom end (mouse released after drag).
-   * Zooms to the selected area and clears the overlay.
-   */
-  private handleAreaZoomEnd(): void {
-    if (!this.areaZoomManager || !this.viewport || !this.index) {
-      this.clearAreaZoom();
-      return;
-    }
-
-    const state = this.areaZoomManager.getState();
-    if (state && state.endTime - state.startTime > 0) {
-      // Zoom to the selected area (exact fit, no padding)
-      const middleDepth = Math.floor(this.index.maxDepth / 2);
-      this.viewport.focusOnEvent(
-        state.startTime,
-        state.endTime - state.startTime,
-        middleDepth,
-        0, // 100% zoom, no padding
-      );
-
-      this.notifyViewportChange();
-    }
-
-    // Clear the area zoom overlay
-    this.clearAreaZoom();
-  }
-
-  /**
-   * Clear the current area zoom overlay.
-   */
-  private clearAreaZoom(): void {
-    if (!this.areaZoomManager) {
-      return;
-    }
-
-    this.areaZoomManager.clear();
-    this.areaZoomRenderer?.clear();
-
-    this.requestRender();
-  }
-
-  // ============================================================================
-  // RESIZE HANDLERS (drag existing measurement edge)
-  // ============================================================================
-
-  /**
-   * Check if screenX is near a measurement resize edge.
-   * Returns 'left' or 'right' if near an edge, null otherwise.
-   */
-  private getMeasurementResizeEdge(screenX: number): 'left' | 'right' | null {
-    if (!this.measurementManager?.hasMeasurement() || !this.viewport) {
-      return null;
-    }
-
-    const measurement = this.measurementManager.getState();
-    if (!measurement || measurement.isActive) {
-      // Only finished measurements can be resized
-      return null;
-    }
-
-    const viewportState = this.viewport.getState();
-    const screenStartX = measurement.startTime * viewportState.zoom - viewportState.offsetX;
-    const screenEndX = measurement.endTime * viewportState.zoom - viewportState.offsetX;
-
-    const threshold = 8; // px
-    if (Math.abs(screenX - screenStartX) <= threshold) {
-      return 'left';
-    }
-    if (Math.abs(screenX - screenEndX) <= threshold) {
-      return 'right';
-    }
-    return null;
-  }
-
-  /**
-   * Handle resize start (click on measurement edge).
-   */
-  private handleResizeStart(_screenX: number, edge: 'left' | 'right'): void {
-    if (!this.measurementManager) {
-      return;
-    }
-
-    const measurement = this.measurementManager.getState();
-    if (!measurement) {
-      return;
-    }
-
-    this.resizeEdge = edge;
-    // Store the anchor (the edge NOT being dragged)
-    this.resizeAnchorTime = edge === 'left' ? measurement.endTime : measurement.startTime;
-
-    this.requestRender();
-  }
-
-  /**
-   * Handle resize update (dragging measurement edge).
-   */
-  private handleResizeUpdate(screenX: number): void {
-    if (!this.measurementManager || this.resizeAnchorTime === null) {
-      return;
-    }
-
-    const timeNs = this.screenXToTime(screenX);
-    const clampedTime = Math.max(0, Math.min(this.index?.totalDuration ?? Infinity, timeNs));
-
-    // Update measurement using anchor - dragged time becomes one edge, anchor is the other
-    this.measurementManager.setEdges(clampedTime, this.resizeAnchorTime);
-
-    // Notify callback
-    this.callbacks.onMeasurementChange?.(this.measurementManager.getState());
-
-    this.requestRender();
-  }
-
-  /**
-   * Handle resize end (mouse released after dragging edge).
-   */
-  private handleResizeEnd(): void {
-    this.resizeEdge = null;
-    this.resizeAnchorTime = null;
-
-    // Notify callback with final measurement state
-    this.callbacks.onMeasurementChange?.(this.measurementManager?.getState() ?? null);
-
-    this.requestRender();
+    return this.measurementOrchestrator?.hasMeasurement() ?? false;
   }
 
   /**
@@ -1968,27 +1457,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Used by double-click inside measurement and zoom icon in label.
    */
   public zoomToMeasurement(): void {
-    if (!this.measurementManager?.hasMeasurement() || !this.viewport || !this.index) {
-      return;
-    }
-
-    const measurement = this.measurementManager.getState();
-    if (!measurement) {
-      return;
-    }
-
-    // Use middle depth for vertical centering
-    const middleDepth = Math.floor(this.index.maxDepth / 2);
-
-    // Focus on the measurement range (zoom to fit exactly, no padding)
-    this.viewport.focusOnEvent(
-      measurement.startTime,
-      measurement.endTime - measurement.startTime,
-      middleDepth,
-      0, // 100% zoom, no padding
-    );
-
-    this.notifyViewportChange();
+    this.measurementOrchestrator?.zoomToMeasurement();
   }
 
   // ============================================================================
@@ -2520,61 +1989,34 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.selectionRenderer?.clear();
     }
 
-    // Render measurement overlay (if active)
-    if (this.measurementRenderer && this.measurementManager) {
-      this.measurementRenderer.render(viewportState, this.measurementManager.getState());
-    }
-
-    // Render area zoom overlay (if active)
-    if (this.areaZoomRenderer && this.areaZoomManager) {
-      this.areaZoomRenderer.render(viewportState, this.areaZoomManager.getState());
+    // Render measurement and area zoom overlays via orchestrator
+    if (this.measurementOrchestrator) {
+      this.measurementOrchestrator.render({ viewportState });
     }
 
     // Render cursor line on main timeline (bidirectional cursor mirroring)
-    if (this.cursorLineRenderer) {
-      this.cursorLineRenderer.render(viewportState, this.cursorTimeNs);
+    // Cursor time is owned by the minimap orchestrator
+    if (this.cursorLineRenderer && this.minimapOrchestrator) {
+      const cursorTimeNs = this.minimapOrchestrator.getCursorTimeNs();
+      this.cursorLineRenderer.render(viewportState, cursorTimeNs);
     }
 
     // Render main timeline
     this.app.render();
 
-    // Render minimap (if initialized)
-    if (
-      this.minimapApp &&
-      this.minimapRenderer &&
-      this.minimapManager &&
-      this.minimapDensityQuery
-    ) {
-      // Get visible depth range from viewport bounds
+    // Render minimap via orchestrator
+    if (this.minimapOrchestrator) {
       const bounds = this.viewport.getBounds();
-
-      // Sync lens position with main viewport (including Y bounds)
-      this.minimapManager.setSelectionFromViewport(
+      this.minimapOrchestrator.render({
         viewportState,
-        bounds.depthStart,
-        bounds.depthEnd,
-      );
-
-      // Query density data (cached unless display width changed)
-      const densityData = this.minimapDensityQuery.query(viewportState.displayWidth);
-
-      // Render minimap with density, markers, cursor, and interaction state
-      // Show lens label only when hovering over the lens area or dragging
-      const isHoveringLens =
-        this.isMouseInMinimap &&
-        this.minimapManager.isPointInsideLens(this.minimapMouseX, this.minimapMouseY);
-      const isInteracting = isHoveringLens || this.minimapManager.isDragging();
-      this.minimapRenderer.render(
-        this.minimapManager,
-        densityData,
-        this.markers,
-        this.state.batchColorsCache,
-        this.cursorTimeNs,
-        isInteracting,
-      );
-
-      // Render minimap app
-      this.minimapApp.render();
+        viewportBounds: {
+          depthStart: bounds.depthStart,
+          depthEnd: bounds.depthEnd,
+        },
+        markers: this.markers,
+        batchColors: this.state.batchColorsCache,
+        cursorTimeNs: this.minimapOrchestrator.getCursorTimeNs(),
+      });
     }
   }
 }
