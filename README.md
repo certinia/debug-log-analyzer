@@ -88,6 +88,8 @@ The Flame Chart view shows a timeline of the Salesforce Apex log execution — i
 - **⚡ Fast** – Blazing-fast zoom, pan, and rendering even on massive logs (500k+ lines).
 - **🎯 Frame Selection & Navigation** – Click to select frames, use arrow keys to navigate the call stack, double-click or press `Enter` to zoom and focus.
 - **Zoom & Pan** – Navigate your logs down to 0.001 ms with precision zoom. `W`/`S` keys or scroll wheel for zoom; `A`/`D` keys or drag for pan.
+- **📏 Measure Range** – `Shift+Drag` to measure the duration between any two points. Resize edges, double-click to zoom.
+- **🔍 Area Zoom** – `Alt/Option+Drag` to select a region and instantly zoom to fit.
 - **Dynamic Labels** – Instantly see method names on timeline events for faster scanning.
 - **19 Curated Themes** – Choose from beautiful, optimized color themes or create your own via Settings.
 - **Smart Interaction** – Right-click for context actions; `Cmd/Ctrl+Click` to jump directly to the Call Tree; `Cmd/Ctrl+C` to copy frame names.

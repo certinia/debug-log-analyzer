@@ -13,28 +13,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Visual Display**: Dynamic labels on Timeline events for faster log scanning; Time axis auto-spaces markers intelligently and more naturally as you zoom; Search + highlight dims non-matches for fast scanning.
 
 - ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart built for massive logs and up to **7X faster**. ([#446] [#251] [#92] [#564])
+  - Full feature parity with the original Timeline including:
+    - Zoom and pan navigation (mouse + keyboard)
+    - Search with result highlighting
+    - Frame tooltips on hover
+    - Markers for errors, skipped lines, and truncation
+    - Click to navigate to Call Tree (now on key press of `J` or `Cmd/Ctrl+Click`)
   - **⚡ Performance**: Improved performance to handle huge Apex debug logs.
     - Zoom + pan are **7X faster** with smoother motion.
   - **Visual Display**:
     - Adaptive level-of-detail bucketing reveals richer timeline detail as you zoom while keeping the view clean and fast.
-    - Dynamic labels on Timeline events for faster log scanning.
+    - Dynamic labels on Timeline events for faster log scanning. ([#92])
     - Time axis auto-spaces markers intelligently and more naturally as you zoom.
     - Search + highlight dims non-matches for fast scanning.
   - **🎨 Themes**:
     - 18 curated timeline themes plus the default theme has been improved for better contrast and readability.
     - Add your own multiple custom themes via **Settings -> Apex Log Analyzer -> Timeline -> Custom Themes**.
     - Fast theme switching via **Command Palette**: **Log: Timeline Theme** or **Settings -> Apex Log Analyzer -> Timeline -> Active Theme**.
-  - **Keyboard and Mouse Navigation**: Comprehensive interaction controls for the timeline. ([#573] [#366] [#353] [#296] [#295] [#535])
-    - **View Control**:
+  - **Keyboard and Mouse Navigation**: Comprehensive interaction controls for the timeline. ([#573] [#366] [#296] [#295] [#535])
+    - **Selection & Focus**:
+      - **Frame Selection**: Click to select and highlight a frame without navigating away.
+      - **Frame Navigation**: Arrow keys traverse the call stack (Up=child, Down=parent, Left/Right=siblings).
+      - **Focus/Zoom to Frame**: Double-click or press `Enter`/`Z` to zoom and fit the selected frame. ([#535] [#295])
+    - **Pan & Zoom**: ([#296])
       - **Zoom**: Scroll wheel (mouse-anchored), or `W`/`S`/`+`/`-` keys.
       - **Horizontal Pan**: `Alt/Option+Scroll`, trackpad swipe, `A`/`D` keys, or click and drag.
       - **Vertical Pan**: `Shift+Scroll` or `Shift+W`/`Shift+S` to pan through stack depth.
       - **Reset Zoom**: Press `Home` or `0` to reset zoom and fit all content.
-    - **Frame Control**:
-      - **Frame Selection**: Click to select and highlight a frame without navigating away.
-      - **Frame Navigation**: Arrow keys traverse the call stack (Up=child, Down=parent, Left/Right=siblings).
-      - **Focus/Zoom to Frame**: Double-click or press `Enter`/`Z` to zoom and fit the selected frame.
-    - **Navigation & Actions**:
+      - **Area Zoom**: `Alt/Option+Drag` to select a time range and instantly zoom to fit it. ([#164])
+    - **Measure Range**: `Shift+Drag` to measure the duration between two points; resize by dragging edges; double-click or click the zoom icon to zoom to the measured range. ([#164])
+      - `Esc` or click empty space to dismis the range.
+    - **Actions & Shortcuts**: ([#573] [#366])
       - **Jump to Call Tree**: Press `J` or `Cmd/Ctrl+Click` to navigate to the frame in the Call Tree.
       - **Context Menu**: Right-click for Go to Source, Copy Name, Copy Details, and Copy Call Stack.
       - **Copy**: `Cmd/Ctrl+C` copies the selected frame name.
@@ -441,10 +450,10 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#164]: https://github.com/certinia/debug-log-analyzer/issues/164
 [#535]: https://github.com/certinia/debug-log-analyzer/issues/535
 [#295]: https://github.com/certinia/debug-log-analyzer/issues/295
 [#296]: https://github.com/certinia/debug-log-analyzer/issues/296
-[#353]: https://github.com/certinia/debug-log-analyzer/issues/353
 [#366]: https://github.com/certinia/debug-log-analyzer/issues/366
 [#573]: https://github.com/certinia/debug-log-analyzer/issues/573
 [#564]: https://github.com/certinia/debug-log-analyzer/issues/564
