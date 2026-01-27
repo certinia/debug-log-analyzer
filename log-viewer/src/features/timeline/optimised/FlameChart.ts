@@ -55,8 +55,6 @@ import { CursorLineRenderer } from './rendering/CursorLineRenderer.js';
 import { FlameChartCursor } from './search/FlameChartCursor.js';
 import { SearchCursorImpl } from './search/SearchCursor.js';
 import { SearchManager } from './search/SearchManager.js';
-import { SelectionHighlightRenderer } from './selection/SelectionHighlightRenderer.js';
-import { SelectionManager } from './selection/SelectionManager.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineViewport } from './TimelineViewport.js';
 import { ViewportAnimator } from './ViewportAnimator.js';
@@ -69,6 +67,8 @@ import {
   MINIMAP_GAP,
   MinimapOrchestrator,
 } from './orchestrators/MinimapOrchestrator.js';
+
+import { SelectionOrchestrator } from './orchestrators/SelectionOrchestrator.js';
 
 export interface FlameChartCallbacks {
   onMouseMove?: (
@@ -155,9 +155,8 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   private hitTestManager: HitTestManager | null = null;
 
-  // Selection system
-  private selectionManager: SelectionManager<E> | null = null;
-  private selectionRenderer: SelectionHighlightRenderer | null = null;
+  // Selection orchestrator (owns selection state and rendering)
+  private selectionOrchestrator: SelectionOrchestrator<E> | null = null;
   private viewportAnimator: ViewportAnimator | null = null;
 
   // Measurement orchestrator (owns measurement and area zoom state, rendering)
@@ -260,13 +259,6 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Store pre-converted TreeNode structure for search and navigation
     this.treeNodes = treeNodes;
-
-    // Initialize selection manager for frame selection and traversal
-    // Pass pre-built maps to avoid duplicate O(n) traversal
-    this.selectionManager = new SelectionManager<E>(this.treeNodes, maps);
-
-    // Set markers in selection manager for marker navigation
-    this.selectionManager.setMarkers(this.markers);
 
     // Initialize viewport animator for smooth transitions
     this.viewportAnimator = new ViewportAnimator();
@@ -381,12 +373,8 @@ export class FlameChart<E extends EventNode = EventNode> {
       rectangleManager: this.rectangleManager,
     });
 
-    // Create selection highlight renderer
-    if (this.worldContainer) {
-      this.selectionRenderer = new SelectionHighlightRenderer(this.worldContainer);
-      // Set marker context for marker selection highlighting
-      this.selectionRenderer.setMarkerContext(this.markers, this.index.totalDuration);
-    }
+    // Initialize selection orchestrator (owns selection state and rendering)
+    this.setupSelection(treeNodes, maps);
 
     // Initialize measurement orchestrator (owns measurement and area zoom)
     this.setupMeasurement();
@@ -439,12 +427,11 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.keyboardHandler = null;
     }
 
-    // Clean up selection components
-    if (this.selectionRenderer) {
-      this.selectionRenderer.destroy();
-      this.selectionRenderer = null;
+    // Clean up selection orchestrator
+    if (this.selectionOrchestrator) {
+      this.selectionOrchestrator.destroy();
+      this.selectionOrchestrator = null;
     }
-    this.selectionManager = null;
 
     // Clean up measurement orchestrator
     if (this.measurementOrchestrator) {
@@ -583,10 +570,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     // Clear selection when starting a new search to show search highlights
-    this.selectionManager?.clear();
-    if (this.selectionRenderer) {
-      this.selectionRenderer.clear();
-    }
+    this.selectionOrchestrator?.clearSelection();
 
     const innerCursor = this.newSearchManager.search(predicate, options);
 
@@ -630,10 +614,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     // Clear selection so search highlight shows
-    this.selectionManager?.clear();
-    if (this.selectionRenderer) {
-      this.selectionRenderer.clear();
-    }
+    this.selectionOrchestrator?.clearSelection();
 
     // Center viewport on the match
     this.viewport.centerOnEvent(match.event.timestamp, match.event.duration, match.depth);
@@ -708,6 +689,9 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Update offset for converting canvas-relative to container-relative coordinates
     this.mainTimelineYOffset = minimapHeight + MINIMAP_GAP;
+
+    // Update selection orchestrator with new offset
+    this.selectionOrchestrator?.setMainTimelineYOffset(this.mainTimelineYOffset);
 
     // Resize minimap orchestrator
     if (this.minimapOrchestrator) {
@@ -997,50 +981,50 @@ export class FlameChart<E extends EventNode = EventNode> {
         // Clear in order: measurement → selection → search
         if (this.measurementOrchestrator?.hasMeasurement()) {
           this.measurementOrchestrator.clearMeasurement();
-        } else if (this.selectionManager?.hasAnySelection()) {
-          this.clearSelection();
+        } else if (this.selectionOrchestrator?.hasAnySelection()) {
+          this.selectionOrchestrator.clearSelection();
         } else {
           this.clearSearch();
         }
       },
       onMarkerNav: (direction: MarkerNavDirection) => {
-        return this.navigateMarker(direction);
+        return this.selectionOrchestrator?.navigateMarker(direction) ?? false;
       },
       onFrameNav: (direction: FrameNavDirection) => {
-        return this.navigateFrame(direction);
+        return this.selectionOrchestrator?.navigateFrame(direction) ?? false;
       },
       onJumpToCallTree: () => {
         // Jump to call tree for selected frame or marker
-        const selectedNode = this.selectionManager?.getSelected();
+        const selectedNode = this.selectionOrchestrator?.getSelectedNode();
         if (selectedNode && this.callbacks.onJumpToCallTree) {
           this.callbacks.onJumpToCallTree(selectedNode.data);
           return;
         }
 
         // Jump to call tree for selected marker
-        const selectedMarker = this.selectionManager?.getSelectedMarker();
+        const selectedMarker = this.selectionOrchestrator?.getSelectedMarker();
         if (selectedMarker && this.callbacks.onJumpToCallTreeForMarker) {
           this.callbacks.onJumpToCallTreeForMarker(selectedMarker);
         }
       },
       onFocus: () => {
         // Focus (zoom to fit) on selected frame or marker
-        if (this.selectionManager?.hasSelection()) {
-          this.focusOnSelectedFrame();
-        } else if (this.selectionManager?.hasMarkerSelection()) {
-          this.focusOnSelectedMarker();
+        if (this.selectionOrchestrator?.hasSelection()) {
+          this.selectionOrchestrator.focusOnSelectedFrame();
+        } else if (this.selectionOrchestrator?.hasMarkerSelection()) {
+          this.selectionOrchestrator.focusOnSelectedMarker();
         }
       },
       onCopy: () => {
         // Copy selected frame name
-        const selectedNode = this.selectionManager?.getSelected();
+        const selectedNode = this.selectionOrchestrator?.getSelectedNode();
         if (selectedNode && this.callbacks.onCopy) {
           this.callbacks.onCopy(selectedNode.data);
           return;
         }
 
         // Copy selected marker summary
-        const selectedMarker = this.selectionManager?.getSelectedMarker();
+        const selectedMarker = this.selectionOrchestrator?.getSelectedMarker();
         if (selectedMarker && this.callbacks.onCopyMarker) {
           this.callbacks.onCopyMarker(selectedMarker);
         }
@@ -1177,6 +1161,80 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
+   * Setup selection orchestrator for frame and marker selection.
+   */
+  private setupSelection(treeNodes: TreeNode<E>[], maps: NavigationMaps): void {
+    if (!this.worldContainer || !this.viewport || !this.index) {
+      return;
+    }
+
+    // Create selection orchestrator with callbacks
+    this.selectionOrchestrator = new SelectionOrchestrator<E>({
+      onSelectionChange: (event: EventNode | null) => {
+        this.callbacks.onSelect?.(event);
+      },
+      onMarkerSelectionChange: (marker: TimelineMarker | null) => {
+        this.callbacks.onMarkerSelect?.(marker);
+      },
+      onCenterOnFrame: (timestamp: number, duration: number, depth: number) => {
+        if (!this.viewport) {
+          return null;
+        }
+        return this.viewport.calculateCenterOffset(timestamp, duration, depth);
+      },
+      onCenterOnMarker: (startTime: number, duration: number, depth: number) => {
+        if (!this.viewport) {
+          return null;
+        }
+        return this.viewport.calculateCenterOffset(startTime, duration, depth);
+      },
+      onFocusOnFrame: (timestamp: number, duration: number, depth: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        this.viewport.focusOnEvent(timestamp, duration, depth);
+        this.notifyViewportChange();
+      },
+      onFocusOnMarker: (startTime: number, duration: number, depth: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        this.viewport.focusOnEvent(startTime, duration, depth);
+        this.notifyViewportChange();
+      },
+      onFrameNavigate: (event: EventNode, screenX: number, screenY: number, depth: number) => {
+        this.callbacks.onFrameNavigate?.(event, screenX, screenY, depth);
+      },
+      onMarkerNavigate: (marker: TimelineMarker, screenX: number, screenY: number) => {
+        this.callbacks.onMarkerNavigate?.(marker, screenX, screenY);
+      },
+      onAnimateToPosition: (targetX: number, targetY: number, durationMs: number) => {
+        if (!this.viewport || !this.viewportAnimator) {
+          return;
+        }
+        this.viewportAnimator.animate(this.viewport, targetX, targetY, durationMs, () =>
+          this.notifyViewportChange(),
+        );
+      },
+      requestRender: () => {
+        this.requestRender();
+      },
+    });
+
+    // Initialize the orchestrator
+    this.selectionOrchestrator.init(
+      this.worldContainer,
+      this.viewport,
+      treeNodes,
+      maps,
+      this.markers,
+      this.index.totalDuration,
+      this.index.maxDepth,
+      this.mainTimelineYOffset,
+    );
+  }
+
+  /**
    * Setup measurement orchestrator for Shift+drag measurement and Alt+drag area zoom.
    */
   private setupMeasurement(): void {
@@ -1264,13 +1322,13 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Update selection based on click target
     if (event) {
       // Find the TreeNode for this LogEvent using original reference
-      const treeNode = this.selectionManager?.findByOriginal(event);
+      const treeNode = this.selectionOrchestrator?.findByOriginal(event);
       if (treeNode) {
-        this.selectFrame(treeNode);
+        this.selectionOrchestrator?.selectFrame(treeNode);
       }
     } else if (marker) {
       // Clicked on a marker - select it
-      this.selectMarker(marker);
+      this.selectionOrchestrator?.selectMarker(marker);
     } else {
       // Clicked on empty space - check if inside measurement area
       if (this.measurementOrchestrator?.hasMeasurement()) {
@@ -1281,7 +1339,7 @@ export class FlameChart<E extends EventNode = EventNode> {
         }
         // Clicked inside measurement - don't clear, allow frame selection below
       }
-      this.clearSelection();
+      this.selectionOrchestrator?.clearSelection();
     }
 
     // Notify callback with container-relative coordinates
@@ -1324,26 +1382,26 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Handle event double-click
     if (event) {
       // Find the TreeNode for this LogEvent
-      const treeNode = this.selectionManager?.findByOriginal(event);
+      const treeNode = this.selectionOrchestrator?.findByOriginal(event);
       if (!treeNode) {
         return;
       }
 
       // Select the frame first (so it's highlighted after focus)
-      this.selectFrame(treeNode);
+      this.selectionOrchestrator?.selectFrame(treeNode);
 
       // Focus on the individual event (zoom to fit)
-      this.focusOnSelectedFrame();
+      this.selectionOrchestrator?.focusOnSelectedFrame();
       return;
     }
 
     // Handle marker double-click
     if (marker) {
       // Select the marker first (so it's highlighted after focus)
-      this.selectMarker(marker);
+      this.selectionOrchestrator?.selectMarker(marker);
 
       // Focus on the marker (zoom to fit)
-      this.focusOnSelectedMarker();
+      this.selectionOrchestrator?.focusOnSelectedMarker();
     }
   }
 
@@ -1384,13 +1442,13 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Handle event context menu
     if (event) {
       // Find the TreeNode for this LogEvent
-      const treeNode = this.selectionManager?.findByOriginal(event);
+      const treeNode = this.selectionOrchestrator?.findByOriginal(event);
       if (!treeNode) {
         return;
       }
 
       // Select the frame (so it's highlighted when menu appears)
-      this.selectFrame(treeNode);
+      this.selectionOrchestrator?.selectFrame(treeNode);
 
       // Notify callback with selected event data
       // - screenX/screenY: container-relative coordinates for tooltip positioning
@@ -1410,7 +1468,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Handle marker context menu
     if (marker) {
       // Select the marker (so it's highlighted when menu appears)
-      this.selectMarker(marker);
+      this.selectionOrchestrator?.selectMarker(marker);
 
       // Notify callback with selected marker data
       if (this.callbacks.onContextMenu) {
@@ -1479,7 +1537,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * @returns Current highlight mode
    */
   private getHighlightMode(): 'none' | 'search' | 'selection' {
-    if (this.selectionManager?.hasAnySelection()) {
+    if (this.selectionOrchestrator?.hasAnySelection()) {
       return 'selection';
     }
     const cursor = this.newSearchManager?.getCursor();
@@ -1501,270 +1559,15 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   // ============================================================================
-  // SELECTION METHODS
+  // SELECTION API (delegated to SelectionOrchestrator)
   // ============================================================================
-
-  /**
-   * Select a frame (TreeNode).
-   * Updates visual highlight and notifies callback.
-   * Selection takes priority over search highlight (via getHighlightMode()).
-   *
-   * @param node - TreeNode to select
-   */
-  private selectFrame(node: TreeNode<E>): void {
-    // DON'T clear measurement - selection and measurement can coexist
-
-    this.selectionManager?.select(node);
-
-    // Notify callback
-    if (this.callbacks.onSelect) {
-      this.callbacks.onSelect(node.data);
-    }
-
-    this.requestRender();
-  }
-
-  /**
-   * Clear the current selection (frame or marker).
-   * If search has matches, search highlight will automatically show via getHighlightMode().
-   */
-  private clearSelection(): void {
-    const hadFrameSelection = this.selectionManager?.hasSelection();
-    const hadMarkerSelection = this.selectionManager?.hasMarkerSelection();
-
-    if (!hadFrameSelection && !hadMarkerSelection) {
-      return;
-    }
-
-    this.selectionManager?.clear();
-
-    // Clear selection renderer
-    if (this.selectionRenderer) {
-      this.selectionRenderer.clear();
-    }
-
-    // Notify callbacks
-    if (hadFrameSelection && this.callbacks.onSelect) {
-      this.callbacks.onSelect(null);
-    }
-    if (hadMarkerSelection && this.callbacks.onMarkerSelect) {
-      this.callbacks.onMarkerSelect(null);
-    }
-
-    this.requestRender();
-  }
-
-  /**
-   * Select a marker.
-   * Updates visual highlight and notifies callback.
-   * Selection takes priority over search highlight (via getHighlightMode()).
-   *
-   * @param marker - TimelineMarker to select
-   */
-  private selectMarker(marker: TimelineMarker): void {
-    // DON'T clear measurement - selection and measurement can coexist
-
-    this.selectionManager?.selectMarker(marker);
-
-    // Notify callback
-    if (this.callbacks.onMarkerSelect) {
-      this.callbacks.onMarkerSelect(marker);
-    }
-
-    this.requestRender();
-  }
-
-  /**
-   * Navigate marker selection.
-   * Called by keyboard handler for arrow key navigation on markers.
-   *
-   * @param direction - Navigation direction ('left' for previous, 'right' for next)
-   * @returns true if navigation was handled (marker is selected)
-   */
-  private navigateMarker(direction: MarkerNavDirection): boolean {
-    // No navigation if no marker is selected
-    if (!this.selectionManager?.hasMarkerSelection()) {
-      return false;
-    }
-
-    // Navigate and get the new marker (or null if at boundary)
-    const nextMarker = this.selectionManager.navigateMarker(direction);
-
-    // If navigation found a valid marker, center viewport and notify
-    if (nextMarker) {
-      // Notify callback
-      if (this.callbacks.onMarkerSelect) {
-        this.callbacks.onMarkerSelect(nextMarker);
-      }
-
-      // Always request render to show updated selection highlight
-      this.requestRender();
-
-      // Auto-center viewport on the newly selected marker
-      this.centerOnSelectedMarker();
-
-      // Notify navigation callback for tooltip
-      if (this.callbacks.onMarkerNavigate && this.viewport) {
-        const screenX = this.viewport.calculateVisibleCenterX(nextMarker.startTime, 0);
-        // Markers span full height - position tooltip near top of visible area
-        // Add offset to convert canvas-relative to container-relative
-        const screenY = 50 + this.mainTimelineYOffset;
-        this.callbacks.onMarkerNavigate(nextMarker, screenX, screenY);
-      }
-    }
-
-    // Return true if we have a marker selection (even if we couldn't navigate further)
-    // This prevents falling through to frame navigation or pan when at a boundary
-    return true;
-  }
-
-  /**
-   * Navigate frame selection using tree navigation.
-   * Called by keyboard handler for arrow key navigation.
-   *
-   * @param direction - Navigation direction
-   * @returns true if navigation was handled (selection changed or stayed at boundary)
-   */
-  private navigateFrame(direction: FrameNavDirection): boolean {
-    // No navigation if nothing is selected
-    if (!this.selectionManager?.hasSelection()) {
-      return false;
-    }
-
-    // Navigate and get the new node (or null if at boundary)
-    const nextNode = this.selectionManager.navigate(direction);
-
-    // If navigation found a valid node, center viewport and notify
-    if (nextNode) {
-      // Notify callback
-      if (this.callbacks.onSelect) {
-        this.callbacks.onSelect(nextNode.data);
-      }
-
-      // Always request render to show updated selection highlight
-      // (centerOnSelectedFrame only renders if viewport moves)
-      this.requestRender();
-
-      // Auto-center viewport on the newly selected frame
-      this.centerOnSelectedFrame();
-
-      // Notify navigation callback for tooltip (similar to search navigation)
-      if (this.callbacks.onFrameNavigate && this.viewport) {
-        const depth = nextNode.depth ?? 0;
-        const screenX = this.viewport.calculateVisibleCenterX(
-          nextNode.data.timestamp,
-          nextNode.data.duration,
-        );
-        // Convert canvas-relative to container-relative for tooltip positioning
-        const screenY = this.viewport.depthToScreenY(depth) + this.mainTimelineYOffset;
-        this.callbacks.onFrameNavigate(nextNode.data, screenX, screenY, depth);
-      }
-    }
-
-    // Return true if we have a selection (even if we couldn't navigate further)
-    // This prevents falling through to pan when at a boundary (e.g., at root)
-    return true;
-  }
-
-  /**
-   * Center viewport on the currently selected frame.
-   * Uses smooth animation when navigating to off-screen frames.
-   */
-  private centerOnSelectedFrame(): void {
-    const selectedNode = this.selectionManager?.getSelected();
-    if (!selectedNode || !this.viewport) {
-      return;
-    }
-
-    const event = selectedNode.data;
-    const depth = selectedNode.depth ?? 0;
-
-    // Calculate target offset (without applying it)
-    const targetOffset = this.viewport.calculateCenterOffset(
-      event.timestamp,
-      event.duration,
-      depth,
-    );
-
-    // Check if viewport needs to move
-    const currentState = this.viewport.getState();
-    const needsAnimation =
-      Math.abs(targetOffset.x - currentState.offsetX) > 1 ||
-      Math.abs(targetOffset.y - currentState.offsetY) > 1;
-
-    if (needsAnimation && this.viewportAnimator) {
-      // Animate to target position (300ms)
-      this.viewportAnimator.animate(this.viewport, targetOffset.x, targetOffset.y, 300, () =>
-        this.notifyViewportChange(),
-      );
-    } else if (needsAnimation) {
-      // Fallback: instant move if no animator
-      this.viewport.centerOnEvent(event.timestamp, event.duration, depth);
-      this.notifyViewportChange();
-    }
-  }
 
   /**
    * Focus viewport on the currently selected frame (zoom to fit).
    * Calculates optimal zoom to fit the frame with padding.
    */
   public focusOnSelectedFrame(): void {
-    const selectedNode = this.selectionManager?.getSelected();
-    if (!selectedNode || !this.viewport) {
-      return;
-    }
-
-    const event = selectedNode.data;
-    const depth = selectedNode.depth ?? 0;
-
-    // Focus on the event (zoom to fit with padding)
-    this.viewport.focusOnEvent(event.timestamp, event.duration, depth);
-    this.notifyViewportChange();
-  }
-
-  /**
-   * Center viewport on the currently selected marker.
-   * Uses smooth animation when navigating to off-screen markers.
-   */
-  private centerOnSelectedMarker(): void {
-    const selectedMarker = this.selectionManager?.getSelectedMarker();
-    if (!selectedMarker || !this.viewport || !this.index) {
-      return;
-    }
-
-    // Calculate marker duration (extends to next marker or timeline end)
-    const markers = this.selectionManager?.getMarkers() ?? [];
-    const markerIndex = markers.findIndex((m) => m.id === selectedMarker.id);
-    const nextMarker = markers[markerIndex + 1];
-    const markerEnd = nextMarker?.startTime ?? this.index.totalDuration;
-    const duration = markerEnd - selectedMarker.startTime;
-
-    // Use middle depth for centering (markers span all depths)
-    const middleDepth = Math.floor(this.index.maxDepth / 2);
-
-    // Calculate target offset (without applying it)
-    const targetOffset = this.viewport.calculateCenterOffset(
-      selectedMarker.startTime,
-      duration,
-      middleDepth,
-    );
-
-    // Check if viewport needs to move
-    const currentState = this.viewport.getState();
-    const needsAnimation =
-      Math.abs(targetOffset.x - currentState.offsetX) > 1 ||
-      Math.abs(targetOffset.y - currentState.offsetY) > 1;
-
-    if (needsAnimation && this.viewportAnimator) {
-      // Animate to target position (300ms)
-      this.viewportAnimator.animate(this.viewport, targetOffset.x, targetOffset.y, 300, () =>
-        this.notifyViewportChange(),
-      );
-    } else if (needsAnimation) {
-      // Fallback: instant move if no animator
-      this.viewport.centerOnEvent(selectedMarker.startTime, duration, middleDepth);
-      this.notifyViewportChange();
-    }
+    this.selectionOrchestrator?.focusOnSelectedFrame();
   }
 
   /**
@@ -1772,24 +1575,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * Calculates optimal zoom to fit the marker with padding.
    */
   public focusOnSelectedMarker(): void {
-    const selectedMarker = this.selectionManager?.getSelectedMarker();
-    if (!selectedMarker || !this.viewport || !this.index) {
-      return;
-    }
-
-    // Calculate marker duration (extends to next marker or timeline end)
-    const markers = this.selectionManager?.getMarkers() ?? [];
-    const markerIndex = markers.findIndex((m) => m.id === selectedMarker.id);
-    const nextMarker = markers[markerIndex + 1];
-    const markerEnd = nextMarker?.startTime ?? this.index.totalDuration;
-    const duration = markerEnd - selectedMarker.startTime;
-
-    // Use middle depth for focusing (markers span all depths)
-    const middleDepth = Math.floor(this.index.maxDepth / 2);
-
-    // Focus on the marker (zoom to fit with padding)
-    this.viewport.focusOnEvent(selectedMarker.startTime, duration, middleDepth);
-    this.notifyViewportChange();
+    this.selectionOrchestrator?.focusOnSelectedMarker();
   }
 
   /**
@@ -1798,7 +1584,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * @returns Currently selected TreeNode, or null if none
    */
   public getSelectedNode(): TreeNode<E> | null {
-    return this.selectionManager?.getSelected() ?? null;
+    return this.selectionOrchestrator?.getSelectedNode() ?? null;
   }
 
   /**
@@ -1807,7 +1593,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * @returns Currently selected TimelineMarker, or null if none
    */
   public getSelectedMarker(): TimelineMarker | null {
-    return this.selectionManager?.getSelectedMarker() ?? null;
+    return this.selectionOrchestrator?.getSelectedMarker() ?? null;
   }
 
   /**
@@ -1981,20 +1767,17 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Render only ONE highlight based on computed mode (selection takes priority)
     const highlightMode = this.getHighlightMode();
     if (highlightMode === 'selection') {
-      // Selection highlight mode: show selection highlight
-      // Pass selection state from SelectionManager (single source of truth)
-      const selectedNode = this.selectionManager?.getSelected() as TreeNode<EventNode> | null;
-      const selectedMarker = this.selectionManager?.getSelectedMarker() ?? null;
-      this.selectionRenderer?.render(viewportState, selectedNode, selectedMarker);
+      // Selection highlight mode: show selection highlight via orchestrator
+      this.selectionOrchestrator?.render({ viewportState });
       this.searchRenderer?.clear();
     } else if (highlightMode === 'search') {
       // Search highlight mode: show search match highlight
       this.searchRenderer!.render(cursor!, viewportState);
-      this.selectionRenderer?.clear();
+      this.selectionOrchestrator?.clearRender();
     } else {
       // No active highlight mode: clear both
       this.searchRenderer?.clear();
-      this.selectionRenderer?.clear();
+      this.selectionOrchestrator?.clearRender();
     }
 
     // Render measurement and area zoom overlays via orchestrator
