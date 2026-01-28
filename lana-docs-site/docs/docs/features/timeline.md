@@ -1,7 +1,7 @@
 ---
 id: timeline
 title: Timeline
-description: Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, measure time ranges, and interact with detailed tooltips for efficient Salesforce Apex log analysis and debugging.
+description: Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, measure time ranges, and navigate massive logs with the minimap overview for efficient Salesforce Apex log analysis and debugging.
 keywords:
   [
     salesforce apex log analysis,
@@ -12,6 +12,8 @@ keywords:
     apex performance analysis,
     measure time range,
     area zoom selection,
+    timeline minimap,
+    log navigation,
   ]
 image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png
 hide_title: true
@@ -19,15 +21,70 @@ hide_title: true
 
 ## 🔥 Timeline / Flame Chart
 
-Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, and interact with detailed tooltips for efficient Salesforce apex log analysis and debugging.
+Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, navigate with the minimap overview, and interact with detailed tooltips for efficient Salesforce apex log analysis and debugging.
 
 ![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png)
 
-The new experimental timeline is up to **7X faster** than the legacy timeline, with improved performance especially for large logs. It includes text labels on events, faster zoom/pan operations, and a more natural time axis scaling.
+The new experimental timeline is up to **7X faster** than the legacy timeline, with improved performance especially for large logs. It includes text labels on frames, faster zoom/pan operations, and a more natural time axis scaling.
 
 :::tip Legacy Timeline
 To revert to the legacy timeline, navigate to **Settings → Apex Log Analyzer → Timeline → Legacy** and enable it.
 :::
+
+## Minimap
+
+The minimap gives you instant context of your entire log. Spot hotspots at a glance, jump anywhere with a click, and always know exactly where you are—all without scrolling.
+
+### What the Minimap Shows
+
+- **Skyline Chart**: A density-based visualization:
+  - **Height** = maximum call stack depth at that point
+  - **Color** = dominant event category (method, SOQL, DML, etc.)
+  - **Opacity** = event density (brighter = more events)
+- **Viewport Lens**: A window showing exactly what's visible in the main timeline (time range horizontal, depth range vertical)
+- **Time Axis**: Time reference markers at the top
+- **Markers**: Error, skip, and truncation markers from the main timeline
+- **Cursor Mirroring**: Hover to see a guide line on the main timeline
+
+### Mouse Interactions
+
+| Action           | Mouse                 | Result                              |
+| ---------------- | --------------------- | ----------------------------------- |
+| Create Zoom      | Drag anywhere         | Draw a viewport area and zoom to it |
+| Resize Viewport  | Drag lens edge        | Adjust zoom range                   |
+| Move Viewport    | Drag top/`Shift+Drag` | Pan the viewport                    |
+| Teleport Lens    | `Cmd/Ctrl+Click`      | Center the lens on click position   |
+| Zoom In/Out      | Scroll (vertical)     | Zoom at cursor position             |
+| Pan Horizontally | Scroll (horizontal)   | Move viewport left/right            |
+| Pan Depth        | Drag (vertical)       | Scroll the main timeline up/down    |
+| Reset            | Double-click          | Zoom out to fit entire timeline     |
+
+:::tip Teleport Navigation
+`Cmd/Ctrl+Click` is the fastest way to jump to any point in a massive log. The lens teleports to center on your click while preserving the current zoom level.
+:::
+
+### Keyboard Shortcuts
+
+When your mouse is hovering over the minimap, these keyboard shortcuts are available:
+
+| Key             | Action                                      |
+| --------------- | ------------------------------------------- |
+| `Arrow Left`    | Pan viewport left (10% of selection width)  |
+| `Arrow Right`   | Pan viewport right (10% of selection width) |
+| `Arrow Up`      | Pan depth up (show deeper frames)           |
+| `Arrow Down`    | Pan depth down (show shallower frames)      |
+| `W` / `+` / `=` | Zoom in (narrow the lens)                   |
+| `S` / `-`       | Zoom out (widen the lens)                   |
+| `Home`          | Jump to timeline start                      |
+| `End`           | Jump to timeline end                        |
+| `0` / `Escape`  | Reset zoom (fit entire timeline)            |
+
+### Lens Label
+
+When hovering over the viewport lens or dragging, a label appears showing:
+
+- The **duration** of the selected time range (e.g., "1.23s")
+- The **time range** start and end (e.g., "0.5s - 1.73s")
 
 ## Navigation
 
