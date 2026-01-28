@@ -12,7 +12,7 @@ Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers.
 
 [Installation](#%EF%B8%8F-installation 'Install Apex Log Analyzer in VS Code') |
 [Debug Log Levels](#%EF%B8%8F-recommended-debug-log-levels 'Go to Recommended Debug Log Levels') |
-[Features](#-flame-chart-timeline 'Go to Features') |
+[Features](#-timeline 'Go to Features') |
 [Customization](#-customization 'Go to Customization') |
 [Documentation](#-documentation 'Go to Documentation') |
 [Contributors](#%EF%B8%8F-contributors 'Go to Contributors') |
@@ -20,7 +20,7 @@ Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers.
 
 ## 🚀 Key Features
 
-- **🔥 [Flame Chart Timeline](#-flame-chart-timeline)** – Visualize every method, SOQL query, and DML operation in your Apex logs.
+- **🔥 [Timeline](#-timeline)** – Visualize every method, SOQL query, and DML operation in your Apex logs with an interactive flame chart and minimap navigation.
 - **🌲 [Interactive Call Tree](#-call-tree)** – Dive into execution stacks with timing, row counts, and DML/ SOQL metrics.
 - **📊 [Apex](#-apex-analysis) + [Database](#%EF%B8%8F-database-analysis) Analysis** – Identify slow-performing SOQL, high-impact DML, and time-heavy Apex methods.
 - **🧠 Smart Filtering + Sorting** – Focus on what matters: filter by namespace, event type, or duration.
@@ -81,20 +81,21 @@ Use `Log: Retrieve Apex Log And Show Analysis` from the Command Palette.
 - Avoid truncated logs — they can result in incomplete or misleading analysis.
 - Recommended settings for a good balance of detail and performance: `APEX_CODE,FINE; APEX_PROFILING,FINE; CALLOUT,INFO; DB,FINEST; NBA,INFO; SYSTEM,DEBUG; VALIDATION,INFO; VISUALFORCE,FINE; WAVE,INFO; WORKFLOW,FINE`
 
-## 🔥 Flame Chart Timeline
+## 🔥 Timeline
 
-The Flame Chart view shows a timeline of the Salesforce Apex log execution — including methods, SOQL queries, DML operations, workflows, flows, and more.
+The Timeline view shows a live visualization of your Salesforce Apex log execution — including methods, SOQL queries, DML operations, workflows, flows, and more.
 
 - **⚡ Fast** – Blazing-fast zoom, pan, and rendering even on massive logs (500k+ lines).
 - **🎯 Frame Selection & Navigation** – Click to select frames, use arrow keys to navigate the call stack, double-click or press `Enter` to zoom and focus.
 - **Zoom & Pan** – Navigate your logs down to 0.001 ms with precision zoom. `W`/`S` keys or scroll wheel for zoom; `A`/`D` keys or drag for pan.
+- **Dynamic Frame Labels** – Instantly see method names on timeline frames for faster scanning.
+- **🗺️ Minimap** – Bird's-eye view with skyline overview showing call stack depth, viewport lens for navigation, and instant teleport to any position.
 - **📏 Measure Range** – `Shift+Drag` to measure the duration between any two points. Resize edges, double-click to zoom.
 - **🔍 Area Zoom** – `Alt/Option+Drag` to select a region and instantly zoom to fit.
-- **Dynamic Labels** – Instantly see method names on timeline events for faster scanning.
-- **19 Curated Themes** – Choose from beautiful, optimized color themes or create your own via Settings.
-- **Smart Interaction** – Right-click for context actions; `Cmd/Ctrl+Click` to jump directly to the Call Tree; `Cmd/Ctrl+C` to copy frame names.
 - **Tooltips** – Hover for duration, event name, SOQL/DML/Exception counts, SOQL/DML rows, and more.
-- **Adaptive Detail** – Level-of-detail bucketing reveals richer detail as you zoom while keeping performance snappy.
+- **Cotext Menu Actions** – Right-click for context actions; `Cmd/Ctrl+Click` to jump directly to the Call Tree; `Cmd/Ctrl+C` to copy frame names.
+- **19 Curated Themes** – Choose from beautiful, optimized color themes or create your own via Settings.
+- **Adaptive Frame Detail** – Level-of-detail bucketing reveals richer detail as you zoom while keeping performance snappy.
 - **Stacked by Time** – See how execution time is distributed across nested method calls and system events.
 
 ![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png)
