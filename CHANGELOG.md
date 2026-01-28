@@ -9,27 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **⚡ Performance**: Improved performance to handle huge Apex debug logs; Zoom + pan are **7X faster** with smoother motion; Adaptive level-of-detail bucketing reveals richer timeline detail as you zoom while keeping the view clean and fast.
-  - **Visual Display**: Dynamic labels on Timeline events for faster log scanning; Time axis auto-spaces markers intelligently and more naturally as you zoom; Search + highlight dims non-matches for fast scanning.
-
 - ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart built for massive logs and up to **7X faster**. ([#446] [#251] [#92] [#564])
-  - Full feature parity with the original Timeline including:
-    - Zoom and pan navigation (mouse + keyboard)
-    - Search with result highlighting
-    - Frame tooltips on hover
-    - Markers for errors, skipped lines, and truncation
-    - Click to navigate to Call Tree (now on key press of `J` or `Cmd/Ctrl+Click`)
   - **⚡ Performance**: Improved performance to handle huge Apex debug logs.
     - Zoom + pan are **7X faster** with smoother motion.
-  - **Visual Display**:
-    - Adaptive level-of-detail bucketing reveals richer timeline detail as you zoom while keeping the view clean and fast.
-    - Dynamic labels on Timeline events for faster log scanning. ([#92])
-    - Time axis auto-spaces markers intelligently and more naturally as you zoom.
-    - Search + highlight dims non-matches for fast scanning.
-  - **🎨 Themes**:
-    - 18 curated timeline themes plus the default theme has been improved for better contrast and readability.
-    - Add your own multiple custom themes via **Settings -> Apex Log Analyzer -> Timeline -> Custom Themes**.
-    - Fast theme switching via **Command Palette**: **Log: Timeline Theme** or **Settings -> Apex Log Analyzer -> Timeline -> Active Theme**.
+  - **Minimap**: Navigate massive logs at a glance with the new minimap overview. ([#245] [#446])
+    - **Skyline Overview**: Density-based visualization shows stack depth and event distribution across the entire timeline. Color-coded categories and logarithmic opacity reveal hotspots instantly.
+    - **Viewport Lens**: A window highlights exactly what's visible in the main timeline — both time range and depth. Drag to create zoom selections, resize edges to adjust, or teleport with `Cmd/Ctrl+Click`.
+    - **Cursor Mirroring**: Hover on the minimap to see a guide line on the main timeline.
+    - **Rich Interactions**:
+      - **Drag anywhere** → draw a new zoom selection
+      - **Drag lens edges** → resize the viewport
+      - **Shift+Drag inside lens** → pan the viewport
+      - **Cmd/Ctrl+Click** → instantly teleport the lens
+      - **Scroll** → zoom (vertical) or pan (horizontal)
+      - **Double-click** → reset to full timeline view
+    - **Keyboard shortcuts** (when hovering minimap): Arrow keys pan, `W`/`S` zoom, `Home`/`End` jump, `0` resets.
+  - **Adaptive Frame Bucketing**: Reveals nested frame detail and stack structure as you zoom, automatically adjusting frame granularity to understand complex call hierarchies.
+  - **Dynamic Frame Labels**: Labels automatically appear on timeline frames as you zoom and pan, making log scanning and navigation effortless without manually hovering to see event details. ([#92])
   - **Keyboard and Mouse Navigation**: Comprehensive interaction controls for the timeline. ([#573] [#366] [#296] [#295] [#535])
     - **Selection & Focus**:
       - **Frame Selection**: Click to select and highlight a frame without navigating away.
@@ -49,6 +45,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       - **Copy**: `Cmd/Ctrl+C` copies the selected frame name.
       - **Marker Navigation**: Click markers to select; arrow Left/Right to navigate between markers.
       - **Clear Selection**: Press `Escape` to deselect the current frame or marker.
+  - **Visual Display**:
+    - Time axis auto-spaces markers intelligently and more naturally as you zoom.
+    - Search + highlight dims non-matches for fast scanning.
+  - **🎨 Themes**:
+    - 18 curated timeline themes plus the default theme has been improved for better contrast and readability.
+    - Add your own multiple custom themes via **Settings -> Apex Log Analyzer -> Timeline -> Custom Themes**.
+    - Fast theme switching via **Command Palette**: **Log: Timeline Theme** or **Settings -> Apex Log Analyzer -> Timeline -> Active Theme**.
+  - **Full support for all original Timeline features** including:
+    - Zoom and pan navigation (mouse + keyboard)
+    - Search with result highlighting
+    - Frame tooltips on hover
+    - Markers for errors, skipped lines, and truncation
+    - Click to navigate to Call Tree (now on key press of `J` or `Cmd/Ctrl+Click`)
   - **Legacy Support**: Toggle the legacy timeline anytime via **Settings -> Apex Log Analyzer -> Timeline -> Legacy**.
 
 ### Changed
@@ -450,6 +459,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#245]: https://github.com/certinia/debug-log-analyzer/issues/245
 [#164]: https://github.com/certinia/debug-log-analyzer/issues/164
 [#535]: https://github.com/certinia/debug-log-analyzer/issues/535
 [#295]: https://github.com/certinia/debug-log-analyzer/issues/295
