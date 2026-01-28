@@ -234,7 +234,8 @@ export class MinimapRenderer {
   }
 
   /**
-   * Create the HTML label element with styling (matches MeasureRangeRenderer).
+   * Create the HTML label element with styling matching timeline text labels.
+   * Positioned at top of minimap (centered in axis area) to avoid blocking skyline.
    */
   private createLabelElement(): HTMLDivElement {
     const label = document.createElement('div');
@@ -242,18 +243,17 @@ export class MinimapRenderer {
     label.style.cssText = `
       position: absolute;
       display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 8px 12px;
+      padding: 2px 6px;
       border-radius: 4px;
-      background: color-mix(in srgb, var(--vscode-editorWidget-background, #252526) 85%, transparent);
+      background: var(--vscode-editorWidget-background, #252526);
       border: 1px solid var(--vscode-editorWidget-border, #454545);
-      color: var(--vscode-editorWidget-foreground, #cccccc);
-      font-family: var(--vscode-font-family, sans-serif);
-      font-size: 12px;
+      color: #e3e3e3;
+      font-family: monospace;
+      font-size: 10px;
+      font-weight: lighter;
       pointer-events: none;
       z-index: 100;
+      white-space: nowrap;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     `;
     return label;
@@ -332,8 +332,8 @@ export class MinimapRenderer {
 
   /**
    * Update lens label visibility and content.
-   * Shows duration and time range when user is interacting with minimap.
-   * Label is positioned above the lens, centered horizontally on the lens.
+   * Shows compact duration when user is interacting with minimap.
+   * Label is positioned at top of minimap (in axis area) to avoid blocking skyline.
    *
    * @param manager - MinimapManager for coordinate calculations
    * @param selection - Current lens selection
@@ -349,41 +349,31 @@ export class MinimapRenderer {
       return;
     }
 
-    // Format content
+    // Format content - duration with range: "1.23s (0.5s - 1.73s)"
     const duration = selection.endTime - selection.startTime;
     const durationStr = formatDuration(duration);
     const rangeStr = formatTimeRange(selection.startTime, selection.endTime);
 
-    this.labelElement.innerHTML = `
-      <div style="text-align: center;">
-        <div style="font-size: 14px; font-weight: 600;">${durationStr}</div>
-        <div style="font-size: 11px; opacity: 0.8; margin-top: 2px;">${rangeStr}</div>
-      </div>
-    `;
-    this.labelElement.style.display = 'flex';
+    this.labelElement.textContent = `${durationStr} (${rangeStr})`;
+    this.labelElement.style.display = 'block';
 
-    // Calculate lens pixel bounds
+    // Calculate lens pixel bounds for horizontal centering
     const lensX1 = manager.timeToMinimapX(selection.startTime);
     const lensX2 = manager.timeToMinimapX(selection.endTime);
-    const axisHeight = this.axisRenderer.getHeight();
-    const lensY1 = Math.max(axisHeight, manager.depthToMinimapY(selection.depthEnd));
-
     const lensCenterX = (lensX1 + lensX2) / 2;
 
     // Position after content is rendered (need label dimensions)
     requestAnimationFrame(() => {
       const labelWidth = this.labelElement.offsetWidth;
-      const labelHeight = this.labelElement.offsetHeight;
       const containerWidth = this.htmlContainer.offsetWidth;
-      const minimapHeight = manager.getState().height;
       const padding = 4;
 
       // Horizontal: center on lens, clamp to viewport
       let left = lensCenterX - labelWidth / 2;
       left = Math.max(padding, Math.min(containerWidth - labelWidth - padding, left));
 
-      // Vertical: center within the entire minimap
-      const top = (minimapHeight - labelHeight) / 2;
+      // Vertical: start at top edge of minimap
+      const top = 0;
 
       this.labelElement.style.left = `${left}px`;
       this.labelElement.style.top = `${top}px`;

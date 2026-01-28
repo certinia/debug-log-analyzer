@@ -12,6 +12,7 @@
  * - Click+drag on minimap: Create selection → zoom main timeline to selection
  * - Drag inside lens: Move viewport horizontally
  * - Drag edge handles: Expand/contract zoom range
+ * - Cmd/Ctrl+click: Teleport lens to click position (preserving width)
  * - Wheel vertical: Zoom both views at cursor
  * - Wheel horizontal: Pan selection
  * - Double-click: Reset view (zoom to fit full timeline)
@@ -88,6 +89,15 @@ export class MinimapInteractionHandler {
   // Modifier key state
   private shiftKeyHeld = false;
 
+  // Saved selection for restoring on click without drag (prevents ew-resize cursor bug)
+  private savedSelectionStart = 0;
+  private savedSelectionEnd = 0;
+
+  // Track last known mouse position for cursor updates on key changes
+  private lastMouseX = 0;
+  private lastMouseY = 0;
+  private isMouseInMinimap = false;
+
   // Double-click detection
   private lastClickTime = 0;
   private lastClickX = 0;
@@ -146,6 +156,14 @@ export class MinimapInteractionHandler {
     // Store global mousemove handler for dynamic attach/detach during drag
     const globalMouseMoveHandler = this.handleGlobalMouseMove.bind(this) as (e: Event) => void;
     this.boundHandlers.set('global-mousemove', globalMouseMoveHandler);
+
+    // Keydown/keyup handlers for cursor updates when Shift/Cmd/Ctrl changes
+    const keyDownHandler = this.handleKeyDown.bind(this) as (e: Event) => void;
+    const keyUpHandler = this.handleKeyUp.bind(this) as (e: Event) => void;
+    document.addEventListener('keydown', keyDownHandler);
+    document.addEventListener('keyup', keyUpHandler);
+    this.boundHandlers.set('keydown', keyDownHandler);
+    this.boundHandlers.set('keyup', keyUpHandler);
   }
 
   private detachEventListeners(): void {
@@ -155,6 +173,10 @@ export class MinimapInteractionHandler {
     for (const [key, handler] of this.boundHandlers) {
       if (key === 'global-mouseup') {
         document.removeEventListener('mouseup', handler);
+      } else if (key === 'keydown') {
+        document.removeEventListener('keydown', handler);
+      } else if (key === 'keyup') {
+        document.removeEventListener('keyup', handler);
       } else if (key !== 'global-mousemove') {
         // Skip global-mousemove, it's managed dynamically
         this.canvas.removeEventListener(key, handler);
@@ -259,12 +281,14 @@ export class MinimapInteractionHandler {
   }
 
   /**
-   * Handle mouse down - start drag operation.
+   * Handle mouse down - start drag operation or teleport.
    *
    * Interaction behavior:
+   * - Cmd/Ctrl+click: Teleport lens to click position (no drag)
    * - Default drag anywhere: Create new zoom area selection
    * - Shift + drag inside lens: Move existing viewport
-   * - Drag on edge: Resize (unchanged)
+   * - Drag on top edge of lens: Move existing viewport
+   * - Drag on left/right edge: Resize
    */
   private handleMouseDown(event: MouseEvent): void {
     if (event.button !== 0) {
@@ -288,13 +312,35 @@ export class MinimapInteractionHandler {
     this.didDrag = false;
     this.didPositionDepth = false;
 
+    // Save current selection (for restoring on click without drag)
+    const currentSelection = this.manager.getSelection();
+    this.savedSelectionStart = currentSelection.startTime;
+    this.savedSelectionEnd = currentSelection.endTime;
+
+    // Cmd/Ctrl+click = teleport lens, then start move mode if still holding
+    if (event.metaKey || event.ctrlKey) {
+      this.teleportLensToPosition(screenX);
+      // Start move mode for continued dragging after teleport
+      this.dragMode = 'move';
+      this.shiftKeyHeld = false;
+      this.isDragging = true;
+      this.attachGlobalMouseMove();
+      this.dragStartX = screenX;
+      this.dragStartY = screenY;
+      this.lastDragY = screenY;
+      this.dragStartTime = this.manager.minimapXToTime(screenX);
+      this.lastDragTime = this.dragStartTime;
+      this.manager.startDrag(this.dragMode);
+      this.updateCursor(this.dragMode, false, true, false);
+      return;
+    }
+
     // Track Shift key state
     this.shiftKeyHeld = event.shiftKey;
 
     // Determine drag mode based on position AND modifier keys
-    // - Shift+drag inside lens = move viewport
-    // - Default drag inside lens = create new selection
-    this.dragMode = this.manager.getDragModeForPosition(screenX, this.shiftKeyHeld);
+    // Pass screenY to enable top edge detection
+    this.dragMode = this.manager.getDragModeForPosition(screenX, this.shiftKeyHeld, screenY);
     this.isDragging = true;
     this.attachGlobalMouseMove(); // Track mouse even outside canvas
     this.dragStartX = screenX;
@@ -304,11 +350,10 @@ export class MinimapInteractionHandler {
     this.lastDragTime = this.dragStartTime; // Track for continuous X panning
 
     // Store anchor for resize operations
-    const selection = this.manager.getSelection();
     if (this.dragMode === 'resize-left') {
-      this.dragAnchorTime = selection.endTime;
+      this.dragAnchorTime = currentSelection.endTime;
     } else if (this.dragMode === 'resize-right') {
-      this.dragAnchorTime = selection.startTime;
+      this.dragAnchorTime = currentSelection.startTime;
     }
 
     // For create mode, start selection at current position
@@ -318,7 +363,7 @@ export class MinimapInteractionHandler {
     }
 
     this.manager.startDrag(this.dragMode);
-    this.updateCursor(this.dragMode);
+    this.updateCursor(this.dragMode, false, true, this.shiftKeyHeld);
   }
 
   /**
@@ -329,13 +374,20 @@ export class MinimapInteractionHandler {
     const screenX = event.clientX - rect.left;
     const screenY = event.clientY - rect.top;
 
+    // Track mouse position for key event cursor updates
+    this.lastMouseX = screenX;
+    this.lastMouseY = screenY;
+
     // Only handle if within minimap height (unless dragging)
     if (screenY > this.manager.getHeight() && !this.isDragging) {
       // Cursor left minimap area
+      this.isMouseInMinimap = false;
       this.callbacks.onCursorMove(null);
       this.canvas.style.cursor = 'default';
       return;
     }
+
+    this.isMouseInMinimap = true;
 
     // Always update cursor mirror when in minimap
     const cursorTime = this.manager.minimapXToTime(screenX);
@@ -364,10 +416,10 @@ export class MinimapInteractionHandler {
       const currentTime = this.manager.minimapXToTime(screenX);
       this.handleDrag(currentTime, screenY, event.shiftKey);
     } else {
-      // Update cursor based on position and current Shift state
-      // Show grab cursor when Shift is held over lens, crosshair otherwise
-      const mode = this.manager.getDragModeForPosition(screenX, event.shiftKey);
-      this.updateCursor(mode);
+      // Update cursor based on position and modifier keys
+      // Pass screenY to enable top edge detection for grab cursor
+      const mode = this.manager.getDragModeForPosition(screenX, event.shiftKey, screenY);
+      this.updateCursor(mode, event.metaKey || event.ctrlKey, false, event.shiftKey);
     }
   }
 
@@ -451,6 +503,11 @@ export class MinimapInteractionHandler {
     // Notify selection change
     const selection = this.manager.getSelection();
     this.callbacks.onSelectionChange(selection.startTime, selection.endTime);
+
+    // Update cursor during drag (use current drag mode, not position-based mode)
+    if (this.dragMode) {
+      this.updateCursor(this.dragMode, false, true, shiftKey);
+    }
   }
 
   /**
@@ -465,10 +522,20 @@ export class MinimapInteractionHandler {
     const screenX = event.clientX - rect.left;
     const screenY = event.clientY - rect.top;
 
+    // Save drag mode before ending drag (needed for selection restoration)
+    const wasCreateMode = this.dragMode === 'create';
+
     this.endDrag();
 
-    // Check for double-click (if no drag occurred)
+    // Check for double-click or single click (if no drag occurred)
     if (!this.didDrag) {
+      // Restore original selection if this was create mode without actual drag
+      // This prevents the zero-width selection from affecting cursor calculation
+      if (wasCreateMode) {
+        this.manager.setSelection(this.savedSelectionStart, this.savedSelectionEnd);
+        this.callbacks.onSelectionChange(this.savedSelectionStart, this.savedSelectionEnd);
+      }
+
       const currentTime = Date.now();
       const timeSinceLastClick = currentTime - this.lastClickTime;
       const distanceX = Math.abs(screenX - this.lastClickX);
@@ -484,15 +551,12 @@ export class MinimapInteractionHandler {
         this.lastClickTime = currentTime;
         this.lastClickX = screenX;
         this.lastClickY = screenY;
-
-        // For single click in create mode with no drag, zoom to that point
-        // (Skip this - it's not in the spec, just a thought)
       }
     }
 
-    // Update cursor
-    const mode = this.manager.getDragModeForPosition(screenX);
-    this.updateCursor(mode);
+    // Update cursor based on position after drag ends
+    const mode = this.manager.getDragModeForPosition(screenX, event.shiftKey, screenY);
+    this.updateCursor(mode, event.metaKey || event.ctrlKey, false, event.shiftKey);
   }
 
   /**
@@ -509,8 +573,49 @@ export class MinimapInteractionHandler {
    */
   private handleMouseLeave(_event: MouseEvent): void {
     if (!this.isDragging) {
+      this.isMouseInMinimap = false;
       this.callbacks.onCursorMove(null);
       this.canvas.style.cursor = 'default';
+    }
+  }
+
+  /**
+   * Handle keydown - update cursor when modifier keys change.
+   */
+  private handleKeyDown(event: KeyboardEvent): void {
+    // Only update cursor if mouse is in minimap and not dragging
+    if (!this.isMouseInMinimap || this.isDragging) {
+      return;
+    }
+
+    // Update cursor when Shift, Cmd, or Ctrl is pressed
+    if (event.key === 'Shift' || event.key === 'Meta' || event.key === 'Control') {
+      const mode = this.manager.getDragModeForPosition(
+        this.lastMouseX,
+        event.shiftKey,
+        this.lastMouseY,
+      );
+      this.updateCursor(mode, event.metaKey || event.ctrlKey, false, event.shiftKey);
+    }
+  }
+
+  /**
+   * Handle keyup - update cursor when modifier keys change.
+   */
+  private handleKeyUp(event: KeyboardEvent): void {
+    // Only update cursor if mouse is in minimap and not dragging
+    if (!this.isMouseInMinimap || this.isDragging) {
+      return;
+    }
+
+    // Update cursor when Shift, Cmd, or Ctrl is released
+    if (event.key === 'Shift' || event.key === 'Meta' || event.key === 'Control') {
+      const mode = this.manager.getDragModeForPosition(
+        this.lastMouseX,
+        event.shiftKey,
+        this.lastMouseY,
+      );
+      this.updateCursor(mode, event.metaKey || event.ctrlKey, false, event.shiftKey);
     }
   }
 
@@ -525,22 +630,84 @@ export class MinimapInteractionHandler {
   }
 
   /**
-   * Update cursor style based on drag mode.
+   * Teleport lens to center on a screen X position, preserving current width.
+   * Clamps to timeline bounds while maintaining lens width.
    */
-  private updateCursor(mode: MinimapDragMode): void {
+  private teleportLensToPosition(screenX: number): void {
+    const selection = this.manager.getSelection();
+    const clickTime = this.manager.minimapXToTime(screenX);
+    const duration = selection.endTime - selection.startTime;
+    const halfDuration = duration / 2;
+
+    // Calculate new bounds centered on click
+    let newStart = clickTime - halfDuration;
+    let newEnd = clickTime + halfDuration;
+
+    // Clamp to timeline bounds while maintaining width
+    const totalDuration = this.manager.getState().totalDuration;
+    if (newStart < 0) {
+      newStart = 0;
+      newEnd = Math.min(duration, totalDuration);
+    } else if (newEnd > totalDuration) {
+      newEnd = totalDuration;
+      newStart = Math.max(0, totalDuration - duration);
+    }
+
+    this.manager.setSelection(newStart, newEnd);
+    this.callbacks.onSelectionChange(newStart, newEnd);
+  }
+
+  /**
+   * Update cursor style based on drag mode and modifier keys.
+   *
+   * Cursor states:
+   * - Cmd/Ctrl held (teleport ready): pointer
+   * - Shift held (pan ready): grab
+   * - Shift + click/drag (panning): grabbing
+   * - Hover left/right edge: ew-resize
+   * - Hover top edge of lens: grab
+   * - Dragging top edge: grabbing
+   * - Creating/dragging selection: crosshair
+   * - Default: crosshair
+   *
+   * @param mode - The drag mode based on position
+   * @param metaKey - Whether Cmd/Ctrl is held
+   * @param isDraggingNow - Whether currently in active drag
+   * @param shiftKey - Whether Shift is held
+   */
+  private updateCursor(
+    mode: MinimapDragMode,
+    metaKey = false,
+    isDraggingNow = false,
+    shiftKey = false,
+  ): void {
+    // Cmd/Ctrl held shows pointer for teleport action (only when not dragging)
+    if (metaKey && !isDraggingNow) {
+      this.canvas.style.cursor = 'pointer';
+      return;
+    }
+
+    // Shift key handling: grab when hovering, grabbing when clicking/dragging
+    // This applies when shift turns 'create' mode into 'move' mode
+    if (shiftKey) {
+      this.canvas.style.cursor = isDraggingNow ? 'grabbing' : 'grab';
+      return;
+    }
+
     switch (mode) {
       case 'resize-left':
       case 'resize-right':
         this.canvas.style.cursor = 'ew-resize';
         break;
       case 'move':
-        this.canvas.style.cursor = this.isDragging ? 'grabbing' : 'grab';
+        // Move mode (top edge or after teleport): grab when hovering, grabbing when dragging
+        this.canvas.style.cursor = isDraggingNow ? 'grabbing' : 'grab';
         break;
       case 'create':
         this.canvas.style.cursor = 'crosshair';
         break;
       default:
-        this.canvas.style.cursor = 'default';
+        this.canvas.style.cursor = 'crosshair';
     }
   }
 

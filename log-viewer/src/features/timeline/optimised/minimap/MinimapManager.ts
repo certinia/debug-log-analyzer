@@ -67,6 +67,10 @@ export interface MinimapSelection {
 
 /**
  * Drag mode for minimap interactions.
+ * - 'create': Drawing a new selection area
+ * - 'move': Moving the lens (from top edge or with Shift)
+ * - 'resize-left': Resizing from left edge
+ * - 'resize-right': Resizing from right edge
  */
 export type MinimapDragMode = 'create' | 'move' | 'resize-left' | 'resize-right';
 
@@ -75,6 +79,18 @@ export type MinimapDragMode = 'create' | 'move' | 'resize-left' | 'resize-right'
  * Used to detect if cursor is near a lens edge for resize.
  */
 const EDGE_THRESHOLD = 8;
+
+/**
+ * Top edge detection threshold in pixels.
+ * Smaller than side edges to allow drawing new lens above the top edge.
+ */
+const TOP_EDGE_THRESHOLD = 4;
+
+/**
+ * Minimum lens width in pixels for edge interactions.
+ * Below this width, resize/move interactions are disabled.
+ */
+const MIN_LENS_WIDTH_FOR_EDGES = 20;
 
 /**
  * Minimap height as percentage of canvas height.
@@ -406,38 +422,65 @@ export class MinimapManager {
 
   /**
    * Determine the appropriate drag mode based on cursor position and modifier keys.
-   * Uses 8px edge threshold for resize handle detection.
+   * Uses 8px edge threshold for resize/move handle detection.
    *
    * Default behavior (no modifiers):
-   * - Edge = resize (same as before)
-   * - Inside lens = CREATE new selection (changed from 'move')
+   * - Left/right edge = resize
+   * - Top edge of lens = move (drag lens)
+   * - Inside lens = CREATE new selection
    * - Outside lens = CREATE new selection
    *
    * With Shift key:
-   * - Edge = resize (same)
+   * - Left/right edge = resize (same)
    * - Inside lens = MOVE viewport
    * - Outside lens = CREATE new selection
    *
    * @param screenX - Screen X coordinate in minimap space
    * @param shiftKey - Whether Shift key is held (enables move mode inside lens)
+   * @param screenY - Screen Y coordinate for top edge detection (optional)
    * @returns Appropriate drag mode for starting a drag at this position
    */
-  public getDragModeForPosition(screenX: number, shiftKey = false): MinimapDragMode {
+  public getDragModeForPosition(
+    screenX: number,
+    shiftKey = false,
+    screenY?: number,
+  ): MinimapDragMode {
     const lensStartX = this.timeToMinimapX(this.selection.startTime);
     const lensEndX = this.timeToMinimapX(this.selection.endTime);
+    const lensWidth = lensEndX - lensStartX;
 
-    // Check if near left edge (resize-left) - same behavior regardless of modifier
-    if (Math.abs(screenX - lensStartX) <= EDGE_THRESHOLD) {
-      return 'resize-left';
-    }
+    // Check if lens has meaningful width for edge interactions
+    // Skip edge detection if lens is too small or covers full timeline
+    const hasActiveLens =
+      lensWidth >= MIN_LENS_WIDTH_FOR_EDGES && lensWidth < this.state.displayWidth;
 
-    // Check if near right edge (resize-right) - same behavior regardless of modifier
-    if (Math.abs(screenX - lensEndX) <= EDGE_THRESHOLD) {
-      return 'resize-right';
+    // Check if within X bounds of lens first
+    const isWithinLensX = screenX >= lensStartX && screenX <= lensEndX;
+
+    // Only check edges if lens has meaningful width
+    if (hasActiveLens) {
+      // Check if near left edge (resize-left) - same behavior regardless of modifier
+      if (Math.abs(screenX - lensStartX) <= EDGE_THRESHOLD) {
+        return 'resize-left';
+      }
+
+      // Check if near right edge (resize-right) - same behavior regardless of modifier
+      if (Math.abs(screenX - lensEndX) <= EDGE_THRESHOLD) {
+        return 'resize-right';
+      }
+
+      // Check if near top edge of lens (move mode) - only if Y coordinate provided
+      // Use smaller threshold for top edge to allow drawing above it
+      if (screenY !== undefined && isWithinLensX) {
+        const lensTopY = Math.max(AXIS_HEIGHT, this.depthToMinimapY(this.selection.depthEnd));
+        if (Math.abs(screenY - lensTopY) <= TOP_EDGE_THRESHOLD && screenY >= AXIS_HEIGHT) {
+          return 'move';
+        }
+      }
     }
 
     // Check if inside lens
-    if (screenX >= lensStartX && screenX <= lensEndX) {
+    if (isWithinLensX) {
       // Shift+drag inside lens = move viewport
       // Default drag inside lens = create new selection (like outside lens)
       return shiftKey ? 'move' : 'create';
