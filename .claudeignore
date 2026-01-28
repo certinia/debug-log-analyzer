@@ -1,0 +1,14 @@
+# Build outputs
+**/out/
+**/dist/
+**/node_modules/
+
+# Large test logs
+sample-app/**/*.log
+
+# Docs build
+lana-docs-site/.docusaurus/
+lana-docs-site/build/
+
+# Packages
+*.vsix
