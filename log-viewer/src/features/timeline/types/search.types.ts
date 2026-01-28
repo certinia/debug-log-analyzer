@@ -13,6 +13,21 @@ import type { PrecomputedRect } from '../optimised/RectangleManager.js';
 import type { EventNode } from './flamechart.types.js';
 
 /**
+ * Lightweight info about a matched event for bucket search highlighting.
+ * Used instead of full SearchMatch to avoid exposing event details to renderers.
+ */
+export interface MatchedEventInfo {
+  /** Event start time in nanoseconds */
+  timestamp: number;
+  /** Event duration in nanoseconds */
+  duration: number;
+  /** Depth in the event tree (0-indexed) */
+  depth: number;
+  /** Event subcategory for color resolution */
+  category: string;
+}
+
+/**
  * Represents a single search match with rendering data.
  */
 export interface SearchMatch<E extends EventNode> {
@@ -76,6 +91,9 @@ export interface SearchCursor<E extends EventNode> {
   // Rendering support
   /** Get set of matched event IDs for desaturation rendering */
   getMatchedEventIds(): ReadonlySet<string>;
+
+  /** Get lightweight info about matched events for bucket search highlighting */
+  getMatchedEventsInfo(): ReadonlyArray<MatchedEventInfo>;
 }
 
 /**

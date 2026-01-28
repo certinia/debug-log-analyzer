@@ -109,11 +109,13 @@ export class MeshRectangleRenderer {
     this.geometry.ensureCapacity(totalRects);
 
     // Create viewport transform for coordinate conversion
+    // No canvasYOffset needed - main timeline has its own canvas
     const viewportTransform: ViewportTransform = {
       offsetX: vp.offsetX,
       offsetY: vp.offsetY,
       displayWidth: vp.displayWidth,
       displayHeight: vp.displayHeight,
+      canvasYOffset: 0,
     };
 
     // Pre-calculate constants outside loops

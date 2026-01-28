@@ -33,6 +33,7 @@ import type {
   RenderBatch,
 } from '../../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
+import type { MatchedEventInfo } from '../../types/search.types.js';
 import { resolveColor } from '../BucketColorResolver.js';
 import type { PrecomputedRect } from '../RectangleManager.js';
 import { SpritePool } from '../SpritePool.js';
@@ -62,12 +63,14 @@ export class SearchStyleRenderer {
    * @param matchedEventIds - Set of event IDs that match search (retain original colors)
    * @param buckets - Aggregated pixel buckets grouped by category
    * @param _viewport - Unused, for API compatibility with mesh renderer
+   * @param matchedEventsInfo - Lightweight info about matched events for bucket highlighting
    */
   public render(
     culledRects: Map<string, PrecomputedRect[]>,
     matchedEventIds: ReadonlySet<string>,
     buckets: Map<string, PixelBucket[]> = new Map(),
     _viewport?: unknown,
+    matchedEventsInfo: ReadonlyArray<MatchedEventInfo> = [],
   ): void {
     // Release all sprites back to pool for reuse
     this.spritePool.releaseAll();
@@ -98,7 +101,7 @@ export class SearchStyleRenderer {
     }
 
     // Render all buckets with search styling
-    this.renderBucketsWithSearch(buckets, matchedEventIds);
+    this.renderBucketsWithSearch(buckets, matchedEventsInfo);
   }
 
   /**
@@ -127,21 +130,24 @@ export class SearchStyleRenderer {
    * Buckets with matches use resolved color from matched events.
    * Buckets without matches use desaturated greyscale.
    *
+   * Uses time-range matching since bucket.eventRefs may be empty for memory-optimized buckets.
+   *
    * @param buckets - Aggregated buckets grouped by category
-   * @param matchedEventIds - Set of matched event IDs
+   * @param matchedEventsInfo - Lightweight info about matched events
    */
   private renderBucketsWithSearch(
     buckets: Map<string, PixelBucket[]>,
-    matchedEventIds: ReadonlySet<string>,
+    matchedEventsInfo: ReadonlyArray<MatchedEventInfo>,
   ): void {
-    // Build a lookup set of "timestamp-depth" for O(1) matching
-    // matchedEventIds format: "timestamp-depth-index"
-    const matchedTimestampDepths = new Set<string>();
-    for (const matchedId of matchedEventIds) {
-      const parts = matchedId.split('-');
-      if (parts.length >= 2) {
-        matchedTimestampDepths.add(`${parts[0]}-${parts[1]}`);
+    // Build spatial index: Map<depth, Array<{timestamp, category}>>
+    const matchesByDepth = new Map<number, Array<{ timestamp: number; category: string }>>();
+    for (const info of matchedEventsInfo) {
+      let depthMatches = matchesByDepth.get(info.depth);
+      if (!depthMatches) {
+        depthMatches = [];
+        matchesByDepth.set(info.depth, depthMatches);
       }
+      depthMatches.push({ timestamp: info.timestamp, category: info.category });
     }
 
     // Pre-calculate constants outside loops
@@ -154,19 +160,24 @@ export class SearchStyleRenderer {
     // Render all buckets from all categories
     for (const categoryBuckets of buckets.values()) {
       for (const bucket of categoryBuckets) {
-        // Find matched events in this bucket
+        // Find matched events in this bucket using time-range matching
         const matchedCategoryStats = new Map<string, CategoryAggregation>();
 
-        for (const event of bucket.eventRefs) {
-          const key = `${event.timestamp}-${bucket.depth}`;
-          if (matchedTimestampDepths.has(key) && event.subCategory) {
-            let stats = matchedCategoryStats.get(event.subCategory);
-            if (!stats) {
-              stats = { count: 0, totalDuration: 0 };
-              matchedCategoryStats.set(event.subCategory, stats);
+        const depthMatches = matchesByDepth.get(bucket.depth);
+        if (depthMatches) {
+          for (const match of depthMatches) {
+            if (
+              match.timestamp >= bucket.timeStart &&
+              match.timestamp < bucket.timeEnd &&
+              match.category
+            ) {
+              let stats = matchedCategoryStats.get(match.category);
+              if (!stats) {
+                stats = { count: 0, totalDuration: 0 };
+                matchedCategoryStats.set(match.category, stats);
+              }
+              stats.count++;
             }
-            stats.count++;
-            stats.totalDuration += event.duration?.total ?? 0;
           }
         }
 

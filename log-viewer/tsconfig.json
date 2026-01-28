@@ -15,6 +15,7 @@
 
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "erasableSyntaxOnly": true,
 
     "moduleResolution": "Bundler",
     "module": "ESNext",

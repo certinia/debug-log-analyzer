@@ -191,11 +191,13 @@ export class MeshMarkerRenderer {
     // Create viewport transform for coordinate conversion
     // Note: offsetY is 0 because markers should span full screen height
     // regardless of vertical panning
+    // No canvasYOffset needed - main timeline has its own canvas
     const viewportTransform: ViewportTransform = {
       offsetX: viewportState.offsetX,
       offsetY: 0, // Full-height elements ignore Y pan
       displayWidth: viewportState.displayWidth,
       displayHeight: viewportState.displayHeight,
+      canvasYOffset: 0,
     };
 
     // Apply 1px gap for negative space separation between adjacent markers

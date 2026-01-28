@@ -23,7 +23,7 @@ import {
   type ViewportBounds,
   type ViewportState,
 } from '../../types/flamechart.types.js';
-import type { PrecomputedRect } from '../RectangleManager.js';
+import type { PrecomputedRect, RectangleManager } from '../RectangleManager.js';
 import type { TimelineEventIndex } from '../TimelineEventIndex.js';
 
 /**
@@ -57,6 +57,8 @@ export interface HitTestConfig {
   buckets: Map<string, PixelBucket[]>;
   /** Optional marker renderer for hit testing markers */
   markerRenderer?: MarkerHitTestable | null;
+  /** Optional RectangleManager for O(log n) hit testing queries */
+  rectangleManager?: RectangleManager | null;
 }
 
 export class HitTestManager {
@@ -64,12 +66,14 @@ export class HitTestManager {
   private visibleRects: Map<string, PrecomputedRect[]>;
   private buckets: Map<string, PixelBucket[]>;
   private markerRenderer: MarkerHitTestable | null;
+  private rectangleManager: RectangleManager | null;
 
   constructor(config: HitTestConfig) {
     this.index = config.index;
     this.visibleRects = config.visibleRects;
     this.buckets = config.buckets;
     this.markerRenderer = config.markerRenderer ?? null;
+    this.rectangleManager = config.rectangleManager ?? null;
   }
 
   /**
@@ -226,15 +230,25 @@ export class HitTestManager {
   private findBestEventInBucket(bucket: PixelBucket): LogEvent | null {
     let events = bucket.eventRefs;
 
-    // If eventRefs is empty (TemporalSegmentTree optimization), query the index
+    // If eventRefs is empty (TemporalSegmentTree optimization), query for events in region
     if (events.length === 0) {
-      const bounds: ViewportBounds = {
-        timeStart: bucket.timeStart,
-        timeEnd: bucket.timeEnd,
-        depthStart: bucket.depth,
-        depthEnd: bucket.depth,
-      };
-      events = this.index.findEventsInRegion(bounds);
+      // Use RectangleManager for O(log n) query when available, fall back to O(n) index
+      if (this.rectangleManager) {
+        events = this.rectangleManager.queryEventsInRegion(
+          bucket.timeStart,
+          bucket.timeEnd,
+          bucket.depth,
+          bucket.depth,
+        );
+      } else {
+        const bounds: ViewportBounds = {
+          timeStart: bucket.timeStart,
+          timeEnd: bucket.timeEnd,
+          depthStart: bucket.depth,
+          depthEnd: bucket.depth,
+        };
+        events = this.index.findEventsInRegion(bounds);
+      }
     }
 
     if (events.length === 0) {

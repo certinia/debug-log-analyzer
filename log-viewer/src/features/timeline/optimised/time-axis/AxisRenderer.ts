@@ -309,6 +309,7 @@ export class AxisRenderer {
         const screenSpaceX = screenX - viewport.offsetX;
 
         // Position label in screen space (top-left origin, Y pointing down)
+        // No minimap offset needed - main timeline has its own canvas
         label.x = screenSpaceX - 3; // 3px to the left of line
         label.y = 5; // 5px from top
         label.anchor.set(1, 0); // Right-align to line, align top

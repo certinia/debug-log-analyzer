@@ -29,10 +29,9 @@ export const tooltipStyles = `
       .tooltip-header {
         font-weight: 500;
         margin-bottom: 10px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        line-height: 1em;
+        line-height: 1.3em;
         white-space: pre-wrap;
+        word-break: break-all;
       }
 
       .tooltip-row {

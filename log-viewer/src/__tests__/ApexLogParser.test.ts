@@ -424,7 +424,7 @@ describe('parseLog tests', () => {
       '09:19:13.82 (51595120059)|EXECUTION_FINISHED\n';
 
     const apexLog = parse(log);
-    const execEvent = <MethodEntryLine>apexLog.children[0];
+    const execEvent = apexLog.children[0] as MethodEntryLine;
     expect(execEvent).toBeInstanceOf(ExecutionStartedLine);
 
     expect(execEvent.children.length).toEqual(1);

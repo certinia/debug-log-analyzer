@@ -17,7 +17,7 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { formatDuration } from '../../../../core/utility/Util.js';
+import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
 import type { MeasurementState } from './MeasurementManager.js';
 
@@ -232,10 +232,9 @@ export class MeasureRangeRenderer {
       return;
     }
 
-    // Format times
+    // Format times using shared utilities
     const durationStr = formatDuration(duration);
-    const startStr = formatDuration(startTime);
-    const endStr = formatDuration(endTime);
+    const rangeStr = formatTimeRange(startTime, endTime);
 
     // Only show zoom icon when measurement is finished (not while dragging)
     const zoomIconHtml =
@@ -268,7 +267,7 @@ export class MeasureRangeRenderer {
       <div style="display: flex; align-items: center;">
         <div style="text-align: center;">
           <div style="font-size: 14px; font-weight: 600;">${durationStr}</div>
-          <div style="font-size: 11px; opacity: 0.8; margin-top: 2px;">${startStr} → ${endStr}</div>
+          <div style="font-size: 11px; opacity: 0.8; margin-top: 2px;">${rangeStr}</div>
         </div>
         ${zoomIconHtml}
       </div>

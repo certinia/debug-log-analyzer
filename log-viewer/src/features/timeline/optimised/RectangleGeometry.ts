@@ -57,6 +57,8 @@ export interface ViewportTransform {
   displayWidth: number;
   /** Display height in pixels */
   displayHeight: number;
+  /** Vertical offset from top of canvas (for minimap exclusion). Defaults to 0. */
+  canvasYOffset?: number;
 }
 
 /**
@@ -220,9 +222,21 @@ export class RectangleGeometry {
     // Screen space: X from 0 (left) to displayWidth (right), Y from 0 (top) to displayHeight (bottom)
     const clipX1 = (screenX1 / viewport.displayWidth) * 2 - 1;
     const clipX2 = (screenX2 / viewport.displayWidth) * 2 - 1;
-    // Note: Y is inverted - screenY=0 maps to clipY=+1, screenY=displayHeight maps to clipY=-1
-    const clipY1 = 1 - (screenY1 / viewport.displayHeight) * 2;
-    const clipY2 = 1 - (screenY2 / viewport.displayHeight) * 2;
+
+    // Get canvas Y offset (defaults to 0 for backward compatibility)
+    // This offset accounts for the minimap area at the top of the canvas
+    const canvasYOffset = viewport.canvasYOffset ?? 0;
+
+    // Total canvas height is displayHeight + canvasYOffset
+    const canvasHeight = viewport.displayHeight + canvasYOffset;
+
+    // Convert screen Y to canvas Y (add offset to position below minimap)
+    const canvasY1 = screenY1 + canvasYOffset;
+    const canvasY2 = screenY2 + canvasYOffset;
+
+    // Note: Y is inverted - canvasY=0 maps to clipY=+1, canvasY=canvasHeight maps to clipY=-1
+    const clipY1 = 1 - (canvasY1 / canvasHeight) * 2;
+    const clipY2 = 1 - (canvasY2 / canvasHeight) * 2;
 
     // Write position data (6 vertices for 2 triangles)
     // In clip space: Y increases upward, so clipY2 is top, clipY1 is bottom

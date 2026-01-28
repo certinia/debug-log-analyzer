@@ -9,9 +9,15 @@
  * Based on contracts from specs/001-pixijs-timeline-v2/contracts/timeline-api.ts
  */
 
+//TODO: Remove deps outside timeline
+
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type { LogSubCategory } from '../../../core/log-parser/types.js';
 import type { PrecomputedRect } from '../optimised/RectangleManager.js';
+
+// Re-export LogEvent for use within timeline/optimised folder
+// This keeps the log-parser dependency at the boundary (types file)
+export type { LogEvent };
 
 // ============================================================================
 // VIEWPORT STATE
@@ -98,6 +104,9 @@ export interface EventNode {
 
   /** Display text for event */
   text: string;
+
+  /** Optional subcategory for color resolution (e.g., 'Method', 'SOQL', 'DML') */
+  subCategory?: string;
 }
 
 /**
@@ -411,25 +420,28 @@ export type BucketCategoryPriority = (typeof BUCKET_CONSTANTS.CATEGORY_PRIORITY)
 /**
  * Timeline-specific error types.
  */
-export enum TimelineErrorCode {
-  WEBGL_UNAVAILABLE = 'WEBGL_UNAVAILABLE',
-  INVALID_CONTAINER = 'INVALID_CONTAINER',
-  INVALID_EVENT_DATA = 'INVALID_EVENT_DATA',
-  RENDER_FAILED = 'RENDER_FAILED',
-  INTERNAL_ERROR = 'INTERNAL_ERROR',
-}
+export const TimelineErrorCode = {
+  WEBGL_UNAVAILABLE: 'WEBGL_UNAVAILABLE',
+  INVALID_CONTAINER: 'INVALID_CONTAINER',
+  INVALID_EVENT_DATA: 'INVALID_EVENT_DATA',
+  RENDER_FAILED: 'RENDER_FAILED',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+} as const;
+
+export type TimelineErrorCode = (typeof TimelineErrorCode)[keyof typeof TimelineErrorCode];
 
 /**
  * Custom error class for timeline-specific errors.
  */
 export class TimelineError extends Error {
-  constructor(
-    public code: TimelineErrorCode,
-    message: string,
-    public details?: unknown,
-  ) {
+  public code: TimelineErrorCode;
+  public details?: unknown;
+
+  constructor(code: TimelineErrorCode, message: string, details?: unknown) {
     super(message);
     this.name = 'TimelineError';
+    this.code = code;
+    this.details = details;
   }
 }
 

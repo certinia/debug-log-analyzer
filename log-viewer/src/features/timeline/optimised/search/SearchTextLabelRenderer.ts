@@ -44,6 +44,9 @@ export class SearchTextLabelRenderer {
   /** Batch color data for contrast calculation */
   private batches: Map<string, RenderBatch>;
 
+  /** TextLabelRenderer instance for rendering matched labels */
+  private textLabelRenderer: TextLabelRenderer;
+
   /**
    * Create a new SearchTextLabelRenderer.
    *
@@ -53,13 +56,14 @@ export class SearchTextLabelRenderer {
    */
   constructor(
     parentContainer: Container,
-    private textLabelRenderer: TextLabelRenderer,
+    textLabelRenderer: TextLabelRenderer,
     batches: Map<string, RenderBatch>,
   ) {
     this.container = new Container();
     this.container.zIndex = TEXT_LABEL_CONSTANTS.Z_INDEX;
     this.container.label = 'SearchTextLabelRenderer';
     parentContainer.addChild(this.container);
+    this.textLabelRenderer = textLabelRenderer;
     this.batches = batches;
   }
 

@@ -48,8 +48,11 @@ export interface PrecomputedRect extends RenderRectangle {
   /** Call stack depth (fixed) */
   depth: number;
 
-  /** Duration in nanoseconds (fixed) */
+  /** Total duration in nanoseconds including children (fixed) */
   duration: number;
+
+  /** Self duration in nanoseconds excluding children (fixed, for category resolution) */
+  selfDuration: number;
 
   /** Event category for color batching (fixed) */
   category: string;
@@ -149,6 +152,36 @@ export class RectangleManager {
     return this.rectsByCategory;
   }
 
+  /**
+   * Query events within a specific time and depth region.
+   * Delegates to TemporalSegmentTree for O(log n + k) performance.
+   * Used for hit testing when bucket eventRefs are empty.
+   *
+   * @param timeStart - Start time in nanoseconds
+   * @param timeEnd - End time in nanoseconds
+   * @param depthStart - Minimum depth (inclusive)
+   * @param depthEnd - Maximum depth (inclusive)
+   * @returns Array of LogEvent references in the region
+   */
+  public queryEventsInRegion(
+    timeStart: number,
+    timeEnd: number,
+    depthStart: number,
+    depthEnd: number,
+  ): LogEvent[] {
+    return this.segmentTree.queryEventsInRegion(timeStart, timeEnd, depthStart, depthEnd);
+  }
+
+  /**
+   * Get the underlying segment tree for direct queries.
+   * Used by MinimapDensityQuery for O(B×log N) density computation.
+   *
+   * @returns The TemporalSegmentTree instance
+   */
+  public getSegmentTree(): TemporalSegmentTree {
+    return this.segmentTree;
+  }
+
   // ============================================================================
   // PRIVATE METHODS
   // ============================================================================
@@ -216,6 +249,7 @@ export class RectangleManager {
               timeEnd: exitStamp ?? timestamp,
               depth,
               duration: duration.total,
+              selfDuration: duration.self,
               category: subCategory,
               eventRef: event,
               x: 0,

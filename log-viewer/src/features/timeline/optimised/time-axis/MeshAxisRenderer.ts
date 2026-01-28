@@ -149,6 +149,63 @@ export class MeshAxisRenderer {
   }
 
   /**
+   * Refresh colors from CSS variables (e.g., after VS Code theme change).
+   * Updates grid line and label colors.
+   */
+  public refreshColors(): void {
+    // Re-extract colors from CSS variables
+    const computedStyle = getComputedStyle(document.documentElement);
+
+    // Update grid line color
+    const lineColorStr =
+      computedStyle.getPropertyValue('--vscode-editorLineNumber-foreground').trim() || '#808080';
+    this.gridLineColor = this.parseColorToHex(lineColorStr);
+    this.config.lineColor = this.gridLineColor;
+
+    // Update text color
+    this.config.textColor =
+      computedStyle.getPropertyValue('--vscode-editorLineNumber-foreground').trim() || '#808080';
+
+    // Update existing labels with new color
+    for (const label of this.labelCache.values()) {
+      label.style.fill = this.config.textColor;
+    }
+  }
+
+  /**
+   * Parse CSS color string to numeric hex.
+   */
+  private parseColorToHex(cssColor: string): number {
+    if (!cssColor) {
+      return 0x808080;
+    }
+
+    if (cssColor.startsWith('#')) {
+      const hex = cssColor.slice(1);
+      if (hex.length === 6) {
+        return parseInt(hex, 16);
+      }
+      if (hex.length === 3) {
+        const r = hex[0]!;
+        const g = hex[1]!;
+        const b = hex[2]!;
+        return parseInt(r + r + g + g + b + b, 16);
+      }
+    }
+
+    // rgba() fallback
+    const rgba = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
+    if (rgba) {
+      const r = parseInt(rgba[1]!, 10);
+      const g = parseInt(rgba[2]!, 10);
+      const b = parseInt(rgba[3]!, 10);
+      return (r << 16) | (g << 8) | b;
+    }
+
+    return 0x808080;
+  }
+
+  /**
    * Clean up resources.
    */
   public destroy(): void {
@@ -282,11 +339,13 @@ export class MeshAxisRenderer {
     // Create viewport transform for coordinate conversion
     // Note: offsetY is 0 because axis grid lines should span full screen height
     // regardless of vertical panning
+    // No canvasYOffset needed - main timeline has its own canvas
     const viewportTransform: ViewportTransform = {
       offsetX: viewport.offsetX,
       offsetY: 0, // Full-height elements ignore Y pan
       displayWidth: viewport.displayWidth,
       displayHeight: viewport.displayHeight,
+      canvasYOffset: 0,
     };
 
     let rectIndex = 0;
@@ -335,6 +394,7 @@ export class MeshAxisRenderer {
           const screenSpaceX = screenX - viewport.offsetX;
 
           // Position label in screen space (top-left origin, Y pointing down)
+          // No minimap offset needed - main timeline has its own canvas
           label.x = screenSpaceX - 3; // 3px to the left of line
           label.y = 5; // 5px from top
           label.anchor.set(1, 0); // Right-align to line, align top

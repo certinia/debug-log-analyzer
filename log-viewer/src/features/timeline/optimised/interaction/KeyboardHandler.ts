@@ -87,6 +87,49 @@ export interface KeyboardCallbacks {
    * Called when Ctrl/Cmd+C is pressed to copy the selected frame name.
    */
   onCopy?: () => void;
+
+  // ============================================================================
+  // MINIMAP KEYBOARD CALLBACKS
+  // ============================================================================
+
+  /**
+   * Called to check if the mouse is currently in the minimap area.
+   * Used to determine whether to use minimap-specific key bindings.
+   */
+  isInMinimapArea?: () => boolean;
+
+  /**
+   * Called when arrow keys are pressed to pan the minimap viewport lens.
+   * @param deltaTimeNs - Time delta in nanoseconds (positive = right)
+   */
+  onMinimapPanViewport?: (deltaTimeNs: number) => void;
+
+  /**
+   * Called when arrow up/down are pressed to pan depth in minimap.
+   * @param deltaY - Pixel delta (positive = down, showing shallower frames)
+   */
+  onMinimapPanDepth?: (deltaY: number) => void;
+
+  /**
+   * Called when +/-/W/S is pressed in minimap to zoom the selection.
+   * @param direction - 'in' to narrow the lens, 'out' to widen it
+   */
+  onMinimapZoom?: (direction: 'in' | 'out') => void;
+
+  /**
+   * Called when Home key is pressed in minimap to jump to start.
+   */
+  onMinimapJumpStart?: () => void;
+
+  /**
+   * Called when End key is pressed in minimap to jump to end.
+   */
+  onMinimapJumpEnd?: () => void;
+
+  /**
+   * Called when 0/Escape is pressed in minimap to reset zoom.
+   */
+  onMinimapResetZoom?: () => void;
 }
 
 /**
@@ -166,7 +209,15 @@ export class KeyboardHandler {
    * Handle keydown events.
    */
   private handleKeyDown(event: KeyboardEvent): void {
-    // Determine action based on key combination
+    // Check if mouse is in minimap area - use minimap-specific handling
+    if (this.callbacks.isInMinimapArea?.()) {
+      if (this.handleMinimapKeyDown(event)) {
+        event.preventDefault();
+        return;
+      }
+    }
+
+    // Determine action based on key combination (main timeline)
     if (this.handlePanKeys(event)) {
       event.preventDefault();
       return;
@@ -200,6 +251,98 @@ export class KeyboardHandler {
     if (this.handleCopyKey(event)) {
       event.preventDefault();
       return;
+    }
+  }
+
+  /**
+   * Handle keydown events when mouse is in minimap area.
+   * Returns true if event was handled.
+   *
+   * Key Mappings:
+   * - Arrow Left/Right: Pan viewport lens horizontally
+   * - Arrow Up/Down: Pan depth vertically
+   * - W/+/=: Zoom selection in (narrow lens)
+   * - S/-: Zoom selection out (widen lens)
+   * - Home: Jump to timeline start
+   * - End: Jump to timeline end
+   * - 0/Escape: Reset zoom
+   */
+  private handleMinimapKeyDown(event: KeyboardEvent): boolean {
+    // Don't handle if Ctrl/Alt/Meta is pressed (allow browser shortcuts)
+    if (event.ctrlKey || event.altKey || event.metaKey) {
+      return false;
+    }
+
+    const key = event.key.toLowerCase();
+
+    // Pan viewport lens (Arrow keys)
+    if (this.handleMinimapPanKeys(event)) {
+      return true;
+    }
+
+    // Zoom selection (W/S/+/-/=)
+    switch (key) {
+      case 'w':
+      case '+':
+      case '=':
+        this.callbacks.onMinimapZoom?.('in');
+        return true;
+      case 's':
+      case '-':
+        this.callbacks.onMinimapZoom?.('out');
+        return true;
+    }
+
+    // Jump to start/end (Home/End)
+    switch (event.key) {
+      case 'Home':
+        this.callbacks.onMinimapJumpStart?.();
+        return true;
+      case 'End':
+        this.callbacks.onMinimapJumpEnd?.();
+        return true;
+    }
+
+    // Reset zoom (0/Escape)
+    if (key === '0' || event.key === 'Escape') {
+      this.callbacks.onMinimapResetZoom?.();
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handle arrow keys for minimap pan.
+   * - Left/Right: Pan viewport lens horizontally
+   * - Up/Down: Pan depth vertically
+   */
+  private handleMinimapPanKeys(event: KeyboardEvent): boolean {
+    const viewportState = this.viewport.getState();
+
+    // Calculate pan step (5% of visible range, matching main timeline)
+    const horizontalStep = viewportState.displayWidth * KEYBOARD_CONSTANTS.panStepPercent;
+    const verticalStep = viewportState.displayHeight * KEYBOARD_CONSTANTS.panStepPercent;
+
+    switch (event.key) {
+      case 'ArrowLeft':
+        // Pan viewport lens left - convert pixels to time
+        this.callbacks.onMinimapPanViewport?.(-horizontalStep / viewportState.zoom);
+        return true;
+      case 'ArrowRight':
+        // Pan viewport lens right - convert pixels to time
+        this.callbacks.onMinimapPanViewport?.(horizontalStep / viewportState.zoom);
+        return true;
+      case 'ArrowUp':
+        // Pan depth up - lens moves up visually (offsetY more negative)
+        this.callbacks.onMinimapPanDepth?.(-verticalStep);
+        return true;
+      case 'ArrowDown':
+        // Pan depth down - lens moves down visually (offsetY less negative)
+        this.callbacks.onMinimapPanDepth?.(verticalStep);
+        return true;
+      default:
+        return false;
     }
   }
 
