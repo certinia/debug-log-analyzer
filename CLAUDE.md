@@ -1,38 +1,21 @@
-# Context
+# Apex Log Analyzer
 
-**Apex Log Analyzer** - VS Code extension for analyzing Salesforce debug logs with interactive visualizations (flame charts, call trees, SOQL/DML breakdowns).
+VS Code extension for Salesforce debug log analysis.
 
-## Monorepo Structure
+## Structure
 
-- lana/: VS Code extension (TypeScript)
-- log-viewer/: Webview UI (TypeScript)
-- lana-docs-site/: Docusaurus documentation
-- sample-app/: Sample Salesforce app with test logs
+- `lana/` - VS Code extension
+- `log-viewer/` - Webview UI (NO vscode imports allowed)
 
-## Technology + Tooling
+## Commands
 
-- TypeScript
-- lit, html, css, js
+pnpm watch | build | test | lint | prettier-format
 
-Always use pnpm
+## Standards
 
-## Key Commands
+See `.specify/memory/constitution.md` for full guidelines.
 
-- pnpm watch: Dev build with hot reload
-- pnpm build: Production build
-- pnpm test: Run tests before commiting
-- pnpm lint: Type + lint check
-- pnpm prettier-format: Auto-format all files
-
-## Development Guidelines
-
-- Strict TypeScript enabled
-- `log-viewer/` + `lana/` must remain independent + `log-viewer/` can not import VSCode APIs
-- Write tests first (TDD)
-- Fast performance + Handle 50MB+ logs (500k+ lines)
-
-## Important notes
-
-- See `.specify/memory/constitution.md` for Core principles, development standards, Release process
-- Conventional commit messages
-- Don't auto commit
+- Strict TypeScript, no `any`
+- Performance: <3s for 10MB logs
+- Tests required for features
+- Conventional commits, no auto-commit
