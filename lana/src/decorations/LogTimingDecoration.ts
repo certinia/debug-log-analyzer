@@ -1,0 +1,164 @@
+/*
+ * Copyright (c) 2020 Certinia Inc. All rights reserved.
+ */
+import {
+  window,
+  workspace,
+  type DecorationOptions,
+  type ExtensionContext,
+  type TextDocument,
+  type TextEditor,
+} from 'vscode';
+
+import { Context } from '../Context.js';
+
+// Regex to extract nanosecond timestamp from log line
+// Format: "HH:MM:SS.d (nanoseconds)|EVENT_TYPE"
+const timestampRegex = /^\d{2}:\d{2}:\d{2}\.\d+\s*\((\d+)\)\|/;
+
+// Pattern to find EXECUTION_STARTED line
+const executionStartedRegex = /^\d{2}:\d{2}:\d{2}\.\d+\s*\((\d+)\)\|EXECUTION_STARTED/m;
+
+// Decoration type for ghost text
+const decorationType = window.createTextEditorDecorationType({
+  after: {
+    margin: '0 0 0 2em',
+    color: '#888888',
+  },
+  isWholeLine: true,
+});
+
+export class LogTimingDecoration {
+  private static instance: LogTimingDecoration | null = null;
+  private context: ExtensionContext;
+
+  private constructor(context: ExtensionContext) {
+    this.context = context;
+  }
+
+  static apply(context: Context): void {
+    if (LogTimingDecoration.instance) {
+      return;
+    }
+
+    LogTimingDecoration.instance = new LogTimingDecoration(context.context);
+    LogTimingDecoration.instance.register();
+  }
+
+  private register(): void {
+    // Update decorations for active editor on activation
+    if (window.activeTextEditor) {
+      this.updateDecorations(window.activeTextEditor);
+    }
+
+    // Listen for editor changes
+    this.context.subscriptions.push(
+      window.onDidChangeActiveTextEditor((editor) => {
+        if (editor) {
+          this.updateDecorations(editor);
+        }
+      }),
+    );
+
+    // Listen for document changes
+    this.context.subscriptions.push(
+      workspace.onDidChangeTextDocument((event) => {
+        const editor = window.activeTextEditor;
+        if (editor && event.document === editor.document) {
+          this.updateDecorations(editor);
+        }
+      }),
+    );
+
+    // Listen for document open
+    this.context.subscriptions.push(
+      workspace.onDidOpenTextDocument((doc) => {
+        const editor = window.activeTextEditor;
+        if (editor && editor.document === doc) {
+          this.updateDecorations(editor);
+        }
+      }),
+    );
+  }
+
+  private updateDecorations(editor: TextEditor): void {
+    const document = editor.document;
+
+    // Only process apexlog files
+    if (document.languageId !== 'apexlog') {
+      editor.setDecorations(decorationType, []);
+      return;
+    }
+
+    const duration = this.calculateLogDuration(document);
+    if (duration === null) {
+      editor.setDecorations(decorationType, []);
+      return;
+    }
+
+    const formattedDuration = this.formatDuration(duration);
+
+    // Create decoration for line 0 (first line)
+    const line = document.lineAt(0);
+    const decoration: DecorationOptions = {
+      range: line.range,
+      renderOptions: {
+        after: {
+          contentText: `⏱ ${formattedDuration}`,
+        },
+      },
+    };
+
+    editor.setDecorations(decorationType, [decoration]);
+  }
+
+  private calculateLogDuration(document: TextDocument): number | null {
+    const text = document.getText();
+
+    // Find first EXECUTION_STARTED timestamp
+    const startMatch = text.match(executionStartedRegex);
+    if (!startMatch || !startMatch[1]) {
+      return null;
+    }
+    const startTimestamp = parseInt(startMatch[1], 10);
+
+    // Find last timestamp by scanning from end
+    // For performance, only scan the last portion of the file
+    const lastChunk = text.slice(-10000); // Last 10KB should be enough
+    const lines = lastChunk.split('\n');
+
+    let endTimestamp: number | null = null;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      if (!line) {
+        continue;
+      }
+      const match = line.match(timestampRegex);
+      if (match && match[1]) {
+        endTimestamp = parseInt(match[1], 10);
+        break;
+      }
+    }
+
+    if (endTimestamp === null || endTimestamp <= startTimestamp) {
+      return null;
+    }
+
+    return endTimestamp - startTimestamp;
+  }
+
+  private formatDuration(nanoseconds: number): string {
+    const milliseconds = nanoseconds / 1_000_000;
+    const seconds = milliseconds / 1000;
+
+    if (seconds >= 60) {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes}m ${remainingSeconds.toFixed(2)}s`;
+    } else if (seconds >= 1) {
+      return `${seconds.toFixed(2)}s`;
+    } else {
+      return `${milliseconds.toFixed(2)}ms`;
+    }
+  }
+}

@@ -7,6 +7,7 @@ import { ShowAnalysisCodeLens } from './codelenses/ShowAnalysisCodeLens.js';
 import { RetrieveLogFile } from './commands/RetrieveLogFile.js';
 import { ShowLogAnalysis } from './commands/ShowLogAnalysis.js';
 import { SwitchTimelineTheme } from './commands/SwitchTimelineTheme.js';
+import { LogTimingDecoration } from './decorations/LogTimingDecoration.js';
 import { Display } from './display/Display.js';
 import { WhatsNewNotification } from './display/WhatsNewNotification.js';
 import { SymbolFinder } from './salesforce/codesymbol/SymbolFinder.js';
@@ -32,6 +33,7 @@ export class Context {
     ShowLogAnalysis.apply(this);
     SwitchTimelineTheme.apply(this);
     ShowAnalysisCodeLens.apply(this);
+    LogTimingDecoration.apply(this);
     WhatsNewNotification.apply(this);
   }
 
