@@ -338,6 +338,7 @@ export class ApexLog extends LogEvent {
     queueableJobsAddedToQueue: { used: 0, limit: 0 },
     mobileApexPushCalls: { used: 0, limit: 0 },
     byNamespace: new Map<string, Limits>(),
+    snapshots: [],
   };
 
   /**
@@ -1092,6 +1093,13 @@ export class LimitUsageForNSLine extends LogEvent {
     }
 
     parser.governorLimits.byNamespace.set(this.namespace, limits);
+
+    // Track snapshots for governor limit visualization
+    parser.governorLimits.snapshots.push({
+      timestamp: this.timestamp,
+      namespace: this.namespace,
+      limits,
+    });
   }
 }
 

@@ -27,14 +27,22 @@
 
 import * as PIXI from 'pixi.js';
 import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.js';
-import type { MarkerType, TimelineMarker } from '../../types/flamechart.types.js';
+import type {
+  HeatStripTimeSeries,
+  MarkerType,
+  TimelineMarker,
+} from '../../types/flamechart.types.js';
 import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
 import { blendWithBackground } from '../BucketColorResolver.js';
 import { createRectangleShader } from '../RectangleShader.js';
+import { HEAT_STRIP_HEIGHT, HeatStripRenderer } from './HeatStripRenderer.js';
 import { MinimapAxisRenderer } from './MinimapAxisRenderer.js';
 import { MinimapBarGeometry } from './MinimapBarGeometry.js';
 import type { MinimapDensityData } from './MinimapDensityQuery.js';
 import type { MinimapManager, MinimapSelection } from './MinimapManager.js';
+
+// Re-export heat strip height for use by other components
+export { HEAT_STRIP_HEIGHT };
 
 /**
  * Opacity constants for density visualization (logarithmic scale).
@@ -108,6 +116,9 @@ export class MinimapRenderer {
   /** Time axis renderer (static). */
   private axisRenderer: MinimapAxisRenderer;
 
+  /** Heat strip renderer (static). */
+  private heatStripRenderer: HeatStripRenderer;
+
   /** Cached render texture for static content. */
   private staticTexture: PIXI.RenderTexture | null = null;
 
@@ -148,6 +159,9 @@ export class MinimapRenderer {
 
   /** HTML label element for lens time info. */
   private labelElement: HTMLDivElement;
+
+  /** HTML tooltip element for heat strip hover. */
+  private heatStripTooltipElement: HTMLDivElement;
 
   // ============================================================================
   // OTHER STATE
@@ -194,16 +208,21 @@ export class MinimapRenderer {
     // Create axis renderer (doesn't add to parent - we control layer order)
     this.axisRenderer = new MinimapAxisRenderer();
 
+    // Create heat strip renderer for metric visualization
+    this.heatStripRenderer = new HeatStripRenderer();
+
     // Add static layers in correct order (back to front):
     // 1. Background
     // 2. Markers
     // 3. Axis (tick lines and labels - labels are in strip above chart area)
     // 4. Skyline (mesh-based for performance)
+    // 5. Heat strip (at bottom of minimap)
     this.staticContainer.addChild(this.backgroundGraphics);
     this.staticContainer.addChild(this.markerGraphics);
     this.staticContainer.addChild(this.axisRenderer.getTickGraphics());
     this.staticContainer.addChild(this.axisRenderer.getLabelsContainer());
     this.staticContainer.addChild(this.skylineMesh);
+    this.staticContainer.addChild(this.heatStripRenderer.getGraphics());
 
     // ============================================================================
     // DYNAMIC CONTENT SETUP
@@ -231,6 +250,10 @@ export class MinimapRenderer {
     // Create HTML label for lens time info
     this.labelElement = this.createLabelElement();
     htmlContainer.appendChild(this.labelElement);
+
+    // Create HTML tooltip for heat strip hover
+    this.heatStripTooltipElement = this.createHeatStripTooltipElement();
+    htmlContainer.appendChild(this.heatStripTooltipElement);
   }
 
   /**
@@ -260,6 +283,155 @@ export class MinimapRenderer {
   }
 
   /**
+   * Create the HTML tooltip element for heat strip hover.
+   * Shows governor limit percentages on hover.
+   */
+  private createHeatStripTooltipElement(): HTMLDivElement {
+    const tooltip = document.createElement('div');
+    tooltip.className = 'heat-strip-tooltip';
+    tooltip.style.cssText = `
+      position: absolute;
+      display: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      background: var(--vscode-editorWidget-background, #252526);
+      border: 1px solid var(--vscode-editorWidget-border, #454545);
+      color: var(--vscode-editorWidget-foreground, #e3e3e3);
+      font-family: monospace;
+      font-size: 11px;
+      pointer-events: none;
+      z-index: 200;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    `;
+    return tooltip;
+  }
+
+  /**
+   * Show the heat strip tooltip with metric data.
+   *
+   * @param screenX - X position for tooltip placement
+   * @param screenY - Y position (tooltip appears above this)
+   * @param timeNs - Time in nanoseconds to show data for
+   */
+  public showHeatStripTooltip(screenX: number, screenY: number, timeNs: number): void {
+    const dataPoint = this.heatStripRenderer.getDataPointAtTime(timeNs);
+    const metrics = this.heatStripRenderer.getMetrics();
+    if (!dataPoint || !metrics) {
+      this.hideHeatStripTooltip();
+      return;
+    }
+
+    // Build tooltip content
+    const { point } = dataPoint;
+    const rows: string[] = [];
+
+    // Sort metrics by priority (lower = shown first), then by percentage descending
+    const sortedMetrics = Array.from(point.metricSnapshots.entries()).sort((a, b) => {
+      const metricA = metrics.get(a[0]);
+      const metricB = metrics.get(b[0]);
+      const priorityA = metricA?.priority ?? 999;
+      const priorityB = metricB?.priority ?? 999;
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      return b[1].percent - a[1].percent;
+    });
+
+    // High-priority metrics (priority < 4) always shown, others only if > 0%
+    const HIGH_PRIORITY_THRESHOLD = 4;
+
+    for (const [metricId, snapshot] of sortedMetrics) {
+      const metric = metrics.get(metricId);
+      const isHighPriority = (metric?.priority ?? 999) < HIGH_PRIORITY_THRESHOLD;
+      const isNonZero = snapshot.percent > 0;
+
+      // Show high-priority metrics always, others only if > 0%
+      if (isHighPriority || isNonZero) {
+        const name = metric?.displayName ?? metricId;
+        const percentStr = (snapshot.percent * 100).toFixed(1).padStart(5);
+        const color = this.getPercentColor(snapshot.percent);
+        const unit = metric?.unit ?? '';
+        const valueStr = this.formatMetricValue(snapshot.used, snapshot.limit, unit);
+        rows.push(
+          `<div style="display:grid;grid-template-columns:140px 55px auto;gap:4px;margin:2px 0;">` +
+            `<span style="color:var(--vscode-descriptionForeground, #999)">${name}</span>` +
+            `<span style="text-align:right;color:${color}">${percentStr}%</span>` +
+            `<span style="color:var(--vscode-descriptionForeground, #666)">(${valueStr})</span>` +
+            `</div>`,
+        );
+      }
+    }
+
+    if (rows.length === 0) {
+      this.hideHeatStripTooltip();
+      return;
+    }
+
+    // Set content - title comes from first metric's context or default
+    this.heatStripTooltipElement.innerHTML =
+      `<div style="font-weight:bold;margin-bottom:4px;">Metrics</div>` + rows.join('');
+    this.heatStripTooltipElement.style.display = 'block';
+
+    // Position tooltip above the heat strip
+    requestAnimationFrame(() => {
+      const tooltipWidth = this.heatStripTooltipElement.offsetWidth;
+      const tooltipHeight = this.heatStripTooltipElement.offsetHeight;
+      const containerWidth = this.htmlContainer.offsetWidth;
+      const padding = 4;
+
+      // Center on cursor X, clamp to viewport
+      let left = screenX - tooltipWidth / 2;
+      left = Math.max(padding, Math.min(containerWidth - tooltipWidth - padding, left));
+
+      // Position above the hover point
+      const top = screenY - tooltipHeight - 8;
+
+      this.heatStripTooltipElement.style.left = `${left}px`;
+      this.heatStripTooltipElement.style.top = `${Math.max(0, top)}px`;
+    });
+  }
+
+  /**
+   * Hide the heat strip tooltip.
+   */
+  public hideHeatStripTooltip(): void {
+    this.heatStripTooltipElement.style.display = 'none';
+  }
+
+  /**
+   * Get color for percentage value (traffic light).
+   */
+  private getPercentColor(percent: number): string {
+    if (percent >= 1.0) {
+      return '#7c3aed'; // Purple - breached
+    } else if (percent >= 0.8) {
+      return '#dc2626'; // Red - critical
+    } else if (percent >= 0.5) {
+      return '#f59e0b'; // Amber - warning
+    }
+    return '#10b981'; // Green - safe
+  }
+
+  /**
+   * Format metric value with used/limit and optional unit.
+   */
+  private formatMetricValue(used: number, limit: number, unit: string): string {
+    const usedStr = this.formatNumber(used);
+    const limitStr = this.formatNumber(limit);
+    if (unit) {
+      return `${usedStr} / ${limitStr} ${unit}`;
+    }
+    return `${usedStr} / ${limitStr}`;
+  }
+
+  /**
+   * Format a number with thousands separators.
+   */
+  private formatNumber(value: number): string {
+    return value.toLocaleString();
+  }
+
+  /**
    * Set the PIXI renderer for texture caching.
    * Must be called before render() to enable static content caching.
    */
@@ -280,6 +452,26 @@ export class MinimapRenderer {
    */
   public invalidateStatic(): void {
     this.staticDirty = true;
+  }
+
+  /**
+   * Set heat strip time series data for visualization.
+   * Call this when log data is loaded or changes.
+   *
+   * @param timeSeries - Generic heat strip time series data, or null to clear
+   */
+  public setHeatStripTimeSeries(timeSeries: HeatStripTimeSeries | null): void {
+    if (timeSeries) {
+      this.heatStripRenderer.processData(timeSeries);
+    }
+    this.invalidateStatic();
+  }
+
+  /**
+   * Get the heat strip renderer for tooltip access.
+   */
+  public getHeatStripRenderer(): HeatStripRenderer {
+    return this.heatStripRenderer;
   }
 
   /**
@@ -407,6 +599,9 @@ export class MinimapRenderer {
     // Render time axis
     this.axisRenderer.render(manager);
 
+    // Render governor limit heat strip
+    this.heatStripRenderer.render(manager, minimapHeight, state.totalDuration);
+
     // If we have a renderer, cache to texture
     if (this.renderer && displayWidth > 0 && minimapHeight > 0) {
       // Create or resize texture
@@ -494,9 +689,10 @@ export class MinimapRenderer {
     const { buckets, globalMaxDepth } = densityData;
 
     // Axis is at TOP - chart area is below it
+    // When heat strip has data, chart ends above the heat strip track
     const axisHeight = this.axisRenderer.getHeight();
-    const chartHeight = minimapHeight - axisHeight;
-    const chartBottom = minimapHeight; // Chart ends at bottom of minimap
+    const chartBottom = manager.getChartBottom();
+    const chartHeight = chartBottom - axisHeight;
 
     if (globalMaxDepth === 0 || buckets.length === 0 || chartHeight <= 0) {
       this.skylineBarGeometry.setDrawCount(0);
@@ -579,9 +775,11 @@ export class MinimapRenderer {
     const state = manager.getState();
 
     // Axis is at TOP - chart area is below it
+    // When heat strip has data, chart ends above the heat strip track
     const axisHeight = this.axisRenderer.getHeight();
     const chartTop = axisHeight;
-    const chartHeight = minimapHeight - axisHeight;
+    const chartBottom = manager.getChartBottom();
+    const chartHeight = chartBottom - chartTop;
 
     // Apply 1px gap for negative space separation between adjacent markers
     // Same approach as TimelineMarkerRenderer: 0.5px inset from each edge
@@ -630,9 +828,10 @@ export class MinimapRenderer {
     const state = manager.getState();
 
     // Axis is at TOP - chart area is below it
+    // When heat strip has data, curtain ends above the heat strip (it's separate)
     const axisHeight = this.axisRenderer.getHeight();
     const chartTop = axisHeight;
-    const chartBottom = minimapHeight;
+    const chartBottom = manager.getChartBottom();
     const chartHeight = chartBottom - chartTop;
 
     // Calculate lens X bounds (time)
@@ -651,7 +850,7 @@ export class MinimapRenderer {
     const clampedLensY2 = Math.max(chartTop, Math.min(chartBottom, lensY2));
 
     // Draw 4 curtain regions (L-shaped around the lens window)
-    // Curtain covers ONLY the chart area (Y=axisHeight to Y=minimapHeight)
+    // Curtain covers ONLY the chart area (Y=axisHeight to Y=chartBottom)
     // Axis area (Y=0 to Y=axisHeight) is NOT covered to keep labels crisp
 
     // Left curtain (chart area only, excludes axis)
@@ -673,13 +872,13 @@ export class MinimapRenderer {
       this.curtainGraphics.fill({ color: this.colors.curtain, alpha: CURTAIN_OPACITY });
     }
 
-    // Bottom curtain (between left and right curtains, below lens to bottom of minimap)
-    if (clampedLensY2 < minimapHeight) {
+    // Bottom curtain (between left and right curtains, below lens to bottom of chart area)
+    if (clampedLensY2 < chartBottom) {
       this.curtainGraphics.rect(
         lensX1,
         clampedLensY2,
         lensX2 - lensX1,
-        minimapHeight - clampedLensY2,
+        chartBottom - clampedLensY2,
       );
       this.curtainGraphics.fill({ color: this.colors.curtain, alpha: CURTAIN_OPACITY });
     }
@@ -694,9 +893,10 @@ export class MinimapRenderer {
     minimapHeight: number,
   ): void {
     // Axis is at TOP - chart area is below it
+    // When heat strip has data, lens ends above the heat strip (it's separate)
     const axisHeight = this.axisRenderer.getHeight();
     const chartTop = axisHeight;
-    const chartBottom = minimapHeight;
+    const chartBottom = manager.getChartBottom();
 
     // Calculate lens bounds
     const lensX1 = manager.timeToMinimapX(selection.startTime);
@@ -855,6 +1055,7 @@ export class MinimapRenderer {
     this.skylineBarGeometry.destroy();
     this.markerGraphics.destroy();
     this.axisRenderer.destroy();
+    this.heatStripRenderer.destroy();
     this.staticContainer.destroy();
 
     if (this.staticTexture) {
@@ -873,8 +1074,9 @@ export class MinimapRenderer {
     this.cursorLineGraphics.destroy();
     this.dynamicContainer.destroy();
 
-    // Remove HTML label
+    // Remove HTML labels
     this.labelElement.remove();
+    this.heatStripTooltipElement.remove();
 
     // Destroy main container
     this.container.destroy();

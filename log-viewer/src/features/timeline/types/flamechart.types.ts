@@ -646,6 +646,60 @@ export interface FindResultsEventDetail {
 }
 
 // ============================================================================
+// HEAT STRIP VISUALIZATION TYPES
+// ============================================================================
+
+/**
+ * Generic metric definition for heat strip visualization.
+ * Allows any metric system (not just Apex governor limits) to be displayed.
+ */
+export interface HeatStripMetric {
+  /** Unique identifier for this metric (e.g., 'cpuTime') */
+  id: string;
+  /** Human-readable display name (e.g., 'CPU Time') */
+  displayName: string;
+  /** Unit string for formatting (e.g., 'ms', 'bytes', '') */
+  unit: string;
+  /** Priority for tooltip ordering (0 = highest, shown first) */
+  priority: number;
+}
+
+/**
+ * Metric snapshot at a point in time.
+ * Represents current usage and limit for a single metric.
+ */
+export interface HeatStripMetricValue {
+  /** Current usage value */
+  used: number;
+  /** Maximum allowed value (limit) */
+  limit: number;
+}
+
+/**
+ * Time series event with generic metric values.
+ * Represents a snapshot of all metrics at a specific timestamp.
+ */
+export interface HeatStripEvent {
+  /** Timestamp in nanoseconds */
+  timestamp: number;
+  /** Namespace or context (e.g., 'default', 'managed package name') */
+  namespace: string;
+  /** Map of metric id to current values */
+  values: Map<string, HeatStripMetricValue>;
+}
+
+/**
+ * Complete time series data for heat strip visualization.
+ * Generic structure that can represent any metric system.
+ */
+export interface HeatStripTimeSeries {
+  /** Metric definitions (id → metadata) */
+  metrics: Map<string, HeatStripMetric>;
+  /** Time series events ordered by timestamp */
+  events: HeatStripEvent[];
+}
+
+// ============================================================================
 // TEMPORAL SEGMENT TREE TYPES
 // ============================================================================
 

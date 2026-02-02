@@ -14,6 +14,7 @@ import * as PIXI from 'pixi.js';
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type {
   EventNode,
+  HeatStripTimeSeries,
   ModifierKeys,
   TimelineMarker,
   TimelineOptions,
@@ -685,6 +686,16 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Request re-render
     this.requestRender();
+  }
+
+  /**
+   * Set heat strip time series data for visualization.
+   * Call this after init() when log data is available.
+   *
+   * @param timeSeries - Heat strip time series data (generic format)
+   */
+  public setHeatStripTimeSeries(timeSeries: HeatStripTimeSeries | null): void {
+    this.minimapOrchestrator?.setHeatStripTimeSeries(timeSeries);
   }
 
   // ============================================================================

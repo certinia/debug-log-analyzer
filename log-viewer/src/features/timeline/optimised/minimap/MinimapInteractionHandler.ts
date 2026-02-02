@@ -19,6 +19,7 @@
  * - Hover: Show vertical guide on other view (cursor mirror)
  */
 
+import { HEAT_STRIP_HIT_HEIGHT } from './HeatStripRenderer.js';
 import type { MinimapDragMode, MinimapManager } from './MinimapManager.js';
 
 /**
@@ -52,6 +53,20 @@ export interface MinimapInteractionCallbacks {
    * @param minimapY - Y coordinate in minimap where drag started
    */
   onDepthPositionStart?: (minimapY: number) => void;
+
+  /**
+   * Called when user hovers over the heat strip area.
+   * @param timeNs - Time position being hovered, or null when leaving
+   * @param screenX - Screen X coordinate for tooltip positioning
+   * @param screenY - Screen Y coordinate for tooltip positioning
+   */
+  onHeatStripHover?: (timeNs: number | null, screenX: number, screenY: number) => void;
+
+  /**
+   * Called when user clicks on the heat strip area.
+   * @param timeNs - Time position clicked
+   */
+  onHeatStripClick?: (timeNs: number) => void;
 }
 
 /**
@@ -102,6 +117,9 @@ export class MinimapInteractionHandler {
   private lastClickTime = 0;
   private lastClickX = 0;
   private lastClickY = 0;
+
+  // Heat strip hover state
+  private isInHeatStrip = false;
 
   // Event listener references for cleanup
   private boundHandlers: Map<string, (e: Event) => void> = new Map();
@@ -367,6 +385,19 @@ export class MinimapInteractionHandler {
   }
 
   /**
+   * Check if a Y coordinate is within the heat strip area.
+   * Hit area extends above and below the visual heat strip for easier targeting.
+   */
+  private isInHeatStripArea(screenY: number): boolean {
+    const minimapHeight = this.manager.getHeight();
+    // Use larger hit area for easier mouse targeting (extends above and below)
+    const heatStripTop = minimapHeight - HEAT_STRIP_HIT_HEIGHT;
+    // Extend hit area 5px below minimap bottom edge for bottom-edge targeting
+    const heatStripBottom = minimapHeight + 5;
+    return screenY >= heatStripTop && screenY <= heatStripBottom;
+  }
+
+  /**
    * Handle mouse move - update drag or cursor.
    */
   private handleMouseMove(event: MouseEvent): void {
@@ -382,6 +413,7 @@ export class MinimapInteractionHandler {
     if (screenY > this.manager.getHeight() && !this.isDragging) {
       // Cursor left minimap area
       this.isMouseInMinimap = false;
+      this.handleHeatStripLeave();
       this.callbacks.onCursorMove(null);
       this.canvas.style.cursor = 'default';
       return;
@@ -393,7 +425,30 @@ export class MinimapInteractionHandler {
     const cursorTime = this.manager.minimapXToTime(screenX);
     this.callbacks.onCursorMove(cursorTime);
 
+    // Check for heat strip hover (only when not dragging)
+    if (!this.isDragging) {
+      const inHeatStrip = this.isInHeatStripArea(screenY);
+      if (inHeatStrip !== this.isInHeatStrip) {
+        this.isInHeatStrip = inHeatStrip;
+        if (!inHeatStrip) {
+          this.handleHeatStripLeave();
+        }
+      }
+      if (inHeatStrip) {
+        this.callbacks.onHeatStripHover?.(cursorTime, screenX, screenY);
+        // Change cursor to pointer for clickable heat strip
+        this.canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
+
     if (this.isDragging) {
+      // Hide heat strip tooltip during drag
+      if (this.isInHeatStrip) {
+        this.isInHeatStrip = false;
+        this.handleHeatStripLeave();
+      }
+
       // Check if we've moved enough to count as drag
       if (!this.didDrag) {
         const distance = Math.max(
@@ -421,6 +476,13 @@ export class MinimapInteractionHandler {
       const mode = this.manager.getDragModeForPosition(screenX, event.shiftKey, screenY);
       this.updateCursor(mode, event.metaKey || event.ctrlKey, false, event.shiftKey);
     }
+  }
+
+  /**
+   * Handle heat strip leave (hide tooltip).
+   */
+  private handleHeatStripLeave(): void {
+    this.callbacks.onHeatStripHover?.(null, 0, 0);
   }
 
   /**
@@ -536,6 +598,14 @@ export class MinimapInteractionHandler {
         this.callbacks.onSelectionChange(this.savedSelectionStart, this.savedSelectionEnd);
       }
 
+      // Check for heat strip click
+      if (this.isInHeatStripArea(screenY)) {
+        const clickTime = this.manager.minimapXToTime(screenX);
+        this.callbacks.onHeatStripClick?.(clickTime);
+        // Don't process as regular click
+        return;
+      }
+
       const currentTime = Date.now();
       const timeSinceLastClick = currentTime - this.lastClickTime;
       const distanceX = Math.abs(screenX - this.lastClickX);
@@ -574,6 +644,7 @@ export class MinimapInteractionHandler {
   private handleMouseLeave(_event: MouseEvent): void {
     if (!this.isDragging) {
       this.isMouseInMinimap = false;
+      this.handleHeatStripLeave();
       this.callbacks.onCursorMove(null);
       this.canvas.style.cursor = 'default';
     }

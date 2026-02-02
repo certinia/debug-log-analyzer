@@ -34,8 +34,22 @@ export interface Limits {
   mobileApexPushCalls: { used: number; limit: number };
 }
 
+/**
+ * A single governor limit usage snapshot at a point in time.
+ */
+export interface GovernorSnapshot {
+  /** Timestamp in nanoseconds when this limit snapshot was recorded. */
+  timestamp: number;
+  /** Namespace the limits apply to (e.g., 'default', 'MyPackage'). */
+  namespace: string;
+  /** The limit values at this timestamp. */
+  limits: Limits;
+}
+
 export interface GovernorLimits extends Limits {
   byNamespace: Map<string, Limits>;
+  /** Point-in-time snapshots of governor limit usage, ordered by timestamp ascending. */
+  snapshots: GovernorSnapshot[];
 }
 
 export interface LogIssue {

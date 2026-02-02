@@ -24,6 +24,15 @@ import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 
 The `flamechart.types.ts` file re-exports necessary types from external modules, keeping dependencies contained at the boundary.
 
+### Heat Strip Architecture
+
+The minimap heat strip visualization is generic and not coupled to Apex governor limits:
+
+- `HeatStripRenderer` accepts `HeatStripTimeSeries` (generic metrics over time)
+- `ApexLogTimeline` transforms `GovernorSnapshot[]` → `HeatStripTimeSeries`
+- Apex-specific display names, units, and priority order are defined ONLY in ApexLogTimeline
+- Tooltip formatting uses metric properties from the generic types
+
 ## Spatial Queries: Use TemporalSegmentTree
 
 **Always use TemporalSegmentTree (via RectangleManager) for frame queries. Never traverse the event tree directly.**
