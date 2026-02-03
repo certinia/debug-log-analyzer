@@ -10,6 +10,7 @@ import { Uri, commands, window as vscWindow, workspace, type WebviewPanel } from
 import { Context } from '../Context.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
+import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
 import { getConfig } from '../workspace/AppConfig.js';
 
 interface WebViewLogFileRequest<T = unknown> {
@@ -21,9 +22,14 @@ interface WebViewLogFileRequest<T = unknown> {
 export class LogView {
   private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
   private static currentPanel: WebviewPanel | undefined;
+  private static currentLogPath: string | undefined;
 
   static getCurrentView() {
     return LogView.currentPanel;
+  }
+
+  static getLogPath() {
+    return LogView.currentLogPath;
   }
 
   static async createView(
@@ -37,6 +43,7 @@ export class LogView {
       Uri.file(dirname(logPath || '')),
     ]);
     this.currentPanel = panel;
+    this.currentLogPath = logPath;
 
     const logViewerRoot = join(context.context.extensionPath, 'out');
     const index = join(logViewerRoot, 'index.html');
@@ -120,6 +127,14 @@ export class LogView {
             const { text } = payload as { text: string };
             if (text) {
               vscWindow.showErrorMessage(text);
+            }
+            break;
+          }
+
+          case 'goToLogLine': {
+            const { timestamp } = payload as { timestamp: number };
+            if (timestamp && LogView.currentLogPath) {
+              RawLogNavigation.goToLineByTimestamp(LogView.currentLogPath, timestamp);
             }
             break;
           }

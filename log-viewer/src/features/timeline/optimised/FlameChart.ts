@@ -1536,6 +1536,19 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
+   * Select a frame by its original LogEvent reference.
+   * Used when navigating from external sources (e.g., calltree "Show in Timeline").
+   *
+   * @param logEvent - The original LogEvent to find and select
+   */
+  public selectByOriginal(logEvent: LogEvent): void {
+    const treeNode = this.selectionOrchestrator?.findByOriginal(logEvent);
+    if (treeNode) {
+      this.selectionOrchestrator?.selectFrame(treeNode);
+    }
+  }
+
+  /**
    * Reset viewport to show entire timeline.
    * Cancels any active animations.
    */

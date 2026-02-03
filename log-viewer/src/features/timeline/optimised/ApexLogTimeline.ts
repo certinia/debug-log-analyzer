@@ -17,9 +17,12 @@
  * LogEvent should only be referenced here in ApexLogTimeline to convert to generic EventNode for FlameChart and not in FlameChart or its dependencies.
  */
 
-import { ContextMenu, type ContextMenuItem } from '../../../components/ContextMenu.js';
+import { ContextMenu } from '../../../components/ContextMenu.js';
+import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
+import { eventBus } from '../../../core/events/EventBus.js';
 import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { findEventByTimestamp } from '../../../core/utility/EventSearch.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
 import { getTheme } from '../themes/ThemeSelector.js';
@@ -53,6 +56,7 @@ export class ApexLogTimeline {
   private searchCursor: SearchCursor<EventNode> | null = null;
   private selectedEventForContextMenu: EventNode | null = null;
   private selectedMarkerForContextMenu: TimelineMarker | null = null;
+  private eventBusUnsubscribe: (() => void) | null = null;
 
   constructor() {
     this.flamechart = new FlameChart();
@@ -157,6 +161,32 @@ export class ApexLogTimeline {
 
     // Wire up search event listeners
     this.enableSearch();
+
+    // Subscribe to EventBus for timeline navigation requests (from CalltreeView)
+    this.eventBusUnsubscribe = eventBus.on('timeline:navigate-to', ({ timestamp }) => {
+      this.navigateToTimestamp(timestamp);
+    });
+  }
+
+  /**
+   * Navigate to a specific timestamp in the timeline.
+   * Called via EventBus 'timeline:navigate-to' event from CalltreeView.
+   * Centers the viewport AND selects the event for visual highlighting.
+   */
+  private navigateToTimestamp(timestamp: number): void {
+    // Find event by timestamp (binary search - events sorted by time)
+    const result = findEventByTimestamp(this.events, timestamp);
+    if (!result) {
+      return;
+    }
+
+    // Select the event (highlights it)
+    this.flamechart.selectByOriginal(result.event);
+
+    // Zoom to fit the event (with padding)
+    const viewport = this.flamechart.getViewportManager();
+    viewport?.focusOnEvent(result.event.timestamp, result.event.duration.total, result.depth);
+    this.flamechart.requestRender();
   }
 
   /**
@@ -167,6 +197,12 @@ export class ApexLogTimeline {
     document.removeEventListener('lv-find', this.handleFind);
     document.removeEventListener('lv-find-match', this.handleFindMatch);
     document.removeEventListener('lv-find-close', this.handleFindClose);
+
+    // Unsubscribe from EventBus
+    if (this.eventBusUnsubscribe) {
+      this.eventBusUnsubscribe();
+      this.eventBusUnsubscribe = null;
+    }
 
     this.flamechart.destroy();
     if (this.tooltipManager) {
@@ -450,26 +486,36 @@ export class ApexLogTimeline {
       this.tooltipManager.show(logEvent, screenX, screenY, { keepPosition: true });
     }
 
-    // Build menu items
-    const items: ContextMenuItem[] = [
+    // Build menu using ContextMenuBuilder
+    const builder = new ContextMenuBuilder();
+
+    // Group 1: View actions (stay here)
+    builder.addGroup([{ id: 'zoom-to-frame', label: 'Zoom to Frame', shortcut: 'Z' }]);
+
+    // Group 2: Navigation actions (go elsewhere)
+    const navActions: { id: string; label: string; shortcut?: string }[] = [
       { id: 'show-in-call-tree', label: 'Show in Call Tree', shortcut: 'J' },
     ];
 
-    // Add "Go to Source" only when hasValidSymbols is true
     if (logEvent?.hasValidSymbols) {
-      items.push({ id: 'go-to-source', label: 'Go to Source' });
+      navActions.push({ id: 'go-to-source', label: 'Go to Source' });
     }
 
-    items.push(
-      { id: 'zoom-to-frame', label: 'Zoom to Frame', shortcut: 'Z' },
-      { id: 'separator-1', label: '', separator: true },
-      { id: 'copy-name', label: 'Copy Name', shortcut: this.getCopyShortcut() },
+    if (logEvent?.timestamp) {
+      navActions.push({ id: 'show-in-log', label: 'Show in Log' });
+    }
+
+    builder.addGroup(navActions);
+
+    // Group 3: Copy actions
+    builder.addGroup([
+      { id: 'copy-name', label: 'Copy Name', shortcut: ContextMenuBuilder.copyShortcut() },
       { id: 'copy-details', label: 'Copy Details' },
       { id: 'copy-call-stack', label: 'Copy Call Stack' },
-    );
+    ]);
 
     // Use client coords for context menu (positioned in viewport)
-    this.contextMenu.show(items, clientX, clientY);
+    this.contextMenu.show(builder.build(), clientX, clientY);
   }
 
   /**
@@ -495,17 +541,23 @@ export class ApexLogTimeline {
       this.tooltipManager.showTruncation(marker, screenX, screenY);
     }
 
-    // Build menu items for markers
-    const items: ContextMenuItem[] = [
-      { id: 'show-in-call-tree', label: 'Show in Call Tree', shortcut: 'J' },
-      { id: 'zoom-to-marker', label: 'Zoom to Marker', shortcut: 'Z' },
-      { id: 'separator-1', label: '', separator: true },
-      { id: 'copy-summary', label: 'Copy Summary', shortcut: this.getCopyShortcut() },
+    // Build menu using ContextMenuBuilder
+    const builder = new ContextMenuBuilder();
+
+    // Group 1: View actions
+    builder.addGroup([{ id: 'zoom-to-marker', label: 'Zoom to Marker', shortcut: 'Z' }]);
+
+    // Group 2: Navigation actions
+    builder.addGroup([{ id: 'show-in-call-tree', label: 'Show in Call Tree', shortcut: 'J' }]);
+
+    // Group 3: Copy actions
+    builder.addGroup([
+      { id: 'copy-summary', label: 'Copy Summary', shortcut: ContextMenuBuilder.copyShortcut() },
       { id: 'copy-marker-details', label: 'Copy Details' },
-    ];
+    ]);
 
     // Use client coords for context menu (positioned in viewport)
-    this.contextMenu.show(items, clientX, clientY);
+    this.contextMenu.show(builder.build(), clientX, clientY);
   }
 
   /**
@@ -525,17 +577,33 @@ export class ApexLogTimeline {
       this.tooltipManager.hide();
     }
 
-    // Build menu items for empty space
-    const items: ContextMenuItem[] = [{ id: 'reset-zoom', label: 'Reset Zoom', shortcut: '0' }];
+    // Build menu using ContextMenuBuilder
+    const builder = new ContextMenuBuilder();
+
+    // Group 1: View actions
+    builder.addGroup([{ id: 'reset-zoom', label: 'Reset Zoom', shortcut: '0' }]);
 
     // Use client coords for context menu (positioned in viewport)
-    this.contextMenu.show(items, clientX, clientY);
+    this.contextMenu.show(builder.build(), clientX, clientY);
   }
 
   /**
    * Handle context menu item selection.
    */
   private handleContextMenuSelect(itemId: string): void {
+    // Handle browser-level actions (available everywhere)
+    switch (itemId) {
+      case 'browser-cut':
+        document.execCommand('cut');
+        return;
+      case 'browser-copy':
+        document.execCommand('copy');
+        return;
+      case 'browser-paste':
+        document.execCommand('paste');
+        return;
+    }
+
     // Handle viewport-level actions (don't require a selected event or marker)
     if (itemId === 'reset-zoom') {
       this.flamechart.resetZoom();
@@ -587,6 +655,21 @@ export class ApexLogTimeline {
       case 'copy-call-stack':
         this.copyToClipboard(this.formatCallStack(event));
         break;
+      case 'show-in-log':
+        this.handleShowInLog(event);
+        break;
+    }
+  }
+
+  /**
+   * Handle "Show in Log" action.
+   * Navigates to the raw log file at the event's timestamp.
+   */
+  private handleShowInLog(eventNode: EventNode): void {
+    const eventWithOriginal = eventNode as EventNode & { original?: LogEvent };
+    const logEvent = eventWithOriginal.original;
+    if (logEvent?.timestamp) {
+      vscodeMessenger.send('goToLogLine', { timestamp: logEvent.timestamp });
     }
   }
 
@@ -713,15 +796,6 @@ export class ApexLogTimeline {
     }
 
     return lines.join('\n');
-  }
-
-  /**
-   * Get platform-specific copy shortcut.
-   */
-  private getCopyShortcut(): string {
-    // Use userAgent as fallback since navigator.platform is deprecated
-    const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    return isMac ? '\u2318C' : 'Ctrl+C';
   }
 
   /**
