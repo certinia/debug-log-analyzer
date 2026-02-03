@@ -46,6 +46,9 @@ export class LogTimingDecoration {
   }
 
   private register(): void {
+    // NOTE: window.activeTextEditor is undefined for files 50mb or larger for performance reasons.
+    // tokenization, wrapping, folding, codelens, word highlighting all get disabled.
+
     // Update decorations for active editor on activation
     if (window.activeTextEditor) {
       this.updateDecorations(window.activeTextEditor);
@@ -113,38 +116,23 @@ export class LogTimingDecoration {
   }
 
   private calculateLogDuration(document: TextDocument): number | null {
-    const text = document.getText();
+    const startTs = this.findTimestamp(document, false, executionStartedRegex);
+    const endTs = this.findTimestamp(document, true, timestampRegex);
+    return startTs && endTs && endTs > startTs ? endTs - startTs : null;
+  }
 
-    // Find first EXECUTION_STARTED timestamp
-    const startMatch = text.match(executionStartedRegex);
-    if (!startMatch || !startMatch[1]) {
-      return null;
-    }
-    const startTimestamp = parseInt(startMatch[1], 10);
+  private findTimestamp(doc: TextDocument, fromEnd: boolean, pattern: RegExp): number | null {
+    const limit = Math.min(1000, doc.lineCount);
+    const start = fromEnd ? doc.lineCount - 1 : 0;
+    const step = fromEnd ? -1 : 1;
 
-    // Find last timestamp by scanning from end
-    // For performance, only scan the last portion of the file
-    const lastChunk = text.slice(-10000); // Last 10KB should be enough
-    const lines = lastChunk.split('\n');
-
-    let endTimestamp: number | null = null;
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i];
-      if (!line) {
-        continue;
-      }
-      const match = line.match(timestampRegex);
-      if (match && match[1]) {
-        endTimestamp = parseInt(match[1], 10);
-        break;
+    for (let i = 0; i < limit; i++) {
+      const match = doc.lineAt(start + i * step).text.match(pattern);
+      if (match?.[1]) {
+        return parseInt(match[1], 10);
       }
     }
-
-    if (endTimestamp === null || endTimestamp <= startTimestamp) {
-      return null;
-    }
-
-    return endTimestamp - startTimestamp;
+    return null;
   }
 
   private formatDuration(nanoseconds: number): string {
