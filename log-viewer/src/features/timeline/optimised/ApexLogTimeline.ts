@@ -180,8 +180,19 @@ export class ApexLogTimeline {
       return;
     }
 
+    // Create EventNode with original reference for selection
+    const eventNode: EventNode = {
+      id: `${result.event.timestamp}-${result.depth}`,
+      timestamp: result.event.timestamp,
+      duration: result.event.duration.total,
+      type: result.event.type ?? result.event.subCategory ?? 'UNKNOWN',
+      text: result.event.text,
+      subCategory: result.event.subCategory,
+      original: result.event,
+    };
+
     // Select the event (highlights it)
-    this.flamechart.selectByOriginal(result.event);
+    this.flamechart.selectByEventNode(eventNode);
 
     // Zoom to fit the event (with padding)
     const viewport = this.flamechart.getViewportManager();
@@ -278,7 +289,7 @@ export class ApexLogTimeline {
   private handleMouseMove(
     screenX: number,
     screenY: number,
-    event: LogEvent | null,
+    eventNode: EventNode | null,
     marker: TimelineMarker | null,
   ): void {
     if (!this.tooltipManager) {
@@ -291,12 +302,16 @@ export class ApexLogTimeline {
     }
 
     // Priority: Events take precedence over truncation markers
-    if (event) {
-      this.tooltipManager.show(event, screenX, screenY);
+    if (eventNode) {
+      // Extract LogEvent from EventNode.original for tooltip display
+      const logEvent = eventNode.original as LogEvent | undefined;
+      if (logEvent) {
+        this.tooltipManager.show(logEvent, screenX, screenY);
 
-      // Call external callback if provided
-      if (this.options.onEventHover) {
-        this.options.onEventHover(event);
+        // Call external callback if provided
+        if (this.options.onEventHover) {
+          this.options.onEventHover(logEvent);
+        }
       }
     } else if (marker) {
       this.tooltipManager.showTruncation(marker, screenX, screenY);
@@ -318,14 +333,14 @@ export class ApexLogTimeline {
   private handleClick(
     _screenX: number,
     _screenY: number,
-    event: LogEvent | null,
+    eventNode: EventNode | null,
     marker: TimelineMarker | null,
     modifiers?: ModifierKeys,
   ): void {
     // Cmd/Ctrl+Click on a frame navigates directly to call tree
     // Note: Only works on individual frames, not buckets (buckets are aggregated)
-    if (event && (modifiers?.metaKey || modifiers?.ctrlKey)) {
-      goToRow(event.timestamp);
+    if (eventNode && (modifiers?.metaKey || modifiers?.ctrlKey)) {
+      goToRow(eventNode.timestamp);
       return;
     }
 
