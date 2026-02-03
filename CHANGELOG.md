@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       - **Scroll** → zoom (vertical) or pan (horizontal)
       - **Double-click** → reset to full timeline view
     - **Keyboard shortcuts** (when hovering minimap): Arrow keys pan, `W`/`S` zoom, `Home`/`End` jump, `0` resets.
+  - **📊 Governor Limits Visualization**: New metric strip showing governor limit usage over time. ([#714])
+    - **Traffic Light Coloring**: Instant visual feedback on limit consumption (safe/warning/critical/breach zones).
+    - **Collapsed Mode**: Compact heat-style strip showing max usage across all metrics.
+    - **Expanded Mode**: Full step chart with individual metric lines (click chevron or `Shift+Click` to toggle).
+    - **Smart Tooltips**: Hover to see detailed breakdown with top metrics, always-visible core limits (CPU, Heap, SOQL, DML), and usage percentages.
+    - **Tier Classification**: Metrics auto-classified by usage—Tier 1 (top 3), Tier 2 (>80%), Tier 3 (others aggregated).
+    - **Synced Navigation**: Zoom, pan, and cursor synchronized with main timeline.
   - **Adaptive Frame Bucketing**: Reveals nested frame detail and stack structure as you zoom, automatically adjusting frame granularity to understand complex call hierarchies.
   - **Dynamic Frame Labels**: Labels automatically appear on timeline frames as you zoom and pan, making log scanning and navigation effortless without manually hovering to see event details. ([#92])
   - **Keyboard and Mouse Navigation**: Comprehensive interaction controls for the timeline. ([#573] [#366] [#296] [#295] [#535])
@@ -459,6 +466,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#714]: https://github.com/certinia/debug-log-analyzer/issues/714
 [#245]: https://github.com/certinia/debug-log-analyzer/issues/245
 [#164]: https://github.com/certinia/debug-log-analyzer/issues/164
 [#535]: https://github.com/certinia/debug-log-analyzer/issues/535
