@@ -933,14 +933,6 @@ export class CalltreeView extends LitElement {
       { id: 'copy-name', label: 'Copy Name' },
     );
 
-    // 4. Separator + Browser actions
-    items.push(
-      { id: 'separator-browser', label: '', separator: true },
-      { id: 'browser-cut', label: 'Cut', shortcut: this._getCutShortcut() },
-      { id: 'browser-copy', label: 'Copy', shortcut: this._getCopyShortcut() },
-      { id: 'browser-paste', label: 'Paste', shortcut: this._getPasteShortcut() },
-    );
-
     this.contextMenu.show(items, clientX, clientY);
   }
 
@@ -970,37 +962,9 @@ export class CalltreeView extends LitElement {
       case 'copy-name':
         navigator.clipboard.writeText(rowData.text);
         break;
-
-      case 'browser-cut':
-        document.execCommand('cut');
-        break;
-
-      case 'browser-copy':
-        document.execCommand('copy');
-        break;
-
-      case 'browser-paste':
-        document.execCommand('paste');
-        break;
     }
 
     this.contextMenuRow = null;
-  }
-
-  private _getCopyShortcut(): string {
-    return this._isMac() ? '\u2318C' : 'Ctrl+C';
-  }
-
-  private _getCutShortcut(): string {
-    return this._isMac() ? '\u2318X' : 'Ctrl+X';
-  }
-
-  private _getPasteShortcut(): string {
-    return this._isMac() ? '\u2318V' : 'Ctrl+V';
-  }
-
-  private _isMac(): boolean {
-    return /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
   }
 
   private _expandCollapseAll(rows: RowComponent[], expand: boolean = true) {

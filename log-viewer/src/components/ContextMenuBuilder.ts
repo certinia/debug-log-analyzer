@@ -7,7 +7,6 @@
  *
  * Simplifies context menu construction with:
  * - Grouped actions with automatic separators
- * - Optional built-in browser actions (Cut/Copy/Paste)
  * - Platform-aware keyboard shortcuts
  *
  * Usage:
@@ -40,20 +39,10 @@ export interface ContextMenuAction {
   disabled?: boolean;
 }
 
-export interface ContextMenuBuilderOptions {
-  /** Include browser Cut/Copy/Paste actions at the end. Default: true */
-  includeBrowserActions?: boolean;
-}
-
 export class ContextMenuBuilder {
   private groups: ContextMenuAction[][] = [];
-  private options: Required<ContextMenuBuilderOptions>;
 
-  constructor(options: ContextMenuBuilderOptions = {}) {
-    this.options = {
-      includeBrowserActions: options.includeBrowserActions ?? true,
-    };
-  }
+  constructor() {}
 
   /**
    * Add a group of actions. Groups are separated by dividers.
@@ -100,20 +89,6 @@ export class ContextMenuBuilder {
       }
     }
 
-    // Add browser actions if enabled
-    if (this.options.includeBrowserActions) {
-      // Add separator before browser actions (if there are existing items)
-      if (items.length > 0) {
-        items.push({ id: 'separator-browser', label: '', separator: true });
-      }
-
-      items.push(
-        { id: 'browser-cut', label: 'Cut', shortcut: ContextMenuBuilder.cutShortcut() },
-        { id: 'browser-copy', label: 'Copy', shortcut: ContextMenuBuilder.copyShortcut() },
-        { id: 'browser-paste', label: 'Paste', shortcut: ContextMenuBuilder.pasteShortcut() },
-      );
-    }
-
     return items;
   }
 
@@ -133,19 +108,5 @@ export class ContextMenuBuilder {
    */
   static copyShortcut(): string {
     return ContextMenuBuilder.isMac() ? '\u2318C' : 'Ctrl+C';
-  }
-
-  /**
-   * Get platform-specific cut shortcut.
-   */
-  static cutShortcut(): string {
-    return ContextMenuBuilder.isMac() ? '\u2318X' : 'Ctrl+X';
-  }
-
-  /**
-   * Get platform-specific paste shortcut.
-   */
-  static pasteShortcut(): string {
-    return ContextMenuBuilder.isMac() ? '\u2318V' : 'Ctrl+V';
   }
 }

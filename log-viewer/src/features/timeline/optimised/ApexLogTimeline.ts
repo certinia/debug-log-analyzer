@@ -606,19 +606,6 @@ export class ApexLogTimeline {
    * Handle context menu item selection.
    */
   private handleContextMenuSelect(itemId: string): void {
-    // Handle browser-level actions (available everywhere)
-    switch (itemId) {
-      case 'browser-cut':
-        document.execCommand('cut');
-        return;
-      case 'browser-copy':
-        document.execCommand('copy');
-        return;
-      case 'browser-paste':
-        document.execCommand('paste');
-        return;
-    }
-
     // Handle viewport-level actions (don't require a selected event or marker)
     if (itemId === 'reset-zoom') {
       this.flamechart.resetZoom();
