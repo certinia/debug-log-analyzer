@@ -3,9 +3,9 @@
  */
 
 /**
- * SwimlaneManager
+ * MetricStripManager
  *
- * State management and tier classification for the governor limit swimlane.
+ * State management and tier classification for the governor limit metric strip.
  * Transforms generic time series data into classified, renderable format.
  *
  * Tier Classification Algorithm:
@@ -15,7 +15,7 @@
  * 4. Tier 3: Remaining metrics (aggregated as max, grey dashed 1.5px)
  *
  * Responsibilities:
- * - Process HeatStripTimeSeries into SwimlaneProcessedData
+ * - Process HeatStripTimeSeries into MetricStripProcessedData
  * - Classify metrics into tiers
  * - Aggregate Tier 3 metrics
  * - Provide data for rendering
@@ -23,11 +23,15 @@
 
 import type {
   HeatStripTimeSeries,
-  SwimlaneClassifiedMetric,
-  SwimlaneDataPoint,
-  SwimlaneProcessedData,
+  MetricStripClassifiedMetric,
+  MetricStripDataPoint,
+  MetricStripProcessedData,
 } from '../../types/flamechart.types.js';
-import { getMetricColor, SWIMLANE_THRESHOLDS, SWIMLANE_Y_MAX_PERCENT } from './swimlane-colors.js';
+import {
+  getMetricColor,
+  METRIC_STRIP_THRESHOLDS,
+  METRIC_STRIP_Y_MAX_PERCENT,
+} from './metric-strip-colors.js';
 
 /**
  * Number of top metrics to always show as Tier 1.
@@ -37,11 +41,11 @@ const TIER_1_COUNT = 3;
 /**
  * Threshold for auto-promotion to Tier 2 (80%).
  */
-const TIER_2_THRESHOLD = SWIMLANE_THRESHOLDS.dangerStart;
+const TIER_2_THRESHOLD = METRIC_STRIP_THRESHOLDS.dangerStart;
 
-export class SwimlaneManager {
-  /** Processed swimlane data ready for rendering. */
-  private processedData: SwimlaneProcessedData | null = null;
+export class MetricStripManager {
+  /** Processed metric strip data ready for rendering. */
+  private processedData: MetricStripProcessedData | null = null;
 
   /** Whether dark theme is active (for color selection). */
   private isDarkTheme = true;
@@ -67,12 +71,12 @@ export class SwimlaneManager {
   }
 
   /**
-   * Process time series data into swimlane format.
+   * Process time series data into metric strip format.
    *
    * @param timeSeries - Input time series data
-   * @returns Processed swimlane data
+   * @returns Processed metric strip data
    */
-  public processData(timeSeries: HeatStripTimeSeries): SwimlaneProcessedData {
+  public processData(timeSeries: HeatStripTimeSeries): MetricStripProcessedData {
     if (timeSeries.events.length === 0) {
       this.processedData = {
         points: [],
@@ -110,9 +114,9 @@ export class SwimlaneManager {
   }
 
   /**
-   * Get the processed swimlane data.
+   * Get the processed metric strip data.
    */
-  public getData(): SwimlaneProcessedData | null {
+  public getData(): MetricStripProcessedData | null {
     return this.processedData;
   }
 
@@ -126,33 +130,33 @@ export class SwimlaneManager {
   /**
    * Get classified metrics (for legend/tooltip display).
    */
-  public getClassifiedMetrics(): SwimlaneClassifiedMetric[] {
+  public getClassifiedMetrics(): MetricStripClassifiedMetric[] {
     return this.processedData?.classifiedMetrics ?? [];
   }
 
   /**
    * Get metrics visible in the chart (Tier 1 and Tier 2 only).
    */
-  public getVisibleMetrics(): SwimlaneClassifiedMetric[] {
+  public getVisibleMetrics(): MetricStripClassifiedMetric[] {
     return this.getClassifiedMetrics().filter((m) => m.tier === 1 || m.tier === 2);
   }
 
   /**
    * Get the effective Y-axis maximum for dynamic scaling.
-   * Default is SWIMLANE_Y_MAX_PERCENT (1.1 = 110%).
+   * Default is METRIC_STRIP_Y_MAX_PERCENT (1.1 = 110%).
    * Always adds +10% headroom above the max data value.
    *
    * @returns Effective Y-max percentage (e.g., 1.1 for 110%)
    */
   public getEffectiveYMax(): number {
     if (!this.processedData) {
-      return SWIMLANE_Y_MAX_PERCENT;
+      return METRIC_STRIP_Y_MAX_PERCENT;
     }
 
     const dataMax = this.processedData.globalMaxPercent;
     // Always +10% above max, with minimum of 110%
     const calculatedMax = Math.ceil(dataMax * 10) / 10 + 0.1;
-    return Math.max(SWIMLANE_Y_MAX_PERCENT, calculatedMax);
+    return Math.max(METRIC_STRIP_Y_MAX_PERCENT, calculatedMax);
   }
 
   /**
@@ -161,7 +165,9 @@ export class SwimlaneManager {
    * @param timeNs - Time in nanoseconds
    * @returns Data point and next timestamp, or null if not found
    */
-  public getDataPointAtTime(timeNs: number): { point: SwimlaneDataPoint; endTime: number } | null {
+  public getDataPointAtTime(
+    timeNs: number,
+  ): { point: MetricStripDataPoint; endTime: number } | null {
     if (!this.processedData?.hasData) {
       return null;
     }
@@ -267,7 +273,7 @@ export class SwimlaneManager {
   private classifyMetrics(
     metricMaxPercents: Map<string, number>,
     timeSeries: HeatStripTimeSeries,
-  ): SwimlaneClassifiedMetric[] {
+  ): MetricStripClassifiedMetric[] {
     // Create array of metrics with their max percents for sorting
     const metricsWithMax: Array<{
       metricId: string;
@@ -292,7 +298,7 @@ export class SwimlaneManager {
     metricsWithMax.sort((a, b) => b.maxPercent - a.maxPercent);
 
     // Classify into tiers
-    const classified: SwimlaneClassifiedMetric[] = [];
+    const classified: MetricStripClassifiedMetric[] = [];
 
     for (let i = 0; i < metricsWithMax.length; i++) {
       const metric = metricsWithMax[i]!;
@@ -329,16 +335,16 @@ export class SwimlaneManager {
    */
   private buildDataPoints(
     aggregatedByTime: Map<number, Map<string, { used: number; limit: number }>>,
-    classifiedMetrics: SwimlaneClassifiedMetric[],
+    classifiedMetrics: MetricStripClassifiedMetric[],
     _timeSeries: HeatStripTimeSeries,
-  ): { points: SwimlaneDataPoint[]; globalMaxPercent: number } {
+  ): { points: MetricStripDataPoint[]; globalMaxPercent: number } {
     // Create lookup for tier by metric ID
     const metricTiers = new Map<string, 1 | 2 | 3>();
     for (const metric of classifiedMetrics) {
       metricTiers.set(metric.metricId, metric.tier);
     }
 
-    const points: SwimlaneDataPoint[] = [];
+    const points: MetricStripDataPoint[] = [];
     let globalMaxPercent = 0;
 
     // Sort timestamps

@@ -3,13 +3,13 @@
  */
 
 /**
- * SwimlaneOrchestrator
+ * MetricStripOrchestrator
  *
- * Orchestrates all swimlane functionality for the FlameChart.
- * Composes SwimlaneManager, SwimlaneRenderer, and SwimlaneTooltipRenderer.
+ * Orchestrates all metric strip functionality for the FlameChart.
+ * Composes MetricStripManager, MetricStripRenderer, and MetricStripTooltipRenderer.
  *
  * Responsibilities:
- * - Swimlane lifecycle (init, destroy, resize)
+ * - Metric strip lifecycle (init, destroy, resize)
  * - Hover interactions (show/hide tooltip)
  * - Click interactions (zoom to region)
  * - Cursor line synchronization with main timeline
@@ -27,20 +27,24 @@ import type {
   TimelineMarker,
   ViewportState,
 } from '../../types/flamechart.types.js';
-import { SwimlaneManager } from './SwimlaneManager.js';
-import { SwimlaneRenderer } from './SwimlaneRenderer.js';
-import { SwimlaneTooltipRenderer } from './SwimlaneTooltipRenderer.js';
-import { getSwimlaneColors, SWIMLANE_GAP, SWIMLANE_HEIGHT } from './swimlane-colors.js';
+import { MetricStripManager } from './MetricStripManager.js';
+import { MetricStripRenderer } from './MetricStripRenderer.js';
+import { MetricStripTooltipRenderer } from './MetricStripTooltipRenderer.js';
+import {
+  getMetricStripColors,
+  METRIC_STRIP_GAP,
+  METRIC_STRIP_HEIGHT,
+} from './metric-strip-colors.js';
 
 // Re-export for convenience
-export { SWIMLANE_GAP, SWIMLANE_HEIGHT };
+export { METRIC_STRIP_GAP, METRIC_STRIP_HEIGHT };
 
 /**
- * Callbacks for swimlane orchestrator events.
+ * Callbacks for metric strip orchestrator events.
  */
-export interface SwimlaneOrchestratorCallbacks {
+export interface MetricStripOrchestratorCallbacks {
   /**
-   * Called when user clicks on the swimlane to zoom to a region.
+   * Called when user clicks on the metric strip to zoom to a region.
    * FlameChart should update the main viewport.
    *
    * @param centerTimeNs - Center time of the zoom region
@@ -57,7 +61,7 @@ export interface SwimlaneOrchestratorCallbacks {
   onCursorMove: (timeNs: number | null) => void;
 
   /**
-   * Called when swimlane needs a re-render.
+   * Called when metric strip needs a re-render.
    */
   requestRender: () => void;
 
@@ -90,9 +94,9 @@ export interface SwimlaneOrchestratorCallbacks {
 }
 
 /**
- * Context for rendering the swimlane.
+ * Context for rendering the metric strip.
  */
-export interface SwimlaneRenderContext {
+export interface MetricStripRenderContext {
   /** Current viewport state from main timeline */
   viewportState: ViewportState;
   /** Total timeline duration in nanoseconds */
@@ -103,7 +107,7 @@ export interface SwimlaneRenderContext {
   markers?: TimelineMarker[];
 }
 
-export class SwimlaneOrchestrator {
+export class MetricStripOrchestrator {
   // ============================================================================
   // PIXI RESOURCES
   // ============================================================================
@@ -112,11 +116,11 @@ export class SwimlaneOrchestrator {
   private htmlContainer: HTMLElement | null = null;
 
   // ============================================================================
-  // SWIMLANE COMPONENTS
+  // METRIC STRIP COMPONENTS
   // ============================================================================
-  private manager: SwimlaneManager | null = null;
-  private renderer: SwimlaneRenderer | null = null;
-  private tooltipRenderer: SwimlaneTooltipRenderer | null = null;
+  private manager: MetricStripManager | null = null;
+  private renderer: MetricStripRenderer | null = null;
+  private tooltipRenderer: MetricStripTooltipRenderer | null = null;
 
   // ============================================================================
   // CURSOR LINE RENDERING
@@ -127,16 +131,16 @@ export class SwimlaneOrchestrator {
   // STATE
   // ============================================================================
   private cursorTimeNs: number | null = null;
-  private isMouseInSwimlane = false;
+  private isMouseInMetricStrip = false;
   private mouseX = 0;
   private mouseY = 0;
   private isDarkTheme = true;
   private totalDuration = 0;
-  private callbacks: SwimlaneOrchestratorCallbacks;
+  private callbacks: MetricStripOrchestratorCallbacks;
   /** Last viewport state received during render (for wheel handler). */
   private lastViewportState: ViewportState | null = null;
 
-  constructor(callbacks: SwimlaneOrchestratorCallbacks) {
+  constructor(callbacks: MetricStripOrchestratorCallbacks) {
     this.callbacks = callbacks;
   }
 
@@ -145,21 +149,25 @@ export class SwimlaneOrchestrator {
   // ============================================================================
 
   /**
-   * Initialize the swimlane system.
+   * Initialize the metric strip system.
    *
-   * @param swimlaneDiv - HTML element to render swimlane into
+   * @param metricStripDiv - HTML element to render metric strip into
    * @param width - Canvas width
    * @param totalDuration - Total timeline duration in nanoseconds
    */
-  public async init(swimlaneDiv: HTMLElement, width: number, totalDuration: number): Promise<void> {
-    this.htmlContainer = swimlaneDiv;
+  public async init(
+    metricStripDiv: HTMLElement,
+    width: number,
+    totalDuration: number,
+  ): Promise<void> {
+    this.htmlContainer = metricStripDiv;
     this.totalDuration = totalDuration;
 
-    // Create PIXI Application for swimlane
+    // Create PIXI Application for metric strip
     this.app = new PIXI.Application();
     await this.app.init({
       width,
-      height: SWIMLANE_HEIGHT,
+      height: METRIC_STRIP_HEIGHT,
       antialias: true, // Smooth lines
       backgroundAlpha: 0,
       resolution: window.devicePixelRatio || 1,
@@ -169,20 +177,20 @@ export class SwimlaneOrchestrator {
     });
     this.app.ticker.stop();
     this.app.stage.eventMode = 'none';
-    swimlaneDiv.appendChild(this.app.canvas);
+    metricStripDiv.appendChild(this.app.canvas);
 
     // Create main container
     this.container = new PIXI.Container();
     this.app.stage.addChild(this.container);
 
     // Initialize manager
-    this.manager = new SwimlaneManager();
+    this.manager = new MetricStripManager();
     this.manager.setTheme(this.isDarkTheme);
 
     // Initialize renderer
-    this.renderer = new SwimlaneRenderer();
+    this.renderer = new MetricStripRenderer();
     this.renderer.setTheme(this.isDarkTheme);
-    this.renderer.setHeight(SWIMLANE_HEIGHT);
+    this.renderer.setHeight(METRIC_STRIP_HEIGHT);
 
     // Add renderer graphics to container
     for (const graphics of this.renderer.getGraphics()) {
@@ -194,7 +202,7 @@ export class SwimlaneOrchestrator {
     this.container.addChild(this.cursorLineGraphics);
 
     // Initialize tooltip renderer
-    this.tooltipRenderer = new SwimlaneTooltipRenderer(swimlaneDiv);
+    this.tooltipRenderer = new MetricStripTooltipRenderer(metricStripDiv);
     this.tooltipRenderer.setTheme(this.isDarkTheme);
 
     // Setup interaction handler
@@ -202,7 +210,7 @@ export class SwimlaneOrchestrator {
   }
 
   /**
-   * Clean up all swimlane resources.
+   * Clean up all metric strip resources.
    */
   public destroy(): void {
     // Remove event listeners
@@ -243,13 +251,13 @@ export class SwimlaneOrchestrator {
   }
 
   /**
-   * Handle resize of the swimlane container.
+   * Handle resize of the metric strip container.
    *
    * @param newWidth - New canvas width
    */
   public resize(newWidth: number): void {
     if (this.app) {
-      this.app.renderer.resize(newWidth, SWIMLANE_HEIGHT);
+      this.app.renderer.resize(newWidth, METRIC_STRIP_HEIGHT);
     }
   }
 
@@ -258,7 +266,7 @@ export class SwimlaneOrchestrator {
   // ============================================================================
 
   /**
-   * Set time series data for the swimlane.
+   * Set time series data for the metric strip.
    *
    * @param timeSeries - Heat strip time series data
    */
@@ -282,7 +290,7 @@ export class SwimlaneOrchestrator {
   }
 
   /**
-   * Set the theme for the swimlane.
+   * Set the theme for the metric strip.
    *
    * @param isDark - Whether dark theme is active
    */
@@ -312,10 +320,10 @@ export class SwimlaneOrchestrator {
   }
 
   /**
-   * Check if mouse is currently in the swimlane area.
+   * Check if mouse is currently in the metric strip area.
    */
-  public isMouseInSwimlaneArea(): boolean {
-    return this.isMouseInSwimlane;
+  public isMouseInMetricStripArea(): boolean {
+    return this.isMouseInMetricStrip;
   }
 
   /**
@@ -326,10 +334,10 @@ export class SwimlaneOrchestrator {
   }
 
   /**
-   * Get the swimlane height.
+   * Get the metric strip height.
    */
   public getHeight(): number {
-    return SWIMLANE_HEIGHT;
+    return METRIC_STRIP_HEIGHT;
   }
 
   // ============================================================================
@@ -337,11 +345,11 @@ export class SwimlaneOrchestrator {
   // ============================================================================
 
   /**
-   * Render the swimlane.
+   * Render the metric strip.
    *
    * @param context - Render context with viewport state
    */
-  public render(context: SwimlaneRenderContext): void {
+  public render(context: MetricStripRenderContext): void {
     if (!this.app || !this.renderer || !this.manager) {
       return;
     }
@@ -384,12 +392,12 @@ export class SwimlaneOrchestrator {
       return;
     }
 
-    const colors = getSwimlaneColors(this.isDarkTheme);
+    const colors = getMetricStripColors(this.isDarkTheme);
     const x = cursorTimeNs * viewportState.zoom - viewportState.offsetX;
 
     // Only draw if within visible area
     if (x >= 0 && x <= viewportState.displayWidth) {
-      this.cursorLineGraphics.rect(x - 0.5, 0, 1, SWIMLANE_HEIGHT);
+      this.cursorLineGraphics.rect(x - 0.5, 0, 1, METRIC_STRIP_HEIGHT);
       this.cursorLineGraphics.fill({ color: colors.labelText, alpha: 0.6 });
     }
   }
@@ -425,11 +433,11 @@ export class SwimlaneOrchestrator {
   }
 
   private handleMouseEnter = (): void => {
-    this.isMouseInSwimlane = true;
+    this.isMouseInMetricStrip = true;
   };
 
   private handleMouseLeave = (): void => {
-    this.isMouseInSwimlane = false;
+    this.isMouseInMetricStrip = false;
     this.cursorTimeNs = null;
     this.callbacks.onCursorMove(null);
     this.tooltipRenderer?.hide();

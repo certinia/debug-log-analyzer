@@ -3,9 +3,9 @@
  */
 
 /**
- * SwimlaneRenderer
+ * MetricStripRenderer
  *
- * PIXI.js renderer for the governor limit swimlane step chart.
+ * PIXI.js renderer for the governor limit metric strip step chart.
  * Renders metric lines, danger zone, limit line, area fills, and breach areas.
  *
  * Visual Design:
@@ -29,26 +29,26 @@
 
 import { Graphics } from 'pixi.js';
 import type {
-  SwimlaneClassifiedMetric,
-  SwimlaneDataPoint,
-  SwimlaneProcessedData,
+  MetricStripClassifiedMetric,
+  MetricStripDataPoint,
+  MetricStripProcessedData,
   TimelineMarker,
   ViewportState,
 } from '../../types/flamechart.types.js';
 import {
   BREACH_AREA_OPACITY,
   DANGER_ZONE_OPACITY,
-  getSwimlaneColors,
-  SWIMLANE_HEIGHT,
-  SWIMLANE_LINE_WIDTHS,
-  SWIMLANE_MARKER_COLORS_BLENDED,
-  SWIMLANE_MARKER_OPACITY,
-  SWIMLANE_THRESHOLDS,
-  SWIMLANE_TIME_GRID_COLOR,
-  SWIMLANE_TIME_GRID_OPACITY,
-  SWIMLANE_Y_MAX_PERCENT,
-  type SwimlaneColors,
-} from './swimlane-colors.js';
+  getMetricStripColors,
+  METRIC_STRIP_HEIGHT,
+  METRIC_STRIP_LINE_WIDTHS,
+  METRIC_STRIP_MARKER_COLORS_BLENDED,
+  METRIC_STRIP_MARKER_OPACITY,
+  METRIC_STRIP_THRESHOLDS,
+  METRIC_STRIP_TIME_GRID_COLOR,
+  METRIC_STRIP_TIME_GRID_OPACITY,
+  METRIC_STRIP_Y_MAX_PERCENT,
+  type MetricStripColors,
+} from './metric-strip-colors.js';
 
 /**
  * 1-2-5 sequence intervals in nanoseconds for time grid lines.
@@ -86,7 +86,7 @@ const TIME_GRID_INTERVALS = [
  */
 const TARGET_GRID_SPACING_PX = 80;
 
-export class SwimlaneRenderer {
+export class MetricStripRenderer {
   /** Graphics for marker backgrounds. */
   private markerGraphics: Graphics;
 
@@ -109,16 +109,16 @@ export class SwimlaneRenderer {
   private breachGraphics: Graphics;
 
   /** Current color palette. */
-  private colors: SwimlaneColors;
+  private colors: MetricStripColors;
 
   /** Whether dark theme is active. */
   private isDarkTheme = true;
 
   /** Cached height. */
-  private height = SWIMLANE_HEIGHT;
+  private height = METRIC_STRIP_HEIGHT;
 
   /** Effective Y-max for dynamic scaling. */
-  private effectiveYMax = SWIMLANE_Y_MAX_PERCENT;
+  private effectiveYMax = METRIC_STRIP_Y_MAX_PERCENT;
 
   constructor() {
     this.markerGraphics = new Graphics();
@@ -129,7 +129,7 @@ export class SwimlaneRenderer {
     this.limitLineGraphics = new Graphics();
     this.breachGraphics = new Graphics();
 
-    this.colors = getSwimlaneColors(true);
+    this.colors = getMetricStripColors(true);
   }
 
   /**
@@ -153,11 +153,11 @@ export class SwimlaneRenderer {
    */
   public setTheme(isDark: boolean): void {
     this.isDarkTheme = isDark;
-    this.colors = getSwimlaneColors(isDark);
+    this.colors = getMetricStripColors(isDark);
   }
 
   /**
-   * Set the swimlane height.
+   * Set the metric strip height.
    */
   public setHeight(height: number): void {
     this.height = height;
@@ -171,15 +171,15 @@ export class SwimlaneRenderer {
   }
 
   /**
-   * Render the swimlane visualization.
+   * Render the metric strip visualization.
    *
-   * @param data - Processed swimlane data
+   * @param data - Processed metric strip data
    * @param viewportState - Current viewport state for coordinate transforms
    * @param totalDuration - Total timeline duration in nanoseconds
    * @param markers - Timeline markers for background rendering
    */
   public render(
-    data: SwimlaneProcessedData,
+    data: MetricStripProcessedData,
     viewportState: ViewportState,
     totalDuration: number,
     markers?: TimelineMarker[],
@@ -264,7 +264,7 @@ export class SwimlaneRenderer {
         continue;
       }
 
-      const color = SWIMLANE_MARKER_COLORS_BLENDED[marker.type];
+      const color = METRIC_STRIP_MARKER_COLORS_BLENDED[marker.type];
       if (color === undefined) {
         continue;
       }
@@ -275,7 +275,7 @@ export class SwimlaneRenderer {
 
       if (gappedWidth > 0) {
         g.rect(gappedStartX, 0, gappedWidth, this.height);
-        g.fill({ color, alpha: SWIMLANE_MARKER_OPACITY });
+        g.fill({ color, alpha: METRIC_STRIP_MARKER_OPACITY });
       }
     }
   }
@@ -304,7 +304,7 @@ export class SwimlaneRenderer {
       const x = timeNs * zoom - offsetX;
       if (x >= 0 && x <= displayWidth) {
         g.rect(x, 0, 1, this.height);
-        g.fill({ color: SWIMLANE_TIME_GRID_COLOR, alpha: SWIMLANE_TIME_GRID_OPACITY });
+        g.fill({ color: METRIC_STRIP_TIME_GRID_COLOR, alpha: METRIC_STRIP_TIME_GRID_OPACITY });
       }
     }
   }
@@ -328,8 +328,8 @@ export class SwimlaneRenderer {
   private renderDangerZone(displayWidth: number, height: number): void {
     const g = this.dangerZoneGraphics;
 
-    const y1 = this.percentToY(SWIMLANE_THRESHOLDS.limit, height); // 100% (top of band)
-    const y2 = this.percentToY(SWIMLANE_THRESHOLDS.dangerStart, height); // 80% (bottom of band)
+    const y1 = this.percentToY(METRIC_STRIP_THRESHOLDS.limit, height); // 100% (top of band)
+    const y2 = this.percentToY(METRIC_STRIP_THRESHOLDS.dangerStart, height); // 80% (bottom of band)
     const bandHeight = y2 - y1;
 
     g.rect(0, y1, displayWidth, bandHeight);
@@ -340,7 +340,7 @@ export class SwimlaneRenderer {
    * Render area fills under metric lines.
    */
   private renderAreaFills(
-    data: SwimlaneProcessedData,
+    data: MetricStripProcessedData,
     viewportState: ViewportState,
     totalDuration: number,
     height: number,
@@ -387,8 +387,8 @@ export class SwimlaneRenderer {
    */
   private renderMetricAreaFill(
     g: Graphics,
-    points: SwimlaneDataPoint[],
-    metric: SwimlaneClassifiedMetric,
+    points: MetricStripDataPoint[],
+    metric: MetricStripClassifiedMetric,
     visibleStartTime: number,
     visibleEndTime: number,
     viewportState: ViewportState,
@@ -451,7 +451,7 @@ export class SwimlaneRenderer {
    */
   private renderTier3AreaFill(
     g: Graphics,
-    points: SwimlaneDataPoint[],
+    points: MetricStripDataPoint[],
     visibleStartTime: number,
     visibleEndTime: number,
     viewportState: ViewportState,
@@ -507,7 +507,7 @@ export class SwimlaneRenderer {
    * Render step chart lines for all metrics.
    */
   private renderStepChartLines(
-    data: SwimlaneProcessedData,
+    data: MetricStripProcessedData,
     viewportState: ViewportState,
     totalDuration: number,
     height: number,
@@ -532,8 +532,8 @@ export class SwimlaneRenderer {
    */
   private renderMetricLine(
     g: Graphics,
-    points: SwimlaneDataPoint[],
-    metric: SwimlaneClassifiedMetric,
+    points: MetricStripDataPoint[],
+    metric: MetricStripClassifiedMetric,
     viewportState: ViewportState,
     totalDuration: number,
     height: number,
@@ -583,7 +583,7 @@ export class SwimlaneRenderer {
     if (!isFirst) {
       g.stroke({
         color: metric.color,
-        width: SWIMLANE_LINE_WIDTHS.primary,
+        width: METRIC_STRIP_LINE_WIDTHS.primary,
         alpha: 1.0,
       });
     }
@@ -594,7 +594,7 @@ export class SwimlaneRenderer {
    */
   private renderTier3Line(
     g: Graphics,
-    points: SwimlaneDataPoint[],
+    points: MetricStripDataPoint[],
     viewportState: ViewportState,
     totalDuration: number,
     height: number,
@@ -641,7 +641,7 @@ export class SwimlaneRenderer {
     if (!isFirst) {
       g.stroke({
         color: this.colors.tier3,
-        width: SWIMLANE_LINE_WIDTHS.tier3,
+        width: METRIC_STRIP_LINE_WIDTHS.tier3,
         alpha: 0.7,
       });
     }
@@ -668,7 +668,7 @@ export class SwimlaneRenderer {
 
     g.stroke({
       color: this.colors.limitLine,
-      width: SWIMLANE_LINE_WIDTHS.limit,
+      width: METRIC_STRIP_LINE_WIDTHS.limit,
       alpha: 0.8,
     });
   }
@@ -677,7 +677,7 @@ export class SwimlaneRenderer {
    * Render breach areas (above 100%) in purple.
    */
   private renderBreachAreas(
-    data: SwimlaneProcessedData,
+    data: MetricStripProcessedData,
     viewportState: ViewportState,
     totalDuration: number,
     height: number,

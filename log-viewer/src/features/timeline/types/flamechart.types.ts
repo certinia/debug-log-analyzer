@@ -699,15 +699,34 @@ export interface HeatStripTimeSeries {
   events: HeatStripEvent[];
 }
 
+/**
+ * Snapshot of a single metric at a point in time for tooltip display.
+ * Includes pre-computed percentage for convenience.
+ */
+export interface HeatStripMetricSnapshot {
+  /** Current usage value */
+  used: number;
+  /** Maximum allowed value (limit) */
+  limit: number;
+  /** Pre-computed percentage (used/limit) */
+  percent: number;
+}
+
+/**
+ * Metric definition for heat strip tooltip display.
+ * Alias for HeatStripMetric for semantic clarity.
+ */
+export type HeatStripTimeSeriesMetric = HeatStripMetric;
+
 // ============================================================================
-// SWIMLANE VISUALIZATION TYPES
+// METRIC STRIP VISUALIZATION TYPES
 // ============================================================================
 
 /**
- * Classified metric for swimlane tier system.
+ * Classified metric for metric strip tier system.
  * Metrics are classified into tiers based on their global max percentage.
  */
-export interface SwimlaneClassifiedMetric {
+export interface MetricStripClassifiedMetric {
   /** Unique metric identifier (e.g., 'cpuTime', 'soqlQueries') */
   metricId: string;
   /** Display name for the metric (e.g., 'CPU Time', 'SOQL Queries') */
@@ -727,7 +746,7 @@ export interface SwimlaneClassifiedMetric {
 /**
  * Raw metric value with used and limit.
  */
-export interface SwimlaneRawValue {
+export interface MetricStripRawValue {
   /** Current usage value */
   used: number;
   /** Maximum allowed value (limit) */
@@ -735,27 +754,27 @@ export interface SwimlaneRawValue {
 }
 
 /**
- * Data point at a specific timestamp in the swimlane.
+ * Data point at a specific timestamp in the metric strip.
  */
-export interface SwimlaneDataPoint {
+export interface MetricStripDataPoint {
   /** Timestamp in nanoseconds */
   timestamp: number;
   /** Map of metricId → percentage (0-1+) */
   values: Map<string, number>;
   /** Map of metricId → raw used/limit values */
-  rawValues: Map<string, SwimlaneRawValue>;
+  rawValues: Map<string, MetricStripRawValue>;
   /** Maximum value of all Tier 3 metrics at this timestamp */
   tier3Max: number;
 }
 
 /**
- * Processed swimlane data ready for rendering.
+ * Processed metric strip data ready for rendering.
  */
-export interface SwimlaneProcessedData {
+export interface MetricStripProcessedData {
   /** Data points ordered by timestamp */
-  points: SwimlaneDataPoint[];
+  points: MetricStripDataPoint[];
   /** Classified metrics with tier assignments */
-  classifiedMetrics: SwimlaneClassifiedMetric[];
+  classifiedMetrics: MetricStripClassifiedMetric[];
   /** Global maximum percentage across all metrics and timestamps */
   globalMaxPercent: number;
   /** Whether there's any data to render */
@@ -763,10 +782,25 @@ export interface SwimlaneProcessedData {
 }
 
 /**
- * Swimlane time series input data (generic format).
- * This is the same structure as HeatStripTimeSeries - reused for swimlane.
+ * Metric strip time series input data (generic format).
+ * This is the same structure as HeatStripTimeSeries - reused for metric strip.
  */
-export type SwimlaneTimeSeries = HeatStripTimeSeries;
+export type MetricStripTimeSeries = HeatStripTimeSeries;
+
+// ============================================================================
+// BACKWARDS COMPATIBILITY ALIASES (deprecated, use MetricStrip* instead)
+// ============================================================================
+
+/** @deprecated Use MetricStripClassifiedMetric instead */
+export type SwimlaneClassifiedMetric = MetricStripClassifiedMetric;
+/** @deprecated Use MetricStripRawValue instead */
+export type SwimlaneRawValue = MetricStripRawValue;
+/** @deprecated Use MetricStripDataPoint instead */
+export type SwimlaneDataPoint = MetricStripDataPoint;
+/** @deprecated Use MetricStripProcessedData instead */
+export type SwimlaneProcessedData = MetricStripProcessedData;
+/** @deprecated Use MetricStripTimeSeries instead */
+export type SwimlaneTimeSeries = MetricStripTimeSeries;
 
 // ============================================================================
 // TEMPORAL SEGMENT TREE TYPES

@@ -63,11 +63,12 @@ import {
 
 import { SearchOrchestrator } from './orchestrators/SearchOrchestrator.js';
 import { SelectionOrchestrator } from './orchestrators/SelectionOrchestrator.js';
+
 import {
-  SWIMLANE_GAP,
-  SWIMLANE_HEIGHT,
-  SwimlaneOrchestrator,
-} from './swimlane/SwimlaneOrchestrator.js';
+  METRIC_STRIP_GAP,
+  METRIC_STRIP_HEIGHT,
+  MetricStripOrchestrator,
+} from './metric-strip/MetricStripOrchestrator.js';
 
 export interface FlameChartCallbacks {
   onMouseMove?: (
@@ -163,14 +164,14 @@ export class FlameChart<E extends EventNode = EventNode> {
   private minimapOrchestrator: MinimapOrchestrator | null = null;
   private minimapDiv: HTMLElement | null = null; // HTML container for minimap canvas
 
-  // Swimlane orchestrator (owns governor limit visualization between minimap and main timeline)
-  private swimlaneOrchestrator: SwimlaneOrchestrator | null = null;
-  private swimlaneDiv: HTMLElement | null = null; // HTML container for swimlane canvas
+  // Metric strip orchestrator (owns governor limit visualization between minimap and main timeline)
+  private metricStripOrchestrator: MetricStripOrchestrator | null = null;
+  private metricStripDiv: HTMLElement | null = null; // HTML container for metric strip canvas
 
   // Cursor line renderer for main timeline (bidirectional cursor mirroring)
   private cursorLineRenderer: CursorLineRenderer | null = null;
 
-  // Vertical offset from container top to main timeline canvas (minimap + swimlane + gaps)
+  // Vertical offset from container top to main timeline canvas (minimap + metric strip + gaps)
   // Used to convert canvas-relative coordinates to container-relative for tooltip positioning
   private mainTimelineYOffset = 0;
 
@@ -233,11 +234,11 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Create event index
     this.index = new TimelineEventIndex(events);
 
-    // Calculate minimap and swimlane heights BEFORE creating viewport
-    // Viewport needs the available height for main timeline (excluding minimap + swimlane + gaps)
+    // Calculate minimap and metric strip heights BEFORE creating viewport
+    // Viewport needs the available height for main timeline (excluding minimap + metric strip + gaps)
     const minimapHeight = calculateMinimapHeight(height);
-    const swimlaneHeight = SWIMLANE_HEIGHT;
-    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + swimlaneHeight + SWIMLANE_GAP;
+    const metricStripHeight = METRIC_STRIP_HEIGHT;
+    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
     const mainTimelineHeight = height - totalOverheadHeight;
 
     // Store offset for converting canvas-relative to container-relative coordinates
@@ -368,8 +369,8 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Initialize minimap orchestrator
     await this.setupMinimap();
 
-    // Initialize swimlane orchestrator
-    await this.setupSwimlane();
+    // Initialize metric strip orchestrator
+    await this.setupMetricStrip();
 
     // Setup interaction handler
     this.setupInteractionHandler();
@@ -439,10 +440,10 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.minimapOrchestrator = null;
     }
 
-    // Clean up swimlane orchestrator
-    if (this.swimlaneOrchestrator) {
-      this.swimlaneOrchestrator.destroy();
-      this.swimlaneOrchestrator = null;
+    // Clean up metric strip orchestrator
+    if (this.metricStripOrchestrator) {
+      this.metricStripOrchestrator.destroy();
+      this.metricStripOrchestrator = null;
     }
 
     // Clean up viewport animator
@@ -643,10 +644,10 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     const visibleWorldYBottom = -oldState.offsetY;
 
-    // Calculate new minimap, swimlane, and main timeline heights
+    // Calculate new minimap, metric strip, and main timeline heights
     const minimapHeight = calculateMinimapHeight(newHeight);
-    const swimlaneHeight = SWIMLANE_HEIGHT;
-    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + swimlaneHeight + SWIMLANE_GAP;
+    const metricStripHeight = METRIC_STRIP_HEIGHT;
+    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
     const mainTimelineHeight = newHeight - totalOverheadHeight;
 
     // Update offset for converting canvas-relative to container-relative coordinates
@@ -661,9 +662,9 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.minimapOrchestrator.resize(newWidth, newHeight);
     }
 
-    // Resize swimlane orchestrator
-    if (this.swimlaneOrchestrator) {
-      this.swimlaneOrchestrator.resize(newWidth);
+    // Resize metric strip orchestrator
+    if (this.metricStripOrchestrator) {
+      this.metricStripOrchestrator.resize(newWidth);
     }
 
     // Resize main timeline app
@@ -723,7 +724,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   public setHeatStripTimeSeries(timeSeries: HeatStripTimeSeries | null): void {
     this.minimapOrchestrator?.setHeatStripTimeSeries(timeSeries);
-    this.swimlaneOrchestrator?.setTimeSeries(timeSeries);
+    this.metricStripOrchestrator?.setTimeSeries(timeSeries);
   }
 
   // ============================================================================
@@ -739,10 +740,10 @@ export class FlameChart<E extends EventNode = EventNode> {
     sysTicker.autoStart = false;
     sysTicker.stop();
 
-    // Calculate minimap, swimlane, and main timeline heights
+    // Calculate minimap, metric strip, and main timeline heights
     const minimapHeight = calculateMinimapHeight(height);
-    const swimlaneHeight = SWIMLANE_HEIGHT;
-    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + swimlaneHeight + SWIMLANE_GAP;
+    const metricStripHeight = METRIC_STRIP_HEIGHT;
+    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
     const mainTimelineHeight = height - totalOverheadHeight;
 
     // Create wrapper container with flexbox layout
@@ -754,23 +755,29 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.minimapDiv = document.createElement('div');
     this.minimapDiv.style.cssText = `height:${minimapHeight}px;width:100%;flex-shrink:0;position:relative`;
 
-    // Gap element between minimap and swimlane
+    // Gap element between minimap and metric strip
     const minimapGapDiv = document.createElement('div');
     minimapGapDiv.style.cssText = `height:${MINIMAP_GAP}px;width:100%;flex-shrink:0;background:transparent`;
 
-    // Swimlane container (fixed height)
-    this.swimlaneDiv = document.createElement('div');
-    this.swimlaneDiv.style.cssText = `height:${swimlaneHeight}px;width:100%;flex-shrink:0;position:relative`;
+    // Metric strip container (fixed height)
+    this.metricStripDiv = document.createElement('div');
+    this.metricStripDiv.style.cssText = `height:${metricStripHeight}px;width:100%;flex-shrink:0;position:relative`;
 
-    // Gap element between swimlane and main timeline
-    const swimlaneGapDiv = document.createElement('div');
-    swimlaneGapDiv.style.cssText = `height:${SWIMLANE_GAP}px;width:100%;flex-shrink:0;background:transparent`;
+    // Gap element between metric strip and main timeline
+    const metricStripGapDiv = document.createElement('div');
+    metricStripGapDiv.style.cssText = `height:${METRIC_STRIP_GAP}px;width:100%;flex-shrink:0;background:transparent`;
 
     // Main timeline container (fills remaining space)
     const mainDiv = document.createElement('div');
     mainDiv.style.cssText = 'flex:1;width:100%;min-height:0';
 
-    this.wrapper.append(this.minimapDiv, minimapGapDiv, this.swimlaneDiv, swimlaneGapDiv, mainDiv);
+    this.wrapper.append(
+      this.minimapDiv,
+      minimapGapDiv,
+      this.metricStripDiv,
+      metricStripGapDiv,
+      mainDiv,
+    );
 
     if (this.container) {
       this.container.appendChild(this.wrapper);
@@ -859,9 +866,9 @@ export class FlameChart<E extends EventNode = EventNode> {
         },
         onMouseLeave: () => {
           // Clear cursor position when mouse leaves main timeline
-          // Cursor is managed by the minimap and swimlane orchestrators
+          // Cursor is managed by the minimap and metric strip orchestrators
           this.minimapOrchestrator?.setCursorFromMainTimeline(null);
-          this.swimlaneOrchestrator?.setCursorFromMainTimeline(null);
+          this.metricStripOrchestrator?.setCursorFromMainTimeline(null);
           this.requestRender();
 
           if (this.callbacks.onMouseMove) {
@@ -1022,114 +1029,31 @@ export class FlameChart<E extends EventNode = EventNode> {
 
       // Minimap keyboard callbacks (delegated to MinimapOrchestrator)
       isInMinimapArea: () => this.minimapOrchestrator?.isMouseInMinimapArea() ?? false,
+      onMinimapPanViewport: (delta) => this.handleAnimatedPanViewport(delta),
+      onMinimapPanDepth: (delta) => this.handleAnimatedPanDepth(delta),
+      onMinimapZoom: (dir) => this.handleAnimatedZoom(dir),
+      onMinimapJumpStart: () => this.minimapOrchestrator?.handleJumpStart(),
+      onMinimapJumpEnd: () => this.minimapOrchestrator?.handleJumpEnd(),
+      onMinimapResetZoom: () => this.resetZoom(),
 
-      onMinimapPanViewport: (deltaTimeNs: number) => {
-        if (!this.viewport || !this.viewportAnimator) {
-          return;
-        }
-        // Convert time delta to pixel delta using current zoom
-        const viewportState = this.viewport.getState();
-        const deltaX = deltaTimeNs * viewportState.zoom;
-
-        // Use animated pan via chase animation for smooth keyboard panning
-        this.viewportAnimator.addToTarget(this.viewport, deltaX, 0, () =>
-          this.notifyViewportChange(),
-        );
-      },
-
-      onMinimapPanDepth: (deltaY: number) => {
-        if (!this.viewport || !this.viewportAnimator) {
-          return;
-        }
-        // Use animated pan via chase animation for smooth keyboard panning
-        this.viewportAnimator.addToTarget(this.viewport, 0, deltaY, () =>
-          this.notifyViewportChange(),
-        );
-      },
-
-      onMinimapZoom: (direction: 'in' | 'out') => {
-        if (!this.viewport || !this.viewportAnimator) {
-          return;
-        }
-
-        const factor =
-          direction === 'in' ? KEYBOARD_CONSTANTS.zoomFactor : 1 / KEYBOARD_CONSTANTS.zoomFactor;
-
-        // Use animated zoom via chase animation for smooth keyboard zooming
-        this.viewportAnimator.multiplyZoomTarget(this.viewport, factor, () =>
-          this.notifyViewportChange(),
-        );
-      },
-
-      onMinimapJumpStart: () => {
-        this.minimapOrchestrator?.handleJumpStart();
-      },
-
-      onMinimapJumpEnd: () => {
-        this.minimapOrchestrator?.handleJumpEnd();
-      },
-
-      onMinimapResetZoom: () => {
-        this.resetZoom();
-      },
-
-      // Swimlane keyboard callbacks (delegated to viewport via animation)
-      isInSwimlaneArea: () => this.swimlaneOrchestrator?.isMouseInSwimlaneArea() ?? false,
-
-      onSwimlanePanViewport: (deltaTimeNs: number) => {
-        if (!this.viewport || !this.viewportAnimator) {
-          return;
-        }
-        // Convert time delta to pixel delta using current zoom
-        const viewportState = this.viewport.getState();
-        const deltaX = deltaTimeNs * viewportState.zoom;
-
-        // Use animated pan via chase animation for smooth keyboard panning
-        this.viewportAnimator.addToTarget(this.viewport, deltaX, 0, () =>
-          this.notifyViewportChange(),
-        );
-      },
-
-      onSwimlanePanDepth: (deltaY: number) => {
-        if (!this.viewport || !this.viewportAnimator) {
-          return;
-        }
-        // Use animated pan via chase animation for smooth keyboard panning
-        this.viewportAnimator.addToTarget(this.viewport, 0, deltaY, () =>
-          this.notifyViewportChange(),
-        );
-      },
-
-      onSwimlaneZoom: (direction: 'in' | 'out') => {
-        if (!this.viewport || !this.viewportAnimator) {
-          return;
-        }
-
-        const factor =
-          direction === 'in' ? KEYBOARD_CONSTANTS.zoomFactor : 1 / KEYBOARD_CONSTANTS.zoomFactor;
-
-        // Use animated zoom via chase animation for smooth keyboard zooming
-        this.viewportAnimator.multiplyZoomTarget(this.viewport, factor, () =>
-          this.notifyViewportChange(),
-        );
-      },
-
-      onSwimlaneJumpStart: () => {
+      // Metric strip keyboard callbacks (delegated to viewport via animation)
+      isInMetricStripArea: () => this.metricStripOrchestrator?.isMouseInMetricStripArea() ?? false,
+      onMetricStripPanViewport: (delta) => this.handleAnimatedPanViewport(delta),
+      onMetricStripPanDepth: (delta) => this.handleAnimatedPanDepth(delta),
+      onMetricStripZoom: (dir) => this.handleAnimatedZoom(dir),
+      onMetricStripJumpStart: () => {
         if (!this.viewport) {
           return;
         }
-        // Cancel any animation and jump to start
         this.viewportAnimator?.cancel();
         const viewportState = this.viewport.getState();
         this.viewport.setOffset(0, viewportState.offsetY);
         this.notifyViewportChange();
       },
-
-      onSwimlaneJumpEnd: () => {
+      onMetricStripJumpEnd: () => {
         if (!this.viewport || !this.index) {
           return;
         }
-        // Cancel any animation and jump to end
         this.viewportAnimator?.cancel();
         const viewportState = this.viewport.getState();
         const endOffsetX =
@@ -1137,10 +1061,7 @@ export class FlameChart<E extends EventNode = EventNode> {
         this.viewport.setOffset(Math.max(0, endOffsetX), viewportState.offsetY);
         this.notifyViewportChange();
       },
-
-      onSwimlaneResetZoom: () => {
-        this.resetZoom();
-      },
+      onMetricStripResetZoom: () => this.resetZoom(),
     });
 
     this.keyboardHandler.attach();
@@ -1220,17 +1141,17 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
-   * Setup swimlane orchestrator for governor limit visualization.
+   * Setup metric strip orchestrator for governor limit visualization.
    */
-  private async setupSwimlane(): Promise<void> {
-    if (!this.index || !this.viewport || !this.swimlaneDiv) {
+  private async setupMetricStrip(): Promise<void> {
+    if (!this.index || !this.viewport || !this.metricStripDiv) {
       return;
     }
 
     const { displayWidth } = this.viewport.getState();
 
-    // Create swimlane orchestrator with callbacks
-    this.swimlaneOrchestrator = new SwimlaneOrchestrator({
+    // Create metric strip orchestrator with callbacks
+    this.metricStripOrchestrator = new MetricStripOrchestrator({
       onZoomToRegion: (centerTimeNs: number, durationNs: number) => {
         if (!this.viewport) {
           return;
@@ -1247,7 +1168,7 @@ export class FlameChart<E extends EventNode = EventNode> {
         this.notifyViewportChange();
       },
       onCursorMove: (timeNs: number | null) => {
-        // Update minimap cursor to sync with swimlane
+        // Update minimap cursor to sync with metric strip
         this.minimapOrchestrator?.setCursorFromMainTimeline(timeNs);
       },
       requestRender: () => {
@@ -1286,12 +1207,16 @@ export class FlameChart<E extends EventNode = EventNode> {
     });
 
     // Initialize the orchestrator
-    await this.swimlaneOrchestrator.init(this.swimlaneDiv, displayWidth, this.index.totalDuration);
+    await this.metricStripOrchestrator.init(
+      this.metricStripDiv,
+      displayWidth,
+      this.index.totalDuration,
+    );
 
-    // Focus container on swimlane mousedown for keyboard support
-    const swimlaneApp = this.swimlaneOrchestrator.getApp();
-    if (swimlaneApp?.canvas) {
-      swimlaneApp.canvas.addEventListener('mousedown', () => {
+    // Focus container on metric strip mousedown for keyboard support
+    const metricStripApp = this.metricStripOrchestrator.getApp();
+    if (metricStripApp?.canvas) {
+      metricStripApp.canvas.addEventListener('mousedown', () => {
         this.container?.focus();
       });
     }
@@ -1432,9 +1357,9 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.interactionHandler.updateCursor(event !== null || marker !== null);
     }
 
-    // Update swimlane cursor (sync from main timeline)
+    // Update metric strip cursor (sync from main timeline)
     const timeNs = (screenX + viewportState.offsetX) / viewportState.zoom;
-    this.swimlaneOrchestrator?.setCursorFromMainTimeline(timeNs);
+    this.metricStripOrchestrator?.setCursorFromMainTimeline(timeNs);
 
     // Notify callback with container-relative coordinates
     // (screenY is canvas-relative, add minimap offset for container-relative positioning)
@@ -1752,6 +1677,45 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.notifyViewportChange();
   }
 
+  /**
+   * Handle animated pan in the time (X) direction.
+   * Used by minimap and metric strip keyboard handlers.
+   */
+  private handleAnimatedPanViewport(deltaTimeNs: number): void {
+    if (!this.viewport || !this.viewportAnimator) {
+      return;
+    }
+    const viewportState = this.viewport.getState();
+    const deltaX = deltaTimeNs * viewportState.zoom;
+    this.viewportAnimator.addToTarget(this.viewport, deltaX, 0, () => this.notifyViewportChange());
+  }
+
+  /**
+   * Handle animated pan in the depth (Y) direction.
+   * Used by minimap and metric strip keyboard handlers.
+   */
+  private handleAnimatedPanDepth(deltaY: number): void {
+    if (!this.viewport || !this.viewportAnimator) {
+      return;
+    }
+    this.viewportAnimator.addToTarget(this.viewport, 0, deltaY, () => this.notifyViewportChange());
+  }
+
+  /**
+   * Handle animated zoom in or out.
+   * Used by minimap and metric strip keyboard handlers.
+   */
+  private handleAnimatedZoom(direction: 'in' | 'out'): void {
+    if (!this.viewport || !this.viewportAnimator) {
+      return;
+    }
+    const factor =
+      direction === 'in' ? KEYBOARD_CONSTANTS.zoomFactor : 1 / KEYBOARD_CONSTANTS.zoomFactor;
+    this.viewportAnimator.multiplyZoomTarget(this.viewport, factor, () =>
+      this.notifyViewportChange(),
+    );
+  }
+
   private initializeState(events: LogEvent[]): void {
     if (!this.viewport) {
       return;
@@ -1852,8 +1816,8 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Phase 7: Render minimap
     this.renderMinimap(viewportState);
 
-    // Phase 8: Render swimlane
-    this.renderSwimlane(viewportState);
+    // Phase 8: Render metric strip
+    this.renderMetricStrip(viewportState);
   }
 
   /**
@@ -1970,20 +1934,20 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
-   * Render swimlane via orchestrator.
+   * Render metric strip via orchestrator.
    * Pure render method - click handling and cursor updates happen in event handlers.
    */
-  private renderSwimlane(viewportState: ViewportState): void {
-    if (!this.swimlaneOrchestrator || !this.index) {
+  private renderMetricStrip(viewportState: ViewportState): void {
+    if (!this.metricStripOrchestrator || !this.index) {
       return;
     }
 
-    // Get cursor time from swimlane or minimap (for bidirectional sync)
-    const cursorTimeNs = this.swimlaneOrchestrator.isMouseInSwimlaneArea()
-      ? this.swimlaneOrchestrator.getCursorTimeNs()
+    // Get cursor time from metric strip or minimap (for bidirectional sync)
+    const cursorTimeNs = this.metricStripOrchestrator.isMouseInMetricStripArea()
+      ? this.metricStripOrchestrator.getCursorTimeNs()
       : (this.minimapOrchestrator?.getCursorTimeNs() ?? null);
 
-    this.swimlaneOrchestrator.render({
+    this.metricStripOrchestrator.render({
       viewportState,
       totalDuration: this.index.totalDuration,
       cursorTimeNs,

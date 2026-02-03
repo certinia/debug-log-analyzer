@@ -36,6 +36,7 @@ import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
 import { blendWithBackground } from '../BucketColorResolver.js';
 import { createRectangleShader } from '../RectangleShader.js';
 import { HEAT_STRIP_HEIGHT, HeatStripRenderer } from './HeatStripRenderer.js';
+import { HeatStripTooltipRenderer } from './HeatStripTooltipRenderer.js';
 import { MinimapAxisRenderer } from './MinimapAxisRenderer.js';
 import { MinimapBarGeometry } from './MinimapBarGeometry.js';
 import type { MinimapDensityData } from './MinimapDensityQuery.js';
@@ -160,8 +161,8 @@ export class MinimapRenderer {
   /** HTML label element for lens time info. */
   private labelElement: HTMLDivElement;
 
-  /** HTML tooltip element for heat strip hover. */
-  private heatStripTooltipElement: HTMLDivElement;
+  /** Heat strip tooltip renderer. */
+  private heatStripTooltip: HeatStripTooltipRenderer;
 
   // ============================================================================
   // OTHER STATE
@@ -251,9 +252,8 @@ export class MinimapRenderer {
     this.labelElement = this.createLabelElement();
     htmlContainer.appendChild(this.labelElement);
 
-    // Create HTML tooltip for heat strip hover
-    this.heatStripTooltipElement = this.createHeatStripTooltipElement();
-    htmlContainer.appendChild(this.heatStripTooltipElement);
+    // Create heat strip tooltip renderer
+    this.heatStripTooltip = new HeatStripTooltipRenderer(htmlContainer);
   }
 
   /**
@@ -283,30 +283,6 @@ export class MinimapRenderer {
   }
 
   /**
-   * Create the HTML tooltip element for heat strip hover.
-   * Shows governor limit percentages on hover.
-   */
-  private createHeatStripTooltipElement(): HTMLDivElement {
-    const tooltip = document.createElement('div');
-    tooltip.className = 'heat-strip-tooltip';
-    tooltip.style.cssText = `
-      position: absolute;
-      display: none;
-      padding: 8px 12px;
-      border-radius: 4px;
-      background: var(--vscode-editorWidget-background, #252526);
-      border: 1px solid var(--vscode-editorWidget-border, #454545);
-      color: var(--vscode-editorWidget-foreground, #e3e3e3);
-      font-family: monospace;
-      font-size: 11px;
-      pointer-events: none;
-      z-index: 200;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    `;
-    return tooltip;
-  }
-
-  /**
    * Show the heat strip tooltip with metric data.
    *
    * @param screenX - X position for tooltip placement
@@ -321,114 +297,14 @@ export class MinimapRenderer {
       return;
     }
 
-    // Build tooltip content
-    const { point } = dataPoint;
-    const rows: string[] = [];
-
-    // Sort metrics by priority (lower = shown first), then by percentage descending
-    const sortedMetrics = Array.from(point.metricSnapshots.entries()).sort((a, b) => {
-      const metricA = metrics.get(a[0]);
-      const metricB = metrics.get(b[0]);
-      const priorityA = metricA?.priority ?? 999;
-      const priorityB = metricB?.priority ?? 999;
-      if (priorityA !== priorityB) {
-        return priorityA - priorityB;
-      }
-      return b[1].percent - a[1].percent;
-    });
-
-    // High-priority metrics (priority < 4) always shown, others only if > 0%
-    const HIGH_PRIORITY_THRESHOLD = 4;
-
-    for (const [metricId, snapshot] of sortedMetrics) {
-      const metric = metrics.get(metricId);
-      const isHighPriority = (metric?.priority ?? 999) < HIGH_PRIORITY_THRESHOLD;
-      const isNonZero = snapshot.percent > 0;
-
-      // Show high-priority metrics always, others only if > 0%
-      if (isHighPriority || isNonZero) {
-        const name = metric?.displayName ?? metricId;
-        const percentStr = (snapshot.percent * 100).toFixed(1).padStart(5);
-        const color = this.getPercentColor(snapshot.percent);
-        const unit = metric?.unit ?? '';
-        const valueStr = this.formatMetricValue(snapshot.used, snapshot.limit, unit);
-        rows.push(
-          `<div style="display:grid;grid-template-columns:140px 55px auto;gap:4px;margin:2px 0;">` +
-            `<span style="color:var(--vscode-descriptionForeground, #999)">${name}</span>` +
-            `<span style="text-align:right;color:${color}">${percentStr}%</span>` +
-            `<span style="color:var(--vscode-descriptionForeground, #666)">(${valueStr})</span>` +
-            `</div>`,
-        );
-      }
-    }
-
-    if (rows.length === 0) {
-      this.hideHeatStripTooltip();
-      return;
-    }
-
-    // Set content - title comes from first metric's context or default
-    this.heatStripTooltipElement.innerHTML =
-      `<div style="font-weight:bold;margin-bottom:4px;">Metrics</div>` + rows.join('');
-    this.heatStripTooltipElement.style.display = 'block';
-
-    // Position tooltip above the heat strip
-    requestAnimationFrame(() => {
-      const tooltipWidth = this.heatStripTooltipElement.offsetWidth;
-      const tooltipHeight = this.heatStripTooltipElement.offsetHeight;
-      const containerWidth = this.htmlContainer.offsetWidth;
-      const padding = 4;
-
-      // Center on cursor X, clamp to viewport
-      let left = screenX - tooltipWidth / 2;
-      left = Math.max(padding, Math.min(containerWidth - tooltipWidth - padding, left));
-
-      // Position above the hover point
-      const top = screenY - tooltipHeight - 8;
-
-      this.heatStripTooltipElement.style.left = `${left}px`;
-      this.heatStripTooltipElement.style.top = `${Math.max(0, top)}px`;
-    });
+    this.heatStripTooltip.show(screenX, screenY, dataPoint.point.metricSnapshots, metrics);
   }
 
   /**
    * Hide the heat strip tooltip.
    */
   public hideHeatStripTooltip(): void {
-    this.heatStripTooltipElement.style.display = 'none';
-  }
-
-  /**
-   * Get color for percentage value (traffic light).
-   */
-  private getPercentColor(percent: number): string {
-    if (percent >= 1.0) {
-      return '#7c3aed'; // Purple - breached
-    } else if (percent >= 0.8) {
-      return '#dc2626'; // Red - critical
-    } else if (percent >= 0.5) {
-      return '#f59e0b'; // Amber - warning
-    }
-    return '#10b981'; // Green - safe
-  }
-
-  /**
-   * Format metric value with used/limit and optional unit.
-   */
-  private formatMetricValue(used: number, limit: number, unit: string): string {
-    const usedStr = this.formatNumber(used);
-    const limitStr = this.formatNumber(limit);
-    if (unit) {
-      return `${usedStr} / ${limitStr} ${unit}`;
-    }
-    return `${usedStr} / ${limitStr}`;
-  }
-
-  /**
-   * Format a number with thousands separators.
-   */
-  private formatNumber(value: number): string {
-    return value.toLocaleString();
+    this.heatStripTooltip.hide();
   }
 
   /**
@@ -1074,9 +950,9 @@ export class MinimapRenderer {
     this.cursorLineGraphics.destroy();
     this.dynamicContainer.destroy();
 
-    // Remove HTML labels
+    // Remove HTML labels and tooltips
     this.labelElement.remove();
-    this.heatStripTooltipElement.remove();
+    this.heatStripTooltip.destroy();
 
     // Destroy main container
     this.container.destroy();
