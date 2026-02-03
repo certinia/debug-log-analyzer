@@ -44,54 +44,18 @@ import {
   METRIC_STRIP_MARKER_COLORS_BLENDED,
   METRIC_STRIP_MARKER_OPACITY,
   METRIC_STRIP_THRESHOLDS,
-  METRIC_STRIP_TIME_GRID_COLOR,
-  METRIC_STRIP_TIME_GRID_OPACITY,
+  METRIC_STRIP_TOGGLE_WIDTH,
   METRIC_STRIP_Y_MAX_PERCENT,
+  TRAFFIC_LIGHT_COLORS,
   type MetricStripColors,
 } from './metric-strip-colors.js';
 
-/**
- * 1-2-5 sequence intervals in nanoseconds for time grid lines.
- * Used to select appropriate spacing based on zoom level.
- */
-const TIME_GRID_INTERVALS = [
-  1e3,
-  2e3,
-  5e3, // microseconds
-  1e4,
-  2e4,
-  5e4, // tens of microseconds
-  1e5,
-  2e5,
-  5e5, // hundreds of microseconds
-  1e6,
-  2e6,
-  5e6, // milliseconds
-  1e7,
-  2e7,
-  5e7, // tens of milliseconds
-  1e8,
-  2e8,
-  5e8, // hundreds of milliseconds
-  1e9,
-  2e9,
-  5e9, // seconds
-  1e10,
-  2e10,
-  5e10, // tens of seconds
-];
-
-/**
- * Target pixel spacing between time grid lines.
- */
-const TARGET_GRID_SPACING_PX = 80;
+// Re-export toggle width for use by orchestrator
+export { METRIC_STRIP_TOGGLE_WIDTH };
 
 export class MetricStripRenderer {
   /** Graphics for marker backgrounds. */
   private markerGraphics: Graphics;
-
-  /** Graphics for vertical time grid lines. */
-  private timeGridGraphics: Graphics;
 
   /** Graphics for danger zone band. */
   private dangerZoneGraphics: Graphics;
@@ -108,6 +72,9 @@ export class MetricStripRenderer {
   /** Graphics for breach areas. */
   private breachGraphics: Graphics;
 
+  /** Graphics for expand/collapse toggle button. */
+  private toggleGraphics: Graphics;
+
   /** Current color palette. */
   private colors: MetricStripColors;
 
@@ -120,14 +87,20 @@ export class MetricStripRenderer {
   /** Effective Y-max for dynamic scaling. */
   private effectiveYMax = METRIC_STRIP_Y_MAX_PERCENT;
 
+  /** Whether the metric strip is in collapsed mode. */
+  private isCollapsed = false;
+
+  /** Whether mouse is hovering over the toggle area. */
+  private isToggleHovered = false;
+
   constructor() {
     this.markerGraphics = new Graphics();
-    this.timeGridGraphics = new Graphics();
     this.dangerZoneGraphics = new Graphics();
     this.areaFillGraphics = new Graphics();
     this.lineGraphics = new Graphics();
     this.limitLineGraphics = new Graphics();
     this.breachGraphics = new Graphics();
+    this.toggleGraphics = new Graphics();
 
     this.colors = getMetricStripColors(true);
   }
@@ -139,12 +112,12 @@ export class MetricStripRenderer {
   public getGraphics(): Graphics[] {
     return [
       this.markerGraphics,
-      this.timeGridGraphics,
       this.dangerZoneGraphics,
       this.areaFillGraphics,
       this.lineGraphics,
       this.limitLineGraphics,
       this.breachGraphics,
+      this.toggleGraphics, // Toggle rendered on top
     ];
   }
 
@@ -171,6 +144,29 @@ export class MetricStripRenderer {
   }
 
   /**
+   * Set the collapsed state.
+   */
+  public setCollapsed(collapsed: boolean): void {
+    this.isCollapsed = collapsed;
+  }
+
+  /**
+   * Set the toggle hover state.
+   *
+   * @param hovered - Whether mouse is over the toggle area
+   */
+  public setToggleHovered(hovered: boolean): void {
+    this.isToggleHovered = hovered;
+  }
+
+  /**
+   * Check if the toggle is currently hovered.
+   */
+  public getIsToggleHovered(): boolean {
+    return this.isToggleHovered;
+  }
+
+  /**
    * Render the metric strip visualization.
    *
    * @param data - Processed metric strip data
@@ -190,11 +186,18 @@ export class MetricStripRenderer {
     const { displayWidth } = viewportState;
     const height = this.height;
 
-    // Always render markers and grid (even without data)
+    // Always render markers (background layer) - visible in both collapsed and expanded modes
     if (markers && markers.length > 0) {
       this.renderMarkers(markers, viewportState, totalDuration);
     }
-    this.renderTimeGridLines(viewportState);
+
+    // Note: Time grid lines are now rendered by MeshAxisRenderer in MetricStripOrchestrator
+
+    // In collapsed mode, only render toggle button (markers already rendered above)
+    if (this.isCollapsed) {
+      this.renderCollapsedView(displayWidth, height);
+      return;
+    }
 
     if (!data.hasData) {
       return;
@@ -206,6 +209,180 @@ export class MetricStripRenderer {
     this.renderStepChartLines(data, viewportState, totalDuration, height);
     this.renderLimitLine(displayWidth, height);
     this.renderBreachAreas(data, viewportState, totalDuration, height);
+
+    // Always render toggle button on top
+    this.renderToggleButton(height);
+  }
+
+  /**
+   * Render the collapsed view - stacked colored strips showing metric percentages.
+   * This is a heat-style visualization showing Tier 1/2 metrics.
+   */
+  private renderCollapsedView(_displayWidth: number, height: number): void {
+    // The heat-style visualization is rendered in renderCollapsedWithData()
+    // Here we just render the toggle button
+    this.renderToggleButton(height);
+  }
+
+  /**
+   * Render the expand/collapse toggle button on the left edge.
+   * Shows a chevron icon: ▶ when collapsed, ▼ when expanded.
+   * No background - just the chevron icon at top left.
+   */
+  private renderToggleButton(_height: number): void {
+    const g = this.toggleGraphics;
+
+    // Chevron icon at top left (no background)
+    const iconColor = this.isToggleHovered ? 0xffffff : 0xcccccc;
+    const iconX = 6; // Left padding
+    const iconY = 6; // Top padding
+    const iconSize = 5;
+
+    if (this.isCollapsed) {
+      // ▶ (right-pointing triangle)
+      g.moveTo(iconX, iconY);
+      g.lineTo(iconX + iconSize, iconY + iconSize);
+      g.lineTo(iconX, iconY + iconSize * 2);
+      g.closePath();
+    } else {
+      // ▼ (down-pointing triangle)
+      g.moveTo(iconX, iconY);
+      g.lineTo(iconX + iconSize * 2, iconY);
+      g.lineTo(iconX + iconSize, iconY + iconSize);
+      g.closePath();
+    }
+    g.fill({ color: iconColor, alpha: 1.0 });
+  }
+
+  /**
+   * Render the collapsed view with actual metric data.
+   * Shows stacked colored strips representing metric percentages.
+   */
+  public renderCollapsedWithData(
+    classifiedMetrics: MetricStripClassifiedMetric[],
+    viewportState: ViewportState,
+    getPointAtTime: (timeNs: number) => MetricStripDataPoint | null,
+    totalDuration: number,
+  ): void {
+    if (this.isCollapsed) {
+      this.renderCollapsedHeatStrips(
+        classifiedMetrics,
+        viewportState,
+        getPointAtTime,
+        totalDuration,
+      );
+    }
+  }
+
+  /**
+   * Render heat-style colored strips in collapsed mode.
+   * Uses traffic light system: color based on MAX percentage across ALL metrics.
+   * - 0-50%: transparent/clear (safe)
+   * - 50-80%: amber/orange (warning)
+   * - 80-100%: red (critical)
+   * - >100%: purple (breach)
+   */
+  private renderCollapsedHeatStrips(
+    _classifiedMetrics: MetricStripClassifiedMetric[],
+    viewportState: ViewportState,
+    getPointAtTime: (timeNs: number) => MetricStripDataPoint | null,
+    totalDuration: number,
+  ): void {
+    const { zoom, offsetX, displayWidth } = viewportState;
+    const height = this.height;
+    const g = this.areaFillGraphics;
+
+    // Calculate time range and bucket size
+    const visibleStartTime = offsetX / zoom;
+    const visibleEndTime = (offsetX + displayWidth) / zoom;
+
+    // Use ~2px buckets for smooth visualization
+    const numBuckets = Math.ceil(displayWidth / 2);
+    const bucketWidth = displayWidth / numBuckets;
+    const timeBucketSize = (visibleEndTime - visibleStartTime) / numBuckets;
+
+    // Track current color run for merging adjacent buckets with same color
+    let runStartX = 0;
+    let runColor = 0;
+    let runAlpha = 0;
+    let inRun = false;
+
+    // Process each bucket and merge adjacent ones with same color
+    for (let i = 0; i < numBuckets; i++) {
+      const bucketStartTime = visibleStartTime + i * timeBucketSize;
+      const bucketMidTime = bucketStartTime + timeBucketSize / 2;
+      const bucketX = i * bucketWidth;
+
+      // Clamp to valid time range
+      const timeNs = Math.max(0, Math.min(totalDuration, bucketMidTime));
+      const point = getPointAtTime(timeNs);
+
+      // Get color for this bucket
+      let color = 0;
+      let alpha = 0;
+
+      if (point) {
+        // Find MAX percentage across ALL metrics at this point
+        let maxPercent = 0;
+        for (const percent of point.values.values()) {
+          if (percent > maxPercent) {
+            maxPercent = percent;
+          }
+        }
+        // Also check tier3Max
+        if (point.tier3Max > maxPercent) {
+          maxPercent = point.tier3Max;
+        }
+
+        // Determine traffic light color based on max percentage
+        const colorInfo = this.getTrafficLightColor(maxPercent);
+        color = colorInfo.color;
+        alpha = colorInfo.alpha;
+      }
+
+      // Check if color changed from current run
+      if (color !== runColor || alpha !== runAlpha) {
+        // Draw previous run if it had visible color
+        if (inRun && runAlpha > 0) {
+          g.rect(runStartX, 0, bucketX - runStartX, height);
+          g.fill({ color: runColor, alpha: runAlpha });
+        }
+        // Start new run
+        runStartX = bucketX;
+        runColor = color;
+        runAlpha = alpha;
+        inRun = alpha > 0;
+      }
+    }
+
+    // Draw final run if it has visible color
+    if (inRun && runAlpha > 0) {
+      g.rect(runStartX, 0, displayWidth - runStartX, height);
+      g.fill({ color: runColor, alpha: runAlpha });
+    }
+  }
+
+  /**
+   * Get traffic light color and alpha for a given percentage.
+   * - 0-50%: transparent (safe)
+   * - 50-80%: amber (warning)
+   * - 80-100%: red (critical)
+   * - >100%: purple (breach)
+   */
+  private getTrafficLightColor(percent: number): { color: number; alpha: number } {
+    if (percent > METRIC_STRIP_THRESHOLDS.limit) {
+      // Breach: >100% - purple
+      return { color: TRAFFIC_LIGHT_COLORS.breach, alpha: 0.7 };
+    } else if (percent >= METRIC_STRIP_THRESHOLDS.dangerStart) {
+      // Critical: 80-100% - red
+      return { color: TRAFFIC_LIGHT_COLORS.critical, alpha: 0.7 };
+    } else if (percent >= METRIC_STRIP_THRESHOLDS.warningStart) {
+      // Warning: 50-80% - amber
+      return { color: TRAFFIC_LIGHT_COLORS.warning, alpha: 0.7 };
+    } else {
+      // Safe: 0-50% - transparent
+      return { color: 0x000000, alpha: 0 };
+    }
   }
 
   /**
@@ -213,12 +390,12 @@ export class MetricStripRenderer {
    */
   public clear(): void {
     this.markerGraphics.clear();
-    this.timeGridGraphics.clear();
     this.dangerZoneGraphics.clear();
     this.areaFillGraphics.clear();
     this.lineGraphics.clear();
     this.limitLineGraphics.clear();
     this.breachGraphics.clear();
+    this.toggleGraphics.clear();
   }
 
   /**
@@ -226,12 +403,12 @@ export class MetricStripRenderer {
    */
   public destroy(): void {
     this.markerGraphics.destroy();
-    this.timeGridGraphics.destroy();
     this.dangerZoneGraphics.destroy();
     this.areaFillGraphics.destroy();
     this.lineGraphics.destroy();
     this.limitLineGraphics.destroy();
     this.breachGraphics.destroy();
+    this.toggleGraphics.destroy();
   }
 
   // ============================================================================
@@ -278,48 +455,6 @@ export class MetricStripRenderer {
         g.fill({ color, alpha: METRIC_STRIP_MARKER_OPACITY });
       }
     }
-  }
-
-  /**
-   * Render vertical time grid lines matching the main timeline axis.
-   * Uses 1-2-5 sequence for interval selection based on zoom level.
-   */
-  private renderTimeGridLines(viewportState: ViewportState): void {
-    const { zoom, offsetX, displayWidth } = viewportState;
-    const g = this.timeGridGraphics;
-
-    // Calculate visible time range
-    const timeStartNs = offsetX / zoom;
-    const timeEndNs = (offsetX + displayWidth) / zoom;
-
-    // Calculate target interval in nanoseconds (~80px between lines)
-    const targetIntervalNs = TARGET_GRID_SPACING_PX / zoom;
-    const intervalNs = this.selectGridInterval(targetIntervalNs);
-
-    // Find first grid line position (aligned to interval)
-    const firstLineTime = Math.ceil(timeStartNs / intervalNs) * intervalNs;
-
-    // Draw grid lines
-    for (let timeNs = firstLineTime; timeNs <= timeEndNs; timeNs += intervalNs) {
-      const x = timeNs * zoom - offsetX;
-      if (x >= 0 && x <= displayWidth) {
-        g.rect(x, 0, 1, this.height);
-        g.fill({ color: METRIC_STRIP_TIME_GRID_COLOR, alpha: METRIC_STRIP_TIME_GRID_OPACITY });
-      }
-    }
-  }
-
-  /**
-   * Select appropriate grid interval using 1-2-5 sequence.
-   * Returns the first interval >= target.
-   */
-  private selectGridInterval(targetNs: number): number {
-    for (const interval of TIME_GRID_INTERVALS) {
-      if (interval >= targetNs) {
-        return interval;
-      }
-    }
-    return TIME_GRID_INTERVALS[TIME_GRID_INTERVALS.length - 1]!;
   }
 
   /**

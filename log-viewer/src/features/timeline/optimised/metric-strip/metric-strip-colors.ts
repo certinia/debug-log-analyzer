@@ -101,9 +101,15 @@ export const DANGER_ZONE_OPACITY = 0.15;
 export const BREACH_AREA_OPACITY = 0.25;
 
 /**
- * MetricStrip height in pixels.
+ * MetricStrip height in pixels (expanded).
  */
 export const METRIC_STRIP_HEIGHT = 80;
+
+/**
+ * MetricStrip height when collapsed in pixels.
+ * Shows a compact heat-style visualization with expand icon.
+ */
+export const METRIC_STRIP_COLLAPSED_HEIGHT = 15;
 
 /**
  * Gap between metric strip and main timeline in pixels.
@@ -120,10 +126,29 @@ export const METRIC_STRIP_Y_MAX_PERCENT = 1.1;
  * Thresholds for danger zone and breach visualization.
  */
 export const METRIC_STRIP_THRESHOLDS = {
+  /** Safe zone (0-50%) - clear/transparent */
+  safeEnd: 0.5,
+  /** Warning zone start (50%) */
+  warningStart: 0.5,
   /** Start of danger zone (80%) */
   dangerStart: 0.8,
   /** End of danger zone / start of breach (100%) */
   limit: 1.0,
+} as const;
+
+/**
+ * Traffic light colors for collapsed heat-style visualization.
+ * Based on the max percentage across all metrics in a time bucket.
+ */
+export const TRAFFIC_LIGHT_COLORS = {
+  /** 0-50%: Safe zone - transparent/clear */
+  safe: 0x00ff00, // Green (but typically rendered transparent)
+  /** 50-80%: Warning zone - amber/orange */
+  warning: 0xf59e0b,
+  /** 80-100%: Critical zone - red */
+  critical: 0xdc2626,
+  /** >100%: Breach zone - purple */
+  breach: 0x7c3aed,
 } as const;
 
 /**
@@ -141,6 +166,70 @@ export const METRIC_STRIP_LINE_WIDTHS = {
 } as const;
 
 /**
+ * Rank-based colors for Tier 1 metrics (top 3 by usage).
+ * These are assigned by rank position, not by metric type.
+ * Index 0 = highest usage metric, Index 1 = second highest, etc.
+ */
+export const TIER_1_COLORS_DARK: readonly number[] = [
+  0xff6b6b, // Coral red - most prominent
+  0xffe66d, // Yellow - second
+  0x4ecdc4, // Teal - third
+] as const;
+
+export const TIER_1_COLORS_LIGHT: readonly number[] = [
+  0xcc0000, // Dark red - most prominent
+  0xff9900, // Orange - second
+  0x008080, // Dark teal - third
+] as const;
+
+/**
+ * Rank-based colors for Tier 2 metrics (auto-promoted due to >80% usage).
+ * These wrap if more than available colors.
+ */
+export const TIER_2_COLORS_DARK: readonly number[] = [
+  0x95e1d3, // Mint green
+  0xffa500, // Orange
+  0x9b59b6, // Purple
+  0x3498db, // Blue
+  0xe91e63, // Pink
+  0x00bcd4, // Cyan
+] as const;
+
+export const TIER_2_COLORS_LIGHT: readonly number[] = [
+  0x00cc99, // Dark mint
+  0xcc7000, // Dark orange
+  0x7b2d8e, // Dark purple
+  0x2070a0, // Dark blue
+  0xb0164a, // Dark pink
+  0x008090, // Dark cyan
+] as const;
+
+/**
+ * Get color for a metric based on its rank within a tier.
+ *
+ * @param tier - The tier (1, 2, or 3)
+ * @param rankInTier - The rank within the tier (0-indexed)
+ * @param isDarkTheme - Whether dark theme is active
+ * @returns Color for the metric
+ */
+export function getRankBasedColor(
+  tier: 1 | 2 | 3,
+  rankInTier: number,
+  isDarkTheme: boolean,
+): number {
+  if (tier === 1) {
+    const colors = isDarkTheme ? TIER_1_COLORS_DARK : TIER_1_COLORS_LIGHT;
+    return colors[rankInTier % colors.length]!;
+  } else if (tier === 2) {
+    const colors = isDarkTheme ? TIER_2_COLORS_DARK : TIER_2_COLORS_LIGHT;
+    return colors[rankInTier % colors.length]!;
+  } else {
+    // Tier 3 always gets grey
+    return isDarkTheme ? METRIC_STRIP_COLORS_DARK.tier3 : METRIC_STRIP_COLORS_LIGHT.tier3;
+  }
+}
+
+/**
  * Get metric strip colors for the current theme.
  *
  * @param isDarkTheme - Whether dark theme is active
@@ -153,6 +242,7 @@ export function getMetricStripColors(isDarkTheme: boolean): MetricStripColors {
 /**
  * Default metric color mapping for Apex governor limits.
  * Maps metric IDs to their assigned colors.
+ * @deprecated Use getRankBasedColor() for rank-based coloring instead
  */
 export const APEX_METRIC_COLORS_DARK: Record<string, number> = {
   cpuTime: METRIC_STRIP_COLORS_DARK.cpu,
@@ -216,5 +306,25 @@ export const METRIC_STRIP_MARKER_COLORS_BLENDED: Record<string, number> = {
 
 /**
  * Marker band opacity in metric strip.
+ * Matches MARKER_ALPHA (0.2) from main timeline for visual consistency.
  */
-export const METRIC_STRIP_MARKER_OPACITY = 0.15;
+export const METRIC_STRIP_MARKER_OPACITY = 0.2;
+
+/**
+ * Width of the expand/collapse toggle area on the left side.
+ */
+export const METRIC_STRIP_TOGGLE_WIDTH = 20;
+
+/**
+ * Toggle button colors.
+ */
+export const METRIC_STRIP_TOGGLE_COLORS = {
+  /** Background when not hovered. */
+  background: 0x333333,
+  /** Background when hovered. */
+  backgroundHover: 0x444444,
+  /** Chevron icon color. */
+  icon: 0xcccccc,
+  /** Chevron icon color when hovered. */
+  iconHover: 0xffffff,
+} as const;

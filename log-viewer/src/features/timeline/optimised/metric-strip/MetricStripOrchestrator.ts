@@ -27,17 +27,21 @@ import type {
   TimelineMarker,
   ViewportState,
 } from '../../types/flamechart.types.js';
+import { MeshAxisRenderer } from '../time-axis/MeshAxisRenderer.js';
 import { MetricStripManager } from './MetricStripManager.js';
 import { MetricStripRenderer } from './MetricStripRenderer.js';
 import { MetricStripTooltipRenderer } from './MetricStripTooltipRenderer.js';
 import {
   getMetricStripColors,
+  METRIC_STRIP_COLLAPSED_HEIGHT,
   METRIC_STRIP_GAP,
   METRIC_STRIP_HEIGHT,
+  METRIC_STRIP_TIME_GRID_COLOR,
+  METRIC_STRIP_TIME_GRID_OPACITY,
 } from './metric-strip-colors.js';
 
 // Re-export for convenience
-export { METRIC_STRIP_GAP, METRIC_STRIP_HEIGHT };
+export { METRIC_STRIP_COLLAPSED_HEIGHT, METRIC_STRIP_GAP, METRIC_STRIP_HEIGHT };
 
 /**
  * Callbacks for metric strip orchestrator events.
@@ -91,6 +95,14 @@ export interface MetricStripOrchestratorCallbacks {
    * @param deltaY - Vertical pan delta in pixels
    */
   onDepthPan?: (deltaY: number) => void;
+
+  /**
+   * Called when the metric strip height changes (collapse/expand).
+   * FlameChart should recalculate layout.
+   *
+   * @param newHeight - New height in pixels
+   */
+  onHeightChange?: (newHeight: number) => void;
 }
 
 /**
@@ -121,6 +133,7 @@ export class MetricStripOrchestrator {
   private manager: MetricStripManager | null = null;
   private renderer: MetricStripRenderer | null = null;
   private tooltipRenderer: MetricStripTooltipRenderer | null = null;
+  private axisRenderer: MeshAxisRenderer | null = null;
 
   // ============================================================================
   // CURSOR LINE RENDERING
@@ -139,6 +152,8 @@ export class MetricStripOrchestrator {
   private callbacks: MetricStripOrchestratorCallbacks;
   /** Last viewport state received during render (for wheel handler). */
   private lastViewportState: ViewportState | null = null;
+  /** Whether the metric strip is collapsed. */
+  private isCollapsed = true;
 
   constructor(callbacks: MetricStripOrchestratorCallbacks) {
     this.callbacks = callbacks;
@@ -163,11 +178,11 @@ export class MetricStripOrchestrator {
     this.htmlContainer = metricStripDiv;
     this.totalDuration = totalDuration;
 
-    // Create PIXI Application for metric strip
+    // Create PIXI Application for metric strip (starts collapsed)
     this.app = new PIXI.Application();
     await this.app.init({
       width,
-      height: METRIC_STRIP_HEIGHT,
+      height: METRIC_STRIP_COLLAPSED_HEIGHT,
       antialias: true, // Smooth lines
       backgroundAlpha: 0,
       resolution: window.devicePixelRatio || 1,
@@ -187,10 +202,22 @@ export class MetricStripOrchestrator {
     this.manager = new MetricStripManager();
     this.manager.setTheme(this.isDarkTheme);
 
-    // Initialize renderer
+    // Initialize axis renderer for grid lines (rendered first, behind other content)
+    this.axisRenderer = new MeshAxisRenderer(this.container, {
+      height: METRIC_STRIP_COLLAPSED_HEIGHT,
+      lineColor: METRIC_STRIP_TIME_GRID_COLOR,
+      textColor: '#808080',
+      fontSize: 11,
+      minLabelSpacing: 120,
+      showLabels: false,
+      gridAlpha: METRIC_STRIP_TIME_GRID_OPACITY,
+    });
+
+    // Initialize renderer (starts collapsed)
     this.renderer = new MetricStripRenderer();
     this.renderer.setTheme(this.isDarkTheme);
-    this.renderer.setHeight(METRIC_STRIP_HEIGHT);
+    this.renderer.setHeight(METRIC_STRIP_COLLAPSED_HEIGHT);
+    this.renderer.setCollapsed(true);
 
     // Add renderer graphics to container
     for (const graphics of this.renderer.getGraphics()) {
@@ -234,6 +261,11 @@ export class MetricStripOrchestrator {
       this.renderer = null;
     }
 
+    if (this.axisRenderer) {
+      this.axisRenderer.destroy();
+      this.axisRenderer = null;
+    }
+
     if (this.cursorLineGraphics) {
       this.cursorLineGraphics.destroy();
       this.cursorLineGraphics = null;
@@ -257,7 +289,7 @@ export class MetricStripOrchestrator {
    */
   public resize(newWidth: number): void {
     if (this.app) {
-      this.app.renderer.resize(newWidth, METRIC_STRIP_HEIGHT);
+      this.app.renderer.resize(newWidth, this.getHeight());
     }
   }
 
@@ -287,6 +319,14 @@ export class MetricStripOrchestrator {
    */
   public hasData(): boolean {
     return this.manager?.hasData() ?? false;
+  }
+
+  /**
+   * Check if the metric strip should be visible.
+   * Returns true if there's data to display.
+   */
+  public getIsVisible(): boolean {
+    return this.hasData();
   }
 
   /**
@@ -334,10 +374,49 @@ export class MetricStripOrchestrator {
   }
 
   /**
-   * Get the metric strip height.
+   * Get the metric strip height based on collapse state.
    */
   public getHeight(): number {
-    return METRIC_STRIP_HEIGHT;
+    return this.isCollapsed ? METRIC_STRIP_COLLAPSED_HEIGHT : METRIC_STRIP_HEIGHT;
+  }
+
+  /**
+   * Check if the metric strip is collapsed.
+   */
+  public getIsCollapsed(): boolean {
+    return this.isCollapsed;
+  }
+
+  /**
+   * Toggle the collapsed state of the metric strip.
+   */
+  public toggleCollapsed(): void {
+    this.isCollapsed = !this.isCollapsed;
+
+    // Resize the PIXI application to match new height
+    const newHeight = this.getHeight();
+    if (this.app) {
+      this.app.renderer.resize(this.app.renderer.width, newHeight);
+    }
+
+    // Update renderer height and collapsed state
+    this.renderer?.setHeight(newHeight);
+    this.renderer?.setCollapsed(this.isCollapsed);
+
+    // Notify FlameChart to recalculate layout
+    this.callbacks.onHeightChange?.(newHeight);
+    this.callbacks.requestRender();
+  }
+
+  /**
+   * Set the collapsed state of the metric strip.
+   *
+   * @param collapsed - Whether the metric strip should be collapsed
+   */
+  public setCollapsed(collapsed: boolean): void {
+    if (this.isCollapsed !== collapsed) {
+      this.toggleCollapsed();
+    }
   }
 
   // ============================================================================
@@ -357,6 +436,11 @@ export class MetricStripOrchestrator {
     // Cache viewport state for wheel handler
     this.lastViewportState = context.viewportState;
 
+    // Render time grid lines using shared axis renderer
+    if (this.axisRenderer) {
+      this.axisRenderer.render(context.viewportState, this.getHeight());
+    }
+
     const data = this.manager.getData();
 
     // Set dynamic Y-max based on data
@@ -370,6 +454,16 @@ export class MetricStripOrchestrator {
       context.totalDuration,
       context.markers,
     );
+
+    // In collapsed mode, render heat-style visualization with actual data
+    if (this.isCollapsed && data?.hasData) {
+      this.renderer.renderCollapsedWithData(
+        data.classifiedMetrics,
+        context.viewportState,
+        (timeNs) => this.manager?.getDataPointAtTime(timeNs)?.point ?? null,
+        context.totalDuration,
+      );
+    }
 
     // Render cursor line
     this.renderCursorLine(context.viewportState, context.cursorTimeNs);
@@ -395,9 +489,9 @@ export class MetricStripOrchestrator {
     const colors = getMetricStripColors(this.isDarkTheme);
     const x = cursorTimeNs * viewportState.zoom - viewportState.offsetX;
 
-    // Only draw if within visible area
+    // Only draw if within visible area (use dynamic height for collapsed/expanded state)
     if (x >= 0 && x <= viewportState.displayWidth) {
-      this.cursorLineGraphics.rect(x - 0.5, 0, 1, METRIC_STRIP_HEIGHT);
+      this.cursorLineGraphics.rect(x - 0.5, 0, 1, this.getHeight());
       this.cursorLineGraphics.fill({ color: colors.labelText, alpha: 0.6 });
     }
   }
@@ -454,6 +548,14 @@ export class MetricStripOrchestrator {
     this.mouseX = event.clientX - rect.left;
     this.mouseY = event.clientY - rect.top;
 
+    // Check if hovering over toggle area
+    const TOGGLE_WIDTH = 20; // Same as METRIC_STRIP_TOGGLE_WIDTH
+    const isOverToggle = this.mouseX < TOGGLE_WIDTH;
+    this.renderer?.setToggleHovered(isOverToggle);
+
+    // Update cursor style
+    canvas.style.cursor = isOverToggle ? 'pointer' : 'default';
+
     // Update cursor position using stored viewport state
     const timeNs = (this.mouseX + this.lastViewportState.offsetX) / this.lastViewportState.zoom;
     const clampedTimeNs = Math.max(0, Math.min(this.totalDuration, timeNs));
@@ -461,17 +563,23 @@ export class MetricStripOrchestrator {
     this.cursorTimeNs = clampedTimeNs;
     this.callbacks.onCursorMove(clampedTimeNs);
 
-    // Update tooltip
-    const dataPoint = this.manager.getDataPointAtTime(clampedTimeNs);
-    if (dataPoint) {
-      this.tooltipRenderer?.show(
-        this.mouseX,
-        this.mouseY,
-        dataPoint.point,
-        this.manager.getClassifiedMetrics(),
-      );
-    } else {
+    // Don't show tooltip when hovering toggle
+    if (isOverToggle) {
       this.tooltipRenderer?.hide();
+    } else {
+      // Update tooltip - position below the metric strip
+      const dataPoint = this.manager.getDataPointAtTime(clampedTimeNs);
+      if (dataPoint) {
+        this.tooltipRenderer?.show(
+          this.mouseX,
+          this.mouseY,
+          dataPoint.point,
+          this.manager.getClassifiedMetrics(),
+          this.getHeight(),
+        );
+      } else {
+        this.tooltipRenderer?.hide();
+      }
     }
 
     this.callbacks.requestRender();
@@ -485,6 +593,14 @@ export class MetricStripOrchestrator {
     const canvas = this.app.canvas as HTMLCanvasElement;
     const rect = canvas.getBoundingClientRect();
     const clickX = event.clientX - rect.left;
+
+    // Click on toggle area (left edge) or Shift+click anywhere toggles collapsed state
+    // Import METRIC_STRIP_TOGGLE_WIDTH directly to avoid circular import issues
+    const TOGGLE_WIDTH = 20; // Same as METRIC_STRIP_TOGGLE_WIDTH
+    if (clickX < TOGGLE_WIDTH || event.shiftKey) {
+      this.toggleCollapsed();
+      return;
+    }
 
     // Process pan immediately using stored viewport state
     const clickTimeNs = (clickX + this.lastViewportState.offsetX) / this.lastViewportState.zoom;
@@ -519,7 +635,21 @@ export class MetricStripOrchestrator {
     }
   };
 
-  private handleDoubleClick = (): void => {
+  private handleDoubleClick = (event: MouseEvent): void => {
+    if (!this.app?.canvas) {
+      return;
+    }
+
+    const canvas = this.app.canvas as HTMLCanvasElement;
+    const rect = canvas.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+
+    // Ignore double-clicks on toggle area (left edge)
+    const TOGGLE_WIDTH = 20;
+    if (clickX < TOGGLE_WIDTH) {
+      return;
+    }
+
     this.callbacks.onResetView?.();
   };
 

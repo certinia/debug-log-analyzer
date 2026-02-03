@@ -203,12 +203,13 @@ export class MinimapManager {
 
   /**
    * Set the heat strip height reservation.
-   * Called when heat strip data is set/cleared to notify the manager of the reserved space.
+   * @deprecated Heat strip moved to MetricStripOrchestrator. Always returns 0.
    *
-   * @param height - Height in pixels reserved for heat strip (0 if no data)
+   * @param _height - Height in pixels (ignored, always 0)
    */
-  public setHeatStripReservation(height: number): void {
-    this.heatStripReservation = height;
+  public setHeatStripReservation(_height: number): void {
+    // Heat strip moved to MetricStripOrchestrator - reservation always 0
+    this.heatStripReservation = 0;
   }
 
   /**

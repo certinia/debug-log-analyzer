@@ -198,6 +198,8 @@ export class ApexLogTimeline {
     if (apexLog.governorLimits.snapshots.length > 0) {
       const heatStripSeries = this.transformGovernorToHeatStrip(apexLog.governorLimits.snapshots);
       this.flamechart.setHeatStripTimeSeries(heatStripSeries);
+    } else {
+      this.flamechart.setHeatStripTimeSeries(null);
     }
   }
 

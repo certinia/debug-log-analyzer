@@ -28,7 +28,7 @@ import type {
   MetricStripProcessedData,
 } from '../../types/flamechart.types.js';
 import {
-  getMetricColor,
+  getRankBasedColor,
   METRIC_STRIP_THRESHOLDS,
   METRIC_STRIP_Y_MAX_PERCENT,
 } from './metric-strip-colors.js';
@@ -63,9 +63,11 @@ export class MetricStripManager {
     this.isDarkTheme = isDark;
     // Re-process if we have data
     if (this.processedData) {
-      // Update colors on classified metrics
+      // Update colors on classified metrics using rank-based coloring
+      const tierRanks = { 1: 0, 2: 0, 3: 0 };
       for (const metric of this.processedData.classifiedMetrics) {
-        metric.color = getMetricColor(metric.metricId, isDark);
+        const rankInTier = tierRanks[metric.tier]++;
+        metric.color = getRankBasedColor(metric.tier, rankInTier, isDark);
       }
     }
   }
@@ -269,6 +271,7 @@ export class MetricStripManager {
 
   /**
    * Classify metrics into tiers based on their global max percentages.
+   * Colors are assigned by rank within each tier, not by metric type.
    */
   private classifyMetrics(
     metricMaxPercents: Map<string, number>,
@@ -297,23 +300,30 @@ export class MetricStripManager {
     // Sort by max percent descending
     metricsWithMax.sort((a, b) => b.maxPercent - a.maxPercent);
 
-    // Classify into tiers
+    // Classify into tiers and track rank within each tier
     const classified: MetricStripClassifiedMetric[] = [];
+    let tier1Rank = 0;
+    let tier2Rank = 0;
+    let tier3Rank = 0;
 
     for (let i = 0; i < metricsWithMax.length; i++) {
       const metric = metricsWithMax[i]!;
 
       let tier: 1 | 2 | 3;
+      let rankInTier: number;
 
       if (i < TIER_1_COUNT) {
         // Top 3 metrics are always Tier 1
         tier = 1;
+        rankInTier = tier1Rank++;
       } else if (metric.maxPercent >= TIER_2_THRESHOLD) {
         // Metrics that exceed 80% are Tier 2
         tier = 2;
+        rankInTier = tier2Rank++;
       } else {
         // Everything else is Tier 3
         tier = 3;
+        rankInTier = tier3Rank++;
       }
 
       classified.push({
@@ -321,7 +331,7 @@ export class MetricStripManager {
         displayName: metric.displayName,
         tier,
         globalMaxPercent: metric.maxPercent,
-        color: getMetricColor(metric.metricId, this.isDarkTheme),
+        color: getRankBasedColor(tier, rankInTier, this.isDarkTheme),
         priority: metric.priority,
         unit: metric.unit,
       });

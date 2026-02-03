@@ -24,7 +24,9 @@ export type TooltipPositionMode =
   /** Center on X, position above Y */
   | 'centered-above'
   /** Position at cursor with offset, flip if needed */
-  | 'cursor-offset';
+  | 'cursor-offset'
+  /** Center on X, position above Y but flip below if not enough room above */
+  | 'adaptive';
 
 /**
  * Options for tooltip positioning.
@@ -153,6 +155,22 @@ export abstract class BaseTooltipRenderer {
         left = Math.max(padding, Math.min(containerWidth - tooltipWidth - padding, left));
         top = screenY - tooltipHeight - offset;
         top = Math.max(0, top);
+      } else if (mode === 'adaptive') {
+        // Center on X, position above Y but flip below if not enough room above
+        left = screenX - tooltipWidth / 2;
+        left = Math.max(padding, Math.min(containerWidth - tooltipWidth - padding, left));
+
+        // Try above first
+        const aboveTop = screenY - tooltipHeight - offset;
+        // If there's room above, position above; otherwise position below
+        if (aboveTop >= 0) {
+          top = aboveTop;
+        } else {
+          // Position below the reference point (below the metric strip)
+          top = screenY + offset;
+          // Clamp to container bounds
+          top = Math.min(containerHeight - tooltipHeight - padding, top);
+        }
       } else {
         // Cursor offset mode: position to the right and below, flip if needed
         left = screenX + offset;

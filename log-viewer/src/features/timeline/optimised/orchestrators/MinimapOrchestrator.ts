@@ -21,18 +21,13 @@
  */
 
 import * as PIXI from 'pixi.js';
-import type {
-  HeatStripTimeSeries,
-  TimelineMarker,
-  ViewportState,
-} from '../../types/flamechart.types.js';
+import type { TimelineMarker, ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { RectangleManager } from '../RectangleManager.js';
 import type { CursorLineRenderer } from '../rendering/CursorLineRenderer.js';
 import type { TimelineEventIndex } from '../TimelineEventIndex.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 
-import { HEAT_STRIP_HEIGHT, type HeatStripRenderer } from '../minimap/HeatStripRenderer.js';
 import { MinimapDensityQuery } from '../minimap/MinimapDensityQuery.js';
 import { MinimapInteractionHandler } from '../minimap/MinimapInteractionHandler.js';
 import { MINIMAP_GAP, MinimapManager, calculateMinimapHeight } from '../minimap/MinimapManager.js';
@@ -337,29 +332,6 @@ export class MinimapOrchestrator {
   }
 
   /**
-   * Set heat strip time series data for visualization.
-   * Call this when log data is loaded.
-   *
-   * @param timeSeries - Heat strip time series data
-   */
-  public setHeatStripTimeSeries(timeSeries: HeatStripTimeSeries | null): void {
-    this.renderer?.setHeatStripTimeSeries(timeSeries);
-
-    // Notify manager of heat strip reservation so depth calculations are accurate
-    if (this.manager) {
-      const hasData = this.renderer?.getHeatStripRenderer()?.hasData() ?? false;
-      this.manager.setHeatStripReservation(hasData ? HEAT_STRIP_HEIGHT : 0);
-    }
-  }
-
-  /**
-   * Get the heat strip renderer for tooltip/interaction access.
-   */
-  public getHeatStripRenderer(): HeatStripRenderer | null {
-    return this.renderer?.getHeatStripRenderer() ?? null;
-  }
-
-  /**
    * Refresh colors from CSS variables (e.g., after theme change).
    */
   public refreshColors(): void {
@@ -545,12 +517,6 @@ export class MinimapOrchestrator {
       onDepthPositionStart: (minimapY: number) => {
         this.handleMinimapDepthPositionStart(minimapY);
       },
-      onHeatStripHover: (timeNs: number | null, screenX: number, screenY: number) => {
-        this.handleHeatStripHover(timeNs, screenX, screenY);
-      },
-      onHeatStripClick: (timeNs: number) => {
-        this.handleHeatStripClick(timeNs);
-      },
     });
 
     // Track mouse enter/leave/move for keyboard support and lens tooltip
@@ -674,58 +640,5 @@ export class MinimapOrchestrator {
     const deltaY = newOffsetY - viewportState.offsetY;
 
     this.callbacks.onDepthPan(deltaY);
-  }
-
-  /**
-   * Handle heat strip hover - show/hide tooltip.
-   *
-   * @param timeNs - Time position being hovered, or null when leaving
-   * @param screenX - Screen X coordinate for tooltip positioning
-   * @param screenY - Screen Y coordinate for tooltip positioning
-   */
-  private handleHeatStripHover(timeNs: number | null, screenX: number, screenY: number): void {
-    if (timeNs === null) {
-      this.renderer?.hideHeatStripTooltip();
-    } else {
-      this.renderer?.showHeatStripTooltip(screenX, screenY, timeNs);
-    }
-  }
-
-  /**
-   * Handle heat strip click - pan viewport to clicked position.
-   * Keeps current zoom level, centers view on click point.
-   *
-   * @param timeNs - Time position clicked
-   */
-  private handleHeatStripClick(timeNs: number): void {
-    if (!this.manager || !this.viewport) {
-      return;
-    }
-
-    const state = this.manager.getState();
-    const totalDuration = state.totalDuration;
-    const viewportState = this.viewport.getState();
-
-    // Keep current zoom level, just center on clicked time
-    const visibleDuration = viewportState.displayWidth / viewportState.zoom;
-    const halfDuration = visibleDuration / 2;
-
-    let startTime = timeNs - halfDuration;
-    let endTime = timeNs + halfDuration;
-
-    // Clamp to valid bounds
-    if (startTime < 0) {
-      startTime = 0;
-      endTime = Math.min(visibleDuration, totalDuration);
-    }
-    if (endTime > totalDuration) {
-      endTime = totalDuration;
-      startTime = Math.max(0, totalDuration - visibleDuration);
-    }
-
-    // Update selection and notify viewport change
-    this.manager.setSelection(startTime, endTime);
-    this.notifyViewportChange(startTime, endTime);
-    this.callbacks.requestRender();
   }
 }

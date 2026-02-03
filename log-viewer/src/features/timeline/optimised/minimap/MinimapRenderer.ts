@@ -27,23 +27,14 @@
 
 import * as PIXI from 'pixi.js';
 import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.js';
-import type {
-  HeatStripTimeSeries,
-  MarkerType,
-  TimelineMarker,
-} from '../../types/flamechart.types.js';
+import type { MarkerType, TimelineMarker } from '../../types/flamechart.types.js';
 import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
 import { blendWithBackground } from '../BucketColorResolver.js';
 import { createRectangleShader } from '../RectangleShader.js';
-import { HEAT_STRIP_HEIGHT, HeatStripRenderer } from './HeatStripRenderer.js';
-import { HeatStripTooltipRenderer } from './HeatStripTooltipRenderer.js';
 import { MinimapAxisRenderer } from './MinimapAxisRenderer.js';
 import { MinimapBarGeometry } from './MinimapBarGeometry.js';
 import type { MinimapDensityData } from './MinimapDensityQuery.js';
 import type { MinimapManager, MinimapSelection } from './MinimapManager.js';
-
-// Re-export heat strip height for use by other components
-export { HEAT_STRIP_HEIGHT };
 
 /**
  * Opacity constants for density visualization (logarithmic scale).
@@ -117,9 +108,6 @@ export class MinimapRenderer {
   /** Time axis renderer (static). */
   private axisRenderer: MinimapAxisRenderer;
 
-  /** Heat strip renderer (static). */
-  private heatStripRenderer: HeatStripRenderer;
-
   /** Cached render texture for static content. */
   private staticTexture: PIXI.RenderTexture | null = null;
 
@@ -160,9 +148,6 @@ export class MinimapRenderer {
 
   /** HTML label element for lens time info. */
   private labelElement: HTMLDivElement;
-
-  /** Heat strip tooltip renderer. */
-  private heatStripTooltip: HeatStripTooltipRenderer;
 
   // ============================================================================
   // OTHER STATE
@@ -209,21 +194,17 @@ export class MinimapRenderer {
     // Create axis renderer (doesn't add to parent - we control layer order)
     this.axisRenderer = new MinimapAxisRenderer();
 
-    // Create heat strip renderer for metric visualization
-    this.heatStripRenderer = new HeatStripRenderer();
-
     // Add static layers in correct order (back to front):
     // 1. Background
     // 2. Markers
     // 3. Axis (tick lines and labels - labels are in strip above chart area)
     // 4. Skyline (mesh-based for performance)
-    // 5. Heat strip (at bottom of minimap)
+    // NOTE: Heat strip removed - now rendered in MetricStripOrchestrator
     this.staticContainer.addChild(this.backgroundGraphics);
     this.staticContainer.addChild(this.markerGraphics);
     this.staticContainer.addChild(this.axisRenderer.getTickGraphics());
     this.staticContainer.addChild(this.axisRenderer.getLabelsContainer());
     this.staticContainer.addChild(this.skylineMesh);
-    this.staticContainer.addChild(this.heatStripRenderer.getGraphics());
 
     // ============================================================================
     // DYNAMIC CONTENT SETUP
@@ -251,9 +232,6 @@ export class MinimapRenderer {
     // Create HTML label for lens time info
     this.labelElement = this.createLabelElement();
     htmlContainer.appendChild(this.labelElement);
-
-    // Create heat strip tooltip renderer
-    this.heatStripTooltip = new HeatStripTooltipRenderer(htmlContainer);
   }
 
   /**
@@ -283,31 +261,6 @@ export class MinimapRenderer {
   }
 
   /**
-   * Show the heat strip tooltip with metric data.
-   *
-   * @param screenX - X position for tooltip placement
-   * @param screenY - Y position (tooltip appears above this)
-   * @param timeNs - Time in nanoseconds to show data for
-   */
-  public showHeatStripTooltip(screenX: number, screenY: number, timeNs: number): void {
-    const dataPoint = this.heatStripRenderer.getDataPointAtTime(timeNs);
-    const metrics = this.heatStripRenderer.getMetrics();
-    if (!dataPoint || !metrics) {
-      this.hideHeatStripTooltip();
-      return;
-    }
-
-    this.heatStripTooltip.show(screenX, screenY, dataPoint.point.metricSnapshots, metrics);
-  }
-
-  /**
-   * Hide the heat strip tooltip.
-   */
-  public hideHeatStripTooltip(): void {
-    this.heatStripTooltip.hide();
-  }
-
-  /**
    * Set the PIXI renderer for texture caching.
    * Must be called before render() to enable static content caching.
    */
@@ -328,26 +281,6 @@ export class MinimapRenderer {
    */
   public invalidateStatic(): void {
     this.staticDirty = true;
-  }
-
-  /**
-   * Set heat strip time series data for visualization.
-   * Call this when log data is loaded or changes.
-   *
-   * @param timeSeries - Generic heat strip time series data, or null to clear
-   */
-  public setHeatStripTimeSeries(timeSeries: HeatStripTimeSeries | null): void {
-    if (timeSeries) {
-      this.heatStripRenderer.processData(timeSeries);
-    }
-    this.invalidateStatic();
-  }
-
-  /**
-   * Get the heat strip renderer for tooltip access.
-   */
-  public getHeatStripRenderer(): HeatStripRenderer {
-    return this.heatStripRenderer;
   }
 
   /**
@@ -475,8 +408,7 @@ export class MinimapRenderer {
     // Render time axis
     this.axisRenderer.render(manager);
 
-    // Render governor limit heat strip
-    this.heatStripRenderer.render(manager, minimapHeight, state.totalDuration);
+    // NOTE: Heat strip removed - now rendered in MetricStripOrchestrator
 
     // If we have a renderer, cache to texture
     if (this.renderer && displayWidth > 0 && minimapHeight > 0) {
@@ -931,7 +863,6 @@ export class MinimapRenderer {
     this.skylineBarGeometry.destroy();
     this.markerGraphics.destroy();
     this.axisRenderer.destroy();
-    this.heatStripRenderer.destroy();
     this.staticContainer.destroy();
 
     if (this.staticTexture) {
@@ -950,9 +881,8 @@ export class MinimapRenderer {
     this.cursorLineGraphics.destroy();
     this.dynamicContainer.destroy();
 
-    // Remove HTML labels and tooltips
+    // Remove HTML label
     this.labelElement.remove();
-    this.heatStripTooltip.destroy();
 
     // Destroy main container
     this.container.destroy();

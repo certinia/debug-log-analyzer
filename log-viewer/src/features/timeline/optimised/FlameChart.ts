@@ -65,8 +65,8 @@ import { SearchOrchestrator } from './orchestrators/SearchOrchestrator.js';
 import { SelectionOrchestrator } from './orchestrators/SelectionOrchestrator.js';
 
 import {
+  METRIC_STRIP_COLLAPSED_HEIGHT,
   METRIC_STRIP_GAP,
-  METRIC_STRIP_HEIGHT,
   MetricStripOrchestrator,
 } from './metric-strip/MetricStripOrchestrator.js';
 
@@ -167,6 +167,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   // Metric strip orchestrator (owns governor limit visualization between minimap and main timeline)
   private metricStripOrchestrator: MetricStripOrchestrator | null = null;
   private metricStripDiv: HTMLElement | null = null; // HTML container for metric strip canvas
+  private metricStripGapDiv: HTMLElement | null = null; // Gap element below metric strip
 
   // Cursor line renderer for main timeline (bidirectional cursor mirroring)
   private cursorLineRenderer: CursorLineRenderer | null = null;
@@ -236,8 +237,9 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Calculate minimap and metric strip heights BEFORE creating viewport
     // Viewport needs the available height for main timeline (excluding minimap + metric strip + gaps)
+    // Metric strip starts collapsed, so use collapsed height for initial layout
     const minimapHeight = calculateMinimapHeight(height);
-    const metricStripHeight = METRIC_STRIP_HEIGHT;
+    const metricStripHeight = METRIC_STRIP_COLLAPSED_HEIGHT;
     const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
     const mainTimelineHeight = height - totalOverheadHeight;
 
@@ -645,8 +647,10 @@ export class FlameChart<E extends EventNode = EventNode> {
     const visibleWorldYBottom = -oldState.offsetY;
 
     // Calculate new minimap, metric strip, and main timeline heights
+    // Query actual metric strip height (respects collapsed/expanded state)
     const minimapHeight = calculateMinimapHeight(newHeight);
-    const metricStripHeight = METRIC_STRIP_HEIGHT;
+    const metricStripHeight =
+      this.metricStripOrchestrator?.getHeight() ?? METRIC_STRIP_COLLAPSED_HEIGHT;
     const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
     const mainTimelineHeight = newHeight - totalOverheadHeight;
 
@@ -723,8 +727,24 @@ export class FlameChart<E extends EventNode = EventNode> {
    * @param timeSeries - Heat strip time series data (generic format)
    */
   public setHeatStripTimeSeries(timeSeries: HeatStripTimeSeries | null): void {
-    this.minimapOrchestrator?.setHeatStripTimeSeries(timeSeries);
     this.metricStripOrchestrator?.setTimeSeries(timeSeries);
+    this.updateMetricStripVisibility();
+  }
+
+  /**
+   * Update metric strip visibility based on whether there's data to display.
+   * Hides the metric strip container and gap if no governor limit data exists.
+   */
+  private updateMetricStripVisibility(): void {
+    const isVisible = this.metricStripOrchestrator?.getIsVisible() ?? false;
+    const display = isVisible ? 'block' : 'none';
+
+    if (this.metricStripDiv) {
+      this.metricStripDiv.style.display = display;
+    }
+    if (this.metricStripGapDiv) {
+      this.metricStripGapDiv.style.display = display;
+    }
   }
 
   // ============================================================================
@@ -741,8 +761,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     sysTicker.stop();
 
     // Calculate minimap, metric strip, and main timeline heights
+    // Metric strip starts collapsed, so use collapsed height for initial layout
     const minimapHeight = calculateMinimapHeight(height);
-    const metricStripHeight = METRIC_STRIP_HEIGHT;
+    const metricStripHeight = METRIC_STRIP_COLLAPSED_HEIGHT;
     const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
     const mainTimelineHeight = height - totalOverheadHeight;
 
@@ -764,8 +785,8 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.metricStripDiv.style.cssText = `height:${metricStripHeight}px;width:100%;flex-shrink:0;position:relative`;
 
     // Gap element between metric strip and main timeline
-    const metricStripGapDiv = document.createElement('div');
-    metricStripGapDiv.style.cssText = `height:${METRIC_STRIP_GAP}px;width:100%;flex-shrink:0;background:transparent`;
+    this.metricStripGapDiv = document.createElement('div');
+    this.metricStripGapDiv.style.cssText = `height:${METRIC_STRIP_GAP}px;width:100%;flex-shrink:0;background:transparent`;
 
     // Main timeline container (fills remaining space)
     const mainDiv = document.createElement('div');
@@ -775,7 +796,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.minimapDiv,
       minimapGapDiv,
       this.metricStripDiv,
-      metricStripGapDiv,
+      this.metricStripGapDiv,
       mainDiv,
     );
 
@@ -1203,6 +1224,18 @@ export class FlameChart<E extends EventNode = EventNode> {
         const viewportState = this.viewport.getState();
         this.viewport.setOffset(viewportState.offsetX, viewportState.offsetY + deltaY);
         this.notifyViewportChange();
+      },
+      onHeightChange: (newHeight: number) => {
+        // Update metric strip div height
+        if (this.metricStripDiv) {
+          this.metricStripDiv.style.height = `${newHeight}px`;
+        }
+        // Trigger full layout recalculation to resize main timeline
+        // The container size doesn't change, but internal flexbox layout does
+        if (this.container) {
+          const { width, height } = this.container.getBoundingClientRect();
+          this.resize(width, height);
+        }
       },
     });
 
