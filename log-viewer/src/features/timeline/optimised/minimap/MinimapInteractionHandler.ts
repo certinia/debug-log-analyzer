@@ -325,6 +325,14 @@ export class MinimapInteractionHandler {
     event.preventDefault();
     event.stopPropagation();
 
+    // Heat strip click: set isDragging but skip drag mode setup
+    // This allows mouseUp to handle the heat strip click via existing code
+    if (this.isInHeatStripArea(screenY)) {
+      this.isDragging = true;
+      this.didDrag = false;
+      return;
+    }
+
     this.mouseDownX = event.clientX;
     this.mouseDownY = event.clientY;
     this.didDrag = false;
@@ -617,7 +625,10 @@ export class MinimapInteractionHandler {
         this.callbacks.onResetView();
         this.lastClickTime = 0;
       } else {
-        // Single click - record for potential double-click
+        // Single click - teleport lens to clicked position
+        this.teleportLensToPosition(screenX);
+
+        // Record for potential double-click
         this.lastClickTime = currentTime;
         this.lastClickX = screenX;
         this.lastClickY = screenY;

@@ -130,6 +130,49 @@ export interface KeyboardCallbacks {
    * Called when 0/Escape is pressed in minimap to reset zoom.
    */
   onMinimapResetZoom?: () => void;
+
+  // ============================================================================
+  // SWIMLANE KEYBOARD CALLBACKS
+  // ============================================================================
+
+  /**
+   * Called to check if the mouse is currently in the swimlane area.
+   * Used to determine whether to use swimlane-specific key bindings.
+   */
+  isInSwimlaneArea?: () => boolean;
+
+  /**
+   * Called when arrow keys are pressed to pan the swimlane viewport.
+   * @param deltaTimeNs - Time delta in nanoseconds (positive = right)
+   */
+  onSwimlanePanViewport?: (deltaTimeNs: number) => void;
+
+  /**
+   * Called when arrow up/down are pressed to pan depth in swimlane.
+   * @param deltaY - Pixel delta (positive = down, showing shallower frames)
+   */
+  onSwimlanePanDepth?: (deltaY: number) => void;
+
+  /**
+   * Called when +/-/W/S is pressed in swimlane to zoom.
+   * @param direction - 'in' to zoom in, 'out' to zoom out
+   */
+  onSwimlaneZoom?: (direction: 'in' | 'out') => void;
+
+  /**
+   * Called when Home key is pressed in swimlane to jump to start.
+   */
+  onSwimlaneJumpStart?: () => void;
+
+  /**
+   * Called when End key is pressed in swimlane to jump to end.
+   */
+  onSwimlaneJumpEnd?: () => void;
+
+  /**
+   * Called when 0/Escape is pressed in swimlane to reset zoom.
+   */
+  onSwimlaneResetZoom?: () => void;
 }
 
 /**
@@ -212,6 +255,14 @@ export class KeyboardHandler {
     // Check if mouse is in minimap area - use minimap-specific handling
     if (this.callbacks.isInMinimapArea?.()) {
       if (this.handleMinimapKeyDown(event)) {
+        event.preventDefault();
+        return;
+      }
+    }
+
+    // Check if mouse is in swimlane area - use swimlane-specific handling
+    if (this.callbacks.isInSwimlaneArea?.()) {
+      if (this.handleSwimlaneKeyDown(event)) {
         event.preventDefault();
         return;
       }
@@ -340,6 +391,98 @@ export class KeyboardHandler {
       case 'ArrowDown':
         // Pan depth down - lens moves down visually (offsetY less negative)
         this.callbacks.onMinimapPanDepth?.(verticalStep);
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Handle keydown events when mouse is in swimlane area.
+   * Returns true if event was handled.
+   *
+   * Key Mappings (mirrors minimap):
+   * - Arrow Left/Right: Pan viewport horizontally
+   * - Arrow Up/Down: Pan depth vertically
+   * - W/+/=: Zoom in
+   * - S/-: Zoom out
+   * - Home: Jump to timeline start
+   * - End: Jump to timeline end
+   * - 0/Escape: Reset zoom
+   */
+  private handleSwimlaneKeyDown(event: KeyboardEvent): boolean {
+    // Don't handle if Ctrl/Alt/Meta is pressed (allow browser shortcuts)
+    if (event.ctrlKey || event.altKey || event.metaKey) {
+      return false;
+    }
+
+    const key = event.key.toLowerCase();
+
+    // Pan viewport (Arrow keys)
+    if (this.handleSwimlanePanKeys(event)) {
+      return true;
+    }
+
+    // Zoom (W/S/+/-/=)
+    switch (key) {
+      case 'w':
+      case '+':
+      case '=':
+        this.callbacks.onSwimlaneZoom?.('in');
+        return true;
+      case 's':
+      case '-':
+        this.callbacks.onSwimlaneZoom?.('out');
+        return true;
+    }
+
+    // Jump to start/end (Home/End)
+    switch (event.key) {
+      case 'Home':
+        this.callbacks.onSwimlaneJumpStart?.();
+        return true;
+      case 'End':
+        this.callbacks.onSwimlaneJumpEnd?.();
+        return true;
+    }
+
+    // Reset zoom (0/Escape)
+    if (key === '0' || event.key === 'Escape') {
+      this.callbacks.onSwimlaneResetZoom?.();
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handle arrow keys for swimlane pan.
+   * - Left/Right: Pan viewport horizontally
+   * - Up/Down: Pan depth vertically
+   */
+  private handleSwimlanePanKeys(event: KeyboardEvent): boolean {
+    const viewportState = this.viewport.getState();
+
+    // Calculate pan step (5% of visible range, matching main timeline and minimap)
+    const horizontalStep = viewportState.displayWidth * KEYBOARD_CONSTANTS.panStepPercent;
+    const verticalStep = viewportState.displayHeight * KEYBOARD_CONSTANTS.panStepPercent;
+
+    switch (event.key) {
+      case 'ArrowLeft':
+        // Pan viewport left - convert pixels to time
+        this.callbacks.onSwimlanePanViewport?.(-horizontalStep / viewportState.zoom);
+        return true;
+      case 'ArrowRight':
+        // Pan viewport right - convert pixels to time
+        this.callbacks.onSwimlanePanViewport?.(horizontalStep / viewportState.zoom);
+        return true;
+      case 'ArrowUp':
+        // Pan depth up (show deeper frames)
+        this.callbacks.onSwimlanePanDepth?.(-verticalStep);
+        return true;
+      case 'ArrowDown':
+        // Pan depth down (show shallower frames)
+        this.callbacks.onSwimlanePanDepth?.(verticalStep);
         return true;
       default:
         return false;

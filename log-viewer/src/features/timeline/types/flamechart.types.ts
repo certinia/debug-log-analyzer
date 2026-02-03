@@ -700,6 +700,75 @@ export interface HeatStripTimeSeries {
 }
 
 // ============================================================================
+// SWIMLANE VISUALIZATION TYPES
+// ============================================================================
+
+/**
+ * Classified metric for swimlane tier system.
+ * Metrics are classified into tiers based on their global max percentage.
+ */
+export interface SwimlaneClassifiedMetric {
+  /** Unique metric identifier (e.g., 'cpuTime', 'soqlQueries') */
+  metricId: string;
+  /** Display name for the metric (e.g., 'CPU Time', 'SOQL Queries') */
+  displayName: string;
+  /** Tier classification: 1 = top 3, 2 = >80% at any point, 3 = remaining */
+  tier: 1 | 2 | 3;
+  /** Maximum percentage reached across all timestamps (0-1+) */
+  globalMaxPercent: number;
+  /** Line color for this metric (hex number 0xRRGGBB) */
+  color: number;
+  /** Priority for ordering (lower = higher priority, shown first) */
+  priority: number;
+  /** Unit string for formatting (e.g., 'ms', 'bytes', '') */
+  unit: string;
+}
+
+/**
+ * Raw metric value with used and limit.
+ */
+export interface SwimlaneRawValue {
+  /** Current usage value */
+  used: number;
+  /** Maximum allowed value (limit) */
+  limit: number;
+}
+
+/**
+ * Data point at a specific timestamp in the swimlane.
+ */
+export interface SwimlaneDataPoint {
+  /** Timestamp in nanoseconds */
+  timestamp: number;
+  /** Map of metricId → percentage (0-1+) */
+  values: Map<string, number>;
+  /** Map of metricId → raw used/limit values */
+  rawValues: Map<string, SwimlaneRawValue>;
+  /** Maximum value of all Tier 3 metrics at this timestamp */
+  tier3Max: number;
+}
+
+/**
+ * Processed swimlane data ready for rendering.
+ */
+export interface SwimlaneProcessedData {
+  /** Data points ordered by timestamp */
+  points: SwimlaneDataPoint[];
+  /** Classified metrics with tier assignments */
+  classifiedMetrics: SwimlaneClassifiedMetric[];
+  /** Global maximum percentage across all metrics and timestamps */
+  globalMaxPercent: number;
+  /** Whether there's any data to render */
+  hasData: boolean;
+}
+
+/**
+ * Swimlane time series input data (generic format).
+ * This is the same structure as HeatStripTimeSeries - reused for swimlane.
+ */
+export type SwimlaneTimeSeries = HeatStripTimeSeries;
+
+// ============================================================================
 // TEMPORAL SEGMENT TREE TYPES
 // ============================================================================
 

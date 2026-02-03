@@ -63,6 +63,11 @@ import {
 
 import { SearchOrchestrator } from './orchestrators/SearchOrchestrator.js';
 import { SelectionOrchestrator } from './orchestrators/SelectionOrchestrator.js';
+import {
+  SWIMLANE_GAP,
+  SWIMLANE_HEIGHT,
+  SwimlaneOrchestrator,
+} from './swimlane/SwimlaneOrchestrator.js';
 
 export interface FlameChartCallbacks {
   onMouseMove?: (
@@ -158,10 +163,14 @@ export class FlameChart<E extends EventNode = EventNode> {
   private minimapOrchestrator: MinimapOrchestrator | null = null;
   private minimapDiv: HTMLElement | null = null; // HTML container for minimap canvas
 
+  // Swimlane orchestrator (owns governor limit visualization between minimap and main timeline)
+  private swimlaneOrchestrator: SwimlaneOrchestrator | null = null;
+  private swimlaneDiv: HTMLElement | null = null; // HTML container for swimlane canvas
+
   // Cursor line renderer for main timeline (bidirectional cursor mirroring)
   private cursorLineRenderer: CursorLineRenderer | null = null;
 
-  // Vertical offset from container top to main timeline canvas (minimap height + gap)
+  // Vertical offset from container top to main timeline canvas (minimap + swimlane + gaps)
   // Used to convert canvas-relative coordinates to container-relative for tooltip positioning
   private mainTimelineYOffset = 0;
 
@@ -224,13 +233,15 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Create event index
     this.index = new TimelineEventIndex(events);
 
-    // Calculate minimap height BEFORE creating viewport
-    // Viewport needs the available height for main timeline (excluding minimap + gap)
+    // Calculate minimap and swimlane heights BEFORE creating viewport
+    // Viewport needs the available height for main timeline (excluding minimap + swimlane + gaps)
     const minimapHeight = calculateMinimapHeight(height);
-    const mainTimelineHeight = height - minimapHeight - MINIMAP_GAP;
+    const swimlaneHeight = SWIMLANE_HEIGHT;
+    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + swimlaneHeight + SWIMLANE_GAP;
+    const mainTimelineHeight = height - totalOverheadHeight;
 
     // Store offset for converting canvas-relative to container-relative coordinates
-    this.mainTimelineYOffset = minimapHeight + MINIMAP_GAP;
+    this.mainTimelineYOffset = totalOverheadHeight;
 
     // Create viewport manager with adjusted height for main timeline area
     this.viewport = new TimelineViewport(
@@ -357,6 +368,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Initialize minimap orchestrator
     await this.setupMinimap();
 
+    // Initialize swimlane orchestrator
+    await this.setupSwimlane();
+
     // Setup interaction handler
     this.setupInteractionHandler();
 
@@ -423,6 +437,12 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.minimapOrchestrator) {
       this.minimapOrchestrator.destroy();
       this.minimapOrchestrator = null;
+    }
+
+    // Clean up swimlane orchestrator
+    if (this.swimlaneOrchestrator) {
+      this.swimlaneOrchestrator.destroy();
+      this.swimlaneOrchestrator = null;
     }
 
     // Clean up viewport animator
@@ -623,12 +643,14 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     const visibleWorldYBottom = -oldState.offsetY;
 
-    // Calculate new minimap and main timeline heights
+    // Calculate new minimap, swimlane, and main timeline heights
     const minimapHeight = calculateMinimapHeight(newHeight);
-    const mainTimelineHeight = newHeight - minimapHeight - MINIMAP_GAP;
+    const swimlaneHeight = SWIMLANE_HEIGHT;
+    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + swimlaneHeight + SWIMLANE_GAP;
+    const mainTimelineHeight = newHeight - totalOverheadHeight;
 
     // Update offset for converting canvas-relative to container-relative coordinates
-    this.mainTimelineYOffset = minimapHeight + MINIMAP_GAP;
+    this.mainTimelineYOffset = totalOverheadHeight;
 
     // Update orchestrators with new offset
     this.selectionOrchestrator?.setMainTimelineYOffset(this.mainTimelineYOffset);
@@ -637,6 +659,11 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Resize minimap orchestrator
     if (this.minimapOrchestrator) {
       this.minimapOrchestrator.resize(newWidth, newHeight);
+    }
+
+    // Resize swimlane orchestrator
+    if (this.swimlaneOrchestrator) {
+      this.swimlaneOrchestrator.resize(newWidth);
     }
 
     // Resize main timeline app
@@ -696,6 +723,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   public setHeatStripTimeSeries(timeSeries: HeatStripTimeSeries | null): void {
     this.minimapOrchestrator?.setHeatStripTimeSeries(timeSeries);
+    this.swimlaneOrchestrator?.setTimeSeries(timeSeries);
   }
 
   // ============================================================================
@@ -711,9 +739,11 @@ export class FlameChart<E extends EventNode = EventNode> {
     sysTicker.autoStart = false;
     sysTicker.stop();
 
-    // Calculate minimap and main timeline heights
+    // Calculate minimap, swimlane, and main timeline heights
     const minimapHeight = calculateMinimapHeight(height);
-    const mainTimelineHeight = height - minimapHeight - MINIMAP_GAP;
+    const swimlaneHeight = SWIMLANE_HEIGHT;
+    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + swimlaneHeight + SWIMLANE_GAP;
+    const mainTimelineHeight = height - totalOverheadHeight;
 
     // Create wrapper container with flexbox layout
     this.wrapper = document.createElement('div');
@@ -724,15 +754,23 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.minimapDiv = document.createElement('div');
     this.minimapDiv.style.cssText = `height:${minimapHeight}px;width:100%;flex-shrink:0;position:relative`;
 
-    // Gap element
-    const gapDiv = document.createElement('div');
-    gapDiv.style.cssText = `height:${MINIMAP_GAP}px;width:100%;flex-shrink:0;background:transparent`;
+    // Gap element between minimap and swimlane
+    const minimapGapDiv = document.createElement('div');
+    minimapGapDiv.style.cssText = `height:${MINIMAP_GAP}px;width:100%;flex-shrink:0;background:transparent`;
+
+    // Swimlane container (fixed height)
+    this.swimlaneDiv = document.createElement('div');
+    this.swimlaneDiv.style.cssText = `height:${swimlaneHeight}px;width:100%;flex-shrink:0;position:relative`;
+
+    // Gap element between swimlane and main timeline
+    const swimlaneGapDiv = document.createElement('div');
+    swimlaneGapDiv.style.cssText = `height:${SWIMLANE_GAP}px;width:100%;flex-shrink:0;background:transparent`;
 
     // Main timeline container (fills remaining space)
     const mainDiv = document.createElement('div');
     mainDiv.style.cssText = 'flex:1;width:100%;min-height:0';
 
-    this.wrapper.append(this.minimapDiv, gapDiv, mainDiv);
+    this.wrapper.append(this.minimapDiv, minimapGapDiv, this.swimlaneDiv, swimlaneGapDiv, mainDiv);
 
     if (this.container) {
       this.container.appendChild(this.wrapper);
@@ -821,8 +859,9 @@ export class FlameChart<E extends EventNode = EventNode> {
         },
         onMouseLeave: () => {
           // Clear cursor position when mouse leaves main timeline
-          // Cursor is now managed by the minimap orchestrator
+          // Cursor is managed by the minimap and swimlane orchestrators
           this.minimapOrchestrator?.setCursorFromMainTimeline(null);
+          this.swimlaneOrchestrator?.setCursorFromMainTimeline(null);
           this.requestRender();
 
           if (this.callbacks.onMouseMove) {
@@ -1033,6 +1072,75 @@ export class FlameChart<E extends EventNode = EventNode> {
       onMinimapResetZoom: () => {
         this.resetZoom();
       },
+
+      // Swimlane keyboard callbacks (delegated to viewport via animation)
+      isInSwimlaneArea: () => this.swimlaneOrchestrator?.isMouseInSwimlaneArea() ?? false,
+
+      onSwimlanePanViewport: (deltaTimeNs: number) => {
+        if (!this.viewport || !this.viewportAnimator) {
+          return;
+        }
+        // Convert time delta to pixel delta using current zoom
+        const viewportState = this.viewport.getState();
+        const deltaX = deltaTimeNs * viewportState.zoom;
+
+        // Use animated pan via chase animation for smooth keyboard panning
+        this.viewportAnimator.addToTarget(this.viewport, deltaX, 0, () =>
+          this.notifyViewportChange(),
+        );
+      },
+
+      onSwimlanePanDepth: (deltaY: number) => {
+        if (!this.viewport || !this.viewportAnimator) {
+          return;
+        }
+        // Use animated pan via chase animation for smooth keyboard panning
+        this.viewportAnimator.addToTarget(this.viewport, 0, deltaY, () =>
+          this.notifyViewportChange(),
+        );
+      },
+
+      onSwimlaneZoom: (direction: 'in' | 'out') => {
+        if (!this.viewport || !this.viewportAnimator) {
+          return;
+        }
+
+        const factor =
+          direction === 'in' ? KEYBOARD_CONSTANTS.zoomFactor : 1 / KEYBOARD_CONSTANTS.zoomFactor;
+
+        // Use animated zoom via chase animation for smooth keyboard zooming
+        this.viewportAnimator.multiplyZoomTarget(this.viewport, factor, () =>
+          this.notifyViewportChange(),
+        );
+      },
+
+      onSwimlaneJumpStart: () => {
+        if (!this.viewport) {
+          return;
+        }
+        // Cancel any animation and jump to start
+        this.viewportAnimator?.cancel();
+        const viewportState = this.viewport.getState();
+        this.viewport.setOffset(0, viewportState.offsetY);
+        this.notifyViewportChange();
+      },
+
+      onSwimlaneJumpEnd: () => {
+        if (!this.viewport || !this.index) {
+          return;
+        }
+        // Cancel any animation and jump to end
+        this.viewportAnimator?.cancel();
+        const viewportState = this.viewport.getState();
+        const endOffsetX =
+          this.index.totalDuration * viewportState.zoom - viewportState.displayWidth;
+        this.viewport.setOffset(Math.max(0, endOffsetX), viewportState.offsetY);
+        this.notifyViewportChange();
+      },
+
+      onSwimlaneResetZoom: () => {
+        this.resetZoom();
+      },
     });
 
     this.keyboardHandler.attach();
@@ -1106,6 +1214,84 @@ export class FlameChart<E extends EventNode = EventNode> {
     const minimapApp = this.minimapOrchestrator.getApp();
     if (minimapApp?.canvas) {
       minimapApp.canvas.addEventListener('mousedown', () => {
+        this.container?.focus();
+      });
+    }
+  }
+
+  /**
+   * Setup swimlane orchestrator for governor limit visualization.
+   */
+  private async setupSwimlane(): Promise<void> {
+    if (!this.index || !this.viewport || !this.swimlaneDiv) {
+      return;
+    }
+
+    const { displayWidth } = this.viewport.getState();
+
+    // Create swimlane orchestrator with callbacks
+    this.swimlaneOrchestrator = new SwimlaneOrchestrator({
+      onZoomToRegion: (centerTimeNs: number, durationNs: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        // Simplified zoom calculation for better performance
+        // Calculate new zoom to fit the duration in the viewport
+        const viewportState = this.viewport.getState();
+        const newZoom = viewportState.displayWidth / durationNs;
+        // Center on the click time
+        const newOffsetX = centerTimeNs * newZoom - viewportState.displayWidth / 2;
+
+        this.viewport.setZoom(newZoom);
+        this.viewport.setOffset(Math.max(0, newOffsetX), viewportState.offsetY);
+        this.notifyViewportChange();
+      },
+      onCursorMove: (timeNs: number | null) => {
+        // Update minimap cursor to sync with swimlane
+        this.minimapOrchestrator?.setCursorFromMainTimeline(timeNs);
+      },
+      requestRender: () => {
+        this.requestRender();
+      },
+      onZoom: (factor: number, anchorTimeNs: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        // Convert anchor time to screen X in main viewport
+        const viewportState = this.viewport.getState();
+        const anchorScreenX = anchorTimeNs * viewportState.zoom - viewportState.offsetX;
+        // Apply zoom with anchor
+        this.viewport.zoomByFactor(factor, anchorScreenX);
+        this.notifyViewportChange();
+      },
+      onHorizontalPan: (deltaPixels: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        const viewportState = this.viewport.getState();
+        this.viewport.setOffset(viewportState.offsetX + deltaPixels, viewportState.offsetY);
+        this.notifyViewportChange();
+      },
+      onResetView: () => {
+        this.resetZoom();
+      },
+      onDepthPan: (deltaY: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        const viewportState = this.viewport.getState();
+        this.viewport.setOffset(viewportState.offsetX, viewportState.offsetY + deltaY);
+        this.notifyViewportChange();
+      },
+    });
+
+    // Initialize the orchestrator
+    await this.swimlaneOrchestrator.init(this.swimlaneDiv, displayWidth, this.index.totalDuration);
+
+    // Focus container on swimlane mousedown for keyboard support
+    const swimlaneApp = this.swimlaneOrchestrator.getApp();
+    if (swimlaneApp?.canvas) {
+      swimlaneApp.canvas.addEventListener('mousedown', () => {
         this.container?.focus();
       });
     }
@@ -1245,6 +1431,10 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.interactionHandler) {
       this.interactionHandler.updateCursor(event !== null || marker !== null);
     }
+
+    // Update swimlane cursor (sync from main timeline)
+    const timeNs = (screenX + viewportState.offsetX) / viewportState.zoom;
+    this.swimlaneOrchestrator?.setCursorFromMainTimeline(timeNs);
 
     // Notify callback with container-relative coordinates
     // (screenY is canvas-relative, add minimap offset for container-relative positioning)
@@ -1661,6 +1851,9 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Phase 7: Render minimap
     this.renderMinimap(viewportState);
+
+    // Phase 8: Render swimlane
+    this.renderSwimlane(viewportState);
   }
 
   /**
@@ -1773,6 +1966,28 @@ export class FlameChart<E extends EventNode = EventNode> {
       markers: this.markers,
       batchColors: this.state.batchColorsCache,
       cursorTimeNs: this.minimapOrchestrator.getCursorTimeNs(),
+    });
+  }
+
+  /**
+   * Render swimlane via orchestrator.
+   * Pure render method - click handling and cursor updates happen in event handlers.
+   */
+  private renderSwimlane(viewportState: ViewportState): void {
+    if (!this.swimlaneOrchestrator || !this.index) {
+      return;
+    }
+
+    // Get cursor time from swimlane or minimap (for bidirectional sync)
+    const cursorTimeNs = this.swimlaneOrchestrator.isMouseInSwimlaneArea()
+      ? this.swimlaneOrchestrator.getCursorTimeNs()
+      : (this.minimapOrchestrator?.getCursorTimeNs() ?? null);
+
+    this.swimlaneOrchestrator.render({
+      viewportState,
+      totalDuration: this.index.totalDuration,
+      cursorTimeNs,
+      markers: this.markers,
     });
   }
 }

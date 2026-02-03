@@ -1,0 +1,382 @@
+/*
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ */
+
+/**
+ * SwimlaneManager
+ *
+ * State management and tier classification for the governor limit swimlane.
+ * Transforms generic time series data into classified, renderable format.
+ *
+ * Tier Classification Algorithm:
+ * 1. Calculate global max percentage for each metric across all timestamps
+ * 2. Tier 1: Top 3 metrics by global max (always shown, solid 2px lines)
+ * 3. Tier 2: Any metric exceeding 80% at any point (auto-promoted, solid 2px)
+ * 4. Tier 3: Remaining metrics (aggregated as max, grey dashed 1.5px)
+ *
+ * Responsibilities:
+ * - Process HeatStripTimeSeries into SwimlaneProcessedData
+ * - Classify metrics into tiers
+ * - Aggregate Tier 3 metrics
+ * - Provide data for rendering
+ */
+
+import type {
+  HeatStripTimeSeries,
+  SwimlaneClassifiedMetric,
+  SwimlaneDataPoint,
+  SwimlaneProcessedData,
+} from '../../types/flamechart.types.js';
+import { getMetricColor, SWIMLANE_THRESHOLDS, SWIMLANE_Y_MAX_PERCENT } from './swimlane-colors.js';
+
+/**
+ * Number of top metrics to always show as Tier 1.
+ */
+const TIER_1_COUNT = 3;
+
+/**
+ * Threshold for auto-promotion to Tier 2 (80%).
+ */
+const TIER_2_THRESHOLD = SWIMLANE_THRESHOLDS.dangerStart;
+
+export class SwimlaneManager {
+  /** Processed swimlane data ready for rendering. */
+  private processedData: SwimlaneProcessedData | null = null;
+
+  /** Whether dark theme is active (for color selection). */
+  private isDarkTheme = true;
+
+  constructor() {
+    // Default to dark theme
+  }
+
+  /**
+   * Set the theme for color selection.
+   *
+   * @param isDark - Whether dark theme is active
+   */
+  public setTheme(isDark: boolean): void {
+    this.isDarkTheme = isDark;
+    // Re-process if we have data
+    if (this.processedData) {
+      // Update colors on classified metrics
+      for (const metric of this.processedData.classifiedMetrics) {
+        metric.color = getMetricColor(metric.metricId, isDark);
+      }
+    }
+  }
+
+  /**
+   * Process time series data into swimlane format.
+   *
+   * @param timeSeries - Input time series data
+   * @returns Processed swimlane data
+   */
+  public processData(timeSeries: HeatStripTimeSeries): SwimlaneProcessedData {
+    if (timeSeries.events.length === 0) {
+      this.processedData = {
+        points: [],
+        classifiedMetrics: [],
+        globalMaxPercent: 0,
+        hasData: false,
+      };
+      return this.processedData;
+    }
+
+    // Step 1: Aggregate events by timestamp (sum used values across namespaces)
+    const aggregatedByTime = this.aggregateByTimestamp(timeSeries);
+
+    // Step 2: Calculate global max percentage for each metric
+    const metricMaxPercents = this.calculateMetricMaxPercents(aggregatedByTime, timeSeries);
+
+    // Step 3: Classify metrics into tiers
+    const classifiedMetrics = this.classifyMetrics(metricMaxPercents, timeSeries);
+
+    // Step 4: Build data points with tier classification
+    const { points, globalMaxPercent } = this.buildDataPoints(
+      aggregatedByTime,
+      classifiedMetrics,
+      timeSeries,
+    );
+
+    this.processedData = {
+      points,
+      classifiedMetrics,
+      globalMaxPercent,
+      hasData: points.length > 0,
+    };
+
+    return this.processedData;
+  }
+
+  /**
+   * Get the processed swimlane data.
+   */
+  public getData(): SwimlaneProcessedData | null {
+    return this.processedData;
+  }
+
+  /**
+   * Check if there's data to render.
+   */
+  public hasData(): boolean {
+    return this.processedData?.hasData ?? false;
+  }
+
+  /**
+   * Get classified metrics (for legend/tooltip display).
+   */
+  public getClassifiedMetrics(): SwimlaneClassifiedMetric[] {
+    return this.processedData?.classifiedMetrics ?? [];
+  }
+
+  /**
+   * Get metrics visible in the chart (Tier 1 and Tier 2 only).
+   */
+  public getVisibleMetrics(): SwimlaneClassifiedMetric[] {
+    return this.getClassifiedMetrics().filter((m) => m.tier === 1 || m.tier === 2);
+  }
+
+  /**
+   * Get the effective Y-axis maximum for dynamic scaling.
+   * Default is SWIMLANE_Y_MAX_PERCENT (1.1 = 110%).
+   * Always adds +10% headroom above the max data value.
+   *
+   * @returns Effective Y-max percentage (e.g., 1.1 for 110%)
+   */
+  public getEffectiveYMax(): number {
+    if (!this.processedData) {
+      return SWIMLANE_Y_MAX_PERCENT;
+    }
+
+    const dataMax = this.processedData.globalMaxPercent;
+    // Always +10% above max, with minimum of 110%
+    const calculatedMax = Math.ceil(dataMax * 10) / 10 + 0.1;
+    return Math.max(SWIMLANE_Y_MAX_PERCENT, calculatedMax);
+  }
+
+  /**
+   * Get data point at a specific time using binary search.
+   *
+   * @param timeNs - Time in nanoseconds
+   * @returns Data point and next timestamp, or null if not found
+   */
+  public getDataPointAtTime(timeNs: number): { point: SwimlaneDataPoint; endTime: number } | null {
+    if (!this.processedData?.hasData) {
+      return null;
+    }
+
+    const points = this.processedData.points;
+
+    // Binary search for the last point at or before timeNs
+    let left = 0;
+    let right = points.length - 1;
+    let result = -1;
+
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      if (points[mid]!.timestamp <= timeNs) {
+        result = mid;
+        left = mid + 1;
+      } else {
+        right = mid - 1;
+      }
+    }
+
+    if (result === -1) {
+      return null;
+    }
+
+    const point = points[result]!;
+    const endTime = points[result + 1]?.timestamp ?? Infinity;
+
+    // Check if timeNs is within this segment
+    if (timeNs >= point.timestamp && timeNs < endTime) {
+      return { point, endTime };
+    }
+
+    return null;
+  }
+
+  // ============================================================================
+  // PRIVATE METHODS
+  // ============================================================================
+
+  /**
+   * Aggregate events by timestamp, summing used values across namespaces.
+   */
+  private aggregateByTimestamp(
+    timeSeries: HeatStripTimeSeries,
+  ): Map<number, Map<string, { used: number; limit: number }>> {
+    const aggregated = new Map<number, Map<string, { used: number; limit: number }>>();
+
+    for (const event of timeSeries.events) {
+      let timestampData = aggregated.get(event.timestamp);
+      if (!timestampData) {
+        timestampData = new Map();
+        aggregated.set(event.timestamp, timestampData);
+      }
+
+      // Sum used values across namespaces for each metric
+      for (const [metricId, value] of event.values) {
+        const existing = timestampData.get(metricId);
+        if (existing) {
+          existing.used += value.used;
+        } else {
+          timestampData.set(metricId, { used: value.used, limit: value.limit });
+        }
+      }
+    }
+
+    return aggregated;
+  }
+
+  /**
+   * Calculate the global maximum percentage for each metric.
+   */
+  private calculateMetricMaxPercents(
+    aggregatedByTime: Map<number, Map<string, { used: number; limit: number }>>,
+    timeSeries: HeatStripTimeSeries,
+  ): Map<string, number> {
+    const maxPercents = new Map<string, number>();
+
+    // Initialize all metrics with 0
+    for (const metricId of timeSeries.metrics.keys()) {
+      maxPercents.set(metricId, 0);
+    }
+
+    // Find max percentage for each metric
+    for (const timestampData of aggregatedByTime.values()) {
+      for (const [metricId, value] of timestampData) {
+        if (value.limit > 0) {
+          const percent = value.used / value.limit;
+          const currentMax = maxPercents.get(metricId) ?? 0;
+          if (percent > currentMax) {
+            maxPercents.set(metricId, percent);
+          }
+        }
+      }
+    }
+
+    return maxPercents;
+  }
+
+  /**
+   * Classify metrics into tiers based on their global max percentages.
+   */
+  private classifyMetrics(
+    metricMaxPercents: Map<string, number>,
+    timeSeries: HeatStripTimeSeries,
+  ): SwimlaneClassifiedMetric[] {
+    // Create array of metrics with their max percents for sorting
+    const metricsWithMax: Array<{
+      metricId: string;
+      displayName: string;
+      priority: number;
+      maxPercent: number;
+      unit: string;
+    }> = [];
+
+    for (const [metricId, maxPercent] of metricMaxPercents) {
+      const metricDef = timeSeries.metrics.get(metricId);
+      metricsWithMax.push({
+        metricId,
+        displayName: metricDef?.displayName ?? metricId,
+        priority: metricDef?.priority ?? 999,
+        maxPercent,
+        unit: metricDef?.unit ?? '',
+      });
+    }
+
+    // Sort by max percent descending
+    metricsWithMax.sort((a, b) => b.maxPercent - a.maxPercent);
+
+    // Classify into tiers
+    const classified: SwimlaneClassifiedMetric[] = [];
+
+    for (let i = 0; i < metricsWithMax.length; i++) {
+      const metric = metricsWithMax[i]!;
+
+      let tier: 1 | 2 | 3;
+
+      if (i < TIER_1_COUNT) {
+        // Top 3 metrics are always Tier 1
+        tier = 1;
+      } else if (metric.maxPercent >= TIER_2_THRESHOLD) {
+        // Metrics that exceed 80% are Tier 2
+        tier = 2;
+      } else {
+        // Everything else is Tier 3
+        tier = 3;
+      }
+
+      classified.push({
+        metricId: metric.metricId,
+        displayName: metric.displayName,
+        tier,
+        globalMaxPercent: metric.maxPercent,
+        color: getMetricColor(metric.metricId, this.isDarkTheme),
+        priority: metric.priority,
+        unit: metric.unit,
+      });
+    }
+
+    return classified;
+  }
+
+  /**
+   * Build data points with tier-based aggregation.
+   */
+  private buildDataPoints(
+    aggregatedByTime: Map<number, Map<string, { used: number; limit: number }>>,
+    classifiedMetrics: SwimlaneClassifiedMetric[],
+    _timeSeries: HeatStripTimeSeries,
+  ): { points: SwimlaneDataPoint[]; globalMaxPercent: number } {
+    // Create lookup for tier by metric ID
+    const metricTiers = new Map<string, 1 | 2 | 3>();
+    for (const metric of classifiedMetrics) {
+      metricTiers.set(metric.metricId, metric.tier);
+    }
+
+    const points: SwimlaneDataPoint[] = [];
+    let globalMaxPercent = 0;
+
+    // Sort timestamps
+    const timestamps = Array.from(aggregatedByTime.keys()).sort((a, b) => a - b);
+
+    for (const timestamp of timestamps) {
+      const timestampData = aggregatedByTime.get(timestamp)!;
+      const values = new Map<string, number>();
+      const rawValues = new Map<string, { used: number; limit: number }>();
+      let tier3Max = 0;
+
+      for (const [metricId, value] of timestampData) {
+        if (value.limit > 0) {
+          const percent = value.used / value.limit;
+          values.set(metricId, percent);
+          rawValues.set(metricId, { used: value.used, limit: value.limit });
+
+          // Track global max
+          if (percent > globalMaxPercent) {
+            globalMaxPercent = percent;
+          }
+
+          // Track Tier 3 max for aggregation
+          const tier = metricTiers.get(metricId);
+          if (tier === 3 && percent > tier3Max) {
+            tier3Max = percent;
+          }
+        }
+      }
+
+      points.push({
+        timestamp,
+        values,
+        rawValues,
+        tier3Max,
+      });
+    }
+
+    return { points, globalMaxPercent };
+  }
+}

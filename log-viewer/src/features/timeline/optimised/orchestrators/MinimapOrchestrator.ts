@@ -692,8 +692,8 @@ export class MinimapOrchestrator {
   }
 
   /**
-   * Handle heat strip click - zoom to clicked region.
-   * Zooms to approximately 20% of total log duration, centered on click point.
+   * Handle heat strip click - pan viewport to clicked position.
+   * Keeps current zoom level, centers view on click point.
    *
    * @param timeNs - Time position clicked
    */
@@ -704,10 +704,11 @@ export class MinimapOrchestrator {
 
     const state = this.manager.getState();
     const totalDuration = state.totalDuration;
+    const viewportState = this.viewport.getState();
 
-    // Calculate zoom region: 20% of total duration, centered on click
-    const regionDuration = totalDuration * 0.2;
-    const halfDuration = regionDuration / 2;
+    // Keep current zoom level, just center on clicked time
+    const visibleDuration = viewportState.displayWidth / viewportState.zoom;
+    const halfDuration = visibleDuration / 2;
 
     let startTime = timeNs - halfDuration;
     let endTime = timeNs + halfDuration;
@@ -715,11 +716,11 @@ export class MinimapOrchestrator {
     // Clamp to valid bounds
     if (startTime < 0) {
       startTime = 0;
-      endTime = Math.min(regionDuration, totalDuration);
+      endTime = Math.min(visibleDuration, totalDuration);
     }
     if (endTime > totalDuration) {
       endTime = totalDuration;
-      startTime = Math.max(0, totalDuration - regionDuration);
+      startTime = Math.max(0, totalDuration - visibleDuration);
     }
 
     // Update selection and notify viewport change
