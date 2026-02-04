@@ -235,7 +235,7 @@ export class MetricStripRenderer {
     // Chevron icon at top left (no background)
     const iconColor = this.isToggleHovered ? 0xffffff : 0xcccccc;
     const iconX = 6; // Left padding
-    const iconY = 6; // Top padding
+    const iconY = 2.5; // Top padding
     const iconSize = 5;
 
     if (this.isCollapsed) {
