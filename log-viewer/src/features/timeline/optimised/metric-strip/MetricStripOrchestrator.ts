@@ -219,7 +219,7 @@ export class MetricStripOrchestrator {
     this.renderer.setHeight(METRIC_STRIP_COLLAPSED_HEIGHT);
     this.renderer.setCollapsed(true);
 
-    // Add renderer graphics to container
+    // Add renderer graphics to main container (in render order)
     for (const graphics of this.renderer.getGraphics()) {
       this.container.addChild(graphics);
     }
