@@ -78,9 +78,6 @@ export class MetricStripRenderer {
   /** Current color palette. */
   private colors: MetricStripColors;
 
-  /** Whether dark theme is active. */
-  private isDarkTheme = true;
-
   /** Cached height. */
   private height = METRIC_STRIP_HEIGHT;
 
@@ -102,7 +99,7 @@ export class MetricStripRenderer {
     this.breachGraphics = new Graphics();
     this.toggleGraphics = new Graphics();
 
-    this.colors = getMetricStripColors(true);
+    this.colors = getMetricStripColors();
   }
 
   /**
@@ -119,14 +116,6 @@ export class MetricStripRenderer {
       this.breachGraphics,
       this.toggleGraphics, // Toggle rendered on top
     ];
-  }
-
-  /**
-   * Set the theme for color selection.
-   */
-  public setTheme(isDark: boolean): void {
-    this.isDarkTheme = isDark;
-    this.colors = getMetricStripColors(isDark);
   }
 
   /**

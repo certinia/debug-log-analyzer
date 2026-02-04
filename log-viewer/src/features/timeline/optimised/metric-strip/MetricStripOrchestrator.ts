@@ -147,7 +147,6 @@ export class MetricStripOrchestrator {
   private isMouseInMetricStrip = false;
   private mouseX = 0;
   private mouseY = 0;
-  private isDarkTheme = true;
   private totalDuration = 0;
   private callbacks: MetricStripOrchestratorCallbacks;
   /** Last viewport state received during render (for wheel handler). */
@@ -200,7 +199,6 @@ export class MetricStripOrchestrator {
 
     // Initialize manager
     this.manager = new MetricStripManager();
-    this.manager.setTheme(this.isDarkTheme);
 
     // Initialize axis renderer for grid lines (rendered first, behind other content)
     this.axisRenderer = new MeshAxisRenderer(this.container, {
@@ -215,7 +213,6 @@ export class MetricStripOrchestrator {
 
     // Initialize renderer (starts collapsed)
     this.renderer = new MetricStripRenderer();
-    this.renderer.setTheme(this.isDarkTheme);
     this.renderer.setHeight(METRIC_STRIP_COLLAPSED_HEIGHT);
     this.renderer.setCollapsed(true);
 
@@ -230,7 +227,6 @@ export class MetricStripOrchestrator {
 
     // Initialize tooltip renderer
     this.tooltipRenderer = new MetricStripTooltipRenderer(metricStripDiv);
-    this.tooltipRenderer.setTheme(this.isDarkTheme);
 
     // Setup interaction handler
     this.setupInteractionHandler();
@@ -327,19 +323,6 @@ export class MetricStripOrchestrator {
    */
   public getIsVisible(): boolean {
     return this.hasData();
-  }
-
-  /**
-   * Set the theme for the metric strip.
-   *
-   * @param isDark - Whether dark theme is active
-   */
-  public setTheme(isDark: boolean): void {
-    this.isDarkTheme = isDark;
-    this.manager?.setTheme(isDark);
-    this.renderer?.setTheme(isDark);
-    this.tooltipRenderer?.setTheme(isDark);
-    this.callbacks.requestRender();
   }
 
   /**
@@ -486,7 +469,7 @@ export class MetricStripOrchestrator {
       return;
     }
 
-    const colors = getMetricStripColors(this.isDarkTheme);
+    const colors = getMetricStripColors();
     const x = cursorTimeNs * viewportState.zoom - viewportState.offsetX;
 
     // Only draw if within visible area (use dynamic height for collapsed/expanded state)

@@ -47,31 +47,6 @@ export class MetricStripManager {
   /** Processed metric strip data ready for rendering. */
   private processedData: MetricStripProcessedData | null = null;
 
-  /** Whether dark theme is active (for color selection). */
-  private isDarkTheme = true;
-
-  constructor() {
-    // Default to dark theme
-  }
-
-  /**
-   * Set the theme for color selection.
-   *
-   * @param isDark - Whether dark theme is active
-   */
-  public setTheme(isDark: boolean): void {
-    this.isDarkTheme = isDark;
-    // Re-process if we have data
-    if (this.processedData) {
-      // Update colors on classified metrics using rank-based coloring
-      const tierRanks = { 1: 0, 2: 0, 3: 0 };
-      for (const metric of this.processedData.classifiedMetrics) {
-        const rankInTier = tierRanks[metric.tier]++;
-        metric.color = getRankBasedColor(metric.tier, rankInTier, isDark);
-      }
-    }
-  }
-
   /**
    * Process time series data into metric strip format.
    *
@@ -331,7 +306,7 @@ export class MetricStripManager {
         displayName: metric.displayName,
         tier,
         globalMaxPercent: metric.maxPercent,
-        color: getRankBasedColor(tier, rankInTier, this.isDarkTheme),
+        color: getRankBasedColor(tier, rankInTier),
         priority: metric.priority,
         unit: metric.unit,
       });

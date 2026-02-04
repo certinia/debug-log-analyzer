@@ -73,16 +73,15 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
   constructor(htmlContainer: HTMLElement, options: MetricStripTooltipOptions = {}) {
     super(htmlContainer, { mode: 'cursor-offset', offset: 8, padding: 4 });
 
-    this.colors = getMetricStripColors(true);
+    this.colors = getMetricStripColors();
     this.title = options.title ?? 'Governor Limits';
   }
 
   /**
-   * Set the theme for color selection.
+   * No-op: theme is not used (universal colors).
    */
-  public setTheme(isDark: boolean): void {
-    this.isDarkTheme = isDark;
-    this.colors = getMetricStripColors(isDark);
+  public setTheme(_isDark: boolean): void {
+    // No-op: metric strip uses universal colors
   }
 
   /**

@@ -5,13 +5,12 @@
 /**
  * MetricStrip Color Definitions
  *
- * Light and dark theme colors for the governor limit metric strip visualization.
- * Colors are designed to be distinguishable in both themes while maintaining
- * visual consistency with the overall timeline design.
+ * Universal colors for the governor limit metric strip visualization.
+ * Colors are designed to be distinguishable on both light and dark backgrounds.
  */
 
 /**
- * MetricStrip color palette for a specific theme.
+ * MetricStrip color palette.
  */
 export interface MetricStripColors {
   // Metric line colors (Big 4)
@@ -37,57 +36,30 @@ export interface MetricStripColors {
 }
 
 /**
- * Dark theme colors for metric strip.
- * Optimized for visibility on dark backgrounds.
+ * Universal colors for metric strip.
+ * Vibrant colors that work on both light and dark backgrounds.
  */
-export const METRIC_STRIP_COLORS_DARK: MetricStripColors = {
-  // Metric line colors (vibrant for dark backgrounds)
-  soql: 0xff6b6b, // Coral red
-  dml: 0x4ecdc4, // Teal
-  cpu: 0xffe66d, // Yellow
-  heap: 0x95e1d3, // Mint green
+export const METRIC_STRIP_COLORS: MetricStripColors = {
+  // Metric line colors - vibrant, work on both backgrounds
+  soql: 0xe64c4c, // Warm red
+  dml: 0x00a3a3, // Teal
+  cpu: 0xf5a623, // Amber/orange
+  heap: 0x4ecdc4, // Mint teal
 
-  // Tier 3 aggregate line (subtle grey)
-  tier3: 0x666666,
+  // Tier 3 aggregate line (medium grey)
+  tier3: 0x808080,
 
   // Zone colors
-  dangerZone: 0xff9999, // Light red with low alpha
-  limitLine: 0xff3333, // Bright red
+  dangerZone: 0xff9999, // Light red
+  limitLine: 0xe64c4c, // Same warm red
   breachArea: 0x7c3aed, // Purple
 
-  // Grid and labels
-  gridLine: 0x444444,
-  labelText: 0x999999,
+  // Grid and labels - medium grey
+  gridLine: 0x808080,
+  labelText: 0x808080,
 
   // Area fill opacity
   areaFillOpacity: 0.15,
-};
-
-/**
- * Light theme colors for metric strip.
- * Optimized for visibility on light backgrounds.
- */
-export const METRIC_STRIP_COLORS_LIGHT: MetricStripColors = {
-  // Metric line colors (darker for light backgrounds)
-  soql: 0xcc0000, // Dark red
-  dml: 0x008080, // Dark teal
-  cpu: 0xff9900, // Orange
-  heap: 0x00cc99, // Dark mint
-
-  // Tier 3 aggregate line (medium grey)
-  tier3: 0x999999,
-
-  // Zone colors
-  dangerZone: 0xffcccc, // Light red with low alpha
-  limitLine: 0xcc0000, // Dark red
-  breachArea: 0x7c3aed, // Purple (same in both themes)
-
-  // Grid and labels
-  gridLine: 0xcccccc,
-  labelText: 0x666666,
-
-  // Area fill opacity
-  areaFillOpacity: 0.12,
 };
 
 /**
@@ -169,39 +141,26 @@ export const METRIC_STRIP_LINE_WIDTHS = {
  * Rank-based colors for Tier 1 metrics (top 3 by usage).
  * These are assigned by rank position, not by metric type.
  * Index 0 = highest usage metric, Index 1 = second highest, etc.
+ * Universal colors that work on both light and dark backgrounds.
  */
-export const TIER_1_COLORS_DARK: readonly number[] = [
-  0xff6b6b, // Coral red - most prominent
-  0xffe66d, // Yellow - second
-  0x4ecdc4, // Teal - third
-] as const;
-
-export const TIER_1_COLORS_LIGHT: readonly number[] = [
-  0xcc0000, // Dark red - most prominent
-  0xff9900, // Orange - second
-  0x008080, // Dark teal - third
+export const TIER_1_COLORS: readonly number[] = [
+  0xe64c4c, // Warm red - most prominent
+  0xf5a623, // Amber - second
+  0x00a3a3, // Teal - third
 ] as const;
 
 /**
  * Rank-based colors for Tier 2 metrics (auto-promoted due to >80% usage).
  * These wrap if more than available colors.
+ * Universal colors that work on both light and dark backgrounds.
  */
-export const TIER_2_COLORS_DARK: readonly number[] = [
-  0x95e1d3, // Mint green
-  0xffa500, // Orange
-  0x9b59b6, // Purple
-  0x3498db, // Blue
-  0xe91e63, // Pink
-  0x00bcd4, // Cyan
-] as const;
-
-export const TIER_2_COLORS_LIGHT: readonly number[] = [
-  0x00cc99, // Dark mint
-  0xcc7000, // Dark orange
-  0x7b2d8e, // Dark purple
-  0x2070a0, // Dark blue
-  0xb0164a, // Dark pink
-  0x008090, // Dark cyan
+export const TIER_2_COLORS: readonly number[] = [
+  0x4ecdc4, // Mint teal
+  0xf59e0b, // Amber
+  0x8b5cf6, // Purple
+  0x3b82f6, // Blue
+  0xec4899, // Pink
+  0x14b8a6, // Teal
 ] as const;
 
 /**
@@ -209,34 +168,26 @@ export const TIER_2_COLORS_LIGHT: readonly number[] = [
  *
  * @param tier - The tier (1, 2, or 3)
  * @param rankInTier - The rank within the tier (0-indexed)
- * @param isDarkTheme - Whether dark theme is active
  * @returns Color for the metric
  */
-export function getRankBasedColor(
-  tier: 1 | 2 | 3,
-  rankInTier: number,
-  isDarkTheme: boolean,
-): number {
+export function getRankBasedColor(tier: 1 | 2 | 3, rankInTier: number): number {
   if (tier === 1) {
-    const colors = isDarkTheme ? TIER_1_COLORS_DARK : TIER_1_COLORS_LIGHT;
-    return colors[rankInTier % colors.length]!;
+    return TIER_1_COLORS[rankInTier % TIER_1_COLORS.length]!;
   } else if (tier === 2) {
-    const colors = isDarkTheme ? TIER_2_COLORS_DARK : TIER_2_COLORS_LIGHT;
-    return colors[rankInTier % colors.length]!;
+    return TIER_2_COLORS[rankInTier % TIER_2_COLORS.length]!;
   } else {
     // Tier 3 always gets grey
-    return isDarkTheme ? METRIC_STRIP_COLORS_DARK.tier3 : METRIC_STRIP_COLORS_LIGHT.tier3;
+    return METRIC_STRIP_COLORS.tier3;
   }
 }
 
 /**
- * Get metric strip colors for the current theme.
+ * Get metric strip colors.
  *
- * @param isDarkTheme - Whether dark theme is active
- * @returns Color palette for the theme
+ * @returns Color palette
  */
-export function getMetricStripColors(isDarkTheme: boolean): MetricStripColors {
-  return isDarkTheme ? METRIC_STRIP_COLORS_DARK : METRIC_STRIP_COLORS_LIGHT;
+export function getMetricStripColors(): MetricStripColors {
+  return METRIC_STRIP_COLORS;
 }
 
 /**
@@ -244,43 +195,27 @@ export function getMetricStripColors(isDarkTheme: boolean): MetricStripColors {
  * Maps metric IDs to their assigned colors.
  * @deprecated Use getRankBasedColor() for rank-based coloring instead
  */
-export const APEX_METRIC_COLORS_DARK: Record<string, number> = {
-  cpuTime: METRIC_STRIP_COLORS_DARK.cpu,
-  soqlQueries: METRIC_STRIP_COLORS_DARK.soql,
-  dmlStatements: METRIC_STRIP_COLORS_DARK.dml,
-  heapSize: METRIC_STRIP_COLORS_DARK.heap,
+export const APEX_METRIC_COLORS: Record<string, number> = {
+  cpuTime: METRIC_STRIP_COLORS.cpu,
+  soqlQueries: METRIC_STRIP_COLORS.soql,
+  dmlStatements: METRIC_STRIP_COLORS.dml,
+  heapSize: METRIC_STRIP_COLORS.heap,
   // Additional colors for Tier 2-eligible metrics
-  queryRows: 0xffa500, // Orange
-  dmlRows: 0x9b59b6, // Purple
-  soslQueries: 0x3498db, // Blue
-  callouts: 0xe91e63, // Pink
-  futureCalls: 0x00bcd4, // Cyan
-};
-
-export const APEX_METRIC_COLORS_LIGHT: Record<string, number> = {
-  cpuTime: METRIC_STRIP_COLORS_LIGHT.cpu,
-  soqlQueries: METRIC_STRIP_COLORS_LIGHT.soql,
-  dmlStatements: METRIC_STRIP_COLORS_LIGHT.dml,
-  heapSize: METRIC_STRIP_COLORS_LIGHT.heap,
-  // Additional colors for Tier 2-eligible metrics
-  queryRows: 0xcc7000, // Dark orange
-  dmlRows: 0x7b2d8e, // Dark purple
-  soslQueries: 0x2070a0, // Dark blue
-  callouts: 0xb0164a, // Dark pink
-  futureCalls: 0x008090, // Dark cyan
+  queryRows: 0xf59e0b, // Amber
+  dmlRows: 0x8b5cf6, // Purple
+  soslQueries: 0x3b82f6, // Blue
+  callouts: 0xec4899, // Pink
+  futureCalls: 0x14b8a6, // Teal
 };
 
 /**
  * Get metric color for a specific metric ID.
  *
  * @param metricId - The metric identifier
- * @param isDarkTheme - Whether dark theme is active
  * @returns Color for the metric, or tier3 color as fallback
  */
-export function getMetricColor(metricId: string, isDarkTheme: boolean): number {
-  const colors = isDarkTheme ? APEX_METRIC_COLORS_DARK : APEX_METRIC_COLORS_LIGHT;
-  const fallback = isDarkTheme ? METRIC_STRIP_COLORS_DARK.tier3 : METRIC_STRIP_COLORS_LIGHT.tier3;
-  return colors[metricId] ?? fallback;
+export function getMetricColor(metricId: string): number {
+  return APEX_METRIC_COLORS[metricId] ?? METRIC_STRIP_COLORS.tier3;
 }
 
 /**
