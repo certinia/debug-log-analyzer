@@ -90,6 +90,7 @@ The Timeline view shows a live visualization of your Salesforce Apex log executi
 - **Zoom & Pan** – Navigate your logs down to 0.001 ms with precision zoom. `W`/`S` keys or scroll wheel for zoom; `A`/`D` keys or drag for pan.
 - **Dynamic Frame Labels** – Instantly see method names on timeline frames for faster scanning.
 - **🗺️ Minimap** – Bird's-eye view with skyline overview showing call stack depth, viewport lens for navigation, and instant teleport to any position.
+- **📊 Governor Limits Strip** – At-a-glance limit usage with traffic light coloring (safe/warning/critical/breach). Expand for detailed step chart.
 - **📏 Measure Range** – `Shift+Drag` to measure the duration between any two points. Resize edges, double-click to zoom.
 - **🔍 Area Zoom** – `Alt/Option+Drag` to select a region and instantly zoom to fit.
 - **Tooltips** – Hover for duration, event name, SOQL/DML/Exception counts, SOQL/DML rows, and more.
