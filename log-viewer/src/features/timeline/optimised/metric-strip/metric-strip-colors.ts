@@ -193,6 +193,39 @@ export function getMetricStripColors(): MetricStripColors {
 }
 
 /**
+ * Traffic light color result with color and alpha.
+ */
+export interface TrafficLightColor {
+  color: number;
+  alpha: number;
+}
+
+/**
+ * Get traffic light color and alpha for a given percentage.
+ * Uses METRIC_STRIP_THRESHOLDS for consistent threshold values.
+ *
+ * @param percent - Percentage value (0-1+)
+ * @returns Color and alpha for the percentage level
+ *
+ * Thresholds:
+ * - 0-50%: transparent (safe)
+ * - 50-80%: amber (warning)
+ * - 80-100%: red (critical)
+ * - >100%: purple (breach)
+ */
+export function getTrafficLightColor(percent: number): TrafficLightColor {
+  if (percent > METRIC_STRIP_THRESHOLDS.limit) {
+    return { color: TRAFFIC_LIGHT_COLORS.breach, alpha: 0.7 };
+  } else if (percent >= METRIC_STRIP_THRESHOLDS.dangerStart) {
+    return { color: TRAFFIC_LIGHT_COLORS.critical, alpha: 0.7 };
+  } else if (percent >= METRIC_STRIP_THRESHOLDS.warningStart) {
+    return { color: TRAFFIC_LIGHT_COLORS.warning, alpha: 0.7 };
+  } else {
+    return { color: 0x000000, alpha: 0 };
+  }
+}
+
+/**
  * Default metric color mapping for Apex governor limits.
  * Maps metric IDs to their assigned colors.
  * @deprecated Use getRankBasedColor() for rank-based coloring instead

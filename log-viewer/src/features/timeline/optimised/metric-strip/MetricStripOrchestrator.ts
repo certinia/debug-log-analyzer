@@ -359,6 +359,8 @@ export class MetricStripOrchestrator {
 
   /**
    * Get the metric strip height based on collapse state.
+   *
+   * @returns Height in pixels (METRIC_STRIP_COLLAPSED_HEIGHT or METRIC_STRIP_HEIGHT)
    */
   public getHeight(): number {
     return this.isCollapsed ? METRIC_STRIP_COLLAPSED_HEIGHT : METRIC_STRIP_HEIGHT;
@@ -366,6 +368,8 @@ export class MetricStripOrchestrator {
 
   /**
    * Check if the metric strip is collapsed.
+   *
+   * @returns True if collapsed (compact heat-style view), false if expanded (step chart)
    */
   public getIsCollapsed(): boolean {
     return this.isCollapsed;
@@ -373,6 +377,7 @@ export class MetricStripOrchestrator {
 
   /**
    * Toggle the collapsed state of the metric strip.
+   * Updates PIXI renderer size and notifies FlameChart via onHeightChange callback.
    */
   public toggleCollapsed(): void {
     this.isCollapsed = !this.isCollapsed;

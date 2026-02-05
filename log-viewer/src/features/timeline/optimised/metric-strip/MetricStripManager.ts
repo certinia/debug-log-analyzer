@@ -43,9 +43,22 @@ const TIER_1_COUNT = 3;
  */
 const TIER_2_THRESHOLD = METRIC_STRIP_THRESHOLDS.dangerStart;
 
+/** Cached lookup result for getDataPointAtTime optimization. */
+interface CachedLookup {
+  /** Start time of the cached segment (inclusive). */
+  startTime: number;
+  /** End time of the cached segment (exclusive). */
+  endTime: number;
+  /** The cached result. */
+  result: { point: MetricStripDataPoint; endTime: number };
+}
+
 export class MetricStripManager {
   /** Processed metric strip data ready for rendering. */
   private processedData: MetricStripProcessedData | null = null;
+
+  /** Single-entry cache for getDataPointAtTime to avoid repeated binary searches. */
+  private lookupCache: CachedLookup | null = null;
 
   /**
    * Process time series data into metric strip format.
@@ -54,6 +67,9 @@ export class MetricStripManager {
    * @returns Processed metric strip data
    */
   public processData(timeSeries: HeatStripTimeSeries): MetricStripProcessedData {
+    // Clear lookup cache when data changes
+    this.lookupCache = null;
+
     if (timeSeries.events.length === 0) {
       this.processedData = {
         points: [],
@@ -138,6 +154,8 @@ export class MetricStripManager {
 
   /**
    * Get data point at a specific time using binary search.
+   * Uses single-entry cache to optimize repeated lookups within the same segment
+   * (common during mouse movement within a time bucket).
    *
    * @param timeNs - Time in nanoseconds
    * @returns Data point and next timestamp, or null if not found
@@ -149,33 +167,51 @@ export class MetricStripManager {
       return null;
     }
 
+    // Check cache first - if timeNs falls within the cached segment, return cached result
+    if (
+      this.lookupCache &&
+      timeNs >= this.lookupCache.startTime &&
+      timeNs < this.lookupCache.endTime
+    ) {
+      return this.lookupCache.result;
+    }
+
     const points = this.processedData.points;
 
     // Binary search for the last point at or before timeNs
     let left = 0;
     let right = points.length - 1;
-    let result = -1;
+    let resultIdx = -1;
 
     while (left <= right) {
       const mid = Math.floor((left + right) / 2);
       if (points[mid]!.timestamp <= timeNs) {
-        result = mid;
+        resultIdx = mid;
         left = mid + 1;
       } else {
         right = mid - 1;
       }
     }
 
-    if (result === -1) {
+    if (resultIdx === -1) {
       return null;
     }
 
-    const point = points[result]!;
-    const endTime = points[result + 1]?.timestamp ?? Infinity;
+    const point = points[resultIdx]!;
+    const endTime = points[resultIdx + 1]?.timestamp ?? Infinity;
 
     // Check if timeNs is within this segment
     if (timeNs >= point.timestamp && timeNs < endTime) {
-      return { point, endTime };
+      const result = { point, endTime };
+
+      // Cache this lookup for subsequent queries in the same segment
+      this.lookupCache = {
+        startTime: point.timestamp,
+        endTime,
+        result,
+      };
+
+      return result;
     }
 
     return null;

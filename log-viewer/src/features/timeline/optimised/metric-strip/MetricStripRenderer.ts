@@ -39,6 +39,7 @@ import {
   BREACH_AREA_OPACITY,
   DANGER_ZONE_OPACITY,
   getMetricStripColors,
+  getTrafficLightColor,
   METRIC_STRIP_HEIGHT,
   METRIC_STRIP_LINE_WIDTHS,
   METRIC_STRIP_MARKER_COLORS_BLENDED,
@@ -46,7 +47,6 @@ import {
   METRIC_STRIP_THRESHOLDS,
   METRIC_STRIP_TOGGLE_WIDTH,
   METRIC_STRIP_Y_MAX_PERCENT,
-  TRAFFIC_LIGHT_COLORS,
   type MetricStripColors,
 } from './metric-strip-colors.js';
 
@@ -324,7 +324,7 @@ export class MetricStripRenderer {
         }
 
         // Determine traffic light color based on max percentage
-        const colorInfo = this.getTrafficLightColor(maxPercent);
+        const colorInfo = getTrafficLightColor(maxPercent);
         color = colorInfo.color;
         alpha = colorInfo.alpha;
       }
@@ -348,29 +348,6 @@ export class MetricStripRenderer {
     if (inRun && runAlpha > 0) {
       g.rect(runStartX, 0, displayWidth - runStartX, height);
       g.fill({ color: runColor, alpha: runAlpha });
-    }
-  }
-
-  /**
-   * Get traffic light color and alpha for a given percentage.
-   * - 0-50%: transparent (safe)
-   * - 50-80%: amber (warning)
-   * - 80-100%: red (critical)
-   * - >100%: purple (breach)
-   */
-  private getTrafficLightColor(percent: number): { color: number; alpha: number } {
-    if (percent > METRIC_STRIP_THRESHOLDS.limit) {
-      // Breach: >100% - purple
-      return { color: TRAFFIC_LIGHT_COLORS.breach, alpha: 0.7 };
-    } else if (percent >= METRIC_STRIP_THRESHOLDS.dangerStart) {
-      // Critical: 80-100% - red
-      return { color: TRAFFIC_LIGHT_COLORS.critical, alpha: 0.7 };
-    } else if (percent >= METRIC_STRIP_THRESHOLDS.warningStart) {
-      // Warning: 50-80% - amber
-      return { color: TRAFFIC_LIGHT_COLORS.warning, alpha: 0.7 };
-    } else {
-      // Safe: 0-50% - transparent
-      return { color: 0x000000, alpha: 0 };
     }
   }
 
