@@ -38,6 +38,7 @@ import {
   METRIC_STRIP_HEIGHT,
   METRIC_STRIP_TIME_GRID_COLOR,
   METRIC_STRIP_TIME_GRID_OPACITY,
+  METRIC_STRIP_TOGGLE_WIDTH,
 } from './metric-strip-colors.js';
 
 // Re-export for convenience
@@ -532,8 +533,7 @@ export class MetricStripOrchestrator {
     this.mouseY = event.clientY - rect.top;
 
     // Check if hovering over toggle area
-    const TOGGLE_WIDTH = 20; // Same as METRIC_STRIP_TOGGLE_WIDTH
-    const isOverToggle = this.mouseX < TOGGLE_WIDTH;
+    const isOverToggle = this.mouseX < METRIC_STRIP_TOGGLE_WIDTH;
     this.renderer?.setToggleHovered(isOverToggle);
 
     // Update cursor style
@@ -578,9 +578,7 @@ export class MetricStripOrchestrator {
     const clickX = event.clientX - rect.left;
 
     // Click on toggle area (left edge) or Shift+click anywhere toggles collapsed state
-    // Import METRIC_STRIP_TOGGLE_WIDTH directly to avoid circular import issues
-    const TOGGLE_WIDTH = 20; // Same as METRIC_STRIP_TOGGLE_WIDTH
-    if (clickX < TOGGLE_WIDTH || event.shiftKey) {
+    if (clickX < METRIC_STRIP_TOGGLE_WIDTH || event.shiftKey) {
       this.toggleCollapsed();
       return;
     }
@@ -628,8 +626,7 @@ export class MetricStripOrchestrator {
     const clickX = event.clientX - rect.left;
 
     // Ignore double-clicks on toggle area (left edge)
-    const TOGGLE_WIDTH = 20;
-    if (clickX < TOGGLE_WIDTH) {
+    if (clickX < METRIC_STRIP_TOGGLE_WIDTH) {
       return;
     }
 
