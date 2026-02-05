@@ -447,9 +447,8 @@ export class MetricStripOrchestrator {
     // In collapsed mode, render heat-style visualization with actual data
     if (this.isCollapsed && data?.hasData) {
       this.renderer.renderCollapsedWithData(
-        data.classifiedMetrics,
         context.viewportState,
-        (timeNs) => this.manager?.getDataPointAtTime(timeNs)?.point ?? null,
+        (timeNs) => this.manager?.getDataPointAtTime(timeNs) ?? null,
         context.totalDuration,
       );
     }

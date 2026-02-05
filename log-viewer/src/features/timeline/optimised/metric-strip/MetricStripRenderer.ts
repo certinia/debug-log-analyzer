@@ -29,7 +29,6 @@
 
 import { Graphics } from 'pixi.js';
 import type {
-  MetricStripClassifiedMetric,
   MetricStripDataPoint,
   MetricStripProcessedData,
   TimelineMarker,
@@ -52,6 +51,38 @@ import {
 
 // Re-export toggle width for use by orchestrator
 export { METRIC_STRIP_TOGGLE_WIDTH };
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+/** Toggle icon left padding in pixels */
+const TOGGLE_ICON_PADDING_X = 6;
+/** Toggle icon top padding in pixels */
+const TOGGLE_ICON_PADDING_Y = 2.5;
+/** Toggle icon size in pixels */
+const TOGGLE_ICON_SIZE = 5;
+
+/** Limit line dash length in pixels */
+const LIMIT_LINE_DASH = 8;
+/** Limit line gap length in pixels */
+const LIMIT_LINE_GAP = 4;
+
+/** Heat strip bucket width in pixels for collapsed view */
+const HEAT_STRIP_BUCKET_WIDTH_PX = 2;
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+/** Function to extract a percentage value from a data point */
+type ValueExtractor = (point: MetricStripDataPoint) => number;
+
+/** Result from getDataPointAtTime including segment end time for caching */
+interface DataPointResult {
+  point: MetricStripDataPoint;
+  endTime: number;
+}
 
 export class MetricStripRenderer {
   /** Graphics for marker backgrounds. */
@@ -182,35 +213,20 @@ export class MetricStripRenderer {
 
     // Note: Time grid lines are now rendered by MeshAxisRenderer in MetricStripOrchestrator
 
-    // In collapsed mode, only render toggle button (markers already rendered above)
-    if (this.isCollapsed) {
-      this.renderCollapsedView();
+    // Toggle button is rendered in both collapsed and expanded modes
+    this.renderToggleButton();
+
+    // In collapsed mode, heat strips are rendered separately via renderCollapsedWithData()
+    if (this.isCollapsed || !data.hasData) {
       return;
     }
 
-    if (!data.hasData) {
-      return;
-    }
-
-    // Render layers in order (back to front)
+    // Render expanded view layers (back to front)
     this.renderDangerZone(displayWidth, height);
     this.renderAreaFills(data, viewportState, totalDuration, height);
     this.renderStepChartLines(data, viewportState, totalDuration, height);
     this.renderLimitLine(displayWidth, height);
     this.renderBreachAreas(data, viewportState, totalDuration, height);
-
-    // Always render toggle button on top
-    this.renderToggleButton();
-  }
-
-  /**
-   * Render the collapsed view - stacked colored strips showing metric percentages.
-   * This is a heat-style visualization showing Tier 1/2 metrics.
-   */
-  private renderCollapsedView(): void {
-    // The heat-style visualization is rendered in renderCollapsedWithData()
-    // Here we just render the toggle button
-    this.renderToggleButton();
   }
 
   /**
@@ -220,24 +236,19 @@ export class MetricStripRenderer {
    */
   private renderToggleButton(): void {
     const g = this.toggleGraphics;
-
-    // Chevron icon at top left (no background)
     const iconColor = this.isToggleHovered ? 0xffffff : 0xcccccc;
-    const iconX = 6; // Left padding
-    const iconY = 2.5; // Top padding
-    const iconSize = 5;
 
     if (this.isCollapsed) {
       // ▶ (right-pointing triangle)
-      g.moveTo(iconX, iconY);
-      g.lineTo(iconX + iconSize, iconY + iconSize);
-      g.lineTo(iconX, iconY + iconSize * 2);
+      g.moveTo(TOGGLE_ICON_PADDING_X, TOGGLE_ICON_PADDING_Y);
+      g.lineTo(TOGGLE_ICON_PADDING_X + TOGGLE_ICON_SIZE, TOGGLE_ICON_PADDING_Y + TOGGLE_ICON_SIZE);
+      g.lineTo(TOGGLE_ICON_PADDING_X, TOGGLE_ICON_PADDING_Y + TOGGLE_ICON_SIZE * 2);
       g.closePath();
     } else {
       // ▼ (down-pointing triangle)
-      g.moveTo(iconX, iconY);
-      g.lineTo(iconX + iconSize * 2, iconY);
-      g.lineTo(iconX + iconSize, iconY + iconSize);
+      g.moveTo(TOGGLE_ICON_PADDING_X, TOGGLE_ICON_PADDING_Y);
+      g.lineTo(TOGGLE_ICON_PADDING_X + TOGGLE_ICON_SIZE * 2, TOGGLE_ICON_PADDING_Y);
+      g.lineTo(TOGGLE_ICON_PADDING_X + TOGGLE_ICON_SIZE, TOGGLE_ICON_PADDING_Y + TOGGLE_ICON_SIZE);
       g.closePath();
     }
     g.fill({ color: iconColor, alpha: 1.0 });
@@ -248,18 +259,12 @@ export class MetricStripRenderer {
    * Shows stacked colored strips representing metric percentages.
    */
   public renderCollapsedWithData(
-    classifiedMetrics: MetricStripClassifiedMetric[],
     viewportState: ViewportState,
-    getPointAtTime: (timeNs: number) => MetricStripDataPoint | null,
+    getDataPointAtTime: (timeNs: number) => DataPointResult | null,
     totalDuration: number,
   ): void {
     if (this.isCollapsed) {
-      this.renderCollapsedHeatStrips(
-        classifiedMetrics,
-        viewportState,
-        getPointAtTime,
-        totalDuration,
-      );
+      this.renderCollapsedHeatStrips(viewportState, getDataPointAtTime, totalDuration);
     }
   }
 
@@ -272,9 +277,8 @@ export class MetricStripRenderer {
    * - >100%: purple (breach)
    */
   private renderCollapsedHeatStrips(
-    _classifiedMetrics: MetricStripClassifiedMetric[],
     viewportState: ViewportState,
-    getPointAtTime: (timeNs: number) => MetricStripDataPoint | null,
+    getDataPointAtTime: (timeNs: number) => DataPointResult | null,
     totalDuration: number,
   ): void {
     const { zoom, offsetX, displayWidth } = viewportState;
@@ -285,8 +289,7 @@ export class MetricStripRenderer {
     const visibleStartTime = offsetX / zoom;
     const visibleEndTime = (offsetX + displayWidth) / zoom;
 
-    // Use ~2px buckets for smooth visualization
-    const numBuckets = Math.ceil(displayWidth / 2);
+    const numBuckets = Math.ceil(displayWidth / HEAT_STRIP_BUCKET_WIDTH_PX);
     const bucketWidth = displayWidth / numBuckets;
     const timeBucketSize = (visibleEndTime - visibleStartTime) / numBuckets;
 
@@ -296,6 +299,9 @@ export class MetricStripRenderer {
     let runAlpha = 0;
     let inRun = false;
 
+    // Cache point lookup to avoid redundant binary searches for adjacent buckets
+    let cachedResult: DataPointResult | null = null;
+
     // Process each bucket and merge adjacent ones with same color
     for (let i = 0; i < numBuckets; i++) {
       const bucketStartTime = visibleStartTime + i * timeBucketSize;
@@ -304,26 +310,18 @@ export class MetricStripRenderer {
 
       // Clamp to valid time range
       const timeNs = Math.max(0, Math.min(totalDuration, bucketMidTime));
-      const point = getPointAtTime(timeNs);
+
+      // Reuse cached result if time falls within same segment
+      if (!cachedResult || timeNs >= cachedResult.endTime) {
+        cachedResult = getDataPointAtTime(timeNs);
+      }
 
       // Get color for this bucket
       let color = 0;
       let alpha = 0;
 
-      if (point) {
-        // Find MAX percentage across ALL metrics at this point
-        let maxPercent = 0;
-        for (const percent of point.values.values()) {
-          if (percent > maxPercent) {
-            maxPercent = percent;
-          }
-        }
-        // Also check tier3Max
-        if (point.tier3Max > maxPercent) {
-          maxPercent = point.tier3Max;
-        }
-
-        // Determine traffic light color based on max percentage
+      if (cachedResult) {
+        const maxPercent = this.getMaxPercentAtPoint(cachedResult.point);
         const colorInfo = getTrafficLightColor(maxPercent);
         color = colorInfo.color;
         alpha = colorInfo.alpha;
@@ -448,66 +446,67 @@ export class MetricStripRenderer {
   ): void {
     const g = this.areaFillGraphics;
     const { zoom, offsetX, displayWidth } = viewportState;
-
-    // Get visible time range
     const visibleStartTime = offsetX / zoom;
     const visibleEndTime = (offsetX + displayWidth) / zoom;
 
     // Render area fills for Tier 1 and Tier 2 metrics
-    const visibleMetrics = data.classifiedMetrics.filter((m) => m.tier === 1 || m.tier === 2);
-
-    for (const metric of visibleMetrics) {
-      this.renderMetricAreaFill(
-        g,
-        data.points,
-        metric,
-        visibleStartTime,
-        visibleEndTime,
-        viewportState,
-        totalDuration,
-        height,
-      );
+    for (const metric of data.classifiedMetrics) {
+      if (metric.tier === 1 || metric.tier === 2) {
+        this.renderAreaFill(
+          g,
+          data.points,
+          (p) => p.values.get(metric.metricId) ?? 0,
+          visibleStartTime,
+          visibleEndTime,
+          viewportState,
+          totalDuration,
+          height,
+          metric.color,
+          this.colors.areaFillOpacity,
+        );
+      }
     }
 
     // Render Tier 3 aggregate area fill
     if (data.classifiedMetrics.some((m) => m.tier === 3)) {
-      this.renderTier3AreaFill(
+      this.renderAreaFill(
         g,
         data.points,
+        (p) => p.tier3Max,
         visibleStartTime,
         visibleEndTime,
         viewportState,
         totalDuration,
         height,
+        this.colors.tier3,
+        this.colors.areaFillOpacity * 0.5,
       );
     }
   }
 
   /**
-   * Render area fill for a single metric.
+   * Render area fill for a metric using a value extractor.
+   * Capped at 100% for clean visual appearance.
    */
-  private renderMetricAreaFill(
+  private renderAreaFill(
     g: Graphics,
     points: MetricStripDataPoint[],
-    metric: MetricStripClassifiedMetric,
+    getValue: ValueExtractor,
     visibleStartTime: number,
     visibleEndTime: number,
     viewportState: ViewportState,
     totalDuration: number,
     height: number,
+    color: number,
+    alpha: number,
   ): void {
-    const { zoom, offsetX } = viewportState;
+    const { zoom, offsetX, displayWidth } = viewportState;
     const baseY = this.percentToY(0, height);
-
-    // Build path for area fill
     const pathPoints: Array<{ x: number; y: number }> = [];
 
     for (let i = 0; i < points.length; i++) {
       const point = points[i]!;
-
-      // Skip points outside visible range (with some padding)
-      const nextPoint = points[i + 1];
-      const segmentEnd = nextPoint?.timestamp ?? totalDuration;
+      const segmentEnd = points[i + 1]?.timestamp ?? totalDuration;
 
       if (segmentEnd < visibleStartTime) {
         continue;
@@ -516,68 +515,7 @@ export class MetricStripRenderer {
         break;
       }
 
-      const percent = point.values.get(metric.metricId) ?? 0;
-      const x1 = point.timestamp * zoom - offsetX;
-      const x2 = segmentEnd * zoom - offsetX;
-      const y = this.percentToY(Math.min(percent, 1.0), height); // Cap at 100% for fill
-
-      // Add step chart points (horizontal then vertical)
-      if (pathPoints.length === 0) {
-        // Start from baseline
-        pathPoints.push({ x: Math.max(0, x1), y: baseY });
-      }
-
-      pathPoints.push({ x: Math.max(0, x1), y });
-      pathPoints.push({ x: Math.min(viewportState.displayWidth, x2), y });
-    }
-
-    if (pathPoints.length < 2) {
-      return;
-    }
-
-    // Close the path back to baseline
-    pathPoints.push({ x: pathPoints[pathPoints.length - 1]!.x, y: baseY });
-
-    // Draw filled polygon
-    g.moveTo(pathPoints[0]!.x, pathPoints[0]!.y);
-    for (let i = 1; i < pathPoints.length; i++) {
-      g.lineTo(pathPoints[i]!.x, pathPoints[i]!.y);
-    }
-    g.closePath();
-    g.fill({ color: metric.color, alpha: this.colors.areaFillOpacity });
-  }
-
-  /**
-   * Render area fill for Tier 3 aggregate.
-   */
-  private renderTier3AreaFill(
-    g: Graphics,
-    points: MetricStripDataPoint[],
-    visibleStartTime: number,
-    visibleEndTime: number,
-    viewportState: ViewportState,
-    totalDuration: number,
-    height: number,
-  ): void {
-    const { zoom, offsetX } = viewportState;
-    const baseY = this.percentToY(0, height);
-
-    const pathPoints: Array<{ x: number; y: number }> = [];
-
-    for (let i = 0; i < points.length; i++) {
-      const point = points[i]!;
-
-      const nextPoint = points[i + 1];
-      const segmentEnd = nextPoint?.timestamp ?? totalDuration;
-
-      if (segmentEnd < visibleStartTime) {
-        continue;
-      }
-      if (point.timestamp > visibleEndTime) {
-        break;
-      }
-
-      const percent = point.tier3Max;
+      const percent = getValue(point);
       const x1 = point.timestamp * zoom - offsetX;
       const x2 = segmentEnd * zoom - offsetX;
       const y = this.percentToY(Math.min(percent, 1.0), height);
@@ -587,7 +525,7 @@ export class MetricStripRenderer {
       }
 
       pathPoints.push({ x: Math.max(0, x1), y });
-      pathPoints.push({ x: Math.min(viewportState.displayWidth, x2), y });
+      pathPoints.push({ x: Math.min(displayWidth, x2), y });
     }
 
     if (pathPoints.length < 2) {
@@ -601,7 +539,7 @@ export class MetricStripRenderer {
       g.lineTo(pathPoints[i]!.x, pathPoints[i]!.y);
     }
     g.closePath();
-    g.fill({ color: this.colors.tier3, alpha: this.colors.areaFillOpacity * 0.5 });
+    g.fill({ color, alpha });
   }
 
   /**
@@ -616,32 +554,53 @@ export class MetricStripRenderer {
     const g = this.lineGraphics;
 
     // Render Tier 1 and Tier 2 metrics with solid lines
-    const visibleMetrics = data.classifiedMetrics.filter((m) => m.tier === 1 || m.tier === 2);
-
-    for (const metric of visibleMetrics) {
-      this.renderMetricLine(g, data.points, metric, viewportState, totalDuration, height);
+    for (const metric of data.classifiedMetrics) {
+      if (metric.tier === 1 || metric.tier === 2) {
+        this.renderStepChartLine(
+          g,
+          data.points,
+          (p) => p.values.get(metric.metricId) ?? 0,
+          viewportState,
+          totalDuration,
+          height,
+          metric.color,
+          METRIC_STRIP_LINE_WIDTHS.primary,
+          1.0,
+        );
+      }
     }
 
-    // Render Tier 3 aggregate with dashed line
+    // Render Tier 3 aggregate line
     if (data.classifiedMetrics.some((m) => m.tier === 3)) {
-      this.renderTier3Line(g, data.points, viewportState, totalDuration, height);
+      this.renderStepChartLine(
+        g,
+        data.points,
+        (p) => p.tier3Max,
+        viewportState,
+        totalDuration,
+        height,
+        this.colors.tier3,
+        METRIC_STRIP_LINE_WIDTHS.tier3,
+        0.7,
+      );
     }
   }
 
   /**
-   * Render step chart line for a single metric.
+   * Render a step chart line using a value extractor.
    */
-  private renderMetricLine(
+  private renderStepChartLine(
     g: Graphics,
     points: MetricStripDataPoint[],
-    metric: MetricStripClassifiedMetric,
+    getValue: ValueExtractor,
     viewportState: ViewportState,
     totalDuration: number,
     height: number,
+    color: number,
+    width: number,
+    alpha: number,
   ): void {
     const { zoom, offsetX, displayWidth } = viewportState;
-
-    // Get visible time range
     const visibleStartTime = offsetX / zoom;
     const visibleEndTime = (offsetX + displayWidth) / zoom;
 
@@ -650,9 +609,7 @@ export class MetricStripRenderer {
 
     for (let i = 0; i < points.length; i++) {
       const point = points[i]!;
-
-      const nextPoint = points[i + 1];
-      const segmentEnd = nextPoint?.timestamp ?? totalDuration;
+      const segmentEnd = points[i + 1]?.timestamp ?? totalDuration;
 
       if (segmentEnd < visibleStartTime) {
         continue;
@@ -661,67 +618,7 @@ export class MetricStripRenderer {
         break;
       }
 
-      const percent = point.values.get(metric.metricId) ?? 0;
-      const x1 = point.timestamp * zoom - offsetX;
-      const x2 = segmentEnd * zoom - offsetX;
-      const y = this.percentToY(percent, height);
-
-      if (isFirst) {
-        g.moveTo(x1, y);
-        isFirst = false;
-      } else {
-        // Step pattern: horizontal to new X, then vertical to new Y
-        g.lineTo(x1, prevY);
-        g.lineTo(x1, y);
-      }
-
-      // Horizontal segment to next timestamp
-      g.lineTo(x2, y);
-      prevY = y;
-    }
-
-    // Stroke the line
-    if (!isFirst) {
-      g.stroke({
-        color: metric.color,
-        width: METRIC_STRIP_LINE_WIDTHS.primary,
-        alpha: 1.0,
-      });
-    }
-  }
-
-  /**
-   * Render step chart line for Tier 3 aggregate (dashed).
-   */
-  private renderTier3Line(
-    g: Graphics,
-    points: MetricStripDataPoint[],
-    viewportState: ViewportState,
-    totalDuration: number,
-    height: number,
-  ): void {
-    const { zoom, offsetX, displayWidth } = viewportState;
-
-    const visibleStartTime = offsetX / zoom;
-    const visibleEndTime = (offsetX + displayWidth) / zoom;
-
-    let isFirst = true;
-    let prevY = 0;
-
-    for (let i = 0; i < points.length; i++) {
-      const point = points[i]!;
-
-      const nextPoint = points[i + 1];
-      const segmentEnd = nextPoint?.timestamp ?? totalDuration;
-
-      if (segmentEnd < visibleStartTime) {
-        continue;
-      }
-      if (point.timestamp > visibleEndTime) {
-        break;
-      }
-
-      const percent = point.tier3Max;
+      const percent = getValue(point);
       const x1 = point.timestamp * zoom - offsetX;
       const x2 = segmentEnd * zoom - offsetX;
       const y = this.percentToY(percent, height);
@@ -738,13 +635,8 @@ export class MetricStripRenderer {
       prevY = y;
     }
 
-    // Stroke with dashed style (simulated with alpha)
     if (!isFirst) {
-      g.stroke({
-        color: this.colors.tier3,
-        width: METRIC_STRIP_LINE_WIDTHS.tier3,
-        alpha: 0.7,
-      });
+      g.stroke({ color, width, alpha });
     }
   }
 
@@ -756,15 +648,12 @@ export class MetricStripRenderer {
     const y = this.percentToY(1.0, height);
 
     // Dashed line (simulated with multiple segments)
-    const dashLength = 8;
-    const gapLength = 4;
     let x = 0;
-
     while (x < displayWidth) {
-      const dashEnd = Math.min(x + dashLength, displayWidth);
+      const dashEnd = Math.min(x + LIMIT_LINE_DASH, displayWidth);
       g.moveTo(x, y);
       g.lineTo(dashEnd, y);
-      x += dashLength + gapLength;
+      x += LIMIT_LINE_DASH + LIMIT_LINE_GAP;
     }
 
     g.stroke({
@@ -790,12 +679,9 @@ export class MetricStripRenderer {
     const visibleEndTime = (offsetX + displayWidth) / zoom;
     const limitY = this.percentToY(1.0, height);
 
-    // Check all metrics for values > 100%
     for (let i = 0; i < data.points.length; i++) {
       const point = data.points[i]!;
-
-      const nextPoint = data.points[i + 1];
-      const segmentEnd = nextPoint?.timestamp ?? totalDuration;
+      const segmentEnd = data.points[i + 1]?.timestamp ?? totalDuration;
 
       if (segmentEnd < visibleStartTime) {
         continue;
@@ -804,27 +690,15 @@ export class MetricStripRenderer {
         break;
       }
 
-      // Find the max breach value at this timestamp
-      let maxPercent = 0;
-      for (const [_metricId, percent] of point.values) {
-        if (percent > maxPercent) {
-          maxPercent = percent;
-        }
-      }
-
-      // Also check tier3Max
-      if (point.tier3Max > maxPercent) {
-        maxPercent = point.tier3Max;
-      }
+      const maxPercent = this.getMaxPercentAtPoint(point);
 
       // Only render if breaching 100%
       if (maxPercent > 1.0) {
         const x1 = Math.max(0, point.timestamp * zoom - offsetX);
         const x2 = Math.min(displayWidth, segmentEnd * zoom - offsetX);
         const y = this.percentToY(maxPercent, height);
-
-        // Draw rectangle from 100% line up to breach level
         const rectHeight = limitY - y;
+
         if (rectHeight > 0 && x2 > x1) {
           g.rect(x1, y, x2 - x1, rectHeight);
           g.fill({ color: this.colors.breachArea, alpha: BREACH_AREA_OPACITY });
@@ -834,17 +708,29 @@ export class MetricStripRenderer {
   }
 
   // ============================================================================
-  // COORDINATE HELPERS
+  // HELPERS
   // ============================================================================
+
+  /**
+   * Get the maximum percentage across all metrics at a data point.
+   * Includes both individual metric values and tier3Max.
+   */
+  private getMaxPercentAtPoint(point: MetricStripDataPoint): number {
+    let max = 0;
+    for (const percent of point.values.values()) {
+      if (percent > max) {
+        max = percent;
+      }
+    }
+    return Math.max(max, point.tier3Max);
+  }
 
   /**
    * Convert percentage (0-1.2+) to Y coordinate.
    * 0% is at bottom, effectiveYMax at top.
    */
   private percentToY(percent: number, height: number): number {
-    // Clamp to valid range
     const clampedPercent = Math.max(0, Math.min(this.effectiveYMax, percent));
-    // Invert Y: 0% at bottom (y = height), effectiveYMax at top (y = 0)
     return height * (1 - clampedPercent / this.effectiveYMax);
   }
 }
