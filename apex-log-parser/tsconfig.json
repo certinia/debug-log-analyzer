@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "lib": ["ES2022"],
+
+    "outDir": "dist",
+    "rootDir": "src",
+
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "es2022",
+    "verbatimModuleSyntax": true,
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "erasableSyntaxOnly": true,
+
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+
+    "strictFunctionTypes": true,
+
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "forceConsistentCasingInFileNames": true,
+    "importHelpers": true,
+    "isolatedModules": true,
+    "noEmitOnError": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "removeComments": true,
+    "sourceMap": false
+  },
+  "include": ["./src/**/*.ts"],
+  "exclude": ["**/node_modules", "**/.*/"]
+}
