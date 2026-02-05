@@ -45,6 +45,10 @@ interface AxisConfig {
   fontSize: number;
   /** Minimum spacing between labels in pixels */
   minLabelSpacing: number;
+  /** Whether to show labels (default: true) */
+  showLabels?: boolean;
+  /** Grid line alpha/opacity (default: 1.0) */
+  gridAlpha?: number;
 }
 
 /**
@@ -132,8 +136,9 @@ export class MeshAxisRenderer {
    *
    * Implements dynamic tick calculation and label density management.
    * @param viewport - Current viewport state
+   * @param gridHeight - Optional height override for grid lines (defaults to viewport.displayHeight)
    */
-  public render(viewport: ViewportState): void {
+  public render(viewport: ViewportState, gridHeight?: number): void {
     // Clear previous frame
     this.clearLabels();
 
@@ -145,7 +150,7 @@ export class MeshAxisRenderer {
     const tickInterval = this.calculateTickInterval(viewport);
 
     // Render tick marks (vertical lines from top to bottom, behind rectangles)
-    this.renderTicks(viewport, timeStart, timeEnd, tickInterval);
+    this.renderTicks(viewport, timeStart, timeEnd, tickInterval, gridHeight);
   }
 
   /**
@@ -170,6 +175,26 @@ export class MeshAxisRenderer {
     for (const label of this.labelCache.values()) {
       label.style.fill = this.config.textColor;
     }
+  }
+
+  /**
+   * Apply alpha to a color by pre-multiplying into ABGR format for the shader.
+   * The shader expects colors in ABGR format with alpha in the high byte.
+   */
+  private applyAlphaToColor(color: number, alpha: number): number {
+    if (alpha >= 1.0) {
+      // Full alpha - pack as opaque ABGR
+      const r = (color >> 16) & 0xff;
+      const g = (color >> 8) & 0xff;
+      const b = color & 0xff;
+      return (0xff << 24) | (b << 16) | (g << 8) | r;
+    }
+    // Pre-multiply alpha into ABGR format
+    const r = (color >> 16) & 0xff;
+    const g = (color >> 8) & 0xff;
+    const b = color & 0xff;
+    const a = Math.round(alpha * 255);
+    return (a << 24) | (b << 16) | (g << 8) | r;
   }
 
   /**
@@ -320,7 +345,11 @@ export class MeshAxisRenderer {
     timeStart: number,
     timeEnd: number,
     tickInterval: TickInterval,
+    gridHeight?: number,
   ): void {
+    const effectiveHeight = gridHeight ?? viewport.displayHeight;
+    const showLabels = this.config.showLabels !== false;
+    const gridAlpha = this.config.gridAlpha ?? 1.0;
     // Calculate first tick position (snap to interval boundary)
     // Go back one extra tick to ensure we cover the left edge
     const firstTickIndex = Math.floor(timeStart / tickInterval.interval) - 1;
@@ -344,9 +373,12 @@ export class MeshAxisRenderer {
       offsetX: viewport.offsetX,
       offsetY: 0, // Full-height elements ignore Y pan
       displayWidth: viewport.displayWidth,
-      displayHeight: viewport.displayHeight,
+      displayHeight: effectiveHeight,
       canvasYOffset: 0,
     };
+
+    // Pre-multiply color with alpha for grid lines
+    const gridLineColorWithAlpha = this.applyAlphaToColor(this.gridLineColor, gridAlpha);
 
     let rectIndex = 0;
 
@@ -374,14 +406,14 @@ export class MeshAxisRenderer {
         pixelX,
         0,
         1,
-        viewport.displayHeight,
-        this.gridLineColor,
+        effectiveHeight,
+        gridLineColorWithAlpha,
         viewportTransform,
       );
       rectIndex++;
 
-      // Add label at top if requested
-      if (shouldShowLabel && this.screenSpaceContainer) {
+      // Add label at top if requested (only when showLabels is enabled)
+      if (showLabels && shouldShowLabel && this.screenSpaceContainer) {
         const timeMs = time / NS_PER_MS;
         const labelText = this.formatMilliseconds(timeMs);
 

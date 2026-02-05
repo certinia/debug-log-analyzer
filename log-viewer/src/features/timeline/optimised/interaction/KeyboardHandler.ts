@@ -130,6 +130,49 @@ export interface KeyboardCallbacks {
    * Called when 0/Escape is pressed in minimap to reset zoom.
    */
   onMinimapResetZoom?: () => void;
+
+  // ============================================================================
+  // METRIC STRIP KEYBOARD CALLBACKS
+  // ============================================================================
+
+  /**
+   * Called to check if the mouse is currently in the metric strip area.
+   * Used to determine whether to use metric strip-specific key bindings.
+   */
+  isInMetricStripArea?: () => boolean;
+
+  /**
+   * Called when arrow keys are pressed to pan the metric strip viewport.
+   * @param deltaTimeNs - Time delta in nanoseconds (positive = right)
+   */
+  onMetricStripPanViewport?: (deltaTimeNs: number) => void;
+
+  /**
+   * Called when arrow up/down are pressed to pan depth in metric strip.
+   * @param deltaY - Pixel delta (positive = down, showing shallower frames)
+   */
+  onMetricStripPanDepth?: (deltaY: number) => void;
+
+  /**
+   * Called when +/-/W/S is pressed in metric strip to zoom.
+   * @param direction - 'in' to zoom in, 'out' to zoom out
+   */
+  onMetricStripZoom?: (direction: 'in' | 'out') => void;
+
+  /**
+   * Called when Home key is pressed in metric strip to jump to start.
+   */
+  onMetricStripJumpStart?: () => void;
+
+  /**
+   * Called when End key is pressed in metric strip to jump to end.
+   */
+  onMetricStripJumpEnd?: () => void;
+
+  /**
+   * Called when 0/Escape is pressed in metric strip to reset zoom.
+   */
+  onMetricStripResetZoom?: () => void;
 }
 
 /**
@@ -212,6 +255,14 @@ export class KeyboardHandler {
     // Check if mouse is in minimap area - use minimap-specific handling
     if (this.callbacks.isInMinimapArea?.()) {
       if (this.handleMinimapKeyDown(event)) {
+        event.preventDefault();
+        return;
+      }
+    }
+
+    // Check if mouse is in metric strip area - use metric strip-specific handling
+    if (this.callbacks.isInMetricStripArea?.()) {
+      if (this.handleMetricStripKeyDown(event)) {
         event.preventDefault();
         return;
       }
@@ -340,6 +391,98 @@ export class KeyboardHandler {
       case 'ArrowDown':
         // Pan depth down - lens moves down visually (offsetY less negative)
         this.callbacks.onMinimapPanDepth?.(verticalStep);
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Handle keydown events when mouse is in metric strip area.
+   * Returns true if event was handled.
+   *
+   * Key Mappings (mirrors minimap):
+   * - Arrow Left/Right: Pan viewport horizontally
+   * - Arrow Up/Down: Pan depth vertically
+   * - W/+/=: Zoom in
+   * - S/-: Zoom out
+   * - Home: Jump to timeline start
+   * - End: Jump to timeline end
+   * - 0/Escape: Reset zoom
+   */
+  private handleMetricStripKeyDown(event: KeyboardEvent): boolean {
+    // Don't handle if Ctrl/Alt/Meta is pressed (allow browser shortcuts)
+    if (event.ctrlKey || event.altKey || event.metaKey) {
+      return false;
+    }
+
+    const key = event.key.toLowerCase();
+
+    // Pan viewport (Arrow keys)
+    if (this.handleMetricStripPanKeys(event)) {
+      return true;
+    }
+
+    // Zoom (W/S/+/-/=)
+    switch (key) {
+      case 'w':
+      case '+':
+      case '=':
+        this.callbacks.onMetricStripZoom?.('in');
+        return true;
+      case 's':
+      case '-':
+        this.callbacks.onMetricStripZoom?.('out');
+        return true;
+    }
+
+    // Jump to start/end (Home/End)
+    switch (event.key) {
+      case 'Home':
+        this.callbacks.onMetricStripJumpStart?.();
+        return true;
+      case 'End':
+        this.callbacks.onMetricStripJumpEnd?.();
+        return true;
+    }
+
+    // Reset zoom (0/Escape)
+    if (key === '0' || event.key === 'Escape') {
+      this.callbacks.onMetricStripResetZoom?.();
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handle arrow keys for metric strip pan.
+   * - Left/Right: Pan viewport horizontally
+   * - Up/Down: Pan depth vertically
+   */
+  private handleMetricStripPanKeys(event: KeyboardEvent): boolean {
+    const viewportState = this.viewport.getState();
+
+    // Calculate pan step (5% of visible range, matching main timeline and minimap)
+    const horizontalStep = viewportState.displayWidth * KEYBOARD_CONSTANTS.panStepPercent;
+    const verticalStep = viewportState.displayHeight * KEYBOARD_CONSTANTS.panStepPercent;
+
+    switch (event.key) {
+      case 'ArrowLeft':
+        // Pan viewport left - convert pixels to time
+        this.callbacks.onMetricStripPanViewport?.(-horizontalStep / viewportState.zoom);
+        return true;
+      case 'ArrowRight':
+        // Pan viewport right - convert pixels to time
+        this.callbacks.onMetricStripPanViewport?.(horizontalStep / viewportState.zoom);
+        return true;
+      case 'ArrowUp':
+        // Pan depth up (show deeper frames)
+        this.callbacks.onMetricStripPanDepth?.(-verticalStep);
+        return true;
+      case 'ArrowDown':
+        // Pan depth down (show shallower frames)
+        this.callbacks.onMetricStripPanDepth?.(verticalStep);
         return true;
       default:
         return false;

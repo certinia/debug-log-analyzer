@@ -141,6 +141,9 @@ export class MinimapManager {
   private state: MinimapState;
   private selection: MinimapSelection;
 
+  /** Height reservation for heat strip at bottom of minimap (0 if no heat strip data). */
+  private heatStripReservation = 0;
+
   constructor(
     totalDuration: number,
     maxDepth: number,
@@ -199,10 +202,32 @@ export class MinimapManager {
   }
 
   /**
-   * Get minimap chart area height (excludes axis).
+   * Set the heat strip height reservation.
+   * @deprecated Heat strip moved to MetricStripOrchestrator. Always returns 0.
+   *
+   * @param _height - Height in pixels (ignored, always 0)
+   */
+  public setHeatStripReservation(_height: number): void {
+    // Heat strip moved to MetricStripOrchestrator - reservation always 0
+    this.heatStripReservation = 0;
+  }
+
+  /**
+   * Get the bottom Y coordinate of the usable chart area.
+   * When heat strip has data, this is above the heat strip track.
+   * When no heat strip data, this is the full minimap height.
+   *
+   * @returns Y coordinate of chart area bottom
+   */
+  public getChartBottom(): number {
+    return this.state.height - this.heatStripReservation;
+  }
+
+  /**
+   * Get minimap chart area height (excludes axis and heat strip reservation).
    */
   public getChartHeight(): number {
-    return this.state.height - AXIS_HEIGHT;
+    return this.getChartBottom() - AXIS_HEIGHT;
   }
 
   // ============================================================================
@@ -246,18 +271,19 @@ export class MinimapManager {
    * - maxDepth (deepest frames) maps to TOP of chart area (just below axis)
    *
    * The axis is at TOP of minimap (Y=0 to Y=AXIS_HEIGHT).
-   * The chart area is from Y=AXIS_HEIGHT to Y=minimapHeight.
+   * The chart area is from Y=AXIS_HEIGHT to Y=chartBottom (accounts for heat strip).
    *
    * @param depth - Depth value (0-based)
    * @returns Y coordinate in minimap pixels
    */
   public depthToMinimapY(depth: number): number {
-    const chartHeight = this.state.height - AXIS_HEIGHT;
+    const chartBottom = this.getChartBottom();
+    const chartHeight = chartBottom - AXIS_HEIGHT;
     if (this.state.maxDepth <= 0) {
-      return this.state.height; // Return bottom of chart area if no depth info
+      return chartBottom; // Return bottom of chart area if no depth info
     }
     const ratio = depth / this.state.maxDepth;
-    // Invert: depth 0 → bottom (minimapHeight), maxDepth → top of chart (AXIS_HEIGHT)
+    // Invert: depth 0 → bottom (chartBottom), maxDepth → top of chart (AXIS_HEIGHT)
     return AXIS_HEIGHT + chartHeight * (1 - ratio);
   }
 
@@ -266,19 +292,20 @@ export class MinimapManager {
    * Inverse of depthToMinimapY - accounts for inverted Y-axis mapping.
    *
    * Axis area: Y=0 to Y=AXIS_HEIGHT (at TOP).
-   * Chart area: Y=AXIS_HEIGHT (top of chart) to Y=minimapHeight (bottom).
+   * Chart area: Y=AXIS_HEIGHT (top of chart) to Y=chartBottom (accounts for heat strip).
    * - Y=AXIS_HEIGHT → maxDepth (deepest)
-   * - Y=minimapHeight → depth 0 (root)
+   * - Y=chartBottom → depth 0 (root)
    *
    * @param y - Y coordinate in minimap pixels
    * @returns Depth value (0-based)
    */
   public minimapYToDepth(y: number): number {
-    const chartHeight = this.state.height - AXIS_HEIGHT;
+    const chartBottom = this.getChartBottom();
+    const chartHeight = chartBottom - AXIS_HEIGHT;
     if (chartHeight <= 0) {
       return 0;
     }
-    // Invert: Y at top of chart (AXIS_HEIGHT) → maxDepth, Y at bottom (minimapHeight) → depth 0
+    // Invert: Y at top of chart (AXIS_HEIGHT) → maxDepth, Y at bottom (chartBottom) → depth 0
     const yInChart = y - AXIS_HEIGHT;
     const ratio = 1 - yInChart / chartHeight;
     return Math.max(0, Math.min(this.state.maxDepth, ratio * this.state.maxDepth));
@@ -531,7 +558,7 @@ export class MinimapManager {
 
     // Get lens Y bounds (inverted: depthEnd is top, depthStart is bottom)
     const chartTop = AXIS_HEIGHT;
-    const chartBottom = this.state.height;
+    const chartBottom = this.getChartBottom();
     const lensY1 = Math.max(chartTop, this.depthToMinimapY(this.selection.depthEnd)); // Top of lens
     const lensY2 = Math.min(chartBottom, this.depthToMinimapY(this.selection.depthStart)); // Bottom of lens
 

@@ -49,6 +49,7 @@ export class ApexLogParser {
     queueableJobsAddedToQueue: { used: 0, limit: 0 },
     mobileApexPushCalls: { used: 0, limit: 0 },
     byNamespace: new Map<string, Limits>(),
+    snapshots: [],
   };
 
   /**
