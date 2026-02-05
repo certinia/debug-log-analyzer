@@ -119,11 +119,10 @@ const config: Config = {
       { name: 'author', content: 'Certinia' },
     ],
     navbar: {
-      title: 'Apex Log Analyzer for Salesforce',
+      title: 'Apex Log Analyzer',
       logo: {
-        alt: 'Certinia Logo',
-        src: 'img/logo.svg',
-        srcDark: 'img/logo-dark.svg',
+        alt: 'Apex Log Analyzer',
+        src: 'favicon.svg',
       },
       items: [
         {
