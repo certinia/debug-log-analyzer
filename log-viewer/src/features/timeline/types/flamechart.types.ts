@@ -646,6 +646,163 @@ export interface FindResultsEventDetail {
 }
 
 // ============================================================================
+// HEAT STRIP VISUALIZATION TYPES
+// ============================================================================
+
+/**
+ * Generic metric definition for heat strip visualization.
+ * Allows any metric system (not just Apex governor limits) to be displayed.
+ */
+export interface HeatStripMetric {
+  /** Unique identifier for this metric (e.g., 'cpuTime') */
+  id: string;
+  /** Human-readable display name (e.g., 'CPU Time') */
+  displayName: string;
+  /** Unit string for formatting (e.g., 'ms', 'bytes', '') */
+  unit: string;
+  /** Priority for tooltip ordering (0 = highest, shown first) */
+  priority: number;
+}
+
+/**
+ * Metric snapshot at a point in time.
+ * Represents current usage and limit for a single metric.
+ */
+export interface HeatStripMetricValue {
+  /** Current usage value */
+  used: number;
+  /** Maximum allowed value (limit) */
+  limit: number;
+}
+
+/**
+ * Time series event with generic metric values.
+ * Represents a snapshot of all metrics at a specific timestamp.
+ */
+export interface HeatStripEvent {
+  /** Timestamp in nanoseconds */
+  timestamp: number;
+  /** Namespace or context (e.g., 'default', 'managed package name') */
+  namespace: string;
+  /** Map of metric id to current values */
+  values: Map<string, HeatStripMetricValue>;
+}
+
+/**
+ * Complete time series data for heat strip visualization.
+ * Generic structure that can represent any metric system.
+ */
+export interface HeatStripTimeSeries {
+  /** Metric definitions (id → metadata) */
+  metrics: Map<string, HeatStripMetric>;
+  /** Time series events ordered by timestamp */
+  events: HeatStripEvent[];
+}
+
+/**
+ * Snapshot of a single metric at a point in time for tooltip display.
+ * Includes pre-computed percentage for convenience.
+ */
+export interface HeatStripMetricSnapshot {
+  /** Current usage value */
+  used: number;
+  /** Maximum allowed value (limit) */
+  limit: number;
+  /** Pre-computed percentage (used/limit) */
+  percent: number;
+}
+
+/**
+ * Metric definition for heat strip tooltip display.
+ * Alias for HeatStripMetric for semantic clarity.
+ */
+export type HeatStripTimeSeriesMetric = HeatStripMetric;
+
+// ============================================================================
+// METRIC STRIP VISUALIZATION TYPES
+// ============================================================================
+
+/**
+ * Classified metric for metric strip tier system.
+ * Metrics are classified into tiers based on their global max percentage.
+ */
+export interface MetricStripClassifiedMetric {
+  /** Unique metric identifier (e.g., 'cpuTime', 'soqlQueries') */
+  metricId: string;
+  /** Display name for the metric (e.g., 'CPU Time', 'SOQL Queries') */
+  displayName: string;
+  /** Tier classification: 1 = top 3, 2 = >80% at any point, 3 = remaining */
+  tier: 1 | 2 | 3;
+  /** Maximum percentage reached across all timestamps (0-1+) */
+  globalMaxPercent: number;
+  /** Line color for this metric (hex number 0xRRGGBB) */
+  color: number;
+  /** Priority for ordering (lower = higher priority, shown first) */
+  priority: number;
+  /** Unit string for formatting (e.g., 'ms', 'bytes', '') */
+  unit: string;
+}
+
+/**
+ * Raw metric value with used and limit.
+ */
+export interface MetricStripRawValue {
+  /** Current usage value */
+  used: number;
+  /** Maximum allowed value (limit) */
+  limit: number;
+}
+
+/**
+ * Data point at a specific timestamp in the metric strip.
+ */
+export interface MetricStripDataPoint {
+  /** Timestamp in nanoseconds */
+  timestamp: number;
+  /** Map of metricId → percentage (0-1+) */
+  values: Map<string, number>;
+  /** Map of metricId → raw used/limit values */
+  rawValues: Map<string, MetricStripRawValue>;
+  /** Maximum value of all Tier 3 metrics at this timestamp */
+  tier3Max: number;
+}
+
+/**
+ * Processed metric strip data ready for rendering.
+ */
+export interface MetricStripProcessedData {
+  /** Data points ordered by timestamp */
+  points: MetricStripDataPoint[];
+  /** Classified metrics with tier assignments */
+  classifiedMetrics: MetricStripClassifiedMetric[];
+  /** Global maximum percentage across all metrics and timestamps */
+  globalMaxPercent: number;
+  /** Whether there's any data to render */
+  hasData: boolean;
+}
+
+/**
+ * Metric strip time series input data (generic format).
+ * This is the same structure as HeatStripTimeSeries - reused for metric strip.
+ */
+export type MetricStripTimeSeries = HeatStripTimeSeries;
+
+// ============================================================================
+// BACKWARDS COMPATIBILITY ALIASES (deprecated, use MetricStrip* instead)
+// ============================================================================
+
+/** @deprecated Use MetricStripClassifiedMetric instead */
+export type SwimlaneClassifiedMetric = MetricStripClassifiedMetric;
+/** @deprecated Use MetricStripRawValue instead */
+export type SwimlaneRawValue = MetricStripRawValue;
+/** @deprecated Use MetricStripDataPoint instead */
+export type SwimlaneDataPoint = MetricStripDataPoint;
+/** @deprecated Use MetricStripProcessedData instead */
+export type SwimlaneProcessedData = MetricStripProcessedData;
+/** @deprecated Use MetricStripTimeSeries instead */
+export type SwimlaneTimeSeries = MetricStripTimeSeries;
+
+// ============================================================================
 // TEMPORAL SEGMENT TREE TYPES
 // ============================================================================
 

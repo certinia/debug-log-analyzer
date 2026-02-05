@@ -199,6 +199,7 @@ export class MinimapRenderer {
     // 2. Markers
     // 3. Axis (tick lines and labels - labels are in strip above chart area)
     // 4. Skyline (mesh-based for performance)
+    // NOTE: Heat strip removed - now rendered in MetricStripOrchestrator
     this.staticContainer.addChild(this.backgroundGraphics);
     this.staticContainer.addChild(this.markerGraphics);
     this.staticContainer.addChild(this.axisRenderer.getTickGraphics());
@@ -407,6 +408,8 @@ export class MinimapRenderer {
     // Render time axis
     this.axisRenderer.render(manager);
 
+    // NOTE: Heat strip removed - now rendered in MetricStripOrchestrator
+
     // If we have a renderer, cache to texture
     if (this.renderer && displayWidth > 0 && minimapHeight > 0) {
       // Create or resize texture
@@ -494,9 +497,10 @@ export class MinimapRenderer {
     const { buckets, globalMaxDepth } = densityData;
 
     // Axis is at TOP - chart area is below it
+    // When heat strip has data, chart ends above the heat strip track
     const axisHeight = this.axisRenderer.getHeight();
-    const chartHeight = minimapHeight - axisHeight;
-    const chartBottom = minimapHeight; // Chart ends at bottom of minimap
+    const chartBottom = manager.getChartBottom();
+    const chartHeight = chartBottom - axisHeight;
 
     if (globalMaxDepth === 0 || buckets.length === 0 || chartHeight <= 0) {
       this.skylineBarGeometry.setDrawCount(0);
@@ -579,9 +583,11 @@ export class MinimapRenderer {
     const state = manager.getState();
 
     // Axis is at TOP - chart area is below it
+    // When heat strip has data, chart ends above the heat strip track
     const axisHeight = this.axisRenderer.getHeight();
     const chartTop = axisHeight;
-    const chartHeight = minimapHeight - axisHeight;
+    const chartBottom = manager.getChartBottom();
+    const chartHeight = chartBottom - chartTop;
 
     // Apply 1px gap for negative space separation between adjacent markers
     // Same approach as TimelineMarkerRenderer: 0.5px inset from each edge
@@ -630,9 +636,10 @@ export class MinimapRenderer {
     const state = manager.getState();
 
     // Axis is at TOP - chart area is below it
+    // When heat strip has data, curtain ends above the heat strip (it's separate)
     const axisHeight = this.axisRenderer.getHeight();
     const chartTop = axisHeight;
-    const chartBottom = minimapHeight;
+    const chartBottom = manager.getChartBottom();
     const chartHeight = chartBottom - chartTop;
 
     // Calculate lens X bounds (time)
@@ -651,7 +658,7 @@ export class MinimapRenderer {
     const clampedLensY2 = Math.max(chartTop, Math.min(chartBottom, lensY2));
 
     // Draw 4 curtain regions (L-shaped around the lens window)
-    // Curtain covers ONLY the chart area (Y=axisHeight to Y=minimapHeight)
+    // Curtain covers ONLY the chart area (Y=axisHeight to Y=chartBottom)
     // Axis area (Y=0 to Y=axisHeight) is NOT covered to keep labels crisp
 
     // Left curtain (chart area only, excludes axis)
@@ -673,13 +680,13 @@ export class MinimapRenderer {
       this.curtainGraphics.fill({ color: this.colors.curtain, alpha: CURTAIN_OPACITY });
     }
 
-    // Bottom curtain (between left and right curtains, below lens to bottom of minimap)
-    if (clampedLensY2 < minimapHeight) {
+    // Bottom curtain (between left and right curtains, below lens to bottom of chart area)
+    if (clampedLensY2 < chartBottom) {
       this.curtainGraphics.rect(
         lensX1,
         clampedLensY2,
         lensX2 - lensX1,
-        minimapHeight - clampedLensY2,
+        chartBottom - clampedLensY2,
       );
       this.curtainGraphics.fill({ color: this.colors.curtain, alpha: CURTAIN_OPACITY });
     }
@@ -694,9 +701,10 @@ export class MinimapRenderer {
     minimapHeight: number,
   ): void {
     // Axis is at TOP - chart area is below it
+    // When heat strip has data, lens ends above the heat strip (it's separate)
     const axisHeight = this.axisRenderer.getHeight();
     const chartTop = axisHeight;
-    const chartBottom = minimapHeight;
+    const chartBottom = manager.getChartBottom();
 
     // Calculate lens bounds
     const lensX1 = manager.timeToMinimapX(selection.startTime);

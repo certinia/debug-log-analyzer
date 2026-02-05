@@ -24,6 +24,18 @@ import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 
 The `flamechart.types.ts` file re-exports necessary types from external modules, keeping dependencies contained at the boundary.
 
+### Metric Strip Architecture
+
+The metric strip visualization (governor limits) is rendered below the main timeline and above the minimap:
+
+- `MetricStripOrchestrator` manages the metric strip lifecycle and interactions
+- `MetricStripRenderer` renders step charts for governor limit metrics
+- `MetricStripManager` processes `HeatStripTimeSeries` data and classifies metrics into tiers
+- `ApexLogTimeline` transforms `GovernorSnapshot[]` → `HeatStripTimeSeries`
+- Apex-specific display names, units, and priority order are defined ONLY in ApexLogTimeline
+
+The metric strip supports collapsed (heat-style) and expanded (step chart) views, toggled via a chevron icon.
+
 ## Spatial Queries: Use TemporalSegmentTree
 
 **Always use TemporalSegmentTree (via RectangleManager) for frame queries. Never traverse the event tree directly.**
@@ -266,12 +278,18 @@ Tests should focus on the manager's API, not internal implementation.
    - Use instanced rendering where possible
    - Minimize state changes
 
-4. **Profile before optimizing**
+4. **Use Mesh for filled shapes, Graphics for lines**
+   - Mesh-based rendering (RectangleGeometry + custom shader) for rectangles/filled shapes
+   - Single draw call for many rectangles, much faster than Graphics
+   - Keep Graphics for thin lines (step charts, dashed lines) - mesh overhead not justified
+   - See `MeshRectangleRenderer`, `MeshMetricStripRenderer` for examples
+
+5. **Profile before optimizing**
    - Use Chrome DevTools Performance tab
    - Measure frame time, not just "feels fast"
    - Target 60fps (16.6ms frame budget)
 
-5. **Cache computed values**
+6. **Cache computed values**
    - Viewport transforms
    - Color conversions
    - Text measurements
