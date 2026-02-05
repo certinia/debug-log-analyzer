@@ -86,6 +86,72 @@ When hovering over the viewport lens or dragging, a label appears showing:
 - The **duration** of the selected time range (e.g., "1.23s")
 - The **time range** start and end (e.g., "0.5s - 1.73s")
 
+## Governor Limits Strip
+
+The Governor Limits strip displays Salesforce governor limit usage over time, positioned below the main timeline. It provides instant visual feedback on limit consumption to help identify potential limit breaches.
+
+### Display Modes
+
+#### Collapsed Mode (Default)
+
+A compact heat-style visualization showing the maximum limit usage across all metrics at each point in time.
+
+**Traffic Light Colors:**
+
+| Usage Range | Color        | Meaning  |
+| ----------- | ------------ | -------- |
+| 0-50%       | Transparent  | Safe     |
+| 50-80%      | Amber/Orange | Warning  |
+| 80-100%     | Red          | Critical |
+| >100%       | Purple       | Breach   |
+
+#### Expanded Mode
+
+Click the chevron icon (◀/▼) in the top-left corner or `Shift+Click` anywhere to expand to a full step chart showing:
+
+- **Tier 1 Metrics**: Top 3 metrics by usage (solid colored lines)
+- **Tier 2 Metrics**: Any metric exceeding 80% (solid colored lines)
+- **Tier 3 Metrics**: Remaining metrics (aggregated as grey dashed line)
+- **Danger Zone**: Semi-transparent band from 80-100%
+- **100% Limit Line**: Red dashed line at the limit threshold
+- **Breach Areas**: Purple shading for values above 100%
+
+### Mouse Interactions
+
+| Action          | Mouse                          | Result                            |
+| --------------- | ------------------------------ | --------------------------------- |
+| Toggle View     | Click chevron or `Shift+Click` | Switch between collapsed/expanded |
+| Show Tooltip    | Hover                          | Display metric breakdown          |
+| Center Timeline | Click on strip                 | Pan timeline to clicked position  |
+| Zoom            | Scroll (vertical)              | Zoom at cursor position           |
+| Pan             | Scroll (horizontal)            | Move timeline left/right          |
+| Reset View      | Double-click                   | Fit entire timeline               |
+
+### Keyboard Shortcuts
+
+When your mouse is hovering over the Governor Limits strip, these keyboard shortcuts are available:
+
+| Key            | Action                                      |
+| -------------- | ------------------------------------------- |
+| `Arrow Left`   | Pan viewport left (10% of selection width)  |
+| `Arrow Right`  | Pan viewport right (10% of selection width) |
+| `W` / `+`      | Zoom in                                     |
+| `S` / `-`      | Zoom out                                    |
+| `Home`         | Jump to timeline start                      |
+| `End`          | Jump to timeline end                        |
+| `0` / `Escape` | Reset zoom (fit entire timeline)            |
+
+### Tooltip
+
+Hovering over the metric strip displays a detailed breakdown showing:
+
+- **Always-visible metrics**: CPU Time, Heap Size, SOQL Queries, Query Rows, DML Statements, DML Rows
+- **Top 3 by percentage**: Highest usage metrics (if not already shown)
+- **Critical metrics**: Any metric at or above 80%
+- **Summary**: Count of remaining metrics with max percentage
+
+Each row displays: color swatch, metric name, percentage, and used/limit values.
+
 ## Navigation
 
 ### Zoom + Pan

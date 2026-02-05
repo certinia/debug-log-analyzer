@@ -547,7 +547,10 @@ export class MinimapInteractionHandler {
         this.callbacks.onResetView();
         this.lastClickTime = 0;
       } else {
-        // Single click - record for potential double-click
+        // Single click - teleport lens to clicked position
+        this.teleportLensToPosition(screenX);
+
+        // Record for potential double-click
         this.lastClickTime = currentTime;
         this.lastClickX = screenX;
         this.lastClickY = screenY;

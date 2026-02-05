@@ -13,7 +13,7 @@
 import * as PIXI from 'pixi.js';
 import type {
   EventNode,
-  LogEvent,
+  HeatStripTimeSeries,
   ModifierKeys,
   TimelineMarker,
   TimelineOptions,
@@ -62,6 +62,12 @@ import {
 
 import { SearchOrchestrator } from './orchestrators/SearchOrchestrator.js';
 import { SelectionOrchestrator } from './orchestrators/SelectionOrchestrator.js';
+
+import {
+  METRIC_STRIP_COLLAPSED_HEIGHT,
+  METRIC_STRIP_GAP,
+  MetricStripOrchestrator,
+} from './metric-strip/MetricStripOrchestrator.js';
 
 export interface FlameChartCallbacks {
   onMouseMove?: (
@@ -157,10 +163,15 @@ export class FlameChart<E extends EventNode = EventNode> {
   private minimapOrchestrator: MinimapOrchestrator | null = null;
   private minimapDiv: HTMLElement | null = null; // HTML container for minimap canvas
 
+  // Metric strip orchestrator (owns governor limit visualization between minimap and main timeline)
+  private metricStripOrchestrator: MetricStripOrchestrator | null = null;
+  private metricStripDiv: HTMLElement | null = null; // HTML container for metric strip canvas
+  private metricStripGapDiv: HTMLElement | null = null; // Gap element below metric strip
+
   // Cursor line renderer for main timeline (bidirectional cursor mirroring)
   private cursorLineRenderer: CursorLineRenderer | null = null;
 
-  // Vertical offset from container top to main timeline canvas (minimap height + gap)
+  // Vertical offset from container top to main timeline canvas (minimap + metric strip + gaps)
   // Used to convert canvas-relative coordinates to container-relative for tooltip positioning
   private mainTimelineYOffset = 0;
 
@@ -223,13 +234,16 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Create event index
     this.index = new TimelineEventIndex(events);
 
-    // Calculate minimap height BEFORE creating viewport
-    // Viewport needs the available height for main timeline (excluding minimap + gap)
+    // Calculate minimap and metric strip heights BEFORE creating viewport
+    // Viewport needs the available height for main timeline (excluding minimap + metric strip + gaps)
+    // Metric strip starts collapsed, so use collapsed height for initial layout
     const minimapHeight = calculateMinimapHeight(height);
-    const mainTimelineHeight = height - minimapHeight - MINIMAP_GAP;
+    const metricStripHeight = METRIC_STRIP_COLLAPSED_HEIGHT;
+    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
+    const mainTimelineHeight = height - totalOverheadHeight;
 
     // Store offset for converting canvas-relative to container-relative coordinates
-    this.mainTimelineYOffset = minimapHeight + MINIMAP_GAP;
+    this.mainTimelineYOffset = totalOverheadHeight;
 
     // Create viewport manager with adjusted height for main timeline area
     this.viewport = new TimelineViewport(
@@ -356,6 +370,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Initialize minimap orchestrator
     await this.setupMinimap();
 
+    // Initialize metric strip orchestrator
+    await this.setupMetricStrip();
+
     // Setup interaction handler
     this.setupInteractionHandler();
 
@@ -422,6 +439,12 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.minimapOrchestrator) {
       this.minimapOrchestrator.destroy();
       this.minimapOrchestrator = null;
+    }
+
+    // Clean up metric strip orchestrator
+    if (this.metricStripOrchestrator) {
+      this.metricStripOrchestrator.destroy();
+      this.metricStripOrchestrator = null;
     }
 
     // Clean up viewport animator
@@ -622,12 +645,16 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     const visibleWorldYBottom = -oldState.offsetY;
 
-    // Calculate new minimap and main timeline heights
+    // Calculate new minimap, metric strip, and main timeline heights
+    // Query actual metric strip height (respects collapsed/expanded state)
     const minimapHeight = calculateMinimapHeight(newHeight);
-    const mainTimelineHeight = newHeight - minimapHeight - MINIMAP_GAP;
+    const metricStripHeight =
+      this.metricStripOrchestrator?.getHeight() ?? METRIC_STRIP_COLLAPSED_HEIGHT;
+    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
+    const mainTimelineHeight = newHeight - totalOverheadHeight;
 
     // Update offset for converting canvas-relative to container-relative coordinates
-    this.mainTimelineYOffset = minimapHeight + MINIMAP_GAP;
+    this.mainTimelineYOffset = totalOverheadHeight;
 
     // Update orchestrators with new offset
     this.selectionOrchestrator?.setMainTimelineYOffset(this.mainTimelineYOffset);
@@ -636,6 +663,11 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Resize minimap orchestrator
     if (this.minimapOrchestrator) {
       this.minimapOrchestrator.resize(newWidth, newHeight);
+    }
+
+    // Resize metric strip orchestrator
+    if (this.metricStripOrchestrator) {
+      this.metricStripOrchestrator.resize(newWidth);
     }
 
     // Resize main timeline app
@@ -687,6 +719,33 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.requestRender();
   }
 
+  /**
+   * Set heat strip time series data for visualization.
+   * Call this after init() when log data is available.
+   *
+   * @param timeSeries - Heat strip time series data (generic format)
+   */
+  public setHeatStripTimeSeries(timeSeries: HeatStripTimeSeries | null): void {
+    this.metricStripOrchestrator?.setTimeSeries(timeSeries);
+    this.updateMetricStripVisibility();
+  }
+
+  /**
+   * Update metric strip visibility based on whether there's data to display.
+   * Hides the metric strip container and gap if no governor limit data exists.
+   */
+  private updateMetricStripVisibility(): void {
+    const isVisible = this.metricStripOrchestrator?.getIsVisible() ?? false;
+    const display = isVisible ? 'block' : 'none';
+
+    if (this.metricStripDiv) {
+      this.metricStripDiv.style.display = display;
+    }
+    if (this.metricStripGapDiv) {
+      this.metricStripGapDiv.style.display = display;
+    }
+  }
+
   // ============================================================================
   // PRIVATE SETUP METHODS
   // ============================================================================
@@ -700,9 +759,12 @@ export class FlameChart<E extends EventNode = EventNode> {
     sysTicker.autoStart = false;
     sysTicker.stop();
 
-    // Calculate minimap and main timeline heights
+    // Calculate minimap, metric strip, and main timeline heights
+    // Metric strip starts collapsed, so use collapsed height for initial layout
     const minimapHeight = calculateMinimapHeight(height);
-    const mainTimelineHeight = height - minimapHeight - MINIMAP_GAP;
+    const metricStripHeight = METRIC_STRIP_COLLAPSED_HEIGHT;
+    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
+    const mainTimelineHeight = height - totalOverheadHeight;
 
     // Create wrapper container with flexbox layout
     this.wrapper = document.createElement('div');
@@ -713,15 +775,29 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.minimapDiv = document.createElement('div');
     this.minimapDiv.style.cssText = `height:${minimapHeight}px;width:100%;flex-shrink:0;position:relative`;
 
-    // Gap element
-    const gapDiv = document.createElement('div');
-    gapDiv.style.cssText = `height:${MINIMAP_GAP}px;width:100%;flex-shrink:0;background:transparent`;
+    // Gap element between minimap and metric strip
+    const minimapGapDiv = document.createElement('div');
+    minimapGapDiv.style.cssText = `height:${MINIMAP_GAP}px;width:100%;flex-shrink:0;background:transparent`;
+
+    // Metric strip container (fixed height)
+    this.metricStripDiv = document.createElement('div');
+    this.metricStripDiv.style.cssText = `height:${metricStripHeight}px;width:100%;flex-shrink:0;position:relative`;
+
+    // Gap element between metric strip and main timeline
+    this.metricStripGapDiv = document.createElement('div');
+    this.metricStripGapDiv.style.cssText = `height:${METRIC_STRIP_GAP}px;width:100%;flex-shrink:0;background:transparent`;
 
     // Main timeline container (fills remaining space)
     const mainDiv = document.createElement('div');
     mainDiv.style.cssText = 'flex:1;width:100%;min-height:0';
 
-    this.wrapper.append(this.minimapDiv, gapDiv, mainDiv);
+    this.wrapper.append(
+      this.minimapDiv,
+      minimapGapDiv,
+      this.metricStripDiv,
+      this.metricStripGapDiv,
+      mainDiv,
+    );
 
     if (this.container) {
       this.container.appendChild(this.wrapper);
@@ -810,8 +886,9 @@ export class FlameChart<E extends EventNode = EventNode> {
         },
         onMouseLeave: () => {
           // Clear cursor position when mouse leaves main timeline
-          // Cursor is now managed by the minimap orchestrator
+          // Cursor is managed by the minimap and metric strip orchestrators
           this.minimapOrchestrator?.setCursorFromMainTimeline(null);
+          this.metricStripOrchestrator?.setCursorFromMainTimeline(null);
           this.requestRender();
 
           if (this.callbacks.onMouseMove) {
@@ -972,56 +1049,39 @@ export class FlameChart<E extends EventNode = EventNode> {
 
       // Minimap keyboard callbacks (delegated to MinimapOrchestrator)
       isInMinimapArea: () => this.minimapOrchestrator?.isMouseInMinimapArea() ?? false,
+      onMinimapPanViewport: (delta) => this.handleAnimatedPanViewport(delta),
+      onMinimapPanDepth: (delta) => this.handleAnimatedPanDepth(delta),
+      onMinimapZoom: (dir) => this.handleAnimatedZoom(dir),
+      onMinimapJumpStart: () => this.minimapOrchestrator?.handleJumpStart(),
+      onMinimapJumpEnd: () => this.minimapOrchestrator?.handleJumpEnd(),
+      onMinimapResetZoom: () => this.resetZoom(),
 
-      onMinimapPanViewport: (deltaTimeNs: number) => {
-        if (!this.viewport || !this.viewportAnimator) {
+      // Metric strip keyboard callbacks (delegated to viewport via animation)
+      isInMetricStripArea: () => this.metricStripOrchestrator?.isMouseInMetricStripArea() ?? false,
+      onMetricStripPanViewport: (delta) => this.handleAnimatedPanViewport(delta),
+      onMetricStripPanDepth: (delta) => this.handleAnimatedPanDepth(delta),
+      onMetricStripZoom: (dir) => this.handleAnimatedZoom(dir),
+      onMetricStripJumpStart: () => {
+        if (!this.viewport) {
           return;
         }
-        // Convert time delta to pixel delta using current zoom
+        this.viewportAnimator?.cancel();
         const viewportState = this.viewport.getState();
-        const deltaX = deltaTimeNs * viewportState.zoom;
-
-        // Use animated pan via chase animation for smooth keyboard panning
-        this.viewportAnimator.addToTarget(this.viewport, deltaX, 0, () =>
-          this.notifyViewportChange(),
-        );
+        this.viewport.setOffset(0, viewportState.offsetY);
+        this.notifyViewportChange();
       },
-
-      onMinimapPanDepth: (deltaY: number) => {
-        if (!this.viewport || !this.viewportAnimator) {
+      onMetricStripJumpEnd: () => {
+        if (!this.viewport || !this.index) {
           return;
         }
-        // Use animated pan via chase animation for smooth keyboard panning
-        this.viewportAnimator.addToTarget(this.viewport, 0, deltaY, () =>
-          this.notifyViewportChange(),
-        );
+        this.viewportAnimator?.cancel();
+        const viewportState = this.viewport.getState();
+        const endOffsetX =
+          this.index.totalDuration * viewportState.zoom - viewportState.displayWidth;
+        this.viewport.setOffset(Math.max(0, endOffsetX), viewportState.offsetY);
+        this.notifyViewportChange();
       },
-
-      onMinimapZoom: (direction: 'in' | 'out') => {
-        if (!this.viewport || !this.viewportAnimator) {
-          return;
-        }
-
-        const factor =
-          direction === 'in' ? KEYBOARD_CONSTANTS.zoomFactor : 1 / KEYBOARD_CONSTANTS.zoomFactor;
-
-        // Use animated zoom via chase animation for smooth keyboard zooming
-        this.viewportAnimator.multiplyZoomTarget(this.viewport, factor, () =>
-          this.notifyViewportChange(),
-        );
-      },
-
-      onMinimapJumpStart: () => {
-        this.minimapOrchestrator?.handleJumpStart();
-      },
-
-      onMinimapJumpEnd: () => {
-        this.minimapOrchestrator?.handleJumpEnd();
-      },
-
-      onMinimapResetZoom: () => {
-        this.resetZoom();
-      },
+      onMetricStripResetZoom: () => this.resetZoom(),
     });
 
     this.keyboardHandler.attach();
@@ -1095,6 +1155,100 @@ export class FlameChart<E extends EventNode = EventNode> {
     const minimapApp = this.minimapOrchestrator.getApp();
     if (minimapApp?.canvas) {
       minimapApp.canvas.addEventListener('mousedown', () => {
+        this.container?.focus();
+      });
+    }
+  }
+
+  /**
+   * Setup metric strip orchestrator for governor limit visualization.
+   */
+  private async setupMetricStrip(): Promise<void> {
+    if (!this.index || !this.viewport || !this.metricStripDiv) {
+      return;
+    }
+
+    const { displayWidth } = this.viewport.getState();
+
+    // Create metric strip orchestrator with callbacks
+    this.metricStripOrchestrator = new MetricStripOrchestrator({
+      onZoomToRegion: (centerTimeNs: number, durationNs: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        // Simplified zoom calculation for better performance
+        // Calculate new zoom to fit the duration in the viewport
+        const viewportState = this.viewport.getState();
+        const newZoom = viewportState.displayWidth / durationNs;
+        // Center on the click time
+        const newOffsetX = centerTimeNs * newZoom - viewportState.displayWidth / 2;
+
+        this.viewport.setZoom(newZoom);
+        this.viewport.setOffset(Math.max(0, newOffsetX), viewportState.offsetY);
+        this.notifyViewportChange();
+      },
+      onCursorMove: (timeNs: number | null) => {
+        // Update minimap cursor to sync with metric strip
+        this.minimapOrchestrator?.setCursorFromMainTimeline(timeNs);
+      },
+      requestRender: () => {
+        this.requestRender();
+      },
+      onZoom: (factor: number, anchorTimeNs: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        // Convert anchor time to screen X in main viewport
+        const viewportState = this.viewport.getState();
+        const anchorScreenX = anchorTimeNs * viewportState.zoom - viewportState.offsetX;
+        // Apply zoom with anchor
+        this.viewport.zoomByFactor(factor, anchorScreenX);
+        this.notifyViewportChange();
+      },
+      onHorizontalPan: (deltaPixels: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        const viewportState = this.viewport.getState();
+        this.viewport.setOffset(viewportState.offsetX + deltaPixels, viewportState.offsetY);
+        this.notifyViewportChange();
+      },
+      onResetView: () => {
+        this.resetZoom();
+      },
+      onDepthPan: (deltaY: number) => {
+        if (!this.viewport) {
+          return;
+        }
+        const viewportState = this.viewport.getState();
+        this.viewport.setOffset(viewportState.offsetX, viewportState.offsetY + deltaY);
+        this.notifyViewportChange();
+      },
+      onHeightChange: (newHeight: number) => {
+        // Update metric strip div height
+        if (this.metricStripDiv) {
+          this.metricStripDiv.style.height = `${newHeight}px`;
+        }
+        // Trigger full layout recalculation to resize main timeline
+        // The container size doesn't change, but internal flexbox layout does
+        if (this.container) {
+          const { width, height } = this.container.getBoundingClientRect();
+          this.resize(width, height);
+        }
+      },
+    });
+
+    // Initialize the orchestrator
+    await this.metricStripOrchestrator.init(
+      this.metricStripDiv,
+      displayWidth,
+      this.index.totalDuration,
+    );
+
+    // Focus container on metric strip mousedown for keyboard support
+    const metricStripApp = this.metricStripOrchestrator.getApp();
+    if (metricStripApp?.canvas) {
+      metricStripApp.canvas.addEventListener('mousedown', () => {
         this.container?.focus();
       });
     }
@@ -1234,6 +1388,10 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.interactionHandler) {
       this.interactionHandler.updateCursor(eventNode !== null || marker !== null);
     }
+
+    // Update metric strip cursor (sync from main timeline)
+    const timeNs = (screenX + viewportState.offsetX) / viewportState.zoom;
+    this.metricStripOrchestrator?.setCursorFromMainTimeline(timeNs);
 
     // Notify callback with container-relative coordinates
     // (screenY is canvas-relative, add minimap offset for container-relative positioning)
@@ -1571,6 +1729,45 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.notifyViewportChange();
   }
 
+  /**
+   * Handle animated pan in the time (X) direction.
+   * Used by minimap and metric strip keyboard handlers.
+   */
+  private handleAnimatedPanViewport(deltaTimeNs: number): void {
+    if (!this.viewport || !this.viewportAnimator) {
+      return;
+    }
+    const viewportState = this.viewport.getState();
+    const deltaX = deltaTimeNs * viewportState.zoom;
+    this.viewportAnimator.addToTarget(this.viewport, deltaX, 0, () => this.notifyViewportChange());
+  }
+
+  /**
+   * Handle animated pan in the depth (Y) direction.
+   * Used by minimap and metric strip keyboard handlers.
+   */
+  private handleAnimatedPanDepth(deltaY: number): void {
+    if (!this.viewport || !this.viewportAnimator) {
+      return;
+    }
+    this.viewportAnimator.addToTarget(this.viewport, 0, deltaY, () => this.notifyViewportChange());
+  }
+
+  /**
+   * Handle animated zoom in or out.
+   * Used by minimap and metric strip keyboard handlers.
+   */
+  private handleAnimatedZoom(direction: 'in' | 'out'): void {
+    if (!this.viewport || !this.viewportAnimator) {
+      return;
+    }
+    const factor =
+      direction === 'in' ? KEYBOARD_CONSTANTS.zoomFactor : 1 / KEYBOARD_CONSTANTS.zoomFactor;
+    this.viewportAnimator.multiplyZoomTarget(this.viewport, factor, () =>
+      this.notifyViewportChange(),
+    );
+  }
+
   private initializeState(events: LogEvent[]): void {
     if (!this.viewport) {
       return;
@@ -1670,6 +1867,9 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Phase 7: Render minimap
     this.renderMinimap(viewportState);
+
+    // Phase 8: Render metric strip
+    this.renderMetricStrip(viewportState);
   }
 
   /**
@@ -1782,6 +1982,28 @@ export class FlameChart<E extends EventNode = EventNode> {
       markers: this.markers,
       batchColors: this.state.batchColorsCache,
       cursorTimeNs: this.minimapOrchestrator.getCursorTimeNs(),
+    });
+  }
+
+  /**
+   * Render metric strip via orchestrator.
+   * Pure render method - click handling and cursor updates happen in event handlers.
+   */
+  private renderMetricStrip(viewportState: ViewportState): void {
+    if (!this.metricStripOrchestrator || !this.index) {
+      return;
+    }
+
+    // Get cursor time from metric strip or minimap (for bidirectional sync)
+    const cursorTimeNs = this.metricStripOrchestrator.isMouseInMetricStripArea()
+      ? this.metricStripOrchestrator.getCursorTimeNs()
+      : (this.minimapOrchestrator?.getCursorTimeNs() ?? null);
+
+    this.metricStripOrchestrator.render({
+      viewportState,
+      totalDuration: this.index.totalDuration,
+      cursorTimeNs,
+      markers: this.markers,
     });
   }
 }

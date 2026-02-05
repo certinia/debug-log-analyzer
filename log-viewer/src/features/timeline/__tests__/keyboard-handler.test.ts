@@ -61,6 +61,14 @@ describe('KeyboardHandler', () => {
       onMinimapJumpStart: jest.fn(),
       onMinimapJumpEnd: jest.fn(),
       onMinimapResetZoom: jest.fn(),
+      // Metric strip keyboard callbacks
+      isInMetricStripArea: jest.fn().mockReturnValue(false),
+      onMetricStripPanViewport: jest.fn(),
+      onMetricStripPanDepth: jest.fn(),
+      onMetricStripZoom: jest.fn(),
+      onMetricStripJumpStart: jest.fn(),
+      onMetricStripJumpEnd: jest.fn(),
+      onMetricStripResetZoom: jest.fn(),
     };
 
     handler = new KeyboardHandler(container, viewport, callbacks);
