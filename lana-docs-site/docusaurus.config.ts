@@ -35,10 +35,29 @@ const config: Config = {
     defaultLocale: 'en',
     locales: ['en'],
   },
-  favicon: `${siteUrl}/favicon.svg`,
+  favicon: `${siteUrl}/favicon-192x192.png`,
   // Enhanced head tags for better search engine recognition
   // Multiple favicon formats for better compatibility
+  // Google requires favicons to be at least 48x48 pixels
   headTags: [
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'icon',
+        type: 'image/png',
+        sizes: '192x192',
+        href: `${siteUrl}/favicon-192x192.png`,
+      },
+    },
+    {
+      tagName: 'link',
+      attributes: {
+        rel: 'icon',
+        type: 'image/png',
+        sizes: '48x48',
+        href: `${siteUrl}/favicon-48x48.png`,
+      },
+    },
     {
       tagName: 'link',
       attributes: {
@@ -52,13 +71,13 @@ const config: Config = {
       attributes: {
         rel: 'icon',
         type: 'image/x-icon',
-        href: `${siteUrl}/favicon.ico`, // fallback for older browsers
+        href: `${siteUrl}/favicon.ico`,
       },
     },
     {
       tagName: 'link',
       attributes: {
-        rel: 'apple-touch-icon', // Apple touch icon for better mobile display
+        rel: 'apple-touch-icon',
         sizes: '180x180',
         href: `${siteUrl}/favicon.png`,
       },
