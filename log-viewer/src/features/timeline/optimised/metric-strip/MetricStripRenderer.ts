@@ -184,7 +184,7 @@ export class MetricStripRenderer {
 
     // In collapsed mode, only render toggle button (markers already rendered above)
     if (this.isCollapsed) {
-      this.renderCollapsedView(displayWidth, height);
+      this.renderCollapsedView();
       return;
     }
 
@@ -200,17 +200,17 @@ export class MetricStripRenderer {
     this.renderBreachAreas(data, viewportState, totalDuration, height);
 
     // Always render toggle button on top
-    this.renderToggleButton(height);
+    this.renderToggleButton();
   }
 
   /**
    * Render the collapsed view - stacked colored strips showing metric percentages.
    * This is a heat-style visualization showing Tier 1/2 metrics.
    */
-  private renderCollapsedView(_displayWidth: number, height: number): void {
+  private renderCollapsedView(): void {
     // The heat-style visualization is rendered in renderCollapsedWithData()
     // Here we just render the toggle button
-    this.renderToggleButton(height);
+    this.renderToggleButton();
   }
 
   /**
@@ -218,7 +218,7 @@ export class MetricStripRenderer {
    * Shows a chevron icon: ▶ when collapsed, ▼ when expanded.
    * No background - just the chevron icon at top left.
    */
-  private renderToggleButton(_height: number): void {
+  private renderToggleButton(): void {
     const g = this.toggleGraphics;
 
     // Chevron icon at top left (no background)
