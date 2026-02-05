@@ -9,6 +9,8 @@
  * Colors are designed to be distinguishable on both light and dark backgrounds.
  */
 
+import type { MarkerType } from '../../types/flamechart.types.js';
+
 /**
  * MetricStrip color palette.
  */
@@ -233,7 +235,7 @@ export const METRIC_STRIP_TIME_GRID_OPACITY = 0.3;
  * Marker colors pre-blended with background for metric strip background bands.
  * These match the minimap marker colors for visual consistency.
  */
-export const METRIC_STRIP_MARKER_COLORS_BLENDED: Record<string, number> = {
+export const METRIC_STRIP_MARKER_COLORS_BLENDED: Record<MarkerType, number> = {
   error: 0xff8080, // Light red
   skip: 0x1e80ff, // Light blue
   unexpected: 0x8080ff, // Light purple
