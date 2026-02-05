@@ -494,14 +494,6 @@ export class MetricStripOrchestrator {
 
     const canvas = this.app.canvas as HTMLCanvasElement;
 
-    // Bind event handlers to preserve `this` context
-    this.handleMouseEnter = this.handleMouseEnter.bind(this);
-    this.handleMouseLeave = this.handleMouseLeave.bind(this);
-    this.handleMouseMove = this.handleMouseMove.bind(this);
-    this.handleClick = this.handleClick.bind(this);
-    this.handleWheel = this.handleWheel.bind(this);
-    this.handleDoubleClick = this.handleDoubleClick.bind(this);
-
     canvas.addEventListener('mouseenter', this.handleMouseEnter);
     canvas.addEventListener('mouseleave', this.handleMouseLeave);
     canvas.addEventListener('mousemove', this.handleMouseMove);
