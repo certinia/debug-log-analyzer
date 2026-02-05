@@ -56,6 +56,9 @@ export abstract class BaseTooltipRenderer {
   /** Default positioning options. */
   protected positionOptions: TooltipPositionOptions;
 
+  /** Pending requestAnimationFrame ID for cancellation. */
+  private pendingRafId: number | null = null;
+
   /**
    * Create a new tooltip renderer.
    *
@@ -85,6 +88,7 @@ export abstract class BaseTooltipRenderer {
    * Hide the tooltip.
    */
   public hide(): void {
+    this.cancelPendingPositioning();
     this.tooltipElement.style.display = 'none';
   }
 
@@ -92,7 +96,18 @@ export abstract class BaseTooltipRenderer {
    * Destroy the tooltip and cleanup.
    */
   public destroy(): void {
+    this.cancelPendingPositioning();
     this.tooltipElement.remove();
+  }
+
+  /**
+   * Cancel any pending positioning animation frame.
+   */
+  private cancelPendingPositioning(): void {
+    if (this.pendingRafId !== null) {
+      cancelAnimationFrame(this.pendingRafId);
+      this.pendingRafId = null;
+    }
   }
 
   /**
@@ -140,7 +155,11 @@ export abstract class BaseTooltipRenderer {
   protected positionTooltip(screenX: number, screenY: number): void {
     const { mode, offset = 8, padding = 4 } = this.positionOptions;
 
-    requestAnimationFrame(() => {
+    // Cancel any pending positioning to avoid stale updates
+    this.cancelPendingPositioning();
+
+    this.pendingRafId = requestAnimationFrame(() => {
+      this.pendingRafId = null;
       const tooltipWidth = this.tooltipElement.offsetWidth;
       const tooltipHeight = this.tooltipElement.offsetHeight;
       const containerWidth = this.container.offsetWidth;

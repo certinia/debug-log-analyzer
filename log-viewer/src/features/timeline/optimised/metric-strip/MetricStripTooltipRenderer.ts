@@ -145,23 +145,23 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
     const offset = this.positionOptions.offset ?? 8;
     const padding = this.positionOptions.padding ?? 4;
 
-    requestAnimationFrame(() => {
-      const tooltipWidth = this.tooltipElement.offsetWidth;
-      const containerWidth = this.container.offsetWidth;
+    // Use base class positioning logic pattern (calls cancelPendingPositioning internally)
+    // But we need direct positioning here, so call super pattern manually
+    const tooltipWidth = this.tooltipElement.offsetWidth;
+    const containerWidth = this.container.offsetWidth;
 
-      // X: position at cursor with flip if needed
-      let left = screenX + offset;
-      if (left + tooltipWidth > containerWidth) {
-        left = screenX - tooltipWidth - offset;
-      }
-      left = Math.max(padding, Math.min(containerWidth - tooltipWidth - padding, left));
+    // X: position at cursor with flip if needed
+    let left = screenX + offset;
+    if (left + tooltipWidth > containerWidth) {
+      left = screenX - tooltipWidth - offset;
+    }
+    left = Math.max(padding, Math.min(containerWidth - tooltipWidth - padding, left));
 
-      // Y: always position below the strip
-      const top = this.stripHeight + offset;
+    // Y: always position below the strip
+    const top = this.stripHeight + offset;
 
-      this.tooltipElement.style.left = `${left}px`;
-      this.tooltipElement.style.top = `${top}px`;
-    });
+    this.tooltipElement.style.left = `${left}px`;
+    this.tooltipElement.style.top = `${top}px`;
   }
 
   // ============================================================================
