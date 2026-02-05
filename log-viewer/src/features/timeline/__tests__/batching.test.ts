@@ -12,9 +12,8 @@
  * - Hierarchical rectangle collection
  */
 
+import type { LogEvent, LogSubCategory } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type { LogSubCategory } from '../../../core/log-parser/types.js';
 import { EventBatchRenderer } from '../optimised/EventBatchRenderer.js';
 import { RectangleManager } from '../optimised/RectangleManager.js';
 import type { RenderBatch, ViewportState } from '../types/flamechart.types.js';

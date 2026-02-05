@@ -12,7 +12,7 @@
 import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
-import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog } from 'apex-log-parser';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 
 import type { TimelineOptions } from '../types/flamechart.types.js';

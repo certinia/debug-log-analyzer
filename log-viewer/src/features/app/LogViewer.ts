@@ -4,8 +4,7 @@
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { parse } from '../../core/log-parser/ApexLogParser.js';
-import { type ApexLog } from '../../core/log-parser/LogEvents.js';
+import { parse, type ApexLog } from 'apex-log-parser';
 import { vscodeMessenger } from '../../core/messaging/VSCodeExtensionMessenger.js';
 import {
   Notification,

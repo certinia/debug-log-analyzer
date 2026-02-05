@@ -2,8 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
-import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type { LogIssue, LogSubCategory } from '../../../core/log-parser/types.js';
+import type { ApexLog, LogEvent, LogIssue, LogSubCategory } from 'apex-log-parser';
 import { debounce, formatDuration } from '../../../core/utility/Util.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
 

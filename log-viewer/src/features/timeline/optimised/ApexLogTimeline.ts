@@ -17,9 +17,8 @@
  * LogEvent should only be referenced here in ApexLogTimeline to convert to generic EventNode for FlameChart and not in FlameChart or its dependencies.
  */
 
+import type { ApexLog, GovernorSnapshot, Limits, LogEvent } from 'apex-log-parser';
 import { ContextMenu, type ContextMenuItem } from '../../../components/ContextMenu.js';
-import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type { GovernorSnapshot, Limits } from '../../../core/log-parser/types.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
