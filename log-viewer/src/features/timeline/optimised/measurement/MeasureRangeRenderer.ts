@@ -19,6 +19,8 @@
 import * as PIXI from 'pixi.js';
 import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
+import { parseColorToHex } from '../rendering/ColorUtils.js';
+import { calculateLabelPosition, createTimelineLabel } from '../rendering/LabelPositioning.js';
 import type { MeasurementState } from './MeasurementManager.js';
 
 /**
@@ -84,26 +86,7 @@ export class MeasureRangeRenderer {
    * Create the HTML label element with styling.
    */
   private createLabelElement(): HTMLDivElement {
-    const label = document.createElement('div');
-    label.className = 'measure-range-label';
-    label.style.cssText = `
-      position: absolute;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 8px 12px;
-      border-radius: 4px;
-      background: var(--vscode-editorWidget-background, #252526);
-      border: 1px solid var(--vscode-editorWidget-border, #454545);
-      color: var(--vscode-editorWidget-foreground, #cccccc);
-      font-family: var(--vscode-font-family, sans-serif);
-      font-size: 12px;
-      pointer-events: none;
-      z-index: 100;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    `;
-    return label;
+    return createTimelineLabel('measure-range-label');
   }
 
   /**
@@ -124,52 +107,13 @@ export class MeasureRangeRenderer {
       computedStyle.getPropertyValue('--vscode-focusBorder').trim() ||
       '#007fd4';
 
+    // Default blue (0x264f78) for measurement overlay
+    const defaultBlue = 0x264f78;
+
     return {
-      fillColor: this.parseColorToHex(fillStr),
-      borderColor: this.parseColorToHex(borderStr),
+      fillColor: parseColorToHex(fillStr, defaultBlue),
+      borderColor: parseColorToHex(borderStr, defaultBlue),
     };
-  }
-
-  /**
-   * Parse CSS color string to numeric hex (RGB only).
-   */
-  private parseColorToHex(cssColor: string): number {
-    if (!cssColor) {
-      return 0x264f78; // Default blue
-    }
-
-    if (cssColor.startsWith('#')) {
-      const hex = cssColor.slice(1);
-      if (hex.length === 8) {
-        return parseInt(hex.slice(0, 6), 16);
-      }
-      if (hex.length === 6) {
-        return parseInt(hex, 16);
-      }
-      if (hex.length === 4) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        return parseInt(r + r + g + g + b + b, 16);
-      }
-      if (hex.length === 3) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        return parseInt(r + r + g + g + b + b, 16);
-      }
-    }
-
-    // rgba() fallback
-    const rgba = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-    if (rgba) {
-      const r = parseInt(rgba[1]!, 10);
-      const g = parseInt(rgba[2]!, 10);
-      const b = parseInt(rgba[3]!, 10);
-      return (r << 16) | (g << 8) | b;
-    }
-
-    return 0x264f78; // Default blue
   }
 
   /**
@@ -299,49 +243,14 @@ export class MeasureRangeRenderer {
     // Position label after content is set (need to measure label size)
     requestAnimationFrame(() => {
       const labelRect = this.labelElement.getBoundingClientRect();
-      const labelWidth = labelRect.width;
-      const labelHeight = labelRect.height;
-      const padding = 8;
-
-      // Calculate visible portion of measurement overlay
-      const visibleStartX = Math.max(screenStartX, 0);
-      const visibleEndX = Math.min(screenEndX, viewport.displayWidth);
-      const visibleWidth = visibleEndX - visibleStartX;
-
-      // Determine horizontal position
-      let left: number;
-
-      // Try to center in visible portion first
-      const centeredLeft = visibleStartX + (visibleWidth - labelWidth) / 2;
-
-      if (visibleWidth >= labelWidth + padding * 2) {
-        // Visible portion is wide enough: center tooltip in visible portion
-        left = centeredLeft;
-      } else if (screenStartX < 0 && screenEndX > viewport.displayWidth) {
-        // Both edges offscreen: center on viewport
-        left = (viewport.displayWidth - labelWidth) / 2;
-      } else if (screenStartX < 0) {
-        // Left edge offscreen, right visible: stick to left edge of viewport
-        left = padding;
-      } else if (screenEndX > viewport.displayWidth) {
-        // Right edge offscreen, left visible: stick to right edge of viewport
-        left = viewport.displayWidth - labelWidth - padding;
-      } else {
-        // Overlay is small but fully visible: center on overlay (may extend outside)
-        left = centeredLeft;
-      }
-
-      // Clamp to viewport bounds (safety)
-      left = Math.max(padding, Math.min(viewport.displayWidth - labelWidth - padding, left));
-
-      // Vertical center
-      const top = Math.max(
-        padding,
-        Math.min(
-          viewport.displayHeight - labelHeight - padding,
-          viewport.displayHeight / 2 - labelHeight / 2,
-        ),
-      );
+      const { left, top } = calculateLabelPosition({
+        labelWidth: labelRect.width,
+        labelHeight: labelRect.height,
+        screenStartX,
+        screenEndX,
+        displayWidth: viewport.displayWidth,
+        displayHeight: viewport.displayHeight,
+      });
 
       this.labelElement.style.left = `${left}px`;
       this.labelElement.style.top = `${top}px`;

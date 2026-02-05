@@ -730,3 +730,44 @@ export const SEGMENT_TREE_CONSTANTS = {
   MIN_NODE_SPAN: 1,
 } as const;
 /* eslint-enable @typescript-eslint/naming-convention */
+
+// ============================================================================
+// INTERACTION MODE TYPES
+// ============================================================================
+
+/**
+ * Types of drag interactions in the timeline.
+ * Used for unified mode handling in TimelineInteractionHandler.
+ */
+export const InteractionModeType = {
+  MEASURE: 'measure',
+  AREA_ZOOM: 'areaZoom',
+  RESIZE: 'resize',
+} as const;
+
+export type InteractionModeType = (typeof InteractionModeType)[keyof typeof InteractionModeType];
+
+/**
+ * Unified state for drag-based interaction modes.
+ * Consolidates common state tracked across measure, area zoom, and resize modes.
+ */
+export interface DragModeState {
+  /** Type of interaction mode */
+  type: InteractionModeType;
+  /** Whether the mode is actively dragging */
+  isActive: boolean;
+  /** Starting X coordinate (screen pixels) */
+  startX: number;
+  /** Whether a drag threshold has been exceeded (distinguishes click from drag) */
+  didDrag: boolean;
+  /** Last tracked screen X position (for auto-scroll updates) */
+  lastScreenX: number;
+  /** Last tracked screen Y position (for auto-scroll updates) */
+  lastScreenY: number;
+  /** Mouse down X (client coordinates, for drag threshold) */
+  mouseDownX: number;
+  /** Mouse down Y (client coordinates, for drag threshold) */
+  mouseDownY: number;
+  /** Edge being dragged (for resize mode only) */
+  edge?: 'left' | 'right';
+}
