@@ -106,6 +106,9 @@ export class MetricStripRenderer {
   /** Graphics for expand/collapse toggle button. */
   private toggleGraphics: Graphics;
 
+  /** All graphics containers. Ordered back to front. */
+  private graphics: Graphics[];
+
   /** Current color palette. */
   private colors: MetricStripColors;
 
@@ -130,15 +133,7 @@ export class MetricStripRenderer {
     this.breachGraphics = new Graphics();
     this.toggleGraphics = new Graphics();
 
-    this.colors = getMetricStripColors();
-  }
-
-  /**
-   * Get all graphics objects for adding to a container.
-   * Returns in correct render order (back to front).
-   */
-  public getGraphics(): Graphics[] {
-    return [
+    this.graphics = [
       this.markerGraphics,
       this.dangerZoneGraphics,
       this.areaFillGraphics,
@@ -147,6 +142,16 @@ export class MetricStripRenderer {
       this.breachGraphics,
       this.toggleGraphics, // Toggle rendered on top
     ];
+
+    this.colors = getMetricStripColors();
+  }
+
+  /**
+   * Get all graphics objects for adding to a container.
+   * Returns in correct render order (back to front).
+   */
+  public getGraphics(): Graphics[] {
+    return this.graphics;
   }
 
   /**
@@ -353,26 +358,18 @@ export class MetricStripRenderer {
    * Clear all graphics.
    */
   public clear(): void {
-    this.markerGraphics.clear();
-    this.dangerZoneGraphics.clear();
-    this.areaFillGraphics.clear();
-    this.lineGraphics.clear();
-    this.limitLineGraphics.clear();
-    this.breachGraphics.clear();
-    this.toggleGraphics.clear();
+    for (const graphics of this.getGraphics()) {
+      graphics.clear();
+    }
   }
 
   /**
    * Destroy all graphics and cleanup.
    */
   public destroy(): void {
-    this.markerGraphics.destroy();
-    this.dangerZoneGraphics.destroy();
-    this.areaFillGraphics.destroy();
-    this.lineGraphics.destroy();
-    this.limitLineGraphics.destroy();
-    this.breachGraphics.destroy();
-    this.toggleGraphics.destroy();
+    for (const graphics of this.getGraphics()) {
+      graphics.destroy();
+    }
   }
 
   // ============================================================================
