@@ -561,7 +561,7 @@ export class ApexLogTimeline {
     }
 
     if (logEvent?.timestamp) {
-      navActions.push({ id: 'show-in-log', label: 'Show in Log' });
+      navActions.push({ id: 'show-in-log', label: 'Show in Log File' });
     }
 
     builder.addGroup(navActions);

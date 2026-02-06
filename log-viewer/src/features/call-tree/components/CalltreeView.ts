@@ -923,7 +923,7 @@ export class CalltreeView extends LitElement {
 
     // 2. View actions (show related content)
     if (rowData.originalData.timestamp) {
-      items.push({ id: 'show-in-log', label: 'Show in Log' });
+      items.push({ id: 'show-in-log', label: 'Show in Log File' });
     }
 
     // 3. Separator + Copy actions
