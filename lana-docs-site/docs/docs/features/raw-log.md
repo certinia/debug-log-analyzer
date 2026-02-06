@@ -47,12 +47,21 @@ Raw log files support code folding for matching start/end events:
 | Fold all      | `Ctrl+K Ctrl+0`                             |
 | Unfold all    | `Ctrl+K Ctrl+J`                             |
 
+### Line Decorations
+
+When your cursor is on a log line, duration information appears as ghost text at the end of the line:
+
+- **Total time** - Time spent in the event and its children
+- **Self time** - Time directly spent in the event (shown in parentheses when different from total)
+
+Example: `1.23s (self: 45ms)`
+
 ### Hover Details
 
-Hover over any line in a raw log file to see:
+Hover near the ghost text to see detailed metrics:
 
 - Event timing and duration
-- SOQL/DML counts
-- Governor limit metrics
+- SOQL/DML counts and row counts
+- Exception counts
 
-The first line of the log shows the total execution time.
+Click **Show in Log Analysis** in the hover to navigate to the Timeline or Call Tree.
