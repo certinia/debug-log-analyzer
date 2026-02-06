@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
 /** Regex to extract nanosecond timestamp from log line. Format: "HH:MM:SS.d (nanoseconds)|EVENT_TYPE" */
