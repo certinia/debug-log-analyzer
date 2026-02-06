@@ -13,6 +13,7 @@ import { LogTimingDecoration } from './decorations/LogTimingDecoration.js';
 import { RawLogLineDecoration } from './decorations/RawLogLineDecoration.js';
 import { Display } from './display/Display.js';
 import { WhatsNewNotification } from './display/WhatsNewNotification.js';
+import { RawLogFoldingProvider } from './folding/RawLogFoldingProvider.js';
 import { SymbolFinder } from './salesforce/codesymbol/SymbolFinder.js';
 import { VSWorkspace } from './workspace/VSWorkspace.js';
 
@@ -40,6 +41,7 @@ export class Context {
     ShowAnalysisCodeLens.apply(this);
     LogTimingDecoration.apply(this);
     RawLogLineDecoration.apply(this);
+    RawLogFoldingProvider.apply(this);
     WhatsNewNotification.apply(this);
   }
 
