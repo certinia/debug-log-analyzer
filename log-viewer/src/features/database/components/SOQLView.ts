@@ -16,7 +16,7 @@ import {
   type RowComponent,
 } from 'tabulator-tables';
 
-import type { ApexLog, SOQLExecuteBeginLine } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { DatabaseAccess } from '../services/Database.js';

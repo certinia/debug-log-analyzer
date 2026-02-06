@@ -15,7 +15,7 @@
  * 4. Timeline markers (only if not over events/buckets)
  */
 
-import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
+import type { LogEvent } from 'apex-log-parser';
 import {
   BUCKET_CONSTANTS,
   type PixelBucket,

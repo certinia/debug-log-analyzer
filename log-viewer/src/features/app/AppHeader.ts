@@ -10,7 +10,7 @@ import {
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import type { ApexLog } from '../../core/log-parser/LogEvents.js';
+import type { ApexLog } from 'apex-log-parser';
 import { Notification } from '../notifications/components/NotificationPanel.js';
 
 // web components

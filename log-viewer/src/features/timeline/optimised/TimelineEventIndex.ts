@@ -9,7 +9,7 @@
  * Uses hierarchical binary search with depth-first traversal.
  */
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { LogEvent } from 'apex-log-parser';
 import type { ViewportBounds, ViewportState } from '../types/flamechart.types.js';
 
 export class TimelineEventIndex {

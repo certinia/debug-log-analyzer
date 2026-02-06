@@ -12,7 +12,7 @@
  * duplicate O(n) traversal work.
  */
 
-import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
+import type { LogEvent } from 'apex-log-parser';
 import type { EventNode, TreeNode } from '../../types/flamechart.types.js';
 import type { NavigationMaps, SiblingInfo } from '../../utils/tree-converter.js';
 

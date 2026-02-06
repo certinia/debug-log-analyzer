@@ -4,7 +4,7 @@
 import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 
-import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog } from 'apex-log-parser';
 import { init as timelineInit } from '../services/Timeline.js';
 
 // styles

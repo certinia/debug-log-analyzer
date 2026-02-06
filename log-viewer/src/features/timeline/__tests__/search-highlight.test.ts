@@ -11,8 +11,8 @@
  * - Edge cases (empty search, invalid cursor, off-screen events)
  */
 
+import type { LogEvent } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type { PrecomputedRect } from '../optimised/RectangleManager.js';
 import { SearchHighlightRenderer } from '../optimised/search/SearchHighlightRenderer.js';
 import type { EventNode, ViewportState } from '../types/flamechart.types.js';

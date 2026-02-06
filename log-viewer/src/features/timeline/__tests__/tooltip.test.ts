@@ -16,7 +16,7 @@
  * - Show/hide timing and debouncing
  */
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { LogEvent } from 'apex-log-parser';
 import { TimelineTooltipManager } from '../optimised/TimelineTooltipManager.js';
 
 describe('TimelineTooltipManager', () => {

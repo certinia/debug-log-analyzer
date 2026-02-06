@@ -18,7 +18,7 @@
  * Selection is mutually exclusive: selecting a frame clears marker selection and vice versa.
  */
 
-import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
+import type { LogEvent } from 'apex-log-parser';
 import type { EventNode, TimelineMarker, TreeNode } from '../../types/flamechart.types.js';
 import type { NavigationMaps } from '../../utils/tree-converter.js';
 import type { FrameNavDirection } from '../interaction/KeyboardHandler.js';

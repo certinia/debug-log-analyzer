@@ -2,8 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
-import type { LogSubCategory } from '../../../../core/log-parser/types.js';
+import type { LogEvent, LogSubCategory } from 'apex-log-parser';
 import type { PixelBucket, ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import { legacyCullRectangles } from '../LegacyViewportCuller.js';

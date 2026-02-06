@@ -10,8 +10,8 @@
  * Apex-specific logic is handled via callbacks.
  */
 
+import type { LogEvent } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type {
   EventNode,
   HeatStripTimeSeries,
