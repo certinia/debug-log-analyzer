@@ -66,6 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Markers for errors, skipped lines, and truncation
     - Click to navigate to Call Tree (now on key press of `J` or `Cmd/Ctrl+Click`)
   - **Legacy Support**: Toggle the legacy timeline anytime via **Settings -> Apex Log Analyzer -> Timeline -> Legacy**.
+- 📄 **Raw Log Navigation**: Seamless navigation between raw log files and the log analysis. ([#204])
+  - **Show in Raw Log**: Right-click timeline or call tree frames → "Show in Log File" to jump to the corresponding line.
+  - **Show in Log Analysis**: Click the hover link on raw log lines to navigate back to analysis with the corresponding frame selected.
+  - **Code Folding**: Collapse/expand matching start/end events (METHOD_ENTRY/EXIT, CODE_UNIT, DML, SOQL, etc.).
+  - **Hover Details**: See event timing, SOQL/DML counts, and metrics when hovering raw log lines.
+  - **Total Duration**: First line shows total log execution time.
 
 ### Changed
 
@@ -466,6 +472,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#204]: https://github.com/certinia/debug-log-analyzer/issues/204
 [#714]: https://github.com/certinia/debug-log-analyzer/issues/714
 [#245]: https://github.com/certinia/debug-log-analyzer/issues/245
 [#164]: https://github.com/certinia/debug-log-analyzer/issues/164
