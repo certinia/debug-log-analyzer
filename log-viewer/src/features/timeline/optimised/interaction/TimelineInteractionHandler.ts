@@ -137,9 +137,6 @@ export class TimelineInteractionHandler {
   // Unified drag mode state (replaces separate isMeasuring, isAreaZooming, isResizing flags)
   private activeMode: DragModeState | null = null;
 
-  // Threshold for hitting resize handle
-  private static readonly RESIZE_HANDLE_THRESHOLD = 8; // px from edge
-
   // Auto-scroll state for drag modes
   private static readonly EDGE_ZONE = 50; // px from edge to trigger auto-scroll
   private static readonly AUTO_SCROLL_SPEED = 10; // px per frame
@@ -354,13 +351,6 @@ export class TimelineInteractionHandler {
    */
   private isDragModeActive(): boolean {
     return this.activeMode !== null && this.activeMode.isActive;
-  }
-
-  /**
-   * Check if a specific drag mode is active.
-   */
-  private isModeActive(type: InteractionModeType): boolean {
-    return this.activeMode?.type === type && this.activeMode.isActive;
   }
 
   // ============================================================================

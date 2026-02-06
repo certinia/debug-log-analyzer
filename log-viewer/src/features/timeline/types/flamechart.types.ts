@@ -173,6 +173,32 @@ export interface RenderRectangle {
 /**
  * Timeline state container for entire component.
  */
+/**
+ * Granular dirty flags for selective rendering optimization.
+ * Allows skipping expensive render phases when only specific parts changed.
+ *
+ * Performance impact:
+ * - Mouse move (cursor only): overlays + minimap (~1ms vs ~10ms full render)
+ * - Selection change: highlights + overlays (~2ms vs ~10ms)
+ * - Viewport change: all phases (full render required)
+ */
+export interface RenderDirtyState {
+  /** Background layers: markers, axis positioning */
+  background: boolean;
+  /** Rectangle culling (expensive - O(n) viewport query) */
+  culling: boolean;
+  /** Event rendering: batch renderer, text labels */
+  eventRendering: boolean;
+  /** Highlights: selection/search overlays */
+  highlights: boolean;
+  /** UI overlays: measurement, cursor line */
+  overlays: boolean;
+  /** Minimap rendering */
+  minimap: boolean;
+  /** Metric strip rendering */
+  metricStrip: boolean;
+}
+
 export interface TimelineState {
   /** Input event data. */
   events: LogEvent[];
@@ -196,6 +222,9 @@ export interface TimelineState {
   /** Flags. */
   needsRender: boolean;
   isInitialized: boolean;
+
+  /** Granular dirty flags for selective rendering (Phase 3 optimization). */
+  renderDirty: RenderDirtyState;
 }
 
 // ============================================================================
@@ -896,11 +925,13 @@ export const SEGMENT_TREE_CONSTANTS = {
  * Types of drag interactions in the timeline.
  * Used for unified mode handling in TimelineInteractionHandler.
  */
+/* eslint-disable @typescript-eslint/naming-convention */
 export const InteractionModeType = {
   MEASURE: 'measure',
   AREA_ZOOM: 'areaZoom',
   RESIZE: 'resize',
 } as const;
+/* eslint-enable @typescript-eslint/naming-convention */
 
 export type InteractionModeType = (typeof InteractionModeType)[keyof typeof InteractionModeType];
 

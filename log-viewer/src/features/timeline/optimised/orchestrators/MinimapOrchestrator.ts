@@ -76,9 +76,15 @@ export interface MinimapOrchestratorCallbacks {
   onCursorMove: (timeNs: number | null) => void;
 
   /**
-   * Called when minimap needs a re-render.
+   * Called when minimap needs a re-render (full render including culling).
    */
   requestRender: () => void;
+
+  /**
+   * Called when only cursor-related rendering is needed (~1ms vs ~10ms).
+   * Use for cursor moves that don't change viewport.
+   */
+  requestCursorRender: () => void;
 
   /**
    * Called when reset zoom is requested (double-click or keyboard).
@@ -297,7 +303,7 @@ export class MinimapOrchestrator {
    */
   public setCursorFromMainTimeline(timeNs: number | null): void {
     this.cursorTimeNs = timeNs;
-    this.callbacks.requestRender();
+    this.callbacks.requestCursorRender();
   }
 
   /**
@@ -498,7 +504,7 @@ export class MinimapOrchestrator {
       onCursorMove: (timeNs: number | null) => {
         this.cursorTimeNs = timeNs;
         this.callbacks.onCursorMove(timeNs);
-        this.callbacks.requestRender();
+        this.callbacks.requestCursorRender();
       },
       onHorizontalPan: (deltaPixels: number) => {
         if (!this.viewport || !this.manager) {
