@@ -14,17 +14,30 @@ export interface EventSearchResult {
 }
 
 export class LogEventCache {
+  private static readonly MAX_CACHE_SIZE = 10;
   private static cache = new Map<string, ApexLog>();
 
   static async getApexLog(filePath: string): Promise<ApexLog | null> {
     const cached = LogEventCache.cache.get(filePath);
     if (cached) {
+      // Move to end (most recently used)
+      LogEventCache.cache.delete(filePath);
+      LogEventCache.cache.set(filePath, cached);
       return cached;
     }
 
     try {
       const content = await readFile(filePath, 'utf-8');
       const apexLog = parse(content);
+
+      // Evict oldest if at capacity
+      if (LogEventCache.cache.size >= LogEventCache.MAX_CACHE_SIZE) {
+        const oldest = LogEventCache.cache.keys().next().value;
+        if (oldest) {
+          LogEventCache.cache.delete(oldest);
+        }
+      }
+
       LogEventCache.cache.set(filePath, apexLog);
       return apexLog;
     } catch {

@@ -14,8 +14,7 @@ import type { LogEvent } from 'apex-log-parser';
 
 import { Context } from '../Context.js';
 import { LogEventCache } from '../cache/LogEventCache.js';
-
-const timestampRegex = /^\d{2}:\d{2}:\d{2}\.\d+\s*\((\d+)\)\|/;
+import { TIMESTAMP_REGEX } from '../log-utils.js';
 
 class RawLogFoldingProvider implements FoldingRangeProvider {
   async provideFoldingRanges(
@@ -41,7 +40,7 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
 
     for (let i = 0; i < document.lineCount; i++) {
       const line = document.lineAt(i);
-      const match = line.text.match(timestampRegex);
+      const match = line.text.match(TIMESTAMP_REGEX);
       if (match?.[1]) {
         const timestamp = parseInt(match[1], 10);
         if (!map.has(timestamp)) {

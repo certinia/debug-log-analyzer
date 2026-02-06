@@ -11,10 +11,7 @@ import {
 } from 'vscode';
 
 import { Context } from '../Context.js';
-
-// Regex to extract nanosecond timestamp from log line
-// Format: "HH:MM:SS.d (nanoseconds)|EVENT_TYPE"
-const timestampRegex = /^\d{2}:\d{2}:\d{2}\.\d+\s*\((\d+)\)\|/;
+import { formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
 
 // Pattern to find EXECUTION_STARTED line
 const executionStartedRegex = /^\d{2}:\d{2}:\d{2}\.\d+\s*\((\d+)\)\|EXECUTION_STARTED/m;
@@ -99,7 +96,7 @@ export class LogTimingDecoration {
       return;
     }
 
-    const formattedDuration = this.formatDuration(duration);
+    const formattedDuration = formatDuration(duration);
 
     // Create decoration for line 0 (first line)
     const line = document.lineAt(0);
@@ -117,7 +114,7 @@ export class LogTimingDecoration {
 
   private calculateLogDuration(document: TextDocument): number | null {
     const startTs = this.findTimestamp(document, false, executionStartedRegex);
-    const endTs = this.findTimestamp(document, true, timestampRegex);
+    const endTs = this.findTimestamp(document, true, TIMESTAMP_REGEX);
     return startTs && endTs && endTs > startTs ? endTs - startTs : null;
   }
 
@@ -133,20 +130,5 @@ export class LogTimingDecoration {
       }
     }
     return null;
-  }
-
-  private formatDuration(nanoseconds: number): string {
-    const milliseconds = nanoseconds / 1_000_000;
-    const seconds = milliseconds / 1000;
-
-    if (seconds >= 60) {
-      const minutes = Math.floor(seconds / 60);
-      const remainingSeconds = seconds % 60;
-      return `${minutes}m ${remainingSeconds.toFixed(2)}s`;
-    } else if (seconds >= 1) {
-      return `${seconds.toFixed(2)}s`;
-    } else {
-      return `${milliseconds.toFixed(2)}ms`;
-    }
   }
 }
