@@ -3,20 +3,5 @@
   "version": "0.1.0",
   "private": true,
   "description": "Apex debug log parser for Salesforce",
-  "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": [
-    "dist",
-    "src"
-  ],
-  "scripts": {
-    "build": "tsc"
-  }
+  "type": "module"
 }

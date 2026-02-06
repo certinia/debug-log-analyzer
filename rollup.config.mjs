@@ -63,6 +63,10 @@ export default [
       alias({
         entries: [
           {
+            find: 'apex-log-parser',
+            replacement: path.resolve(__dirname, 'apex-log-parser/src/index.ts'),
+          },
+          {
             find: 'eventemitter3',
             replacement: path.resolve(__dirname, 'node_modules/eventemitter3/index.js'),
           },

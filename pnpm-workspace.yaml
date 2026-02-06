@@ -1,5 +1,4 @@
 packages:
-  - 'apex-log-parser'
   - 'lana'
   - 'lana-docs-site'
   - 'log-viewer'

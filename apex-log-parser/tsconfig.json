@@ -19,7 +19,7 @@
 
     "moduleResolution": "Bundler",
     "module": "ESNext",
-    "noEmit": false,
+    "noEmit": true,
     "declaration": true,
     "declarationMap": true,
 
