@@ -158,7 +158,8 @@ Seamlessly navigate between the visual analysis and your raw `.log` files:
 - **Show in Raw Log** – Right-click any frame in Timeline or Call Tree → "Show in Log File" to jump to the exact line.
 - **Show in Log Analysis** – Hover a raw log line to see metrics and click "Show in Log Analysis" to jump back.
 - **Code Folding** – Collapse/expand matching start/end events (METHOD_ENTRY/EXIT, DML_BEGIN/END, etc.) using the gutter icons or `Ctrl+Shift+[`/`]`.
-- **Hover Details** – See event timing, SOQL/DML counts, and exception info when hovering cursor on raw log lines.
+- **Line Decorations** – Duration appears as ghost text at the end of the cursor line (e.g., `1.23s (self: 45ms)`).
+- **Hover Details** – Hover near the ghost text to see SOQL/DML counts, row counts, and exception info.
 - **Total Duration** – First line displays total log execution time.
 
 ## 🎨 Customization
