@@ -80,6 +80,13 @@ export class TimelineFlameChart extends LitElement {
   themeName: string | null = null;
 
   /**
+   * Timestamp to navigate to after initialization.
+   * Used when opening the timeline from a raw log file hover.
+   */
+  @property({ type: Number })
+  navigateToTimestamp: number | undefined = undefined;
+
+  /**
    * Optional configuration options.
    */
   @state()
@@ -142,6 +149,11 @@ export class TimelineFlameChart extends LitElement {
 
       this.apexLogTimeline = new ApexLogTimeline();
       await this.apexLogTimeline.init(this.containerRef, this.apexLog, optionsWithTheme);
+
+      // Navigate to timestamp after initialization completes
+      if (this.navigateToTimestamp !== undefined) {
+        this.apexLogTimeline.navigateToTimestamp(this.navigateToTimestamp);
+      }
     } catch (error) {
       this.handleError(error);
     }

@@ -5,7 +5,11 @@ import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { parse, type ApexLog } from 'apex-log-parser';
-import { vscodeMessenger } from '../../core/messaging/VSCodeExtensionMessenger.js';
+import { eventBus } from '../../core/events/EventBus.js';
+import {
+  VSCodeExtensionMessenger,
+  vscodeMessenger,
+} from '../../core/messaging/VSCodeExtensionMessenger.js';
 import {
   Notification,
   type NotificationSeverity,
@@ -17,6 +21,10 @@ import { globalStyles } from '../../styles/global.styles.js';
 
 // web components
 import './AppHeader.js';
+
+interface NavigateToTimelinePayload {
+  timestamp: number;
+}
 
 @customElement('log-viewer')
 export class LogViewer extends LitElement {
@@ -37,6 +45,9 @@ export class LogViewer extends LitElement {
 
   @state()
   _selectedTab = 'timeline-tab';
+
+  @state()
+  private _navigateToTimestamp: number | undefined = undefined;
 
   static styles = [
     globalStyles,
@@ -86,6 +97,15 @@ export class LogViewer extends LitElement {
     document.addEventListener('show-tab', (e: Event) => {
       this._showTabEvent(e);
     });
+
+    // Listen for navigation messages from the extension
+    VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {
+      const { cmd, payload } = event.data;
+      if (cmd === 'navigateToTimeline' && payload?.timestamp) {
+        this._showTab('timeline-tab');
+        eventBus.emit('timeline:navigate-to', { timestamp: payload.timestamp });
+      }
+    });
   }
 
   render() {
@@ -130,7 +150,10 @@ export class LogViewer extends LitElement {
         </vscode-panel-tab>
 
         <vscode-panel-view id="view1">
-          <timeline-view .timelineRoot="${this.timelineRoot}"></timeline-view>
+          <timeline-view
+            .timelineRoot="${this.timelineRoot}"
+            .navigateToTimestamp="${this._navigateToTimestamp}"
+          ></timeline-view>
         </vscode-panel-view>
         <vscode-panel-view id="view2">
           <call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view>
@@ -197,6 +220,12 @@ export class LogViewer extends LitElement {
     this.notifications = localNotifications;
 
     this.parserIssues = this.parserIssuesToMessages(apexLog);
+
+    // Navigate to timestamp if requested (passed as prop to timeline-view)
+    if (data.navigateToTimestamp !== undefined) {
+      this._showTab('timeline-tab');
+      this._navigateToTimestamp = data.navigateToTimestamp;
+    }
   }
 
   async _readLog(logUri: string): Promise<string> {
@@ -273,4 +302,5 @@ interface LogDataEvent {
   logUri?: string;
   logPath?: string;
   logData?: string;
+  navigateToTimestamp?: number;
 }

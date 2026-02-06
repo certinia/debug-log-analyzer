@@ -23,6 +23,7 @@ export class LogView {
   private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
   private static currentPanel: WebviewPanel | undefined;
   private static currentLogPath: string | undefined;
+  private static pendingNavigationTimestamp: number | undefined;
 
   static getCurrentView() {
     return LogView.currentPanel;
@@ -30,6 +31,10 @@ export class LogView {
 
   static getLogPath() {
     return LogView.currentLogPath;
+  }
+
+  static setPendingNavigation(timestamp: number): void {
+    LogView.pendingNavigationTimestamp = timestamp;
   }
 
   static async createView(
@@ -58,6 +63,15 @@ export class LogView {
     panel.webview.html = indexSrc.replace(/bundle.js|\${extensionRoot}/gi, function (matched) {
       return toReplace[matched] || '';
     });
+
+    panel.onDidDispose(
+      () => {
+        this.currentPanel = undefined;
+        this.currentLogPath = undefined;
+      },
+      undefined,
+      context.context.subscriptions,
+    );
 
     panel.webview.onDidReceiveMessage(
       async (msg: WebViewLogFileRequest) => {
@@ -177,6 +191,9 @@ export class LogView {
     }
 
     const filePath = parse(logFilePath || '');
+    const navigateToTimestamp = LogView.pendingNavigationTimestamp;
+    LogView.pendingNavigationTimestamp = undefined;
+
     panel.webview.postMessage({
       requestId,
       cmd: 'fetchLog',
@@ -185,6 +202,7 @@ export class LogView {
         logUri: logFilePath ? panel.webview.asWebviewUri(Uri.file(logFilePath)).toString(true) : '',
         logPath: logFilePath,
         logData: logData,
+        navigateToTimestamp,
       },
     });
   }

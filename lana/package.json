@@ -68,6 +68,10 @@
         "command": "lana.switchTimelineTheme",
         "title": "Log: Timeline Theme",
         "icon": "./certinia-icon-color.png"
+      },
+      {
+        "command": "lana.showInLogAnalysis",
+        "title": "Log: Show in Log Analysis"
       }
     ],
     "languages": [

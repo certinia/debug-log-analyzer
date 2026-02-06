@@ -213,10 +213,11 @@ export class ApexLogTimeline {
 
   /**
    * Navigate to a specific timestamp in the timeline.
-   * Called via EventBus 'timeline:navigate-to' event from CalltreeView.
+   * Called via EventBus 'timeline:navigate-to' event from CalltreeView,
+   * or directly from TimelineFlameChart after initialization.
    * Centers the viewport AND selects the event for visual highlighting.
    */
-  private navigateToTimestamp(timestamp: number): void {
+  public navigateToTimestamp(timestamp: number): void {
     // Find event by timestamp (binary search - events sorted by time)
     const result = findEventByTimestamp(this.events, timestamp);
     if (!result) {

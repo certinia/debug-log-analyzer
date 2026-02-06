@@ -3,11 +3,14 @@
  */
 import { workspace, type ExtensionContext } from 'vscode';
 
+import { LogEventCache } from './cache/LogEventCache.js';
 import { ShowAnalysisCodeLens } from './codelenses/ShowAnalysisCodeLens.js';
 import { RetrieveLogFile } from './commands/RetrieveLogFile.js';
+import { ShowInLogAnalysis } from './commands/ShowInLogAnalysis.js';
 import { ShowLogAnalysis } from './commands/ShowLogAnalysis.js';
 import { SwitchTimelineTheme } from './commands/SwitchTimelineTheme.js';
 import { LogTimingDecoration } from './decorations/LogTimingDecoration.js';
+import { RawLogLineDecoration } from './decorations/RawLogLineDecoration.js';
 import { Display } from './display/Display.js';
 import { WhatsNewNotification } from './display/WhatsNewNotification.js';
 import { SymbolFinder } from './salesforce/codesymbol/SymbolFinder.js';
@@ -29,11 +32,14 @@ export class Context {
       });
     }
 
+    LogEventCache.apply(this);
     RetrieveLogFile.apply(this);
     ShowLogAnalysis.apply(this);
+    ShowInLogAnalysis.apply(this);
     SwitchTimelineTheme.apply(this);
     ShowAnalysisCodeLens.apply(this);
     LogTimingDecoration.apply(this);
+    RawLogLineDecoration.apply(this);
     WhatsNewNotification.apply(this);
   }
 
