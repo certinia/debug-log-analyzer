@@ -68,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Legacy Support**: Toggle the legacy timeline anytime via **Settings -> Apex Log Analyzer -> Timeline -> Legacy**.
 - 📄 **Raw Log Navigation**: Seamless navigation between raw log files and the log analysis. ([#204])
   - **Show in Raw Log**: Right-click timeline or call tree frames → "Show in Log File" to jump to the corresponding line.
-  - **Show in Log Analysis**: Click the hover link on raw log lines to navigate back to analysis with the corresponding frame selected.
+  - **Show in Log Analysis**: Click the hover link on raw log lines to navigate back to the log analysis.
   - **Code Folding**: Collapse/expand matching start/end events (METHOD_ENTRY/EXIT, CODE_UNIT, DML, SOQL, etc.).
   - **Hover Details**: See event timing, SOQL/DML counts, and metrics when hovering raw log lines.
   - **Total Duration**: First line shows total log execution time.
