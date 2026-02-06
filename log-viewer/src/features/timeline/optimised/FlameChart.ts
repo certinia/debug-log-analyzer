@@ -180,7 +180,6 @@ export class FlameChart<E extends EventNode = EventNode> {
   private cachedVisibleRects: Map<string, PrecomputedRect[]> | null = null;
   private cachedBuckets: Map<string, import('../types/flamechart.types.js').PixelBucket[]> | null =
     null;
-  private lastViewportForCulling: ViewportState | null = null;
 
   /**
    * Initialize the flamechart renderer.
@@ -1945,7 +1944,6 @@ export class FlameChart<E extends EventNode = EventNode> {
       // Cache for reuse when only cursor moves
       this.cachedVisibleRects = visibleRects;
       this.cachedBuckets = buckets;
-      this.lastViewportForCulling = { ...viewportState };
 
       this.hitTestManager?.setVisibleRects(visibleRects);
       this.hitTestManager?.setBuckets(buckets);

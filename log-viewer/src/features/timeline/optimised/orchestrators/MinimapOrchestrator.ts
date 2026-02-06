@@ -376,9 +376,9 @@ export class MinimapOrchestrator {
   /**
    * Zoom the minimap selection.
    *
-   * @param direction - 'in' to narrow the lens, 'out' to widen it
+   * @param _direction - 'in' to narrow the lens, 'out' to widen it
    */
-  public handleZoom(direction: 'in' | 'out'): void {
+  public handleZoom(_direction: 'in' | 'out'): void {
     // This is handled by FlameChart via ViewportAnimator
     // The orchestrator doesn't own the viewport, so we delegate
   }
