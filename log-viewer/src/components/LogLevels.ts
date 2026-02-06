@@ -5,7 +5,7 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 
-import { DebugLevel } from '../core/log-parser/ApexLogParser.js';
+import { DebugLevel } from 'apex-log-parser';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';

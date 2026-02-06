@@ -12,9 +12,8 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
 
+import type { ApexLog, LogEvent, LogEventType } from 'apex-log-parser';
 import { eventBus } from '../../../core/events/EventBus.js';
-import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type { LogEventType } from '../../../core/log-parser/types.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { findEventByTimestamp } from '../../../core/utility/EventSearch.js';
 import { formatDuration, isVisible } from '../../../core/utility/Util.js';

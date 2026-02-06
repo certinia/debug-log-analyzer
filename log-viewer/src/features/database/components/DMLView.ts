@@ -10,7 +10,7 @@ import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'l
 import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
-import type { ApexLog, DMLBeginLine } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog, DMLBeginLine } from 'apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { DatabaseAccess } from '../services/Database.js';

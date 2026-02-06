@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
-    "lib": ["ES2022", "dom", "DOM.Iterable"],
+    "lib": ["ES2022"],
+
+    "outDir": "dist",
+    "rootDir": "src",
 
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -17,13 +20,8 @@
     "moduleResolution": "Bundler",
     "module": "ESNext",
     "noEmit": true,
-
-    "composite": true,
+    "declaration": true,
     "declarationMap": true,
-
-    "paths": {
-      "apex-log-parser": ["../apex-log-parser/src/index.ts"]
-    },
 
     "strictFunctionTypes": true,
 
@@ -39,6 +37,6 @@
     "removeComments": true,
     "sourceMap": false
   },
-  "include": ["./src/**/*.ts", "declarations.d.ts", "../apex-log-parser/src/**/*.ts"],
+  "include": ["./src/**/*.ts"],
   "exclude": ["**/node_modules", "**/.*/"]
 }

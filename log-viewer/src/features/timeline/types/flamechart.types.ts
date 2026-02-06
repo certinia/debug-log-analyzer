@@ -9,8 +9,9 @@
  * Based on contracts from specs/001-pixijs-timeline-v2/contracts/timeline-api.ts
  */
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type { LogSubCategory } from '../../../core/log-parser/types.js';
+//TODO: Remove deps outside timeline
+
+import type { LogEvent, LogSubCategory } from 'apex-log-parser';
 import type { PrecomputedRect } from '../optimised/RectangleManager.js';
 
 // Re-export LogEvent for internal use within timeline/ folder

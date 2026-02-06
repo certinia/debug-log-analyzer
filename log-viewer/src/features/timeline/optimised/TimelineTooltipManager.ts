@@ -9,7 +9,7 @@
  * Handles tooltip positioning, content generation, and visibility.
  */
 
-import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { formatDuration } from '../../../core/utility/Util.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 
