@@ -177,6 +177,8 @@ export class FlameChart<E extends EventNode = EventNode> {
   private mainTimelineYOffset = 0;
 
   // Cached culled rectangles (reused when viewport unchanged - Phase 3 optimization)
+  // INVARIANT: These caches are invalidated when renderDirty.culling is set to true.
+  // Any code that changes viewport state must call invalidateAll() or set culling dirty flag.
   private cachedVisibleRects: Map<string, PrecomputedRect[]> | null = null;
   private cachedBuckets: Map<string, import('../types/flamechart.types.js').PixelBucket[]> | null =
     null;
