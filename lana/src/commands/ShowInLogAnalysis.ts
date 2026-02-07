@@ -50,15 +50,13 @@ export class ShowInLogAnalysis {
       // Panel exists - reveal it first
       panel.reveal();
 
-      if (logPath) {
-        // Verify we're navigating to the same log
-        const activeEditor = window.activeTextEditor;
-        if (activeEditor && activeEditor.document.uri.fsPath !== logPath) {
-          // Different log file is active, open the active one
-          LogView.setPendingNavigation(timestamp);
-          await LogView.createView(context, Promise.resolve(), activeEditor.document.uri.fsPath);
-          return; // Navigation will happen via fetchLog payload
-        }
+      // Verify we're navigating to the same log
+      const activeEditor = window.activeTextEditor;
+      if (logPath && activeEditor && activeEditor.document.uri.fsPath !== logPath) {
+        // Different log file is active, open the active one
+        LogView.setPendingNavigation(timestamp);
+        await LogView.createView(context, Promise.resolve(), activeEditor.document.uri.fsPath);
+        return; // Navigation will happen via fetchLog payload
       }
     }
 

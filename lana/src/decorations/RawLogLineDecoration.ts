@@ -15,7 +15,7 @@ import type { LogEvent } from 'apex-log-parser';
 
 import { Context } from '../Context.js';
 import { LogEventCache } from '../cache/LogEventCache.js';
-import { formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
+import { buildMetricParts, formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
 
 // Decoration type for ghost text on cursor line - no isWholeLine so hover only triggers at end
 const cursorLineDecorationType = window.createTextEditorDecorationType({
@@ -127,7 +127,7 @@ export class RawLogLineDecoration {
     const args = encodeURIComponent(JSON.stringify({ timestamp, filePath }));
     const commandUri = `command:lana.showInLogAnalysis?${args}`;
 
-    const metricParts = this.buildMetricParts(event);
+    const metricParts = buildMetricParts(event);
 
     const parts: string[] = [];
     if (metricParts.length > 0) {
@@ -140,47 +140,6 @@ export class RawLogLineDecoration {
     markdown.isTrusted = true;
 
     return markdown;
-  }
-
-  private buildMetricParts(event: LogEvent): string[] {
-    const parts: string[] = [];
-
-    // Duration with optional self time
-    const totalDuration = formatDuration(event.duration.total);
-    if (event.duration.self !== event.duration.total) {
-      parts.push(`**${totalDuration}** (self: ${formatDuration(event.duration.self)})`);
-    } else {
-      parts.push(`**${totalDuration}**`);
-    }
-
-    // SOQL with self count
-    if (event.soqlCount.total > 0) {
-      const selfPart = event.soqlCount.self > 0 ? ` (self: ${event.soqlCount.self})` : '';
-      parts.push(`${event.soqlCount.total} SOQL${selfPart}`);
-    }
-
-    // SOQL rows
-    if (event.soqlRowCount.total > 0) {
-      parts.push(`${event.soqlRowCount.total} rows`);
-    }
-
-    // DML with self count
-    if (event.dmlCount.total > 0) {
-      const selfPart = event.dmlCount.self > 0 ? ` (self: ${event.dmlCount.self})` : '';
-      parts.push(`${event.dmlCount.total} DML${selfPart}`);
-    }
-
-    // DML rows
-    if (event.dmlRowCount.total > 0) {
-      parts.push(`${event.dmlRowCount.total} DML rows`);
-    }
-
-    // Exceptions
-    if (event.totalThrownCount > 0) {
-      parts.push(`⚠️ ${event.totalThrownCount} thrown`);
-    }
-
-    return parts;
   }
 
   private formatDurationText(totalNs: number, selfNs: number): string {

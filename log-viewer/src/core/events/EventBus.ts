@@ -9,7 +9,6 @@
 
 interface EventMap {
   'timeline:navigate-to': { timestamp: number };
-  'calltree:navigate-to': { timestamp: number };
 }
 
 type EventCallback<K extends keyof EventMap> = (detail: EventMap[K]) => void;

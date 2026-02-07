@@ -42,8 +42,6 @@ export interface ContextMenuAction {
 export class ContextMenuBuilder {
   private groups: ContextMenuAction[][] = [];
 
-  constructor() {}
-
   /**
    * Add a group of actions. Groups are separated by dividers.
    */
