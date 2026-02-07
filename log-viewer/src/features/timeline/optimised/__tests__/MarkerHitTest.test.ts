@@ -196,6 +196,46 @@ describe('MarkerHitTest', () => {
 
         expect(result).toBe(marker);
       });
+
+      it('should handle very large offsetX values', () => {
+        const marker = createMarker('m1', 'error', 1000);
+        const indicator = createIndicator(marker, 1_000_000, 1_000_100); // Far into timeline
+
+        // With large offset, screenX 50 -> worldX = 1_000_050 (inside marker)
+        expect(hitTestMarkers(50, 1_000_000, [indicator])).toBe(marker);
+
+        // With large offset, screenX 0 -> worldX = 1_000_000 (on left edge)
+        expect(hitTestMarkers(0, 1_000_000, [indicator])).toBe(marker);
+
+        // Miss: screenX 200 -> worldX = 1_000_200 (after marker)
+        expect(hitTestMarkers(200, 1_000_000, [indicator])).toBeNull();
+      });
+
+      it('should handle markers at world coordinate zero', () => {
+        const marker = createMarker('m1', 'error', 0);
+        const indicator = createIndicator(marker, 0, 100); // Starts at world origin
+
+        // Click at world origin with no offset
+        expect(hitTestMarkers(0, 0, [indicator])).toBe(marker);
+
+        // Click inside marker
+        expect(hitTestMarkers(50, 0, [indicator])).toBe(marker);
+
+        // Click after marker
+        expect(hitTestMarkers(150, 0, [indicator])).toBeNull();
+      });
+
+      it('should handle single-pixel-wide marker', () => {
+        const marker = createMarker('m1', 'error', 1000);
+        const indicator = createIndicator(marker, 100, 101); // 1px wide
+
+        // Hit the marker
+        expect(hitTestMarkers(0, 100, [indicator])).toBe(marker); // worldX = 100
+        expect(hitTestMarkers(1, 100, [indicator])).toBe(marker); // worldX = 101
+
+        // Miss the marker
+        expect(hitTestMarkers(2, 100, [indicator])).toBeNull(); // worldX = 102
+      });
     });
   });
 });

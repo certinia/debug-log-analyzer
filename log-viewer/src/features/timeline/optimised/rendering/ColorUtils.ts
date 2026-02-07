@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
 /**
@@ -38,16 +38,8 @@ export function parseColorToHex(cssColor: string, defaultColor: number = 0x1e1e1
       return parseInt(hex, 16);
     }
 
-    // #RGBA (4 chars) - expand and ignore alpha
-    if (hex.length === 4) {
-      const r = hex[0]!;
-      const g = hex[1]!;
-      const b = hex[2]!;
-      return parseInt(r + r + g + g + b + b, 16);
-    }
-
-    // #RGB (3 chars) - expand to 6 chars
-    if (hex.length === 3) {
+    // #RGB (3 chars) or #RGBA (4 chars) - expand first 3 chars to 6, ignore alpha
+    if (hex.length === 3 || hex.length === 4) {
       const r = hex[0]!;
       const g = hex[1]!;
       const b = hex[2]!;
