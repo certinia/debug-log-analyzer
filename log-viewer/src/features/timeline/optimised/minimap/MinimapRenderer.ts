@@ -579,7 +579,7 @@ export class MinimapRenderer {
   private renderMarkers(
     manager: MinimapManager,
     markers: TimelineMarker[],
-    minimapHeight: number,
+    _minimapHeight: number,
   ): void {
     const state = manager.getState();
 
@@ -632,7 +632,7 @@ export class MinimapRenderer {
   private render2DCurtain(
     manager: MinimapManager,
     selection: Readonly<MinimapSelection>,
-    minimapHeight: number,
+    _minimapHeight: number,
   ): void {
     const state = manager.getState();
 
@@ -699,7 +699,7 @@ export class MinimapRenderer {
   private renderLens(
     manager: MinimapManager,
     selection: Readonly<MinimapSelection>,
-    minimapHeight: number,
+    _minimapHeight: number,
   ): void {
     // Axis is at TOP - chart area is below it
     // When heat strip has data, lens ends above the heat strip (it's separate)
