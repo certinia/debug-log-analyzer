@@ -51,8 +51,14 @@ export class MeasureRangeRenderer {
   /** HTML container for the label (avoids PIXI coordinate inversion issues) */
   private labelElement: HTMLDivElement;
 
-  /** Parent HTML container for positioning */
-  private container: HTMLElement;
+  /** Duration text element (reused to avoid innerHTML) */
+  private durationText!: HTMLDivElement;
+
+  /** Range text element (reused to avoid innerHTML) */
+  private rangeText!: HTMLDivElement;
+
+  /** Zoom icon button (created once, shown/hidden as needed) */
+  private zoomIcon: HTMLButtonElement | null = null;
 
   /** Cached colors from CSS variables */
   private colors: MeasurementColors;
@@ -66,7 +72,6 @@ export class MeasureRangeRenderer {
    * @param onZoomClick - Optional callback when zoom icon is clicked
    */
   constructor(pixiContainer: PIXI.Container, htmlContainer: HTMLElement, onZoomClick?: () => void) {
-    this.container = htmlContainer;
     this.onZoomClick = onZoomClick;
 
     // Create graphics for overlay - render above frames but below tooltips
@@ -83,10 +88,89 @@ export class MeasureRangeRenderer {
   }
 
   /**
-   * Create the HTML label element with styling.
+   * Create the HTML label element with full structure.
+   * Creates all child elements once to avoid recreating on each update.
    */
   private createLabelElement(): HTMLDivElement {
-    return createTimelineLabel('measure-range-label');
+    const label = createTimelineLabel('measure-range-label');
+
+    // Create container for flex layout
+    const contentWrapper = document.createElement('div');
+    contentWrapper.style.cssText = 'display: flex; align-items: center;';
+
+    // Create text container
+    const textContainer = document.createElement('div');
+    textContainer.style.cssText = 'text-align: center;';
+
+    // Duration text
+    this.durationText = document.createElement('div');
+    this.durationText.style.cssText = 'font-size: 14px; font-weight: 600;';
+
+    // Range text
+    this.rangeText = document.createElement('div');
+    this.rangeText.style.cssText = 'font-size: 11px; opacity: 0.8; margin-top: 2px;';
+
+    textContainer.appendChild(this.durationText);
+    textContainer.appendChild(this.rangeText);
+    contentWrapper.appendChild(textContainer);
+
+    // Create zoom icon button (created once, shown/hidden as needed)
+    if (this.onZoomClick) {
+      this.zoomIcon = this.createZoomIcon();
+      contentWrapper.appendChild(this.zoomIcon);
+    }
+
+    label.appendChild(contentWrapper);
+    return label;
+  }
+
+  /**
+   * Create the zoom icon button with event listeners attached once.
+   */
+  private createZoomIcon(): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.className = 'measure-zoom-icon';
+    button.title = 'Zoom to fit (double-click)';
+    button.style.cssText = `
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      margin-left: 8px;
+      padding: 0;
+      border: none;
+      border-radius: 4px;
+      background: var(--vscode-button-secondaryBackground, #3a3d41);
+      color: var(--vscode-button-secondaryForeground, #cccccc);
+      cursor: pointer;
+      pointer-events: auto;
+      transition: background 0.1s;
+    `;
+
+    // SVG icon
+    button.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+        <path d="M6.5 3a.5.5 0 0 1 .5.5V6h2.5a.5.5 0 0 1 0 1H7v2.5a.5.5 0 0 1-1 0V7H3.5a.5.5 0 0 1 0-1H6V3.5a.5.5 0 0 1 .5-.5z"/>
+      </svg>
+    `;
+
+    // Attach event listeners once
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.onZoomClick?.();
+    });
+
+    button.addEventListener('mouseenter', () => {
+      button.style.background = 'var(--vscode-button-secondaryHoverBackground, #45494e)';
+    });
+
+    button.addEventListener('mouseleave', () => {
+      button.style.background = 'var(--vscode-button-secondaryBackground, #3a3d41)';
+    });
+
+    return button;
   }
 
   /**
@@ -176,65 +260,14 @@ export class MeasureRangeRenderer {
       return;
     }
 
-    // Format times using shared utilities
-    const durationStr = formatDuration(duration);
-    const rangeStr = formatTimeRange(startTime, endTime);
+    // Update text content (no innerHTML - reuse existing elements)
+    this.durationText.textContent = formatDuration(duration);
+    this.rangeText.textContent = formatTimeRange(startTime, endTime);
 
-    // Only show zoom icon when measurement is finished (not while dragging)
-    const zoomIconHtml =
-      !isActive && this.onZoomClick
-        ? `<button class="measure-zoom-icon" style="
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 24px;
-          height: 24px;
-          margin-left: 8px;
-          padding: 0;
-          border: none;
-          border-radius: 4px;
-          background: var(--vscode-button-secondaryBackground, #3a3d41);
-          color: var(--vscode-button-secondaryForeground, #cccccc);
-          cursor: pointer;
-          pointer-events: auto;
-          transition: background 0.1s;
-        " title="Zoom to fit (double-click)">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
-            <path d="M6.5 3a.5.5 0 0 1 .5.5V6h2.5a.5.5 0 0 1 0 1H7v2.5a.5.5 0 0 1-1 0V7H3.5a.5.5 0 0 1 0-1H6V3.5a.5.5 0 0 1 .5-.5z"/>
-          </svg>
-        </button>`
-        : '';
-
-    // Update label content with centered duration
-    this.labelElement.innerHTML = `
-      <div style="display: flex; align-items: center;">
-        <div style="text-align: center;">
-          <div style="font-size: 14px; font-weight: 600;">${durationStr}</div>
-          <div style="font-size: 11px; opacity: 0.8; margin-top: 2px;">${rangeStr}</div>
-        </div>
-        ${zoomIconHtml}
-      </div>
-    `;
-
-    // Add click listener to zoom icon
-    if (!isActive && this.onZoomClick) {
-      const zoomIcon = this.labelElement.querySelector('.measure-zoom-icon');
-      if (zoomIcon) {
-        zoomIcon.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.onZoomClick?.();
-        });
-        // Hover effect
-        zoomIcon.addEventListener('mouseenter', () => {
-          (zoomIcon as HTMLElement).style.background =
-            'var(--vscode-button-secondaryHoverBackground, #45494e)';
-        });
-        zoomIcon.addEventListener('mouseleave', () => {
-          (zoomIcon as HTMLElement).style.background =
-            'var(--vscode-button-secondaryBackground, #3a3d41)';
-        });
-      }
+    // Show/hide zoom icon based on measurement state
+    // Only show when measurement is finished (not while dragging)
+    if (this.zoomIcon) {
+      this.zoomIcon.style.display = !isActive ? 'flex' : 'none';
     }
 
     // Show label
