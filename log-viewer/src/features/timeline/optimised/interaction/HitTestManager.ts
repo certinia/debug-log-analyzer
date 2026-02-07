@@ -15,9 +15,10 @@
  * 4. Timeline markers (only if not over events/buckets)
  */
 
-import type { LogEvent } from 'apex-log-parser';
 import {
   BUCKET_CONSTANTS,
+  type EventNode,
+  type LogEvent,
   type PixelBucket,
   type TimelineMarker,
   type ViewportBounds,
@@ -37,8 +38,8 @@ export interface MarkerHitTestable {
  * Result of a hit test operation.
  */
 export interface HitTestResult {
-  /** The event at the hit position, if any */
-  event: LogEvent | null;
+  /** The event node at the hit position, if any */
+  eventNode: EventNode | null;
   /** The marker at the hit position, if any (only set if no event/bucket) */
   marker: TimelineMarker | null;
   /** Whether the cursor is over an event or bucket area */
@@ -105,7 +106,7 @@ export class HitTestManager {
    * @param depth - Depth level at the Y position
    * @param viewport - Current viewport state
    * @param maxDepth - Maximum depth in the timeline
-   * @returns Hit test result with event, marker, and area info
+   * @returns Hit test result with eventNode, marker, and area info
    */
   public hitTest(
     screenX: number,
@@ -117,27 +118,27 @@ export class HitTestManager {
     // Check if depth is within valid bounds (0 to maxDepth)
     const isValidDepth = depth >= 0 && depth <= maxDepth;
 
-    let event: LogEvent | null = null;
+    let logEvent: LogEvent | null = null;
     let isOverEventArea = false;
 
     if (isValidDepth) {
       // Priority 1: Check visible rectangles from last render (in sync with display)
-      event = this.findVisibleRectAtPosition(screenX, depth, viewport);
+      logEvent = this.findVisibleRectAtPosition(screenX, depth, viewport);
 
       // Priority 2: If no visible rect, check event index (for wider search)
-      if (!event) {
-        event = this.index.findEventAtPosition(screenX, screenY, viewport, depth, false);
+      if (!logEvent) {
+        logEvent = this.index.findEventAtPosition(screenX, screenY, viewport, depth, false);
       }
 
-      isOverEventArea = event !== null;
+      isOverEventArea = logEvent !== null;
 
       // Priority 3: If no event found, check if we're over a bucket at this depth
-      if (!event) {
+      if (!logEvent) {
         const bucketResult = this.findBucketAtPosition(screenX, depth, viewport);
         if (bucketResult) {
           isOverEventArea = true;
           // Find best event from bucket using priority and duration
-          event = this.findBestEventInBucket(bucketResult.bucket);
+          logEvent = this.findBestEventInBucket(bucketResult.bucket);
         }
       }
     }
@@ -149,7 +150,26 @@ export class HitTestManager {
       marker = this.markerRenderer.hitTest(screenX, screenY);
     }
 
-    return { event, marker, isOverEventArea };
+    // Convert LogEvent to EventNode for public API
+    const eventNode = logEvent ? this.toEventNode(logEvent, depth) : null;
+
+    return { eventNode, marker, isOverEventArea };
+  }
+
+  /**
+   * Convert a LogEvent to an EventNode for the public API.
+   * Stores the original LogEvent reference for adapter layer access.
+   */
+  private toEventNode(logEvent: LogEvent, depth: number): EventNode {
+    return {
+      id: `${logEvent.timestamp}-${depth}`,
+      timestamp: logEvent.timestamp,
+      duration: logEvent.duration?.total ?? 0,
+      type: logEvent.type ?? logEvent.subCategory ?? 'UNKNOWN',
+      text: logEvent.text,
+      subCategory: logEvent.subCategory,
+      original: logEvent,
+    };
   }
 
   /**

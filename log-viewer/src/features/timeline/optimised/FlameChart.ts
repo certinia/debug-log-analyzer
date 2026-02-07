@@ -74,13 +74,13 @@ export interface FlameChartCallbacks {
   onMouseMove?: (
     screenX: number,
     screenY: number,
-    event: LogEvent | null,
+    eventNode: EventNode | null,
     marker: TimelineMarker | null,
   ) => void;
   onClick?: (
     screenX: number,
     screenY: number,
-    event: LogEvent | null,
+    eventNode: EventNode | null,
     marker: TimelineMarker | null,
     modifiers?: ModifierKeys,
   ) => void;
@@ -1377,7 +1377,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     const depth = this.viewport.screenYToDepth(screenY);
     const maxDepth = this.index.maxDepth;
 
-    const { event, marker } = this.hitTestManager.hitTest(
+    const { eventNode, marker } = this.hitTestManager.hitTest(
       screenX,
       screenY,
       depth,
@@ -1387,7 +1387,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Update cursor
     if (this.interactionHandler) {
-      this.interactionHandler.updateCursor(event !== null || marker !== null);
+      this.interactionHandler.updateCursor(eventNode !== null || marker !== null);
     }
 
     // Update metric strip cursor (sync from main timeline)
@@ -1397,7 +1397,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Notify callback with container-relative coordinates
     // (screenY is canvas-relative, add minimap offset for container-relative positioning)
     if (this.callbacks.onMouseMove) {
-      this.callbacks.onMouseMove(screenX, screenY + this.mainTimelineYOffset, event, marker);
+      this.callbacks.onMouseMove(screenX, screenY + this.mainTimelineYOffset, eventNode, marker);
     }
   }
 
@@ -1410,7 +1410,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     const depth = this.viewport.screenYToDepth(screenY);
     const maxDepth = this.index.maxDepth;
 
-    const { event, marker } = this.hitTestManager.hitTest(
+    const { eventNode, marker } = this.hitTestManager.hitTest(
       screenX,
       screenY,
       depth,
@@ -1419,9 +1419,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     );
 
     // Update selection based on click target
-    if (event) {
-      // Find the TreeNode for this LogEvent using original reference
-      const treeNode = this.selectionOrchestrator?.findByOriginal(event);
+    if (eventNode) {
+      // Find the TreeNode for this EventNode using original reference
+      const treeNode = this.selectionOrchestrator?.findByOriginal(eventNode);
       if (treeNode) {
         this.selectionOrchestrator?.selectFrame(treeNode);
       }
@@ -1443,7 +1443,13 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Notify callback with container-relative coordinates
     if (this.callbacks.onClick) {
-      this.callbacks.onClick(screenX, screenY + this.mainTimelineYOffset, event, marker, modifiers);
+      this.callbacks.onClick(
+        screenX,
+        screenY + this.mainTimelineYOffset,
+        eventNode,
+        marker,
+        modifiers,
+      );
     }
   }
 
@@ -1470,7 +1476,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     const depth = this.viewport.screenYToDepth(screenY);
     const maxDepth = this.index.maxDepth;
 
-    const { event, marker } = this.hitTestManager.hitTest(
+    const { eventNode, marker } = this.hitTestManager.hitTest(
       screenX,
       screenY,
       depth,
@@ -1479,9 +1485,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     );
 
     // Handle event double-click
-    if (event) {
-      // Find the TreeNode for this LogEvent
-      const treeNode = this.selectionOrchestrator?.findByOriginal(event);
+    if (eventNode) {
+      // Find the TreeNode for this EventNode
+      const treeNode = this.selectionOrchestrator?.findByOriginal(eventNode);
       if (!treeNode) {
         return;
       }
@@ -1530,7 +1536,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     const maxDepth = this.index.maxDepth;
 
     // Use screenX/screenY for hit testing
-    const { event, marker } = this.hitTestManager.hitTest(
+    const { eventNode, marker } = this.hitTestManager.hitTest(
       screenX,
       screenY,
       depth,
@@ -1539,9 +1545,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     );
 
     // Handle event context menu
-    if (event) {
-      // Find the TreeNode for this LogEvent
-      const treeNode = this.selectionOrchestrator?.findByOriginal(event);
+    if (eventNode) {
+      // Find the TreeNode for this EventNode
+      const treeNode = this.selectionOrchestrator?.findByOriginal(eventNode);
       if (!treeNode) {
         return;
       }
@@ -1692,6 +1698,20 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   public getSelectedMarker(): TimelineMarker | null {
     return this.selectionOrchestrator?.getSelectedMarker() ?? null;
+  }
+
+  /**
+   * Select a frame by its EventNode reference.
+   * Used when navigating from external sources (e.g., calltree "Show in Timeline").
+   *
+   * @param eventNode - The EventNode containing an original reference to find and select
+   */
+  public selectByEventNode(eventNode: EventNode): void {
+    const treeNode = this.selectionOrchestrator?.findByOriginal(eventNode);
+    if (treeNode) {
+      this.selectionOrchestrator?.selectFrame(treeNode);
+      this.requestRender();
+    }
   }
 
   /**

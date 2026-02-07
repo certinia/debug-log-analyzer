@@ -23,6 +23,7 @@ Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers.
 - **🔥 [Timeline](#-timeline)** – Visualize every method, SOQL query, and DML operation in your Apex logs with an interactive flame chart and minimap navigation.
 - **🌲 [Interactive Call Tree](#-call-tree)** – Dive into execution stacks with timing, row counts, and DML/ SOQL metrics.
 - **📊 [Apex](#-apex-analysis) + [Database](#%EF%B8%8F-database-analysis) Analysis** – Identify slow-performing SOQL, high-impact DML, and time-heavy Apex methods.
+- **📄 [Raw Log Navigation](#-raw-log-navigation)** – Jump between analysis views and raw log files with code folding, hover details, and bidirectional navigation.
 - **🧠 Smart Filtering + Sorting** – Focus on what matters: filter by namespace, event type, or duration.
 - **🔍 Deep Search** – Find events across the flame chart, call tree, and database tables.
 - **📤 Export + Share** – Copy or Export Salesforce debug log insights for analysis or collaboration.
@@ -149,6 +150,17 @@ Search across all visualizations:
 - Database
 
 Quickly step through matches, auto-expand parents, and automatically show timeline tooltips.
+
+## 📄 Raw Log Navigation
+
+Seamlessly navigate between the visual analysis and your raw `.log` files:
+
+- **Show in Raw Log** – Right-click any frame in Timeline or Call Tree → "Show in Log File" to jump to the exact line.
+- **Show in Log Analysis** – Hover a raw log line to see metrics and click "Show in Log Analysis" to jump back.
+- **Code Folding** – Collapse/expand matching start/end events (METHOD_ENTRY/EXIT, DML_BEGIN/END, etc.) using the gutter icons or `Ctrl+Shift+[`/`]`.
+- **Line Decorations** – Duration appears as ghost text at the end of the cursor line (e.g., `1.23s (self: 45ms)`).
+- **Hover Details** – Hover near the ghost text to see SOQL/DML counts, row counts, and exception info.
+- **Total Duration** – First line displays total log execution time.
 
 ## 🎨 Customization
 

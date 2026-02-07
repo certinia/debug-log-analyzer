@@ -8,21 +8,39 @@ The module follows a **pure orchestrator** pattern where FlameChart is a generic
 
 ## Dependency Boundaries
 
-**Critical: Files in `timeline/optimised/` must NOT import directly from outside the `timeline/` folder.**
+**Critical: Files in `timeline/optimised/` must NOT import from `log-parser` or `LogEvents.js`.**
 
-The only exception is `ApexLogTimeline.ts`, which serves as the adapter layer converting Apex-specific types to generic timeline types.
+Exception: `ApexLogTimeline.ts` is the adapter layer and may import log-parser types.
 
 ### Import Rules
 
 ```typescript
 // GOOD: Import from types file (the boundary)
-import type { LogEvent } from '../types/flamechart.types.js';
+import type { EventNode, LogEvent } from '../types/flamechart.types.js';
 
-// BAD: Direct import from outside timeline folder
+// BAD: Direct import from log-parser (violates boundary)
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 ```
 
-The `flamechart.types.ts` file re-exports necessary types from external modules, keeping dependencies contained at the boundary.
+### API Boundary
+
+FlameChart's **public API** (callbacks like `onMouseMove`, `onClick`) must use `EventNode`, not `LogEvent`:
+
+```typescript
+// FlameChartCallbacks uses EventNode for public APIs
+onMouseMove?: (screenX: number, screenY: number, eventNode: EventNode | null, marker: TimelineMarker | null) => void;
+onClick?: (screenX: number, screenY: number, eventNode: EventNode | null, marker: TimelineMarker | null, modifiers?: ModifierKeys) => void;
+```
+
+When FlameChart needs to pass event data to callbacks:
+
+- Use `EventNode` type (not LogEvent) in the callback signature
+- Store LogEvent reference in `eventNode.original` property
+- ApexLogTimeline extracts LogEvent via `(eventNode.original as LogEvent)`
+
+### Internal Types
+
+`LogEvent` is still used internally by data structures (`RectangleManager`, `TimelineEventIndex`, `PixelBucket`) for performance reasons. These types are imported through `flamechart.types.ts` which re-exports them from log-parser.
 
 ### Metric Strip Architecture
 

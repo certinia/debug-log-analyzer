@@ -19,7 +19,6 @@
  * - Never mutates viewport directly (viewport operations go through callbacks)
  */
 
-import type { LogEvent } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
 import type {
   EventNode,
@@ -275,11 +274,12 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
   }
 
   /**
-   * Find a TreeNode by its original LogEvent reference.
+   * Find a TreeNode by its EventNode reference.
+   * Uses the original reference stored in eventNode.original for lookup.
    * Used to map hit test results back to tree nodes for selection.
    */
-  public findByOriginal(logEvent: LogEvent): TreeNode<E> | null {
-    return this.selectionManager?.findByOriginal(logEvent) ?? null;
+  public findByOriginal(eventNode: EventNode): TreeNode<E> | null {
+    return this.selectionManager?.findByOriginal(eventNode) ?? null;
   }
 
   // ============================================================================

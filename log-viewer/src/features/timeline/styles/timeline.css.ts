@@ -22,7 +22,7 @@ export const tooltipStyles = `
         color: var(--vscode-editor-foreground);
         font-family: monospace;
         font-size: 0.92rem;
-        pointer-events: none;
+        pointer-events: auto;
         transition: opacity 0.15s ease;
       }
 

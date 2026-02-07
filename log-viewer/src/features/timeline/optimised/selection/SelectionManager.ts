@@ -18,7 +18,6 @@
  * Selection is mutually exclusive: selecting a frame clears marker selection and vice versa.
  */
 
-import type { LogEvent } from 'apex-log-parser';
 import type { EventNode, TimelineMarker, TreeNode } from '../../types/flamechart.types.js';
 import type { NavigationMaps } from '../../utils/tree-converter.js';
 import type { FrameNavDirection } from '../interaction/KeyboardHandler.js';
@@ -265,14 +264,19 @@ export class SelectionManager<E extends EventNode> {
   }
 
   /**
-   * Find a TreeNode by its original LogEvent reference.
+   * Find a TreeNode by its EventNode reference.
+   * Uses the original reference stored in eventNode.original for lookup.
    * Used to map hit test results back to tree nodes for selection.
    *
-   * @param logEvent - Original LogEvent from hit test
+   * @param eventNode - EventNode containing original reference
    * @returns The TreeNode, or null if not found
    */
-  public findByOriginal(logEvent: LogEvent): TreeNode<E> | null {
-    return this.navigator.findByOriginal(logEvent) as TreeNode<E> | null;
+  public findByOriginal(eventNode: EventNode): TreeNode<E> | null {
+    const original = eventNode.original;
+    if (!original) {
+      return null;
+    }
+    return this.navigator.findByOriginal(original) as TreeNode<E> | null;
   }
 
   /**
