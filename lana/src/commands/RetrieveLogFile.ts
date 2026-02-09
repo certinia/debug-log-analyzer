@@ -41,11 +41,10 @@ export class RetrieveLogFile {
 
   private static async safeCommand(context: Context): Promise<WebviewPanel | void> {
     try {
-      return RetrieveLogFile.command(context);
+      return await RetrieveLogFile.command(context);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       context.display.showErrorMessage(`Error loading logfile: ${msg}`);
-      return Promise.resolve();
     }
   }
 
