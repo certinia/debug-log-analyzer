@@ -279,7 +279,7 @@ describe('TimelineTooltipManager', () => {
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.textContent).toContain('total');
       // Check for some duration value (format may vary)
-      expect(tooltip.textContent).toContain('µs');
+      expect(tooltip.textContent).toContain('ms');
 
       tooltipManager.hide();
     });

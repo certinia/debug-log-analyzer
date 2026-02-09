@@ -13,11 +13,16 @@
 
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type { LogSubCategory } from '../../../core/log-parser/types.js';
+import { formatDuration } from '../../../core/utility/Util.js';
 import type { PrecomputedRect } from '../optimised/RectangleManager.js';
 
 // Re-export LogEvent for use within timeline/optimised folder
 // This keeps the log-parser dependency at the boundary (types file)
 export type { LogEvent };
+
+// Re-export formatDuration for use within timeline/optimised folder
+// This keeps the Util.ts dependency at the boundary (types file)
+export { formatDuration };
 
 // ============================================================================
 // VIEWPORT STATE
