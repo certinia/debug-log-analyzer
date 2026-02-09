@@ -877,9 +877,6 @@ export interface SegmentNode {
   /** Whether this is a leaf node */
   isLeaf: boolean;
 
-  // Y position (pre-computed based on depth)
-  /** Screen Y position = depth * EVENT_HEIGHT */
-  y: number;
   /** Call stack depth (0-indexed) */
   depth: number;
 }

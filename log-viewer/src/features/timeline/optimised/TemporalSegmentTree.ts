@@ -535,7 +535,6 @@ export class TemporalSegmentTree {
       children: null,
       isLeaf: true,
 
-      y: depth * TIMELINE_CONSTANTS.EVENT_HEIGHT,
       depth,
     };
   }
@@ -612,29 +611,21 @@ export class TemporalSegmentTree {
 
     const nodeSpan = Math.max(SEGMENT_TREE_CONSTANTS.MIN_NODE_SPAN, timeEnd - timeStart);
 
-    // Determine dominant category
-    const dominantCategory = this.resolveDominantCategory(categoryStats);
-    // PERF: Pre-compute priority to avoid PRIORITY_MAP lookups during query
-    const dominantPriority = PRIORITY_MAP.get(dominantCategory) ?? Infinity;
-
-    // Store actual child references for tree traversal
-    const childNodes = children.slice(start, end);
-
     return {
       timeStart,
       timeEnd,
       nodeSpan,
 
       categoryStats,
-      dominantCategory,
-      dominantPriority,
+      // Branch nodes don't use dominantCategory/Priority - buckets resolve from categoryStats
+      dominantCategory: '',
+      dominantPriority: Infinity,
 
       eventCount: totalEventCount,
 
-      children: childNodes,
+      children: children.slice(start, end),
       isLeaf: false,
 
-      y: firstChild.y,
       depth: firstChild.depth,
     };
   }
