@@ -853,12 +853,21 @@ export interface SegmentNode {
   nodeSpan: number;
 
   // Category statistics (for tooltips and color resolution)
-  /** Per-category event counts and durations */
-  categoryStats: Map<string, CategoryAggregation>;
+  /**
+   * Per-category event counts and durations.
+   * null for leaf nodes (use leafCategory/leafDuration instead to avoid Map allocation).
+   */
+  categoryStats: Map<string, CategoryAggregation> | null;
   /** Winning category after priority/duration/count resolution */
   dominantCategory: string;
   /** Pre-computed priority for dominantCategory (avoids map lookup during query) */
   dominantPriority: number;
+
+  // Leaf-specific fields (avoid Map allocation for 500k+ leaf nodes)
+  /** For leaf nodes only: category string (avoids Map allocation) */
+  leafCategory?: string;
+  /** For leaf nodes only: duration value (avoids Map allocation) */
+  leafDuration?: number;
 
   // Event tracking
   /** Total event count in this subtree */

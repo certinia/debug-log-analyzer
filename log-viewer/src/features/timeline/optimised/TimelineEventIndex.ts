@@ -12,15 +12,30 @@
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
 import type { ViewportBounds, ViewportState } from '../types/flamechart.types.js';
 
+/**
+ * Precomputed metrics from unified tree conversion (single-pass optimization).
+ * When provided, TimelineEventIndex skips its own O(n) calculation methods.
+ */
+export interface PrecomputedMetrics {
+  maxDepth: number;
+  totalDuration: number;
+}
+
 export class TimelineEventIndex {
   private rootEvents: LogEvent[];
   private _maxDepth: number;
   private _totalDuration: number;
 
-  constructor(events: LogEvent[]) {
+  /**
+   * Create TimelineEventIndex with either computed or precomputed metrics.
+   *
+   * @param events - Root events for spatial queries
+   * @param precomputed - Optional precomputed metrics from unified conversion
+   */
+  constructor(events: LogEvent[], precomputed?: PrecomputedMetrics) {
     this.rootEvents = events;
-    this._maxDepth = this.calculateMaxDepth(events);
-    this._totalDuration = this.calculateTotalDuration(events);
+    this._maxDepth = precomputed?.maxDepth ?? this.calculateMaxDepth(events);
+    this._totalDuration = precomputed?.totalDuration ?? this.calculateTotalDuration(events);
   }
 
   /**

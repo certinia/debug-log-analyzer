@@ -103,6 +103,18 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
   private searchTextLabelRenderer: SearchTextLabelRenderer | null = null;
 
   // ============================================================================
+  // DEFERRED INIT STATE
+  // ============================================================================
+  /** Stored for deferred renderer initialization */
+  private deferredInitData: {
+    worldContainer: PIXI.Container;
+    batches: Map<string, RenderBatch>;
+    textLabelRenderer: TextLabelRenderer;
+    useMeshRenderer: boolean;
+    stage?: PIXI.Container;
+  } | null = null;
+
+  // ============================================================================
   // EXTERNAL REFERENCES (not owned)
   // ============================================================================
   private viewport: TimelineViewport | null = null;
@@ -143,20 +155,41 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     this.viewport = viewport;
     this.mainTimelineYOffset = mainTimelineYOffset;
 
-    // Build rectMap by ID from PrecomputedRect
-    const rectMap = new Map<string, PrecomputedRect>();
-    const logEventRectMap = rectangleManager.getRectMap();
+    // PERF: Use cached rectMapById instead of rebuilding (~18ms saved)
+    const rectMap = rectangleManager.getRectMapById();
 
-    for (const [_event, rect] of logEventRectMap.entries()) {
-      rectMap.set(rect.id, rect);
+    // Initialize SearchManager eagerly (needed for search() calls)
+    this.searchManager = new SearchManager(treeNodes, rectMap);
+
+    // PERF: Defer renderer initialization to first search() call (~6ms saved at init)
+    // Store data needed for deferred initialization
+    this.deferredInitData = {
+      worldContainer,
+      batches,
+      textLabelRenderer,
+      useMeshRenderer,
+    };
+  }
+
+  /**
+   * Ensure search renderers are initialized (lazy initialization).
+   * Called on first search() or render operation.
+   */
+  private ensureRenderersInitialized(): void {
+    if (this.searchStyleRenderer || !this.deferredInitData) {
+      return; // Already initialized or no data to initialize with
     }
 
-    // Initialize SearchManager
-    this.searchManager = new SearchManager(treeNodes, rectMap);
+    const { worldContainer, batches, textLabelRenderer, useMeshRenderer, stage } =
+      this.deferredInitData;
 
     // Initialize search style renderer (renders with desaturation for search mode)
     if (useMeshRenderer) {
       this.searchStyleRenderer = new MeshSearchStyleRenderer(worldContainer, batches);
+      // If stage was set before renderers were initialized, apply it now
+      if (stage) {
+        (this.searchStyleRenderer as MeshSearchStyleRenderer).setStageContainer(stage);
+      }
     } else {
       this.searchStyleRenderer = new SearchStyleRenderer(worldContainer, batches);
     }
@@ -170,6 +203,9 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       textLabelRenderer,
       batches,
     );
+
+    // Clear deferred data - no longer needed
+    this.deferredInitData = null;
   }
 
   /**
@@ -178,6 +214,12 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @param stage - PixiJS stage container
    */
   public setStageContainer(stage: PIXI.Container): void {
+    // Store for deferred initialization if renderers not yet created
+    if (this.deferredInitData) {
+      this.deferredInitData.stage = stage;
+    }
+
+    // Apply immediately if renderer already exists
     if (this.searchStyleRenderer && 'setStageContainer' in this.searchStyleRenderer) {
       (this.searchStyleRenderer as MeshSearchStyleRenderer).setStageContainer(stage);
     }
@@ -256,6 +298,9 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       return null;
     }
 
+    // PERF: Initialize renderers on first search call (~6ms deferred from init)
+    this.ensureRenderersInitialized();
+
     // Clear selection when starting a new search to show search highlights
     this.callbacks.onClearSelection();
 
@@ -294,7 +339,14 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @param context - Render context with viewport state, visible rects, and buckets
    */
   public renderStyledEvents(context: SearchRenderContext): void {
-    if (!this.searchStyleRenderer || !this.searchManager) {
+    if (!this.searchManager) {
+      return;
+    }
+
+    // Ensure renderers are initialized before rendering
+    this.ensureRenderersInitialized();
+
+    if (!this.searchStyleRenderer) {
       return;
     }
 
@@ -332,7 +384,14 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @param context - Render context with viewport state and visible rects
    */
   public renderStyledLabels(context: SearchRenderContext): void {
-    if (!this.searchTextLabelRenderer || !this.searchManager) {
+    if (!this.searchManager) {
+      return;
+    }
+
+    // Ensure renderers are initialized before rendering
+    this.ensureRenderersInitialized();
+
+    if (!this.searchTextLabelRenderer) {
       return;
     }
 
@@ -366,7 +425,14 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @param viewportState - Current viewport state
    */
   public renderHighlight(viewportState: ViewportState): void {
-    if (!this.searchHighlightRenderer || !this.searchManager) {
+    if (!this.searchManager) {
+      return;
+    }
+
+    // Ensure renderers are initialized before rendering
+    this.ensureRenderersInitialized();
+
+    if (!this.searchHighlightRenderer) {
       return;
     }
 

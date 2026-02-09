@@ -193,6 +193,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * @param markers - Timeline markers (truncation regions, etc.)
    * @param options - Rendering options
    * @param callbacks - Event callbacks
+   * @param precomputed - Optional precomputed data from unified tree conversion
    */
   public async init(
     container: HTMLElement,
@@ -202,6 +203,14 @@ export class FlameChart<E extends EventNode = EventNode> {
     markers: TimelineMarker[] = [],
     options: TimelineOptions = {},
     callbacks: FlameChartCallbacks = {},
+    precomputed?: {
+      maxDepth: number;
+      totalDuration: number;
+      rectsByCategory: Map<string, PrecomputedRect[]>;
+      rectsByDepth?: Map<number, PrecomputedRect[]>;
+      rectMap: Map<LogEvent, PrecomputedRect>;
+      preSorted?: boolean;
+    },
   ): Promise<void> {
     // Validate inputs
     if (!container || !(container instanceof HTMLElement)) {
@@ -239,8 +248,13 @@ export class FlameChart<E extends EventNode = EventNode> {
       );
     }
 
-    // Create event index
-    this.index = new TimelineEventIndex(events);
+    // Create event index (use precomputed metrics if available)
+    this.index = new TimelineEventIndex(
+      events,
+      precomputed
+        ? { maxDepth: precomputed.maxDepth, totalDuration: precomputed.totalDuration }
+        : undefined,
+    );
 
     // Calculate minimap and metric strip heights BEFORE creating viewport
     // Viewport needs the available height for main timeline (excluding minimap + metric strip + gaps)
@@ -315,9 +329,18 @@ export class FlameChart<E extends EventNode = EventNode> {
     }
 
     // Create RectangleManager (single source of truth for rectangle computation)
+    // Use precomputed rectangles if available (from unified tree conversion)
     if (this.state) {
       const categories = new Set(this.state.batches.keys());
-      this.rectangleManager = new RectangleManager(events, categories);
+      const precomputedRects = precomputed
+        ? {
+            rectsByCategory: precomputed.rectsByCategory,
+            rectMap: precomputed.rectMap,
+            rectsByDepth: precomputed.rectsByDepth,
+            preSorted: precomputed.preSorted,
+          }
+        : undefined;
+      this.rectangleManager = new RectangleManager(events, categories, precomputedRects);
     }
 
     // Create batch renderer (pure rendering, receives rectangles from RectangleManager)

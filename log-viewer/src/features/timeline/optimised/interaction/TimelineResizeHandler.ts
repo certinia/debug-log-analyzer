@@ -61,7 +61,18 @@ export class TimelineResizeHandler {
       return;
     }
 
+    // PERF: Skip first callback unconditionally.
+    // ResizeObserver fires immediately on observe(), and even with dimension
+    // pre-population, DOM manipulation during init can cause layout shifts.
+    // Skipping the first callback eliminates ~100ms duplicate render.
+    let skipFirstCallback = true;
+
     this.resizeObserver = new ResizeObserver(() => {
+      if (skipFirstCallback) {
+        skipFirstCallback = false;
+        return;
+      }
+
       // Debounce resize handling to prevent flickering
       // Clear any existing frame request
       if (this.resizeDebounceFrameId !== null) {

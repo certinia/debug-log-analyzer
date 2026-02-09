@@ -37,7 +37,7 @@ import type {
 } from '../types/flamechart.types.js';
 import type { SearchCursor } from '../types/search.types.js';
 import { extractMarkers } from '../utils/marker-utils.js';
-import { logEventToTreeNode } from '../utils/tree-converter.js';
+import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
 import { TimelineTooltipManager } from './TimelineTooltipManager.js';
 
@@ -120,12 +120,36 @@ export class ApexLogTimeline {
     const markers = extractMarkers(this.apexLog);
     this.events = this.extractEvents();
 
-    // Convert LogEvent to TreeNode structure for search and navigation
-    // This is Apex-specific: filters out 0-duration events that are invisible
-    // Also builds navigation maps during traversal to avoid duplicate O(n) work
-    const { treeNodes, maps } = logEventToTreeNode(this.events);
+    // Define categories for rectangle indexing (matches FlameChart batch categories)
+    const categories = new Set([
+      'Code Unit',
+      'Workflow',
+      'Method',
+      'Flow',
+      'DML',
+      'SOQL',
+      'System Method',
+    ]);
 
-    // Initialize FlameChart with Apex-specific callbacks
+    // Single-pass unified conversion: builds TreeNodes, navigation maps,
+    // PrecomputedRects, maxDepth, and totalDuration in one O(n) traversal.
+    // This eliminates redundant traversals previously done by:
+    // - logEventToTreeNode (tree + maps)
+    // - TimelineEventIndex.calculateMaxDepth
+    // - TimelineEventIndex.calculateTotalDuration
+    // - RectangleManager.flattenEvents
+    const {
+      treeNodes,
+      maps,
+      rectsByCategory,
+      rectsByDepth,
+      rectMap,
+      maxDepth,
+      totalDuration,
+      preSorted,
+    } = logEventToTreeAndRects(this.events, categories);
+
+    // Initialize FlameChart with Apex-specific callbacks and precomputed data
     await this.flamechart.init(
       container,
       this.events,
@@ -176,6 +200,8 @@ export class ApexLogTimeline {
           this.copyToClipboard(marker.summary);
         },
       },
+      // Pass precomputed data to skip redundant O(n) traversals
+      { maxDepth, totalDuration, rectsByCategory, rectsByDepth, rectMap, preSorted },
     );
 
     // Create context menu Lit element (using constructor ensures custom element is registered)
