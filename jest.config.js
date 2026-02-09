@@ -44,6 +44,12 @@ export default {
       ...defaultConfig,
       displayName: 'lana',
       rootDir: '<rootDir>/lana',
+      setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
+      moduleNameMapper: {
+        ...defaultConfig.moduleNameMapper,
+        '^vscode$': '<rootDir>/src/__tests__/mocks/vscode.ts',
+        '^apex-log-parser$': '<rootDir>/../apex-log-parser/src/index.ts',
+      },
       transformIgnorePatterns: [
         // allow lit/@lit transformation
         '<rootDir>/node_modules/(?!@?lit)',
