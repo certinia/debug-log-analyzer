@@ -97,7 +97,7 @@ export class SearchCursorImpl<E extends EventNode> implements SearchCursor<E> {
       timestamp: m.event.timestamp,
       duration: m.event.duration ?? 0,
       depth: m.depth,
-      category: m.event.subCategory ?? '',
+      category: m.rect.category,
     }));
   }
 }

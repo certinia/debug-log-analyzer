@@ -120,7 +120,6 @@ function convertEventsRecursive(
         duration: duration,
         type: event.type ?? event.subCategory ?? 'UNKNOWN',
         text: event.text,
-        subCategory: event.subCategory,
         original: event,
       },
       children: undefined,

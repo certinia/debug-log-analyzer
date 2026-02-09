@@ -100,7 +100,7 @@ describe('SearchHighlightRenderer', () => {
           timestamp: m.event.timestamp,
           duration: m.event.duration,
           depth: m.depth,
-          category: m.event.subCategory ?? '',
+          category: m.rect.category,
         })),
       ),
     };
