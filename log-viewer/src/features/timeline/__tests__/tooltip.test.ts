@@ -56,13 +56,6 @@ describe('TimelineTooltipManager', () => {
     } as unknown as LogEvent;
   }
 
-  /**
-   * Helper to wait for async operations
-   */
-  function wait(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
   beforeEach(() => {
     // Create container element
     container = document.createElement('div');

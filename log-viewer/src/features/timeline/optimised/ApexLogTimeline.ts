@@ -257,7 +257,6 @@ export class ApexLogTimeline {
       duration: result.event.duration.total,
       type: result.event.type ?? result.event.subCategory ?? 'UNKNOWN',
       text: result.event.text,
-      subCategory: result.event.subCategory,
       original: result.event,
     };
 
