@@ -12,7 +12,6 @@
  * duplicate O(n) traversal work.
  */
 
-import type { LogEvent } from '../../../../core/log-parser/LogEvents.js';
 import type { EventNode, TreeNode } from '../../types/flamechart.types.js';
 import type { NavigationMaps, SiblingInfo } from '../../utils/tree-converter.js';
 
@@ -48,8 +47,8 @@ export class TreeNavigator {
   /** Maps event ID to sibling info for efficient sibling navigation */
   private siblingMap: Map<string, SiblingInfo>;
 
-  /** Maps original LogEvent to TreeNode for hit test lookup */
-  private originalMap: Map<LogEvent, TreeNode<EventNode>>;
+  /** Maps original reference to TreeNode for hit test lookup */
+  private originalMap: Map<unknown, TreeNode<EventNode>>;
 
   /** Maps depth to nodes at that depth, sorted by timestamp for cross-parent navigation */
   private depthMap: Map<number, TreeNode<EventNode>[]>;
@@ -89,14 +88,14 @@ export class TreeNavigator {
   }
 
   /**
-   * Find a TreeNode by its original LogEvent reference.
+   * Find a TreeNode by its original reference.
    * Useful for mapping hit test results back to tree nodes.
    *
-   * @param logEvent - Original LogEvent from hit test
+   * @param original - Original reference (e.g., LogEvent) from hit test
    * @returns The TreeNode, or null if not found
    */
-  public findByOriginal(logEvent: LogEvent): TreeNode<EventNode> | null {
-    return this.originalMap.get(logEvent) ?? null;
+  public findByOriginal(original: unknown): TreeNode<EventNode> | null {
+    return this.originalMap.get(original) ?? null;
   }
 
   /**

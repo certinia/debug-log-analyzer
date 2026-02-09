@@ -16,7 +16,7 @@
  * eliminating redundant traversals.
  */
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { LogEvent } from 'apex-log-parser';
 import type { PrecomputedRect } from '../optimised/RectangleManager.js';
 import { TIMELINE_CONSTANTS, type EventNode, type TreeNode } from '../types/flamechart.types.js';
 

@@ -21,7 +21,7 @@
  * - Implement any search logic
  */
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { LogEvent } from 'apex-log-parser';
 import type {
   CulledRenderData,
   RenderRectangle,

@@ -10,6 +10,7 @@ import { Uri, commands, window as vscWindow, workspace, type WebviewPanel } from
 import { Context } from '../Context.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
+import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
 import { getConfig } from '../workspace/AppConfig.js';
 
 interface WebViewLogFileRequest<T = unknown> {
@@ -21,9 +22,19 @@ interface WebViewLogFileRequest<T = unknown> {
 export class LogView {
   private static helpUrl = 'https://certinia.github.io/debug-log-analyzer/';
   private static currentPanel: WebviewPanel | undefined;
+  private static currentLogPath: string | undefined;
+  private static pendingNavigationTimestamp: number | undefined;
 
   static getCurrentView() {
     return LogView.currentPanel;
+  }
+
+  static getLogPath() {
+    return LogView.currentLogPath;
+  }
+
+  static setPendingNavigation(timestamp: number): void {
+    LogView.pendingNavigationTimestamp = timestamp;
   }
 
   static async createView(
@@ -37,6 +48,7 @@ export class LogView {
       Uri.file(dirname(logPath || '')),
     ]);
     this.currentPanel = panel;
+    this.currentLogPath = logPath;
 
     const logViewerRoot = join(context.context.extensionPath, 'out');
     const index = join(logViewerRoot, 'index.html');
@@ -51,6 +63,15 @@ export class LogView {
     panel.webview.html = indexSrc.replace(/bundle.js|\${extensionRoot}/gi, function (matched) {
       return toReplace[matched] || '';
     });
+
+    panel.onDidDispose(
+      () => {
+        this.currentPanel = undefined;
+        this.currentLogPath = undefined;
+      },
+      undefined,
+      context.context.subscriptions,
+    );
 
     panel.webview.onDidReceiveMessage(
       async (msg: WebViewLogFileRequest) => {
@@ -123,6 +144,14 @@ export class LogView {
             }
             break;
           }
+
+          case 'goToLogLine': {
+            const { timestamp } = payload as { timestamp: number };
+            if (timestamp && LogView.currentLogPath) {
+              RawLogNavigation.goToLineByTimestamp(LogView.currentLogPath, timestamp);
+            }
+            break;
+          }
         }
       },
       undefined,
@@ -162,6 +191,9 @@ export class LogView {
     }
 
     const filePath = parse(logFilePath || '');
+    const navigateToTimestamp = LogView.pendingNavigationTimestamp;
+    LogView.pendingNavigationTimestamp = undefined;
+
     panel.webview.postMessage({
       requestId,
       cmd: 'fetchLog',
@@ -170,6 +202,7 @@ export class LogView {
         logUri: logFilePath ? panel.webview.asWebviewUri(Uri.file(logFilePath)).toString(true) : '',
         logPath: logFilePath,
         logData: logData,
+        navigateToTimestamp,
       },
     });
   }

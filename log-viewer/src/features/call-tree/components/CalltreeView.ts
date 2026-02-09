@@ -12,9 +12,10 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
 
-import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type { LogEventType } from '../../../core/log-parser/types.js';
+import type { ApexLog, LogEvent, LogEventType } from 'apex-log-parser';
+import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { findEventByTimestamp } from '../../../core/utility/EventSearch.js';
 import { formatDuration, isVisible } from '../../../core/utility/Util.js';
 
 // Tabulator custom modules, imports + styles
@@ -33,6 +34,8 @@ import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 import { globalStyles } from '../../../styles/global.styles.js';
 
 // web components
+import '../../../components/ContextMenu.js';
+import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/GridSkeleton.js';
 
 provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
@@ -69,6 +72,9 @@ export class CalltreeView extends LitElement {
   tableContainer: HTMLDivElement | null = null;
   rootMethod: ApexLog | null = null;
 
+  private contextMenu: ContextMenu | null = null;
+  private contextMenuRow: CalltreeRow | null = null;
+
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (this.tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
   }
@@ -93,6 +99,10 @@ export class CalltreeView extends LitElement {
     ) {
       this._appendTableWhenVisible();
     }
+  }
+
+  firstUpdated(): void {
+    this.contextMenu = this.renderRoot.querySelector('context-menu');
   }
 
   static styles = [
@@ -216,6 +226,7 @@ export class CalltreeView extends LitElement {
           ${skeleton}
           <div id="call-tree-table"></div>
         </div>
+        <context-menu @menu-select="${this._handleContextMenuSelect}"></context-menu>
       </div>
     `;
   }
@@ -863,6 +874,17 @@ export class CalltreeView extends LitElement {
         }
       });
 
+      // Custom context menu handler using Tabulator's rowContext event
+      this.calltreeTable.on('rowContext', (e: UIEvent, row: RowComponent) => {
+        // If user has selected text, allow browser's native context menu
+        if (window.getSelection()?.type === 'Range') {
+          return;
+        }
+        e.preventDefault();
+        const mouseEvent = e as MouseEvent;
+        this._showRowContextMenu(row, mouseEvent.clientX, mouseEvent.clientY);
+      });
+
       this.calltreeTable.on('tableBuilt', () => {
         resolve();
       });
@@ -880,6 +902,68 @@ export class CalltreeView extends LitElement {
     this.calltreeTable.clearFindHighlights(Object.values(this.findMap));
     this.findMap = {};
     this.totalMatches = 0;
+  }
+
+  private _showRowContextMenu(row: RowComponent, clientX: number, clientY: number): void {
+    if (!this.contextMenu) {
+      return;
+    }
+
+    const rowData = row.getData() as CalltreeRow;
+    this.contextMenuRow = rowData;
+
+    const items: { id: string; label: string; separator?: boolean; shortcut?: string }[] = [];
+
+    // 1. Navigation actions (go elsewhere)
+    items.push({ id: 'show-in-timeline', label: 'Show in Timeline' });
+
+    if (rowData.originalData.hasValidSymbols) {
+      items.push({ id: 'go-to-source', label: 'Go to Source' });
+    }
+
+    // 2. View actions (show related content)
+    if (rowData.originalData.timestamp) {
+      items.push({ id: 'show-in-log', label: 'Show in Log File' });
+    }
+
+    // 3. Separator + Copy actions
+    items.push(
+      { id: 'separator-1', label: '', separator: true },
+      { id: 'copy-name', label: 'Copy Name' },
+    );
+
+    this.contextMenu.show(items, clientX, clientY);
+  }
+
+  private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>): void {
+    if (!this.contextMenuRow) {
+      return;
+    }
+
+    const rowData = this.contextMenuRow;
+
+    switch (e.detail.itemId) {
+      case 'show-in-log':
+        vscodeMessenger.send('goToLogLine', { timestamp: rowData.originalData.timestamp });
+        break;
+
+      case 'show-in-timeline':
+        document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'timeline-tab' } }));
+        eventBus.emit('timeline:navigate-to', {
+          timestamp: rowData.originalData.timestamp,
+        });
+        break;
+
+      case 'go-to-source':
+        vscodeMessenger.send<string>('openType', rowData.originalData.text);
+        break;
+
+      case 'copy-name':
+        navigator.clipboard.writeText(rowData.text);
+        break;
+    }
+
+    this.contextMenuRow = null;
   }
 
   private _expandCollapseAll(rows: RowComponent[], expand: boolean = true) {
@@ -929,40 +1013,57 @@ export class CalltreeView extends LitElement {
     return results;
   }
 
-  private _findByTime(rows: RowComponent[], timeStamp: number): RowComponent | null {
-    if (!rows) {
+  /**
+   * Find a row by timestamp using the shared binary search utility.
+   * First finds the target LogEvent, then locates the corresponding row.
+   */
+  private _findByTime(rows: RowComponent[], timestamp: number): RowComponent | null {
+    if (!rows?.length || !this.rootMethod?.children) {
       return null;
     }
 
-    let start = 0,
-      end = rows.length - 1;
+    // Use shared utility to find the target event
+    const result = findEventByTimestamp(this.rootMethod.children, timestamp);
+    if (!result) {
+      return null;
+    }
 
-    // Iterate as long as the beginning does not encounter the end.
+    // Find the row matching the found event
+    return this._findRowByEvent(rows, result.event);
+  }
+
+  /**
+   * Find the RowComponent that contains the specified LogEvent.
+   * Uses binary search since rows are sorted by timestamp.
+   */
+  private _findRowByEvent(rows: RowComponent[], targetEvent: LogEvent): RowComponent | null {
+    let start = 0;
+    let end = rows.length - 1;
+
     while (start <= end) {
-      // find out the middle index
       const mid = Math.floor((start + end) / 2);
       const row = rows[mid];
-
       if (!row) {
         break;
       }
-      const node = (row.getData() as CalltreeRow).originalData as LogEvent;
 
-      // Return True if the element is present in the middle.
-      const endTime = node.exitStamp ?? node.timestamp;
-      const isInRange = timeStamp >= node.timestamp && timeStamp <= endTime;
-      if (timeStamp === node.timestamp) {
+      const rowEvent = (row.getData() as CalltreeRow).originalData as LogEvent;
+      const endTime = rowEvent.exitStamp ?? rowEvent.timestamp;
+
+      if (rowEvent.timestamp === targetEvent.timestamp) {
         return row;
-      } else if (isInRange) {
-        return this._findByTime(row.getTreeChildren() ?? [], timeStamp);
       }
-      // Otherwise, look in the left or right half
-      else if (timeStamp > endTime) {
+
+      // Check if target is within this row's time range (i.e., in children)
+      if (targetEvent.timestamp >= rowEvent.timestamp && targetEvent.timestamp <= endTime) {
+        const childResult = this._findRowByEvent(row.getTreeChildren() ?? [], targetEvent);
+        return childResult ?? row;
+      }
+
+      if (targetEvent.timestamp > endTime) {
         start = mid + 1;
-      } else if (timeStamp < node.timestamp) {
-        end = mid - 1;
       } else {
-        return null;
+        end = mid - 1;
       }
     }
 

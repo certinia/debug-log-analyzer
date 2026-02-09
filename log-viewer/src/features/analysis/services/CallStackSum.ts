@@ -2,7 +2,7 @@
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { LogEvent } from 'apex-log-parser';
 import type { Metric } from '../../analysis/services/RowGrouper.js';
 
 /**

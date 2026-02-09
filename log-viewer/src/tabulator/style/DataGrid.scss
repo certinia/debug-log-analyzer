@@ -103,8 +103,16 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
   }
 
   .tabulator-tooltip {
+    // Match timeline tooltip styling for consistency
     background: var(--vscode-editor-background);
+    color: var(--vscode-editor-foreground);
     overflow-wrap: anywhere;
+    font-family: monospace;
+    font-size: 0.92rem;
+    font-variant-numeric: tabular-nums;
+    padding: 5px;
+    border-radius: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   }
   .tabulator-row.tabulator-selected {
     color: var(--vscode-list-activeSelectionForeground);

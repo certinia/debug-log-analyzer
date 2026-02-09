@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { parse } from '../core/log-parser/ApexLogParser.js';
+import { parse } from 'apex-log-parser';
 import { DatabaseAccess } from '../features/database/services/Database.js';
 
 describe('Analyse database tests', () => {
