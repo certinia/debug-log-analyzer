@@ -17,7 +17,11 @@
  */
 
 import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { PrecomputedRect } from '../optimised/RectangleManager.js';
 import { TIMELINE_CONSTANTS, type EventNode, type TreeNode } from '../types/flamechart.types.js';
+
+// Re-export PrecomputedRect for consumers of this module
+export type { PrecomputedRect };
 
 /**
  * Sibling information for a node.
@@ -170,25 +174,6 @@ function convertEventsRecursive(
 // ============================================================================
 
 /**
- * Import PrecomputedRect type inline to avoid circular dependency issues.
- * This matches the interface in RectangleManager.ts.
- */
-interface PrecomputedRectLocal {
-  id: string;
-  timeStart: number;
-  timeEnd: number;
-  depth: number;
-  duration: number;
-  selfDuration: number;
-  category: string;
-  eventRef: LogEvent;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-/**
  * Unified result from single-pass tree conversion and rectangle pre-computation.
  * Contains all data structures needed for FlameChart initialization.
  */
@@ -198,11 +183,11 @@ export interface UnifiedConversionResult {
   /** Navigation maps for O(1) lookups */
   maps: NavigationMaps;
   /** Pre-computed rectangles grouped by category (for RectangleManager) */
-  rectsByCategory: Map<string, PrecomputedRectLocal[]>;
+  rectsByCategory: Map<string, PrecomputedRect[]>;
   /** Pre-computed rectangles grouped by depth (for TemporalSegmentTree) */
-  rectsByDepth: Map<number, PrecomputedRectLocal[]>;
+  rectsByDepth: Map<number, PrecomputedRect[]>;
   /** Map from LogEvent to PrecomputedRect (for search functionality) */
-  rectMap: Map<LogEvent, PrecomputedRectLocal>;
+  rectMap: Map<LogEvent, PrecomputedRect>;
   /** Maximum depth in tree (tracked during traversal) */
   maxDepth: number;
   /** Total duration in nanoseconds (tracked during traversal) */
@@ -258,15 +243,15 @@ export function logEventToTreeAndRects(
   };
 
   // Initialize category arrays for rectangles
-  const rectsByCategory = new Map<string, PrecomputedRectLocal[]>();
+  const rectsByCategory = new Map<string, PrecomputedRect[]>();
   for (const category of categories) {
     rectsByCategory.set(category, []);
   }
 
   // Pre-group by depth for TemporalSegmentTree (eliminates O(n) grouping later)
-  const rectsByDepth = new Map<number, PrecomputedRectLocal[]>();
+  const rectsByDepth = new Map<number, PrecomputedRect[]>();
 
-  const rectMap = new Map<LogEvent, PrecomputedRectLocal>();
+  const rectMap = new Map<LogEvent, PrecomputedRect>();
   const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
 
   // Metrics tracked during traversal
@@ -330,7 +315,7 @@ export function logEventToTreeAndRects(
       if (subCategory) {
         const rects = rectsByCategory.get(subCategory);
         if (rects) {
-          const rect: PrecomputedRectLocal = {
+          const rect: PrecomputedRect = {
             id,
             timeStart: event.timestamp,
             timeEnd: exitStamp,
@@ -360,17 +345,6 @@ export function logEventToTreeAndRects(
       // PERF: Inline sibling map population (~25ms saved)
       // Track current index in result array for sibling linking
       const currentIndex = resultArray.length;
-
-      // Link to previous sibling at same depth in same result array
-      const prevNode = lastNodeAtDepth.get(depth);
-      if (prevNode) {
-        // Check if prev node is in the same sibling group (same result array)
-        const prevInfo = maps.siblingMap.get(prevNode.data.id);
-        if (prevInfo && prevInfo.siblings === resultArray) {
-          // Update the previous node's sibling info to know about this node
-          // (sibling info is set when node is added, but we track index)
-        }
-      }
 
       // Store sibling info for this node
       maps.siblingMap.set(id, {

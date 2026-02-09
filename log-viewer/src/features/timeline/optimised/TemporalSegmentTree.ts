@@ -39,6 +39,7 @@ import type {
 } from '../types/flamechart.types.js';
 import {
   BUCKET_CONSTANTS,
+  mergeNodeCategoryStats,
   SEGMENT_TREE_CONSTANTS,
   TIMELINE_CONSTANTS,
 } from '../types/flamechart.types.js';
@@ -644,30 +645,7 @@ export class TemporalSegmentTree {
       }
 
       totalEventCount += child.eventCount;
-
-      // Merge category stats - handle both leaf nodes (leafCategory/leafDuration)
-      // and branch nodes (categoryStats Map)
-      if (child.categoryStats) {
-        // Branch node: merge from Map
-        for (const [cat, stats] of child.categoryStats) {
-          const existing = categoryStats.get(cat);
-          if (existing) {
-            existing.count += stats.count;
-            existing.totalDuration += stats.totalDuration;
-          } else {
-            categoryStats.set(cat, { count: stats.count, totalDuration: stats.totalDuration });
-          }
-        }
-      } else if (child.leafCategory !== undefined && child.leafDuration !== undefined) {
-        // Leaf node: use leafCategory/leafDuration directly
-        const existing = categoryStats.get(child.leafCategory);
-        if (existing) {
-          existing.count += 1;
-          existing.totalDuration += child.leafDuration;
-        } else {
-          categoryStats.set(child.leafCategory, { count: 1, totalDuration: child.leafDuration });
-        }
-      }
+      mergeNodeCategoryStats(categoryStats, child);
     }
 
     const nodeSpan = Math.max(SEGMENT_TREE_CONSTANTS.MIN_NODE_SPAN, timeEnd - timeStart);
@@ -789,36 +767,7 @@ export class TemporalSegmentTree {
 
     // Aggregate node stats into bucket
     bucket.eventCount += node.eventCount;
-
-    // Merge category stats - handle both leaf nodes (leafCategory/leafDuration)
-    // and branch nodes (categoryStats Map)
-    if (node.categoryStats) {
-      // Branch node: merge from Map
-      for (const [category, stats] of node.categoryStats) {
-        const existing = bucket.categoryStats.get(category);
-        if (existing) {
-          existing.count += stats.count;
-          existing.totalDuration += stats.totalDuration;
-        } else {
-          bucket.categoryStats.set(category, {
-            count: stats.count,
-            totalDuration: stats.totalDuration,
-          });
-        }
-      }
-    } else if (node.leafCategory !== undefined && node.leafDuration !== undefined) {
-      // Leaf node: use leafCategory/leafDuration directly
-      const existing = bucket.categoryStats.get(node.leafCategory);
-      if (existing) {
-        existing.count += 1;
-        existing.totalDuration += node.leafDuration;
-      } else {
-        bucket.categoryStats.set(node.leafCategory, {
-          count: 1,
-          totalDuration: node.leafDuration,
-        });
-      }
-    }
+    mergeNodeCategoryStats(bucket.categoryStats, node);
   }
 
   /**
