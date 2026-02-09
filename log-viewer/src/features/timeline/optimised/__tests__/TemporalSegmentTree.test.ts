@@ -344,6 +344,69 @@ describe('TemporalSegmentTree', () => {
     });
   });
 
+  describe('branch node bounds calculation', () => {
+    it('should include long events when later short events end earlier', () => {
+      // Bug scenario: Children sorted by timeStart, but earlier child has longer duration
+      // Child A: timeStart=0, timeEnd=100 (long event)
+      // Child B: timeStart=50, timeEnd=60 (short event, ends before A)
+      // Query for time range [70, 90] should return Child A
+      const events = [
+        createEvent(0, 100, 'Method'), // timeStart=0, timeEnd=100
+        createEvent(50, 10, 'SOQL'), // timeStart=50, timeEnd=60
+      ];
+      const manager = new RectangleManager(events, categories);
+      const tree = new TemporalSegmentTree(manager.getRectsByCategory());
+
+      // Query time range that only intersects with the long event (not the short one)
+      // Using viewport that shows time [70, 90]
+      // At zoom=1, offset=70, width=20: timeStart=70, timeEnd=90
+      const viewport = createViewport(1, 70, 0, 20, 500);
+      const result = tree.query(viewport);
+
+      // The long event (Method) should be visible because it spans [0, 100]
+      // and overlaps with query range [70, 90]
+      const totalEvents = result.stats.visibleCount + result.stats.bucketedEventCount;
+      expect(totalEvents).toBe(1);
+      expect(result.visibleRects.get('Method')?.length).toBe(1);
+    });
+
+    it('should correctly compute branch timeEnd as max of all children', () => {
+      // Multiple events with varying durations to test max computation
+      const events = [
+        createEvent(0, 50, 'Method'), // timeEnd=50
+        createEvent(10, 100, 'SOQL'), // timeEnd=110 (longest)
+        createEvent(20, 30, 'DML'), // timeEnd=50
+        createEvent(30, 20, 'Method'), // timeEnd=50
+      ];
+      const manager = new RectangleManager(events, categories);
+      const tree = new TemporalSegmentTree(manager.getRectsByCategory());
+
+      // Query time range [80, 120] - only overlaps with the SOQL event (timeEnd=110)
+      const viewport = createViewport(1, 80, 0, 40, 500);
+      const result = tree.query(viewport);
+
+      const totalEvents = result.stats.visibleCount + result.stats.bucketedEventCount;
+      expect(totalEvents).toBe(1);
+      expect(result.visibleRects.get('SOQL')?.length).toBe(1);
+    });
+
+    it('should find events via queryEventsInRegion with correct branch bounds', () => {
+      // Same scenario but using queryEventsInRegion for hit testing
+      const events = [
+        createEvent(0, 100, 'Method'), // timeStart=0, timeEnd=100
+        createEvent(50, 10, 'SOQL'), // timeStart=50, timeEnd=60
+      ];
+      const manager = new RectangleManager(events, categories);
+      const tree = new TemporalSegmentTree(manager.getRectsByCategory());
+
+      // Query region that only intersects with the long event
+      const eventsInRegion = tree.queryEventsInRegion(70, 90, 0, 0);
+
+      expect(eventsInRegion).toHaveLength(1);
+      expect(eventsInRegion[0]?.subCategory).toBe('Method');
+    });
+  });
+
   describe('fill ratio and brightness', () => {
     it('should calculate fill ratio for buckets', () => {
       // Single short event in a wider time span = low fill ratio
@@ -374,6 +437,27 @@ describe('TemporalSegmentTree', () => {
       expect(allBuckets[0]!.eventCount).toBe(1);
       // Color should be defined and brighter than a low-density bucket
       expect(allBuckets[0]!.color).toBeDefined();
+    });
+
+    it('should resolve bucket dominant category using priority order', () => {
+      // CATEGORY_PRIORITY: DML=0 (highest), SOQL=1, Method=2
+      // DML should win even though SOQL has more duration and count
+      const events = [
+        createEvent(0, 1, 'SOQL'), // priority 1, duration 1
+        createEvent(1, 1, 'SOQL'), // priority 1, duration 1 (SOQL total: 2 events, 2 duration)
+        createEvent(2, 1, 'DML'), // priority 0, duration 1 (DML total: 1 event, 1 duration)
+      ];
+      const manager = new RectangleManager(events, categories);
+      const tree = new TemporalSegmentTree(manager.getRectsByCategory());
+
+      // Zoom out so all events aggregate into one bucket
+      const viewport = createViewport(0.01, 0, 0, 1000);
+      const result = tree.query(viewport);
+
+      // Bucket should be categorized as DML (priority 0 beats priority 1)
+      // despite SOQL having more total duration (2 vs 1) and count (2 vs 1)
+      expect(result.buckets.get('DML')?.length).toBe(1);
+      expect(result.buckets.get('SOQL')?.length ?? 0).toBe(0);
     });
   });
 });

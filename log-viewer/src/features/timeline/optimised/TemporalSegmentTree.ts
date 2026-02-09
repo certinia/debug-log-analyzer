@@ -579,17 +579,23 @@ export class TemporalSegmentTree {
     end: number,
   ): SegmentNode {
     const firstChild = children[start]!;
-    const lastChild = children[end - 1]!;
     const timeStart = firstChild.timeStart;
-    const timeEnd = lastChild.timeEnd;
-    const nodeSpan = Math.max(SEGMENT_TREE_CONSTANTS.MIN_NODE_SPAN, timeEnd - timeStart);
 
-    // Aggregate statistics
+    // Aggregate statistics and compute max timeEnd in a single pass
+    // Children are sorted by timeStart, but an earlier child may have a longer duration
+    // and thus a later timeEnd than subsequent children
+    let timeEnd = firstChild.timeEnd;
     let totalEventCount = 0;
     const categoryStats = new Map<string, CategoryAggregation>();
 
     for (let i = start; i < end; i++) {
       const child = children[i]!;
+
+      // Track max timeEnd
+      if (child.timeEnd > timeEnd) {
+        timeEnd = child.timeEnd;
+      }
+
       totalEventCount += child.eventCount;
 
       // Merge category stats
@@ -603,6 +609,8 @@ export class TemporalSegmentTree {
         }
       }
     }
+
+    const nodeSpan = Math.max(SEGMENT_TREE_CONSTANTS.MIN_NODE_SPAN, timeEnd - timeStart);
 
     // Determine dominant category
     const dominantCategory = this.resolveDominantCategory(categoryStats);
