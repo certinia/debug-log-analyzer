@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
 /**
@@ -19,6 +19,8 @@
 import * as PIXI from 'pixi.js';
 import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
+import { parseColorToHex } from '../rendering/ColorUtils.js';
+import { calculateLabelPosition, createTimelineLabel } from '../rendering/LabelPositioning.js';
 import type { MeasurementState } from './MeasurementManager.js';
 
 /**
@@ -49,8 +51,14 @@ export class MeasureRangeRenderer {
   /** HTML container for the label (avoids PIXI coordinate inversion issues) */
   private labelElement: HTMLDivElement;
 
-  /** Parent HTML container for positioning */
-  private container: HTMLElement;
+  /** Duration text element (reused to avoid innerHTML) */
+  private durationText!: HTMLDivElement;
+
+  /** Range text element (reused to avoid innerHTML) */
+  private rangeText!: HTMLDivElement;
+
+  /** Zoom icon button (created once, shown/hidden as needed) */
+  private zoomIcon: HTMLButtonElement | null = null;
 
   /** Cached colors from CSS variables */
   private colors: MeasurementColors;
@@ -64,7 +72,6 @@ export class MeasureRangeRenderer {
    * @param onZoomClick - Optional callback when zoom icon is clicked
    */
   constructor(pixiContainer: PIXI.Container, htmlContainer: HTMLElement, onZoomClick?: () => void) {
-    this.container = htmlContainer;
     this.onZoomClick = onZoomClick;
 
     // Create graphics for overlay - render above frames but below tooltips
@@ -81,29 +88,89 @@ export class MeasureRangeRenderer {
   }
 
   /**
-   * Create the HTML label element with styling.
+   * Create the HTML label element with full structure.
+   * Creates all child elements once to avoid recreating on each update.
    */
   private createLabelElement(): HTMLDivElement {
-    const label = document.createElement('div');
-    label.className = 'measure-range-label';
-    label.style.cssText = `
-      position: absolute;
+    const label = createTimelineLabel('measure-range-label');
+
+    // Create container for flex layout
+    const contentWrapper = document.createElement('div');
+    contentWrapper.style.cssText = 'display: flex; align-items: center;';
+
+    // Create text container
+    const textContainer = document.createElement('div');
+    textContainer.style.cssText = 'text-align: center;';
+
+    // Duration text
+    this.durationText = document.createElement('div');
+    this.durationText.style.cssText = 'font-size: 14px; font-weight: 600;';
+
+    // Range text
+    this.rangeText = document.createElement('div');
+    this.rangeText.style.cssText = 'font-size: 11px; opacity: 0.8; margin-top: 2px;';
+
+    textContainer.appendChild(this.durationText);
+    textContainer.appendChild(this.rangeText);
+    contentWrapper.appendChild(textContainer);
+
+    // Create zoom icon button (created once, shown/hidden as needed)
+    if (this.onZoomClick) {
+      this.zoomIcon = this.createZoomIcon();
+      contentWrapper.appendChild(this.zoomIcon);
+    }
+
+    label.appendChild(contentWrapper);
+    return label;
+  }
+
+  /**
+   * Create the zoom icon button with event listeners attached once.
+   */
+  private createZoomIcon(): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.className = 'measure-zoom-icon';
+    button.title = 'Zoom to fit (double-click)';
+    button.style.cssText = `
       display: none;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 8px 12px;
+      width: 24px;
+      height: 24px;
+      margin-left: 8px;
+      padding: 0;
+      border: none;
       border-radius: 4px;
-      background: var(--vscode-editorWidget-background, #252526);
-      border: 1px solid var(--vscode-editorWidget-border, #454545);
-      color: var(--vscode-editorWidget-foreground, #cccccc);
-      font-family: var(--vscode-font-family, sans-serif);
-      font-size: 12px;
-      pointer-events: none;
-      z-index: 100;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      background: var(--vscode-button-secondaryBackground, #3a3d41);
+      color: var(--vscode-button-secondaryForeground, #cccccc);
+      cursor: pointer;
+      pointer-events: auto;
+      transition: background 0.1s;
     `;
-    return label;
+
+    // SVG icon
+    button.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+        <path d="M6.5 3a.5.5 0 0 1 .5.5V6h2.5a.5.5 0 0 1 0 1H7v2.5a.5.5 0 0 1-1 0V7H3.5a.5.5 0 0 1 0-1H6V3.5a.5.5 0 0 1 .5-.5z"/>
+      </svg>
+    `;
+
+    // Attach event listeners once
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.onZoomClick?.();
+    });
+
+    button.addEventListener('mouseenter', () => {
+      button.style.background = 'var(--vscode-button-secondaryHoverBackground, #45494e)';
+    });
+
+    button.addEventListener('mouseleave', () => {
+      button.style.background = 'var(--vscode-button-secondaryBackground, #3a3d41)';
+    });
+
+    return button;
   }
 
   /**
@@ -124,52 +191,13 @@ export class MeasureRangeRenderer {
       computedStyle.getPropertyValue('--vscode-focusBorder').trim() ||
       '#007fd4';
 
+    // Default blue (0x264f78) for measurement overlay
+    const defaultBlue = 0x264f78;
+
     return {
-      fillColor: this.parseColorToHex(fillStr),
-      borderColor: this.parseColorToHex(borderStr),
+      fillColor: parseColorToHex(fillStr, defaultBlue),
+      borderColor: parseColorToHex(borderStr, defaultBlue),
     };
-  }
-
-  /**
-   * Parse CSS color string to numeric hex (RGB only).
-   */
-  private parseColorToHex(cssColor: string): number {
-    if (!cssColor) {
-      return 0x264f78; // Default blue
-    }
-
-    if (cssColor.startsWith('#')) {
-      const hex = cssColor.slice(1);
-      if (hex.length === 8) {
-        return parseInt(hex.slice(0, 6), 16);
-      }
-      if (hex.length === 6) {
-        return parseInt(hex, 16);
-      }
-      if (hex.length === 4) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        return parseInt(r + r + g + g + b + b, 16);
-      }
-      if (hex.length === 3) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        return parseInt(r + r + g + g + b + b, 16);
-      }
-    }
-
-    // rgba() fallback
-    const rgba = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-    if (rgba) {
-      const r = parseInt(rgba[1]!, 10);
-      const g = parseInt(rgba[2]!, 10);
-      const b = parseInt(rgba[3]!, 10);
-      return (r << 16) | (g << 8) | b;
-    }
-
-    return 0x264f78; // Default blue
   }
 
   /**
@@ -232,65 +260,14 @@ export class MeasureRangeRenderer {
       return;
     }
 
-    // Format times using shared utilities
-    const durationStr = formatDuration(duration);
-    const rangeStr = formatTimeRange(startTime, endTime);
+    // Update text content (no innerHTML - reuse existing elements)
+    this.durationText.textContent = formatDuration(duration);
+    this.rangeText.textContent = formatTimeRange(startTime, endTime);
 
-    // Only show zoom icon when measurement is finished (not while dragging)
-    const zoomIconHtml =
-      !isActive && this.onZoomClick
-        ? `<button class="measure-zoom-icon" style="
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 24px;
-          height: 24px;
-          margin-left: 8px;
-          padding: 0;
-          border: none;
-          border-radius: 4px;
-          background: var(--vscode-button-secondaryBackground, #3a3d41);
-          color: var(--vscode-button-secondaryForeground, #cccccc);
-          cursor: pointer;
-          pointer-events: auto;
-          transition: background 0.1s;
-        " title="Zoom to fit (double-click)">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
-            <path d="M6.5 3a.5.5 0 0 1 .5.5V6h2.5a.5.5 0 0 1 0 1H7v2.5a.5.5 0 0 1-1 0V7H3.5a.5.5 0 0 1 0-1H6V3.5a.5.5 0 0 1 .5-.5z"/>
-          </svg>
-        </button>`
-        : '';
-
-    // Update label content with centered duration
-    this.labelElement.innerHTML = `
-      <div style="display: flex; align-items: center;">
-        <div style="text-align: center;">
-          <div style="font-size: 14px; font-weight: 600;">${durationStr}</div>
-          <div style="font-size: 11px; opacity: 0.8; margin-top: 2px;">${rangeStr}</div>
-        </div>
-        ${zoomIconHtml}
-      </div>
-    `;
-
-    // Add click listener to zoom icon
-    if (!isActive && this.onZoomClick) {
-      const zoomIcon = this.labelElement.querySelector('.measure-zoom-icon');
-      if (zoomIcon) {
-        zoomIcon.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.onZoomClick?.();
-        });
-        // Hover effect
-        zoomIcon.addEventListener('mouseenter', () => {
-          (zoomIcon as HTMLElement).style.background =
-            'var(--vscode-button-secondaryHoverBackground, #45494e)';
-        });
-        zoomIcon.addEventListener('mouseleave', () => {
-          (zoomIcon as HTMLElement).style.background =
-            'var(--vscode-button-secondaryBackground, #3a3d41)';
-        });
-      }
+    // Show/hide zoom icon based on measurement state
+    // Only show when measurement is finished (not while dragging)
+    if (this.zoomIcon) {
+      this.zoomIcon.style.display = !isActive ? 'flex' : 'none';
     }
 
     // Show label
@@ -299,49 +276,14 @@ export class MeasureRangeRenderer {
     // Position label after content is set (need to measure label size)
     requestAnimationFrame(() => {
       const labelRect = this.labelElement.getBoundingClientRect();
-      const labelWidth = labelRect.width;
-      const labelHeight = labelRect.height;
-      const padding = 8;
-
-      // Calculate visible portion of measurement overlay
-      const visibleStartX = Math.max(screenStartX, 0);
-      const visibleEndX = Math.min(screenEndX, viewport.displayWidth);
-      const visibleWidth = visibleEndX - visibleStartX;
-
-      // Determine horizontal position
-      let left: number;
-
-      // Try to center in visible portion first
-      const centeredLeft = visibleStartX + (visibleWidth - labelWidth) / 2;
-
-      if (visibleWidth >= labelWidth + padding * 2) {
-        // Visible portion is wide enough: center tooltip in visible portion
-        left = centeredLeft;
-      } else if (screenStartX < 0 && screenEndX > viewport.displayWidth) {
-        // Both edges offscreen: center on viewport
-        left = (viewport.displayWidth - labelWidth) / 2;
-      } else if (screenStartX < 0) {
-        // Left edge offscreen, right visible: stick to left edge of viewport
-        left = padding;
-      } else if (screenEndX > viewport.displayWidth) {
-        // Right edge offscreen, left visible: stick to right edge of viewport
-        left = viewport.displayWidth - labelWidth - padding;
-      } else {
-        // Overlay is small but fully visible: center on overlay (may extend outside)
-        left = centeredLeft;
-      }
-
-      // Clamp to viewport bounds (safety)
-      left = Math.max(padding, Math.min(viewport.displayWidth - labelWidth - padding, left));
-
-      // Vertical center
-      const top = Math.max(
-        padding,
-        Math.min(
-          viewport.displayHeight - labelHeight - padding,
-          viewport.displayHeight / 2 - labelHeight / 2,
-        ),
-      );
+      const { left, top } = calculateLabelPosition({
+        labelWidth: labelRect.width,
+        labelHeight: labelRect.height,
+        screenStartX,
+        screenEndX,
+        displayWidth: viewport.displayWidth,
+        displayHeight: viewport.displayHeight,
+      });
 
       this.labelElement.style.left = `${left}px`;
       this.labelElement.style.top = `${top}px`;

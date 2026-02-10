@@ -167,7 +167,6 @@ export class HitTestManager {
       duration: logEvent.duration?.total ?? 0,
       type: logEvent.type ?? logEvent.subCategory ?? 'UNKNOWN',
       text: logEvent.text,
-      subCategory: logEvent.subCategory,
       original: logEvent,
     };
   }

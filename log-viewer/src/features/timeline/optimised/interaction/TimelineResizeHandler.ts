@@ -26,34 +26,15 @@ export class TimelineResizeHandler {
   /**
    * @param containerRef - The container element to observe for resize
    * @param renderer - The resizable component to notify on resize
-   * @param initialWidth - Initial width used by init (pass to ensure consistency)
-   * @param initialHeight - Initial height used by init (pass to ensure consistency)
    */
-  constructor(
-    containerRef: HTMLElement,
-    renderer: IResizable,
-    initialWidth?: number,
-    initialHeight?: number,
-  ) {
+  constructor(containerRef: HTMLElement, renderer: IResizable) {
     this.containerRef = containerRef;
     this.renderer = renderer;
 
-    // Pre-populate with the SAME dimensions that init() used.
-    // This prevents double render on init: FlameChart.init() calls requestRender(),
-    // and ResizeObserver fires immediately on observe() with the same dimensions.
-    //
-    // IMPORTANT: We must use the same dimensions that init() used to create the viewport,
-    // not re-read from the container. DOM manipulation during init (adding canvases)
-    // can cause layout shifts that change container dimensions between when init()
-    // reads them and when this constructor runs.
-
-    // Fallback to reading from container (legacy behavior)
-    const { width, height } =
-      initialWidth && initialHeight
-        ? { width: initialWidth, height: initialHeight }
-        : containerRef.getBoundingClientRect();
-    this.lastResizeWidth = Math.round(width);
-    this.lastResizeHeight = Math.round(height);
+    // Dimensions will be populated when setupResizeObserver() is called.
+    // This is deferred until after first render to avoid double render on init.
+    this.lastResizeWidth = 0;
+    this.lastResizeHeight = 0;
   }
 
   public setupResizeObserver(): void {
@@ -61,16 +42,35 @@ export class TimelineResizeHandler {
       return;
     }
 
+    // Read current dimensions as baseline (after layout is finalized from first render).
+    // This ensures ResizeObserver only triggers for actual subsequent resizes.
+    const { width, height } = this.containerRef.getBoundingClientRect();
+    this.lastResizeWidth = Math.round(width);
+    this.lastResizeHeight = Math.round(height);
+
     this.resizeObserver = new ResizeObserver(() => {
-      // Debounce resize handling to prevent flickering
-      // Clear any existing frame request
+      // Check dimensions immediately - handles initial callback naturally
+      // If dimensions match what init() used, skip (no redundant render)
+      // If dimensions changed (layout shift during init), handle it
+      const { width, height } = this.containerRef.getBoundingClientRect();
+      const roundedWidth = Math.round(width);
+      const roundedHeight = Math.round(height);
+
+      if (roundedWidth === this.lastResizeWidth && roundedHeight === this.lastResizeHeight) {
+        return; // Skip if unchanged (covers initial callback case)
+      }
+
+      // Update dimensions before debounce to prevent rapid duplicate checks
+      this.lastResizeWidth = roundedWidth;
+      this.lastResizeHeight = roundedHeight;
+
+      // Debounce actual resize handling to prevent flickering
       if (this.resizeDebounceFrameId !== null) {
         cancelAnimationFrame(this.resizeDebounceFrameId);
       }
 
-      // Schedule resize handling on next frame
       this.resizeDebounceFrameId = requestAnimationFrame(() => {
-        this.handleResize();
+        this.renderer?.resize(roundedWidth, roundedHeight);
         this.resizeDebounceFrameId = null;
       });
     });
@@ -90,36 +90,5 @@ export class TimelineResizeHandler {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
     }
-  }
-
-  /**
-   * Handle container resize efficiently without full re-initialization.
-   * Preserves viewport zoom/pan state.
-   */
-  private handleResize(): void {
-    if (!this.containerRef || !this.renderer) {
-      return;
-    }
-
-    const { width, height } = this.containerRef.getBoundingClientRect();
-    if (width <= 0 || height <= 0) {
-      return;
-    }
-
-    // Round to prevent sub-pixel resize thrashing
-    const roundedWidth = Math.round(width);
-    const roundedHeight = Math.round(height);
-
-    // Skip if dimensions haven't actually changed (prevents duplicate calls)
-    if (roundedWidth === this.lastResizeWidth && roundedHeight === this.lastResizeHeight) {
-      return;
-    }
-
-    // Update last resize dimensions
-    this.lastResizeWidth = roundedWidth;
-    this.lastResizeHeight = roundedHeight;
-
-    // Use efficient resize method that preserves state
-    this.renderer.resize(roundedWidth, roundedHeight);
   }
 }

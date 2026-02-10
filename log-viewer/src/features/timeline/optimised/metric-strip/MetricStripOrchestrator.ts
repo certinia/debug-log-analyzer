@@ -66,9 +66,15 @@ export interface MetricStripOrchestratorCallbacks {
   onCursorMove: (timeNs: number | null) => void;
 
   /**
-   * Called when metric strip needs a re-render.
+   * Called when metric strip needs a re-render (full render including culling).
    */
   requestRender: () => void;
+
+  /**
+   * Called when only cursor-related rendering is needed (~1ms vs ~10ms).
+   * Use for cursor moves that don't change viewport.
+   */
+  requestCursorRender: () => void;
 
   /**
    * Called when wheel zoom is applied at a cursor position.
@@ -340,7 +346,7 @@ export class MetricStripOrchestrator {
    */
   public setCursorFromMainTimeline(timeNs: number | null): void {
     this.cursorTimeNs = timeNs;
-    this.callbacks.requestRender();
+    this.callbacks.requestCursorRender();
   }
 
   /**
@@ -515,7 +521,7 @@ export class MetricStripOrchestrator {
     this.cursorTimeNs = null;
     this.callbacks.onCursorMove(null);
     this.tooltipRenderer?.hide();
-    this.callbacks.requestRender();
+    this.callbacks.requestCursorRender();
   };
 
   private handleMouseMove = (event: MouseEvent): void => {
@@ -561,7 +567,7 @@ export class MetricStripOrchestrator {
       }
     }
 
-    this.callbacks.requestRender();
+    this.callbacks.requestCursorRender();
   };
 
   private handleClick = (event: MouseEvent): void => {

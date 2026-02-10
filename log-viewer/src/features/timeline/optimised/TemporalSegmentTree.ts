@@ -39,6 +39,7 @@ import type {
 } from '../types/flamechart.types.js';
 import {
   BUCKET_CONSTANTS,
+  mergeNodeCategoryStats,
   SEGMENT_TREE_CONSTANTS,
   TIMELINE_CONSTANTS,
 } from '../types/flamechart.types.js';
@@ -97,8 +98,14 @@ export class TemporalSegmentTree {
   private batchColors?: Map<string, BatchColorInfo>;
 
   /**
+   * Unsorted frames collected during tree construction.
+   * Sorting is deferred to first getAllFramesSorted() call.
+   */
+  private unsortedFrames: SkylineFrame[] | null = null;
+
+  /**
    * Cached sorted frames for minimap density computation.
-   * Pre-sorted by timeStart during tree construction for O(1) access.
+   * Lazily sorted on first access to defer ~25ms sort cost to minimap render.
    */
   private cachedSortedFrames: SkylineFrame[] | null = null;
 
@@ -107,13 +114,15 @@ export class TemporalSegmentTree {
    *
    * @param rectsByCategory - Rectangles grouped by category (from RectangleManager)
    * @param batchColors - Optional colors for theme support
+   * @param rectsByDepth - Optional pre-grouped by depth (from unified conversion, saves ~12ms)
    */
   constructor(
     rectsByCategory: Map<string, PrecomputedRect[]>,
     batchColors?: Map<string, BatchColorInfo>,
+    rectsByDepth?: Map<number, PrecomputedRect[]>,
   ) {
     this.batchColors = batchColors;
-    this.buildTrees(rectsByCategory);
+    this.buildTrees(rectsByCategory, rectsByDepth);
   }
 
   /**
@@ -246,15 +255,21 @@ export class TemporalSegmentTree {
 
   /**
    * Get all frames sorted by timeStart for minimap density computation.
-   * Frames are pre-built and sorted during tree construction for O(1) access.
+   * Frames are collected during tree construction but sorting is deferred
+   * to first access to avoid blocking init when minimap isn't immediately visible.
    *
-   * Performance: Pre-sorting during construction eliminates ~120ms of
-   * recursive tree traversal that previously occurred on first access.
+   * Performance: Lazy sorting defers ~25ms cost to first minimap render,
+   * reducing init time when minimap isn't immediately needed.
    *
    * @returns Array of SkylineFrame sorted by timeStart
    */
   public getAllFramesSorted(): SkylineFrame[] {
-    // Frames are pre-built during construction
+    // Lazy sort on first access
+    if (!this.cachedSortedFrames && this.unsortedFrames) {
+      this.cachedSortedFrames = this.unsortedFrames;
+      this.cachedSortedFrames.sort((a, b) => a.timeStart - b.timeStart);
+      this.unsortedFrames = null; // Release reference
+    }
     return this.cachedSortedFrames ?? [];
   }
 
@@ -443,34 +458,64 @@ export class TemporalSegmentTree {
   /**
    * Build segment trees for all depth levels.
    *
-   * PERF: Also collects and sorts frames for minimap density computation
-   * during this iteration, avoiding a separate O(N) tree traversal later.
+   * PERF optimizations:
+   * - Uses pre-grouped rectsByDepth when available (~12ms saved)
+   * - Collects frames for minimap during iteration (avoids O(N) traversal)
+   * - Defers frame sorting to first getAllFramesSorted() call (~25ms saved)
+   *
+   * @param rectsByCategory - Rectangles grouped by category
+   * @param preGroupedByDepth - Optional pre-grouped by depth from unified conversion
    */
-  private buildTrees(rectsByCategory: Map<string, PrecomputedRect[]>): void {
-    // Group all rectangles by depth
-    const rectsByDepth = new Map<number, PrecomputedRect[]>();
-
+  private buildTrees(
+    rectsByCategory: Map<string, PrecomputedRect[]>,
+    preGroupedByDepth?: Map<number, PrecomputedRect[]>,
+  ): void {
     // Collect frames during iteration (avoids separate tree traversal later)
     const allFrames: SkylineFrame[] = [];
 
-    for (const rects of rectsByCategory.values()) {
-      for (const rect of rects) {
-        let depthRects = rectsByDepth.get(rect.depth);
-        if (!depthRects) {
-          depthRects = [];
-          rectsByDepth.set(rect.depth, depthRects);
-        }
-        depthRects.push(rect);
-        this.maxDepth = Math.max(this.maxDepth, rect.depth);
+    // Use pre-grouped rectsByDepth if available, otherwise group from category map
+    let rectsByDepth: Map<number, PrecomputedRect[]>;
 
-        // Collect frame directly (eliminates recursive tree traversal in getAllFramesSorted)
-        allFrames.push({
-          timeStart: rect.timeStart,
-          timeEnd: rect.timeEnd,
-          depth: rect.depth,
-          category: rect.category,
-          selfDuration: rect.selfDuration,
-        });
+    if (preGroupedByDepth) {
+      // PERF: Use pre-grouped data (~12ms saved by skipping grouping iteration)
+      rectsByDepth = preGroupedByDepth;
+
+      // Still need to collect frames and track maxDepth
+      for (const [depth, rects] of rectsByDepth) {
+        this.maxDepth = Math.max(this.maxDepth, depth);
+        for (const rect of rects) {
+          allFrames.push({
+            timeStart: rect.timeStart,
+            timeEnd: rect.timeEnd,
+            depth: rect.depth,
+            category: rect.category,
+            selfDuration: rect.selfDuration,
+          });
+        }
+      }
+    } else {
+      // Fallback: Group all rectangles by depth
+      rectsByDepth = new Map<number, PrecomputedRect[]>();
+
+      for (const rects of rectsByCategory.values()) {
+        for (const rect of rects) {
+          let depthRects = rectsByDepth.get(rect.depth);
+          if (!depthRects) {
+            depthRects = [];
+            rectsByDepth.set(rect.depth, depthRects);
+          }
+          depthRects.push(rect);
+          this.maxDepth = Math.max(this.maxDepth, rect.depth);
+
+          // Collect frame directly (eliminates recursive tree traversal in getAllFramesSorted)
+          allFrames.push({
+            timeStart: rect.timeStart,
+            timeEnd: rect.timeEnd,
+            depth: rect.depth,
+            category: rect.category,
+            selfDuration: rect.selfDuration,
+          });
+        }
       }
     }
 
@@ -482,9 +527,8 @@ export class TemporalSegmentTree {
       }
     }
 
-    // Sort frames by timeStart once during construction (O(N log N) but only once)
-    allFrames.sort((a, b) => a.timeStart - b.timeStart);
-    this.cachedSortedFrames = allFrames;
+    // PERF: Defer sorting to first getAllFramesSorted() call (~25ms saved at init)
+    this.unsortedFrames = allFrames;
   }
 
   /**
@@ -510,23 +554,27 @@ export class TemporalSegmentTree {
 
   /**
    * Create a leaf node from a PrecomputedRect.
+   *
+   * PERF: Uses leafCategory/leafDuration instead of Map to avoid 500k+ Map allocations.
+   * categoryStats is null for leaf nodes - aggregation creates Maps only for branch nodes.
    */
   private createLeafNode(rect: PrecomputedRect, depth: number): SegmentNode {
     const duration = Math.max(SEGMENT_TREE_CONSTANTS.MIN_NODE_SPAN, rect.duration);
-
-    const categoryStats = new Map<string, CategoryAggregation>([
-      [rect.category, { count: 1, totalDuration: duration }],
-    ]);
 
     return {
       timeStart: rect.timeStart,
       timeEnd: rect.timeEnd,
       nodeSpan: duration,
 
-      categoryStats,
+      // PERF: null instead of Map - saves ~35-40ms for 500k leaf nodes
+      categoryStats: null,
       dominantCategory: rect.category,
       // PERF: Pre-compute priority to avoid PRIORITY_MAP lookups during query
       dominantPriority: PRIORITY_MAP.get(rect.category) ?? Infinity,
+
+      // Leaf-specific fields (avoid Map allocation)
+      leafCategory: rect.category,
+      leafDuration: duration,
 
       eventCount: 1,
       eventRef: rect.eventRef,
@@ -535,7 +583,6 @@ export class TemporalSegmentTree {
       children: null,
       isLeaf: true,
 
-      y: depth * TIMELINE_CONSTANTS.EVENT_HEIGHT,
       depth,
     };
   }
@@ -572,6 +619,7 @@ export class TemporalSegmentTree {
    * Create a branch node from a range of children (avoids array allocation).
    *
    * PERF: Uses start/end indices instead of creating a sliced array.
+   * PERF: Handles leaf nodes with leafCategory/leafDuration instead of categoryStats Map.
    */
   private createBranchNodeFromRange(
     children: SegmentNode[],
@@ -579,38 +627,28 @@ export class TemporalSegmentTree {
     end: number,
   ): SegmentNode {
     const firstChild = children[start]!;
-    const lastChild = children[end - 1]!;
     const timeStart = firstChild.timeStart;
-    const timeEnd = lastChild.timeEnd;
-    const nodeSpan = Math.max(SEGMENT_TREE_CONSTANTS.MIN_NODE_SPAN, timeEnd - timeStart);
 
-    // Aggregate statistics
+    // Aggregate statistics and compute max timeEnd in a single pass
+    // Children are sorted by timeStart, but an earlier child may have a longer duration
+    // and thus a later timeEnd than subsequent children
+    let timeEnd = firstChild.timeEnd;
     let totalEventCount = 0;
     const categoryStats = new Map<string, CategoryAggregation>();
 
     for (let i = start; i < end; i++) {
       const child = children[i]!;
-      totalEventCount += child.eventCount;
 
-      // Merge category stats
-      for (const [cat, stats] of child.categoryStats) {
-        const existing = categoryStats.get(cat);
-        if (existing) {
-          existing.count += stats.count;
-          existing.totalDuration += stats.totalDuration;
-        } else {
-          categoryStats.set(cat, { count: stats.count, totalDuration: stats.totalDuration });
-        }
+      // Track max timeEnd
+      if (child.timeEnd > timeEnd) {
+        timeEnd = child.timeEnd;
       }
+
+      totalEventCount += child.eventCount;
+      mergeNodeCategoryStats(categoryStats, child);
     }
 
-    // Determine dominant category
-    const dominantCategory = this.resolveDominantCategory(categoryStats);
-    // PERF: Pre-compute priority to avoid PRIORITY_MAP lookups during query
-    const dominantPriority = PRIORITY_MAP.get(dominantCategory) ?? Infinity;
-
-    // Store actual child references for tree traversal
-    const childNodes = children.slice(start, end);
+    const nodeSpan = Math.max(SEGMENT_TREE_CONSTANTS.MIN_NODE_SPAN, timeEnd - timeStart);
 
     return {
       timeStart,
@@ -618,15 +656,15 @@ export class TemporalSegmentTree {
       nodeSpan,
 
       categoryStats,
-      dominantCategory,
-      dominantPriority,
+      // Branch nodes don't use dominantCategory/Priority - buckets resolve from categoryStats
+      dominantCategory: '',
+      dominantPriority: Infinity,
 
       eventCount: totalEventCount,
 
-      children: childNodes,
+      children: children.slice(start, end),
       isLeaf: false,
 
-      y: firstChild.y,
       depth: firstChild.depth,
     };
   }
@@ -700,6 +738,8 @@ export class TemporalSegmentTree {
    * Aggregate a segment node into a grid-aligned bucket.
    * Multiple nodes that fall into the same grid cell are merged into one bucket.
    * Dominant category is resolved after all nodes are aggregated.
+   *
+   * PERF: Handles leaf nodes with leafCategory/leafDuration instead of categoryStats Map.
    */
   private aggregateIntoBucket(
     node: SegmentNode,
@@ -727,20 +767,7 @@ export class TemporalSegmentTree {
 
     // Aggregate node stats into bucket
     bucket.eventCount += node.eventCount;
-
-    // Merge category stats
-    for (const [category, stats] of node.categoryStats) {
-      const existing = bucket.categoryStats.get(category);
-      if (existing) {
-        existing.count += stats.count;
-        existing.totalDuration += stats.totalDuration;
-      } else {
-        bucket.categoryStats.set(category, {
-          count: stats.count,
-          totalDuration: stats.totalDuration,
-        });
-      }
-    }
+    mergeNodeCategoryStats(bucket.categoryStats, node);
   }
 
   /**

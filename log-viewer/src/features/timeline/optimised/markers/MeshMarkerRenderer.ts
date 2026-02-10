@@ -22,6 +22,7 @@ import { blendWithBackground } from '../BucketColorResolver.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
 import { createRectangleShader } from '../RectangleShader.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
+import { hitTestMarkers, type MarkerIndicator } from './MarkerHitTest.js';
 
 /**
  * Pre-blended opaque marker colors (MARKER_COLORS blended at MARKER_ALPHA opacity).
@@ -32,19 +33,6 @@ const MARKER_COLORS_BLENDED: Record<MarkerType, number> = {
   skip: blendWithBackground(MARKER_COLORS.skip, MARKER_ALPHA),
   unexpected: blendWithBackground(MARKER_COLORS.unexpected, MARKER_ALPHA),
 };
-
-/**
- * Internal representation of a marker indicator's visual state.
- */
-interface MarkerIndicator {
-  marker: TimelineMarker;
-  resolvedEndTime: number;
-  screenStartX: number;
-  screenEndX: number;
-  screenWidth: number;
-  color: number;
-  isVisible: boolean;
-}
 
 /**
  * Renders marker indicators as semi-transparent vertical bands using Mesh.
@@ -236,46 +224,13 @@ export class MeshMarkerRenderer {
    *
    * Used for hover detection. Returns marker with highest severity when multiple overlap.
    *
-   * Algorithm:
-   * 1. Convert screen coordinates to world coordinates (account for container pan)
-   * 2. Iterate through visibleIndicators (already culled during render)
-   * 3. Check AABB collision: worldX falls within [worldStartX, worldEndX]
-   * 4. Sort matches by severity rank (error > unexpected > skip)
-   * 5. Return highest priority marker, or null if no hits
-   *
    * @param screenX - Mouse X coordinate in pixels (canvas-relative)
    * @param _screenY - Mouse Y coordinate in pixels (unused - indicators span full height)
    * @returns Marker under cursor (highest severity if multiple), or null if no hit
    */
   public hitTest(screenX: number, _screenY: number): TimelineMarker | null {
-    // Convert screen coordinates to world coordinates
-    // Container is positioned at -offsetX, so add offsetX to convert screen to world
     const viewportState = this.viewport.getState();
-    const worldX = screenX + viewportState.offsetX;
-
-    // Collect all indicators under cursor
-    const hits: TimelineMarker[] = [];
-
-    for (const indicator of this.visibleIndicators) {
-      // AABB collision test: check if world X coordinate falls within indicator bounds
-      if (worldX >= indicator.screenStartX && worldX <= indicator.screenEndX) {
-        hits.push(indicator.marker);
-      }
-    }
-
-    // No hits
-    if (hits.length === 0) {
-      return null;
-    }
-
-    // Single hit - return immediately
-    if (hits.length === 1) {
-      return hits[0]!;
-    }
-
-    // Multiple hits - return highest severity
-    hits.sort((a, b) => SEVERITY_RANK[b.type] - SEVERITY_RANK[a.type]);
-    return hits[0]!;
+    return hitTestMarkers(screenX, viewportState.offsetX, this.visibleIndicators);
   }
 
   /**

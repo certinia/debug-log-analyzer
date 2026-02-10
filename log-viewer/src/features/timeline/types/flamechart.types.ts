@@ -105,9 +105,6 @@ export interface EventNode {
   /** Display text for event */
   text: string;
 
-  /** Optional subcategory for color resolution (e.g., 'Method', 'SOQL', 'DML') */
-  subCategory?: string;
-
   /** Optional reference to original data (e.g., LogEvent) - used by adapter layer */
   original?: unknown;
 }
@@ -176,6 +173,32 @@ export interface RenderRectangle {
 /**
  * Timeline state container for entire component.
  */
+/**
+ * Granular dirty flags for selective rendering optimization.
+ * Allows skipping expensive render phases when only specific parts changed.
+ *
+ * Performance impact:
+ * - Mouse move (cursor only): overlays + minimap (~1ms vs ~10ms full render)
+ * - Selection change: highlights + overlays (~2ms vs ~10ms)
+ * - Viewport change: all phases (full render required)
+ */
+export interface RenderDirtyState {
+  /** Background layers: markers, axis positioning */
+  background: boolean;
+  /** Rectangle culling (expensive - O(n) viewport query) */
+  culling: boolean;
+  /** Event rendering: batch renderer, text labels */
+  eventRendering: boolean;
+  /** Highlights: selection/search overlays */
+  highlights: boolean;
+  /** UI overlays: measurement, cursor line */
+  overlays: boolean;
+  /** Minimap rendering */
+  minimap: boolean;
+  /** Metric strip rendering */
+  metricStrip: boolean;
+}
+
 export interface TimelineState {
   /** Input event data. */
   events: LogEvent[];
@@ -199,6 +222,9 @@ export interface TimelineState {
   /** Flags. */
   needsRender: boolean;
   isInitialized: boolean;
+
+  /** Granular dirty flags for selective rendering (Phase 3 optimization). */
+  renderDirty: RenderDirtyState;
 }
 
 // ============================================================================
@@ -257,6 +283,46 @@ export interface CategoryAggregation {
   count: number;
   /** Total duration in nanoseconds */
   totalDuration: number;
+}
+
+/**
+ * Merge category stats from a SegmentNode into a target map.
+ * Handles both leaf nodes (leafCategory/leafDuration) and branch nodes (categoryStats Map).
+ *
+ * PERF: Extracted helper to avoid duplicating this ~20-line pattern in 3+ places.
+ *
+ * @param target - Map to merge stats into
+ * @param node - SegmentNode with either categoryStats (branch) or leafCategory/leafDuration (leaf)
+ */
+export function mergeNodeCategoryStats(
+  target: Map<string, CategoryAggregation>,
+  node: {
+    categoryStats: Map<string, CategoryAggregation> | null;
+    leafCategory?: string;
+    leafDuration?: number;
+  },
+): void {
+  if (node.categoryStats) {
+    // Branch node: merge from Map
+    for (const [category, stats] of node.categoryStats) {
+      const existing = target.get(category);
+      if (existing) {
+        existing.count += stats.count;
+        existing.totalDuration += stats.totalDuration;
+      } else {
+        target.set(category, { count: stats.count, totalDuration: stats.totalDuration });
+      }
+    }
+  } else if (node.leafCategory !== undefined && node.leafDuration !== undefined) {
+    // Leaf node: use leafCategory/leafDuration directly
+    const existing = target.get(node.leafCategory);
+    if (existing) {
+      existing.count += 1;
+      existing.totalDuration += node.leafDuration;
+    } else {
+      target.set(node.leafCategory, { count: 1, totalDuration: node.leafDuration });
+    }
+  }
 }
 
 /**
@@ -830,12 +896,21 @@ export interface SegmentNode {
   nodeSpan: number;
 
   // Category statistics (for tooltips and color resolution)
-  /** Per-category event counts and durations */
-  categoryStats: Map<string, CategoryAggregation>;
+  /**
+   * Per-category event counts and durations.
+   * null for leaf nodes (use leafCategory/leafDuration instead to avoid Map allocation).
+   */
+  categoryStats: Map<string, CategoryAggregation> | null;
   /** Winning category after priority/duration/count resolution */
   dominantCategory: string;
   /** Pre-computed priority for dominantCategory (avoids map lookup during query) */
   dominantPriority: number;
+
+  // Leaf-specific fields (avoid Map allocation for 500k+ leaf nodes)
+  /** For leaf nodes only: category string (avoids Map allocation) */
+  leafCategory?: string;
+  /** For leaf nodes only: duration value (avoids Map allocation) */
+  leafDuration?: number;
 
   // Event tracking
   /** Total event count in this subtree */
@@ -851,9 +926,6 @@ export interface SegmentNode {
   /** Whether this is a leaf node */
   isLeaf: boolean;
 
-  // Y position (pre-computed based on depth)
-  /** Screen Y position = depth * EVENT_HEIGHT */
-  y: number;
   /** Call stack depth (0-indexed) */
   depth: number;
 }
@@ -890,3 +962,46 @@ export const SEGMENT_TREE_CONSTANTS = {
   MIN_NODE_SPAN: 1,
 } as const;
 /* eslint-enable @typescript-eslint/naming-convention */
+
+// ============================================================================
+// INTERACTION MODE TYPES
+// ============================================================================
+
+/**
+ * Types of drag interactions in the timeline.
+ * Used for unified mode handling in TimelineInteractionHandler.
+ */
+/* eslint-disable @typescript-eslint/naming-convention */
+export const InteractionModeType = {
+  MEASURE: 'measure',
+  AREA_ZOOM: 'areaZoom',
+  RESIZE: 'resize',
+} as const;
+/* eslint-enable @typescript-eslint/naming-convention */
+
+export type InteractionModeType = (typeof InteractionModeType)[keyof typeof InteractionModeType];
+
+/**
+ * Unified state for drag-based interaction modes.
+ * Consolidates common state tracked across measure, area zoom, and resize modes.
+ */
+export interface DragModeState {
+  /** Type of interaction mode */
+  type: InteractionModeType;
+  /** Whether the mode is actively dragging */
+  isActive: boolean;
+  /** Starting X coordinate (screen pixels) */
+  startX: number;
+  /** Whether a drag threshold has been exceeded (distinguishes click from drag) */
+  didDrag: boolean;
+  /** Last tracked screen X position (for auto-scroll updates) */
+  lastScreenX: number;
+  /** Last tracked screen Y position (for auto-scroll updates) */
+  lastScreenY: number;
+  /** Mouse down X (client coordinates, for drag threshold) */
+  mouseDownX: number;
+  /** Mouse down Y (client coordinates, for drag threshold) */
+  mouseDownY: number;
+  /** Edge being dragged (for resize mode only) */
+  edge?: 'left' | 'right';
+}

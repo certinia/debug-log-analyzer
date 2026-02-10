@@ -31,6 +31,7 @@ import type { MarkerType, TimelineMarker } from '../../types/flamechart.types.js
 import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
 import { blendWithBackground } from '../BucketColorResolver.js';
 import { createRectangleShader } from '../RectangleShader.js';
+import { parseColorToHex } from '../rendering/ColorUtils.js';
 import { MinimapAxisRenderer } from './MinimapAxisRenderer.js';
 import { MinimapBarGeometry } from './MinimapBarGeometry.js';
 import type { MinimapDensityData } from './MinimapDensityQuery.js';
@@ -578,7 +579,7 @@ export class MinimapRenderer {
   private renderMarkers(
     manager: MinimapManager,
     markers: TimelineMarker[],
-    minimapHeight: number,
+    _minimapHeight: number,
   ): void {
     const state = manager.getState();
 
@@ -631,7 +632,7 @@ export class MinimapRenderer {
   private render2DCurtain(
     manager: MinimapManager,
     selection: Readonly<MinimapSelection>,
-    minimapHeight: number,
+    _minimapHeight: number,
   ): void {
     const state = manager.getState();
 
@@ -698,7 +699,7 @@ export class MinimapRenderer {
   private renderLens(
     manager: MinimapManager,
     selection: Readonly<MinimapSelection>,
-    minimapHeight: number,
+    _minimapHeight: number,
   ): void {
     // Axis is at TOP - chart area is below it
     // When heat strip has data, lens ends above the heat strip (it's separate)
@@ -787,43 +788,10 @@ export class MinimapRenderer {
     const borderStr = computedStyle.getPropertyValue('--vscode-focusBorder').trim() || '#007fd4';
 
     return {
-      curtain: this.parseColorToHex(curtainStr),
-      lensBorder: this.parseColorToHex(borderStr),
-      edgeHandle: this.parseColorToHex(borderStr),
+      curtain: parseColorToHex(curtainStr),
+      lensBorder: parseColorToHex(borderStr),
+      edgeHandle: parseColorToHex(borderStr),
     };
-  }
-
-  /**
-   * Parse CSS color string to numeric hex (RGB only).
-   */
-  private parseColorToHex(cssColor: string): number {
-    if (!cssColor) {
-      return 0x1e1e1e; // Default dark
-    }
-
-    if (cssColor.startsWith('#')) {
-      const hex = cssColor.slice(1);
-      if (hex.length === 6) {
-        return parseInt(hex, 16);
-      }
-      if (hex.length === 3) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        return parseInt(r + r + g + g + b + b, 16);
-      }
-    }
-
-    // rgba() fallback
-    const rgba = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-    if (rgba) {
-      const r = parseInt(rgba[1]!, 10);
-      const g = parseInt(rgba[2]!, 10);
-      const b = parseInt(rgba[3]!, 10);
-      return (r << 16) | (g << 8) | b;
-    }
-
-    return 0x1e1e1e; // Default dark
   }
 
   /**
