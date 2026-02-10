@@ -14,6 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const production = process.env.NODE_ENV === 'production';
+
 console.log('Package mode:', production ? 'production' : 'development');
 export default [
   {
@@ -35,7 +36,7 @@ export default [
           },
         ],
       }),
-      nodeResolve({ preferBuiltins: true, dedupe: ['@salesforce/core'] }),
+      nodeResolve({ preferBuiltins: true }),
       commonjs(),
       json(),
       swc(
@@ -55,6 +56,33 @@ export default [
           },
         }),
       ),
+      // Copy runtime dependency files for salesforce bundle compatibility
+      copy({
+        targets: [
+          // Pino worker files (thread-stream requires these at runtime)
+          {
+            src: 'node_modules/.pnpm/thread-stream@*/node_modules/thread-stream/lib/worker.js',
+            dest: 'lana/out',
+            rename: 'thread-stream-worker.js',
+          },
+          {
+            src: 'node_modules/.pnpm/pino@*/node_modules/pino/lib/worker.js',
+            dest: 'lana/out',
+            rename: 'pino-worker.js',
+          },
+          {
+            src: 'node_modules/.pnpm/pino@*/node_modules/pino/file.js',
+            dest: 'lana/out',
+            rename: 'pino-file.js',
+          },
+          // @salesforce/core logger transform stream (pino transport pipeline)
+          {
+            src: 'node_modules/.pnpm/@salesforce+core@*/node_modules/@salesforce/core/lib/logger/transformStream.js',
+            dest: 'lana/out',
+            rename: 'salesforce-transform-stream.js',
+          },
+        ],
+      }),
     ],
   },
   {
