@@ -314,7 +314,7 @@
   "devDependencies": {
     "@types/node": "~22.16.3",
     "@types/vscode": "~1.99.1",
-    "concurrently": "^9.2.0",
+    "concurrently": "^9.2.1",
     "typescript": "^5.9.2"
   }
 }
