@@ -308,8 +308,8 @@
   "dependencies": {
     "@apexdevtools/apex-ls": "^5.10.0",
     "@apexdevtools/apex-parser": "^4.4.0",
-    "@apexdevtools/sfdx-auth-helper": "^2.1.0",
-    "@salesforce/apex-node": "^1.6.2"
+    "@salesforce/apex-node": "^8.4.6",
+    "@salesforce/core": "^8.25.1"
   },
   "devDependencies": {
     "@types/node": "~22.16.3",
