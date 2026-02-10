@@ -2,7 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents';
+import type { LogEvent } from 'apex-log-parser';
 
 /**
  * Represents aggregated metrics for a specific method or function across multiple invocations.

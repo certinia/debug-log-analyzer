@@ -12,7 +12,7 @@
  * - Region-based event culling
  */
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { LogEvent } from 'apex-log-parser';
 import { TimelineEventIndex } from '../optimised/TimelineEventIndex.js';
 import type { ViewportState } from '../types/flamechart.types.js';
 

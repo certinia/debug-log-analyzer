@@ -425,17 +425,21 @@ export class BulkHeapAllocateLine extends LogEvent {
   }
 }
 
-export class CalloutRequestLine extends LogEvent {
+export class CalloutRequestLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts);
-    this.text = `${parts[3]} : ${parts[2]}`;
+    super(parser, parts, ['CALLOUT_RESPONSE'], 'Method', 'free');
+    this.text = parts[3] ?? '';
+    this.lineNumber = this.parseLineNumber(parts[2]);
   }
 }
 
 export class CalloutResponseLine extends LogEvent {
+  isExit = true;
+
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
-    this.text = `${parts[3]} : ${parts[2]}`;
+    this.text = parts[3] ?? '';
+    this.lineNumber = this.parseLineNumber(parts[2]);
   }
 }
 export class NamedCredentialRequestLine extends LogEvent {

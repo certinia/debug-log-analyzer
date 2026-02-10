@@ -8,7 +8,7 @@
  * Helper functions for extracting and validating  markers from ApexLog.
  */
 
-import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog } from 'apex-log-parser';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 import { isMarkerType } from '../types/flamechart.types.js';
 

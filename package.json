@@ -39,28 +39,17 @@
     "prepare": "husky",
     "bump-prerelease": "node ./scripts/pre-release.js",
     "build": "NODE_ENV=production pnpm run build:dev",
-    "build:fast": "NODE_ENV=production pnpm run build:dev",
-    "build:dev": "rm -rf lana/out && concurrently -r -g 'rollup -c rollup.config.mjs' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
-    "build:dev:fast": "rm -rf lana/out && concurrently -r -g 'rolldown -c rolldown.config.ts' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
+    "build:fast": "NODE_ENV=production pnpm run build:dev:fast",
+    "build:dev": "rm -rf lana/out && concurrently -r -g 'rollup -c rollup.config.mjs' 'tsc --noemit --skipLibCheck -p apex-log-parser/tsconfig.json' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
+    "build:dev:fast": "rm -rf lana/out && concurrently -r -g 'rolldown -c rolldown.config.ts' 'tsc --noemit --skipLibCheck -p apex-log-parser/tsconfig.json' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",
     "watch:fast": "rm -rf lana/out && rolldown -w -c rolldown.config.ts",
-    "lint": "concurrently -r -g 'eslint **/*.ts' 'prettier --cache **/*.{ts,css,md,scss} --check --experimental-cli' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
+    "lint": "concurrently -r -g 'eslint **/*.ts' 'prettier --cache **/*.{ts,css,md,scss} --check --experimental-cli' 'tsc --noemit --skipLibCheck -p apex-log-parser/tsconfig.json' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "test": "jest",
     "test:ci": "jest --runInBand",
     "prettier-format": "prettier '**/*.ts' --cache --write --experimental-cli"
   },
   "lint-staged": {
     "*.{ts,css,md,scss}": "prettier --cache --write --experimental-cli"
-  },
-  "pnpm": {
-    "patchedDependencies": {
-      "@salesforce/bunyan@2.0.0": "patches/@salesforce__bunyan@2.0.0.patch"
-    },
-    "overrides": {
-      "@salesforce/core>jsforce": "^2.0.0-beta.27",
-      "@salesforce/apex-node>@salesforce/core": "^4.3.11",
-      "@apexdevtools/sfdx-auth-helper>jsforce": "^2.0.0-beta.27",
-      "@apexdevtools/sfdx-auth-helper>@salesforce/core": "^4.3.11"
-    }
   }
 }

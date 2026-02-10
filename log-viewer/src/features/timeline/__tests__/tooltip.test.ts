@@ -16,7 +16,7 @@
  * - Show/hide timing and debouncing
  */
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
+import type { LogEvent } from 'apex-log-parser';
 import { TimelineTooltipManager } from '../optimised/TimelineTooltipManager.js';
 
 describe('TimelineTooltipManager', () => {
@@ -54,13 +54,6 @@ describe('TimelineTooltipManager', () => {
       soslCount: { total: 0, self: 0 },
       soslRowCount: { total: 0, self: 0 },
     } as unknown as LogEvent;
-  }
-
-  /**
-   * Helper to wait for async operations
-   */
-  function wait(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   beforeEach(() => {

@@ -11,13 +11,13 @@
 
 //TODO: Remove deps outside timeline
 
-import type { LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type { LogSubCategory } from '../../../core/log-parser/types.js';
+import type { LogEvent, LogSubCategory } from 'apex-log-parser';
 import { formatDuration } from '../../../core/utility/Util.js';
 import type { PrecomputedRect } from '../optimised/RectangleManager.js';
 
-// Re-export LogEvent for use within timeline/optimised folder
-// This keeps the log-parser dependency at the boundary (types file)
+// Re-export LogEvent for internal use within timeline/ folder
+// Note: FlameChart's PUBLIC API (callbacks) should use EventNode, not LogEvent
+// LogEvent is only used internally by data structures like RectangleManager, HitTestManager
 export type { LogEvent };
 
 // Re-export formatDuration for use within timeline/optimised folder
@@ -109,6 +109,9 @@ export interface EventNode {
 
   /** Display text for event */
   text: string;
+
+  /** Optional reference to original data (e.g., LogEvent) - used by adapter layer */
+  original?: unknown;
 }
 
 /**

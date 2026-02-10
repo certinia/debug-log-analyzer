@@ -12,7 +12,7 @@
 import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
-import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog } from 'apex-log-parser';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 
 import type { TimelineOptions } from '../types/flamechart.types.js';
@@ -80,6 +80,13 @@ export class TimelineFlameChart extends LitElement {
   themeName: string | null = null;
 
   /**
+   * Timestamp to navigate to after initialization.
+   * Used when opening the timeline from a raw log file hover.
+   */
+  @property({ type: Number })
+  navigateToTimestamp: number | undefined = undefined;
+
+  /**
    * Optional configuration options.
    */
   @state()
@@ -142,6 +149,11 @@ export class TimelineFlameChart extends LitElement {
 
       this.apexLogTimeline = new ApexLogTimeline();
       await this.apexLogTimeline.init(this.containerRef, this.apexLog, optionsWithTheme);
+
+      // Navigate to timestamp after initialization completes
+      if (this.navigateToTimestamp !== undefined) {
+        this.apexLogTimeline.navigateToTimestamp(this.navigateToTimestamp);
+      }
     } catch (error) {
       this.handleError(error);
     }
