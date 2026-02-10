@@ -22,13 +22,19 @@
  */
 
 import { BitmapText, Container, Graphics } from 'pixi.js';
-import { TEXT_LABEL_CONSTANTS } from '../../types/flamechart.types.js';
+
+import { formatDuration, TEXT_LABEL_CONSTANTS } from '../../types/flamechart.types.js';
 import type { MinimapManager } from './MinimapManager.js';
 
 /**
  * Nanoseconds per millisecond conversion constant.
  */
 const NS_PER_MS = 1_000_000;
+
+/**
+ * Pre-allocated options for compact duration formatting (avoids allocation in render loop).
+ */
+const COMPACT_FORMAT = { compact: true } as const;
 
 /**
  * Axis configuration.
@@ -67,6 +73,9 @@ export class MinimapAxisRenderer {
   private labelPool: BitmapText[] = [];
   private activeLabelCount = 0;
 
+  /** Pre-allocated stroke options (avoids allocation in render loop) */
+  private strokeOptions: { color: number; width: number };
+
   /**
    * Creates the axis renderer without adding to any parent container.
    * Caller is responsible for adding getTickGraphics() and getLabelsContainer()
@@ -82,6 +91,9 @@ export class MinimapAxisRenderer {
 
     // Create container for labels
     this.labelsContainer = new Container();
+
+    // Initialize stroke options (updated in refreshColors)
+    this.strokeOptions = { color: this.config.tickColor, width: 1 };
   }
 
   /**
@@ -158,12 +170,12 @@ export class MinimapAxisRenderer {
       // Draw tick line full height of minimap
       this.tickGraphics.moveTo(x, axisY);
       this.tickGraphics.lineTo(x, minimapHeight);
-      this.tickGraphics.stroke({ color: this.config.tickColor, width: 1 });
+      this.tickGraphics.stroke(this.strokeOptions);
 
       // Add label if needed (positioned to the left of the line)
       if (shouldShowLabel && timeNs > 0) {
         const label = this.getOrCreateLabel();
-        label.text = this.formatTime(timeNs);
+        label.text = formatDuration(timeNs, COMPACT_FORMAT);
         label.x = x - 3; // 3px to the left of line
         label.y = axisY + 2; // Near top
         label.anchor.set(1, 0); // Right-align to line
@@ -194,6 +206,7 @@ export class MinimapAxisRenderer {
     const tickColorStr =
       computedStyle.getPropertyValue('--vscode-editorLineNumber-foreground').trim() || '#808080';
     this.config.tickColor = this.parseColorToHex(tickColorStr);
+    this.strokeOptions.color = this.config.tickColor;
 
     // Update label tint color
     this.config.labelTint = this.parseColorToHex(tickColorStr);
@@ -369,37 +382,5 @@ export class MinimapAxisRenderer {
     for (const label of this.labelPool) {
       label.visible = false;
     }
-  }
-
-  // ============================================================================
-  // PRIVATE: FORMATTING
-  // ============================================================================
-
-  /**
-   * Format time with appropriate units.
-   * Similar to main axis but more compact for minimap.
-   */
-  private formatTime(timeNs: number): string {
-    const timeMs = timeNs / NS_PER_MS;
-
-    // Convert to seconds if >= 1000ms and whole seconds
-    if (timeMs >= 1000 && timeMs % 1000 === 0) {
-      const seconds = timeMs / 1000;
-      return `${seconds}s`;
-    }
-
-    // Format as milliseconds
-    if (timeMs >= 1) {
-      // Whole milliseconds: no decimals
-      if (timeMs === Math.floor(timeMs)) {
-        return `${Math.floor(timeMs)}ms`;
-      }
-      // Fractional: up to 2 decimal places
-      return `${timeMs.toFixed(2).replace(/\.?0+$/, '')}ms`;
-    }
-
-    // Sub-millisecond: show as microseconds
-    const timeUs = timeMs * 1000;
-    return `${Math.round(timeUs)}µs`;
   }
 }
