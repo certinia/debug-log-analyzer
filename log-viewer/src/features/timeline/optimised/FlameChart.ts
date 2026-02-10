@@ -153,6 +153,9 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   private hitTestManager: HitTestManager | null = null;
 
+  // Flag to track if ResizeObserver has been set up (deferred until after first render)
+  private resizeObserverActive = false;
+
   // Selection orchestrator (owns selection state and rendering)
   private selectionOrchestrator: SelectionOrchestrator<E> | null = null;
   private viewportAnimator: ViewportAnimator | null = null;
@@ -239,7 +242,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Store truncation markers for rendering
     this.markers.push(...markers);
 
-    // Get container dimensions
+    // Get container dimensions for validation
     const { width, height } = container.getBoundingClientRect();
     if (width === 0 || height === 0) {
       throw new TimelineError(
@@ -256,27 +259,21 @@ export class FlameChart<E extends EventNode = EventNode> {
         : undefined,
     );
 
-    // Calculate minimap and metric strip heights BEFORE creating viewport
-    // Viewport needs the available height for main timeline (excluding minimap + metric strip + gaps)
-    // Metric strip starts collapsed, so use collapsed height for initial layout
-    const minimapHeight = calculateMinimapHeight(height);
-    const metricStripHeight = METRIC_STRIP_COLLAPSED_HEIGHT;
-    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
-    const mainTimelineHeight = height - totalOverheadHeight;
+    // Initialize PixiJS Application first - creates DOM and measures dimensions after RAF.
+    // This ensures flex layout is computed before we measure mainDiv's actual height.
+    const { mainTimelineHeight } = await this.setupPixiApplication(width, height);
 
-    // Store offset for converting canvas-relative to container-relative coordinates
-    this.mainTimelineYOffset = totalOverheadHeight;
+    // Calculate mainTimelineYOffset from measured height
+    // This is the vertical offset from container top to main timeline canvas
+    this.mainTimelineYOffset = height - mainTimelineHeight;
 
-    // Create viewport manager with adjusted height for main timeline area
+    // Create viewport manager with measured height for main timeline area
     this.viewport = new TimelineViewport(
       width,
       mainTimelineHeight,
       this.index.totalDuration,
       this.index.maxDepth,
     );
-
-    // Initialize PixiJS Application
-    await this.setupPixiApplication(width, height);
 
     // Setup coordinate system (Y-axis inversion)
     this.setupCoordinateSystem();
@@ -410,12 +407,10 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Setup keyboard handler
     this.setupKeyboardHandler();
 
-    // Pass the same dimensions that init() used to create the viewport.
-    // This ensures ResizeObserver's initial callback (which fires with current container
-    // dimensions) is correctly skipped, even if DOM manipulation during init caused
-    // a layout shift that changed the container size.
-    this.resizeHandler = new TimelineResizeHandler(container, this, width, height);
-    this.resizeHandler.setupResizeObserver();
+    // Container dimensions are unchanged by DOM setup (wrapper fills 100%).
+    // The fix is measuring mainTimelineHeight from actual flexbox layout.
+    // ResizeObserver setup is deferred until after first render to avoid double render on init.
+    this.resizeHandler = new TimelineResizeHandler(container, this);
 
     // Initialize search if enabled via options
     if (options.enableSearch) {
@@ -691,6 +686,13 @@ export class FlameChart<E extends EventNode = EventNode> {
         if (this.state && this.state.needsRender) {
           this.render();
           this.state.needsRender = false;
+
+          // Setup ResizeObserver after first render to avoid double render on init.
+          // By this point, layout is finalized and ResizeObserver baseline matches rendered state.
+          if (this.resizeHandler && !this.resizeObserverActive) {
+            this.resizeHandler.setupResizeObserver();
+            this.resizeObserverActive = true;
+          }
         }
         this.renderLoopId = null;
       });
@@ -699,6 +701,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   /**
    * Handle window resize.
+   * Calculates main timeline height by subtracting visible component heights.
    */
   public resize(newWidth: number, newHeight: number): void {
     if (!this.app || !this.viewport || !this.container || !this.index) {
@@ -718,20 +721,31 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     const visibleWorldYBottom = -oldState.offsetY;
 
-    // Calculate new minimap, metric strip, and main timeline heights
-    // Query actual metric strip height (respects collapsed/expanded state)
+    // Calculate component heights, only including visible components
     const minimapHeight = calculateMinimapHeight(newHeight);
-    const metricStripHeight =
-      this.metricStripOrchestrator?.getHeight() ?? METRIC_STRIP_COLLAPSED_HEIGHT;
-    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
+
+    // Only include metric strip in calculation if it's visible (has data)
+    const metricStripVisible = this.metricStripOrchestrator?.getIsVisible() ?? false;
+    const metricStripHeight = metricStripVisible
+      ? (this.metricStripOrchestrator?.getHeight() ?? METRIC_STRIP_COLLAPSED_HEIGHT)
+      : 0;
+    const metricStripGap = metricStripVisible ? METRIC_STRIP_GAP : 0;
+
+    // Calculate main timeline height by subtracting all visible component heights
+    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + metricStripGap;
     const mainTimelineHeight = newHeight - totalOverheadHeight;
+
+    if (mainTimelineHeight <= 0) {
+      return; // Invalid state, skip resize
+    }
 
     // Update offset for converting canvas-relative to container-relative coordinates
     this.mainTimelineYOffset = totalOverheadHeight;
 
-    // Update orchestrators with new offset
-    this.selectionOrchestrator?.setMainTimelineYOffset(this.mainTimelineYOffset);
-    this.searchOrchestrator?.setMainTimelineYOffset(this.mainTimelineYOffset);
+    // Update minimap div height
+    if (this.minimapDiv) {
+      this.minimapDiv.style.height = `${minimapHeight}px`;
+    }
 
     // Resize minimap orchestrator
     if (this.minimapOrchestrator) {
@@ -743,16 +757,12 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.metricStripOrchestrator.resize(newWidth);
     }
 
+    // Update orchestrators with new offset
+    this.selectionOrchestrator?.setMainTimelineYOffset(this.mainTimelineYOffset);
+    this.searchOrchestrator?.setMainTimelineYOffset(this.mainTimelineYOffset);
+
     // Resize main timeline app
     this.app.renderer.resize(newWidth, mainTimelineHeight);
-
-    // Update wrapper div heights
-    if (this.wrapper) {
-      const minimapDiv = this.wrapper.children[0] as HTMLElement;
-      if (minimapDiv) {
-        minimapDiv.style.height = `${minimapHeight}px`;
-      }
-    }
 
     const newZoom = newWidth / visibleTimeRange;
     const newOffsetX = visibleTimeStart * newZoom;
@@ -806,6 +816,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   /**
    * Update metric strip visibility based on whether there's data to display.
    * Hides the metric strip container and gap if no governor limit data exists.
+   * Triggers resize to recalculate main timeline height after visibility change.
    */
   private updateMetricStripVisibility(): void {
     const isVisible = this.metricStripOrchestrator?.getIsVisible() ?? false;
@@ -817,13 +828,22 @@ export class FlameChart<E extends EventNode = EventNode> {
     if (this.metricStripGapDiv) {
       this.metricStripGapDiv.style.display = display;
     }
+
+    // Trigger resize to recalculate main timeline height after visibility change
+    if (this.container && isVisible) {
+      const { width, height } = this.container.getBoundingClientRect();
+      this.resize(width, height);
+    }
   }
 
   // ============================================================================
   // PRIVATE SETUP METHODS
   // ============================================================================
 
-  private async setupPixiApplication(width: number, height: number): Promise<void> {
+  private async setupPixiApplication(
+    width: number,
+    height: number,
+  ): Promise<{ mainTimelineHeight: number }> {
     const ticker = PIXI.Ticker.shared;
     ticker.autoStart = false;
     ticker.stop();
@@ -832,12 +852,10 @@ export class FlameChart<E extends EventNode = EventNode> {
     sysTicker.autoStart = false;
     sysTicker.stop();
 
-    // Calculate minimap, metric strip, and main timeline heights
+    // Calculate minimap, metric strip heights for fixed-height elements
     // Metric strip starts collapsed, so use collapsed height for initial layout
     const minimapHeight = calculateMinimapHeight(height);
     const metricStripHeight = METRIC_STRIP_COLLAPSED_HEIGHT;
-    const totalOverheadHeight = minimapHeight + MINIMAP_GAP + metricStripHeight + METRIC_STRIP_GAP;
-    const mainTimelineHeight = height - totalOverheadHeight;
 
     // Create wrapper container with flexbox layout
     this.wrapper = document.createElement('div');
@@ -860,7 +878,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.metricStripGapDiv = document.createElement('div');
     this.metricStripGapDiv.style.cssText = `height:${METRIC_STRIP_GAP}px;width:100%;flex-shrink:0;background:transparent`;
 
-    // Main timeline container (fills remaining space)
+    // Main timeline container (fills remaining space via flex:1)
     const mainDiv = document.createElement('div');
     mainDiv.style.cssText = 'flex:1;width:100%;min-height:0';
 
@@ -876,9 +894,21 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.container.appendChild(this.wrapper);
     }
 
+    // Calculate main timeline height by subtracting fixed component heights.
+    // At init time, all components are visible (metric strip hides later via setHeatStripTimeSeries).
+    const mainTimelineHeight =
+      height - minimapHeight - MINIMAP_GAP - metricStripHeight - METRIC_STRIP_GAP;
+
+    if (mainTimelineHeight <= 0) {
+      throw new TimelineError(
+        TimelineErrorCode.INVALID_CONTAINER,
+        'Container height too small for timeline layout',
+      );
+    }
+
     // Minimap app is created by MinimapOrchestrator in setupMinimap()
 
-    // Create main timeline app
+    // Create main timeline app with measured height
     this.app = new PIXI.Application();
     await this.app.init({
       width,
@@ -893,6 +923,8 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.app.ticker.stop();
     this.app.stage.eventMode = 'none';
     mainDiv.appendChild(this.app.canvas);
+
+    return { mainTimelineHeight };
   }
 
   private setupCoordinateSystem(): void {
