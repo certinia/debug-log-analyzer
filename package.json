@@ -39,7 +39,7 @@
     "prepare": "husky",
     "bump-prerelease": "node ./scripts/pre-release.js",
     "build": "NODE_ENV=production pnpm run build:dev",
-    "build:fast": "NODE_ENV=production pnpm run build:dev",
+    "build:fast": "NODE_ENV=production pnpm run build:dev:fast",
     "build:dev": "rm -rf lana/out && concurrently -r -g 'rollup -c rollup.config.mjs' 'tsc --noemit --skipLibCheck -p apex-log-parser/tsconfig.json' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "build:dev:fast": "rm -rf lana/out && concurrently -r -g 'rolldown -c rolldown.config.ts' 'tsc --noemit --skipLibCheck -p apex-log-parser/tsconfig.json' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",
