@@ -14,12 +14,12 @@ export async function getSalesforceConnection(wsPath: string): Promise<Connectio
   const { ConfigAggregator, OrgConfigProperties, Org } = await import('@salesforce/core');
 
   const aggregator = await ConfigAggregator.create({ projectPath: wsPath });
-  const usernameOrAlias = aggregator.getPropertyValue(OrgConfigProperties.TARGET_ORG);
+  const aliasOrUsername = aggregator.getPropertyValue<string>(OrgConfigProperties.TARGET_ORG);
 
-  if (!usernameOrAlias) {
+  if (!aliasOrUsername) {
     throw new Error('No default org configured for workspace');
   }
 
-  const org = await Org.create({ aliasOrUsername: String(usernameOrAlias) });
+  const org = await Org.create({ aliasOrUsername });
   return org.getConnection();
 }
