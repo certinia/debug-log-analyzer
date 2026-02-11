@@ -50,7 +50,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:apexlog"
+    "onLanguage:apexlog",
+    "onStartupFinished"
   ],
   "contributes": {
     "commands": [
@@ -77,10 +78,7 @@
           "ApexLog",
           "DebugLog"
         ],
-        "extensions": [
-          ".log",
-          ".txt"
-        ],
+        "extensions": [],
         "firstLine": "^\\d\\d.\\d.+?APEX_CODE,\\w.+$"
       }
     ],
@@ -88,33 +86,33 @@
       "commandPalette": [
         {
           "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog"
+          "when": "resourceLangId == apexlog || lana.isApexLog"
         }
       ],
       "editor/context": [
         {
           "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog"
+          "when": "resourceLangId == apexlog || lana.isApexLog"
         }
       ],
       "editor/title/context": [
         {
           "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog",
+          "when": "resourceLangId == apexlog || lana.isApexLog",
           "group": "lana"
         }
       ],
       "editor/title/run": [
         {
           "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog",
+          "when": "resourceLangId == apexlog || lana.isApexLog",
           "group": "lana"
         }
       ],
       "explorer/context": [
         {
           "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog"
+          "when": "resourceLangId == apexlog || lana.isApexLog"
         }
       ]
     },
