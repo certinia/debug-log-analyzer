@@ -11,6 +11,7 @@ import {
 } from 'vscode';
 
 import { Context } from '../Context.js';
+import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 import { formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
 
 // Pattern to find EXECUTION_STARTED line
@@ -84,8 +85,7 @@ export class LogTimingDecoration {
   private updateDecorations(editor: TextEditor): void {
     const document = editor.document;
 
-    // Only process apexlog files
-    if (document.languageId !== 'apexlog') {
+    if (!isApexLogContent(document)) {
       editor.setDecorations(decorationType, []);
       return;
     }
