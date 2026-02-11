@@ -46,10 +46,16 @@ export class Context {
   }
 
   async findSymbol(symbol: string): Promise<string[]> {
-    const path = await this.symbolFinder.findSymbol(this.workspaces, symbol);
-    if (!path.length) {
-      this.display.showErrorMessage(`Type '${symbol}' was not found in workspace`);
+    try {
+      const path = await this.symbolFinder.findSymbol(this.workspaces, symbol);
+      if (!path.length) {
+        this.display.showErrorMessage(`Type '${symbol}' was not found in workspace`);
+      }
+      return path;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.display.showErrorMessage(`Error finding symbol '${symbol}': ${message}`);
     }
-    return path;
+    return [];
   }
 }
