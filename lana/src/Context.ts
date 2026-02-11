@@ -14,6 +14,7 @@ import { RawLogLineDecoration } from './decorations/RawLogLineDecoration.js';
 import { Display } from './display/Display.js';
 import { WhatsNewNotification } from './display/WhatsNewNotification.js';
 import { RawLogFoldingProvider } from './folding/RawLogFoldingProvider.js';
+import { ApexLogLanguageDetector } from './language/ApexLogLanguageDetector.js';
 import { SymbolFinder } from './salesforce/codesymbol/SymbolFinder.js';
 import { VSWorkspace } from './workspace/VSWorkspace.js';
 
@@ -33,6 +34,7 @@ export class Context {
       });
     }
 
+    ApexLogLanguageDetector.apply(this);
     LogEventCache.apply(this);
     RetrieveLogFile.apply(this);
     ShowLogAnalysis.apply(this);

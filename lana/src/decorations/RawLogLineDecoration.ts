@@ -15,6 +15,7 @@ import type { LogEvent } from 'apex-log-parser';
 
 import { Context } from '../Context.js';
 import { LogEventCache } from '../cache/LogEventCache.js';
+import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 import { buildMetricParts, formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
 
 // Decoration type for ghost text on cursor line - no isWholeLine so hover only triggers at end
@@ -72,7 +73,7 @@ export class RawLogLineDecoration {
   private async updateDecoration(editor: TextEditor): Promise<void> {
     const document = editor.document;
 
-    if (document.languageId !== 'apexlog') {
+    if (!isApexLogContent(document)) {
       this.clearDecorations(editor);
       return;
     }
