@@ -179,8 +179,6 @@ export interface MockContext {
   context: MockExtensionContext;
   display: MockDisplay;
   workspaces: { uri: { fsPath: string }; name: string }[];
-  symbolFinder: { findSymbol: jest.Mock };
-  findSymbol: jest.Mock;
 }
 
 /**
@@ -195,8 +193,6 @@ export function createMockContext(overrides: Partial<MockContext> = {}): MockCon
     context,
     display,
     workspaces: [],
-    symbolFinder: { findSymbol: jest.fn().mockResolvedValue([]) },
-    findSymbol: jest.fn().mockResolvedValue([]),
   };
 
   return { ...base, ...overrides };
