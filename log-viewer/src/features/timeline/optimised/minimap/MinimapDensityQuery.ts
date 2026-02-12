@@ -334,9 +334,6 @@ export class MinimapDensityQuery {
    * - New: O(N) single pass + O(B × k) skyline computation = ~10-20ms
    *   (where k = avg frames per bucket, much smaller than N)
    *
-   * PERF: Uses binary search to find frames for each bucket on-demand,
-   * avoiding O(N × bucketSpan) frame collection (~10-15ms saved).
-   *
    * @param bucketCount - Number of output buckets
    * @returns MinimapDensityData
    */
@@ -352,16 +349,19 @@ export class MinimapDensityQuery {
 
     const frames = this.segmentTree.getAllFramesSorted();
     const bucketTimeWidth = this.totalDuration / bucketCount;
-    const frameCount = frames.length;
 
     // Pre-allocate bucket arrays
     const maxDepths = new Uint16Array(bucketCount);
     const eventCounts = new Uint32Array(bucketCount);
     const selfDurationSums = new Float64Array(bucketCount);
 
-    // First pass: compute maxDepth, eventCount, and selfDurationSums per bucket
-    // This still needs to iterate frames spanning multiple buckets, but we avoid
-    // storing frame references (which was the main memory/allocation cost)
+    // Collect frames per bucket for skyline computation
+    const framesPerBucket: SkylineFrame[][] = new Array(bucketCount);
+    for (let i = 0; i < bucketCount; i++) {
+      framesPerBucket[i] = [];
+    }
+
+    // Single pass: compute maxDepth, eventCount, selfDurationSums, and collect frames
     for (const frame of frames) {
       const startBucket = Math.max(0, Math.floor(frame.timeStart / bucketTimeWidth));
       const endBucket = Math.min(bucketCount - 1, Math.floor(frame.timeEnd / bucketTimeWidth));
@@ -387,15 +387,15 @@ export class MinimapDensityQuery {
         const overlapRatio = frameDuration > 0 ? visibleTime / frameDuration : 0;
         const proportionalSelfDuration = frame.selfDuration * overlapRatio;
         selfDurationSums[b]! += proportionalSelfDuration;
+
+        // Collect frame for skyline computation
+        framesPerBucket[b]!.push(frame);
       }
     }
 
-    // Build output buckets with on-demand frame lookup for skyline computation
+    // Build output buckets
     const buckets: MinimapDensityBucket[] = new Array(bucketCount);
     let maxEventCount = 0;
-
-    // Track search position for binary search optimization
-    let searchStartIdx = 0;
 
     for (let i = 0; i < bucketCount; i++) {
       const eventCount = eventCounts[i]!;
@@ -406,25 +406,9 @@ export class MinimapDensityQuery {
       const bucketStart = i * bucketTimeWidth;
       const bucketEnd = (i + 1) * bucketTimeWidth;
 
-      // PERF: Use binary search to find frames for this bucket on-demand
-      // instead of pre-collecting all frames into all buckets
-      const bucketFrames = this.getFramesInRange(
-        frames,
-        frameCount,
-        bucketStart,
-        bucketEnd,
-        searchStartIdx,
-      );
-
-      // Update search start for next bucket (frames are sorted by timeStart)
-      // Advance searchStartIdx to skip frames that end before this bucket
-      while (searchStartIdx < frameCount && frames[searchStartIdx]!.timeEnd <= bucketStart) {
-        searchStartIdx++;
-      }
-
       // Resolve dominant category using skyline (on-top time) algorithm
       const dominantCategory = this.resolveCategoryFromSkyline(
-        bucketFrames,
+        framesPerBucket[i]!,
         bucketStart,
         bucketEnd,
       );
@@ -445,56 +429,6 @@ export class MinimapDensityQuery {
       maxEventCount,
       totalDuration: this.totalDuration,
     };
-  }
-
-  /**
-   * Binary search to find frames overlapping a time range.
-   * Uses the fact that frames are sorted by timeStart.
-   *
-   * PERF: O(log N + k) where k = frames in range, vs O(N) for pre-collection.
-   *
-   * @param frames - Sorted frames array
-   * @param frameCount - Number of frames
-   * @param bucketStart - Bucket start time
-   * @param bucketEnd - Bucket end time
-   * @param startIdx - Starting index for search (optimization for sequential buckets)
-   * @returns Frames overlapping the bucket
-   */
-  private getFramesInRange(
-    frames: SkylineFrame[],
-    frameCount: number,
-    bucketStart: number,
-    bucketEnd: number,
-    startIdx: number,
-  ): SkylineFrame[] {
-    // Binary search for first frame that could overlap (timeEnd > bucketStart)
-    let lo = startIdx;
-    let hi = frameCount;
-
-    while (lo < hi) {
-      const mid = (lo + hi) >>> 1;
-      if (frames[mid]!.timeEnd <= bucketStart) {
-        lo = mid + 1;
-      } else {
-        hi = mid;
-      }
-    }
-
-    // Linear scan from found position to collect overlapping frames
-    const result: SkylineFrame[] = [];
-    for (let i = lo; i < frameCount; i++) {
-      const frame = frames[i]!;
-      // Frames are sorted by timeStart, so stop when past bucket
-      if (frame.timeStart >= bucketEnd) {
-        break;
-      }
-      // Check for overlap: frame overlaps bucket if frame.timeEnd > bucketStart
-      if (frame.timeEnd > bucketStart) {
-        result.push(frame);
-      }
-    }
-
-    return result;
   }
 
   /**

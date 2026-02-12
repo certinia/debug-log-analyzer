@@ -12,9 +12,26 @@ import {
 } from 'vscode';
 
 import { Context } from '../Context.js';
+import { SymbolFinder } from '../salesforce/codesymbol/SymbolFinder.js';
 import { Item, Options, QuickPick } from './QuickPick.js';
 
 import { getMethodLine, parseApex } from '../salesforce/ApexParser/ApexSymbolLocator.js';
+
+const symbolFinder = new SymbolFinder();
+
+async function findSymbol(context: Context, symbol: string): Promise<string[]> {
+  try {
+    const path = await symbolFinder.findSymbol(context.workspaces, symbol);
+    if (!path.length) {
+      context.display.showErrorMessage(`Type '${symbol}' was not found in workspace`);
+    }
+    return path;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    context.display.showErrorMessage(`Error finding symbol '${symbol}': ${message}`);
+  }
+  return [];
+}
 
 export class OpenFileInPackage {
   static async openFileForSymbol(context: Context, symbolName: string): Promise<void> {
@@ -24,8 +41,7 @@ export class OpenFileInPackage {
 
     const parts = symbolName.slice(0, symbolName.indexOf('('));
 
-    // findSymbol displays an error message if not found, so no need to duplicate here but it would probably be better here.
-    const paths = await context.findSymbol(parts);
+    const paths = await findSymbol(context, parts);
     if (!paths.length) {
       return;
     }

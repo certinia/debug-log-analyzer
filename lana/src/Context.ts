@@ -15,11 +15,9 @@ import { Display } from './display/Display.js';
 import { WhatsNewNotification } from './display/WhatsNewNotification.js';
 import { RawLogFoldingProvider } from './folding/RawLogFoldingProvider.js';
 import { ApexLogLanguageDetector } from './language/ApexLogLanguageDetector.js';
-import { SymbolFinder } from './salesforce/codesymbol/SymbolFinder.js';
 import { VSWorkspace } from './workspace/VSWorkspace.js';
 
 export class Context {
-  symbolFinder = new SymbolFinder();
   context: ExtensionContext;
   display: Display;
   workspaces: VSWorkspace[] = [];
@@ -45,13 +43,5 @@ export class Context {
     RawLogLineDecoration.apply(this);
     RawLogFoldingProvider.apply(this);
     WhatsNewNotification.apply(this);
-  }
-
-  async findSymbol(symbol: string): Promise<string[]> {
-    const path = await this.symbolFinder.findSymbol(this.workspaces, symbol);
-    if (!path.length) {
-      this.display.showErrorMessage(`Type '${symbol}' was not found in workspace`);
-    }
-    return path;
   }
 }
