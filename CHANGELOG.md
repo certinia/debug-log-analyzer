@@ -73,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Line Decorations**: Duration appears as ghost text at the end of the cursor line (e.g., `1.23s (self: 45ms)`).
   - **Hover Details**: Hover near the ghost text to see SOQL/DML counts, row counts, and exception info.
   - **Total Duration**: First line shows total log execution time.
+  - **Syntax Highlighting**: Apex debug log files are automatically recognized and syntax highlighted for improved readability.
 
 ### Changed
 
