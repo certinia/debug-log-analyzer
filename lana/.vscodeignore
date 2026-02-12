@@ -3,6 +3,7 @@
 // inlcude only the following in the extension
 !.vscodeignore
 !out/
+!syntaxes/
 !package.json
 !CHANGELOG.md
 !README.md
