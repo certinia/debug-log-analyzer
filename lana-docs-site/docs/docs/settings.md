@@ -31,13 +31,26 @@ or
 settings.json
 
 ```json
-"lana.timeline.colors": {
-  "Code Unit": "#88AE58",
-  "Workflow": "#51A16E",
-  "Method": "#2B8F81",
-  "Flow": "#337986",
-  "DML": "#285663",
-  "SOQL": "#5D4963",
-  "System Method": "#5C3444"
+"lana.timeline.customThemes": {
+  "Glacial Warmth": {
+    "apex": "#6882A6",
+    "codeUnit": "#7A9B6E",
+    "system": "#9E8E7C",
+    "automation": "#D98650",
+    "dml": "#C85A5A",
+    "soql": "#57A89A",
+    "callout": "#C9A64D",
+    "validation": "#8B7BAC"
+  },
+  "Orchid Slate": {
+    "apex": "#647C96",
+    "codeUnit": "#8872A8",
+    "system": "#8A7E7E",
+    "automation": "#C08545",
+    "dml": "#C94C6E",
+    "soql": "#5A9E85",
+    "callout": "#B5A044",
+    "validation": "#4EA6A6"
+  }
 }
 ```
