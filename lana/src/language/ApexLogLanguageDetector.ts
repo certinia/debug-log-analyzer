@@ -16,7 +16,9 @@ import {
 
 import { Context } from '../Context.js';
 
-const APEXLOG_HEADER = /^\d\d\.\d.+?APEX_CODE,\w.+$/;
+const APEXLOG_HEADER = /^(\d\d\.\d.+?)?APEX_CODE,\w.+$/;
+const EXECUTION_STARTED = /^\d{2}:\d{2}:\d{2}\.\d{1,} \(\d+\)\|EXECUTION_STARTED$/;
+const USER_INFO = /^\d{2}:\d{2}:\d{2}\.\d{1,} \(\d+\)\|USER_INFO\|/;
 const DETECT_EXTENSIONS = new Set(['.log', '.txt']);
 const MAX_LINES_TO_CHECK = 100;
 
@@ -27,7 +29,8 @@ export function isApexLogContent(doc: TextDocument): boolean {
 
   const linesToCheck = Math.min(MAX_LINES_TO_CHECK, doc.lineCount);
   for (let i = 0; i < linesToCheck; i++) {
-    if (APEXLOG_HEADER.test(doc.lineAt(i).text)) {
+    const text = doc.lineAt(i).text;
+    if (APEXLOG_HEADER.test(text) || EXECUTION_STARTED.test(text) || USER_INFO.test(text)) {
       return true;
     }
   }
@@ -47,11 +50,12 @@ function isApexLogFile(fsPath: string): boolean {
     const buf = Buffer.alloc(4096);
     const bytesRead = readSync(fd, buf, 0, 4096, 0);
     const text = buf.toString('utf8', 0, bytesRead);
-    const lines = text.split('\n');
+    const lines = text.split(/\r?\n/);
 
     const linesToCheck = Math.min(MAX_LINES_TO_CHECK, lines.length);
     for (let i = 0; i < linesToCheck; i++) {
-      if (APEXLOG_HEADER.test(lines[i] ?? '')) {
+      const line = lines[i] ?? '';
+      if (APEXLOG_HEADER.test(line) || EXECUTION_STARTED.test(line) || USER_INFO.test(line)) {
         return true;
       }
     }
