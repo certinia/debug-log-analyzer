@@ -117,8 +117,8 @@ describe('BucketColorResolver', () => {
 
       const result = resolveColor(stats);
 
-      // Validation color is #546E7A = 0x546E7A
-      expect(result.color).toBe(0x546e7a);
+      // Validation color is #5C8FA6 = 0x5C8FA6
+      expect(result.color).toBe(0x5c8fa6);
       expect(result.dominantCategory).toBe('Validation');
     });
   });
