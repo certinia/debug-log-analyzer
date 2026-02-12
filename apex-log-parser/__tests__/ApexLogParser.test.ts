@@ -1120,7 +1120,7 @@ describe('Recalculate durations tests', () => {
   it('Recalculates parent node', () => {
     const parser = new ApexLogParser();
     const node = new DummyLine(parser, ['14:32:07.563 (1)', 'DUMMY']);
-    node.subCategory = 'Method';
+    node.category = 'Apex';
     node.exitStamp = 3;
 
     node.recalculateDurations();

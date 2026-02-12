@@ -8,15 +8,48 @@ export type IssueType = 'unexpected' | 'error' | 'skip';
 
 export type LineNumber = number | 'EXTERNAL' | null; // an actual line-number or 'EXTERNAL'
 
-export type LogSubCategory =
-  | ''
-  | 'Method'
-  | 'System Method'
-  | 'Code Unit'
-  | 'DML'
-  | 'SOQL'
-  | 'Flow'
-  | 'Workflow';
+/**
+ * Original Salesforce debug log categories as defined in SF Setup > Debug Log Levels.
+ * These are the categories users configure in the Salesforce UI.
+ * See: https://help.salesforce.com/s/articleView?id=platform.code_setting_debug_log_levels.htm
+ */
+export const DEBUG_CATEGORY = {
+  Database: 'Database',
+  Workflow: 'Workflow',
+  NBA: 'NBA',
+  Validation: 'Validation',
+  Callout: 'Callout',
+  ApexCode: 'Apex Code',
+  ApexProfiling: 'Apex Profiling',
+  Visualforce: 'Visualforce',
+  System: 'System',
+} as const;
+
+/** Original Salesforce debug log category (from Debug Log Levels UI). */
+export type DebugCategory = (typeof DEBUG_CATEGORY)[keyof typeof DEBUG_CATEGORY] | '';
+
+/**
+ * Timeline display categories - our simplified/enhanced view of SF categories.
+ * Split Database → DML + SOQL, merge Flow + Workflow → Automation.
+ */
+export const LOG_CATEGORY = {
+  Apex: 'Apex',
+  System: 'System',
+  CodeUnit: 'Code Unit',
+  Automation: 'Automation',
+  DML: 'DML',
+  SOQL: 'SOQL',
+  Validation: 'Validation',
+  Callout: 'Callout',
+} as const;
+
+export type LogCategory = (typeof LOG_CATEGORY)[keyof typeof LOG_CATEGORY] | '';
+
+/** Readonly array of all category values (for building Sets, iterating, etc.) */
+export const ALL_LOG_CATEGORIES: readonly LogCategory[] = Object.values(LOG_CATEGORY);
+
+/** @deprecated Use LogCategory instead */
+export type LogSubCategory = LogCategory;
 
 export interface Limits {
   soqlQueries: { used: number; limit: number };

@@ -8,7 +8,7 @@ import { resolveColor } from '../BucketColorResolver.js';
 /**
  * Tests for BucketColorResolver - resolves bucket color from category statistics.
  *
- * Priority order: DML > SOQL > Method > Code Unit > System Method > Flow > Workflow
+ * Priority order: DML > SOQL > Callout > Apex > Code Unit > System > Automation > Validation
  * Tie-breakers: total duration → event count
  */
 
@@ -32,7 +32,7 @@ describe('BucketColorResolver', () => {
       const stats = createCategoryStats({
         DML: { count: 1, totalDuration: 100 },
         SOQL: { count: 10, totalDuration: 1000 },
-        Method: { count: 100, totalDuration: 10000 },
+        Apex: { count: 100, totalDuration: 10000 },
       });
 
       const result = resolveColor(stats);
@@ -42,10 +42,10 @@ describe('BucketColorResolver', () => {
       expect(result.dominantCategory).toBe('DML');
     });
 
-    it('should prioritize SOQL over Method, Code Unit, etc.', () => {
+    it('should prioritize SOQL over Apex, Code Unit, etc.', () => {
       const stats = createCategoryStats({
         SOQL: { count: 1, totalDuration: 100 },
-        Method: { count: 10, totalDuration: 1000 },
+        Apex: { count: 10, totalDuration: 1000 },
         'Code Unit': { count: 100, totalDuration: 10000 },
       });
 
@@ -56,91 +56,86 @@ describe('BucketColorResolver', () => {
       expect(result.dominantCategory).toBe('SOQL');
     });
 
-    it('should prioritize Method over Code Unit, System Method, Flow, Workflow', () => {
+    it('should prioritize Callout over Apex, Code Unit, System', () => {
       const stats = createCategoryStats({
-        Method: { count: 1, totalDuration: 100 },
+        Callout: { count: 1, totalDuration: 100 },
+        Apex: { count: 10, totalDuration: 1000 },
+        System: { count: 100, totalDuration: 10000 },
+      });
+
+      const result = resolveColor(stats);
+
+      // Callout color is #CCA033 = 0xCCA033
+      expect(result.color).toBe(0xcca033);
+      expect(result.dominantCategory).toBe('Callout');
+    });
+
+    it('should prioritize Apex over Code Unit, System, Automation', () => {
+      const stats = createCategoryStats({
+        Apex: { count: 1, totalDuration: 100 },
         'Code Unit': { count: 10, totalDuration: 1000 },
-        'System Method': { count: 100, totalDuration: 10000 },
+        System: { count: 100, totalDuration: 10000 },
       });
 
       const result = resolveColor(stats);
 
-      // Method color is #2B8F81 = 0x2B8F81
+      // Apex color is #2B8F81 = 0x2B8F81
       expect(result.color).toBe(0x2b8f81);
-      expect(result.dominantCategory).toBe('Method');
+      expect(result.dominantCategory).toBe('Apex');
     });
 
-    it('should prioritize Code Unit over System Method, Flow, Workflow', () => {
+    it('should prioritize System over Automation', () => {
       const stats = createCategoryStats({
-        'Code Unit': { count: 1, totalDuration: 100 },
-        'System Method': { count: 10, totalDuration: 1000 },
-        Flow: { count: 100, totalDuration: 10000 },
+        System: { count: 1, totalDuration: 100 },
+        Automation: { count: 10, totalDuration: 1000 },
       });
 
       const result = resolveColor(stats);
 
-      // Code Unit color is #88AE58 = 0x88AE58
-      expect(result.color).toBe(0x88ae58);
-      expect(result.dominantCategory).toBe('Code Unit');
-    });
-
-    it('should prioritize System Method over Flow and Workflow', () => {
-      const stats = createCategoryStats({
-        'System Method': { count: 1, totalDuration: 100 },
-        Flow: { count: 10, totalDuration: 1000 },
-        Workflow: { count: 100, totalDuration: 10000 },
-      });
-
-      const result = resolveColor(stats);
-
-      // System Method color is #8D6E63 = 0x8D6E63
+      // System color is #8D6E63 = 0x8D6E63
       expect(result.color).toBe(0x8d6e63);
-      expect(result.dominantCategory).toBe('System Method');
+      expect(result.dominantCategory).toBe('System');
     });
 
-    it('should prioritize Flow over Workflow', () => {
+    it('should prioritize Automation over Validation', () => {
       const stats = createCategoryStats({
-        Flow: { count: 1, totalDuration: 100 },
-        Workflow: { count: 10, totalDuration: 1000 },
+        Automation: { count: 1, totalDuration: 100 },
+        Validation: { count: 10, totalDuration: 1000 },
       });
 
       const result = resolveColor(stats);
 
-      // Flow color is #5C8FA6 = 0x5C8FA6
-      expect(result.color).toBe(0x5c8fa6);
-      expect(result.dominantCategory).toBe('Flow');
-    });
-
-    it('should return Workflow color when only Workflow present', () => {
-      const stats = createCategoryStats({
-        Workflow: { count: 5, totalDuration: 500 },
-      });
-
-      const result = resolveColor(stats);
-
-      // Workflow color is #51A16E = 0x51A16E
+      // Automation color is #51A16E = 0x51A16E
       expect(result.color).toBe(0x51a16e);
-      expect(result.dominantCategory).toBe('Workflow');
+      expect(result.dominantCategory).toBe('Automation');
+    });
+
+    it('should return Validation color when only Validation present', () => {
+      const stats = createCategoryStats({
+        Validation: { count: 5, totalDuration: 500 },
+      });
+
+      const result = resolveColor(stats);
+
+      // Validation color is #5C8FA6 = 0x5C8FA6
+      expect(result.color).toBe(0x5c8fa6);
+      expect(result.dominantCategory).toBe('Validation');
     });
   });
 
   describe('duration tie-breaking', () => {
     it('should use duration to break ties between same-priority categories', () => {
-      // Method and Method have same priority (both are "Method")
-      // But we can test with a hypothetical case or use different duration values
-      // within same category - this test verifies the algorithm
       const stats = createCategoryStats({
-        Method: { count: 5, totalDuration: 1000 }, // Higher duration
+        Apex: { count: 5, totalDuration: 1000 },
       });
 
       const result = resolveColor(stats);
-      expect(result.dominantCategory).toBe('Method');
+      expect(result.dominantCategory).toBe('Apex');
     });
   });
 
   describe('count tie-breaking', () => {
     it('should use count when priority and duration are equal', () => {
-      // Single category - count doesn't matter for single item
       const stats = createCategoryStats({
         DML: { count: 10, totalDuration: 500 },
       });
@@ -166,14 +161,14 @@ describe('BucketColorResolver', () => {
     it('should prioritize known categories over unknown ones', () => {
       const stats = createCategoryStats({
         UnknownCategory: { count: 100, totalDuration: 10000 },
-        Workflow: { count: 1, totalDuration: 100 },
+        Automation: { count: 1, totalDuration: 100 },
       });
 
       const result = resolveColor(stats);
 
-      // Workflow is known, so it should win over unknown
+      // Automation is known, so it should win over unknown
       expect(result.color).toBe(0x51a16e);
-      expect(result.dominantCategory).toBe('Workflow');
+      expect(result.dominantCategory).toBe('Automation');
     });
   });
 

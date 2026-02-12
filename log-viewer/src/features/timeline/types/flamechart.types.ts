@@ -11,7 +11,7 @@
 
 //TODO: Remove deps outside timeline
 
-import type { LogEvent, LogSubCategory } from 'apex-log-parser';
+import type { LogCategory, LogEvent } from 'apex-log-parser';
 import { formatDuration } from '../../../core/utility/Util.js';
 import type { PrecomputedRect } from '../optimised/RectangleManager.js';
 
@@ -139,7 +139,7 @@ export interface TreeNode<T extends EventNode> {
  */
 export interface RenderBatch {
   /** Event category this batch represents. */
-  category: LogSubCategory;
+  category: LogCategory;
 
   /** PixiJS color value (0xRRGGBB) - pre-blended opaque. */
   color: number;
@@ -212,7 +212,7 @@ export interface TimelineState {
   viewport: ViewportState;
 
   /** Render batches (7 categories). */
-  batches: Map<LogSubCategory, RenderBatch>;
+  batches: Map<LogCategory, RenderBatch>;
 
   /** Cached batch colors for bucket color resolution (performance optimization). */
   batchColorsCache: Map<string, { color: number }>;
@@ -241,7 +241,7 @@ export interface TimelineState {
  * Colors can be hex strings ("#RRGGBB"), CSS color names, or rgb/rgba strings.
  */
 export type TimelineColorMap = {
-  [K in LogSubCategory]?: string;
+  [K in LogCategory]?: string;
 };
 
 /**
@@ -413,13 +413,14 @@ export const TIMELINE_CONSTANTS = {
 
   /** Default color map (matches current Canvas2D colors). */
   DEFAULT_COLORS: {
+    Apex: '#2B8F81',
     'Code Unit': '#88AE58',
-    Workflow: '#51A16E',
-    Method: '#2B8F81',
-    Flow: '#5C8FA6',
+    System: '#8D6E63',
+    Automation: '#51A16E',
     DML: '#B06868',
     SOQL: '#6D4C7D',
-    'System Method': '#8D6E63',
+    Callout: '#CCA033',
+    Validation: '#5C8FA6',
   } as TimelineColorMap,
 
   /** Maximum zoom level (0.01ms = 10 microsecond visible width in nanoseconds). */
@@ -473,11 +474,12 @@ export const BUCKET_CONSTANTS = {
   CATEGORY_PRIORITY: [
     'DML',
     'SOQL',
-    'Method',
+    'Callout',
+    'Apex',
     'Code Unit',
-    'System Method',
-    'Flow',
-    'Workflow',
+    'System',
+    'Automation',
+    'Validation',
   ] as const,
 } as const;
 /* eslint-enable @typescript-eslint/naming-convention */

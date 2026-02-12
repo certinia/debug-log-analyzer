@@ -293,11 +293,11 @@ export class RectangleManager {
       const len = currentEvents.length;
       for (let i = 0; i < len; i++) {
         const event = currentEvents[i]!;
-        const { duration, subCategory, timestamp, exitStamp, children } = event;
+        const { duration, category, timestamp, exitStamp, children } = event;
 
         // Check if this event should be rendered
-        if (duration.total && subCategory) {
-          const rects = this.rectsByCategory.get(subCategory);
+        if (duration.total && category) {
+          const rects = this.rectsByCategory.get(category);
           if (rects) {
             // Create persistent rect object (updated during culling)
             // ID format: timestamp-depth-childIndex
@@ -308,7 +308,7 @@ export class RectangleManager {
               depth,
               duration: duration.total,
               selfDuration: duration.self,
-              category: subCategory,
+              category,
               eventRef: event,
               x: 0,
               y: depthY,

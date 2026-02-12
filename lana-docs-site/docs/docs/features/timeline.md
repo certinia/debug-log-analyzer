@@ -39,7 +39,7 @@ The minimap gives you instant context of your entire log. Spot hotspots at a gla
 
 - **Skyline Chart**: A density-based visualization:
   - **Height** = maximum call stack depth at that point
-  - **Color** = dominant event category (method, SOQL, DML, etc.)
+  - **Color** = dominant event category (Apex, SOQL, DML, etc.)
   - **Opacity** = event density (brighter = more events)
 - **Viewport Lens**: A window showing exactly what's visible in the main timeline (time range horizontal, depth range vertical)
 - **Time Axis**: Time reference markers at the top
@@ -333,23 +333,25 @@ You can create custom color themes to match your preferences or specific use cas
 
 ```json
 "lana.timeline.customThemes": {
-  "My Theme": {
-    "codeUnit": "#0176D3",
-    "workflow": "#CE4A6B",
-    "method": "#54698D",
-    "flow": "#9050E9",
-    "dml": "#D68128",
-    "soql": "#04844B",
-    "system": "#706E6B"
+  "Glacial Warmth": {
+    "apex": "#6882A6",
+    "codeUnit": "#7A9B6E",
+    "system": "#9E8E7C",
+    "automation": "#D98650",
+    "dml": "#C85A5A",
+    "soql": "#57A89A",
+    "callout": "#C9A64D",
+    "validation": "#8B7BAC"
   },
-  "High Contrast": {
-    "codeUnit": "#722ED1",
-    "workflow": "#52C41A",
-    "method": "#1890FF",
-    "flow": "#00BCD4",
-    "dml": "#FF9100",
-    "soql": "#EB2F96",
-    "system": "#90A4AE"
+  "Orchid Slate": {
+    "apex": "#647C96",
+    "codeUnit": "#8872A8",
+    "system": "#8A7E7E",
+    "automation": "#C08545",
+    "dml": "#C94C6E",
+    "soql": "#5A9E85",
+    "callout": "#B5A044",
+    "validation": "#4EA6A6"
   }
 }
 ```
@@ -358,13 +360,14 @@ You can create custom color themes to match your preferences or specific use cas
 
 Each theme requires the following color properties (in hex format):
 
+- **apex** - Apex method entry/exit events
 - **codeUnit** - Code Unit events
-- **workflow** - Workflow and automation events
-- **method** - Method entry/exit events
-- **flow** - Flow execution events
+- **system** - System method calls
+- **automation** - Workflow, Flow, and Process Builder events
 - **dml** - DML operations (insert, update, delete, etc.)
 - **soql** - SOQL queries
-- **system** - System method calls
+- **callout** - HTTP callout events
+- **validation** - Validation rule events
 
 Custom themes will appear in the theme selector alongside built-in themes and can be switched using the Command Palette or settings.
 

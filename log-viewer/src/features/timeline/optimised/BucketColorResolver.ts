@@ -8,7 +8,7 @@
  * Resolves the display color for a pixel bucket based on category statistics.
  * Uses priority order with duration and count tie-breakers.
  *
- * Priority order: DML > SOQL > Method > Code Unit > System Method > Flow > Workflow
+ * Priority order: DML > SOQL > Callout > Apex > Code Unit > System > Automation > Validation
  */
 
 import type { CategoryStats } from '../types/flamechart.types.js';
@@ -22,13 +22,14 @@ import { BUCKET_CONSTANTS } from '../types/flamechart.types.js';
  * All timeline code should use this via import or batchColors from theme.
  */
 export const CATEGORY_COLORS: Record<string, number> = {
+  Apex: 0x2b8f81, // #2B8F81
+  'Code Unit': 0x88ae58, // #88AE58
+  System: 0x8d6e63, // #8D6E63
+  Automation: 0x51a16e, // #51A16E
   DML: 0xb06868, // #B06868
   SOQL: 0x6d4c7d, // #6D4C7D
-  Method: 0x2b8f81, // #2B8F81
-  'Code Unit': 0x88ae58, // #88AE58
-  'System Method': 0x8d6e63, // #8D6E63
-  Flow: 0x5c8fa6, // #5C8FA6
-  Workflow: 0x51a16e, // #51A16E
+  Callout: 0xcca033, // #CCA033
+  Validation: 0x5c8fa6, // #5C8FA6
 };
 
 /**

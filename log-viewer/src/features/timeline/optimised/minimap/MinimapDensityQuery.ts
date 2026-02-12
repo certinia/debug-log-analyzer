@@ -28,13 +28,14 @@
  *   score[category] = onTopTime[category] × CATEGORY_WEIGHTS[category]
  *   winner = argmax(score)
  *
- * Example: SOQL at depth 2 covers 0-100ms with Method child at depth 3 covering 30-80ms
+ * Example: SOQL at depth 2 covers 0-100ms with Apex child at depth 3 covering 30-80ms
  * - SOQL is on-top at 0-30ms and 80-100ms = 50ms total (50%)
- * - Method is on-top at 30-80ms = 50ms total (50%)
- * - With weights: SOQL = 50% × 2.5 = 125, Method = 50% × 1.0 = 50
+ * - Apex is on-top at 30-80ms = 50ms total (50%)
+ * - With weights: SOQL = 50% × 2.5 = 125, Apex = 50% × 1.0 = 50
  * - SOQL wins because its weighted score is higher
  */
 
+import type { BucketCategoryPriority } from '../../types/flamechart.types.js';
 import type { PrecomputedRect } from '../RectangleManager.js';
 import type { SkylineFrame, TemporalSegmentTree } from '../TemporalSegmentTree.js';
 
@@ -87,14 +88,15 @@ export interface MinimapDensityData {
  * Balance: DML at 2.5x means it can win over a Method child 1-2 levels deeper,
  * but a child 5+ levels deeper will still dominate (depth² wins at larger gaps).
  */
-const CATEGORY_WEIGHTS: Record<string, number> = {
+const CATEGORY_WEIGHTS: Partial<Record<BucketCategoryPriority, number>> = {
   DML: 2.5,
   SOQL: 2.5,
-  Method: 1.0,
+  Callout: 1.5,
+  Apex: 1.0,
   'Code Unit': 1.0,
-  'System Method': 0.8,
-  Flow: 0.8,
-  Workflow: 0.8,
+  System: 0.8,
+  Automation: 0.8,
+  Validation: 0.8,
 };
 
 /**
@@ -526,7 +528,7 @@ export class MinimapDensityQuery {
   ): string {
     // Fast path: no frames
     if (frames.length === 0) {
-      return 'Method';
+      return 'Apex';
     }
 
     // Fast path: single frame
@@ -612,11 +614,11 @@ export class MinimapDensityQuery {
     }
 
     // Apply category weights and find winner
-    let winningCategory = 'Method';
+    let winningCategory = 'Apex';
     let winningScore = -1;
 
     for (const [category, time] of onTopTime) {
-      const weight = CATEGORY_WEIGHTS[category] ?? 1.0;
+      const weight = CATEGORY_WEIGHTS[category as BucketCategoryPriority] ?? 1.0;
       const score = time * weight;
       if (score > winningScore) {
         winningScore = score;

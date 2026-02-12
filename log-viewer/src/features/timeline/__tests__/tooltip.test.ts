@@ -30,7 +30,7 @@ describe('TimelineTooltipManager', () => {
     timestamp: number,
     duration: number,
     type: string = 'TestEvent',
-    subCategory: string = 'Method',
+    category: string = 'Apex',
   ): LogEvent {
     return {
       timestamp,
@@ -41,10 +41,9 @@ describe('TimelineTooltipManager', () => {
         self: duration * 0.5,
       },
       type,
-      subCategory,
+      category,
       text: `Event at ${timestamp}`,
       lineNumber: 42,
-      category: 'Method',
       children: [],
       isParent: true, // Required for tooltip to show
       dmlCount: { total: 0, self: 0 },
@@ -111,7 +110,7 @@ describe('TimelineTooltipManager', () => {
       tooltipManager.destroy();
 
       tooltipManager = new TimelineTooltipManager(container, {
-        categoryColors: { Method: '#88ae58' },
+        categoryColors: { Apex: '#88ae58' },
         cursorOffset: 20,
         enableFlip: true,
       });
@@ -563,7 +562,7 @@ describe('TimelineTooltipManager', () => {
     it('should handle event with minimal data', () => {
       const event = {
         timestamp: 0,
-        category: 'Method',
+        category: 'Apex',
         children: [],
         isParent: true,
         text: 'Minimal event',
