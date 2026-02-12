@@ -78,8 +78,7 @@
           "ApexLog",
           "DebugLog"
         ],
-        "extensions": [],
-        "firstLine": "^\\d\\d.\\d.+?APEX_CODE,\\w.+$"
+        "extensions": []
       }
     ],
     "menus": {

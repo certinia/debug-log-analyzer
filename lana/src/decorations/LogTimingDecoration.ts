@@ -11,7 +11,7 @@ import {
 } from 'vscode';
 
 import { Context } from '../Context.js';
-import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
+import { APEXLOG_HEADER, isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 import { formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
 
 // Pattern to find EXECUTION_STARTED line
@@ -98,8 +98,13 @@ export class LogTimingDecoration {
 
     const formattedDuration = formatDuration(duration);
 
-    // Create decoration for line 0 (first line)
-    const line = document.lineAt(0);
+    const startLine = this.findFirstLogLine(document);
+    if (startLine === null) {
+      editor.setDecorations(decorationType, []);
+      return;
+    }
+
+    const line = document.lineAt(startLine);
     const decoration: DecorationOptions = {
       range: line.range,
       renderOptions: {
@@ -110,6 +115,17 @@ export class LogTimingDecoration {
     };
 
     editor.setDecorations(decorationType, [decoration]);
+  }
+
+  private findFirstLogLine(doc: TextDocument): number | null {
+    const limit = Math.min(1000, doc.lineCount);
+    for (let i = 0; i < limit; i++) {
+      const text = doc.lineAt(i).text;
+      if (APEXLOG_HEADER.test(text) || TIMESTAMP_REGEX.test(text)) {
+        return i;
+      }
+    }
+    return null;
   }
 
   private calculateLogDuration(document: TextDocument): number | null {
