@@ -5,14 +5,16 @@
 import type { ApexLogParser, DebugLevel } from './ApexLogParser';
 import type {
   CPUType,
+  DebugCategory,
   GovernorLimits,
   Limits,
   LineNumber,
+  LogCategory,
   LogEventType,
   LogIssue,
-  LogSubCategory,
   SelfTotal,
 } from './types.js';
+import { DEBUG_CATEGORY, LOG_CATEGORY } from './types.js';
 
 /**
  * All log lines extend this base class.
@@ -106,9 +108,14 @@ export abstract class LogEvent {
   exitStamp: number | null = null;
 
   /**
-   * The log sub category this event belongs to
+   * The timeline display category this event belongs to.
    */
-  subCategory: LogSubCategory = '';
+  category: LogCategory = '';
+
+  /**
+   * The original Salesforce debug log category.
+   */
+  debugCategory: DebugCategory = '';
 
   /**
    * The CPU type, e.g loading, method, custom
@@ -269,13 +276,15 @@ export class DurationLogEvent extends LogEvent {
     parser: ApexLogParser,
     parts: string[],
     exitTypes: LogEventType[],
-    subCategory: LogSubCategory,
+    category: LogCategory,
     cpuType: CPUType,
+    debugCategory: DebugCategory = '',
   ) {
     super(parser, parts);
     this.exitTypes = exitTypes;
-    this.subCategory = subCategory;
+    this.category = category;
     this.cpuType = cpuType;
+    this.debugCategory = debugCategory;
   }
 }
 
@@ -295,7 +304,7 @@ export class ApexLog extends LogEvent {
   timestamp = 0;
   exitStamp = 0;
   exitTypes = [];
-  subCategory: LogSubCategory = '';
+  override category: LogCategory = '';
   cpuType: CPUType = '';
 
   /**
@@ -427,7 +436,14 @@ export class BulkHeapAllocateLine extends LogEvent {
 
 export class CalloutRequestLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['CALLOUT_RESPONSE'], 'Method', 'free');
+    super(
+      parser,
+      parts,
+      ['CALLOUT_RESPONSE'],
+      LOG_CATEGORY.Callout,
+      'free',
+      DEBUG_CATEGORY.Callout,
+    );
     this.text = parts[3] ?? '';
     this.lineNumber = this.parseLineNumber(parts[2]);
   }
@@ -445,6 +461,7 @@ export class CalloutResponseLine extends LogEvent {
 export class NamedCredentialRequestLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Callout;
     this.text = `${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
   }
 }
@@ -452,6 +469,7 @@ export class NamedCredentialRequestLine extends LogEvent {
 export class NamedCredentialResponseLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Callout;
     this.text = `${parts[2]}`;
   }
 }
@@ -459,6 +477,7 @@ export class NamedCredentialResponseLine extends LogEvent {
 export class NamedCredentialResponseDetailLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Callout;
     this.text = `${parts[3]} : ${parts[4]} ${parts[5]} : ${parts[6]} ${parts[7]}`;
   }
 }
@@ -468,7 +487,14 @@ export class ConstructorEntryLine extends DurationLogEvent {
   suffix = ' (constructor)';
 
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['CONSTRUCTOR_EXIT'], 'Method', 'method');
+    super(
+      parser,
+      parts,
+      ['CONSTRUCTOR_EXIT'],
+      LOG_CATEGORY.Apex,
+      'method',
+      DEBUG_CATEGORY.ApexCode,
+    );
     this.lineNumber = this.parseLineNumber(parts[2]);
     const [, , , , args, className] = parts;
 
@@ -517,7 +543,7 @@ export class MethodEntryLine extends DurationLogEvent {
   hasValidSymbols = true;
 
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['METHOD_EXIT'], 'Method', 'method');
+    super(parser, parts, ['METHOD_EXIT'], LOG_CATEGORY.Apex, 'method', DEBUG_CATEGORY.ApexCode);
     const [, , lineNumber, , methodName] = parts;
     this.lineNumber = this.parseLineNumber(lineNumber);
     this.text = methodName || this.type || this.text;
@@ -592,7 +618,14 @@ export class SystemConstructorEntryLine extends DurationLogEvent {
   suffix = '(system constructor)';
 
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['SYSTEM_CONSTRUCTOR_EXIT'], 'System Method', 'method');
+    super(
+      parser,
+      parts,
+      ['SYSTEM_CONSTRUCTOR_EXIT'],
+      LOG_CATEGORY.System,
+      'method',
+      DEBUG_CATEGORY.System,
+    );
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
   }
@@ -608,7 +641,14 @@ export class SystemConstructorExitLine extends LogEvent {
 }
 export class SystemMethodEntryLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['SYSTEM_METHOD_EXIT'], 'System Method', 'method');
+    super(
+      parser,
+      parts,
+      ['SYSTEM_METHOD_EXIT'],
+      LOG_CATEGORY.System,
+      'method',
+      DEBUG_CATEGORY.System,
+    );
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
   }
@@ -628,7 +668,14 @@ export class CodeUnitStartedLine extends DurationLogEvent {
   codeUnitType = '';
 
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['CODE_UNIT_FINISHED'], 'Code Unit', 'custom');
+    super(
+      parser,
+      parts,
+      ['CODE_UNIT_FINISHED'],
+      LOG_CATEGORY.CodeUnit,
+      'custom',
+      DEBUG_CATEGORY.ApexCode,
+    );
 
     const typeString = parts[5] || parts[4] || parts[3] || '';
     let sepIndex = typeString.indexOf(':');
@@ -713,7 +760,14 @@ export class VFApexCallStartLine extends DurationLogEvent {
   ];
 
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['VF_APEX_CALL_END'], 'Method', 'method');
+    super(
+      parser,
+      parts,
+      ['VF_APEX_CALL_END'],
+      LOG_CATEGORY.Apex,
+      'method',
+      DEBUG_CATEGORY.ApexCode,
+    );
     this.lineNumber = this.parseLineNumber(parts[2]);
 
     const classText = parts[5] || parts[3] || '';
@@ -760,7 +814,14 @@ export class VFApexCallEndLine extends LogEvent {
 
 export class VFDeserializeViewstateBeginLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['VF_DESERIALIZE_VIEWSTATE_END'], 'System Method', 'method');
+    super(
+      parser,
+      parts,
+      ['VF_DESERIALIZE_VIEWSTATE_END'],
+      LOG_CATEGORY.System,
+      'method',
+      DEBUG_CATEGORY.Visualforce,
+    );
   }
 }
 
@@ -768,7 +829,14 @@ export class VFFormulaStartLine extends DurationLogEvent {
   suffix = ' (VF FORMULA)';
 
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['VF_EVALUATE_FORMULA_END'], 'System Method', 'custom');
+    super(
+      parser,
+      parts,
+      ['VF_EVALUATE_FORMULA_END'],
+      LOG_CATEGORY.System,
+      'custom',
+      DEBUG_CATEGORY.Visualforce,
+    );
     this.text = parts[3] || '';
   }
 }
@@ -778,13 +846,21 @@ export class VFFormulaEndLine extends LogEvent {
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Visualforce;
     this.text = parts[2] || '';
   }
 }
 
 export class VFSeralizeViewStateStartLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['VF_SERIALIZE_VIEWSTATE_END'], 'System Method', 'method');
+    super(
+      parser,
+      parts,
+      ['VF_SERIALIZE_VIEWSTATE_END'],
+      LOG_CATEGORY.System,
+      'method',
+      DEBUG_CATEGORY.Visualforce,
+    );
   }
 }
 
@@ -792,6 +868,7 @@ export class VFPageMessageLine extends LogEvent {
   acceptsText = true;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.ApexCode;
     this.text = parts[2] || '';
   }
 }
@@ -804,7 +881,7 @@ export class DMLBeginLine extends DurationLogEvent {
   namespace = 'default';
 
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['DML_END'], 'DML', 'free');
+    super(parser, parts, ['DML_END'], LOG_CATEGORY.DML, 'free', DEBUG_CATEGORY.Database);
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = 'DML ' + parts[3] + ' ' + parts[4];
     const rowCountString = parts[5];
@@ -837,7 +914,7 @@ export class SOQLExecuteBeginLine extends DurationLogEvent {
   };
 
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['SOQL_EXECUTE_END'], 'SOQL', 'free');
+    super(parser, parts, ['SOQL_EXECUTE_END'], LOG_CATEGORY.SOQL, 'free', DEBUG_CATEGORY.Database);
     this.lineNumber = this.parseLineNumber(parts[2]);
 
     const [, , , aggregations, soqlString] = parts;
@@ -918,7 +995,7 @@ export class SOSLExecuteBeginLine extends DurationLogEvent {
   };
 
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['SOSL_EXECUTE_END'], 'SOQL', 'free');
+    super(parser, parts, ['SOSL_EXECUTE_END'], LOG_CATEGORY.SOQL, 'free', DEBUG_CATEGORY.Database);
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = `SOSL: ${parts[3]}`;
   }
@@ -996,7 +1073,14 @@ export class UserDebugLine extends LogEvent {
 export class CumulativeLimitUsageLine extends DurationLogEvent {
   namespace = 'default';
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['CUMULATIVE_LIMIT_USAGE_END'], 'System Method', 'system');
+    super(
+      parser,
+      parts,
+      ['CUMULATIVE_LIMIT_USAGE_END'],
+      LOG_CATEGORY.System,
+      'system',
+      DEBUG_CATEGORY.ApexProfiling,
+    );
   }
 }
 
@@ -1012,7 +1096,14 @@ export class CumulativeProfilingLine extends LogEvent {
 export class CumulativeProfilingBeginLine extends DurationLogEvent {
   namespace = 'default';
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['CUMULATIVE_PROFILING_END'], 'System Method', 'custom');
+    super(
+      parser,
+      parts,
+      ['CUMULATIVE_PROFILING_END'],
+      LOG_CATEGORY.System,
+      'custom',
+      DEBUG_CATEGORY.ApexProfiling,
+    );
   }
 }
 
@@ -1020,6 +1111,7 @@ export class LimitUsageLine extends LogEvent {
   namespace = 'default';
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.ApexProfiling;
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] + ' ' + parts[4] + ' out of ' + parts[5];
   }
@@ -1046,6 +1138,7 @@ export class LimitUsageForNSLine extends LogEvent {
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.ApexProfiling;
     this.acceptsText = true;
     this.text = parts[2] || '';
   }
@@ -1109,7 +1202,7 @@ export class LimitUsageForNSLine extends LogEvent {
 
 export class NBANodeBegin extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['NBA_NODE_END'], 'System Method', 'method');
+    super(parser, parts, ['NBA_NODE_END'], LOG_CATEGORY.Automation, 'method', DEBUG_CATEGORY.NBA);
     this.text = parts.slice(2).join(' | ');
   }
 }
@@ -1141,7 +1234,14 @@ export class NBAOfferInvalid extends LogEvent {
 }
 export class NBAStrategyBegin extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['NBA_STRATEGY_END'], 'System Method', 'method');
+    super(
+      parser,
+      parts,
+      ['NBA_STRATEGY_END'],
+      LOG_CATEGORY.Automation,
+      'method',
+      DEBUG_CATEGORY.NBA,
+    );
     this.text = parts.slice(2).join(' | ');
   }
 }
@@ -1177,7 +1277,7 @@ export class PopTraceFlagsLine extends LogEvent {
 
 export class QueryMoreBeginLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['QUERY_MORE_END'], 'SOQL', 'custom');
+    super(parser, parts, ['QUERY_MORE_END'], LOG_CATEGORY.SOQL, 'custom', DEBUG_CATEGORY.Database);
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = `line: ${this.lineNumber}`;
   }
@@ -1259,13 +1359,20 @@ export class SystemModeExitLine extends LogEvent {
 export class ExecutionStartedLine extends DurationLogEvent {
   namespace = 'default';
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['EXECUTION_FINISHED'], 'Method', 'method');
+    super(
+      parser,
+      parts,
+      ['EXECUTION_FINISHED'],
+      LOG_CATEGORY.Apex,
+      'method',
+      DEBUG_CATEGORY.ApexCode,
+    );
   }
 }
 
 export class EnteringManagedPackageLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, [], 'Method', 'pkg');
+    super(parser, parts, [], LOG_CATEGORY.Apex, 'pkg', DEBUG_CATEGORY.ApexCode);
     const rawNs = parts[2] || '',
       lastDot = rawNs.lastIndexOf('.');
 
@@ -1281,7 +1388,14 @@ export class EnteringManagedPackageLine extends DurationLogEvent {
 
 export class EventSericePubBeginLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['EVENT_SERVICE_PUB_END'], 'Flow', 'custom');
+    super(
+      parser,
+      parts,
+      ['EVENT_SERVICE_PUB_END'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = parts[2] || '';
   }
 }
@@ -1304,7 +1418,14 @@ export class EventSericePubDetailLine extends LogEvent {
 
 export class EventSericeSubBeginLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['EVENT_SERVICE_SUB_END'], 'Flow', 'custom');
+    super(
+      parser,
+      parts,
+      ['EVENT_SERVICE_SUB_END'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = `${parts[2]} ${parts[3]}`;
   }
 }
@@ -1329,7 +1450,14 @@ export class FlowStartInterviewsBeginLine extends DurationLogEvent {
   text = 'FLOW_START_INTERVIEWS : ';
 
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['FLOW_START_INTERVIEWS_END'], 'Flow', 'custom');
+    super(
+      parser,
+      parts,
+      ['FLOW_START_INTERVIEWS_END'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
   }
 
   onEnd(end: LogEvent, stack: LogEvent[]) {
@@ -1369,13 +1497,21 @@ export class FlowStartInterviewsErrorLine extends LogEvent {
   acceptsText = true;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} - ${parts[4]}`;
   }
 }
 
 export class FlowStartInterviewBeginLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['FLOW_START_INTERVIEW_END'], 'Flow', 'custom');
+    super(
+      parser,
+      parts,
+      ['FLOW_START_INTERVIEW_END'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = parts[3] || '';
   }
 }
@@ -1383,6 +1519,7 @@ export class FlowStartInterviewBeginLine extends DurationLogEvent {
 export class FlowStartInterviewLimitUsageLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[2] || '';
   }
 }
@@ -1390,6 +1527,7 @@ export class FlowStartInterviewLimitUsageLine extends LogEvent {
 export class FlowStartScheduledRecordsLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
@@ -1397,13 +1535,21 @@ export class FlowStartScheduledRecordsLine extends LogEvent {
 export class FlowCreateInterviewErrorLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
 
 export class FlowElementBeginLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['FLOW_ELEMENT_END'], 'Flow', 'custom');
+    super(
+      parser,
+      parts,
+      ['FLOW_ELEMENT_END'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = parts[3] + ' ' + parts[4];
   }
 }
@@ -1411,6 +1557,7 @@ export class FlowElementBeginLine extends DurationLogEvent {
 export class FlowElementDeferredLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[2] + ' ' + parts[3];
   }
 }
@@ -1420,6 +1567,7 @@ export class FlowElementAssignmentLine extends LogEvent {
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[3] + ' ' + parts[4];
   }
 }
@@ -1427,6 +1575,7 @@ export class FlowElementAssignmentLine extends LogEvent {
 export class FlowWaitEventResumingDetailLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
@@ -1434,6 +1583,7 @@ export class FlowWaitEventResumingDetailLine extends LogEvent {
 export class FlowWaitEventWaitingDetailLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]}`;
   }
 }
@@ -1441,6 +1591,7 @@ export class FlowWaitEventWaitingDetailLine extends LogEvent {
 export class FlowWaitResumingDetailLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -1448,6 +1599,7 @@ export class FlowWaitResumingDetailLine extends LogEvent {
 export class FlowWaitWaitingDetailLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
@@ -1455,6 +1607,7 @@ export class FlowWaitWaitingDetailLine extends LogEvent {
 export class FlowInterviewFinishedLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[3] || '';
   }
 }
@@ -1462,6 +1615,7 @@ export class FlowInterviewFinishedLine extends LogEvent {
 export class FlowInterviewResumedLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
@@ -1469,6 +1623,7 @@ export class FlowInterviewResumedLine extends LogEvent {
 export class FlowInterviewPausedLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -1477,6 +1632,7 @@ export class FlowElementErrorLine extends LogEvent {
   acceptsText = true;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[1] || '' + parts[2] + ' ' + parts[3] + ' ' + parts[4];
   }
 }
@@ -1484,6 +1640,7 @@ export class FlowElementErrorLine extends LogEvent {
 export class FlowElementFaultLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -1491,6 +1648,7 @@ export class FlowElementFaultLine extends LogEvent {
 export class FlowElementLimitUsageLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]}`;
   }
 }
@@ -1498,6 +1656,7 @@ export class FlowElementLimitUsageLine extends LogEvent {
 export class FlowInterviewFinishedLimitUsageLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]}`;
   }
 }
@@ -1505,6 +1664,7 @@ export class FlowInterviewFinishedLimitUsageLine extends LogEvent {
 export class FlowSubflowDetailLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
@@ -1512,6 +1672,7 @@ export class FlowSubflowDetailLine extends LogEvent {
 export class FlowActionCallDetailLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[3] + ' : ' + parts[4] + ' : ' + parts[5] + ' : ' + parts[6];
   }
 }
@@ -1519,6 +1680,7 @@ export class FlowActionCallDetailLine extends LogEvent {
 export class FlowAssignmentDetailLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[3] + ' : ' + parts[4] + ' : ' + parts[5];
   }
 }
@@ -1526,6 +1688,7 @@ export class FlowAssignmentDetailLine extends LogEvent {
 export class FlowLoopDetailLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[3] + ' : ' + parts[4];
   }
 }
@@ -1533,13 +1696,21 @@ export class FlowLoopDetailLine extends LogEvent {
 export class FlowRuleDetailLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[3] + ' : ' + parts[4];
   }
 }
 
 export class FlowBulkElementBeginLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['FLOW_BULK_ELEMENT_END'], 'Flow', 'custom');
+    super(
+      parser,
+      parts,
+      ['FLOW_BULK_ELEMENT_END'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = `${parts[2]} - ${parts[3]}`;
   }
 }
@@ -1547,6 +1718,7 @@ export class FlowBulkElementBeginLine extends DurationLogEvent {
 export class FlowBulkElementDetailLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[2] + ' : ' + parts[3] + ' : ' + parts[4];
   }
 }
@@ -1554,6 +1726,7 @@ export class FlowBulkElementDetailLine extends LogEvent {
 export class FlowBulkElementNotSupportedLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -1561,6 +1734,7 @@ export class FlowBulkElementNotSupportedLine extends LogEvent {
 export class FlowBulkElementLimitUsageLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[2] || '';
   }
 }
@@ -1624,12 +1798,14 @@ export class TestingLimitsLine extends LogEvent {
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.ApexProfiling;
   }
 }
 
 export class ValidationRuleLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Validation;
     this.text = parts[3] || '';
   }
 }
@@ -1638,6 +1814,7 @@ export class ValidationErrorLine extends LogEvent {
   acceptsText = true;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Validation;
     this.text = parts[2] || '';
   }
 }
@@ -1647,6 +1824,7 @@ export class ValidationFormulaLine extends LogEvent {
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Validation;
     const extra = parts.length > 3 ? ' ' + parts[3] : '';
 
     this.text = parts[2] + extra;
@@ -1656,6 +1834,7 @@ export class ValidationFormulaLine extends LogEvent {
 export class ValidationPassLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Validation;
     this.text = parts[3] || '';
   }
 }
@@ -1664,6 +1843,7 @@ export class WFFlowActionErrorLine extends LogEvent {
   acceptsText = true;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[1] + ' ' + parts[4];
   }
 }
@@ -1672,6 +1852,7 @@ export class WFFlowActionErrorDetailLine extends LogEvent {
   acceptsText = true;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[1] + ' ' + parts[2];
   }
 }
@@ -1680,14 +1861,28 @@ export class WFFieldUpdateLine extends DurationLogEvent {
   isExit = true;
   nextLineIsExit = true;
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_FIELD_UPDATE'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_FIELD_UPDATE'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = ' ' + parts[2] + ' ' + parts[3] + ' ' + parts[4] + ' ' + parts[5] + ' ' + parts[6];
   }
 }
 
 export class WFRuleEvalBeginLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_RULE_EVAL_END'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_RULE_EVAL_END'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = parts[2] || '';
   }
 }
@@ -1695,6 +1890,7 @@ export class WFRuleEvalBeginLine extends DurationLogEvent {
 export class WFRuleEvalValueLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[2] || '';
   }
 }
@@ -1704,13 +1900,21 @@ export class WFRuleFilterLine extends LogEvent {
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[2] || '';
   }
 }
 
 export class WFCriteriaBeginLine extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_CRITERIA_END', 'WF_RULE_NOT_EVALUATED'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_CRITERIA_END', 'WF_RULE_NOT_EVALUATED'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = 'WF_CRITERIA : ' + parts[5] + ' : ' + parts[3];
   }
 }
@@ -1721,7 +1925,14 @@ export class WFFormulaLine extends DurationLogEvent {
   nextLineIsExit = true;
 
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_FORMULA'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_FORMULA'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = parts[2] + ' : ' + parts[3];
   }
 }
@@ -1729,6 +1940,7 @@ export class WFFormulaLine extends DurationLogEvent {
 export class WFActionLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[2] || '';
   }
 }
@@ -1736,6 +1948,7 @@ export class WFActionLine extends LogEvent {
 export class WFActionsEndLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[2] || '';
   }
 }
@@ -1743,6 +1956,7 @@ export class WFActionsEndLine extends LogEvent {
 export class WFActionTaskLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]} : ${parts[6]} : ${parts[7]}`;
   }
 }
@@ -1751,7 +1965,14 @@ export class WFApprovalLine extends DurationLogEvent {
   isExit = true;
   nextLineIsExit = true;
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_APPROVAL'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_APPROVAL'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -1759,6 +1980,7 @@ export class WFApprovalLine extends DurationLogEvent {
 export class WFApprovalRemoveLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]}`;
   }
 }
@@ -1767,7 +1989,14 @@ export class WFApprovalSubmitLine extends DurationLogEvent {
   isExit = true;
   nextLineIsExit = true;
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_APPROVAL_SUBMIT'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_APPROVAL_SUBMIT'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = `${parts[2]}`;
   }
 }
@@ -1775,6 +2004,7 @@ export class WFApprovalSubmitLine extends DurationLogEvent {
 export class WFApprovalSubmitterLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -1782,6 +2012,7 @@ export class WFApprovalSubmitterLine extends LogEvent {
 export class WFAssignLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
@@ -1790,7 +2021,14 @@ export class WFEmailAlertLine extends DurationLogEvent {
   isExit = true;
   nextLineIsExit = true;
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_EMAIL_ALERT'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_EMAIL_ALERT'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -1799,7 +2037,14 @@ export class WFEmailSentLine extends DurationLogEvent {
   isExit = true;
   nextLineIsExit = true;
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_EMAIL_SENT'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_EMAIL_SENT'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -1807,6 +2052,7 @@ export class WFEmailSentLine extends DurationLogEvent {
 export class WFEnqueueActionsLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[2] || '';
   }
 }
@@ -1814,6 +2060,7 @@ export class WFEnqueueActionsLine extends LogEvent {
 export class WFEscalationActionLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
@@ -1822,7 +2069,14 @@ export class WFEvalEntryCriteriaLine extends DurationLogEvent {
   isExit = true;
   nextLineIsExit = true;
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_EVAL_ENTRY_CRITERIA'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_EVAL_ENTRY_CRITERIA'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -1830,6 +2084,7 @@ export class WFEvalEntryCriteriaLine extends DurationLogEvent {
 export class WFFlowActionDetailLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     const optional = parts[4] ? ` : ${parts[4]} :${parts[5]}` : '';
     this.text = `${parts[2]} : ${parts[3]}` + optional;
   }
@@ -1839,7 +2094,14 @@ export class WFNextApproverLine extends DurationLogEvent {
   isExit = true;
   nextLineIsExit = true;
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_NEXT_APPROVER'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_NEXT_APPROVER'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]}`;
   }
 }
@@ -1847,6 +2109,7 @@ export class WFNextApproverLine extends DurationLogEvent {
 export class WFOutboundMsgLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
@@ -1855,7 +2118,14 @@ export class WFProcessFoundLine extends DurationLogEvent {
   isExit = true;
   nextLineIsExit = true;
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_PROCESS_FOUND'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_PROCESS_FOUND'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
@@ -1864,7 +2134,14 @@ export class WFProcessNode extends DurationLogEvent {
   isExit = true;
   nextLineIsExit = true;
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_PROCESS_NODE'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_PROCESS_NODE'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = parts[2] || '';
   }
 }
@@ -1872,6 +2149,7 @@ export class WFProcessNode extends DurationLogEvent {
 export class WFReassignRecordLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]}`;
   }
 }
@@ -1879,6 +2157,7 @@ export class WFReassignRecordLine extends LogEvent {
 export class WFResponseNotifyLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
@@ -1886,6 +2165,7 @@ export class WFResponseNotifyLine extends LogEvent {
 export class WFRuleEntryOrderLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[2] || '';
   }
 }
@@ -1894,7 +2174,14 @@ export class WFRuleInvocationLine extends DurationLogEvent {
   isExit = true;
   nextLineIsExit = true;
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['WF_RULE_INVOCATION'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['WF_RULE_INVOCATION'],
+      LOG_CATEGORY.Automation,
+      'custom',
+      DEBUG_CATEGORY.Workflow,
+    );
     this.text = parts[2] || '';
   }
 }
@@ -1902,6 +2189,7 @@ export class WFRuleInvocationLine extends DurationLogEvent {
 export class WFSoftRejectLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[2] || '';
   }
 }
@@ -1909,6 +2197,7 @@ export class WFSoftRejectLine extends LogEvent {
 export class WFTimeTriggerLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = `${parts[2]} : ${parts[3]} : ${parts[4]} : ${parts[5]}`;
   }
 }
@@ -1916,6 +2205,7 @@ export class WFTimeTriggerLine extends LogEvent {
 export class WFSpoolActionBeginLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
+    this.debugCategory = DEBUG_CATEGORY.Workflow;
     this.text = parts[2] || '';
   }
 }
@@ -1990,7 +2280,14 @@ export class XDSResponseErrorLine extends LogEvent {
 // e.g. "09:45:31.888 (38889007737)|DUPLICATE_DETECTION_BEGIN"
 export class DuplicateDetectionBegin extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['DUPLICATE_DETECTION_END'], 'Workflow', 'custom');
+    super(
+      parser,
+      parts,
+      ['DUPLICATE_DETECTION_END'],
+      LOG_CATEGORY.System,
+      'custom',
+      DEBUG_CATEGORY.System,
+    );
   }
 }
 
@@ -2035,53 +2332,116 @@ export class DuplicateDetectionSummary extends LogEvent {
 
 export class SessionCachePutBegin extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['SESSION_CACHE_PUT_END'], 'Method', 'method');
+    super(
+      parser,
+      parts,
+      ['SESSION_CACHE_PUT_END'],
+      LOG_CATEGORY.Apex,
+      'method',
+      DEBUG_CATEGORY.ApexCode,
+    );
   }
 }
 export class SessionCacheGetBegin extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['SESSION_CACHE_GET_END'], 'Method', 'method');
+    super(
+      parser,
+      parts,
+      ['SESSION_CACHE_GET_END'],
+      LOG_CATEGORY.Apex,
+      'method',
+      DEBUG_CATEGORY.ApexCode,
+    );
   }
 }
 
 export class SessionCacheRemoveBegin extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['SESSION_CACHE_REMOVE_END'], 'Method', 'method');
+    super(
+      parser,
+      parts,
+      ['SESSION_CACHE_REMOVE_END'],
+      LOG_CATEGORY.Apex,
+      'method',
+      DEBUG_CATEGORY.ApexCode,
+    );
   }
 }
 
 export class OrgCachePutBegin extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['ORG_CACHE_PUT_END'], 'Method', 'method');
+    super(
+      parser,
+      parts,
+      ['ORG_CACHE_PUT_END'],
+      LOG_CATEGORY.Apex,
+      'method',
+      DEBUG_CATEGORY.ApexCode,
+    );
   }
 }
 
 export class OrgCacheGetBegin extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['ORG_CACHE_GET_END'], 'Method', 'method');
+    super(
+      parser,
+      parts,
+      ['ORG_CACHE_GET_END'],
+      LOG_CATEGORY.Apex,
+      'method',
+      DEBUG_CATEGORY.ApexCode,
+    );
   }
 }
 
 export class OrgCacheRemoveBegin extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['ORG_CACHE_REMOVE_END'], 'Method', 'method');
+    super(
+      parser,
+      parts,
+      ['ORG_CACHE_REMOVE_END'],
+      LOG_CATEGORY.Apex,
+      'method',
+      DEBUG_CATEGORY.ApexCode,
+    );
   }
 }
 
 export class VFSerializeContinuationStateBegin extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['VF_SERIALIZE_CONTINUATION_STATE_END'], 'Method', 'method');
+    super(
+      parser,
+      parts,
+      ['VF_SERIALIZE_CONTINUATION_STATE_END'],
+      LOG_CATEGORY.Apex,
+      'method',
+      DEBUG_CATEGORY.ApexCode,
+    );
   }
 }
 
 export class VFDeserializeContinuationStateBegin extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['VF_SERIALIZE_CONTINUATION_STATE_END'], 'Method', 'method');
+    super(
+      parser,
+      parts,
+      ['VF_SERIALIZE_CONTINUATION_STATE_END'],
+      LOG_CATEGORY.Apex,
+      'method',
+      DEBUG_CATEGORY.ApexCode,
+    );
   }
 }
 
 export class MatchEngineBegin extends DurationLogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
-    super(parser, parts, ['MATCH_ENGINE_END'], 'Method', 'method');
+    super(
+      parser,
+      parts,
+      ['MATCH_ENGINE_END'],
+      LOG_CATEGORY.System,
+      'method',
+      DEBUG_CATEGORY.System,
+    );
   }
 }

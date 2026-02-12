@@ -24,13 +24,14 @@ import './TimelineSkeleton.js';
 /* eslint-disable @typescript-eslint/naming-convention */
 interface ThemeSettings {
   [key: string]: {
+    apex: string;
     codeUnit: string;
-    workflow: string;
-    method: string;
-    flow: string;
+    system: string;
+    automation: string;
     dml: string;
     soql: string;
-    system: string;
+    callout: string;
+    validation: string;
   };
 }
 /* eslint-enable @typescript-eslint/naming-convention */
@@ -124,13 +125,14 @@ export class TimelineView extends LitElement {
     const themes: { [key: string]: TimelineColors } = {};
     for (const [name, colors] of Object.entries(themeSettings)) {
       themes[name] = {
+        apex: colors.apex,
         codeUnit: colors.codeUnit,
-        workflow: colors.workflow,
-        method: colors.method,
-        flow: colors.flow,
+        system: colors.system,
+        automation: colors.automation,
         dml: colors.dml,
         soql: colors.soql,
-        system: colors.system,
+        callout: colors.callout,
+        validation: colors.validation,
       };
     }
     return themes;
@@ -139,20 +141,20 @@ export class TimelineView extends LitElement {
   private toTimelineKeys(colors: TimelineColors): TimelineGroup[] {
     return [
       {
+        label: 'Apex',
+        fillColor: colors.apex,
+      },
+      {
         label: 'Code Unit',
         fillColor: colors.codeUnit,
       },
       {
-        label: 'Workflow',
-        fillColor: colors.workflow,
+        label: 'System',
+        fillColor: colors.system,
       },
       {
-        label: 'Method',
-        fillColor: colors.method,
-      },
-      {
-        label: 'Flow',
-        fillColor: colors.flow,
+        label: 'Automation',
+        fillColor: colors.automation,
       },
       {
         label: 'DML',
@@ -163,9 +165,14 @@ export class TimelineView extends LitElement {
         fillColor: colors.soql,
       },
       {
-        label: 'System Method',
-        fillColor: colors.system,
+        label: 'Callout',
+        fillColor: colors.callout,
       },
+      //NOTE: add back once the parser is updated to include validation events
+      // {
+      //   label: 'Validation',
+      //   fillColor: colors.validation,
+      // },
     ];
   }
 }

@@ -165,7 +165,7 @@ export class HitTestManager {
       id: `${logEvent.timestamp}-${depth}`,
       timestamp: logEvent.timestamp,
       duration: logEvent.duration?.total ?? 0,
-      type: logEvent.type ?? logEvent.subCategory ?? 'UNKNOWN',
+      type: logEvent.type ?? logEvent.category ?? 'UNKNOWN',
       text: logEvent.text,
       original: logEvent,
     };
@@ -288,7 +288,7 @@ export class HitTestManager {
     let bestDuration = -1;
 
     for (const event of events) {
-      const priority = priorityMap.get(event.subCategory) ?? Infinity;
+      const priority = priorityMap.get(event.category) ?? Infinity;
       const duration = event.duration?.total ?? 0;
 
       // Priority wins first (lower index = higher priority)

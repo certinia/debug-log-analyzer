@@ -348,7 +348,7 @@ export class TimelineTooltipManager {
         '',
         event.text + (event.suffix ?? ''),
         rows,
-        this.options.categoryColors[event.subCategory] || '',
+        this.options.categoryColors[event.category] || '',
       );
     }
 

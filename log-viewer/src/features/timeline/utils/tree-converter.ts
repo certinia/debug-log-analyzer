@@ -126,7 +126,7 @@ function convertEventsRecursive(
         id,
         timestamp: event.timestamp,
         duration: duration,
-        type: event.type ?? event.subCategory ?? 'UNKNOWN',
+        type: event.type ?? event.category ?? 'UNKNOWN',
         text: event.text,
         original: event,
       },
@@ -302,7 +302,7 @@ export function logEventToTreeAndRects(
           id,
           timestamp: event.timestamp,
           duration: duration,
-          type: event.type ?? event.subCategory ?? 'UNKNOWN',
+          type: event.type ?? event.category ?? 'UNKNOWN',
           text: event.text,
           original: event,
         },
@@ -311,9 +311,9 @@ export function logEventToTreeAndRects(
       };
 
       // Create PrecomputedRect if event has a valid category
-      const subCategory = event.subCategory;
-      if (subCategory) {
-        const rects = rectsByCategory.get(subCategory);
+      const category = event.category;
+      if (category) {
+        const rects = rectsByCategory.get(category);
         if (rects) {
           const rect: PrecomputedRect = {
             id,
@@ -322,7 +322,7 @@ export function logEventToTreeAndRects(
             depth,
             duration,
             selfDuration: event.duration.self,
-            category: subCategory,
+            category,
             eventRef: event,
             x: 0,
             y: depth * eventHeight,

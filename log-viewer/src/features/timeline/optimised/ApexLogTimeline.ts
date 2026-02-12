@@ -26,16 +26,17 @@ import { findEventByTimestamp } from '../../../core/utility/EventSearch.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
 import { getTheme } from '../themes/ThemeSelector.js';
-import type {
-  EventNode,
-  FindEventDetail,
-  FindResultsEventDetail,
-  HeatStripMetric,
-  HeatStripTimeSeries,
-  ModifierKeys,
-  TimelineMarker,
-  TimelineOptions,
-  ViewportState,
+import {
+  BUCKET_CONSTANTS,
+  type EventNode,
+  type FindEventDetail,
+  type FindResultsEventDetail,
+  type HeatStripMetric,
+  type HeatStripTimeSeries,
+  type ModifierKeys,
+  type TimelineMarker,
+  type TimelineOptions,
+  type ViewportState,
 } from '../types/flamechart.types.js';
 import type { SearchCursor } from '../types/search.types.js';
 import { extractMarkers } from '../utils/marker-utils.js';
@@ -123,16 +124,8 @@ export class ApexLogTimeline {
     const markers = extractMarkers(this.apexLog);
     this.events = this.extractEvents();
 
-    // Define categories for rectangle indexing (matches FlameChart batch categories)
-    const categories = new Set([
-      'Code Unit',
-      'Workflow',
-      'Method',
-      'Flow',
-      'DML',
-      'SOQL',
-      'System Method',
-    ]);
+    // Derive categories from shared constant (ensures compile-time sync with color map)
+    const categories = new Set<string>(BUCKET_CONSTANTS.CATEGORY_PRIORITY);
 
     // Single-pass unified conversion: builds TreeNodes, navigation maps,
     // PrecomputedRects, maxDepth, and totalDuration in one O(n) traversal.
@@ -255,7 +248,7 @@ export class ApexLogTimeline {
       id: `${result.event.timestamp}-${result.depth}`,
       timestamp: result.event.timestamp,
       duration: result.event.duration.total,
-      type: result.event.type ?? result.event.subCategory ?? 'UNKNOWN',
+      type: result.event.type ?? result.event.category ?? 'UNKNOWN',
       text: result.event.text,
       original: result.event,
     };
@@ -337,13 +330,14 @@ export class ApexLogTimeline {
     // Convert TimelineColors keys to the format expected by FlameChart
     /* eslint-disable @typescript-eslint/naming-convention */
     return {
+      Apex: theme.apex,
       'Code Unit': theme.codeUnit,
-      Workflow: theme.workflow,
-      Method: theme.method,
-      Flow: theme.flow,
+      System: theme.system,
+      Automation: theme.automation,
       DML: theme.dml,
       SOQL: theme.soql,
-      'System Method': theme.system,
+      Callout: theme.callout,
+      Validation: theme.validation,
     };
     /* eslint-enable @typescript-eslint/naming-convention */
   }

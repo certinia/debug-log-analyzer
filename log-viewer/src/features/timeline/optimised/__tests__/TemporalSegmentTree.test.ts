@@ -2,7 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent, LogSubCategory } from 'apex-log-parser';
+import type { LogCategory, LogEvent } from 'apex-log-parser';
 import type { PixelBucket, ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import { legacyCullRectangles } from '../LegacyViewportCuller.js';
@@ -20,14 +20,14 @@ import { TemporalSegmentTree } from '../TemporalSegmentTree.js';
 function createEvent(
   timestamp: number,
   duration: number,
-  category: LogSubCategory,
+  category: LogCategory,
   children?: LogEvent[],
 ): LogEvent {
   return {
     timestamp,
     exitStamp: timestamp + duration,
     duration: { total: duration, self: duration, netSelf: duration },
-    subCategory: category,
+    category,
     type: 'METHOD_ENTRY',
     text: `Event at ${timestamp}`,
     children: children ?? [],
@@ -71,19 +71,20 @@ function countBuckets(bucketsMap: Map<string, unknown[]>): number {
 
 describe('TemporalSegmentTree', () => {
   const categories = new Set([
-    'Method',
-    'SOQL',
-    'DML',
+    'Apex',
     'Code Unit',
-    'System Method',
-    'Flow',
-    'Workflow',
+    'System',
+    'Automation',
+    'DML',
+    'SOQL',
+    'Callout',
+    'Validation',
   ]);
 
   describe('tree building', () => {
     it('should build tree from rectangles', () => {
       const events = [
-        createEvent(0, 10, 'Method'),
+        createEvent(0, 10, 'Apex'),
         createEvent(20, 10, 'SOQL'),
         createEvent(40, 10, 'DML'),
       ];
@@ -95,7 +96,7 @@ describe('TemporalSegmentTree', () => {
 
     it('should handle events at multiple depths', () => {
       const events = [
-        createEvent(0, 100, 'Method', [createEvent(10, 30, 'SOQL'), createEvent(50, 30, 'DML')]),
+        createEvent(0, 100, 'Apex', [createEvent(10, 30, 'SOQL'), createEvent(50, 30, 'DML')]),
       ];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
@@ -114,21 +115,21 @@ describe('TemporalSegmentTree', () => {
   describe('query - display density principle', () => {
     it('should return visible rects for events > threshold', () => {
       // Event with duration 10ns at zoom=1 gives 10px width (> 2px threshold)
-      const events = [createEvent(0, 10, 'Method')];
+      const events = [createEvent(0, 10, 'Apex')];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       const viewport = createViewport(1, 0, 0);
       const result = tree.query(viewport);
 
-      expect(result.visibleRects.get('Method')).toHaveLength(1);
+      expect(result.visibleRects.get('Apex')).toHaveLength(1);
       expect(countBuckets(result.buckets)).toBe(0);
       expect(result.stats.visibleCount).toBe(1);
     });
 
     it('should return buckets for events <= threshold', () => {
       // Event with duration 1ns at zoom=1 gives 1px width (<= 2px threshold)
-      const events = [createEvent(0, 1, 'Method')];
+      const events = [createEvent(0, 1, 'Apex')];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
@@ -136,7 +137,7 @@ describe('TemporalSegmentTree', () => {
       const result = tree.query(viewport);
 
       // Pre-initialized map has empty arrays for known categories
-      expect(result.visibleRects.get('Method')).toHaveLength(0);
+      expect(result.visibleRects.get('Apex')).toHaveLength(0);
       expect(countBuckets(result.buckets)).toBe(1);
       expect(result.stats.bucketedEventCount).toBe(1);
     });
@@ -144,7 +145,7 @@ describe('TemporalSegmentTree', () => {
     it('should aggregate multiple small events into buckets', () => {
       // Multiple small events at zoom=0.1 (threshold = 20ns)
       const events = [
-        createEvent(0, 5, 'Method'),
+        createEvent(0, 5, 'Apex'),
         createEvent(10, 5, 'SOQL'),
         createEvent(20, 5, 'DML'),
       ];
@@ -162,10 +163,10 @@ describe('TemporalSegmentTree', () => {
   describe('zoom level transitions', () => {
     it('should return more detail when zoomed in', () => {
       const events = [
-        createEvent(0, 5, 'Method'),
+        createEvent(0, 5, 'Apex'),
         createEvent(10, 5, 'SOQL'),
         createEvent(20, 5, 'DML'),
-        createEvent(30, 5, 'Method'),
+        createEvent(30, 5, 'Apex'),
       ];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
@@ -184,7 +185,7 @@ describe('TemporalSegmentTree', () => {
 
     it('should maintain total event count across zoom levels', () => {
       const events = [
-        createEvent(0, 5, 'Method'),
+        createEvent(0, 5, 'Apex'),
         createEvent(10, 5, 'SOQL'),
         createEvent(20, 5, 'DML'),
       ];
@@ -213,7 +214,7 @@ describe('TemporalSegmentTree', () => {
   describe('viewport culling', () => {
     it('should exclude events outside time bounds', () => {
       const events = [
-        createEvent(0, 10, 'Method'),
+        createEvent(0, 10, 'Apex'),
         createEvent(100, 10, 'SOQL'),
         createEvent(200, 10, 'DML'),
       ];
@@ -231,7 +232,7 @@ describe('TemporalSegmentTree', () => {
 
     it('should exclude events outside depth bounds', () => {
       const events = [
-        createEvent(0, 100, 'Method', [createEvent(10, 80, 'SOQL', [createEvent(20, 60, 'DML')])]),
+        createEvent(0, 100, 'Apex', [createEvent(10, 80, 'SOQL', [createEvent(20, 60, 'DML')])]),
       ];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
@@ -286,9 +287,9 @@ describe('TemporalSegmentTree', () => {
     it('should include event count in bucket', () => {
       // Multiple events that will be aggregated
       const events = [
-        createEvent(0, 1, 'Method'),
-        createEvent(1, 1, 'Method'),
-        createEvent(2, 1, 'Method'),
+        createEvent(0, 1, 'Apex'),
+        createEvent(1, 1, 'Apex'),
+        createEvent(2, 1, 'Apex'),
       ];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
@@ -301,7 +302,7 @@ describe('TemporalSegmentTree', () => {
     });
 
     it('should include category stats for tooltips', () => {
-      const events = [createEvent(0, 1, 'Method'), createEvent(1, 1, 'SOQL')];
+      const events = [createEvent(0, 1, 'Apex'), createEvent(1, 1, 'SOQL')];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
@@ -319,10 +320,10 @@ describe('TemporalSegmentTree', () => {
   describe('integration with RectangleManager', () => {
     it('should produce same event count as legacy implementation', () => {
       const events = [
-        createEvent(0, 10, 'Method'),
+        createEvent(0, 10, 'Apex'),
         createEvent(20, 5, 'SOQL'),
         createEvent(30, 3, 'DML'),
-        createEvent(40, 1, 'Method'),
+        createEvent(40, 1, 'Apex'),
       ];
 
       // Both implementations now use segment tree (legacy is in LegacyViewportCuller)
@@ -350,7 +351,7 @@ describe('TemporalSegmentTree', () => {
       // Child B: timeStart=50, timeEnd=60 (short event, ends before A)
       // Query for time range [70, 90] should return Child A
       const events = [
-        createEvent(0, 100, 'Method'), // timeStart=0, timeEnd=100
+        createEvent(0, 100, 'Apex'), // timeStart=0, timeEnd=100
         createEvent(50, 10, 'SOQL'), // timeStart=50, timeEnd=60
       ];
       const manager = new RectangleManager(events, categories);
@@ -366,16 +367,16 @@ describe('TemporalSegmentTree', () => {
       // and overlaps with query range [70, 90]
       const totalEvents = result.stats.visibleCount + result.stats.bucketedEventCount;
       expect(totalEvents).toBe(1);
-      expect(result.visibleRects.get('Method')?.length).toBe(1);
+      expect(result.visibleRects.get('Apex')?.length).toBe(1);
     });
 
     it('should correctly compute branch timeEnd as max of all children', () => {
       // Multiple events with varying durations to test max computation
       const events = [
-        createEvent(0, 50, 'Method'), // timeEnd=50
+        createEvent(0, 50, 'Apex'), // timeEnd=50
         createEvent(10, 100, 'SOQL'), // timeEnd=110 (longest)
         createEvent(20, 30, 'DML'), // timeEnd=50
-        createEvent(30, 20, 'Method'), // timeEnd=50
+        createEvent(30, 20, 'Apex'), // timeEnd=50
       ];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
@@ -392,7 +393,7 @@ describe('TemporalSegmentTree', () => {
     it('should find events via queryEventsInRegion with correct branch bounds', () => {
       // Same scenario but using queryEventsInRegion for hit testing
       const events = [
-        createEvent(0, 100, 'Method'), // timeStart=0, timeEnd=100
+        createEvent(0, 100, 'Apex'), // timeStart=0, timeEnd=100
         createEvent(50, 10, 'SOQL'), // timeStart=50, timeEnd=60
       ];
       const manager = new RectangleManager(events, categories);
@@ -402,14 +403,14 @@ describe('TemporalSegmentTree', () => {
       const eventsInRegion = tree.queryEventsInRegion(70, 90, 0, 0);
 
       expect(eventsInRegion).toHaveLength(1);
-      expect(eventsInRegion[0]?.subCategory).toBe('Method');
+      expect(eventsInRegion[0]?.category).toBe('Apex');
     });
   });
 
   describe('fill ratio and brightness', () => {
     it('should calculate fill ratio for buckets', () => {
       // Single short event in a wider time span = low fill ratio
-      const events = [createEvent(0, 1, 'Method')];
+      const events = [createEvent(0, 1, 'Apex')];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
@@ -424,7 +425,7 @@ describe('TemporalSegmentTree', () => {
 
     it('should use full brightness for single-event buckets (optimization)', () => {
       // Single event bucket should have full brightness (eventCount === 1)
-      const events = [createEvent(0, 1, 'Method')];
+      const events = [createEvent(0, 1, 'Apex')];
       const manager = new RectangleManager(events, categories);
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 

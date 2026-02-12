@@ -32,11 +32,10 @@ describe('SearchHighlightRenderer', () => {
         total: duration,
         exclusive: duration,
       },
-      subCategory: 'Method',
+      category: 'Apex',
       children: [],
       text: 'Test Event',
       lineNumber: 0,
-      category: 'Method',
     } as unknown as LogEvent;
     return event;
   };
@@ -52,7 +51,7 @@ describe('SearchHighlightRenderer', () => {
       id: `${timestamp}-${depth}-0`,
       timestamp,
       duration,
-      type: 'Method',
+      type: 'Apex',
       text: 'Test Event',
     };
     const rect: PrecomputedRect = {
@@ -67,7 +66,7 @@ describe('SearchHighlightRenderer', () => {
       depth,
       duration,
       selfDuration: duration,
-      category: 'Method',
+      category: 'Apex',
     };
     return {
       event: eventNode,

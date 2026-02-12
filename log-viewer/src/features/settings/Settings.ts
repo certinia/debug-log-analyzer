@@ -8,23 +8,23 @@ export type LanaSettings = {
   timeline: {
     activeTheme: string;
     colors: {
-      'Code Unit': '#88AE58';
-      Workflow: '#51A16E';
-      Method: '#2B8F81';
-      Flow: '#5C8FA6';
-      DML: '#B06868';
-      SOQL: '#6D4C7D';
-      'System Method': '#8D6E63';
+      Method: string;
+      'Code Unit': string;
+      'System Method': string;
+      Workflow: string;
+      DML: string;
+      SOQL: string;
     };
     customThemes: {
       [key: string]: {
+        apex: string;
         codeUnit: string;
-        workflow: string;
-        method: string;
-        flow: string;
+        system: string;
+        automation: string;
         dml: string;
         soql: string;
-        system: string;
+        callout: string;
+        validation: string;
       };
     };
     legacy: boolean;

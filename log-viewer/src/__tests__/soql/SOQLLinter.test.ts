@@ -7,7 +7,7 @@ import { SOQLLinter } from '../../features/soql/services/SOQLLinter.js';
 class DummySOQLLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
-    this.subCategory = 'Code Unit';
+    this.category = 'Code Unit';
     this.cpuType = 'method';
     this.exitTypes = ['CODE_UNIT_FINISHED'];
   }

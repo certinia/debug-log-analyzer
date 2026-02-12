@@ -12,7 +12,7 @@
  * - Hierarchical rectangle collection
  */
 
-import type { LogEvent, LogSubCategory } from 'apex-log-parser';
+import type { LogCategory, LogEvent } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
 import { EventBatchRenderer } from '../optimised/EventBatchRenderer.js';
 import { RectangleManager } from '../optimised/RectangleManager.js';
@@ -31,7 +31,7 @@ describe('EventBatchRenderer', () => {
   function createEvent(
     timestamp: number,
     duration: number,
-    subCategory: LogSubCategory,
+    category: LogCategory,
     children: LogEvent[] = [],
   ): LogEvent {
     return {
@@ -41,11 +41,10 @@ describe('EventBatchRenderer', () => {
         total: duration,
         exclusive: duration,
       },
-      subCategory,
       children,
-      text: `${subCategory} at ${timestamp}`,
+      text: `${category} at ${timestamp}`,
       lineNumber: 0,
-      category: subCategory,
+      category,
     } as unknown as LogEvent;
   }
 
@@ -86,9 +85,9 @@ describe('EventBatchRenderer', () => {
     // Create batches for common categories
     batches = new Map([
       [
-        'Method',
+        'Apex',
         {
-          category: 'Method',
+          category: 'Apex',
           color: 0x88ae58,
           rectangles: [],
           isDirty: false,
@@ -139,50 +138,50 @@ describe('EventBatchRenderer', () => {
   });
 
   describe('batching by category', () => {
-    it('should group events by subCategory', () => {
+    it('should group events by category', () => {
       const events = [
-        createEvent(0, 100, 'Method'),
+        createEvent(0, 100, 'Apex'),
         createEvent(200, 100, 'SOQL'),
-        createEvent(400, 100, 'Method'),
+        createEvent(400, 100, 'Apex'),
       ];
 
       const viewport = createViewport();
       setupAndRender(events, viewport);
 
-      const methodBatch = batches.get('Method');
+      const apexBatch = batches.get('Apex');
       const soqlBatch = batches.get('SOQL');
 
-      expect(methodBatch?.rectangles).toHaveLength(2);
+      expect(apexBatch?.rectangles).toHaveLength(2);
       expect(soqlBatch?.rectangles).toHaveLength(1);
     });
 
     it('should separate nested events into correct batches', () => {
       const child = createEvent(50, 20, 'SOQL');
-      const parent = createEvent(0, 100, 'Method', [child]);
+      const parent = createEvent(0, 100, 'Apex', [child]);
       const events = [parent];
 
       const viewport = createViewport();
       setupAndRender(events, viewport);
 
-      const methodBatch = batches.get('Method')!;
+      const apexBatch = batches.get('Apex')!;
       const soqlBatch = batches.get('SOQL')!;
 
-      expect(methodBatch.rectangles).toHaveLength(1);
+      expect(apexBatch.rectangles).toHaveLength(1);
       expect(soqlBatch.rectangles).toHaveLength(1);
     });
 
     it('should ignore events with unknown categories', () => {
       const events = [
-        createEvent(0, 100, 'Method'),
-        createEvent(200, 100, 'UnknownCategory' as LogSubCategory),
+        createEvent(0, 100, 'Apex'),
+        createEvent(200, 100, 'UnknownCategory' as LogCategory),
       ];
 
       const viewport = createViewport();
       setupAndRender(events, viewport);
 
-      const methodBatch = batches.get('Method');
+      const apexBatch = batches.get('Apex');
 
-      expect(methodBatch?.rectangles).toHaveLength(1);
+      expect(apexBatch?.rectangles).toHaveLength(1);
       expect(batches.get('UnknownCategory')).toBeUndefined();
     });
   });
@@ -190,56 +189,56 @@ describe('EventBatchRenderer', () => {
   describe('horizontal culling (time-based)', () => {
     it('should render events within viewport time range', () => {
       const events = [
-        createEvent(0, 100, 'Method'),
-        createEvent(200, 100, 'Method'),
-        createEvent(400, 100, 'Method'),
+        createEvent(0, 100, 'Apex'),
+        createEvent(200, 100, 'Apex'),
+        createEvent(400, 100, 'Apex'),
       ];
 
       const viewport = createViewport(1, 0, 0);
       setupAndRender(events, viewport);
 
-      const methodBatch = batches.get('Method');
-      expect(methodBatch?.rectangles).toHaveLength(3);
+      const apexBatch = batches.get('Apex');
+      expect(apexBatch?.rectangles).toHaveLength(3);
     });
 
     it('should cull events before viewport', () => {
-      const events = [createEvent(0, 100, 'Method'), createEvent(200, 100, 'Method')];
+      const events = [createEvent(0, 100, 'Apex'), createEvent(200, 100, 'Apex')];
 
       const viewport = createViewport(1, 150, 0);
       setupAndRender(events, viewport);
 
-      const methodBatch = batches.get('Method');
+      const apexBatch = batches.get('Apex');
       // First event should be culled, second should be visible
-      expect(methodBatch?.rectangles).toHaveLength(1);
-      expect(methodBatch?.rectangles[0]?.eventRef.timestamp).toBe(200);
+      expect(apexBatch?.rectangles).toHaveLength(1);
+      expect(apexBatch?.rectangles[0]?.eventRef.timestamp).toBe(200);
     });
 
     it('should cull events after viewport', () => {
       const events = [
-        createEvent(0, 100, 'Method'),
-        createEvent(1200, 100, 'Method'), // Starts after viewport end
+        createEvent(0, 100, 'Apex'),
+        createEvent(1200, 100, 'Apex'), // Starts after viewport end
       ];
 
       const viewport = createViewport(1, 0, 0, 1000);
       setupAndRender(events, viewport);
 
-      const methodBatch = batches.get('Method');
+      const apexBatch = batches.get('Apex');
       // Second event should be culled
-      expect(methodBatch?.rectangles).toHaveLength(1);
-      expect(methodBatch?.rectangles[0]?.eventRef.timestamp).toBe(0);
+      expect(apexBatch?.rectangles).toHaveLength(1);
+      expect(apexBatch?.rectangles[0]?.eventRef.timestamp).toBe(0);
     });
 
     it('should include partially visible events', () => {
       const events = [
-        createEvent(50, 200, 'Method'), // Spans 50-250, viewport is 0-200
+        createEvent(50, 200, 'Apex'), // Spans 50-250, viewport is 0-200
       ];
 
       const viewport = createViewport(1, 0, 0, 200);
       setupAndRender(events, viewport);
 
-      const methodBatch = batches.get('Method');
+      const apexBatch = batches.get('Apex');
       // Should be included even though only partially visible
-      expect(methodBatch?.rectangles).toHaveLength(1);
+      expect(apexBatch?.rectangles).toHaveLength(1);
     });
   });
 
@@ -247,14 +246,14 @@ describe('EventBatchRenderer', () => {
     it('should render events within viewport depth range', () => {
       const level2 = createEvent(60, 10, 'DML');
       const level1 = createEvent(50, 30, 'SOQL', [level2]);
-      const level0 = createEvent(0, 100, 'Method', [level1]);
+      const level0 = createEvent(0, 100, 'Apex', [level1]);
       const events = [level0];
 
       const viewport = createViewport();
       setupAndRender(events, viewport);
 
       // All three events should be visible
-      expect(batches.get('Method')?.rectangles).toHaveLength(1);
+      expect(batches.get('Apex')?.rectangles).toHaveLength(1);
       expect(batches.get('SOQL')?.rectangles).toHaveLength(1);
       expect(batches.get('DML')?.rectangles).toHaveLength(1);
     });
@@ -262,7 +261,7 @@ describe('EventBatchRenderer', () => {
     it('should cull events below viewport', () => {
       const level2 = createEvent(60, 10, 'DML');
       const level1 = createEvent(50, 30, 'SOQL', [level2]);
-      const level0 = createEvent(0, 100, 'Method', [level1]);
+      const level0 = createEvent(0, 100, 'Apex', [level1]);
       const events = [level0];
 
       // Pan down so only depth 2+ is visible
@@ -271,13 +270,13 @@ describe('EventBatchRenderer', () => {
       setupAndRender(events, viewport);
 
       // Level 0 and 1 should be culled (depths < depthStart), level 2 should be visible
-      const methodBatch = batches.get('Method');
+      const apexBatch = batches.get('Apex');
       const soqlBatch = batches.get('SOQL');
       const dmlBatch = batches.get('DML');
 
       // With the new implementation, events are pre-computed, so only depth filtering applies
       // Depth 0 and 1 are culled, but depth 2 (DML) might still be visible
-      expect(methodBatch?.rectangles.length).toBeLessThanOrEqual(1);
+      expect(apexBatch?.rectangles.length).toBeLessThanOrEqual(1);
       expect(soqlBatch?.rectangles.length).toBeLessThanOrEqual(1);
       // Depth 2 might be visible since it's in the viewport
       expect(dmlBatch?.rectangles.length).toBeGreaterThanOrEqual(0);
@@ -286,7 +285,7 @@ describe('EventBatchRenderer', () => {
     it('should cull events above viewport', () => {
       const level2 = createEvent(60, 10, 'DML');
       const level1 = createEvent(50, 30, 'SOQL', [level2]);
-      const level0 = createEvent(0, 100, 'Method', [level1]);
+      const level0 = createEvent(0, 100, 'Apex', [level1]);
       const events = [level0];
 
       // Viewport showing depths 0 and 1, but not 2
@@ -301,7 +300,7 @@ describe('EventBatchRenderer', () => {
       // But depth 2 is not (2 > 1)
       // However, since level 1 (SOQL) is visible and has children,
       // those children will be checked. Level 2 (DML) at depth 2 should be culled.
-      expect(batches.get('Method')?.rectangles).toHaveLength(1);
+      expect(batches.get('Apex')?.rectangles).toHaveLength(1);
       expect(batches.get('SOQL')?.rectangles).toHaveLength(1);
       expect(batches.get('DML')?.rectangles).toHaveLength(0);
     });
@@ -310,39 +309,39 @@ describe('EventBatchRenderer', () => {
   describe('minimum size filtering', () => {
     it('should cull events smaller than minimum size', () => {
       const events = [
-        createEvent(0, 0.01, 'Method'), // Very small duration
+        createEvent(0, 0.01, 'Apex'), // Very small duration
       ];
 
       // At zoom=1, event width = 0.01px (< MIN_RECT_SIZE = 0.05)
       const viewport = createViewport(1, 0, 0);
       setupAndRender(events, viewport);
 
-      const methodBatch = batches.get('Method');
-      expect(methodBatch?.rectangles).toHaveLength(0);
+      const apexBatch = batches.get('Apex');
+      expect(apexBatch?.rectangles).toHaveLength(0);
     });
 
     it('should render events that meet minimum size threshold', () => {
       const events = [
-        createEvent(0, 3, 'Method'), // Width = 3px at zoom=1 (> MIN_RECT_SIZE = 2px)
+        createEvent(0, 3, 'Apex'), // Width = 3px at zoom=1 (> MIN_RECT_SIZE = 2px)
       ];
 
       const viewport = createViewport(1, 0, 0);
       setupAndRender(events, viewport);
 
-      const methodBatch = batches.get('Method');
-      expect(methodBatch?.rectangles).toHaveLength(1);
+      const apexBatch = batches.get('Apex');
+      expect(apexBatch?.rectangles).toHaveLength(1);
     });
 
     it('should render small events when zoomed in', () => {
       const events = [
-        createEvent(0, 1, 'Method'), // 1ns duration
+        createEvent(0, 1, 'Apex'), // 1ns duration
       ];
 
       const viewport = createViewport(10, 0, 0);
       setupAndRender(events, viewport);
 
-      const methodBatch = batches.get('Method');
-      expect(methodBatch?.rectangles).toHaveLength(1);
+      const apexBatch = batches.get('Apex');
+      expect(apexBatch?.rectangles).toHaveLength(1);
     });
   });
 
@@ -350,13 +349,13 @@ describe('EventBatchRenderer', () => {
     it('should collect rectangles at correct depths', () => {
       const level2 = createEvent(60, 10, 'DML');
       const level1 = createEvent(50, 30, 'SOQL', [level2]);
-      const level0 = createEvent(0, 100, 'Method', [level1]);
+      const level0 = createEvent(0, 100, 'Apex', [level1]);
       const events = [level0];
 
       const viewport = createViewport();
       setupAndRender(events, viewport);
 
-      const methodRect = batches.get('Method')?.rectangles[0];
+      const methodRect = batches.get('Apex')?.rectangles[0];
       const soqlRect = batches.get('SOQL')?.rectangles[0];
       const dmlRect = batches.get('DML')?.rectangles[0];
 
@@ -369,7 +368,7 @@ describe('EventBatchRenderer', () => {
 
     it('should skip children if parent is not visible', () => {
       const child = createEvent(2000, 100, 'SOQL');
-      const parent = createEvent(1500, 600, 'Method', [child]);
+      const parent = createEvent(1500, 600, 'Apex', [child]);
       const events = [parent];
 
       // Viewport shows time 0-1000, parent starts at 1500
@@ -377,13 +376,13 @@ describe('EventBatchRenderer', () => {
       setupAndRender(events, viewport);
 
       // Both parent and child should be culled
-      expect(batches.get('Method')?.rectangles).toHaveLength(0);
+      expect(batches.get('Apex')?.rectangles).toHaveLength(0);
       expect(batches.get('SOQL')?.rectangles).toHaveLength(0);
     });
 
     it('should process children even if parent is partially visible', () => {
       const child = createEvent(500, 100, 'SOQL');
-      const parent = createEvent(400, 300, 'Method', [child]);
+      const parent = createEvent(400, 300, 'Apex', [child]);
       const events = [parent];
 
       // Viewport shows time 0-600, parent extends to 700
@@ -391,20 +390,20 @@ describe('EventBatchRenderer', () => {
       setupAndRender(events, viewport);
 
       // Both should be visible
-      expect(batches.get('Method')?.rectangles).toHaveLength(1);
+      expect(batches.get('Apex')?.rectangles).toHaveLength(1);
       expect(batches.get('SOQL')?.rectangles).toHaveLength(1);
     });
   });
 
   describe('rectangle calculations', () => {
     it('should calculate correct rectangle positions with zoom', () => {
-      const events = [createEvent(100, 50, 'Method')];
+      const events = [createEvent(100, 50, 'Apex')];
 
       const viewport = createViewport(2, 0, 0); // 2x zoom
 
       setupAndRender(events, viewport);
 
-      const rect = batches.get('Method')?.rectangles[0];
+      const rect = batches.get('Apex')?.rectangles[0];
 
       // At 2x zoom: x = 100 * 2 = 200, width = 50 * 2 = 100
       expect(rect?.x).toBe(200);
@@ -412,24 +411,24 @@ describe('EventBatchRenderer', () => {
     });
 
     it('should calculate correct rectangle height', () => {
-      const events = [createEvent(0, 100, 'Method')];
+      const events = [createEvent(0, 100, 'Apex')];
 
       const viewport = createViewport();
       setupAndRender(events, viewport);
 
-      const rect = batches.get('Method')?.rectangles[0];
+      const rect = batches.get('Apex')?.rectangles[0];
 
       expect(rect?.height).toBe(TIMELINE_CONSTANTS.EVENT_HEIGHT);
     });
 
     it('should preserve event reference in rectangle', () => {
-      const event = createEvent(0, 100, 'Method');
+      const event = createEvent(0, 100, 'Apex');
       const events = [event];
 
       const viewport = createViewport();
       setupAndRender(events, viewport);
 
-      const rect = batches.get('Method')?.rectangles[0];
+      const rect = batches.get('Apex')?.rectangles[0];
 
       expect(rect?.eventRef).toBe(event);
     });
@@ -437,28 +436,28 @@ describe('EventBatchRenderer', () => {
 
   describe('dirty flag management', () => {
     it('should mark batches as dirty during render', () => {
-      const events = [createEvent(0, 100, 'Method')];
+      const events = [createEvent(0, 100, 'Apex')];
 
       const viewport = createViewport();
       setupAndRender(events, viewport);
 
       // After render, dirty flags should be cleared
-      expect(batches.get('Method')?.isDirty).toBe(false);
+      expect(batches.get('Apex')?.isDirty).toBe(false);
     });
 
     it('should clear rectangles on each render', () => {
-      const events = [createEvent(0, 100, 'Method'), createEvent(200, 100, 'Method')];
+      const events = [createEvent(0, 100, 'Apex'), createEvent(200, 100, 'Apex')];
 
       const viewport = createViewport();
       setupAndRender(events, viewport);
-      expect(batches.get('Method')?.rectangles).toHaveLength(2);
+      expect(batches.get('Apex')?.rectangles).toHaveLength(2);
 
       // Second render with different viewport (should recalculate)
       const viewport2 = createViewport(1, 150, 0); // Pan to cull first event
       const { visibleRects: visibleRects2, buckets: buckets2 } =
         rectangleManager.getCulledRectangles(viewport2);
       renderer.render(visibleRects2, buckets2);
-      expect(batches.get('Method')?.rectangles).toHaveLength(1);
+      expect(batches.get('Apex')?.rectangles).toHaveLength(1);
     });
   });
 
@@ -477,10 +476,9 @@ describe('EventBatchRenderer', () => {
     it('should handle events without duration', () => {
       const event = {
         timestamp: 0,
-        subCategory: 'Method',
+        category: 'Apex',
         text: 'No duration',
         lineNumber: 0,
-        category: 'Method',
         children: [],
         duration: {
           total: 0,
@@ -493,11 +491,11 @@ describe('EventBatchRenderer', () => {
       const viewport = createViewport();
       setupAndRender(events, viewport);
 
-      expect(batches.get('Method')?.rectangles).toHaveLength(0);
+      expect(batches.get('Apex')?.rectangles).toHaveLength(0);
     });
 
     it('should handle zero zoom gracefully', () => {
-      const events = [createEvent(0, 100, 'Method')];
+      const events = [createEvent(0, 100, 'Apex')];
 
       const viewport = createViewport(0, 0, 0);
       setupAndRender(events, viewport);
@@ -525,17 +523,17 @@ describe('EventBatchRenderer', () => {
       // affect SearchHighlightRenderer's ability to render highlights for those events.
 
       const events = [
-        createEvent(0, 100, 'Method'), // Will be culled when zoomed out
+        createEvent(0, 100, 'Apex'), // Will be culled when zoomed out
       ];
 
       // Zoom out so screenWidth = 100 * 0.002 = 0.2px (< MIN_RECT_SIZE = 0.5px)
       const viewport = createViewport(0.002, 0, 0);
       setupAndRender(events, viewport);
 
-      const methodBatch = batches.get('Method');
+      const apexBatch = batches.get('Apex');
 
       // Event should be culled by EventBatchRenderer (too small)
-      expect(methodBatch?.rectangles).toHaveLength(0);
+      expect(apexBatch?.rectangles).toHaveLength(0);
 
       // This confirms that EventBatchRenderer correctly culls small rectangles.
       // SearchHighlightRenderer is tested separately to ensure it enforces minimum
@@ -543,16 +541,16 @@ describe('EventBatchRenderer', () => {
     });
 
     it('should render events when they meet minimum size threshold after zoom', () => {
-      const events = [createEvent(0, 300, 'Method')];
+      const events = [createEvent(0, 300, 'Apex')];
 
       // Zoom in so screenWidth = 300 * 0.01 = 3px (> MIN_RECT_SIZE = 2px)
       const viewport = createViewport(0.01, 0, 0);
       setupAndRender(events, viewport);
 
-      const methodBatch = batches.get('Method');
+      const apexBatch = batches.get('Apex');
 
       // Event should be rendered (meets minimum size)
-      expect(methodBatch?.rectangles).toHaveLength(1);
+      expect(apexBatch?.rectangles).toHaveLength(1);
     });
   });
 });

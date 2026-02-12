@@ -2,7 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
-import type { ApexLog, LogEvent, LogIssue, LogSubCategory } from 'apex-log-parser';
+import type { ApexLog, LogEvent, LogIssue } from 'apex-log-parser';
 import { debounce, formatDuration } from '../../../core/utility/Util.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
 
@@ -13,13 +13,12 @@ export interface TimelineGroup {
 
 /* eslint-disable @typescript-eslint/naming-convention */
 interface TimelineColors {
-  'Code Unit': '#88AE58';
-  Workflow: '#51A16E';
-  Method: '#2B8F81';
-  Flow: '#5C8FA6';
-  DML: '#B06868';
-  SOQL: '#6D4C7D';
-  'System Method': '#8D6E63';
+  Method: string;
+  'Code Unit': string;
+  'System Method': string;
+  Workflow: string;
+  DML: string;
+  SOQL: string;
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
@@ -38,57 +37,27 @@ interface Rect {
 
 const scaleY = -15;
 const strokeColor = '#D3D3D3';
-export const keyMap: Map<LogSubCategory, TimelineGroup> = new Map([
-  [
-    'Code Unit',
-    {
-      label: 'Code Unit',
-      fillColor: '#88AE58',
-    },
-  ],
-  [
-    'Workflow',
-    {
-      label: 'Workflow',
-      fillColor: '#51A16E',
-    },
-  ],
-  [
-    'Method',
-    {
-      label: 'Method',
-      fillColor: '#2B8F81',
-    },
-  ],
-  [
-    'Flow',
-    {
-      label: 'Flow',
-      fillColor: '#337986',
-    },
-  ],
-  [
-    'DML',
-    {
-      label: 'DML',
-      fillColor: '#285663',
-    },
-  ],
-  [
-    'SOQL',
-    {
-      label: 'SOQL',
-      fillColor: '#5D4963',
-    },
-  ],
-  [
-    'System Method',
-    {
-      label: 'System Method',
-      fillColor: '#5C3444',
-    },
-  ],
+export const keyMap: Map<string, TimelineGroup> = new Map([
+  ['Method', { label: 'Method', fillColor: '#2B8F81' }],
+  ['Code Unit', { label: 'Code Unit', fillColor: '#88AE58' }],
+  ['System Method', { label: 'System Method', fillColor: '#8D6E63' }],
+  ['Workflow', { label: 'Workflow', fillColor: '#51A16E' }],
+  ['DML', { label: 'DML', fillColor: '#B06868' }],
+  ['SOQL', { label: 'SOQL', fillColor: '#6D4C7D' }],
 ]);
+
+/* eslint-disable @typescript-eslint/naming-convention */
+const LEGACY_CATEGORY_MAP: Record<string, string> = {
+  Apex: 'Method',
+  'Code Unit': 'Code Unit',
+  System: 'System Method',
+  Automation: 'Workflow',
+  DML: 'DML',
+  SOQL: 'SOQL',
+  Callout: 'Method',
+  Validation: 'System Method',
+};
+/* eslint-enable @typescript-eslint/naming-convention */
 
 class State {
   public isRedrawQueued = true;
@@ -257,7 +226,7 @@ function nodesToRectangles(rootNodes: LogEvent[]) {
     const nextLevel: LogEvent[] = [];
 
     for (const node of currentLevel) {
-      if (node.duration && node.subCategory) {
+      if (node.duration && node.category) {
         addToRectQueue(node, depth);
       }
 
@@ -278,7 +247,7 @@ function nodesToRectangles(rootNodes: LogEvent[]) {
     borders.sort((a, b) => a.x - b.x);
   }
 }
-const rectRenderQueue = new Map<LogSubCategory, Rect[]>();
+const rectRenderQueue = new Map<string, Rect[]>();
 const borderRenderQueue = new Map<string, Rect[]>();
 let borderSettings = new Map<string, number>();
 let findMatchColor = '#ea5c0054';
@@ -291,10 +260,11 @@ let currentFindMatchColor = '#9e6a03';
  */
 function addToRectQueue(node: LogEvent, y: number) {
   const {
-    subCategory: subCategory,
+    category,
     timestamp: x,
     duration: { total: w },
   } = node;
+  const legacyKey = LEGACY_CATEGORY_MAP[category] ?? category;
 
   let borderColor = '';
   if (hasFindMatch(node)) {
@@ -302,9 +272,9 @@ function addToRectQueue(node: LogEvent, y: number) {
   }
 
   const rect: Rect = { x, y, w, borderColor };
-  let list = rectRenderQueue.get(subCategory);
+  let list = rectRenderQueue.get(legacyKey);
   if (!list) {
-    rectRenderQueue.set(subCategory, (list = []));
+    rectRenderQueue.set(legacyKey, (list = []));
   }
   list.push(rect);
 
@@ -560,7 +530,8 @@ export function init(timelineContainer: HTMLElement, rootMethod: ApexLog) {
 
 export function setColors(timelineColors: TimelineColors) {
   for (const keyMeta of keyMap.values()) {
-    const newColor = timelineColors[keyMeta.label as keyof TimelineColors];
+    const key = keyMeta.label as keyof TimelineColors;
+    const newColor = timelineColors[key];
     if (newColor) {
       keyMeta.fillColor = newColor;
     }
@@ -739,7 +710,7 @@ function findTimelineTooltip(
     return createTooltip(
       target.text + (target.suffix ?? ''),
       rows,
-      keyMap.get(target.subCategory)?.fillColor || '',
+      keyMap.get(LEGACY_CATEGORY_MAP[target.category] ?? target.category)?.fillColor || '',
     );
   }
   canvas.classList.add('timeline-hover');

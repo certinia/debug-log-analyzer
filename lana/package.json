@@ -161,56 +161,59 @@
           "order": 1,
           "default": {
             "Custom": {
+              "apex": "#2B8F81",
               "codeUnit": "#88AE58",
-              "workflow": "#51A16E",
-              "method": "#2B8F81",
-              "flow": "#5C8FA6",
+              "system": "#8D6E63",
+              "automation": "#51A16E",
               "dml": "#B06868",
               "soql": "#6D4C7D",
-              "system": "#8D6E63"
+              "callout": "#CCA033",
+              "validation": "#5C8FA6"
             }
           },
           "additionalProperties": {
             "type": "object",
             "additionalProperties": false,
             "required": [
+              "apex",
               "codeUnit",
-              "workflow",
-              "method",
-              "flow",
+              "system",
+              "automation",
               "dml",
               "soql",
-              "system"
+              "callout",
+              "validation"
             ],
             "properties": {
               "default": {
+                "apex": "#2B8F81",
                 "codeUnit": "#88AE58",
-                "workflow": "#51A16E",
-                "method": "#2B8F81",
-                "flow": "#5C8FA6",
+                "system": "#8D6E63",
+                "automation": "#51A16E",
                 "dml": "#B06868",
                 "soql": "#6D4C7D",
-                "system": "#8D6E63"
+                "callout": "#CCA033",
+                "validation": "#5C8FA6"
+              },
+              "apex": {
+                "type": "string",
+                "format": "color-hex",
+                "default": "#2B8F81"
               },
               "codeUnit": {
                 "type": "string",
                 "format": "color-hex",
                 "default": "#88AE58"
               },
-              "workflow": {
+              "system": {
+                "type": "string",
+                "format": "color-hex",
+                "default": "#8D6E63"
+              },
+              "automation": {
                 "type": "string",
                 "format": "color-hex",
                 "default": "#51A16E"
-              },
-              "method": {
-                "type": "string",
-                "format": "color-hex",
-                "default": "#2B8F81"
-              },
-              "flow": {
-                "type": "string",
-                "format": "color-hex",
-                "default": "#5C8FA6"
               },
               "dml": {
                 "type": "string",
@@ -222,10 +225,15 @@
                 "format": "color-hex",
                 "default": "#6D4C7D"
               },
-              "system": {
+              "callout": {
                 "type": "string",
                 "format": "color-hex",
-                "default": "#8D6E63"
+                "default": "#CCA033"
+              },
+              "validation": {
+                "type": "string",
+                "format": "color-hex",
+                "default": "#5C8FA6"
               }
             }
           }
@@ -247,7 +255,6 @@
             "Code Unit": "#88AE58",
             "Workflow": "#51A16E",
             "Method": "#2B8F81",
-            "Flow": "#5C8FA6",
             "DML": "#B06868",
             "SOQL": "#6D4C7D",
             "System Method": "#8D6E63"
@@ -269,12 +276,6 @@
               "type": "string",
               "default": "#2B8F81",
               "description": "Hex color for Method timeline events.",
-              "format": "color-hex"
-            },
-            "Flow": {
-              "type": "string",
-              "default": "#5C8FA6",
-              "description": "Hex color for Flow timeline events.",
               "format": "color-hex"
             },
             "DML": {
