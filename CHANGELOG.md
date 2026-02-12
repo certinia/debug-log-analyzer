@@ -52,9 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       - **Copy**: `Cmd/Ctrl+C` copies the selected frame name.
       - **Marker Navigation**: Click markers to select; arrow Left/Right to navigate between markers.
       - **Clear Selection**: Press `Escape` to deselect the current frame or marker.
-  - **Visual Display**:
-    - Time axis auto-spaces markers intelligently and more naturally as you zoom.
-    - Search + highlight dims non-matches for fast scanning.
+  - **⏱️ Time Axis Auto-Spacing**: Markers intelligently and naturally auto-space as you zoom.
+  - **🔍 Search + Highlight**: Dims non-matches for fast scanning.
+  - **Timeline Categories**: Redesigned timeline categories for clearer, more meaningful event grouping. ([#98])
+    - Apex (Apex code), Automation (Workflow, NBA), Callout, Code Unit, DML, SOQL, System (System, Visualforce), Validation
   - **🎨 Themes**:
     - 18 curated timeline themes plus the default theme has been improved for better contrast and readability.
     - Add your own multiple custom themes via **Settings -> Apex Log Analyzer -> Timeline -> Custom Themes**.
@@ -474,6 +475,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#98]: https://github.com/certinia/debug-log-analyzer/issues/98
 [#204]: https://github.com/certinia/debug-log-analyzer/issues/204
 [#714]: https://github.com/certinia/debug-log-analyzer/issues/714
 [#245]: https://github.com/certinia/debug-log-analyzer/issues/245
