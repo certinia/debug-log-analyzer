@@ -258,6 +258,15 @@ Use `Alt/Option+Drag` to select a time range and instantly zoom to fit it. This 
 
 Release the mouse button to zoom the viewport to fit the selected area exactly.
 
+## Wall-Clock Time
+
+The timeline supports switching between two time display modes:
+
+- **Elapsed Time** (default): Time relative to the start of the log (e.g., `0 ms`, `1500 ms`, `2.5 s`)
+- **Wall-Clock Time**: Actual time of day from the log (e.g., `14:30:05.122`)
+
+Click the clock icon button in the top-right corner of the timeline toolbar to toggle between modes.
+
 ## Tooltip
 
 <img
@@ -275,6 +284,7 @@ The tooltip provides the following information:
 - **Event Name** - e.g., `METHOD_ENTRY`, `EXECUTION_STARTED`, `SOQL_EXECUTION_BEGIN`
 - **Event Description** - Additional information about the event such as method name or SOQL query executed
 - **Timestamp** - The start and end timestamp for the given event which can be cross-referenced in the log file
+- **Time** - Wall-clock time of day for the event (e.g., `14:30:05.122 → 14:30:06.625`). Only shown when wall-clock data is available in the log.
 - **Duration** - Made up of **Total Time** (time spent in that event and its children) and **Self Time** (time directly spent in that event)
 - **Rows** - Shows **Total Rows** (rows from that event and its children) and **Self Rows** (rows directly from that event)
 

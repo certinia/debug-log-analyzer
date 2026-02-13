@@ -95,6 +95,7 @@ The Timeline view shows a live visualization of your Salesforce Apex log executi
 - **📏 Measure Range** – `Shift+Drag` to measure the duration between any two points. Resize edges, double-click to zoom.
 - **🔍 Area Zoom** – `Alt/Option+Drag` to select a region and instantly zoom to fit.
 - **Tooltips** – Hover for duration, event name, SOQL/DML/Exception counts, SOQL/DML rows, and more.
+- **🕐 Wall-Clock Time** – Toggle between elapsed and real-time (HH:MM:SS.mmm) on the time axis via the toolbar clock button.
 - **Cotext Menu Actions** – Right-click for context actions; `Cmd/Ctrl+Click` to jump directly to the Call Tree; `Cmd/Ctrl+C` to copy frame names.
 - **19 Curated Themes** – Choose from beautiful, optimized color themes or create your own via Settings.
 - **Adaptive Frame Detail** – Level-of-detail bucketing reveals richer detail as you zoom while keeping performance snappy.
