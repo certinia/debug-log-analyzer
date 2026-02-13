@@ -351,6 +351,13 @@ export class ApexLog extends LogEvent {
   };
 
   /**
+   * The wall-clock time of the first event, in milliseconds since midnight.
+   * Parsed from the `HH:MM:SS.f` portion of the first log line.
+   * Null if no wall-clock time could be parsed.
+   */
+  startTime: number | null = null;
+
+  /**
    * The endtime with nodes of 0 duration excluded
    */
   executionEndTime = 0;
@@ -360,10 +367,16 @@ export class ApexLog extends LogEvent {
   }
 
   setTimes() {
-    this.timestamp =
-      this.children.find((child) => {
-        return child.timestamp;
-      })?.timestamp || 0;
+    const firstChild = this.children.find((child) => {
+      return child.timestamp;
+    });
+    this.timestamp = firstChild?.timestamp || 0;
+
+    // Parse wall-clock time from the first child's log line (HH:MM:SS.f before the '(')
+    if (firstChild?.logLine) {
+      this.startTime = parseWallClockTime(firstChild.logLine);
+    }
+
     // We do not just want to use the very last exitStamp because it could be CUMULATIVE_USAGE which is not really part of the code execution time but does have a later time.
     let endTime;
     const reverseLen = this.children.length - 1;
@@ -410,6 +423,25 @@ export function parseVfNamespace(text: string): string {
     return 'default';
   }
   return text.substring(secondSlash + 1, sep);
+}
+
+/**
+ * Parses the wall-clock time from a log line's timestamp portion.
+ * Log lines start with `HH:MM:SS.f (nanoseconds)|...`
+ * Returns milliseconds since midnight, or null if parsing fails.
+ */
+function parseWallClockTime(logLine: string): number | null {
+  const match = /^(\d{1,2}):(\d{2}):(\d{2})\.(\d+)\s/.exec(logLine);
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = Number(match[3]);
+  const fraction = Number(match[4]!.padEnd(3, '0'));
+
+  return (hours * 3600 + minutes * 60 + seconds) * 1000 + fraction;
 }
 
 export function parseRows(text: string | null | undefined): number {

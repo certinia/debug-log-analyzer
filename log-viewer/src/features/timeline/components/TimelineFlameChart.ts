@@ -159,6 +159,13 @@ export class TimelineFlameChart extends LitElement {
     }
   }
 
+  /**
+   * Set the time display mode on the axis (called by parent TimelineView).
+   */
+  public setTimeDisplayMode(mode: 'elapsed' | 'wallClock'): void {
+    this.apexLogTimeline?.setTimeDisplayMode(mode);
+  }
+
   // ============================================================================
   // CLEANUP
   // ============================================================================

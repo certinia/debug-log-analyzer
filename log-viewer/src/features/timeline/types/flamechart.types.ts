@@ -533,6 +533,11 @@ export class TimelineError extends Error {
 export type MarkerType = 'error' | 'skip' | 'unexpected';
 
 /**
+ * Controls whether the timeline axis shows elapsed time or wall-clock time.
+ */
+export type TimeDisplayMode = 'elapsed' | 'wallClock';
+
+/**
  * Represents a time range in the log where Marker occurred.
  * Extracted from ApexLog.logIssues during timeline initialization.
  */

@@ -316,6 +316,72 @@ describe('TimelineTooltipManager', () => {
 
       tooltipManager.hide();
     });
+
+    it('should display wall-clock time row when apexLog has startTime', () => {
+      tooltipManager.destroy();
+      const mockApexLog = {
+        startTime: 37764600, // 10:29:24.600
+        timestamp: 6329577, // first event nanosecond offset
+        governorLimits: {
+          dmlStatements: { limit: 150 },
+          dmlRows: { limit: 10000 },
+          soqlQueries: { limit: 100 },
+          queryRows: { limit: 50000 },
+          soslQueries: { limit: 20 },
+        },
+      };
+
+      tooltipManager = new TimelineTooltipManager(container, {
+        categoryColors: {},
+        cursorOffset: 10,
+        enableFlip: true,
+        apexLog: mockApexLog as never,
+      });
+
+      // Event at timestamp 6329577ns with duration 1,000,000ns
+      const event = createEvent(6329577, 1_000_000);
+
+      tooltipManager.show(event, 100, 100);
+
+      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
+      expect(tooltip.textContent).toContain('time:');
+      expect(tooltip.textContent).toContain('10:29:24.600');
+      // End time should be ~1ms later
+      expect(tooltip.textContent).toContain('10:29:24.601');
+      expect(tooltip.textContent).toContain('→');
+
+      tooltipManager.hide();
+    });
+
+    it('should not display wall-clock time row when apexLog has no startTime', () => {
+      tooltipManager.destroy();
+      tooltipManager = new TimelineTooltipManager(container, {
+        categoryColors: {},
+        cursorOffset: 10,
+        enableFlip: true,
+        apexLog: { startTime: null, timestamp: 0 } as never,
+      });
+
+      const event = createEvent(0, 1_000_000);
+
+      tooltipManager.show(event, 100, 100);
+
+      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
+      expect(tooltip.textContent).not.toContain('time:');
+
+      tooltipManager.hide();
+    });
+
+    it('should not display wall-clock time row when no apexLog', () => {
+      const event = createEvent(0, 1_000_000);
+
+      tooltipManager.show(event, 100, 100);
+
+      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
+      expect(tooltip.textContent).not.toContain('time:');
+
+      tooltipManager.hide();
+    });
   });
 
   describe('positioning - basic', () => {

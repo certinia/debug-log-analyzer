@@ -10,7 +10,11 @@
  */
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
-import { formatDuration } from '../../../core/utility/Util.js';
+import {
+  computeWallClockMs,
+  formatDuration,
+  formatWallClockTime,
+} from '../../../core/utility/Util.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 
 /**
@@ -274,6 +278,26 @@ export class TimelineTooltipManager {
           }
 
           rows.push({ label: 'total:', value: val });
+        }
+
+        // Wall-clock time row (only if startTime is available)
+        const apexLog = this.options.apexLog;
+        if (apexLog?.startTime !== null && apexLog?.timestamp !== undefined) {
+          const startWallClock = computeWallClockMs(
+            apexLog.startTime,
+            apexLog.timestamp,
+            event.timestamp,
+          );
+          let timeVal = formatWallClockTime(startWallClock);
+          if (event.exitStamp) {
+            const endWallClock = computeWallClockMs(
+              apexLog.startTime,
+              apexLog.timestamp,
+              event.exitStamp,
+            );
+            timeVal += ` → ${formatWallClockTime(endWallClock)}`;
+          }
+          rows.push({ label: 'time:', value: timeVal });
         }
 
         const govLimits = this.options.apexLog?.governorLimits;
