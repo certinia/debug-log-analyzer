@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       - **Marker Navigation**: Click markers to select; arrow Left/Right to navigate between markers.
       - **Clear Selection**: Press `Escape` to deselect the current frame or marker.
   - **⏱️ Time Axis Auto-Spacing**: Markers intelligently and naturally auto-space as you zoom.
+  - **🕐 Wall-Clock Time**: Toggle between elapsed time and wall-clock time (HH:MM:SS.mmm) on the time axis. Click the clock button in the timeline toolbar to switch modes. Tooltips also show the wall-clock start → end time for each event. ([#685])
   - **🔍 Search + Highlight**: Dims non-matches for fast scanning.
   - **Timeline Categories**: Redesigned timeline categories for clearer, more meaningful event grouping. ([#98])
     - Apex (Apex code), Automation (Workflow, NBA), Callout, Code Unit, DML, SOQL, System (System, Visualforce), Validation
@@ -475,6 +476,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#685]: https://github.com/certinia/debug-log-analyzer/issues/685
 [#98]: https://github.com/certinia/debug-log-analyzer/issues/98
 [#204]: https://github.com/certinia/debug-log-analyzer/issues/204
 [#714]: https://github.com/certinia/debug-log-analyzer/issues/714
