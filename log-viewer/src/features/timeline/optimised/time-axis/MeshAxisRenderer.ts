@@ -22,6 +22,7 @@
  */
 
 import { Container, Geometry, Mesh, Shader, Text } from 'pixi.js';
+import { formatWallClockTime } from '../../../../core/utility/Util.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
 import { createRectangleShader } from '../RectangleShader.js';
@@ -72,6 +73,13 @@ export class MeshAxisRenderer {
   private labelCache: Map<string, Text> = new Map();
   /** Grid line color */
   private gridLineColor: number;
+
+  /** Time display mode: 'elapsed' (default) or 'wallClock' */
+  private displayMode: 'elapsed' | 'wallClock' = 'elapsed';
+  /** Wall-clock time of the first event in ms since midnight (for wallClock mode) */
+  private startTimeMs = 0;
+  /** Nanosecond timestamp of the first event (for wallClock mode) */
+  private firstTimestampNs = 0;
 
   constructor(container: Container, config?: Partial<AxisConfig>) {
     this.parentContainer = container;
@@ -175,6 +183,20 @@ export class MeshAxisRenderer {
     for (const label of this.labelCache.values()) {
       label.style.fill = this.config.textColor;
     }
+  }
+
+  /**
+   * Set the time display mode for axis labels.
+   * In 'wallClock' mode, labels show wall-clock time (HH:MM:SS.mmm) instead of elapsed time.
+   */
+  public setTimeDisplayMode(
+    mode: 'elapsed' | 'wallClock',
+    startTimeMs: number,
+    firstTimestampNs: number,
+  ): void {
+    this.displayMode = mode;
+    this.startTimeMs = startTimeMs;
+    this.firstTimestampNs = firstTimestampNs;
   }
 
   /**
@@ -382,6 +404,9 @@ export class MeshAxisRenderer {
 
     let rectIndex = 0;
 
+    const isWallClockDisplay = this.displayMode === 'wallClock';
+    const isIntervalMsOrMore = tickInterval.interval >= NS_PER_MS;
+
     // Render all ticks in range
     for (let i = firstTickIndex; i <= lastTickIndex; i++) {
       const time = i * tickInterval.interval;
@@ -415,7 +440,10 @@ export class MeshAxisRenderer {
       // Add label at top if requested (only when showLabels is enabled)
       if (showLabels && shouldShowLabel && this.screenSpaceContainer) {
         const timeMs = time / NS_PER_MS;
-        const labelText = this.formatMilliseconds(timeMs);
+        const useWallClock = isWallClockDisplay && (isIntervalMsOrMore || time % NS_PER_MS === 0);
+        const labelText = useWallClock
+          ? formatWallClockTime(this.startTimeMs + (time - this.firstTimestampNs) / NS_PER_MS)
+          : this.formatMilliseconds(timeMs);
 
         // Only show label if not empty (skip zero)
         if (labelText) {

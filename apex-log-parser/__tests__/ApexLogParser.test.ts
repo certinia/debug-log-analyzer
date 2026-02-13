@@ -1480,3 +1480,51 @@ describe('Aggregating Totals', () => {
     );
   });
 });
+
+describe('ApexLog.startTime tests', () => {
+  it('should parse startTime from first child log line', () => {
+    const logData =
+      '10:29:24.6 (6329577)|EXECUTION_STARTED\n' +
+      '10:29:24.6 (6400000)|METHOD_ENTRY|[1]|01p000000000000|MyClass.myMethod()\n' +
+      '10:29:24.7 (7000000)|METHOD_EXIT|[1]|01p000000000000|MyClass.myMethod()\n' +
+      '10:29:24.7 (7100000)|EXECUTION_FINISHED';
+
+    const log = parse(logData);
+    expect(log.startTime).toBe(37764600);
+  });
+
+  it('should set startTime to null when no children', () => {
+    const log = parse('');
+    expect(log.startTime).toBeNull();
+  });
+
+  it('should parse midnight time (00:00:00.0) as 0', () => {
+    const logData = '00:00:00.0 (100)|EXECUTION_STARTED\n' + '00:00:00.0 (200)|EXECUTION_FINISHED';
+
+    const log = parse(logData);
+    expect(log.startTime).toBe(0);
+  });
+
+  it('should parse end-of-day time (23:59:59.9)', () => {
+    const logData = '23:59:59.9 (100)|EXECUTION_STARTED\n' + '23:59:59.9 (200)|EXECUTION_FINISHED';
+
+    const log = parse(logData);
+    expect(log.startTime).toBe(86399900);
+  });
+
+  it('should parse multi-digit fraction (.12) as 120ms', () => {
+    const logData =
+      '14:30:05.12 (100)|EXECUTION_STARTED\n' + '14:30:05.12 (200)|EXECUTION_FINISHED';
+
+    const log = parse(logData);
+    expect(log.startTime).toBe(52205120);
+  });
+
+  it('should parse 3-digit fraction (.123) as 123ms', () => {
+    const logData =
+      '14:30:05.123 (100)|EXECUTION_STARTED\n' + '14:30:05.123 (200)|EXECUTION_FINISHED';
+
+    const log = parse(logData);
+    expect(log.startTime).toBe(52205123);
+  });
+});

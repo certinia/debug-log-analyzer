@@ -263,6 +263,20 @@ export class ApexLogTimeline {
   }
 
   /**
+   * Set time display mode (elapsed vs wall-clock) for axis labels.
+   * Only has effect when apexLog has a valid startTime.
+   */
+  public setTimeDisplayMode(mode: 'elapsed' | 'wallClock'): void {
+    if (!this.apexLog) {
+      return;
+    }
+
+    const startTime = this.apexLog.startTime ?? 0;
+    const firstTimestamp = this.apexLog.timestamp;
+    this.flamechart.setTimeDisplayMode(mode, startTime, firstTimestamp);
+  }
+
+  /**
    * Clean up resources.
    */
   public destroy(): void {

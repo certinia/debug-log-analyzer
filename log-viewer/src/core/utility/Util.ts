@@ -90,6 +90,49 @@ export function formatTimeRange(startTimeNs: number, endTimeNs: number): string 
   return `${formatDuration(startTimeNs)} → ${formatDuration(endTimeNs)}`;
 }
 
+/**
+ * Formats milliseconds-since-midnight to `HH:MM:SS.mmm` wall-clock time string.
+ *
+ * @param ms - Milliseconds since midnight (0–86,400,000)
+ * @returns Formatted time string like "14:30:05.122"
+ */
+export function formatWallClockTime(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const millis = Math.round(ms % 1000);
+  const seconds = totalSeconds % 60;
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  const hours = Math.floor(totalSeconds / 3600) % 24;
+
+  return (
+    String(hours).padStart(2, '0') +
+    ':' +
+    String(minutes).padStart(2, '0') +
+    ':' +
+    String(seconds).padStart(2, '0') +
+    '.' +
+    String(millis).padStart(3, '0')
+  );
+}
+
+/**
+ * Computes the wall-clock time (ms since midnight) for any event given:
+ * - The wall-clock start time of the log (from ApexLog.startTime)
+ * - The nanosecond timestamp of the first event (ApexLog.timestamp)
+ * - The nanosecond timestamp of the target event
+ *
+ * @param startTimeMs - Wall-clock time of the first event, in ms since midnight
+ * @param firstTimestampNs - Nanosecond timestamp of the first event
+ * @param eventTimestampNs - Nanosecond timestamp of the event to compute
+ * @returns Wall-clock time in milliseconds since midnight
+ */
+export function computeWallClockMs(
+  startTimeMs: number,
+  firstTimestampNs: number,
+  eventTimestampNs: number,
+): number {
+  return startTimeMs + (eventTimestampNs - firstTimestampNs) / 1_000_000;
+}
+
 export function debounce<T extends unknown[]>(callBack: (...args: T) => unknown) {
   let requestId: number = 0;
 

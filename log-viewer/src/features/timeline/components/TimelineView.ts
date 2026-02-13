@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { LitElement, css, html, unsafeCSS } from 'lit';
+import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
@@ -12,7 +12,11 @@ import { type TimelineGroup, keyMap, setColors } from '../services/Timeline.js';
 import { DEFAULT_THEME_NAME, type TimelineColors } from '../themes/Themes.js';
 import { addCustomThemes, getTheme } from '../themes/ThemeSelector.js';
 
+import type { TimeDisplayMode } from '../types/flamechart.types.js';
+import type { TimelineFlameChart } from './TimelineFlameChart.js';
+
 // styles
+import codiconStyles from '../../../styles/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 
 // web components
@@ -53,20 +57,42 @@ export class TimelineView extends LitElement {
   @state()
   private useLegacyTimeline: boolean | null = null;
 
+  @state()
+  private timeDisplayMode: TimeDisplayMode = 'elapsed';
+
+  @query('timeline-flame-chart')
+  private flameChartRef!: TimelineFlameChart;
+
   constructor() {
     super();
   }
 
   static styles = [
     globalStyles,
+    unsafeCSS(codiconStyles),
     css`
       :host {
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+
         display: flex;
         flex-direction: column;
         flex: 1;
         position: relative;
         width: 100%;
         height: 90%;
+      }
+
+      .timeline-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+        flex: 0 0 auto;
+      }
+
+      vscode-button {
+        height: 22px;
+        width: 22px;
       }
     `,
   ];
@@ -102,7 +128,24 @@ export class TimelineView extends LitElement {
     }
 
     if (!this.useLegacyTimeline) {
-      return html`<timeline-flame-chart
+      const hasWallClock = this.timelineRoot?.startTime !== null;
+      const isWallClock = this.timeDisplayMode === 'wallClock';
+
+      return html`${hasWallClock
+          ? html`<div class="timeline-toolbar">
+              <vscode-button
+                appearance="icon"
+                aria-label="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
+                @click=${() => this.toggleTimeDisplay()}
+              >
+                <span
+                  class="codicon ${isWallClock ? 'codicon-history' : 'codicon-clockface'}"
+                  title="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
+                ></span>
+              </vscode-button>
+            </div>`
+          : ''}
+        <timeline-flame-chart
           .apexLog=${this.timelineRoot}
           .themeName=${this.activeTheme}
           .navigateToTimestamp=${this.navigateToTimestamp}
@@ -114,6 +157,11 @@ export class TimelineView extends LitElement {
         .themeName=${this.activeTheme}
       ></timeline-legacy
       ><timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>`;
+  }
+
+  private toggleTimeDisplay(): void {
+    this.timeDisplayMode = this.timeDisplayMode === 'elapsed' ? 'wallClock' : 'elapsed';
+    this.flameChartRef?.setTimeDisplayMode(this.timeDisplayMode);
   }
 
   private setTheme(themeName: string) {

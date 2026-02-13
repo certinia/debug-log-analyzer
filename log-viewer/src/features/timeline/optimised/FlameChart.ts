@@ -814,6 +814,27 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
+   * Set the time display mode for the axis (elapsed vs wall-clock).
+   * In wall-clock mode, axis labels show HH:MM:SS.mmm instead of elapsed ms.
+   */
+  public setTimeDisplayMode(
+    mode: 'elapsed' | 'wallClock',
+    startTimeMs: number,
+    firstTimestampNs: number,
+  ): void {
+    if (this.axisRenderer instanceof MeshAxisRenderer) {
+      this.axisRenderer.setTimeDisplayMode(mode, startTimeMs, firstTimestampNs);
+
+      if (!this.state) {
+        return;
+      }
+      this.state.needsRender = true;
+      this.state.renderDirty.background = true;
+      this.scheduleRender();
+    }
+  }
+
+  /**
    * Update metric strip visibility based on whether there's data to display.
    * Hides the metric strip container and gap if no governor limit data exists.
    * Triggers resize to recalculate main timeline height after visibility change.
