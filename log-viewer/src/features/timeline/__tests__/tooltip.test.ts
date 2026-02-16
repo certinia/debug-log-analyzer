@@ -7,7 +7,7 @@
  */
 
 /**
- * Unit tests for TimelineTooltipManager
+ * Unit tests for FrameTooltipRenderer
  *
  * Tests tooltip positioning and content generation including:
  * - Boundary detection and auto-positioning
@@ -17,11 +17,11 @@
  */
 
 import type { LogEvent } from 'apex-log-parser';
-import { TimelineTooltipManager } from '../optimised/TimelineTooltipManager.js';
+import { FrameTooltipRenderer } from '../optimised/FrameTooltipRenderer.js';
 
-describe('TimelineTooltipManager', () => {
+describe('FrameTooltipRenderer', () => {
   let container: HTMLElement;
-  let tooltipManager: TimelineTooltipManager;
+  let frameTooltipRenderer: FrameTooltipRenderer;
 
   /**
    * Helper to create a mock LogEvent
@@ -72,11 +72,11 @@ describe('TimelineTooltipManager', () => {
         bottom: 600,
       }) as DOMRect;
 
-    tooltipManager = new TimelineTooltipManager(container);
+    frameTooltipRenderer = new FrameTooltipRenderer(container);
   });
 
   afterEach(() => {
-    tooltipManager.destroy();
+    frameTooltipRenderer.destroy();
     document.body.removeChild(container);
   });
 
@@ -98,31 +98,31 @@ describe('TimelineTooltipManager', () => {
       const event = createEvent(0, 100);
 
       // Show immediately with new implementation
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.style.display).toBe('block'); // Shown immediately
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should accept custom options', () => {
-      tooltipManager.destroy();
+      frameTooltipRenderer.destroy();
 
-      tooltipManager = new TimelineTooltipManager(container, {
+      frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: { Apex: '#88ae58' },
         cursorOffset: 20,
         enableFlip: true,
       });
 
       const event = createEvent(0, 100);
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       // With 0 delay, should show immediately
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.style.display).toBe('block');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
   });
 
@@ -130,21 +130,21 @@ describe('TimelineTooltipManager', () => {
     it('should show tooltip immediately', async () => {
       const event = createEvent(0, 100);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       // Should be visible immediately with new implementation
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.style.display).toBe('block');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should hide tooltip immediately', async () => {
       const event = createEvent(0, 100);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.style.display).toBe('none');
@@ -157,25 +157,25 @@ describe('TimelineTooltipManager', () => {
       event2.text = 'Event2';
 
       // Show first tooltip
-      tooltipManager.show(event1, 100, 100);
+      frameTooltipRenderer.show(event1, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.textContent).toContain('Event1');
 
       // Switch to second event - should update immediately without delay
-      tooltipManager.show(event2, 200, 200);
+      frameTooltipRenderer.show(event2, 200, 200);
 
       // Should update immediately
       expect(tooltip.textContent).toContain('Event2');
       expect(tooltip.style.display).toBe('block');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should update position when hovering same event', async () => {
       const event = createEvent(0, 100);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
 
@@ -193,20 +193,20 @@ describe('TimelineTooltipManager', () => {
       const initialLeft = tooltip.style.left;
 
       // Move mouse while on same event
-      tooltipManager.show(event, 200, 100);
+      frameTooltipRenderer.show(event, 200, 100);
 
       const newLeft = tooltip.style.left;
       expect(newLeft).not.toBe(initialLeft);
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
   });
 
   describe('content generation', () => {
     beforeEach(() => {
-      tooltipManager.destroy();
+      frameTooltipRenderer.destroy();
       // Use zero delay for content tests
-      tooltipManager = new TimelineTooltipManager(container, {
+      frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: {},
         cursorOffset: 10,
         enableFlip: true,
@@ -216,97 +216,97 @@ describe('TimelineTooltipManager', () => {
     it('should display event type', () => {
       const event = createEvent(0, 100, 'MyCustomEvent');
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.textContent).toContain('MyCustomEvent');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should display event text', () => {
       const event = createEvent(0, 100, 'Event', 'SOQL');
       event.text = 'SOQL query execution';
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.textContent).toContain('SOQL query execution');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should display duration in milliseconds', () => {
       // Duration: 1,500,000 ns = 1.5ms
       const event = createEvent(0, 1_500_000);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       // Duration is formatted by formatDuration helper
       expect(tooltip.textContent).toContain('ms');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should display self duration', () => {
       // Self duration: 50% of total = 750,000 ns = 0.75ms
       const event = createEvent(0, 1_500_000);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.textContent).toContain('self');
       expect(tooltip.textContent).toContain('0.75');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should display total duration', () => {
       // Timestamp: 2,000,000 ns = 2.000ms, duration: 100,000 ns = 0.1ms
       const event = createEvent(2_000_000, 100_000);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.textContent).toContain('total');
       // Check for some duration value (format may vary)
       expect(tooltip.textContent).toContain('ms');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should display event text', () => {
       const event = createEvent(0, 100);
       event.text = 'Custom event description';
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.textContent).toContain('Custom event description');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should handle long event text', () => {
       const event = createEvent(0, 100);
       event.text = 'A'.repeat(150); // 150 characters
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       // Just check that tooltip shows - text handling may or may not truncate
       expect(tooltip.style.display).toBe('block');
       expect(tooltip.textContent).toContain('A');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should escape HTML in event data', () => {
       const event = createEvent(0, 100);
       event.text = '<script>alert("xss")</script>';
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       // textContent shows text without HTML tags - script tags won't execute
@@ -314,11 +314,11 @@ describe('TimelineTooltipManager', () => {
       // Check that no actual script element was created
       expect(tooltip.querySelector('script')).toBeNull();
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should display wall-clock time row when apexLog has startTime', () => {
-      tooltipManager.destroy();
+      frameTooltipRenderer.destroy();
       const mockApexLog = {
         startTime: 37764600, // 10:29:24.600
         timestamp: 6329577, // first event nanosecond offset
@@ -331,7 +331,7 @@ describe('TimelineTooltipManager', () => {
         },
       };
 
-      tooltipManager = new TimelineTooltipManager(container, {
+      frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: {},
         cursorOffset: 10,
         enableFlip: true,
@@ -341,7 +341,7 @@ describe('TimelineTooltipManager', () => {
       // Event at timestamp 6329577ns with duration 1,000,000ns
       const event = createEvent(6329577, 1_000_000);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.textContent).toContain('time:');
@@ -350,12 +350,12 @@ describe('TimelineTooltipManager', () => {
       expect(tooltip.textContent).toContain('10:29:24.601');
       expect(tooltip.textContent).toContain('→');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should not display wall-clock time row when apexLog has no startTime', () => {
-      tooltipManager.destroy();
-      tooltipManager = new TimelineTooltipManager(container, {
+      frameTooltipRenderer.destroy();
+      frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: {},
         cursorOffset: 10,
         enableFlip: true,
@@ -364,30 +364,30 @@ describe('TimelineTooltipManager', () => {
 
       const event = createEvent(0, 1_000_000);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.textContent).not.toContain('time:');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should not display wall-clock time row when no apexLog', () => {
       const event = createEvent(0, 1_000_000);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.textContent).not.toContain('time:');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
   });
 
   describe('positioning - basic', () => {
     beforeEach(() => {
-      tooltipManager.destroy();
-      tooltipManager = new TimelineTooltipManager(container, {
+      frameTooltipRenderer.destroy();
+      frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: {},
         cursorOffset: 10,
         enableFlip: true,
@@ -414,7 +414,7 @@ describe('TimelineTooltipManager', () => {
     it('should position tooltip below and right of cursor by default', () => {
       const event = createEvent(0, 100);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       const left = parseInt(tooltip.style.left, 10);
@@ -424,12 +424,12 @@ describe('TimelineTooltipManager', () => {
       expect(left).toBeGreaterThanOrEqual(110); // 100 + 10
       expect(top).toBeGreaterThanOrEqual(110); // 100 + 10
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should use custom cursor offset', () => {
-      tooltipManager.destroy();
-      tooltipManager = new TimelineTooltipManager(container, {
+      frameTooltipRenderer.destroy();
+      frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: {},
         cursorOffset: 20,
         enableFlip: true,
@@ -437,7 +437,7 @@ describe('TimelineTooltipManager', () => {
 
       const event = createEvent(0, 100);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       const left = parseInt(tooltip.style.left, 10);
@@ -446,14 +446,14 @@ describe('TimelineTooltipManager', () => {
       expect(left).toBeGreaterThanOrEqual(120); // 100 + 20
       expect(top).toBeGreaterThanOrEqual(120); // 100 + 20
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
   });
 
   describe('positioning - boundary detection', () => {
     beforeEach(() => {
-      tooltipManager.destroy();
-      tooltipManager = new TimelineTooltipManager(container, {
+      frameTooltipRenderer.destroy();
+      frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: {},
         cursorOffset: 10,
         enableFlip: true,
@@ -481,7 +481,7 @@ describe('TimelineTooltipManager', () => {
       const event = createEvent(0, 100);
 
       // Position near right edge
-      tooltipManager.show(event, 950, 100);
+      frameTooltipRenderer.show(event, 950, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       // Mock the tooltip dimensions
@@ -499,14 +499,14 @@ describe('TimelineTooltipManager', () => {
       // Tooltip should be positioned to stay within container
       expect(left + 200).toBeLessThanOrEqual(1000);
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should flip vertically when tooltip goes off bottom edge', () => {
       const event = createEvent(0, 100);
 
       // Position near bottom edge
-      tooltipManager.show(event, 100, 550);
+      frameTooltipRenderer.show(event, 100, 550);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       tooltip.getBoundingClientRect = () =>
@@ -523,14 +523,14 @@ describe('TimelineTooltipManager', () => {
       // Tooltip should be positioned to stay within container
       expect(top + 100).toBeLessThanOrEqual(600);
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should keep tooltip within left boundary', () => {
       const event = createEvent(0, 100);
 
       // Position at left edge
-      tooltipManager.show(event, 0, 100);
+      frameTooltipRenderer.show(event, 0, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       const left = parseInt(tooltip.style.left, 10);
@@ -538,14 +538,14 @@ describe('TimelineTooltipManager', () => {
       // Should not be negative
       expect(left).toBeGreaterThanOrEqual(0);
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should keep tooltip within top boundary', () => {
       const event = createEvent(0, 100);
 
       // Position at top edge
-      tooltipManager.show(event, 100, 0);
+      frameTooltipRenderer.show(event, 100, 0);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       const top = parseInt(tooltip.style.top, 10);
@@ -553,14 +553,14 @@ describe('TimelineTooltipManager', () => {
       // Should not be negative
       expect(top).toBeGreaterThanOrEqual(0);
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should handle corner positioning (bottom-right)', () => {
       const event = createEvent(0, 100);
 
       // Position at bottom-right corner
-      tooltipManager.show(event, 950, 550);
+      frameTooltipRenderer.show(event, 950, 550);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       tooltip.getBoundingClientRect = () =>
@@ -580,7 +580,7 @@ describe('TimelineTooltipManager', () => {
       expect(left + 200).toBeLessThanOrEqual(1000);
       expect(top + 100).toBeLessThanOrEqual(600);
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
   });
 
@@ -589,7 +589,7 @@ describe('TimelineTooltipManager', () => {
       const tooltip = container.querySelector('#timeline-tooltip');
       expect(tooltip).not.toBeNull();
 
-      tooltipManager.destroy();
+      frameTooltipRenderer.destroy();
 
       const tooltipAfter = container.querySelector('#timeline-tooltip');
       expect(tooltipAfter).toBeNull();
@@ -598,9 +598,9 @@ describe('TimelineTooltipManager', () => {
     it('should handle destroy after show', async () => {
       const event = createEvent(0, 100);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
-      tooltipManager.destroy();
+      frameTooltipRenderer.destroy();
 
       // Tooltip should not exist
       const tooltip = container.querySelector('#timeline-tooltip');
@@ -608,8 +608,8 @@ describe('TimelineTooltipManager', () => {
     });
 
     it('should handle multiple destroy calls safely', () => {
-      tooltipManager.destroy();
-      tooltipManager.destroy(); // Should not throw
+      frameTooltipRenderer.destroy();
+      frameTooltipRenderer.destroy(); // Should not throw
 
       expect(true).toBe(true); // If we get here, no error was thrown
     });
@@ -617,8 +617,8 @@ describe('TimelineTooltipManager', () => {
 
   describe('edge cases', () => {
     beforeEach(() => {
-      tooltipManager.destroy();
-      tooltipManager = new TimelineTooltipManager(container, {
+      frameTooltipRenderer.destroy();
+      frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: {},
         cursorOffset: 10,
         enableFlip: true,
@@ -642,44 +642,44 @@ describe('TimelineTooltipManager', () => {
         soslRowCount: { total: 0, self: 0 },
       } as unknown as LogEvent;
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       expect(tooltip.style.display).toBe('block');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should handle zero duration', () => {
       const event = createEvent(0, 0);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       // Just check the tooltip displays - no duration shown for 0
       expect(tooltip.style.display).toBe('block');
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should handle very large durations', () => {
       // 1 second = 1,000,000,000 ns
       const event = createEvent(0, 1_000_000_000);
 
-      tooltipManager.show(event, 100, 100);
+      frameTooltipRenderer.show(event, 100, 100);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       // Should show duration in seconds or milliseconds
       expect(tooltip.textContent).toMatch(/\d+\s*(s|ms)/);
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should handle negative mouse coordinates', () => {
       const event = createEvent(0, 100);
 
       // Should not crash with negative coordinates
-      tooltipManager.show(event, -10, -10);
+      frameTooltipRenderer.show(event, -10, -10);
 
       const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       const left = parseInt(tooltip.style.left, 10);
@@ -689,7 +689,7 @@ describe('TimelineTooltipManager', () => {
       expect(left).toBeGreaterThanOrEqual(0);
       expect(top).toBeGreaterThanOrEqual(0);
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
 
     it('should handle mouse coordinates beyond container', () => {
@@ -707,7 +707,7 @@ describe('TimelineTooltipManager', () => {
           bottom: 100,
         }) as DOMRect;
 
-      tooltipManager.show(event, 2000, 2000);
+      frameTooltipRenderer.show(event, 2000, 2000);
 
       const left = parseInt(tooltip.style.left, 10);
       const top = parseInt(tooltip.style.top, 10);
@@ -716,7 +716,7 @@ describe('TimelineTooltipManager', () => {
       expect(left).toBeLessThanOrEqual(1000);
       expect(top).toBeLessThanOrEqual(600);
 
-      tooltipManager.hide();
+      frameTooltipRenderer.hide();
     });
   });
 });

@@ -102,7 +102,7 @@ export class SelectionHighlightRenderer {
 
   /**
    * Render the selection highlight (frame or marker).
-   * This renderer is stateless - selection state is passed in from SelectionManager.
+   * This renderer is stateless - selection state is passed in from SelectionNavigator.
    *
    * @param viewport - Viewport state for culling and transforms
    * @param selectedNode - Currently selected frame node, or null

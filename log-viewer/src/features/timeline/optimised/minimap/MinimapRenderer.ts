@@ -35,7 +35,7 @@ import { parseColorToHex } from '../rendering/ColorUtils.js';
 import { MinimapAxisRenderer } from './MinimapAxisRenderer.js';
 import { MinimapBarGeometry } from './MinimapBarGeometry.js';
 import type { MinimapDensityData } from './MinimapDensityQuery.js';
-import type { MinimapManager, MinimapSelection } from './MinimapManager.js';
+import type { MinimapSelection, MinimapViewport } from './MinimapViewport.js';
 
 /**
  * Opacity constants for density visualization (logarithmic scale).
@@ -291,7 +291,7 @@ export class MinimapRenderer {
    * 1. Static pass: Only when invalidated (resize, data change, theme change)
    * 2. Dynamic pass: Every frame (curtain, lens, cursor)
    *
-   * @param manager - MinimapManager with state
+   * @param manager - MinimapViewport with state
    * @param densityData - Density data for skyline
    * @param markers - Timeline markers to display
    * @param batchColors - Category colors from theme
@@ -299,7 +299,7 @@ export class MinimapRenderer {
    * @param isInteracting - Whether user is hovering or dragging (shows lens label)
    */
   public render(
-    manager: MinimapManager,
+    manager: MinimapViewport,
     densityData: MinimapDensityData,
     markers: TimelineMarker[],
     batchColors: Map<string, { color: number }>,
@@ -337,12 +337,12 @@ export class MinimapRenderer {
    * Shows compact duration when user is interacting with minimap.
    * Label is positioned at top of minimap (in axis area) to avoid blocking skyline.
    *
-   * @param manager - MinimapManager for coordinate calculations
+   * @param manager - MinimapViewport for coordinate calculations
    * @param selection - Current lens selection
    * @param isInteracting - True if hovering or dragging
    */
   private updateLensLabel(
-    manager: MinimapManager,
+    manager: MinimapViewport,
     selection: Readonly<MinimapSelection>,
     isInteracting: boolean,
   ): void {
@@ -387,7 +387,7 @@ export class MinimapRenderer {
    * This is cached as a RenderTexture for performance.
    */
   private renderStaticContent(
-    manager: MinimapManager,
+    manager: MinimapViewport,
     densityData: MinimapDensityData,
     markers: TimelineMarker[],
     batchColors: Map<string, { color: number }>,
@@ -454,7 +454,7 @@ export class MinimapRenderer {
    * Called every frame during pan/zoom.
    */
   private renderDynamicContent(
-    manager: MinimapManager,
+    manager: MinimapViewport,
     selection: Readonly<MinimapSelection>,
     cursorTimeNs: number | null,
   ): void {
@@ -489,7 +489,7 @@ export class MinimapRenderer {
    * Uses mesh-based rendering for performance (~100ms → <20ms).
    */
   private renderSkyline(
-    manager: MinimapManager,
+    manager: MinimapViewport,
     densityData: MinimapDensityData,
     batchColors: Map<string, { color: number }>,
     minimapHeight: number,
@@ -577,7 +577,7 @@ export class MinimapRenderer {
    * Uses pre-blended opaque colors and 1px gaps between adjacent markers.
    */
   private renderMarkers(
-    manager: MinimapManager,
+    manager: MinimapViewport,
     markers: TimelineMarker[],
     _minimapHeight: number,
   ): void {
@@ -630,7 +630,7 @@ export class MinimapRenderer {
    * This prevents the 50% opacity curtain from making axis labels appear dull.
    */
   private render2DCurtain(
-    manager: MinimapManager,
+    manager: MinimapViewport,
     selection: Readonly<MinimapSelection>,
     _minimapHeight: number,
   ): void {
@@ -697,7 +697,7 @@ export class MinimapRenderer {
    * Render viewport lens borders (rectangular window).
    */
   private renderLens(
-    manager: MinimapManager,
+    manager: MinimapViewport,
     selection: Readonly<MinimapSelection>,
     _minimapHeight: number,
   ): void {
@@ -754,7 +754,7 @@ export class MinimapRenderer {
    * Render cursor mirror line.
    */
   private renderCursorLine(
-    manager: MinimapManager,
+    manager: MinimapViewport,
     cursorTimeNs: number,
     minimapHeight: number,
   ): void {

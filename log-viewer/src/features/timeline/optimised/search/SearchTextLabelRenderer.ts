@@ -18,7 +18,7 @@
 import { BitmapText, Container } from 'pixi.js';
 import type { RenderBatch, ViewportState } from '../../types/flamechart.types.js';
 import { TEXT_LABEL_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
-import type { PrecomputedRect } from '../RectangleManager.js';
+import type { PrecomputedRect } from '../RectangleCache.js';
 import type { TextLabelRenderer } from '../TextLabelRenderer.js';
 
 /**
@@ -72,7 +72,7 @@ export class SearchTextLabelRenderer {
    * Matched events are rendered by TextLabelRenderer (full opacity).
    * Non-matched events are rendered here (dimmed).
    *
-   * @param culledRects - Rectangles grouped by category (from RectangleManager)
+   * @param culledRects - Rectangles grouped by category (from RectangleCache)
    * @param matchedEventIds - Set of event IDs that match search
    * @param viewport - Current viewport state for sticky label positioning
    */

@@ -6,13 +6,13 @@ import type { LogCategory, LogEvent } from 'apex-log-parser';
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import { legacyCullRectangles } from '../LegacyViewportCuller.js';
-import { RectangleManager } from '../RectangleManager.js';
+import { RectangleCache } from '../RectangleCache.js';
 
 /**
  * Tests for legacy O(n) bucket aggregation.
  *
  * These tests use the LegacyViewportCuller to test the original bucket
- * aggregation behavior. For production, RectangleManager uses TemporalSegmentTree
+ * aggregation behavior. For production, RectangleCache uses TemporalSegmentTree
  * which has O(log n) performance but doesn't store eventRefs in multi-event buckets.
  *
  * When events are smaller than MIN_RECT_SIZE (2px) at the current zoom level,
@@ -60,7 +60,7 @@ function cullRectanglesLegacy(
   categories: Set<string>,
   viewport: ViewportState,
 ) {
-  const manager = new RectangleManager(events, categories);
+  const manager = new RectangleCache(events, categories);
   return legacyCullRectangles(manager.getRectsByCategory(), viewport);
 }
 

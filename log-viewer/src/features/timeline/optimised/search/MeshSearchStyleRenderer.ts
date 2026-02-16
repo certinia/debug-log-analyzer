@@ -19,8 +19,8 @@
  * - Maintain original colors for matched events
  *
  * Does NOT:
- * - Pre-compute rectangles (done by RectangleManager)
- * - Perform culling (done by RectangleManager)
+ * - Pre-compute rectangles (done by RectangleCache)
+ * - Perform culling (done by RectangleCache)
  * - Draw highlight borders (done by SearchHighlightRenderer)
  * - Implement search logic
  */
@@ -35,8 +35,8 @@ import type {
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { MatchedEventInfo } from '../../types/search.types.js';
 import { resolveColor } from '../BucketColorResolver.js';
+import type { PrecomputedRect } from '../RectangleCache.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
-import type { PrecomputedRect } from '../RectangleManager.js';
 import { createRectangleShader } from '../RectangleShader.js';
 
 /**
@@ -85,7 +85,7 @@ export class MeshSearchStyleRenderer {
    * Non-matched events: desaturated greyscale
    * Buckets: search-aware styling based on matched events
    *
-   * @param culledRects - Rectangles grouped by category (from RectangleManager)
+   * @param culledRects - Rectangles grouped by category (from RectangleCache)
    * @param matchedEventIds - Set of event IDs that match search (retain original colors)
    * @param buckets - Aggregated pixel buckets grouped by category
    * @param viewport - Current viewport state for coordinate transforms

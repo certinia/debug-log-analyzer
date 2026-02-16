@@ -3,7 +3,7 @@
  */
 
 /**
- * SelectionManager
+ * SelectionNavigator
  *
  * Owns selection state and logic for flame chart selection (frames and markers).
  * Encapsulates TreeNavigator and provides a clean API for selection operations.
@@ -33,7 +33,7 @@ export type MarkerNavDirection = 'left' | 'right';
  */
 export type SelectionType = 'none' | 'frame' | 'marker';
 
-export class SelectionManager<E extends EventNode> {
+export class SelectionNavigator<E extends EventNode> {
   /** Currently selected node (frame) */
   private selectedNode: TreeNode<E> | null = null;
 
@@ -47,7 +47,7 @@ export class SelectionManager<E extends EventNode> {
   private navigator: TreeNavigator;
 
   /**
-   * Create a SelectionManager from tree nodes and pre-built maps.
+   * Create a SelectionNavigator from tree nodes and pre-built maps.
    *
    * @param treeNodes - Root-level TreeNodes to navigate
    * @param maps - Pre-built navigation maps from tree conversion

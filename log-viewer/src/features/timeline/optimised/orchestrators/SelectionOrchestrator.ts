@@ -29,7 +29,7 @@ import type {
 import type { NavigationMaps } from '../../utils/tree-converter.js';
 import type { FrameNavDirection } from '../interaction/KeyboardHandler.js';
 import { SelectionHighlightRenderer } from '../selection/SelectionHighlightRenderer.js';
-import { SelectionManager, type MarkerNavDirection } from '../selection/SelectionManager.js';
+import { SelectionNavigator, type MarkerNavDirection } from '../selection/SelectionNavigator.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 
 // Re-export types for convenience
@@ -149,7 +149,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
   // ============================================================================
   // SELECTION COMPONENTS
   // ============================================================================
-  private selectionManager: SelectionManager<E> | null = null;
+  private selectionNavigator: SelectionNavigator<E> | null = null;
   private selectionRenderer: SelectionHighlightRenderer | null = null;
 
   // ============================================================================
@@ -198,8 +198,8 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
     this.mainTimelineYOffset = mainTimelineYOffset;
 
     // Initialize selection manager
-    this.selectionManager = new SelectionManager<E>(treeNodes, maps);
-    this.selectionManager.setMarkers(markers);
+    this.selectionNavigator = new SelectionNavigator<E>(treeNodes, maps);
+    this.selectionNavigator.setMarkers(markers);
 
     // Initialize selection highlight renderer
     this.selectionRenderer = new SelectionHighlightRenderer(worldContainer);
@@ -223,7 +223,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
       this.selectionRenderer.destroy();
       this.selectionRenderer = null;
     }
-    this.selectionManager = null;
+    this.selectionNavigator = null;
     this.viewport = null;
   }
 
@@ -235,42 +235,42 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    * Check if there is an active frame selection.
    */
   public hasSelection(): boolean {
-    return this.selectionManager?.hasSelection() ?? false;
+    return this.selectionNavigator?.hasSelection() ?? false;
   }
 
   /**
    * Check if there is an active marker selection.
    */
   public hasMarkerSelection(): boolean {
-    return this.selectionManager?.hasMarkerSelection() ?? false;
+    return this.selectionNavigator?.hasMarkerSelection() ?? false;
   }
 
   /**
    * Check if there is any selection (frame or marker).
    */
   public hasAnySelection(): boolean {
-    return this.selectionManager?.hasAnySelection() ?? false;
+    return this.selectionNavigator?.hasAnySelection() ?? false;
   }
 
   /**
    * Get the currently selected frame node.
    */
   public getSelectedNode(): TreeNode<E> | null {
-    return this.selectionManager?.getSelected() ?? null;
+    return this.selectionNavigator?.getSelected() ?? null;
   }
 
   /**
    * Get the currently selected marker.
    */
   public getSelectedMarker(): TimelineMarker | null {
-    return this.selectionManager?.getSelectedMarker() ?? null;
+    return this.selectionNavigator?.getSelectedMarker() ?? null;
   }
 
   /**
    * Get all markers.
    */
   public getMarkers(): TimelineMarker[] {
-    return this.selectionManager?.getMarkers() ?? [];
+    return this.selectionNavigator?.getMarkers() ?? [];
   }
 
   /**
@@ -279,7 +279,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    * Used to map hit test results back to tree nodes for selection.
    */
   public findByOriginal(eventNode: EventNode): TreeNode<E> | null {
-    return this.selectionManager?.findByOriginal(eventNode) ?? null;
+    return this.selectionNavigator?.findByOriginal(eventNode) ?? null;
   }
 
   // ============================================================================
@@ -293,7 +293,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    * @param node - TreeNode to select
    */
   public selectFrame(node: TreeNode<E>): void {
-    this.selectionManager?.select(node);
+    this.selectionNavigator?.select(node);
     this.callbacks.onSelectionChange(node.data);
     this.callbacks.requestRender();
   }
@@ -305,7 +305,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    * @param marker - TimelineMarker to select
    */
   public selectMarker(marker: TimelineMarker): void {
-    this.selectionManager?.selectMarker(marker);
+    this.selectionNavigator?.selectMarker(marker);
     this.callbacks.onMarkerSelectionChange(marker);
     this.callbacks.requestRender();
   }
@@ -314,14 +314,14 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    * Clear the current selection (frame or marker).
    */
   public clearSelection(): void {
-    const hadFrameSelection = this.selectionManager?.hasSelection();
-    const hadMarkerSelection = this.selectionManager?.hasMarkerSelection();
+    const hadFrameSelection = this.selectionNavigator?.hasSelection();
+    const hadMarkerSelection = this.selectionNavigator?.hasMarkerSelection();
 
     if (!hadFrameSelection && !hadMarkerSelection) {
       return;
     }
 
-    this.selectionManager?.clear();
+    this.selectionNavigator?.clear();
 
     // Clear selection renderer
     if (this.selectionRenderer) {
@@ -351,11 +351,11 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    * @returns true if navigation was handled (selection changed or stayed at boundary)
    */
   public navigateFrame(direction: FrameNavDirection): boolean {
-    if (!this.selectionManager?.hasSelection()) {
+    if (!this.selectionNavigator?.hasSelection()) {
       return false;
     }
 
-    const nextNode = this.selectionManager.navigate(direction);
+    const nextNode = this.selectionNavigator.navigate(direction);
 
     if (nextNode) {
       this.callbacks.onSelectionChange(nextNode.data);
@@ -388,11 +388,11 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    * @returns true if navigation was handled (marker is selected)
    */
   public navigateMarker(direction: MarkerNavDirection): boolean {
-    if (!this.selectionManager?.hasMarkerSelection()) {
+    if (!this.selectionNavigator?.hasMarkerSelection()) {
       return false;
     }
 
-    const nextMarker = this.selectionManager.navigateMarker(direction);
+    const nextMarker = this.selectionNavigator.navigateMarker(direction);
 
     if (nextMarker) {
       this.callbacks.onMarkerSelectionChange(nextMarker);
@@ -423,7 +423,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    * Uses smooth animation when navigating to off-screen frames.
    */
   public centerOnSelectedFrame(): void {
-    const selectedNode = this.selectionManager?.getSelected();
+    const selectedNode = this.selectionNavigator?.getSelected();
     if (!selectedNode || !this.viewport) {
       return;
     }
@@ -454,7 +454,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    * Calculates optimal zoom to fit the frame with padding.
    */
   public focusOnSelectedFrame(): void {
-    const selectedNode = this.selectionManager?.getSelected();
+    const selectedNode = this.selectionNavigator?.getSelected();
     if (!selectedNode) {
       return;
     }
@@ -470,13 +470,13 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    * Uses smooth animation when navigating to off-screen markers.
    */
   public centerOnSelectedMarker(): void {
-    const selectedMarker = this.selectionManager?.getSelectedMarker();
+    const selectedMarker = this.selectionNavigator?.getSelectedMarker();
     if (!selectedMarker || !this.viewport) {
       return;
     }
 
     // Calculate marker duration (extends to next marker or timeline end)
-    const markers = this.selectionManager?.getMarkers() ?? [];
+    const markers = this.selectionNavigator?.getMarkers() ?? [];
     const markerIndex = markers.findIndex((m) => m.id === selectedMarker.id);
     const nextMarker = markers[markerIndex + 1];
     const markerEnd = nextMarker?.startTime ?? this.totalDuration;
@@ -512,13 +512,13 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    * Calculates optimal zoom to fit the marker with padding.
    */
   public focusOnSelectedMarker(): void {
-    const selectedMarker = this.selectionManager?.getSelectedMarker();
+    const selectedMarker = this.selectionNavigator?.getSelectedMarker();
     if (!selectedMarker) {
       return;
     }
 
     // Calculate marker duration (extends to next marker or timeline end)
-    const markers = this.selectionManager?.getMarkers() ?? [];
+    const markers = this.selectionNavigator?.getMarkers() ?? [];
     const markerIndex = markers.findIndex((m) => m.id === selectedMarker.id);
     const nextMarker = markers[markerIndex + 1];
     const markerEnd = nextMarker?.startTime ?? this.totalDuration;
@@ -540,12 +540,12 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
    * @param context - Render context with viewport state
    */
   public render(context: SelectionRenderContext): void {
-    if (!this.selectionRenderer || !this.selectionManager) {
+    if (!this.selectionRenderer || !this.selectionNavigator) {
       return;
     }
 
-    const selectedNode = this.selectionManager.getSelected() as TreeNode<EventNode> | null;
-    const selectedMarker = this.selectionManager.getSelectedMarker();
+    const selectedNode = this.selectionNavigator.getSelected() as TreeNode<EventNode> | null;
+    const selectedMarker = this.selectionNavigator.getSelectedMarker();
 
     this.selectionRenderer.render(context.viewportState, selectedNode, selectedMarker);
   }

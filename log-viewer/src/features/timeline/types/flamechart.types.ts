@@ -13,11 +13,11 @@
 
 import type { LogCategory, LogEvent } from 'apex-log-parser';
 import { formatDuration } from '../../../core/utility/Util.js';
-import type { PrecomputedRect } from '../optimised/RectangleManager.js';
+import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 
 // Re-export LogEvent for internal use within timeline/ folder
 // Note: FlameChart's PUBLIC API (callbacks) should use EventNode, not LogEvent
-// LogEvent is only used internally by data structures like RectangleManager, HitTestManager
+// LogEvent is only used internally by data structures like RectangleCache, HitDetector
 export type { LogEvent };
 
 // Re-export formatDuration for use within timeline/optimised folder
@@ -892,7 +892,7 @@ export type SwimlaneTimeSeries = MetricStripTimeSeries;
  *
  * Leaf nodes represent individual events; branch nodes aggregate children.
  * The tree is used for O(log n) viewport culling and bucket aggregation,
- * replacing the per-frame O(n) iteration in RectangleManager.
+ * replacing the per-frame O(n) iteration in RectangleCache.
  *
  * Key optimization: Pre-computed category stats enable instant bucket
  * rendering without recalculating aggregates per frame.

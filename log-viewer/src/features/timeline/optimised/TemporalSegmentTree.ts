@@ -6,11 +6,11 @@
  * Temporal Segment Tree
  *
  * The primary spatial index for efficient frame queries in the timeline.
- * Use this tree (via RectangleManager) for all spatial queries instead of
+ * Use this tree (via RectangleCache) for all spatial queries instead of
  * traversing the event tree directly.
  *
  * A pre-computed tree structure for O(log n) viewport culling and bucket aggregation.
- * Replaces the per-frame O(n) iteration in RectangleManager.getCulledRectangles().
+ * Replaces the per-frame O(n) iteration in RectangleCache.getCulledRectangles().
  *
  * Key capabilities:
  * - Viewport culling: query() returns visible rectangles and buckets
@@ -48,7 +48,7 @@ import {
   UNKNOWN_CATEGORY_COLOR,
   type BatchColorInfo,
 } from './BucketColorResolver.js';
-import type { PrecomputedRect } from './RectangleManager.js';
+import type { PrecomputedRect } from './RectangleCache.js';
 import { calculateViewportBounds } from './ViewportUtils.js';
 
 /**
@@ -112,7 +112,7 @@ export class TemporalSegmentTree {
   /**
    * Build segment trees from pre-computed rectangles.
    *
-   * @param rectsByCategory - Rectangles grouped by category (from RectangleManager)
+   * @param rectsByCategory - Rectangles grouped by category (from RectangleCache)
    * @param batchColors - Optional colors for theme support
    * @param rectsByDepth - Optional pre-grouped by depth (from unified conversion, saves ~12ms)
    */
@@ -170,7 +170,7 @@ export class TemporalSegmentTree {
     }
 
     // Bucket aggregation map: keyed by (depth << 24) | bucketIndex
-    // This matches the legacy RectangleManager approach for grid-aligned buckets
+    // This matches the legacy RectangleCache approach for grid-aligned buckets
     const bucketMap = new Map<number, AggregationBucket>();
 
     // Stats tracking - using mutable object to avoid callback overhead

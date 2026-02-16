@@ -3,7 +3,7 @@
  */
 
 /**
- * MinimapManager
+ * MinimapViewport
  *
  * State management and coordinate transforms for the timeline minimap.
  * The minimap shows a condensed overview of the entire timeline with a viewport
@@ -137,7 +137,7 @@ export function calculateMinimapHeight(canvasHeight: number): number {
  */
 export const MINIMAP_HEIGHT = 80;
 
-export class MinimapManager {
+export class MinimapViewport {
   private state: MinimapState;
   private selection: MinimapSelection;
 

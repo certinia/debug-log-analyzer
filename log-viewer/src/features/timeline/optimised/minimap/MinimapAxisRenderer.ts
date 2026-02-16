@@ -24,7 +24,7 @@
 import { BitmapText, Container, Graphics } from 'pixi.js';
 
 import { formatDuration, TEXT_LABEL_CONSTANTS } from '../../types/flamechart.types.js';
-import type { MinimapManager } from './MinimapManager.js';
+import type { MinimapViewport } from './MinimapViewport.js';
 
 /**
  * Nanoseconds per millisecond conversion constant.
@@ -123,9 +123,9 @@ export class MinimapAxisRenderer {
    * Render the time axis based on minimap state.
    * Shows full timeline duration (0 to totalDuration) regardless of main viewport zoom.
    *
-   * @param manager - MinimapManager with state and coordinate transforms
+   * @param manager - MinimapViewport with state and coordinate transforms
    */
-  public render(manager: MinimapManager): void {
+  public render(manager: MinimapViewport): void {
     this.tickGraphics.clear();
     this.hideAllLabels();
     this.activeLabelCount = 0;

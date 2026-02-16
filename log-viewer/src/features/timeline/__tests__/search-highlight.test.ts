@@ -13,7 +13,7 @@
 
 import type { LogEvent } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
-import type { PrecomputedRect } from '../optimised/RectangleManager.js';
+import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import { SearchHighlightRenderer } from '../optimised/search/SearchHighlightRenderer.js';
 import type { EventNode, ViewportState } from '../types/flamechart.types.js';
 import type { SearchCursor, SearchMatch } from '../types/search.types.js';

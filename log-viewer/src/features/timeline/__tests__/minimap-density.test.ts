@@ -13,7 +13,7 @@
 
 import type { LogEvent } from 'apex-log-parser';
 import { MinimapDensityQuery } from '../optimised/minimap/MinimapDensityQuery.js';
-import type { PrecomputedRect } from '../optimised/RectangleManager.js';
+import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import { TemporalSegmentTree } from '../optimised/TemporalSegmentTree.js';
 
 /**

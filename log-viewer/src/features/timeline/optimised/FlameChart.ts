@@ -36,7 +36,7 @@ import { TextLabelRenderer } from './TextLabelRenderer.js';
 import { AxisRenderer } from './time-axis/AxisRenderer.js';
 
 import { cssColorToPixi } from './BucketColorResolver.js';
-import { HitTestManager } from './interaction/HitTestManager.js';
+import { HitDetector } from './interaction/HitDetector.js';
 import {
   KEYBOARD_CONSTANTS,
   KeyboardHandler,
@@ -45,8 +45,8 @@ import {
 } from './interaction/KeyboardHandler.js';
 import { TimelineInteractionHandler } from './interaction/TimelineInteractionHandler.js';
 import { TimelineResizeHandler } from './interaction/TimelineResizeHandler.js';
-import type { MeasurementState } from './measurement/MeasurementManager.js';
-import { RectangleManager, type PrecomputedRect } from './RectangleManager.js';
+import type { MeasurementSnapshot } from './measurement/MeasurementState.js';
+import { RectangleCache, type PrecomputedRect } from './RectangleCache.js';
 import { CursorLineRenderer } from './rendering/CursorLineRenderer.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineViewport } from './TimelineViewport.js';
@@ -115,7 +115,7 @@ export interface FlameChartCallbacks {
   /** Called when Ctrl/Cmd+C is pressed to copy selected marker. */
   onCopyMarker?: (marker: TimelineMarker) => void;
   /** Called when measurement state changes (started, updated, finished, cleared). */
-  onMeasurementChange?: (measurement: MeasurementState | null) => void;
+  onMeasurementChange?: (measurement: MeasurementSnapshot | null) => void;
 }
 
 export class FlameChart<E extends EventNode = EventNode> {
@@ -128,7 +128,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   private options: TimelineOptions = {};
   private callbacks: FlameChartCallbacks = {};
 
-  private rectangleManager: RectangleManager | null = null;
+  private rectangleManager: RectangleCache | null = null;
   private batchRenderer: EventBatchRenderer | MeshRectangleRenderer | null = null;
   private axisRenderer: AxisRenderer | MeshAxisRenderer | null = null;
   private markerRenderer: TimelineMarkerRenderer | MeshMarkerRenderer | null = null;
@@ -151,7 +151,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   private readonly markers: TimelineMarker[] = [];
 
-  private hitTestManager: HitTestManager | null = null;
+  private hitDetector: HitDetector | null = null;
 
   // Flag to track if ResizeObserver has been set up (deferred until after first render)
   private resizeObserverActive = false;
@@ -325,7 +325,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       // No minimap offset needed - main timeline has its own canvas
     }
 
-    // Create RectangleManager (single source of truth for rectangle computation)
+    // Create RectangleCache (single source of truth for rectangle computation)
     // Use precomputed rectangles if available (from unified tree conversion)
     if (this.state) {
       const categories = new Set(this.state.batches.keys());
@@ -337,10 +337,10 @@ export class FlameChart<E extends EventNode = EventNode> {
             preSorted: precomputed.preSorted,
           }
         : undefined;
-      this.rectangleManager = new RectangleManager(events, categories, precomputedRects);
+      this.rectangleManager = new RectangleCache(events, categories, precomputedRects);
     }
 
-    // Create batch renderer (pure rendering, receives rectangles from RectangleManager)
+    // Create batch renderer (pure rendering, receives rectangles from RectangleCache)
     if (this.worldContainer && this.state) {
       if (useMeshRenderer) {
         this.batchRenderer = new MeshRectangleRenderer(this.worldContainer, this.state.batches);
@@ -376,7 +376,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Create hit test manager for mouse interactions
     // Pass rectangleManager for O(log n) hit testing queries
-    this.hitTestManager = new HitTestManager({
+    this.hitDetector = new HitDetector({
       index: this.index,
       visibleRects: new Map(),
       buckets: new Map(),
@@ -516,7 +516,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.resizeHandler = null;
     }
 
-    this.hitTestManager = null;
+    this.hitDetector = null;
 
     // Destroy main app
     if (this.app) {
@@ -1474,7 +1474,7 @@ export class FlameChart<E extends EventNode = EventNode> {
         this.viewport.focusOnEvent(startTime, duration, middleDepth, 0);
         this.notifyViewportChange();
       },
-      onMeasurementChange: (measurement: MeasurementState | null) => {
+      onMeasurementChange: (measurement: MeasurementSnapshot | null) => {
         this.callbacks.onMeasurementChange?.(measurement);
       },
       requestRender: () => {
@@ -1496,7 +1496,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   private handleMouseMove(screenX: number, screenY: number): void {
-    if (!this.viewport || !this.index || !this.hitTestManager) {
+    if (!this.viewport || !this.index || !this.hitDetector) {
       return;
     }
 
@@ -1504,7 +1504,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     const depth = this.viewport.screenYToDepth(screenY);
     const maxDepth = this.index.maxDepth;
 
-    const { eventNode, marker } = this.hitTestManager.hitTest(
+    const { eventNode, marker } = this.hitDetector.hitTest(
       screenX,
       screenY,
       depth,
@@ -1528,7 +1528,7 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   private handleClick(screenX: number, screenY: number, modifiers?: ModifierKeys): void {
-    if (!this.viewport || !this.index || !this.hitTestManager) {
+    if (!this.viewport || !this.index || !this.hitDetector) {
       return;
     }
 
@@ -1536,7 +1536,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     const depth = this.viewport.screenYToDepth(screenY);
     const maxDepth = this.index.maxDepth;
 
-    const { eventNode, marker } = this.hitTestManager.hitTest(
+    const { eventNode, marker } = this.hitDetector.hitTest(
       screenX,
       screenY,
       depth,
@@ -1585,7 +1585,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    * If double-click is inside a measurement range, zooms to the measurement.
    */
   private handleDoubleClick(screenX: number, screenY: number): void {
-    if (!this.viewport || !this.index || !this.hitTestManager) {
+    if (!this.viewport || !this.index || !this.hitDetector) {
       return;
     }
 
@@ -1602,7 +1602,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     const depth = this.viewport.screenYToDepth(screenY);
     const maxDepth = this.index.maxDepth;
 
-    const { eventNode, marker } = this.hitTestManager.hitTest(
+    const { eventNode, marker } = this.hitDetector.hitTest(
       screenX,
       screenY,
       depth,
@@ -1653,7 +1653,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     clientX: number,
     clientY: number,
   ): void {
-    if (!this.viewport || !this.index || !this.hitTestManager) {
+    if (!this.viewport || !this.index || !this.hitDetector) {
       return;
     }
 
@@ -1662,7 +1662,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     const maxDepth = this.index.maxDepth;
 
     // Use screenX/screenY for hit testing
-    const { eventNode, marker } = this.hitTestManager.hitTest(
+    const { eventNode, marker } = this.hitDetector.hitTest(
       screenX,
       screenY,
       depth,
@@ -2028,7 +2028,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Phase 2: Cull visible rectangles and update hit testing
     // This is the most expensive phase - cache results when viewport unchanged
-    let visibleRects: Map<string, import('./RectangleManager.js').PrecomputedRect[]>;
+    let visibleRects: Map<string, import('./RectangleCache.js').PrecomputedRect[]>;
     let buckets: Map<string, import('../types/flamechart.types.js').PixelBucket[]>;
 
     if (dirty.culling || !this.cachedVisibleRects || !this.cachedBuckets) {
@@ -2043,8 +2043,8 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.cachedVisibleRects = visibleRects;
       this.cachedBuckets = buckets;
 
-      this.hitTestManager?.setVisibleRects(visibleRects);
-      this.hitTestManager?.setBuckets(buckets);
+      this.hitDetector?.setVisibleRects(visibleRects);
+      this.hitDetector?.setBuckets(buckets);
       dirty.culling = false;
     } else {
       // Reuse cached culling results
@@ -2123,7 +2123,7 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   private renderEventsAndLabels(
     viewportState: ViewportState,
-    visibleRects: Map<string, import('./RectangleManager.js').PrecomputedRect[]>,
+    visibleRects: Map<string, import('./RectangleCache.js').PrecomputedRect[]>,
     buckets: Map<string, import('../types/flamechart.types.js').PixelBucket[]>,
     searchContext: {
       viewportState: ViewportState;

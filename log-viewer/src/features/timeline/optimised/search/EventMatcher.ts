@@ -3,9 +3,9 @@
  */
 
 /**
- * SearchManager
+ * EventMatcher
  *
- * Generic search manager for timeline events.
+ * Generic event searcher for timeline events.
  * Decoupled from LogEvent-specific implementation, works with any EventNode type.
  *
  * Responsibilities:
@@ -17,10 +17,10 @@
 
 import type { EventNode, TreeNode } from '../../types/flamechart.types.js';
 import type { SearchCursor, SearchMatch, SearchOptions } from '../../types/search.types.js';
-import type { PrecomputedRect } from '../RectangleManager.js';
+import type { PrecomputedRect } from '../RectangleCache.js';
 import { SearchCursorImpl } from './SearchCursor.js';
 
-export class SearchManager<E extends EventNode> {
+export class EventMatcher<E extends EventNode> {
   private rectMap: Map<string, PrecomputedRect>;
   private currentCursor?: SearchCursorImpl<E>;
   private roots: TreeNode<E>[];

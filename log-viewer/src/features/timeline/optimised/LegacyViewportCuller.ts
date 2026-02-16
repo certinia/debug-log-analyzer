@@ -5,7 +5,7 @@
 /**
  * LegacyViewportCuller
  *
- * O(n) viewport culling implementation extracted from RectangleManager.
+ * O(n) viewport culling implementation extracted from RectangleCache.
  * Preserved as a thin facade for:
  * - Fallback option if segment tree issues arise
  * - Test compatibility with existing bucket tests
@@ -24,7 +24,7 @@ import type {
 } from '../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import { resolveColor, type BatchColorInfo } from './BucketColorResolver.js';
-import type { PrecomputedRect } from './RectangleManager.js';
+import type { PrecomputedRect } from './RectangleCache.js';
 import { calculateViewportBounds } from './ViewportUtils.js';
 
 /**

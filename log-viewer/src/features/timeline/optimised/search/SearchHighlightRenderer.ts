@@ -14,7 +14,7 @@
 import * as PIXI from 'pixi.js';
 import type { EventNode, ViewportState } from '../../types/flamechart.types.js';
 import type { SearchCursor, SearchMatch } from '../../types/search.types.js';
-import type { PrecomputedRect } from '../RectangleManager.js';
+import type { PrecomputedRect } from '../RectangleCache.js';
 import {
   extractHighlightColors,
   renderHighlight,

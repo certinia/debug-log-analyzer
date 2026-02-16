@@ -6,7 +6,7 @@
  * Shared tooltip utility functions and constants.
  *
  * Provides common helpers used by all tooltip implementations:
- * - TimelineTooltipManager (event hover)
+ * - FrameTooltipRenderer (event hover)
  * - MetricStripTooltipRenderer (governor limits)
  * - HeatStripTooltipRenderer (minimap metrics)
  */

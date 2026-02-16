@@ -34,12 +34,12 @@ import type {
   ViewportState,
 } from '../../types/flamechart.types.js';
 import type { SearchCursor, SearchOptions } from '../../types/search.types.js';
-import type { PrecomputedRect, RectangleManager } from '../RectangleManager.js';
+import type { PrecomputedRect, RectangleCache } from '../RectangleCache.js';
+import { EventMatcher } from '../search/EventMatcher.js';
 import { FlameChartCursor } from '../search/FlameChartCursor.js';
 import { MeshSearchStyleRenderer } from '../search/MeshSearchStyleRenderer.js';
 import { SearchCursorImpl } from '../search/SearchCursor.js';
 import { SearchHighlightRenderer } from '../search/SearchHighlightRenderer.js';
-import { SearchManager } from '../search/SearchManager.js';
 import { SearchStyleRenderer } from '../search/SearchStyleRenderer.js';
 import { SearchTextLabelRenderer } from '../search/SearchTextLabelRenderer.js';
 import type { TextLabelRenderer } from '../TextLabelRenderer.js';
@@ -97,7 +97,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
   // ============================================================================
   // SEARCH COMPONENTS
   // ============================================================================
-  private searchManager: SearchManager<E> | null = null;
+  private eventMatcher: EventMatcher<E> | null = null;
   private searchStyleRenderer: SearchStyleRenderer | MeshSearchStyleRenderer | null = null;
   private searchHighlightRenderer: SearchHighlightRenderer | null = null;
   private searchTextLabelRenderer: SearchTextLabelRenderer | null = null;
@@ -145,7 +145,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
   public init(
     worldContainer: PIXI.Container,
     treeNodes: TreeNode<E>[],
-    rectangleManager: RectangleManager,
+    rectangleManager: RectangleCache,
     batches: Map<string, RenderBatch>,
     textLabelRenderer: TextLabelRenderer,
     useMeshRenderer: boolean,
@@ -158,8 +158,8 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     // PERF: Use cached rectMapById instead of rebuilding (~18ms saved)
     const rectMap = rectangleManager.getRectMapById();
 
-    // Initialize SearchManager eagerly (needed for search() calls)
-    this.searchManager = new SearchManager(treeNodes, rectMap);
+    // Initialize eventMatcher eagerly (needed for search() calls)
+    this.eventMatcher = new EventMatcher(treeNodes, rectMap);
 
     // PERF: Defer renderer initialization to first search() call (~6ms saved at init)
     // Store data needed for deferred initialization
@@ -253,7 +253,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       this.searchTextLabelRenderer = null;
     }
 
-    this.searchManager = null;
+    this.eventMatcher = null;
     this.viewport = null;
   }
 
@@ -265,7 +265,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * Check if there is an active search with matches.
    */
   public isActive(): boolean {
-    const cursor = this.searchManager?.getCursor();
+    const cursor = this.eventMatcher?.getCursor();
     return cursor !== undefined && cursor.total > 0;
   }
 
@@ -273,7 +273,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * Check if there is a search cursor (may have zero matches).
    */
   public hasCursor(): boolean {
-    return this.searchManager?.getCursor() !== undefined;
+    return this.eventMatcher?.getCursor() !== undefined;
   }
 
   /**
@@ -282,7 +282,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @returns Current cursor or undefined if no active search
    */
   public getCursor(): SearchCursor<E> | undefined {
-    return this.searchManager?.getCursor();
+    return this.eventMatcher?.getCursor();
   }
 
   /**
@@ -294,7 +294,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @returns FlameChartCursor for navigating results, or null if search not initialized
    */
   public search(predicate: (event: E) => boolean, options?: SearchOptions): SearchCursor<E> | null {
-    if (!this.searchManager) {
+    if (!this.eventMatcher) {
       return null;
     }
 
@@ -304,7 +304,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     // Clear selection when starting a new search to show search highlights
     this.callbacks.onClearSelection();
 
-    const innerCursor = this.searchManager.search(predicate, options);
+    const innerCursor = this.eventMatcher.search(predicate, options);
 
     // Request render to update display with new search state
     // (especially important when search returns 0 results to clear old highlights)
@@ -313,8 +313,8 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     // Wrap with FlameChartCursor to add automatic side effects
     return new FlameChartCursor(innerCursor, (match) => {
       // Restore cursor if it was cleared (e.g., by Escape key)
-      if (!this.searchManager?.getCursor()) {
-        this.searchManager?.setCursor(innerCursor as SearchCursorImpl<E>);
+      if (!this.eventMatcher?.getCursor()) {
+        this.eventMatcher?.setCursor(innerCursor as SearchCursorImpl<E>);
       }
       this.handleSearchNavigation(match);
     });
@@ -324,7 +324,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * Clear current search and reset cursor.
    */
   public clearSearch(): void {
-    this.searchManager?.clear();
+    this.eventMatcher?.clear();
     this.callbacks.requestRender();
   }
 
@@ -339,7 +339,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @param context - Render context with viewport state, visible rects, and buckets
    */
   public renderStyledEvents(context: SearchRenderContext): void {
-    if (!this.searchManager) {
+    if (!this.eventMatcher) {
       return;
     }
 
@@ -350,7 +350,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       return;
     }
 
-    const cursor = this.searchManager.getCursor();
+    const cursor = this.eventMatcher.getCursor();
     if (!cursor) {
       return;
     }
@@ -384,7 +384,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @param context - Render context with viewport state and visible rects
    */
   public renderStyledLabels(context: SearchRenderContext): void {
-    if (!this.searchManager) {
+    if (!this.eventMatcher) {
       return;
     }
 
@@ -395,7 +395,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       return;
     }
 
-    const cursor = this.searchManager.getCursor();
+    const cursor = this.eventMatcher.getCursor();
     if (!cursor) {
       return;
     }
@@ -425,7 +425,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @param viewportState - Current viewport state
    */
   public renderHighlight(viewportState: ViewportState): void {
-    if (!this.searchManager) {
+    if (!this.eventMatcher) {
       return;
     }
 
@@ -436,7 +436,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       return;
     }
 
-    const cursor = this.searchManager.getCursor();
+    const cursor = this.eventMatcher.getCursor();
     if (!cursor) {
       return;
     }

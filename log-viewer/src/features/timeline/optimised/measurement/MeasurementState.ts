@@ -3,7 +3,7 @@
  */
 
 /**
- * MeasurementManager
+ * MeasurementState
  *
  * Manages measurement state for the timeline Measure Range feature.
  * Allows users to measure time between two points by Shift+dragging.
@@ -18,7 +18,7 @@
 /**
  * Measurement state representing a time range measurement.
  */
-export interface MeasurementState {
+export interface MeasurementSnapshot {
   /** Start time in nanoseconds */
   startTime: number;
   /** End time in nanoseconds */
@@ -27,8 +27,8 @@ export interface MeasurementState {
   isActive: boolean;
 }
 
-export class MeasurementManager {
-  private state: MeasurementState | null = null;
+export class MeasurementState {
+  private state: MeasurementSnapshot | null = null;
 
   /**
    * Start a new measurement at the given time.
@@ -98,7 +98,7 @@ export class MeasurementManager {
    *
    * @returns Measurement state or null if no measurement
    */
-  public getState(): MeasurementState | null {
+  public getState(): MeasurementSnapshot | null {
     if (!this.state) {
       return null;
     }
@@ -120,7 +120,7 @@ export class MeasurementManager {
    *
    * @returns Raw measurement state or null if no measurement
    */
-  public getRawState(): MeasurementState | null {
+  public getRawState(): MeasurementSnapshot | null {
     return this.state ? { ...this.state } : null;
   }
 

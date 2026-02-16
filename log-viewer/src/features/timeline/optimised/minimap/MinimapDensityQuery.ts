@@ -6,7 +6,7 @@
  * MinimapDensityQuery
  *
  * Computes density data for the minimap visualization by leveraging
- * the existing RectangleManager's spatial index.
+ * the existing RectangleCache's spatial index.
  *
  * The minimap displays a heatmap where:
  * - Height = normalized stack depth (maxDepth at bucket / global maxDepth)
@@ -36,7 +36,7 @@
  */
 
 import type { BucketCategoryPriority } from '../../types/flamechart.types.js';
-import type { PrecomputedRect } from '../RectangleManager.js';
+import type { PrecomputedRect } from '../RectangleCache.js';
 import type { SkylineFrame, TemporalSegmentTree } from '../TemporalSegmentTree.js';
 
 /**
@@ -121,7 +121,7 @@ interface SkylineEvent {
 }
 
 export class MinimapDensityQuery {
-  /** All rectangles grouped by category from RectangleManager. */
+  /** All rectangles grouped by category from RectangleCache. */
   private rectsByCategory: Map<string, PrecomputedRect[]>;
 
   /** Global maximum depth across timeline. */

@@ -25,7 +25,7 @@
 import { BitmapFont, BitmapText, Container } from 'pixi.js';
 import type { RenderBatch, ViewportState } from '../types/flamechart.types.js';
 import { TEXT_LABEL_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
-import type { PrecomputedRect } from './RectangleManager.js';
+import type { PrecomputedRect } from './RectangleCache.js';
 
 /**
  * TextLabelRenderer
@@ -100,7 +100,7 @@ export class TextLabelRenderer {
    * Creates labels lazily for rectangles that are visible AND wide enough.
    * Labels "stick" to the left edge of the viewport when panning.
    *
-   * @param culledRects - Rectangles grouped by category (from RectangleManager)
+   * @param culledRects - Rectangles grouped by category (from RectangleCache)
    * @param viewport - Current viewport state for sticky label positioning
    *
    * Performance target: <5ms for 1000 visible rectangles

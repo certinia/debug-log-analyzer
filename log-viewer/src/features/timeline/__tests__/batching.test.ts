@@ -15,14 +15,14 @@
 import type { LogCategory, LogEvent } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
 import { EventBatchRenderer } from '../optimised/EventBatchRenderer.js';
-import { RectangleManager } from '../optimised/RectangleManager.js';
+import { RectangleCache } from '../optimised/RectangleCache.js';
 import type { RenderBatch, ViewportState } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 
 describe('EventBatchRenderer', () => {
   let container: PIXI.Container;
   let renderer: EventBatchRenderer;
-  let rectangleManager: RectangleManager;
+  let rectangleManager: RectangleCache;
   let batches: Map<string, RenderBatch>;
 
   /**
@@ -72,7 +72,7 @@ describe('EventBatchRenderer', () => {
    */
   function setupAndRender(events: LogEvent[], viewport: ViewportState): void {
     const categories = new Set(batches.keys());
-    rectangleManager = new RectangleManager(events, categories);
+    rectangleManager = new RectangleCache(events, categories);
     renderer = new EventBatchRenderer(container, batches);
 
     const { visibleRects, buckets } = rectangleManager.getCulledRectangles(viewport);

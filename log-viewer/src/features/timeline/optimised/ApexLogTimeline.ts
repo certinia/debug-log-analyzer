@@ -42,7 +42,7 @@ import type { SearchCursor } from '../types/search.types.js';
 import { extractMarkers } from '../utils/marker-utils.js';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
-import { TimelineTooltipManager } from './TimelineTooltipManager.js';
+import { FrameTooltipRenderer } from './FrameTooltipRenderer.js';
 
 /**
  * Apex-specific metric definitions for heat strip visualization.
@@ -83,7 +83,7 @@ interface ApexTimelineOptions extends TimelineOptions {
 
 export class ApexLogTimeline {
   private flamechart: FlameChart;
-  private tooltipManager: TimelineTooltipManager | null = null;
+  private tooltipRenderer: FrameTooltipRenderer | null = null;
   private contextMenu: ContextMenu | null = null;
   private apexLog: ApexLog | null = null;
   private options: TimelineOptions = {};
@@ -114,7 +114,7 @@ export class ApexLogTimeline {
     options.colors = colorMap;
 
     // Create tooltip manager for Apex-specific tooltips
-    this.tooltipManager = new TimelineTooltipManager(container, {
+    this.tooltipRenderer = new FrameTooltipRenderer(container, {
       enableFlip: true,
       cursorOffset: 10,
       categoryColors: colorMap,
@@ -133,7 +133,7 @@ export class ApexLogTimeline {
     // - logEventToTreeNode (tree + maps)
     // - TimelineEventIndex.calculateMaxDepth
     // - TimelineEventIndex.calculateTotalDuration
-    // - RectangleManager.flattenEvents
+    // - RectangleCache.flattenEvents
     const {
       treeNodes,
       maps,
@@ -292,9 +292,9 @@ export class ApexLogTimeline {
     }
 
     this.flamechart.destroy();
-    if (this.tooltipManager) {
-      this.tooltipManager.destroy();
-      this.tooltipManager = null;
+    if (this.tooltipRenderer) {
+      this.tooltipRenderer.destroy();
+      this.tooltipRenderer = null;
     }
     if (this.contextMenu) {
       this.contextMenu.remove();
@@ -334,8 +334,8 @@ export class ApexLogTimeline {
     this.flamechart.setColors(colorMap);
 
     // Update TooltipManager colors if available
-    if (this.tooltipManager) {
-      this.tooltipManager.updateCategoryColors(colorMap);
+    if (this.tooltipRenderer) {
+      this.tooltipRenderer.updateCategoryColors(colorMap);
     }
   }
 
@@ -369,7 +369,7 @@ export class ApexLogTimeline {
     eventNode: EventNode | null,
     marker: TimelineMarker | null,
   ): void {
-    if (!this.tooltipManager) {
+    if (!this.tooltipRenderer) {
       return;
     }
 
@@ -383,7 +383,7 @@ export class ApexLogTimeline {
       // Extract LogEvent from EventNode.original for tooltip display
       const logEvent = eventNode.original as LogEvent | undefined;
       if (logEvent) {
-        this.tooltipManager.show(logEvent, screenX, screenY);
+        this.tooltipRenderer.show(logEvent, screenX, screenY);
 
         // Call external callback if provided
         if (this.options.onEventHover) {
@@ -391,9 +391,9 @@ export class ApexLogTimeline {
         }
       }
     } else if (marker) {
-      this.tooltipManager.showTruncation(marker, screenX, screenY);
+      this.tooltipRenderer.showTruncation(marker, screenX, screenY);
     } else {
-      this.tooltipManager.hide();
+      this.tooltipRenderer.hide();
 
       // Call external callback with null
       if (this.options.onEventHover) {
@@ -440,8 +440,8 @@ export class ApexLogTimeline {
   private handleSelect(eventNode: EventNode | null): void {
     if (!eventNode) {
       // Selection cleared - hide tooltip
-      if (this.tooltipManager) {
-        this.tooltipManager.hide();
+      if (this.tooltipRenderer) {
+        this.tooltipRenderer.hide();
       }
       return;
     }
@@ -472,8 +472,8 @@ export class ApexLogTimeline {
   private handleMarkerSelect(marker: TimelineMarker | null): void {
     if (!marker) {
       // Marker selection cleared - hide tooltip
-      if (this.tooltipManager) {
-        this.tooltipManager.hide();
+      if (this.tooltipRenderer) {
+        this.tooltipRenderer.hide();
       }
       return;
     }
@@ -487,14 +487,14 @@ export class ApexLogTimeline {
    * Shows tooltip for the navigated-to frame.
    */
   private handleFrameNavigate(event: EventNode, screenX: number, screenY: number): void {
-    if (!this.tooltipManager) {
+    if (!this.tooltipRenderer) {
       return;
     }
 
     const eventWithOriginal = event as EventNode & { original?: LogEvent };
     const logEvent = eventWithOriginal.original;
     if (logEvent) {
-      this.tooltipManager.show(logEvent, screenX, screenY);
+      this.tooltipRenderer.show(logEvent, screenX, screenY);
     }
   }
 
@@ -503,10 +503,10 @@ export class ApexLogTimeline {
    * Shows tooltip for the navigated-to marker.
    */
   private handleMarkerNavigate(marker: TimelineMarker, screenX: number, screenY: number): void {
-    if (!this.tooltipManager) {
+    if (!this.tooltipRenderer) {
       return;
     }
-    this.tooltipManager.showTruncation(marker, screenX, screenY);
+    this.tooltipRenderer.showTruncation(marker, screenX, screenY);
   }
 
   /**
@@ -574,8 +574,8 @@ export class ApexLogTimeline {
     // Show tooltip for the right-clicked frame using screen coords (same as hover)
     const eventWithOriginal = eventNode as EventNode & { original?: LogEvent };
     const logEvent = eventWithOriginal.original;
-    if (this.tooltipManager && logEvent) {
-      this.tooltipManager.show(logEvent, screenX, screenY, { keepPosition: true });
+    if (this.tooltipRenderer && logEvent) {
+      this.tooltipRenderer.show(logEvent, screenX, screenY, { keepPosition: true });
     }
 
     // Build menu using ContextMenuBuilder
@@ -629,8 +629,8 @@ export class ApexLogTimeline {
     this.selectedEventForContextMenu = null;
 
     // Show tooltip for the right-clicked marker using screen coords
-    if (this.tooltipManager) {
-      this.tooltipManager.showTruncation(marker, screenX, screenY);
+    if (this.tooltipRenderer) {
+      this.tooltipRenderer.showTruncation(marker, screenX, screenY);
     }
 
     // Build menu using ContextMenuBuilder
@@ -665,8 +665,8 @@ export class ApexLogTimeline {
     this.selectedMarkerForContextMenu = null;
 
     // Hide tooltip since we're not over a frame or marker
-    if (this.tooltipManager) {
-      this.tooltipManager.hide();
+    if (this.tooltipRenderer) {
+      this.tooltipRenderer.hide();
     }
 
     // Build menu using ContextMenuBuilder
@@ -995,7 +995,7 @@ export class ApexLogTimeline {
     screenY: number,
     _depth: number,
   ): void {
-    if (!this.tooltipManager) {
+    if (!this.tooltipRenderer) {
       return;
     }
 
@@ -1004,7 +1004,7 @@ export class ApexLogTimeline {
     const logEvent = eventWithOriginal.original;
 
     if (logEvent) {
-      this.tooltipManager.show(logEvent, screenX, screenY);
+      this.tooltipRenderer.show(logEvent, screenX, screenY);
     }
   }
 

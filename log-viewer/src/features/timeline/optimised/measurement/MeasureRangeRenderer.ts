@@ -21,7 +21,7 @@ import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.j
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { parseColorToHex } from '../rendering/ColorUtils.js';
 import { calculateLabelPosition, createTimelineLabel } from '../rendering/LabelPositioning.js';
-import type { MeasurementState } from './MeasurementManager.js';
+import type { MeasurementSnapshot } from './MeasurementState.js';
 
 /**
  * Colors for the measurement overlay, extracted from CSS variables.
@@ -206,7 +206,7 @@ export class MeasureRangeRenderer {
    * @param viewport - Current viewport state
    * @param measurement - Measurement state (normalized: startTime <= endTime)
    */
-  public render(viewport: ViewportState, measurement: MeasurementState | null): void {
+  public render(viewport: ViewportState, measurement: MeasurementSnapshot | null): void {
     this.graphics.clear();
 
     if (!measurement) {
@@ -246,7 +246,7 @@ export class MeasureRangeRenderer {
    * Smart positioning: center in visible portion, stick to edge when partially offscreen,
    * hide when fully offscreen.
    */
-  private updateLabel(viewport: ViewportState, measurement: MeasurementState): void {
+  private updateLabel(viewport: ViewportState, measurement: MeasurementSnapshot): void {
     const { startTime, endTime, isActive } = measurement;
     const duration = endTime - startTime;
 
