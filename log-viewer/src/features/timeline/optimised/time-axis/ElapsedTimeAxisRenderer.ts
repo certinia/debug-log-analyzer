@@ -5,8 +5,7 @@
 import type { Text } from 'pixi.js';
 
 import type { TickInterval, TickLabelResult, TimeAxisLabelStrategy } from './MeshAxisRenderer.js';
-
-const NS_PER_MS = 1_000_000;
+import { NS_PER_MS, formatMilliseconds } from './timeAxisConstants.js';
 
 /**
  * Elapsed-time label strategy for the time axis.
@@ -51,25 +50,4 @@ export class ElapsedTimeAxisRenderer implements TimeAxisLabelStrategy {
   destroy(): void {
     // No owned resources to clean up
   }
-}
-
-/**
- * Format time with appropriate units and precision.
- * - Whole seconds: "1 s", "2 s" (not "1000 ms")
- * - Milliseconds: up to 3 decimal places: "18800.345 ms"
- * - Omit zero: don't show "0 s" or "0 ms"
- */
-function formatMilliseconds(timeMs: number): string {
-  if (timeMs === 0) {
-    return '';
-  }
-
-  if (timeMs >= 1000 && timeMs % 1000 === 0) {
-    const seconds = timeMs / 1000;
-    return `${seconds} s`;
-  }
-
-  const formatted = timeMs.toFixed(3);
-  const trimmed = formatted.replace(/\.?0+$/, '');
-  return `${trimmed} ms`;
 }

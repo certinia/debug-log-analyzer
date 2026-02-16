@@ -12,6 +12,8 @@
  * human-readable time units (microseconds, milliseconds, seconds).
  */
 
+import { NS_PER_MS, selectInterval } from './timeAxisConstants.js';
+
 /**
  * 1-2-5 sequence intervals in nanoseconds for time grid lines.
  * Covers from 1 microsecond to 50 seconds.
@@ -106,46 +108,7 @@ export function calculateLastGridLineTime(timeEndNs: number, intervalNs: number)
 }
 
 /**
- * Base intervals in milliseconds using 1-2-5 sequence.
- * Matches AxisRenderer's baseIntervals for consistent grid alignment.
- */
-const BASE_INTERVALS_MS: readonly number[] = [
-  // Sub-millisecond (microseconds in ms)
-  0.001, // 1 microsecond
-  0.002, // 2 microseconds
-  0.005, // 5 microseconds
-  // Tens of microseconds
-  0.01, // 10 microseconds
-  0.02, // 20 microseconds
-  0.05, // 50 microseconds
-  // Hundreds of microseconds
-  0.1, // 100 microseconds
-  0.2, // 200 microseconds
-  0.5, // 500 microseconds
-  // Milliseconds
-  1,
-  2,
-  5,
-  10,
-  20,
-  50,
-  100,
-  200,
-  500,
-  // Seconds
-  1000,
-  2000,
-  5000,
-  10000,
-] as const;
-
-/**
- * Nanoseconds per millisecond conversion constant.
- */
-const NS_PER_MS = 1_000_000;
-
-/**
- * Calculate grid interval in nanoseconds using AxisRenderer's exact logic.
+ * Calculate grid interval in nanoseconds using the shared 1-2-5 sequence logic.
  * Ensures metric strip and main timeline use identical intervals.
  *
  * @param zoom - Pixels per nanosecond
@@ -158,15 +121,6 @@ export function calculateGridIntervalNs(
 ): number {
   const targetIntervalNs = minSpacingPx / zoom;
   const targetIntervalMs = targetIntervalNs / NS_PER_MS;
-
-  // Find smallest interval >= targetMs (same logic as AxisRenderer.selectInterval)
-  let intervalMs = BASE_INTERVALS_MS[BASE_INTERVALS_MS.length - 1]!;
-  for (const candidate of BASE_INTERVALS_MS) {
-    if (candidate >= targetIntervalMs) {
-      intervalMs = candidate;
-      break;
-    }
-  }
-
-  return intervalMs * NS_PER_MS;
+  const { interval } = selectInterval(targetIntervalMs);
+  return interval * NS_PER_MS;
 }

@@ -6,8 +6,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 
 import { formatWallClockTime } from '../../../../core/utility/Util.js';
 import type { TickInterval, TickLabelResult, TimeAxisLabelStrategy } from './MeshAxisRenderer.js';
-
-const NS_PER_MS = 1_000_000;
+import { NS_PER_MS, parseColorToHex } from './timeAxisConstants.js';
 
 const STICKY_PADDING_X = 4;
 const STICKY_PADDING_Y = 2;
@@ -270,33 +269,4 @@ function getStickyBackgroundColor(): number {
   const computedStyle = getComputedStyle(document.documentElement);
   const bgStr = computedStyle.getPropertyValue('--vscode-editor-background').trim() || '#1e1e1e';
   return parseColorToHex(bgStr);
-}
-
-function parseColorToHex(cssColor: string): number {
-  if (!cssColor) {
-    return 0x808080;
-  }
-
-  if (cssColor.startsWith('#')) {
-    const hex = cssColor.slice(1);
-    if (hex.length === 6) {
-      return parseInt(hex, 16);
-    }
-    if (hex.length === 3) {
-      const r = hex[0]!;
-      const g = hex[1]!;
-      const b = hex[2]!;
-      return parseInt(r + r + g + g + b + b, 16);
-    }
-  }
-
-  const rgba = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-  if (rgba) {
-    const r = parseInt(rgba[1]!, 10);
-    const g = parseInt(rgba[2]!, 10);
-    const b = parseInt(rgba[3]!, 10);
-    return (r << 16) | (g << 8) | b;
-  }
-
-  return 0x808080;
 }

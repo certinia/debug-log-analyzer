@@ -23,11 +23,7 @@
 import { Container, Text } from 'pixi.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { SpritePool } from '../SpritePool.js';
-
-/**
- * Nanoseconds per millisecond conversion constant.
- */
-const NS_PER_MS = 1_000_000;
+import { NS_PER_MS, formatMilliseconds, selectInterval } from './timeAxisConstants.js';
 
 /**
  * Axis rendering configuration.
@@ -56,7 +52,6 @@ interface TickInterval {
 }
 
 export class AxisRenderer {
-  private container: Container;
   private spritePool: SpritePool;
   private labelsContainer: Container;
   private screenSpaceContainer: Container | null = null;
@@ -66,8 +61,6 @@ export class AxisRenderer {
   private gridLineColor: number;
 
   constructor(container: Container, config?: Partial<AxisConfig>) {
-    this.container = container;
-
     // Default configuration
     this.config = {
       height: 30,
@@ -157,76 +150,12 @@ export class AxisRenderer {
     const targetIntervalMs = targetIntervalNs / NS_PER_MS;
 
     // Find appropriate interval using 1-2-5 sequence
-    const { interval, skipFactor } = this.selectInterval(targetIntervalMs);
+    const { interval, skipFactor } = selectInterval(targetIntervalMs);
 
     return {
       interval: interval * NS_PER_MS, // Convert back to nanoseconds
       skipFactor,
     };
-  }
-
-  /**
-   * Select appropriate interval using 1-2-5 sequence.
-   * Returns interval in milliseconds and skip factor for label density.
-   */
-  private selectInterval(targetMs: number): { interval: number; skipFactor: number } {
-    // Base intervals using 1-2-5 sequence
-    // Extended to support 0.001ms (1 microsecond) precision when zoomed way in
-    const baseIntervals = [
-      // Sub-millisecond (microseconds in ms)
-      0.001, // 1 microsecond
-      0.002, // 2 microseconds
-      0.005, // 5 microseconds
-      // Tens of microseconds
-      0.01, // 10 microseconds
-      0.02, // 20 microseconds
-      0.05, // 50 microseconds
-      // Hundreds of microseconds
-      0.1, // 100 microseconds
-      0.2, // 200 microseconds
-      0.5, // 500 microseconds
-      // Milliseconds
-      1,
-      2,
-      5,
-      10,
-      20,
-      50,
-      100,
-      200,
-      500,
-      // Seconds
-      1000,
-      2000,
-      5000,
-      10000,
-    ];
-
-    // Find smallest interval >= targetMs
-    let interval = baseIntervals[baseIntervals.length - 1] ?? 1000;
-    for (const candidate of baseIntervals) {
-      if (candidate >= targetMs) {
-        interval = candidate;
-        break;
-      }
-    }
-
-    // Default skip factor of 1 (show all labels)
-    let skipFactor = 1;
-
-    // If labels are still too close, increase skip factor
-    // This happens when zoomed way out
-    if (interval >= 1000) {
-      // For large intervals (1s+), potentially skip every 2nd or 5th
-      if (targetMs > interval * 1.5) {
-        skipFactor = 2;
-      }
-      if (targetMs > interval * 3) {
-        skipFactor = 5;
-      }
-    }
-
-    return { interval, skipFactor };
   }
 
   // ============================================================================
@@ -298,7 +227,7 @@ export class AxisRenderer {
     // Add label at top if requested
     if (showLabel && this.screenSpaceContainer) {
       const timeMs = timeNs / NS_PER_MS;
-      const labelText = this.formatMilliseconds(timeMs);
+      const labelText = formatMilliseconds(timeMs);
 
       // Only show label if not empty (skip zero)
       if (labelText) {
@@ -354,34 +283,5 @@ export class AxisRenderer {
     for (const label of this.labelCache.values()) {
       label.visible = false;
     }
-  }
-
-  // ============================================================================
-  // PRIVATE: FORMATTING
-  // ============================================================================
-
-  /**
-   * Format time with appropriate units and precision.
-   * - Whole seconds: "1 s", "2 s" (not "1000 ms")
-   * - Milliseconds: up to 3 decimal places: "18800.345 ms"
-   * - Omit zero: don't show "0 s" or "0 ms", just start from first non-zero
-   */
-  private formatMilliseconds(timeMs: number): string {
-    // Omit zero
-    if (timeMs === 0) {
-      return '';
-    }
-
-    // Convert to seconds if >= 1000ms and whole seconds
-    if (timeMs >= 1000 && timeMs % 1000 === 0) {
-      const seconds = timeMs / 1000;
-      return `${seconds} s`;
-    }
-
-    // Format as milliseconds with up to 3 decimal places
-    // Remove trailing zeros after decimal point
-    const formatted = timeMs.toFixed(3);
-    const trimmed = formatted.replace(/\.?0+$/, '');
-    return `${trimmed} ms`;
   }
 }

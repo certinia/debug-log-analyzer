@@ -14,6 +14,7 @@
  * - Direct buffer updates (no scene graph overhead)
  * - Clip-space coordinates (no uniform binding overhead)
  * - Labels use PIXI.Text (optimal for dynamic text with caching)
+ * - Cached per-frame allocations (Set, closure, viewport object)
  *
  * Tick levels (zoom-dependent):
  * - Seconds: Major ticks at 1s, 2s, 5s, 10s intervals
@@ -29,11 +30,12 @@ import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.
 import { createRectangleShader } from '../RectangleShader.js';
 import { ClockTimeAxisRenderer } from './ClockTimeAxisRenderer.js';
 import { ElapsedTimeAxisRenderer } from './ElapsedTimeAxisRenderer.js';
-
-/**
- * Nanoseconds per millisecond conversion constant.
- */
-const NS_PER_MS = 1_000_000;
+import {
+  NS_PER_MS,
+  applyAlphaToColor,
+  parseColorToHex,
+  selectInterval,
+} from './timeAxisConstants.js';
 
 /**
  * Axis rendering configuration.
@@ -109,9 +111,24 @@ export class MeshAxisRenderer {
   private activeLabelCount = 0;
   /** Grid line color */
   private gridLineColor: number;
+  /** Cached grid line color with alpha pre-applied (ABGR format) */
+  private gridLineColorWithAlpha: number;
 
   /** Active label strategy */
   private strategy: TimeAxisLabelStrategy;
+
+  /** Cached Set reused across frames to track rendered pixel positions */
+  private renderedPixels = new Set<number>();
+  /** Cached bound method for getOrCreateLabel to avoid closure allocation per frame */
+  private boundGetOrCreateLabel: (text: string) => Text;
+  /** Cached viewport transform object reused across frames */
+  private cachedViewportTransform: ViewportTransform = {
+    offsetX: 0,
+    offsetY: 0,
+    displayWidth: 0,
+    displayHeight: 0,
+    canvasYOffset: 0,
+  };
 
   constructor(container: Container, config?: Partial<AxisConfig>) {
     // Default configuration
@@ -125,6 +142,10 @@ export class MeshAxisRenderer {
     };
 
     this.gridLineColor = this.config.lineColor;
+    this.gridLineColorWithAlpha = applyAlphaToColor(
+      this.gridLineColor,
+      this.config.gridAlpha ?? 1.0,
+    );
 
     // Create geometry and shader for grid lines
     this.geometry = new RectangleGeometry();
@@ -143,6 +164,9 @@ export class MeshAxisRenderer {
 
     // Default to elapsed time strategy
     this.strategy = new ElapsedTimeAxisRenderer();
+
+    // Bind once in constructor instead of creating a closure each frame
+    this.boundGetOrCreateLabel = this.getOrCreateLabel.bind(this);
   }
 
   /**
@@ -208,8 +232,14 @@ export class MeshAxisRenderer {
     // Update grid line color
     const lineColorStr =
       computedStyle.getPropertyValue('--vscode-editorLineNumber-foreground').trim() || '#808080';
-    this.gridLineColor = this.parseColorToHex(lineColorStr);
+    this.gridLineColor = parseColorToHex(lineColorStr);
     this.config.lineColor = this.gridLineColor;
+
+    // Update cached color with alpha
+    this.gridLineColorWithAlpha = applyAlphaToColor(
+      this.gridLineColor,
+      this.config.gridAlpha ?? 1.0,
+    );
 
     // Update text color
     this.config.textColor =
@@ -305,7 +335,6 @@ export class MeshAxisRenderer {
   ): void {
     const effectiveHeight = gridHeight ?? viewport.displayHeight;
     const showLabels = this.config.showLabels !== false;
-    const gridAlpha = this.config.gridAlpha ?? 1.0;
 
     // Calculate first tick position (snap to interval boundary)
     // Go back one extra tick to ensure we cover the left edge
@@ -315,36 +344,26 @@ export class MeshAxisRenderer {
     // Go forward one extra tick to ensure we cover the right edge
     const lastTickIndex = Math.ceil(timeEnd / tickInterval.interval) + 1;
 
-    // Track rendered pixel positions to prevent duplicates
-    const renderedPixels = new Set<number>();
+    // Reuse cached Set instead of allocating new one each frame
+    this.renderedPixels.clear();
 
     // Count ticks for buffer allocation
     const maxTicks = lastTickIndex - firstTickIndex + 1;
     this.geometry.ensureCapacity(maxTicks);
 
-    // Create viewport transform for coordinate conversion
-    // Note: offsetY is 0 because axis grid lines should span full screen height
-    // regardless of vertical panning
-    // No canvasYOffset needed - main timeline has its own canvas
-    const viewportTransform: ViewportTransform = {
-      offsetX: viewport.offsetX,
-      offsetY: 0, // Full-height elements ignore Y pan
-      displayWidth: viewport.displayWidth,
-      displayHeight: effectiveHeight,
-      canvasYOffset: 0,
-    };
-
-    // Pre-multiply color with alpha for grid lines
-    const gridLineColorWithAlpha = applyAlphaToColor(this.gridLineColor, gridAlpha);
+    // Update cached viewport transform in-place
+    const viewportTransform = this.cachedViewportTransform;
+    viewportTransform.offsetX = viewport.offsetX;
+    viewportTransform.offsetY = 0; // Full-height elements ignore Y pan
+    viewportTransform.displayWidth = viewport.displayWidth;
+    viewportTransform.displayHeight = effectiveHeight;
+    viewportTransform.canvasYOffset = 0;
 
     let rectIndex = 0;
     const hasSubMsTicks = tickInterval.interval < NS_PER_MS;
 
     // Notify strategy of frame start
     this.strategy.beginFrame(tickInterval, firstTickIndex, firstTickIndex * tickInterval.interval);
-
-    // Bind getOrCreateLabel for the strategy
-    const getOrCreateLabel = (text: string): Text => this.getOrCreateLabel(text);
 
     // Render all ticks in range
     for (let i = firstTickIndex; i <= lastTickIndex; i++) {
@@ -355,10 +374,10 @@ export class MeshAxisRenderer {
       const pixelX = Math.round(screenX);
 
       // Skip if we already rendered a line at this pixel position
-      if (renderedPixels.has(pixelX)) {
+      if (this.renderedPixels.has(pixelX)) {
         continue;
       }
-      renderedPixels.add(pixelX);
+      this.renderedPixels.add(pixelX);
 
       // Calculate if this tick should show a label based on global position
       // This ensures labels stay consistent when panning
@@ -371,7 +390,7 @@ export class MeshAxisRenderer {
         0,
         1,
         effectiveHeight,
-        gridLineColorWithAlpha,
+        this.gridLineColorWithAlpha,
         viewportTransform,
       );
       rectIndex++;
@@ -379,7 +398,7 @@ export class MeshAxisRenderer {
       // Add label at top if requested (only when showLabels is enabled)
       if (showLabels && shouldShowLabel && this.screenSpaceContainer) {
         const screenSpaceX = screenX - viewport.offsetX;
-        this.strategy.renderTickLabel(time, screenSpaceX, getOrCreateLabel, i);
+        this.strategy.renderTickLabel(time, screenSpaceX, this.boundGetOrCreateLabel, i);
       }
     }
 
@@ -432,104 +451,4 @@ export class MeshAxisRenderer {
     this.activeLabelCount = 0;
     // Strategy handles its own label cleanup (e.g., sticky label) in beginFrame
   }
-
-  // ============================================================================
-  // PRIVATE: UTILITIES
-  // ============================================================================
-
-  /**
-   * Parse CSS color string to numeric hex.
-   */
-  private parseColorToHex(cssColor: string): number {
-    if (!cssColor) {
-      return 0x808080;
-    }
-
-    if (cssColor.startsWith('#')) {
-      const hex = cssColor.slice(1);
-      if (hex.length === 6) {
-        return parseInt(hex, 16);
-      }
-      if (hex.length === 3) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        return parseInt(r + r + g + g + b + b, 16);
-      }
-    }
-
-    // rgba() fallback
-    const rgba = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-    if (rgba) {
-      const r = parseInt(rgba[1]!, 10);
-      const g = parseInt(rgba[2]!, 10);
-      const b = parseInt(rgba[3]!, 10);
-      return (r << 16) | (g << 8) | b;
-    }
-
-    return 0x808080;
-  }
-}
-
-// ============================================================================
-// MODULE-LEVEL UTILITIES
-// ============================================================================
-
-/**
- * Apply alpha to a color by pre-multiplying into ABGR format for the shader.
- * The shader expects colors in ABGR format with alpha in the high byte.
- */
-function applyAlphaToColor(color: number, alpha: number): number {
-  const r = (color >> 16) & 0xff;
-  const g = (color >> 8) & 0xff;
-  const b = color & 0xff;
-  if (alpha >= 1.0) {
-    return (0xff << 24) | (b << 16) | (g << 8) | r;
-  }
-  const a = Math.round(alpha * 255);
-  return (a << 24) | (b << 16) | (g << 8) | r;
-}
-
-/**
- * Select appropriate interval using 1-2-5 sequence.
- * Returns interval in milliseconds and skip factor for label density.
- */
-function selectInterval(targetMs: number): { interval: number; skipFactor: number } {
-  const baseIntervals = [
-    // Sub-millisecond (microseconds in ms)
-    0.001, 0.002, 0.005,
-    // Tens of microseconds
-    0.01, 0.02, 0.05,
-    // Hundreds of microseconds
-    0.1, 0.2, 0.5,
-    // Milliseconds
-    1, 2, 5, 10, 20, 50, 100, 200, 500,
-    // Seconds
-    1000, 2000, 5000, 10000,
-  ];
-
-  // Find smallest interval >= targetMs
-  let interval = baseIntervals[baseIntervals.length - 1] ?? 1000;
-  for (const candidate of baseIntervals) {
-    if (candidate >= targetMs) {
-      interval = candidate;
-      break;
-    }
-  }
-
-  // Default skip factor of 1 (show all labels)
-  let skipFactor = 1;
-
-  // If labels are still too close, increase skip factor
-  // This happens when zoomed way out
-  if (interval >= 1000) {
-    if (targetMs > interval * 1.5) {
-      skipFactor = 2;
-    }
-    if (targetMs > interval * 3) {
-      skipFactor = 5;
-    }
-  }
-
-  return { interval, skipFactor };
 }
