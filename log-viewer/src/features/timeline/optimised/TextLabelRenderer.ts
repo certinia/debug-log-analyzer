@@ -26,6 +26,7 @@ import { BitmapFont, BitmapText, Container } from 'pixi.js';
 import type { RenderBatch, ViewportState } from '../types/flamechart.types.js';
 import { TEXT_LABEL_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import type { PrecomputedRect } from './RectangleCache.js';
+import { isLightBackground } from './rendering/ColorUtils.js';
 
 /**
  * TextLabelRenderer
@@ -254,27 +255,12 @@ export class TextLabelRenderer {
 
   /**
    * Calculate contrasting text color based on background luminance.
-   * Uses W3C relative luminance formula for accessibility compliance.
    *
    * @param bgColor - Background color in PixiJS format (0xRRGGBB)
    * @returns Dark text color for light backgrounds, light text color for dark backgrounds
    */
   private getContrastingTextColor(bgColor: number): number {
-    const r = ((bgColor >> 16) & 0xff) / 255;
-    const g = ((bgColor >> 8) & 0xff) / 255;
-    const b = (bgColor & 0xff) / 255;
-
-    // Apply gamma correction for sRGB
-    const rLin = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
-    const gLin = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
-    const bLin = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
-
-    // W3C relative luminance formula
-    const luminance = 0.2126 * rLin + 0.7152 * gLin + 0.0722 * bLin;
-
-    // Use dark text for light backgrounds, light text for dark backgrounds
-    // Threshold of 0.179 corresponds to ~50% perceived brightness
-    return luminance > 0.179
+    return isLightBackground(bgColor)
       ? TEXT_LABEL_CONSTANTS.FONT.LIGHT_THEME_COLOR
       : TEXT_LABEL_CONSTANTS.FONT.DARK_THEME_COLOR;
   }

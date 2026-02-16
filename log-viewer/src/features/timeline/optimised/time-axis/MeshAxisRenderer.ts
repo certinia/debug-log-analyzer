@@ -26,6 +26,7 @@ import { formatWallClockTime } from '../../../../core/utility/Util.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
 import { createRectangleShader } from '../RectangleShader.js';
+import { parseColorToHex } from '../rendering/ColorUtils.js';
 
 /**
  * Nanoseconds per millisecond conversion constant.
@@ -172,7 +173,7 @@ export class MeshAxisRenderer {
     // Update grid line color
     const lineColorStr =
       computedStyle.getPropertyValue('--vscode-editorLineNumber-foreground').trim() || '#808080';
-    this.gridLineColor = this.parseColorToHex(lineColorStr);
+    this.gridLineColor = parseColorToHex(lineColorStr, 0x808080);
     this.config.lineColor = this.gridLineColor;
 
     // Update text color
@@ -197,59 +198,6 @@ export class MeshAxisRenderer {
     this.displayMode = mode;
     this.startTimeMs = startTimeMs;
     this.firstTimestampNs = firstTimestampNs;
-  }
-
-  /**
-   * Apply alpha to a color by pre-multiplying into ABGR format for the shader.
-   * The shader expects colors in ABGR format with alpha in the high byte.
-   */
-  private applyAlphaToColor(color: number, alpha: number): number {
-    if (alpha >= 1.0) {
-      // Full alpha - pack as opaque ABGR
-      const r = (color >> 16) & 0xff;
-      const g = (color >> 8) & 0xff;
-      const b = color & 0xff;
-      return (0xff << 24) | (b << 16) | (g << 8) | r;
-    }
-    // Pre-multiply alpha into ABGR format
-    const r = (color >> 16) & 0xff;
-    const g = (color >> 8) & 0xff;
-    const b = color & 0xff;
-    const a = Math.round(alpha * 255);
-    return (a << 24) | (b << 16) | (g << 8) | r;
-  }
-
-  /**
-   * Parse CSS color string to numeric hex.
-   */
-  private parseColorToHex(cssColor: string): number {
-    if (!cssColor) {
-      return 0x808080;
-    }
-
-    if (cssColor.startsWith('#')) {
-      const hex = cssColor.slice(1);
-      if (hex.length === 6) {
-        return parseInt(hex, 16);
-      }
-      if (hex.length === 3) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        return parseInt(r + r + g + g + b + b, 16);
-      }
-    }
-
-    // rgba() fallback
-    const rgba = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-    if (rgba) {
-      const r = parseInt(rgba[1]!, 10);
-      const g = parseInt(rgba[2]!, 10);
-      const b = parseInt(rgba[3]!, 10);
-      return (r << 16) | (g << 8) | b;
-    }
-
-    return 0x808080;
   }
 
   /**
@@ -399,9 +347,6 @@ export class MeshAxisRenderer {
       canvasYOffset: 0,
     };
 
-    // Pre-multiply color with alpha for grid lines
-    const gridLineColorWithAlpha = this.applyAlphaToColor(this.gridLineColor, gridAlpha);
-
     let rectIndex = 0;
 
     const isWallClockDisplay = this.displayMode === 'wallClock';
@@ -432,8 +377,9 @@ export class MeshAxisRenderer {
         0,
         1,
         effectiveHeight,
-        gridLineColorWithAlpha,
+        this.gridLineColor,
         viewportTransform,
+        gridAlpha,
       );
       rectIndex++;
 

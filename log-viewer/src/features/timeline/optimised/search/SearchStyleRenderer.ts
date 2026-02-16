@@ -36,6 +36,7 @@ import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.typ
 import type { MatchedEventInfo } from '../../types/search.types.js';
 import { resolveColor } from '../BucketColorResolver.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
+import { colorToGreyscale } from '../rendering/ColorUtils.js';
 import { SpritePool } from '../SpritePool.js';
 
 /**
@@ -87,7 +88,7 @@ export class SearchStyleRenderer {
       }
 
       const originalColor = batch.color;
-      const greyColor = this.colorToGreyscale(originalColor);
+      const greyColor = colorToGreyscale(originalColor);
 
       for (const rect of rectangles) {
         const sprite = this.spritePool.acquire();
@@ -191,7 +192,7 @@ export class SearchStyleRenderer {
           }).color;
         } else {
           // No matches - desaturate the bucket's pre-blended color
-          displayColor = this.colorToGreyscale(bucket.color);
+          displayColor = colorToGreyscale(bucket.color);
         }
 
         const sprite = this.spritePool.acquire();
@@ -201,29 +202,5 @@ export class SearchStyleRenderer {
         sprite.tint = displayColor;
       }
     }
-  }
-
-  /**
-   * Convert a color to greyscale based on luminance.
-   * Uses standard luminance formula: 0.299*R + 0.587*G + 0.114*B
-   * Then applies slight dimming to match Chrome DevTools appearance.
-   *
-   * @param color - PixiJS color (0xRRGGBB)
-   * @returns Greyscale color (0xRRGGBB)
-   */
-  private colorToGreyscale(color: number): number {
-    // Extract RGB components
-    const r = (color >> 16) & 0xff;
-    const g = (color >> 8) & 0xff;
-    const b = color & 0xff;
-
-    // Calculate luminance (perceived brightness)
-    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-
-    // Apply dimming factor to match Chrome DevTools
-    const dimmed = Math.floor(luminance * 0.7);
-
-    // Create greyscale color (same value for R, G, B)
-    return (dimmed << 16) | (dimmed << 8) | dimmed;
   }
 }

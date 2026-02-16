@@ -18,6 +18,7 @@
 
 import * as PIXI from 'pixi.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
+import { parseColorToHex } from './ColorUtils.js';
 
 /**
  * Cursor line width in pixels.
@@ -113,40 +114,7 @@ export class CursorLineRenderer {
       computedStyle.getPropertyValue('--vscode-focusBorder').trim() ||
       '#ffffff';
 
-    return this.parseColorToHex(colorStr);
-  }
-
-  /**
-   * Parse CSS color string to numeric hex.
-   */
-  private parseColorToHex(cssColor: string): number {
-    if (!cssColor) {
-      return DEFAULT_CURSOR_COLOR;
-    }
-
-    if (cssColor.startsWith('#')) {
-      const hex = cssColor.slice(1);
-      if (hex.length === 6) {
-        return parseInt(hex, 16);
-      }
-      if (hex.length === 3) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        return parseInt(r + r + g + g + b + b, 16);
-      }
-    }
-
-    // rgba() fallback
-    const rgba = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-    if (rgba) {
-      const r = parseInt(rgba[1]!, 10);
-      const g = parseInt(rgba[2]!, 10);
-      const b = parseInt(rgba[3]!, 10);
-      return (r << 16) | (g << 8) | b;
-    }
-
-    return DEFAULT_CURSOR_COLOR;
+    return parseColorToHex(colorStr, DEFAULT_CURSOR_COLOR);
   }
 
   /**

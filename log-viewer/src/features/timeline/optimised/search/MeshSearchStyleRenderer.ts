@@ -38,6 +38,7 @@ import { resolveColor } from '../BucketColorResolver.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
 import { createRectangleShader } from '../RectangleShader.js';
+import { colorToGreyscale } from '../rendering/ColorUtils.js';
 
 /**
  * MeshSearchStyleRenderer
@@ -148,7 +149,7 @@ export class MeshSearchStyleRenderer {
       }
 
       const originalColor = batch.color;
-      const greyColor = this.colorToGreyscale(originalColor);
+      const greyColor = colorToGreyscale(originalColor);
 
       for (const rect of rectangles) {
         // Use original color for matched events, greyscale for non-matched
@@ -275,7 +276,7 @@ export class MeshSearchStyleRenderer {
           }).color;
         } else {
           // No matches - desaturate the bucket's pre-blended color
-          displayColor = this.colorToGreyscale(bucket.color);
+          displayColor = colorToGreyscale(bucket.color);
         }
 
         this.geometry.writeRectangle(
@@ -292,29 +293,5 @@ export class MeshSearchStyleRenderer {
     }
 
     return rectIndex;
-  }
-
-  /**
-   * Convert a color to greyscale based on luminance.
-   * Uses standard luminance formula: 0.299*R + 0.587*G + 0.114*B
-   * Then applies slight dimming to match Chrome DevTools appearance.
-   *
-   * @param color - PixiJS color (0xRRGGBB)
-   * @returns Greyscale color (0xRRGGBB)
-   */
-  private colorToGreyscale(color: number): number {
-    // Extract RGB components
-    const r = (color >> 16) & 0xff;
-    const g = (color >> 8) & 0xff;
-    const b = color & 0xff;
-
-    // Calculate luminance (perceived brightness)
-    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-
-    // Apply dimming factor to match Chrome DevTools
-    const dimmed = Math.floor(luminance * 0.7);
-
-    // Create greyscale color (same value for R, G, B)
-    return (dimmed << 16) | (dimmed << 8) | dimmed;
   }
 }
