@@ -43,16 +43,11 @@ export class AreaZoomRenderer {
   /** HTML container for the label */
   private labelElement: HTMLDivElement;
 
-  /** Parent HTML container for positioning */
-  private container: HTMLElement;
-
   /**
    * @param pixiContainer - PixiJS container for graphics (worldContainer)
    * @param htmlContainer - HTML container for label positioning
    */
   constructor(pixiContainer: PIXI.Container, htmlContainer: HTMLElement) {
-    this.container = htmlContainer;
-
     // Create graphics for overlay - render above frames but below tooltips
     this.graphics = new PIXI.Graphics();
     this.graphics.zIndex = 5; // Above measurement overlay (4)

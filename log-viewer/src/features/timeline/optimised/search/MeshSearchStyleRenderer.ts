@@ -26,19 +26,14 @@
  */
 
 import { Container, Geometry, Mesh, Shader } from 'pixi.js';
-import type {
-  CategoryAggregation,
-  PixelBucket,
-  RenderBatch,
-  ViewportState,
-} from '../../types/flamechart.types.js';
+import type { PixelBucket, RenderBatch, ViewportState } from '../../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { MatchedEventInfo } from '../../types/search.types.js';
-import { resolveColor } from '../BucketColorResolver.js';
 import type { PrecomputedRect } from '../RectangleCache.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
 import { createRectangleShader } from '../RectangleShader.js';
 import { colorToGreyscale } from '../rendering/ColorUtils.js';
+import { buildMatchIndex, resolveBucketSearchColor } from './SearchBucketMatcher.js';
 
 /**
  * MeshSearchStyleRenderer
@@ -222,16 +217,7 @@ export class MeshSearchStyleRenderer {
     startIndex: number,
     viewportTransform: ViewportTransform,
   ): number {
-    // Build spatial index: Map<depth, Array<{timestamp, category}>>
-    const matchesByDepth = new Map<number, Array<{ timestamp: number; category: string }>>();
-    for (const info of matchedEventsInfo) {
-      let depthMatches = matchesByDepth.get(info.depth);
-      if (!depthMatches) {
-        depthMatches = [];
-        matchesByDepth.set(info.depth, depthMatches);
-      }
-      depthMatches.push({ timestamp: info.timestamp, category: info.category });
-    }
+    const matchIndex = buildMatchIndex(matchedEventsInfo);
 
     // Pre-calculate constants outside loops
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
@@ -245,39 +231,7 @@ export class MeshSearchStyleRenderer {
     // Write all buckets from all categories
     for (const categoryBuckets of buckets.values()) {
       for (const bucket of categoryBuckets) {
-        // Find matched events in this bucket using time-range matching
-        const matchedCategoryStats = new Map<string, CategoryAggregation>();
-
-        const depthMatches = matchesByDepth.get(bucket.depth);
-        if (depthMatches) {
-          for (const match of depthMatches) {
-            if (
-              match.timestamp >= bucket.timeStart &&
-              match.timestamp < bucket.timeEnd &&
-              match.category
-            ) {
-              let stats = matchedCategoryStats.get(match.category);
-              if (!stats) {
-                stats = { count: 0, totalDuration: 0 };
-                matchedCategoryStats.set(match.category, stats);
-              }
-              stats.count++;
-            }
-          }
-        }
-
-        let displayColor: number;
-
-        if (matchedCategoryStats.size > 0) {
-          // Resolve color from matched events using priority rules
-          displayColor = resolveColor({
-            byCategory: matchedCategoryStats,
-            dominantCategory: '',
-          }).color;
-        } else {
-          // No matches - desaturate the bucket's pre-blended color
-          displayColor = colorToGreyscale(bucket.color);
-        }
+        const displayColor = resolveBucketSearchColor(bucket, matchIndex);
 
         this.geometry.writeRectangle(
           rectIndex,

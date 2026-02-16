@@ -40,7 +40,6 @@ import { FlameChartCursor } from '../search/FlameChartCursor.js';
 import { MeshSearchStyleRenderer } from '../search/MeshSearchStyleRenderer.js';
 import { SearchCursorImpl } from '../search/SearchCursor.js';
 import { SearchHighlightRenderer } from '../search/SearchHighlightRenderer.js';
-import { SearchStyleRenderer } from '../search/SearchStyleRenderer.js';
 import { SearchTextLabelRenderer } from '../search/SearchTextLabelRenderer.js';
 import type { TextLabelRenderer } from '../TextLabelRenderer.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
@@ -98,7 +97,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
   // SEARCH COMPONENTS
   // ============================================================================
   private eventMatcher: EventMatcher<E> | null = null;
-  private searchStyleRenderer: SearchStyleRenderer | MeshSearchStyleRenderer | null = null;
+  private searchStyleRenderer: MeshSearchStyleRenderer | null = null;
   private searchHighlightRenderer: SearchHighlightRenderer | null = null;
   private searchTextLabelRenderer: SearchTextLabelRenderer | null = null;
 
@@ -110,7 +109,6 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     worldContainer: PIXI.Container;
     batches: Map<string, RenderBatch>;
     textLabelRenderer: TextLabelRenderer;
-    useMeshRenderer: boolean;
     stage?: PIXI.Container;
   } | null = null;
 
@@ -138,7 +136,6 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @param rectangleManager - Rectangle manager for building rect map
    * @param batches - Event batches for styled rendering
    * @param textLabelRenderer - Text label renderer for search label coordination
-   * @param useMeshRenderer - Whether to use mesh-based renderers
    * @param viewport - Main timeline viewport (for coordinate calculations)
    * @param mainTimelineYOffset - Offset from container top to main timeline canvas
    */
@@ -148,7 +145,6 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     rectangleManager: RectangleCache,
     batches: Map<string, RenderBatch>,
     textLabelRenderer: TextLabelRenderer,
-    useMeshRenderer: boolean,
     viewport: TimelineViewport,
     mainTimelineYOffset: number,
   ): void {
@@ -167,7 +163,6 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       worldContainer,
       batches,
       textLabelRenderer,
-      useMeshRenderer,
     };
   }
 
@@ -180,18 +175,13 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       return; // Already initialized or no data to initialize with
     }
 
-    const { worldContainer, batches, textLabelRenderer, useMeshRenderer, stage } =
-      this.deferredInitData;
+    const { worldContainer, batches, textLabelRenderer, stage } = this.deferredInitData;
 
     // Initialize search style renderer (renders with desaturation for search mode)
-    if (useMeshRenderer) {
-      this.searchStyleRenderer = new MeshSearchStyleRenderer(worldContainer, batches);
-      // If stage was set before renderers were initialized, apply it now
-      if (stage) {
-        (this.searchStyleRenderer as MeshSearchStyleRenderer).setStageContainer(stage);
-      }
-    } else {
-      this.searchStyleRenderer = new SearchStyleRenderer(worldContainer, batches);
+    this.searchStyleRenderer = new MeshSearchStyleRenderer(worldContainer, batches);
+    // If stage was set before renderers were initialized, apply it now
+    if (stage) {
+      this.searchStyleRenderer.setStageContainer(stage);
     }
 
     // Initialize search highlight renderer (for borders/overlays on current match)
@@ -220,8 +210,8 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     }
 
     // Apply immediately if renderer already exists
-    if (this.searchStyleRenderer && 'setStageContainer' in this.searchStyleRenderer) {
-      (this.searchStyleRenderer as MeshSearchStyleRenderer).setStageContainer(stage);
+    if (this.searchStyleRenderer) {
+      this.searchStyleRenderer.setStageContainer(stage);
     }
   }
 

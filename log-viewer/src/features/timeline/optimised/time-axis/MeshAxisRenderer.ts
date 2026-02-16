@@ -64,7 +64,6 @@ interface TickInterval {
 }
 
 export class MeshAxisRenderer {
-  private parentContainer: Container;
   private geometry: RectangleGeometry;
   private shader: Shader;
   private mesh: Mesh<Geometry, Shader>;
@@ -83,8 +82,6 @@ export class MeshAxisRenderer {
   private firstTimestampNs = 0;
 
   constructor(container: Container, config?: Partial<AxisConfig>) {
-    this.parentContainer = container;
-
     // Default configuration
     this.config = {
       height: 30,

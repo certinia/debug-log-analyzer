@@ -30,10 +30,7 @@ import { MeshMarkerRenderer } from './markers/MeshMarkerRenderer.js';
 import { MeshRectangleRenderer } from './MeshRectangleRenderer.js';
 import { MeshAxisRenderer } from './time-axis/MeshAxisRenderer.js';
 
-import { EventBatchRenderer } from './EventBatchRenderer.js';
-import { TimelineMarkerRenderer } from './markers/TimelineMarkerRenderer.js';
 import { TextLabelRenderer } from './TextLabelRenderer.js';
-import { AxisRenderer } from './time-axis/AxisRenderer.js';
 
 import { cssColorToPixi } from './BucketColorResolver.js';
 import { HitDetector } from './interaction/HitDetector.js';
@@ -129,9 +126,9 @@ export class FlameChart<E extends EventNode = EventNode> {
   private callbacks: FlameChartCallbacks = {};
 
   private rectangleManager: RectangleCache | null = null;
-  private batchRenderer: EventBatchRenderer | MeshRectangleRenderer | null = null;
-  private axisRenderer: AxisRenderer | MeshAxisRenderer | null = null;
-  private markerRenderer: TimelineMarkerRenderer | MeshMarkerRenderer | null = null;
+  private batchRenderer: MeshRectangleRenderer | null = null;
+  private axisRenderer: MeshAxisRenderer | null = null;
+  private markerRenderer: MeshMarkerRenderer | null = null;
   private resizeHandler: TimelineResizeHandler | null = null;
 
   // Search orchestrator (owns search state and rendering)
@@ -287,24 +284,13 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Initialize viewport animator for smooth transitions
     this.viewportAnimator = new ViewportAnimator();
 
-    // Determine renderer type: mesh is default for testing
-    const useMeshRenderer = options.renderer !== 'sprite';
-
     // Create truncation renderer FIRST (renders behind axis and events)
     if (this.markerContainer && this.markers.length > 0) {
-      if (useMeshRenderer) {
-        this.markerRenderer = new MeshMarkerRenderer(
-          this.markerContainer,
-          this.viewport,
-          this.markers,
-        );
-      } else {
-        this.markerRenderer = new TimelineMarkerRenderer(
-          this.markerContainer,
-          this.viewport,
-          this.markers,
-        );
-      }
+      this.markerRenderer = new MeshMarkerRenderer(
+        this.markerContainer,
+        this.viewport,
+        this.markers,
+      );
     }
 
     // Create axis renderer SECOND
@@ -316,11 +302,7 @@ export class FlameChart<E extends EventNode = EventNode> {
         fontSize: 11,
         minLabelSpacing: 120,
       };
-      if (useMeshRenderer) {
-        this.axisRenderer = new MeshAxisRenderer(this.axisContainer, axisConfig);
-      } else {
-        this.axisRenderer = new AxisRenderer(this.axisContainer, axisConfig);
-      }
+      this.axisRenderer = new MeshAxisRenderer(this.axisContainer, axisConfig);
       this.axisRenderer.setScreenSpaceContainer(this.uiContainer);
       // No minimap offset needed - main timeline has its own canvas
     }
@@ -342,11 +324,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Create batch renderer (pure rendering, receives rectangles from RectangleCache)
     if (this.worldContainer && this.state) {
-      if (useMeshRenderer) {
-        this.batchRenderer = new MeshRectangleRenderer(this.worldContainer, this.state.batches);
-      } else {
-        this.batchRenderer = new EventBatchRenderer(this.worldContainer, this.state.batches);
-      }
+      this.batchRenderer = new MeshRectangleRenderer(this.worldContainer, this.state.batches);
     }
 
     // Create text label renderer (renders method names on rectangles)
@@ -359,17 +337,17 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.worldContainer.sortableChildren = true;
     }
 
-    // For mesh renderers, set stage container for clip-space rendering
-    if (useMeshRenderer && this.app) {
+    // Set stage container for clip-space rendering
+    if (this.app) {
       const stage = this.app.stage;
-      if (this.batchRenderer && 'setStageContainer' in this.batchRenderer) {
-        (this.batchRenderer as MeshRectangleRenderer).setStageContainer(stage);
+      if (this.batchRenderer) {
+        this.batchRenderer.setStageContainer(stage);
       }
-      if (this.markerRenderer && 'setStageContainer' in this.markerRenderer) {
-        (this.markerRenderer as MeshMarkerRenderer).setStageContainer(stage);
+      if (this.markerRenderer) {
+        this.markerRenderer.setStageContainer(stage);
       }
-      if (this.axisRenderer && 'setStageContainer' in this.axisRenderer) {
-        (this.axisRenderer as MeshAxisRenderer).setStageContainer(stage);
+      if (this.axisRenderer) {
+        this.axisRenderer.setStageContainer(stage);
       }
       // No minimap offset needed - main timeline has its own canvas
     }
@@ -414,7 +392,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Initialize search if enabled via options
     if (options.enableSearch) {
-      this.setupSearch(useMeshRenderer);
+      this.setupSearch();
     }
 
     // Initial render
@@ -545,10 +523,8 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   /**
    * Setup search orchestrator for find and navigation functionality.
-   *
-   * @param useMeshRenderer - Whether to use mesh-based renderers
    */
-  private setupSearch(useMeshRenderer: boolean): void {
+  private setupSearch(): void {
     if (
       !this.rectangleManager ||
       !this.treeNodes ||
@@ -583,13 +559,12 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.rectangleManager,
       this.state.batches,
       this.textLabelRenderer,
-      useMeshRenderer,
       this.viewport,
       this.mainTimelineYOffset,
     );
 
-    // For mesh renderers, set stage container for clip-space rendering
-    if (useMeshRenderer && this.app) {
+    // Set stage container for clip-space rendering
+    if (this.app) {
       this.searchOrchestrator.setStageContainer(this.app.stage);
     }
   }
@@ -822,7 +797,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     startTimeMs: number,
     firstTimestampNs: number,
   ): void {
-    if (this.axisRenderer instanceof MeshAxisRenderer) {
+    if (this.axisRenderer) {
       this.axisRenderer.setTimeDisplayMode(mode, startTimeMs, firstTimestampNs);
 
       if (!this.state) {
