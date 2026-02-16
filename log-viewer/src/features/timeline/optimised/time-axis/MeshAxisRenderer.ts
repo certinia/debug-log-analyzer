@@ -21,7 +21,7 @@
  * - Nanoseconds: Major ticks at 1ns, 2ns, 5ns, 10ns intervals
  */
 
-import { Container, Geometry, Mesh, Shader, Text } from 'pixi.js';
+import { Container, Geometry, Graphics, Mesh, Shader, Text } from 'pixi.js';
 import { formatWallClockTime } from '../../../../core/utility/Util.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
@@ -31,6 +31,14 @@ import { createRectangleShader } from '../RectangleShader.js';
  * Nanoseconds per millisecond conversion constant.
  */
 const NS_PER_MS = 1_000_000;
+
+/**
+ * Padding around the sticky label in pixels.
+ */
+const STICKY_PADDING_X = 4;
+const STICKY_PADDING_Y = 2;
+const STICKY_LEFT_X = 4;
+const STICKY_TOP_Y = 5;
 
 /**
  * Axis rendering configuration.
@@ -70,7 +78,10 @@ export class MeshAxisRenderer {
   private labelsContainer: Container;
   private screenSpaceContainer: Container | null = null;
   private config: AxisConfig;
-  private labelCache: Map<string, Text> = new Map();
+  /** Pool of reusable Text labels (index-based to support duplicate text) */
+  private labelPool: Text[] = [];
+  /** Number of active labels in current frame */
+  private activeLabelCount = 0;
   /** Grid line color */
   private gridLineColor: number;
 
@@ -80,6 +91,11 @@ export class MeshAxisRenderer {
   private startTimeMs = 0;
   /** Nanosecond timestamp of the first event (for wallClock mode) */
   private firstTimestampNs = 0;
+
+  /** Sticky label: persistent text pinned to left edge showing last off-screen anchor */
+  private stickyText: Text | null = null;
+  /** Sticky label background rectangle */
+  private stickyBackground: Graphics | null = null;
 
   constructor(container: Container, config?: Partial<AxisConfig>) {
     this.parentContainer = container;
@@ -180,9 +196,15 @@ export class MeshAxisRenderer {
       computedStyle.getPropertyValue('--vscode-editorLineNumber-foreground').trim() || '#808080';
 
     // Update existing labels with new color
-    for (const label of this.labelCache.values()) {
+    for (const label of this.labelPool) {
       label.style.fill = this.config.textColor;
     }
+
+    // Update sticky label colors
+    if (this.stickyText) {
+      this.stickyText.style.fill = this.config.textColor;
+    }
+    this.updateStickyBackground();
   }
 
   /**
@@ -259,7 +281,17 @@ export class MeshAxisRenderer {
     this.geometry.destroy();
     this.mesh.destroy();
     this.labelsContainer.destroy();
-    this.labelCache.clear();
+    this.labelPool.length = 0;
+    this.activeLabelCount = 0;
+
+    if (this.stickyText) {
+      this.stickyText.destroy();
+      this.stickyText = null;
+    }
+    if (this.stickyBackground) {
+      this.stickyBackground.destroy();
+      this.stickyBackground = null;
+    }
   }
 
   // ============================================================================
@@ -287,7 +319,9 @@ export class MeshAxisRenderer {
 
     return {
       interval: interval * NS_PER_MS, // Convert back to nanoseconds
-      skipFactor,
+      // In wall-clock mode every tick gets a label (wall-clock or relative),
+      // so never skip ticks
+      skipFactor: this.displayMode === 'wallClock' ? 1 : skipFactor,
     };
   }
 
@@ -405,7 +439,46 @@ export class MeshAxisRenderer {
     let rectIndex = 0;
 
     const isWallClockDisplay = this.displayMode === 'wallClock';
-    const isIntervalMsOrMore = tickInterval.interval >= NS_PER_MS;
+
+    // Wall-clock per-tick tracking: show wall-clock time when the integer ms
+    // differs from the previous tick, otherwise show a relative offset.
+    let previousWallClockMsInt = -1;
+    let previousAnchorTime = 0;
+    let lastOffscreenAnchorTime: number | null = null;
+    let preComputedAnchorIdx = -1;
+
+    if (isWallClockDisplay) {
+      // Pre-compute anchor state so the first tick in the loop is correctly
+      // classified as wall-clock vs relative. Without this, the first tick
+      // always becomes an anchor (because previousWallClockMsInt starts at -1),
+      // causing relative labels to vanish on the left side of the viewport.
+      //
+      // Find the ms value for the first tick, then compute where that ms run
+      // starts by finding the ms boundary (where Math.round transitions).
+      const firstTime = firstTickIndex * tickInterval.interval;
+      const firstMs = Math.round(
+        this.startTimeMs + (firstTime - this.firstTimestampNs) / NS_PER_MS,
+      );
+
+      // The ms boundary is where wallClockMs = firstMs - 0.5 (Math.round rounds .5 up).
+      // Convert back to nanoseconds to find the anchor tick.
+      const msBoundaryNs = (firstMs - 0.5 - this.startTimeMs) * NS_PER_MS + this.firstTimestampNs;
+      const anchorTickIndex = Math.ceil(msBoundaryNs / tickInterval.interval);
+
+      previousWallClockMsInt = firstMs;
+      previousAnchorTime = anchorTickIndex * tickInterval.interval;
+      preComputedAnchorIdx = anchorTickIndex;
+
+      // If the pre-computed anchor is before the loop range it won't get a label,
+      // so track it here for the sticky label.
+      if (anchorTickIndex < firstTickIndex) {
+        lastOffscreenAnchorTime = previousAnchorTime;
+      }
+    }
+
+    // Track visible labels for collision detection with sticky label
+    const visibleLabels: { label: Text; isAnchor: boolean }[] = [];
+    const hasSubMsTicks = tickInterval.interval < NS_PER_MS;
 
     // Render all ticks in range
     for (let i = firstTickIndex; i <= lastTickIndex; i++) {
@@ -439,25 +512,56 @@ export class MeshAxisRenderer {
 
       // Add label at top if requested (only when showLabels is enabled)
       if (showLabels && shouldShowLabel && this.screenSpaceContainer) {
-        const timeMs = time / NS_PER_MS;
-        const useWallClock = isWallClockDisplay && (isIntervalMsOrMore || time % NS_PER_MS === 0);
-        const labelText = useWallClock
-          ? formatWallClockTime(this.startTimeMs + (time - this.firstTimestampNs) / NS_PER_MS)
-          : this.formatMilliseconds(timeMs);
+        const screenSpaceX = screenX - viewport.offsetX;
+        let labelText: string;
+        let isAnchorLabel = false;
 
-        // Only show label if not empty (skip zero)
+        if (isWallClockDisplay) {
+          // Per-tick decision: show wall-clock time when the rounded ms is
+          // unique (different from the previous tick), otherwise show a
+          // relative offset from the last unique-ms tick.
+          //
+          // Math.round matches formatWallClockTime's internal Math.round(ms % 1000),
+          // so the classification is consistent with the formatted output.
+          const wallClockMs = this.startTimeMs + (time - this.firstTimestampNs) / NS_PER_MS;
+          const wallClockMsInt = Math.round(wallClockMs);
+
+          if (wallClockMsInt !== previousWallClockMsInt || i === preComputedAnchorIdx) {
+            // Unique ms (or pre-computed anchor) — show wall-clock label
+            previousWallClockMsInt = wallClockMsInt;
+            previousAnchorTime = time;
+            labelText = this.formatWallClockTimeTrimmed(wallClockMs);
+            isAnchorLabel = true;
+          } else {
+            // Same ms as previous tick — show relative offset
+            labelText = this.formatRelativeOffset(time - previousAnchorTime);
+          }
+        } else {
+          // Elapsed mode
+          const timeMs = time / NS_PER_MS;
+          labelText = this.formatMilliseconds(timeMs);
+        }
+
         if (labelText) {
           const label = this.getOrCreateLabel(labelText);
+          label.x = screenSpaceX - 3;
+          label.y = 5;
+          label.anchor.set(1, 0);
 
-          // Calculate screen-space X position (accounting for stage pan)
-          // screenX is in world space, need to convert to screen space
-          const screenSpaceX = screenX - viewport.offsetX;
-
-          // Position label in screen space (top-left origin, Y pointing down)
-          // No minimap offset needed - main timeline has its own canvas
-          label.x = screenSpaceX - 3; // 3px to the left of line
-          label.y = 5; // 5px from top
-          label.anchor.set(1, 0); // Right-align to line, align top
+          if (isWallClockDisplay) {
+            if (isAnchorLabel) {
+              const labelLeftEdge = label.x - this.estimateMonospaceWidth(labelText);
+              if (labelLeftEdge < 0) {
+                // Anchor is being clipped — sticky replaces it
+                lastOffscreenAnchorTime = time;
+                label.visible = false;
+              } else {
+                visibleLabels.push({ label, isAnchor: true });
+              }
+            } else {
+              visibleLabels.push({ label, isAnchor: false });
+            }
+          }
         }
       }
     }
@@ -465,6 +569,129 @@ export class MeshAxisRenderer {
     // Set draw count and make visible
     this.geometry.setDrawCount(rectIndex);
     this.mesh.visible = true;
+
+    // Update sticky label for wall-clock relative mode
+    this.updateStickyLabel(lastOffscreenAnchorTime, visibleLabels, hasSubMsTicks);
+  }
+
+  // ============================================================================
+  // PRIVATE: STICKY LABEL
+  // ============================================================================
+
+  /**
+   * Update the sticky anchor label pinned to the left edge.
+   * Shows the wall-clock time of the last off-screen anchor.
+   */
+  private updateStickyLabel(
+    lastOffscreenAnchorTime: number | null,
+    visibleLabels: { label: Text; isAnchor: boolean }[],
+    hasSubMsTicks: boolean,
+  ): void {
+    // Only show sticky when sub-ms ticks exist (relative labels between anchors).
+    // At lower zoom every tick is an anchor so sticky adds no value.
+    if (!lastOffscreenAnchorTime || !this.screenSpaceContainer || !hasSubMsTicks) {
+      this.hideStickyLabel();
+      return;
+    }
+
+    const stickyTimeText = this.formatWallClockTimeTrimmed(
+      this.startTimeMs + (lastOffscreenAnchorTime - this.firstTimestampNs) / NS_PER_MS,
+    );
+
+    // Create or update sticky text
+    if (!this.stickyText) {
+      this.stickyText = new Text({
+        text: stickyTimeText,
+        style: {
+          fontFamily: 'monospace',
+          fontSize: this.config.fontSize,
+          fill: this.config.textColor,
+        },
+      });
+      this.stickyText.anchor.set(0, 0);
+      // Sticky label renders on top (added after regular labels container)
+      this.screenSpaceContainer.addChild(this.stickyText);
+    } else {
+      this.stickyText.text = stickyTimeText;
+    }
+
+    this.stickyText.x = STICKY_LEFT_X + STICKY_PADDING_X;
+    this.stickyText.y = STICKY_TOP_Y;
+    this.stickyText.visible = true;
+
+    // Create or update sticky background
+    if (!this.stickyBackground) {
+      this.stickyBackground = new Graphics();
+      // Insert background before text so text renders on top
+      const textIndex = this.screenSpaceContainer.getChildIndex(this.stickyText);
+      this.screenSpaceContainer.addChildAt(this.stickyBackground, textIndex);
+    }
+    this.updateStickyBackground();
+    this.stickyBackground.visible = true;
+
+    // Collision detection: handle overlapping labels near the sticky.
+    // - Relative labels yield to the sticky (hidden).
+    // - Anchor labels cause the sticky to yield (sticky hidden) since
+    //   the anchor provides more relevant context as it scrolls past.
+    const stickyRightEdge = STICKY_LEFT_X + this.stickyText.width + STICKY_PADDING_X * 2 + 4;
+
+    for (const { label, isAnchor } of visibleLabels) {
+      // Labels are right-anchored, so left edge = label.x - label.width
+      const labelLeftEdge = label.x - label.width;
+      if (labelLeftEdge < stickyRightEdge) {
+        if (isAnchor) {
+          // Anchor approaching — hide sticky so anchor stays visible
+          this.hideStickyLabel();
+          break;
+        }
+        label.visible = false;
+      }
+    }
+  }
+
+  /**
+   * Redraw the sticky label background rectangle.
+   */
+  private updateStickyBackground(): void {
+    if (!this.stickyBackground || !this.stickyText || !this.stickyText.visible) {
+      return;
+    }
+
+    this.stickyBackground.clear();
+
+    const bgColor = this.getStickyBackgroundColor();
+    const width = this.stickyText.width + STICKY_PADDING_X * 2;
+    const height = this.stickyText.height + STICKY_PADDING_Y * 2;
+
+    this.stickyBackground.roundRect(
+      STICKY_LEFT_X,
+      STICKY_TOP_Y - STICKY_PADDING_Y,
+      width,
+      height,
+      2,
+    );
+    this.stickyBackground.fill({ color: bgColor, alpha: 0.85 });
+  }
+
+  /**
+   * Get background color for sticky label from CSS variables.
+   */
+  private getStickyBackgroundColor(): number {
+    const computedStyle = getComputedStyle(document.documentElement);
+    const bgStr = computedStyle.getPropertyValue('--vscode-editor-background').trim() || '#1e1e1e';
+    return this.parseColorToHex(bgStr);
+  }
+
+  /**
+   * Hide the sticky label and background.
+   */
+  private hideStickyLabel(): void {
+    if (this.stickyText) {
+      this.stickyText.visible = false;
+    }
+    if (this.stickyBackground) {
+      this.stickyBackground.visible = false;
+    }
   }
 
   // ============================================================================
@@ -472,11 +699,12 @@ export class MeshAxisRenderer {
   // ============================================================================
 
   /**
-   * Get or create a PIXI.Text label from cache.
-   * Reuses labels to avoid constant object creation.
+   * Get or create a PIXI.Text label from the pool.
+   * Uses index-based pooling so the same text can appear at multiple positions.
    */
   private getOrCreateLabel(text: string): Text {
-    let label = this.labelCache.get(text);
+    const index = this.activeLabelCount++;
+    let label = this.labelPool[index];
 
     if (!label) {
       label = new Text({
@@ -487,13 +715,13 @@ export class MeshAxisRenderer {
           fill: this.config.textColor,
         },
       });
-      this.labelCache.set(text, label);
+      this.labelPool.push(label);
       this.labelsContainer.addChild(label);
+    } else {
+      label.text = text;
     }
 
-    // Make label visible
     label.visible = true;
-
     return label;
   }
 
@@ -501,9 +729,11 @@ export class MeshAxisRenderer {
    * Hide all labels (for next render pass).
    */
   private clearLabels(): void {
-    for (const label of this.labelCache.values()) {
-      label.visible = false;
+    for (let i = 0; i < this.activeLabelCount; i++) {
+      this.labelPool[i]!.visible = false;
     }
+    this.activeLabelCount = 0;
+    this.hideStickyLabel();
   }
 
   // ============================================================================
@@ -533,5 +763,42 @@ export class MeshAxisRenderer {
     const formatted = timeMs.toFixed(3);
     const trimmed = formatted.replace(/\.?0+$/, '');
     return `${trimmed} ms`;
+  }
+
+  /**
+   * Format wall-clock time for axis labels, trimming trailing zeros from milliseconds.
+   * e.g., "10:35:55.100" → "10:35:55.1", "10:35:55.000" → "10:35:55"
+   */
+  private formatWallClockTimeTrimmed(ms: number): string {
+    const raw = formatWallClockTime(ms);
+    // raw format: "HH:mm:ss.SSS" — trim trailing zeros from the ms portion
+    return raw.replace(/\.?0+$/, '');
+  }
+
+  /**
+   * Format a relative offset in nanoseconds as "+N ms" or "+N s".
+   * Uses smart decimal trimming (no trailing zeros).
+   */
+  private estimateMonospaceWidth(text: string): number {
+    return text.length * this.config.fontSize * 0.6;
+  }
+
+  private formatRelativeOffset(offsetNs: number): string {
+    if (offsetNs === 0) {
+      return '';
+    }
+
+    const offsetMs = offsetNs / NS_PER_MS;
+
+    // For offsets >= 1s, show in seconds
+    if (offsetMs >= 1000) {
+      const seconds = offsetMs / 1000;
+      const formatted = seconds.toFixed(3).replace(/\.?0+$/, '');
+      return `+${formatted} s`;
+    }
+
+    // Show in milliseconds with smart decimal trimming
+    const formatted = offsetMs.toFixed(3).replace(/\.?0+$/, '');
+    return `+${formatted} ms`;
   }
 }
