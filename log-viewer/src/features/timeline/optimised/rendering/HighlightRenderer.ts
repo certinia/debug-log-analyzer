@@ -12,7 +12,6 @@
 
 import * as PIXI from 'pixi.js';
 import { TIMELINE_CONSTANTS, type ViewportState } from '../../types/flamechart.types.js';
-import { parseColorToHex } from './ColorUtils.js';
 
 /**
  * Highlight colors with alpha values for true transparency.
@@ -103,19 +102,18 @@ export function renderHighlight(
 }
 
 /**
- * Extract highlight colors from CSS variables.
- * Uses --vscode-editor-findMatchBackground as the source color.
- * Alpha values are applied during rendering for true transparency.
+ * Create highlight colors from a resolved PixiJS color value.
  *
+ * @param findMatchBackground - Resolved find match color (0xRRGGBB)
  * @returns Highlight colors (source color only)
  */
-export function extractHighlightColors(): HighlightColors {
-  const computedStyle = getComputedStyle(document.documentElement);
-
-  const colorStr =
-    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground').trim() || '#ff9632';
-
+export function createHighlightColors(findMatchBackground: number): HighlightColors {
   return {
-    sourceColor: parseColorToHex(colorStr, 0xea5c00),
+    sourceColor: findMatchBackground,
   };
 }
+
+/**
+ * Default highlight color used when no editor colors are provided.
+ */
+export const DEFAULT_FIND_MATCH_COLOR = 0xea5c00;

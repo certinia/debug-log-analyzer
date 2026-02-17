@@ -26,7 +26,6 @@ import { formatWallClockTime } from '../../../../core/utility/Util.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
 import { createRectangleShader } from '../RectangleShader.js';
-import { parseColorToHex } from '../rendering/ColorUtils.js';
 
 /**
  * Nanoseconds per millisecond conversion constant.
@@ -160,26 +159,19 @@ export class MeshAxisRenderer {
   }
 
   /**
-   * Refresh colors from CSS variables (e.g., after VS Code theme change).
-   * Updates grid line and label colors.
+   * Update axis colors (e.g., after theme change).
+   *
+   * @param lineColor - Grid line color (0xRRGGBB)
+   * @param textColor - Label text color (CSS string)
    */
-  public refreshColors(): void {
-    // Re-extract colors from CSS variables
-    const computedStyle = getComputedStyle(document.documentElement);
-
-    // Update grid line color
-    const lineColorStr =
-      computedStyle.getPropertyValue('--vscode-editorLineNumber-foreground').trim() || '#808080';
-    this.gridLineColor = parseColorToHex(lineColorStr, 0x808080);
-    this.config.lineColor = this.gridLineColor;
-
-    // Update text color
-    this.config.textColor =
-      computedStyle.getPropertyValue('--vscode-editorLineNumber-foreground').trim() || '#808080';
+  public setColors(lineColor: number, textColor: string): void {
+    this.gridLineColor = lineColor;
+    this.config.lineColor = lineColor;
+    this.config.textColor = textColor;
 
     // Update existing labels with new color
     for (const label of this.labelCache.values()) {
-      label.style.fill = this.config.textColor;
+      label.style.fill = textColor;
     }
   }
 

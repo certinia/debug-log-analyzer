@@ -295,10 +295,13 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Create axis renderer SECOND
     if (this.axisContainer && this.uiContainer) {
+      const editorColors = this.options.editorColors;
       const axisConfig = {
         height: 30,
-        lineColor: 0x808080,
-        textColor: '#808080',
+        lineColor: editorColors?.lineNumberForeground ?? 0x808080,
+        textColor: editorColors
+          ? `#${editorColors.lineNumberForeground.toString(16).padStart(6, '0')}`
+          : '#808080',
         fontSize: 11,
         minLabelSpacing: 120,
       };
@@ -370,7 +373,10 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     // Initialize cursor line renderer (for bidirectional cursor mirroring)
     if (this.uiContainer) {
-      this.cursorLineRenderer = new CursorLineRenderer(this.uiContainer);
+      this.cursorLineRenderer = new CursorLineRenderer(
+        this.uiContainer,
+        this.options.editorColors?.cursorForeground,
+      );
     }
 
     // Initialize minimap orchestrator
@@ -561,6 +567,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.textLabelRenderer,
       this.viewport,
       this.mainTimelineYOffset,
+      this.options.editorColors?.findMatchBackground,
     );
 
     // Set stage container for clip-space rendering
@@ -1241,6 +1248,7 @@ export class FlameChart<E extends EventNode = EventNode> {
     });
 
     // Initialize the orchestrator
+    const minimapEditorColors = this.options.editorColors;
     await this.minimapOrchestrator.init(
       this.minimapDiv,
       displayWidth,
@@ -1248,6 +1256,13 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.index,
       this.rectangleManager,
       this.viewport,
+      minimapEditorColors
+        ? {
+            widgetBackground: minimapEditorColors.widgetBackground,
+            focusBorder: minimapEditorColors.focusBorder,
+            lineNumberForeground: minimapEditorColors.lineNumberForeground,
+          }
+        : undefined,
     );
 
     // Focus container on minimap mousedown for keyboard support
@@ -1428,6 +1443,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.index.totalDuration,
       this.index.maxDepth,
       this.mainTimelineYOffset,
+      this.options.editorColors?.findMatchBackground,
     );
   }
 
@@ -1461,12 +1477,20 @@ export class FlameChart<E extends EventNode = EventNode> {
     });
 
     // Initialize the orchestrator
+    const editorColors = this.options.editorColors;
     this.measurementOrchestrator.init(
       this.worldContainer,
       this.container,
       this.viewport,
       this.index.totalDuration,
       this.index.maxDepth,
+      editorColors
+        ? {
+            selectionBackground: editorColors.selectionBackground,
+            selectionHighlightBorder: editorColors.selectionHighlightBorder,
+            focusBorder: editorColors.focusBorder,
+          }
+        : undefined,
     );
   }
 

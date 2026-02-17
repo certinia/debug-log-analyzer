@@ -123,6 +123,11 @@ export class MeasurementOrchestrator {
     viewport: TimelineViewport,
     totalDuration: number,
     maxDepth: number,
+    measureColors?: {
+      selectionBackground: number;
+      selectionHighlightBorder: number;
+      focusBorder: number;
+    },
   ): void {
     this.viewport = viewport;
     this.totalDuration = totalDuration;
@@ -130,8 +135,11 @@ export class MeasurementOrchestrator {
 
     // Initialize measurement system
     this.measurementState = new MeasurementState();
-    this.measurementRenderer = new MeasureRangeRenderer(worldContainer, htmlContainer, () =>
-      this.zoomToMeasurement(),
+    this.measurementRenderer = new MeasureRangeRenderer(
+      worldContainer,
+      htmlContainer,
+      () => this.zoomToMeasurement(),
+      measureColors,
     );
 
     // Initialize area zoom system
@@ -477,10 +485,13 @@ export class MeasurementOrchestrator {
   }
 
   /**
-   * Refresh colors from CSS variables (e.g., after theme change).
+   * Update measurement colors (e.g., after theme change).
+   *
+   * @param selectionBackground - Fill color (0xRRGGBB)
+   * @param borderColor - Border color (0xRRGGBB)
    */
-  public refreshColors(): void {
-    this.measurementRenderer?.refreshColors();
+  public setColors(selectionBackground: number, borderColor: number): void {
+    this.measurementRenderer?.setColors(selectionBackground, borderColor);
   }
 
   // ============================================================================

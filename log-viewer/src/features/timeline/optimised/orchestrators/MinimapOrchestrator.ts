@@ -188,6 +188,7 @@ export class MinimapOrchestrator {
     index: TimelineEventIndex,
     rectangleManager: RectangleCache,
     viewport: TimelineViewport,
+    minimapColors?: { widgetBackground: number; focusBorder: number; lineNumberForeground: number },
   ): Promise<void> {
     this.index = index;
     this.viewport = viewport;
@@ -227,7 +228,7 @@ export class MinimapOrchestrator {
     this.app.stage.addChild(this.container);
 
     // Initialize minimap renderer with HTML container for lens label
-    this.renderer = new MinimapRenderer(this.container, minimapDiv);
+    this.renderer = new MinimapRenderer(this.container, minimapDiv, minimapColors);
     this.renderer.setRenderer(this.app.renderer as PIXI.Renderer);
 
     // Initialize interaction handler
@@ -342,10 +343,18 @@ export class MinimapOrchestrator {
   }
 
   /**
-   * Refresh colors from CSS variables (e.g., after theme change).
+   * Update minimap colors (e.g., after theme change).
+   *
+   * @param widgetBackground - Widget background color (0xRRGGBB)
+   * @param focusBorder - Focus border color (0xRRGGBB)
+   * @param lineNumberForeground - Line number / axis color (0xRRGGBB)
    */
-  public refreshColors(): void {
-    this.renderer?.refreshColors();
+  public setColors(
+    widgetBackground: number,
+    focusBorder: number,
+    lineNumberForeground: number,
+  ): void {
+    this.renderer?.setColors(widgetBackground, focusBorder, lineNumberForeground);
   }
 
   // ============================================================================

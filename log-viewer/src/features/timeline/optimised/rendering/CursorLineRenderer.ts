@@ -18,7 +18,6 @@
 
 import * as PIXI from 'pixi.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
-import { parseColorToHex } from './ColorUtils.js';
 
 /**
  * Cursor line width in pixels.
@@ -39,20 +38,20 @@ export class CursorLineRenderer {
   /** Graphics object for cursor line */
   private graphics: PIXI.Graphics;
 
-  /** Cursor line color extracted from CSS variables */
+  /** Cursor line color */
   private cursorColor: number;
 
   /**
    * @param container - PixiJS container to add graphics to (uiContainer)
+   * @param cursorColor - Resolved cursor color (0xRRGGBB)
    */
-  constructor(container: PIXI.Container) {
+  constructor(container: PIXI.Container, cursorColor: number = DEFAULT_CURSOR_COLOR) {
     this.graphics = new PIXI.Graphics();
     // Position above other UI elements
     this.graphics.zIndex = 10;
     container.addChild(this.graphics);
 
-    // Extract color from CSS variables
-    this.cursorColor = this.extractCursorColor();
+    this.cursorColor = cursorColor;
   }
 
   /**
@@ -95,26 +94,12 @@ export class CursorLineRenderer {
   }
 
   /**
-   * Refresh colors from CSS variables (e.g., after theme change).
+   * Update cursor color (e.g., after theme change).
+   *
+   * @param cursorColor - Resolved cursor color (0xRRGGBB)
    */
-  public refreshColors(): void {
-    this.cursorColor = this.extractCursorColor();
-  }
-
-  /**
-   * Extract cursor color from CSS variables.
-   * Uses the same color as selection/focus for consistency.
-   */
-  private extractCursorColor(): number {
-    const computedStyle = getComputedStyle(document.documentElement);
-
-    // Use focus border color for cursor (matches VS Code selection)
-    const colorStr =
-      computedStyle.getPropertyValue('--vscode-editorCursor-foreground').trim() ||
-      computedStyle.getPropertyValue('--vscode-focusBorder').trim() ||
-      '#ffffff';
-
-    return parseColorToHex(colorStr, DEFAULT_CURSOR_COLOR);
+  public setColor(cursorColor: number): void {
+    this.cursorColor = cursorColor;
   }
 
   /**

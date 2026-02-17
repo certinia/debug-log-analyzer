@@ -25,7 +25,8 @@ import type {
 } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import {
-  extractHighlightColors,
+  createHighlightColors,
+  DEFAULT_FIND_MATCH_COLOR,
   MIN_HIGHLIGHT_WIDTH,
   renderHighlight,
   type HighlightColors,
@@ -72,8 +73,9 @@ export class SelectionHighlightRenderer {
 
   /**
    * @param container - PixiJS container to add graphics to (worldContainer)
+   * @param findMatchColor - Resolved find match color (0xRRGGBB)
    */
-  constructor(container: PIXI.Container) {
+  constructor(container: PIXI.Container, findMatchColor?: number) {
     // Frame highlight graphics - renders on top of frames
     this.frameGraphics = new PIXI.Graphics();
     this.frameGraphics.zIndex = 3;
@@ -84,8 +86,7 @@ export class SelectionHighlightRenderer {
     this.markerGraphics.zIndex = -1;
     container.addChild(this.markerGraphics);
 
-    // Extract colors from shared utility (same colors as search highlight)
-    this.colors = extractHighlightColors();
+    this.colors = createHighlightColors(findMatchColor ?? DEFAULT_FIND_MATCH_COLOR);
   }
 
   /**
@@ -212,10 +213,12 @@ export class SelectionHighlightRenderer {
   }
 
   /**
-   * Refresh colors from CSS variables (e.g., after VS Code theme change).
+   * Update highlight colors (e.g., after theme change).
+   *
+   * @param findMatchColor - Resolved find match color (0xRRGGBB)
    */
-  public refreshColors(): void {
-    this.colors = extractHighlightColors();
+  public setHighlightColor(findMatchColor: number): void {
+    this.colors = createHighlightColors(findMatchColor);
   }
 
   /**

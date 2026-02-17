@@ -18,8 +18,8 @@ export const tooltipStyles = `
         padding: 5px;
         border-radius: 4px;
         border-left: 4px solid;
-        background-color: var(--vscode-editor-background);
-        color: var(--vscode-editor-foreground);
+        background-color: var(--tl-editor-background);
+        color: var(--tl-editor-foreground);
         font-family: monospace;
         font-size: 0.92rem;
         pointer-events: auto;
@@ -57,6 +57,6 @@ export const tooltipStyles = `
         opacity: 0.9;
         text-align: right;
         white-space: pre-wrap;
-        color: var(--vscode-descriptionForeground, #999)
+        color: var(--tl-description-foreground, #999)
       }
 `;

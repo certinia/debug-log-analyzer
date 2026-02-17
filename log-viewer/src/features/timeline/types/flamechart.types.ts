@@ -245,6 +245,29 @@ export type TimelineColorMap = {
 };
 
 /**
+ * Resolved editor colors for PixiJS renderers.
+ * Extracted from CSS custom properties (--tl-*) in the Lit layer,
+ * so renderers don't need to read CSS variables at runtime.
+ * All values are PixiJS numeric colors (0xRRGGBB).
+ */
+export interface EditorColors {
+  /** Cursor line color (--tl-cursor-foreground) */
+  cursorForeground: number;
+  /** Focus/selection border color (--tl-focus-border) */
+  focusBorder: number;
+  /** Search match highlight color (--tl-find-match-background) */
+  findMatchBackground: number;
+  /** Widget/tooltip background color (--tl-widget-background) */
+  widgetBackground: number;
+  /** Line number / axis color (--tl-line-number-foreground) */
+  lineNumberForeground: number;
+  /** Selection overlay color (--tl-selection-background) */
+  selectionBackground: number;
+  /** Selection highlight border color (--tl-selection-highlight-border) */
+  selectionHighlightBorder: number;
+}
+
+/**
  * Configuration options for timeline initialization.
  */
 export interface TimelineOptions {
@@ -261,6 +284,9 @@ export interface TimelineOptions {
     /** Enable case-sensitive search (default: false). */
     caseSensitive?: boolean;
   };
+
+  /** Resolved editor colors for PixiJS renderers (extracted from CSS in the Lit layer). */
+  editorColors?: EditorColors;
 
   /** Event handlers for user interactions. */
   onEventClick?: (event: LogEvent) => void;

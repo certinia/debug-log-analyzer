@@ -110,6 +110,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     batches: Map<string, RenderBatch>;
     textLabelRenderer: TextLabelRenderer;
     stage?: PIXI.Container;
+    findMatchColor?: number;
   } | null = null;
 
   // ============================================================================
@@ -147,6 +148,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     textLabelRenderer: TextLabelRenderer,
     viewport: TimelineViewport,
     mainTimelineYOffset: number,
+    findMatchColor?: number,
   ): void {
     this.viewport = viewport;
     this.mainTimelineYOffset = mainTimelineYOffset;
@@ -163,6 +165,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       worldContainer,
       batches,
       textLabelRenderer,
+      findMatchColor,
     };
   }
 
@@ -175,7 +178,8 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
       return; // Already initialized or no data to initialize with
     }
 
-    const { worldContainer, batches, textLabelRenderer, stage } = this.deferredInitData;
+    const { worldContainer, batches, textLabelRenderer, stage, findMatchColor } =
+      this.deferredInitData;
 
     // Initialize search style renderer (renders with desaturation for search mode)
     this.searchStyleRenderer = new MeshSearchStyleRenderer(worldContainer, batches);
@@ -185,7 +189,7 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
     }
 
     // Initialize search highlight renderer (for borders/overlays on current match)
-    this.searchHighlightRenderer = new SearchHighlightRenderer(worldContainer);
+    this.searchHighlightRenderer = new SearchHighlightRenderer(worldContainer, findMatchColor);
 
     // Initialize search text label renderer (coordinates matched and unmatched labels)
     this.searchTextLabelRenderer = new SearchTextLabelRenderer(

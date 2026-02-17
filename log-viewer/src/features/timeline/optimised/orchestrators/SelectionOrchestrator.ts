@@ -191,6 +191,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
     totalDuration: number,
     maxDepth: number,
     mainTimelineYOffset: number,
+    findMatchColor?: number,
   ): void {
     this.viewport = viewport;
     this.totalDuration = totalDuration;
@@ -202,7 +203,7 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
     this.selectionNavigator.setMarkers(markers);
 
     // Initialize selection highlight renderer
-    this.selectionRenderer = new SelectionHighlightRenderer(worldContainer);
+    this.selectionRenderer = new SelectionHighlightRenderer(worldContainer, findMatchColor);
     this.selectionRenderer.setMarkerContext(markers, totalDuration);
   }
 
@@ -558,9 +559,11 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
   }
 
   /**
-   * Refresh colors from CSS variables (e.g., after theme change).
+   * Update highlight color (e.g., after theme change).
+   *
+   * @param findMatchColor - Resolved find match color (0xRRGGBB)
    */
-  public refreshColors(): void {
-    this.selectionRenderer?.refreshColors();
+  public setHighlightColor(findMatchColor: number): void {
+    this.selectionRenderer?.setHighlightColor(findMatchColor);
   }
 }

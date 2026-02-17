@@ -24,7 +24,6 @@
 import { BitmapText, Container, Graphics } from 'pixi.js';
 
 import { formatDuration, TEXT_LABEL_CONSTANTS } from '../../types/flamechart.types.js';
-import { parseColorToHex } from '../rendering/ColorUtils.js';
 import type { MinimapViewport } from './MinimapViewport.js';
 
 /**
@@ -93,7 +92,7 @@ export class MinimapAxisRenderer {
     // Create container for labels
     this.labelsContainer = new Container();
 
-    // Initialize stroke options (updated in refreshColors)
+    // Initialize stroke options (updated in setColors)
     this.strokeOptions = { color: this.config.tickColor, width: 1 };
   }
 
@@ -196,25 +195,18 @@ export class MinimapAxisRenderer {
   }
 
   /**
-   * Refresh colors from CSS variables (e.g., after VS Code theme change).
-   * Updates tick and label colors.
+   * Update tick and label colors (e.g., after theme change).
+   *
+   * @param color - Resolved color for ticks and labels (0xRRGGBB)
    */
-  public refreshColors(): void {
-    // Re-extract colors from CSS variables
-    const computedStyle = getComputedStyle(document.documentElement);
-
-    // Update tick color
-    const tickColorStr =
-      computedStyle.getPropertyValue('--vscode-editorLineNumber-foreground').trim() || '#808080';
-    this.config.tickColor = parseColorToHex(tickColorStr, 0x808080);
-    this.strokeOptions.color = this.config.tickColor;
-
-    // Update label tint color
-    this.config.labelTint = parseColorToHex(tickColorStr, 0x808080);
+  public setColors(color: number): void {
+    this.config.tickColor = color;
+    this.strokeOptions.color = color;
+    this.config.labelTint = color;
 
     // Update existing labels with new tint (BitmapText uses tint for color)
     for (const label of this.labelPool) {
-      label.tint = this.config.labelTint;
+      label.tint = color;
     }
   }
 

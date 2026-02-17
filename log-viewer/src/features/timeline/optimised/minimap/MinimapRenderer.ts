@@ -31,7 +31,6 @@ import type { MarkerType, TimelineMarker } from '../../types/flamechart.types.js
 import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
 import { blendWithBackground } from '../BucketColorResolver.js';
 import { createRectangleShader } from '../RectangleShader.js';
-import { parseColorToHex } from '../rendering/ColorUtils.js';
 import { MinimapAxisRenderer } from './MinimapAxisRenderer.js';
 import { MinimapBarGeometry } from './MinimapBarGeometry.js';
 import type { MinimapDensityData } from './MinimapDensityQuery.js';
@@ -163,8 +162,13 @@ export class MinimapRenderer {
   /**
    * @param parentContainer - PIXI container to add minimap graphics to
    * @param htmlContainer - HTML element for positioning the lens label
+   * @param colors - Optional pre-resolved colors (widgetBackground, focusBorder)
    */
-  constructor(parentContainer: PIXI.Container, htmlContainer: HTMLElement) {
+  constructor(
+    parentContainer: PIXI.Container,
+    htmlContainer: HTMLElement,
+    colors?: { widgetBackground: number; focusBorder: number; lineNumberForeground: number },
+  ) {
     // Store HTML container for label positioning
     this.htmlContainer = htmlContainer;
 
@@ -227,8 +231,19 @@ export class MinimapRenderer {
     // Add to main container (static sprite will be added when first rendered)
     this.container.addChild(this.dynamicContainer);
 
-    // Extract colors from CSS variables
-    this.colors = this.extractColors();
+    // Use provided colors or defaults
+    this.colors = colors
+      ? {
+          curtain: colors.widgetBackground,
+          lensBorder: colors.focusBorder,
+          edgeHandle: colors.focusBorder,
+        }
+      : { curtain: 0x252526, lensBorder: 0x007fd4, edgeHandle: 0x007fd4 };
+
+    // Create axis renderer with pre-resolved color
+    if (colors) {
+      this.axisRenderer.setColors(colors.lineNumberForeground);
+    }
 
     // Create HTML label for lens time info
     this.labelElement = this.createLabelElement();
@@ -247,8 +262,8 @@ export class MinimapRenderer {
       display: none;
       padding: 2px 6px;
       border-radius: 4px;
-      background: var(--vscode-editorWidget-background, #252526);
-      border: 1px solid var(--vscode-editorWidget-border, #454545);
+      background: var(--tl-widget-background, #252526);
+      border: 1px solid var(--tl-widget-border, #454545);
       color: #e3e3e3;
       font-family: monospace;
       font-size: 10px;
@@ -775,34 +790,25 @@ export class MinimapRenderer {
   }
 
   /**
-   * Extract colors from CSS variables.
+   * Update colors (e.g., after theme change).
+   *
+   * @param widgetBackground - Widget background color (0xRRGGBB)
+   * @param focusBorder - Focus border color (0xRRGGBB)
+   * @param lineNumberForeground - Line number / axis color (0xRRGGBB)
    */
-  private extractColors(): MinimapColors {
-    const computedStyle = getComputedStyle(document.documentElement);
-
-    // Curtain - slightly lighter than background for visibility
-    const curtainStr =
-      computedStyle.getPropertyValue('--vscode-editorWidget-background').trim() || '#252526';
-
-    // Lens border - use focus/selection color
-    const borderStr = computedStyle.getPropertyValue('--vscode-focusBorder').trim() || '#007fd4';
-
-    return {
-      curtain: parseColorToHex(curtainStr),
-      lensBorder: parseColorToHex(borderStr),
-      edgeHandle: parseColorToHex(borderStr),
+  public setColors(
+    widgetBackground: number,
+    focusBorder: number,
+    lineNumberForeground: number,
+  ): void {
+    this.colors = {
+      curtain: widgetBackground,
+      lensBorder: focusBorder,
+      edgeHandle: focusBorder,
     };
-  }
 
-  /**
-   * Refresh colors from CSS variables (e.g., after VS Code theme change).
-   * Also invalidates static content to trigger re-render with new colors.
-   */
-  public refreshColors(): void {
-    this.colors = this.extractColors();
-
-    // Refresh axis renderer colors
-    this.axisRenderer.refreshColors();
+    // Update axis renderer colors
+    this.axisRenderer.setColors(lineNumberForeground);
 
     this.invalidateStatic();
   }

@@ -39,15 +39,15 @@ export const PERCENT_THRESHOLD_BREACH = 1.0;
  */
 export const TOOLTIP_CSS = {
   /** Background color */
-  background: 'var(--vscode-editorWidget-background, #252526)',
+  background: 'var(--tl-widget-background, #252526)',
   /** Border color */
-  border: 'var(--vscode-editorWidget-border, #454545)',
+  border: 'var(--tl-widget-border, #454545)',
   /** Text color */
-  foreground: 'var(--vscode-editorWidget-foreground, #e3e3e3)',
+  foreground: 'var(--tl-widget-foreground, #e3e3e3)',
   /** Description/secondary text color */
-  descriptionForeground: 'var(--vscode-descriptionForeground, #999)',
+  descriptionForeground: 'var(--tl-description-foreground, #999)',
   /** Muted description text color */
-  descriptionForegroundMuted: 'var(--vscode-descriptionForeground, #777)',
+  descriptionForegroundMuted: 'var(--tl-description-foreground, #777)',
 } as const;
 
 // ============================================================================
