@@ -33,13 +33,20 @@ export class SwitchTimelineTheme {
 
   private static async command(_context: Context, _uri: Uri): Promise<void> {
     const config = getConfig();
-    const customThemesNames = Object.keys(config.timeline.customThemes || {});
-    const allThemeNames = Array.from(new Set(THEMES.concat(customThemesNames))).sort();
 
-    const items = allThemeNames.map((label) => ({
+    const items = THEMES.map((label) => ({
       label,
       description: label === DEFAULT_THEME ? 'default' : '',
     }));
+
+    const builtInThemesNames = new Set(THEMES);
+    for (const customThemeName of Object.keys(config.timeline.customThemes ?? {})) {
+      if (!builtInThemesNames.has(customThemeName)) {
+        items.push({ label: customThemeName, description: 'custom' });
+      }
+    }
+
+    items.sort((a, b) => a.label.localeCompare(b.label));
 
     // Create a QuickPick that allows custom text
     const pick = window.createQuickPick();
