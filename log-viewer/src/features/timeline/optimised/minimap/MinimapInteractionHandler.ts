@@ -19,7 +19,7 @@
  * - Hover: Show vertical guide on other view (cursor mirror)
  */
 
-import type { MinimapDragMode, MinimapManager } from './MinimapManager.js';
+import type { MinimapDragMode, MinimapViewport } from './MinimapViewport.js';
 
 /**
  * Callbacks for minimap interaction events.
@@ -67,7 +67,7 @@ const DOUBLE_CLICK_DISTANCE = 5;
 
 export class MinimapInteractionHandler {
   private canvas: HTMLCanvasElement;
-  private manager: MinimapManager;
+  private manager: MinimapViewport;
   private callbacks: MinimapInteractionCallbacks;
 
   // Drag state
@@ -108,7 +108,7 @@ export class MinimapInteractionHandler {
 
   constructor(
     canvas: HTMLCanvasElement,
-    manager: MinimapManager,
+    manager: MinimapViewport,
     callbacks: MinimapInteractionCallbacks,
   ) {
     this.canvas = canvas;

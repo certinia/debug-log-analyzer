@@ -6,7 +6,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 
 import { formatWallClockTime } from '../../../../core/utility/Util.js';
 import type { TickInterval, TickLabelResult, TimeAxisLabelStrategy } from './MeshAxisRenderer.js';
-import { NS_PER_MS, parseColorToHex } from './timeAxisConstants.js';
+import { NS_PER_MS } from './timeAxisConstants.js';
 
 const STICKY_PADDING_X = 4;
 const STICKY_PADDING_Y = 2;
@@ -34,12 +34,20 @@ export class ClockTimeAxisRenderer implements TimeAxisLabelStrategy {
   private preComputedAnchorIdx = -1;
   private visibleLabels: { label: Text; isAnchor: boolean }[] = [];
   private textColor: string;
+  private backgroundColor: number;
 
-  constructor(startTimeMs: number, firstTimestampNs: number, fontSize: number, textColor: string) {
+  constructor(
+    startTimeMs: number,
+    firstTimestampNs: number,
+    fontSize: number,
+    textColor: string,
+    backgroundColor: number,
+  ) {
     this.startTimeMs = startTimeMs;
     this.firstTimestampNs = firstTimestampNs;
     this.fontSize = fontSize;
     this.textColor = textColor;
+    this.backgroundColor = backgroundColor;
   }
 
   adjustTickInterval(interval: TickInterval): TickInterval {
@@ -125,8 +133,11 @@ export class ClockTimeAxisRenderer implements TimeAxisLabelStrategy {
     );
   }
 
-  refreshColors(textColor: string): void {
+  refreshColors(textColor: string, backgroundColor?: number): void {
     this.textColor = textColor;
+    if (backgroundColor !== undefined) {
+      this.backgroundColor = backgroundColor;
+    }
     if (this.stickyText) {
       this.stickyText.style.fill = textColor;
     }
@@ -211,7 +222,6 @@ export class ClockTimeAxisRenderer implements TimeAxisLabelStrategy {
 
     this.stickyBackground.clear();
 
-    const bgColor = getStickyBackgroundColor();
     const width = this.stickyText.width + STICKY_PADDING_X * 2;
     const height = this.stickyText.height + STICKY_PADDING_Y * 2;
 
@@ -222,7 +232,7 @@ export class ClockTimeAxisRenderer implements TimeAxisLabelStrategy {
       height,
       2,
     );
-    this.stickyBackground.fill({ color: bgColor, alpha: 0.85 });
+    this.stickyBackground.fill({ color: this.backgroundColor, alpha: 0.85 });
   }
 
   private hideStickyLabel(): void {
@@ -263,10 +273,4 @@ function formatRelativeOffset(offsetNs: number): string {
 
 function estimateMonospaceWidth(text: string, fontSize: number): number {
   return text.length * fontSize * 0.6;
-}
-
-function getStickyBackgroundColor(): number {
-  const computedStyle = getComputedStyle(document.documentElement);
-  const bgStr = computedStyle.getPropertyValue('--vscode-editor-background').trim() || '#1e1e1e';
-  return parseColorToHex(bgStr);
 }

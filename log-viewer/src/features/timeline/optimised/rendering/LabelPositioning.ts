@@ -57,10 +57,10 @@ export function createTimelineLabel(className: string): HTMLDivElement {
     justify-content: center;
     padding: 8px 12px;
     border-radius: 4px;
-    background: var(--vscode-editorWidget-background, #252526);
-    border: 1px solid var(--vscode-editorWidget-border, #454545);
-    color: var(--vscode-editorWidget-foreground, #cccccc);
-    font-family: var(--vscode-font-family, sans-serif);
+    background: var(--tl-widget-background, #252526);
+    border: 1px solid var(--tl-widget-border, #454545);
+    color: var(--tl-widget-foreground, #cccccc);
+    font-family: var(--tl-font-family, sans-serif);
     font-size: 12px;
     pointer-events: none;
     z-index: 100;

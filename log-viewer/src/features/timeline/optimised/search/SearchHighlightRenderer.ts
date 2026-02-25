@@ -14,9 +14,10 @@
 import * as PIXI from 'pixi.js';
 import type { EventNode, ViewportState } from '../../types/flamechart.types.js';
 import type { SearchCursor, SearchMatch } from '../../types/search.types.js';
-import type { PrecomputedRect } from '../RectangleManager.js';
+import type { PrecomputedRect } from '../RectangleCache.js';
 import {
-  extractHighlightColors,
+  createHighlightColors,
+  DEFAULT_FIND_MATCH_COLOR,
   renderHighlight,
   type HighlightColors,
 } from '../rendering/HighlightRenderer.js';
@@ -56,8 +57,9 @@ export class SearchHighlightRenderer {
 
   /**
    * @param container - PixiJS container to add graphics to (worldContainer)
+   * @param findMatchColor - Resolved find match color (0xRRGGBB)
    */
-  constructor(container: PIXI.Container) {
+  constructor(container: PIXI.Container, findMatchColor?: number) {
     this.allMatchGraphics = new PIXI.Graphics();
     this.currentMatchGraphics = new PIXI.Graphics();
 
@@ -68,8 +70,7 @@ export class SearchHighlightRenderer {
     container.addChild(this.allMatchGraphics);
     container.addChild(this.currentMatchGraphics);
 
-    // Extract colors from shared utility
-    this.colors = extractHighlightColors();
+    this.colors = createHighlightColors(findMatchColor ?? DEFAULT_FIND_MATCH_COLOR);
   }
 
   /**

@@ -72,7 +72,39 @@ export class TimelineView extends LitElement {
     unsafeCSS(codiconStyles),
     css`
       :host {
-        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+        /* Editor */
+        --tl-editor-background: var(--vscode-editor-background);
+        --tl-editor-foreground: var(--vscode-editor-foreground);
+        --tl-cursor-foreground: var(--vscode-editorCursor-foreground, #fff);
+        --tl-focus-border: var(--vscode-focusBorder, #007fd4);
+        --tl-line-number-foreground: var(--vscode-editorLineNumber-foreground, #808080);
+
+        /* Find/selection */
+        --tl-find-match-background: var(--vscode-editor-findMatchBackground, #ff9632);
+        --tl-selection-background: var(--vscode-editor-selectionBackground, rgba(38, 79, 120, 0.5));
+        --tl-selection-highlight-border: var(--vscode-editor-selectionHighlightBorder, transparent);
+
+        /* Widgets */
+        --tl-widget-background: var(--vscode-editorWidget-background, #252526);
+        --tl-widget-border: var(--vscode-editorWidget-border, #454545);
+        --tl-widget-foreground: var(--vscode-editorWidget-foreground, #cccccc);
+
+        /* Text */
+        --tl-description-foreground: var(--vscode-descriptionForeground, #999);
+        --tl-font-family: var(--vscode-font-family, sans-serif);
+
+        /* Buttons */
+        --tl-button-secondary-background: var(--vscode-button-secondaryBackground, #3a3d41);
+        --tl-button-secondary-foreground: var(--vscode-button-secondaryForeground, #cccccc);
+        --tl-button-secondary-hover-background: var(
+          --vscode-button-secondaryHoverBackground,
+          #45494e
+        );
+
+        /* Toolbar */
+        --tl-toolbar-hover-background: var(--vscode-toolbar-hoverBackground);
+
+        --button-icon-hover-background: var(--tl-toolbar-hover-background);
 
         display: flex;
         flex-direction: column;

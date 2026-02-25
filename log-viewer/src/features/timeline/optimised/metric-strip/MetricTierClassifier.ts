@@ -3,7 +3,7 @@
  */
 
 /**
- * MetricStripManager
+ * MetricTierClassifier
  *
  * State management and tier classification for the governor limit metric strip.
  * Transforms generic time series data into classified, renderable format.
@@ -53,7 +53,7 @@ interface CachedLookup {
   result: { point: MetricStripDataPoint; endTime: number };
 }
 
-export class MetricStripManager {
+export class MetricTierClassifier {
   /** Processed metric strip data ready for rendering. */
   private processedData: MetricStripProcessedData | null = null;
 

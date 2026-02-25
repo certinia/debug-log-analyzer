@@ -6,7 +6,7 @@
  * MinimapDensityQuery
  *
  * Computes density data for the minimap visualization by leveraging
- * the existing RectangleManager's spatial index.
+ * the existing RectangleCache's spatial index.
  *
  * The minimap displays a heatmap where:
  * - Height = normalized stack depth (maxDepth at bucket / global maxDepth)
@@ -36,7 +36,7 @@
  */
 
 import type { BucketCategoryPriority } from '../../types/flamechart.types.js';
-import type { PrecomputedRect } from '../RectangleManager.js';
+import type { PrecomputedRect } from '../RectangleCache.js';
 import type { SkylineFrame, TemporalSegmentTree } from '../TemporalSegmentTree.js';
 
 /**
@@ -121,7 +121,7 @@ interface SkylineEvent {
 }
 
 export class MinimapDensityQuery {
-  /** All rectangles grouped by category from RectangleManager. */
+  /** All rectangles grouped by category from RectangleCache. */
   private rectsByCategory: Map<string, PrecomputedRect[]>;
 
   /** Global maximum depth across timeline. */
@@ -420,69 +420,6 @@ export class MinimapDensityQuery {
         eventCount,
         dominantCategory,
         selfDurationSum: selfDurationSums[i]!,
-      };
-    }
-
-    return {
-      buckets,
-      globalMaxDepth: this.globalMaxDepth,
-      maxEventCount,
-      totalDuration: this.totalDuration,
-    };
-  }
-
-  /**
-   * Compute density data using per-bucket tree queries.
-   * O(B × log N) complexity - for each bucket, query the segment tree.
-   *
-   * Key insight: queryBucketStats() traverses tree branches, not leaves.
-   * For a bucket covering 1/1024 of the timeline, it visits O(log N) nodes.
-   *
-   * Note: Currently unused but retained for potential future optimizations.
-   *
-   * @param bucketCount - Number of output buckets
-   * @returns MinimapDensityData
-   */
-  private computeDensityFromTree(bucketCount: number): MinimapDensityData {
-    if (bucketCount <= 0 || this.totalDuration <= 0 || !this.segmentTree) {
-      return {
-        buckets: [],
-        globalMaxDepth: this.globalMaxDepth,
-        maxEventCount: 0,
-        totalDuration: this.totalDuration,
-      };
-    }
-
-    const bucketTimeWidth = this.totalDuration / bucketCount;
-    const buckets: MinimapDensityBucket[] = new Array(bucketCount);
-    let maxEventCount = 0;
-
-    // Query each bucket using the segment tree
-    for (let b = 0; b < bucketCount; b++) {
-      const bucketStart = b * bucketTimeWidth;
-      const bucketEnd = (b + 1) * bucketTimeWidth;
-
-      // Use tree query - O(log N) traversal per bucket
-      const stats = this.segmentTree.queryBucketStats(bucketStart, bucketEnd);
-
-      if (stats.eventCount > maxEventCount) {
-        maxEventCount = stats.eventCount;
-      }
-
-      // Resolve dominant category using skyline (on-top time) algorithm
-      const dominantCategory = this.resolveCategoryFromSkyline(
-        stats.frames,
-        bucketStart,
-        bucketEnd,
-      );
-
-      buckets[b] = {
-        timeStart: bucketStart,
-        timeEnd: bucketEnd,
-        maxDepth: stats.maxDepth,
-        eventCount: stats.eventCount,
-        dominantCategory,
-        selfDurationSum: stats.selfDurationSum,
       };
     }
 

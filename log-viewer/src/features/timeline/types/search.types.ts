@@ -9,7 +9,7 @@
  * and search options, decoupled from specific event implementations.
  */
 
-import type { PrecomputedRect } from '../optimised/RectangleManager.js';
+import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import type { EventNode } from './flamechart.types.js';
 
 /**

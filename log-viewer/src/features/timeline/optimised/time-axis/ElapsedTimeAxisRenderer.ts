@@ -43,7 +43,7 @@ export class ElapsedTimeAxisRenderer implements TimeAxisLabelStrategy {
     // No post-frame work for elapsed time
   }
 
-  refreshColors(_textColor: string): void {
+  refreshColors(_textColor: string, _backgroundColor?: number): void {
     // No owned resources to update
   }
 

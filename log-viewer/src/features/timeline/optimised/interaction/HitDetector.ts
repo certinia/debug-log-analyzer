@@ -3,7 +3,7 @@
  */
 
 /**
- * HitTestManager
+ * HitDetector
  *
  * Handles hit detection for mouse interactions on the timeline.
  * Determines which event, bucket, or marker is under the mouse cursor.
@@ -24,7 +24,7 @@ import {
   type ViewportBounds,
   type ViewportState,
 } from '../../types/flamechart.types.js';
-import type { PrecomputedRect, RectangleManager } from '../RectangleManager.js';
+import { RectangleCache, type PrecomputedRect } from '../RectangleCache.js';
 import type { TimelineEventIndex } from '../TimelineEventIndex.js';
 
 /**
@@ -47,7 +47,7 @@ export interface HitTestResult {
 }
 
 /**
- * Configuration for HitTestManager.
+ * Configuration for HitDetector.
  */
 export interface HitTestConfig {
   /** Event index for spatial queries */
@@ -58,16 +58,16 @@ export interface HitTestConfig {
   buckets: Map<string, PixelBucket[]>;
   /** Optional marker renderer for hit testing markers */
   markerRenderer?: MarkerHitTestable | null;
-  /** Optional RectangleManager for O(log n) hit testing queries */
-  rectangleManager?: RectangleManager | null;
+  /** Optional RectangleCache for O(log n) hit testing queries */
+  rectangleManager?: RectangleCache | null;
 }
 
-export class HitTestManager {
+export class HitDetector {
   private index: TimelineEventIndex;
   private visibleRects: Map<string, PrecomputedRect[]>;
   private buckets: Map<string, PixelBucket[]>;
   private markerRenderer: MarkerHitTestable | null;
-  private rectangleManager: RectangleManager | null;
+  private rectangleManager: RectangleCache | null;
 
   constructor(config: HitTestConfig) {
     this.index = config.index;
@@ -251,7 +251,7 @@ export class HitTestManager {
 
     // If eventRefs is empty (TemporalSegmentTree optimization), query for events in region
     if (events.length === 0) {
-      // Use RectangleManager for O(log n) query when available, fall back to O(n) index
+      // Use RectangleCache for O(log n) query when available, fall back to O(n) index
       if (this.rectangleManager) {
         events = this.rectangleManager.queryEventsInRegion(
           bucket.timeStart,

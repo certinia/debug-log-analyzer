@@ -6,7 +6,7 @@
  * MetricStripOrchestrator
  *
  * Orchestrates all metric strip functionality for the FlameChart.
- * Composes MetricStripManager, MetricStripRenderer, and MetricStripTooltipRenderer.
+ * Composes MetricTierClassifier, MetricStripRenderer, and MetricStripTooltipRenderer.
  *
  * Responsibilities:
  * - Metric strip lifecycle (init, destroy, resize)
@@ -28,9 +28,9 @@ import type {
   ViewportState,
 } from '../../types/flamechart.types.js';
 import { MeshAxisRenderer } from '../time-axis/MeshAxisRenderer.js';
-import { MetricStripManager } from './MetricStripManager.js';
 import { MetricStripRenderer } from './MetricStripRenderer.js';
 import { MetricStripTooltipRenderer } from './MetricStripTooltipRenderer.js';
+import { MetricTierClassifier } from './MetricTierClassifier.js';
 import {
   getMetricStripColors,
   METRIC_STRIP_COLLAPSED_HEIGHT,
@@ -137,7 +137,7 @@ export class MetricStripOrchestrator {
   // ============================================================================
   // METRIC STRIP COMPONENTS
   // ============================================================================
-  private manager: MetricStripManager | null = null;
+  private classifier: MetricTierClassifier | null = null;
   private renderer: MetricStripRenderer | null = null;
   private tooltipRenderer: MetricStripTooltipRenderer | null = null;
   private axisRenderer: MeshAxisRenderer | null = null;
@@ -205,7 +205,7 @@ export class MetricStripOrchestrator {
     this.app.stage.addChild(this.container);
 
     // Initialize manager
-    this.manager = new MetricStripManager();
+    this.classifier = new MetricTierClassifier();
 
     // Initialize axis renderer for grid lines (rendered first, behind other content)
     this.axisRenderer = new MeshAxisRenderer(this.container, {
@@ -274,7 +274,7 @@ export class MetricStripOrchestrator {
       this.cursorLineGraphics = null;
     }
 
-    this.manager = null;
+    this.classifier = null;
     this.container = null;
 
     if (this.app) {
@@ -306,12 +306,12 @@ export class MetricStripOrchestrator {
    * @param timeSeries - Heat strip time series data
    */
   public setTimeSeries(timeSeries: HeatStripTimeSeries | null): void {
-    if (!this.manager) {
+    if (!this.classifier) {
       return;
     }
 
     if (timeSeries) {
-      this.manager.processData(timeSeries);
+      this.classifier.processData(timeSeries);
     }
 
     this.callbacks.requestRender();
@@ -321,7 +321,7 @@ export class MetricStripOrchestrator {
    * Check if there's data to render.
    */
   public hasData(): boolean {
-    return this.manager?.hasData() ?? false;
+    return this.classifier?.hasData() ?? false;
   }
 
   /**
@@ -424,7 +424,7 @@ export class MetricStripOrchestrator {
    * @param context - Render context with viewport state
    */
   public render(context: MetricStripRenderContext): void {
-    if (!this.app || !this.renderer || !this.manager) {
+    if (!this.app || !this.renderer || !this.classifier) {
       return;
     }
 
@@ -436,10 +436,10 @@ export class MetricStripOrchestrator {
       this.axisRenderer.render(context.viewportState, this.getHeight());
     }
 
-    const data = this.manager.getData();
+    const data = this.classifier.getData();
 
     // Set dynamic Y-max based on data
-    const effectiveYMax = this.manager.getEffectiveYMax();
+    const effectiveYMax = this.classifier.getEffectiveYMax();
     this.renderer.setEffectiveYMax(effectiveYMax);
 
     // Render the step chart with markers
@@ -454,7 +454,7 @@ export class MetricStripOrchestrator {
     if (this.isCollapsed && data?.hasData) {
       this.renderer.renderCollapsedWithData(
         context.viewportState,
-        (timeNs) => this.manager?.getDataPointAtTime(timeNs) ?? null,
+        (timeNs) => this.classifier?.getDataPointAtTime(timeNs) ?? null,
         context.totalDuration,
       );
     }
@@ -525,7 +525,7 @@ export class MetricStripOrchestrator {
   };
 
   private handleMouseMove = (event: MouseEvent): void => {
-    if (!this.app?.canvas || !this.manager || !this.lastViewportState) {
+    if (!this.app?.canvas || !this.classifier || !this.lastViewportState) {
       return;
     }
 
@@ -553,13 +553,13 @@ export class MetricStripOrchestrator {
       this.tooltipRenderer?.hide();
     } else {
       // Update tooltip - position below the metric strip
-      const dataPoint = this.manager.getDataPointAtTime(clampedTimeNs);
+      const dataPoint = this.classifier.getDataPointAtTime(clampedTimeNs);
       if (dataPoint) {
         this.tooltipRenderer?.show(
           this.mouseX,
           this.mouseY,
           dataPoint.point,
-          this.manager.getClassifiedMetrics(),
+          this.classifier.getClassifiedMetrics(),
           this.getHeight(),
         );
       } else {

@@ -13,11 +13,11 @@
 
 import type { LogCategory, LogEvent } from 'apex-log-parser';
 import { formatDuration } from '../../../core/utility/Util.js';
-import type { PrecomputedRect } from '../optimised/RectangleManager.js';
+import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 
 // Re-export LogEvent for internal use within timeline/ folder
 // Note: FlameChart's PUBLIC API (callbacks) should use EventNode, not LogEvent
-// LogEvent is only used internally by data structures like RectangleManager, HitTestManager
+// LogEvent is only used internally by data structures like RectangleCache, HitDetector
 export type { LogEvent };
 
 // Re-export formatDuration for use within timeline/optimised folder
@@ -245,6 +245,29 @@ export type TimelineColorMap = {
 };
 
 /**
+ * Resolved editor colors for PixiJS renderers.
+ * Extracted from CSS custom properties (--tl-*) in the Lit layer,
+ * so renderers don't need to read CSS variables at runtime.
+ * All values are PixiJS numeric colors (0xRRGGBB).
+ */
+export interface EditorColors {
+  /** Cursor line color (--tl-cursor-foreground) */
+  cursorForeground: number;
+  /** Focus/selection border color (--tl-focus-border) */
+  focusBorder: number;
+  /** Search match highlight color (--tl-find-match-background) */
+  findMatchBackground: number;
+  /** Widget/tooltip background color (--tl-widget-background) */
+  widgetBackground: number;
+  /** Line number / axis color (--tl-line-number-foreground) */
+  lineNumberForeground: number;
+  /** Selection overlay color (--tl-selection-background) */
+  selectionBackground: number;
+  /** Selection highlight border color (--tl-selection-highlight-border) */
+  selectionHighlightBorder: number;
+}
+
+/**
  * Configuration options for timeline initialization.
  */
 export interface TimelineOptions {
@@ -262,13 +285,8 @@ export interface TimelineOptions {
     caseSensitive?: boolean;
   };
 
-  /**
-   * Renderer type: 'sprite' or 'mesh'.
-   * - 'sprite': Uses SpritePool with shared texture (proven approach)
-   * - 'mesh': Uses custom mesh with vertex colors (potentially faster for large datasets)
-   * Default: 'mesh' for testing, can be changed to 'sprite' for comparison.
-   */
-  renderer?: 'sprite' | 'mesh';
+  /** Resolved editor colors for PixiJS renderers (extracted from CSS in the Lit layer). */
+  editorColors?: EditorColors;
 
   /** Event handlers for user interactions. */
   onEventClick?: (event: LogEvent) => void;
@@ -892,7 +910,7 @@ export type SwimlaneTimeSeries = MetricStripTimeSeries;
  *
  * Leaf nodes represent individual events; branch nodes aggregate children.
  * The tree is used for O(log n) viewport culling and bucket aggregation,
- * replacing the per-frame O(n) iteration in RectangleManager.
+ * replacing the per-frame O(n) iteration in RectangleCache.
  *
  * Key optimization: Pre-computed category stats enable instant bucket
  * rendering without recalculating aggregates per frame.

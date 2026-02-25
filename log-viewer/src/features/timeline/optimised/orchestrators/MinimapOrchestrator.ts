@@ -23,15 +23,19 @@
 import * as PIXI from 'pixi.js';
 import type { TimelineMarker, ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
-import type { RectangleManager } from '../RectangleManager.js';
+import type { RectangleCache } from '../RectangleCache.js';
 import type { CursorLineRenderer } from '../rendering/CursorLineRenderer.js';
 import type { TimelineEventIndex } from '../TimelineEventIndex.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 
 import { MinimapDensityQuery } from '../minimap/MinimapDensityQuery.js';
 import { MinimapInteractionHandler } from '../minimap/MinimapInteractionHandler.js';
-import { MINIMAP_GAP, MinimapManager, calculateMinimapHeight } from '../minimap/MinimapManager.js';
 import { MinimapRenderer } from '../minimap/MinimapRenderer.js';
+import {
+  MINIMAP_GAP,
+  MinimapViewport,
+  calculateMinimapHeight,
+} from '../minimap/MinimapViewport.js';
 
 // Re-export for convenience
 export { MINIMAP_GAP, calculateMinimapHeight };
@@ -141,7 +145,7 @@ export class MinimapOrchestrator {
   // ============================================================================
   // MINIMAP COMPONENTS
   // ============================================================================
-  private manager: MinimapManager | null = null;
+  private minimapViewport: MinimapViewport | null = null;
   private renderer: MinimapRenderer | null = null;
   private interactionHandler: MinimapInteractionHandler | null = null;
   private densityQuery: MinimapDensityQuery | null = null;
@@ -182,8 +186,9 @@ export class MinimapOrchestrator {
     width: number,
     height: number,
     index: TimelineEventIndex,
-    rectangleManager: RectangleManager,
+    rectangleManager: RectangleCache,
     viewport: TimelineViewport,
+    minimapColors?: { widgetBackground: number; focusBorder: number; lineNumberForeground: number },
   ): Promise<void> {
     this.index = index;
     this.viewport = viewport;
@@ -208,7 +213,7 @@ export class MinimapOrchestrator {
     minimapDiv.appendChild(this.app.canvas);
 
     // Initialize minimap manager (state and coordinate transforms)
-    this.manager = new MinimapManager(index.totalDuration, index.maxDepth, width, height);
+    this.minimapViewport = new MinimapViewport(index.totalDuration, index.maxDepth, width, height);
 
     // Initialize density query (leverages segment tree for O(B x log N) performance)
     this.densityQuery = new MinimapDensityQuery(
@@ -223,7 +228,7 @@ export class MinimapOrchestrator {
     this.app.stage.addChild(this.container);
 
     // Initialize minimap renderer with HTML container for lens label
-    this.renderer = new MinimapRenderer(this.container, minimapDiv);
+    this.renderer = new MinimapRenderer(this.container, minimapDiv, minimapColors);
     this.renderer.setRenderer(this.app.renderer as PIXI.Renderer);
 
     // Initialize interaction handler
@@ -244,7 +249,7 @@ export class MinimapOrchestrator {
       this.renderer = null;
     }
 
-    this.manager = null;
+    this.minimapViewport = null;
     this.densityQuery = null;
     this.container = null;
 
@@ -271,8 +276,8 @@ export class MinimapOrchestrator {
       this.app.renderer.resize(newWidth, minimapHeight);
     }
 
-    if (this.manager) {
-      this.manager.resize(newWidth, newHeight);
+    if (this.minimapViewport) {
+      this.minimapViewport.resize(newWidth, newHeight);
     }
 
     if (this.densityQuery) {
@@ -318,7 +323,7 @@ export class MinimapOrchestrator {
    * Get the minimap height.
    */
   public getHeight(): number {
-    return this.manager?.getHeight() ?? 0;
+    return this.minimapViewport?.getHeight() ?? 0;
   }
 
   /**
@@ -338,10 +343,18 @@ export class MinimapOrchestrator {
   }
 
   /**
-   * Refresh colors from CSS variables (e.g., after theme change).
+   * Update minimap colors (e.g., after theme change).
+   *
+   * @param widgetBackground - Widget background color (0xRRGGBB)
+   * @param focusBorder - Focus border color (0xRRGGBB)
+   * @param lineNumberForeground - Line number / axis color (0xRRGGBB)
    */
-  public refreshColors(): void {
-    this.renderer?.refreshColors();
+  public setColors(
+    widgetBackground: number,
+    focusBorder: number,
+    lineNumberForeground: number,
+  ): void {
+    this.renderer?.setColors(widgetBackground, focusBorder, lineNumberForeground);
   }
 
   // ============================================================================
@@ -355,12 +368,12 @@ export class MinimapOrchestrator {
    * @param deltaTimeNs - Time delta in nanoseconds (positive = right)
    */
   public handlePanViewport(deltaTimeNs: number): void {
-    if (!this.manager) {
+    if (!this.minimapViewport) {
       return;
     }
 
-    this.manager.moveSelection(deltaTimeNs);
-    const selection = this.manager.getSelection();
+    this.minimapViewport.moveSelection(deltaTimeNs);
+    const selection = this.minimapViewport.getSelection();
     this.notifyViewportChange(selection.startTime, selection.endTime);
   }
 
@@ -377,15 +390,15 @@ export class MinimapOrchestrator {
    * Jump to timeline start.
    */
   public handleJumpStart(): void {
-    if (!this.manager) {
+    if (!this.minimapViewport) {
       return;
     }
 
-    const selection = this.manager.getSelection();
+    const selection = this.minimapViewport.getSelection();
     const duration = selection.endTime - selection.startTime;
 
-    this.manager.setSelection(0, duration);
-    const newSelection = this.manager.getSelection();
+    this.minimapViewport.setSelection(0, duration);
+    const newSelection = this.minimapViewport.getSelection();
     this.notifyViewportChange(newSelection.startTime, newSelection.endTime);
   }
 
@@ -393,16 +406,16 @@ export class MinimapOrchestrator {
    * Jump to timeline end.
    */
   public handleJumpEnd(): void {
-    if (!this.manager || !this.index) {
+    if (!this.minimapViewport || !this.index) {
       return;
     }
 
-    const selection = this.manager.getSelection();
+    const selection = this.minimapViewport.getSelection();
     const duration = selection.endTime - selection.startTime;
     const totalDuration = this.index.totalDuration;
 
-    this.manager.setSelection(totalDuration - duration, totalDuration);
-    const newSelection = this.manager.getSelection();
+    this.minimapViewport.setSelection(totalDuration - duration, totalDuration);
+    const newSelection = this.minimapViewport.getSelection();
     this.notifyViewportChange(newSelection.startTime, newSelection.endTime);
   }
 
@@ -423,12 +436,12 @@ export class MinimapOrchestrator {
    * @param context - Render context with all necessary data
    */
   public render(context: MinimapRenderContext): void {
-    if (!this.app || !this.renderer || !this.manager || !this.densityQuery) {
+    if (!this.app || !this.renderer || !this.minimapViewport || !this.densityQuery) {
       return;
     }
 
     // Sync lens position with main viewport (including Y bounds)
-    this.manager.setSelectionFromViewport(
+    this.minimapViewport.setSelectionFromViewport(
       context.viewportState,
       context.viewportBounds.depthStart,
       context.viewportBounds.depthEnd,
@@ -439,12 +452,12 @@ export class MinimapOrchestrator {
 
     // Determine if user is interacting (for lens label visibility)
     const isHoveringLens =
-      this.isMouseInMinimap && this.manager.isPointInsideLens(this.mouseX, this.mouseY);
-    const isInteracting = isHoveringLens || this.manager.isDragging();
+      this.isMouseInMinimap && this.minimapViewport.isPointInsideLens(this.mouseX, this.mouseY);
+    const isInteracting = isHoveringLens || this.minimapViewport.isDragging();
 
     // Render minimap
     this.renderer.render(
-      this.manager,
+      this.minimapViewport,
       densityData,
       context.markers,
       context.batchColors,
@@ -475,13 +488,13 @@ export class MinimapOrchestrator {
    * Setup interaction handler for mouse events on minimap canvas.
    */
   private setupInteractionHandler(): void {
-    if (!this.app || !this.manager) {
+    if (!this.app || !this.minimapViewport) {
       return;
     }
 
     const canvas = this.app.canvas as HTMLCanvasElement;
 
-    this.interactionHandler = new MinimapInteractionHandler(canvas, this.manager, {
+    this.interactionHandler = new MinimapInteractionHandler(canvas, this.minimapViewport, {
       onSelectionChange: (startTime: number, endTime: number) => {
         this.notifyViewportChange(startTime, endTime);
       },
@@ -497,14 +510,14 @@ export class MinimapOrchestrator {
         this.callbacks.requestCursorRender();
       },
       onHorizontalPan: (deltaPixels: number) => {
-        if (!this.viewport || !this.manager) {
+        if (!this.viewport || !this.minimapViewport) {
           return;
         }
         // Convert pixels to time using main viewport zoom
         const viewportState = this.viewport.getState();
         const deltaTime = deltaPixels / viewportState.zoom;
-        this.manager.moveSelection(deltaTime);
-        const selection = this.manager.getSelection();
+        this.minimapViewport.moveSelection(deltaTime);
+        const selection = this.minimapViewport.getSelection();
         this.notifyViewportChange(selection.startTime, selection.endTime);
       },
       onDepthPan: (deltaY: number) => {
@@ -561,7 +574,7 @@ export class MinimapOrchestrator {
    * @param scaled - If true, scale deltaY so lens follows mouse 1:1
    */
   private handleMinimapDepthPan(deltaY: number, scaled: boolean): void {
-    if (!this.manager || !this.index) {
+    if (!this.minimapViewport || !this.index) {
       return;
     }
 
@@ -569,7 +582,7 @@ export class MinimapOrchestrator {
 
     if (scaled) {
       // Scale deltaY so lens follows mouse 1:1 on minimap
-      const minimapChartHeight = this.manager.getChartHeight();
+      const minimapChartHeight = this.minimapViewport.getChartHeight();
       const totalDepthHeight = (this.index.maxDepth + 1) * TIMELINE_CONSTANTS.EVENT_HEIGHT;
       const scale = minimapChartHeight > 0 ? totalDepthHeight / minimapChartHeight : 1;
       // Apply slight damping (0.9) for smoother feel
@@ -585,12 +598,12 @@ export class MinimapOrchestrator {
    * @param minimapY - Y coordinate in minimap where drag started
    */
   private handleMinimapDepthPositionStart(minimapY: number): void {
-    if (!this.viewport || !this.manager || !this.index) {
+    if (!this.viewport || !this.minimapViewport || !this.index) {
       return;
     }
 
-    const chartHeight = this.manager.getChartHeight();
-    const minimapHeight = this.manager.getHeight();
+    const chartHeight = this.minimapViewport.getChartHeight();
+    const minimapHeight = this.minimapViewport.getHeight();
     const axisHeight = minimapHeight - chartHeight;
     const maxDepth = this.index.maxDepth;
     const eventHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;

@@ -24,7 +24,7 @@
 import { BitmapText, Container, Graphics } from 'pixi.js';
 
 import { formatDuration, TEXT_LABEL_CONSTANTS } from '../../types/flamechart.types.js';
-import type { MinimapManager } from './MinimapManager.js';
+import type { MinimapViewport } from './MinimapViewport.js';
 
 /**
  * Nanoseconds per millisecond conversion constant.
@@ -92,7 +92,7 @@ export class MinimapAxisRenderer {
     // Create container for labels
     this.labelsContainer = new Container();
 
-    // Initialize stroke options (updated in refreshColors)
+    // Initialize stroke options (updated in setColors)
     this.strokeOptions = { color: this.config.tickColor, width: 1 };
   }
 
@@ -123,9 +123,9 @@ export class MinimapAxisRenderer {
    * Render the time axis based on minimap state.
    * Shows full timeline duration (0 to totalDuration) regardless of main viewport zoom.
    *
-   * @param manager - MinimapManager with state and coordinate transforms
+   * @param manager - MinimapViewport with state and coordinate transforms
    */
-  public render(manager: MinimapManager): void {
+  public render(manager: MinimapViewport): void {
     this.tickGraphics.clear();
     this.hideAllLabels();
     this.activeLabelCount = 0;
@@ -195,59 +195,19 @@ export class MinimapAxisRenderer {
   }
 
   /**
-   * Refresh colors from CSS variables (e.g., after VS Code theme change).
-   * Updates tick and label colors.
+   * Update tick and label colors (e.g., after theme change).
+   *
+   * @param color - Resolved color for ticks and labels (0xRRGGBB)
    */
-  public refreshColors(): void {
-    // Re-extract colors from CSS variables
-    const computedStyle = getComputedStyle(document.documentElement);
-
-    // Update tick color
-    const tickColorStr =
-      computedStyle.getPropertyValue('--vscode-editorLineNumber-foreground').trim() || '#808080';
-    this.config.tickColor = this.parseColorToHex(tickColorStr);
-    this.strokeOptions.color = this.config.tickColor;
-
-    // Update label tint color
-    this.config.labelTint = this.parseColorToHex(tickColorStr);
+  public setColors(color: number): void {
+    this.config.tickColor = color;
+    this.strokeOptions.color = color;
+    this.config.labelTint = color;
 
     // Update existing labels with new tint (BitmapText uses tint for color)
     for (const label of this.labelPool) {
-      label.tint = this.config.labelTint;
+      label.tint = color;
     }
-  }
-
-  /**
-   * Parse CSS color string to numeric hex.
-   */
-  private parseColorToHex(cssColor: string): number {
-    if (!cssColor) {
-      return 0x808080;
-    }
-
-    if (cssColor.startsWith('#')) {
-      const hex = cssColor.slice(1);
-      if (hex.length === 6) {
-        return parseInt(hex, 16);
-      }
-      if (hex.length === 3) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        return parseInt(r + r + g + g + b + b, 16);
-      }
-    }
-
-    // rgba() fallback
-    const rgba = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-    if (rgba) {
-      const r = parseInt(rgba[1]!, 10);
-      const g = parseInt(rgba[2]!, 10);
-      const b = parseInt(rgba[3]!, 10);
-      return (r << 16) | (g << 8) | b;
-    }
-
-    return 0x808080;
   }
 
   /**

@@ -17,7 +17,7 @@
  */
 
 import type { LogEvent } from 'apex-log-parser';
-import type { PrecomputedRect } from '../optimised/RectangleManager.js';
+import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 import { TIMELINE_CONSTANTS, type EventNode, type TreeNode } from '../types/flamechart.types.js';
 
 // Re-export PrecomputedRect for consumers of this module
@@ -64,7 +64,7 @@ export interface TreeConversionResult {
  * Converts LogEvent array to TreeNode array with navigation maps.
  *
  * Recursively traverses event.children to build tree structure.
- * Generates synthetic IDs using timestamp-depth-childIndex to match RectangleManager.
+ * Generates synthetic IDs using timestamp-depth-childIndex to match RectangleCache.
  * Builds all navigation maps during traversal to avoid duplicate O(n) work.
  *
  * **Important:** Events with zero duration are filtered out as they are invisible
@@ -182,7 +182,7 @@ export interface UnifiedConversionResult {
   treeNodes: TreeNode<EventNode & { original: LogEvent }>[];
   /** Navigation maps for O(1) lookups */
   maps: NavigationMaps;
-  /** Pre-computed rectangles grouped by category (for RectangleManager) */
+  /** Pre-computed rectangles grouped by category (for RectangleCache) */
   rectsByCategory: Map<string, PrecomputedRect[]>;
   /** Pre-computed rectangles grouped by depth (for TemporalSegmentTree) */
   rectsByDepth: Map<number, PrecomputedRect[]>;
@@ -192,7 +192,7 @@ export interface UnifiedConversionResult {
   maxDepth: number;
   /** Total duration in nanoseconds (tracked during traversal) */
   totalDuration: number;
-  /** Whether rectsByCategory arrays are pre-sorted by timeStart (skip sorting in RectangleManager) */
+  /** Whether rectsByCategory arrays are pre-sorted by timeStart (skip sorting in RectangleCache) */
   preSorted: boolean;
 }
 
@@ -216,7 +216,7 @@ interface ConversionWorkItem {
  * - logEventToTreeNode (tree conversion + navigation maps)
  * - TimelineEventIndex.calculateMaxDepth (depth calculation)
  * - TimelineEventIndex.calculateTotalDuration (duration calculation)
- * - RectangleManager.flattenEvents (rectangle pre-computation)
+ * - RectangleCache.flattenEvents (rectangle pre-computation)
  *
  * PERF optimizations in this version:
  * - Iterative with explicit stack (eliminates 500k function calls, ~65ms saved)
@@ -386,7 +386,7 @@ export function logEventToTreeAndRects(
     }
   }
 
-  // PERF: Pre-sort rectsByCategory arrays by timeStart (~15-20ms saved in RectangleManager)
+  // PERF: Pre-sort rectsByCategory arrays by timeStart (~15-20ms saved in RectangleCache)
   // Sort here during conversion to avoid redundant sorting later
   for (const rects of rectsByCategory.values()) {
     rects.sort((a, b) => a.timeStart - b.timeStart);

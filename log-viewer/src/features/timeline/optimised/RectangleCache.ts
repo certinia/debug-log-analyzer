@@ -3,7 +3,7 @@
  */
 
 /**
- * RectangleManager
+ * RectangleCache
  *
  * Single source of truth for rectangle computation and viewport culling.
  * Separates "what to draw" from "how to draw it" to eliminate coupling between renderers.
@@ -75,7 +75,7 @@ export interface PrecomputedRect extends RenderRectangle {
 
 /**
  * Precomputed data from unified tree conversion (single-pass optimization).
- * When provided, RectangleManager skips its own flattenEvents traversal.
+ * When provided, RectangleCache skips its own flattenEvents traversal.
  */
 export interface PrecomputedRectData {
   rectsByCategory: Map<string, PrecomputedRect[]>;
@@ -87,7 +87,7 @@ export interface PrecomputedRectData {
 }
 
 /**
- * RectangleManager
+ * RectangleCache
  *
  * Manages rectangle pre-computation, spatial indexing, and viewport culling.
  * Provides a clean API for renderers to consume rectangle data without coupling.
@@ -95,7 +95,7 @@ export interface PrecomputedRectData {
  * Uses TemporalSegmentTree for O(log n) viewport culling.
  * For O(n) legacy culling, use LegacyViewportCuller directly.
  */
-export class RectangleManager {
+export class RectangleCache {
   /** Spatial index: all rectangles grouped by category */
   private rectsByCategory: Map<string, PrecomputedRect[]> = new Map();
 
@@ -109,7 +109,7 @@ export class RectangleManager {
   private segmentTree: TemporalSegmentTree;
 
   /**
-   * Create RectangleManager with either raw events or precomputed data.
+   * Create RectangleCache with either raw events or precomputed data.
    *
    * @param events - Event tree to pre-compute rectangles from
    * @param categories - Set of valid categories for spatial indexing

@@ -23,12 +23,12 @@
 import * as PIXI from 'pixi.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { AreaZoomRenderer } from '../measurement/AreaZoomRenderer.js';
-import { MeasurementManager, type MeasurementState } from '../measurement/MeasurementManager.js';
+import { MeasurementState, type MeasurementSnapshot } from '../measurement/MeasurementState.js';
 import { MeasureRangeRenderer } from '../measurement/MeasureRangeRenderer.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 
-// Re-export MeasurementState for convenience
-export type { MeasurementState };
+// Re-export MeasurementSnapshot for convenience
+export type { MeasurementSnapshot };
 
 /**
  * Callbacks for measurement orchestrator events.
@@ -50,7 +50,7 @@ export interface MeasurementOrchestratorCallbacks {
    *
    * @param measurement - Current measurement state, or null if cleared
    */
-  onMeasurementChange: (measurement: MeasurementState | null) => void;
+  onMeasurementChange: (measurement: MeasurementSnapshot | null) => void;
 
   /**
    * Called when a re-render is needed.
@@ -76,13 +76,13 @@ export class MeasurementOrchestrator {
   // ============================================================================
   // MEASUREMENT COMPONENTS
   // ============================================================================
-  private measurementManager: MeasurementManager | null = null;
+  private measurementState: MeasurementState | null = null;
   private measurementRenderer: MeasureRangeRenderer | null = null;
 
   // ============================================================================
   // AREA ZOOM COMPONENTS
   // ============================================================================
-  private areaZoomManager: MeasurementManager | null = null;
+  private areaZoomState: MeasurementState | null = null;
   private areaZoomRenderer: AreaZoomRenderer | null = null;
 
   // ============================================================================
@@ -123,19 +123,27 @@ export class MeasurementOrchestrator {
     viewport: TimelineViewport,
     totalDuration: number,
     maxDepth: number,
+    measureColors?: {
+      selectionBackground: number;
+      selectionHighlightBorder: number;
+      focusBorder: number;
+    },
   ): void {
     this.viewport = viewport;
     this.totalDuration = totalDuration;
     this.maxDepth = maxDepth;
 
     // Initialize measurement system
-    this.measurementManager = new MeasurementManager();
-    this.measurementRenderer = new MeasureRangeRenderer(worldContainer, htmlContainer, () =>
-      this.zoomToMeasurement(),
+    this.measurementState = new MeasurementState();
+    this.measurementRenderer = new MeasureRangeRenderer(
+      worldContainer,
+      htmlContainer,
+      () => this.zoomToMeasurement(),
+      measureColors,
     );
 
     // Initialize area zoom system
-    this.areaZoomManager = new MeasurementManager();
+    this.areaZoomState = new MeasurementState();
     this.areaZoomRenderer = new AreaZoomRenderer(worldContainer, htmlContainer);
   }
 
@@ -147,13 +155,13 @@ export class MeasurementOrchestrator {
       this.measurementRenderer.destroy();
       this.measurementRenderer = null;
     }
-    this.measurementManager = null;
+    this.measurementState = null;
 
     if (this.areaZoomRenderer) {
       this.areaZoomRenderer.destroy();
       this.areaZoomRenderer = null;
     }
-    this.areaZoomManager = null;
+    this.areaZoomState = null;
 
     this.resizeEdge = null;
     this.resizeAnchorTime = null;
@@ -168,25 +176,25 @@ export class MeasurementOrchestrator {
    * Check if there is an active or finished measurement.
    */
   public hasMeasurement(): boolean {
-    return this.measurementManager?.hasMeasurement() ?? false;
+    return this.measurementState?.hasMeasurement() ?? false;
   }
 
   /**
    * Get the current measurement state.
    */
-  public getMeasurementState(): MeasurementState | null {
-    return this.measurementManager?.getState() ?? null;
+  public getMeasurementSnapshot(): MeasurementSnapshot | null {
+    return this.measurementState?.getState() ?? null;
   }
 
   /**
    * Clear the current measurement.
    */
   public clearMeasurement(): void {
-    if (!this.measurementManager?.hasMeasurement()) {
+    if (!this.measurementState?.hasMeasurement()) {
       return;
     }
 
-    this.measurementManager.clear();
+    this.measurementState.clear();
     this.measurementRenderer?.clear();
 
     this.callbacks.onMeasurementChange(null);
@@ -197,11 +205,11 @@ export class MeasurementOrchestrator {
    * Zoom to fit the current measurement range.
    */
   public zoomToMeasurement(): void {
-    if (!this.measurementManager?.hasMeasurement()) {
+    if (!this.measurementState?.hasMeasurement()) {
       return;
     }
 
-    const measurement = this.measurementManager.getState();
+    const measurement = this.measurementState.getState();
     if (!measurement) {
       return;
     }
@@ -221,11 +229,11 @@ export class MeasurementOrchestrator {
    * @returns 'left' or 'right' if near an edge, null otherwise
    */
   public getMeasurementResizeEdge(screenX: number): 'left' | 'right' | null {
-    if (!this.measurementManager?.hasMeasurement() || !this.viewport) {
+    if (!this.measurementState?.hasMeasurement() || !this.viewport) {
       return null;
     }
 
-    const measurement = this.measurementManager.getState();
+    const measurement = this.measurementState.getState();
     if (!measurement || measurement.isActive) {
       // Only finished measurements can be resized
       return null;
@@ -252,11 +260,11 @@ export class MeasurementOrchestrator {
    * @returns true if inside measurement
    */
   public isInsideMeasurement(screenX: number): boolean {
-    if (!this.measurementManager?.hasMeasurement() || !this.viewport) {
+    if (!this.measurementState?.hasMeasurement() || !this.viewport) {
       return false;
     }
 
-    const measurement = this.measurementManager.getState();
+    const measurement = this.measurementState.getState();
     if (!measurement) {
       return false;
     }
@@ -275,7 +283,7 @@ export class MeasurementOrchestrator {
    * @param screenX - Screen X coordinate
    */
   public handleMeasureStart(screenX: number): void {
-    if (!this.measurementManager) {
+    if (!this.measurementState) {
       return;
     }
 
@@ -285,9 +293,9 @@ export class MeasurementOrchestrator {
     // Start measurement - clamp to timeline bounds
     const timeNs = this.screenXToTime(screenX);
     const clampedTime = Math.max(0, Math.min(this.totalDuration, timeNs));
-    this.measurementManager.start(clampedTime);
+    this.measurementState.start(clampedTime);
 
-    this.callbacks.onMeasurementChange(this.measurementManager.getState());
+    this.callbacks.onMeasurementChange(this.measurementState.getState());
     this.callbacks.requestRender();
   }
 
@@ -297,15 +305,15 @@ export class MeasurementOrchestrator {
    * @param screenX - Screen X coordinate
    */
   public handleMeasureUpdate(screenX: number): void {
-    if (!this.measurementManager) {
+    if (!this.measurementState) {
       return;
     }
 
     const timeNs = this.screenXToTime(screenX);
     const clampedTime = Math.max(0, Math.min(this.totalDuration, timeNs));
-    this.measurementManager.update(clampedTime);
+    this.measurementState.update(clampedTime);
 
-    this.callbacks.onMeasurementChange(this.measurementManager.getState());
+    this.callbacks.onMeasurementChange(this.measurementState.getState());
     this.callbacks.requestRender();
   }
 
@@ -313,13 +321,13 @@ export class MeasurementOrchestrator {
    * Handle measurement end (mouse released).
    */
   public handleMeasureEnd(): void {
-    if (!this.measurementManager) {
+    if (!this.measurementState) {
       return;
     }
 
-    this.measurementManager.finish();
+    this.measurementState.finish();
 
-    this.callbacks.onMeasurementChange(this.measurementManager.getState());
+    this.callbacks.onMeasurementChange(this.measurementState.getState());
     this.callbacks.requestRender();
   }
 
@@ -333,7 +341,7 @@ export class MeasurementOrchestrator {
    * @param screenX - Screen X coordinate
    */
   public handleAreaZoomStart(screenX: number): void {
-    if (!this.areaZoomManager) {
+    if (!this.areaZoomState) {
       return;
     }
 
@@ -343,7 +351,7 @@ export class MeasurementOrchestrator {
     // Start area zoom - clamp to timeline bounds
     const timeNs = this.screenXToTime(screenX);
     const clampedTime = Math.max(0, Math.min(this.totalDuration, timeNs));
-    this.areaZoomManager.start(clampedTime);
+    this.areaZoomState.start(clampedTime);
 
     this.callbacks.requestRender();
   }
@@ -354,13 +362,13 @@ export class MeasurementOrchestrator {
    * @param screenX - Screen X coordinate
    */
   public handleAreaZoomUpdate(screenX: number): void {
-    if (!this.areaZoomManager) {
+    if (!this.areaZoomState) {
       return;
     }
 
     const timeNs = this.screenXToTime(screenX);
     const clampedTime = Math.max(0, Math.min(this.totalDuration, timeNs));
-    this.areaZoomManager.update(clampedTime);
+    this.areaZoomState.update(clampedTime);
 
     this.callbacks.requestRender();
   }
@@ -369,12 +377,12 @@ export class MeasurementOrchestrator {
    * Handle area zoom end (mouse released).
    */
   public handleAreaZoomEnd(): void {
-    if (!this.areaZoomManager) {
+    if (!this.areaZoomState) {
       this.clearAreaZoom();
       return;
     }
 
-    const state = this.areaZoomManager.getState();
+    const state = this.areaZoomState.getState();
     if (state && state.endTime - state.startTime > 0) {
       const middleDepth = Math.floor(this.maxDepth / 2);
       this.callbacks.onZoomToRange(state.startTime, state.endTime - state.startTime, middleDepth);
@@ -387,11 +395,11 @@ export class MeasurementOrchestrator {
    * Clear the area zoom overlay.
    */
   public clearAreaZoom(): void {
-    if (!this.areaZoomManager) {
+    if (!this.areaZoomState) {
       return;
     }
 
-    this.areaZoomManager.clear();
+    this.areaZoomState.clear();
     this.areaZoomRenderer?.clear();
 
     this.callbacks.requestRender();
@@ -408,11 +416,11 @@ export class MeasurementOrchestrator {
    * @param edge - Which edge is being resized
    */
   public handleResizeStart(_screenX: number, edge: 'left' | 'right'): void {
-    if (!this.measurementManager) {
+    if (!this.measurementState) {
       return;
     }
 
-    const measurement = this.measurementManager.getState();
+    const measurement = this.measurementState.getState();
     if (!measurement) {
       return;
     }
@@ -430,7 +438,7 @@ export class MeasurementOrchestrator {
    * @param screenX - Screen X coordinate
    */
   public handleResizeUpdate(screenX: number): void {
-    if (!this.measurementManager || this.resizeAnchorTime === null) {
+    if (!this.measurementState || this.resizeAnchorTime === null) {
       return;
     }
 
@@ -438,9 +446,9 @@ export class MeasurementOrchestrator {
     const clampedTime = Math.max(0, Math.min(this.totalDuration, timeNs));
 
     // Update measurement using anchor
-    this.measurementManager.setEdges(clampedTime, this.resizeAnchorTime);
+    this.measurementState.setEdges(clampedTime, this.resizeAnchorTime);
 
-    this.callbacks.onMeasurementChange(this.measurementManager.getState());
+    this.callbacks.onMeasurementChange(this.measurementState.getState());
     this.callbacks.requestRender();
   }
 
@@ -451,7 +459,7 @@ export class MeasurementOrchestrator {
     this.resizeEdge = null;
     this.resizeAnchorTime = null;
 
-    this.callbacks.onMeasurementChange(this.measurementManager?.getState() ?? null);
+    this.callbacks.onMeasurementChange(this.measurementState?.getState() ?? null);
     this.callbacks.requestRender();
   }
 
@@ -466,21 +474,24 @@ export class MeasurementOrchestrator {
    */
   public render(context: MeasurementRenderContext): void {
     // Render measurement overlay
-    if (this.measurementRenderer && this.measurementManager) {
-      this.measurementRenderer.render(context.viewportState, this.measurementManager.getState());
+    if (this.measurementRenderer && this.measurementState) {
+      this.measurementRenderer.render(context.viewportState, this.measurementState.getState());
     }
 
     // Render area zoom overlay
-    if (this.areaZoomRenderer && this.areaZoomManager) {
-      this.areaZoomRenderer.render(context.viewportState, this.areaZoomManager.getState());
+    if (this.areaZoomRenderer && this.areaZoomState) {
+      this.areaZoomRenderer.render(context.viewportState, this.areaZoomState.getState());
     }
   }
 
   /**
-   * Refresh colors from CSS variables (e.g., after theme change).
+   * Update measurement colors (e.g., after theme change).
+   *
+   * @param selectionBackground - Fill color (0xRRGGBB)
+   * @param borderColor - Border color (0xRRGGBB)
    */
-  public refreshColors(): void {
-    this.measurementRenderer?.refreshColors();
+  public setColors(selectionBackground: number, borderColor: number): void {
+    this.measurementRenderer?.setColors(selectionBackground, borderColor);
   }
 
   // ============================================================================

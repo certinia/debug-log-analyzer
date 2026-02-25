@@ -102,66 +102,18 @@ export function renderHighlight(
 }
 
 /**
- * Extract highlight colors from CSS variables.
- * Uses --vscode-editor-findMatchBackground as the source color.
- * Alpha values are applied during rendering for true transparency.
+ * Create highlight colors from a resolved PixiJS color value.
  *
+ * @param findMatchBackground - Resolved find match color (0xRRGGBB)
  * @returns Highlight colors (source color only)
  */
-export function extractHighlightColors(): HighlightColors {
-  const computedStyle = getComputedStyle(document.documentElement);
-
-  const colorStr =
-    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground').trim() || '#ff9632';
-
+export function createHighlightColors(findMatchBackground: number): HighlightColors {
   return {
-    sourceColor: parseColorToHex(colorStr),
+    sourceColor: findMatchBackground,
   };
 }
 
 /**
- * Parse CSS color string to numeric hex color (RGB only, ignoring alpha).
- *
- * @param cssColor - CSS color string
- * @returns Numeric color (0xRRGGBB)
+ * Default highlight color used when no editor colors are provided.
  */
-function parseColorToHex(cssColor: string): number {
-  if (!cssColor) {
-    return 0xea5c00; // Default orange
-  }
-
-  if (cssColor.startsWith('#')) {
-    const hex = cssColor.slice(1);
-    if (hex.length === 8) {
-      // #RRGGBBAA - extract RGB, ignore alpha
-      return parseInt(hex.slice(0, 6), 16);
-    }
-    if (hex.length === 6) {
-      return parseInt(hex, 16);
-    }
-    if (hex.length === 4) {
-      // #RGBA - extract RGB, ignore alpha
-      const r = hex[0]!;
-      const g = hex[1]!;
-      const b = hex[2]!;
-      return parseInt(r + r + g + g + b + b, 16);
-    }
-    if (hex.length === 3) {
-      const r = hex[0]!;
-      const g = hex[1]!;
-      const b = hex[2]!;
-      return parseInt(r + r + g + g + b + b, 16);
-    }
-  }
-
-  // rgba() fallback - ignore alpha
-  const rgba = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d*(?:\.\d+)?))?\)/);
-  if (rgba) {
-    const r = parseInt(rgba[1]!, 10);
-    const g = parseInt(rgba[2]!, 10);
-    const b = parseInt(rgba[3]!, 10);
-    return (r << 16) | (g << 8) | b;
-  }
-
-  return 0xea5c00; // Default orange
-}
+export const DEFAULT_FIND_MATCH_COLOR = 0xea5c00;

@@ -189,8 +189,9 @@ export class RectangleGeometry {
    * @param worldY - Top edge Y in world coordinates
    * @param worldWidth - Rectangle width in world coordinates
    * @param worldHeight - Rectangle height in world coordinates
-   * @param color - PixiJS color (0xRRGGBB), will be converted to RGBA
+   * @param color - PixiJS color (0xRRGGBB), will be converted to ABGR
    * @param viewport - Viewport transform for coordinate conversion
+   * @param alpha - Alpha value 0.0–1.0 (default: 1.0, fully opaque)
    */
   public writeRectangle(
     rectIndex: number,
@@ -200,6 +201,7 @@ export class RectangleGeometry {
     worldHeight: number,
     color: number,
     viewport: ViewportTransform,
+    alpha: number = 1.0,
   ): void {
     // Calculate buffer offsets (6 vertices per rect)
     const positionOffset = rectIndex * VERTICES_PER_RECT * FLOATS_PER_POSITION;
@@ -264,11 +266,11 @@ export class RectangleGeometry {
     this.positionData[positionOffset + 11] = clipY1;
 
     // Convert 0xRRGGBB to 0xAABBGGRR (ABGR for little-endian systems)
-    // Alpha is always 255 (fully opaque) since colors are pre-blended
     const r = (color >> 16) & 0xff;
     const g = (color >> 8) & 0xff;
     const b = color & 0xff;
-    const packedColor = 0xff000000 | (b << 16) | (g << 8) | r; // ABGR format
+    const a = (Math.round(alpha * 255) & 0xff) << 24;
+    const packedColor = a | (b << 16) | (g << 8) | r; // ABGR format
 
     // Write color data (same color for all 6 vertices)
     this.colorData[colorOffset] = packedColor;

@@ -16,23 +16,12 @@
  */
 
 import { Container, Geometry, Mesh, Shader } from 'pixi.js';
-import type { MarkerType, TimelineMarker } from '../../types/flamechart.types.js';
-import { MARKER_ALPHA, MARKER_COLORS, SEVERITY_RANK } from '../../types/flamechart.types.js';
-import { blendWithBackground } from '../BucketColorResolver.js';
+import type { TimelineMarker } from '../../types/flamechart.types.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
 import { createRectangleShader } from '../RectangleShader.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 import { hitTestMarkers, type MarkerIndicator } from './MarkerHitTest.js';
-
-/**
- * Pre-blended opaque marker colors (MARKER_COLORS blended at MARKER_ALPHA opacity).
- * Computed once at module load time for performance.
- */
-const MARKER_COLORS_BLENDED: Record<MarkerType, number> = {
-  error: blendWithBackground(MARKER_COLORS.error, MARKER_ALPHA),
-  skip: blendWithBackground(MARKER_COLORS.skip, MARKER_ALPHA),
-  unexpected: blendWithBackground(MARKER_COLORS.unexpected, MARKER_ALPHA),
-};
+import { MARKER_COLORS_BLENDED, sortMarkersByTimeAndSeverity } from './MarkerProcessor.js';
 
 /**
  * Renders marker indicators as semi-transparent vertical bands using Mesh.
@@ -64,12 +53,7 @@ export class MeshMarkerRenderer {
     this.viewport = viewport;
 
     // Sort markers by startTime for efficient end time resolution
-    this.markers = [...markers].sort((a, b) => {
-      if (a.startTime !== b.startTime) {
-        return a.startTime - b.startTime;
-      }
-      return SEVERITY_RANK[b.type] - SEVERITY_RANK[a.type];
-    });
+    this.markers = sortMarkersByTimeAndSeverity(markers);
 
     // Create geometry and shader
     this.geometry = new RectangleGeometry();
@@ -239,7 +223,7 @@ export class MeshMarkerRenderer {
    * @param markers - New array of markers
    */
   public updateMarkers(markers: readonly TimelineMarker[]): void {
-    (this.markers as TimelineMarker[]) = [...markers].sort((a, b) => a.startTime - b.startTime);
+    this.markers = sortMarkersByTimeAndSeverity(markers);
     this.visibleIndicators = [];
   }
 

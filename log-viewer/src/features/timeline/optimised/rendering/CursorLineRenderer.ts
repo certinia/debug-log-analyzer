@@ -38,20 +38,20 @@ export class CursorLineRenderer {
   /** Graphics object for cursor line */
   private graphics: PIXI.Graphics;
 
-  /** Cursor line color extracted from CSS variables */
+  /** Cursor line color */
   private cursorColor: number;
 
   /**
    * @param container - PixiJS container to add graphics to (uiContainer)
+   * @param cursorColor - Resolved cursor color (0xRRGGBB)
    */
-  constructor(container: PIXI.Container) {
+  constructor(container: PIXI.Container, cursorColor: number = DEFAULT_CURSOR_COLOR) {
     this.graphics = new PIXI.Graphics();
     // Position above other UI elements
     this.graphics.zIndex = 10;
     container.addChild(this.graphics);
 
-    // Extract color from CSS variables
-    this.cursorColor = this.extractCursorColor();
+    this.cursorColor = cursorColor;
   }
 
   /**
@@ -94,59 +94,12 @@ export class CursorLineRenderer {
   }
 
   /**
-   * Refresh colors from CSS variables (e.g., after theme change).
+   * Update cursor color (e.g., after theme change).
+   *
+   * @param cursorColor - Resolved cursor color (0xRRGGBB)
    */
-  public refreshColors(): void {
-    this.cursorColor = this.extractCursorColor();
-  }
-
-  /**
-   * Extract cursor color from CSS variables.
-   * Uses the same color as selection/focus for consistency.
-   */
-  private extractCursorColor(): number {
-    const computedStyle = getComputedStyle(document.documentElement);
-
-    // Use focus border color for cursor (matches VS Code selection)
-    const colorStr =
-      computedStyle.getPropertyValue('--vscode-editorCursor-foreground').trim() ||
-      computedStyle.getPropertyValue('--vscode-focusBorder').trim() ||
-      '#ffffff';
-
-    return this.parseColorToHex(colorStr);
-  }
-
-  /**
-   * Parse CSS color string to numeric hex.
-   */
-  private parseColorToHex(cssColor: string): number {
-    if (!cssColor) {
-      return DEFAULT_CURSOR_COLOR;
-    }
-
-    if (cssColor.startsWith('#')) {
-      const hex = cssColor.slice(1);
-      if (hex.length === 6) {
-        return parseInt(hex, 16);
-      }
-      if (hex.length === 3) {
-        const r = hex[0]!;
-        const g = hex[1]!;
-        const b = hex[2]!;
-        return parseInt(r + r + g + g + b + b, 16);
-      }
-    }
-
-    // rgba() fallback
-    const rgba = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-    if (rgba) {
-      const r = parseInt(rgba[1]!, 10);
-      const g = parseInt(rgba[2]!, 10);
-      const b = parseInt(rgba[3]!, 10);
-      return (r << 16) | (g << 8) | b;
-    }
-
-    return DEFAULT_CURSOR_COLOR;
+  public setColor(cursorColor: number): void {
+    this.cursorColor = cursorColor;
   }
 
   /**

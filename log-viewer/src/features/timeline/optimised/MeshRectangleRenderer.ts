@@ -19,16 +19,16 @@
  * - Render buckets (sub-pixel aggregated events)
  *
  * Does NOT:
- * - Pre-compute rectangles (done by RectangleManager)
- * - Perform culling (done by RectangleManager)
+ * - Pre-compute rectangles (done by RectangleCache)
+ * - Perform culling (done by RectangleCache)
  * - Handle search logic (done by MeshSearchStyleRenderer)
  */
 
 import { Container, Geometry, Mesh, Shader } from 'pixi.js';
 import type { PixelBucket, RenderBatch, ViewportState } from '../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
+import type { PrecomputedRect } from './RectangleCache.js';
 import { RectangleGeometry, type ViewportTransform } from './RectangleGeometry.js';
-import type { PrecomputedRect } from './RectangleManager.js';
 import { createRectangleShader } from './RectangleShader.js';
 
 export class MeshRectangleRenderer {
@@ -70,7 +70,7 @@ export class MeshRectangleRenderer {
 
   /**
    * Render culled rectangles and buckets.
-   * Receives pre-culled rectangles and aggregated buckets from RectangleManager.
+   * Receives pre-culled rectangles and aggregated buckets from RectangleCache.
    * Both are keyed by category.
    *
    * @param culledRects - Rectangles grouped by category (events > 2px)

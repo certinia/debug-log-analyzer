@@ -20,7 +20,7 @@ import * as PIXI from 'pixi.js';
 import { formatDuration } from '../../../../core/utility/Util.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { calculateLabelPosition, createTimelineLabel } from '../rendering/LabelPositioning.js';
-import type { MeasurementState } from './MeasurementManager.js';
+import type { MeasurementSnapshot } from './MeasurementState.js';
 
 /** Opacity for the dim overlay outside the selection */
 const DIM_ALPHA = 0.3;
@@ -43,16 +43,11 @@ export class AreaZoomRenderer {
   /** HTML container for the label */
   private labelElement: HTMLDivElement;
 
-  /** Parent HTML container for positioning */
-  private container: HTMLElement;
-
   /**
    * @param pixiContainer - PixiJS container for graphics (worldContainer)
    * @param htmlContainer - HTML container for label positioning
    */
   constructor(pixiContainer: PIXI.Container, htmlContainer: HTMLElement) {
-    this.container = htmlContainer;
-
     // Create graphics for overlay - render above frames but below tooltips
     this.graphics = new PIXI.Graphics();
     this.graphics.zIndex = 5; // Above measurement overlay (4)
@@ -77,7 +72,7 @@ export class AreaZoomRenderer {
    * @param viewport - Current viewport state
    * @param state - Area zoom state (normalized: startTime <= endTime)
    */
-  public render(viewport: ViewportState, state: MeasurementState | null): void {
+  public render(viewport: ViewportState, state: MeasurementSnapshot | null): void {
     this.graphics.clear();
 
     if (!state) {
@@ -126,7 +121,7 @@ export class AreaZoomRenderer {
    * Update the HTML label position and content.
    * Shows duration only (no zoom icon since zoom happens automatically on release).
    */
-  private updateLabel(viewport: ViewportState, state: MeasurementState): void {
+  private updateLabel(viewport: ViewportState, state: MeasurementSnapshot): void {
     const { startTime, endTime } = state;
     const duration = endTime - startTime;
 

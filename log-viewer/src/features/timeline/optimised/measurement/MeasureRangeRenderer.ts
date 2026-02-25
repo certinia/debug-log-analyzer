@@ -19,9 +19,8 @@
 import * as PIXI from 'pixi.js';
 import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
-import { parseColorToHex } from '../rendering/ColorUtils.js';
 import { calculateLabelPosition, createTimelineLabel } from '../rendering/LabelPositioning.js';
-import type { MeasurementState } from './MeasurementManager.js';
+import type { MeasurementSnapshot } from './MeasurementState.js';
 
 /**
  * Colors for the measurement overlay, extracted from CSS variables.
@@ -70,8 +69,18 @@ export class MeasureRangeRenderer {
    * @param pixiContainer - PixiJS container for graphics (worldContainer)
    * @param htmlContainer - HTML container for label positioning
    * @param onZoomClick - Optional callback when zoom icon is clicked
+   * @param resolvedColors - Optional pre-resolved colors (selectionBackground, selectionHighlightBorder, focusBorder)
    */
-  constructor(pixiContainer: PIXI.Container, htmlContainer: HTMLElement, onZoomClick?: () => void) {
+  constructor(
+    pixiContainer: PIXI.Container,
+    htmlContainer: HTMLElement,
+    onZoomClick?: () => void,
+    resolvedColors?: {
+      selectionBackground: number;
+      selectionHighlightBorder: number;
+      focusBorder: number;
+    },
+  ) {
     this.onZoomClick = onZoomClick;
 
     // Create graphics for overlay - render above frames but below tooltips
@@ -83,8 +92,15 @@ export class MeasureRangeRenderer {
     this.labelElement = this.createLabelElement();
     htmlContainer.appendChild(this.labelElement);
 
-    // Extract colors from CSS variables
-    this.colors = this.extractColors();
+    // Use provided colors or defaults
+    if (resolvedColors) {
+      this.colors = {
+        fillColor: resolvedColors.selectionBackground,
+        borderColor: resolvedColors.selectionHighlightBorder || resolvedColors.focusBorder,
+      };
+    } else {
+      this.colors = { fillColor: 0x264f78, borderColor: 0x264f78 };
+    }
   }
 
   /**
@@ -141,8 +157,8 @@ export class MeasureRangeRenderer {
       padding: 0;
       border: none;
       border-radius: 4px;
-      background: var(--vscode-button-secondaryBackground, #3a3d41);
-      color: var(--vscode-button-secondaryForeground, #cccccc);
+      background: var(--tl-button-secondary-background, #3a3d41);
+      color: var(--tl-button-secondary-foreground, #cccccc);
       cursor: pointer;
       pointer-events: auto;
       transition: background 0.1s;
@@ -163,40 +179,26 @@ export class MeasureRangeRenderer {
     });
 
     button.addEventListener('mouseenter', () => {
-      button.style.background = 'var(--vscode-button-secondaryHoverBackground, #45494e)';
+      button.style.background = 'var(--tl-button-secondary-hover-background, #45494e)';
     });
 
     button.addEventListener('mouseleave', () => {
-      button.style.background = 'var(--vscode-button-secondaryBackground, #3a3d41)';
+      button.style.background = 'var(--tl-button-secondary-background, #3a3d41)';
     });
 
     return button;
   }
 
   /**
-   * Extract measurement colors from CSS variables.
-   * Uses VS Code selection colors for theme compatibility.
+   * Update measurement colors (e.g., after theme change).
+   *
+   * @param selectionBackground - Fill color (0xRRGGBB)
+   * @param borderColor - Border color (0xRRGGBB)
    */
-  private extractColors(): MeasurementColors {
-    const computedStyle = getComputedStyle(document.documentElement);
-
-    // Selection background for fill
-    const fillStr =
-      computedStyle.getPropertyValue('--vscode-editor-selectionBackground').trim() ||
-      'rgba(38, 79, 120, 0.5)';
-
-    // Selection highlight border or fallback to a visible color
-    const borderStr =
-      computedStyle.getPropertyValue('--vscode-editor-selectionHighlightBorder').trim() ||
-      computedStyle.getPropertyValue('--vscode-focusBorder').trim() ||
-      '#007fd4';
-
-    // Default blue (0x264f78) for measurement overlay
-    const defaultBlue = 0x264f78;
-
-    return {
-      fillColor: parseColorToHex(fillStr, defaultBlue),
-      borderColor: parseColorToHex(borderStr, defaultBlue),
+  public setColors(selectionBackground: number, borderColor: number): void {
+    this.colors = {
+      fillColor: selectionBackground,
+      borderColor,
     };
   }
 
@@ -206,7 +208,7 @@ export class MeasureRangeRenderer {
    * @param viewport - Current viewport state
    * @param measurement - Measurement state (normalized: startTime <= endTime)
    */
-  public render(viewport: ViewportState, measurement: MeasurementState | null): void {
+  public render(viewport: ViewportState, measurement: MeasurementSnapshot | null): void {
     this.graphics.clear();
 
     if (!measurement) {
@@ -246,7 +248,7 @@ export class MeasureRangeRenderer {
    * Smart positioning: center in visible portion, stick to edge when partially offscreen,
    * hide when fully offscreen.
    */
-  private updateLabel(viewport: ViewportState, measurement: MeasurementState): void {
+  private updateLabel(viewport: ViewportState, measurement: MeasurementSnapshot): void {
     const { startTime, endTime, isActive } = measurement;
     const duration = endTime - startTime;
 
@@ -296,13 +298,6 @@ export class MeasureRangeRenderer {
   public clear(): void {
     this.graphics.clear();
     this.labelElement.style.display = 'none';
-  }
-
-  /**
-   * Refresh colors from CSS variables (e.g., after theme change).
-   */
-  public refreshColors(): void {
-    this.colors = this.extractColors();
   }
 
   /**

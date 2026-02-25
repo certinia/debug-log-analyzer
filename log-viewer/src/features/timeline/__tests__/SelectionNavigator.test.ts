@@ -7,7 +7,7 @@
  */
 
 /**
- * Unit tests for SelectionManager
+ * Unit tests for SelectionNavigator
  *
  * Tests selection state management and navigation:
  * - select/clear/getSelected lifecycle
@@ -16,11 +16,11 @@
  * - findByOriginal for hit test integration
  */
 
-import { SelectionManager } from '../optimised/selection/SelectionManager.js';
+import { SelectionNavigator } from '../optimised/selection/SelectionNavigator.js';
 import type { EventNode, TreeNode } from '../types/flamechart.types.js';
 import type { NavigationMaps } from '../utils/tree-converter.js';
 
-describe('SelectionManager', () => {
+describe('SelectionNavigator', () => {
   /**
    * Helper to create a mock EventNode
    */
@@ -97,7 +97,7 @@ describe('SelectionManager', () => {
   }
 
   describe('selection lifecycle', () => {
-    let manager: SelectionManager<EventNode>;
+    let manager: SelectionNavigator<EventNode>;
     let node1: TreeNode<EventNode>;
     let node2: TreeNode<EventNode>;
 
@@ -105,7 +105,7 @@ describe('SelectionManager', () => {
       node1 = createNode(createEvent('1'));
       node2 = createNode(createEvent('2'));
       const rootNodes = [node1, node2];
-      manager = new SelectionManager(rootNodes, buildMapsFromNodes(rootNodes));
+      manager = new SelectionNavigator(rootNodes, buildMapsFromNodes(rootNodes));
     });
 
     it('should have no selection initially', () => {
@@ -152,7 +152,7 @@ describe('SelectionManager', () => {
     //     └── child2 (id: 12)
     //   root2 (id: 2)
 
-    let manager: SelectionManager<EventNode>;
+    let manager: SelectionNavigator<EventNode>;
     let root1: TreeNode<EventNode>;
     let root2: TreeNode<EventNode>;
     let child1: TreeNode<EventNode>;
@@ -167,7 +167,7 @@ describe('SelectionManager', () => {
       root2 = createNode(createEvent('2'), undefined, 0);
 
       const rootNodes = [root1, root2];
-      manager = new SelectionManager(rootNodes, buildMapsFromNodes(rootNodes));
+      manager = new SelectionNavigator(rootNodes, buildMapsFromNodes(rootNodes));
     });
 
     it('should return null when navigating with no selection', () => {
@@ -275,7 +275,7 @@ describe('SelectionManager', () => {
   });
 
   describe('findById', () => {
-    let manager: SelectionManager<EventNode>;
+    let manager: SelectionNavigator<EventNode>;
     let node1: TreeNode<EventNode>;
     let node2: TreeNode<EventNode>;
 
@@ -284,7 +284,7 @@ describe('SelectionManager', () => {
       node1 = createNode(createEvent('1'), [child], 0);
       node2 = createNode(createEvent('2'), undefined, 0);
       const rootNodes = [node1, node2];
-      manager = new SelectionManager(rootNodes, buildMapsFromNodes(rootNodes));
+      manager = new SelectionNavigator(rootNodes, buildMapsFromNodes(rootNodes));
     });
 
     it('should find node by id', () => {
@@ -306,7 +306,7 @@ describe('SelectionManager', () => {
   describe('empty tree', () => {
     it('should handle empty tree', () => {
       const rootNodes: TreeNode<EventNode>[] = [];
-      const manager = new SelectionManager<EventNode>(rootNodes, buildMapsFromNodes(rootNodes));
+      const manager = new SelectionNavigator<EventNode>(rootNodes, buildMapsFromNodes(rootNodes));
 
       expect(manager.hasSelection()).toBe(false);
       expect(manager.getSelected()).toBeNull();

@@ -19,25 +19,21 @@
  * - Maintain original colors for matched events
  *
  * Does NOT:
- * - Pre-compute rectangles (done by RectangleManager)
- * - Perform culling (done by RectangleManager)
+ * - Pre-compute rectangles (done by RectangleCache)
+ * - Perform culling (done by RectangleCache)
  * - Draw highlight borders (done by SearchHighlightRenderer)
  * - Implement search logic
  */
 
 import { Container, Geometry, Mesh, Shader } from 'pixi.js';
-import type {
-  CategoryAggregation,
-  PixelBucket,
-  RenderBatch,
-  ViewportState,
-} from '../../types/flamechart.types.js';
+import type { PixelBucket, RenderBatch, ViewportState } from '../../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { MatchedEventInfo } from '../../types/search.types.js';
-import { resolveColor } from '../BucketColorResolver.js';
+import type { PrecomputedRect } from '../RectangleCache.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
-import type { PrecomputedRect } from '../RectangleManager.js';
 import { createRectangleShader } from '../RectangleShader.js';
+import { colorToGreyscale } from '../rendering/ColorUtils.js';
+import { buildMatchIndex, resolveBucketSearchColor } from './SearchBucketMatcher.js';
 
 /**
  * MeshSearchStyleRenderer
@@ -85,7 +81,7 @@ export class MeshSearchStyleRenderer {
    * Non-matched events: desaturated greyscale
    * Buckets: search-aware styling based on matched events
    *
-   * @param culledRects - Rectangles grouped by category (from RectangleManager)
+   * @param culledRects - Rectangles grouped by category (from RectangleCache)
    * @param matchedEventIds - Set of event IDs that match search (retain original colors)
    * @param buckets - Aggregated pixel buckets grouped by category
    * @param viewport - Current viewport state for coordinate transforms
@@ -148,7 +144,7 @@ export class MeshSearchStyleRenderer {
       }
 
       const originalColor = batch.color;
-      const greyColor = this.colorToGreyscale(originalColor);
+      const greyColor = colorToGreyscale(originalColor);
 
       for (const rect of rectangles) {
         // Use original color for matched events, greyscale for non-matched
@@ -221,16 +217,7 @@ export class MeshSearchStyleRenderer {
     startIndex: number,
     viewportTransform: ViewportTransform,
   ): number {
-    // Build spatial index: Map<depth, Array<{timestamp, category}>>
-    const matchesByDepth = new Map<number, Array<{ timestamp: number; category: string }>>();
-    for (const info of matchedEventsInfo) {
-      let depthMatches = matchesByDepth.get(info.depth);
-      if (!depthMatches) {
-        depthMatches = [];
-        matchesByDepth.set(info.depth, depthMatches);
-      }
-      depthMatches.push({ timestamp: info.timestamp, category: info.category });
-    }
+    const matchIndex = buildMatchIndex(matchedEventsInfo);
 
     // Pre-calculate constants outside loops
     const gap = TIMELINE_CONSTANTS.RECT_GAP;
@@ -244,39 +231,7 @@ export class MeshSearchStyleRenderer {
     // Write all buckets from all categories
     for (const categoryBuckets of buckets.values()) {
       for (const bucket of categoryBuckets) {
-        // Find matched events in this bucket using time-range matching
-        const matchedCategoryStats = new Map<string, CategoryAggregation>();
-
-        const depthMatches = matchesByDepth.get(bucket.depth);
-        if (depthMatches) {
-          for (const match of depthMatches) {
-            if (
-              match.timestamp >= bucket.timeStart &&
-              match.timestamp < bucket.timeEnd &&
-              match.category
-            ) {
-              let stats = matchedCategoryStats.get(match.category);
-              if (!stats) {
-                stats = { count: 0, totalDuration: 0 };
-                matchedCategoryStats.set(match.category, stats);
-              }
-              stats.count++;
-            }
-          }
-        }
-
-        let displayColor: number;
-
-        if (matchedCategoryStats.size > 0) {
-          // Resolve color from matched events using priority rules
-          displayColor = resolveColor({
-            byCategory: matchedCategoryStats,
-            dominantCategory: '',
-          }).color;
-        } else {
-          // No matches - desaturate the bucket's pre-blended color
-          displayColor = this.colorToGreyscale(bucket.color);
-        }
+        const displayColor = resolveBucketSearchColor(bucket, matchIndex);
 
         this.geometry.writeRectangle(
           rectIndex,
@@ -292,29 +247,5 @@ export class MeshSearchStyleRenderer {
     }
 
     return rectIndex;
-  }
-
-  /**
-   * Convert a color to greyscale based on luminance.
-   * Uses standard luminance formula: 0.299*R + 0.587*G + 0.114*B
-   * Then applies slight dimming to match Chrome DevTools appearance.
-   *
-   * @param color - PixiJS color (0xRRGGBB)
-   * @returns Greyscale color (0xRRGGBB)
-   */
-  private colorToGreyscale(color: number): number {
-    // Extract RGB components
-    const r = (color >> 16) & 0xff;
-    const g = (color >> 8) & 0xff;
-    const b = color & 0xff;
-
-    // Calculate luminance (perceived brightness)
-    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-
-    // Apply dimming factor to match Chrome DevTools
-    const dimmed = Math.floor(luminance * 0.7);
-
-    // Create greyscale color (same value for R, G, B)
-    return (dimmed << 16) | (dimmed << 8) | dimmed;
   }
 }

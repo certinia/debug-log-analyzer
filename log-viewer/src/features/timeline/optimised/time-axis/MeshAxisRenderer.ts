@@ -30,12 +30,7 @@ import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.
 import { createRectangleShader } from '../RectangleShader.js';
 import { ClockTimeAxisRenderer } from './ClockTimeAxisRenderer.js';
 import { ElapsedTimeAxisRenderer } from './ElapsedTimeAxisRenderer.js';
-import {
-  NS_PER_MS,
-  applyAlphaToColor,
-  parseColorToHex,
-  selectInterval,
-} from './timeAxisConstants.js';
+import { NS_PER_MS, selectInterval } from './timeAxisConstants.js';
 
 /**
  * Axis rendering configuration.
@@ -93,7 +88,7 @@ export interface TimeAxisLabelStrategy {
   /** Called after the tick loop (e.g., wall-clock updates sticky label) */
   endFrame(screenSpaceContainer: Container | null, hasSubMsTicks: boolean): void;
   /** Refresh colors after theme change */
-  refreshColors(textColor: string): void;
+  refreshColors(textColor: string, backgroundColor?: number): void;
   /** Clean up resources */
   destroy(): void;
 }
@@ -105,14 +100,15 @@ export class MeshAxisRenderer {
   private labelsContainer: Container;
   private screenSpaceContainer: Container | null = null;
   private config: AxisConfig;
+  private labelCache: Map<string, Text> = new Map();
   /** Pool of reusable Text labels (index-based to support duplicate text) */
   private labelPool: Text[] = [];
   /** Number of active labels in current frame */
   private activeLabelCount = 0;
   /** Grid line color */
   private gridLineColor: number;
-  /** Cached grid line color with alpha pre-applied (ABGR format) */
-  private gridLineColorWithAlpha: number;
+  /** Background color for sticky labels */
+  private backgroundColor: number = 0x252526;
 
   /** Active label strategy */
   private strategy: TimeAxisLabelStrategy;
@@ -142,10 +138,6 @@ export class MeshAxisRenderer {
     };
 
     this.gridLineColor = this.config.lineColor;
-    this.gridLineColorWithAlpha = applyAlphaToColor(
-      this.gridLineColor,
-      this.config.gridAlpha ?? 1.0,
-    );
 
     // Create geometry and shader for grid lines
     this.geometry = new RectangleGeometry();
@@ -222,36 +214,26 @@ export class MeshAxisRenderer {
   }
 
   /**
-   * Refresh colors from CSS variables (e.g., after VS Code theme change).
-   * Updates grid line and label colors.
+   * Update axis colors (e.g., after theme change).
+   *
+   * @param lineColor - Grid line color (0xRRGGBB)
+   * @param textColor - Label text color (CSS string)
    */
-  public refreshColors(): void {
-    // Re-extract colors from CSS variables
-    const computedStyle = getComputedStyle(document.documentElement);
-
-    // Update grid line color
-    const lineColorStr =
-      computedStyle.getPropertyValue('--vscode-editorLineNumber-foreground').trim() || '#808080';
-    this.gridLineColor = parseColorToHex(lineColorStr);
-    this.config.lineColor = this.gridLineColor;
-
-    // Update cached color with alpha
-    this.gridLineColorWithAlpha = applyAlphaToColor(
-      this.gridLineColor,
-      this.config.gridAlpha ?? 1.0,
-    );
-
-    // Update text color
-    this.config.textColor =
-      computedStyle.getPropertyValue('--vscode-editorLineNumber-foreground').trim() || '#808080';
+  public setColors(lineColor: number, textColor: string, backgroundColor?: number): void {
+    this.gridLineColor = lineColor;
+    this.config.lineColor = lineColor;
+    this.config.textColor = textColor;
+    if (backgroundColor !== undefined) {
+      this.backgroundColor = backgroundColor;
+    }
 
     // Update existing labels with new color
-    for (const label of this.labelPool) {
-      label.style.fill = this.config.textColor;
+    for (const label of this.labelCache.values()) {
+      label.style.fill = textColor;
     }
 
     // Update strategy colors
-    this.strategy.refreshColors(this.config.textColor);
+    this.strategy.refreshColors(this.config.textColor, this.backgroundColor);
   }
 
   /**
@@ -272,6 +254,7 @@ export class MeshAxisRenderer {
         firstTimestampNs,
         this.config.fontSize,
         this.config.textColor,
+        this.backgroundColor,
       );
     } else {
       this.strategy = new ElapsedTimeAxisRenderer();
@@ -390,8 +373,9 @@ export class MeshAxisRenderer {
         0,
         1,
         effectiveHeight,
-        this.gridLineColorWithAlpha,
+        this.gridLineColor,
         viewportTransform,
+        this.config.gridAlpha,
       );
       rectIndex++;
 

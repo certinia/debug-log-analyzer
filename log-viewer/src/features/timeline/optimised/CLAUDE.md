@@ -40,7 +40,7 @@ When FlameChart needs to pass event data to callbacks:
 
 ### Internal Types
 
-`LogEvent` is still used internally by data structures (`RectangleManager`, `TimelineEventIndex`, `PixelBucket`) for performance reasons. These types are imported through `flamechart.types.ts` which re-exports them from log-parser.
+`LogEvent` is still used internally by data structures (`RectangleCache`, `TimelineEventIndex`, `PixelBucket`) for performance reasons. These types are imported through `flamechart.types.ts` which re-exports them from log-parser.
 
 ### Metric Strip Architecture
 
@@ -48,7 +48,7 @@ The metric strip visualization (governor limits) is rendered below the main time
 
 - `MetricStripOrchestrator` manages the metric strip lifecycle and interactions
 - `MetricStripRenderer` renders step charts for governor limit metrics
-- `MetricStripManager` processes `HeatStripTimeSeries` data and classifies metrics into tiers
+- `MetricTierClassifier` processes `HeatStripTimeSeries` data and classifies metrics into tiers
 - `ApexLogTimeline` transforms `GovernorSnapshot[]` → `HeatStripTimeSeries`
 - Apex-specific display names, units, and priority order are defined ONLY in ApexLogTimeline
 
@@ -56,7 +56,7 @@ The metric strip supports collapsed (heat-style) and expanded (step chart) views
 
 ## Spatial Queries: Use TemporalSegmentTree
 
-**Always use TemporalSegmentTree (via RectangleManager) for frame queries. Never traverse the event tree directly.**
+**Always use TemporalSegmentTree (via RectangleCache) for frame queries. Never traverse the event tree directly.**
 
 ### Available Query Methods
 
@@ -69,11 +69,11 @@ The metric strip supports collapsed (heat-style) and expanded (step chart) views
 ### Access Pattern
 
 ```typescript
-// Via RectangleManager (preferred)
-const events = rectangleManager.queryEventsInRegion(timeStart, timeEnd, depthStart, depthEnd);
+// Via RectangleCache (preferred)
+const events = rectangleCache.queryEventsInRegion(timeStart, timeEnd, depthStart, depthEnd);
 
 // Direct tree access (for specialized queries)
-const tree = rectangleManager.getSegmentTree();
+const tree = rectangleCache.getSegmentTree();
 const stats = tree.queryBucketStats(timeStart, timeEnd);
 ```
 
@@ -97,14 +97,14 @@ const stats = tree.queryBucketStats(timeStart, timeEnd);
 - Handles themes, tooltips, markers
 - Delegates rendering to FlameChart
 
-### SelectionManager
+### SelectionNavigator
 
 - Owns selection state (`selectedNode`)
 - Tree navigation logic (up/down/left/right)
 - Selection lifecycle (select, clear, navigate)
 - Maps hit test results to tree nodes
 
-### SearchManager
+### EventMatcher
 
 - Owns search state and cursor
 - Tree traversal with predicates
@@ -192,8 +192,8 @@ Prefer computed methods over manual state tracking:
 ```typescript
 // GOOD: Computed from actual state
 private getHighlightMode(): 'none' | 'search' | 'selection' {
-  if (this.selectionManager?.hasSelection()) return 'selection';
-  if (this.searchManager?.getCursor()?.total > 0) return 'search';
+  if (this.selectionNavigator?.hasSelection()) return 'selection';
+  if (this.eventMatcher?.getCursor()?.total > 0) return 'search';
   return 'none';
 }
 
@@ -250,13 +250,13 @@ optimised/
 ├── interaction/
 │   ├── KeyboardHandler.ts     # Keyboard input processing
 │   ├── TimelineInteractionHandler.ts  # Mouse/touch input
-│   └── HitTestManager.ts      # Hit testing for mouse events
+│   └── HitDetector.ts         # Hit testing for mouse events
 ├── selection/
-│   ├── SelectionManager.ts    # Selection state and navigation
+│   ├── SelectionNavigator.ts   # Selection state and navigation
 │   ├── SelectionHighlightRenderer.ts  # Selection visuals
 │   └── TreeNavigator.ts       # Tree traversal (internal)
 ├── search/
-│   ├── SearchManager.ts       # Search state and matching
+│   ├── EventMatcher.ts         # Search state and matching
 │   ├── SearchHighlightRenderer.ts  # Search visuals
 │   └── ...
 ├── rendering/
@@ -269,9 +269,9 @@ optimised/
 
 Each manager class should have its own test file:
 
-- `SelectionManager.test.ts` - Selection logic tests
+- `SelectionNavigator.test.ts` - Selection logic tests
 - `TreeNavigator.test.ts` - Tree navigation tests
-- `SearchManager.test.ts` - Search logic tests
+- `EventMatcher.test.ts` - Search logic tests
 
 Tests should focus on the manager's API, not internal implementation.
 

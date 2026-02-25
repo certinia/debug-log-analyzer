@@ -69,54 +69,6 @@ export function selectInterval(targetMs: number): { interval: number; skipFactor
 }
 
 /**
- * Parse CSS color string to numeric hex.
- */
-export function parseColorToHex(cssColor: string): number {
-  if (!cssColor) {
-    return 0x808080;
-  }
-
-  if (cssColor.startsWith('#')) {
-    const hex = cssColor.slice(1);
-    if (hex.length === 6) {
-      return parseInt(hex, 16);
-    }
-    if (hex.length === 3) {
-      const r = hex[0]!;
-      const g = hex[1]!;
-      const b = hex[2]!;
-      return parseInt(r + r + g + g + b + b, 16);
-    }
-  }
-
-  // rgba() fallback
-  const rgba = cssColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*[\d.]+)?\)/);
-  if (rgba) {
-    const r = parseInt(rgba[1]!, 10);
-    const g = parseInt(rgba[2]!, 10);
-    const b = parseInt(rgba[3]!, 10);
-    return (r << 16) | (g << 8) | b;
-  }
-
-  return 0x808080;
-}
-
-/**
- * Apply alpha to a color by pre-multiplying into ABGR format for the shader.
- * The shader expects colors in ABGR format with alpha in the high byte.
- */
-export function applyAlphaToColor(color: number, alpha: number): number {
-  const r = (color >> 16) & 0xff;
-  const g = (color >> 8) & 0xff;
-  const b = color & 0xff;
-  if (alpha >= 1.0) {
-    return (0xff << 24) | (b << 16) | (g << 8) | r;
-  }
-  const a = Math.round(alpha * 255);
-  return (a << 24) | (b << 16) | (g << 8) | r;
-}
-
-/**
  * Format time with appropriate units and precision.
  * - Whole seconds: "1 s", "2 s" (not "1000 ms")
  * - Milliseconds: up to 3 decimal places: "18800.345 ms"

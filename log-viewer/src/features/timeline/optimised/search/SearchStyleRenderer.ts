@@ -20,8 +20,8 @@
  * - Maintain original colors for matched events
  *
  * Does NOT:
- * - Pre-compute rectangles (done by RectangleManager)
- * - Perform culling (done by RectangleManager)
+ * - Pre-compute rectangles (done by RectangleCache)
+ * - Perform culling (done by RectangleCache)
  * - Draw highlight borders (done by SearchHighlightRenderer)
  * - Implement search logic
  */
@@ -35,7 +35,8 @@ import type {
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
 import type { MatchedEventInfo } from '../../types/search.types.js';
 import { resolveColor } from '../BucketColorResolver.js';
-import type { PrecomputedRect } from '../RectangleManager.js';
+import type { PrecomputedRect } from '../RectangleCache.js';
+import { colorToGreyscale } from '../rendering/ColorUtils.js';
 import { SpritePool } from '../SpritePool.js';
 
 /**
@@ -59,7 +60,7 @@ export class SearchStyleRenderer {
    * Non-matched events: desaturated greyscale
    * Buckets: search-aware styling based on matched events
    *
-   * @param culledRects - Rectangles grouped by category (from RectangleManager)
+   * @param culledRects - Rectangles grouped by category (from RectangleCache)
    * @param matchedEventIds - Set of event IDs that match search (retain original colors)
    * @param buckets - Aggregated pixel buckets grouped by category
    * @param _viewport - Unused, for API compatibility with mesh renderer
@@ -87,7 +88,7 @@ export class SearchStyleRenderer {
       }
 
       const originalColor = batch.color;
-      const greyColor = this.colorToGreyscale(originalColor);
+      const greyColor = colorToGreyscale(originalColor);
 
       for (const rect of rectangles) {
         const sprite = this.spritePool.acquire();
@@ -191,7 +192,7 @@ export class SearchStyleRenderer {
           }).color;
         } else {
           // No matches - desaturate the bucket's pre-blended color
-          displayColor = this.colorToGreyscale(bucket.color);
+          displayColor = colorToGreyscale(bucket.color);
         }
 
         const sprite = this.spritePool.acquire();
@@ -201,29 +202,5 @@ export class SearchStyleRenderer {
         sprite.tint = displayColor;
       }
     }
-  }
-
-  /**
-   * Convert a color to greyscale based on luminance.
-   * Uses standard luminance formula: 0.299*R + 0.587*G + 0.114*B
-   * Then applies slight dimming to match Chrome DevTools appearance.
-   *
-   * @param color - PixiJS color (0xRRGGBB)
-   * @returns Greyscale color (0xRRGGBB)
-   */
-  private colorToGreyscale(color: number): number {
-    // Extract RGB components
-    const r = (color >> 16) & 0xff;
-    const g = (color >> 8) & 0xff;
-    const b = color & 0xff;
-
-    // Calculate luminance (perceived brightness)
-    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-
-    // Apply dimming factor to match Chrome DevTools
-    const dimmed = Math.floor(luminance * 0.7);
-
-    // Create greyscale color (same value for R, G, B)
-    return (dimmed << 16) | (dimmed << 8) | dimmed;
   }
 }

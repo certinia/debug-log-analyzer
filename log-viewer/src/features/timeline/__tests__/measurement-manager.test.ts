@@ -2,13 +2,13 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 
-import { MeasurementManager } from '../optimised/measurement/MeasurementManager.js';
+import { MeasurementState } from '../optimised/measurement/MeasurementState.js';
 
-describe('MeasurementManager', () => {
-  let manager: MeasurementManager;
+describe('MeasurementState', () => {
+  let manager: MeasurementState;
 
   beforeEach(() => {
-    manager = new MeasurementManager();
+    manager = new MeasurementState();
   });
 
   describe('initial state', () => {

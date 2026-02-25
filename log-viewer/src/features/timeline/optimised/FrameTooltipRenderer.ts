@@ -3,7 +3,7 @@
  */
 
 /**
- * TimelineTooltipManager
+ * FrameTooltipRenderer
  *
  * Manages HTML tooltip display for event hover interactions.
  * Handles tooltip positioning, content generation, and visibility.
@@ -32,7 +32,7 @@ export interface TooltipOptions {
   apexLog?: ApexLog | null;
 }
 
-export class TimelineTooltipManager {
+export class FrameTooltipRenderer {
   private container: HTMLElement;
   private tooltipElement: HTMLElement | null = null;
   private options: TooltipOptions;
