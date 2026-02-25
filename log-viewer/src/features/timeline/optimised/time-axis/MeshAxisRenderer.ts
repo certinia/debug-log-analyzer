@@ -7,12 +7,14 @@
  *
  * Renders time scale axis with dynamic labels and tick marks using PixiJS Mesh.
  * Adapts tick density and label precision based on zoom level.
+ * Delegates label formatting to strategy renderers (elapsed vs wall-clock).
  *
  * Performance optimizations:
  * - Single Mesh draw call for all grid lines
  * - Direct buffer updates (no scene graph overhead)
  * - Clip-space coordinates (no uniform binding overhead)
  * - Labels use PIXI.Text (optimal for dynamic text with caching)
+ * - Cached per-frame allocations (Set, closure, viewport object)
  *
  * Tick levels (zoom-dependent):
  * - Seconds: Major ticks at 1s, 2s, 5s, 10s intervals
@@ -22,15 +24,13 @@
  */
 
 import { Container, Geometry, Mesh, Shader, Text } from 'pixi.js';
-import { formatWallClockTime } from '../../../../core/utility/Util.js';
+
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
 import { createRectangleShader } from '../RectangleShader.js';
-
-/**
- * Nanoseconds per millisecond conversion constant.
- */
-const NS_PER_MS = 1_000_000;
+import { ClockTimeAxisRenderer } from './ClockTimeAxisRenderer.js';
+import { ElapsedTimeAxisRenderer } from './ElapsedTimeAxisRenderer.js';
+import { NS_PER_MS, selectInterval } from './timeAxisConstants.js';
 
 /**
  * Axis rendering configuration.
@@ -55,11 +55,42 @@ interface AxisConfig {
 /**
  * Time interval for tick marks.
  */
-interface TickInterval {
+export interface TickInterval {
   /** Interval duration in nanoseconds */
   interval: number;
   /** Skip factor (1 = show all, 2 = show every 2nd, 5 = show every 5th) */
   skipFactor: number;
+}
+
+/**
+ * Result from rendering a single tick label.
+ */
+export interface TickLabelResult {
+  label: Text;
+  isAnchor: boolean;
+}
+
+/**
+ * Strategy interface for time axis label rendering.
+ */
+export interface TimeAxisLabelStrategy {
+  /** Adjust tick interval (e.g., wall-clock sets skipFactor to 1) */
+  adjustTickInterval(interval: TickInterval): TickInterval;
+  /** Called before the tick loop to set up per-frame state */
+  beginFrame(tickInterval: TickInterval, firstTickIndex: number, firstTimestampNs: number): void;
+  /** Format and position a label for a single tick. Returns the created label or null. */
+  renderTickLabel(
+    time: number,
+    screenSpaceX: number,
+    getOrCreateLabel: (text: string) => Text,
+    tickIndex?: number,
+  ): TickLabelResult | null;
+  /** Called after the tick loop (e.g., wall-clock updates sticky label) */
+  endFrame(screenSpaceContainer: Container | null, hasSubMsTicks: boolean): void;
+  /** Refresh colors after theme change */
+  refreshColors(textColor: string, backgroundColor?: number): void;
+  /** Clean up resources */
+  destroy(): void;
 }
 
 export class MeshAxisRenderer {
@@ -70,22 +101,37 @@ export class MeshAxisRenderer {
   private screenSpaceContainer: Container | null = null;
   private config: AxisConfig;
   private labelCache: Map<string, Text> = new Map();
+  /** Pool of reusable Text labels (index-based to support duplicate text) */
+  private labelPool: Text[] = [];
+  /** Number of active labels in current frame */
+  private activeLabelCount = 0;
   /** Grid line color */
   private gridLineColor: number;
+  /** Background color for sticky labels */
+  private backgroundColor: number = 0x252526;
 
-  /** Time display mode: 'elapsed' (default) or 'wallClock' */
-  private displayMode: 'elapsed' | 'wallClock' = 'elapsed';
-  /** Wall-clock time of the first event in ms since midnight (for wallClock mode) */
-  private startTimeMs = 0;
-  /** Nanosecond timestamp of the first event (for wallClock mode) */
-  private firstTimestampNs = 0;
+  /** Active label strategy */
+  private strategy: TimeAxisLabelStrategy;
+
+  /** Cached Set reused across frames to track rendered pixel positions */
+  private renderedPixels = new Set<number>();
+  /** Cached bound method for getOrCreateLabel to avoid closure allocation per frame */
+  private boundGetOrCreateLabel: (text: string) => Text;
+  /** Cached viewport transform object reused across frames */
+  private cachedViewportTransform: ViewportTransform = {
+    offsetX: 0,
+    offsetY: 0,
+    displayWidth: 0,
+    displayHeight: 0,
+    canvasYOffset: 0,
+  };
 
   constructor(container: Container, config?: Partial<AxisConfig>) {
     // Default configuration
     this.config = {
       height: 30,
-      lineColor: 0x808080, // Medium gray that works in light and dark themes
-      textColor: '#808080', // Medium gray that works in light and dark themes
+      lineColor: 0x808080,
+      textColor: '#808080',
       fontSize: 11,
       minLabelSpacing: 80,
       ...config,
@@ -107,6 +153,12 @@ export class MeshAxisRenderer {
 
     // Labels container - will be added to screen space container when provided
     this.labelsContainer = new Container();
+
+    // Default to elapsed time strategy
+    this.strategy = new ElapsedTimeAxisRenderer();
+
+    // Bind once in constructor instead of creating a closure each frame
+    this.boundGetOrCreateLabel = this.getOrCreateLabel.bind(this);
   }
 
   /**
@@ -154,8 +206,11 @@ export class MeshAxisRenderer {
     // Calculate appropriate tick interval based on zoom
     const tickInterval = this.calculateTickInterval(viewport);
 
+    // Let strategy adjust the tick interval (e.g., wall-clock sets skipFactor to 1)
+    const adjustedInterval = this.strategy.adjustTickInterval(tickInterval);
+
     // Render tick marks (vertical lines from top to bottom, behind rectangles)
-    this.renderTicks(viewport, timeStart, timeEnd, tickInterval, gridHeight);
+    this.renderTicks(viewport, timeStart, timeEnd, adjustedInterval, gridHeight);
   }
 
   /**
@@ -164,15 +219,21 @@ export class MeshAxisRenderer {
    * @param lineColor - Grid line color (0xRRGGBB)
    * @param textColor - Label text color (CSS string)
    */
-  public setColors(lineColor: number, textColor: string): void {
+  public setColors(lineColor: number, textColor: string, backgroundColor?: number): void {
     this.gridLineColor = lineColor;
     this.config.lineColor = lineColor;
     this.config.textColor = textColor;
+    if (backgroundColor !== undefined) {
+      this.backgroundColor = backgroundColor;
+    }
 
     // Update existing labels with new color
     for (const label of this.labelCache.values()) {
       label.style.fill = textColor;
     }
+
+    // Update strategy colors
+    this.strategy.refreshColors(this.config.textColor, this.backgroundColor);
   }
 
   /**
@@ -184,9 +245,20 @@ export class MeshAxisRenderer {
     startTimeMs: number,
     firstTimestampNs: number,
   ): void {
-    this.displayMode = mode;
-    this.startTimeMs = startTimeMs;
-    this.firstTimestampNs = firstTimestampNs;
+    // Destroy the old strategy to clean up resources
+    this.strategy.destroy();
+
+    if (mode === 'wallClock') {
+      this.strategy = new ClockTimeAxisRenderer(
+        startTimeMs,
+        firstTimestampNs,
+        this.config.fontSize,
+        this.config.textColor,
+        this.backgroundColor,
+      );
+    } else {
+      this.strategy = new ElapsedTimeAxisRenderer();
+    }
   }
 
   /**
@@ -196,7 +268,9 @@ export class MeshAxisRenderer {
     this.geometry.destroy();
     this.mesh.destroy();
     this.labelsContainer.destroy();
-    this.labelCache.clear();
+    this.labelPool.length = 0;
+    this.activeLabelCount = 0;
+    this.strategy.destroy();
   }
 
   // ============================================================================
@@ -220,76 +294,12 @@ export class MeshAxisRenderer {
     const targetIntervalMs = targetIntervalNs / NS_PER_MS;
 
     // Find appropriate interval using 1-2-5 sequence
-    const { interval, skipFactor } = this.selectInterval(targetIntervalMs);
+    const { interval, skipFactor } = selectInterval(targetIntervalMs);
 
     return {
       interval: interval * NS_PER_MS, // Convert back to nanoseconds
       skipFactor,
     };
-  }
-
-  /**
-   * Select appropriate interval using 1-2-5 sequence.
-   * Returns interval in milliseconds and skip factor for label density.
-   */
-  private selectInterval(targetMs: number): { interval: number; skipFactor: number } {
-    // Base intervals using 1-2-5 sequence
-    // Extended to support 0.001ms (1 microsecond) precision when zoomed way in
-    const baseIntervals = [
-      // Sub-millisecond (microseconds in ms)
-      0.001, // 1 microsecond
-      0.002, // 2 microseconds
-      0.005, // 5 microseconds
-      // Tens of microseconds
-      0.01, // 10 microseconds
-      0.02, // 20 microseconds
-      0.05, // 50 microseconds
-      // Hundreds of microseconds
-      0.1, // 100 microseconds
-      0.2, // 200 microseconds
-      0.5, // 500 microseconds
-      // Milliseconds
-      1,
-      2,
-      5,
-      10,
-      20,
-      50,
-      100,
-      200,
-      500,
-      // Seconds
-      1000,
-      2000,
-      5000,
-      10000,
-    ];
-
-    // Find smallest interval >= targetMs
-    let interval = baseIntervals[baseIntervals.length - 1] ?? 1000;
-    for (const candidate of baseIntervals) {
-      if (candidate >= targetMs) {
-        interval = candidate;
-        break;
-      }
-    }
-
-    // Default skip factor of 1 (show all labels)
-    let skipFactor = 1;
-
-    // If labels are still too close, increase skip factor
-    // This happens when zoomed way out
-    if (interval >= 1000) {
-      // For large intervals (1s+), potentially skip every 2nd or 5th
-      if (targetMs > interval * 1.5) {
-        skipFactor = 2;
-      }
-      if (targetMs > interval * 3) {
-        skipFactor = 5;
-      }
-    }
-
-    return { interval, skipFactor };
   }
 
   // ============================================================================
@@ -308,7 +318,7 @@ export class MeshAxisRenderer {
   ): void {
     const effectiveHeight = gridHeight ?? viewport.displayHeight;
     const showLabels = this.config.showLabels !== false;
-    const gridAlpha = this.config.gridAlpha ?? 1.0;
+
     // Calculate first tick position (snap to interval boundary)
     // Go back one extra tick to ensure we cover the left edge
     const firstTickIndex = Math.floor(timeStart / tickInterval.interval) - 1;
@@ -317,29 +327,26 @@ export class MeshAxisRenderer {
     // Go forward one extra tick to ensure we cover the right edge
     const lastTickIndex = Math.ceil(timeEnd / tickInterval.interval) + 1;
 
-    // Track rendered pixel positions to prevent duplicates
-    const renderedPixels = new Set<number>();
+    // Reuse cached Set instead of allocating new one each frame
+    this.renderedPixels.clear();
 
     // Count ticks for buffer allocation
     const maxTicks = lastTickIndex - firstTickIndex + 1;
     this.geometry.ensureCapacity(maxTicks);
 
-    // Create viewport transform for coordinate conversion
-    // Note: offsetY is 0 because axis grid lines should span full screen height
-    // regardless of vertical panning
-    // No canvasYOffset needed - main timeline has its own canvas
-    const viewportTransform: ViewportTransform = {
-      offsetX: viewport.offsetX,
-      offsetY: 0, // Full-height elements ignore Y pan
-      displayWidth: viewport.displayWidth,
-      displayHeight: effectiveHeight,
-      canvasYOffset: 0,
-    };
+    // Update cached viewport transform in-place
+    const viewportTransform = this.cachedViewportTransform;
+    viewportTransform.offsetX = viewport.offsetX;
+    viewportTransform.offsetY = 0; // Full-height elements ignore Y pan
+    viewportTransform.displayWidth = viewport.displayWidth;
+    viewportTransform.displayHeight = effectiveHeight;
+    viewportTransform.canvasYOffset = 0;
 
     let rectIndex = 0;
+    const hasSubMsTicks = tickInterval.interval < NS_PER_MS;
 
-    const isWallClockDisplay = this.displayMode === 'wallClock';
-    const isIntervalMsOrMore = tickInterval.interval >= NS_PER_MS;
+    // Notify strategy of frame start
+    this.strategy.beginFrame(tickInterval, firstTickIndex, firstTickIndex * tickInterval.interval);
 
     // Render all ticks in range
     for (let i = firstTickIndex; i <= lastTickIndex; i++) {
@@ -350,10 +357,10 @@ export class MeshAxisRenderer {
       const pixelX = Math.round(screenX);
 
       // Skip if we already rendered a line at this pixel position
-      if (renderedPixels.has(pixelX)) {
+      if (this.renderedPixels.has(pixelX)) {
         continue;
       }
-      renderedPixels.add(pixelX);
+      this.renderedPixels.add(pixelX);
 
       // Calculate if this tick should show a label based on global position
       // This ensures labels stay consistent when panning
@@ -368,38 +375,23 @@ export class MeshAxisRenderer {
         effectiveHeight,
         this.gridLineColor,
         viewportTransform,
-        gridAlpha,
+        this.config.gridAlpha,
       );
       rectIndex++;
 
       // Add label at top if requested (only when showLabels is enabled)
       if (showLabels && shouldShowLabel && this.screenSpaceContainer) {
-        const timeMs = time / NS_PER_MS;
-        const useWallClock = isWallClockDisplay && (isIntervalMsOrMore || time % NS_PER_MS === 0);
-        const labelText = useWallClock
-          ? formatWallClockTime(this.startTimeMs + (time - this.firstTimestampNs) / NS_PER_MS)
-          : this.formatMilliseconds(timeMs);
-
-        // Only show label if not empty (skip zero)
-        if (labelText) {
-          const label = this.getOrCreateLabel(labelText);
-
-          // Calculate screen-space X position (accounting for stage pan)
-          // screenX is in world space, need to convert to screen space
-          const screenSpaceX = screenX - viewport.offsetX;
-
-          // Position label in screen space (top-left origin, Y pointing down)
-          // No minimap offset needed - main timeline has its own canvas
-          label.x = screenSpaceX - 3; // 3px to the left of line
-          label.y = 5; // 5px from top
-          label.anchor.set(1, 0); // Right-align to line, align top
-        }
+        const screenSpaceX = screenX - viewport.offsetX;
+        this.strategy.renderTickLabel(time, screenSpaceX, this.boundGetOrCreateLabel, i);
       }
     }
 
     // Set draw count and make visible
     this.geometry.setDrawCount(rectIndex);
     this.mesh.visible = true;
+
+    // Notify strategy of frame end
+    this.strategy.endFrame(this.screenSpaceContainer, hasSubMsTicks);
   }
 
   // ============================================================================
@@ -407,11 +399,12 @@ export class MeshAxisRenderer {
   // ============================================================================
 
   /**
-   * Get or create a PIXI.Text label from cache.
-   * Reuses labels to avoid constant object creation.
+   * Get or create a PIXI.Text label from the pool.
+   * Uses index-based pooling so the same text can appear at multiple positions.
    */
   private getOrCreateLabel(text: string): Text {
-    let label = this.labelCache.get(text);
+    const index = this.activeLabelCount++;
+    let label = this.labelPool[index];
 
     if (!label) {
       label = new Text({
@@ -422,13 +415,13 @@ export class MeshAxisRenderer {
           fill: this.config.textColor,
         },
       });
-      this.labelCache.set(text, label);
+      this.labelPool.push(label);
       this.labelsContainer.addChild(label);
+    } else {
+      label.text = text;
     }
 
-    // Make label visible
     label.visible = true;
-
     return label;
   }
 
@@ -436,37 +429,10 @@ export class MeshAxisRenderer {
    * Hide all labels (for next render pass).
    */
   private clearLabels(): void {
-    for (const label of this.labelCache.values()) {
-      label.visible = false;
+    for (let i = 0; i < this.activeLabelCount; i++) {
+      this.labelPool[i]!.visible = false;
     }
-  }
-
-  // ============================================================================
-  // PRIVATE: FORMATTING
-  // ============================================================================
-
-  /**
-   * Format time with appropriate units and precision.
-   * - Whole seconds: "1 s", "2 s" (not "1000 ms")
-   * - Milliseconds: up to 3 decimal places: "18800.345 ms"
-   * - Omit zero: don't show "0 s" or "0 ms", just start from first non-zero
-   */
-  private formatMilliseconds(timeMs: number): string {
-    // Omit zero
-    if (timeMs === 0) {
-      return '';
-    }
-
-    // Convert to seconds if >= 1000ms and whole seconds
-    if (timeMs >= 1000 && timeMs % 1000 === 0) {
-      const seconds = timeMs / 1000;
-      return `${seconds} s`;
-    }
-
-    // Format as milliseconds with up to 3 decimal places
-    // Remove trailing zeros after decimal point
-    const formatted = timeMs.toFixed(3);
-    const trimmed = formatted.replace(/\.?0+$/, '');
-    return `${trimmed} ms`;
+    this.activeLabelCount = 0;
+    // Strategy handles its own label cleanup (e.g., sticky label) in beginFrame
   }
 }

@@ -307,6 +307,13 @@ export class FlameChart<E extends EventNode = EventNode> {
       };
       this.axisRenderer = new MeshAxisRenderer(this.axisContainer, axisConfig);
       this.axisRenderer.setScreenSpaceContainer(this.uiContainer);
+      if (editorColors) {
+        this.axisRenderer.setColors(
+          editorColors.lineNumberForeground,
+          `#${editorColors.lineNumberForeground.toString(16).padStart(6, '0')}`,
+          editorColors.widgetBackground,
+        );
+      }
       // No minimap offset needed - main timeline has its own canvas
     }
 

@@ -31,6 +31,133 @@ The new experimental timeline is up to **7X faster** than the legacy timeline, w
 To revert to the legacy timeline, navigate to **Settings → Apex Log Analyzer → Timeline → Legacy** and enable it.
 :::
 
+## Navigation
+
+### Zoom + Pan
+
+| Action           | Mouse                                          | Keyboard               |
+| ---------------- | ---------------------------------------------- | ---------------------- |
+| Zoom In/Out      | Scroll wheel (mouse-anchored)                  | `W` / `S` or `+` / `-` |
+| Pan Horizontally | `Alt/Option` + Scroll, Trackpad swipe, or Drag | `A` / `D`              |
+| Pan Vertically   | `Shift` + Scroll or Drag                       | `Shift+W` / `Shift+S`  |
+| Reset Zoom       | —                                              | `Home` or `0`          |
+
+- When zooming, the mouse pointer position is kept on screen (mouse-anchored zoom).
+- Trackpad users can swipe left/right for natural horizontal panning.
+- Time markers are shown with a ms time value (e.g., 9600.001 ms).
+
+### Frame Selection
+
+Click on any event to **select** and highlight it. Selection enables keyboard navigation through the call stack.
+
+| Action              | Mouse             | Keyboard                     |
+| ------------------- | ----------------- | ---------------------------- |
+| Select Frame        | Click             | —                            |
+| Clear Selection     | Click empty space | `Escape`                     |
+| Navigate to Parent  | —                 | `Arrow Down`                 |
+| Navigate to Child   | —                 | `Arrow Up`                   |
+| Navigate to Sibling | —                 | `Arrow Left` / `Arrow Right` |
+| Focus/Zoom to Frame | Double-click      | `Enter` or `Z`               |
+
+:::tip Arrow Key Behavior
+When no frame is selected, arrow keys pan the viewport. When a frame is selected, arrow keys navigate the call stack. Hold `Shift` to always pan.
+:::
+
+### Go to Call Tree
+
+| Action            | Mouse              | Keyboard |
+| ----------------- | ------------------ | -------- |
+| Show in Call Tree | `Cmd/Ctrl` + Click | `J`      |
+| Show Context Menu | Right-click        | —        |
+
+Use `J` or `Cmd/Ctrl+Click` to navigate to the selected frame in the Call Tree. Right-click opens a context menu with additional actions.
+
+### Context Menu
+
+Right-click on any frame to access:
+
+- **Show in Call Tree** (`J`) — Navigate to the frame in the Call Tree
+- **Go to Source** — Jump to the source method in your project (when available)
+- **Zoom to Frame** (`Z`) — Zoom and center the selected frame
+- **Copy Name** (`Cmd/Ctrl+C`) — Copy the frame name to clipboard
+- **Copy Details** — Copy tooltip information
+- **Copy Call Stack** — Copy the full call stack
+
+Right-click on empty space shows **Reset Zoom** (`0`).
+
+### Markers
+
+Log issue markers (truncation, errors, etc.) can be selected and navigated:
+
+| Action            | Mouse              | Keyboard                                            |
+| ----------------- | ------------------ | --------------------------------------------------- |
+| Select Marker     | Click              | —                                                   |
+| Navigate Markers  | —                  | `Arrow Left` / `Arrow Right` (when marker selected) |
+| Jump to Call Tree | `Cmd/Ctrl` + Click | `J`                                                 |
+
+### Search + Highlight
+
+The timeline supports search functionality that dims non-matching events, making it easier to find specific matches visually.
+
+| Action                | Keyboard                      |
+| --------------------- | ----------------------------- |
+| Next Match            | `Enter`                       |
+| Previous Match        | `Shift+Enter`                 |
+| Continuous Navigation | Hold `Enter` or `Shift+Enter` |
+
+### Measurement & Zoom Tools
+
+#### Measure Range
+
+Use `Shift+Drag` to measure the duration between any two points on the timeline. This is useful for precisely measuring the time span of specific operations or groups of events.
+
+| Action              | Mouse/Keyboard                                      |
+| ------------------- | --------------------------------------------------- |
+| Create Measurement  | `Shift+Drag` on timeline                            |
+| Resize Measurement  | Drag the left or right edge of the measurement      |
+| Zoom to Measurement | Double-click inside measurement, or click zoom icon |
+| Clear Measurement   | `Escape` or click outside the measurement area      |
+
+The measurement overlay displays:
+
+- The time duration of the selected range
+- A zoom icon to quickly zoom to fit the measured area
+
+:::tip Resize Handles
+Hover near the edges of an existing measurement to see the resize cursor. Drag to adjust the measurement boundaries — edges can be dragged past each other to swap positions.
+:::
+
+#### Area Zoom
+
+Use `Alt/Option+Drag` to select a time range and instantly zoom to fit it. This provides a quick way to focus on a specific portion of the timeline.
+
+| Action    | Mouse/Keyboard                |
+| --------- | ----------------------------- |
+| Area Zoom | `Alt/Option+Drag` on timeline |
+
+Release the mouse button to zoom the viewport to fit the selected area exactly.
+
+## Tooltip
+
+<img
+src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline-tooltip.png"
+alt="Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts"
+style={{
+  width: '50%', height:'auto', maxWidth:'400px'
+}}
+loading="lazy"/>
+
+Hovering over an element displays detailed information about that event. Use `J` or `Cmd/Ctrl+Click` to navigate to the frame in the Call Tree.
+
+The tooltip provides the following information:
+
+- **Event Name** - e.g., `METHOD_ENTRY`, `EXECUTION_STARTED`, `SOQL_EXECUTION_BEGIN`
+- **Event Description** - Additional information about the event such as method name or SOQL query executed
+- **Timestamp** - The start and end timestamp for the given event which can be cross-referenced in the log file
+- **Time** - Wall-clock time of day for the event (e.g., `14:30:05.122 → 14:30:06.625`). Only shown when wall-clock data is available in the log.
+- **Duration** - Made up of **Total Time** (time spent in that event and its children) and **Self Time** (time directly spent in that event)
+- **Rows** - Shows **Total Rows** (rows from that event and its children) and **Self Rows** (rows directly from that event)
+
 ## Minimap
 
 The minimap gives you instant context of your entire log. Spot hotspots at a glance, jump anywhere with a click, and always know exactly where you are—all without scrolling.
@@ -152,112 +279,6 @@ Hovering over the metric strip displays a detailed breakdown showing:
 
 Each row displays: color swatch, metric name, percentage, and used/limit values.
 
-## Navigation
-
-### Zoom + Pan
-
-| Action           | Mouse                                          | Keyboard               |
-| ---------------- | ---------------------------------------------- | ---------------------- |
-| Zoom In/Out      | Scroll wheel (mouse-anchored)                  | `W` / `S` or `+` / `-` |
-| Pan Horizontally | `Alt/Option` + Scroll, Trackpad swipe, or Drag | `A` / `D`              |
-| Pan Vertically   | `Shift` + Scroll or Drag                       | `Shift+W` / `Shift+S`  |
-| Reset Zoom       | —                                              | `Home` or `0`          |
-
-- When zooming, the mouse pointer position is kept on screen (mouse-anchored zoom).
-- Trackpad users can swipe left/right for natural horizontal panning.
-- Time markers are shown with a ms time value (e.g., 9600.001 ms).
-
-### Frame Selection
-
-Click on any event to **select** and highlight it. Selection enables keyboard navigation through the call stack.
-
-| Action              | Mouse             | Keyboard                     |
-| ------------------- | ----------------- | ---------------------------- |
-| Select Frame        | Click             | —                            |
-| Clear Selection     | Click empty space | `Escape`                     |
-| Navigate to Parent  | —                 | `Arrow Down`                 |
-| Navigate to Child   | —                 | `Arrow Up`                   |
-| Navigate to Sibling | —                 | `Arrow Left` / `Arrow Right` |
-| Focus/Zoom to Frame | Double-click      | `Enter` or `Z`               |
-
-:::tip Arrow Key Behavior
-When no frame is selected, arrow keys pan the viewport. When a frame is selected, arrow keys navigate the call stack. Hold `Shift` to always pan.
-:::
-
-### Go to Call Tree
-
-| Action            | Mouse              | Keyboard |
-| ----------------- | ------------------ | -------- |
-| Show in Call Tree | `Cmd/Ctrl` + Click | `J`      |
-| Show Context Menu | Right-click        | —        |
-
-Use `J` or `Cmd/Ctrl+Click` to navigate to the selected frame in the Call Tree. Right-click opens a context menu with additional actions.
-
-### Context Menu
-
-Right-click on any frame to access:
-
-- **Show in Call Tree** (`J`) — Navigate to the frame in the Call Tree
-- **Go to Source** — Jump to the source method in your project (when available)
-- **Zoom to Frame** (`Z`) — Zoom and center the selected frame
-- **Copy Name** (`Cmd/Ctrl+C`) — Copy the frame name to clipboard
-- **Copy Details** — Copy tooltip information
-- **Copy Call Stack** — Copy the full call stack
-
-Right-click on empty space shows **Reset Zoom** (`0`).
-
-### Markers
-
-Log issue markers (truncation, errors, etc.) can be selected and navigated:
-
-| Action            | Mouse              | Keyboard                                            |
-| ----------------- | ------------------ | --------------------------------------------------- |
-| Select Marker     | Click              | —                                                   |
-| Navigate Markers  | —                  | `Arrow Left` / `Arrow Right` (when marker selected) |
-| Jump to Call Tree | `Cmd/Ctrl` + Click | `J`                                                 |
-
-### Search + Highlight
-
-The timeline supports search functionality that dims non-matching events, making it easier to find specific matches visually.
-
-| Action                | Keyboard                      |
-| --------------------- | ----------------------------- |
-| Next Match            | `Enter`                       |
-| Previous Match        | `Shift+Enter`                 |
-| Continuous Navigation | Hold `Enter` or `Shift+Enter` |
-
-### Measurement & Zoom Tools
-
-#### Measure Range
-
-Use `Shift+Drag` to measure the duration between any two points on the timeline. This is useful for precisely measuring the time span of specific operations or groups of events.
-
-| Action              | Mouse/Keyboard                                      |
-| ------------------- | --------------------------------------------------- |
-| Create Measurement  | `Shift+Drag` on timeline                            |
-| Resize Measurement  | Drag the left or right edge of the measurement      |
-| Zoom to Measurement | Double-click inside measurement, or click zoom icon |
-| Clear Measurement   | `Escape` or click outside the measurement area      |
-
-The measurement overlay displays:
-
-- The time duration of the selected range
-- A zoom icon to quickly zoom to fit the measured area
-
-:::tip Resize Handles
-Hover near the edges of an existing measurement to see the resize cursor. Drag to adjust the measurement boundaries — edges can be dragged past each other to swap positions.
-:::
-
-#### Area Zoom
-
-Use `Alt/Option+Drag` to select a time range and instantly zoom to fit it. This provides a quick way to focus on a specific portion of the timeline.
-
-| Action    | Mouse/Keyboard                |
-| --------- | ----------------------------- |
-| Area Zoom | `Alt/Option+Drag` on timeline |
-
-Release the mouse button to zoom the viewport to fit the selected area exactly.
-
 ## Wall-Clock Time
 
 The timeline supports switching between two time display modes:
@@ -266,27 +287,6 @@ The timeline supports switching between two time display modes:
 - **Wall-Clock Time**: Actual time of day from the log (e.g., `14:30:05.122`)
 
 Click the clock icon button in the top-right corner of the timeline toolbar to toggle between modes.
-
-## Tooltip
-
-<img
-src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline-tooltip.png"
-alt="Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts"
-style={{
-  width: '50%', height:'auto', maxWidth:'400px'
-}}
-loading="lazy"/>
-
-Hovering over an element displays detailed information about that event. Use `J` or `Cmd/Ctrl+Click` to navigate to the frame in the Call Tree.
-
-The tooltip provides the following information:
-
-- **Event Name** - e.g., `METHOD_ENTRY`, `EXECUTION_STARTED`, `SOQL_EXECUTION_BEGIN`
-- **Event Description** - Additional information about the event such as method name or SOQL query executed
-- **Timestamp** - The start and end timestamp for the given event which can be cross-referenced in the log file
-- **Time** - Wall-clock time of day for the event (e.g., `14:30:05.122 → 14:30:06.625`). Only shown when wall-clock data is available in the log.
-- **Duration** - Made up of **Total Time** (time spent in that event and its children) and **Self Time** (time directly spent in that event)
-- **Rows** - Shows **Total Rows** (rows from that event and its children) and **Self Rows** (rows directly from that event)
 
 ## Themes
 
