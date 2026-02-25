@@ -133,8 +133,12 @@ describe('SwitchTimelineTheme', () => {
       await command.run({} as never);
 
       const items = mockQuickPick.items;
-      expect(items.some((i) => i.label === 'My Custom Theme')).toBe(true);
-      expect(items.some((i) => i.label === 'Another Theme')).toBe(true);
+      const myCustom = items.find((i) => i.label === 'My Custom Theme');
+      const another = items.find((i) => i.label === 'Another Theme');
+      expect(myCustom).toBeDefined();
+      expect(myCustom?.description).toBe('custom');
+      expect(another).toBeDefined();
+      expect(another?.description).toBe('custom');
     });
 
     it('should sort themes alphabetically', async () => {
@@ -170,6 +174,18 @@ describe('SwitchTimelineTheme', () => {
 
       const defaultItem = mockQuickPick.items.find((i) => i.label === '50 Shades of Green');
       expect(defaultItem?.description).toBe('default');
+    });
+
+    it('should not mark non-default built-in themes as custom', async () => {
+      const mockContext = createMockContext();
+      const command = SwitchTimelineTheme.getCommand(
+        mockContext as unknown as import('../../Context.js').Context,
+      );
+
+      await command.run({} as never);
+
+      const draculaItem = mockQuickPick.items.find((i) => i.label === 'Dracula');
+      expect(draculaItem?.description).toBe('');
     });
 
     it('should deduplicate themes when custom theme has same name as preset', async () => {
