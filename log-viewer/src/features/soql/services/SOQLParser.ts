@@ -73,9 +73,8 @@ export class SOQLParser {
   async parse(query: string): Promise<SOQLTree> {
     // Dynamic import for code splitting. Improves performance by reducing the amount of JS that is loaded and parsed at the start.
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { ApexLexer, ApexParser, CaseInsensitiveInputStream } = await import(
-      '@apexdevtools/apex-parser'
-    );
+    const { ApexLexer, ApexParser, CaseInsensitiveInputStream } =
+      await import('@apexdevtools/apex-parser');
     // Dynamic import for code splitting. Improves performance by reducing the amount of JS that is loaded and parsed at the start.
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const { CharStreams, CommonTokenStream } = await import('antlr4ts');
