@@ -96,17 +96,17 @@ importers:
   lana:
     dependencies:
       '@apexdevtools/apex-ls':
-        specifier: ^5.10.0
-        version: 5.10.0
+        specifier: ^6.0.2
+        version: 6.0.2
       '@apexdevtools/apex-parser':
         specifier: ^4.4.0
         version: 4.4.1
       '@salesforce/apex-node':
-        specifier: ^8.4.6
-        version: 8.4.6(tslib@2.8.1)
+        specifier: ^8.4.11
+        version: 8.4.11(tslib@2.8.1)
       '@salesforce/core':
-        specifier: ^8.25.1
-        version: 8.25.1(tslib@2.8.1)
+        specifier: ^8.26.3
+        version: 8.26.3(tslib@2.8.1)
     devDependencies:
       '@types/node':
         specifier: ~22.16.5
@@ -173,14 +173,14 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0(react@19.1.1)
       lit:
-        specifier: ^3.3.1
-        version: 3.3.1
+        specifier: ^3.3.2
+        version: 3.3.2
       pixi.js:
-        specifier: ^8.5.2
-        version: 8.14.0
+        specifier: ^8.16.0
+        version: 8.16.0
       tabulator-tables:
-        specifier: ^6.3.1
-        version: 6.3.1
+        specifier: ^6.4.0
+        version: 6.4.0
     devDependencies:
       '@types/tabulator-tables':
         specifier: ^6.3.1
@@ -280,8 +280,8 @@ packages:
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
 
-  '@apexdevtools/apex-ls@5.10.0':
-    resolution: {integrity: sha512-xc9yRYKBRKgTvG1xeINDDwi3iY9/f92BpCGKlpsQpS17CSh9ioAetkiryvzLHiOn3ru8YGvqdBD8FNAheC+Rdg==}
+  '@apexdevtools/apex-ls@6.0.2':
+    resolution: {integrity: sha512-1RHLBom+fsbe7XayL9BZVfxWwonYILj/3WD59/FiLiSg3WIT1ey8VT6TNv8UHkscfypeCy1v3eJ5NdQlCELhmQ==}
     engines: {node: '>=14.0.0'}
 
   '@apexdevtools/apex-parser@4.3.1':
@@ -2434,12 +2434,12 @@ packages:
     resolution: {integrity: sha512-VynGOEsVw2s8TAlLf/uESfrgfrq2+rcXB1muPJYBWbsm1Oa6r5qVQhjA5ggM6z/coYPrsVMgovl3Ff7Q7OCp1w==}
     engines: {node: '>=16.0.0'}
 
-  '@salesforce/apex-node@8.4.6':
-    resolution: {integrity: sha512-bEQbNiFxim74n5HTtTc/5UDsE3THcigXLFBsvaeCp/gUrkZPzArpcmdLLbyTpZ9ca2iIkF2bVmZRTfV9F3ORvg==}
+  '@salesforce/apex-node@8.4.11':
+    resolution: {integrity: sha512-bp79AWx9+G1jQSOPQPPecModBiibAjRjJGOeo8aYLyqsh+N70safY0cGHV74dwNgPHkZLkyIQK7qjB+17Y3Jkg==}
     engines: {node: '>=18.18.2'}
 
-  '@salesforce/core@8.25.1':
-    resolution: {integrity: sha512-Jon0a9uZpp+mNa5PiY+y8dTjaPcsMaxXEkswdzWotrdrZ4g84MmPKSEv+Q/LtXw3uc9i4RmqBJBUXSIvZhgrjg==}
+  '@salesforce/core@8.26.3':
+    resolution: {integrity: sha512-lPNFHjHFeC4V3KuH88xuVLGhAqmtM8meUcvyejNh8bQ5w642APKRTGDZ0pOnWHJAe5SQy7cSQ1WqvO3V73ouQw==}
     engines: {node: '>=18.0.0'}
 
   '@salesforce/kit@3.2.4':
@@ -2758,9 +2758,6 @@ packages:
 
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
-
-  '@types/css-font-loading-module@0.0.12':
-    resolution: {integrity: sha512-x2tZZYkSxXqWvTDgveSynfjq/T2HyiZHXb00j/+gy19yp70PHCizM48XFdjBCWH7eHBD0R5i/pw9yMBP/BH5uA==}
 
   '@types/debug@4.1.12':
     resolution: {integrity: sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ==}
@@ -3159,8 +3156,8 @@ packages:
   '@webassemblyjs/wast-printer@1.14.1':
     resolution: {integrity: sha512-kPSSXE6De1XOR820C90RIo2ogvZG+c3KiHzqUoO/F34Y2shGzesfqv7o57xrxovZJH/MetF5UjroJ/R/3isoiw==}
 
-  '@webgpu/types@0.1.66':
-    resolution: {integrity: sha512-YA2hLrwLpDsRueNDXIMqN9NTzD6bCDkuXbOSe0heS+f8YE8usA6Gbv1prj81pzVHrbaAma7zObnIC+I6/sXJgA==}
+  '@webgpu/types@0.1.69':
+    resolution: {integrity: sha512-RPmm6kgRbI8e98zSD3RVACvnuktIja5+yLgDAkTmxLr90BEwdTXRQWNLF3ETTTyH/8mKhznZuN5AveXYFEsMGQ==}
 
   '@xmldom/xmldom@0.7.9':
     resolution: {integrity: sha512-yceMpm/xd4W2a85iqZyO09gTnHvXF6pyiWjD2jcOJs7hRoZtNNOO1eJlhHj1ixA+xip2hOyGn+LgcvLCMo5zXA==}
@@ -3246,9 +3243,6 @@ packages:
 
   ajv@6.14.0:
     resolution: {integrity: sha512-IWrosm/yrn43eiKqkfkHis7QioDleaXQHdDVPKg0FSwwd/DuvyX79TZnFOnYpB7dcsFAMmtFztZuXPDvSePkFw==}
-
-  ajv@8.17.1:
-    resolution: {integrity: sha512-B/gBuNg5SiMTrPkC+A2+cW0RszwxYmn6VYxB/inlBStS5nx6xHIt/ehKRhIMhqusl7a8LjQoZnjCs5vhwxOQ1g==}
 
   ajv@8.18.0:
     resolution: {integrity: sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A==}
@@ -4454,8 +4448,8 @@ packages:
   fast-safe-stringify@2.1.1:
     resolution: {integrity: sha512-W+KJc2dmILlPplD/H4K9l9LcAHAfPtP6BY84uVLXQ6Evcz9Lcg33Y2z1IVblT6xdY54PXYVHEv+0Wpq8Io6zkA==}
 
-  fast-uri@3.0.6:
-    resolution: {integrity: sha512-Atfo14OibSv5wAp4VWNsFYE1AchQRTv9cBGWET4pZWHzYshFSS9NQI6I57rdKn9croWVMbYFbLhJ+yJvmZIIHw==}
+  fast-uri@3.1.0:
+    resolution: {integrity: sha512-iPeeDKJSWf4IEOasVVrknXpaBV0IApz/gp7S2bb7Z4Lljbl2MGJRqInZiUrQwV16cpzw/D3S5j5Julj/gT52AA==}
 
   fastest-levenshtein@1.0.16:
     resolution: {integrity: sha512-eRnCtTTtGZFpQCwhJiUOuxPQWRXVKYDn0b2PeHfXL6/Zi53SLAzAHfVhVWK2AryC/WH05kGfxhFIPvTF0SXQzg==}
@@ -5526,8 +5520,8 @@ packages:
   lit-html@3.3.0:
     resolution: {integrity: sha512-RHoswrFAxY2d8Cf2mm4OZ1DgzCoBKUKSPvA1fhtSELxUERq2aQQ2h05pO9j81gS1o7RIRJ+CePLogfyahwmynw==}
 
-  lit@3.3.1:
-    resolution: {integrity: sha512-Ksr/8L3PTapbdXJCk+EJVB78jDodUMaP54gD24W186zGRARvwrsPfS60wae/SSCTCNZVPd1chXqio1qHQmu4NA==}
+  lit@3.3.2:
+    resolution: {integrity: sha512-NF9zbsP79l4ao2SNrH3NkfmFgN/hBYSQo90saIVI1o5GpjAdCPVstVzO1MrLOakHoEhYkrtRjPK6Ob521aoYWQ==}
 
   loader-runner@4.3.0:
     resolution: {integrity: sha512-3R/1M+yS3j5ou80Me59j7F9IMs4PXs3VqRrm0TU3AbKPxlmpoY1TNscJV/oGJXo8qCatFGTfDbY6W6ipGOYXfg==}
@@ -6277,8 +6271,8 @@ packages:
     resolution: {integrity: sha512-TfySrs/5nm8fQJDcBDuUng3VOUKsd7S+zqvbOTiGXHfxX4wK31ard+hoNuvkicM/2YFzlpDgABOevKSsB4G/FA==}
     engines: {node: '>= 6'}
 
-  pixi.js@8.14.0:
-    resolution: {integrity: sha512-ituDiEBb1Oqx56RYwTtC6MjPUhPfF/i15fpUv5oEqmzC/ce3SaSumulJcOjKG7+y0J0Ekl9Rl4XTxaUw+MVFZw==}
+  pixi.js@8.16.0:
+    resolution: {integrity: sha512-gu2xw3sZGAn3cWBtk0HqTQT+v19YAfiaYXwUGgWoJl5NKz4cEZJUgWrwkmdfDszGyYBAGqOvJNbd2M9+vzLLMg==}
 
   pkg-dir@4.2.0:
     resolution: {integrity: sha512-HRDzbaKjC+AOWVXxAU/x54COGeIv9eb+6CkDSQoNTt4XyWoIJvuPsXizxu/Fr23EiekbtZwmh1IcIG/l/a10GQ==}
@@ -7655,8 +7649,8 @@ packages:
   tabbable@5.3.3:
     resolution: {integrity: sha512-QD9qKY3StfbZqWOPLp0++pOrAVb/HbUi5xCc8cUo4XjP19808oaMiDzn0leBY5mCespIBM0CIZePzZjgzR83kA==}
 
-  tabulator-tables@6.3.1:
-    resolution: {integrity: sha512-qFW7kfadtcaISQIibKAIy0f3eeIXUVi8242Vly1iJfMD79kfEGzfczNuPBN/80hDxHzQJXYbmJ8VipI40hQtfA==}
+  tabulator-tables@6.4.0:
+    resolution: {integrity: sha512-Lxh+leFNoBo/Yyr4USs6gxqbfo8anYUaUMmoT91pfVLtoUgl/dE+qV7ahnFrKVMCYYqGG33aIMPR7FzpPBaNYA==}
 
   tapable@2.2.2:
     resolution: {integrity: sha512-Re10+NauLTMCudc7T5WLFLAwDhQ0JWdrMK+9B2M8zR5hRExKmsRDCBA7/aV/pNJFltmBFO5BAMlQFi/vq3nKOg==}
@@ -7727,8 +7721,8 @@ packages:
   tiny-invariant@1.3.3:
     resolution: {integrity: sha512-+FbBPE1o9QAYvviau/qC5SE3caw21q3xkvWKBtja5vgqOWIHHJ3ioaq1VPfn/Szqctz2bU/oYeKd9/z5BL+PVg==}
 
-  tiny-lru@11.4.5:
-    resolution: {integrity: sha512-hkcz3FjNJfKXjV4mjQ1OrXSLAehg8Hw+cEZclOVT+5c/cWQWImQ9wolzTjth+dmmDe++p3bme3fTxz6Q4Etsqw==}
+  tiny-lru@11.4.7:
+    resolution: {integrity: sha512-w/Te7uMUVeH0CR8vZIjr+XiN41V+30lkDdK+NRIDCUYKKuL9VcmaUEmaPISuwGhLlrTGh5yu18lENtR9axSxYw==}
     engines: {node: '>=12'}
 
   tiny-warning@1.0.3:
@@ -8381,7 +8375,7 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.12
       '@jridgewell/trace-mapping': 0.3.29
 
-  '@apexdevtools/apex-ls@5.10.0':
+  '@apexdevtools/apex-ls@6.0.2':
     dependencies:
       '@apexdevtools/apex-parser': 4.3.1
       '@apexdevtools/vf-parser': 1.1.0
@@ -9845,7 +9839,7 @@ snapshots:
     dependencies:
       '@docusaurus/types': 3.8.1(@swc/core@1.15.18(@swc/helpers@0.5.19))(acorn@8.16.0)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
       '@types/history': 4.7.11
-      '@types/react': 19.1.9
+      '@types/react': 19.2.14
       '@types/react-router-config': 5.0.11
       '@types/react-router-dom': 5.3.3
       react: 19.1.1
@@ -11473,9 +11467,9 @@ snapshots:
 
   '@rspack/lite-tapable@1.0.1': {}
 
-  '@salesforce/apex-node@8.4.6(tslib@2.8.1)':
+  '@salesforce/apex-node@8.4.11(tslib@2.8.1)':
     dependencies:
-      '@salesforce/core': 8.25.1(tslib@2.8.1)
+      '@salesforce/core': 8.26.3(tslib@2.8.1)
       '@salesforce/kit': 3.2.4
       '@types/istanbul-reports': 3.0.4
       fast-glob: 3.3.3
@@ -11489,12 +11483,12 @@ snapshots:
       - supports-color
       - tslib
 
-  '@salesforce/core@8.25.1(tslib@2.8.1)':
+  '@salesforce/core@8.26.3(tslib@2.8.1)':
     dependencies:
       '@jsforce/jsforce-node': 3.10.13
       '@salesforce/kit': 3.2.4
       '@salesforce/ts-types': 2.0.12
-      ajv: 8.17.1
+      ajv: 8.18.0
       change-case: 4.1.2
       fast-levenshtein: 3.0.0
       faye: 1.4.1
@@ -11817,8 +11811,6 @@ snapshots:
   '@types/connect@3.4.38':
     dependencies:
       '@types/node': 25.3.5
-
-  '@types/css-font-loading-module@0.0.12': {}
 
   '@types/debug@4.1.12':
     dependencies:
@@ -12263,7 +12255,7 @@ snapshots:
       '@webassemblyjs/ast': 1.14.1
       '@xtuc/long': 4.2.2
 
-  '@webgpu/types@0.1.66': {}
+  '@webgpu/types@0.1.69': {}
 
   '@xmldom/xmldom@0.7.9': {}
 
@@ -12341,17 +12333,10 @@ snapshots:
       json-schema-traverse: 0.4.1
       uri-js: 4.4.1
 
-  ajv@8.17.1:
-    dependencies:
-      fast-deep-equal: 3.1.3
-      fast-uri: 3.0.6
-      json-schema-traverse: 1.0.0
-      require-from-string: 2.0.2
-
   ajv@8.18.0:
     dependencies:
       fast-deep-equal: 3.1.3
-      fast-uri: 3.0.6
+      fast-uri: 3.1.0
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
@@ -13683,7 +13668,7 @@ snapshots:
 
   fast-safe-stringify@2.1.1: {}
 
-  fast-uri@3.0.6: {}
+  fast-uri@3.1.0: {}
 
   fastest-levenshtein@1.0.16: {}
 
@@ -15049,7 +15034,7 @@ snapshots:
     dependencies:
       '@types/trusted-types': 2.0.7
 
-  lit@3.3.1:
+  lit@3.3.2:
     dependencies:
       '@lit/reactive-element': 2.1.0
       lit-element: 4.2.0
@@ -16063,19 +16048,18 @@ snapshots:
 
   pirates@4.0.7: {}
 
-  pixi.js@8.14.0:
+  pixi.js@8.16.0:
     dependencies:
       '@pixi/colord': 2.9.6
-      '@types/css-font-loading-module': 0.0.12
       '@types/earcut': 3.0.0
-      '@webgpu/types': 0.1.66
+      '@webgpu/types': 0.1.69
       '@xmldom/xmldom': 0.8.11
       earcut: 3.0.2
       eventemitter3: 5.0.1
       gifuct-js: 2.1.2
       ismobilejs: 1.1.1
       parse-svg-path: 0.1.2
-      tiny-lru: 11.4.5
+      tiny-lru: 11.4.7
 
   pkg-dir@4.2.0:
     dependencies:
@@ -17651,7 +17635,7 @@ snapshots:
 
   tabbable@5.3.3: {}
 
-  tabulator-tables@6.3.1: {}
+  tabulator-tables@6.4.0: {}
 
   tapable@2.2.2: {}
 
@@ -17710,7 +17694,7 @@ snapshots:
 
   tiny-invariant@1.3.3: {}
 
-  tiny-lru@11.4.5: {}
+  tiny-lru@11.4.7: {}
 
   tiny-warning@1.0.3: {}
 
