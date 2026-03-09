@@ -1,5 +1,5 @@
 {
-  "name": "lana-docs-site",
+  "name": "@debug-log-analyzer/docs-site",
   "version": "0.0.0",
   "private": true,
   "scripts": {
