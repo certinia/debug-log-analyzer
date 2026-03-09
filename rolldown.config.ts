@@ -35,6 +35,22 @@ const getSwcOptions = (dirPath: string) =>
  * This plugin converts the string literals to numeric char code arrays before the printer
  * sees them. Can be removed once the upstream fix fully covers CJS long strings.
  */
+/**
+ * Stubs @apexdevtools/apex-parser Check.js for browser builds.
+ * Check.js imports node:fs, node:path etc. for filesystem operations that are
+ * never used in the browser. Replace the module with an empty export.
+ */
+function stubApexParserCheck(): Plugin {
+  return {
+    name: 'stub-apex-parser-check',
+    load(id) {
+      if (id.includes('@apexdevtools/apex-parser') && id.endsWith('/Check.js')) {
+        return 'export {}';
+      }
+    },
+  };
+}
+
 function preserveAntlrATN(): Plugin {
   const segmentPattern =
     /(\w+\._serializedATNSegment\d+)\s*=\s*("(?:[^"\\]|\\.)*"(?:\s*\+\s*"(?:[^"\\]|\\.)*")*)\s*;/g;
@@ -91,13 +107,16 @@ export default defineConfig([
     ],
     platform: 'browser',
     resolve: {
-      alias: { eventemitter3: path.resolve(__dirname, 'node_modules/eventemitter3/index.js') },
+      alias: {
+        eventemitter3: path.resolve(__dirname, 'node_modules/eventemitter3/index.js'),
+      },
     },
     moduleTypes: {
       '.css': 'js',
     },
     tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
     plugins: [
+      stubApexParserCheck(),
       nodePolyfills(),
       postcss({
         extensions: ['.css', '.scss'],
