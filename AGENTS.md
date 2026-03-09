@@ -6,7 +6,7 @@
 
 - lana/: VS Code extension (TypeScript)
 - log-viewer/: Webview UI (TypeScript)
-- lana-docs-site/: Docusaurus documentation
+- lana-docs/: Docusaurus documentation
 - sample-app/: Sample Salesforce app with test logs
 
 ## Technology + Tooling

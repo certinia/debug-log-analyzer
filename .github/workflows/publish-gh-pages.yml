@@ -43,7 +43,7 @@ jobs:
           HUSKY=0 pnpm install
       - name: Build Site
         run: |
-          cd lana-docs-site
+          cd lana-docs
           pnpm run build
       # 👆 Build steps
       - name: Setup Pages
@@ -51,7 +51,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./lana-docs-site/build
+          path: ./lana-docs/build
 
   # Deployment job
   deploy:

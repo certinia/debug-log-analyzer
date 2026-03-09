@@ -16,7 +16,7 @@ Write all code in TypeScript with strict mode enabled (`strict: true` in tsconfi
 
 ### 2. Monorepo Modularity
 
-Maintain clear separation between packages: `lana/` (VS Code extension), `log-viewer/` (webview), and `lana-docs-site/` (docs).
+Maintain clear separation between packages: `lana/` (VS Code extension), `log-viewer/` (webview), and `lana-docs/` (docs).
 
 **Rules:**
 

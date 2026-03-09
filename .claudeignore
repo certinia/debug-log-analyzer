@@ -7,8 +7,8 @@
 sample-app/**/*.log
 
 # Docs build
-lana-docs-site/.docusaurus/
-lana-docs-site/build/
+lana-docs/.docusaurus/
+lana-docs/build/
 
 # Packages
 *.vsix
