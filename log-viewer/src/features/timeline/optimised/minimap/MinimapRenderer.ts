@@ -27,9 +27,8 @@
 
 import * as PIXI from 'pixi.js';
 import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.js';
-import type { MarkerType, TimelineMarker } from '../../types/flamechart.types.js';
+import type { TimelineMarker } from '../../types/flamechart.types.js';
 import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
-import { blendWithBackground } from '../BucketColorResolver.js';
 import { createRectangleShader } from '../RectangleShader.js';
 import { MinimapAxisRenderer } from './MinimapAxisRenderer.js';
 import { MinimapBarGeometry } from './MinimapBarGeometry.js';
@@ -42,16 +41,6 @@ import type { MinimapSelection, MinimapViewport } from './MinimapViewport.js';
 const MIN_OPACITY = 0.5;
 const MAX_OPACITY = 1.0;
 const SATURATION_COUNT = 100;
-
-/**
- * Pre-blended opaque marker colors (MARKER_COLORS blended at MARKER_ALPHA opacity).
- * Computed once at module load time for performance.
- */
-const MINIMAP_MARKER_COLORS_BLENDED: Record<MarkerType, number> = {
-  error: blendWithBackground(MARKER_COLORS.error, MARKER_ALPHA),
-  skip: blendWithBackground(MARKER_COLORS.skip, MARKER_ALPHA),
-  unexpected: blendWithBackground(MARKER_COLORS.unexpected, MARKER_ALPHA),
-};
 
 /**
  * Curtain overlay opacity (outside viewport lens).
@@ -589,7 +578,7 @@ export class MinimapRenderer {
 
   /**
    * Render markers as colored vertical bands.
-   * Uses pre-blended opaque colors and 1px gaps between adjacent markers.
+   * Uses MARKER_COLORS with MARKER_ALPHA and 1px gaps between adjacent markers.
    */
   private renderMarkers(
     manager: MinimapViewport,
@@ -621,8 +610,7 @@ export class MinimapRenderer {
       const endTime = nextMarker?.startTime ?? state.totalDuration;
       const endX = manager.timeToMinimapX(endTime);
 
-      // Get pre-blended opaque marker color
-      const color = MINIMAP_MARKER_COLORS_BLENDED[marker.type] ?? 0x808080;
+      const color = MARKER_COLORS[marker.type];
 
       // Apply gap to create separation between adjacent markers
       const gappedStartX = startX + halfGap;
@@ -631,7 +619,7 @@ export class MinimapRenderer {
       // Draw marker band (full height of chart area below axis)
       if (gappedWidth > 0) {
         this.markerGraphics.rect(gappedStartX, chartTop, gappedWidth, chartHeight);
-        this.markerGraphics.fill({ color, alpha: 1.0 });
+        this.markerGraphics.fill({ color, alpha: MARKER_ALPHA });
       }
     }
   }

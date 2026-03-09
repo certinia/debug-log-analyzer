@@ -41,8 +41,8 @@ void main() {
 /**
  * WebGL fragment shader (GLSL 300 ES)
  *
- * Simply outputs the interpolated vertex color.
- * Colors are pre-blended with background, so no alpha blending needed.
+ * Outputs premultiplied alpha color for correct blending with PixiJS 8's
+ * default blend mode (GL_ONE, GL_ONE_MINUS_SRC_ALPHA).
  */
 const glslFragment = /* glsl */ `#version 300 es
 precision highp float;
@@ -51,7 +51,7 @@ in vec4 vColor;
 out vec4 fragColor;
 
 void main() {
-    fragColor = vColor;
+    fragColor = vec4(vColor.rgb * vColor.a, vColor.a);
 }
 `;
 
@@ -83,7 +83,7 @@ fn main(input: VertexInput) -> VertexOutput {
 /**
  * WebGPU fragment shader (WGSL)
  *
- * Same functionality as GLSL version for WebGPU renderer.
+ * Outputs premultiplied alpha color for correct blending.
  */
 const wgslFragment = /* wgsl */ `
 struct FragmentInput {
@@ -92,7 +92,7 @@ struct FragmentInput {
 
 @fragment
 fn main(input: FragmentInput) -> @location(0) vec4f {
-    return input.vColor;
+    return vec4f(input.vColor.rgb * input.vColor.a, input.vColor.a);
 }
 `;
 

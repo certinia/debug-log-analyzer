@@ -34,6 +34,7 @@ import type {
   TimelineMarker,
   ViewportState,
 } from '../../types/flamechart.types.js';
+import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
 import {
   BREACH_AREA_OPACITY,
   DANGER_ZONE_OPACITY,
@@ -41,8 +42,6 @@ import {
   getTrafficLightColor,
   METRIC_STRIP_HEIGHT,
   METRIC_STRIP_LINE_WIDTHS,
-  METRIC_STRIP_MARKER_COLORS_BLENDED,
-  METRIC_STRIP_MARKER_OPACITY,
   METRIC_STRIP_THRESHOLDS,
   METRIC_STRIP_TOGGLE_WIDTH,
   METRIC_STRIP_Y_MAX_PERCENT,
@@ -402,7 +401,7 @@ export class MetricStripRenderer {
         continue;
       }
 
-      const color = METRIC_STRIP_MARKER_COLORS_BLENDED[marker.type];
+      const color = MARKER_COLORS[marker.type];
       if (color === undefined) {
         continue;
       }
@@ -413,7 +412,7 @@ export class MetricStripRenderer {
 
       if (gappedWidth > 0) {
         g.rect(gappedStartX, 0, gappedWidth, this.height);
-        g.fill({ color, alpha: METRIC_STRIP_MARKER_OPACITY });
+        g.fill({ color, alpha: MARKER_ALPHA });
       }
     }
   }

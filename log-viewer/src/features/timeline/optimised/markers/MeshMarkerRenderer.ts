@@ -12,16 +12,17 @@
  * - Single Mesh draw call for all markers
  * - Direct buffer updates (no scene graph overhead)
  * - Clip-space coordinates (no uniform binding overhead)
- * - Pre-blended opaque colors (no alpha blending)
+ * - True alpha transparency for theme-adaptive colors
  */
 
 import { Container, Geometry, Mesh, Shader } from 'pixi.js';
 import type { TimelineMarker } from '../../types/flamechart.types.js';
+import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
 import { createRectangleShader } from '../RectangleShader.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 import { hitTestMarkers, type MarkerIndicator } from './MarkerHitTest.js';
-import { MARKER_COLORS_BLENDED, sortMarkersByTimeAndSeverity } from './MarkerProcessor.js';
+import { sortMarkersByTimeAndSeverity } from './MarkerProcessor.js';
 
 /**
  * Renders marker indicators as semi-transparent vertical bands using Mesh.
@@ -136,14 +137,13 @@ export class MeshMarkerRenderer {
         continue;
       }
 
-      // Create indicator record with pre-blended opaque color
       const indicator: MarkerIndicator = {
         marker,
         resolvedEndTime,
         screenStartX: worldStartX,
         screenEndX: worldEndX,
         screenWidth: worldWidth,
-        color: MARKER_COLORS_BLENDED[marker.type],
+        color: MARKER_COLORS[marker.type],
         isVisible: true,
       };
 
@@ -193,6 +193,7 @@ export class MeshMarkerRenderer {
           viewportState.displayHeight,
           indicator.color,
           viewportTransform,
+          MARKER_ALPHA,
         );
         rectIndex++;
       }
