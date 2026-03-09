@@ -37,7 +37,10 @@
     "theme": "dark"
   },
   "publisher": "FinancialForce",
-  "author": "",
+  "author": {
+    "name": "Certinia",
+    "url": "https://github.com/certinia"
+  },
   "license": "SEE LICENSE IN LICENSE.txt",
   "repository": {
     "type": "git",
