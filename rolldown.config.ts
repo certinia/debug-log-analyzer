@@ -48,6 +48,7 @@ export default defineConfig([
     output: {
       format: 'esm',
       dir: './lana/out',
+      cleanDir: true,
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
       keepNames: true,
@@ -70,6 +71,7 @@ export default defineConfig([
       {
         format: 'esm',
         dir: './log-viewer/out',
+        cleanDir: true,
         chunkFileNames: 'log-viewer-[name].js',
         sourcemap: false,
         keepNames: true,
