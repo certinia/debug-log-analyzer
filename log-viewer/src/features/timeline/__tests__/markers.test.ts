@@ -19,6 +19,7 @@ class MockSprite {
   public width = 0;
   public height = 0;
   public tint = 0xffffff;
+  public alpha = 1;
   public visible = true;
   public parent: unknown = null;
   public _zIndex = 0;
@@ -67,21 +68,10 @@ jest.mock('pixi.js', () => {
 });
 
 import * as PIXI from 'pixi.js';
-import { blendWithBackground } from '../optimised/BucketColorResolver.js';
 import { TimelineMarkerRenderer } from '../optimised/markers/TimelineMarkerRenderer.js';
 import { TimelineViewport } from '../optimised/TimelineViewport.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 import { MARKER_ALPHA, MARKER_COLORS } from '../types/flamechart.types.js';
-
-/**
- * Pre-blended marker colors for testing (matches TimelineMarkerRenderer).
- * These are computed once to match the expected render output.
- */
-const MARKER_COLORS_BLENDED = {
-  error: blendWithBackground(MARKER_COLORS.error, MARKER_ALPHA),
-  skip: blendWithBackground(MARKER_COLORS.skip, MARKER_ALPHA),
-  unexpected: blendWithBackground(MARKER_COLORS.unexpected, MARKER_ALPHA),
-};
 
 // Mock PIXI.Container
 class MockContainer {
@@ -125,7 +115,7 @@ describe('TimelineMarkerRenderer', () => {
   });
 
   describe('T013: Color Accuracy Verification', () => {
-    it('should render error markers with pre-blended color via sprite tint', () => {
+    it('should render error markers with raw color and alpha via sprite tint', () => {
       const markers: TimelineMarker[] = [
         { id: 'marker-error', type: 'error', startTime: 100_000, summary: 'Test error' },
       ];
@@ -137,14 +127,15 @@ describe('TimelineMarkerRenderer', () => {
       );
       renderer.render();
 
-      // Find the sprite with error color
+      // Find the sprite with error color and alpha
       const errorSprites = createdMockSprites.filter(
-        (s) => s.visible && s.tint === MARKER_COLORS_BLENDED.error,
+        (s) => s.visible && s.tint === MARKER_COLORS.error,
       );
       expect(errorSprites.length).toBeGreaterThanOrEqual(1);
+      expect(errorSprites[0]!.alpha).toBe(MARKER_ALPHA);
     });
 
-    it('should render skip markers with pre-blended color via sprite tint', () => {
+    it('should render skip markers with raw color and alpha via sprite tint', () => {
       const markers: TimelineMarker[] = [
         { id: 'marker-skip', type: 'skip', startTime: 100_000, summary: 'Test skip' },
       ];
@@ -156,14 +147,15 @@ describe('TimelineMarkerRenderer', () => {
       );
       renderer.render();
 
-      // Find the sprite with skip color
+      // Find the sprite with skip color and alpha
       const skipSprites = createdMockSprites.filter(
-        (s) => s.visible && s.tint === MARKER_COLORS_BLENDED.skip,
+        (s) => s.visible && s.tint === MARKER_COLORS.skip,
       );
       expect(skipSprites.length).toBeGreaterThanOrEqual(1);
+      expect(skipSprites[0]!.alpha).toBe(MARKER_ALPHA);
     });
 
-    it('should render unexpected markers with pre-blended color via sprite tint', () => {
+    it('should render unexpected markers with raw color and alpha via sprite tint', () => {
       const markers: TimelineMarker[] = [
         {
           id: 'marker-unexpected',
@@ -180,11 +172,12 @@ describe('TimelineMarkerRenderer', () => {
       );
       renderer.render();
 
-      // Find the sprite with unexpected color
+      // Find the sprite with unexpected color and alpha
       const unexpectedSprites = createdMockSprites.filter(
-        (s) => s.visible && s.tint === MARKER_COLORS_BLENDED.unexpected,
+        (s) => s.visible && s.tint === MARKER_COLORS.unexpected,
       );
       expect(unexpectedSprites.length).toBeGreaterThanOrEqual(1);
+      expect(unexpectedSprites[0]!.alpha).toBe(MARKER_ALPHA);
     });
   });
 
@@ -300,7 +293,7 @@ describe('TimelineMarkerRenderer', () => {
       // First marker should be culled (ends at 200_000 < viewport start 250_000)
       // Second marker should be visible (200_000 to 1_000_000 overlaps 250_000)
       expect(visibleSprites.length).toBe(1);
-      expect(visibleSprites[0]!.tint).toBe(MARKER_COLORS_BLENDED.skip);
+      expect(visibleSprites[0]!.tint).toBe(MARKER_COLORS.skip);
     });
 
     it('should cull markers entirely after viewport', () => {
@@ -412,11 +405,11 @@ describe('TimelineMarkerRenderer', () => {
       expect(visibleSprites.length).toBe(3);
 
       // First sprite (skip at 100_000) should be leftmost
-      expect(visibleSprites[0]!.tint).toBe(MARKER_COLORS_BLENDED.skip);
+      expect(visibleSprites[0]!.tint).toBe(MARKER_COLORS.skip);
       // Second sprite (unexpected at 200_000)
-      expect(visibleSprites[1]!.tint).toBe(MARKER_COLORS_BLENDED.unexpected);
+      expect(visibleSprites[1]!.tint).toBe(MARKER_COLORS.unexpected);
       // Third sprite (error at 300_000)
-      expect(visibleSprites[2]!.tint).toBe(MARKER_COLORS_BLENDED.error);
+      expect(visibleSprites[2]!.tint).toBe(MARKER_COLORS.error);
     });
   });
 
@@ -580,8 +573,8 @@ describe('TimelineMarkerRenderer', () => {
       expect(visibleSprites.length).toBe(2);
 
       // Verify the new markers are rendered with correct tints
-      const skipSprites = visibleSprites.filter((s) => s.tint === MARKER_COLORS_BLENDED.skip);
-      const errorSprites = visibleSprites.filter((s) => s.tint === MARKER_COLORS_BLENDED.error);
+      const skipSprites = visibleSprites.filter((s) => s.tint === MARKER_COLORS.skip);
+      const errorSprites = visibleSprites.filter((s) => s.tint === MARKER_COLORS.error);
       expect(skipSprites.length).toBe(1);
       expect(errorSprites.length).toBe(1);
     });

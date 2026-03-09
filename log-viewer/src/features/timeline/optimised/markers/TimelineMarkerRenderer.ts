@@ -11,26 +11,15 @@
  * Performance optimizations:
  * - Uses SpritePool with shared 1x1 white texture for automatic GPU batching
  * - Sprites are pooled and reused (no GC overhead after warmup)
- * - Color applied via sprite.tint (pre-blended opaque colors)
+ * - Color applied via sprite.tint with true alpha transparency
  */
 
 import type { Container } from 'pixi.js';
-import type { MarkerType, TimelineMarker } from '../../types/flamechart.types.js';
+import type { TimelineMarker } from '../../types/flamechart.types.js';
 import { MARKER_ALPHA, MARKER_COLORS, SEVERITY_RANK } from '../../types/flamechart.types.js';
-import { blendWithBackground } from '../BucketColorResolver.js';
 import { SpritePool } from '../SpritePool.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 import { hitTestMarkers, type MarkerIndicator } from './MarkerHitTest.js';
-
-/**
- * Pre-blended opaque marker colors (MARKER_COLORS blended at MARKER_ALPHA opacity).
- * Computed once at module load time for performance.
- */
-const MARKER_COLORS_BLENDED: Record<MarkerType, number> = {
-  error: blendWithBackground(MARKER_COLORS.error, MARKER_ALPHA),
-  skip: blendWithBackground(MARKER_COLORS.skip, MARKER_ALPHA),
-  unexpected: blendWithBackground(MARKER_COLORS.unexpected, MARKER_ALPHA),
-};
 
 /**
  * Renders marker indicators as semi-transparent vertical bands using sprites.
@@ -130,14 +119,13 @@ export class TimelineMarkerRenderer {
         continue;
       }
 
-      // Create indicator record with pre-blended opaque color
       const indicator: MarkerIndicator = {
         marker,
         resolvedEndTime,
         screenStartX: worldStartX,
         screenEndX: worldEndX,
         screenWidth: worldWidth,
-        color: MARKER_COLORS_BLENDED[marker.type],
+        color: MARKER_COLORS[marker.type],
         isVisible: true,
       };
 
@@ -161,6 +149,7 @@ export class TimelineMarkerRenderer {
       sprite.width = gappedWidth;
       sprite.height = viewportState.displayHeight;
       sprite.tint = indicator.color;
+      sprite.alpha = MARKER_ALPHA;
     }
   }
 

@@ -10,22 +10,8 @@
  * used by both MeshMarkerRenderer and TimelineMarkerRenderer.
  */
 
-import type { MarkerType, TimelineMarker } from '../../types/flamechart.types.js';
-import { MARKER_ALPHA, MARKER_COLORS, SEVERITY_RANK } from '../../types/flamechart.types.js';
-import { blendWithBackground } from '../BucketColorResolver.js';
-
-/**
- * Pre-blended opaque marker colors (MARKER_COLORS blended at MARKER_ALPHA opacity).
- * Computed once at module load time for performance.
- *
- * Using pre-blended colors avoids runtime alpha compositing on the GPU,
- * which is more efficient for static opacity values.
- */
-export const MARKER_COLORS_BLENDED: Record<MarkerType, number> = {
-  error: blendWithBackground(MARKER_COLORS.error, MARKER_ALPHA),
-  skip: blendWithBackground(MARKER_COLORS.skip, MARKER_ALPHA),
-  unexpected: blendWithBackground(MARKER_COLORS.unexpected, MARKER_ALPHA),
-};
+import type { TimelineMarker } from '../../types/flamechart.types.js';
+import { SEVERITY_RANK } from '../../types/flamechart.types.js';
 
 /**
  * Sort markers by startTime, then by severity (higher severity first for stacking).
