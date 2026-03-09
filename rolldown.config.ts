@@ -6,27 +6,12 @@ import nodePolyfills from '@rolldown/plugin-node-polyfills';
 // rollup plugins
 import copy from 'rollup-plugin-copy';
 import postcss from 'rollup-plugin-postcss';
-import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
 
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const getSwcOptions = (dirPath: string) =>
-  defineRollupSwcOption({
-    include: /\.[mc]?[jt]sx?$/,
-    exclude: 'node_modules',
-    tsconfig: production ? `${dirPath}/tsconfig.json` : `${dirPath}/tsconfig-dev.json`,
-    jsc: {
-      transform: { useDefineForClassFields: false },
-      minify: {
-        compress: production ? { keep_classnames: true, keep_fnames: true } : false,
-        mangle: production ? { keep_classnames: true } : false,
-      },
-    },
-  });
 
 /**
  * Workaround for oxc printer lone-surrogate bug (https://github.com/oxc-project/oxc/issues/3526).
@@ -63,9 +48,11 @@ export default defineConfig([
     output: {
       format: 'esm',
       dir: './lana/out',
+      cleanDir: true,
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
       keepNames: true,
+      minify: production,
     },
     tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
     platform: 'node',
@@ -76,7 +63,7 @@ export default defineConfig([
     },
 
     external: ['vscode'],
-    plugins: [preserveAntlrATN(), swc(getSwcOptions('./lana'))],
+    plugins: [preserveAntlrATN()],
   },
   {
     input: { bundle: './log-viewer/src/Main.ts' },
@@ -84,9 +71,11 @@ export default defineConfig([
       {
         format: 'esm',
         dir: './log-viewer/out',
+        cleanDir: true,
         chunkFileNames: 'log-viewer-[name].js',
         sourcemap: false,
         keepNames: true,
+        minify: production,
       },
     ],
     platform: 'browser',
@@ -103,7 +92,6 @@ export default defineConfig([
         extensions: ['.css', '.scss'],
         minimize: true,
       }),
-      swc(getSwcOptions('./log-viewer')),
       copy({
         hook: 'closeBundle',
         targets: [
