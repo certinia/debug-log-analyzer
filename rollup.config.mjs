@@ -46,12 +46,8 @@ export default [
           tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
           jsc: {
             minify: {
-              compress: production,
-              mangle: production
-                ? {
-                    keep_classnames: true,
-                  }
-                : false,
+              compress: production ? { keep_classnames: true, keep_fnames: true } : false,
+              mangle: production? { keep_classnames: true,  } : false,
             },
           },
         }),

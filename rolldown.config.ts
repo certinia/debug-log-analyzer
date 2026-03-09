@@ -1,4 +1,4 @@
-import { defineConfig } from 'rolldown';
+import { defineConfig, Plugin } from 'rolldown';
 
 // rolldown plugins
 import nodePolyfills from '@rolldown/plugin-node-polyfills';
@@ -22,15 +22,38 @@ const getSwcOptions = (dirPath: string) =>
     jsc: {
       transform: { useDefineForClassFields: false },
       minify: {
-        compress: production,
-        mangle: production
-          ? {
-              keepClassNames: true,
-            }
-          : false,
+        compress: production ? { keep_classnames: true, keep_fnames: true } : false,
+        mangle: production ? { keep_classnames: true } : false,
       },
     },
   });
+
+/**
+ * Workaround for oxc printer lone-surrogate bug (https://github.com/oxc-project/oxc/issues/3526).
+ * The oxc codegen replaces lone surrogates (0xD800-0xDFFF) with U+FFFD in long CJS strings,
+ * corrupting ANTLR ATN serialized data which uses surrogates as raw char codes.
+ * This plugin converts the string literals to numeric char code arrays before the printer
+ * sees them. Can be removed once the upstream fix fully covers CJS long strings.
+ */
+function preserveAntlrATN(): Plugin {
+  const segmentPattern =
+    /(\w+\._serializedATNSegment\d+)\s*=\s*("(?:[^"\\]|\\.)*"(?:\s*\+\s*"(?:[^"\\]|\\.)*")*)\s*;/g;
+
+  return {
+    name: 'preserve-antlr-atn',
+    transform(code, id) {
+      if (!id.includes('node_modules') || !/_serializedATNSegment\d+\s*=/.test(code)) {
+        return;
+      }
+
+      return code.replace(segmentPattern, (_match, varName: string, expr: string) => {
+        const str = new Function(`return ${expr}`)() as string;
+        const charCodes = Array.from(str, (c) => c.charCodeAt(0));
+        return `${varName} = String.fromCharCode(${charCodes.join(',')});`;
+      });
+    },
+  };
+}
 
 const production = process.env.NODE_ENV === 'production';
 console.log('Package mode:', production ? 'production' : 'development');
@@ -42,11 +65,18 @@ export default defineConfig([
       dir: './lana/out',
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
+      keepNames: true,
     },
     tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
     platform: 'node',
+    resolve: {
+      alias: {
+        'apex-log-parser': path.resolve(__dirname, 'apex-log-parser/src/index.ts'),
+      },
+    },
+
     external: ['vscode'],
-    plugins: [swc(getSwcOptions('./lana'))],
+    plugins: [preserveAntlrATN(), swc(getSwcOptions('./lana'))],
   },
   {
     input: { bundle: './log-viewer/src/Main.ts' },
@@ -56,13 +86,13 @@ export default defineConfig([
         dir: './log-viewer/out',
         chunkFileNames: 'log-viewer-[name].js',
         sourcemap: false,
+        keepNames: true,
       },
     ],
     platform: 'browser',
     resolve: {
       alias: { eventemitter3: path.resolve(__dirname, 'node_modules/eventemitter3/index.js') },
     },
-    keepNames: true,
     moduleTypes: {
       '.css': 'js',
     },
