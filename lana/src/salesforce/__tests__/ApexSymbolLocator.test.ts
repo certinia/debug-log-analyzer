@@ -5,7 +5,12 @@ import { getMethodLine, parseApex } from '../ApexParser/ApexSymbolLocator';
 import { ApexVisitor, type ApexNode } from '../ApexParser/ApexVisitor';
 
 jest.mock('../ApexParser/ApexVisitor');
-jest.mock('@apexdevtools/apex-parser');
+jest.mock('@apexdevtools/apex-parser', () => ({
+  ApexParserFactory: {
+    createParser: () => ({ compilationUnit: () => ({}) }),
+  },
+  ApexParserBaseVisitor: class {},
+}));
 
 describe('ApexSymbolLocator', () => {
   const mockAST = {

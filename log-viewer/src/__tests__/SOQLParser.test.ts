@@ -1,7 +1,9 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { SOQLParser, SyntaxException } from '../features/soql/services/SOQLParser.js';
+import { ApexSyntaxError } from '@apexdevtools/apex-parser';
+
+import { SOQLParser } from '../features/soql/services/SOQLParser.js';
 
 describe('Analyse database tests', () => {
   it('throws on unparsable query', async () => {
@@ -10,7 +12,10 @@ describe('Analyse database tests', () => {
       await parser.parse('');
       expect(true).toBe(false);
     } catch (ex) {
-      expect(ex).toEqual(new SyntaxException(1, 0, "mismatched input '<EOF>' expecting 'select'"));
+      expect(ex).toBeInstanceOf(ApexSyntaxError);
+      const syntaxError = ex as ApexSyntaxError;
+      expect(syntaxError.line).toBe(1);
+      expect(syntaxError.column).toBe(0);
     }
   });
 

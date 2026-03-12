@@ -1,14 +1,17 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type {
-  ApexParserVisitor,
-  ClassDeclarationContext,
-  ConstructorDeclarationContext,
-  FormalParametersContext,
-  MethodDeclarationContext,
+import {
+  ApexParserBaseVisitor,
+  type ApexErrorNode,
+  type ApexParserRuleContext,
+  type ApexParseTree,
+  type ApexTerminalNode,
+  type ClassDeclarationContext,
+  type ConstructorDeclarationContext,
+  type FormalParametersContext,
+  type MethodDeclarationContext,
 } from '@apexdevtools/apex-parser';
-import type { ErrorNode, ParseTree, RuleNode, TerminalNode } from 'antlr4ts/tree';
 
 type ApexNature = 'Constructor' | 'Class' | 'Method';
 
@@ -67,19 +70,18 @@ export interface ApexConstructorNode extends ApexParamNode {
   nature: 'Constructor';
 }
 
-type VisitableApex = ParseTree & {
-  accept<Result>(visitor: ApexParserVisitor<Result>): Result;
-};
-
-export class ApexVisitor implements ApexParserVisitor<ApexNode> {
-  visit(ctx: ParseTree): ApexNode {
-    return ctx ? (ctx as VisitableApex).accept(this) : {};
+export class ApexVisitor extends ApexParserBaseVisitor<ApexNode> {
+  override visit(ctx: ApexParseTree): ApexNode {
+    if (!ctx) {
+      return {};
+    }
+    return super.visit(ctx);
   }
 
-  visitChildren(ctx: RuleNode): ApexNode {
+  override visitChildren(ctx: ApexParserRuleContext): ApexNode {
     const children: ApexNode[] = [];
 
-    for (let index = 0; index < ctx.childCount; index++) {
+    for (let index = 0; index < ctx.getChildCount(); index++) {
       const child = ctx.getChild(index);
       const node = this.visit(child);
       if (!node) {
@@ -98,25 +100,25 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
 
     return {
       nature: 'Class',
-      name: ident.text ?? '',
+      name: ident.getText() ?? '',
       children: ctx.children?.length ? this.visitChildren(ctx).children : [],
       line: start.line,
-      idCharacter: ident.start.charPositionInLine ?? 0,
+      idCharacter: ident.start.column ?? 0,
     };
   }
 
   visitConstructorDeclaration(ctx: ConstructorDeclarationContext): ApexConstructorNode {
     const { start } = ctx;
-    const idContexts = ctx.qualifiedName().id();
+    const idContexts = ctx.qualifiedName().id_list();
     const constructorName = idContexts[idContexts.length - 1];
 
     return {
       nature: 'Constructor',
-      name: constructorName?.text ?? '',
+      name: constructorName?.getText() ?? '',
       children: ctx.children?.length ? this.visitChildren(ctx).children : [],
       params: this.getParameters(ctx.formalParameters()),
       line: start.line,
-      idCharacter: start.charPositionInLine ?? 0,
+      idCharacter: start.column ?? 0,
     };
   }
 
@@ -126,25 +128,25 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
 
     return {
       nature: 'Method',
-      name: ident.text ?? '',
+      name: ident.getText() ?? '',
       children: ctx.children?.length ? this.visitChildren(ctx).children : [],
       params: this.getParameters(ctx.formalParameters()),
       line: start.line,
-      idCharacter: ident.start.charPositionInLine ?? 0,
+      idCharacter: ident.start.column ?? 0,
     };
   }
 
-  visitTerminal(_ctx: TerminalNode): ApexNode {
+  override visitTerminal(_ctx: ApexTerminalNode): ApexNode {
     return {};
   }
 
-  visitErrorNode(_ctx: ErrorNode): ApexNode {
+  override visitErrorNode(_ctx: ApexErrorNode): ApexNode {
     return {};
   }
 
   private getParameters(ctx: FormalParametersContext): string {
-    const paramsList = ctx.formalParameterList()?.formalParameter();
-    return paramsList?.map((param) => param.typeRef().text).join(',') ?? '';
+    const paramsList = ctx.formalParameterList()?.formalParameter_list();
+    return paramsList?.map((param) => param.typeRef().getText()).join(',') ?? '';
   }
 
   private forNode(node: ApexNode, anonHandler: (n: ApexNode) => void) {

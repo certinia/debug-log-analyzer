@@ -2,12 +2,6 @@
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
 import { type QueryContext } from '@apexdevtools/apex-parser';
-import {
-  type ANTLRErrorListener,
-  type RecognitionException,
-  type Recognizer,
-  type Token,
-} from 'antlr4ts';
 
 // To understand the parser AST see https://github.com/nawforce/apex-parser/blob/master/antlr/ApexParser.g4
 // Start with the 'query' rule at ~532
@@ -23,46 +17,46 @@ export class SOQLTree {
   /* Return true if SELECT list only contains field names, no functions, sub-queries or typeof */
   isSimpleSelect(): boolean {
     const selectList = this._queryContext.selectList();
-    const selectEntries = selectList.selectEntry();
-    return selectEntries.every((selectEntry) => selectEntry.fieldName() !== undefined);
+    const selectEntries = selectList.selectEntry_list();
+    return selectEntries.every((selectEntry) => selectEntry.fieldName() != null);
   }
 
   /* Return true for queries only containing WHERE, ORDER BY & LIMIT clauses */
   isTrivialQuery(): boolean {
     return (
-      this._queryContext.usingScope() === undefined &&
-      this._queryContext.withClause() === undefined &&
-      this._queryContext.groupByClause() === undefined &&
-      this._queryContext.offsetClause() === undefined &&
-      this._queryContext.allRowsClause() === undefined &&
-      this._queryContext.forClauses().childCount === 0 &&
-      this._queryContext.updateList() === undefined
+      this._queryContext.usingScope() == null &&
+      this._queryContext.withClause() == null &&
+      this._queryContext.groupByClause() == null &&
+      this._queryContext.offsetClause() == null &&
+      this._queryContext.allRowsClause() == null &&
+      this._queryContext.forClauses().getChildCount() === 0 &&
+      this._queryContext.updateList() == null
     );
   }
 
   /* Return true if query has ORDER BY */
   isOrdered(): boolean {
-    return this._queryContext.orderByClause() !== undefined;
+    return this._queryContext.orderByClause() != null;
   }
 
   /* Return limit value if defined, maybe a number or a bound expression */
   limitValue(): number | string | undefined {
     const limitClause = this._queryContext.limitClause();
-    if (limitClause === undefined) {
+    if (limitClause == null) {
       return undefined;
-    } else if (limitClause?.IntegerLiteral() !== undefined) {
-      return parseInt(limitClause?.IntegerLiteral()?.text as string);
+    } else if (limitClause.IntegerLiteral() != null) {
+      return parseInt(limitClause.IntegerLiteral()!.getText() as string);
     } else {
-      return limitClause?.boundExpression()?.text as string;
+      return limitClause.boundExpression()?.getText() as string;
     }
   }
 
   /* Return FROM clase SObject name, if there is a single SObject */
   fromObject(): undefined | string {
     const fromContext = this._queryContext.fromNameList();
-    const fieldNames = fromContext.fieldName();
+    const fieldNames = fromContext.fieldName_list();
     if (fieldNames.length === 1) {
-      return fieldNames[0]?.text;
+      return fieldNames[0]?.getText();
     } else {
       return undefined;
     }
@@ -73,42 +67,10 @@ export class SOQLParser {
   async parse(query: string): Promise<SOQLTree> {
     // Dynamic import for code splitting. Improves performance by reducing the amount of JS that is loaded and parsed at the start.
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { ApexLexer, ApexParser, CaseInsensitiveInputStream } =
-      await import('@apexdevtools/apex-parser');
-    // Dynamic import for code splitting. Improves performance by reducing the amount of JS that is loaded and parsed at the start.
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { CharStreams, CommonTokenStream } = await import('antlr4ts');
-    const lexer = new ApexLexer(new CaseInsensitiveInputStream(CharStreams.fromString(query)));
-    const tokens = new CommonTokenStream(lexer);
-    const parser = new ApexParser(tokens);
+    const { ApexParserFactory, ThrowingErrorListener } = await import('@apexdevtools/apex-parser');
+    const parser = ApexParserFactory.createParser(query, false);
     parser.removeErrorListeners();
-    parser.addErrorListener(new ThrowingErrorListener());
+    parser.addErrorListener(ThrowingErrorListener.INSTANCE);
     return new SOQLTree(parser.query());
-  }
-}
-
-export class SyntaxException {
-  line: number;
-  column: number;
-  message: string;
-
-  constructor(line: number, column: number, message: string) {
-    this.line = line;
-    this.column = column;
-    this.message = message;
-  }
-}
-
-class ThrowingErrorListener implements ANTLRErrorListener<Token> {
-  syntaxError<Token>(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recognizer: Recognizer<Token, any>,
-    offendingSymbol: Token,
-    line: number,
-    charPositionInLine: number,
-    msg: string,
-    _e: RecognitionException | undefined,
-  ): void {
-    throw new SyntaxException(line, charPositionInLine, msg);
   }
 }
