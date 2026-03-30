@@ -18,8 +18,8 @@ export const tooltipStyles = `
         padding: 5px;
         border-radius: 4px;
         border-left: 4px solid;
-        background-color: var(--tl-editor-background);
-        color: var(--tl-editor-foreground);
+        background-color: var(--tl-hover-background);
+        color: var(--tl-hover-foreground);
         font-family: monospace;
         font-size: 0.92rem;
         pointer-events: auto;
@@ -47,6 +47,8 @@ export const tooltipStyles = `
         white-space: nowrap;
         text-overflow: ellipsis;
         padding-right: 12px;
+        color: var(--tl-description-foreground, #999);
+        opacity: 0.9;
       }
 
       .tooltip-value {
@@ -54,9 +56,7 @@ export const tooltipStyles = `
         font-variant-numeric: tabular-nums;
         font-weight: 500;
         font-family: monospace;
-        opacity: 0.9;
         text-align: right;
         white-space: pre-wrap;
-        color: var(--tl-description-foreground, #999)
       }
 `;

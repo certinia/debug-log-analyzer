@@ -89,6 +89,20 @@ export class TimelineView extends LitElement {
         --tl-widget-border: var(--vscode-editorWidget-border, #454545);
         --tl-widget-foreground: var(--vscode-editorWidget-foreground, #cccccc);
 
+        /* Hover/tooltip */
+        --tl-hover-background: var(
+          --vscode-editorHoverWidget-background,
+          var(--vscode-editorWidget-background, #252526)
+        );
+        --tl-hover-border: var(
+          --vscode-editorHoverWidget-border,
+          var(--vscode-editorWidget-border, #454545)
+        );
+        --tl-hover-foreground: var(
+          --vscode-editorHoverWidget-foreground,
+          var(--vscode-editorWidget-foreground, #cccccc)
+        );
+
         /* Text */
         --tl-description-foreground: var(--vscode-descriptionForeground, #999);
         --tl-font-family: var(--vscode-font-family, sans-serif);
