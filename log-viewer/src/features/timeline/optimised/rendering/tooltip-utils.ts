@@ -39,11 +39,11 @@ export const PERCENT_THRESHOLD_BREACH = 1.0;
  */
 export const TOOLTIP_CSS = {
   /** Background color */
-  background: 'var(--tl-widget-background, #252526)',
+  background: 'var(--tl-hover-background, #252526)',
   /** Border color */
-  border: 'var(--tl-widget-border, #454545)',
+  border: 'var(--tl-hover-border, #454545)',
   /** Text color */
-  foreground: 'var(--tl-widget-foreground, #e3e3e3)',
+  foreground: 'var(--tl-hover-foreground, #e3e3e3)',
   /** Description/secondary text color */
   descriptionForeground: 'var(--tl-description-foreground, #999)',
   /** Muted description text color */

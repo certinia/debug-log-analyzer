@@ -38,6 +38,7 @@ $footerTextColor: var(--vscode-editor-foreground); //footer text color
 $footerBorderColor: transparent; //footer border color
 $footerSeparatorColor: transparent; //footer bottom separator color
 $footerActiveColor: #d00 !default; //footer bottom active text color
+
 @import '~tabulator-tables/src/scss/tabulator.scss';
 @import '../editors/MinMax';
 @import '../format/Progress';
@@ -102,18 +103,6 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
     font-size: var(--vscode-editor-font-size, 0.9em);
   }
 
-  .tabulator-tooltip {
-    // Match timeline tooltip styling for consistency
-    background: var(--vscode-editor-background);
-    color: var(--vscode-editor-foreground);
-    overflow-wrap: anywhere;
-    font-family: monospace;
-    font-size: 0.92rem;
-    font-variant-numeric: tabular-nums;
-    padding: 5px;
-    border-radius: 4px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  }
   .tabulator-row.tabulator-selected {
     color: var(--vscode-list-activeSelectionForeground);
   }
@@ -153,6 +142,19 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
   .number-cell {
     font-variant-numeric: tabular-nums;
   }
+}
+
+.tabulator-tooltip {
+  // Match timeline tooltip styling for consistency
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editor-foreground));
+  overflow-wrap: anywhere;
+  font-family: monospace;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+  padding: 5px;
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 .tabulator-edit-list {
