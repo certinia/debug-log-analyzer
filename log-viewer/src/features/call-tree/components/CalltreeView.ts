@@ -24,7 +24,7 @@ import MinMaxFilter from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find, formatter } from '../../../tabulator/module/Find.js';
+import { Find } from '../../../tabulator/module/Find.js';
 import { MiddleRowFocus } from '../../../tabulator/module/MiddleRowFocus.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
@@ -397,22 +397,12 @@ export class CalltreeView extends LitElement {
       return;
     }
     this.blockClearHighlights = true;
-    this.calltreeTable?.blockRedraw();
     const currentRow = this.findMap[this.findArgs.count];
-    const rows = [
-      currentRow,
-      this.findMap[this.findArgs.count + 1],
-      this.findMap[this.findArgs.count - 1],
-    ];
-    rows.forEach((row) => {
-      row?.reformat();
+    //@ts-expect-error This is a custom function added in by Find custom module
+    await this.calltreeTable.setCurrentMatch(this.findArgs.count, currentRow, {
+      scrollIfVisible: false,
+      focusRow: false,
     });
-
-    if (currentRow) {
-      //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      this.calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
-    }
-    this.calltreeTable?.restoreRedraw();
     this.blockClearHighlights = false;
   }
 
@@ -609,9 +599,6 @@ export class CalltreeView extends LitElement {
             default:
               return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
           }
-        },
-        rowFormatter: (row: RowComponent) => {
-          formatter(row, this.findArgs);
         },
         columnCalcs: 'both',
         columnDefaults: {
@@ -867,7 +854,14 @@ export class CalltreeView extends LitElement {
         this.typeFilterCache.clear();
       });
 
-      this.calltreeTable.on('renderStarted', () => {
+      this.calltreeTable.on('dataSorted', () => {
+        if (!this.blockClearHighlights && this.totalMatches > 0) {
+          this._resetFindWidget();
+          this._clearSearchHighlights();
+        }
+      });
+
+      this.calltreeTable.on('dataFiltered', () => {
         if (!this.blockClearHighlights && this.totalMatches > 0) {
           this._resetFindWidget();
           this._clearSearchHighlights();
@@ -899,7 +893,7 @@ export class CalltreeView extends LitElement {
     this.findArgs.text = '';
     this.findArgs.count = 0;
     //@ts-expect-error This is a custom function added in by Find custom module
-    this.calltreeTable.clearFindHighlights(Object.values(this.findMap));
+    this.calltreeTable.clearFindHighlights();
     this.findMap = {};
     this.totalMatches = 0;
   }

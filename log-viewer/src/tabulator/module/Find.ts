@@ -3,18 +3,68 @@
  */
 import { Module, type GroupComponent, type RowComponent, type Tabulator } from 'tabulator-tables';
 
+type FindArgs = { text: string; count: number; options: { matchCase: boolean } };
+type GoToRowOptions = { scrollIfVisible: boolean; focusRow: boolean };
+
 export class Find extends Module {
   static moduleName = 'FindModule';
+
+  // Shared across all Find instances — one per highlight type
+  static _findHighlight: Highlight | null = null;
+  static _currentHighlight: Highlight | null = null;
+
+  // Per-instance range tracking for cleanup without affecting other instances
+  _myFindRanges: Range[] = [];
+  _myCurrentRanges: Range[] = [];
+  _findArgs: FindArgs | null = null;
+  _currentMatchIndex = 0;
+  _matchIndexes: { [key: number]: RowComponent } = {};
 
   constructor(table: Tabulator) {
     super(table);
     // @ts-expect-error registerTableFunction() needs adding to tabulator types
     this.registerTableFunction('find', this._find.bind(this));
-    // @ts-expect-error registerTableFunction() needs adding to tabulator types
     this.registerTableFunction('clearFindHighlights', this._clearFindHighlights.bind(this));
+    // @ts-expect-error registerTableFunction() needs adding to tabulator types
+    this.registerTableFunction('setCurrentMatch', this._setCurrentMatch.bind(this));
   }
 
-  initialize() {}
+  initialize() {
+    this.table.on('renderComplete', () => {
+      if (this._findArgs?.text) {
+        this._applyHighlights();
+      }
+    });
+
+    // Virtual scroll doesn't fire renderComplete, so listen for scroll events
+    // to apply highlights to newly visible rows. Debounced to avoid blocking
+    // the main thread during fast scrolling, plus scrollend for instant final update.
+    const holder = this.table.element.querySelector('.tabulator-tableholder');
+    if (holder) {
+      let rafId: number | null = null;
+      holder.addEventListener('scroll', () => {
+        if (!this._findArgs?.text) {
+          return;
+        }
+        if (rafId === null) {
+          rafId = requestAnimationFrame(() => {
+            rafId = null;
+            this._applyHighlights();
+          });
+        }
+      });
+
+      holder.addEventListener('scrollend', () => {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+        if (this._findArgs?.text) {
+          this._applyHighlights();
+        }
+      });
+    }
+  }
 
   async _find(findArgs: FindArgs) {
     const result: { totalMatches: number; matchIndexes: { [key: number]: RowComponent } } = {
@@ -22,7 +72,9 @@ export class Find extends Module {
       matchIndexes: {},
     };
 
-    this._clearMatches();
+    this._clearInstanceRanges();
+    this._currentMatchIndex = 0;
+    this._matchIndexes = {};
 
     // We only do this when groups exist to get row order
     const flattenFromGrps = (row: GroupComponent): RowComponent[] => {
@@ -31,7 +83,7 @@ export class Find extends Module {
       row
         .getSubGroups()
         .flatMap(flattenFromGrps)
-        .forEach((child) => {
+        .forEach((child: RowComponent) => {
           mergedArray.push(child);
         });
       return mergedArray;
@@ -39,29 +91,25 @@ export class Find extends Module {
 
     const tbl = this.table;
     const grps = tbl.getGroups().flatMap(flattenFromGrps);
-    const flattenedRows = grps.length ? grps : this._getRows(tbl.getRows('active'));
+    const flattenedRows: RowComponent[] = grps.length ? grps : this._getRows(tbl.getRows('active'));
 
     const findOptions = findArgs.options;
     let searchString = findOptions.matchCase ? findArgs.text : findArgs.text.toLowerCase();
     searchString = searchString.replaceAll(/[[\]*+?{}.()^$|\\-]/g, '\\$&');
     const regex = new RegExp(searchString, `g${findArgs.options.matchCase ? '' : 'i'}`);
 
-    tbl.blockRedraw();
+    // Reset highlightIndexes on all rows (no reformat needed with CSS Highlight API)
     for (const row of flattenedRows) {
       const data = row.getData();
-      if (data.highlightIndexes?.length > 0) {
-        data.highlightIndexes.length = 0;
-        row.reformat();
-      } else if (!data.highlightIndexes) {
+      if (!data.highlightIndexes) {
         data.highlightIndexes = [];
+      } else {
+        data.highlightIndexes.length = 0;
       }
     }
-    tbl.restoreRedraw();
 
-    await new Promise((resolve) => requestAnimationFrame(resolve));
     let totalMatches = 0;
     if (searchString) {
-      const rowsToReformat = new Set<RowComponent>();
       const len = flattenedRows.length;
       for (let i = 0; i < len; i++) {
         const row = flattenedRows[i];
@@ -73,73 +121,187 @@ export class Find extends Module {
         data.highlightIndexes = [];
         row.getCells().forEach((cell) => {
           const elem = cell.getElement();
-          const matchCount = this._countMatches(elem, findArgs, regex);
+          const matchCount = this._countMatches(elem, regex);
           if (matchCount) {
-            const kLen = matchCount;
-            for (let k = 0; k < kLen; k++) {
+            for (let k = 0; k < matchCount; k++) {
               totalMatches++;
               data.highlightIndexes.push(totalMatches);
               result.matchIndexes[totalMatches] = row;
             }
-            rowsToReformat.add(row);
           }
         });
       }
-      tbl.blockRedraw();
-      rowsToReformat.forEach((row) => {
-        row?.reformat();
-      });
-      tbl.restoreRedraw();
     }
 
     result.totalMatches = totalMatches;
+    this._findArgs = findArgs;
+    this._matchIndexes = result.matchIndexes;
+    this._applyHighlights();
+
     return result;
   }
 
-  _clearFindHighlights(rows: RowComponent[]) {
-    this.table.blockRedraw();
-    for (const row of rows) {
-      const data = row.getData();
-      data.highlightIndexes = [];
-      row.reformat();
+  async _setCurrentMatch(index: number, row?: RowComponent, goToRowOpts?: GoToRowOptions) {
+    this._currentMatchIndex = index;
+    if (this._findArgs) {
+      this._findArgs.count = index;
     }
-    this.table.restoreRedraw();
+    this._applyHighlights();
+
+    if (row) {
+      try {
+        // @ts-expect-error goToRow is a custom function added by RowNavigation module
+        await this.table.goToRow(row, goToRowOpts);
+      } finally {
+        this._applyHighlights();
+      }
+    }
   }
 
-  _countMatches(elem: Node, findArgs: FindArgs, regex: RegExp) {
-    let count = 0;
+  _applyHighlights() {
+    // Lazy-init static Highlights
+    if (!Find._findHighlight) {
+      Find._findHighlight = new Highlight();
+    }
+    if (!Find._currentHighlight) {
+      Find._currentHighlight = new Highlight();
+    }
 
+    // Detach highlights during modification to prevent per-range style recalc
+    CSS.highlights.delete('find-match');
+    CSS.highlights.delete('current-find-match');
+
+    // Clear this instance's old ranges from the shared Highlights
+    this._clearInstanceRanges();
+
+    if (!this._findArgs?.text) {
+      CSS.highlights.set('find-match', Find._findHighlight);
+      CSS.highlights.set('current-find-match', Find._currentHighlight);
+      return;
+    }
+
+    const findOptions = this._findArgs.options;
+    let searchString = findOptions.matchCase
+      ? this._findArgs.text
+      : this._findArgs.text.toLowerCase();
+    searchString = searchString.replaceAll(/[[\]*+?{}.()^$|\\-]/g, '\\$&');
+    const regex = new RegExp(searchString, `g${findOptions.matchCase ? '' : 'i'}`);
+
+    const rows = this._getRenderedRows();
+    for (const row of rows) {
+      // Skip GroupComponents — they don't have getData
+      if (typeof row.getData !== 'function') {
+        continue;
+      }
+
+      const data = row.getData();
+
+      let matchIdx = 0;
+      row.getCells().forEach((cell) => {
+        const elem = cell.getElement();
+        this._walkTextNodes(elem, (textNode) => {
+          const text = textNode.textContent;
+          if (!text) {
+            return;
+          }
+
+          regex.lastIndex = 0;
+          let match: RegExpExecArray | null;
+          while ((match = regex.exec(text)) !== null) {
+            const highlightIndex = data.highlightIndexes?.[matchIdx];
+            matchIdx++;
+
+            const range = new Range();
+            range.setStart(textNode, match.index);
+            range.setEnd(textNode, match.index + match[0].length);
+
+            if (highlightIndex === this._currentMatchIndex) {
+              Find._currentHighlight!.add(range);
+              this._myCurrentRanges.push(range);
+            } else {
+              Find._findHighlight!.add(range);
+              this._myFindRanges.push(range);
+            }
+          }
+        });
+      });
+    }
+
+    // Re-attach highlights — browser applies all ranges in a single paint
+    CSS.highlights.set('find-match', Find._findHighlight!);
+    CSS.highlights.set('current-find-match', Find._currentHighlight!);
+  }
+
+  _clearFindHighlights() {
+    this._clearInstanceRanges();
+    this._findArgs = null;
+    this._currentMatchIndex = 0;
+    this._matchIndexes = {};
+  }
+
+  _clearInstanceRanges() {
+    for (const range of this._myFindRanges) {
+      Find._findHighlight?.delete(range);
+    }
+    for (const range of this._myCurrentRanges) {
+      Find._currentHighlight?.delete(range);
+    }
+    this._myFindRanges = [];
+    this._myCurrentRanges = [];
+  }
+
+  _walkTextNodes(node: Node, callback: (textNode: Text) => void) {
     const children =
       //@ts-expect-error renderRoot does not exist on node and we should probably not access it but there is no other option at the moment
-      (elem.childNodes?.length ? elem.childNodes : elem.renderRoot?.childNodes) ?? [];
+      (node.childNodes?.length ? node.childNodes : node.renderRoot?.childNodes) ?? [];
     const len = children.length;
     for (let i = 0; i < len; i++) {
       const cur = children[i];
       if (!cur) {
         continue;
       }
-
       if (cur.nodeType === 1) {
-        count += this._countMatches(cur, findArgs, regex);
+        this._walkTextNodes(cur, callback);
       } else if (cur.nodeType === 3) {
-        const originalText = cur.textContent;
-        if (!originalText) {
-          continue;
-        }
-        const match = originalText.match(regex);
-        count += match?.length ?? 0;
+        callback(cur as Text);
       }
     }
+  }
+
+  _countMatches(elem: Node, regex: RegExp): number {
+    let count = 0;
+    this._walkTextNodes(elem, (textNode) => {
+      const text = textNode.textContent;
+      if (!text) {
+        return;
+      }
+      const match = text.match(regex);
+      count += match?.length ?? 0;
+    });
     return count;
   }
 
-  _getRows(rows: RowComponent[]) {
+  _getRenderedRows(): RowComponent[] {
+    // Returns all rendered rows including buffer (not just viewport).
+    // This allows highlights to be applied to off-screen buffer rows,
+    // eliminating the "pop in" effect when they scroll into view.
+    const renderer = this.table.rowManager?.renderer;
+    if (renderer && renderer.vDomTop !== undefined) {
+      const displayRows = this.table.rowManager.getDisplayRows();
+      return displayRows
+        .slice(renderer.vDomTop, renderer.vDomBottom + 1)
+        .map((row: { getComponent: () => RowComponent }) => row.getComponent());
+    }
+    return this.table.getRows('visible');
+  }
+
+  _getRows(rows: RowComponent[]): RowComponent[] {
     const isDataTreeEnabled = this.table.modules.dataTree && this.table.options.dataTreeFilter;
     if (!isDataTreeEnabled) {
       return rows;
     }
 
-    const children = [];
+    const children: RowComponent[] = [];
     for (const row of rows) {
       children.push(row);
       for (const child of this._getFilteredChildren(row)) {
@@ -164,10 +326,8 @@ export class Find extends Module {
       sorting.sort(internalChildren, true);
     }
 
-    const filteredChildren = [];
     for (const internalChild of internalChildren) {
       const childComp: RowComponent = internalChild.getComponent();
-      filteredChildren.push(childComp);
       output.push(childComp);
 
       const subChildren = this._getFilteredChildren(childComp);
@@ -178,122 +338,4 @@ export class Find extends Module {
 
     return output;
   }
-
-  _clearMatches() {
-    const matches = this.table.element.querySelectorAll('.currentFindMatch, .findMatch');
-    for (const elm of matches) {
-      const previous = elm.previousSibling;
-      const next = elm.nextSibling;
-      if (previous) {
-        const newText = (previous.textContent ?? '') + elm.textContent;
-        previous.textContent = newText;
-
-        if (next) {
-          const newText = (previous.textContent ?? '') + next.textContent;
-          previous.textContent = newText;
-        }
-        elm.remove();
-      } else {
-        if (next) {
-          const newText = (elm.textContent ?? '') + next.textContent;
-          elm.textContent = newText;
-          next.remove();
-        }
-        elm.classList.remove('currentFindMatch', 'findMatch');
-      }
-    }
-  }
 }
-
-export function formatter(row: RowComponent, findArgs: FindArgs) {
-  const { text } = findArgs;
-  if (!text) {
-    return;
-  }
-  const data = row.getData();
-  if (!data || !data.highlightIndexes?.length) {
-    return;
-  }
-
-  const highlights = {
-    indexes: data.highlightIndexes,
-    currentMatch: 0,
-  };
-  row.getCells().forEach((cell) => {
-    const cellElem = cell.getElement();
-    _highlightText(cellElem, findArgs, highlights);
-  });
-
-  //@ts-expect-error This is private to tabulator, but we have no other choice atm.
-  if (row._getSelf().type === 'row') {
-    row.normalizeHeight();
-  }
-}
-
-function _highlightText(
-  elem: Node,
-  findArgs: FindArgs,
-  highlights: { indexes: number[]; currentMatch: number },
-) {
-  const searchText = findArgs.options.matchCase ? findArgs.text : findArgs.text.toLowerCase();
-  const matchHighlightIndex = findArgs.count;
-
-  //@ts-expect-error renderRoot does not exist on node and we should probably not access it but there is no other option at the moment
-  const children = (elem.childNodes?.length ? elem.childNodes : elem.renderRoot?.childNodes) ?? [];
-  const len = children.length;
-  for (let i = 0; i < len; i++) {
-    const cur = children[i];
-    if (!cur) {
-      continue;
-    }
-
-    if (cur.nodeType === 1) {
-      _highlightText(cur, findArgs, highlights);
-    } else if (cur.nodeType === 3) {
-      const parentNode = cur.parentNode;
-      let originalText = cur.textContent;
-      if (!originalText) {
-        continue;
-      }
-
-      let matchIndex = (
-        findArgs.options.matchCase ? originalText : originalText?.toLowerCase()
-      )?.indexOf(searchText);
-      while (matchIndex > -1) {
-        const hightlightIndex = highlights.indexes[highlights.currentMatch++];
-
-        const endOfMatchIndex = matchIndex + searchText.length;
-        const matchingText = originalText.substring(matchIndex, endOfMatchIndex);
-
-        const highlightSpan = document.createElement('span');
-        highlightSpan.className =
-          hightlightIndex === matchHighlightIndex ? 'currentFindMatch' : 'findMatch';
-        highlightSpan.textContent = matchingText;
-        if (parentNode.isEqualNode(highlightSpan)) {
-          break;
-        }
-
-        if (matchIndex > 0) {
-          const beforeText = originalText.substring(0, matchIndex);
-          const beforeTextElem = document.createElement('text');
-          beforeTextElem.textContent = beforeText;
-          parentNode?.insertBefore(beforeTextElem, cur);
-        }
-        parentNode?.insertBefore(highlightSpan, cur);
-
-        const endText = originalText.substring(endOfMatchIndex, originalText.length);
-        if (!endText.length) {
-          parentNode?.removeChild(cur);
-          break;
-        }
-        cur.textContent = endText;
-        originalText = endText;
-        matchIndex = (
-          findArgs.options.matchCase ? originalText : originalText?.toLowerCase()
-        )?.indexOf(searchText);
-      }
-    }
-  }
-}
-
-type FindArgs = { text: string; count: number; options: { matchCase: boolean } };

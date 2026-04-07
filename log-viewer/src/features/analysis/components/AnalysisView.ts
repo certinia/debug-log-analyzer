@@ -24,7 +24,7 @@ import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find, formatter } from '../../../tabulator/module/Find.js';
+import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
@@ -251,19 +251,12 @@ export class AnalysisView extends LitElement {
       return;
     }
     this.blockClearHighlights = true;
-    this.analysisTable?.blockRedraw();
     const currentRow = this.findMap[this.findArgs.count];
-    const rows = [
-      currentRow,
-      this.findMap[this.findArgs.count + 1],
-      this.findMap[this.findArgs.count - 1],
-    ];
-    rows.forEach((row) => {
-      row?.reformat();
+    //@ts-expect-error This is a custom function added in by Find custom module
+    await this.analysisTable.setCurrentMatch(this.findArgs.count, currentRow, {
+      scrollIfVisible: false,
+      focusRow: false,
     });
-    //@ts-expect-error This is a custom function added in by RowNavigation custom module
-    this.analysisTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
-    this.analysisTable?.restoreRedraw();
     this.blockClearHighlights = false;
   }
 
@@ -321,9 +314,6 @@ export class AnalysisView extends LitElement {
       groupClosedShowCalcs: true,
       groupStartOpen: false,
       groupToggleElement: 'header',
-      rowFormatter: (row: RowComponent) => {
-        formatter(row, this.findArgs);
-      },
       columnDefaults: {
         title: 'default',
         resizable: true,
@@ -426,7 +416,21 @@ export class AnalysisView extends LitElement {
       ],
     });
 
-    this.analysisTable.on('renderStarted', () => {
+    this.analysisTable.on('dataSorted', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
+    });
+
+    this.analysisTable.on('dataFiltered', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
+    });
+
+    this.analysisTable.on('dataGrouped', () => {
       if (!this.blockClearHighlights && this.totalMatches > 0) {
         this._resetFindWidget();
         this._clearSearchHighlights();
@@ -442,7 +446,7 @@ export class AnalysisView extends LitElement {
     this.findArgs.text = '';
     this.findArgs.count = 0;
     //@ts-expect-error This is a custom function added in by Find custom module
-    this.analysisTable.clearFindHighlights(Object.values(this.findMap));
+    this.analysisTable.clearFindHighlights();
     this.findMap = {};
     this.totalMatches = 0;
   }
