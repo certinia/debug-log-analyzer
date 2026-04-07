@@ -45,6 +45,7 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
 .tabulator {
   .tabulator-tableholder {
     overflow-x: hidden;
+    overflow-anchor: none;
     .tabulator-table {
       display: block;
       background-color: default;
