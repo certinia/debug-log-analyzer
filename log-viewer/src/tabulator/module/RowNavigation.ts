@@ -58,11 +58,7 @@ export class RowNavigation extends Module {
       this.tableHolder.focus();
     }
 
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        this._scrollToRow(row, opts).then(resolve);
-      });
-    });
+    return this._scrollToRow(row, opts);
   }
 
   _scrollToRow(row: RowComponent, opts: GoToRowOptions): Promise<void> {
@@ -73,19 +69,17 @@ export class RowNavigation extends Module {
       .catch(() => {})
       .then(() => {
         return new Promise<void>((resolve) => {
-          setTimeout(() => {
-            const elem = row.getElement();
+          const elem = row.getElement();
 
-            if (scrollIfVisible || !this._isVisible(elem)) {
-              elem.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-            }
+          if (scrollIfVisible || !this._isVisible(elem)) {
+            elem.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
+          }
 
-            if (focusRow) {
-              elem.focus();
-            }
+          if (focusRow) {
+            elem.focus();
+          }
 
-            resolve();
-          });
+          resolve();
         });
       });
   }
