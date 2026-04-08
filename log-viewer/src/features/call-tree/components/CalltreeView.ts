@@ -29,6 +29,7 @@ import { MiddleRowFocus } from '../../../tabulator/module/MiddleRowFocus.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
+import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -570,7 +571,7 @@ export class CalltreeView extends LitElement {
       const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
       const governorLimits = rootMethod.governorLimits;
 
-      let childIndent;
+      const nameFormatter = createCalltreeNameFormatter(excludedTypes);
       this.calltreeTable = new Tabulator(callTreeTableContainer, {
         data: this._toCallTree(rootMethod.children),
         layout: 'fitColumns',
@@ -617,34 +618,7 @@ export class CalltreeView extends LitElement {
               return 'Total';
             },
             cssClass: 'datagrid-textarea datagrid-code-text',
-            formatter: (cell, _formatterParams, _onRendered) => {
-              const cellElem = cell.getElement();
-              const row = cell.getRow();
-              // @ts-expect-error: _row is private. This is temporary and I will patch the text wrap behaviour in the library.
-              const dataTree = row._row.modules.dataTree;
-              const treeLevel = dataTree?.index ?? 0;
-              childIndent ??= row.getTable().options.dataTreeChildIndent || 0;
-              const levelIndent = treeLevel * childIndent;
-              cellElem.style.paddingLeft = `${levelIndent + 4}px`;
-              cellElem.style.textIndent = `-${levelIndent}px`;
-
-              const node = (cell.getData() as CalltreeRow).originalData;
-              let text = node.text;
-              if (node.hasValidSymbols) {
-                const link = document.createElement('a');
-                link.setAttribute('href', '#!');
-                link.textContent = text;
-                return link;
-              }
-
-              if (node.type && !excludedTypes.has(node.type) && node.type !== text) {
-                text = node.type + ': ' + text;
-              }
-
-              const textSpan = document.createElement('span');
-              textSpan.textContent = text;
-              return textSpan;
-            },
+            formatter: nameFormatter,
             variableHeight: true,
             cellClick: (e, cell) => {
               const { type } = window.getSelection() ?? {};
@@ -977,7 +951,7 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  private _toCallTree(nodes: LogEvent[]): CalltreeRow[] | undefined {
+  private _toCallTree(nodes: LogEvent[], treeLevel = 0): CalltreeRow[] | undefined {
     const len = nodes.length;
     if (!len) {
       return undefined;
@@ -989,12 +963,13 @@ export class CalltreeView extends LitElement {
       if (!node) {
         continue;
       }
-      const children = node.children.length ? this._toCallTree(node.children) : null;
+      const children = node.children.length ? this._toCallTree(node.children, treeLevel + 1) : null;
       results.push({
         id: node.timestamp + '-' + i,
         originalData: node,
         _children: children,
         text: node.text,
+        treeLevel,
         namespace: node.namespace,
         duration: node.duration,
         dmlCount: node.dmlCount,
@@ -1070,6 +1045,7 @@ interface CalltreeRow {
   originalData: LogEvent;
   _children: CalltreeRow[] | undefined | null;
   text: string;
+  treeLevel: number;
   duration: CountTotals;
   namespace: string;
   dmlCount: CountTotals;
