@@ -13,7 +13,7 @@ export class RowNavigation extends Module {
     this.registerTableFunction('goToRow', this.goToRow.bind(this));
   }
 
-  goToRow(
+  async goToRow(
     row: RowComponent,
     opts: GoToRowOptions = { scrollIfVisible: true, focusRow: true },
   ): Promise<void> {
@@ -58,30 +58,27 @@ export class RowNavigation extends Module {
       this.tableHolder.focus();
     }
 
-    return this._scrollToRow(row, opts);
+    return new Promise<void>((resolve) => {
+      // Need to wait for any pending redraws to finish before scrolling or it will not work
+      setTimeout(() => {
+        this._scrollToRow(row, opts).then(resolve);
+      });
+    });
   }
 
-  _scrollToRow(row: RowComponent, opts: GoToRowOptions): Promise<void> {
+  async _scrollToRow(row: RowComponent, opts: GoToRowOptions): Promise<void> {
     const { scrollIfVisible, focusRow } = opts;
 
-    return this.table
-      .scrollToRow(row, 'center', scrollIfVisible)
-      .catch(() => {})
-      .then(() => {
-        return new Promise<void>((resolve) => {
-          const elem = row.getElement();
+    await this.table.scrollToRow(row, 'center', scrollIfVisible);
 
-          if (scrollIfVisible || !this._isVisible(elem)) {
-            elem.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-          }
+    const elem = row.getElement();
+    if (scrollIfVisible || !this._isVisible(elem)) {
+      this._centerRow(elem);
+    }
 
-          if (focusRow) {
-            elem.focus();
-          }
-
-          resolve();
-        });
-      });
+    if (focusRow) {
+      elem.focus();
+    }
   }
 
   _isVisible(el: Element) {
@@ -91,5 +88,39 @@ export class RowNavigation extends Module {
     const holderRect = this.tableHolder.getBoundingClientRect();
     const rect = el.getBoundingClientRect();
     return rect.top >= holderRect.top && rect.bottom <= holderRect.bottom;
+  }
+
+  // TODO: Remove once fixed upstream in tabulator-tables.
+  //
+  // Tabulator bug: _addBottomRow zeroes vDomBottomPad when vDomBottom reaches the last
+  // row index — even for mid-table rows in expanded trees. This shrinks scrollHeight,
+  // clamping scrollTop so scrollToRow places the row at the viewport bottom not center.
+  // Fix: restore the minimum vDomBottomPad needed for centering, then set scrollTop
+  // directly via offsetTop.
+  _centerRow(elem: HTMLElement) {
+    if (!this.tableHolder) return;
+
+    // Only near-bottom rows have vDomBottomPad forced to 0 — skip the DOM write for
+    // all other rows where Tabulator already set it correctly.
+    const renderer = this.table.rowManager?.renderer as Record<string, unknown> | undefined;
+    if (renderer && this.tableHolder && ((renderer.vDomBottomPad as number) ?? 0) === 0) {
+      const displayRows: unknown[] = this.table.rowManager?.getDisplayRows?.() ?? [];
+      const vDomBottom = (renderer.vDomBottom as number) ?? 0;
+      const vDomRowHeight = (renderer.vDomRowHeight as number) ?? 24;
+      const truePad = Math.max(0, (displayRows.length - vDomBottom - 1) * vDomRowHeight);
+      // Cap at clientHeight/2 — the maximum extra scroll range needed to center any row.
+      // Avoids large paddingBottom values for mid-table rows. If truePad < clientHeight/2
+      // the row is genuinely near the bottom and the browser clamps naturally — no blank space.
+      const neededPad = Math.min(truePad, this.tableHolder.clientHeight / 2);
+      if (neededPad > 0) {
+        renderer.vDomBottomPad = neededPad;
+        (renderer.tableElement as HTMLElement).style.paddingBottom = `${neededPad}px`;
+      }
+    }
+
+    // Reading elem.offsetTop forces a layout flush — paddingBottom is included in
+    // scrollHeight before scrollTop is assigned.
+    const holderHeight = this.tableHolder.clientHeight;
+    this.tableHolder.scrollTop = elem.offsetTop - holderHeight / 2 + elem.offsetHeight / 2;
   }
 }
