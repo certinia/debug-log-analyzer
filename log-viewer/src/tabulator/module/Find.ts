@@ -1,7 +1,14 @@
 /*
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
-import { Module, type GroupComponent, type RowComponent, type Tabulator } from 'tabulator-tables';
+import {
+  Module,
+  type CellComponent,
+  type ColumnComponent,
+  type GroupComponent,
+  type RowComponent,
+  type Tabulator,
+} from 'tabulator-tables';
 
 type FindArgs = { text: string; count: number; options: { matchCase: boolean } };
 type GoToRowOptions = { scrollIfVisible: boolean; focusRow: boolean };
@@ -20,6 +27,18 @@ export class Find extends Module {
   _currentMatchIndex = 0;
   _matchIndexes: { [key: number]: RowComponent } = {};
 
+  // Headless formatter execution: single detached element (never in the document)
+  // and a per-row-field text cache keyed by the stable row-data object reference.
+  _mockSearchElem: HTMLElement = document.createElement('div');
+  _cellTextCache: WeakMap<object, Map<string, string>> = new WeakMap();
+
+  // Reusable mock cell — mutable fields updated before each formatter call.
+  _mcData: object = {};
+  _mcValue: unknown = undefined;
+  _mcField = '';
+  _mcColumn: ColumnComponent | null = null;
+  _mockCell: CellComponent = this._createMockCell();
+
   constructor(table: Tabulator) {
     super(table);
     // @ts-expect-error registerTableFunction() needs adding to tabulator types
@@ -30,6 +49,12 @@ export class Find extends Module {
   }
 
   initialize() {
+    // Reset the text cache whenever a new dataset is loaded so stale entries
+    // from the previous log never pollute a fresh search.
+    this.table.on('tableBuilt', () => {
+      this._cellTextCache = new WeakMap();
+    });
+
     this.table.on('renderComplete', () => {
       if (this._findArgs?.text) {
         this._applyHighlights();
@@ -110,6 +135,28 @@ export class Find extends Module {
 
     let totalMatches = 0;
     if (searchString) {
+      // Avoid row.getCells() — for uninitialized off-screen rows it calls generateCells()
+      // which creates a DOM element per cell (document.createElement). For 10k rows that
+      // is O(rows × cols) element creation before a single search character is matched.
+      // Instead iterate columnsByIndex directly, which is the same array generateCells()
+      // would use, avoiding all Cell object and DOM element creation.
+      // columnManager.getRealColumns() is internal — returns columnsByIndex, same order as getCells()
+      const internalCols: Array<{
+        field: string;
+        getComponent: () => ColumnComponent;
+        getFieldValue: (data: object) => unknown;
+        modules?: {
+          format?: {
+            formatter?: (
+              cell: CellComponent,
+              params: object,
+              onRendered: () => void,
+            ) => string | HTMLElement;
+            params?: object | ((cell: CellComponent) => object);
+          };
+        };
+      }> = this.table.columnManager?.getRealColumns?.() ?? [];
+
       const len = flattenedRows.length;
       for (let i = 0; i < len; i++) {
         const row = flattenedRows[i];
@@ -119,9 +166,31 @@ export class Find extends Module {
 
         const data = row.getData();
         data.highlightIndexes = [];
-        row.getCells().forEach((cell) => {
-          const elem = cell.getElement();
-          const matchCount = this._countMatches(elem, regex);
+
+        let rowCache = this._cellTextCache.get(data as object);
+        if (!rowCache) {
+          rowCache = new Map<string, string>();
+          this._cellTextCache.set(data as object, rowCache);
+        }
+
+        for (const col of internalCols) {
+          const field = col.field;
+          if (!field) continue;
+
+          let text = rowCache.get(field);
+          if (text === undefined) {
+            text = this._runFormatterForColumn(
+              data as object,
+              field,
+              col.getFieldValue(data as object),
+              col.getComponent(),
+              col.modules?.format,
+            );
+            rowCache.set(field, text);
+          }
+
+          regex.lastIndex = 0;
+          const matchCount = text.match(regex)?.length ?? 0;
           if (matchCount) {
             for (let k = 0; k < matchCount; k++) {
               totalMatches++;
@@ -129,7 +198,7 @@ export class Find extends Module {
               result.matchIndexes[totalMatches] = row;
             }
           }
-        });
+        }
       }
     }
 
@@ -199,31 +268,32 @@ export class Find extends Module {
       let matchIdx = 0;
       row.getCells().forEach((cell) => {
         const elem = cell.getElement();
-        this._walkTextNodes(elem, (textNode) => {
-          const text = textNode.textContent;
-          if (!text) {
-            return;
+        // Build a flat text-node map so we can create Ranges that span across
+        // adjacent elements (e.g. two <span>s whose text forms a single match).
+        const { text: fullText, nodes: textNodeMap } = this._buildTextNodeMap(elem);
+        if (!fullText) return;
+
+        regex.lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(fullText)) !== null) {
+          const highlightIndex = data.highlightIndexes?.[matchIdx];
+          matchIdx++;
+
+          const range = this._createMatchRange(
+            textNodeMap,
+            match.index,
+            match.index + match[0].length,
+          );
+          if (!range) continue;
+
+          if (highlightIndex === this._currentMatchIndex) {
+            Find._currentHighlight!.add(range);
+            this._myCurrentRanges.push(range);
+          } else {
+            Find._findHighlight!.add(range);
+            this._myFindRanges.push(range);
           }
-
-          regex.lastIndex = 0;
-          let match: RegExpExecArray | null;
-          while ((match = regex.exec(text)) !== null) {
-            const highlightIndex = data.highlightIndexes?.[matchIdx];
-            matchIdx++;
-
-            const range = new Range();
-            range.setStart(textNode, match.index);
-            range.setEnd(textNode, match.index + match[0].length);
-
-            if (highlightIndex === this._currentMatchIndex) {
-              Find._currentHighlight!.add(range);
-              this._myCurrentRanges.push(range);
-            } else {
-              Find._findHighlight!.add(range);
-              this._myFindRanges.push(range);
-            }
-          }
-        });
+        }
       });
     }
 
@@ -266,19 +336,6 @@ export class Find extends Module {
         callback(cur as Text);
       }
     }
-  }
-
-  _countMatches(elem: Node, regex: RegExp): number {
-    let count = 0;
-    this._walkTextNodes(elem, (textNode) => {
-      const text = textNode.textContent;
-      if (!text) {
-        return;
-      }
-      const match = text.match(regex);
-      count += match?.length ?? 0;
-    });
-    return count;
   }
 
   _getRenderedRows(): RowComponent[] {
@@ -337,5 +394,123 @@ export class Find extends Module {
     }
 
     return output;
+  }
+
+  // Collects all text nodes under root with their cumulative byte offsets into a
+  // flat array, plus the concatenated full text.  Used by _applyHighlights so
+  // that a single regex match can span multiple sibling elements.
+  _buildTextNodeMap(root: Node): { text: string; nodes: Array<{ node: Text; start: number }> } {
+    const nodes: Array<{ node: Text; start: number }> = [];
+    let offset = 0;
+    this._walkTextNodes(root, (textNode) => {
+      nodes.push({ node: textNode, start: offset });
+      offset += textNode.textContent?.length ?? 0;
+    });
+    return { text: nodes.map((n) => n.node.textContent ?? '').join(''), nodes };
+  }
+
+  // Creates a Range covering [matchStart, matchEnd) in the text-node map
+  // produced by _buildTextNodeMap.  Supports ranges that cross node boundaries.
+  _createMatchRange(
+    nodes: Array<{ node: Text; start: number }>,
+    matchStart: number,
+    matchEnd: number,
+  ): Range | null {
+    const range = new Range();
+    let startSet = false;
+
+    for (const { node, start } of nodes) {
+      const nodeEnd = start + (node.textContent?.length ?? 0);
+
+      if (!startSet && matchStart < nodeEnd) {
+        range.setStart(node, matchStart - start);
+        startSet = true;
+      }
+
+      if (startSet && matchEnd <= nodeEnd) {
+        range.setEnd(node, matchEnd - start);
+        return range;
+      }
+    }
+
+    return null;
+  }
+
+  // Runs the column formatter headlessly for a given row data + column, without
+  // requiring a CellComponent. This avoids row.getCells(), which triggers
+  // generateCells() and DOM element creation for every uninitialized off-screen row.
+  // Results are cached by (rowData, field) and reused on repeat searches.
+  _createMockCell(): CellComponent {
+    const mockElem = this._mockSearchElem;
+    return {
+      getElement: () => mockElem,
+      getData: () => this._mcData,
+      getValue: () => this._mcValue,
+      getInitialValue: () => this._mcValue,
+      getField: () => this._mcField,
+      getRow: () => ({ getData: () => this._mcData }) as unknown as RowComponent,
+      getColumn: () => this._mcColumn!,
+      checkHeight: () => {},
+      edit: () => {},
+      cancelEdit: () => {},
+      isEdited: () => false,
+      clearEdited: () => {},
+      isValid: () => true,
+      clearValidation: () => {},
+      validate: () => true,
+      popup: () => {},
+    } as unknown as CellComponent;
+  }
+
+  _runFormatterForColumn(
+    data: object,
+    field: string,
+    value: unknown,
+    columnComponent: ColumnComponent,
+    fmt:
+      | {
+          formatter?: (
+            cell: CellComponent,
+            params: object,
+            onRendered: () => void,
+          ) => string | HTMLElement;
+          params?: object | ((cell: CellComponent) => object);
+        }
+      | undefined,
+  ): string {
+    if (!fmt?.formatter) {
+      return String(value ?? '');
+    }
+
+    this._mcData = data;
+    this._mcValue = value;
+    this._mcField = field;
+    this._mcColumn = columnComponent;
+
+    const mockCell = this._mockCell;
+    const resolvedParams =
+      typeof fmt.params === 'function' ? fmt.params(mockCell) : (fmt.params ?? {});
+
+    let result: string | HTMLElement | undefined;
+    try {
+      const ctx: object = this.table.modules?.format ?? { table: this.table };
+      result = fmt.formatter.call(ctx, mockCell, resolvedParams, () => {});
+    } catch {
+      return String(value ?? '');
+    }
+
+    if (typeof result === 'string') {
+      if (result.includes('<') && result.includes('>')) {
+        const mockElem = this._mockSearchElem;
+        mockElem.innerHTML = result;
+        const text = mockElem.textContent ?? '';
+        mockElem.textContent = '';
+        return text;
+      }
+
+      return result;
+    }
+
+    return result?.textContent ?? '';
   }
 }
