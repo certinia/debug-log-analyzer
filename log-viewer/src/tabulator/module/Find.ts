@@ -24,6 +24,7 @@ export class Find extends Module {
   _myFindRanges: Range[] = [];
   _myCurrentRanges: Range[] = [];
   _findArgs: FindArgs | null = null;
+  _cachedRegex: RegExp | null = null;
   _currentMatchIndex = 0;
   _matchIndexes: { [key: number]: RowComponent } = {};
 
@@ -53,6 +54,10 @@ export class Find extends Module {
     // from the previous log never pollute a fresh search.
     this.table.on('tableBuilt', () => {
       this._cellTextCache = new WeakMap();
+    });
+
+    this.table.on('tableDestroyed', () => {
+      this._clearFindHighlights();
     });
 
     this.table.on('renderComplete', () => {
@@ -118,10 +123,7 @@ export class Find extends Module {
     const grps = tbl.getGroups().flatMap(flattenFromGrps);
     const flattenedRows: RowComponent[] = grps.length ? grps : this._getRows(tbl.getRows('active'));
 
-    const findOptions = findArgs.options;
-    let searchString = findOptions.matchCase ? findArgs.text : findArgs.text.toLowerCase();
-    searchString = searchString.replaceAll(/[[\]*+?{}.()^$|\\-]/g, '\\$&');
-    const regex = new RegExp(searchString, `g${findArgs.options.matchCase ? '' : 'i'}`);
+    const regex = this._buildRegex(findArgs);
 
     // Reset highlightIndexes on all rows (no reformat needed with CSS Highlight API)
     for (const row of flattenedRows) {
@@ -134,7 +136,7 @@ export class Find extends Module {
     }
 
     let totalMatches = 0;
-    if (searchString) {
+    if (regex) {
       // Avoid row.getCells() — for uninitialized off-screen rows it calls generateCells()
       // which creates a DOM element per cell (document.createElement). For 10k rows that
       // is O(rows × cols) element creation before a single search character is matched.
@@ -249,12 +251,12 @@ export class Find extends Module {
       return;
     }
 
-    const findOptions = this._findArgs.options;
-    let searchString = findOptions.matchCase
-      ? this._findArgs.text
-      : this._findArgs.text.toLowerCase();
-    searchString = searchString.replaceAll(/[[\]*+?{}.()^$|\\-]/g, '\\$&');
-    const regex = new RegExp(searchString, `g${findOptions.matchCase ? '' : 'i'}`);
+    const regex = this._cachedRegex;
+    if (!regex) {
+      CSS.highlights.set('find-match', Find._findHighlight);
+      CSS.highlights.set('current-find-match', Find._currentHighlight);
+      return;
+    }
 
     const rows = this._getRenderedRows();
     for (const row of rows) {
@@ -305,8 +307,20 @@ export class Find extends Module {
   _clearFindHighlights() {
     this._clearInstanceRanges();
     this._findArgs = null;
+    this._cachedRegex = null;
     this._currentMatchIndex = 0;
     this._matchIndexes = {};
+  }
+
+  _buildRegex(findArgs: FindArgs): RegExp | null {
+    if (!findArgs.text) {
+      this._cachedRegex = null;
+      return null;
+    }
+    let searchString = findArgs.options.matchCase ? findArgs.text : findArgs.text.toLowerCase();
+    searchString = searchString.replaceAll(/[[\]*+?{}.()^$|\\-]/g, '\\$&');
+    this._cachedRegex = new RegExp(searchString, `g${findArgs.options.matchCase ? '' : 'i'}`);
+    return this._cachedRegex;
   }
 
   _clearInstanceRanges() {
