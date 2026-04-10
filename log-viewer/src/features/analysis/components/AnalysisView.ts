@@ -126,6 +126,13 @@ export class AnalysisView extends LitElement {
     document.addEventListener('lv-find-close', this._findEvt);
   }
 
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('lv-find', this._findEvt);
+    document.removeEventListener('lv-find-match', this._findEvt);
+    document.removeEventListener('lv-find-close', this._findEvt);
+  }
+
   updated(changedProperties: PropertyValues): void {
     if (
       this.timelineRoot &&

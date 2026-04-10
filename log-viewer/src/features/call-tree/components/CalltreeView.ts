@@ -80,16 +80,25 @@ export class CalltreeView extends LitElement {
     return (this.tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
   }
 
+  private _goToRowEvt = ((e: CustomEvent) => {
+    this._goToRow(e.detail.timestamp);
+  }) as EventListener;
+
   constructor() {
     super();
 
-    document.addEventListener('calltree-go-to-row', ((e: CustomEvent) => {
-      this._goToRow(e.detail.timestamp);
-    }) as EventListener);
-
+    document.addEventListener('calltree-go-to-row', this._goToRowEvt);
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('calltree-go-to-row', this._goToRowEvt);
+    document.removeEventListener('lv-find', this._findEvt);
+    document.removeEventListener('lv-find-match', this._findEvt);
+    document.removeEventListener('lv-find-close', this._findEvt);
   }
 
   updated(changedProperties: PropertyValues): void {

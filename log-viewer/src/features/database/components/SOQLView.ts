@@ -83,6 +83,13 @@ export class SOQLView extends LitElement {
     document.addEventListener('lv-find-match', this._findEvt);
   }
 
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('lv-find', this._findEvt);
+    document.removeEventListener('lv-find-close', this._findEvt);
+    document.removeEventListener('lv-find-match', this._findEvt);
+  }
+
   updated(changedProperties: PropertyValues): void {
     if (
       this.timelineRoot &&
