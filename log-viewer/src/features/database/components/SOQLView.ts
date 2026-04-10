@@ -27,7 +27,7 @@ import Number from '../../../tabulator/format/Number.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find, formatter } from '../../../tabulator/module/Find.js';
+import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
@@ -80,6 +80,12 @@ export class SOQLView extends LitElement {
 
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('lv-find', this._findEvt);
+    document.removeEventListener('lv-find-close', this._findEvt);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -228,7 +234,7 @@ export class SOQLView extends LitElement {
     });
   }
 
-  _highlightMatches(highlightIndex: number) {
+  async _highlightMatches(highlightIndex: number) {
     if (!this.soqlTable?.element?.clientHeight) {
       return;
     }
@@ -236,17 +242,11 @@ export class SOQLView extends LitElement {
     this.findArgs.count = highlightIndex;
     const currentRow = this.findMap[highlightIndex];
     this.blockClearHighlights = true;
-    this.soqlTable.blockRedraw();
-    const rows = [currentRow, this.findMap[this.oldIndex]];
-    rows.forEach((row) => {
-      row?.reformat();
+    //@ts-expect-error This is a custom function added in by Find custom module
+    await this.soqlTable.setCurrentMatch(highlightIndex, currentRow, {
+      scrollIfVisible: false,
+      focusRow: false,
     });
-
-    if (currentRow) {
-      //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      this.soqlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
-    }
-    this.soqlTable.restoreRedraw();
     this.blockClearHighlights = false;
 
     this.oldIndex = highlightIndex;
@@ -503,10 +503,6 @@ export class SOQLView extends LitElement {
           const detailContainer = this.createSOQLDetailPanel(data.timestamp, timestampToSOQl);
           row.getElement().replaceChildren(detailContainer);
         }
-
-        requestAnimationFrame(() => {
-          formatter(row, this.findArgs);
-        });
       },
     });
 
@@ -591,13 +587,13 @@ export class SOQLView extends LitElement {
     this.findArgs.text = '';
     this.findArgs.count = 0;
     //@ts-expect-error This is a custom function added in by Find custom module
-    this.soqlTable.clearFindHighlights(Object.values(this.findMap));
+    this.soqlTable.clearFindHighlights();
     this.findMap = {};
     this.totalMatches = 0;
 
     document.dispatchEvent(
       new CustomEvent('db-find-results', {
-        detail: { totalMatches: this.totalMatches, type: 'dml' },
+        detail: { totalMatches: this.totalMatches, type: 'soql' },
       }),
     );
   }

@@ -9,7 +9,7 @@ export function progressFormatterMS(
   cell: CellComponent,
   formatterParams: ProgressParams,
   _onRendered: EmptyCallback,
-) {
+): string | HTMLElement {
   const value = (cell.getValue() || 0) / 1_000_000;
   const totalVal = formatterParams.totalValue ?? 0;
   const totalValAsMs = totalVal > 0 ? totalVal / 1_000_000 : 0;

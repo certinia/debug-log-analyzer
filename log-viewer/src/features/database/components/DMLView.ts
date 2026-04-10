@@ -21,7 +21,7 @@ import Number from '../../../tabulator/format/Number.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find, formatter } from '../../../tabulator/module/Find.js';
+import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
@@ -69,6 +69,12 @@ export class DMLView extends LitElement {
 
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('lv-find', this._findEvt);
+    document.removeEventListener('lv-find-close', this._findEvt);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -201,24 +207,19 @@ export class DMLView extends LitElement {
   }
 
   // todo: fix search on grouped data
-  _highlightMatches(highlightIndex: number) {
+  async _highlightMatches(highlightIndex: number) {
     if (!this.dmlTable?.element?.clientHeight) {
       return;
     }
 
     this.findArgs.count = highlightIndex;
     const currentRow = this.findMap[highlightIndex];
-    const rows = [currentRow, this.findMap[this.oldIndex]];
     this.blockClearHighlights = true;
-    this.dmlTable.blockRedraw();
-    rows.forEach((row) => {
-      row?.reformat();
+    //@ts-expect-error This is a custom function added in by Find custom module
+    await this.dmlTable.setCurrentMatch(highlightIndex, currentRow, {
+      scrollIfVisible: false,
+      focusRow: false,
     });
-    if (currentRow) {
-      //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      this.dmlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
-    }
-    this.dmlTable.restoreRedraw();
     this.blockClearHighlights = false;
     this.oldIndex = highlightIndex;
   }
@@ -230,10 +231,6 @@ export class DMLView extends LitElement {
     }
 
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
-    if (!isTableVisible) {
-      newFindArgs.text = '';
-    }
-
     const newSearch =
       newFindArgs.text !== this.findArgs.text ||
       newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
@@ -381,10 +378,6 @@ export class DMLView extends LitElement {
           const detailContainer = this.createDetailPanel(data.timestamp);
           row.getElement().replaceChildren(detailContainer);
         }
-
-        requestAnimationFrame(() => {
-          formatter(row, this.findArgs);
-        });
       },
     });
 
@@ -469,7 +462,7 @@ export class DMLView extends LitElement {
     this.findArgs.text = '';
     this.findArgs.count = 0;
     //@ts-expect-error This is a custom function added in by Find custom module
-    this.dmlTable.clearFindHighlights(Object.values(this.findMap));
+    this.dmlTable.clearFindHighlights();
     this.findMap = {};
     this.totalMatches = 0;
 

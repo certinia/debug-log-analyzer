@@ -24,11 +24,12 @@ import MinMaxFilter from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find, formatter } from '../../../tabulator/module/Find.js';
+import { Find } from '../../../tabulator/module/Find.js';
 import { MiddleRowFocus } from '../../../tabulator/module/MiddleRowFocus.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
+import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -79,16 +80,25 @@ export class CalltreeView extends LitElement {
     return (this.tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
   }
 
+  private _goToRowEvt = ((e: CustomEvent) => {
+    this._goToRow(e.detail.timestamp);
+  }) as EventListener;
+
   constructor() {
     super();
 
-    document.addEventListener('calltree-go-to-row', ((e: CustomEvent) => {
-      this._goToRow(e.detail.timestamp);
-    }) as EventListener);
-
+    document.addEventListener('calltree-go-to-row', this._goToRowEvt);
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('calltree-go-to-row', this._goToRowEvt);
+    document.removeEventListener('lv-find', this._findEvt);
+    document.removeEventListener('lv-find-match', this._findEvt);
+    document.removeEventListener('lv-find-close', this._findEvt);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -385,7 +395,7 @@ export class CalltreeView extends LitElement {
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
-      if (!clearHighlights) {
+      if (!clearHighlights && isTableVisible) {
         document.dispatchEvent(
           new CustomEvent('lv-find-results', { detail: { totalMatches: result.totalMatches } }),
         );
@@ -393,26 +403,16 @@ export class CalltreeView extends LitElement {
     }
 
     // Highlight the current row and reset the previous or next depending on whether we are stepping forward or back.
-    if (this.totalMatches <= 0) {
+    if (this.totalMatches <= 0 || !isTableVisible) {
       return;
     }
     this.blockClearHighlights = true;
-    this.calltreeTable?.blockRedraw();
     const currentRow = this.findMap[this.findArgs.count];
-    const rows = [
-      currentRow,
-      this.findMap[this.findArgs.count + 1],
-      this.findMap[this.findArgs.count - 1],
-    ];
-    rows.forEach((row) => {
-      row?.reformat();
+    //@ts-expect-error This is a custom function added in by Find custom module
+    await this.calltreeTable.setCurrentMatch(this.findArgs.count, currentRow, {
+      scrollIfVisible: false,
+      focusRow: false,
     });
-
-    if (currentRow) {
-      //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      this.calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
-    }
-    this.calltreeTable?.restoreRedraw();
     this.blockClearHighlights = false;
   }
 
@@ -580,7 +580,7 @@ export class CalltreeView extends LitElement {
       const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
       const governorLimits = rootMethod.governorLimits;
 
-      let childIndent;
+      const nameFormatter = createCalltreeNameFormatter(excludedTypes);
       this.calltreeTable = new Tabulator(callTreeTableContainer, {
         data: this._toCallTree(rootMethod.children),
         layout: 'fitColumns',
@@ -610,9 +610,6 @@ export class CalltreeView extends LitElement {
               return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
           }
         },
-        rowFormatter: (row: RowComponent) => {
-          formatter(row, this.findArgs);
-        },
         columnCalcs: 'both',
         columnDefaults: {
           title: 'default',
@@ -630,34 +627,7 @@ export class CalltreeView extends LitElement {
               return 'Total';
             },
             cssClass: 'datagrid-textarea datagrid-code-text',
-            formatter: (cell, _formatterParams, _onRendered) => {
-              const cellElem = cell.getElement();
-              const row = cell.getRow();
-              // @ts-expect-error: _row is private. This is temporary and I will patch the text wrap behaviour in the library.
-              const dataTree = row._row.modules.dataTree;
-              const treeLevel = dataTree?.index ?? 0;
-              childIndent ??= row.getTable().options.dataTreeChildIndent || 0;
-              const levelIndent = treeLevel * childIndent;
-              cellElem.style.paddingLeft = `${levelIndent + 4}px`;
-              cellElem.style.textIndent = `-${levelIndent}px`;
-
-              const node = (cell.getData() as CalltreeRow).originalData;
-              let text = node.text;
-              if (node.hasValidSymbols) {
-                const link = document.createElement('a');
-                link.setAttribute('href', '#!');
-                link.textContent = text;
-                return link;
-              }
-
-              if (node.type && !excludedTypes.has(node.type) && node.type !== text) {
-                text = node.type + ': ' + text;
-              }
-
-              const textSpan = document.createElement('span');
-              textSpan.textContent = text;
-              return textSpan;
-            },
+            formatter: nameFormatter,
             variableHeight: true,
             cellClick: (e, cell) => {
               const { type } = window.getSelection() ?? {};
@@ -867,7 +837,14 @@ export class CalltreeView extends LitElement {
         this.typeFilterCache.clear();
       });
 
-      this.calltreeTable.on('renderStarted', () => {
+      this.calltreeTable.on('dataSorted', () => {
+        if (!this.blockClearHighlights && this.totalMatches > 0) {
+          this._resetFindWidget();
+          this._clearSearchHighlights();
+        }
+      });
+
+      this.calltreeTable.on('dataFiltered', () => {
         if (!this.blockClearHighlights && this.totalMatches > 0) {
           this._resetFindWidget();
           this._clearSearchHighlights();
@@ -899,7 +876,7 @@ export class CalltreeView extends LitElement {
     this.findArgs.text = '';
     this.findArgs.count = 0;
     //@ts-expect-error This is a custom function added in by Find custom module
-    this.calltreeTable.clearFindHighlights(Object.values(this.findMap));
+    this.calltreeTable.clearFindHighlights();
     this.findMap = {};
     this.totalMatches = 0;
   }
@@ -983,7 +960,7 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  private _toCallTree(nodes: LogEvent[]): CalltreeRow[] | undefined {
+  private _toCallTree(nodes: LogEvent[], treeLevel = 0): CalltreeRow[] | undefined {
     const len = nodes.length;
     if (!len) {
       return undefined;
@@ -995,12 +972,13 @@ export class CalltreeView extends LitElement {
       if (!node) {
         continue;
       }
-      const children = node.children.length ? this._toCallTree(node.children) : null;
+      const children = node.children.length ? this._toCallTree(node.children, treeLevel + 1) : null;
       results.push({
         id: node.timestamp + '-' + i,
         originalData: node,
         _children: children,
         text: node.text,
+        treeLevel,
         namespace: node.namespace,
         duration: node.duration,
         dmlCount: node.dmlCount,
@@ -1076,6 +1054,7 @@ interface CalltreeRow {
   originalData: LogEvent;
   _children: CalltreeRow[] | undefined | null;
   text: string;
+  treeLevel: number;
   duration: CountTotals;
   namespace: string;
   dmlCount: CountTotals;

@@ -31,18 +31,13 @@ export const globalStyles = css`
     background-color: var(--vscode-scrollbarSlider-background);
   }
 
-  .findMatch {
-    animation-duration: 0;
-    animation-name: inherit !important;
+  ::highlight(find-match) {
     color: var(--vscode-editor-findMatchForeground);
-    background-color: var(--vscode-editor-findMatchHighlightBackground, 'yellow');
+    background-color: var(--vscode-editor-findMatchHighlightBackground, yellow);
   }
 
-  .currentFindMatch {
+  ::highlight(current-find-match) {
     color: var(--vscode-editor-findMatchHighlightForeground);
-    background-color: var(--vscode-editor-findMatchBackground, '#8B8000');
-    border: 2px solid var(--vscode-editor-findMatchBorder);
-    padding: 1px;
-    box-sizing: border-box;
+    background-color: var(--vscode-editor-findMatchBackground, #8b8000);
   }
 `;

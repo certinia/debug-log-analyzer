@@ -45,6 +45,13 @@ export class DatabaseView extends LitElement {
     document.addEventListener('lv-find', this._findHandler as EventListener);
   }
 
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('db-find-results', this._findResults as EventListener);
+    document.removeEventListener('lv-find-match', this._findHandler as EventListener);
+    document.removeEventListener('lv-find', this._findHandler as EventListener);
+  }
+
   static styles = [
     globalStyles,
     css`

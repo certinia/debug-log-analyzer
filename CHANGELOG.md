@@ -79,12 +79,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- 🎯 **Call Tree Go To**: Go-to links in call tree now navigate to method definition instead of where method was called from ([#632] [#200])
+- 🎯 **Call Tree Go To**: Go-to links in call tree now navigate to method definition instead of where method was called from. ([#632] [#200])
 - 🔍 **Search Navigation**: `Shift+Enter` navigates to the previous search result; hold `Enter` to continuously navigate.
-- ⚡ **Log Parsing**: Improved performance ([#552])
-- ✨ **Duration Formatting**: Human-readable duration formatting in tooltips (30000 ms -> 30s and 0.01 ms -> 10 µs) ([#671])
-- 🎯 **Number Precision**: Total and Self Time column precision changed to 2 decimal places for improved readability ([#671])
-- 🎨 **Navigation Bar**: Redesigned to better match VS Code’s look and feel ([#694])
+- ⚡ **Search Performance**: Up to 10x faster search on large logs. ([#627])
+- ⚡ **Log Parsing**: Improved performance. ([#552])
+- ✨ **Duration Formatting**: Human-readable duration formatting in tooltips (30000 ms -> 30s and 0.01 ms -> 10 µs). ([#671])
+- 🎯 **Number Precision**: Total and Self Time column precision changed to 2 decimal places for improved readability. ([#671])
+- 🎨 **Navigation Bar**: Redesigned to better match VS Code’s look and feel. ([#694])
 
 ## [1.18.1] 2025-07-09
 
@@ -476,6 +477,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#627]: https://github.com/certinia/debug-log-analyzer/issues/627
 [#685]: https://github.com/certinia/debug-log-analyzer/issues/685
 [#98]: https://github.com/certinia/debug-log-analyzer/issues/98
 [#204]: https://github.com/certinia/debug-log-analyzer/issues/204

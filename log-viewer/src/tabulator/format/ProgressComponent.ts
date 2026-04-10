@@ -7,7 +7,11 @@ type ProgressOptions = {
   precision?: number;
 };
 
-export function progressComponent(value: number, totalValue: number, options: ProgressOptions) {
+export function progressComponent(
+  value: number,
+  totalValue: number,
+  options: ProgressOptions,
+): string | HTMLElement {
   const { showPercentageText = true, precision = 2 } = options;
 
   const roundedValue = (value || 0).toFixed(precision);
@@ -17,18 +21,32 @@ export function progressComponent(value: number, totalValue: number, options: Pr
     const percentComplete =
       totalValue !== 0 ? (Math.round((value / totalValue) * 100) / 100) * 100 : 0;
 
-    const percentageText = showPercent ? `(${percentComplete.toFixed(2)}%)` : '';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'progress-wrapper';
 
-    const progressBarElem = `${percentComplete ? `<div class="progress-bar" style="width: ${percentComplete}%;"></div>` : ''}`;
-    const progressBarTextElem = `<div class="progress-bar__text">
-      <span>${roundedValue}</span>
-      ${showPercent ? `<span class="progress-bar__text__percent">${percentageText}</span>` : ''}
-    </div>`;
+    if (percentComplete) {
+      const bar = document.createElement('div');
+      bar.className = 'progress-bar';
+      bar.style.width = `${percentComplete}%`;
+      wrapper.appendChild(bar);
+    }
 
-    return `<div class="progress-wrapper">
-        ${progressBarElem}
-        ${progressBarTextElem}
-      </div>`;
+    const textEl = document.createElement('div');
+    textEl.className = 'progress-bar__text';
+
+    const valueSpan = document.createElement('span');
+    valueSpan.textContent = roundedValue;
+    textEl.appendChild(valueSpan);
+
+    if (showPercent) {
+      const pctSpan = document.createElement('span');
+      pctSpan.className = 'progress-bar__text__percent';
+      pctSpan.textContent = `(${percentComplete.toFixed(2)}%)`;
+      textEl.appendChild(pctSpan);
+    }
+
+    wrapper.appendChild(textEl);
+    return wrapper;
   }
 
   return roundedValue;
