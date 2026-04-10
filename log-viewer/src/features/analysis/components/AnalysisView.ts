@@ -247,14 +247,14 @@ export class AnalysisView extends LitElement {
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
-      if (!clearHighlights) {
+      if (!clearHighlights && isTableVisible) {
         document.dispatchEvent(
           new CustomEvent('lv-find-results', { detail: { totalMatches: result.totalMatches } }),
         );
       }
     }
 
-    if (this.totalMatches <= 0) {
+    if (this.totalMatches <= 0 || !isTableVisible) {
       return;
     }
     this.blockClearHighlights = true;

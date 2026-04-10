@@ -395,7 +395,7 @@ export class CalltreeView extends LitElement {
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
-      if (!clearHighlights) {
+      if (!clearHighlights && isTableVisible) {
         document.dispatchEvent(
           new CustomEvent('lv-find-results', { detail: { totalMatches: result.totalMatches } }),
         );
@@ -403,7 +403,7 @@ export class CalltreeView extends LitElement {
     }
 
     // Highlight the current row and reset the previous or next depending on whether we are stepping forward or back.
-    if (this.totalMatches <= 0) {
+    if (this.totalMatches <= 0 || !isTableVisible) {
       return;
     }
     this.blockClearHighlights = true;

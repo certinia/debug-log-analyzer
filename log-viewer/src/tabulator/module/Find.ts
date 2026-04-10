@@ -513,18 +513,24 @@ export class Find extends Module {
       return String(value ?? '');
     }
 
+    // Fall back to the raw field value when the formatter result has no
+    // extractable text. This happens for custom-element HTML strings like
+    // <call-stack> whose content renders via shadow DOM — in a detached
+    // element they never connect, so textContent is empty.
+    const fallback = String(value ?? '');
+
     if (typeof result === 'string') {
       if (result.includes('<') && result.includes('>')) {
         const mockElem = this._mockSearchElem;
         mockElem.innerHTML = result;
         const text = mockElem.textContent ?? '';
         mockElem.textContent = '';
-        return text;
+        return text || fallback;
       }
 
       return result;
     }
 
-    return result?.textContent ?? '';
+    return result?.textContent || fallback;
   }
 }

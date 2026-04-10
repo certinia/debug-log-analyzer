@@ -69,14 +69,12 @@ export class DMLView extends LitElement {
 
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
-    document.addEventListener('lv-find-match', this._findEvt);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
-    document.removeEventListener('lv-find-match', this._findEvt);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -233,10 +231,6 @@ export class DMLView extends LitElement {
     }
 
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
-    if (!isTableVisible) {
-      newFindArgs.text = '';
-    }
-
     const newSearch =
       newFindArgs.text !== this.findArgs.text ||
       newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;

@@ -80,14 +80,12 @@ export class SOQLView extends LitElement {
 
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
-    document.addEventListener('lv-find-match', this._findEvt);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
-    document.removeEventListener('lv-find-match', this._findEvt);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -595,7 +593,7 @@ export class SOQLView extends LitElement {
 
     document.dispatchEvent(
       new CustomEvent('db-find-results', {
-        detail: { totalMatches: this.totalMatches, type: 'dml' },
+        detail: { totalMatches: this.totalMatches, type: 'soql' },
       }),
     );
   }
