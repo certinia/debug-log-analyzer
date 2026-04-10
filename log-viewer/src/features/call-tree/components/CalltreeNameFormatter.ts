@@ -5,7 +5,7 @@ import type { LogEvent, LogEventType } from 'apex-log-parser';
 import type { CellComponent, EmptyCallback } from 'tabulator-tables';
 
 export function createCalltreeNameFormatter(excludedTypes: Set<LogEventType>) {
-  let childIndent: number = 9;
+  let childIndent: number;
 
   return function calltreeNameFormatter(
     cell: CellComponent,
