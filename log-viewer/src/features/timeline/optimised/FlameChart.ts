@@ -32,7 +32,6 @@ import { MeshAxisRenderer } from './time-axis/MeshAxisRenderer.js';
 
 import { TextLabelRenderer } from './TextLabelRenderer.js';
 
-import { cssColorToPixi } from './BucketColorResolver.js';
 import { HitDetector } from './interaction/HitDetector.js';
 import {
   KEYBOARD_CONSTANTS,
@@ -44,6 +43,7 @@ import { TimelineInteractionHandler } from './interaction/TimelineInteractionHan
 import { TimelineResizeHandler } from './interaction/TimelineResizeHandler.js';
 import type { MeasurementSnapshot } from './measurement/MeasurementState.js';
 import { RectangleCache, type PrecomputedRect } from './RectangleCache.js';
+import { cssColorToPixi } from './rendering/ColorUtils.js';
 import { CursorLineRenderer } from './rendering/CursorLineRenderer.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineViewport } from './TimelineViewport.js';

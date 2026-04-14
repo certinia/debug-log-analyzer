@@ -231,7 +231,7 @@ export class MeshSearchStyleRenderer {
     // Write all buckets from all categories
     for (const categoryBuckets of buckets.values()) {
       for (const bucket of categoryBuckets) {
-        const displayColor = resolveBucketSearchColor(bucket, matchIndex);
+        const displayColor = resolveBucketSearchColor(bucket, matchIndex, this.batches);
 
         this.geometry.writeRectangle(
           rectIndex,

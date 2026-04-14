@@ -186,10 +186,13 @@ export class SearchStyleRenderer {
 
         if (matchedCategoryStats.size > 0) {
           // Resolve color from matched events using priority rules
-          displayColor = resolveColor({
-            byCategory: matchedCategoryStats,
-            dominantCategory: '',
-          }).color;
+          displayColor = resolveColor(
+            {
+              byCategory: matchedCategoryStats,
+              dominantCategory: '',
+            },
+            this.batches,
+          ).color;
         } else {
           // No matches - desaturate the bucket's pre-blended color
           displayColor = colorToGreyscale(bucket.color);

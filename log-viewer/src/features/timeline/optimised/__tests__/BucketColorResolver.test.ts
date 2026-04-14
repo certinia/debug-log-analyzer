@@ -3,7 +3,7 @@
  */
 
 import type { CategoryAggregation, CategoryStats } from '../../types/flamechart.types.js';
-import { resolveColor } from '../BucketColorResolver.js';
+import { type BatchColorInfo, resolveColor } from '../BucketColorResolver.js';
 
 /**
  * Tests for BucketColorResolver - resolves bucket color from category statistics.
@@ -11,6 +11,18 @@ import { resolveColor } from '../BucketColorResolver.js';
  * Priority order: DML > SOQL > Callout > Apex > Code Unit > System > Automation > Validation
  * Tie-breakers: total duration → event count
  */
+
+/** Default theme colors used for test assertions. */
+const TEST_BATCH_COLORS: Map<string, BatchColorInfo> = new Map([
+  ['Apex', { color: 0x2b8f81 }],
+  ['Code Unit', { color: 0x88ae58 }],
+  ['System', { color: 0x8d6e63 }],
+  ['Automation', { color: 0x51a16e }],
+  ['DML', { color: 0xb06868 }],
+  ['SOQL', { color: 0x6d4c7d }],
+  ['Callout', { color: 0xcca033 }],
+  ['Validation', { color: 0x5c8fa6 }],
+]);
 
 // Helper to create CategoryStats
 function createCategoryStats(
@@ -35,7 +47,7 @@ describe('BucketColorResolver', () => {
         Apex: { count: 100, totalDuration: 10000 },
       });
 
-      const result = resolveColor(stats);
+      const result = resolveColor(stats, TEST_BATCH_COLORS);
 
       // DML color is #B06868 = 0xB06868
       expect(result.color).toBe(0xb06868);
@@ -49,7 +61,7 @@ describe('BucketColorResolver', () => {
         'Code Unit': { count: 100, totalDuration: 10000 },
       });
 
-      const result = resolveColor(stats);
+      const result = resolveColor(stats, TEST_BATCH_COLORS);
 
       // SOQL color is #6D4C7D = 0x6D4C7D
       expect(result.color).toBe(0x6d4c7d);
@@ -63,7 +75,7 @@ describe('BucketColorResolver', () => {
         System: { count: 100, totalDuration: 10000 },
       });
 
-      const result = resolveColor(stats);
+      const result = resolveColor(stats, TEST_BATCH_COLORS);
 
       // Callout color is #CCA033 = 0xCCA033
       expect(result.color).toBe(0xcca033);
@@ -77,7 +89,7 @@ describe('BucketColorResolver', () => {
         System: { count: 100, totalDuration: 10000 },
       });
 
-      const result = resolveColor(stats);
+      const result = resolveColor(stats, TEST_BATCH_COLORS);
 
       // Apex color is #2B8F81 = 0x2B8F81
       expect(result.color).toBe(0x2b8f81);
@@ -90,7 +102,7 @@ describe('BucketColorResolver', () => {
         Automation: { count: 10, totalDuration: 1000 },
       });
 
-      const result = resolveColor(stats);
+      const result = resolveColor(stats, TEST_BATCH_COLORS);
 
       // System color is #8D6E63 = 0x8D6E63
       expect(result.color).toBe(0x8d6e63);
@@ -103,7 +115,7 @@ describe('BucketColorResolver', () => {
         Validation: { count: 10, totalDuration: 1000 },
       });
 
-      const result = resolveColor(stats);
+      const result = resolveColor(stats, TEST_BATCH_COLORS);
 
       // Automation color is #51A16E = 0x51A16E
       expect(result.color).toBe(0x51a16e);
@@ -115,7 +127,7 @@ describe('BucketColorResolver', () => {
         Validation: { count: 5, totalDuration: 500 },
       });
 
-      const result = resolveColor(stats);
+      const result = resolveColor(stats, TEST_BATCH_COLORS);
 
       // Validation color is #5C8FA6 = 0x5C8FA6
       expect(result.color).toBe(0x5c8fa6);
@@ -129,7 +141,7 @@ describe('BucketColorResolver', () => {
         Apex: { count: 5, totalDuration: 1000 },
       });
 
-      const result = resolveColor(stats);
+      const result = resolveColor(stats, TEST_BATCH_COLORS);
       expect(result.dominantCategory).toBe('Apex');
     });
   });
@@ -140,7 +152,7 @@ describe('BucketColorResolver', () => {
         DML: { count: 10, totalDuration: 500 },
       });
 
-      const result = resolveColor(stats);
+      const result = resolveColor(stats, TEST_BATCH_COLORS);
       expect(result.dominantCategory).toBe('DML');
     });
   });
@@ -151,7 +163,7 @@ describe('BucketColorResolver', () => {
         UnknownCategory: { count: 5, totalDuration: 500 },
       });
 
-      const result = resolveColor(stats);
+      const result = resolveColor(stats, TEST_BATCH_COLORS);
 
       // Gray fallback is #888888 = 0x888888
       expect(result.color).toBe(0x888888);
@@ -164,7 +176,7 @@ describe('BucketColorResolver', () => {
         Automation: { count: 1, totalDuration: 100 },
       });
 
-      const result = resolveColor(stats);
+      const result = resolveColor(stats, TEST_BATCH_COLORS);
 
       // Automation is known, so it should win over unknown
       expect(result.color).toBe(0x51a16e);
@@ -179,7 +191,7 @@ describe('BucketColorResolver', () => {
         dominantCategory: '',
       };
 
-      const result = resolveColor(stats);
+      const result = resolveColor(stats, TEST_BATCH_COLORS);
 
       expect(result.color).toBe(0x888888);
       expect(result.dominantCategory).toBe('');

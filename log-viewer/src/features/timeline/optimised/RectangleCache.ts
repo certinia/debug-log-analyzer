@@ -133,11 +133,7 @@ export class RectangleCache {
     }
 
     // Pass pre-grouped rectsByDepth if available (saves ~12ms grouping iteration)
-    this.segmentTree = new TemporalSegmentTree(
-      this.rectsByCategory,
-      undefined, // batchColors
-      precomputed?.rectsByDepth,
-    );
+    this.segmentTree = new TemporalSegmentTree(this.rectsByCategory, precomputed?.rectsByDepth);
   }
 
   /**
@@ -148,14 +144,14 @@ export class RectangleCache {
    * Events <= MIN_RECT_SIZE are aggregated into time-aligned buckets.
    *
    * @param viewport - Current viewport state
-   * @param batchColors - Optional colors from RenderBatch (for theme support)
+   * @param batchColors - Theme-aware category colors for bucket color resolution
    * @returns CulledRenderData with visible rectangles, buckets, and stats
    *
    * Performance target: <5ms for 50,000 events
    */
   public getCulledRectangles(
     viewport: ViewportState,
-    batchColors?: Map<string, BatchColorInfo>,
+    batchColors: Map<string, BatchColorInfo>,
   ): CulledRenderData {
     return this.segmentTree.query(viewport, batchColors);
   }
@@ -187,17 +183,6 @@ export class RectangleCache {
       }
     }
     return this.rectMapById;
-  }
-
-  /**
-   * Update batch colors for segment tree (for theme changes).
-   *
-   * @param batchColors - New batch colors from theme
-   */
-  public setBatchColors(batchColors: Map<string, BatchColorInfo>): void {
-    if (this.segmentTree) {
-      this.segmentTree.setBatchColors(batchColors);
-    }
   }
 
   /**
