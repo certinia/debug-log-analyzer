@@ -5,9 +5,13 @@
 import type { LogCategory, LogEvent } from 'apex-log-parser';
 import type { PixelBucket, ViewportState } from '../../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../../types/flamechart.types.js';
+import type { BatchColorInfo } from '../BucketColorResolver.js';
 import { legacyCullRectangles } from '../LegacyViewportCuller.js';
 import { RectangleCache } from '../RectangleCache.js';
 import { TemporalSegmentTree } from '../TemporalSegmentTree.js';
+
+/** Empty batch colors — tests that don't assert color values use this. */
+const EMPTY_BATCH_COLORS: Map<string, BatchColorInfo> = new Map();
 
 /**
  * Tests for TemporalSegmentTree.
@@ -120,7 +124,7 @@ describe('TemporalSegmentTree', () => {
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       const viewport = createViewport(1, 0, 0);
-      const result = tree.query(viewport);
+      const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       expect(result.visibleRects.get('Apex')).toHaveLength(1);
       expect(countBuckets(result.buckets)).toBe(0);
@@ -134,7 +138,7 @@ describe('TemporalSegmentTree', () => {
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       const viewport = createViewport(1, 0, 0);
-      const result = tree.query(viewport);
+      const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // Pre-initialized map has empty arrays for known categories
       expect(result.visibleRects.get('Apex')).toHaveLength(0);
@@ -153,7 +157,7 @@ describe('TemporalSegmentTree', () => {
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       const viewport = createViewport(0.1, 0, 0);
-      const result = tree.query(viewport);
+      const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // All events should be bucketed at this zoom level
       expect(result.stats.bucketedEventCount).toBe(3);
@@ -173,11 +177,11 @@ describe('TemporalSegmentTree', () => {
 
       // Zoomed out: all events are small
       const zoomedOut = createViewport(0.1, 0, 0, 1000);
-      const resultOut = tree.query(zoomedOut);
+      const resultOut = tree.query(zoomedOut, EMPTY_BATCH_COLORS);
 
       // Zoomed in: all events are visible
       const zoomedIn = createViewport(2, 0, 0, 1000);
-      const resultIn = tree.query(zoomedIn);
+      const resultIn = tree.query(zoomedIn, EMPTY_BATCH_COLORS);
 
       // More visible rects when zoomed in
       expect(resultIn.stats.visibleCount).toBeGreaterThanOrEqual(resultOut.stats.visibleCount);
@@ -196,9 +200,9 @@ describe('TemporalSegmentTree', () => {
       const zoomed2 = createViewport(1, 0, 0, 1000);
       const zoomed3 = createViewport(10, 0, 0, 1000);
 
-      const result1 = tree.query(zoomed1);
-      const result2 = tree.query(zoomed2);
-      const result3 = tree.query(zoomed3);
+      const result1 = tree.query(zoomed1, EMPTY_BATCH_COLORS);
+      const result2 = tree.query(zoomed2, EMPTY_BATCH_COLORS);
+      const result3 = tree.query(zoomed3, EMPTY_BATCH_COLORS);
 
       // Total events (visible + bucketed) should be consistent
       const total1 = result1.stats.visibleCount + result1.stats.bucketedEventCount;
@@ -223,7 +227,7 @@ describe('TemporalSegmentTree', () => {
 
       // Viewport only shows time 50-150 (should only include second event)
       const viewport = createViewport(1, 50, 0, 100);
-      const result = tree.query(viewport);
+      const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // Only the middle event should be visible
       const totalEvents = result.stats.visibleCount + result.stats.bucketedEventCount;
@@ -248,7 +252,7 @@ describe('TemporalSegmentTree', () => {
         1000,
         TIMELINE_CONSTANTS.EVENT_HEIGHT * 2, // shows depths 0-1
       );
-      const resultSmall = tree.query(viewportSmall);
+      const resultSmall = tree.query(viewportSmall, EMPTY_BATCH_COLORS);
 
       // Create a larger viewport that shows all 3 depths
       const viewportLarge = createViewport(
@@ -258,7 +262,7 @@ describe('TemporalSegmentTree', () => {
         1000,
         TIMELINE_CONSTANTS.EVENT_HEIGHT * 4, // shows depths 0-3
       );
-      const resultLarge = tree.query(viewportLarge);
+      const resultLarge = tree.query(viewportLarge, EMPTY_BATCH_COLORS);
 
       // Smaller viewport should have fewer or equal events
       const smallTotal = resultSmall.stats.visibleCount + resultSmall.stats.bucketedEventCount;
@@ -276,7 +280,7 @@ describe('TemporalSegmentTree', () => {
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       const viewport = createViewport(1, 0, 0);
-      const result = tree.query(viewport);
+      const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       const allBuckets = getAllBuckets(result.buckets);
       expect(allBuckets).toHaveLength(1);
@@ -295,7 +299,7 @@ describe('TemporalSegmentTree', () => {
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       const viewport = createViewport(0.5, 0, 0); // threshold = 4ns
-      const result = tree.query(viewport);
+      const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // All events should be in buckets with correct count
       expect(result.stats.bucketedEventCount).toBe(3);
@@ -307,7 +311,7 @@ describe('TemporalSegmentTree', () => {
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       const viewport = createViewport(0.1, 0, 0); // threshold = 20ns
-      const result = tree.query(viewport);
+      const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // Bucket should have stats for both categories
       const allBuckets = getAllBuckets(result.buckets);
@@ -330,10 +334,14 @@ describe('TemporalSegmentTree', () => {
       // This test verifies the manager produces consistent results
       const manager = new RectangleCache(events, categories);
       const viewport = createViewport(1, 0, 0);
-      const result = manager.getCulledRectangles(viewport);
+      const result = manager.getCulledRectangles(viewport, EMPTY_BATCH_COLORS);
 
       // For comparison with legacy, use the legacy culler directly
-      const legacyResult = legacyCullRectangles(manager.getRectsByCategory(), viewport);
+      const legacyResult = legacyCullRectangles(
+        manager.getRectsByCategory(),
+        viewport,
+        EMPTY_BATCH_COLORS,
+      );
       const treeResult = result;
 
       // Same total events
@@ -361,7 +369,7 @@ describe('TemporalSegmentTree', () => {
       // Using viewport that shows time [70, 90]
       // At zoom=1, offset=70, width=20: timeStart=70, timeEnd=90
       const viewport = createViewport(1, 70, 0, 20, 500);
-      const result = tree.query(viewport);
+      const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // The long event (Method) should be visible because it spans [0, 100]
       // and overlaps with query range [70, 90]
@@ -383,7 +391,7 @@ describe('TemporalSegmentTree', () => {
 
       // Query time range [80, 120] - only overlaps with the SOQL event (timeEnd=110)
       const viewport = createViewport(1, 80, 0, 40, 500);
-      const result = tree.query(viewport);
+      const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       const totalEvents = result.stats.visibleCount + result.stats.bucketedEventCount;
       expect(totalEvents).toBe(1);
@@ -415,7 +423,7 @@ describe('TemporalSegmentTree', () => {
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       const viewport = createViewport(0.1, 0, 0); // threshold = 20ns, event = 1ns
-      const result = tree.query(viewport);
+      const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       const allBuckets = getAllBuckets(result.buckets);
       expect(allBuckets.length).toBeGreaterThan(0);
@@ -430,7 +438,7 @@ describe('TemporalSegmentTree', () => {
       const tree = new TemporalSegmentTree(manager.getRectsByCategory());
 
       const viewport = createViewport(1, 0, 0); // threshold = 2ns, event = 1ns
-      const result = tree.query(viewport);
+      const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       const allBuckets = getAllBuckets(result.buckets);
       expect(allBuckets).toHaveLength(1);
@@ -452,7 +460,7 @@ describe('TemporalSegmentTree', () => {
 
       // Zoom out so all events aggregate into one bucket
       const viewport = createViewport(0.01, 0, 0, 1000);
-      const result = tree.query(viewport);
+      const result = tree.query(viewport, EMPTY_BATCH_COLORS);
 
       // Bucket should be categorized as DML (priority 0 beats priority 1)
       // despite SOQL having more total duration (2 vs 1) and count (2 vs 1)

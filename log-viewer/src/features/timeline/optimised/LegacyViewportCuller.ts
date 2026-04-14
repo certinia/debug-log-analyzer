@@ -35,13 +35,13 @@ import { calculateViewportBounds } from './ViewportUtils.js';
  *
  * @param rectsByCategory - Spatial index of rectangles by category
  * @param viewport - Current viewport state
- * @param batchColors - Optional colors from RenderBatch (for theme support)
+ * @param batchColors - Theme-aware category colors
  * @returns CulledRenderData with visible rectangles, buckets, and stats
  */
 export function legacyCullRectangles(
   rectsByCategory: Map<string, PrecomputedRect[]>,
   viewport: ViewportState,
-  batchColors?: Map<string, BatchColorInfo>,
+  batchColors: Map<string, BatchColorInfo>,
 ): CulledRenderData {
   const bounds = calculateViewportBounds(viewport);
   const visibleRects = new Map<string, PrecomputedRect[]>();

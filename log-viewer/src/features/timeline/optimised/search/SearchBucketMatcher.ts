@@ -14,7 +14,7 @@
 
 import type { CategoryAggregation, PixelBucket } from '../../types/flamechart.types.js';
 import type { MatchedEventInfo } from '../../types/search.types.js';
-import { resolveColor } from '../BucketColorResolver.js';
+import { type BatchColorInfo, resolveColor } from '../BucketColorResolver.js';
 import { colorToGreyscale } from '../rendering/ColorUtils.js';
 
 /**
@@ -53,9 +53,14 @@ export function buildMatchIndex(
  *
  * @param bucket - The pixel bucket to resolve color for
  * @param matchIndex - Spatial index from buildMatchIndex()
+ * @param batchColors - Theme-aware category colors
  * @returns Resolved display color (0xRRGGBB)
  */
-export function resolveBucketSearchColor(bucket: PixelBucket, matchIndex: MatchesByDepth): number {
+export function resolveBucketSearchColor(
+  bucket: PixelBucket,
+  matchIndex: MatchesByDepth,
+  batchColors: Map<string, BatchColorInfo>,
+): number {
   const matchedCategoryStats = new Map<string, CategoryAggregation>();
 
   const depthMatches = matchIndex.get(bucket.depth);
@@ -77,10 +82,13 @@ export function resolveBucketSearchColor(bucket: PixelBucket, matchIndex: Matche
   }
 
   if (matchedCategoryStats.size > 0) {
-    return resolveColor({
-      byCategory: matchedCategoryStats,
-      dominantCategory: '',
-    }).color;
+    return resolveColor(
+      {
+        byCategory: matchedCategoryStats,
+        dominantCategory: '',
+      },
+      batchColors,
+    ).color;
   }
 
   return colorToGreyscale(bucket.color);

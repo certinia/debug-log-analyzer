@@ -61,7 +61,7 @@ function cullRectanglesLegacy(
   viewport: ViewportState,
 ) {
   const manager = new RectangleCache(events, categories);
-  return legacyCullRectangles(manager.getRectsByCategory(), viewport);
+  return legacyCullRectangles(manager.getRectsByCategory(), viewport, new Map());
 }
 
 // Helper to flatten buckets Map into array for testing

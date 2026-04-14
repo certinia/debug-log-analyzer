@@ -14,10 +14,14 @@
 
 import type { LogCategory, LogEvent } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
+import type { BatchColorInfo } from '../optimised/BucketColorResolver.js';
 import { EventBatchRenderer } from '../optimised/EventBatchRenderer.js';
 import { RectangleCache } from '../optimised/RectangleCache.js';
 import type { RenderBatch, ViewportState } from '../types/flamechart.types.js';
 import { TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
+
+/** Empty batch colors — tests that don't assert color values use this. */
+const EMPTY_BATCH_COLORS: Map<string, BatchColorInfo> = new Map();
 
 describe('EventBatchRenderer', () => {
   let container: PIXI.Container;
@@ -75,7 +79,10 @@ describe('EventBatchRenderer', () => {
     rectangleManager = new RectangleCache(events, categories);
     renderer = new EventBatchRenderer(container, batches);
 
-    const { visibleRects, buckets } = rectangleManager.getCulledRectangles(viewport);
+    const { visibleRects, buckets } = rectangleManager.getCulledRectangles(
+      viewport,
+      EMPTY_BATCH_COLORS,
+    );
     renderer.render(visibleRects, buckets);
   }
 
@@ -455,7 +462,7 @@ describe('EventBatchRenderer', () => {
       // Second render with different viewport (should recalculate)
       const viewport2 = createViewport(1, 150, 0); // Pan to cull first event
       const { visibleRects: visibleRects2, buckets: buckets2 } =
-        rectangleManager.getCulledRectangles(viewport2);
+        rectangleManager.getCulledRectangles(viewport2, EMPTY_BATCH_COLORS);
       renderer.render(visibleRects2, buckets2);
       expect(batches.get('Apex')?.rectangles).toHaveLength(1);
     });

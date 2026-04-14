@@ -43,11 +43,7 @@ import {
   SEGMENT_TREE_CONSTANTS,
   TIMELINE_CONSTANTS,
 } from '../types/flamechart.types.js';
-import {
-  CATEGORY_COLORS,
-  UNKNOWN_CATEGORY_COLOR,
-  type BatchColorInfo,
-} from './BucketColorResolver.js';
+import { UNKNOWN_CATEGORY_COLOR, type BatchColorInfo } from './BucketColorResolver.js';
 import type { PrecomputedRect } from './RectangleCache.js';
 import { calculateViewportBounds } from './ViewportUtils.js';
 
@@ -94,9 +90,6 @@ export class TemporalSegmentTree {
   /** Maximum depth in the tree */
   private maxDepth = 0;
 
-  /** Cached batch colors for theme support */
-  private batchColors?: Map<string, BatchColorInfo>;
-
   /**
    * Unsorted frames collected during tree construction.
    * Sorting is deferred to first getAllFramesSorted() call.
@@ -113,38 +106,26 @@ export class TemporalSegmentTree {
    * Build segment trees from pre-computed rectangles.
    *
    * @param rectsByCategory - Rectangles grouped by category (from RectangleCache)
-   * @param batchColors - Optional colors for theme support
    * @param rectsByDepth - Optional pre-grouped by depth (from unified conversion, saves ~12ms)
    */
   constructor(
     rectsByCategory: Map<string, PrecomputedRect[]>,
-    batchColors?: Map<string, BatchColorInfo>,
     rectsByDepth?: Map<number, PrecomputedRect[]>,
   ) {
-    this.batchColors = batchColors;
     this.buildTrees(rectsByCategory, rectsByDepth);
-  }
-
-  /**
-   * Update batch colors (for theme changes).
-   */
-  public setBatchColors(batchColors: Map<string, BatchColorInfo>): void {
-    this.batchColors = batchColors;
-    // Note: We don't rebuild trees - colors are resolved at query time
   }
 
   /**
    * Query the segment tree for nodes to render at current viewport.
    *
    * @param viewport - Current viewport state
-   * @param batchColors - Optional colors from RenderBatch (for theme support)
+   * @param batchColors - Theme-aware category colors for bucket color resolution
    * @returns CulledRenderData compatible with existing rendering pipeline
    */
   public query(
     viewport: ViewportState,
-    batchColors?: Map<string, BatchColorInfo>,
+    batchColors: Map<string, BatchColorInfo>,
   ): CulledRenderData {
-    const effectiveBatchColors = batchColors ?? this.batchColors;
     const bounds = calculateViewportBounds(viewport);
     // T = 2px / zoom (ns) - used for both threshold check and bucket width
     const bucketTimeWidth = BUCKET_CONSTANTS.BUCKET_WIDTH / viewport.zoom;
@@ -162,10 +143,7 @@ export class TemporalSegmentTree {
       visibleRects.set(category, []);
       bucketsByCategory.set(category, []);
       // Pre-cache base color for each known category
-      const baseColor =
-        effectiveBatchColors?.get(category)?.color ??
-        CATEGORY_COLORS[category] ??
-        UNKNOWN_CATEGORY_COLOR;
+      const baseColor = batchColors.get(category)?.color ?? UNKNOWN_CATEGORY_COLOR;
       categoryBaseColors.set(category, baseColor);
     }
 
