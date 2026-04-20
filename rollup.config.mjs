@@ -15,6 +15,22 @@ const __dirname = path.dirname(__filename);
 
 const production = process.env.NODE_ENV === 'production';
 
+/**
+ * Stubs @apexdevtools/apex-parser Check.js for browser builds.
+ * Check.js imports node:fs, node:path etc. for filesystem operations that are
+ * never used in the browser. Replace the module with an empty export.
+ */
+function stubApexParserCheck() {
+  return {
+    name: 'stub-apex-parser-check',
+    load(id) {
+      if (id.includes('@apexdevtools/apex-parser') && id.endsWith('/Check.js')) {
+        return 'export {}';
+      }
+    },
+  };
+}
+
 console.log('Package mode:', production ? 'production' : 'development');
 export default [
   {
@@ -36,7 +52,7 @@ export default [
           },
         ],
       }),
-      nodeResolve({ preferBuiltins: true }),
+      nodeResolve({ preferBuiltins: true, exportConditions: ['node'] }),
       commonjs(),
       json(),
       swc(
@@ -92,6 +108,7 @@ export default [
       },
     ],
     plugins: [
+      stubApexParserCheck(),
       alias({
         entries: [
           {

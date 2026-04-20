@@ -5,7 +5,7 @@
   "scripts": {},
   "version": "0.1.0",
   "dependencies": {
-    "@apexdevtools/apex-parser": "^4.4.0",
+    "@apexdevtools/apex-parser": "5.0.0-beta.5",
     "@vscode/codicons": "^0.0.44",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "lit": "^3.3.2",

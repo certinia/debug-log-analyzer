@@ -5,9 +5,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { ApexVisitor } from '../ApexParser/ApexVisitor';
 
-jest.mock('@apexdevtools/apex-parser');
-jest.mock('antlr4ts/tree');
-
 describe('ApexVisitor', () => {
   let visitor: ApexVisitor;
 
@@ -16,11 +13,11 @@ describe('ApexVisitor', () => {
   });
 
   describe('visitClassDeclaration', () => {
-    it('should use empty string when ident.text is null', () => {
+    it('should use empty string when ident getText returns null', () => {
       const ctx = {
         id: () => ({
-          text: null,
-          start: { charPositionInLine: 5 },
+          getText: () => null,
+          start: { column: 5 },
         }),
         children: [],
         start: { line: 1 },
@@ -32,11 +29,11 @@ describe('ApexVisitor', () => {
       expect(node.name).toBe('');
     });
 
-    it('should use 0 when charPositionInLine is null', () => {
+    it('should use 0 when column is null', () => {
       const ctx = {
         id: () => ({
-          text: 'MyClass',
-          start: { charPositionInLine: null },
+          getText: () => 'MyClass',
+          start: { column: null },
         }),
         children: [],
         start: { line: 1 },
@@ -51,13 +48,11 @@ describe('ApexVisitor', () => {
     it('should return class node with name and children', () => {
       const ctx = {
         id: () => ({
-          text: 'MyClass',
-          start: { charPositionInLine: 0 },
+          getText: () => 'MyClass',
+          start: { column: 0 },
         }),
         children: [{}],
-        get childCount() {
-          return 1;
-        },
+        getChildCount: () => 1,
         getChild: jest.fn().mockReturnValue({
           accept: jest.fn().mockReturnValue({ nature: 'Method', name: 'foo' }),
         }),
@@ -78,8 +73,8 @@ describe('ApexVisitor', () => {
     it('should handle missing Identifier', () => {
       const ctx = {
         id: () => ({
-          text: '',
-          start: { charPositionInLine: 0 },
+          getText: () => '',
+          start: { column: 0 },
         }),
         children: [],
         start: { line: 10 },
@@ -95,8 +90,8 @@ describe('ApexVisitor', () => {
     it('should handle missing children', () => {
       const ctx = {
         id: () => ({
-          text: 'NoChildren',
-          start: { charPositionInLine: 0 },
+          getText: () => 'NoChildren',
+          start: { column: 0 },
         }),
         children: undefined,
         start: { line: 15 },
@@ -110,11 +105,11 @@ describe('ApexVisitor', () => {
   });
 
   describe('visitMethodDeclaration', () => {
-    it('should use empty string when ident.text is null', () => {
+    it('should use empty string when ident getText returns null', () => {
       const ctx = {
         id: () => ({
-          text: null,
-          start: { charPositionInLine: 5 },
+          getText: () => null,
+          start: { column: 5 },
         }),
         children: [],
         formalParameters: () => ({
@@ -129,11 +124,11 @@ describe('ApexVisitor', () => {
       expect(node.name).toBe('');
     });
 
-    it('should use 0 when charPositionInLine is null', () => {
+    it('should use 0 when column is null', () => {
       const ctx = {
         id: () => ({
-          text: 'myMethod',
-          start: { charPositionInLine: null },
+          getText: () => 'myMethod',
+          start: { column: null },
         }),
         children: [],
         formalParameters: () => ({
@@ -151,15 +146,15 @@ describe('ApexVisitor', () => {
     it('should return method node with name, params, and line', () => {
       const ctx = {
         id: () => ({
-          text: 'myMethod',
-          start: { charPositionInLine: 2 },
+          getText: () => 'myMethod',
+          start: { column: 2 },
         }),
         children: [{}],
         formalParameters: () => ({
           formalParameterList: () => ({
-            formalParameter: () => [
-              { typeRef: () => ({ text: 'Integer' }) },
-              { typeRef: () => ({ text: 'String' }) },
+            formalParameter_list: () => [
+              { typeRef: () => ({ getText: () => 'Integer' }) },
+              { typeRef: () => ({ getText: () => 'String' }) },
             ],
           }),
         }),
@@ -178,8 +173,8 @@ describe('ApexVisitor', () => {
     it('should handle missing Identifier and params', () => {
       const ctx = {
         id: () => ({
-          text: '',
-          start: { charPositionInLine: 0 },
+          getText: () => '',
+          start: { column: 0 },
         }),
         children: [],
         formalParameters: () => ({
@@ -197,16 +192,16 @@ describe('ApexVisitor', () => {
   });
 
   describe('visitConstructorDeclaration', () => {
-    it('should use empty string when constructorName.text is null', () => {
+    it('should use empty string when constructorName getText returns null', () => {
       const ctx = {
         qualifiedName: () => ({
-          id: () => [{ text: null }],
+          id_list: () => [{ getText: () => null }],
         }),
         children: [],
         formalParameters: () => ({
           formalParameterList: () => undefined,
         }),
-        start: { line: 1, charPositionInLine: 5 },
+        start: { line: 1, column: 5 },
       };
       visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
 
@@ -215,16 +210,16 @@ describe('ApexVisitor', () => {
       expect(node.name).toBe('');
     });
 
-    it('should use 0 when start.charPositionInLine is null', () => {
+    it('should use 0 when start.column is null', () => {
       const ctx = {
         qualifiedName: () => ({
-          id: () => [{ text: 'MyConstructor' }],
+          id_list: () => [{ getText: () => 'MyConstructor' }],
         }),
         children: [],
         formalParameters: () => ({
           formalParameterList: () => undefined,
         }),
-        start: { line: 1, charPositionInLine: null },
+        start: { line: 1, column: null },
       };
       visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
 
@@ -236,18 +231,18 @@ describe('ApexVisitor', () => {
     it('should return constructor node with name, params, and line', () => {
       const ctx = {
         qualifiedName: () => ({
-          id: () => [{ text: 'OuterClass' }, { text: 'MyConstructor' }],
+          id_list: () => [{ getText: () => 'OuterClass' }, { getText: () => 'MyConstructor' }],
         }),
         children: [{}],
         formalParameters: () => ({
           formalParameterList: () => ({
-            formalParameter: () => [
-              { typeRef: () => ({ text: 'String' }) },
-              { typeRef: () => ({ text: 'Integer' }) },
+            formalParameter_list: () => [
+              { typeRef: () => ({ getText: () => 'String' }) },
+              { typeRef: () => ({ getText: () => 'Integer' }) },
             ],
           }),
         }),
-        start: { line: 20, charPositionInLine: 5 },
+        start: { line: 20, column: 5 },
       };
       visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
 
@@ -263,13 +258,13 @@ describe('ApexVisitor', () => {
     it('should handle constructor with no params', () => {
       const ctx = {
         qualifiedName: () => ({
-          id: () => [{ text: 'MyClass' }],
+          id_list: () => [{ getText: () => 'MyClass' }],
         }),
         children: [],
         formalParameters: () => ({
           formalParameterList: () => undefined,
         }),
-        start: { line: 10, charPositionInLine: 2 },
+        start: { line: 10, column: 2 },
       };
       visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
 
@@ -284,15 +279,19 @@ describe('ApexVisitor', () => {
     it('should handle nested class constructor', () => {
       const ctx = {
         qualifiedName: () => ({
-          id: () => [{ text: 'OuterClass' }, { text: 'InnerClass' }, { text: 'InnerClass' }],
+          id_list: () => [
+            { getText: () => 'OuterClass' },
+            { getText: () => 'InnerClass' },
+            { getText: () => 'InnerClass' },
+          ],
         }),
         children: [{}],
         formalParameters: () => ({
           formalParameterList: () => ({
-            formalParameter: () => [{ typeRef: () => ({ text: 'Boolean' }) }],
+            formalParameter_list: () => [{ typeRef: () => ({ getText: () => 'Boolean' }) }],
           }),
         }),
-        start: { line: 35, charPositionInLine: 10 },
+        start: { line: 35, column: 10 },
       };
       visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
 
@@ -340,7 +339,7 @@ describe('ApexVisitor', () => {
   describe('visitChildren', () => {
     it('should skip null nodes returned from visit', () => {
       const ctx = {
-        childCount: 2,
+        getChildCount: () => 2,
         getChild: jest.fn().mockImplementation((index: number) => ({
           accept: jest.fn().mockReturnValue(index === 0 ? null : { nature: 'Method', name: 'foo' }),
         })),
@@ -354,7 +353,7 @@ describe('ApexVisitor', () => {
 
     it('should skip undefined nodes returned from visit', () => {
       const ctx = {
-        childCount: 2,
+        getChildCount: () => 2,
         getChild: jest.fn().mockImplementation((index: number) => ({
           accept: jest
             .fn()
@@ -370,7 +369,7 @@ describe('ApexVisitor', () => {
 
     it('should process multiple valid nodes', () => {
       const ctx = {
-        childCount: 3,
+        getChildCount: () => 3,
         getChild: jest.fn().mockImplementation((index: number) => ({
           accept: jest.fn().mockReturnValue({ nature: 'Method', name: `method${index}` }),
         })),
@@ -384,7 +383,7 @@ describe('ApexVisitor', () => {
     it('should flatten children from non-anon nodes (nodes without nature)', () => {
       // A node without 'nature' should have its children extracted
       const ctx = {
-        childCount: 1,
+        getChildCount: () => 1,
         getChild: jest.fn().mockReturnValue({
           accept: jest.fn().mockReturnValue({
             // No nature property - this is a "non-anon" wrapper node
@@ -406,7 +405,7 @@ describe('ApexVisitor', () => {
 
     it('should handle non-anon nodes with empty children array', () => {
       const ctx = {
-        childCount: 1,
+        getChildCount: () => 1,
         getChild: jest.fn().mockReturnValue({
           accept: jest.fn().mockReturnValue({
             // No nature, empty children
@@ -422,7 +421,7 @@ describe('ApexVisitor', () => {
 
     it('should handle non-anon nodes with no children property', () => {
       const ctx = {
-        childCount: 1,
+        getChildCount: () => 1,
         getChild: jest.fn().mockReturnValue({
           accept: jest.fn().mockReturnValue({
             // No nature, no children property
@@ -439,7 +438,7 @@ describe('ApexVisitor', () => {
 
     it('should handle mix of anon and non-anon nodes', () => {
       const ctx = {
-        childCount: 2,
+        getChildCount: () => 2,
         getChild: jest.fn().mockImplementation((index: number) => ({
           accept: jest.fn().mockReturnValue(
             index === 0
