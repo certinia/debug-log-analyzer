@@ -174,15 +174,17 @@ export class CalltreeView extends LitElement {
         flex-flow: column nowrap;
         align-items: flex-start;
         justify-content: flex-start;
-      }
 
-      .dropdown-container label {
-        display: block;
-        color: var(--vscode-foreground);
-        cursor: pointer;
-        font-size: var(--vscode-font-size);
-        line-height: normal;
-        margin-bottom: 2px;
+        label {
+          display: block;
+          color: var(--vscode-descriptionForeground);
+          cursor: pointer;
+          font-size: calc(var(--vscode-font-size) * 0.9);
+          font-weight: 400;
+          line-height: 1.4;
+          margin-bottom: 4px;
+          user-select: none;
+        }
       }
 
       vscode-dropdown::part(listbox) {
@@ -225,6 +227,15 @@ export class CalltreeView extends LitElement {
         height: 100%;
         width: 100%;
       }
+
+      .table-host {
+        height: 100%;
+        width: 100%;
+      }
+
+      .table-host.is-hidden {
+        display: none;
+      }
     `,
   ];
 
@@ -263,6 +274,18 @@ export class CalltreeView extends LitElement {
               >
             </div>
 
+            ${this.viewMode === 'bottom-up'
+              ? html`
+                  <div class="dropdown-container">
+                    <label for="bottomup-groupby">Group by:</label>
+                    <vscode-dropdown id="bottomup-groupby" @change="${this._handleBottomUpGroupBy}">
+                      <vscode-option>None</vscode-option>
+                      <vscode-option>Namespace</vscode-option>
+                      <vscode-option>Type</vscode-option>
+                    </vscode-dropdown>
+                  </div>
+                `
+              : ''}
             ${isTimeOrder
               ? html`
                   <div class="filter-container align__end">
@@ -294,11 +317,15 @@ export class CalltreeView extends LitElement {
 
         <div id="call-tree-table-container">
           ${skeleton}
-          ${this.viewMode === 'time-order'
-            ? html`<div id="call-tree-table"></div>`
-            : this.viewMode === 'aggregated'
-              ? html`<div id="aggregated-tree-table"></div>`
-              : html`<div id="bottom-up-tree-table"></div>`}
+          <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
+            <div id="call-tree-table"></div>
+          </div>
+          <div class="table-host ${this.viewMode === 'aggregated' ? '' : 'is-hidden'}">
+            <div id="aggregated-tree-table"></div>
+          </div>
+          <div class="table-host ${this.viewMode === 'bottom-up' ? '' : 'is-hidden'}">
+            <div id="bottom-up-tree-table"></div>
+          </div>
         </div>
         <context-menu @menu-select="${this._handleContextMenuSelect}"></context-menu>
       </div>
@@ -350,32 +377,41 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    this._destroyCurrentTable();
     this.viewMode = newMode;
 
-    this.updateComplete.then(() => {
+    this.updateComplete.then(async () => {
       if (!this.rootMethod) {
         return;
       }
 
       if (this.viewMode === 'time-order') {
-        const container = this.renderRoot?.querySelector('#call-tree-table') as HTMLDivElement;
-        if (container) {
-          this._renderCallTree(container, this.rootMethod);
+        if (!this.calltreeTable) {
+          const container = this.renderRoot?.querySelector<HTMLDivElement>('#call-tree-table');
+          if (container) {
+            await this._renderCallTree(container, this.rootMethod);
+          }
         }
       } else if (this.viewMode === 'aggregated') {
-        const container = this.renderRoot?.querySelector(
-          '#aggregated-tree-table',
-        ) as HTMLDivElement;
-        if (container) {
-          this._renderAggregatedTree(container, this.rootMethod);
+        if (!this.aggregatedTreeTable) {
+          const container =
+            this.renderRoot?.querySelector<HTMLDivElement>('#aggregated-tree-table');
+          if (container) {
+            this._renderAggregatedTree(container, this.rootMethod);
+          }
         }
       } else if (this.viewMode === 'bottom-up') {
-        const container = this.renderRoot?.querySelector('#bottom-up-tree-table') as HTMLDivElement;
-        if (container) {
-          this._renderBottomUpTree(container, this.rootMethod);
+        if (!this.bottomUpTreeTable) {
+          const container = this.renderRoot?.querySelector<HTMLDivElement>('#bottom-up-tree-table');
+          if (container) {
+            this._renderBottomUpTree(container, this.rootMethod);
+          }
         }
       }
+
+      // const activeTable = this._getActiveTable();
+      // if (activeTable) {
+      //   requestAnimationFrame(() => activeTable.redraw(true));
+      // }
     });
   }
 
@@ -391,6 +427,15 @@ export class CalltreeView extends LitElement {
     if (this.bottomUpTreeTable) {
       this.bottomUpTreeTable.destroy();
       this.bottomUpTreeTable = null;
+    }
+  }
+
+  _handleBottomUpGroupBy(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const fieldName = target.value.toLowerCase();
+    if (this.bottomUpTreeTable) {
+      // @ts-expect-error setSortedGroupBy is added by the GroupSort custom module
+      this.bottomUpTreeTable.setSortedGroupBy(fieldName !== 'none' ? fieldName : '');
     }
   }
 
@@ -487,7 +532,6 @@ export class CalltreeView extends LitElement {
     document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
 
     if (this.viewMode !== 'time-order') {
-      this._destroyCurrentTable();
       this.viewMode = 'time-order';
       await this.updateComplete;
     }

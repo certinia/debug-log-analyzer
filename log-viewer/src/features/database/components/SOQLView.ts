@@ -135,11 +135,13 @@ export class SOQLView extends LitElement {
 
         label {
           display: block;
-          color: var(--vscode-foreground);
+          color: var(--vscode-descriptionForeground);
           cursor: pointer;
-          font-size: var(--vscode-font-size);
-          line-height: normal;
-          margin-bottom: 2px;
+          font-size: calc(var(--vscode-font-size) * 0.9);
+          font-weight: 400;
+          line-height: 1.4;
+          margin-bottom: 4px;
+          user-select: none;
         }
       }
     `,
@@ -152,8 +154,13 @@ export class SOQLView extends LitElement {
 
       <datagrid-filter-bar>
         <div slot="filters" class="dropdown-container">
-          <label for="soql-groupby-dropdown"><strong>Group by</strong></label>
-          <vscode-dropdown id="soql-groupby-dropdown" @change="${this._soqlGroupBy}">
+          <label for="soql-groupby-dropdown">Group by</label>
+          <vscode-dropdown
+            id="soql-groupby-dropdown"
+            aria-label="Group by"
+            aria-labelledby="soql-groupby-dropdown"
+            @change="${this._soqlGroupBy}"
+          >
             <vscode-option>SOQL</vscode-option>
             <vscode-option>Namespace</vscode-option>
             <vscode-option>None</vscode-option>

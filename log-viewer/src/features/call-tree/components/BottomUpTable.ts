@@ -9,6 +9,8 @@ import { formatDuration } from '../../../core/utility/Util.js';
 import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
 import MinMaxFilter from '../../../tabulator/filters/MinMax.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
+import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
+import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import { sumDurationTotalForRootEvents } from '../../analysis/services/CallStackSum.js';
 import { toBottomUpTree, type BottomUpRow } from '../utils/Aggregation.js';
 import {
@@ -26,6 +28,7 @@ export function createBottomUpTable(
   callbacks: TableCallbacks,
 ): Tabulator {
   registerTableModules();
+  Tabulator.registerModule([GroupCalcs, GroupSort]);
 
   const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
   const nameFormatter = createCalltreeNameFormatter(excludedTypes);
@@ -52,7 +55,12 @@ export function createBottomUpTable(
     selectableRows: 1,
     initialSort: [{ column: 'totalSelfTime', dir: 'desc' }],
     headerSortElement,
-    columnCalcs: 'both',
+    columnCalcs: 'table',
+    groupCalcs: true,
+    groupSort: true,
+    groupClosedShowCalcs: true,
+    groupStartOpen: false,
+    groupToggleElement: 'header',
     columnDefaults: commonColumnDefaults,
     columns: [
       {

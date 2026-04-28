@@ -94,11 +94,13 @@ export class AnalysisView extends LitElement {
 
         label {
           display: block;
-          color: var(--vscode-foreground);
+          color: var(--vscode-descriptionForeground);
           cursor: pointer;
-          font-size: var(--vscode-font-size);
-          line-height: normal;
-          margin-bottom: 2px;
+          font-size: calc(var(--vscode-font-size) * 0.9);
+          font-weight: 400;
+          line-height: 1.4;
+          margin-bottom: 4px;
+          user-select: none;
         }
       }
     `,
@@ -150,8 +152,13 @@ export class AnalysisView extends LitElement {
       <div class="analysis-view">
         <datagrid-filter-bar>
           <div slot="filters" class="dropdown-container">
-            <label for="groupby-dropdown"><strong>Group by</strong></label>
-            <vscode-dropdown id="groupby-dropdown" @change="${this._groupBy}">
+            <label id="groupby-dropdown-label" for="groupby-dropdown">Group by</label>
+            <vscode-dropdown
+              id="groupby-dropdown"
+              aria-label="Group by"
+              aria-labelledby="groupby-dropdown-label"
+              @change="${this._groupBy}"
+            >
               <vscode-option>None</vscode-option>
               <vscode-option>Namespace</vscode-option>
               <vscode-option>Type</vscode-option>
