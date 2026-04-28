@@ -113,7 +113,7 @@ export function createTimeOrderTable(
         cssClass: 'number-cell',
         width: 70,
         minWidth: 60,
-        bottomCalc: 'max',
+        bottomCalc: 'sum',
         bottomCalcFormatter: progressFormatter,
         bottomCalcFormatterParams: {
           precision: 0,
@@ -140,7 +140,7 @@ export function createTimeOrderTable(
         cssClass: 'number-cell',
         width: 70,
         minWidth: 60,
-        bottomCalc: 'max',
+        bottomCalc: 'sum',
         bottomCalcFormatter: progressFormatter,
         bottomCalcFormatterParams: {
           precision: 0,
@@ -168,7 +168,7 @@ export function createTimeOrderTable(
         width: 60,
         hozAlign: 'right',
         headerHozAlign: 'right',
-        bottomCalc: 'max',
+        bottomCalc: 'sum',
       },
       {
         title: 'DML Rows',
@@ -176,7 +176,7 @@ export function createTimeOrderTable(
         sorter: 'number',
         cssClass: 'number-cell',
         width: 60,
-        bottomCalc: 'max',
+        bottomCalc: 'sum',
         bottomCalcFormatter: progressFormatter,
         bottomCalcFormatterParams: {
           precision: 0,
@@ -202,7 +202,7 @@ export function createTimeOrderTable(
         sorter: 'number',
         cssClass: 'number-cell',
         width: 60,
-        bottomCalc: 'max',
+        bottomCalc: 'sum',
         bottomCalcFormatter: progressFormatter,
         bottomCalcFormatterParams: {
           precision: 0,
