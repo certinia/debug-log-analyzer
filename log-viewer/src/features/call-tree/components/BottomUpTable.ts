@@ -26,7 +26,7 @@ export function createBottomUpTable(
   container: HTMLDivElement,
   rootMethod: ApexLog,
   callbacks: TableCallbacks,
-): Tabulator {
+): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
   Tabulator.registerModule([GroupCalcs, GroupSort]);
 
@@ -177,5 +177,11 @@ export function createBottomUpTable(
     callbacks.onRenderStarted();
   });
 
-  return table;
+  const tableBuilt = new Promise<void>((resolve) => {
+    table.on('tableBuilt', () => {
+      resolve();
+    });
+  });
+
+  return { table, tableBuilt };
 }

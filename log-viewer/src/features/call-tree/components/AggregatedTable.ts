@@ -23,7 +23,7 @@ export function createAggregatedTable(
   container: HTMLDivElement,
   rootMethod: ApexLog,
   callbacks: TableCallbacks,
-): Tabulator {
+): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
 
   const namespaceFilterCache = new Map<string, boolean>();
@@ -309,5 +309,11 @@ export function createAggregatedTable(
     callbacks.onRenderStarted();
   });
 
-  return table;
+  const tableBuilt = new Promise<void>((resolve) => {
+    table.on('tableBuilt', () => {
+      resolve();
+    });
+  });
+
+  return { table, tableBuilt };
 }

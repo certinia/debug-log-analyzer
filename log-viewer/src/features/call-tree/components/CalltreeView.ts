@@ -87,6 +87,7 @@ export class CalltreeView extends LitElement {
 
   private contextMenu: ContextMenu | null = null;
   private contextMenuRow: MergedCalltreeRow | null = null;
+  private viewSwitchEpoch = 0;
 
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (this.tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
@@ -111,6 +112,7 @@ export class CalltreeView extends LitElement {
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
+    this._destroyCurrentTable();
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -152,6 +154,7 @@ export class CalltreeView extends LitElement {
         width: 100%;
         min-height: 0;
         min-width: 0;
+        position: relative;
       }
 
       .header-bar {
@@ -231,10 +234,14 @@ export class CalltreeView extends LitElement {
       .table-host {
         height: 100%;
         width: 100%;
+        position: absolute;
+        inset: 0;
       }
 
       .table-host.is-hidden {
-        display: none;
+        visibility: hidden;
+        opacity: 0;
+        pointer-events: none;
       }
     `,
   ];
@@ -372,47 +379,40 @@ export class CalltreeView extends LitElement {
     this._updateFiltering();
   }
 
-  _setViewMode(newMode: ViewMode) {
+  async _setViewMode(newMode: ViewMode): Promise<void> {
     if (newMode === this.viewMode) {
       return;
     }
 
+    const switchEpoch = ++this.viewSwitchEpoch;
     this.viewMode = newMode;
+    await this.updateComplete;
+    await this._waitForNextFrame();
 
-    this.updateComplete.then(async () => {
-      if (!this.rootMethod) {
-        return;
+    if (switchEpoch !== this.viewSwitchEpoch || !this.rootMethod) {
+      return;
+    }
+
+    if (this.viewMode === 'time-order') {
+      const container = this.renderRoot?.querySelector<HTMLDivElement>('#call-tree-table');
+      if (container) {
+        await this._renderCallTree(container, this.rootMethod);
       }
-
-      if (this.viewMode === 'time-order') {
-        if (!this.calltreeTable) {
-          const container = this.renderRoot?.querySelector<HTMLDivElement>('#call-tree-table');
-          if (container) {
-            await this._renderCallTree(container, this.rootMethod);
-          }
-        }
-      } else if (this.viewMode === 'aggregated') {
-        if (!this.aggregatedTreeTable) {
-          const container =
-            this.renderRoot?.querySelector<HTMLDivElement>('#aggregated-tree-table');
-          if (container) {
-            this._renderAggregatedTree(container, this.rootMethod);
-          }
-        }
-      } else if (this.viewMode === 'bottom-up') {
-        if (!this.bottomUpTreeTable) {
-          const container = this.renderRoot?.querySelector<HTMLDivElement>('#bottom-up-tree-table');
-          if (container) {
-            this._renderBottomUpTree(container, this.rootMethod);
-          }
-        }
+    } else if (this.viewMode === 'aggregated') {
+      const container = this.renderRoot?.querySelector<HTMLDivElement>('#aggregated-tree-table');
+      if (container) {
+        await this._renderAggregatedTree(container, this.rootMethod);
       }
+    } else if (this.viewMode === 'bottom-up') {
+      const container = this.renderRoot?.querySelector<HTMLDivElement>('#bottom-up-tree-table');
+      if (container) {
+        await this._renderBottomUpTree(container, this.rootMethod);
+      }
+    }
 
-      // const activeTable = this._getActiveTable();
-      // if (activeTable) {
-      //   requestAnimationFrame(() => activeTable.redraw(true));
-      // }
-    });
+    if (switchEpoch !== this.viewSwitchEpoch) {
+      return;
+    }
   }
 
   private _destroyCurrentTable(): void {
@@ -520,7 +520,7 @@ export class CalltreeView extends LitElement {
     isVisible(this).then((isVisible) => {
       this.isVisible = isVisible;
       if (this.rootMethod && this._callTreeTableWrapper) {
-        this._renderCallTree(this._callTreeTableWrapper, this.rootMethod);
+        void this._renderCallTree(this._callTreeTableWrapper, this.rootMethod);
       }
     });
   }
@@ -764,23 +764,8 @@ export class CalltreeView extends LitElement {
     rootMethod: ApexLog,
   ): Promise<void> {
     if (this.calltreeTable) {
-      await new Promise((resolve, reject) => {
-        const visibilityObserver = new IntersectionObserver(
-          (entries, observer) => {
-            const entry = entries[0];
-            const visible = entry?.isIntersecting && entry?.intersectionRatio > 0;
-            if (visible) {
-              resolve(true);
-              observer.disconnect();
-            } else {
-              reject();
-            }
-          },
-          { threshold: 1 },
-        );
-        visibilityObserver.observe(callTreeTableContainer);
-      });
-      return new Promise((resolve) => setTimeout(resolve));
+      await this._waitForNextFrame();
+      return;
     }
 
     const { table, tableBuilt } = createTimeOrderTable(callTreeTableContainer, rootMethod, {
@@ -807,16 +792,19 @@ export class CalltreeView extends LitElement {
       },
     });
     this.calltreeTable = table;
-    return tableBuilt;
+    await tableBuilt;
   }
 
-  private _renderAggregatedTree(container: HTMLDivElement, rootMethod: ApexLog): void {
+  private async _renderAggregatedTree(
+    container: HTMLDivElement,
+    rootMethod: ApexLog,
+  ): Promise<void> {
     if (this.aggregatedTreeTable) {
-      this.aggregatedTreeTable.destroy();
-      this.aggregatedTreeTable = null;
+      await this._waitForNextFrame();
+      return;
     }
 
-    this.aggregatedTreeTable = createAggregatedTable(container, rootMethod, {
+    const { table, tableBuilt } = createAggregatedTable(container, rootMethod, {
       namespaceFilter: this._namespaceFilter,
       onFilterCacheClear: () => {},
       onRenderStarted: () => {
@@ -826,15 +814,17 @@ export class CalltreeView extends LitElement {
         }
       },
     });
+    this.aggregatedTreeTable = table;
+    await tableBuilt;
   }
 
-  private _renderBottomUpTree(container: HTMLDivElement, rootMethod: ApexLog): void {
+  private async _renderBottomUpTree(container: HTMLDivElement, rootMethod: ApexLog): Promise<void> {
     if (this.bottomUpTreeTable) {
-      this.bottomUpTreeTable.destroy();
-      this.bottomUpTreeTable = null;
+      await this._waitForNextFrame();
+      return;
     }
 
-    this.bottomUpTreeTable = createBottomUpTable(container, rootMethod, {
+    const { table, tableBuilt } = createBottomUpTable(container, rootMethod, {
       namespaceFilter: this._namespaceFilter,
       onFilterCacheClear: () => {},
       onRenderStarted: () => {
@@ -843,6 +833,14 @@ export class CalltreeView extends LitElement {
           this._clearSearchHighlights();
         }
       },
+    });
+    this.bottomUpTreeTable = table;
+    await tableBuilt;
+  }
+
+  private _waitForNextFrame(): Promise<void> {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => resolve());
     });
   }
 
