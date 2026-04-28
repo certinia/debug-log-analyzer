@@ -16,10 +16,8 @@ export function progressComponent(
 
   const roundedValue = (value || 0).toFixed(precision);
 
-  if (totalValue !== undefined && totalValue !== null) {
-    const showPercent = showPercentageText ?? true;
-    const percentComplete =
-      totalValue !== 0 ? (Math.round((value / totalValue) * 100) / 100) * 100 : 0;
+  if (totalValue !== null && totalValue !== undefined) {
+    const percentComplete = totalValue !== 0 ? Math.round((value / totalValue) * 100) : 0;
 
     const wrapper = document.createElement('div');
     wrapper.className = 'progress-wrapper';
@@ -38,7 +36,7 @@ export function progressComponent(
     valueSpan.textContent = roundedValue;
     textEl.appendChild(valueSpan);
 
-    if (showPercent) {
+    if (showPercentageText) {
       const pctSpan = document.createElement('span');
       pctSpan.className = 'progress-bar__text__percent';
       pctSpan.textContent = `(${percentComplete.toFixed(2)}%)`;
