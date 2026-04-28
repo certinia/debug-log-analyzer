@@ -51,7 +51,6 @@ export function createTimeOrderTable(
     placeholder: 'No Call Tree Available',
     height: '100%',
     maxHeight: '100%',
-    persistence: true,
     //  custom property for datagrid/module/RowKeyboardNavigation
     rowKeyboardNavigation: true,
     //  custom property for module/MiddleRowFocus
