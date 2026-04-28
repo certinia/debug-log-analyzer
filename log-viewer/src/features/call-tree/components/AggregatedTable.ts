@@ -154,6 +154,10 @@ export function createAggregatedTable(
         },
         hozAlign: 'right',
         headerHozAlign: 'right',
+        tooltip(_event, cell, _onRender) {
+          const maxDmlStatements = rootMethod.governorLimits.dmlStatements.limit;
+          return cell.getValue() + (maxDmlStatements > 0 ? '/' + maxDmlStatements : '');
+        },
       },
       {
         title: 'SOQL Count',
@@ -177,6 +181,72 @@ export function createAggregatedTable(
         },
         hozAlign: 'right',
         headerHozAlign: 'right',
+        tooltip(_event, cell, _onRender) {
+          const maxSoql = rootMethod.governorLimits.soqlQueries.limit;
+          return cell.getValue() + (maxSoql > 0 ? '/' + maxSoql : '');
+        },
+      },
+      {
+        title: 'Throws Count',
+        field: 'totalThrownCount',
+        sorter: 'number',
+        cssClass: 'number-cell',
+        width: 60,
+        hozAlign: 'right',
+        headerHozAlign: 'right',
+        bottomCalc: 'sum',
+      },
+      {
+        title: 'DML Rows',
+        field: 'dmlRowCount.total',
+        sorter: 'number',
+        cssClass: 'number-cell',
+        width: 60,
+        bottomCalc: 'sum',
+        bottomCalcFormatter: progressFormatter,
+        bottomCalcFormatterParams: {
+          precision: 0,
+          totalValue: rootMethod.governorLimits.dmlRows.limit,
+          showPercentageText: false,
+        },
+        formatter: progressFormatter,
+        formatterParams: {
+          precision: 0,
+          totalValue: rootMethod.governorLimits.dmlRows.limit,
+          showPercentageText: false,
+        },
+        hozAlign: 'right',
+        headerHozAlign: 'right',
+        tooltip(_event, cell, _onRender) {
+          const maxDmlRows = rootMethod.governorLimits.dmlRows.limit;
+          return cell.getValue() + (maxDmlRows > 0 ? '/' + maxDmlRows : '');
+        },
+      },
+      {
+        title: 'SOQL Rows',
+        field: 'soqlRowCount.total',
+        sorter: 'number',
+        cssClass: 'number-cell',
+        width: 60,
+        bottomCalc: 'sum',
+        bottomCalcFormatter: progressFormatter,
+        bottomCalcFormatterParams: {
+          precision: 0,
+          totalValue: rootMethod.governorLimits.queryRows.limit,
+          showPercentageText: false,
+        },
+        formatter: progressFormatter,
+        formatterParams: {
+          precision: 0,
+          totalValue: rootMethod.governorLimits.queryRows.limit,
+          showPercentageText: false,
+        },
+        hozAlign: 'right',
+        headerHozAlign: 'right',
+        tooltip(_event, cell, _onRender) {
+          const maxQueryRows = rootMethod.governorLimits.queryRows.limit;
+          return cell.getValue() + (maxQueryRows > 0 ? '/' + maxQueryRows : '');
+        },
       },
       {
         title: 'Total Time (ms)',
