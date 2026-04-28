@@ -224,22 +224,6 @@ export function createAggregatedTable(
         headerFilterLiveFilter: false,
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
-      {
-        title: 'Avg Self (ms)',
-        field: 'avgSelfTime',
-        sorter: 'number',
-        headerSortTristate: true,
-        width: 110,
-        minWidth: 90,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        formatter: progressFormatterMS,
-        formatterParams: {
-          precision: 2,
-          totalValue: rootMethod.duration.total,
-        },
-        tooltip: (_event, cell) => formatDuration(cell.getValue()),
-      },
     ],
   });
   tableRef.current = table;
