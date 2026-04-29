@@ -2,7 +2,7 @@
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
 import type { ApexLog, LogEventType } from 'apex-log-parser';
-import { Tabulator } from 'tabulator-tables';
+import { Tabulator, type Options } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
@@ -22,10 +22,35 @@ import {
 
 import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
 
+export type BottomUpTableOptions = Partial<Options> & {
+  enableClipboardAndDownload?: boolean;
+  exportFileName?: string;
+};
+
+type VSCodeSaveFile = {
+  fileContent: string;
+  options: { defaultFileName: string };
+};
+
+function createDownloadEncoder(defaultFileName: string) {
+  return function (fileContents: string, mimeType: string) {
+    const vscodeHost = vscodeMessenger.getVsCodeAPI();
+    if (vscodeHost) {
+      vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
+        fileContent: fileContents,
+        options: { defaultFileName },
+      });
+      return false;
+    }
+    return new Blob([fileContents], { type: mimeType });
+  };
+}
+
 export function createBottomUpTable(
   container: HTMLDivElement,
   rootMethod: ApexLog,
   callbacks: TableCallbacks,
+  options: BottomUpTableOptions = {},
 ): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
   Tabulator.registerModule([GroupCalcs, GroupSort]);
@@ -39,20 +64,43 @@ export function createBottomUpTable(
     _calcParams: unknown,
   ): number => sumDurationTotalForRootEvents(data.map((row) => row.instances));
 
-  const table = new Tabulator(container, {
+  const { enableClipboardAndDownload, exportFileName, ...tabulatorOptionOverrides } = options;
+
+  // @ts-expect-error tabulator typings are behind runtime support for keybindings
+  const clipboardAndDownloadOptions: Partial<Options> = enableClipboardAndDownload
+    ? {
+        clipboard: true,
+        clipboardCopyConfig: {
+          dataTree: false,
+        },
+        downloadEncoder: createDownloadEncoder(exportFileName ?? 'analysis.csv'),
+        downloadRowRange: 'all',
+        downloadConfig: {
+          columnHeaders: true,
+          columnGroups: true,
+          rowGroups: true,
+          columnCalcs: false,
+          dataTree: true,
+        },
+        clipboardCopyRowRange: 'all',
+        keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
+      }
+    : {};
+
+  const tabulatorOptions = {
     data: toBottomUpTree(rootMethod.children),
     layout: 'fitColumns',
-    placeholder: 'No Call Tree Available',
+    placeholder: options.placeholder ?? 'No Call Tree Available',
     height: '100%',
     maxHeight: '100%',
-    // @ts-expect-error custom property for module/RowKeyboardNavigation + MiddleRowFocus
     rowKeyboardNavigation: true,
     middleRowFocus: true,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',
     tooltipDelay: 100,
-    selectableRows: 1,
+    selectableRows: options.selectableRows ?? 1,
+    ...clipboardAndDownloadOptions,
     initialSort: [{ column: 'totalSelfTime', dir: 'desc' }],
     headerSortElement,
     columnCalcs: 'table',
@@ -62,6 +110,10 @@ export function createBottomUpTable(
     groupStartOpen: false,
     groupToggleElement: 'header',
     columnDefaults: commonColumnDefaults,
+  } as Options;
+
+  const table = new Tabulator(container, {
+    ...tabulatorOptions,
     columns: [
       {
         title: 'Name',
@@ -167,6 +219,7 @@ export function createBottomUpTable(
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
     ],
+    ...tabulatorOptionOverrides,
   });
 
   table.on('dataFiltered', () => {
