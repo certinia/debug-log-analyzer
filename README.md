@@ -103,6 +103,7 @@ Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail,
 Explore nested method calls with performance metrics:
 
 - **Metrics**: Self Time, Total Time, SOQL/DML/Thrown Counts, SOQL/DML/Rows
+- **Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution
 - **Filter by Namespace, Type or Duration**
 - **Toggle Debug-Only + Detail Events**
 - **Keyboard Navigation**
