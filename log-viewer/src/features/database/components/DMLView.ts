@@ -126,7 +126,7 @@ export class DMLView extends LitElement {
 
       <datagrid-filter-bar>
         <div slot="filters">
-          <strong>Group by</strong>
+          Group by
           <div>
             <vscode-checkbox @change="${this._dmlGroupBy}" checked>DML</vscode-checkbox>
           </div>

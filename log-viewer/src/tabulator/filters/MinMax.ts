@@ -2,36 +2,47 @@
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
 
-export default function (
-  filterVal: { start: number | null; end: number | null },
-  rowVal: number,
-  rowData: { _children: []; id: number },
-  filterParams: { columnName: string; filterCache: Map<number, boolean> },
-): boolean {
+type FilterRange = { start: number | null; end: number | null };
+
+type RowWithChildren = { _children?: unknown[]; id: number | string };
+
+const NS_PER_MS = 1_000_000;
+
+export default function (filterVal: FilterRange, rowVal: number): boolean {
   if (!('start' in filterVal) || !('end' in filterVal)) {
     return false;
   }
-
-  return deepFilter(filterVal, rowVal, rowData, filterParams);
+  return inRange(filterVal, rowVal);
 }
 
+export const minMaxTreeFilter = (
+  filterVal: FilterRange,
+  rowVal: number,
+  rowData: RowWithChildren,
+  filterParams: { columnName: string; filterCache: Map<number | string, boolean> },
+): boolean => {
+  if (!('start' in filterVal) || !('end' in filterVal)) {
+    return false;
+  }
+  return deepFilter(filterVal, rowVal, rowData, filterParams);
+};
+
 function deepFilter(
-  headerValue: { start: number | null; end: number | null },
+  headerValue: FilterRange,
   rowValue: number,
-  rowData: { _children: []; id: number },
-  filterParams: { columnName: string; filterCache: Map<number, boolean> },
+  rowData: RowWithChildren,
+  filterParams: { columnName: string; filterCache: Map<number | string, boolean> },
 ): boolean {
-  const cachedMatch = filterParams.filterCache.get(rowData.id);
-  if (cachedMatch !== null && cachedMatch !== undefined) {
-    return cachedMatch;
+  const cached = filterParams.filterCache.get(rowData.id);
+  if (cached !== undefined) {
+    return cached;
   }
 
-  const columnName = filterParams.columnName;
+  const { columnName } = filterParams;
   let childMatch = false;
-  for (const childRow of rowData._children || []) {
-    const match = deepFilter(headerValue, childRow[columnName], childRow, filterParams);
-
-    if (match) {
+  for (const childRow of (rowData._children ?? []) as RowWithChildren[]) {
+    const childVal = getByPath(childRow, columnName);
+    if (typeof childVal === 'number' && deepFilter(headerValue, childVal, childRow, filterParams)) {
       childMatch = true;
       break;
     }
@@ -42,16 +53,37 @@ function deepFilter(
     return true;
   }
 
-  const rowVal = +(rowValue / 1000000).toFixed(3);
-  const min = headerValue.start;
-  const max = headerValue.end;
-  if (min && max) {
+  return inRange(headerValue, rowValue);
+}
+
+function inRange(range: FilterRange, value: number): boolean {
+  const rowVal = +(value / NS_PER_MS).toFixed(3);
+  const { start: min, end: max } = range;
+  if (min !== null && max !== null) {
     return rowVal >= min && rowVal <= max;
-  } else if (min) {
+  }
+  if (min !== null) {
     return rowVal >= min;
-  } else if (max) {
+  }
+  if (max !== null) {
     return rowVal <= max;
   }
-
   return true;
+}
+
+function getByPath(obj: unknown, path: string): unknown {
+  if (obj === null || obj === undefined) {
+    return undefined;
+  }
+  if (!path.includes('.')) {
+    return (obj as Record<string, unknown>)[path];
+  }
+  let cur: unknown = obj;
+  for (const key of path.split('.')) {
+    if (cur === null || cur === undefined || typeof cur !== 'object') {
+      return undefined;
+    }
+    cur = (cur as Record<string, unknown>)[key];
+  }
+  return cur;
 }

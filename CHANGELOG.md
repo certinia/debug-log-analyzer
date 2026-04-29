@@ -68,6 +68,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Markers for errors, skipped lines, and truncation
     - Click to navigate to Call Tree (now on key press of `J` or `Cmd/Ctrl+Click`)
   - **Legacy Support**: Toggle the legacy timeline anytime via **Settings -> Apex Log Analyzer -> Timeline -> Legacy**.
+- 🌲 **Call Tree Views**: Detailed **Time Order**, **Aggregated**, and **Bottom-Up** views. ([#333])
+  - **Time Order**: Chronological call stack for frame-by-frame execution flow.
+  - **Aggregated**: Groups repeated calls to surface the highest-impact methods quickly.
+  - **Bottom-Up**: Starts from callees and expands to callers, with optional grouping by Namespace or Type.
+  - **Go to Source**: Click method names to open source from **Time Order**, **Aggregated**, and **Bottom-Up** when symbols are available.
+  - **Analysis Alignment**: Analysis now uses the same bottom-up table model for consistent caller attribution.
 - 📄 **Raw Log Navigation**: Seamless navigation between raw log files and the log analysis. ([#204])
   - **Show in Raw Log**: Right-click timeline or call tree frames → "Show in Log File" to jump to the corresponding line.
   - **Show in Log Analysis**: Click the hover link on raw log lines to navigate back to the log analysis.
@@ -477,6 +483,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#333]: https://github.com/certinia/debug-log-analyzer/issues/333
 [#627]: https://github.com/certinia/debug-log-analyzer/issues/627
 [#685]: https://github.com/certinia/debug-log-analyzer/issues/685
 [#98]: https://github.com/certinia/debug-log-analyzer/issues/98

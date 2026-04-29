@@ -60,7 +60,7 @@ export class MiddleRowFocus extends Module {
     }
 
     let rowToScrollTo: RowComponent | null = row;
-    if (rowToScrollTo) {
+    if (rowToScrollTo?.getData) {
       const displayRows = this.table.rowManager.getDisplayRows();
       //@ts-expect-error This is private to tabulator, but we have no other choice atm.
       const internalRow = rowToScrollTo._getSelf();

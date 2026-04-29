@@ -18,7 +18,7 @@ hide_title: true
 
 ## 🧠 Analysis
 
-Analyze Salesforce debug logs with detailed metrics on method calls, including Self Time, Total Time, Count, Name, and Type. Easily sort, filter, and group log events by namespace or type, and export or copy results for efficient troubleshooting and performance optimization.
+Analyze Salesforce debug logs with detailed metrics on method calls, including Self Time, Total Time, Count, Name, and Type. Easily sort, filter, and group log events by namespace or type, and export or copy results for efficient troubleshooting and performance optimization. The Analysis table uses a bottom-up caller grouping model, where each method is shown as a root with its direct callers as children.
 
 ![Analysis view screenshot showing method call metrics such as Self Time, Total Time, Count, Name, and Type](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-analysis.png)
 
@@ -33,7 +33,10 @@ Each column can be sorted by clicking the column header, this will sort the rows
 
 ### Group
 
-The rows can be grouped by Type or Namespace
+The rows can be grouped by Type or Namespace using a bottom-up caller grouping model, which complements the three Call Tree views: [Time Order, Aggregated, and Bottom-Up](calltree.md).
+
+In this model, roots are callees and parent/child relationships represent callers expanded beneath each callee.
+`Total Time` is the full attributed time for that callee path, while `Self Time` is the exclusive attributed time for the callee itself.
 
 1. Namespace: Shows the rows aggregated by their namespace e.g `default`, `MyNamespace`
 1. Type: Shows the rows aggregated by namespace event type e.g `METHOD_ENTRY`, `DML_ENTRY`

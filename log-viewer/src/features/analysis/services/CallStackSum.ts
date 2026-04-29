@@ -6,33 +6,17 @@ import type { LogEvent } from 'apex-log-parser';
 import type { Metric } from '../../analysis/services/RowGrouper.js';
 
 /**
- * Calculates the sum of total execution time for root nodes only (nodes without ancestors in the set).
- * This prevents double-counting when multiple nodes from the same call chain are present in the filtered set.
+ * Sums `duration.total` over the union of `eventGroups`, counting each event only
+ * when no ancestor of that event is also in the union. This prevents double-counting
+ * when multiple events from the same call chain are present in the filtered set.
  *
- * For each node, walks up the parent chain to check if any ancestor is also in the node set.
- * Only nodes without ancestors contribute their totalTime to the sum.
- *
- * @param _values - Unused parameter (required by Tabulator's calc function signature)
- * @param data - Array of Metric objects containing the nodes to sum
- * @param _calcParams - Unused parameter (required by Tabulator's calc function signature)
- * @returns The sum of totalTime in nanoseconds for all root nodes (nodes without ancestors in the set)
- *
- * @example
- * ```typescript
- * // If we have nodes: A -> B -> C and the filtered set contains [B, C]
- * // Only B's time is counted (C is excluded because B is its ancestor)
- * const total = sumRootNodesOnly([], [metricB, metricC], {});
- * ```
- *
- * @remarks
- * This function is designed as a Tabulator column calc function, hence the unused parameters.
- * It's used to calculate accurate totals in analysis tables where filtered results may include
- * nodes from the same call stack.
+ * Used by both AnalysisView (rows = `Metric` with `nodes`) and BottomUpTable (rows
+ * = `BottomUpRow` with `instances`).
  */
-export function sumRootNodesOnly(_values: number[], data: Metric[], _calcParams: unknown) {
+export function sumDurationTotalForRootEvents(eventGroups: Iterable<LogEvent[]>): number {
   const allNodes = new Set<LogEvent>();
-  for (const row of data) {
-    for (const node of row.nodes) {
+  for (const group of eventGroups) {
+    for (const node of group) {
       allNodes.add(node);
     }
   }
@@ -56,4 +40,12 @@ export function sumRootNodesOnly(_values: number[], data: Metric[], _calcParams:
   }
 
   return total;
+}
+
+/**
+ * Tabulator `bottomCalc` adapter for AnalysisView: passes each `Metric.nodes` array
+ * to {@link sumDurationTotalForRootEvents}. See that helper for the algorithm.
+ */
+export function sumRootNodesOnly(_values: number[], data: Metric[], _calcParams: unknown): number {
+  return sumDurationTotalForRootEvents(data.map((row) => row.nodes));
 }

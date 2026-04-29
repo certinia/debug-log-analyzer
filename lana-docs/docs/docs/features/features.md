@@ -19,6 +19,6 @@ hide_title: true
 
 import DocCardList from '@theme/DocCardList';
 
-Explore the Apex Log Analyzer for Salesforce debug logs features including interactive timelines, detailed call trees, in-depth analysis, database insights, and powerful search capabilities to streamline your debugging and performance tuning.
+Explore the Apex Log Analyzer for Salesforce debug logs features including interactive timelines, detailed Time Order, Aggregated, and Bottom-Up call trees, in-depth analysis, database insights, and powerful search capabilities to streamline your debugging and performance tuning.
 
 <DocCardList />
