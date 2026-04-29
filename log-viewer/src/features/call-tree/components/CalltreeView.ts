@@ -66,6 +66,7 @@ export class CalltreeView extends LitElement {
     debugOnly: false,
     selectedTypes: [],
   };
+  bottomUpGroupBy = 'None';
   debugOnlyFilterCache = new Map<string, boolean>();
   showDetailsFilterCache = new Map<string, boolean>();
   typeFilterCache = new Map<string, boolean>();
@@ -285,7 +286,11 @@ export class CalltreeView extends LitElement {
               ? html`
                   <div class="dropdown-container">
                     <label for="bottomup-groupby">Group by:</label>
-                    <vscode-dropdown id="bottomup-groupby" @change="${this._handleBottomUpGroupBy}">
+                    <vscode-dropdown
+                      id="bottomup-groupby"
+                      @change="${this._handleBottomUpGroupBy}"
+                      current-value="${this.bottomUpGroupBy}"
+                    >
                       <vscode-option>None</vscode-option>
                       <vscode-option>Namespace</vscode-option>
                       <vscode-option>Type</vscode-option>
@@ -448,7 +453,13 @@ export class CalltreeView extends LitElement {
 
   _handleBottomUpGroupBy(event: Event) {
     const target = event.target as HTMLInputElement;
+    this.bottomUpGroupBy = target.value;
     const fieldName = target.value.toLowerCase();
+    const savedGroup = this.bottomUpGroupBy.toLowerCase();
+    if (savedGroup !== 'none' && this.bottomUpTreeTable) {
+      // @ts-expect-error setSortedGroupBy is added by the GroupSort custom module
+      this.bottomUpTreeTable.setSortedGroupBy(savedGroup);
+    }
     if (this.bottomUpTreeTable) {
       // @ts-expect-error setSortedGroupBy is added by the GroupSort custom module
       this.bottomUpTreeTable.setSortedGroupBy(fieldName !== 'none' ? fieldName : '');
