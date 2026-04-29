@@ -293,7 +293,7 @@ export class CalltreeView extends LitElement {
                   </div>
                 `
               : ''}
-            ${isTimeOrder
+            ${isTimeOrder || this.viewMode === 'aggregated'
               ? html`
                   <div class="filter-container align__end">
                     <vscode-checkbox class="align__end" @change="${this._handleShowDetailsChange}"
@@ -384,6 +384,20 @@ export class CalltreeView extends LitElement {
       return;
     }
 
+    // Reset search when switching views
+    if (this.totalMatches > 0 || this.findArgs.text !== '') {
+      const oldTable = this._getActiveTable();
+      this._resetFindWidget();
+      if (oldTable) {
+        //@ts-expect-error This is a custom function added in by Find custom module
+        oldTable.clearFindHighlights();
+      }
+      this.findArgs.text = '';
+      this.findArgs.count = 0;
+      this.findMap = {};
+      this.totalMatches = 0;
+    }
+
     const switchEpoch = ++this.viewSwitchEpoch;
     this.viewMode = newMode;
     await this.updateComplete;
@@ -397,11 +411,13 @@ export class CalltreeView extends LitElement {
       const container = this.renderRoot?.querySelector<HTMLDivElement>('#call-tree-table');
       if (container) {
         await this._renderCallTree(container, this.rootMethod);
+        this._updateFiltering();
       }
     } else if (this.viewMode === 'aggregated') {
       const container = this.renderRoot?.querySelector<HTMLDivElement>('#aggregated-tree-table');
       if (container) {
         await this._renderAggregatedTree(container, this.rootMethod);
+        this._updateFiltering();
       }
     } else if (this.viewMode === 'bottom-up') {
       const container = this.renderRoot?.querySelector<HTMLDivElement>('#bottom-up-tree-table');
@@ -448,24 +464,37 @@ export class CalltreeView extends LitElement {
   }
 
   _updateFiltering() {
+    if (this.viewMode === 'bottom-up') {
+      return;
+    }
+
     const activeTable = this._getActiveTable();
     if (!activeTable) {
       return;
     }
+
+    this.debugOnlyFilterCache.clear();
+    this.showDetailsFilterCache.clear();
+    this.typeFilterCache.clear();
+
     const filtersToAdd = [];
 
+    const isAggregated = this.viewMode === 'aggregated';
+
     if (this.filterState.debugOnly) {
-      filtersToAdd.push(this._debugFilter);
+      filtersToAdd.push(isAggregated ? this._debugFilterAggregated : this._debugFilter);
     } else {
       if (
         this.filterState.selectedTypes.length > 0 &&
         this.filterState.selectedTypes[0] !== 'None'
       ) {
-        filtersToAdd.push(this._typeFilter);
+        filtersToAdd.push(isAggregated ? this._typeFilterAggregated : this._typeFilter);
       }
 
       if (!this.filterState.showDetails) {
-        filtersToAdd.push(this._showDetailsFilter);
+        filtersToAdd.push(
+          isAggregated ? this._showDetailsFilterAggregated : this._showDetailsFilter,
+        );
       }
     }
 
@@ -660,6 +689,69 @@ export class CalltreeView extends LitElement {
     );
   };
 
+  _showDetailsFilterAggregated = (data: AggregatedRow) => {
+    const excludedTypes = new Set<string>([
+      'CUMULATIVE_LIMIT_USAGE',
+      'LIMIT_USAGE_FOR_NS',
+      'CUMULATIVE_PROFILING',
+      'CUMULATIVE_PROFILING_BEGIN',
+    ]);
+
+    return this._deepFilterAggregated(
+      data,
+      (rowData) => {
+        const aggregatedRow = rowData as AggregatedRow;
+        return (
+          aggregatedRow.totalTime > 0 ||
+          !!(aggregatedRow.originalData.type && excludedTypes.has(aggregatedRow.originalData.type))
+        );
+      },
+      {
+        filterCache: this.showDetailsFilterCache,
+      },
+    );
+  };
+
+  _debugFilterAggregated = (data: AggregatedRow) => {
+    const debugValues = new Set<string>([
+      'USER_DEBUG',
+      'DATAWEAVE_USER_DEBUG',
+      'USER_DEBUG_FINER',
+      'USER_DEBUG_FINEST',
+      'USER_DEBUG_FINE',
+      'USER_DEBUG_DEBUG',
+      'USER_DEBUG_INFO',
+      'USER_DEBUG_WARN',
+      'USER_DEBUG_ERROR',
+    ]);
+    return this._deepFilterAggregated(
+      data,
+      (rowData) => {
+        const logLine = (rowData as AggregatedRow).originalData;
+        return !!(logLine.type && debugValues.has(logLine.type));
+      },
+      {
+        filterCache: this.debugOnlyFilterCache,
+      },
+    );
+  };
+
+  _typeFilterAggregated = (data: AggregatedRow) => {
+    return this._deepFilterAggregated(
+      data,
+      (rowData) => {
+        const logLine = (rowData as AggregatedRow).originalData;
+        if (!logLine.type) {
+          return false;
+        }
+        return this.filterState.selectedTypes.includes(logLine.type);
+      },
+      {
+        filterCache: this.typeFilterCache,
+      },
+    );
+  };
+
   _namespaceFilter = (
     selectedNamespaces: string[],
     _namespace: string,
@@ -718,12 +810,9 @@ export class CalltreeView extends LitElement {
       }
     }
 
-    filterParams.filterCache.set(rowData.id, childMatch);
-    if (childMatch) {
-      return true;
-    }
-
-    return filterFunction(rowData);
+    const finalMatch = childMatch || filterFunction(rowData);
+    filterParams.filterCache.set(rowData.id, finalMatch);
+    return finalMatch;
   }
 
   private _deepFilter(
@@ -751,12 +840,9 @@ export class CalltreeView extends LitElement {
       }
     }
 
-    filterParams.filterCache.set(rowData.id, childMatch);
-    if (childMatch) {
-      return true;
-    }
-
-    return filterFunction(rowData);
+    const finalMatch = childMatch || filterFunction(rowData);
+    filterParams.filterCache.set(rowData.id, finalMatch);
+    return finalMatch;
   }
 
   private async _renderCallTree(
@@ -806,7 +892,11 @@ export class CalltreeView extends LitElement {
 
     const { table, tableBuilt } = createAggregatedTable(container, rootMethod, {
       namespaceFilter: this._namespaceFilter,
-      onFilterCacheClear: () => {},
+      onFilterCacheClear: () => {
+        this.debugOnlyFilterCache.clear();
+        this.showDetailsFilterCache.clear();
+        this.typeFilterCache.clear();
+      },
       onRenderStarted: () => {
         if (!this.blockClearHighlights && this.totalMatches > 0) {
           this._resetFindWidget();
@@ -824,16 +914,25 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    const { table, tableBuilt } = createBottomUpTable(container, rootMethod, {
-      namespaceFilter: this._namespaceFilter,
-      onFilterCacheClear: () => {},
-      onRenderStarted: () => {
-        if (!this.blockClearHighlights && this.totalMatches > 0) {
-          this._resetFindWidget();
-          this._clearSearchHighlights();
-        }
+    const { table, tableBuilt } = createBottomUpTable(
+      container,
+      rootMethod,
+      {
+        namespaceFilter: this._namespaceFilter,
+        onFilterCacheClear: () => {},
+        onRenderStarted: () => {
+          if (!this.blockClearHighlights && this.totalMatches > 0) {
+            this._resetFindWidget();
+            this._clearSearchHighlights();
+          }
+        },
       },
-    });
+      {
+        selectableRows: 'highlight',
+        enableClipboardAndDownload: true,
+        exportFileName: 'bottom-up.csv',
+      },
+    );
     this.bottomUpTreeTable = table;
     await tableBuilt;
   }
