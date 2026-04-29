@@ -10,23 +10,12 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { Tabulator, type GlobalTooltipOption, type RowComponent } from 'tabulator-tables';
+import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog } from 'apex-log-parser';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { formatDuration, isVisible } from '../../../core/utility/Util.js';
-import { sumRootNodesOnly } from '../services/CallStackSum.js';
-import { group } from '../services/RowGrouper.js';
+import { isVisible } from '../../../core/utility/Util.js';
+import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
 
-// Tabulator custom modules, imports + styles
-import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
-import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
-import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
-import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find } from '../../../tabulator/module/Find.js';
-import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
-import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
@@ -279,165 +268,34 @@ export class AnalysisView extends LitElement {
       return;
     }
 
-    Tabulator.registerModule(Object.values(CommonModules));
-    Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs, GroupSort]);
-
-    const durationFormatterParams = { totalValue: rootMethod.duration.total };
-    const tooltipContent: GlobalTooltipOption = (_event, cell, _onRender) => {
-      return formatDuration(cell.getValue());
-    };
-
-    this.analysisTable = new Tabulator(this._tableWrapper, {
-      rowKeyboardNavigation: true,
-      selectableRows: 'highlight',
-      data: group(rootMethod),
-      layout: 'fitColumns',
-      placeholder: 'No Analysis Available',
-      columnCalcs: 'table',
-      clipboard: true,
-      downloadEncoder: function (fileContents: string, mimeType) {
-        const vscodeHost = vscodeMessenger.getVsCodeAPI();
-        if (vscodeHost) {
-          vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
-            fileContent: fileContents,
-            options: {
-              defaultFileName: 'analysis.csv',
-            },
-          });
-          return false;
-        }
-
-        return new Blob([fileContents], { type: mimeType });
+    const { table, tableBuilt } = createBottomUpTable(
+      this._tableWrapper,
+      rootMethod,
+      {
+        namespaceFilter: () => true,
+        onFilterCacheClear: () => {
+          if (!this.blockClearHighlights && this.totalMatches > 0) {
+            this._resetFindWidget();
+            this._clearSearchHighlights();
+          }
+        },
+        onRenderStarted: () => {
+          if (!this.blockClearHighlights && this.totalMatches > 0) {
+            this._resetFindWidget();
+            this._clearSearchHighlights();
+          }
+        },
       },
-      dataTree: true, // temporary: fixes a disappearing table issue when scroll is dragged (needs fix in Tabulator)
-      downloadRowRange: 'all',
-      downloadConfig: {
-        columnHeaders: true,
-        columnGroups: true,
-        rowGroups: true,
-        columnCalcs: false,
-        dataTree: true,
+      {
+        placeholder: 'No Analysis Available',
+        selectableRows: 'highlight',
+        enableClipboardAndDownload: true,
+        exportFileName: 'analysis.csv',
       },
-      //@ts-expect-error types need update array is valid
-      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
-      clipboardCopyRowRange: 'all',
-      height: '100%',
-      maxHeight: '100%',
-      groupCalcs: true,
-      groupSort: true,
-      groupClosedShowCalcs: true,
-      groupStartOpen: false,
-      groupToggleElement: 'header',
-      columnDefaults: {
-        title: 'default',
-        resizable: true,
-        headerSortStartingDir: 'desc',
-        headerTooltip: true,
-        headerWordWrap: true,
-      },
-      tooltipDelay: 100,
-      initialSort: [{ column: 'selfTime', dir: 'desc' }],
-      headerSortElement: function (column, dir) {
-        switch (dir) {
-          case 'asc':
-            return "<div class='sort-by--top'></div>";
-            break;
-          case 'desc':
-            return "<div class='sort-by--bottom'></div>";
-            break;
-          default:
-            return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
-        }
-      },
-      columns: [
-        {
-          title: 'Name',
-          field: 'name',
-          formatter: 'textarea',
-          headerSortStartingDir: 'asc',
-          sorter: 'string',
-          headerSortTristate: true,
-          cssClass: 'datagrid-code-text',
-          bottomCalc: () => {
-            return 'Total';
-          },
-          widthGrow: 5,
-        },
-        {
-          title: 'Namespace',
-          field: 'namespace',
-          headerSortStartingDir: 'desc',
-          width: 150,
-          sorter: 'string',
-          tooltip: true,
-          headerFilter: 'list',
-          headerFilterFunc: 'in',
-          headerFilterParams: {
-            valuesLookup: 'all',
-            clearable: true,
-            multiselect: true,
-          },
-          headerFilterLiveFilter: false,
-        },
-        {
-          title: 'Type',
-          field: 'type',
-          headerSortStartingDir: 'asc',
-          width: 150,
-          sorter: 'string',
-          tooltip: true,
-        },
-        {
-          title: 'Count',
-          field: 'count',
-          sorter: 'number',
-          cssClass: 'number-cell',
-          width: 65,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          bottomCalc: 'sum',
-        },
-        {
-          title: 'Total Time (ms)',
-          field: 'totalTime',
-          sorter: 'number',
-          width: 165,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          bottomCalc: sumRootNodesOnly,
-          bottomCalcFormatter: progressFormatterMS,
-          bottomCalcFormatterParams: durationFormatterParams,
-          formatter: progressFormatterMS,
-          formatterParams: durationFormatterParams,
-          accessorDownload: NumberAccessor,
-          tooltip: tooltipContent,
-        },
-        {
-          title: 'Self Time (ms)',
-          field: 'selfTime',
-          sorter: 'number',
-          width: 165,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          bottomCalc: 'sum',
-          bottomCalcFormatter: progressFormatterMS,
-          bottomCalcFormatterParams: durationFormatterParams,
-          formatter: progressFormatterMS,
-          formatterParams: durationFormatterParams,
-          accessorDownload: NumberAccessor,
-          tooltip: tooltipContent,
-        },
-      ],
-    });
+    );
+    this.analysisTable = table;
 
     this.analysisTable.on('dataSorted', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.analysisTable.on('dataFiltered', () => {
       if (!this.blockClearHighlights && this.totalMatches > 0) {
         this._resetFindWidget();
         this._clearSearchHighlights();
@@ -450,6 +308,8 @@ export class AnalysisView extends LitElement {
         this._clearSearchHighlights();
       }
     });
+
+    await tableBuilt;
   }
 
   _resetFindWidget() {
@@ -465,12 +325,5 @@ export class AnalysisView extends LitElement {
     this.totalMatches = 0;
   }
 }
-
-type VSCodeSaveFile = {
-  fileContent: string;
-  options: {
-    defaultFileName: string;
-  };
-};
 
 type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;
