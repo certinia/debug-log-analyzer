@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Certinia Inc. All rights reserved.
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import type { ApexLog, LogEventType } from 'apex-log-parser';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
