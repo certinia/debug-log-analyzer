@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Certinia Inc. All rights reserved.
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
 import type { LogEvent, SelfTotal } from 'apex-log-parser';
@@ -233,16 +233,28 @@ function addEventToAggregatedRowWithStack(
  * reversed caller path. At every node, child partitions must sum to parent for
  * both self and total. Totals are non-overlapping and recursion-safe.
  *
- * Algorithm (see BOTTOM_UP_CALL_TREE_SPEC.md):
+ * Input invariant expected from parser output for every metric pair M:
+ *   M.total(node) = M.self(node) + Σ M.total(children)
+ * This converter assumes that invariant and preserves it through partitioning.
+ *
+ * Algorithm:
  *   1. Compute per-frame attributed totals. For every frame F with name R,
  *      attr(F) = F.total - Σ T for each nearest same-name descendant T. The DFS
  *      maintains Map<name, deepest-active-frame> and subtracts descendant totals
  *      from their nearest same-name ancestor on entry.
- *   2. For every frame F with F.duration.self > 0, walk its ancestor chain and
+ *   2. For every frame F, walk its ancestor chain and
  *      insert F into a trie keyed by [F.name, F.parent.name, F.grandparent.name, …].
  *      At every prefix, accumulate F.self (bucket.self) and attr(F) (bucket.total)
  *      plus the matching metric pairs.
  *   3. Finalize averages and sort deterministically (totalSelfTime desc, name asc).
+ *
+ * Supported metric pairs (same attribution logic for each pair):
+ *   - duration.self / duration.total
+ *   - dmlCount.self / dmlCount.total
+ *   - soqlCount.self / soqlCount.total
+ *   - dmlRowCount.self / dmlRowCount.total
+ *   - soqlRowCount.self / soqlRowCount.total
+ *   - totalThrownCount (treated like a total metric for attribution)
  */
 export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
   if (rootChildren.length === 0) {
