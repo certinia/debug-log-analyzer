@@ -53,8 +53,8 @@ export function createTimeOrderTable(
     maxHeight: '100%',
     //  custom property for datagrid/module/RowKeyboardNavigation
     rowKeyboardNavigation: true,
-    //  custom property for module/MiddleRowFocus
-    middleRowFocus: true,
+    //  custom property for module/ScrollAnchor
+    scrollAnchor: true,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',

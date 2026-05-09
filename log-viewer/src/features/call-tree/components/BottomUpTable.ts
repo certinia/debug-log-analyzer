@@ -94,7 +94,7 @@ export function createBottomUpTable(
     height: '100%',
     maxHeight: '100%',
     rowKeyboardNavigation: true,
-    middleRowFocus: true,
+    scrollAnchor: true,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',
