@@ -16,8 +16,10 @@ function rect(top: number, height: number) {
 }
 
 function makeRow(top: number, height = 20) {
+  const internal = {};
   return {
     getElement: () => ({ getBoundingClientRect: () => rect(top, height) }),
+    _getSelf: () => internal,
   };
 }
 
@@ -327,11 +329,15 @@ describe('ScrollAnchor', () => {
   it('captures the anchor offset within the holder for pixel-accurate restore', () => {
     // Anchor row offsetTop=130, holder.scrollTop=100 → captured offset = 30 (the
     // row's Y position inside the visible holder viewport).
+    const r1Internal = {};
+    const r2Internal = {};
     const r1 = {
       getElement: () => ({ offsetTop: 100, getBoundingClientRect: () => rect(50, 20) }),
+      _getSelf: () => r1Internal,
     };
     const r2 = {
       getElement: () => ({ offsetTop: 130, getBoundingClientRect: () => rect(80, 40) }),
+      _getSelf: () => r2Internal,
     };
     const holder = {
       scrollTop: 100,
@@ -423,5 +429,98 @@ describe('ScrollAnchor', () => {
     expect(renderer._virtualRenderFill).toHaveBeenCalledWith(0, true);
     expect(holder.scrollTop).toBe(470);
     expect(table.scrollToRow).not.toHaveBeenCalled();
+  });
+
+  it('fallback: collapse case walks up getTreeParent to the nearest displayed ancestor', () => {
+    // Anchor row was a child collapsed under a parent. Parent is displayed.
+    const parentInternal = {};
+    const childInternal = {};
+    const parentComponent = {
+      _getSelf: () => parentInternal,
+      getTreeParent: () => false,
+    };
+    const childComponent = {
+      _getSelf: () => childInternal,
+      getTreeParent: () => parentComponent,
+    };
+    const { table, plugin } = setup();
+    table.rowManager.getDisplayRows = () => [parentInternal] as never;
+
+    const p = plugin as unknown as { anchorRow: unknown };
+    p.anchorRow = childComponent;
+
+    const resolved = (
+      plugin as unknown as { _resolveAnchorRow: () => unknown }
+    )._resolveAnchorRow();
+    expect(resolved).toBe(parentComponent);
+  });
+
+  it('fallback: filter case picks the row at the captured display-rows index (clamped)', () => {
+    // Anchor row was at display-index 50 pre-render. Post-render display set has
+    // only 10 rows (filter removed most). Index clamped to 9 (length - 1).
+    const internalRows = Array.from({ length: 10 }, (_, i) => ({ id: i }));
+    const expectedComponent = { mark: 'expected' };
+    (internalRows[9] as unknown as { getComponent: () => unknown }).getComponent = () =>
+      expectedComponent;
+
+    const anchorInternal = {};
+    const anchorComponent = {
+      _getSelf: () => anchorInternal,
+      getTreeParent: () => false,
+    };
+    const { table, plugin } = setup();
+    table.rowManager.getDisplayRows = () => internalRows as never;
+
+    const p = plugin as unknown as { anchorRow: unknown; anchorDisplayIndex: number };
+    p.anchorRow = anchorComponent;
+    p.anchorDisplayIndex = 50;
+
+    const resolved = (
+      plugin as unknown as { _resolveAnchorRow: () => unknown }
+    )._resolveAnchorRow();
+    expect(resolved).toBe(expectedComponent);
+  });
+
+  it('fallback: filter case with exact index returns the row at that index', () => {
+    const internalRows = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+    const expectedComponent = { mark: 'at-30' };
+    (internalRows[30] as unknown as { getComponent: () => unknown }).getComponent = () =>
+      expectedComponent;
+
+    const anchorInternal = {};
+    const anchorComponent = {
+      _getSelf: () => anchorInternal,
+      getTreeParent: () => false,
+    };
+    const { table, plugin } = setup();
+    table.rowManager.getDisplayRows = () => internalRows as never;
+
+    const p = plugin as unknown as { anchorRow: unknown; anchorDisplayIndex: number };
+    p.anchorRow = anchorComponent;
+    p.anchorDisplayIndex = 30;
+
+    const resolved = (
+      plugin as unknown as { _resolveAnchorRow: () => unknown }
+    )._resolveAnchorRow();
+    expect(resolved).toBe(expectedComponent);
+  });
+
+  it('fallback: returns null when no parent is displayed and display rows are empty', () => {
+    const anchorInternal = {};
+    const anchorComponent = {
+      _getSelf: () => anchorInternal,
+      getTreeParent: () => false,
+    };
+    const { table, plugin } = setup();
+    table.rowManager.getDisplayRows = () => [] as never;
+
+    const p = plugin as unknown as { anchorRow: unknown; anchorDisplayIndex: number };
+    p.anchorRow = anchorComponent;
+    p.anchorDisplayIndex = 5;
+
+    const resolved = (
+      plugin as unknown as { _resolveAnchorRow: () => unknown }
+    )._resolveAnchorRow();
+    expect(resolved).toBeNull();
   });
 });

@@ -1,10 +1,7 @@
 /*
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
-import type { LogEvent } from 'apex-log-parser';
 import { Module, type RowComponent, type Tabulator } from 'tabulator-tables';
-
-type TimedNodeProp = { originalData: LogEvent };
 
 const scrollAnchorOption = 'scrollAnchor' as const;
 
@@ -24,6 +21,7 @@ export class ScrollAnchor extends Module {
   private tableEl: HTMLElement | null = null;
   anchorRow: RowComponent | null = null;
   private anchorOffsetFromHolderTop = 0;
+  private anchorDisplayIndex = -1;
   private pendingFilterRaf: number | null = null;
 
   // Single tree toggle: skip the next renderComplete recenter so scrollTop stays put.
@@ -106,6 +104,8 @@ export class ScrollAnchor extends Module {
       // scrollTop gives the row's Y position inside the holder viewport — same
       // result as paired getBoundingClientRect calls without forcing layout reads.
       this.anchorOffsetFromHolderTop = row.getElement().offsetTop - holder.scrollTop;
+      // @ts-expect-error _getSelf is private to tabulator, but we have no other choice atm.
+      this.anchorDisplayIndex = this.table.rowManager.getDisplayRows().indexOf(row._getSelf());
     }
   }
 
@@ -133,6 +133,7 @@ export class ScrollAnchor extends Module {
   private _clearAnchor() {
     this.anchorRow = null;
     this.anchorOffsetFromHolderTop = 0;
+    this.anchorDisplayIndex = -1;
     this.wasAtTop = false;
     this.wasAtBottom = false;
   }
@@ -173,9 +174,9 @@ export class ScrollAnchor extends Module {
   }
 
   /**
-   * Pick the row to anchor on after the render. Prefer the originally captured
-   * row; if it has been filtered/collapsed away, fall back to the nearest active
-   * row by timestamp so the user keeps their place.
+   * Resolve the anchor row in the post-render display set. If it was filtered
+   * or collapsed away, fall back to the nearest displayed tree ancestor, then
+   * to the row at the captured display-index clamped to the new display length.
    */
   private _resolveAnchorRow(): RowComponent | null {
     const row = this.anchorRow;
@@ -187,11 +188,23 @@ export class ScrollAnchor extends Module {
       return row;
     }
 
-    const timestamp = (row.getData() as TimedNodeProp).originalData?.timestamp;
-    if (timestamp === undefined) {
-      return null;
+    let parent = row.getTreeParent();
+    while (parent) {
+      if (this._isRowActive(parent, displayRows)) {
+        return parent;
+      }
+      parent = parent.getTreeParent();
     }
-    return this._findClosestActive(this.table.getRows('active'), timestamp, displayRows);
+
+    if (this.anchorDisplayIndex >= 0 && displayRows.length > 0) {
+      const idx = Math.min(this.anchorDisplayIndex, displayRows.length - 1);
+      const internalRow = displayRows[idx];
+      if (internalRow) {
+        return (internalRow as unknown as { getComponent: () => RowComponent }).getComponent();
+      }
+    }
+
+    return null;
   }
 
   private _isRowActive(row: RowComponent, displayRows: RowComponent[]): boolean {
@@ -240,104 +253,6 @@ export class ScrollAnchor extends Module {
       this.skipNextRender = false;
     }
     this._clearAnchor();
-  }
-
-  private _findClosestActive(
-    rows: RowComponent[],
-    timeStamp: number,
-    displayRows: RowComponent[] = this.table.rowManager.getDisplayRows(),
-  ): RowComponent | null {
-    if (!rows) {
-      return null;
-    }
-
-    let start = 0,
-      end = rows.length - 1;
-
-    while (start <= end) {
-      const mid = Math.floor((start + end) / 2);
-      const row = rows[mid];
-
-      if (!row) {
-        break;
-      }
-      const node = (row.getData() as TimedNodeProp).originalData;
-      const endTime = node.exitStamp ?? node.timestamp;
-
-      if (timeStamp === node.timestamp) {
-        if (this._isRowActive(row, displayRows)) {
-          return row;
-        }
-
-        return this._findClosestActiveSibling(mid, rows, displayRows);
-      } else if (timeStamp >= node.timestamp && timeStamp <= endTime) {
-        const childMatch = this._findClosestActive(
-          row.getTreeChildren() ?? [],
-          timeStamp,
-          displayRows,
-        );
-        if (childMatch) {
-          return childMatch;
-        }
-        return this._findClosestActiveSibling(mid, rows, displayRows);
-      } else if (timeStamp > endTime) {
-        start = mid + 1;
-      } else if (timeStamp < node.timestamp) {
-        end = mid - 1;
-      } else {
-        return null;
-      }
-    }
-
-    return null;
-  }
-
-  private _findClosestActiveSibling(
-    midIndex: number,
-    rows: RowComponent[],
-    activeRows: RowComponent[],
-  ) {
-    const indexes = [];
-
-    let previousIndex = midIndex;
-    let previousVisible;
-    while (previousIndex >= 0) {
-      previousVisible = rows[previousIndex];
-      if (!previousVisible) {
-        continue;
-      }
-      if (this._isRowActive(previousVisible, activeRows)) {
-        indexes.push(previousIndex);
-        break;
-      }
-
-      previousIndex--;
-    }
-
-    const distanceFromMid = previousIndex > -1 ? midIndex - previousIndex : midIndex;
-
-    const len = rows.length;
-    let nextIndex = midIndex;
-    let nextVisible;
-    while (nextIndex >= 0 && nextIndex !== len && nextIndex - midIndex < distanceFromMid) {
-      nextVisible = rows[nextIndex];
-      if (!nextVisible) {
-        continue;
-      }
-      if (this._isRowActive(nextVisible, activeRows)) {
-        indexes.push(nextIndex);
-        break;
-      }
-      nextIndex++;
-    }
-
-    const closestIndex = indexes.length
-      ? indexes.reduce((a, b) => {
-          return Math.abs(b - midIndex) < Math.abs(a - midIndex) ? b : a;
-        })
-      : null;
-
-    return closestIndex ? rows[closestIndex] || null : null;
   }
 
   private _findMiddleVisibleRow(tableHolder: HTMLElement) {
