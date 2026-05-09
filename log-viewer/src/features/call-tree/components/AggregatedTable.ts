@@ -41,9 +41,9 @@ export function createAggregatedTable(
     placeholder: 'No Call Tree Available',
     height: '100%',
     maxHeight: '100%',
-    // @ts-expect-error custom property for module/RowKeyboardNavigation + MiddleRowFocus
+    // @ts-expect-error custom property for module/RowKeyboardNavigation + ScrollAnchor
     rowKeyboardNavigation: true,
-    middleRowFocus: true,
+    scrollAnchor: true,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',
