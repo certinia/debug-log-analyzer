@@ -6,19 +6,24 @@ import { Module, type RowComponent, type Tabulator } from 'tabulator-tables';
 
 type TimedNodeProp = { originalData: LogEvent };
 
-const middleRowFocusOption = 'middleRowFocus' as const;
+const scrollAnchorOption = 'scrollAnchor' as const;
+
 /**
- * Enable MiddleRowFocus by importing the class and calling
- * Tabulator.registerModule(MiddleRowFocus); before the first instantiation of the table.
- * Then enable by setting middleRowFocus to true in table config.
- * To disable RowNavigation set middleRowFocus to false in table options.
+ * Pixel-accurate scroll anchoring across table re-renders.
+ *
+ * Capture (renderStarted / dataSorting): the middle visible row and its Y offset
+ * inside the holder. Restore (renderComplete, fully synchronous): set scrollTop
+ * so the same row sits at the same pixel — no visible jump.
+ *
+ * Enable by registering the module and setting `scrollAnchor: true` in table options.
  */
-export class MiddleRowFocus extends Module {
-  static moduleName = 'middleRowFocus';
+export class ScrollAnchor extends Module {
+  static moduleName = 'scrollAnchor';
 
   tableHolder: HTMLElement | null = null;
   private tableEl: HTMLElement | null = null;
-  middleRow: RowComponent | null = null;
+  anchorRow: RowComponent | null = null;
+  private anchorOffsetFromHolderTop = 0;
   private pendingFilterRaf: number | null = null;
 
   // Single tree toggle: skip the next renderComplete recenter so scrollTop stays put.
@@ -28,29 +33,28 @@ export class MiddleRowFocus extends Module {
   private toggleSeenInBurst = false;
 
   // Boundary anchoring: when the user is at the top or bottom of the scroll range
-  // before an operation, recentering on the middle row pushes them away from the
-  // edge they were at. Capture the boundary at snapshot time and restore it
-  // (scrollTop = 0 / scrollHeight - clientHeight) instead of centering.
+  // before an operation, recentering pushes them away from the edge they were at.
+  // Capture the boundary at snapshot time and restore it instead of pixel-anchoring.
   private static readonly boundaryThresholdPx = 10;
   private wasAtTop = false;
   private wasAtBottom = false;
 
   constructor(table: Tabulator) {
     super(table);
-    this.registerTableOption(middleRowFocusOption, false);
+    this.registerTableOption(scrollAnchorOption, false);
   }
 
   initialize() {
     // @ts-expect-error not in types
-    if (this.options(middleRowFocusOption)) {
+    if (this.options(scrollAnchorOption)) {
       this.tableHolder = this.table.element.querySelector('.tabulator-tableholder');
 
       this.table.on('dataTreeRowExpanded', () => this._onTreeToggle());
       this.table.on('dataTreeRowCollapsed', () => this._onTreeToggle());
 
       // Sort resets scrollTop before renderStarted fires, so capture the anchor here
-      // (pre-sort) instead. The renderStarted handler below is a no-op once middleRow
-      // is set — see the !this.middleRow guard.
+      // (pre-sort) instead. The renderStarted handler below is a no-op once anchorRow
+      // is set — see the !this.anchorRow guard.
       this.table.on('dataSorting', () => this._captureAnchor());
 
       this.table.on('renderStarted', () => this._captureAnchor());
@@ -69,7 +73,7 @@ export class MiddleRowFocus extends Module {
         });
       });
 
-      this.table.on('renderComplete', async () => {
+      this.table.on('renderComplete', () => {
         if (this.skipNextRender) {
           this.skipNextRender = false;
           this._clearAnchor();
@@ -82,24 +86,34 @@ export class MiddleRowFocus extends Module {
   }
 
   /**
-   * Capture the user's scroll anchor: the row at the visual middle and whether
-   * the user was at the top / bottom edge. Idempotent within one operation —
-   * subsequent calls are no-ops once an anchor is already set.
+   * Capture the user's scroll anchor: the middle visible row, its Y offset inside
+   * the holder, and whether the user was at the top / bottom edge. Idempotent
+   * within one operation — subsequent calls are no-ops once an anchor is set.
    */
   private _captureAnchor() {
-    if (!this.tableHolder || this.middleRow) {
+    if (!this.tableHolder || this.anchorRow) {
       return;
     }
     const holder = this.tableHolder;
     const max = Math.max(0, holder.scrollHeight - holder.clientHeight);
-    this.wasAtTop = holder.scrollTop <= MiddleRowFocus.boundaryThresholdPx;
-    this.wasAtBottom = max - holder.scrollTop <= MiddleRowFocus.boundaryThresholdPx;
-    this.middleRow = this._findMiddleVisibleRow(holder);
+    this.wasAtTop = holder.scrollTop <= ScrollAnchor.boundaryThresholdPx;
+    this.wasAtBottom = max - holder.scrollTop <= ScrollAnchor.boundaryThresholdPx;
+
+    const row = this._findMiddleVisibleRow(holder);
+    this.anchorRow = row;
+    if (row) {
+      const rowRect = row.getElement().getBoundingClientRect();
+      const holderRect = holder.getBoundingClientRect();
+      this.anchorOffsetFromHolderTop = rowRect.top - holderRect.top;
+    } else {
+      this.anchorOffsetFromHolderTop = 0;
+    }
   }
 
   /**
-   * Restore the captured anchor. Boundary cases (was-at-top / was-at-bottom) snap
-   * to the edge so we don't push the user off it. Mid-table centers on middleRow.
+   * Restore the captured anchor synchronously. Boundary cases (was-at-top /
+   * was-at-bottom) snap to the edge. Mid-table sets scrollTop so the anchor row
+   * sits at exactly the same Y pixel it occupied pre-render — no flash.
    */
   private _restoreAnchor() {
     const holder = this.tableHolder;
@@ -112,15 +126,84 @@ export class MiddleRowFocus extends Module {
     } else if (this.wasAtBottom) {
       holder.scrollTop = Math.max(0, holder.scrollHeight - holder.clientHeight);
     } else {
-      this._scrollToRow(this.middleRow);
+      this._anchorPixelAccurate(holder);
     }
     this._clearAnchor();
   }
 
   private _clearAnchor() {
-    this.middleRow = null;
+    this.anchorRow = null;
+    this.anchorOffsetFromHolderTop = 0;
     this.wasAtTop = false;
     this.wasAtBottom = false;
+  }
+
+  /**
+   * Synchronous, pixel-accurate scroll anchor restore.
+   *
+   * 1. Resolve which row to anchor on post-render. If the original anchor row is
+   *    still in the display set, use it. Otherwise fall back to the nearest
+   *    still-active row by timestamp (rows above us could have been added or
+   *    removed; the literal anchor row could have been filtered/collapsed away).
+   * 2. Make sure the row is in the virtual DOM window so its `offsetTop` is
+   *    meaningful — call Tabulator's private `_virtualRenderFill` to refill the
+   *    vDom centered on the row index. Same hook the public `scrollToRow` uses.
+   * 3. Set `scrollTop = rowEl.offsetTop - anchorOffsetFromHolderTop`. Both DOM
+   *    writes happen in the same JS turn as `renderComplete`, so the browser
+   *    paints the corrected scroll position directly — no intermediate frame.
+   */
+  private _anchorPixelAccurate(holder: HTMLElement) {
+    const row = this._resolveAnchorRow();
+    if (!row) {
+      return;
+    }
+
+    const renderer = this.table.rowManager?.renderer as
+      | { rows?: () => unknown[]; _virtualRenderFill?: (index: number, force?: boolean) => void }
+      | undefined;
+
+    // Tabulator's private internal row (Row, not RowComponent) is what the renderer
+    // indexes. We need that index to refill the vDom window around it.
+    // @ts-expect-error _getSelf is private to tabulator, but we have no other choice atm.
+    const internalRow = row._getSelf() as unknown;
+    if (renderer?.rows && renderer._virtualRenderFill) {
+      const rows = renderer.rows();
+      const index = rows.indexOf(internalRow);
+      if (index > -1) {
+        renderer._virtualRenderFill(index, true);
+      }
+    }
+
+    const rowEl = row.getElement();
+    if (!rowEl) {
+      return;
+    }
+    holder.scrollTop = Math.max(0, rowEl.offsetTop - this.anchorOffsetFromHolderTop);
+  }
+
+  /**
+   * Pick the row to anchor on after the render. Prefer the originally captured
+   * row; if it has been filtered/collapsed away, fall back to the nearest active
+   * row by timestamp so the user keeps their place.
+   */
+  private _resolveAnchorRow(): RowComponent | null {
+    const row = this.anchorRow;
+    if (!row) {
+      return null;
+    }
+    const displayRows = this.table.rowManager.getDisplayRows();
+    // @ts-expect-error _getSelf is private to tabulator, but we have no other choice atm.
+    const internalRow = row._getSelf();
+    if (displayRows.indexOf(internalRow) !== -1) {
+      return row;
+    }
+
+    const data = row.getData() as TimedNodeProp;
+    const timestamp = data?.originalData?.timestamp;
+    if (timestamp === undefined) {
+      return null;
+    }
+    return this._findClosestActive(this.table.getRows('active'), timestamp);
   }
 
   /**
@@ -157,46 +240,12 @@ export class MiddleRowFocus extends Module {
 
   private _onTreeToggle() {
     if (!this.toggleSeenInBurst) {
-      // First toggle in this burst: assume single, arm the skip.
       this.toggleSeenInBurst = true;
       this.skipNextRender = true;
     } else {
-      // A second toggle arrived synchronously => it's a bulk operation; let the
-      // existing recenter run so the user's middle row stays in view.
       this.skipNextRender = false;
     }
-    // Clear the anchor so renderStarted captures fresh (with up-to-date boundary flags).
     this._clearAnchor();
-  }
-
-  private _scrollToRow(row: RowComponent | null) {
-    if (!row) {
-      return;
-    }
-
-    let rowToScrollTo: RowComponent | null = row;
-    if (rowToScrollTo?.getData) {
-      const displayRows = this.table.rowManager.getDisplayRows();
-      //@ts-expect-error This is private to tabulator, but we have no other choice atm.
-      const internalRow = rowToScrollTo._getSelf();
-      const canScroll = displayRows.indexOf(internalRow) !== -1;
-      if (!canScroll) {
-        const rowData = rowToScrollTo.getData() as TimedNodeProp;
-        const node = rowData.originalData;
-
-        rowToScrollTo = this._findClosestActive(this.table.getRows('active'), node.timestamp);
-      }
-
-      if (rowToScrollTo) {
-        this.table.scrollToRow(rowToScrollTo, 'center', true).then(() => {
-          setTimeout(() => {
-            rowToScrollTo
-              ?.getElement()
-              .scrollIntoView({ behavior: 'auto', block: 'center', inline: 'start' });
-          });
-        });
-      }
-    }
   }
 
   private _findClosestActive(rows: RowComponent[], timeStamp: number): RowComponent | null {
@@ -207,10 +256,8 @@ export class MiddleRowFocus extends Module {
     let start = 0,
       end = rows.length - 1;
 
-    // Iterate as long as the beginning does not encounter the end.
     const displayRows = this.table.rowManager.getDisplayRows();
     while (start <= end) {
-      // find out the middle index
       const mid = Math.floor((start + end) / 2);
       const row = rows[mid];
 
@@ -221,7 +268,7 @@ export class MiddleRowFocus extends Module {
       const endTime = node.exitStamp ?? node.timestamp;
 
       if (timeStamp === node.timestamp) {
-        //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+        // @ts-expect-error This is private to tabulator, but we have no other choice atm.
         const internalRow = row._getSelf();
         const isActive = displayRows.indexOf(internalRow) !== -1;
         if (isActive) {
@@ -235,9 +282,7 @@ export class MiddleRowFocus extends Module {
           return childMatch;
         }
         return this._findClosestActiveSibling(mid, rows, displayRows);
-      }
-      // Otherwise, look in the left or right half
-      else if (timeStamp > endTime) {
+      } else if (timeStamp > endTime) {
         start = mid + 1;
       } else if (timeStamp < node.timestamp) {
         end = mid - 1;
@@ -263,7 +308,7 @@ export class MiddleRowFocus extends Module {
       if (!previousVisible) {
         continue;
       }
-      //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+      // @ts-expect-error This is private to tabulator, but we have no other choice atm.
       const internalRow = previousVisible._getSelf();
       const isActive = activeRows.indexOf(internalRow) !== -1;
       if (previousVisible && isActive) {
@@ -285,7 +330,7 @@ export class MiddleRowFocus extends Module {
         continue;
       }
 
-      //@ts-expect-error This is private to tabulator, but we have no other choice atm.
+      // @ts-expect-error This is private to tabulator, but we have no other choice atm.
       const internalRow = nextVisible._getSelf();
       const isActive = activeRows.indexOf(internalRow) !== -1;
       if (nextVisible && isActive) {
