@@ -95,6 +95,15 @@ type PartitionRow = {
   _children: PartitionRow[] | null;
 };
 
+function walkRows(rows: PartitionRow[], visit: (row: PartitionRow) => void): void {
+  for (const row of rows) {
+    visit(row);
+    if (row._children && row._children.length > 0) {
+      walkRows(row._children, visit);
+    }
+  }
+}
+
 function assertPartitionInvariant(rows: PartitionRow[]): void {
   for (const row of rows) {
     if (!row._children || row._children.length === 0) {
@@ -138,6 +147,16 @@ function assertPartitionInvariant(rows: PartitionRow[]): void {
     expect(totals.soqlRowTotal).toBeCloseTo(row.soqlRowCount.total, 6);
     assertPartitionInvariant(row._children);
   }
+}
+
+function assertRowsDoNotExceedGlobalTotals(rows: PartitionRow[], global: PartitionRow): void {
+  walkRows(rows, (row) => {
+    expect(row.totalTime).toBeLessThanOrEqual(global.totalTime);
+    expect(row.dmlCount.total).toBeLessThanOrEqual(global.dmlCount.total);
+    expect(row.soqlCount.total).toBeLessThanOrEqual(global.soqlCount.total);
+    expect(row.dmlRowCount.total).toBeLessThanOrEqual(global.dmlRowCount.total);
+    expect(row.soqlRowCount.total).toBeLessThanOrEqual(global.soqlRowCount.total);
+  });
 }
 
 function sumTraceSelfTime(events: LogEvent[]): number {
@@ -658,7 +677,7 @@ describe('toBottomUpTree', () => {
     expect(rootSelfBudget).toBe(traceSelfBudget);
   });
 
-  it('matches worked example A (pure recursion) from BOTTOM_UP_CALL_TREE_SPEC.md', () => {
+  it('matches worked example A (pure recursion)', () => {
     const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
     const outer = createEvent({ text: 'Outer', self: 100, total: 1000, parent: root });
     const r1 = createEvent({ text: 'recursive', self: 10, total: 35, parent: outer });
@@ -689,7 +708,7 @@ describe('toBottomUpTree', () => {
     expect(level3Outer._children).toBeNull();
   });
 
-  it('matches worked example B (other / sub other) from BOTTOM_UP_CALL_TREE_SPEC.md', () => {
+  it('matches worked example B (other / sub other)', () => {
     const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
     const outer = createEvent({ text: 'Outer', self: 0, total: 25, parent: root });
     const other = createEvent({ text: 'other', self: 10, total: 25, parent: outer });
@@ -713,7 +732,7 @@ describe('toBottomUpTree', () => {
     expect(otherOuter).toMatchObject({ totalSelfTime: 10, totalTime: 25 });
   });
 
-  it('matches worked example C (nested Search) from top-down-to-bottom-up-example.md', () => {
+  it('matches worked example C (nested Search)', () => {
     const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
     const outer = createEvent({ text: 'Outer', self: 100, total: 1000, parent: root });
 
@@ -874,6 +893,97 @@ describe('toBottomUpTree', () => {
     expect(limitOnly.callCount).toBe(1);
     expect(limitOnly.dmlCount.self).toBe(1);
     expect(limitOnly.totalThrownCount).toBe(1);
+  });
+
+  it('orders roots deterministically by totalSelfTime desc, then name asc for ties', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    createEvent({ text: 'Zulu', self: 30, total: 30, parent: root });
+    createEvent({ text: 'Alpha', self: 20, total: 20, parent: root });
+    createEvent({ text: 'Beta', self: 20, total: 20, parent: root });
+
+    const rows = toBottomUpTree(root.children);
+    expect(rows.map((row) => row.text)).toEqual(['Zulu', 'Alpha', 'Beta']);
+  });
+
+  it('keeps every bottom-up total metric within the top-down global root totals', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    const outer = createEvent({
+      text: 'Outer',
+      self: 50,
+      total: 500,
+      parent: root,
+      dmlSelf: 4,
+      dmlTotal: 40,
+      soqlSelf: 3,
+      soqlTotal: 30,
+      dmlRowSelf: 20,
+      dmlRowTotal: 200,
+      soqlRowSelf: 10,
+      soqlRowTotal: 100,
+      thrown: 7,
+    });
+
+    const search = createEvent({
+      text: 'Search',
+      self: 25,
+      total: 300,
+      parent: outer,
+      dmlSelf: 2,
+      dmlTotal: 20,
+      soqlSelf: 1,
+      soqlTotal: 15,
+      dmlRowSelf: 10,
+      dmlRowTotal: 120,
+      soqlRowSelf: 4,
+      soqlRowTotal: 60,
+      thrown: 3,
+    });
+
+    createEvent({
+      text: 'Search',
+      self: 10,
+      total: 150,
+      parent: search,
+      dmlSelf: 1,
+      dmlTotal: 8,
+      soqlSelf: 1,
+      soqlTotal: 6,
+      dmlRowSelf: 5,
+      dmlRowTotal: 40,
+      soqlRowSelf: 2,
+      soqlRowTotal: 20,
+      thrown: 1,
+    });
+
+    createEvent({
+      text: 'Worker',
+      self: 60,
+      total: 100,
+      parent: outer,
+      dmlSelf: 2,
+      dmlTotal: 12,
+      soqlSelf: 1,
+      soqlTotal: 7,
+      dmlRowSelf: 8,
+      dmlRowTotal: 35,
+      soqlRowSelf: 3,
+      soqlRowTotal: 15,
+      thrown: 1,
+    });
+
+    const rows = toBottomUpTree(root.children) as PartitionRow[];
+    const globalRoot: PartitionRow = {
+      text: outer.text,
+      totalTime: outer.duration.total,
+      totalSelfTime: outer.duration.self,
+      dmlCount: { self: outer.dmlCount.self, total: outer.dmlCount.total },
+      soqlCount: { self: outer.soqlCount.self, total: outer.soqlCount.total },
+      dmlRowCount: { self: outer.dmlRowCount.self, total: outer.dmlRowCount.total },
+      soqlRowCount: { self: outer.soqlRowCount.self, total: outer.soqlRowCount.total },
+      _children: null,
+    };
+
+    assertRowsDoNotExceedGlobalTotals(rows, globalRoot);
   });
 });
 

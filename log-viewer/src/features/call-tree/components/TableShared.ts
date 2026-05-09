@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Certinia Inc. All rights reserved.
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { Tabulator } from 'tabulator-tables';
 
