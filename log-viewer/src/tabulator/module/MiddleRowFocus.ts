@@ -17,7 +17,24 @@ export class MiddleRowFocus extends Module {
   static moduleName = 'middleRowFocus';
 
   tableHolder: HTMLElement | null = null;
+  private tableEl: HTMLElement | null = null;
   middleRow: RowComponent | null = null;
+  private pendingFilterRaf: number | null = null;
+
+  // Single tree toggle: skip the next renderComplete recenter so scrollTop stays put.
+  // Bulk toggle (expand-all / collapse-all): the second toggle in the synchronous burst
+  // clears the skip flag, so the recenter runs as before.
+  private skipNextRender = false;
+  private toggleSeenInBurst = false;
+
+  // Boundary anchoring: when the user is at the top or bottom of the scroll range
+  // before an operation, recentering on the middle row pushes them away from the
+  // edge they were at. Capture the boundary at snapshot time and restore it
+  // (scrollTop = 0 / scrollHeight - clientHeight) instead of centering.
+  private static readonly boundaryThresholdPx = 10;
+  private wasAtTop = false;
+  private wasAtBottom = false;
+
   constructor(table: Tabulator) {
     super(table);
     this.registerTableOption(middleRowFocusOption, false);
@@ -28,30 +45,128 @@ export class MiddleRowFocus extends Module {
     if (this.options(middleRowFocusOption)) {
       this.tableHolder = this.table.element.querySelector('.tabulator-tableholder');
 
-      this.table.on('dataTreeRowExpanded', () => {
-        this._clearFocusRow();
-      });
+      this.table.on('dataTreeRowExpanded', () => this._onTreeToggle());
+      this.table.on('dataTreeRowCollapsed', () => this._onTreeToggle());
 
-      this.table.on('dataTreeRowCollapsed', () => {
-        this._clearFocusRow();
-      });
+      // Sort resets scrollTop before renderStarted fires, so capture the anchor here
+      // (pre-sort) instead. The renderStarted handler below is a no-op once middleRow
+      // is set — see the !this.middleRow guard.
+      this.table.on('dataSorting', () => this._captureAnchor());
 
-      this.table.on('renderStarted', () => {
-        if (this.table && this.tableHolder && !this.middleRow) {
-          this.middleRow = this._findMiddleVisibleRow(this.tableHolder);
+      this.table.on('renderStarted', () => this._captureAnchor());
+
+      // Tabulator bug workaround: rerenderRows on filter can leave .tabulator-table's
+      // paddingTop inflated when the pre-filter vDomTop/vDomBottom point past the
+      // post-filter row count. Detect and zero on the next frame after the render.
+      // See tabulator-virtual-scroll-fixes.md "Fix 7" for the upstream patch.
+      this.table.on('dataFiltered', () => {
+        if (this.pendingFilterRaf !== null) {
+          cancelAnimationFrame(this.pendingFilterRaf);
         }
+        this.pendingFilterRaf = requestAnimationFrame(() => {
+          this.pendingFilterRaf = null;
+          this._resetStaleTopPadding();
+        });
       });
 
       this.table.on('renderComplete', async () => {
-        const rowToScrollTo = this.middleRow;
-        this._scrollToRow(rowToScrollTo);
-        this.middleRow = null;
+        if (this.skipNextRender) {
+          this.skipNextRender = false;
+          this._clearAnchor();
+        } else {
+          this._restoreAnchor();
+        }
+        this.toggleSeenInBurst = false;
       });
     }
   }
 
-  private _clearFocusRow() {
+  /**
+   * Capture the user's scroll anchor: the row at the visual middle and whether
+   * the user was at the top / bottom edge. Idempotent within one operation —
+   * subsequent calls are no-ops once an anchor is already set.
+   */
+  private _captureAnchor() {
+    if (!this.tableHolder || this.middleRow) {
+      return;
+    }
+    const holder = this.tableHolder;
+    const max = Math.max(0, holder.scrollHeight - holder.clientHeight);
+    this.wasAtTop = holder.scrollTop <= MiddleRowFocus.boundaryThresholdPx;
+    this.wasAtBottom = max - holder.scrollTop <= MiddleRowFocus.boundaryThresholdPx;
+    this.middleRow = this._findMiddleVisibleRow(holder);
+  }
+
+  /**
+   * Restore the captured anchor. Boundary cases (was-at-top / was-at-bottom) snap
+   * to the edge so we don't push the user off it. Mid-table centers on middleRow.
+   */
+  private _restoreAnchor() {
+    const holder = this.tableHolder;
+    if (!holder) {
+      this._clearAnchor();
+      return;
+    }
+    if (this.wasAtTop) {
+      holder.scrollTop = 0;
+    } else if (this.wasAtBottom) {
+      holder.scrollTop = Math.max(0, holder.scrollHeight - holder.clientHeight);
+    } else {
+      this._scrollToRow(this.middleRow);
+    }
+    this._clearAnchor();
+  }
+
+  private _clearAnchor() {
     this.middleRow = null;
+    this.wasAtTop = false;
+    this.wasAtBottom = false;
+  }
+
+  /**
+   * Tabulator bug workaround: after a filter, rerenderRows() (`tabulator_esm.mjs`,
+   * line ~25265) iterates pre-filter `vDomTop..vDomBottom` against the post-filter
+   * `rows()` array. The resulting `topOffset` flows into `_virtualRenderFill` and
+   * inflates `vDomTopPad` → `paddingTop` on `.tabulator-table` → blank strip across
+   * the top of the holder. We detect the symptom (`scrollTop < paddingTop`, which
+   * implies more empty space above the rendered window than the user has scrolled
+   * past) and reset the padding plus Tabulator's internal `vDomTopPad` so future
+   * renders are coherent.
+   */
+  private _resetStaleTopPadding() {
+    if (!this.tableHolder) {
+      return;
+    }
+    if (!this.tableEl) {
+      this.tableEl = this.tableHolder.querySelector('.tabulator-table');
+    }
+    const tableEl = this.tableEl;
+    if (!tableEl) {
+      return;
+    }
+    const paddingTop = parseFloat(tableEl.style.paddingTop) || 0;
+    const scrollTop = this.tableHolder.scrollTop;
+    if (paddingTop > 0 && scrollTop < paddingTop) {
+      tableEl.style.paddingTop = '0px';
+      const renderer = this.table.rowManager?.renderer as Record<string, unknown> | undefined;
+      if (renderer) {
+        renderer.vDomTopPad = 0;
+      }
+    }
+  }
+
+  private _onTreeToggle() {
+    if (!this.toggleSeenInBurst) {
+      // First toggle in this burst: assume single, arm the skip.
+      this.toggleSeenInBurst = true;
+      this.skipNextRender = true;
+    } else {
+      // A second toggle arrived synchronously => it's a bulk operation; let the
+      // existing recenter run so the user's middle row stays in view.
+      this.skipNextRender = false;
+    }
+    // Clear the anchor so renderStarted captures fresh (with up-to-date boundary flags).
+    this._clearAnchor();
   }
 
   private _scrollToRow(row: RowComponent | null) {
