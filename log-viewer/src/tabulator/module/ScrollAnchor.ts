@@ -102,11 +102,10 @@ export class ScrollAnchor extends Module {
     const row = this._findMiddleVisibleRow(holder);
     this.anchorRow = row;
     if (row) {
-      const rowRect = row.getElement().getBoundingClientRect();
-      const holderRect = holder.getBoundingClientRect();
-      this.anchorOffsetFromHolderTop = rowRect.top - holderRect.top;
-    } else {
-      this.anchorOffsetFromHolderTop = 0;
+      // offsetTop is relative to the offsetParent (.tabulator-table); subtracting
+      // scrollTop gives the row's Y position inside the holder viewport — same
+      // result as paired getBoundingClientRect calls without forcing layout reads.
+      this.anchorOffsetFromHolderTop = row.getElement().offsetTop - holder.scrollTop;
     }
   }
 
@@ -141,16 +140,11 @@ export class ScrollAnchor extends Module {
   /**
    * Synchronous, pixel-accurate scroll anchor restore.
    *
-   * 1. Resolve which row to anchor on post-render. If the original anchor row is
-   *    still in the display set, use it. Otherwise fall back to the nearest
-   *    still-active row by timestamp (rows above us could have been added or
-   *    removed; the literal anchor row could have been filtered/collapsed away).
-   * 2. Make sure the row is in the virtual DOM window so its `offsetTop` is
-   *    meaningful — call Tabulator's private `_virtualRenderFill` to refill the
-   *    vDom centered on the row index. Same hook the public `scrollToRow` uses.
-   * 3. Set `scrollTop = rowEl.offsetTop - anchorOffsetFromHolderTop`. Both DOM
-   *    writes happen in the same JS turn as `renderComplete`, so the browser
-   *    paints the corrected scroll position directly — no intermediate frame.
+   * If the anchor row is outside the post-render virtual DOM window its element
+   * is detached and `offsetTop` is stale. Call Tabulator's private
+   * `_virtualRenderFill` (same hook the public `scrollToRow` uses) to refill the
+   * vDom centered on the row, then set scrollTop in the same JS turn as
+   * renderComplete — the browser paints the corrected position directly.
    */
   private _anchorPixelAccurate(holder: HTMLElement) {
     const row = this._resolveAnchorRow();
@@ -158,26 +152,23 @@ export class ScrollAnchor extends Module {
       return;
     }
 
-    const renderer = this.table.rowManager?.renderer as
-      | { rows?: () => unknown[]; _virtualRenderFill?: (index: number, force?: boolean) => void }
-      | undefined;
-
-    // Tabulator's private internal row (Row, not RowComponent) is what the renderer
-    // indexes. We need that index to refill the vDom window around it.
-    // @ts-expect-error _getSelf is private to tabulator, but we have no other choice atm.
-    const internalRow = row._getSelf() as unknown;
-    if (renderer?.rows && renderer._virtualRenderFill) {
-      const rows = renderer.rows();
-      const index = rows.indexOf(internalRow);
-      if (index > -1) {
-        renderer._virtualRenderFill(index, true);
+    const rowEl = row.getElement();
+    if (!rowEl.isConnected) {
+      const renderer = this.table.rowManager.renderer as Record<string, unknown> | undefined;
+      // @ts-expect-error _getSelf is private to tabulator, but we have no other choice atm.
+      const internalRow = row._getSelf() as unknown;
+      const rendererRows = (renderer?.rows as (() => unknown[]) | undefined)?.();
+      const fill = renderer?._virtualRenderFill as
+        | ((index: number, force?: boolean) => void)
+        | undefined;
+      if (rendererRows && fill) {
+        const index = rendererRows.indexOf(internalRow);
+        if (index > -1) {
+          fill.call(renderer, index, true);
+        }
       }
     }
 
-    const rowEl = row.getElement();
-    if (!rowEl) {
-      return;
-    }
     holder.scrollTop = Math.max(0, rowEl.offsetTop - this.anchorOffsetFromHolderTop);
   }
 
@@ -192,18 +183,21 @@ export class ScrollAnchor extends Module {
       return null;
     }
     const displayRows = this.table.rowManager.getDisplayRows();
-    // @ts-expect-error _getSelf is private to tabulator, but we have no other choice atm.
-    const internalRow = row._getSelf();
-    if (displayRows.indexOf(internalRow) !== -1) {
+    if (this._isRowActive(row, displayRows)) {
       return row;
     }
 
-    const data = row.getData() as TimedNodeProp;
-    const timestamp = data?.originalData?.timestamp;
+    const timestamp = (row.getData() as TimedNodeProp).originalData?.timestamp;
     if (timestamp === undefined) {
       return null;
     }
-    return this._findClosestActive(this.table.getRows('active'), timestamp);
+    return this._findClosestActive(this.table.getRows('active'), timestamp, displayRows);
+  }
+
+  private _isRowActive(row: RowComponent, displayRows: RowComponent[]): boolean {
+    // @ts-expect-error _getSelf is private to tabulator, but we have no other choice atm.
+    const internalRow = row._getSelf();
+    return displayRows.indexOf(internalRow) !== -1;
   }
 
   /**
@@ -248,7 +242,11 @@ export class ScrollAnchor extends Module {
     this._clearAnchor();
   }
 
-  private _findClosestActive(rows: RowComponent[], timeStamp: number): RowComponent | null {
+  private _findClosestActive(
+    rows: RowComponent[],
+    timeStamp: number,
+    displayRows: RowComponent[] = this.table.rowManager.getDisplayRows(),
+  ): RowComponent | null {
     if (!rows) {
       return null;
     }
@@ -256,7 +254,6 @@ export class ScrollAnchor extends Module {
     let start = 0,
       end = rows.length - 1;
 
-    const displayRows = this.table.rowManager.getDisplayRows();
     while (start <= end) {
       const mid = Math.floor((start + end) / 2);
       const row = rows[mid];
@@ -268,16 +265,17 @@ export class ScrollAnchor extends Module {
       const endTime = node.exitStamp ?? node.timestamp;
 
       if (timeStamp === node.timestamp) {
-        // @ts-expect-error This is private to tabulator, but we have no other choice atm.
-        const internalRow = row._getSelf();
-        const isActive = displayRows.indexOf(internalRow) !== -1;
-        if (isActive) {
+        if (this._isRowActive(row, displayRows)) {
           return row;
         }
 
         return this._findClosestActiveSibling(mid, rows, displayRows);
       } else if (timeStamp >= node.timestamp && timeStamp <= endTime) {
-        const childMatch = this._findClosestActive(row.getTreeChildren() ?? [], timeStamp);
+        const childMatch = this._findClosestActive(
+          row.getTreeChildren() ?? [],
+          timeStamp,
+          displayRows,
+        );
         if (childMatch) {
           return childMatch;
         }
@@ -308,10 +306,7 @@ export class ScrollAnchor extends Module {
       if (!previousVisible) {
         continue;
       }
-      // @ts-expect-error This is private to tabulator, but we have no other choice atm.
-      const internalRow = previousVisible._getSelf();
-      const isActive = activeRows.indexOf(internalRow) !== -1;
-      if (previousVisible && isActive) {
+      if (this._isRowActive(previousVisible, activeRows)) {
         indexes.push(previousIndex);
         break;
       }
@@ -329,11 +324,7 @@ export class ScrollAnchor extends Module {
       if (!nextVisible) {
         continue;
       }
-
-      // @ts-expect-error This is private to tabulator, but we have no other choice atm.
-      const internalRow = nextVisible._getSelf();
-      const isActive = activeRows.indexOf(internalRow) !== -1;
-      if (nextVisible && isActive) {
+      if (this._isRowActive(nextVisible, activeRows)) {
         indexes.push(nextIndex);
         break;
       }

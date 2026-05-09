@@ -325,10 +325,14 @@ describe('ScrollAnchor', () => {
   });
 
   it('captures the anchor offset within the holder for pixel-accurate restore', () => {
-    // Holder top at y=50, anchor row top at y=80 → offset 30. r1 too small to be middle;
-    // r2 covers half-height first.
-    const r1 = makeRow(50, 20);
-    const r2 = makeRow(80, 40);
+    // Anchor row offsetTop=130, holder.scrollTop=100 → captured offset = 30 (the
+    // row's Y position inside the visible holder viewport).
+    const r1 = {
+      getElement: () => ({ offsetTop: 100, getBoundingClientRect: () => rect(50, 20) }),
+    };
+    const r2 = {
+      getElement: () => ({ offsetTop: 130, getBoundingClientRect: () => rect(80, 40) }),
+    };
     const holder = {
       scrollTop: 100,
       scrollHeight: 1000,
