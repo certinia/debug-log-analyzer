@@ -144,6 +144,10 @@ export class SOQLView extends LitElement {
           user-select: none;
         }
       }
+
+      vscode-dropdown::part(listbox) {
+        width: auto;
+      }
     `,
   ];
 
