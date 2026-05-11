@@ -82,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Hover Details**: Hover near the ghost text to see SOQL/DML counts, row counts, and exception info.
   - **Total Duration**: First line shows total log execution time.
   - **Syntax Highlighting**: Apex debug log files are automatically recognized and syntax highlighted for improved readability.
+- 🏷️ **Group by Caller Namespace**: New grouping option across the Analysis, Bottom-Up, and DML views. Groups rows by the namespace of their **direct caller** (the immediate parent code unit), making it easy to see cross-package activity. ([#604])
 
 ### Changed
 
@@ -483,6 +484,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#604]: https://github.com/certinia/debug-log-analyzer/issues/604
 [#333]: https://github.com/certinia/debug-log-analyzer/issues/333
 [#627]: https://github.com/certinia/debug-log-analyzer/issues/627
 [#685]: https://github.com/certinia/debug-log-analyzer/issues/685
