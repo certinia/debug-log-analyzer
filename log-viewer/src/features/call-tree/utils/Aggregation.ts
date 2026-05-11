@@ -3,6 +3,7 @@
  */
 
 import type { LogEvent, SelfTotal } from 'apex-log-parser';
+import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { Multiset } from '../../../core/utility/Multiset.js';
 
 /**
@@ -18,6 +19,8 @@ export interface AggregatedRow {
   text: string;
   /** Package namespace */
   namespace: string;
+  /** Namespace of the direct caller (representative; used for grouping/filtering, not displayed) */
+  callerNamespace: string;
   /** Number of times this function was called */
   callCount: number;
   /** Sum of self-time across all calls */
@@ -37,7 +40,7 @@ export interface AggregatedRow {
   /** Total exceptions thrown */
   totalThrownCount: number;
   /** Aggregated children (callees grouped by signature) */
-  _children: AggregatedRow[] | null;
+  _children?: AggregatedRow[] | null;
   /** References to original events for drill-down */
   instances: LogEvent[];
   /** Representative event for this row (used by formatters) */
@@ -57,6 +60,8 @@ export interface BottomUpRow {
   text: string;
   /** Package namespace */
   namespace: string;
+  /** Namespace of the direct caller (representative; used for grouping/filtering, not displayed) */
+  callerNamespace: string;
   /** Event type (e.g., METHOD_ENTRY, CODE_UNIT_STARTED) */
   type: string;
   /** Number of times this function was called */
@@ -78,7 +83,7 @@ export interface BottomUpRow {
   /** Total exceptions thrown */
   totalThrownCount: number;
   /** Callers (parent functions) as children - lazy loaded */
-  _children: BottomUpRow[] | null;
+  _children?: BottomUpRow[] | null;
   /** References to the displayed events for drill-down */
   instances: LogEvent[];
   /** Instances whose metrics are being attributed through this caller path */
@@ -418,8 +423,6 @@ function finalizeBucketRecursive(row: BottomUpRow): void {
       finalizeBucketRecursive(child);
     }
     sortBuckets(row._children);
-  } else {
-    row._children = null;
   }
 }
 
@@ -439,6 +442,7 @@ function createEmptyAggregatedRow(key: string, event: LogEvent): AggregatedRow {
     key,
     text: event.text,
     namespace: event.namespace,
+    callerNamespace: getCallerNamespace(event),
     callCount: 0,
     totalSelfTime: 0,
     totalTime: 0,
@@ -460,6 +464,7 @@ function createEmptyBottomUpRow(key: string, event: LogEvent): BottomUpRow {
     key,
     text: event.text,
     namespace: event.namespace,
+    callerNamespace: getCallerNamespace(event),
     type: event.type ?? '',
     callCount: 0,
     totalSelfTime: 0,

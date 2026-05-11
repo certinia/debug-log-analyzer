@@ -19,10 +19,14 @@ import {
   type TableCallbacks,
 } from './TableShared.js';
 
+export interface AggregatedTableCallbacks extends TableCallbacks {
+  showDetailsFilter?: (data: AggregatedRow) => boolean;
+}
+
 export function createAggregatedTable(
   container: HTMLDivElement,
   rootMethod: ApexLog,
-  callbacks: TableCallbacks,
+  callbacks: AggregatedTableCallbacks,
 ): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
 
@@ -41,9 +45,10 @@ export function createAggregatedTable(
     placeholder: 'No Call Tree Available',
     height: '100%',
     maxHeight: '100%',
-    // @ts-expect-error custom property for module/RowKeyboardNavigation + ScrollAnchor
     rowKeyboardNavigation: true,
     scrollAnchor: true,
+    // @ts-expect-error tabulator allows a function predicate but the types only declare Filter[]
+    initialFilter: callbacks.showDetailsFilter,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',

@@ -72,7 +72,7 @@ function findRowByText<T extends { text: string }>(rows: T[], text: string): T {
 }
 
 function assertTotalIsAtLeastSelf(
-  rows: Array<{ totalTime: number; totalSelfTime: number; _children: unknown }>,
+  rows: Array<{ totalTime: number; totalSelfTime: number; _children?: unknown }>,
 ): void {
   for (const row of rows) {
     expect(row.totalTime).toBeGreaterThanOrEqual(row.totalSelfTime);
@@ -92,7 +92,7 @@ type PartitionRow = {
   soqlCount: { self: number; total: number };
   dmlRowCount: { self: number; total: number };
   soqlRowCount: { self: number; total: number };
-  _children: PartitionRow[] | null;
+  _children?: PartitionRow[] | null;
 };
 
 function assertPartitionInvariant(rows: PartitionRow[]): void {

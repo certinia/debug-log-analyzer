@@ -27,6 +27,10 @@ export type BottomUpTableOptions = Partial<Options> & {
   exportFileName?: string;
 };
 
+export interface BottomUpTableCallbacks extends TableCallbacks {
+  showDetailsFilter?: (data: BottomUpRow) => boolean;
+}
+
 type VSCodeSaveFile = {
   fileContent: string;
   options: { defaultFileName: string };
@@ -49,7 +53,7 @@ function createDownloadEncoder(defaultFileName: string) {
 export function createBottomUpTable(
   container: HTMLDivElement,
   rootMethod: ApexLog,
-  callbacks: TableCallbacks,
+  callbacks: BottomUpTableCallbacks,
   options: BottomUpTableOptions = {},
 ): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
@@ -95,6 +99,7 @@ export function createBottomUpTable(
     maxHeight: '100%',
     rowKeyboardNavigation: true,
     scrollAnchor: true,
+    initialFilter: callbacks.showDetailsFilter,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',
