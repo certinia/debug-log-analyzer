@@ -43,6 +43,8 @@ By default rows are grouped by the SOQL/ DML text, grouping can be removed and t
 
 SOQL Statements can also be grouped by package namespace including the default namespace
 
+Rows can also be grouped by **Caller Namespace** — the namespace of the direct caller that issued the DML. This makes it easy to see which package's code is responsible for that DML, even though the time is attributed to the default namespace.
+
 ### DML / SOQL Call Stack
 
 Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occurred in the call tree.

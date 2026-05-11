@@ -33,12 +33,13 @@ Each column can be sorted by clicking the column header, this will sort the rows
 
 ### Group
 
-The rows can be grouped by Type or Namespace using a bottom-up caller grouping model, which complements the three Call Tree views: [Time Order, Aggregated, and Bottom-Up](calltree.md).
+The rows can be grouped by Type, Namespace, or Caller Namespace.
 
 In this model, roots are callees and parent/child relationships represent callers expanded beneath each callee.
 `Total Time` is the full attributed time for that callee path, while `Self Time` is the exclusive attributed time for the callee itself.
 
 1. Namespace: Shows the rows aggregated by their namespace e.g `default`, `MyNamespace`
+1. Caller Namespace: Shows the rows aggregated by the namespace of the direct caller (the immediate parent code unit). Useful for seeing which package triggered work in another package.
 1. Type: Shows the rows aggregated by namespace event type e.g `METHOD_ENTRY`, `DML_ENTRY`
 
 ### Export to CSV + copy to clipboard
