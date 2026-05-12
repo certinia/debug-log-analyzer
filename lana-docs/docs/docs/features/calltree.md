@@ -55,7 +55,7 @@ Each column can be sorted by clicking the column header, this will sort the rows
 1. Show Log events for specific namespaces using the namespace column filter
 1. Min and Max filtering can be done on the _Total Time_ and _Self Time_ columns.
 
-Details, Debug Only, and Type filtering are available in **Time Order** and **Aggregated**. The **Bottom-Up** view has its own grouping controls (None, Namespace, Type).
+Debug Only and Type filtering are available in **Time Order** and **Aggregated**. The Details filter is available in all three views. The **Bottom-Up** view has its own grouping controls (None, Namespace, Caller Namespace, Type).
 
 ### Keyboard Navigation
 

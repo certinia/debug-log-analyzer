@@ -4,7 +4,8 @@
 import {
   provideVSCodeDesignSystem,
   vsCodeButton,
-  vsCodeCheckbox,
+  vsCodeDropdown,
+  vsCodeOption,
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
@@ -12,6 +13,7 @@ import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tab
 
 import type { ApexLog, DMLBeginLine } from 'apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { DatabaseAccess } from '../services/Database.js';
 
@@ -36,7 +38,14 @@ import '../../../components/CallStack.js';
 import '../../../components/datagrid-filter-bar.js';
 import './DatabaseSection.js';
 
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeCheckbox());
+provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDropdown(), vsCodeOption());
+
+const groupLabelsToFields = new Map<string, string>([
+  ['DML', 'dml'],
+  ['Namespace', 'namespace'],
+  ['Caller Namespace', 'callerNamespace'],
+  ['None', ''],
+]);
 
 @customElement('dml-view')
 export class DMLView extends LitElement {
@@ -115,6 +124,29 @@ export class DMLView extends LitElement {
         width: 100%;
         margin-bottom: 1rem;
       }
+
+      .dropdown-container {
+        box-sizing: border-box;
+        display: flex;
+        flex-flow: column nowrap;
+        align-items: flex-start;
+        justify-content: flex-start;
+
+        label {
+          display: block;
+          color: var(--vscode-descriptionForeground);
+          cursor: pointer;
+          font-size: calc(var(--vscode-font-size) * 0.9);
+          font-weight: 400;
+          line-height: 1.4;
+          margin-bottom: 4px;
+          user-select: none;
+        }
+      }
+
+      vscode-dropdown::part(listbox) {
+        width: auto;
+      }
     `,
   ];
 
@@ -125,11 +157,18 @@ export class DMLView extends LitElement {
       <database-section title="DML Statements" .dbLines="${this.dmlLines}"></database-section>
 
       <datagrid-filter-bar>
-        <div slot="filters">
-          Group by
-          <div>
-            <vscode-checkbox @change="${this._dmlGroupBy}" checked>DML</vscode-checkbox>
-          </div>
+        <div slot="filters" class="dropdown-container">
+          <label for="dml-groupby-dropdown">Group by</label>
+          <vscode-dropdown
+            id="dml-groupby-dropdown"
+            aria-label="Group by"
+            aria-labelledby="dml-groupby-dropdown"
+            @change="${this._dmlGroupBy}"
+          >
+            <vscode-option>DML</vscode-option>
+            <vscode-option>Caller Namespace</vscode-option>
+            <vscode-option>None</vscode-option>
+          </vscode-dropdown>
         </div>
 
         <div slot="actions">
@@ -172,9 +211,13 @@ export class DMLView extends LitElement {
   }) as EventListener;
 
   _dmlGroupBy(event: Event) {
+    if (!this.dmlTable) {
+      return;
+    }
     const target = event.target as HTMLInputElement;
+    const groupValue = groupLabelsToFields.get(target.value) ?? '';
     //@ts-expect-error This is a custom function added in the GroupSort custom module
-    this.dmlTable?.setSortedGroupBy(target.checked ? 'dml' : '');
+    this.dmlTable.setSortedGroupBy(groupValue);
   }
 
   get _dmlTableWrapper(): HTMLDivElement | null {
@@ -264,6 +307,8 @@ export class DMLView extends LitElement {
       for (const dml of dmlLines) {
         dmlData.push({
           dml: dml.text,
+          namespace: dml.namespace,
+          callerNamespace: getCallerNamespace(dml),
           rowCount: dml.dmlRowCount.self,
           timeTaken: dml.duration.total,
           timestamp: dml.timestamp,
@@ -342,6 +387,20 @@ export class DMLView extends LitElement {
             endDepth="1"
           ></call-stack>`;
           },
+        },
+        {
+          title: 'Caller Namespace',
+          field: 'callerNamespace',
+          sorter: 'string',
+          width: 120,
+          headerFilter: 'list',
+          headerFilterFunc: 'in',
+          headerFilterParams: {
+            valuesLookup: 'all',
+            clearable: true,
+            multiselect: true,
+          },
+          headerFilterLiveFilter: false,
         },
         {
           title: 'Row Count',
@@ -518,6 +577,8 @@ type VSCodeSaveFile = {
 
 interface DMLRow {
   dml?: string;
+  namespace?: string;
+  callerNamespace?: string;
   rowCount?: number;
   timeTaken?: number;
   timestamp: number;
