@@ -60,32 +60,27 @@ export function createAggregatedTable(
         bottomCalc: () => 'Total',
         cssClass: 'datagrid-textarea datagrid-code-text',
         formatter: (cell) => {
-          const cellElem = cell.getElement();
           const row = cell.getRow();
           // @ts-expect-error: _row is private
           const dataTree = row._row.modules.dataTree;
           const treeLevel = dataTree?.index ?? 0;
           childIndent ??= row.getTable().options.dataTreeChildIndent || 0;
           const levelIndent = treeLevel * childIndent;
+
+          const cellElem = cell.getElement();
           cellElem.style.paddingLeft = `${levelIndent + 4}px`;
           cellElem.style.textIndent = `-${levelIndent}px`;
 
           const rowData = cell.getData() as AggregatedRow;
-          const elem = document.createElement('span');
           const firstInstance = rowData.instances[0];
 
           if (firstInstance?.hasValidSymbols) {
             const link = document.createElement('a');
             link.setAttribute('href', '#!');
             link.textContent = rowData.text;
-            elem.appendChild(link);
-          } else {
-            const textSpan = document.createElement('span');
-            textSpan.textContent = rowData.text;
-            elem.appendChild(textSpan);
+            return link;
           }
-
-          return elem;
+          return document.createTextNode(rowData.text) as unknown as HTMLElement;
         },
         variableHeight: true,
         cellClick: (e, cell) => {
