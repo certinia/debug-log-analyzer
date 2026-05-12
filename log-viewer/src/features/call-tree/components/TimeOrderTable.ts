@@ -277,18 +277,13 @@ export function createTimeOrderTable(
   });
   tableRef.current = table;
 
-  table.on('dataFiltered', () => {
+  // renderStarted fires once after the filter-pipeline; dataFiltered can cascade
+  // on dataTree tables via getFilteredTreeChildren -> filter.filter().
+  table.on('renderStarted', () => {
     totalTimeFilterCache.clear();
     selfTimeFilterCache.clear();
     namespaceFilterCache.clear();
     callbacks.onFilterCacheClear();
-  });
-
-  table.on('dataSorted', () => {
-    callbacks.onRenderStarted();
-  });
-
-  table.on('dataFiltered', () => {
     callbacks.onRenderStarted();
   });
 

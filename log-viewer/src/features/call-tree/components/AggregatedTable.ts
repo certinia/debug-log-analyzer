@@ -293,14 +293,13 @@ export function createAggregatedTable(
   });
   tableRef.current = table;
 
-  table.on('dataFiltered', () => {
+  // renderStarted fires once after the filter-pipeline; dataFiltered can cascade
+  // on dataTree tables via getFilteredTreeChildren -> filter.filter().
+  table.on('renderStarted', () => {
     namespaceFilterCache.clear();
     totalTimeFilterCache.clear();
     selfTimeFilterCache.clear();
     callbacks.onFilterCacheClear();
-  });
-
-  table.on('renderStarted', () => {
     callbacks.onRenderStarted();
   });
 

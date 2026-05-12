@@ -222,11 +222,10 @@ export function createBottomUpTable(
     ...tabulatorOptionOverrides,
   });
 
-  table.on('dataFiltered', () => {
-    callbacks.onFilterCacheClear();
-  });
-
+  // renderStarted fires once after the filter-pipeline; dataFiltered can cascade
+  // on dataTree tables via getFilteredTreeChildren -> filter.filter().
   table.on('renderStarted', () => {
+    callbacks.onFilterCacheClear();
     callbacks.onRenderStarted();
   });
 
