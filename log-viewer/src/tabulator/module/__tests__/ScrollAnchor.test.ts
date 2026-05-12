@@ -90,9 +90,12 @@ describe('ScrollAnchor', () => {
     expect((plugin as unknown as { skipNextRender: boolean }).skipNextRender).toBe(false);
   });
 
-  it('captures the middle row in dataSorting (before Tabulator resets scrollTop)', () => {
-    // Build a table with a holder + visible rows so dataSorting can run
-    // _findMiddleVisibleRow successfully.
+  it('captures the middle row in renderStarted and is idempotent within a render cycle', () => {
+    // renderStarted is the single capture point. VariableHeightVerticalRenderer
+    // preserves scrollTop across rerenderRows, so by the time renderStarted
+    // fires the holder still reflects the pre-render state — capturing the
+    // correct middle row. The capture must also be idempotent: a second
+    // renderStarted within the same cycle must not overwrite the anchor.
     const r1 = makeRow(0, 30);
     const r2 = makeRow(30, 30);
     const r3 = makeRow(60, 30);
@@ -105,7 +108,9 @@ describe('ScrollAnchor', () => {
       }),
       element: { querySelector: jest.fn(() => holder) },
       getRows: jest.fn((type?: string) => {
-        if (type === 'visible') return [r1, r2, r3];
+        if (type === 'visible') {
+          return [r1, r2, r3];
+        }
         return [];
       }),
       rowManager: { getDisplayRows: () => [] },
@@ -117,20 +122,131 @@ describe('ScrollAnchor', () => {
     (plugin as unknown as { options: () => boolean }).options = () => true;
     plugin.initialize();
 
-    // Sort starts — pre-sort middle row should be captured now (= r2).
-    handlers.dataSorting?.[0]?.();
+    handlers.renderStarted?.[0]?.();
     expect((plugin as unknown as { anchorRow: unknown }).anchorRow).toBe(r2);
 
-    // Tabulator now rebuilds DOM with sorted rows in a different order. If our
-    // dataSorting capture didn't happen, renderStarted would capture the wrong
-    // row. Simulate that by changing the visible set and firing renderStarted —
-    // the guard `!this.anchorRow` should make this a no-op.
+    // Simulate Tabulator firing renderStarted a second time within the same
+    // cycle (e.g. nested rerenders). The `!this.anchorRow` guard should make
+    // this a no-op even though the visible set has changed.
     (table.getRows as jest.Mock).mockImplementation((...args: unknown[]) => {
-      if (args[0] === 'visible') return [r3, r2, r1]; // reversed
+      if (args[0] === 'visible') {
+        return [r3, r2, r1]; // reversed
+      }
       return [];
     });
     handlers.renderStarted?.[0]?.();
     expect((plugin as unknown as { anchorRow: unknown }).anchorRow).toBe(r2);
+  });
+
+  it('zeros stale paddingBottom when the last display row is in the rendered window', () => {
+    const tableEl = { style: { paddingBottom: '80px' } };
+    const holder = {
+      scrollTop: 0,
+      querySelector: jest.fn((sel: string) => (sel === '.tabulator-table' ? tableEl : null)),
+    };
+    // 3 rows total; vDomBottom = 2 (== rowsCount - 1) → last row is rendered.
+    const renderer: Record<string, unknown> = { vDomBottom: 2, vDomBottomPad: 80 };
+    const internalRows = [{}, {}, {}];
+    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
+    const table = {
+      handlers,
+      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
+        (handlers[evt] ??= []).push(fn);
+      }),
+      element: { querySelector: jest.fn(() => holder) },
+      getRows: jest.fn(() => []),
+      rowManager: { renderer, getDisplayRows: () => internalRows },
+      scrollToRow: jest.fn(() => Promise.resolve()),
+    };
+    const plugin = new ScrollAnchor(table as never);
+    (plugin as unknown as { table: typeof table }).table = table;
+    (plugin as unknown as { options: () => boolean }).options = () => true;
+    plugin.initialize();
+
+    (plugin as unknown as { _resetStaleBottomPadding: () => void })._resetStaleBottomPadding();
+
+    expect(tableEl.style.paddingBottom).toBe('0px');
+    expect(renderer.vDomBottomPad).toBe(0);
+  });
+
+  it('leaves paddingBottom alone when the last display row is not yet rendered', () => {
+    const tableEl = { style: { paddingBottom: '80px' } };
+    const holder = {
+      scrollTop: 0,
+      querySelector: jest.fn((sel: string) => (sel === '.tabulator-table' ? tableEl : null)),
+    };
+    // 10 rows total; vDomBottom = 4 → there are rows below the window. The pad
+    // is legitimately non-zero in this case; we must not touch it.
+    const renderer: Record<string, unknown> = { vDomBottom: 4, vDomBottomPad: 120 };
+    const internalRows = Array.from({ length: 10 }, () => ({}));
+    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
+    const table = {
+      handlers,
+      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
+        (handlers[evt] ??= []).push(fn);
+      }),
+      element: { querySelector: jest.fn(() => holder) },
+      getRows: jest.fn(() => []),
+      rowManager: { renderer, getDisplayRows: () => internalRows },
+      scrollToRow: jest.fn(() => Promise.resolve()),
+    };
+    const plugin = new ScrollAnchor(table as never);
+    (plugin as unknown as { table: typeof table }).table = table;
+    (plugin as unknown as { options: () => boolean }).options = () => true;
+    plugin.initialize();
+
+    (plugin as unknown as { _resetStaleBottomPadding: () => void })._resetStaleBottomPadding();
+
+    expect(tableEl.style.paddingBottom).toBe('80px');
+    expect(renderer.vDomBottomPad).toBe(120);
+  });
+
+  it('resets paddings before the anchor restore in renderComplete (so scrollHeight is accurate for was-at-bottom)', () => {
+    // wasAtBottom: scrollTop near max. Bottom-padding is stale → scrollHeight
+    // is inflated. If the reset ran AFTER the restore, the boundary restore
+    // would snap to the wrong (inflated) bottom. Verify the reset wins.
+    const tableEl = { style: { paddingBottom: '200px', paddingTop: '0px' } };
+    const holder = {
+      scrollTop: 800,
+      scrollHeight: 1000, // 800 + 200 stale pad
+      clientHeight: 100,
+      querySelector: jest.fn((sel: string) => (sel === '.tabulator-table' ? tableEl : null)),
+      getBoundingClientRect: () => rect(0, 100),
+    };
+    const renderer: Record<string, unknown> = { vDomBottom: 0, vDomBottomPad: 200 };
+    const internalRows = [{}];
+    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
+    const table = {
+      handlers,
+      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
+        (handlers[evt] ??= []).push(fn);
+      }),
+      element: { querySelector: jest.fn(() => holder) },
+      getRows: jest.fn(() => []),
+      rowManager: { renderer, getDisplayRows: () => internalRows },
+      scrollToRow: jest.fn(() => Promise.resolve()),
+    };
+    const plugin = new ScrollAnchor(table as never);
+    (plugin as unknown as { table: typeof table }).table = table;
+    (plugin as unknown as { options: () => boolean }).options = () => true;
+    plugin.initialize();
+
+    // Seed wasAtBottom directly; the renderComplete handler should run both
+    // padding resets, then snap scrollTop to the corrected max.
+    const p = plugin as unknown as { wasAtBottom: boolean };
+    p.wasAtBottom = true;
+
+    // Once the pad is zeroed the holder's scrollHeight reflects only content.
+    Object.defineProperty(holder, 'scrollHeight', {
+      get: () => (renderer.vDomBottomPad === 0 ? 800 : 1000),
+    });
+
+    handlers.renderComplete?.[0]?.();
+
+    expect(tableEl.style.paddingBottom).toBe('0px');
+    expect(renderer.vDomBottomPad).toBe(0);
+    // scrollTop snapped to corrected max (800 - 100 = 700), not stale (1000 - 100 = 900).
+    expect(holder.scrollTop).toBe(700);
   });
 
   it('zeros stale paddingTop after filter when scrollTop is less than paddingTop', () => {
@@ -226,10 +342,16 @@ describe('ScrollAnchor', () => {
   });
 
   it('on renderComplete with wasAtTop, snaps scrollTop to 0 instead of centering', () => {
-    const holder: { scrollTop: number; scrollHeight: number; clientHeight: number } = {
+    const holder: {
+      scrollTop: number;
+      scrollHeight: number;
+      clientHeight: number;
+      querySelector: () => null;
+    } = {
       scrollTop: 0,
       scrollHeight: 1000,
       clientHeight: 100,
+      querySelector: () => null,
     };
     const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
     const table = {
@@ -256,10 +378,16 @@ describe('ScrollAnchor', () => {
   });
 
   it('on renderComplete with wasAtBottom, snaps scrollTop to max instead of centering', () => {
-    const holder: { scrollTop: number; scrollHeight: number; clientHeight: number } = {
+    const holder: {
+      scrollTop: number;
+      scrollHeight: number;
+      clientHeight: number;
+      querySelector: () => null;
+    } = {
       scrollTop: 0,
       scrollHeight: 1000,
       clientHeight: 100,
+      querySelector: () => null,
     };
     const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
     const table = {
@@ -390,11 +518,13 @@ describe('ScrollAnchor', () => {
       scrollHeight: number;
       clientHeight: number;
       getBoundingClientRect: () => ReturnType<typeof rect>;
+      querySelector: () => null;
     } = {
       scrollTop: 100,
       scrollHeight: 5000,
       clientHeight: 100,
       getBoundingClientRect: () => rect(0, 100),
+      querySelector: () => null,
     };
     const renderer = {
       rows: jest.fn(() => [internalRow]),
