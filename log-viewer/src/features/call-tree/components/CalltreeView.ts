@@ -671,24 +671,25 @@ export class CalltreeView extends LitElement {
   _showDetailsFilterRollup = (data: AggregatedRow | BottomUpRow): boolean =>
     makeShowDetailsFilter(this.showDetailsFilterCache)(data);
 
-  private _makeTypeFilter(
-    types: ReadonlySet<string>,
-    cache: Map<string, boolean>,
-  ): (data: MergedCalltreeRow | AggregatedRow | BottomUpRow) => boolean {
-    return (data) =>
-      deepFilter<MergedCalltreeRow | AggregatedRow | BottomUpRow>(
-        data,
-        (row) => {
-          const type = row.originalData.type;
-          return type ? types.has(type) : false;
-        },
-        cache,
-      );
-  }
+  _debugFilter = (data: MergedCalltreeRow | AggregatedRow | BottomUpRow): boolean =>
+    deepFilter<MergedCalltreeRow | AggregatedRow | BottomUpRow>(
+      data,
+      (row) => !!(row.originalData.type && DEBUG_VALUE_TYPES.has(row.originalData.type)),
+      this.debugOnlyFilterCache,
+    );
 
-  _debugFilter = this._makeTypeFilter(DEBUG_VALUE_TYPES, this.debugOnlyFilterCache);
-
-  _typeFilter = this._makeTypeFilter(this.filterState.selectedTypes, this.typeFilterCache);
+  _typeFilter = (data: MergedCalltreeRow | AggregatedRow | BottomUpRow): boolean =>
+    deepFilter<MergedCalltreeRow | AggregatedRow | BottomUpRow>(
+      data,
+      (row) => {
+        const type = row.originalData.type;
+        if (!type) {
+          return false;
+        }
+        return this.filterState.selectedTypes.has(type);
+      },
+      this.typeFilterCache,
+    );
 
   _namespaceFilter = (
     selectedNamespaces: string[],

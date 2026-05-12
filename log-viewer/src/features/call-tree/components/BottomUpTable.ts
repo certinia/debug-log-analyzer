@@ -227,10 +227,21 @@ export function createBottomUpTable(
     ...tabulatorOptionOverrides,
   });
 
-  // renderStarted fires once after the filter-pipeline; dataFiltered can cascade
-  // on dataTree tables via getFilteredTreeChildren -> filter.filter().
-  table.on('renderStarted', () => {
+  // Filter caches MUST be cleared on `dataFiltered`, not `renderStarted`.
+  // Row ids in the bottom-up tree are only unique within a single parent's
+  // children, so the same id string can appear in different subtrees. On
+  // dataTree tables Tabulator runs `filter.filter()` for the top-level pass
+  // and again for each expanded subtree (via `getChildren` ->
+  // `filter.filter(config.children)`). `dataFiltered` fires after every one
+  // of those passes, so clearing here guarantees a fresh cache per pass. If
+  // we waited until `renderStarted` (one event for the whole pipeline), the
+  // top-level walk would poison the cache for later subtree passes and the
+  // wrong rows would match.
+  table.on('dataFiltered', () => {
     callbacks.onFilterCacheClear();
+  });
+
+  table.on('renderStarted', () => {
     callbacks.onRenderStarted();
   });
 
