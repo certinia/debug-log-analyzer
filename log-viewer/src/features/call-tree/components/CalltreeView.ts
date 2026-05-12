@@ -47,6 +47,28 @@ provideVSCodeDesignSystem().register(
 
 type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
 
+// Hoisted out of filter predicates so the Set is constructed once at module
+// load rather than re-allocated on every row's filter evaluation (which can
+// run thousands of times per filter operation on large logs).
+const SHOW_DETAILS_EXCLUDED_TYPES: ReadonlySet<string> = new Set([
+  'CUMULATIVE_LIMIT_USAGE',
+  'LIMIT_USAGE_FOR_NS',
+  'CUMULATIVE_PROFILING',
+  'CUMULATIVE_PROFILING_BEGIN',
+]);
+
+const DEBUG_VALUE_TYPES: ReadonlySet<string> = new Set([
+  'USER_DEBUG',
+  'DATAWEAVE_USER_DEBUG',
+  'USER_DEBUG_FINER',
+  'USER_DEBUG_FINEST',
+  'USER_DEBUG_FINE',
+  'USER_DEBUG_DEBUG',
+  'USER_DEBUG_INFO',
+  'USER_DEBUG_WARN',
+  'USER_DEBUG_ERROR',
+]);
+
 @customElement('call-tree-view')
 export class CalltreeView extends LitElement {
   @property()
@@ -358,12 +380,12 @@ export class CalltreeView extends LitElement {
   }
 
   _flat(arr: LogEvent[], target: LogEvent[]) {
-    arr.forEach((el) => {
-      target.push(el);
-      if (el.children.length > 0) {
-        this._flat(el.children, target);
+    for (const evt of arr) {
+      target.push(evt);
+      if (evt.children.length > 0) {
+        this._flat(evt.children, target);
       }
-    });
+    }
   }
 
   _flatten(arr: LogEvent[]) {
@@ -636,47 +658,27 @@ export class CalltreeView extends LitElement {
     this.blockClearHighlights = false;
   }
 
-  _showDetailsFilter = (data: MergedCalltreeRow) => {
-    const excludedTypes = new Set<string>([
-      'CUMULATIVE_LIMIT_USAGE',
-      'LIMIT_USAGE_FOR_NS',
-      'CUMULATIVE_PROFILING',
-      'CUMULATIVE_PROFILING_BEGIN',
-    ]);
+  _showDetailsFilter = (data: MergedCalltreeRow): boolean => {
+    const showDetailsFilter = (rowData: MergedCalltreeRow): boolean => {
+      const { duration, isParent, discontinuity, type } = rowData.originalData;
+      return (
+        isParent ||
+        duration.total > 0 ||
+        discontinuity ||
+        !!(type && SHOW_DETAILS_EXCLUDED_TYPES.has(type))
+      );
+    };
 
-    return this._deepFilter(
-      data,
-      (rowData) => {
-        const logLine = rowData.originalData;
-        return (
-          logLine.duration.total > 0 ||
-          logLine.exitTypes.length > 0 ||
-          logLine.discontinuity ||
-          !!(logLine.type && excludedTypes.has(logLine.type))
-        );
-      },
-      {
-        filterCache: this.showDetailsFilterCache,
-      },
-    );
+    const params = { filterCache: this.showDetailsFilterCache };
+
+    return this._deepFilter(data, showDetailsFilter, params);
   };
 
   _debugFilter = (data: MergedCalltreeRow) => {
-    const debugValues = new Set<string>([
-      'USER_DEBUG',
-      'DATAWEAVE_USER_DEBUG',
-      'USER_DEBUG_FINER',
-      'USER_DEBUG_FINEST',
-      'USER_DEBUG_FINE',
-      'USER_DEBUG_DEBUG',
-      'USER_DEBUG_INFO',
-      'USER_DEBUG_WARN',
-      'USER_DEBUG_ERROR',
-    ]);
     return this._deepFilter(
       data,
       (rowData) => {
-        return !!(rowData.originalData.type && debugValues.has(rowData.originalData.type));
+        return !!(rowData.originalData.type && DEBUG_VALUE_TYPES.has(rowData.originalData.type));
       },
       {
         filterCache: this.debugOnlyFilterCache,
@@ -724,22 +726,11 @@ export class CalltreeView extends LitElement {
   };
 
   _debugFilterAggregated = (data: AggregatedRow) => {
-    const debugValues = new Set<string>([
-      'USER_DEBUG',
-      'DATAWEAVE_USER_DEBUG',
-      'USER_DEBUG_FINER',
-      'USER_DEBUG_FINEST',
-      'USER_DEBUG_FINE',
-      'USER_DEBUG_DEBUG',
-      'USER_DEBUG_INFO',
-      'USER_DEBUG_WARN',
-      'USER_DEBUG_ERROR',
-    ]);
     return this._deepFilterAggregated(
       data,
       (rowData) => {
         const logLine = (rowData as AggregatedRow).originalData;
-        return !!(logLine.type && debugValues.has(logLine.type));
+        return !!(logLine.type && DEBUG_VALUE_TYPES.has(logLine.type));
       },
       {
         filterCache: this.debugOnlyFilterCache,
@@ -831,28 +822,29 @@ export class CalltreeView extends LitElement {
     filterFunction: (rowData: MergedCalltreeRow) => boolean,
     filterParams: { filterCache: Map<string, boolean> },
   ): boolean {
-    const cachedMatch = filterParams.filterCache.get(rowData.id);
-    if (cachedMatch !== null && cachedMatch !== undefined) {
+    const filterCache = filterParams.filterCache;
+    const rowId = rowData.id;
+    const cachedMatch = filterCache.get(rowId);
+    if (cachedMatch !== undefined) {
       return cachedMatch;
     }
 
     let childMatch = false;
-    const children = rowData._children || [];
-    let len = children.length;
-    while (--len >= 0) {
-      const childRow = children[len];
-      if (childRow) {
-        const match = this._deepFilter(childRow, filterFunction, filterParams);
-
-        if (match) {
-          childMatch = true;
-          break;
+    const children = rowData._children;
+    if (children) {
+      let len = children.length;
+      while (!childMatch && --len >= 0) {
+        const childRow = children[len];
+        if (!childRow) {
+          continue;
         }
+
+        childMatch = this._deepFilter(childRow, filterFunction, filterParams);
       }
     }
 
     const finalMatch = childMatch || filterFunction(rowData);
-    filterParams.filterCache.set(rowData.id, finalMatch);
+    filterCache.set(rowId, finalMatch);
     return finalMatch;
   }
 
