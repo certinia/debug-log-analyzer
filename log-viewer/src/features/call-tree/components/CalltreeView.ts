@@ -19,6 +19,8 @@ import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenge
 import { findEventByTimestamp } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
+import { makeShowDetailsFilter } from '../utils/DetailsFilter.js';
+import { expandCollapseAll } from '../utils/ExpandCollapse.js';
 import type { MergedCalltreeRow } from '../utils/MergeAdjacent.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
@@ -304,29 +306,13 @@ export class CalltreeView extends LitElement {
               >
             </div>
 
-            ${this.viewMode === 'bottom-up'
-              ? html`
-                  <div class="dropdown-container">
-                    <label for="bottomup-groupby">Group by:</label>
-                    <vscode-dropdown
-                      id="bottomup-groupby"
-                      @change="${this._handleBottomUpGroupBy}"
-                      current-value="${this.bottomUpGroupBy}"
-                    >
-                      <vscode-option>None</vscode-option>
-                      <vscode-option>Namespace</vscode-option>
-                      <vscode-option>Type</vscode-option>
-                    </vscode-dropdown>
-                  </div>
-                `
-              : ''}
-            ${isTimeOrder || this.viewMode === 'aggregated'
-              ? html`
-                  <div class="filter-container align__end">
-                    <vscode-checkbox class="align__end" @change="${this._handleShowDetailsChange}"
-                      >Details</vscode-checkbox
-                    >
+            <div class="filter-container align__end">
+              <vscode-checkbox class="align__end" @change="${this._handleShowDetailsChange}"
+                >Details</vscode-checkbox
+              >
 
+              ${isTimeOrder || this.viewMode === 'aggregated'
+                ? html`
                     <vscode-checkbox class="align__end" @change="${this._handleDebugOnlyChange}"
                       >Debug Only</vscode-checkbox
                     >
@@ -343,6 +329,24 @@ export class CalltreeView extends LitElement {
                           : ''}
                       </vscode-dropdown>
                     </div>
+                  `
+                : ''}
+            </div>
+
+            ${this.viewMode === 'bottom-up'
+              ? html`
+                  <div class="dropdown-container">
+                    <label for="bottomup-groupby">Group by:</label>
+                    <vscode-dropdown
+                      id="bottomup-groupby"
+                      @change="${this._handleBottomUpGroupBy}"
+                      current-value="${this.bottomUpGroupBy}"
+                    >
+                      <vscode-option>None</vscode-option>
+                      <vscode-option>Namespace</vscode-option>
+                      <vscode-option>Caller Namespace</vscode-option>
+                      <vscode-option>Type</vscode-option>
+                    </vscode-dropdown>
                   </div>
                 `
               : ''}
@@ -476,12 +480,8 @@ export class CalltreeView extends LitElement {
   _handleBottomUpGroupBy(event: Event) {
     const target = event.target as HTMLInputElement;
     this.bottomUpGroupBy = target.value;
-    const fieldName = target.value.toLowerCase();
-    const savedGroup = this.bottomUpGroupBy.toLowerCase();
-    if (savedGroup !== 'none' && this.bottomUpTreeTable) {
-      // @ts-expect-error setSortedGroupBy is added by the GroupSort custom module
-      this.bottomUpTreeTable.setSortedGroupBy(savedGroup);
-    }
+    const fieldName =
+      target.value === 'Caller Namespace' ? 'callerNamespace' : target.value.toLowerCase();
     if (this.bottomUpTreeTable) {
       // @ts-expect-error setSortedGroupBy is added by the GroupSort custom module
       this.bottomUpTreeTable.setSortedGroupBy(fieldName !== 'none' ? fieldName : '');
@@ -497,10 +497,6 @@ export class CalltreeView extends LitElement {
   }
 
   _updateFiltering() {
-    if (this.viewMode === 'bottom-up') {
-      return;
-    }
-
     const activeTable = this._getActiveTable();
     if (!activeTable) {
       return;
@@ -513,11 +509,13 @@ export class CalltreeView extends LitElement {
     const filtersToAdd = [];
 
     const isAggregated = this.viewMode === 'aggregated';
+    const isBottomUp = this.viewMode === 'bottom-up';
 
-    if (this.filterState.debugOnly) {
+    if (!isBottomUp && this.filterState.debugOnly) {
       filtersToAdd.push(isAggregated ? this._debugFilterAggregated : this._debugFilter);
     } else {
       if (
+        !isBottomUp &&
         this.filterState.selectedTypes.length > 0 &&
         this.filterState.selectedTypes[0] !== 'None'
       ) {
@@ -525,9 +523,13 @@ export class CalltreeView extends LitElement {
       }
 
       if (!this.filterState.showDetails) {
-        filtersToAdd.push(
-          isAggregated ? this._showDetailsFilterAggregated : this._showDetailsFilter,
-        );
+        if (isBottomUp) {
+          filtersToAdd.push(this._showDetailsFilterBottomUp);
+        } else if (isAggregated) {
+          filtersToAdd.push(this._showDetailsFilterAggregated);
+        } else {
+          filtersToAdd.push(this._showDetailsFilter);
+        }
       }
     }
 
@@ -557,7 +559,7 @@ export class CalltreeView extends LitElement {
       return;
     }
     table.blockRedraw();
-    this._expandCollapseAll(table.getRows(), true);
+    expandCollapseAll(table.getRows(), true);
     table.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
     table.restoreRedraw();
   }
@@ -568,7 +570,7 @@ export class CalltreeView extends LitElement {
       return;
     }
     table.blockRedraw();
-    this._expandCollapseAll(table.getRows(), false);
+    expandCollapseAll(table.getRows(), false);
     table.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
     table.restoreRedraw();
   }
@@ -703,26 +705,11 @@ export class CalltreeView extends LitElement {
   };
 
   _showDetailsFilterAggregated = (data: AggregatedRow) => {
-    const excludedTypes = new Set<string>([
-      'CUMULATIVE_LIMIT_USAGE',
-      'LIMIT_USAGE_FOR_NS',
-      'CUMULATIVE_PROFILING',
-      'CUMULATIVE_PROFILING_BEGIN',
-    ]);
+    return makeShowDetailsFilter(this.showDetailsFilterCache)(data);
+  };
 
-    return this._deepFilterAggregated(
-      data,
-      (rowData) => {
-        const aggregatedRow = rowData as AggregatedRow;
-        return (
-          aggregatedRow.totalTime > 0 ||
-          !!(aggregatedRow.originalData.type && excludedTypes.has(aggregatedRow.originalData.type))
-        );
-      },
-      {
-        filterCache: this.showDetailsFilterCache,
-      },
-    );
+  _showDetailsFilterBottomUp = (data: BottomUpRow) => {
+    return makeShowDetailsFilter(this.showDetailsFilterCache)(data);
   };
 
   _debugFilterAggregated = (data: AggregatedRow) => {
@@ -895,6 +882,7 @@ export class CalltreeView extends LitElement {
 
     const { table, tableBuilt } = createAggregatedTable(container, rootMethod, {
       namespaceFilter: this._namespaceFilter,
+      showDetailsFilter: this._showDetailsFilterAggregated,
       onFilterCacheClear: () => {
         this.debugOnlyFilterCache.clear();
         this.showDetailsFilterCache.clear();
@@ -922,7 +910,10 @@ export class CalltreeView extends LitElement {
       rootMethod,
       {
         namespaceFilter: this._namespaceFilter,
-        onFilterCacheClear: () => {},
+        showDetailsFilter: this._showDetailsFilterBottomUp,
+        onFilterCacheClear: () => {
+          this.showDetailsFilterCache.clear();
+        },
         onRenderStarted: () => {
           if (!this.blockClearHighlights && this.totalMatches > 0) {
             this._resetFindWidget();
@@ -1017,23 +1008,6 @@ export class CalltreeView extends LitElement {
     }
 
     this.contextMenuRow = null;
-  }
-
-  private _expandCollapseAll(rows: RowComponent[], expand: boolean = true) {
-    const len = rows.length;
-    for (let i = 0; i < len; ++i) {
-      const row = rows[i];
-      if (!row) {
-        continue;
-      }
-
-      if (expand) {
-        row.treeExpand();
-      } else {
-        row.treeCollapse();
-      }
-      this._expandCollapseAll(row.getTreeChildren() ?? [], expand);
-    }
   }
 
   private _findByTime(rows: RowComponent[], timestamp: number): RowComponent | null {

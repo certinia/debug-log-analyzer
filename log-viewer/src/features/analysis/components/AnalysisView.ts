@@ -15,6 +15,9 @@ import { Tabulator, type RowComponent } from 'tabulator-tables';
 import type { ApexLog } from 'apex-log-parser';
 import { isVisible } from '../../../core/utility/Util.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
+import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
+import { makeShowDetailsFilter } from '../../call-tree/utils/DetailsFilter.js';
+import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
@@ -69,9 +72,19 @@ export class AnalysisView extends LitElement {
         width: 100%;
       }
 
+      .header-bar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 4px;
+      }
+
       .filter-container {
         display: flex;
         gap: 4px;
+      }
+
+      .align__end {
+        align-items: end;
       }
 
       .dropdown-container {
@@ -92,6 +105,10 @@ export class AnalysisView extends LitElement {
           user-select: none;
         }
       }
+
+      vscode-dropdown::part(listbox) {
+        width: auto;
+      }
     `,
   ];
 
@@ -108,6 +125,13 @@ export class AnalysisView extends LitElement {
   };
   totalMatches = 0;
   blockClearHighlights = true;
+
+  filterState = { showDetails: false };
+  showDetailsFilterCache = new Map<string, boolean>();
+
+  _showDetailsFilter = (data: BottomUpRow) => {
+    return makeShowDetailsFilter(this.showDetailsFilterCache)(data);
+  };
 
   constructor() {
     super();
@@ -140,18 +164,40 @@ export class AnalysisView extends LitElement {
     return html`
       <div class="analysis-view">
         <datagrid-filter-bar>
-          <div slot="filters" class="dropdown-container">
-            <label id="groupby-dropdown-label" for="groupby-dropdown">Group by</label>
-            <vscode-dropdown
-              id="groupby-dropdown"
-              aria-label="Group by"
-              aria-labelledby="groupby-dropdown-label"
-              @change="${this._groupBy}"
+          <div slot="filters" class="filter-container align__end">
+            <vscode-button
+              appearance="secondary"
+              aria-label="Expand all"
+              title="Expand all"
+              @click=${this._expandButtonClick}
+              >Expand</vscode-button
             >
-              <vscode-option>None</vscode-option>
-              <vscode-option>Namespace</vscode-option>
-              <vscode-option>Type</vscode-option>
-            </vscode-dropdown>
+            <vscode-button
+              appearance="secondary"
+              aria-label="Collapse all"
+              title="Collapse all"
+              @click=${this._collapseButtonClick}
+              >Collapse</vscode-button
+            >
+
+            <vscode-checkbox class="align__end" @change="${this._handleShowDetailsChange}"
+              >Details</vscode-checkbox
+            >
+
+            <div class="dropdown-container">
+              <label id="groupby-dropdown-label" for="groupby-dropdown">Group by</label>
+              <vscode-dropdown
+                id="groupby-dropdown"
+                aria-label="Group by"
+                aria-labelledby="groupby-dropdown-label"
+                @change="${this._groupBy}"
+              >
+                <vscode-option>None</vscode-option>
+                <vscode-option>Namespace</vscode-option>
+                <vscode-option>Caller Namespace</vscode-option>
+                <vscode-option>Type</vscode-option>
+              </vscode-dropdown>
+            </div>
           </div>
 
           <div slot="actions">
@@ -200,11 +246,52 @@ export class AnalysisView extends LitElement {
 
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
-    const fieldName = target.value.toLowerCase();
+    const fieldName =
+      target.value === 'Caller Namespace' ? 'callerNamespace' : target.value.toLowerCase();
     if (this.analysisTable) {
       //@ts-expect-error This is a custom function added in the GroupSort custom module
       this.analysisTable?.setSortedGroupBy(fieldName !== 'none' ? fieldName : '');
     }
+  }
+
+  _handleShowDetailsChange(event: Event) {
+    const target = event.target as HTMLInputElement;
+    this.filterState.showDetails = target.checked;
+    this._updateFiltering();
+  }
+
+  _updateFiltering() {
+    const table = this.analysisTable;
+    if (!table) {
+      return;
+    }
+    this.showDetailsFilterCache.clear();
+    table.blockRedraw();
+    table.clearFilter(false);
+    if (!this.filterState.showDetails) {
+      // @ts-expect-error tabulator allows a function predicate but the types only declare Filter[]
+      table.addFilter(this._showDetailsFilter);
+    }
+    table.restoreRedraw();
+  }
+
+  _expandButtonClick() {
+    this._expandCollapseAll(true);
+  }
+
+  _collapseButtonClick() {
+    this._expandCollapseAll(false);
+  }
+
+  _expandCollapseAll(expand: boolean) {
+    const table = this.analysisTable;
+    if (!table?.modules?.dataTree) {
+      return;
+    }
+    table.blockRedraw();
+    expandCollapseAll(table.getRows(), expand);
+    table.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
+    table.restoreRedraw();
   }
 
   _appendTableWhenVisible() {
@@ -273,7 +360,9 @@ export class AnalysisView extends LitElement {
       rootMethod,
       {
         namespaceFilter: () => true,
+        showDetailsFilter: this._showDetailsFilter,
         onFilterCacheClear: () => {
+          this.showDetailsFilterCache.clear();
           if (!this.blockClearHighlights && this.totalMatches > 0) {
             this._resetFindWidget();
             this._clearSearchHighlights();

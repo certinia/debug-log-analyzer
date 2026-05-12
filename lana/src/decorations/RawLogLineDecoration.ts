@@ -135,7 +135,7 @@ export class RawLogLineDecoration {
       parts.push(metricParts.join(' · '));
       parts.push('---');
     }
-    parts.push(`[Show in Log Analysis](${commandUri})`);
+    parts.push(`[Show in Log Analysis](${commandUri} "Show in Log Analysis")`);
 
     const markdown = new MarkdownString(parts.join('\n\n'), true);
     markdown.isTrusted = true;

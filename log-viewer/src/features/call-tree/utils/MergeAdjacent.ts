@@ -4,6 +4,8 @@
 
 import type { LogEvent, SelfTotal } from 'apex-log-parser';
 
+import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+
 /**
  * Default gap threshold in nanoseconds (100ms)
  * Events within this gap are considered adjacent
@@ -24,6 +26,7 @@ export interface MergedCalltreeRow {
   _children: MergedCalltreeRow[] | undefined | null;
   text: string;
   namespace: string;
+  callerNamespace: string;
   duration: SelfTotal;
   dmlCount: SelfTotal;
   soqlCount: SelfTotal;
@@ -99,6 +102,7 @@ function createMergedRow(events: LogEvent[], index: number): MergedCalltreeRow {
     _children: mergedChildren,
     text: firstEvent.text,
     namespace: firstEvent.namespace,
+    callerNamespace: getCallerNamespace(firstEvent),
     duration: { self: totalSelfTime, total: totalDuration },
     dmlCount: { self: totalDmlCount, total: totalDmlCount },
     soqlCount: { self: totalSoqlCount, total: totalSoqlCount },
@@ -126,6 +130,7 @@ function createSingleRow(event: LogEvent, index: number): MergedCalltreeRow {
     _children: children,
     text: event.text,
     namespace: event.namespace,
+    callerNamespace: getCallerNamespace(event),
     duration: event.duration,
     dmlCount: event.dmlCount,
     soqlCount: event.soqlCount,
