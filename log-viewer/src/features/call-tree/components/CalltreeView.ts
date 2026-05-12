@@ -85,10 +85,10 @@ export class CalltreeView extends LitElement {
   aggregatedTreeTable: Tabulator | null = null;
   bottomUpTreeTable: Tabulator | null = null;
 
-  filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: string[] } = {
+  filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: Set<string> } = {
     showDetails: false,
     debugOnly: false,
-    selectedTypes: [],
+    selectedTypes: new Set<string>(),
   };
   bottomUpGroupBy = 'None';
   debugOnlyFilterCache = new Map<string, boolean>();
@@ -489,10 +489,7 @@ export class CalltreeView extends LitElement {
   }
 
   _handleTypeFilter(event: CustomEvent<{ selectedOptions: [{ value: string }] }>) {
-    this.filterState.selectedTypes = [];
-    event.detail.selectedOptions.forEach((element) => {
-      this.filterState.selectedTypes.push(element.value);
-    });
+    this.filterState.selectedTypes = new Set(event.detail.selectedOptions.map((e) => e.value));
     this._updateFiltering();
   }
 
@@ -516,8 +513,8 @@ export class CalltreeView extends LitElement {
     } else {
       if (
         !isBottomUp &&
-        this.filterState.selectedTypes.length > 0 &&
-        this.filterState.selectedTypes[0] !== 'None'
+        this.filterState.selectedTypes.size > 0 &&
+        !this.filterState.selectedTypes.has('None')
       ) {
         filtersToAdd.push(this._typeFilter);
       }
@@ -684,8 +681,7 @@ export class CalltreeView extends LitElement {
   _typeFilter = (data: MergedCalltreeRow | AggregatedRow | BottomUpRow): boolean =>
     deepFilter<MergedCalltreeRow | AggregatedRow | BottomUpRow>(
       data,
-      (row) =>
-        !!row.originalData.type && this.filterState.selectedTypes.includes(row.originalData.type),
+      (row) => !!row.originalData.type && this.filterState.selectedTypes.has(row.originalData.type),
       this.typeFilterCache,
     );
 
