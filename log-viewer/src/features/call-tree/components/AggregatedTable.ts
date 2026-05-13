@@ -298,24 +298,19 @@ export function createAggregatedTable(
   });
   tableRef.current = table;
 
-  // Filter caches MUST be cleared on `dataFiltered`, not `renderStarted`.
-  // Row ids in the aggregated tree are only unique within a single parent's
-  // children, so the same id string can appear in different subtrees. On
-  // dataTree tables Tabulator runs `filter.filter()` for the top-level pass
-  // and again for each expanded subtree (via `getChildren` ->
-  // `filter.filter(config.children)`). `dataFiltered` fires after every one
-  // of those passes, so clearing here guarantees a fresh cache per pass. If
-  // we waited until `renderStarted` (one event for the whole pipeline), the
-  // top-level walk would poison the cache for later subtree passes and the
-  // wrong rows would match.
-  table.on('dataFiltered', () => {
+  // Filter caches are cleared once per render via `renderStarted`. Row ids
+  // produced by `toAggregatedCallTree` are globally unique within a build
+  // (per-build monotonic counter), so cached `deepFilter` results stay valid
+  // across the cascaded `filter.filter()` passes Tabulator runs for each
+  // expanded subtree — `getChildren` → `filter.filter(config.children)`
+  // would otherwise fire `dataFiltered` multiple times per user action,
+  // defeating the cache. If row ids ever lose their uniqueness guarantee
+  // this must move back to `dataFiltered`.
+  table.on('renderStarted', () => {
     namespaceFilterCache.clear();
     totalTimeFilterCache.clear();
     selfTimeFilterCache.clear();
     callbacks.onFilterCacheClear();
-  });
-
-  table.on('renderStarted', () => {
     callbacks.onRenderStarted();
   });
 
