@@ -5,9 +5,9 @@
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { AggregatedRow, BottomUpRow } from './Aggregation.js';
-import { type MergedCalltreeRow } from './MergeAdjacent.js';
+import { type TimeOrderRow } from './TimeOrderTree.js';
 
-type CalltreeRowUnion = MergedCalltreeRow | AggregatedRow | BottomUpRow;
+type CalltreeRowUnion = TimeOrderRow | AggregatedRow | BottomUpRow;
 
 interface InternalRow {
   getComponent(): RowComponent;

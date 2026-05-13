@@ -21,7 +21,7 @@ import { isVisible } from '../../../core/utility/Util.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { deepFilter, makeShowDetailsFilter } from '../utils/DetailsFilter.js';
 import { expandCollapseAll } from '../utils/ExpandCollapse.js';
-import type { MergedCalltreeRow } from '../utils/MergeAdjacent.js';
+import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
@@ -111,7 +111,7 @@ export class CalltreeView extends LitElement {
   rootMethod: ApexLog | null = null;
 
   private contextMenu: ContextMenu | null = null;
-  private contextMenuRow: MergedCalltreeRow | null = null;
+  private contextMenuRow: TimeOrderRow | null = null;
   private viewSwitchEpoch = 0;
 
   get _callTreeTableWrapper(): HTMLDivElement | null {
@@ -653,8 +653,8 @@ export class CalltreeView extends LitElement {
     this.blockClearHighlights = false;
   }
 
-  _showDetailsFilter = (data: MergedCalltreeRow): boolean =>
-    deepFilter<MergedCalltreeRow>(
+  _showDetailsFilter = (data: TimeOrderRow): boolean =>
+    deepFilter<TimeOrderRow>(
       data,
       (row) => {
         const { duration, isParent, discontinuity, type } = row.originalData;
@@ -671,15 +671,15 @@ export class CalltreeView extends LitElement {
   _showDetailsFilterRollup = (data: AggregatedRow | BottomUpRow): boolean =>
     makeShowDetailsFilter(this.showDetailsFilterCache)(data);
 
-  _debugFilter = (data: MergedCalltreeRow | AggregatedRow | BottomUpRow): boolean =>
-    deepFilter<MergedCalltreeRow | AggregatedRow | BottomUpRow>(
+  _debugFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
+    deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
       data,
       (row) => !!(row.originalData.type && DEBUG_VALUE_TYPES.has(row.originalData.type)),
       this.debugOnlyFilterCache,
     );
 
-  _typeFilter = (data: MergedCalltreeRow | AggregatedRow | BottomUpRow): boolean =>
-    deepFilter<MergedCalltreeRow | AggregatedRow | BottomUpRow>(
+  _typeFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
+    deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
       data,
       (row) => {
         const type = row.originalData.type;
@@ -694,13 +694,13 @@ export class CalltreeView extends LitElement {
   _namespaceFilter = (
     selectedNamespaces: string[],
     _namespace: string,
-    data: MergedCalltreeRow | AggregatedRow | BottomUpRow,
+    data: TimeOrderRow | AggregatedRow | BottomUpRow,
     filterParams: { filterCache: Map<string, boolean> },
   ): boolean => {
     if (selectedNamespaces.length === 0) {
       return true;
     }
-    return deepFilter<MergedCalltreeRow | AggregatedRow | BottomUpRow>(
+    return deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
       data,
       (row) => selectedNamespaces.includes(row.namespace || ''),
       filterParams.filterCache,
@@ -828,7 +828,7 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    const rowData = row.getData() as MergedCalltreeRow;
+    const rowData = row.getData() as TimeOrderRow;
     this.contextMenuRow = rowData;
 
     const items: { id: string; label: string; separator?: boolean; shortcut?: string }[] = [];
@@ -906,7 +906,7 @@ export class CalltreeView extends LitElement {
         break;
       }
 
-      const rowEvent = (row.getData() as MergedCalltreeRow).originalData as LogEvent;
+      const rowEvent = (row.getData() as TimeOrderRow).originalData as LogEvent;
       const endTime = rowEvent.exitStamp ?? rowEvent.timestamp;
 
       if (rowEvent.timestamp === targetEvent.timestamp) {
