@@ -6,11 +6,14 @@ import { Module, type RowComponent, type Tabulator } from 'tabulator-tables';
 const scrollAnchorOption = 'scrollAnchor' as const;
 
 /**
- * Pixel-accurate scroll anchoring across table re-renders.
+ * Pixel-accurate, data-agnostic scroll anchoring across table re-renders.
  *
- * Capture (renderStarted / dataSorting): the middle visible row and its Y offset
- * inside the holder. Restore (renderComplete, fully synchronous): set scrollTop
- * so the same row sits at the same pixel — no visible jump.
+ * Capture (renderStarted): the middle visible row, its Y offset inside the
+ * holder, and its index in `getDisplayRows()`. Restore (renderComplete, fully
+ * synchronous): set scrollTop so the same row sits at the same pixel — no
+ * visible jump. If the anchor row was filtered or collapsed out, fall back to
+ * the nearest displayed tree ancestor, then to the row at the captured
+ * display-index clamped to the new display length.
  *
  * Enable by registering the module and setting `scrollAnchor: true` in table options.
  */
@@ -22,7 +25,6 @@ export class ScrollAnchor extends Module {
   anchorRow: RowComponent | null = null;
   private anchorOffsetFromHolderTop = 0;
   private anchorDisplayIndex = -1;
-  private pendingFilterRaf: number | null = null;
 
   // Single tree toggle: skip the next renderComplete recenter so scrollTop stays put.
   // Bulk toggle (expand-all / collapse-all): the second toggle in the synchronous burst
@@ -50,28 +52,18 @@ export class ScrollAnchor extends Module {
       this.table.on('dataTreeRowExpanded', () => this._onTreeToggle());
       this.table.on('dataTreeRowCollapsed', () => this._onTreeToggle());
 
-      // Sort resets scrollTop before renderStarted fires, so capture the anchor here
-      // (pre-sort) instead. The renderStarted handler below is a no-op once anchorRow
-      // is set — see the !this.anchorRow guard.
-      this.table.on('dataSorting', () => this._captureAnchor());
-
+      // Capture once per render-cycle. Our custom VariableHeightVerticalRenderer
+      // preserves scrollTop across sort/filter in rerenderRows, so renderStarted
+      // fires with the correct pre-render scrollTop — a single source of capture,
+      // one fewer subscription firing per sort than the old dataSorting + renderStarted pair.
       this.table.on('renderStarted', () => this._captureAnchor());
 
-      // Tabulator bug workaround: rerenderRows on filter can leave .tabulator-table's
-      // paddingTop inflated when the pre-filter vDomTop/vDomBottom point past the
-      // post-filter row count. Detect and zero on the next frame after the render.
-      // See tabulator-virtual-scroll-fixes.md "Fix 7" for the upstream patch.
-      this.table.on('dataFiltered', () => {
-        if (this.pendingFilterRaf !== null) {
-          cancelAnimationFrame(this.pendingFilterRaf);
-        }
-        this.pendingFilterRaf = requestAnimationFrame(() => {
-          this.pendingFilterRaf = null;
-          this._resetStaleTopPadding();
-        });
-      });
-
       this.table.on('renderComplete', () => {
+        // Reset stale paddings BEFORE restore: paddingTop affects the rendered
+        // window position, and paddingBottom contributes to scrollHeight which
+        // the was-at-bottom boundary restore reads.
+        this._resetStaleTopPadding();
+        this._resetStaleBottomPadding();
         if (this.skipNextRender) {
           this.skipNextRender = false;
           this._clearAnchor();
@@ -242,6 +234,43 @@ export class ScrollAnchor extends Module {
       if (renderer) {
         renderer.vDomTopPad = 0;
       }
+    }
+  }
+
+  /**
+   * Tabulator bug workaround: when the last display row is in the rendered
+   * window, `vDomBottomPad` must be 0 by definition — but `_virtualRenderFill`'s
+   * "position" branch can leave it non-zero because it derives the pad from a
+   * stale `vDomScrollHeight` (only updated by the "no-position" branch). The
+   * symptom is a blank strip below the last row after sort / filter / tree
+   * toggle / resize. See `tabulator-virtual-scroll-fixes.md` "Fix 8" for the
+   * upstream patch.
+   */
+  private _resetStaleBottomPadding() {
+    if (!this.tableHolder) {
+      return;
+    }
+    if (!this.tableEl) {
+      this.tableEl = this.tableHolder.querySelector('.tabulator-table');
+    }
+    const tableEl = this.tableEl;
+    if (!tableEl) {
+      return;
+    }
+    const renderer = this.table.rowManager?.renderer as Record<string, unknown> | undefined;
+    if (!renderer) {
+      return;
+    }
+
+    const rowsCount = this.table.rowManager?.getDisplayRows?.()?.length ?? 0;
+    const vDomBottom = (renderer.vDomBottom as number) ?? 0;
+    if (rowsCount === 0 || vDomBottom < rowsCount - 1) {
+      return;
+    }
+    const actualPad = parseFloat(tableEl.style.paddingBottom) || 0;
+    if (actualPad > 0) {
+      tableEl.style.paddingBottom = '0px';
+      renderer.vDomBottomPad = 0;
     }
   }
 

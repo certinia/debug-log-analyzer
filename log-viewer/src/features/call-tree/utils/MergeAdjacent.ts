@@ -71,7 +71,7 @@ function isWithinGapThreshold(
 /**
  * Creates a merged row from a group of adjacent events
  */
-function createMergedRow(events: LogEvent[], index: number): MergedCalltreeRow {
+function createMergedRow(events: LogEvent[], idFor: () => string): MergedCalltreeRow {
   const firstEvent = events[0]!;
   const totalDuration = events.reduce((sum, e) => sum + e.duration.total, 0);
   const totalSelfTime = events.reduce((sum, e) => sum + e.duration.self, 0);
@@ -86,18 +86,22 @@ function createMergedRow(events: LogEvent[], index: number): MergedCalltreeRow {
   const maxDuration = Math.max(...durations);
   const avgDuration = totalDuration / events.length;
 
+  // Reserve this row's id first so its prefix sits before any descendant ids
+  // produced during the recursive merge below.
+  const id = `merged-${idFor()}`;
+
   // Create merged children from all events' children
   const allChildren: LogEvent[] = [];
   for (const event of events) {
     allChildren.push(...event.children);
   }
-  const mergedChildren = allChildren.length > 0 ? toMergedCallTree(allChildren) : null;
+  const mergedChildren = allChildren.length > 0 ? toMergedCallTree(allChildren, idFor) : null;
 
   const callCount = events.length;
   const avgSelfTime = callCount > 0 ? totalSelfTime / callCount : 0;
 
   return {
-    id: `merged-${firstEvent.timestamp}-${index}`,
+    id,
     originalData: firstEvent,
     _children: mergedChildren,
     text: firstEvent.text,
@@ -121,11 +125,14 @@ function createMergedRow(events: LogEvent[], index: number): MergedCalltreeRow {
 /**
  * Creates a non-merged row from a single event
  */
-function createSingleRow(event: LogEvent, index: number): MergedCalltreeRow {
-  const children = event.children.length > 0 ? toMergedCallTree(event.children) : null;
+function createSingleRow(event: LogEvent, idFor: () => string): MergedCalltreeRow {
+  // Reserve this row's id before recursing so the parent sits before its
+  // descendants in the global counter sequence.
+  const id = `tt-${idFor()}`;
+  const children = event.children.length > 0 ? toMergedCallTree(event.children, idFor) : null;
 
   return {
-    id: `${event.timestamp}-${index}`,
+    id,
     originalData: event,
     _children: children,
     text: event.text,
@@ -148,7 +155,10 @@ function createSingleRow(event: LogEvent, index: number): MergedCalltreeRow {
 /**
  * Converts log events to call tree rows with adjacent event merging
  */
-export function toMergedCallTree(nodes: LogEvent[]): MergedCalltreeRow[] | undefined {
+export function toMergedCallTree(
+  nodes: LogEvent[],
+  idFor: () => string,
+): MergedCalltreeRow[] | undefined {
   const len = nodes.length;
   if (!len) {
     return undefined;
@@ -183,9 +193,9 @@ export function toMergedCallTree(nodes: LogEvent[]): MergedCalltreeRow[] | undef
 
     // Only merge if we have at least 2 adjacent events
     if (adjacentGroup.length >= 2) {
-      results.push(createMergedRow(adjacentGroup, results.length));
+      results.push(createMergedRow(adjacentGroup, idFor));
     } else {
-      results.push(createSingleRow(currentEvent, results.length));
+      results.push(createSingleRow(currentEvent, idFor));
     }
 
     i = j;
@@ -195,7 +205,11 @@ export function toMergedCallTree(nodes: LogEvent[]): MergedCalltreeRow[] | undef
 }
 
 /**
- * Converts log events to call tree rows without merging (regular view)
+ * Converts log events to call tree rows without merging (regular view).
+ * The top level is single-row per event; descendants are merged via
+ * `toMergedCallTree`. Row ids are a per-build monotonic counter so they are
+ * globally unique within the returned tree, which lets `deepFilter` cache
+ * results across cascaded Tabulator subtree filter passes without collision.
  */
 export function toUnmergedCallTree(nodes: LogEvent[]): MergedCalltreeRow[] | undefined {
   const len = nodes.length;
@@ -203,10 +217,13 @@ export function toUnmergedCallTree(nodes: LogEvent[]): MergedCalltreeRow[] | und
     return undefined;
   }
 
+  let next = 0;
+  const idFor = (): string => String(++next);
+
   const results: MergedCalltreeRow[] = [];
   for (let i = 0; i < len; ++i) {
     const node = nodes[i]!;
-    results.push(createSingleRow(node, i));
+    results.push(createSingleRow(node, idFor));
   }
   return results;
 }

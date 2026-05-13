@@ -19,7 +19,7 @@ import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenge
 import { findEventByTimestamp } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
-import { makeShowDetailsFilter } from '../utils/DetailsFilter.js';
+import { deepFilter, makeShowDetailsFilter } from '../utils/DetailsFilter.js';
 import { expandCollapseAll } from '../utils/ExpandCollapse.js';
 import type { MergedCalltreeRow } from '../utils/MergeAdjacent.js';
 
@@ -49,6 +49,28 @@ provideVSCodeDesignSystem().register(
 
 type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
 
+// Hoisted out of filter predicates so the Set is constructed once at module
+// load rather than re-allocated on every row's filter evaluation (which can
+// run thousands of times per filter operation on large logs).
+const SHOW_DETAILS_EXCLUDED_TYPES: ReadonlySet<string> = new Set([
+  'CUMULATIVE_LIMIT_USAGE',
+  'LIMIT_USAGE_FOR_NS',
+  'CUMULATIVE_PROFILING',
+  'CUMULATIVE_PROFILING_BEGIN',
+]);
+
+const DEBUG_VALUE_TYPES: ReadonlySet<string> = new Set([
+  'USER_DEBUG',
+  'DATAWEAVE_USER_DEBUG',
+  'USER_DEBUG_FINER',
+  'USER_DEBUG_FINEST',
+  'USER_DEBUG_FINE',
+  'USER_DEBUG_DEBUG',
+  'USER_DEBUG_INFO',
+  'USER_DEBUG_WARN',
+  'USER_DEBUG_ERROR',
+]);
+
 @customElement('call-tree-view')
 export class CalltreeView extends LitElement {
   @property()
@@ -63,10 +85,10 @@ export class CalltreeView extends LitElement {
   aggregatedTreeTable: Tabulator | null = null;
   bottomUpTreeTable: Tabulator | null = null;
 
-  filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: string[] } = {
+  filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: Set<string> } = {
     showDetails: false,
     debugOnly: false,
-    selectedTypes: [],
+    selectedTypes: new Set<string>(),
   };
   bottomUpGroupBy = 'None';
   debugOnlyFilterCache = new Map<string, boolean>();
@@ -362,12 +384,12 @@ export class CalltreeView extends LitElement {
   }
 
   _flat(arr: LogEvent[], target: LogEvent[]) {
-    arr.forEach((el) => {
-      target.push(el);
-      if (el.children.length > 0) {
-        this._flat(el.children, target);
+    for (const evt of arr) {
+      target.push(evt);
+      if (evt.children.length > 0) {
+        this._flat(evt.children, target);
       }
-    });
+    }
   }
 
   _flatten(arr: LogEvent[]) {
@@ -467,10 +489,7 @@ export class CalltreeView extends LitElement {
   }
 
   _handleTypeFilter(event: CustomEvent<{ selectedOptions: [{ value: string }] }>) {
-    this.filterState.selectedTypes = [];
-    event.detail.selectedOptions.forEach((element) => {
-      this.filterState.selectedTypes.push(element.value);
-    });
+    this.filterState.selectedTypes = new Set(event.detail.selectedOptions.map((e) => e.value));
     this._updateFiltering();
   }
 
@@ -490,24 +509,20 @@ export class CalltreeView extends LitElement {
     const isBottomUp = this.viewMode === 'bottom-up';
 
     if (!isBottomUp && this.filterState.debugOnly) {
-      filtersToAdd.push(isAggregated ? this._debugFilterAggregated : this._debugFilter);
+      filtersToAdd.push(this._debugFilter);
     } else {
       if (
         !isBottomUp &&
-        this.filterState.selectedTypes.length > 0 &&
-        this.filterState.selectedTypes[0] !== 'None'
+        this.filterState.selectedTypes.size > 0 &&
+        !this.filterState.selectedTypes.has('None')
       ) {
-        filtersToAdd.push(isAggregated ? this._typeFilterAggregated : this._typeFilter);
+        filtersToAdd.push(this._typeFilter);
       }
 
       if (!this.filterState.showDetails) {
-        if (isBottomUp) {
-          filtersToAdd.push(this._showDetailsFilterBottomUp);
-        } else if (isAggregated) {
-          filtersToAdd.push(this._showDetailsFilterAggregated);
-        } else {
-          filtersToAdd.push(this._showDetailsFilter);
-        }
+        filtersToAdd.push(
+          isAggregated || isBottomUp ? this._showDetailsFilterRollup : this._showDetailsFilter,
+        );
       }
     }
 
@@ -638,210 +653,59 @@ export class CalltreeView extends LitElement {
     this.blockClearHighlights = false;
   }
 
-  _showDetailsFilter = (data: MergedCalltreeRow) => {
-    const excludedTypes = new Set<string>([
-      'CUMULATIVE_LIMIT_USAGE',
-      'LIMIT_USAGE_FOR_NS',
-      'CUMULATIVE_PROFILING',
-      'CUMULATIVE_PROFILING_BEGIN',
-    ]);
-
-    return this._deepFilter(
+  _showDetailsFilter = (data: MergedCalltreeRow): boolean =>
+    deepFilter<MergedCalltreeRow>(
       data,
-      (rowData) => {
-        const logLine = rowData.originalData;
+      (row) => {
+        const { duration, isParent, discontinuity, type } = row.originalData;
         return (
-          logLine.duration.total > 0 ||
-          logLine.exitTypes.length > 0 ||
-          logLine.discontinuity ||
-          !!(logLine.type && excludedTypes.has(logLine.type))
+          isParent ||
+          duration.total > 0 ||
+          discontinuity ||
+          !!(type && SHOW_DETAILS_EXCLUDED_TYPES.has(type))
         );
       },
-      {
-        filterCache: this.showDetailsFilterCache,
-      },
+      this.showDetailsFilterCache,
     );
-  };
 
-  _debugFilter = (data: MergedCalltreeRow) => {
-    const debugValues = new Set<string>([
-      'USER_DEBUG',
-      'DATAWEAVE_USER_DEBUG',
-      'USER_DEBUG_FINER',
-      'USER_DEBUG_FINEST',
-      'USER_DEBUG_FINE',
-      'USER_DEBUG_DEBUG',
-      'USER_DEBUG_INFO',
-      'USER_DEBUG_WARN',
-      'USER_DEBUG_ERROR',
-    ]);
-    return this._deepFilter(
+  _showDetailsFilterRollup = (data: AggregatedRow | BottomUpRow): boolean =>
+    makeShowDetailsFilter(this.showDetailsFilterCache)(data);
+
+  _debugFilter = (data: MergedCalltreeRow | AggregatedRow | BottomUpRow): boolean =>
+    deepFilter<MergedCalltreeRow | AggregatedRow | BottomUpRow>(
       data,
-      (rowData) => {
-        return !!(rowData.originalData.type && debugValues.has(rowData.originalData.type));
-      },
-      {
-        filterCache: this.debugOnlyFilterCache,
-      },
+      (row) => !!(row.originalData.type && DEBUG_VALUE_TYPES.has(row.originalData.type)),
+      this.debugOnlyFilterCache,
     );
-  };
 
-  _typeFilter = (data: MergedCalltreeRow) => {
-    return this._deepFilter(
+  _typeFilter = (data: MergedCalltreeRow | AggregatedRow | BottomUpRow): boolean =>
+    deepFilter<MergedCalltreeRow | AggregatedRow | BottomUpRow>(
       data,
-      (rowData) => {
-        if (!rowData.originalData.type) {
+      (row) => {
+        const type = row.originalData.type;
+        if (!type) {
           return false;
         }
-
-        return this.filterState.selectedTypes.includes(rowData.originalData.type);
+        return this.filterState.selectedTypes.has(type);
       },
-      {
-        filterCache: this.typeFilterCache,
-      },
+      this.typeFilterCache,
     );
-  };
-
-  _showDetailsFilterAggregated = (data: AggregatedRow) => {
-    return makeShowDetailsFilter(this.showDetailsFilterCache)(data);
-  };
-
-  _showDetailsFilterBottomUp = (data: BottomUpRow) => {
-    return makeShowDetailsFilter(this.showDetailsFilterCache)(data);
-  };
-
-  _debugFilterAggregated = (data: AggregatedRow) => {
-    const debugValues = new Set<string>([
-      'USER_DEBUG',
-      'DATAWEAVE_USER_DEBUG',
-      'USER_DEBUG_FINER',
-      'USER_DEBUG_FINEST',
-      'USER_DEBUG_FINE',
-      'USER_DEBUG_DEBUG',
-      'USER_DEBUG_INFO',
-      'USER_DEBUG_WARN',
-      'USER_DEBUG_ERROR',
-    ]);
-    return this._deepFilterAggregated(
-      data,
-      (rowData) => {
-        const logLine = (rowData as AggregatedRow).originalData;
-        return !!(logLine.type && debugValues.has(logLine.type));
-      },
-      {
-        filterCache: this.debugOnlyFilterCache,
-      },
-    );
-  };
-
-  _typeFilterAggregated = (data: AggregatedRow) => {
-    return this._deepFilterAggregated(
-      data,
-      (rowData) => {
-        const logLine = (rowData as AggregatedRow).originalData;
-        if (!logLine.type) {
-          return false;
-        }
-        return this.filterState.selectedTypes.includes(logLine.type);
-      },
-      {
-        filterCache: this.typeFilterCache,
-      },
-    );
-  };
 
   _namespaceFilter = (
     selectedNamespaces: string[],
     _namespace: string,
     data: MergedCalltreeRow | AggregatedRow | BottomUpRow,
     filterParams: { filterCache: Map<string, boolean> },
-  ) => {
+  ): boolean => {
     if (selectedNamespaces.length === 0) {
       return true;
     }
-
-    if ('originalData' in data) {
-      return this._deepFilter(
-        data as MergedCalltreeRow,
-        (rowData) => {
-          return selectedNamespaces.includes(rowData.originalData.namespace || '');
-        },
-        {
-          filterCache: filterParams.filterCache,
-        },
-      );
-    }
-
-    return this._deepFilterAggregated(
-      data as AggregatedRow | BottomUpRow,
-      (rowData) => {
-        return selectedNamespaces.includes(rowData.namespace || '');
-      },
-      {
-        filterCache: filterParams.filterCache,
-      },
+    return deepFilter<MergedCalltreeRow | AggregatedRow | BottomUpRow>(
+      data,
+      (row) => selectedNamespaces.includes(row.namespace || ''),
+      filterParams.filterCache,
     );
   };
-
-  private _deepFilterAggregated(
-    rowData: AggregatedRow | BottomUpRow,
-    filterFunction: (rowData: AggregatedRow | BottomUpRow) => boolean,
-    filterParams: { filterCache: Map<string, boolean> },
-  ): boolean {
-    const cachedMatch = filterParams.filterCache.get(rowData.id);
-    if (cachedMatch !== null && cachedMatch !== undefined) {
-      return cachedMatch;
-    }
-
-    let childMatch = false;
-    const children = rowData._children || [];
-    let len = children.length;
-    while (--len >= 0) {
-      const childRow = children[len];
-      if (childRow) {
-        const match = this._deepFilterAggregated(childRow, filterFunction, filterParams);
-
-        if (match) {
-          childMatch = true;
-          break;
-        }
-      }
-    }
-
-    const finalMatch = childMatch || filterFunction(rowData);
-    filterParams.filterCache.set(rowData.id, finalMatch);
-    return finalMatch;
-  }
-
-  private _deepFilter(
-    rowData: MergedCalltreeRow,
-    filterFunction: (rowData: MergedCalltreeRow) => boolean,
-    filterParams: { filterCache: Map<string, boolean> },
-  ): boolean {
-    const cachedMatch = filterParams.filterCache.get(rowData.id);
-    if (cachedMatch !== null && cachedMatch !== undefined) {
-      return cachedMatch;
-    }
-
-    let childMatch = false;
-    const children = rowData._children || [];
-    let len = children.length;
-    while (--len >= 0) {
-      const childRow = children[len];
-      if (childRow) {
-        const match = this._deepFilter(childRow, filterFunction, filterParams);
-
-        if (match) {
-          childMatch = true;
-          break;
-        }
-      }
-    }
-
-    const finalMatch = childMatch || filterFunction(rowData);
-    filterParams.filterCache.set(rowData.id, finalMatch);
-    return finalMatch;
-  }
 
   private async _renderCallTree(
     callTreeTableContainer: HTMLDivElement,
@@ -890,7 +754,7 @@ export class CalltreeView extends LitElement {
 
     const { table, tableBuilt } = createAggregatedTable(container, rootMethod, {
       namespaceFilter: this._namespaceFilter,
-      showDetailsFilter: this._showDetailsFilterAggregated,
+      showDetailsFilter: this._showDetailsFilterRollup,
       onFilterCacheClear: () => {
         this.debugOnlyFilterCache.clear();
         this.showDetailsFilterCache.clear();
@@ -918,7 +782,7 @@ export class CalltreeView extends LitElement {
       rootMethod,
       {
         namespaceFilter: this._namespaceFilter,
-        showDetailsFilter: this._showDetailsFilterBottomUp,
+        showDetailsFilter: this._showDetailsFilterRollup,
         onFilterCacheClear: () => {
           this.showDetailsFilterCache.clear();
         },

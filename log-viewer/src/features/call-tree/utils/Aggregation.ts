@@ -122,6 +122,11 @@ export function toAggregatedCallTree(rootChildren: LogEvent[]): AggregatedRow[] 
     return [];
   }
 
+  // Per-build monotonic counter; row ids must be globally unique within this
+  // tree so deepFilter caches don't collide across cascaded subtree passes.
+  let next = 0;
+  const idFor = (): string => `agg-${++next}`;
+
   // Group root-level events by signature with call stack tracking
   const rootMap = new Map<string, AggregatedRow>();
   const keyStack = new Multiset<string>();
@@ -133,7 +138,7 @@ export function toAggregatedCallTree(rootChildren: LogEvent[]): AggregatedRow[] 
     let row = rootMap.get(key);
 
     if (!row) {
-      row = createEmptyAggregatedRow(key, event);
+      row = createEmptyAggregatedRow(key, event, idFor);
       rootMap.set(key, row);
     }
 
@@ -145,7 +150,7 @@ export function toAggregatedCallTree(rootChildren: LogEvent[]): AggregatedRow[] 
   for (const row of rootMap.values()) {
     const firstInstance = row.instances[0];
     const stackKey = firstInstance ? getStackKey(firstInstance) : row.key;
-    row._children = aggregateChildrenRecursive(row.instances, stackKey);
+    row._children = aggregateChildrenRecursive(row.instances, stackKey, idFor);
     calculateAverages(row);
   }
 
@@ -160,6 +165,7 @@ export function toAggregatedCallTree(rootChildren: LogEvent[]): AggregatedRow[] 
 function aggregateChildrenRecursive(
   instances: LogEvent[],
   parentStackKey: string,
+  idFor: () => string,
 ): AggregatedRow[] | null {
   const childMap = new Map<string, AggregatedRow>();
   // Create a new stack for each aggregation level, starting with the parent stack key
@@ -172,7 +178,7 @@ function aggregateChildrenRecursive(
       let row = childMap.get(key);
 
       if (!row) {
-        row = createEmptyAggregatedRow(key, child);
+        row = createEmptyAggregatedRow(key, child, idFor);
         childMap.set(key, row);
       }
 
@@ -189,7 +195,7 @@ function aggregateChildrenRecursive(
   for (const row of childMap.values()) {
     const firstInstance = row.instances[0];
     const stackKey = firstInstance ? getStackKey(firstInstance) : row.key;
-    row._children = aggregateChildrenRecursive(row.instances, stackKey);
+    row._children = aggregateChildrenRecursive(row.instances, stackKey, idFor);
     calculateAverages(row);
   }
 
@@ -268,11 +274,15 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
 
   const attributionMap = computeFrameAttribution(rootChildren);
   const rootBuckets = new Map<string, BottomUpRow>();
+  // Per-build monotonic counter; row ids must be globally unique within this
+  // tree so deepFilter caches don't collide across cascaded subtree passes.
+  let next = 0;
+  const idFor = (): string => `bu-${++next}`;
 
   for (const frame of attributionMap.keys()) {
     // Insert every frame so callCount and DML/SOQL/exception attributions roll up
     // even for frames whose self-time contribution is zero.
-    insertFrameIntoTrie(frame, attributionMap, rootBuckets);
+    insertFrameIntoTrie(frame, attributionMap, rootBuckets, idFor);
   }
 
   return finalizeBuckets(rootBuckets);
@@ -365,12 +375,13 @@ function insertFrameIntoTrie(
   frame: LogEvent,
   attributionMap: Map<LogEvent, FrameAttribution>,
   rootBuckets: Map<string, BottomUpRow>,
+  idFor: () => string,
 ): void {
   const attribution = getOrInitAttribution(attributionMap, frame);
   const rootKey = getEventKey(frame);
   let bucket = rootBuckets.get(rootKey);
   if (!bucket) {
-    bucket = createEmptyBottomUpRow(rootKey, frame);
+    bucket = createEmptyBottomUpRow(rootKey, frame, idFor);
     rootBuckets.set(rootKey, bucket);
   }
   accumulateContribution(bucket, frame, frame, attribution);
@@ -382,7 +393,7 @@ function insertFrameIntoTrie(
     const existingChildren = parentBucket._children ?? [];
     let childBucket = existingChildren.find((candidate) => candidate.key === ancestorKey);
     if (!childBucket) {
-      childBucket = createEmptyBottomUpRow(ancestorKey, ancestor);
+      childBucket = createEmptyBottomUpRow(ancestorKey, ancestor, idFor);
       existingChildren.push(childBucket);
       parentBucket._children = existingChildren;
     }
@@ -448,9 +459,13 @@ function sortBuckets(rows: BottomUpRow[]): void {
   });
 }
 
-function createEmptyAggregatedRow(key: string, event: LogEvent): AggregatedRow {
+function createEmptyAggregatedRow(
+  key: string,
+  event: LogEvent,
+  idFor: () => string,
+): AggregatedRow {
   return {
-    id: `agg-${key}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    id: idFor(),
     key,
     text: event.text,
     namespace: event.namespace,
@@ -470,9 +485,9 @@ function createEmptyAggregatedRow(key: string, event: LogEvent): AggregatedRow {
   };
 }
 
-function createEmptyBottomUpRow(key: string, event: LogEvent): BottomUpRow {
+function createEmptyBottomUpRow(key: string, event: LogEvent, idFor: () => string): BottomUpRow {
   return {
-    id: `bu-${key}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    id: idFor(),
     key,
     text: event.text,
     namespace: event.namespace,

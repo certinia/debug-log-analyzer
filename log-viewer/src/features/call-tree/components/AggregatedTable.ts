@@ -65,32 +65,27 @@ export function createAggregatedTable(
         bottomCalc: () => 'Total',
         cssClass: 'datagrid-textarea datagrid-code-text',
         formatter: (cell) => {
-          const cellElem = cell.getElement();
           const row = cell.getRow();
           // @ts-expect-error: _row is private
           const dataTree = row._row.modules.dataTree;
           const treeLevel = dataTree?.index ?? 0;
           childIndent ??= row.getTable().options.dataTreeChildIndent || 0;
           const levelIndent = treeLevel * childIndent;
+
+          const cellElem = cell.getElement();
           cellElem.style.paddingLeft = `${levelIndent + 4}px`;
           cellElem.style.textIndent = `-${levelIndent}px`;
 
           const rowData = cell.getData() as AggregatedRow;
-          const elem = document.createElement('span');
           const firstInstance = rowData.instances[0];
 
           if (firstInstance?.hasValidSymbols) {
             const link = document.createElement('a');
             link.setAttribute('href', '#!');
             link.textContent = rowData.text;
-            elem.appendChild(link);
-          } else {
-            const textSpan = document.createElement('span');
-            textSpan.textContent = rowData.text;
-            elem.appendChild(textSpan);
+            return link;
           }
-
-          return elem;
+          return document.createTextNode(rowData.text) as unknown as HTMLElement;
         },
         variableHeight: true,
         cellClick: (e, cell) => {
@@ -303,14 +298,19 @@ export function createAggregatedTable(
   });
   tableRef.current = table;
 
-  table.on('dataFiltered', () => {
+  // Filter caches are cleared once per render via `renderStarted`. Row ids
+  // produced by `toAggregatedCallTree` are globally unique within a build
+  // (per-build monotonic counter), so cached `deepFilter` results stay valid
+  // across the cascaded `filter.filter()` passes Tabulator runs for each
+  // expanded subtree — `getChildren` → `filter.filter(config.children)`
+  // would otherwise fire `dataFiltered` multiple times per user action,
+  // defeating the cache. If row ids ever lose their uniqueness guarantee
+  // this must move back to `dataFiltered`.
+  table.on('renderStarted', () => {
     namespaceFilterCache.clear();
     totalTimeFilterCache.clear();
     selfTimeFilterCache.clear();
     callbacks.onFilterCacheClear();
-  });
-
-  table.on('renderStarted', () => {
     callbacks.onRenderStarted();
   });
 

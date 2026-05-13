@@ -277,18 +277,19 @@ export function createTimeOrderTable(
   });
   tableRef.current = table;
 
-  table.on('dataFiltered', () => {
+  // Filter caches are cleared once per render via `renderStarted`. Row ids
+  // produced by `toUnmergedCallTree` are globally unique within a build
+  // (per-build monotonic counter), so cached `deepFilter` results stay valid
+  // across the cascaded `filter.filter()` passes Tabulator runs for each
+  // expanded subtree — `getChildren` → `filter.filter(config.children)`
+  // would otherwise fire `dataFiltered` multiple times per user action,
+  // defeating the cache. If row ids ever lose their uniqueness guarantee
+  // this must move back to `dataFiltered`.
+  table.on('renderStarted', () => {
     totalTimeFilterCache.clear();
     selfTimeFilterCache.clear();
     namespaceFilterCache.clear();
     callbacks.onFilterCacheClear();
-  });
-
-  table.on('dataSorted', () => {
-    callbacks.onRenderStarted();
-  });
-
-  table.on('dataFiltered', () => {
     callbacks.onRenderStarted();
   });
 
