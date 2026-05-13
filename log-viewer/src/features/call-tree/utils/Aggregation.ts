@@ -56,6 +56,9 @@ export interface BottomUpRow {
   id: string;
   /** Unique grouping key for this function signature */
   key: string;
+  /** Internal interned int id matching {@link key}; used for fast child-bucket
+   *  lookup during the trie build. Not consumed externally. */
+  _keyId: number;
   /** Display name */
   text: string;
   /** Package namespace */
@@ -84,10 +87,12 @@ export interface BottomUpRow {
   totalThrownCount: number;
   /** Callers (parent functions) as children - lazy loaded */
   _children?: BottomUpRow[] | null;
-  /** References to the displayed events for drill-down */
+  /**
+   * References to the displayed events for drill-down. Populated only on root
+   * buckets (used by the table-level `bottomCalc`); deep buckets leave this
+   * empty — use {@link originalData} when a single representative is needed.
+   */
   instances: LogEvent[];
-  /** Instances whose metrics are being attributed through this caller path */
-  contributionInstances: LogEvent[];
   /** Representative event for this row (used by formatters) */
   originalData: LogEvent;
 }
@@ -267,28 +272,13 @@ function addEventToAggregatedRowWithStack(
  *   - soqlRowCount.self / soqlRowCount.total
  *   - totalThrownCount (treated like a total metric for attribution)
  */
-export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
-  if (rootChildren.length === 0) {
-    return [];
-  }
-
-  const attributionMap = computeFrameAttribution(rootChildren);
-  const rootBuckets = new Map<string, BottomUpRow>();
-  // Per-build monotonic counter; row ids must be globally unique within this
-  // tree so deepFilter caches don't collide across cascaded subtree passes.
-  let next = 0;
-  const idFor = (): string => `bu-${++next}`;
-
-  for (const frame of attributionMap.keys()) {
-    // Insert every frame so callCount and DML/SOQL/exception attributions roll up
-    // even for frames whose self-time contribution is zero.
-    insertFrameIntoTrie(frame, attributionMap, rootBuckets, idFor);
-  }
-
-  return finalizeBuckets(rootBuckets);
-}
-
-type FrameAttribution = {
+type FrameContext = {
+  frame: LogEvent;
+  stackKey: string;
+  prior: FrameContext | undefined;
+  // Attribution accumulator — initialised to the frame's own totals and
+  // decremented as same-name descendants are entered. Final when the frame
+  // is popped at post-order exit.
   totalTime: number;
   dmlTotal: number;
   soqlTotal: number;
@@ -297,132 +287,188 @@ type FrameAttribution = {
   thrownTotal: number;
 };
 
+type DfsEntry = {
+  node: LogEvent;
+  childIdx: number;
+  ctx: FrameContext;
+};
+
 /**
- * Walks the top-down tree tracking the deepest active same-name ancestor per name.
- * For each event E, if there is already an active frame A with the same name,
- * subtract E's totals from A's attribution — because E's subtree belongs to E's
- * own bucket, not A's. Every visited event receives an attribution entry whose
- * initial values equal the event's own totals; same-name descendants trim those
- * down to the non-overlapping slice attributable to this frame alone.
+ * Single iterative DFS that fuses attribution computation with trie insertion.
+ *
+ * Pre-order on entering N:
+ *   - Intern N's event key to an int id; push onto the chain stack.
+ *   - Look up `prior` same-name ancestor; build N's `FrameContext` initialised
+ *     to N's own totals; decrement `prior.totalTime`/… by N's totals (the
+ *     deepest-active-frame attribution rule).
+ *
+ * Post-order on leaving N:
+ *   - N's `ctx` totals are now final. Insert N into the trie by walking the
+ *     chain stack from top (= N) down to depth 0. The chain is the live DFS
+ *     ancestor path, so no `frame.parent` walk and no per-step Map lookup is
+ *     needed. Bucket-key comparisons are int equality on `_keyId`.
+ *   - Restore `activeByName[stackKey]` from `ctx.prior`.
+ *
+ * Zero-delta guards on the DML/SOQL/row/thrown accumulators avoid the no-op
+ * `bucket.x += 0` writes that dominate logs without heavy DB work.
  */
-function computeFrameAttribution(rootChildren: LogEvent[]): Map<LogEvent, FrameAttribution> {
-  const attributionMap = new Map<LogEvent, FrameAttribution>();
-  const activeByName = new Map<string, LogEvent>();
+export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
+  if (rootChildren.length === 0) {
+    return [];
+  }
 
-  const visit = (node: LogEvent): void => {
-    const key = getStackKey(node);
-    const nearestSameName = activeByName.get(key);
+  const intern = new Map<string, number>();
+  const idToKey: string[] = [];
+  const rootBuckets = new Map<number, BottomUpRow>();
+  const activeByName = new Map<string, FrameContext>();
+  const dfs: DfsEntry[] = [];
+  const chainIds: number[] = [];
 
-    getOrInitAttribution(attributionMap, node);
+  // Per-build monotonic counter; row ids must be globally unique within this
+  // tree so deepFilter caches don't collide across cascaded subtree passes.
+  let next = 0;
+  const idFor = (): string => `bu-${++next}`;
 
-    if (nearestSameName) {
-      const nearestAttr = getOrInitAttribution(attributionMap, nearestSameName);
-      nearestAttr.totalTime -= node.duration.total;
-      nearestAttr.dmlTotal -= node.dmlCount.total;
-      nearestAttr.soqlTotal -= node.soqlCount.total;
-      nearestAttr.dmlRowTotal -= node.dmlRowCount.total;
-      nearestAttr.soqlRowTotal -= node.soqlRowCount.total;
-      nearestAttr.thrownTotal -= node.totalThrownCount;
+  const enter = (node: LogEvent): void => {
+    const eventKey = getEventKey(node);
+    let id = intern.get(eventKey);
+    if (id === undefined) {
+      id = intern.size;
+      intern.set(eventKey, id);
+      idToKey.push(eventKey);
+    }
+    chainIds.push(id);
+
+    const stackKey = getStackKey(node);
+    const prior = activeByName.get(stackKey);
+    const ctx: FrameContext = {
+      frame: node,
+      stackKey,
+      prior,
+      totalTime: node.duration.total,
+      dmlTotal: node.dmlCount.total,
+      soqlTotal: node.soqlCount.total,
+      dmlRowTotal: node.dmlRowCount.total,
+      soqlRowTotal: node.soqlRowCount.total,
+      thrownTotal: node.totalThrownCount,
+    };
+
+    if (prior) {
+      prior.totalTime -= node.duration.total;
+      prior.dmlTotal -= node.dmlCount.total;
+      prior.soqlTotal -= node.soqlCount.total;
+      prior.dmlRowTotal -= node.dmlRowCount.total;
+      prior.soqlRowTotal -= node.soqlRowCount.total;
+      prior.thrownTotal -= node.totalThrownCount;
+    }
+    activeByName.set(stackKey, ctx);
+    dfs.push({ node, childIdx: 0, ctx });
+  };
+
+  const exit = (): void => {
+    const entry = dfs[dfs.length - 1]!;
+    const { node, ctx } = entry;
+
+    // Hoist invariants once for the chain walk.
+    const selfTime = node.duration.self;
+    const dmlSelf = node.dmlCount.self;
+    const soqlSelf = node.soqlCount.self;
+    const dmlRowSelf = node.dmlRowCount.self;
+    const soqlRowSelf = node.soqlRowCount.self;
+    const totalTime = ctx.totalTime;
+    const dmlTotal = ctx.dmlTotal;
+    const soqlTotal = ctx.soqlTotal;
+    const dmlRowTotal = ctx.dmlRowTotal;
+    const soqlRowTotal = ctx.soqlRowTotal;
+    const thrownTotal = ctx.thrownTotal;
+
+    // Closure captures the hoisted locals; zero-delta guards skip no-op writes
+    // for logs without heavy DB work.
+    const accumulate = (b: BottomUpRow): void => {
+      b.callCount++;
+      b.totalSelfTime += selfTime;
+      b.totalTime += totalTime;
+      if (dmlSelf) {
+        b.dmlCount.self += dmlSelf;
+      }
+      if (dmlTotal) {
+        b.dmlCount.total += dmlTotal;
+      }
+      if (soqlSelf) {
+        b.soqlCount.self += soqlSelf;
+      }
+      if (soqlTotal) {
+        b.soqlCount.total += soqlTotal;
+      }
+      if (dmlRowSelf) {
+        b.dmlRowCount.self += dmlRowSelf;
+      }
+      if (dmlRowTotal) {
+        b.dmlRowCount.total += dmlRowTotal;
+      }
+      if (soqlRowSelf) {
+        b.soqlRowCount.self += soqlRowSelf;
+      }
+      if (soqlRowTotal) {
+        b.soqlRowCount.total += soqlRowTotal;
+      }
+      if (thrownTotal) {
+        b.totalThrownCount += thrownTotal;
+      }
+    };
+
+    const top = chainIds.length - 1;
+    const rootId = chainIds[top]!;
+    let bucket = rootBuckets.get(rootId);
+    if (!bucket) {
+      bucket = createEmptyBottomUpRow(idToKey[rootId]!, rootId, node, idFor);
+      rootBuckets.set(rootId, bucket);
+    }
+    accumulate(bucket);
+    bucket.instances.push(node);
+
+    // Deeper buckets are keyed by successive ancestors. The DFS stack already
+    // holds them — dfs[i].node is N's ancestor at depth i.
+    let parentBucket = bucket;
+    for (let i = top - 1; i >= 0; i--) {
+      const ancestorId = chainIds[i]!;
+      const ancestor = dfs[i]!.node;
+      const existingChildren = parentBucket._children ?? [];
+      let childBucket = existingChildren.find((c) => c._keyId === ancestorId);
+      if (!childBucket) {
+        childBucket = createEmptyBottomUpRow(idToKey[ancestorId]!, ancestorId, ancestor, idFor);
+        existingChildren.push(childBucket);
+        parentBucket._children = existingChildren;
+      }
+      accumulate(childBucket);
+      parentBucket = childBucket;
     }
 
-    activeByName.set(key, node);
-    for (const child of node.children) {
-      visit(child);
-    }
-    if (nearestSameName) {
-      activeByName.set(key, nearestSameName);
+    if (ctx.prior) {
+      activeByName.set(ctx.stackKey, ctx.prior);
     } else {
-      activeByName.delete(key);
+      activeByName.delete(ctx.stackKey);
     }
+    chainIds.pop();
+    dfs.pop();
   };
 
-  for (const child of rootChildren) {
-    visit(child);
-  }
-
-  return attributionMap;
-}
-
-function getOrInitAttribution(
-  map: Map<LogEvent, FrameAttribution>,
-  frame: LogEvent,
-): FrameAttribution {
-  const existing = map.get(frame);
-  if (existing) {
-    return existing;
-  }
-  const entry: FrameAttribution = {
-    totalTime: frame.duration.total,
-    dmlTotal: frame.dmlCount.total,
-    soqlTotal: frame.soqlCount.total,
-    dmlRowTotal: frame.dmlRowCount.total,
-    soqlRowTotal: frame.soqlRowCount.total,
-    thrownTotal: frame.totalThrownCount,
-  };
-  map.set(frame, entry);
-  return entry;
-}
-
-/**
- * Inserts a frame into the bucket trie at every prefix of its ancestor chain.
- * Depth 0 is the root bucket (keyed by the frame's own name); deeper buckets are
- * keyed by each successive ancestor's name. The frame's attributed metrics are
- * added at every prefix — the partition invariant (children sum to parent) is
- * preserved because each frame contributes its own self / attr exactly once per
- * depth and the child buckets partition the parent by ancestor identity.
- */
-function insertFrameIntoTrie(
-  frame: LogEvent,
-  attributionMap: Map<LogEvent, FrameAttribution>,
-  rootBuckets: Map<string, BottomUpRow>,
-  idFor: () => string,
-): void {
-  const attribution = getOrInitAttribution(attributionMap, frame);
-  const rootKey = getEventKey(frame);
-  let bucket = rootBuckets.get(rootKey);
-  if (!bucket) {
-    bucket = createEmptyBottomUpRow(rootKey, frame, idFor);
-    rootBuckets.set(rootKey, bucket);
-  }
-  accumulateContribution(bucket, frame, frame, attribution);
-
-  let ancestor = frame.parent;
-  let parentBucket = bucket;
-  while (ancestor && ancestor.text !== 'LOG_ROOT') {
-    const ancestorKey = getEventKey(ancestor);
-    const existingChildren = parentBucket._children ?? [];
-    let childBucket = existingChildren.find((candidate) => candidate.key === ancestorKey);
-    if (!childBucket) {
-      childBucket = createEmptyBottomUpRow(ancestorKey, ancestor, idFor);
-      existingChildren.push(childBucket);
-      parentBucket._children = existingChildren;
+  // Drive one root tree to completion at a time. Each root is fully entered,
+  // descended, and exited before the next begins.
+  for (const root of rootChildren) {
+    enter(root);
+    while (dfs.length > 0) {
+      const cur = dfs[dfs.length - 1]!;
+      if (cur.childIdx < cur.node.children.length) {
+        const child = cur.node.children[cur.childIdx++]!;
+        enter(child);
+      } else {
+        exit();
+      }
     }
-    accumulateContribution(childBucket, frame, ancestor, attribution);
-    parentBucket = childBucket;
-    ancestor = ancestor.parent;
   }
-}
 
-function accumulateContribution(
-  bucket: BottomUpRow,
-  frame: LogEvent,
-  displayEvent: LogEvent,
-  attribution: FrameAttribution,
-): void {
-  bucket.callCount++;
-  bucket.totalSelfTime += frame.duration.self;
-  bucket.totalTime += attribution.totalTime;
-  bucket.dmlCount.self += frame.dmlCount.self;
-  bucket.dmlCount.total += attribution.dmlTotal;
-  bucket.soqlCount.self += frame.soqlCount.self;
-  bucket.soqlCount.total += attribution.soqlTotal;
-  bucket.dmlRowCount.self += frame.dmlRowCount.self;
-  bucket.dmlRowCount.total += attribution.dmlRowTotal;
-  bucket.soqlRowCount.self += frame.soqlRowCount.self;
-  bucket.soqlRowCount.total += attribution.soqlRowTotal;
-  bucket.totalThrownCount += attribution.thrownTotal;
-  bucket.instances.push(displayEvent);
-  bucket.contributionInstances.push(frame);
+  return finalizeBuckets(rootBuckets);
 }
 
 /**
@@ -430,7 +476,7 @@ function accumulateContribution(
  * (primary metric total-self desc, then name asc) at every level. Empty child
  * arrays are collapsed to null so Tabulator's dataTree renders a leaf indicator.
  */
-function finalizeBuckets(rootBuckets: Map<string, BottomUpRow>): BottomUpRow[] {
+function finalizeBuckets(rootBuckets: Map<number, BottomUpRow>): BottomUpRow[] {
   const roots = Array.from(rootBuckets.values());
   for (const row of roots) {
     finalizeBucketRecursive(row);
@@ -485,10 +531,16 @@ function createEmptyAggregatedRow(
   };
 }
 
-function createEmptyBottomUpRow(key: string, event: LogEvent, idFor: () => string): BottomUpRow {
+function createEmptyBottomUpRow(
+  key: string,
+  keyId: number,
+  event: LogEvent,
+  idFor: () => string,
+): BottomUpRow {
   return {
     id: idFor(),
     key,
+    _keyId: keyId,
     text: event.text,
     namespace: event.namespace,
     callerNamespace: getCallerNamespace(event),
@@ -504,7 +556,6 @@ function createEmptyBottomUpRow(key: string, event: LogEvent, idFor: () => strin
     totalThrownCount: 0,
     _children: null,
     instances: [],
-    contributionInstances: [],
     originalData: event,
   };
 }
