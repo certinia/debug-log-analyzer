@@ -9,13 +9,13 @@ import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavi
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import { ScrollAnchor } from '../../../tabulator/module/ScrollAnchor.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
-import type { MergedCalltreeRow } from '../utils/MergeAdjacent.js';
+import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
 
 export interface TableCallbacks {
   namespaceFilter: (
     selectedNamespaces: string[],
     namespace: string,
-    data: MergedCalltreeRow | AggregatedRow | BottomUpRow,
+    data: TimeOrderRow | AggregatedRow | BottomUpRow,
     filterParams: { filterCache: Map<string, boolean> },
   ) => boolean;
   onFilterCacheClear: () => void;

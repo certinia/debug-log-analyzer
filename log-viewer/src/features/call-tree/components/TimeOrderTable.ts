@@ -11,7 +11,7 @@ import { minMaxTreeFilter } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
-import { toUnmergedCallTree, type MergedCalltreeRow } from '../utils/MergeAdjacent.js';
+import { toTimeOrderTree, type TimeOrderRow } from '../utils/TimeOrderTree.js';
 import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
 import {
   commonColumnDefaults,
@@ -21,7 +21,7 @@ import {
 } from './TableShared.js';
 
 export interface TimeOrderCallbacks extends TableCallbacks {
-  showDetailsFilter: (data: MergedCalltreeRow) => boolean;
+  showDetailsFilter: (data: TimeOrderRow) => boolean;
   onContextMenu: (e: UIEvent, row: RowComponent) => void;
 }
 
@@ -39,7 +39,7 @@ export function createTimeOrderTable(
   const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
   const governorLimits = rootMethod.governorLimits;
 
-  const tableData = toUnmergedCallTree(rootMethod.children);
+  const tableData = toTimeOrderTree(rootMethod.children);
   const nameFormatter = createCalltreeNameFormatter(excludedTypes);
 
   const tableRef: { current: Tabulator | undefined } = { current: undefined };
@@ -83,7 +83,7 @@ export function createTimeOrderTable(
           if (!(e.target as HTMLElement).matches('a')) {
             return;
           }
-          const node = (cell.getData() as MergedCalltreeRow).originalData;
+          const node = (cell.getData() as TimeOrderRow).originalData;
           if (node.hasValidSymbols) {
             vscodeMessenger.send<string>('openType', node.text);
           }
@@ -278,7 +278,7 @@ export function createTimeOrderTable(
   tableRef.current = table;
 
   // Filter caches are cleared once per render via `renderStarted`. Row ids
-  // produced by `toUnmergedCallTree` are globally unique within a build
+  // produced by `toTimeOrderTree` are globally unique within a build
   // (per-build monotonic counter), so cached `deepFilter` results stay valid
   // across the cascaded `filter.filter()` passes Tabulator runs for each
   // expanded subtree — `getChildren` → `filter.filter(config.children)`
