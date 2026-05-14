@@ -138,8 +138,9 @@ export function createBottomUpTable(
             return;
           }
           const rowData = cell.getData() as BottomUpRow;
-          const firstInstance = rowData.instances[0];
-          if (firstInstance?.hasValidSymbols) {
+          // Deep buckets don't populate `instances` (see Aggregation.ts);
+          // `originalData` is the representative event at every depth.
+          if (rowData.originalData?.hasValidSymbols) {
             vscodeMessenger.send<string>('openType', rowData.text);
           }
         },

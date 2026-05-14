@@ -243,7 +243,8 @@ describe('toBottomUpTree', () => {
     const callerA = findRowByText(callers, 'ParentA');
     const callerB = findRowByText(callers, 'ParentB');
 
-    expect(callerA.instances.map((instance) => instance.text)).toEqual(['ParentA']);
+    expect(callerA.originalData.text).toBe('ParentA');
+    expect(callerA.instances).toEqual([]);
     expect(callerA).toMatchObject({
       totalSelfTime: 10,
       totalTime: 10,
@@ -254,7 +255,8 @@ describe('toBottomUpTree', () => {
       totalThrownCount: 1,
     });
 
-    expect(callerB.instances.map((instance) => instance.text)).toEqual(['ParentB']);
+    expect(callerB.originalData.text).toBe('ParentB');
+    expect(callerB.instances).toEqual([]);
     expect(callerB).toMatchObject({
       totalSelfTime: 20,
       totalTime: 20,
