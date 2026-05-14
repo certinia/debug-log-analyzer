@@ -9,13 +9,18 @@ interface FakeRow<TData = unknown> {
 
 interface InternalRowLike {
   getData(): unknown;
-  __children: FakeRow[];
+}
+
+function attachDataChildren(row: FakeRow): unknown {
+  const data = row.data as { _children?: unknown[] };
+  data._children = row.children.map((child) => attachDataChildren(child));
+  return data;
 }
 
 function toInternalRow(row: FakeRow): InternalRowLike {
+  attachDataChildren(row);
   return {
     getData: () => row.data,
-    __children: row.children,
   };
 }
 
@@ -26,11 +31,7 @@ function fakeTable(rootRows: FakeRow[]): Tabulator {
       internalRows.map((ir) => ({
         _getSelf: () => ir,
       })),
-    modules: {
-      dataTree: {
-        getFilteredTreeChildren: (row: InternalRowLike) => row.__children.map(toInternalRow),
-      },
-    },
+    modules: {},
   } as unknown as Tabulator;
 }
 
