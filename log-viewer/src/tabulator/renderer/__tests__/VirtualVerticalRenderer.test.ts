@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { VariableHeightVerticalRenderer } from '../VariableHeightVerticalRenderer';
+import { VirtualVerticalRenderer } from '../VirtualVerticalRenderer';
 
 /**
  * Minimal Tabulator surface needed by the Renderer base class constructor
@@ -49,7 +49,7 @@ interface RendererInternals {
 }
 
 function makeRenderer(rowsCount: number): RendererInternals {
-  const Ctor = VariableHeightVerticalRenderer as unknown as new (table: unknown) => unknown;
+  const Ctor = VirtualVerticalRenderer as unknown as new (table: unknown) => unknown;
   const r = new Ctor(makeMockTable()) as RendererInternals;
   // Manually initialize per-row state for the requested row count. The
   // renderer's real init pathway is driven by RowManager via tableBuilt /
@@ -66,7 +66,7 @@ function makeRenderer(rowsCount: number): RendererInternals {
   return r;
 }
 
-describe('VariableHeightVerticalRenderer height bookkeeping', () => {
+describe('VirtualVerticalRenderer height bookkeeping', () => {
   it('uses estimateHeight for unmeasured rows', () => {
     const r = makeRenderer(10);
     expect(r._heightOf(0)).toBe(r.estimateHeight);
@@ -331,7 +331,7 @@ function makeRendererWithRows(rows: RowStub[]): RendererForSetAnchor {
     options: {},
     eventBus: { _events: {}, dispatch: () => {} },
   };
-  const Ctor = VariableHeightVerticalRenderer as unknown as new (table: unknown) => unknown;
+  const Ctor = VirtualVerticalRenderer as unknown as new (table: unknown) => unknown;
   const r = new Ctor(table) as RendererForSetAnchor;
   const n = rows.length;
   r.measuredHeight = new Float64Array(n);
@@ -345,7 +345,7 @@ function makeRendererWithRows(rows: RowStub[]): RendererForSetAnchor {
   return r;
 }
 
-describe('VariableHeightVerticalRenderer.setAnchor', () => {
+describe('VirtualVerticalRenderer.setAnchor', () => {
   it('places a row at the requested offset using DOM-truth offsetTop', () => {
     // 5 rows, all 50px tall; index 3's document Y = 150. To place it at
     // offsetFromHolderTop = 20, scrollTop should be 150 - 20 = 130.
@@ -422,6 +422,7 @@ interface RerenderRenderer extends RendererForSetAnchor {
 function makeRerenderRenderer(initialRows: RowStub[]): {
   r: RerenderRenderer;
   setDisplayRows: (next: RowStub[]) => void;
+  tableEmpty: jest.Mock;
 } {
   const tableElement = { style: { paddingTop: '0', paddingBottom: '0' }, firstChild: null };
   const elementVertical = {
@@ -431,18 +432,20 @@ function makeRerenderRenderer(initialRows: RowStub[]): {
     clientWidth: 200,
   };
   let current: RowStub[] = initialRows;
+  const tableEmpty = jest.fn();
   const table = {
     rowManager: {
       element: elementVertical,
       tableElement,
       getDisplayRows: () => current,
       scrollHorizontal: () => {},
+      tableEmpty,
     },
     columnManager: { element: {} },
     options: {},
     eventBus: { _events: {}, dispatch: () => {} },
   };
-  const Ctor = VariableHeightVerticalRenderer as unknown as new (table: unknown) => unknown;
+  const Ctor = VirtualVerticalRenderer as unknown as new (table: unknown) => unknown;
   const r = new Ctor(table) as RerenderRenderer;
   const n = initialRows.length;
   r.measuredHeight = new Float64Array(n);
@@ -458,10 +461,11 @@ function makeRerenderRenderer(initialRows: RowStub[]): {
     setDisplayRows: (next) => {
       current = next;
     },
+    tableEmpty,
   };
 }
 
-describe('VariableHeightVerticalRenderer.rerenderRows scroll preservation', () => {
+describe('VirtualVerticalRenderer.rerenderRows scroll preservation', () => {
   it('does not write scrollTop across a sort (reorder)', () => {
     const oldRows: RowStub[] = Array.from({ length: 10 }, (_, i) => makeRowStub(i * 40, false));
     const { r, setDisplayRows } = makeRerenderRenderer(oldRows);
@@ -523,5 +527,77 @@ describe('VariableHeightVerticalRenderer.rerenderRows scroll preservation', () =
     r.rerenderRows();
 
     expect(r.elementVertical.scrollTop).toBe(200);
+  });
+
+  it('calls rowManager.tableEmpty() when the new display is empty', () => {
+    // Stock VirtualDomVertical.rerenderRows ends with
+    // `this.table.rowManager.tableEmpty();` — this triggers RowManager's
+    // placeholder display logic. Mirror that so filter/sort-to-empty shows
+    // the `.tabulator-placeholder` element.
+    const oldRows: RowStub[] = Array.from({ length: 3 }, (_, i) => makeRowStub(i * 40, false));
+    const { r, setDisplayRows, tableEmpty } = makeRerenderRenderer(oldRows);
+    for (let i = 0; i < 3; i++) {
+      r._setHeight(i, 40);
+    }
+    r._flushEstimateUpdate();
+    stubRenderWindow(r);
+
+    // Filter to zero rows.
+    setDisplayRows([]);
+
+    r.rerenderRows();
+
+    expect(tableEmpty).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT call tableEmpty() when the new display is non-empty', () => {
+    const oldRows: RowStub[] = Array.from({ length: 3 }, (_, i) => makeRowStub(i * 40, false));
+    const { r, tableEmpty } = makeRerenderRenderer(oldRows);
+    for (let i = 0; i < 3; i++) {
+      r._setHeight(i, 40);
+    }
+    r._flushEstimateUpdate();
+    stubRenderWindow(r);
+
+    r.rerenderRows();
+
+    expect(tableEmpty).not.toHaveBeenCalled();
+  });
+});
+
+describe('VirtualVerticalRenderer.initialize stock-bug workaround', () => {
+  it('overwrites rowManager.renderMode with the string "virtual"', () => {
+    // Stock Tabulator's setRenderMode copies `renderVertical` (a class) into
+    // rowManager.renderMode. That field is then stringified into the
+    // placeholder element's `tabulator-render-mode` attribute. We overwrite
+    // it with the string "virtual" inside initialize() to dodge the bug.
+    const rowManager: {
+      element: { scrollTop: number; clientHeight: number; clientWidth: number };
+      tableElement: { style: object; firstChild: null };
+      getDisplayRows: () => unknown[];
+      scrollHorizontal: () => void;
+      renderMode: unknown;
+    } = {
+      element: { scrollTop: 0, clientHeight: 0, clientWidth: 200 },
+      tableElement: { style: {}, firstChild: null },
+      getDisplayRows: () => [],
+      scrollHorizontal: () => {},
+      // Simulate the bad state stock leaves us in: renderMode set to the
+      // class reference instead of a string.
+      renderMode: VirtualVerticalRenderer,
+    };
+    const table = {
+      rowManager,
+      columnManager: { element: {} },
+      options: {},
+      eventBus: { _events: {}, dispatch: () => {} },
+    };
+    const Ctor = VirtualVerticalRenderer as unknown as new (table: unknown) => {
+      initialize: () => void;
+    };
+    const r = new Ctor(table);
+    r.initialize();
+
+    expect(rowManager.renderMode).toBe('virtual');
   });
 });

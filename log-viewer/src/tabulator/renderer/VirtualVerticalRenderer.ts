@@ -28,7 +28,7 @@ import { Renderer } from 'tabulator-tables';
  * regardless of scroll-event frequency.
  *
  * Pass as a class reference to the table option:
- *   renderVertical: VariableHeightVerticalRenderer
+ *   renderVertical: VirtualVerticalRenderer
  *
  * Optional debug logging:
  *   variableHeightRendererDebug: true   // logs every _renderWindow() call
@@ -59,6 +59,17 @@ interface RendererBase {
       tableElement: HTMLElement;
       getDisplayRows: () => RowInternals[];
       scrollHorizontal: (left: number) => void;
+      // Tabulator internal: shows the placeholder element when the display
+      // is empty (tabulator_esm.mjs RowManager). Stock VirtualDomVertical
+      // calls this at the end of rerenderRows; we mirror that.
+      tableEmpty?: () => void;
+      // Tabulator internal: RowManager copies `options.renderVertical` into
+      // this field at setRenderMode time (tabulator_esm.mjs:26706). When
+      // `renderVertical` is a class, this becomes a class reference and
+      // gets stringified into the `.tabulator-placeholder` element's
+      // `tabulator-render-mode` attribute (tabulator_esm.mjs:26804). We
+      // overwrite it with the string `'virtual'` in `initialize()`.
+      renderMode?: string;
     };
     options: Record<string, unknown>;
   };
@@ -201,7 +212,7 @@ class Fenwick {
   }
 }
 
-export class VariableHeightVerticalRenderer extends Renderer {
+export class VirtualVerticalRenderer extends Renderer {
   // String tags read directly by RowManager (tabulator_esm.mjs:26706, :26855).
   renderMode = 'virtual';
   // 'fill' tells RowManager to call adjustTableSize() after our renders so the
@@ -264,9 +275,23 @@ export class VariableHeightVerticalRenderer extends Renderer {
   // ---------------------------------------------------------------------------
 
   initialize(): void {
+    // Stock Tabulator bug workaround: when `renderVertical` is a class (as
+    // with this renderer) RowManager sets its `renderMode` field to the
+    // class reference itself (tabulator_esm.mjs:26706, inside
+    // `setRenderMode`). That field is later written to the
+    // `.tabulator-placeholder` element's `tabulator-render-mode` attribute
+    // (tabulator_esm.mjs:26804), which stringifies the class — producing
+    // garbage like `class VirtualVerticalRenderer ...` in the DOM.
+    // Overwrite with the string `'virtual'` here, before the first
+    // placeholder render. Our `initialize()` runs immediately after the
+    // bad assignment (tabulator_esm.mjs:26709), so this is the earliest
+    // safe point.
+    const self = this._self();
+    self.table.rowManager.renderMode = this.renderMode;
+
     // Seed lastClientWidth so the first real resize() call sees a meaningful
     // prev value and only invalidates on actual width changes.
-    const holder = this._self().elementVertical;
+    const holder = self.elementVertical;
     this.lastClientWidth = holder.clientWidth;
 
     // ResizeObserver catches every holder resize, including ones tabulator's
@@ -359,6 +384,14 @@ export class VariableHeightVerticalRenderer extends Renderer {
       row.deinitializeHeight?.();
     }
     this._renderWindow();
+    // Mirror stock VirtualDomVertical.rerenderRows tail
+    // (tabulator_esm.mjs:25247): notify RowManager when the new display is
+    // empty so the `.tabulator-placeholder` element shows. RowManager
+    // handles the initial-load empty case via earlier paths; this catches
+    // filter / sort / collapse-to-empty.
+    if (rows.length === 0) {
+      self.table.rowManager.tableEmpty?.();
+    }
   }
 
   scrollRows(_top: number, _dir: boolean): void {

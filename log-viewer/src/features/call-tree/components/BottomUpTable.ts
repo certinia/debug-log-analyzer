@@ -11,7 +11,7 @@ import MinMaxFilter from '../../../tabulator/filters/MinMax.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
-import { VariableHeightVerticalRenderer } from '../../../tabulator/renderer/VariableHeightVerticalRenderer.js';
+import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { sumDurationTotalForRootEvents } from '../../analysis/services/CallStackSum.js';
 import { toBottomUpTree, type BottomUpRow } from '../utils/Aggregation.js';
 import {
@@ -101,7 +101,7 @@ export function createBottomUpTable(
     rowKeyboardNavigation: true,
     scrollAnchor: true,
     initialFilter: callbacks.showDetailsFilter,
-    renderVertical: VariableHeightVerticalRenderer,
+    renderVertical: VirtualVerticalRenderer,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',
