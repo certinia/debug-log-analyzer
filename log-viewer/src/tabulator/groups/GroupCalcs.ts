@@ -1,7 +1,16 @@
 import { Module, type GroupComponent, type Tabulator } from 'tabulator-tables';
 
+type GroupHeaderFn = (
+  value: unknown,
+  count: number,
+  data: unknown,
+  group: GroupComponent,
+) => string | HTMLElement | null | undefined;
+
 export class GroupCalcs extends Module {
   static moduleName = 'groupCalcs';
+
+  private userGroupHeader?: GroupHeaderFn;
 
   constructor(table: Tabulator) {
     super(table);
@@ -9,10 +18,15 @@ export class GroupCalcs extends Module {
   }
 
   initialize() {
-    // @ts-expect-error groupCalcs
-    if (this.table.options.groupCalcs && !this.table.options.groupHeader) {
-      this.table.options.groupHeader = this.groupHeader;
+    // @ts-expect-error groupCalcs is a custom option registered above
+    if (!this.table.options.groupCalcs) {
+      return;
     }
+    const existing = this.table.options.groupHeader;
+    if (typeof existing === 'function') {
+      this.userGroupHeader = existing as GroupHeaderFn;
+    }
+    this.table.options.groupHeader = this.groupHeader.bind(this);
   }
 
   groupHeader(value: unknown, count: number, data: unknown, group: GroupComponent) {
@@ -21,13 +35,22 @@ export class GroupCalcs extends Module {
     const columnCalcs = group.getTable().modules.columnCalcs;
 
     const row = columnCalcs.generateBottomRow(rawGroup.rows);
-    row.data[columnCalcs.botCalcs[0].field] = group.getKey() + ` (${count})`;
+    const firstField = columnCalcs.botCalcs[0].field;
+    row.data[firstField] = group.getKey() + ` (${count})`;
     row.generateCells();
 
     const arrowClone = rawGroup.arrowElement.cloneNode(true);
     rawGroup.arrowElement = document.createElement('span');
 
     const firstCell = row.cells[0].getElement();
+    if (this.userGroupHeader) {
+      const provided = this.userGroupHeader(value, count, data, group);
+      if (typeof provided === 'string' && provided.length > 0) {
+        firstCell.innerHTML = provided;
+      } else if (provided instanceof HTMLElement) {
+        firstCell.replaceChildren(provided);
+      }
+    }
     firstCell.insertBefore(arrowClone, firstCell.firstChild);
 
     const rowFrag = document.createDocumentFragment();
@@ -36,9 +59,6 @@ export class GroupCalcs extends Module {
     });
     row.element.appendChild(rowFrag);
 
-    // row.cells.forEach((cell) => {
-    //   cell.cellRendered();
-    // });
     return row.element;
   }
 }

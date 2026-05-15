@@ -24,6 +24,7 @@ import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 // styles
 import codiconStyles from '../../../styles/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
 // Components
 import '../../../components/GridSkeleton.js';
@@ -41,6 +42,7 @@ export class AnalysisView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
     unsafeCSS(codiconStyles),
+    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {

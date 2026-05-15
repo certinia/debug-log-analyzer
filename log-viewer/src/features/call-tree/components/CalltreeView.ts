@@ -27,6 +27,7 @@ import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
 // web components
 import '../../../components/ContextMenu.js';
@@ -157,6 +158,7 @@ export class CalltreeView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
     unsafeCSS(codiconStyles),
+    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {

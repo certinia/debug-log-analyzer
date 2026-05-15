@@ -1,12 +1,15 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 import type { LogEvent } from 'apex-log-parser';
 import { goToRow } from '../features/call-tree/components/CalltreeView.js';
 import { DatabaseAccess } from '../features/database/services/Database.js';
+import { formatSOQL } from '../features/soql/format/formatter.js';
+import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
@@ -22,6 +25,7 @@ export class CallStack extends LitElement {
 
   static styles = [
     globalStyles,
+    unsafeCSS(soqlSyntaxStyles),
     css`
       :host {
         overflow: hidden;
@@ -30,6 +34,10 @@ export class CallStack extends LitElement {
         max-height: 30vh;
         padding: 0px 5px 0px 5px;
         white-space: normal;
+      }
+
+      .callstack__soql {
+        margin: 4px 0;
       }
 
       :host(:hover) {
@@ -83,11 +91,20 @@ export class CallStack extends LitElement {
   }
 
   private lineLink(line: LogEvent) {
+    const isSoql = line?.type === 'SOQL_EXECUTE_BEGIN';
+    const isSosl = line?.type === 'SOSL_EXECUTE_BEGIN';
+    const soqlBlock =
+      (isSoql || isSosl) && line?.text
+        ? html`<pre class="soql-block callstack__soql">
+  ${unsafeHTML(formatSOQL(line.text, { mode: 'pretty', dialect: isSosl ? 'sosl' : 'soql' }))}</pre
+          >`
+        : `${line.text}`;
+
     return html`<a
       @click=${this.onCallerClick}
       class="callstack__item code_text"
       data-timestamp="${line.timestamp}"
-      >${line.text}</a
+      >${soqlBlock}</a
     >`;
   }
 

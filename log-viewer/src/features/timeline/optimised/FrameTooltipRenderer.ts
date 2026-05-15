@@ -15,6 +15,7 @@ import {
   formatDuration,
   formatWallClockTime,
 } from '../../../core/utility/Util.js';
+import { formatSOQL } from '../../soql/format/formatter.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 
 /**
@@ -368,11 +369,19 @@ export class FrameTooltipRenderer {
         }
       }
 
+      const descriptionText = event.text + (event.suffix ?? '');
+      const isSoql = event.type === 'SOQL_EXECUTE_BEGIN';
+      const isSosl = event.type === 'SOSL_EXECUTE_BEGIN';
+      const descriptionHtml =
+        isSoql || isSosl
+          ? formatSOQL(descriptionText, { mode: 'pretty', dialect: isSosl ? 'sosl' : 'soql' })
+          : undefined;
       return this.createTooltip(
         '',
-        event.text + (event.suffix ?? ''),
+        descriptionText,
         rows,
         this.options.categoryColors[event.category] || '',
+        descriptionHtml,
       );
     }
 
@@ -389,6 +398,7 @@ export class FrameTooltipRenderer {
     description = '',
     rows: { label: string; value: string }[],
     color: string,
+    descriptionHtml?: string,
   ) {
     const tooltipBody = document.createElement('div');
     tooltipBody.className = 'timeline-tooltip';
@@ -405,8 +415,13 @@ export class FrameTooltipRenderer {
     }
 
     const descriptionDiv = document.createElement('div');
-    descriptionDiv.className = 'tooltip-header';
-    descriptionDiv.textContent = description;
+    if (descriptionHtml !== undefined) {
+      descriptionDiv.className = 'tooltip-header soql-block';
+      descriptionDiv.innerHTML = descriptionHtml;
+    } else {
+      descriptionDiv.className = 'tooltip-header';
+      descriptionDiv.textContent = description;
+    }
     tooltipBody.appendChild(descriptionDiv);
 
     rows.forEach(({ label, value }) => {
