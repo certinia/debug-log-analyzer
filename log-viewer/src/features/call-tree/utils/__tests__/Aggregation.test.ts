@@ -1011,3 +1011,82 @@ describe('toAggregatedCallTree', () => {
     expect(limitOnly.soqlCount.self).toBe(2);
   });
 });
+
+describe('_hasDetailsDeep precomputation', () => {
+  beforeEach(() => {
+    nextTimestamp = 1;
+  });
+
+  it('aggregated: marks zero-time leaf with no excluded type as not significant', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    createEvent({ text: 'NoTime', self: 0, total: 0, parent: root });
+
+    const rows = toAggregatedCallTree(root.children);
+    const noTime = findRowByText(rows, 'NoTime');
+    expect(noTime._hasDetailsDeep).toBe(false);
+  });
+
+  it('aggregated: marks zero-time leaf with excluded type as significant', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    createEvent({
+      text: 'LimitUsage',
+      self: 0,
+      total: 0,
+      parent: root,
+      type: 'CUMULATIVE_LIMIT_USAGE',
+    });
+
+    const rows = toAggregatedCallTree(root.children);
+    const limit = findRowByText(rows, 'LimitUsage');
+    expect(limit._hasDetailsDeep).toBe(true);
+  });
+
+  it('aggregated: marks zero-time parent as significant when any descendant is', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    const parent = createEvent({ text: 'ZeroParent', self: 0, total: 0, parent: root });
+    createEvent({ text: 'BusyChild', self: 5, total: 5, parent });
+
+    const rows = toAggregatedCallTree(root.children);
+    const zeroParent = findRowByText(rows, 'ZeroParent');
+    expect(zeroParent.totalTime).toBe(0);
+    expect(zeroParent._hasDetailsDeep).toBe(true);
+  });
+
+  it('aggregated: marks zero-time parent as not significant when no descendant is', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    const parent = createEvent({ text: 'ZeroParent', self: 0, total: 0, parent: root });
+    createEvent({ text: 'ZeroChild', self: 0, total: 0, parent });
+
+    const rows = toAggregatedCallTree(root.children);
+    const zeroParent = findRowByText(rows, 'ZeroParent');
+    expect(zeroParent._hasDetailsDeep).toBe(false);
+  });
+
+  it('bottom-up: rolls up significance from callers (children)', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    const caller = createEvent({ text: 'Caller', self: 0, total: 5, parent: root });
+    createEvent({ text: 'Callee', self: 5, total: 5, parent: caller });
+
+    const rows = toBottomUpTree(root.children);
+    const callee = findRowByText(rows, 'Callee');
+    expect(callee._hasDetailsDeep).toBe(true);
+    // Caller appears as a child of Callee in bottom-up
+    const callerChild = findRowByText(callee._children ?? [], 'Caller');
+    expect(callerChild._hasDetailsDeep).toBe(true);
+  });
+
+  it('bottom-up: zero-time with excluded type is significant', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    createEvent({
+      text: 'LimitUsage',
+      self: 0,
+      total: 0,
+      parent: root,
+      type: 'LIMIT_USAGE_FOR_NS',
+    });
+
+    const rows = toBottomUpTree(root.children);
+    const limit = findRowByText(rows, 'LimitUsage');
+    expect(limit._hasDetailsDeep).toBe(true);
+  });
+});

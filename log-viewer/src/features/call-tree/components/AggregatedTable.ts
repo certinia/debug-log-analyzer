@@ -310,7 +310,7 @@ export function createAggregatedTable(
     namespaceFilterCache.clear();
     totalTimeFilterCache.clear();
     selfTimeFilterCache.clear();
-    callbacks.onFilterCacheClear();
+    callbacks.onFilterCacheClear?.();
     callbacks.onRenderStarted();
   });
 

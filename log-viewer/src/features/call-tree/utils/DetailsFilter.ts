@@ -1,13 +1,16 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { AggregatedRow, BottomUpRow } from './Aggregation.js';
-
-export type AggregatedLikeRow = AggregatedRow | BottomUpRow;
 
 export type DeepFilterable<T> = { id: string; _children?: T[] | null };
 
-export const EXCLUDED_DETAIL_TYPES = new Set<string>([
+/**
+ * Event types that count as "significant" for the Show Details filter even
+ * though they may have zero duration. Shared by the call-tree row builders
+ * (which pre-compute `_hasDetailsDeep`) and by any runtime predicate that
+ * needs to mirror the same rule.
+ */
+export const EXCLUDED_DETAIL_TYPES: ReadonlySet<string> = new Set<string>([
   'CUMULATIVE_LIMIT_USAGE',
   'LIMIT_USAGE_FOR_NS',
   'CUMULATIVE_PROFILING',
@@ -45,17 +48,4 @@ export function deepFilter<T extends DeepFilterable<T>>(
   const finalMatch = childMatch || predicate(rowData);
   filterCache.set(rowData.id, finalMatch);
   return finalMatch;
-}
-
-export function makeShowDetailsFilter(
-  filterCache: Map<string, boolean>,
-): (data: AggregatedLikeRow) => boolean {
-  return (data) =>
-    deepFilter<AggregatedLikeRow>(
-      data,
-      (row) =>
-        row.totalTime > 0 ||
-        !!(row.originalData.type && EXCLUDED_DETAIL_TYPES.has(row.originalData.type)),
-      filterCache,
-    );
 }

@@ -18,7 +18,7 @@ export interface TableCallbacks {
     data: TimeOrderRow | AggregatedRow | BottomUpRow,
     filterParams: { filterCache: Map<string, boolean> },
   ) => boolean;
-  onFilterCacheClear: () => void;
+  onFilterCacheClear?: () => void;
   onRenderStarted: () => void;
 }
 
