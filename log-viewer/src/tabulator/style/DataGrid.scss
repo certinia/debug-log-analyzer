@@ -113,6 +113,7 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
     overflow-wrap: break-word;
     min-height: 0;
     height: 100%;
+    display: inline-block;
   }
 
   input[type='checkbox'] {

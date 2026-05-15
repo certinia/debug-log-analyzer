@@ -10,6 +10,7 @@ import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
 import { minMaxTreeFilter } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
+import { VariableHeightVerticalRenderer } from '../../../tabulator/renderer/VariableHeightVerticalRenderer.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../utils/TimeOrderTree.js';
 import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
@@ -55,6 +56,7 @@ export function createTimeOrderTable(
     rowKeyboardNavigation: true,
     //  custom property for module/ScrollAnchor
     scrollAnchor: true,
+    renderVertical: VariableHeightVerticalRenderer,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',

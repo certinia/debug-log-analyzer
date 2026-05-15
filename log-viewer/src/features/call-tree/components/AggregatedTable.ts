@@ -10,6 +10,7 @@ import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
 import { minMaxTreeFilter } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
+import { VariableHeightVerticalRenderer } from '../../../tabulator/renderer/VariableHeightVerticalRenderer.js';
 import { toAggregatedCallTree, type AggregatedRow } from '../utils/Aggregation.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import {
@@ -49,6 +50,7 @@ export function createAggregatedTable(
     scrollAnchor: true,
     // @ts-expect-error tabulator allows a function predicate but the types only declare Filter[]
     initialFilter: callbacks.showDetailsFilter,
+    renderVertical: VariableHeightVerticalRenderer,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',
