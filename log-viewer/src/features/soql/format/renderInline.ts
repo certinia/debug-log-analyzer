@@ -3,7 +3,7 @@
  */
 import type { Token, TokenKind } from './tokenize.js';
 
-const CLASS_BY_KIND: Record<TokenKind, string | null> = {
+export const CLASS_BY_KIND: Record<TokenKind, string | null> = {
   keyword: 'soql-tok-keyword',
   function: 'soql-tok-function',
   string: 'soql-tok-string',

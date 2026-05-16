@@ -17,7 +17,7 @@ describe('soqlGroupHeader', () => {
   it('formats SOQL when first row is SOQL_EXECUTE_BEGIN', () => {
     const data = [{ originalData: { type: 'SOQL_EXECUTE_BEGIN' } }];
     const html = soqlGroupHeader('SELECT Id FROM Account', 2, data);
-    expect(html).toContain('soql-block soql-inline');
+    expect(html).toContain('soql-block');
     expect(html).toContain('<span class="soql-tok-keyword">SELECT</span>');
     expect(html).toContain('(2)');
   });

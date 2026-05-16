@@ -1,19 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { escapeHtml } from './renderInline.js';
-import type { Token, TokenKind } from './tokenize.js';
-
-const CLASS_BY_KIND: Record<TokenKind, string | null> = {
-  keyword: 'soql-tok-keyword',
-  function: 'soql-tok-function',
-  string: 'soql-tok-string',
-  number: 'soql-tok-number',
-  bind: 'soql-tok-bind',
-  punct: 'soql-tok-punct',
-  ident: null,
-  ws: null,
-};
+import { CLASS_BY_KIND, escapeHtml } from './renderInline.js';
+import type { Token } from './tokenize.js';
 
 const MAJOR_CLAUSE = new Set<string>([
   'SELECT',
@@ -36,12 +25,6 @@ const COND_JOIN = new Set<string>(['AND', 'OR']);
 
 const INDENT = '  ';
 
-function renderToken(t: Token): string {
-  const cls = CLASS_BY_KIND[t.kind];
-  const escaped = escapeHtml(t.text);
-  return cls ? `<span class="${cls}">${escaped}</span>` : escaped;
-}
-
 function isKeyword(t: Token | undefined, name: string): boolean {
   return !!t && (t.kind === 'keyword' || t.kind === 'function') && t.text.toUpperCase() === name;
 }
@@ -50,9 +33,18 @@ function isPunct(t: Token | undefined, ch: string): boolean {
   return !!t && t.kind === 'punct' && t.text === ch;
 }
 
-export function renderPretty(tokens: Token[]): string {
+/**
+ * Walk the token stream and emit a flat sequence of chunks for pretty-print
+ * layout. Each chunk is either a `Token` (to render as a classed span) or a
+ * plain `string` (literal text — spaces, newlines, indentation).
+ *
+ * Splitting the walker from the rendering target keeps the layout state
+ * machine in one place; downstream renderers (HTML string, Lit template)
+ * just map chunks to their output form.
+ */
+export function prettyChunks(tokens: Token[]): (Token | string)[] {
   const nonWs = tokens.filter((t) => t.kind !== 'ws');
-  let out = '';
+  const out: (Token | string)[] = [];
   let depth = 0;
   // depths at which '(' opened a subquery (so ')' needs a leading newline)
   const subqueryDepths = new Set<number>();
@@ -61,15 +53,21 @@ export function renderPretty(tokens: Token[]): string {
   // whether the most recent major clause at each depth is WHERE/HAVING (for AND/OR breaks)
   const condClauseStack: boolean[] = [];
 
-  const write = (s: string) => {
-    out += s;
-    if (s.length > 0) {
-      atLineStart = s.endsWith('\n');
+  const pushText = (s: string) => {
+    if (!s) {
+      return;
     }
+    out.push(s);
+    atLineStart = s.endsWith('\n');
+  };
+
+  const pushToken = (t: Token) => {
+    out.push(t);
+    atLineStart = false;
   };
 
   const newline = (level: number) => {
-    out += '\n' + INDENT.repeat(level);
+    out.push('\n' + INDENT.repeat(level));
     atLineStart = true;
   };
 
@@ -85,7 +83,7 @@ export function renderPretty(tokens: Token[]): string {
       }
       depth = Math.max(0, depth - 1);
       condClauseStack.length = Math.min(condClauseStack.length, depth + 1);
-      write(renderToken(t));
+      pushToken(t);
       prev = t;
       continue;
     }
@@ -97,7 +95,7 @@ export function renderPretty(tokens: Token[]): string {
       if (!atLineStart && out.length > 0) {
         newline(depth);
       }
-      write(renderToken(t));
+      pushToken(t);
       condClauseStack[depth] = upper === 'WHERE' || upper === 'HAVING';
       prev = t;
       continue;
@@ -110,7 +108,7 @@ export function renderPretty(tokens: Token[]): string {
       condClauseStack[depth]
     ) {
       newline(depth + 1);
-      write(renderToken(t));
+      pushToken(t);
       prev = t;
       continue;
     }
@@ -119,9 +117,9 @@ export function renderPretty(tokens: Token[]): string {
     if (t.kind === 'punct' && t.text === '(') {
       // separator before '('
       if (needsSpaceBefore(prev, t)) {
-        write(' ');
+        pushText(' ');
       }
-      write(renderToken(t));
+      pushToken(t);
       depth++;
       // detect subquery: next non-ws is SELECT / FIND
       if (isKeyword(next, 'SELECT') || isKeyword(next, 'FIND')) {
@@ -134,12 +132,26 @@ export function renderPretty(tokens: Token[]): string {
 
     // default token
     if (!atLineStart && needsSpaceBefore(prev, t)) {
-      write(' ');
+      pushText(' ');
     }
-    write(renderToken(t));
+    pushToken(t);
     prev = t;
   }
 
+  return out;
+}
+
+export function renderPretty(tokens: Token[]): string {
+  let out = '';
+  for (const c of prettyChunks(tokens)) {
+    if (typeof c === 'string') {
+      out += c;
+      continue;
+    }
+    const cls = CLASS_BY_KIND[c.kind];
+    const escaped = escapeHtml(c.text);
+    out += cls ? `<span class="${cls}">${escaped}</span>` : escaped;
+  }
   return out;
 }
 
