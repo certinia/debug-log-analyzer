@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { type WorkspaceFolder } from 'vscode';
+import type { WorkspaceFolder } from 'vscode';
 
 export class VSWorkspace {
   workspaceFolder: WorkspaceFolder;

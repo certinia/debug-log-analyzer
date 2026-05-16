@@ -10,7 +10,7 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { Tabulator, type RowComponent } from 'tabulator-tables';
+import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog } from 'apex-log-parser';
 import { isVisible } from '../../../core/utility/Util.js';

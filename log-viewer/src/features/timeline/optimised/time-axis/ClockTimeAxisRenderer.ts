@@ -2,7 +2,8 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import { Container, Graphics, Text } from 'pixi.js';
+import type { Container } from 'pixi.js';
+import { Graphics, Text } from 'pixi.js';
 
 import { formatWallClockTime } from '../../../../core/utility/Util.js';
 import type { TickInterval, TickLabelResult, TimeAxisLabelStrategy } from './MeshAxisRenderer.js';

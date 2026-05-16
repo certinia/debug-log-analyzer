@@ -395,7 +395,9 @@ describe('toBottomUpTree', () => {
     expect(myMethodRows).toHaveLength(2);
     const codeUnitRow = myMethodRows.find((r) => r.type === 'CODE_UNIT_STARTED');
     const methodEntryRow = myMethodRows.find((r) => r.type === 'METHOD_ENTRY');
-    if (!codeUnitRow || !methodEntryRow) throw new Error('Expected both type rows');
+    if (!codeUnitRow || !methodEntryRow) {
+      throw new Error('Expected both type rows');
+    }
     expect(codeUnitRow.callCount).toBe(1);
     expect(codeUnitRow.totalSelfTime).toBe(10);
     expect(codeUnitRow.totalTime).toBe(10);
@@ -433,7 +435,9 @@ describe('toBottomUpTree', () => {
     expect(parentMethodRows).toHaveLength(2);
     const codeUnitCaller = parentMethodRows.find((r) => r.type === 'CODE_UNIT_STARTED');
     const methodEntryCaller = parentMethodRows.find((r) => r.type === 'METHOD_ENTRY');
-    if (!codeUnitCaller || !methodEntryCaller) throw new Error('Expected both caller type rows');
+    if (!codeUnitCaller || !methodEntryCaller) {
+      throw new Error('Expected both caller type rows');
+    }
     expect(codeUnitCaller.callCount).toBe(1);
     expect(codeUnitCaller.totalSelfTime).toBe(5);
     expect(codeUnitCaller.totalTime).toBe(5);
@@ -452,7 +456,9 @@ describe('toBottomUpTree', () => {
     const rows = toBottomUpTree(root.children);
 
     const searchRow = rows.find((r) => r.text === 'Search');
-    if (!searchRow) throw new Error('Search row not found');
+    if (!searchRow) {
+      throw new Error('Search row not found');
+    }
 
     expect(searchRow.callCount).toBe(3);
     expect(searchRow.totalSelfTime).toBe(150);
@@ -469,11 +475,15 @@ describe('toBottomUpTree', () => {
     const rows = toBottomUpTree(root.children);
 
     const searchRow = rows.find((r) => r.text === 'Search');
-    if (!searchRow) throw new Error('Search row not found');
+    if (!searchRow) {
+      throw new Error('Search row not found');
+    }
 
     const callerRows = searchRow._children ?? [];
     const selfCallerRow = callerRows.find((r) => r.text === 'Search');
-    if (!selfCallerRow) throw new Error('Self-caller row not found');
+    if (!selfCallerRow) {
+      throw new Error('Self-caller row not found');
+    }
 
     expect(selfCallerRow.totalTime).toBe(800);
     expect(selfCallerRow.totalSelfTime).toBeLessThanOrEqual(selfCallerRow.totalTime);
@@ -579,7 +589,9 @@ describe('toBottomUpTree', () => {
     const rows = toBottomUpTree(root.children);
 
     const searchRow = rows.find((r) => r.text === 'Search');
-    if (!searchRow) throw new Error('Search row not found');
+    if (!searchRow) {
+      throw new Error('Search row not found');
+    }
 
     // totalTime uses outermost only (rec1.total = 900) — already tested separately
     expect(searchRow.totalTime).toBe(900);

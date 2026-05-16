@@ -11,7 +11,7 @@ import { ShowLogAnalysis } from './commands/ShowLogAnalysis.js';
 import { SwitchTimelineTheme } from './commands/SwitchTimelineTheme.js';
 import { LogTimingDecoration } from './decorations/LogTimingDecoration.js';
 import { RawLogLineDecoration } from './decorations/RawLogLineDecoration.js';
-import { Display } from './display/Display.js';
+import type { Display } from './display/Display.js';
 import { WhatsNewNotification } from './display/WhatsNewNotification.js';
 import { RawLogFoldingProvider } from './folding/RawLogFoldingProvider.js';
 import { ApexLogLanguageDetector } from './language/ApexLogLanguageDetector.js';

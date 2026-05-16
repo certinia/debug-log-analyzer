@@ -19,7 +19,7 @@
  * - Never mutates viewport directly (viewport operations go through callbacks)
  */
 
-import * as PIXI from 'pixi.js';
+import type * as PIXI from 'pixi.js';
 import type {
   EventNode,
   TimelineMarker,

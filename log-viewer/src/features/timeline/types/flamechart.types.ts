@@ -604,13 +604,12 @@ export function isMarkerType(value: string): value is MarkerType {
  * Values are PixiJS numeric color codes (0xRRGGBB format).
  * Alpha channel (0.2) applied separately during rendering via MARKER_ALPHA.
  */
-/* eslint-disable @typescript-eslint/naming-convention */
+
 export const MARKER_COLORS: Record<MarkerType, number> = {
   error: 0xff8080, // rgba(255, 128, 128, 0.2) - light red
   skip: 0x1e80ff, // rgba(30, 128, 255, 0.2) - light blue
   unexpected: 0x8080ff, // rgba(128, 128, 255, 0.2) - light purple
 } as const;
-/* eslint-enable @typescript-eslint/naming-convention */
 
 /**
  * Transparency level for all truncation indicators.
@@ -677,13 +676,12 @@ export const SEVERITY_ORDER: readonly MarkerType[] = ['unexpected', 'skip', 'err
  * Maps truncation type to severity rank (higher = more severe).
  * Used for sorting and prioritization logic during hit testing.
  */
-/* eslint-disable @typescript-eslint/naming-convention */
+
 export const SEVERITY_RANK: Record<MarkerType, number> = {
   skip: 1,
   unexpected: 2,
   error: 3,
 } as const;
-/* eslint-enable @typescript-eslint/naming-convention */
 
 // ============================================================================
 // SEARCH & HIGHLIGHT

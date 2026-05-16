@@ -2,7 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/naming-convention */
+
 import { ApexVisitor } from '../ApexParser/ApexVisitor';
 
 jest.mock('@apexdevtools/apex-parser');

@@ -5,7 +5,7 @@
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { AggregatedRow, BottomUpRow } from './Aggregation.js';
-import { type TimeOrderRow } from './TimeOrderTree.js';
+import type { TimeOrderRow } from './TimeOrderTree.js';
 
 type CalltreeRowUnion = TimeOrderRow | AggregatedRow | BottomUpRow;
 

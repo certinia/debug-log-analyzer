@@ -1,9 +1,9 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { type Workspace } from '@apexdevtools/apex-ls';
+import type { Workspace } from '@apexdevtools/apex-ls';
 
-import { VSWorkspace } from '../../workspace/VSWorkspace.js';
+import type { VSWorkspace } from '../../workspace/VSWorkspace.js';
 
 /**
  * Finds Apex symbol definitions (classes) within Salesforce workspaces.

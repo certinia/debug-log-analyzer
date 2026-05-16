@@ -1,13 +1,8 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { type QueryContext } from '@apexdevtools/apex-parser';
-import {
-  type ANTLRErrorListener,
-  type RecognitionException,
-  type Recognizer,
-  type Token,
-} from 'antlr4ts';
+import type { QueryContext } from '@apexdevtools/apex-parser';
+import type { ANTLRErrorListener, RecognitionException, Recognizer, Token } from 'antlr4ts';
 
 // To understand the parser AST see https://github.com/nawforce/apex-parser/blob/master/antlr/ApexParser.g4
 // Start with the 'query' rule at ~532

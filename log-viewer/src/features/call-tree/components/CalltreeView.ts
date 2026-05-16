@@ -11,7 +11,7 @@ import {
 import { css, html, LitElement, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
-import { type RowComponent, type Tabulator } from 'tabulator-tables';
+import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { eventBus } from '../../../core/events/EventBus.js';

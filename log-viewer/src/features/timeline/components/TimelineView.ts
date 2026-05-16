@@ -25,7 +25,6 @@ import './TimelineKey.js';
 import './TimelineLegacy.js';
 import './TimelineSkeleton.js';
 
-/* eslint-disable @typescript-eslint/naming-convention */
 interface ThemeSettings {
   [key: string]: {
     apex: string;
@@ -38,7 +37,6 @@ interface ThemeSettings {
     validation: string;
   };
 }
-/* eslint-enable @typescript-eslint/naming-convention */
 
 @customElement('timeline-view')
 export class TimelineView extends LitElement {

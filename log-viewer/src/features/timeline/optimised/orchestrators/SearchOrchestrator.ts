@@ -25,7 +25,7 @@
  * - renderHighlight() renders the current match highlight
  */
 
-import * as PIXI from 'pixi.js';
+import type * as PIXI from 'pixi.js';
 import type {
   EventNode,
   PixelBucket,
@@ -38,7 +38,7 @@ import type { PrecomputedRect, RectangleCache } from '../RectangleCache.js';
 import { EventMatcher } from '../search/EventMatcher.js';
 import { FlameChartCursor } from '../search/FlameChartCursor.js';
 import { MeshSearchStyleRenderer } from '../search/MeshSearchStyleRenderer.js';
-import { SearchCursorImpl } from '../search/SearchCursor.js';
+import type { SearchCursorImpl } from '../search/SearchCursor.js';
 import { SearchHighlightRenderer } from '../search/SearchHighlightRenderer.js';
 import { SearchTextLabelRenderer } from '../search/SearchTextLabelRenderer.js';
 import type { TextLabelRenderer } from '../TextLabelRenderer.js';

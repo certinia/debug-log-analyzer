@@ -12,7 +12,7 @@ import {
 } from 'vscode';
 
 import { LogEventCache } from '../cache/LogEventCache.js';
-import { Context } from '../Context.js';
+import type { Context } from '../Context.js';
 import { buildMetricParts, TIMESTAMP_REGEX } from '../log-utils.js';
 
 class RawLogHoverProvider implements HoverProvider {

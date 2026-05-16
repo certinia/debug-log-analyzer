@@ -177,7 +177,9 @@ export class Find extends Module {
 
         for (const col of internalCols) {
           const field = col.field;
-          if (!field) continue;
+          if (!field) {
+            continue;
+          }
 
           let text = rowCache.get(field);
           if (text === undefined) {
@@ -273,7 +275,9 @@ export class Find extends Module {
         // Build a flat text-node map so we can create Ranges that span across
         // adjacent elements (e.g. two <span>s whose text forms a single match).
         const { text: fullText, nodes: textNodeMap } = this._buildTextNodeMap(elem);
-        if (!fullText) return;
+        if (!fullText) {
+          return;
+        }
 
         regex.lastIndex = 0;
         let match: RegExpExecArray | null;
@@ -286,7 +290,9 @@ export class Find extends Module {
             match.index,
             match.index + match[0].length,
           );
-          if (!range) continue;
+          if (!range) {
+            continue;
+          }
 
           if (highlightIndex === this._currentMatchIndex) {
             Find._currentHighlight!.add(range);
