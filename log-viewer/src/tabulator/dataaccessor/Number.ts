@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { type ColumnComponent, type RowComponent } from 'tabulator-tables';
+import type { ColumnComponent, RowComponent } from 'tabulator-tables';
 
 export default function (
   value: number | null,

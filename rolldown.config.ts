@@ -1,4 +1,5 @@
-import { defineConfig, Plugin } from 'rolldown';
+import type { Plugin } from 'rolldown';
+import { defineConfig } from 'rolldown';
 
 // rolldown plugins
 import nodePolyfills from '@rolldown/plugin-node-polyfills';

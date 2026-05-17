@@ -11,7 +11,7 @@ import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
-import { Notification } from '../notifications/components/NotificationPanel.js';
+import type { Notification } from '../notifications/components/NotificationPanel.js';
 
 // web components
 import '../../components/LogLevels.js';

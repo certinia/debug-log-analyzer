@@ -24,7 +24,8 @@
  * - Handle search logic (done by MeshSearchStyleRenderer)
  */
 
-import { Container, Geometry, Mesh, Shader } from 'pixi.js';
+import type { Container, Geometry, Shader } from 'pixi.js';
+import { Mesh } from 'pixi.js';
 import type { PixelBucket, RenderBatch, ViewportState } from '../types/flamechart.types.js';
 import { BUCKET_CONSTANTS, TIMELINE_CONSTANTS } from '../types/flamechart.types.js';
 import type { PrecomputedRect } from './RectangleCache.js';

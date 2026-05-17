@@ -11,7 +11,7 @@ import {
   type TextDocumentShowOptions,
 } from 'vscode';
 
-import { Context } from '../Context.js';
+import type { Context } from '../Context.js';
 import { SymbolFinder } from '../salesforce/codesymbol/SymbolFinder.js';
 import { Item, Options, QuickPick } from './QuickPick.js';
 

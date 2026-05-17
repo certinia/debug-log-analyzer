@@ -20,7 +20,7 @@
  * - Never mutates viewport directly
  */
 
-import * as PIXI from 'pixi.js';
+import type * as PIXI from 'pixi.js';
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { AreaZoomRenderer } from '../measurement/AreaZoomRenderer.js';
 import { MeasurementState, type MeasurementSnapshot } from '../measurement/MeasurementState.js';

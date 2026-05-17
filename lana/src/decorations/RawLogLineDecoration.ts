@@ -13,7 +13,7 @@ import {
 
 import type { LogEvent } from 'apex-log-parser';
 
-import { Context } from '../Context.js';
+import type { Context } from '../Context.js';
 import { LogEventCache } from '../cache/LogEventCache.js';
 import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 import { buildMetricParts, formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';

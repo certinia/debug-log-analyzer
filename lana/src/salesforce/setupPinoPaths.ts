@@ -13,7 +13,9 @@ import { fileURLToPath } from 'url';
  * paths to the separately copied worker files.
  */
 export function setupPinoBundlerPaths(): void {
-  if ('__bundlerPathsOverrides' in globalThis) return;
+  if ('__bundlerPathsOverrides' in globalThis) {
+    return;
+  }
 
   const __dirname = dirname(fileURLToPath(import.meta.url));
 

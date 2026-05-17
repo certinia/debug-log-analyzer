@@ -23,7 +23,8 @@
  * - Nanoseconds: Major ticks at 1ns, 2ns, 5ns, 10ns intervals
  */
 
-import { Container, Geometry, Mesh, Shader, Text } from 'pixi.js';
+import type { Geometry, Shader } from 'pixi.js';
+import { Container, Mesh, Text } from 'pixi.js';
 
 import type { ViewportState } from '../../types/flamechart.types.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';

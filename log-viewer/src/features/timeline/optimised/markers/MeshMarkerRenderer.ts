@@ -15,7 +15,8 @@
  * - True alpha transparency for theme-adaptive colors
  */
 
-import { Container, Geometry, Mesh, Shader } from 'pixi.js';
+import type { Container, Geometry, Shader } from 'pixi.js';
+import { Mesh } from 'pixi.js';
 import type { TimelineMarker } from '../../types/flamechart.types.js';
 import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';

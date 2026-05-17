@@ -1,10 +1,11 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { Uri, window } from 'vscode';
+import type { Uri } from 'vscode';
+import { window } from 'vscode';
 
 import { appName } from '../AppSettings.js';
-import { Context } from '../Context.js';
+import type { Context } from '../Context.js';
 import { getConfig, updateConfig } from '../workspace/AppConfig.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';

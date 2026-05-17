@@ -10,7 +10,7 @@
  * to create a "yellow glass" tint effect where frame colors show through.
  */
 
-import * as PIXI from 'pixi.js';
+import type * as PIXI from 'pixi.js';
 import { TIMELINE_CONSTANTS, type ViewportState } from '../../types/flamechart.types.js';
 
 /**

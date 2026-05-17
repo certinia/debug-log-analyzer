@@ -10,7 +10,7 @@ import {
   type TextEditor,
 } from 'vscode';
 
-import { Context } from '../Context.js';
+import type { Context } from '../Context.js';
 import { APEXLOG_HEADER, isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 import { formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
 

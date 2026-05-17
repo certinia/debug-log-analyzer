@@ -67,7 +67,7 @@ jest.mock('pixi.js', () => {
   };
 });
 
-import * as PIXI from 'pixi.js';
+import type * as PIXI from 'pixi.js';
 import { TimelineMarkerRenderer } from '../optimised/markers/TimelineMarkerRenderer.js';
 import { TimelineViewport } from '../optimised/TimelineViewport.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
