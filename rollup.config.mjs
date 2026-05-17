@@ -34,6 +34,10 @@ export default [
             find: 'apex-log-parser',
             replacement: path.resolve(__dirname, 'apex-log-parser/src/index.ts'),
           },
+          {
+            find: 'antlr4',
+            replacement: path.resolve(__dirname, 'node_modules/antlr4/dist/antlr4.node.mjs'),
+          },
         ],
       }),
       nodeResolve({ preferBuiltins: true }),
@@ -47,7 +51,7 @@ export default [
           jsc: {
             minify: {
               compress: production ? { keep_classnames: true, keep_fnames: true } : false,
-              mangle: production? { keep_classnames: true,  } : false,
+              mangle: production ? { keep_classnames: true } : false,
             },
           },
         }),
@@ -97,6 +101,10 @@ export default [
           {
             find: 'eventemitter3',
             replacement: path.resolve(__dirname, 'node_modules/eventemitter3/index.js'),
+          },
+          {
+            find: 'antlr4',
+            replacement: path.resolve(__dirname, 'node_modules/antlr4/dist/antlr4.web.mjs'),
           },
         ],
       }),
