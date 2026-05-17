@@ -3,8 +3,6 @@
  */
 import type { QueryContext } from '@apexdevtools/apex-parser';
 
-import { ApexErrorListener } from '@apexdevtools/apex-parser';
-
 // To understand the parser AST see https://github.com/nawforce/apex-parser/blob/master/antlr/ApexParser.g4
 // Start with the 'query' rule at ~532
 // Salesforce SOQL Reference: https://developer.salesforce.com/docs/atlas.en-us.soql_sosl.meta/soql_sosl/sforce_api_calls_soql.htm
@@ -69,7 +67,14 @@ export class SOQLParser {
   async parse(query: string): Promise<SOQLTree> {
     // Dynamic import for code splitting. Improves performance by reducing the amount of JS that is loaded and parsed at the start.
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    const { ApexParserFactory } = await import('@apexdevtools/apex-parser');
+    const { ApexParserFactory, ApexErrorListener } = await import('@apexdevtools/apex-parser');
+
+    class ThrowingErrorListener extends ApexErrorListener {
+      apexSyntaxError(line: number, column: number, message: string): void {
+        throw new SyntaxException(line, column, message);
+      }
+    }
+
     const parser = ApexParserFactory.createParser(query);
     parser.removeErrorListeners();
     parser.addErrorListener(new ThrowingErrorListener());
@@ -86,11 +91,5 @@ export class SyntaxException {
     this.line = line;
     this.column = column;
     this.message = message;
-  }
-}
-
-class ThrowingErrorListener extends ApexErrorListener {
-  apexSyntaxError(line: number, column: number, message: string): void {
-    throw new SyntaxException(line, column, message);
   }
 }
