@@ -16,7 +16,6 @@ import type { ApexLog } from 'apex-log-parser';
 import { isVisible } from '../../../core/utility/Util.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
-import { makeShowDetailsFilter } from '../../call-tree/utils/DetailsFilter.js';
 import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
@@ -127,11 +126,10 @@ export class AnalysisView extends LitElement {
   blockClearHighlights = true;
 
   filterState = { showDetails: false };
-  showDetailsFilterCache = new Map<string, boolean>();
 
-  _showDetailsFilter = (data: BottomUpRow) => {
-    return makeShowDetailsFilter(this.showDetailsFilterCache)(data);
-  };
+  // Precomputed at tree-build time on each BottomUpRow; the filter is a
+  // single boolean read with no walk and no cache.
+  _showDetailsFilter = (data: BottomUpRow): boolean => data._hasDetailsDeep;
 
   constructor() {
     super();
@@ -265,7 +263,6 @@ export class AnalysisView extends LitElement {
     if (!table) {
       return;
     }
-    this.showDetailsFilterCache.clear();
     table.blockRedraw();
     table.clearFilter(false);
     if (!this.filterState.showDetails) {
@@ -362,7 +359,6 @@ export class AnalysisView extends LitElement {
         namespaceFilter: () => true,
         showDetailsFilter: this._showDetailsFilter,
         onFilterCacheClear: () => {
-          this.showDetailsFilterCache.clear();
           if (!this.blockClearHighlights && this.totalMatches > 0) {
             this._resetFindWidget();
             this._clearSearchHighlights();

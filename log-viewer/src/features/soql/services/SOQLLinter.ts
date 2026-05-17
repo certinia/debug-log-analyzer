@@ -67,12 +67,12 @@ class LeadingPercentWildcardRule implements SOQLLinterRule {
     if (whereClause) {
       const hasLeadingWildcard = whereClause
         .logicalExpression()
-        .conditionalExpression()
+        .conditionalExpression_list()
         .find((exp) => {
           const fieldExp = exp.fieldExpression();
           if (
             fieldExp?.comparisonOperator().LIKE() &&
-            fieldExp.value().StringLiteral()?.text.startsWith("'%")
+            fieldExp.value().StringLiteral()?.getText().startsWith("'%")
           ) {
             return exp;
           }
@@ -100,7 +100,7 @@ class NegativeFilterOperatorRule implements SOQLLinterRule {
 
       const hasNegativeOp =
         exp.NOT() ||
-        exp.conditionalExpression().find((exp) => {
+        exp.conditionalExpression_list().find((exp) => {
           const operator = exp.fieldExpression()?.comparisonOperator();
 
           if (
@@ -149,11 +149,11 @@ class LastModifiedDateSystemModStampIndexRule implements SOQLLinterRule {
     if (whereClause) {
       const result = whereClause
         .logicalExpression()
-        .conditionalExpression()
+        .conditionalExpression_list()
         .find((exp) => {
           const fieldExp = exp.fieldExpression();
           if (
-            fieldExp?.fieldName()?.text.toLowerCase().endsWith('lastmodifieddate') &&
+            fieldExp?.fieldName()?.getText().toLowerCase().endsWith('lastmodifieddate') &&
             fieldExp.comparisonOperator().LT()
           ) {
             return exp;
