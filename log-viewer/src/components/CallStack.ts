@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, unsafeCSS, type PropertyValues, type TemplateResult } from 'lit';
+import type { PropertyValues, TemplateResult } from 'lit';
+import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import type { LogEvent } from 'apex-log-parser';
