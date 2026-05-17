@@ -321,7 +321,7 @@
     "antlr4": "4.13.2"
   },
   "devDependencies": {
-    "@types/node": "~22.16.5",
+    "@types/node": "~25.4.0",
     "@types/vscode": "~1.99.1",
     "typescript": "^5.9.3"
   }
