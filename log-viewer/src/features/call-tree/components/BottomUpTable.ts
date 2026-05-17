@@ -12,6 +12,7 @@ import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import { sumDurationTotalForRootEvents } from '../../analysis/services/CallStackSum.js';
+import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { toBottomUpTree, type BottomUpRow } from '../utils/Aggregation.js';
 import {
   commonColumnDefaults,
@@ -110,6 +111,7 @@ export function createBottomUpTable(
     headerSortElement,
     columnCalcs: 'table',
     groupCalcs: true,
+    groupHeader: soqlGroupHeader,
     groupSort: true,
     groupClosedShowCalcs: true,
     groupStartOpen: false,

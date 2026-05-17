@@ -3,6 +3,7 @@
  */
 import type { LogEvent, LogEventType } from 'apex-log-parser';
 import type { CellComponent, EmptyCallback } from 'tabulator-tables';
+import { formatSOQL } from '../../soql/format/formatter.js';
 
 export function createCalltreeNameFormatter(excludedTypes: Set<LogEventType>) {
   let childIndent: number;
@@ -27,6 +28,18 @@ export function createCalltreeNameFormatter(excludedTypes: Set<LogEventType>) {
     const { originalData: node } = cell.getData() as { originalData: LogEvent };
     if (!node) {
       return document.createTextNode(cell.getValue()) as unknown as HTMLElement;
+    }
+
+    const isSoql = node.type === 'SOQL_EXECUTE_BEGIN';
+    const isSosl = node.type === 'SOSL_EXECUTE_BEGIN';
+    if (isSoql || isSosl) {
+      const span = document.createElement('span');
+      span.className = 'soql-block';
+      span.innerHTML = formatSOQL(node.text, {
+        mode: 'pretty',
+        dialect: isSosl ? 'sosl' : 'soql',
+      });
+      return span;
     }
 
     if (node.hasValidSymbols) {
