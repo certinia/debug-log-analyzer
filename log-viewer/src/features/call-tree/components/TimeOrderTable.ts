@@ -289,7 +289,7 @@ export function createTimeOrderTable(
     totalTimeFilterCache.clear();
     selfTimeFilterCache.clear();
     namespaceFilterCache.clear();
-    callbacks.onFilterCacheClear();
+    callbacks.onFilterCacheClear?.();
     callbacks.onRenderStarted();
   });
 

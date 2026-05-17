@@ -239,7 +239,7 @@ export function createBottomUpTable(
   // defeating the cache. If row ids ever lose their uniqueness guarantee
   // this must move back to `dataFiltered`.
   table.on('renderStarted', () => {
-    callbacks.onFilterCacheClear();
+    callbacks.onFilterCacheClear?.();
     callbacks.onRenderStarted();
   });
 
