@@ -1,7 +1,9 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { ApexErrorListener, type QueryContext } from '@apexdevtools/apex-parser';
+import type { QueryContext } from '@apexdevtools/apex-parser';
+
+import { ApexErrorListener } from '@apexdevtools/apex-parser';
 
 // To understand the parser AST see https://github.com/nawforce/apex-parser/blob/master/antlr/ApexParser.g4
 // Start with the 'query' rule at ~532

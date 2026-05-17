@@ -14,7 +14,7 @@ import {
   type Uri,
 } from 'vscode';
 
-import { Context } from '../Context.js';
+import type { Context } from '../Context.js';
 
 export const APEXLOG_HEADER = /^(\d\d\.\d.+?)?APEX_CODE,\w.+$/;
 const EXECUTION_STARTED = /^\d{2}:\d{2}:\d{2}\.\d{1,} \(\d+\)\|EXECUTION_STARTED$/;

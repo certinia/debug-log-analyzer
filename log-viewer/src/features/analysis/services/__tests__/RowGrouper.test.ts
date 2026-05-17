@@ -79,7 +79,9 @@ describe('RowGrouper.group', () => {
 
     const metrics = group(root);
     const limitOnly = metrics.find((m) => m.name === 'LimitOnly');
-    if (!limitOnly) throw new Error('LimitOnly metric missing');
+    if (!limitOnly) {
+      throw new Error('LimitOnly metric missing');
+    }
     expect(limitOnly.count).toBe(1);
     expect(limitOnly.totalTime).toBe(0);
     expect(limitOnly.selfTime).toBe(0);
@@ -120,7 +122,9 @@ describe('RowGrouper.group', () => {
     expect(fooMetrics).toHaveLength(2);
     const codeUnit = fooMetrics.find((m) => m.type === 'CODE_UNIT_STARTED');
     const methodEntry = fooMetrics.find((m) => m.type === 'METHOD_ENTRY');
-    if (!codeUnit || !methodEntry) throw new Error('Missing metric');
+    if (!codeUnit || !methodEntry) {
+      throw new Error('Missing metric');
+    }
 
     // CODE_UNIT outer is the outermost — gets total=100. The inner METHOD_ENTRY frames are on
     // the call stack via the type-less stack key, so neither contributes total to the

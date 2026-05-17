@@ -6,7 +6,7 @@ import { workspace } from 'vscode';
 
 import { parse, type ApexLog, type LogEvent } from 'apex-log-parser';
 
-import { Context } from '../Context.js';
+import type { Context } from '../Context.js';
 
 export interface EventSearchResult {
   event: LogEvent;

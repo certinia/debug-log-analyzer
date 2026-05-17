@@ -501,7 +501,9 @@ export class MinimapDensityQuery {
 
     // Sort events by time, exits before enters at same time
     events.sort((a, b) => {
-      if (a.time !== b.time) return a.time - b.time;
+      if (a.time !== b.time) {
+        return a.time - b.time;
+      }
       // Process exits before enters at the same time
       return a.type - b.type;
     });

@@ -3,7 +3,7 @@
  */
 import { window } from 'vscode';
 
-import { Context } from '../Context.js';
+import type { Context } from '../Context.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 

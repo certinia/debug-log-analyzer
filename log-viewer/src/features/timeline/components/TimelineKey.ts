@@ -4,7 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { type TimelineGroup } from '../services/Timeline.js';
+import type { TimelineGroup } from '../services/Timeline.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';

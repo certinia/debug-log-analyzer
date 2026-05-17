@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { Module, Tabulator, type RowComponent } from 'tabulator-tables';
+import type { Tabulator } from 'tabulator-tables';
+import { Module, type RowComponent } from 'tabulator-tables';
 type GoToRowOptions = { scrollIfVisible: boolean; focusRow: boolean };
 export class RowNavigation extends Module {
   static moduleName = 'rowNavigation';
@@ -98,7 +99,9 @@ export class RowNavigation extends Module {
   // Fix: restore the minimum vDomBottomPad needed for centering, then set scrollTop
   // directly via offsetTop.
   _centerRow(elem: HTMLElement) {
-    if (!this.tableHolder) return;
+    if (!this.tableHolder) {
+      return;
+    }
 
     // Only near-bottom rows have vDomBottomPad forced to 0 — skip the DOM write for
     // all other rows where Tabulator already set it correctly.

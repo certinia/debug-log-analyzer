@@ -158,7 +158,9 @@ export class TemporalSegmentTree {
     const { depthStart, depthEnd, timeStart, timeEnd } = bounds;
     for (let depth = depthStart; depth <= depthEnd; depth++) {
       const tree = this.treesByDepth.get(depth);
-      if (!tree) continue;
+      if (!tree) {
+        continue;
+      }
 
       this.queryNode(
         tree,
@@ -187,11 +189,15 @@ export class TemporalSegmentTree {
 
       // Get pre-initialized category array (skip unknown categories)
       const categoryBuckets = bucketsByCategory.get(dominantCategory);
-      if (!categoryBuckets) continue;
+      if (!categoryBuckets) {
+        continue;
+      }
 
       // Get cached base color (skip unknown categories)
       const baseColor = categoryBaseColors.get(dominantCategory);
-      if (baseColor === undefined) continue;
+      if (baseColor === undefined) {
+        continue;
+      }
 
       const { bucketIndex, depth, timeStart, timeEnd } = bucket;
       categoryBuckets.push({
@@ -761,11 +767,15 @@ export class TemporalSegmentTree {
   ): void {
     // Use the pre-stored rect reference from the leaf node
     const rect = node.rectRef;
-    if (!rect) return;
+    if (!rect) {
+      return;
+    }
 
     // Get pre-initialized category group (skip unknown categories)
     const group = visibleRects.get(node.dominantCategory);
-    if (!group) return;
+    if (!group) {
+      return;
+    }
 
     // Update screen coordinates
     // NOTE: Do NOT subtract viewport.offsetX here - renderer applies via container transform

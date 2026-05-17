@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import { type CellComponent, type EmptyCallback } from 'tabulator-tables';
+import type { CellComponent, EmptyCallback } from 'tabulator-tables';
 
 export default function (
   cell: CellComponent,

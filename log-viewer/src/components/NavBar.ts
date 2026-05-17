@@ -7,7 +7,7 @@ import { customElement, property } from 'lit/decorators.js';
 
 import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../core/utility/Util.js';
-import { Notification } from '../features/notifications/components/NotificationPanel.js';
+import type { Notification } from '../features/notifications/components/NotificationPanel.js';
 
 // styles
 import codiconStyles from '../styles/codicon.css';

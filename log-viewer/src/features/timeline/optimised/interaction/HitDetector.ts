@@ -24,7 +24,7 @@ import {
   type ViewportBounds,
   type ViewportState,
 } from '../../types/flamechart.types.js';
-import { RectangleCache, type PrecomputedRect } from '../RectangleCache.js';
+import type { PrecomputedRect, RectangleCache } from '../RectangleCache.js';
 import type { TimelineEventIndex } from '../TimelineEventIndex.js';
 
 /**
