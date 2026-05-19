@@ -1,12 +1,15 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import type { PropertyValues, TemplateResult } from 'lit';
+import { LitElement, css, html, unsafeCSS } from 'lit';
+import { customElement, property, state } from 'lit/decorators.js';
 
 import type { LogEvent } from 'apex-log-parser';
 import { goToRow } from '../features/call-tree/components/CalltreeView.js';
 import { DatabaseAccess } from '../features/database/services/Database.js';
+import { formatSOQLToTemplate } from '../features/soql/format/formatter.js';
+import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
@@ -20,16 +23,24 @@ export class CallStack extends LitElement {
   @property({ type: Number })
   endDepth = -1;
 
+  // Internal state to hold the pre-formatted Lit templates
+  @state()
+  private _formattedDetails: TemplateResult[] = [];
+
   static styles = [
     globalStyles,
+    unsafeCSS(soqlSyntaxStyles),
     css`
       :host {
         overflow: hidden;
         min-width: 0%;
         min-height: 1ch;
         max-height: 30vh;
-        padding: 0px 5px 0px 5px;
         white-space: normal;
+      }
+
+      .callstack__soql {
+        margin: 4px 0;
       }
 
       :host(:hover) {
@@ -58,24 +69,43 @@ export class CallStack extends LitElement {
         font-weight: var(--vscode-font-weight, normal);
         font-size: var(--vscode-editor-font-size, 0.9em);
       }
+
+      pre {
+        display: inline;
+      }
     `,
   ];
 
+  // 1. THE PERFORMANCE ENGINE: Process data BEFORE rendering
+  protected willUpdate(changedProperties: PropertyValues) {
+    if (
+      changedProperties.has('timestamp') ||
+      changedProperties.has('startDepth') ||
+      changedProperties.has('endDepth')
+    ) {
+      const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() ?? [];
+
+      if (stack.length > 0) {
+        // Run the heavy loop and formatting logic here, only when inputs change
+        this._formattedDetails = stack
+          .slice(this.startDepth, this.endDepth)
+          .map((entry) => this.lineLink(entry));
+      } else {
+        this._formattedDetails = [];
+      }
+    }
+  }
+
   render() {
-    const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() ?? [];
-    if (!stack.length) {
+    if (!this._formattedDetails.length) {
       return html`<div class="callstack__item">No call stack available</div>`;
     }
 
-    const details = stack.slice(this.startDepth, this.endDepth).map((entry) => {
-      return this.lineLink(entry);
-    });
-
-    if (details.length === 1) {
-      return details;
+    if (this._formattedDetails.length === 1) {
+      return this._formattedDetails;
     }
 
-    const [first, ...rest] = details;
+    const [first, ...rest] = this._formattedDetails;
     return html`<details>
       <summary>${first}</summary>
       <div class="callstack">${rest}</div>
@@ -83,12 +113,26 @@ export class CallStack extends LitElement {
   }
 
   private lineLink(line: LogEvent) {
+    const isSoql = line?.type === 'SOQL_EXECUTE_BEGIN';
+    const isSosl = line?.type === 'SOSL_EXECUTE_BEGIN';
+    const formatted =
+      (isSoql || isSosl) && line?.text
+        ? this.formatSOQL(line.text, isSosl ? 'sosl' : 'soql')
+        : null;
+    const soqlBlock = formatted
+      ? html`<div class="soql-block callstack__soql">${formatted}</div>`
+      : `${line.text}`;
+
     return html`<a
       @click=${this.onCallerClick}
       class="callstack__item code_text"
       data-timestamp="${line.timestamp}"
-      >${line.text}</a
+      >${soqlBlock}</a
     >`;
+  }
+
+  private formatSOQL(soql: string, type: 'soql' | 'sosl') {
+    return formatSOQLToTemplate(soql, { mode: 'pretty', dialect: type });
   }
 
   private onCallerClick(evt: Event) {

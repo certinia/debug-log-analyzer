@@ -13,6 +13,7 @@ import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { sumDurationTotalForRootEvents } from '../../analysis/services/CallStackSum.js';
+import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { toBottomUpTree, type BottomUpRow } from '../utils/Aggregation.js';
 import {
   commonColumnDefaults,
@@ -112,6 +113,7 @@ export function createBottomUpTable(
     headerSortElement,
     columnCalcs: 'table',
     groupCalcs: true,
+    groupHeader: soqlGroupHeader,
     groupSort: true,
     groupClosedShowCalcs: true,
     groupStartOpen: false,
@@ -239,7 +241,7 @@ export function createBottomUpTable(
   // defeating the cache. If row ids ever lose their uniqueness guarantee
   // this must move back to `dataFiltered`.
   table.on('renderStarted', () => {
-    callbacks.onFilterCacheClear();
+    callbacks.onFilterCacheClear?.();
     callbacks.onRenderStarted();
   });
 

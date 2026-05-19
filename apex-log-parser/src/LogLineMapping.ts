@@ -3,6 +3,7 @@
  */
 
 import type { ApexLogParser } from './ApexLogParser.js';
+import type { LogEvent } from './LogEvents.js';
 import {
   BasicExitLine,
   BasicLogLine,
@@ -70,7 +71,6 @@ import {
   IdeasQueryExecuteLine,
   LimitUsageForNSLine,
   LimitUsageLine,
-  LogEvent,
   MatchEngineBegin,
   MethodEntryLine,
   MethodExitLine,

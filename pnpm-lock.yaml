@@ -99,14 +99,17 @@ importers:
         specifier: ^6.0.2
         version: 6.0.2
       '@apexdevtools/apex-parser':
-        specifier: ^4.4.0
-        version: 4.4.1
+        specifier: 5.1.0-beta.1
+        version: 5.1.0-beta.1
       '@salesforce/apex-node':
         specifier: ^8.4.11
         version: 8.4.11(tslib@2.8.1)
       '@salesforce/core':
         specifier: ^8.26.3
         version: 8.26.3(tslib@2.8.1)
+      antlr4:
+        specifier: 4.13.2
+        version: 4.13.2
     devDependencies:
       '@types/node':
         specifier: ~22.16.5
@@ -164,14 +167,17 @@ importers:
   log-viewer:
     dependencies:
       '@apexdevtools/apex-parser':
-        specifier: ^4.4.0
-        version: 4.4.1
+        specifier: 5.1.0-beta.1
+        version: 5.1.0-beta.1
       '@vscode/codicons':
         specifier: ^0.0.44
         version: 0.0.44
       '@vscode/webview-ui-toolkit':
         specifier: ^1.4.0
         version: 1.4.0(react@19.2.4)
+      antlr4:
+        specifier: 4.13.2
+        version: 4.13.2
       lit:
         specifier: ^3.3.2
         version: 3.3.2
@@ -278,9 +284,11 @@ packages:
     resolution: {integrity: sha512-RlaWpAFudE0GvUcim/xLBNw5ipNgT0Yd1eM7jeZJS0R9qn5DxeUGY3636zfgKgWkK04075y1fgNbPsIi/EjKiw==}
     engines: {node: '>=8.0.0'}
 
-  '@apexdevtools/apex-parser@4.4.1':
-    resolution: {integrity: sha512-tLHQ8DkI7/aoL9nOax+Xb3OEXk8IK1mTIpcCBaBJ3kk0Mhy4ik9jfQVAoSxjbWo8aLrjz2E4jnjmSU1iZlEt+Q==}
-    engines: {node: '>=8.0.0'}
+  '@apexdevtools/apex-parser@5.1.0-beta.1':
+    resolution: {integrity: sha512-IBuDgIMNypFJ9KXQDPZ44tbroj7Qi+to+l7fTqz+PiiXSw1MRFJfIPznO0oZcY68rohyEaMfeLWG2fYAPNc7hQ==}
+    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+    bundledDependencies:
+      - antlr4
 
   '@apexdevtools/vf-parser@1.1.0':
     resolution: {integrity: sha512-dP45Y3b4F0b8HosvGEMo6ugRx8yKhaz7h6eJh1cD/YvFxajk6x9Hfrtw63U2EKAstug6waBsT6QC7h+4USjBnA==}
@@ -3232,6 +3240,10 @@ packages:
   ansi-styles@6.2.3:
     resolution: {integrity: sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg==}
     engines: {node: '>=12'}
+
+  antlr4@4.13.2:
+    resolution: {integrity: sha512-QiVbZhyy4xAZ17UPEuG3YTOt8ZaoeOR1CvEAqrEsDBsOqINslaB147i9xqljZqoyf5S+EUlGStaj+t22LT9MOg==}
+    engines: {node: '>=16'}
 
   antlr4ts@0.5.0-alpha.4:
     resolution: {integrity: sha512-WPQDt1B74OfPv/IMS2ekXAKkTZIHl88uMetg6q3OTqgFxZ/dxDXI0EWLyZid/1Pe6hTftyg5N7gel5wNAGxXyQ==}
@@ -8213,10 +8225,7 @@ snapshots:
       antlr4ts: 0.5.0-alpha.4
       node-dir: 0.1.17
 
-  '@apexdevtools/apex-parser@4.4.1':
-    dependencies:
-      antlr4ts: 0.5.0-alpha.4
-      node-dir: 0.1.17
+  '@apexdevtools/apex-parser@5.1.0-beta.1': {}
 
   '@apexdevtools/vf-parser@1.1.0':
     dependencies:
@@ -12086,6 +12095,8 @@ snapshots:
   ansi-styles@5.2.0: {}
 
   ansi-styles@6.2.3: {}
+
+  antlr4@4.13.2: {}
 
   antlr4ts@0.5.0-alpha.4: {}
 

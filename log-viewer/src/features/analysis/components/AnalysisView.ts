@@ -10,13 +10,12 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { Tabulator, type RowComponent } from 'tabulator-tables';
+import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog } from 'apex-log-parser';
 import { isVisible } from '../../../core/utility/Util.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
-import { makeShowDetailsFilter } from '../../call-tree/utils/DetailsFilter.js';
 import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
@@ -24,6 +23,7 @@ import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 // styles
 import codiconStyles from '../../../styles/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
 // Components
 import '../../../components/GridSkeleton.js';
@@ -41,6 +41,7 @@ export class AnalysisView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
     unsafeCSS(codiconStyles),
+    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
@@ -127,11 +128,10 @@ export class AnalysisView extends LitElement {
   blockClearHighlights = true;
 
   filterState = { showDetails: false };
-  showDetailsFilterCache = new Map<string, boolean>();
 
-  _showDetailsFilter = (data: BottomUpRow) => {
-    return makeShowDetailsFilter(this.showDetailsFilterCache)(data);
-  };
+  // Precomputed at tree-build time on each BottomUpRow; the filter is a
+  // single boolean read with no walk and no cache.
+  _showDetailsFilter = (data: BottomUpRow): boolean => data._hasDetailsDeep;
 
   constructor() {
     super();
@@ -265,7 +265,6 @@ export class AnalysisView extends LitElement {
     if (!table) {
       return;
     }
-    this.showDetailsFilterCache.clear();
     table.blockRedraw();
     table.clearFilter(false);
     if (!this.filterState.showDetails) {
@@ -362,7 +361,6 @@ export class AnalysisView extends LitElement {
         namespaceFilter: () => true,
         showDetailsFilter: this._showDetailsFilter,
         onFilterCacheClear: () => {
-          this.showDetailsFilterCache.clear();
           if (!this.blockClearHighlights && this.totalMatches > 0) {
             this._resetFindWidget();
             this._clearSearchHighlights();

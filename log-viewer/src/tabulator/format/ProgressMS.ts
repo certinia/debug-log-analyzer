@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { type CellComponent, type EmptyCallback } from 'tabulator-tables';
+import type { CellComponent, EmptyCallback } from 'tabulator-tables';
 import './Progress.css';
 import { progressComponent } from './ProgressComponent.js';
 

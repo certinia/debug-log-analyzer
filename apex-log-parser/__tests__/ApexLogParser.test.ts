@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
+import type { SOQLExecuteBeginLine } from '../src/index.js';
 import {
   ApexLogParser,
   CodeUnitStartedLine,
@@ -12,7 +13,6 @@ import {
   parseObjectNamespace,
   parseRows,
   parseVfNamespace,
-  SOQLExecuteBeginLine,
   SOQLExecuteExplainLine,
 } from '../src/index.js';
 

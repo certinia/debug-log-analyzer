@@ -19,6 +19,8 @@ import {
 import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
+import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { DatabaseAccess } from '../services/Database.js';
 
 // Tabulator custom modules, imports + styles
@@ -106,6 +108,7 @@ export class SOQLView extends LitElement {
     unsafeCSS(dataGridStyles),
     unsafeCSS(databaseViewStyles),
     unsafeCSS(codiconStyles),
+    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
@@ -343,6 +346,7 @@ export class SOQLView extends LitElement {
       keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
       clipboardCopyRowRange: 'all',
       groupCalcs: true,
+      groupHeader: soqlGroupHeader,
       groupSort: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,

@@ -129,6 +129,36 @@ describe('ScrollAnchor', () => {
     expect(holder.scrollTop).toBe(260);
   });
 
+  it('returns the row whose cumulative visible height first crosses half of the holder height', () => {
+    // holder height 100, target 50. r1 contributes 30 (running 30), r2 contributes 30
+    // (running 60 — first row at/over 50), r3 never reached.
+    const r1 = makeRow(0, 30);
+    const r2 = makeRow(30, 30);
+    const r3 = makeRow(60, 30);
+    const holder = { getBoundingClientRect: () => rect(0, 100) };
+
+    const table = {
+      on: jest.fn(),
+      element: { querySelector: jest.fn() },
+      getRows: jest.fn((type?: string) => {
+        if (type === 'visible') {
+          return [r1, r2, r3];
+        }
+        return [];
+      }),
+    };
+
+    const plugin = new ScrollAnchor(table as never);
+    (plugin as unknown as { table: typeof table }).table = table;
+
+    const found = (
+      plugin as unknown as { _findMiddleVisibleRow: (h: unknown) => unknown }
+    )._findMiddleVisibleRow(holder);
+    expect(found).toBe(r2);
+    // r3 should never be reached.
+    void r3;
+  });
+
   it('mid-table filter (anchor still visible): preserves exact viewport-Y', () => {
     const anchor = makeRow({ top: 10, height: 20, offsetTop: 500 });
     const { table, holder } = setup({

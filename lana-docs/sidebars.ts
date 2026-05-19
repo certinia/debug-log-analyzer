@@ -27,6 +27,7 @@ const sidebars: SidebarsConfig = {
         'docs/features/database',
         'docs/features/find',
         'docs/features/raw-log',
+        'docs/features/mcp',
       ],
     },
     'docs/settings',

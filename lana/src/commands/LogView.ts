@@ -7,7 +7,7 @@ import { homedir } from 'os';
 import { basename, dirname, join, parse } from 'path';
 import { Uri, commands, window as vscWindow, workspace, type WebviewPanel } from 'vscode';
 
-import { Context } from '../Context.js';
+import type { Context } from '../Context.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
 import { RawLogNavigation } from '../log-features/RawLogNavigation.js';

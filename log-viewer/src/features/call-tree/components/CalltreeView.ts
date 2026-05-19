@@ -11,7 +11,7 @@ import {
 import { css, html, LitElement, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
-import { type RowComponent, type Tabulator } from 'tabulator-tables';
+import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { eventBus } from '../../../core/events/EventBus.js';
@@ -19,7 +19,7 @@ import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenge
 import { findEventByTimestamp } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
-import { deepFilter, makeShowDetailsFilter } from '../utils/DetailsFilter.js';
+import { deepFilter } from '../utils/DetailsFilter.js';
 import { expandCollapseAll } from '../utils/ExpandCollapse.js';
 import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
 
@@ -27,6 +27,7 @@ import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
 // web components
 import '../../../components/ContextMenu.js';
@@ -48,16 +49,6 @@ provideVSCodeDesignSystem().register(
 );
 
 type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
-
-// Hoisted out of filter predicates so the Set is constructed once at module
-// load rather than re-allocated on every row's filter evaluation (which can
-// run thousands of times per filter operation on large logs).
-const SHOW_DETAILS_EXCLUDED_TYPES: ReadonlySet<string> = new Set([
-  'CUMULATIVE_LIMIT_USAGE',
-  'LIMIT_USAGE_FOR_NS',
-  'CUMULATIVE_PROFILING',
-  'CUMULATIVE_PROFILING_BEGIN',
-]);
 
 const DEBUG_VALUE_TYPES: ReadonlySet<string> = new Set([
   'USER_DEBUG',
@@ -92,7 +83,6 @@ export class CalltreeView extends LitElement {
   };
   bottomUpGroupBy = 'None';
   debugOnlyFilterCache = new Map<string, boolean>();
-  showDetailsFilterCache = new Map<string, boolean>();
   typeFilterCache = new Map<string, boolean>();
 
   findMap: { [key: number]: RowComponent } = {};
@@ -157,6 +147,7 @@ export class CalltreeView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
     unsafeCSS(codiconStyles),
+    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
@@ -500,12 +491,10 @@ export class CalltreeView extends LitElement {
     }
 
     this.debugOnlyFilterCache.clear();
-    this.showDetailsFilterCache.clear();
     this.typeFilterCache.clear();
 
     const filtersToAdd = [];
 
-    const isAggregated = this.viewMode === 'aggregated';
     const isBottomUp = this.viewMode === 'bottom-up';
 
     if (!isBottomUp && this.filterState.debugOnly) {
@@ -520,9 +509,7 @@ export class CalltreeView extends LitElement {
       }
 
       if (!this.filterState.showDetails) {
-        filtersToAdd.push(
-          isAggregated || isBottomUp ? this._showDetailsFilterRollup : this._showDetailsFilter,
-        );
+        filtersToAdd.push(this._showDetailsFilter);
       }
     }
 
@@ -653,23 +640,11 @@ export class CalltreeView extends LitElement {
     this.blockClearHighlights = false;
   }
 
-  _showDetailsFilter = (data: TimeOrderRow): boolean =>
-    deepFilter<TimeOrderRow>(
-      data,
-      (row) => {
-        const { duration, isParent, discontinuity, type } = row.originalData;
-        return (
-          isParent ||
-          duration.total > 0 ||
-          discontinuity ||
-          !!(type && SHOW_DETAILS_EXCLUDED_TYPES.has(type))
-        );
-      },
-      this.showDetailsFilterCache,
-    );
-
-  _showDetailsFilterRollup = (data: AggregatedRow | BottomUpRow): boolean =>
-    makeShowDetailsFilter(this.showDetailsFilterCache)(data);
+  // Show-Details predicate is precomputed at tree-build time (see
+  // `_hasDetailsDeep` in TimeOrderTree/Aggregation), so the Tabulator filter
+  // is a single boolean read — no per-toggle tree walk, no cache.
+  _showDetailsFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
+    data._hasDetailsDeep;
 
   _debugFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
     deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
@@ -721,7 +696,6 @@ export class CalltreeView extends LitElement {
       namespaceFilter: this._namespaceFilter,
       onFilterCacheClear: () => {
         this.debugOnlyFilterCache.clear();
-        this.showDetailsFilterCache.clear();
         this.typeFilterCache.clear();
       },
       onRenderStarted: () => {
@@ -754,10 +728,9 @@ export class CalltreeView extends LitElement {
 
     const { table, tableBuilt } = createAggregatedTable(container, rootMethod, {
       namespaceFilter: this._namespaceFilter,
-      showDetailsFilter: this._showDetailsFilterRollup,
+      showDetailsFilter: this._showDetailsFilter,
       onFilterCacheClear: () => {
         this.debugOnlyFilterCache.clear();
-        this.showDetailsFilterCache.clear();
         this.typeFilterCache.clear();
       },
       onRenderStarted: () => {
@@ -782,10 +755,7 @@ export class CalltreeView extends LitElement {
       rootMethod,
       {
         namespaceFilter: this._namespaceFilter,
-        showDetailsFilter: this._showDetailsFilterRollup,
-        onFilterCacheClear: () => {
-          this.showDetailsFilterCache.clear();
-        },
+        showDetailsFilter: this._showDetailsFilter,
         onRenderStarted: () => {
           if (!this.blockClearHighlights && this.totalMatches > 0) {
             this._resetFindWidget();

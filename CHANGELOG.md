@@ -83,6 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Total Duration**: First line shows total log execution time.
   - **Syntax Highlighting**: Apex debug log files are automatically recognized and syntax highlighted for improved readability.
 - 🏷️ **Group by Caller Namespace**: New grouping option across the Analysis, Bottom-Up, and DML views. Groups rows by the namespace of their **direct caller** (the immediate parent code unit), making it easy to see cross-package activity. ([#604])
+- 🎨 **SOQL Syntax Highlighting & Pretty-Printing**: SOQL queries are now syntax-highlighted and pretty-printed wherever they appear — Database view, Call Tree, Timeline tooltips, and call-stack rows. Keywords, functions, strings, numbers, and bind variables are themed. ([#605])
 
 ### Changed
 
@@ -484,6 +485,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#605]: https://github.com/certinia/debug-log-analyzer/issues/605
 [#604]: https://github.com/certinia/debug-log-analyzer/issues/604
 [#333]: https://github.com/certinia/debug-log-analyzer/issues/333
 [#627]: https://github.com/certinia/debug-log-analyzer/issues/627

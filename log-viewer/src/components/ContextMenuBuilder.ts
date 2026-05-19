@@ -69,7 +69,9 @@ export class ContextMenuBuilder {
     // Add user-defined groups
     for (let i = 0; i < this.groups.length; i++) {
       const group = this.groups[i];
-      if (!group) continue;
+      if (!group) {
+        continue;
+      }
 
       // Add separator before group (except first group)
       if (i > 0) {

@@ -395,7 +395,9 @@ describe('toBottomUpTree', () => {
     expect(myMethodRows).toHaveLength(2);
     const codeUnitRow = myMethodRows.find((r) => r.type === 'CODE_UNIT_STARTED');
     const methodEntryRow = myMethodRows.find((r) => r.type === 'METHOD_ENTRY');
-    if (!codeUnitRow || !methodEntryRow) throw new Error('Expected both type rows');
+    if (!codeUnitRow || !methodEntryRow) {
+      throw new Error('Expected both type rows');
+    }
     expect(codeUnitRow.callCount).toBe(1);
     expect(codeUnitRow.totalSelfTime).toBe(10);
     expect(codeUnitRow.totalTime).toBe(10);
@@ -433,7 +435,9 @@ describe('toBottomUpTree', () => {
     expect(parentMethodRows).toHaveLength(2);
     const codeUnitCaller = parentMethodRows.find((r) => r.type === 'CODE_UNIT_STARTED');
     const methodEntryCaller = parentMethodRows.find((r) => r.type === 'METHOD_ENTRY');
-    if (!codeUnitCaller || !methodEntryCaller) throw new Error('Expected both caller type rows');
+    if (!codeUnitCaller || !methodEntryCaller) {
+      throw new Error('Expected both caller type rows');
+    }
     expect(codeUnitCaller.callCount).toBe(1);
     expect(codeUnitCaller.totalSelfTime).toBe(5);
     expect(codeUnitCaller.totalTime).toBe(5);
@@ -452,7 +456,9 @@ describe('toBottomUpTree', () => {
     const rows = toBottomUpTree(root.children);
 
     const searchRow = rows.find((r) => r.text === 'Search');
-    if (!searchRow) throw new Error('Search row not found');
+    if (!searchRow) {
+      throw new Error('Search row not found');
+    }
 
     expect(searchRow.callCount).toBe(3);
     expect(searchRow.totalSelfTime).toBe(150);
@@ -469,11 +475,15 @@ describe('toBottomUpTree', () => {
     const rows = toBottomUpTree(root.children);
 
     const searchRow = rows.find((r) => r.text === 'Search');
-    if (!searchRow) throw new Error('Search row not found');
+    if (!searchRow) {
+      throw new Error('Search row not found');
+    }
 
     const callerRows = searchRow._children ?? [];
     const selfCallerRow = callerRows.find((r) => r.text === 'Search');
-    if (!selfCallerRow) throw new Error('Self-caller row not found');
+    if (!selfCallerRow) {
+      throw new Error('Self-caller row not found');
+    }
 
     expect(selfCallerRow.totalTime).toBe(800);
     expect(selfCallerRow.totalSelfTime).toBeLessThanOrEqual(selfCallerRow.totalTime);
@@ -579,7 +589,9 @@ describe('toBottomUpTree', () => {
     const rows = toBottomUpTree(root.children);
 
     const searchRow = rows.find((r) => r.text === 'Search');
-    if (!searchRow) throw new Error('Search row not found');
+    if (!searchRow) {
+      throw new Error('Search row not found');
+    }
 
     // totalTime uses outermost only (rec1.total = 900) — already tested separately
     expect(searchRow.totalTime).toBe(900);
@@ -1009,5 +1021,84 @@ describe('toAggregatedCallTree', () => {
     const limitOnly = findRowByText(rows, 'LimitOnly');
     expect(limitOnly.callCount).toBe(1);
     expect(limitOnly.soqlCount.self).toBe(2);
+  });
+});
+
+describe('_hasDetailsDeep precomputation', () => {
+  beforeEach(() => {
+    nextTimestamp = 1;
+  });
+
+  it('aggregated: marks zero-time leaf with no excluded type as not significant', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    createEvent({ text: 'NoTime', self: 0, total: 0, parent: root });
+
+    const rows = toAggregatedCallTree(root.children);
+    const noTime = findRowByText(rows, 'NoTime');
+    expect(noTime._hasDetailsDeep).toBe(false);
+  });
+
+  it('aggregated: marks zero-time leaf with excluded type as significant', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    createEvent({
+      text: 'LimitUsage',
+      self: 0,
+      total: 0,
+      parent: root,
+      type: 'CUMULATIVE_LIMIT_USAGE',
+    });
+
+    const rows = toAggregatedCallTree(root.children);
+    const limit = findRowByText(rows, 'LimitUsage');
+    expect(limit._hasDetailsDeep).toBe(true);
+  });
+
+  it('aggregated: marks zero-time parent as significant when any descendant is', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    const parent = createEvent({ text: 'ZeroParent', self: 0, total: 0, parent: root });
+    createEvent({ text: 'BusyChild', self: 5, total: 5, parent });
+
+    const rows = toAggregatedCallTree(root.children);
+    const zeroParent = findRowByText(rows, 'ZeroParent');
+    expect(zeroParent.totalTime).toBe(0);
+    expect(zeroParent._hasDetailsDeep).toBe(true);
+  });
+
+  it('aggregated: marks zero-time parent as not significant when no descendant is', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    const parent = createEvent({ text: 'ZeroParent', self: 0, total: 0, parent: root });
+    createEvent({ text: 'ZeroChild', self: 0, total: 0, parent });
+
+    const rows = toAggregatedCallTree(root.children);
+    const zeroParent = findRowByText(rows, 'ZeroParent');
+    expect(zeroParent._hasDetailsDeep).toBe(false);
+  });
+
+  it('bottom-up: rolls up significance from callers (children)', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    const caller = createEvent({ text: 'Caller', self: 0, total: 5, parent: root });
+    createEvent({ text: 'Callee', self: 5, total: 5, parent: caller });
+
+    const rows = toBottomUpTree(root.children);
+    const callee = findRowByText(rows, 'Callee');
+    expect(callee._hasDetailsDeep).toBe(true);
+    // Caller appears as a child of Callee in bottom-up
+    const callerChild = findRowByText(callee._children ?? [], 'Caller');
+    expect(callerChild._hasDetailsDeep).toBe(true);
+  });
+
+  it('bottom-up: zero-time with excluded type is significant', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    createEvent({
+      text: 'LimitUsage',
+      self: 0,
+      total: 0,
+      parent: root,
+      type: 'LIMIT_USAGE_FOR_NS',
+    });
+
+    const rows = toBottomUpTree(root.children);
+    const limit = findRowByText(rows, 'LimitUsage');
+    expect(limit._hasDetailsDeep).toBe(true);
   });
 });

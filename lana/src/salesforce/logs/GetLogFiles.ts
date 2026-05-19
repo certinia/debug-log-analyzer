@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { type LogRecord } from '@salesforce/apex-node';
+import type { LogRecord } from '@salesforce/apex-node';
 
 import { getSalesforceConnection } from './SalesforceConnection.js';
 

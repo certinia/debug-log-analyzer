@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
-export const tooltipStyles = `
+export const tooltipStyles = `${soqlSyntaxStyles}
    #timeline-tooltip {
         display: none;
         position: absolute;

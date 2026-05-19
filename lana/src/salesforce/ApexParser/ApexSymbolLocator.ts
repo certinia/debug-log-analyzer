@@ -1,13 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import {
-  ApexLexer,
-  ApexParser,
-  CaseInsensitiveInputStream,
-  CommonTokenStream,
-} from '@apexdevtools/apex-parser';
-import { CharStreams } from 'antlr4ts';
+import { ApexParserFactory } from '@apexdevtools/apex-parser';
 import {
   ApexVisitor,
   type ApexConstructorNode,
@@ -23,11 +17,7 @@ export type SymbolLocation = {
 };
 
 export function parseApex(apexCode: string): ApexNode {
-  const parser = new ApexParser(
-    new CommonTokenStream(
-      new ApexLexer(new CaseInsensitiveInputStream(CharStreams.fromString(apexCode))),
-    ),
-  );
+  const parser = ApexParserFactory.createParser(apexCode);
   return new ApexVisitor().visit(parser.compilationUnit());
 }
 

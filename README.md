@@ -157,6 +157,42 @@ Seamlessly navigate between the visual analysis and your raw `.log` files:
 - **Hover Details** – Hover near the ghost text to see SOQL/DML counts, row counts, and exception info.
 - **Total Duration** – First line displays total log execution time.
 
+## 🤖 AI Assistant (MCP Server)
+
+A companion Model Context Protocol server, [`@certinia/apex-log-mcp`](https://www.npmjs.com/package/@certinia/apex-log-mcp) ([source on GitHub](https://github.com/certinia/debug-log-analyzer-mcp)), exposes Apex log analysis tools to AI assistants. Use it with GitHub Copilot Chat, Claude Code, Cursor, or any MCP client.
+
+**Available tools:** `get_apex_log_summary`, `analyze_apex_log_performance`, `find_performance_bottlenecks`, `execute_anonymous`.
+
+### VS Code
+
+Run `**MCP: Add Server**` from the Command Palette and add an `npx` server with the command `npx -y @certinia/apex-log-mcp`, or add it to `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "apex-log-mcp": {
+      "command": "npx",
+      "args": ["-y", "@certinia/apex-log-mcp"]
+    }
+  }
+}
+```
+
+<details>
+<summary><strong>Claude Code</strong></summary>
+
+Add the server with the Claude CLI:
+
+```bash
+claude mcp add apex-log-mcp -- npx -y @certinia/apex-log-mcp
+```
+
+</details>
+
+### Other MCP clients
+
+The same npm package works in Cursor and other MCP clients. See the [`@certinia/apex-log-mcp` README](https://github.com/certinia/debug-log-analyzer-mcp#readme) for client-specific configuration snippets.
+
 ## 🎨 Customization
 
 Adjust event colors in `settings.json`:
