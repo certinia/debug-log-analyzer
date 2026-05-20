@@ -516,7 +516,6 @@ export class CalltreeView extends LitElement {
     activeTable.blockRedraw();
     activeTable.clearFilter(false);
     filtersToAdd.forEach((filter) => {
-      // @ts-expect-error valid
       activeTable.addFilter(filter);
     });
     activeTable.restoreRedraw();
