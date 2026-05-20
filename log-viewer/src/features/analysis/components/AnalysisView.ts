@@ -268,7 +268,6 @@ export class AnalysisView extends LitElement {
     table.blockRedraw();
     table.clearFilter(false);
     if (!this.filterState.showDetails) {
-      // @ts-expect-error tabulator allows a function predicate but the types only declare Filter[]
       table.addFilter(this._showDetailsFilter);
     }
     table.restoreRedraw();

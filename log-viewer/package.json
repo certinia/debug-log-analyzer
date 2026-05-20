@@ -14,8 +14,8 @@
     "tabulator-tables": "^6.4.0"
   },
   "devDependencies": {
-    "@types/tabulator-tables": "^6.3.1",
-    "postcss": "^8.5.8",
+    "@types/tabulator-tables": "^6.3.3",
+    "postcss": "^8.5.15",
     "sass": "~1.78.0",
     "typescript": "^5.9.3"
   }
