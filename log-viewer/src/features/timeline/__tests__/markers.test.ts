@@ -12,7 +12,7 @@
  * - Hit testing logic (T014)
  */
 
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type * as PIXI from 'pixi.js';
 
 // Mock PIXI.Sprite with test helpers

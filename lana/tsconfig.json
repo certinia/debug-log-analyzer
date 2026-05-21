@@ -16,7 +16,7 @@
     "moduleResolution": "Bundler",
     "module": "ESNext",
     "noEmit": true,
-    "types": [],
+    "types": ["jest"],
 
     "composite": true,
     "declarationMap": true,
