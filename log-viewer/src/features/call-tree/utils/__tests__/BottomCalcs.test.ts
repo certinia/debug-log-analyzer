@@ -1,3 +1,7 @@
+/**
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ */
+import { describe, expect, it } from '@jest/globals';
 import type { Tabulator } from 'tabulator-tables';
 
 import { makeSumSelfTimeAllVisible } from '../BottomCalcs.js';

@@ -1,11 +1,28 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import { ApexVisitor } from '../ApexParser/ApexVisitor';
 
 jest.mock('@apexdevtools/apex-parser');
+
+type ClassDeclarationCtx = Parameters<ApexVisitor['visitClassDeclaration']>[0];
+type MethodDeclarationCtx = Parameters<ApexVisitor['visitMethodDeclaration']>[0];
+type ConstructorDeclarationCtx = Parameters<ApexVisitor['visitConstructorDeclaration']>[0];
+type TerminalCtx = Parameters<ApexVisitor['visitTerminal']>[0];
+type ErrorNodeCtx = Parameters<ApexVisitor['visitErrorNode']>[0];
+type VisitCtx = Parameters<ApexVisitor['visit']>[0];
+type RuleNodeCtx = Parameters<ApexVisitor['visitChildren']>[0];
+
+const asClassDeclarationCtx = (ctx: unknown): ClassDeclarationCtx => ctx as ClassDeclarationCtx;
+const asMethodDeclarationCtx = (ctx: unknown): MethodDeclarationCtx => ctx as MethodDeclarationCtx;
+const asConstructorDeclarationCtx = (ctx: unknown): ConstructorDeclarationCtx =>
+  ctx as ConstructorDeclarationCtx;
+const asTerminalCtx = (ctx: unknown): TerminalCtx => ctx as TerminalCtx;
+const asErrorNodeCtx = (ctx: unknown): ErrorNodeCtx => ctx as ErrorNodeCtx;
+const asVisitCtx = (ctx: unknown): VisitCtx => ctx as VisitCtx;
+const asRuleNodeCtx = (ctx: unknown): RuleNodeCtx => ctx as RuleNodeCtx;
 
 describe('ApexVisitor', () => {
   let visitor: ApexVisitor;
@@ -24,9 +41,11 @@ describe('ApexVisitor', () => {
         children: [],
         start: { line: 1 },
       };
-      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+      visitor.visitChildren = jest
+        .fn<typeof visitor.visitChildren>()
+        .mockReturnValue({ children: [] });
 
-      const node = visitor.visitClassDeclaration(ctx as any);
+      const node = visitor.visitClassDeclaration(asClassDeclarationCtx(ctx));
 
       expect(node.name).toBe('');
     });
@@ -40,9 +59,11 @@ describe('ApexVisitor', () => {
         children: [],
         start: { line: 1 },
       };
-      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+      visitor.visitChildren = jest
+        .fn<typeof visitor.visitChildren>()
+        .mockReturnValue({ children: [] });
 
-      const node = visitor.visitClassDeclaration(ctx as any);
+      const node = visitor.visitClassDeclaration(asClassDeclarationCtx(ctx));
 
       expect(node.idCharacter).toBe(0);
     });
@@ -61,10 +82,10 @@ describe('ApexVisitor', () => {
         start: { line: 5 },
       };
       visitor.visitChildren = jest
-        .fn()
+        .fn<typeof visitor.visitChildren>()
         .mockReturnValue({ children: [{ nature: 'Method', name: 'foo' }] });
 
-      const node = visitor.visitClassDeclaration(ctx as any);
+      const node = visitor.visitClassDeclaration(asClassDeclarationCtx(ctx));
 
       expect(node.nature).toBe('Class');
       expect(node.name).toBe('MyClass');
@@ -81,9 +102,11 @@ describe('ApexVisitor', () => {
         children: [],
         start: { line: 10 },
       };
-      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+      visitor.visitChildren = jest
+        .fn<typeof visitor.visitChildren>()
+        .mockReturnValue({ children: [] });
 
-      const node = visitor.visitClassDeclaration(ctx as any);
+      const node = visitor.visitClassDeclaration(asClassDeclarationCtx(ctx));
 
       expect(node.name).toBe('');
       expect(node.line).toBe(10);
@@ -99,7 +122,7 @@ describe('ApexVisitor', () => {
         start: { line: 15 },
       };
 
-      const node = visitor.visitClassDeclaration(ctx as any);
+      const node = visitor.visitClassDeclaration(asClassDeclarationCtx(ctx));
 
       expect(node.children).toEqual([]);
       expect(node.line).toBe(15);
@@ -119,9 +142,11 @@ describe('ApexVisitor', () => {
         }),
         start: { line: 1 },
       };
-      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+      visitor.visitChildren = jest
+        .fn<typeof visitor.visitChildren>()
+        .mockReturnValue({ children: [] });
 
-      const node = visitor.visitMethodDeclaration(ctx as any);
+      const node = visitor.visitMethodDeclaration(asMethodDeclarationCtx(ctx));
 
       expect(node.name).toBe('');
     });
@@ -138,9 +163,11 @@ describe('ApexVisitor', () => {
         }),
         start: { line: 1 },
       };
-      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+      visitor.visitChildren = jest
+        .fn<typeof visitor.visitChildren>()
+        .mockReturnValue({ children: [] });
 
-      const node = visitor.visitMethodDeclaration(ctx as any);
+      const node = visitor.visitMethodDeclaration(asMethodDeclarationCtx(ctx));
 
       expect(node.idCharacter).toBe(0);
     });
@@ -162,9 +189,11 @@ describe('ApexVisitor', () => {
         }),
         start: { line: 42 },
       };
-      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+      visitor.visitChildren = jest
+        .fn<typeof visitor.visitChildren>()
+        .mockReturnValue({ children: [] });
 
-      const node = visitor.visitMethodDeclaration(ctx as any);
+      const node = visitor.visitMethodDeclaration(asMethodDeclarationCtx(ctx));
 
       expect(node.nature).toBe('Method');
       expect(node.name).toBe('myMethod');
@@ -184,9 +213,11 @@ describe('ApexVisitor', () => {
         }),
         start: { line: 1 },
       };
-      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+      visitor.visitChildren = jest
+        .fn<typeof visitor.visitChildren>()
+        .mockReturnValue({ children: [] });
 
-      const node = visitor.visitMethodDeclaration(ctx as any);
+      const node = visitor.visitMethodDeclaration(asMethodDeclarationCtx(ctx));
 
       expect(node.name).toBe('');
       expect(node.params).toBe('');
@@ -205,9 +236,11 @@ describe('ApexVisitor', () => {
         }),
         start: { line: 1, column: 5 },
       };
-      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+      visitor.visitChildren = jest
+        .fn<typeof visitor.visitChildren>()
+        .mockReturnValue({ children: [] });
 
-      const node = visitor.visitConstructorDeclaration(ctx as any);
+      const node = visitor.visitConstructorDeclaration(asConstructorDeclarationCtx(ctx));
 
       expect(node.name).toBe('');
     });
@@ -223,9 +256,11 @@ describe('ApexVisitor', () => {
         }),
         start: { line: 1, column: null },
       };
-      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+      visitor.visitChildren = jest
+        .fn<typeof visitor.visitChildren>()
+        .mockReturnValue({ children: [] });
 
-      const node = visitor.visitConstructorDeclaration(ctx as any);
+      const node = visitor.visitConstructorDeclaration(asConstructorDeclarationCtx(ctx));
 
       expect(node.idCharacter).toBe(0);
     });
@@ -246,9 +281,11 @@ describe('ApexVisitor', () => {
         }),
         start: { line: 20, column: 5 },
       };
-      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+      visitor.visitChildren = jest
+        .fn<typeof visitor.visitChildren>()
+        .mockReturnValue({ children: [] });
 
-      const node = visitor.visitConstructorDeclaration(ctx as any);
+      const node = visitor.visitConstructorDeclaration(asConstructorDeclarationCtx(ctx));
 
       expect(node.nature).toBe('Constructor');
       expect(node.name).toBe('MyConstructor');
@@ -268,9 +305,11 @@ describe('ApexVisitor', () => {
         }),
         start: { line: 10, column: 2 },
       };
-      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+      visitor.visitChildren = jest
+        .fn<typeof visitor.visitChildren>()
+        .mockReturnValue({ children: [] });
 
-      const node = visitor.visitConstructorDeclaration(ctx as any);
+      const node = visitor.visitConstructorDeclaration(asConstructorDeclarationCtx(ctx));
 
       expect(node.nature).toBe('Constructor');
       expect(node.name).toBe('MyClass');
@@ -295,9 +334,11 @@ describe('ApexVisitor', () => {
         }),
         start: { line: 35, column: 10 },
       };
-      visitor.visitChildren = jest.fn().mockReturnValue({ children: [] });
+      visitor.visitChildren = jest
+        .fn<typeof visitor.visitChildren>()
+        .mockReturnValue({ children: [] });
 
-      const node = visitor.visitConstructorDeclaration(ctx as any);
+      const node = visitor.visitConstructorDeclaration(asConstructorDeclarationCtx(ctx));
 
       expect(node.nature).toBe('Constructor');
       expect(node.name).toBe('InnerClass');
@@ -308,30 +349,30 @@ describe('ApexVisitor', () => {
 
   describe('visitTerminal', () => {
     it('should return empty object', () => {
-      expect(visitor.visitTerminal({} as any)).toEqual({});
+      expect(visitor.visitTerminal(asTerminalCtx({}))).toEqual({});
     });
   });
 
   describe('visitErrorNode', () => {
     it('should return empty object', () => {
-      expect(visitor.visitErrorNode({} as any)).toEqual({});
+      expect(visitor.visitErrorNode(asErrorNodeCtx({}))).toEqual({});
     });
   });
 
   describe('visit', () => {
     it('should return empty object when ctx is null', () => {
-      expect(visitor.visit(null as any)).toEqual({});
+      expect(visitor.visit(asVisitCtx(null))).toEqual({});
     });
 
     it('should return empty object when ctx is undefined', () => {
-      expect(visitor.visit(undefined as any)).toEqual({});
+      expect(visitor.visit(asVisitCtx(undefined))).toEqual({});
     });
 
     it('should call accept on context when ctx exists', () => {
       const mockAccept = jest.fn().mockReturnValue({ nature: 'Method', name: 'test' });
       const ctx = { accept: mockAccept };
 
-      const result = visitor.visit(ctx as any);
+      const result = visitor.visit(asVisitCtx(ctx));
 
       expect(mockAccept).toHaveBeenCalledWith(visitor);
       expect(result).toEqual({ nature: 'Method', name: 'test' });
@@ -342,12 +383,16 @@ describe('ApexVisitor', () => {
     it('should skip null nodes returned from visit', () => {
       const ctx = {
         getChildCount: () => 2,
-        getChild: jest.fn().mockImplementation((index: number) => ({
-          accept: jest.fn().mockReturnValue(index === 0 ? null : { nature: 'Method', name: 'foo' }),
-        })),
+        getChild: jest
+          .fn<(index: number) => { accept: () => unknown }>()
+          .mockImplementation((index: number) => ({
+            accept: jest
+              .fn()
+              .mockReturnValue(index === 0 ? null : { nature: 'Method', name: 'foo' }),
+          })),
       };
 
-      const result = visitor.visitChildren(ctx as any);
+      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
 
       expect(result.children).toHaveLength(1);
       expect(result.children![0]).toEqual({ nature: 'Method', name: 'foo' });
@@ -356,14 +401,16 @@ describe('ApexVisitor', () => {
     it('should skip undefined nodes returned from visit', () => {
       const ctx = {
         getChildCount: () => 2,
-        getChild: jest.fn().mockImplementation((index: number) => ({
-          accept: jest
-            .fn()
-            .mockReturnValue(index === 0 ? undefined : { nature: 'Method', name: 'bar' }),
-        })),
+        getChild: jest
+          .fn<(index: number) => { accept: () => unknown }>()
+          .mockImplementation((index: number) => ({
+            accept: jest
+              .fn()
+              .mockReturnValue(index === 0 ? undefined : { nature: 'Method', name: 'bar' }),
+          })),
       };
 
-      const result = visitor.visitChildren(ctx as any);
+      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
 
       expect(result.children).toHaveLength(1);
       expect(result.children![0]).toEqual({ nature: 'Method', name: 'bar' });
@@ -372,12 +419,14 @@ describe('ApexVisitor', () => {
     it('should process multiple valid nodes', () => {
       const ctx = {
         getChildCount: () => 3,
-        getChild: jest.fn().mockImplementation((index: number) => ({
-          accept: jest.fn().mockReturnValue({ nature: 'Method', name: `method${index}` }),
-        })),
+        getChild: jest
+          .fn<(index: number) => { accept: () => unknown }>()
+          .mockImplementation((index: number) => ({
+            accept: jest.fn().mockReturnValue({ nature: 'Method', name: `method${index}` }),
+          })),
       };
 
-      const result = visitor.visitChildren(ctx as any);
+      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
 
       expect(result.children).toHaveLength(3);
     });
@@ -397,7 +446,7 @@ describe('ApexVisitor', () => {
         }),
       };
 
-      const result = visitor.visitChildren(ctx as any);
+      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
 
       // The children should be flattened
       expect(result.children).toHaveLength(2);
@@ -416,7 +465,7 @@ describe('ApexVisitor', () => {
         }),
       };
 
-      const result = visitor.visitChildren(ctx as any);
+      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
 
       expect(result.children).toHaveLength(0);
     });
@@ -432,7 +481,7 @@ describe('ApexVisitor', () => {
         }),
       };
 
-      const result = visitor.visitChildren(ctx as any);
+      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
 
       // Node is not anon (no nature) and has no children, so nothing added
       expect(result.children).toHaveLength(0);
@@ -441,19 +490,21 @@ describe('ApexVisitor', () => {
     it('should handle mix of anon and non-anon nodes', () => {
       const ctx = {
         getChildCount: () => 2,
-        getChild: jest.fn().mockImplementation((index: number) => ({
-          accept: jest.fn().mockReturnValue(
-            index === 0
-              ? { nature: 'Class', name: 'MyClass' } // Anon node (has nature)
-              : {
-                  // Non-anon node (no nature)
-                  children: [{ nature: 'Method', name: 'nested' }],
-                },
-          ),
-        })),
+        getChild: jest
+          .fn<(index: number) => { accept: () => unknown }>()
+          .mockImplementation((index: number) => ({
+            accept: jest.fn().mockReturnValue(
+              index === 0
+                ? { nature: 'Class', name: 'MyClass' } // Anon node (has nature)
+                : {
+                    // Non-anon node (no nature)
+                    children: [{ nature: 'Method', name: 'nested' }],
+                  },
+            ),
+          })),
       };
 
-      const result = visitor.visitChildren(ctx as any);
+      const result = visitor.visitChildren(asRuleNodeCtx(ctx));
 
       expect(result.children).toHaveLength(2);
       expect(result.children![0]).toEqual({ nature: 'Class', name: 'MyClass' });

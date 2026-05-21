@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Certinia Inc. All rights reserved.
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 
 /**
@@ -11,6 +11,9 @@
  * - Viewport culling behavior (T009)
  * - Hit testing logic (T014)
  */
+
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import type * as PIXI from 'pixi.js';
 
 // Mock PIXI.Sprite with test helpers
 class MockSprite {
@@ -53,7 +56,7 @@ const createdMockSpritesGlobal: MockSprite[] = [];
 jest.mock('pixi.js', () => {
   const actual = jest.requireActual('pixi.js');
   return {
-    ...actual,
+    ...(actual as Record<string, unknown>),
     // eslint-disable-next-line @typescript-eslint/naming-convention
     Sprite: jest.fn().mockImplementation(() => {
       const mock = new MockSprite();
@@ -67,7 +70,6 @@ jest.mock('pixi.js', () => {
   };
 });
 
-import type * as PIXI from 'pixi.js';
 import { TimelineMarkerRenderer } from '../optimised/markers/TimelineMarkerRenderer.js';
 import { TimelineViewport } from '../optimised/TimelineViewport.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';

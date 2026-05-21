@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
+import { describe, expect, it } from '@jest/globals';
 import type { SOQLExecuteBeginLine } from '../src/index.js';
 import {
   ApexLogParser,

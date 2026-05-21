@@ -1,6 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { describe, expect, it } from '@jest/globals';
+
 import { formatSOQL } from '../formatter.js';
 import { detectDialect, tokenize } from '../tokenize.js';
 

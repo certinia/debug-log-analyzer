@@ -1,6 +1,8 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
+import { describe, expect, it } from '@jest/globals';
+
 import { formatDuration } from '../core/utility/Util.js';
 
 describe('Format duration tests', () => {

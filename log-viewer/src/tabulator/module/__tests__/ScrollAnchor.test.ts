@@ -1,4 +1,8 @@
+/**
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ */
 import { describe, expect, it, jest } from '@jest/globals';
+
 import { ScrollAnchor } from '../ScrollAnchor';
 
 function rect(top: number, height: number) {

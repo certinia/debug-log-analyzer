@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-
+import { describe, expect, it } from '@jest/globals';
 import type { LogEvent } from 'apex-log-parser';
+
 import { getCallerNamespace } from '../CallerNamespace.js';
 
 type Stub = { parent: Stub | null; namespace: string };
