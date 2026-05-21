@@ -15,6 +15,7 @@
  * - Sibling traversal (Arrow Left/Right)
  * - Edge cases: root nodes, leaf nodes, only-child scenarios
  */
+import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import { TreeNavigator } from '../optimised/selection/TreeNavigator.js';
 import type { EventNode, TreeNode } from '../types/flamechart.types.js';

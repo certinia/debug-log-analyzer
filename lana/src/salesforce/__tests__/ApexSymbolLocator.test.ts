@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { getMethodLine, parseApex } from '../ApexParser/ApexSymbolLocator';
 import { ApexVisitor, type ApexNode } from '../ApexParser/ApexVisitor';
 

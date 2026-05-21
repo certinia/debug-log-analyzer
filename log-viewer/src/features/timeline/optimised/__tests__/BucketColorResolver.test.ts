@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { describe, expect, it } from '@jest/globals';
 
 import type { CategoryAggregation, CategoryStats } from '../../types/flamechart.types.js';
 import { type BatchColorInfo, resolveColor } from '../BucketColorResolver.js';

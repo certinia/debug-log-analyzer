@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { describe, expect, it } from '@jest/globals';
 
 import { calculateLabelPosition, type LabelPositionParams } from '../rendering/LabelPositioning.js';
 

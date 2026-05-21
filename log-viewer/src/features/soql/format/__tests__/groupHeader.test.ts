@@ -1,6 +1,8 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { describe, expect, it } from '@jest/globals';
+
 import { soqlGroupHeader } from '../groupHeader.js';
 
 describe('soqlGroupHeader', () => {

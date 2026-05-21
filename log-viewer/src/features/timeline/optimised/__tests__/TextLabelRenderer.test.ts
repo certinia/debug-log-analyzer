@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { describe, expect, it } from '@jest/globals';
 
 import { TEXT_LABEL_CONSTANTS } from '../../types/flamechart.types.js';
 

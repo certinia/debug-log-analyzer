@@ -1,3 +1,7 @@
+/**
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ */
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { LogEvent } from 'apex-log-parser';
 
 import { sumDurationTotalForRootEvents, sumRootNodesOnly } from '../CallStackSum.js';
