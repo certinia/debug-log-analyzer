@@ -16,6 +16,7 @@
     "moduleResolution": "Bundler",
     "module": "ESNext",
     "noEmit": true,
+    "types": [],
 
     "composite": true,
     "declarationMap": true,
