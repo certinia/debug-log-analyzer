@@ -1,3 +1,8 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
 .codicon[class*='codicon-'] {
   font: normal normal normal 16px/1 codicon;
   display: inline-block;
@@ -1956,6 +1961,36 @@
 }
 .codicon-cloud-small:before {
   content: '\ec7a';
+}
+.codicon-add-small:before {
+  content: '\ec7b';
+}
+.codicon-remove-small:before {
+  content: '\ec7c';
+}
+.codicon-worktree-small:before {
+  content: '\ec7d';
+}
+.codicon-worktree:before {
+  content: '\ec7e';
+}
+.codicon-screen-cut:before {
+  content: '\ec7f';
+}
+.codicon-ask:before {
+  content: '\ec80';
+}
+.codicon-openai:before {
+  content: '\ec81';
+}
+.codicon-claude:before {
+  content: '\ec82';
+}
+.codicon-open-in-window:before {
+  content: '\ec83';
+}
+.codicon-new-session:before {
+  content: '\ec84';
 }
 .codicon-git-fetch:before {
   content: '\f101';

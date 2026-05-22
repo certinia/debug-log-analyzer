@@ -6,11 +6,11 @@
   "version": "0.1.0",
   "dependencies": {
     "@apexdevtools/apex-parser": "5.1.0-beta.1",
-    "@vscode/codicons": "^0.0.44",
+    "@vscode/codicons": "^0.0.45",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "antlr4": "4.13.2",
-    "lit": "^3.3.2",
-    "pixi.js": "^8.16.0",
+    "lit": "^3.3.3",
+    "pixi.js": "^8.18.1",
     "tabulator-tables": "^6.4.0"
   },
   "devDependencies": {
