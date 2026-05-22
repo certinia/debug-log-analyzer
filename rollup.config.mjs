@@ -7,6 +7,7 @@ import alias from '@rollup/plugin-alias';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
+import postcssUrl from 'postcss-url';
 import copy from 'rollup-plugin-copy';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
@@ -137,6 +138,7 @@ export default [
       postcss({
         extensions: ['.css', '.scss'],
         minimize: true,
+        plugins: [postcssUrl({ url: 'inline', encodeType: 'base64' })],
       }),
       copy({
         hook: 'closeBundle',
@@ -146,7 +148,6 @@ export default [
               'log-viewer/out/*',
               'log-viewer/index.html',
               'lana/certinia-icon-color.png',
-              'node_modules/@vscode/codicons/dist/codicon.ttf',
             ],
             dest: 'lana/out',
           },
