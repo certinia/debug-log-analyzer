@@ -260,7 +260,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Export to CSV` not working when a log was opened in a new VSCode window and not associated to a workspace ([#363][#363]).
 
-## [1.8.0]
+## [1.8.0] - 2023-10-19
 
 Skipped due to adopting odd numbering for pre releases and even number for releases.
 
