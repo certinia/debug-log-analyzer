@@ -39,7 +39,7 @@ import { createAggregatedTable } from './AggregatedTable.js';
 import { createBottomUpTable } from './BottomUpTable.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
-import codiconStyles from '../../../styles/codicon.css';
+import codiconStyles from '@vscode/codicons/dist/codicon.css';
 
 provideVSCodeDesignSystem().register(
   vsCodeButton(),

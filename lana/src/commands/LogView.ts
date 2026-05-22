@@ -54,15 +54,8 @@ export class LogView {
     const index = join(logViewerRoot, 'index.html');
     const bundleUri = panel.webview.asWebviewUri(Uri.file(join(logViewerRoot, 'bundle.js')));
     const indexSrc = await this.getFile(index);
-    const toReplace: { [key: string]: string } = {
-      '${extensionRoot}': panel.webview.asWebviewUri(Uri.file(join(logViewerRoot))).toString(), // eslint-disable-line @typescript-eslint/naming-convention
-      'bundle.js': bundleUri.toString(true), // eslint-disable-line @typescript-eslint/naming-convention
-    };
-
     panel.iconPath = Uri.file(join(logViewerRoot, 'certinia-icon-color.png'));
-    panel.webview.html = indexSrc.replace(/bundle.js|\${extensionRoot}/gi, function (matched) {
-      return toReplace[matched] || '';
-    });
+    panel.webview.html = indexSrc.replace(/bundle\.js/gi, bundleUri.toString(true));
 
     panel.onDidDispose(
       () => {

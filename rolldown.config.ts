@@ -7,6 +7,8 @@ import { defineConfig } from 'rolldown';
 import nodePolyfills from '@rolldown/plugin-node-polyfills';
 
 // rollup plugins
+// @ts-expect-error - no type declarations
+import postcssUrl from 'postcss-url';
 import copy from 'rollup-plugin-copy';
 import postcss from 'rollup-plugin-postcss';
 
@@ -94,17 +96,13 @@ export default defineConfig([
       postcss({
         extensions: ['.css', '.scss'],
         minimize: true,
+        plugins: [postcssUrl({ url: 'inline', encodeType: 'base64' })],
       }),
       copy({
         hook: 'closeBundle',
         targets: [
           {
-            src: [
-              'log-viewer/out/*',
-              'log-viewer/index.html',
-              'lana/certinia-icon-color.png',
-              'node_modules/@vscode/codicons/dist/codicon.ttf',
-            ],
+            src: ['log-viewer/out/*', 'log-viewer/index.html', 'lana/certinia-icon-color.png'],
             dest: 'lana/out',
           },
           { src: ['CHANGELOG.md', 'LICENSE.txt', 'README.md'], dest: 'lana' },

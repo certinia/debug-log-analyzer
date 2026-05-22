@@ -16,7 +16,7 @@ import type { TimeDisplayMode } from '../types/flamechart.types.js';
 import type { TimelineFlameChart } from './TimelineFlameChart.js';
 
 // styles
-import codiconStyles from '../../../styles/codicon.css';
+import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 
 // web components

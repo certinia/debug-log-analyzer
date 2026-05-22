@@ -3,7 +3,7 @@ import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 // styles
-import codiconStyles from '../styles/codicon.css';
+import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../styles/global.styles.js';
 
 provideVSCodeDesignSystem().register(vsCodeButton());

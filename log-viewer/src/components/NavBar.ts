@@ -10,7 +10,7 @@ import { formatDuration } from '../core/utility/Util.js';
 import type { Notification } from '../features/notifications/components/NotificationPanel.js';
 
 // styles
-import codiconStyles from '../styles/codicon.css';
+import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../styles/global.styles.js';
 import { notificationStyles } from '../styles/notification.styles.js';
 
