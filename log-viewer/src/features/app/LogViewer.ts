@@ -16,7 +16,7 @@ import {
 } from '../notifications/components/NotificationPanel.js';
 
 // styles
-import codiconStyles from '../../styles/codicon.css';
+import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../styles/global.styles.js';
 
 // web components

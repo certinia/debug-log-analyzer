@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ */
+import { describe, expect, it } from '@jest/globals';
+
 import { getFilteredDataTreeRows } from '../DataTreeFilter.js';
 
 type Node = {

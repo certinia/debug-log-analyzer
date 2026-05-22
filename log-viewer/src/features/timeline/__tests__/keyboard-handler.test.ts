@@ -15,11 +15,14 @@
  * - Reset zoom via Home / 0 keys
  * - Escape key for cancel/deselect
  */
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 import {
   KEYBOARD_CONSTANTS,
   KeyboardHandler,
+  type FrameNavDirection,
   type KeyboardCallbacks,
+  type MarkerNavDirection,
 } from '../optimised/interaction/KeyboardHandler.js';
 import { TimelineViewport } from '../optimised/TimelineViewport.js';
 
@@ -44,31 +47,31 @@ describe('KeyboardHandler', () => {
 
     // Create mock callbacks
     callbacks = {
-      onPan: jest.fn(),
-      onZoom: jest.fn(),
-      onResetZoom: jest.fn(),
-      onEscape: jest.fn(),
-      onMarkerNav: jest.fn(),
-      onFrameNav: jest.fn(),
-      onJumpToCallTree: jest.fn(),
-      onFocus: jest.fn(),
-      onCopy: jest.fn(),
+      onPan: jest.fn<(deltaX: number, deltaY: number) => void>(),
+      onZoom: jest.fn<(direction: 'in' | 'out') => void>(),
+      onResetZoom: jest.fn<() => void>(),
+      onEscape: jest.fn<() => void>(),
+      onMarkerNav: jest.fn<(direction: MarkerNavDirection) => boolean>(),
+      onFrameNav: jest.fn<(direction: FrameNavDirection) => boolean>(),
+      onJumpToCallTree: jest.fn<() => void>(),
+      onFocus: jest.fn<() => void>(),
+      onCopy: jest.fn<() => void>(),
       // Minimap keyboard callbacks
-      isInMinimapArea: jest.fn().mockReturnValue(false),
-      onMinimapPanViewport: jest.fn(),
-      onMinimapPanDepth: jest.fn(),
-      onMinimapZoom: jest.fn(),
-      onMinimapJumpStart: jest.fn(),
-      onMinimapJumpEnd: jest.fn(),
-      onMinimapResetZoom: jest.fn(),
+      isInMinimapArea: jest.fn<() => boolean>().mockReturnValue(false),
+      onMinimapPanViewport: jest.fn<(deltaTimeNs: number) => void>(),
+      onMinimapPanDepth: jest.fn<(deltaY: number) => void>(),
+      onMinimapZoom: jest.fn<(direction: 'in' | 'out') => void>(),
+      onMinimapJumpStart: jest.fn<() => void>(),
+      onMinimapJumpEnd: jest.fn<() => void>(),
+      onMinimapResetZoom: jest.fn<() => void>(),
       // Metric strip keyboard callbacks
-      isInMetricStripArea: jest.fn().mockReturnValue(false),
-      onMetricStripPanViewport: jest.fn(),
-      onMetricStripPanDepth: jest.fn(),
-      onMetricStripZoom: jest.fn(),
-      onMetricStripJumpStart: jest.fn(),
-      onMetricStripJumpEnd: jest.fn(),
-      onMetricStripResetZoom: jest.fn(),
+      isInMetricStripArea: jest.fn<() => boolean>().mockReturnValue(false),
+      onMetricStripPanViewport: jest.fn<(deltaTimeNs: number) => void>(),
+      onMetricStripPanDepth: jest.fn<(deltaY: number) => void>(),
+      onMetricStripZoom: jest.fn<(direction: 'in' | 'out') => void>(),
+      onMetricStripJumpStart: jest.fn<() => void>(),
+      onMetricStripJumpEnd: jest.fn<() => void>(),
+      onMetricStripResetZoom: jest.fn<() => void>(),
     };
 
     handler = new KeyboardHandler(container, viewport, callbacks);
@@ -104,7 +107,7 @@ describe('KeyboardHandler', () => {
       dispatchKeyEvent('keydown', 'ArrowLeft');
 
       expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0];
+      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number, number];
       expect(deltaX).toBeLessThan(0); // Pan left = negative deltaX
       expect(deltaY).toBe(0);
     });
@@ -113,7 +116,7 @@ describe('KeyboardHandler', () => {
       dispatchKeyEvent('keydown', 'ArrowRight');
 
       expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0];
+      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number, number];
       expect(deltaX).toBeGreaterThan(0); // Pan right = positive deltaX
       expect(deltaY).toBe(0);
     });
@@ -122,7 +125,7 @@ describe('KeyboardHandler', () => {
       dispatchKeyEvent('keydown', 'ArrowUp');
 
       expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0];
+      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number, number];
       expect(deltaX).toBe(0);
       expect(deltaY).toBeLessThan(0); // Pan up = negative deltaY
     });
@@ -131,7 +134,7 @@ describe('KeyboardHandler', () => {
       dispatchKeyEvent('keydown', 'ArrowDown');
 
       expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0];
+      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number, number];
       expect(deltaX).toBe(0);
       expect(deltaY).toBeGreaterThan(0); // Pan down = positive deltaY
     });
@@ -140,7 +143,7 @@ describe('KeyboardHandler', () => {
       dispatchKeyEvent('keydown', 'a');
 
       expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0];
+      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number, number];
       expect(deltaX).toBeLessThan(0);
       expect(deltaY).toBe(0);
     });
@@ -149,7 +152,7 @@ describe('KeyboardHandler', () => {
       dispatchKeyEvent('keydown', 'd');
 
       expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0];
+      const [deltaX, deltaY] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number, number];
       expect(deltaX).toBeGreaterThan(0);
       expect(deltaY).toBe(0);
     });
@@ -158,7 +161,7 @@ describe('KeyboardHandler', () => {
       dispatchKeyEvent('keydown', 'ArrowLeft', { shiftKey: true });
 
       expect(callbacks.onPan).toHaveBeenCalledTimes(1);
-      const [deltaX] = (callbacks.onPan as jest.Mock).mock.calls[0];
+      const [deltaX] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number];
       expect(deltaX).toBeLessThan(0);
     });
 
@@ -166,7 +169,7 @@ describe('KeyboardHandler', () => {
       dispatchKeyEvent('keydown', 'ArrowRight');
 
       const expectedStepX = DISPLAY_WIDTH * KEYBOARD_CONSTANTS.panStepPercent;
-      const [deltaX] = (callbacks.onPan as jest.Mock).mock.calls[0];
+      const [deltaX] = (callbacks.onPan as jest.Mock).mock.calls[0] as [number];
       expect(deltaX).toBeCloseTo(expectedStepX, 5);
     });
 

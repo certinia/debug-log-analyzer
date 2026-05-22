@@ -1,3 +1,5 @@
+import process from 'node:process';
+
 import type { Plugin } from 'rolldown';
 import { defineConfig } from 'rolldown';
 
@@ -5,14 +7,16 @@ import { defineConfig } from 'rolldown';
 import nodePolyfills from '@rolldown/plugin-node-polyfills';
 
 // rollup plugins
+// @ts-expect-error - no type declarations
+import postcssUrl from 'postcss-url';
 import copy from 'rollup-plugin-copy';
 import postcss from 'rollup-plugin-postcss';
 
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _filename = fileURLToPath(import.meta.url);
+const _dirname = path.dirname(_filename);
 
 /**
  * Workaround for oxc printer lone-surrogate bug (https://github.com/oxc-project/oxc/issues/3526).
@@ -59,7 +63,7 @@ export default defineConfig([
     platform: 'node',
     resolve: {
       alias: {
-        'apex-log-parser': path.resolve(__dirname, 'apex-log-parser/src/index.ts'),
+        'apex-log-parser': path.resolve(_dirname, 'apex-log-parser/src/index.ts'),
       },
     },
 
@@ -81,7 +85,7 @@ export default defineConfig([
     ],
     platform: 'browser',
     resolve: {
-      alias: { eventemitter3: path.resolve(__dirname, 'node_modules/eventemitter3/index.js') },
+      alias: { eventemitter3: path.resolve(_dirname, 'node_modules/eventemitter3/index.js') },
     },
     moduleTypes: {
       '.css': 'js',
@@ -92,17 +96,13 @@ export default defineConfig([
       postcss({
         extensions: ['.css', '.scss'],
         minimize: true,
+        plugins: [postcssUrl({ url: 'inline', encodeType: 'base64' })],
       }),
       copy({
         hook: 'closeBundle',
         targets: [
           {
-            src: [
-              'log-viewer/out/*',
-              'log-viewer/index.html',
-              'lana/certinia-icon-color.png',
-              'node_modules/@vscode/codicons/dist/codicon.ttf',
-            ],
+            src: ['log-viewer/out/*', 'log-viewer/index.html', 'lana/certinia-icon-color.png'],
             dest: 'lana/out',
           },
           { src: ['CHANGELOG.md', 'LICENSE.txt', 'README.md'], dest: 'lana' },

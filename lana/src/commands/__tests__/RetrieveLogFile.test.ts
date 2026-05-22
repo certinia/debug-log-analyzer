@@ -6,6 +6,7 @@
  * Tests for RetrieveLogFile command, focusing on the private formatDuration method.
  * Since formatDuration is private, we test it indirectly through its usage in getLogFile.
  */
+import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import { window } from 'vscode';
 

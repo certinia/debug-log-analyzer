@@ -15,8 +15,9 @@
  * - Content generation from event data
  * - Show/hide timing and debouncing
  */
-
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { LogEvent } from 'apex-log-parser';
+
 import { FrameTooltipRenderer } from '../optimised/FrameTooltipRenderer.js';
 
 describe('FrameTooltipRenderer', () => {

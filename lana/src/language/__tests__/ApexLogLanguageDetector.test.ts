@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { describe, expect, it } from '@jest/globals';
 
 import { createMockTextDocument } from '../../__tests__/mocks/vscode.js';
 import { isApexLogContent } from '../ApexLogLanguageDetector.js';

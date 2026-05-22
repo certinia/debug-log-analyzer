@@ -1,20 +1,22 @@
+import path from 'node:path';
+import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+
 // Rollup plugins
 import alias from '@rollup/plugin-alias';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
-import path from 'path';
+import postcssUrl from 'postcss-url';
 import copy from 'rollup-plugin-copy';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
 import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _filename = fileURLToPath(import.meta.url);
+const _dirname = path.dirname(_filename);
 
 const production = process.env.NODE_ENV === 'production';
-
 console.log('Package mode:', production ? 'production' : 'development');
 export default [
   {
@@ -32,11 +34,11 @@ export default [
         entries: [
           {
             find: 'apex-log-parser',
-            replacement: path.resolve(__dirname, 'apex-log-parser/src/index.ts'),
+            replacement: path.resolve(_dirname, 'apex-log-parser/src/index.ts'),
           },
           {
             find: 'antlr4',
-            replacement: path.resolve(__dirname, 'node_modules/antlr4/dist/antlr4.node.mjs'),
+            replacement: path.resolve(_dirname, 'node_modules/antlr4/dist/antlr4.node.mjs'),
           },
         ],
       }),
@@ -100,11 +102,11 @@ export default [
         entries: [
           {
             find: 'eventemitter3',
-            replacement: path.resolve(__dirname, 'node_modules/eventemitter3/index.js'),
+            replacement: path.resolve(_dirname, 'node_modules/eventemitter3/index.js'),
           },
           {
             find: 'antlr4',
-            replacement: path.resolve(__dirname, 'node_modules/antlr4/dist/antlr4.web.mjs'),
+            replacement: path.resolve(_dirname, 'node_modules/antlr4/dist/antlr4.web.mjs'),
           },
         ],
       }),
@@ -136,6 +138,7 @@ export default [
       postcss({
         extensions: ['.css', '.scss'],
         minimize: true,
+        plugins: [postcssUrl({ url: 'inline', encodeType: 'base64' })],
       }),
       copy({
         hook: 'closeBundle',
@@ -145,7 +148,6 @@ export default [
               'log-viewer/out/*',
               'log-viewer/index.html',
               'lana/certinia-icon-color.png',
-              'node_modules/@vscode/codicons/dist/codicon.ttf',
             ],
             dest: 'lana/out',
           },

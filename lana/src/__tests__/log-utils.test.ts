@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import { describe, expect, it } from '@jest/globals';
 
 import { buildMetricParts, formatDuration, TIMESTAMP_REGEX } from '../log-utils.js';
 import { createMockLogEvent } from './helpers/test-builders.js';

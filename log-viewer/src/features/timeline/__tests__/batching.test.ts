@@ -11,9 +11,10 @@
  * - Minimum size filtering
  * - Hierarchical rectangle collection
  */
-
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import type { LogCategory, LogEvent } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
+
 import type { BatchColorInfo } from '../optimised/BucketColorResolver.js';
 import { EventBatchRenderer } from '../optimised/EventBatchRenderer.js';
 import { RectangleCache } from '../optimised/RectangleCache.js';

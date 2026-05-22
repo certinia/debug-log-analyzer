@@ -10,8 +10,7 @@ const siteUrl = `${prodUrl}/${projectName}`;
 const config: Config = {
   future: {
     v4: true,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    experimental_faster: true,
+    faster: true,
   },
   title: 'Apex Log Analyzer for Salesforce',
   tagline:
@@ -27,6 +26,7 @@ const config: Config = {
   projectName: projectName, // Usually your repo name.
   onBrokenLinks: 'throw',
   markdown: {
+    format: 'detect',
     hooks: {
       onBrokenMarkdownLinks: 'warn',
     },
@@ -98,7 +98,7 @@ const config: Config = {
           // Remove this to remove the "edit this page" links.
           editUrl: `https://github.com/${organizationName}/${projectName}/tree/main/lana-docs`,
         },
-
+        blog: false,
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -244,7 +244,7 @@ const config: Config = {
         indexDocs: true,
 
         // whether to index blog pages
-        indexBlog: true,
+        indexBlog: false,
 
         // whether to index static pages
         // /404.html is never indexed

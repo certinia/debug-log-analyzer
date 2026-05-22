@@ -21,7 +21,7 @@ import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
-import codiconStyles from '../../../styles/codicon.css';
+import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
@@ -268,7 +268,6 @@ export class AnalysisView extends LitElement {
     table.blockRedraw();
     table.clearFilter(false);
     if (!this.filterState.showDetails) {
-      // @ts-expect-error tabulator allows a function predicate but the types only declare Filter[]
       table.addFilter(this._showDetailsFilter);
     }
     table.restoreRedraw();

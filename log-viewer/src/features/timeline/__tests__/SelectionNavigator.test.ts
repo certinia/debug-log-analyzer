@@ -15,6 +15,7 @@
  * - navigate() for all directions
  * - findByOriginal for hit test integration
  */
+import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import { SelectionNavigator } from '../optimised/selection/SelectionNavigator.js';
 import type { EventNode, TreeNode } from '../types/flamechart.types.js';

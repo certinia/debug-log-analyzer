@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Certinia Inc. All rights reserved.
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 
 /**
@@ -11,8 +11,9 @@
  * - Hierarchical depth-first traversal
  * - Region-based event culling
  */
-
+import { describe, expect, it } from '@jest/globals';
 import type { LogEvent } from 'apex-log-parser';
+
 import { TimelineEventIndex } from '../optimised/TimelineEventIndex.js';
 import type { ViewportState } from '../types/flamechart.types.js';
 
