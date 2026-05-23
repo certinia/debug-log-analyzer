@@ -23,52 +23,65 @@ interface RowOpts {
   top?: number;
   height?: number;
   offsetTop?: number;
-  isConnected?: boolean;
   parent?: MockRow | null;
-  children?: MockRow[];
 }
 
 interface MockRow {
   getElement: () => MockElement;
-  getData: () => unknown;
   getTreeParent: () => MockRow | false;
-  getTreeChildren: () => MockRow[];
   _getSelf: () => unknown;
   __internal: object;
 }
 
 interface MockElement {
   getBoundingClientRect: () => ReturnType<typeof rect>;
-  scrollIntoView?: (...args: unknown[]) => void;
   offsetTop: number;
-  isConnected: boolean;
 }
 
-function makeRow(opts: RowOpts = {}, data: unknown = {}): MockRow {
+function makeRow(opts: RowOpts = {}): MockRow {
   const top = opts.top ?? 0;
   const height = opts.height ?? 20;
   const elem: MockElement = {
     getBoundingClientRect: () => rect(top, height),
-    scrollIntoView: () => {},
     offsetTop: opts.offsetTop ?? top,
-    isConnected: opts.isConnected ?? true,
   };
   const internal = {};
   return {
     __internal: internal,
     getElement: () => elem,
-    getData: () => data,
     getTreeParent: () => opts.parent ?? false,
-    getTreeChildren: () => opts.children ?? [],
     _getSelf: () => internal,
   };
-  internal.getComponent = () => row;
-  return row;
 }
 
-function makeBareTable() {
+interface MockHolder {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+  getBoundingClientRect: () => ReturnType<typeof rect>;
+}
+
+interface SetupOpts {
+  visibleRows?: MockRow[];
+  displayRows?: MockRow[];
+  holderScrollTop?: number;
+  holderScrollHeight?: number;
+  holderClientHeight?: number;
+}
+
+function setup(opts: SetupOpts = {}) {
+  const holder: MockHolder = {
+    scrollTop: opts.holderScrollTop ?? 200,
+    scrollHeight: opts.holderScrollHeight ?? 1000,
+    clientHeight: opts.holderClientHeight ?? 100,
+    getBoundingClientRect: () => rect(0, opts.holderClientHeight ?? 100),
+  };
   const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-  const renderer: Record<string, unknown> = { vDomTopPad: 0 };
+  // ScrollAnchor delegates mid-table restore to renderer.setAnchor — the
+  // seam VirtualVerticalRenderer exposes. Mock it as a jest.fn so we can
+  // assert exact call args.
+  const setAnchor = jest.fn((_row: unknown, _offset: number) => {});
+  const renderer: Record<string, unknown> = { setAnchor };
   const displayInternals = (opts.displayRows ?? []).map((r) => r.__internal);
   const table = {
     handlers,
@@ -77,29 +90,25 @@ function makeBareTable() {
     }),
     element: { querySelector: jest.fn(() => holder) },
     getRows: jest.fn((type?: string) => {
-      if (type === 'visible') return opts.visibleRows ?? [];
-      if (type === 'active') return opts.activeRows ?? opts.displayRows ?? [];
+      if (type === 'visible') {
+        return opts.visibleRows ?? [];
+      }
       return opts.displayRows ?? opts.visibleRows ?? [];
     }),
     rowManager: {
       renderer,
       getDisplayRows: () => displayInternals,
     },
-    scrollToRow: jest.fn((..._args: unknown[]) => Promise.resolve()),
   };
-}
-
-function setup() {
-  const table = makeBareTable();
   const plugin = new ScrollAnchor(table as never);
   (plugin as unknown as { table: typeof table }).table = table;
   (plugin as unknown as { options: () => boolean }).options = () => true;
   plugin.initialize();
-  return { plugin, table, holder };
+  return { plugin, table, holder, setAnchor };
 }
 
 describe('ScrollAnchor', () => {
-  it('snapshot at dataSorting captures the middle visible row before render', () => {
+  it('captures the middle visible row at renderStarted', () => {
     const r1 = makeRow({ top: 0, height: 30 });
     const r2 = makeRow({ top: 30, height: 30 });
     const r3 = makeRow({ top: 60, height: 30 });
@@ -109,35 +118,34 @@ describe('ScrollAnchor', () => {
       holderScrollTop: 500,
     });
 
-    table.handlers.dataSorting?.[0]?.();
+    table.handlers.renderStarted?.[0]?.();
 
     expect(plugin.anchorRow).toBe(r2);
   });
 
-  it('mid-table sort: scrollToRow(top) then refines scrollTop to prior viewport-Y', () => {
-    // Anchor was at viewport y=40 pre-sort, with offsetTop=300 post-render.
-    // Expect: scrollToRow(anchor, 'top', true), then scrollTop = 300 - 40 = 260.
-    const anchor = makeRow({ top: 40, height: 20, offsetTop: 300 });
-    const { table, holder } = setup({
+  it('mid-table sort: delegates to renderer.setAnchor with captured offset', () => {
+    // Pre-sort: row offsetTop=240, holder scrollTop=200 → captured viewport-Y = 40.
+    const anchor = makeRow({ top: 40, height: 20, offsetTop: 240 });
+    const { table, setAnchor } = setup({
       visibleRows: [anchor],
       displayRows: [anchor],
       holderScrollTop: 200,
       holderScrollHeight: 5000,
     });
 
-    table.handlers.dataSorting?.[0]?.();
+    table.handlers.renderStarted?.[0]?.();
     table.handlers.renderComplete?.[0]?.();
 
-    expect(table.scrollToRow).toHaveBeenCalledWith(anchor, 'top', true);
-    expect(holder.scrollTop).toBe(260);
+    expect(setAnchor).toHaveBeenCalledTimes(1);
+    expect(setAnchor).toHaveBeenCalledWith(anchor.__internal, 40);
   });
 
   it('returns the row whose cumulative visible height first crosses half of the holder height', () => {
     // holder height 100, target 50. r1 contributes 30 (running 30), r2 contributes 30
     // (running 60 — first row at/over 50), r3 never reached.
-    const r1 = makeRow(0, 30);
-    const r2 = makeRow(30, 30);
-    const r3 = makeRow(60, 30);
+    const r1 = makeRow({ top: 0, height: 30 });
+    const r2 = makeRow({ top: 30, height: 30 });
+    const r3 = makeRow({ top: 60, height: 30 });
     const holder = { getBoundingClientRect: () => rect(0, 100) };
 
     const table = {
@@ -163,8 +171,11 @@ describe('ScrollAnchor', () => {
   });
 
   it('mid-table filter (anchor still visible): preserves exact viewport-Y', () => {
+    // offsetTop=500, holder.scrollTop=490 → row sits 10px below the holder's
+    // visible top. _captureAnchor records that exact offset and passes it
+    // through to setAnchor unchanged.
     const anchor = makeRow({ top: 10, height: 20, offsetTop: 500 });
-    const { table, holder } = setup({
+    const { table, setAnchor } = setup({
       visibleRows: [anchor],
       displayRows: [anchor],
       holderScrollTop: 490,
@@ -174,71 +185,54 @@ describe('ScrollAnchor', () => {
     table.handlers.renderStarted?.[0]?.();
     table.handlers.renderComplete?.[0]?.();
 
-    expect(table.scrollToRow).toHaveBeenCalledTimes(1);
-    expect(table.scrollToRow).toHaveBeenCalledWith(anchor, 'top', true);
-    // savedOffset = 10 (anchor's viewport-Y at snapshot). After refine,
-    // scrollTop = offsetTop(500) - savedOffset(10) = 490, so anchor sits at y=10.
-    expect(holder.scrollTop).toBe(490);
+    expect(setAnchor).toHaveBeenCalledTimes(1);
+    expect(setAnchor).toHaveBeenCalledWith(anchor.__internal, 10);
   });
 
-  it('preserve-offset clamps scrollTop within [0, scrollHeight - clientHeight]', () => {
-    // Anchor at offsetTop=10, savedOffset=40 → raw target = -30. Clamp to 0.
-    const anchor = makeRow({ top: 40, height: 20, offsetTop: 10 });
-    const { table, holder } = setup({
-      visibleRows: [anchor],
-      displayRows: [anchor],
-      holderScrollTop: 50,
-      holderScrollHeight: 5000,
-    });
+  it('anchor filtered out without surviving ancestor: cedes to renderer default', () => {
+    const rA = makeRow({ top: -40, height: 20, offsetTop: 0 });
+    const anchor = makeRow({ top: 40, height: 20, offsetTop: 40 });
+    const rC = makeRow({ top: 80, height: 20, offsetTop: 80 });
 
-    table.handlers.dataSorting?.[0]?.();
-    table.handlers.renderComplete?.[0]?.();
-
-    expect(holder.scrollTop).toBe(0);
-  });
-
-  it('anchor filtered out: time-nearest active row is used as fallback', () => {
-    // Three rows in a flat list, all with originalData.timestamp.
-    // Anchor at ts=200 is filtered out; rA(ts=100) and rC(ts=300) remain.
-    const rA = makeRow(
-      { top: -40, height: 20 },
-      { originalData: { timestamp: 100, exitStamp: 100 } },
-    );
-    const anchor = makeRow(
-      { top: 40, height: 20 },
-      { originalData: { timestamp: 200, exitStamp: 200 } },
-    );
-    const rC = makeRow(
-      { top: 80, height: 20 },
-      { originalData: { timestamp: 300, exitStamp: 300 } },
-    );
-
-    const { table } = setup({
+    const { table, holder, setAnchor } = setup({
       visibleRows: [anchor],
       displayRows: [rA, anchor, rC],
-      activeRows: [rA, anchor, rC],
       holderScrollTop: 400,
     });
 
     table.handlers.renderStarted?.[0]?.();
-    // Filter hides anchor; rA and rC remain in display + active.
     table.rowManager.getDisplayRows = () => [rA.__internal, rC.__internal];
-    table.getRows = jest.fn((type?: string) => {
-      if (type === 'visible') return [rA, rC];
-      if (type === 'active') return [rA, rC];
-      return [rA, rC];
-    });
+
+    const scrollBefore = holder.scrollTop;
     table.handlers.renderComplete?.[0]?.();
 
-    // Old _findClosestActive returns null on a between-rows miss (no exact /
-    // range hit at ts=200 when actives are 100 and 300), so no scroll happens.
-    // This is the literal pre-rewrite behavior — the user said that worked.
-    expect(table.scrollToRow).not.toHaveBeenCalled();
+    expect(setAnchor).not.toHaveBeenCalled();
+    expect(holder.scrollTop).toBe(scrollBefore);
   });
 
-  it('was-at-top: snaps scrollTop to 0 instead of centering', () => {
+  it('anchor filtered out, tree parent survives: delegates to setAnchor on parent', () => {
+    const parent = makeRow({ top: 0, height: 20, offsetTop: 0 });
+    const child = makeRow({ top: 20, height: 20, offsetTop: 20, parent });
+
+    // scrollTop > boundaryThresholdPx (10) so wasAtTop doesn't trip.
+    const { table, setAnchor } = setup({
+      visibleRows: [child],
+      displayRows: [parent, child],
+      holderScrollTop: 200,
+      holderScrollHeight: 5000,
+    });
+
+    table.handlers.renderStarted?.[0]?.();
+    table.rowManager.getDisplayRows = () => [parent.__internal];
+    table.handlers.renderComplete?.[0]?.();
+
+    expect(setAnchor).toHaveBeenCalledTimes(1);
+    expect(setAnchor).toHaveBeenCalledWith(parent.__internal, expect.any(Number));
+  });
+
+  it('was-at-top: snaps scrollTop to 0 instead of delegating', () => {
     const anchor = makeRow({ top: 10, height: 20 });
-    const { table, holder } = setup({
+    const { table, holder, setAnchor } = setup({
       visibleRows: [anchor],
       displayRows: [anchor],
       holderScrollTop: 0,
@@ -249,12 +243,12 @@ describe('ScrollAnchor', () => {
     table.handlers.renderComplete?.[0]?.();
 
     expect(holder.scrollTop).toBe(0);
-    expect(table.scrollToRow).not.toHaveBeenCalled();
+    expect(setAnchor).not.toHaveBeenCalled();
   });
 
-  it('was-at-bottom: snaps scrollTop to scrollHeight - clientHeight', () => {
+  it('was-at-bottom: snaps to scrollHeight - clientHeight', () => {
     const anchor = makeRow({ top: 80, height: 20 });
-    const { table, holder } = setup({
+    const { table, holder, setAnchor } = setup({
       visibleRows: [anchor],
       displayRows: [anchor],
       holderScrollTop: 900,
@@ -262,16 +256,16 @@ describe('ScrollAnchor', () => {
       holderClientHeight: 100,
     });
 
-    table.handlers.dataSorting?.[0]?.();
+    table.handlers.renderStarted?.[0]?.();
     table.handlers.renderComplete?.[0]?.();
 
     expect(holder.scrollTop).toBe(900);
-    expect(table.scrollToRow).not.toHaveBeenCalled();
+    expect(setAnchor).not.toHaveBeenCalled();
   });
 
-  it('single tree toggle skips the restore (preserves scrollTop)', () => {
+  it('single tree toggle skips restore (preserves scrollTop)', () => {
     const anchor = makeRow({ top: 40, height: 20 });
-    const { table, holder } = setup({
+    const { table, holder, setAnchor } = setup({
       visibleRows: [anchor],
       displayRows: [anchor],
       holderScrollTop: 250,
@@ -281,14 +275,14 @@ describe('ScrollAnchor', () => {
     table.handlers.renderComplete?.[0]?.();
 
     expect(holder.scrollTop).toBe(250);
-    expect(table.scrollToRow).not.toHaveBeenCalled();
+    expect(setAnchor).not.toHaveBeenCalled();
   });
 
-  it('bulk tree toggle clears the skip flag and restores anchor', () => {
+  it('bulk tree toggle: second toggle clears skip flag, restore delegates', () => {
     const r1 = makeRow({ top: 0, height: 30 });
-    const r2 = makeRow({ top: 30, height: 30 });
+    const r2 = makeRow({ top: 30, height: 30, offsetTop: 30 });
     const r3 = makeRow({ top: 60, height: 30 });
-    const { table } = setup({
+    const { table, setAnchor } = setup({
       visibleRows: [r1, r2, r3],
       displayRows: [r1, r2, r3],
       holderScrollTop: 200,
@@ -299,151 +293,8 @@ describe('ScrollAnchor', () => {
     table.handlers.renderStarted?.[0]?.();
     table.handlers.renderComplete?.[0]?.();
 
-    // r2 is in displayRows → preserve-offset path → scrollToRow with 'top'.
-    expect(table.scrollToRow).toHaveBeenCalledWith(r2, 'top', true);
-  });
-
-  it('zeros stale paddingTop after filter via _resetStaleTopPadding', () => {
-    const tableEl = { style: { paddingTop: '120px' } };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const holder: MockHolder = {
-      scrollTop: 0,
-      scrollHeight: 500,
-      clientHeight: 100,
-      getBoundingClientRect: () => rect(0, 100),
-      querySelector: jest.fn((...args: unknown[]) =>
-        args[0] === '.tabulator-table' ? tableEl : null,
-      ),
-    };
-    const renderer: Record<string, unknown> = { vDomTopPad: 120 };
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn(() => []),
-      rowManager: { renderer, getDisplayRows: () => [] },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
-
-    (plugin as unknown as { _resetStaleTopPadding: () => void })._resetStaleTopPadding();
-
-    expect(tableEl.style.paddingTop).toBe('0px');
-    expect(renderer.vDomTopPad).toBe(0);
-  });
-
-  it('does NOT zero paddingTop when scrollTop has accounted for it', () => {
-    const tableEl = { style: { paddingTop: '500px' } };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const holder: MockHolder = {
-      scrollTop: 500,
-      scrollHeight: 2000,
-      clientHeight: 100,
-      getBoundingClientRect: () => rect(0, 100),
-      querySelector: jest.fn((...args: unknown[]) =>
-        args[0] === '.tabulator-table' ? tableEl : null,
-      ),
-    };
-    const renderer: Record<string, unknown> = { vDomTopPad: 500 };
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn(() => []),
-      rowManager: { renderer, getDisplayRows: () => [] },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
-
-    (plugin as unknown as { _resetStaleTopPadding: () => void })._resetStaleTopPadding();
-
-    expect(tableEl.style.paddingTop).toBe('500px');
-    expect(renderer.vDomTopPad).toBe(500);
-  });
-
-  it('zeros paddingBottom when last row is rendered (vDomBottom === rowsCount - 1)', () => {
-    const tableEl = { style: { paddingBottom: '300px' } };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const holder: MockHolder = {
-      scrollTop: 0,
-      scrollHeight: 500,
-      clientHeight: 100,
-      getBoundingClientRect: () => rect(0, 100),
-      querySelector: jest.fn((...args: unknown[]) =>
-        args[0] === '.tabulator-table' ? tableEl : null,
-      ),
-    };
-    // Last row is rendered (vDomBottom = 9, rowsCount = 10) but paddingBottom is 300.
-    const renderer: Record<string, unknown> = {
-      vDomBottom: 9,
-      vDomRowHeight: 24,
-      vDomBottomPad: 300,
-    };
-    const displayRows = Array.from({ length: 10 }, () => ({}));
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn(() => []),
-      rowManager: { renderer, getDisplayRows: () => displayRows },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
-
-    (plugin as unknown as { _resetStaleBottomPadding: () => void })._resetStaleBottomPadding();
-
-    expect(tableEl.style.paddingBottom).toBe('0px');
-    expect(renderer.vDomBottomPad).toBe(0);
-  });
-
-  it('does NOT touch paddingBottom when more rows remain unrendered', () => {
-    const tableEl = { style: { paddingBottom: '2500px' } };
-    const handlers: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const holder: MockHolder = {
-      scrollTop: 100,
-      scrollHeight: 3000,
-      clientHeight: 100,
-      getBoundingClientRect: () => rect(0, 100),
-      querySelector: jest.fn((...args: unknown[]) =>
-        args[0] === '.tabulator-table' ? tableEl : null,
-      ),
-    };
-    // 100 rows, only 10 rendered — Tabulator's own padding logic owns this case.
-    const renderer: Record<string, unknown> = { vDomBottom: 9, vDomBottomPad: 2500 };
-    const displayRows = Array.from({ length: 100 }, () => ({}));
-    const table = {
-      handlers,
-      on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
-        (handlers[evt] ??= []).push(fn);
-      }),
-      element: { querySelector: jest.fn(() => holder) },
-      getRows: jest.fn(() => []),
-      rowManager: { renderer, getDisplayRows: () => displayRows },
-      scrollToRow: jest.fn(() => Promise.resolve()),
-    };
-    const plugin = new ScrollAnchor(table as never);
-    (plugin as unknown as { table: typeof table }).table = table;
-    (plugin as unknown as { options: () => boolean }).options = () => true;
-    plugin.initialize();
-
-    (plugin as unknown as { _resetStaleBottomPadding: () => void })._resetStaleBottomPadding();
-
-    expect(tableEl.style.paddingBottom).toBe('2500px');
-    expect(renderer.vDomBottomPad).toBe(2500);
+    // r2 middle visible row → captured. offsetTop=30 - scrollTop=200 = -170.
+    expect(setAnchor).toHaveBeenCalledTimes(1);
+    expect(setAnchor).toHaveBeenCalledWith(r2.__internal, -170);
   });
 });
