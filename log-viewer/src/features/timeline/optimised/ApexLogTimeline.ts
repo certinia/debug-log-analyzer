@@ -22,7 +22,7 @@ import { ContextMenu } from '../../../components/ContextMenu.js';
 import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
 import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { findEventByTimestamp } from '../../../core/utility/EventSearch.js';
+import { findEventByEventIndex, findEventByTimestamp } from '../../../core/utility/EventSearch.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { goToRow } from '../../call-tree/components/CalltreeView.js';
 import { getTheme } from '../themes/ThemeSelector.js';
@@ -225,9 +225,27 @@ export class ApexLogTimeline {
     }
 
     // Subscribe to EventBus for timeline navigation requests (from CalltreeView)
-    this.eventBusUnsubscribe = eventBus.on('timeline:navigate-to', ({ timestamp }) => {
-      this.navigateToTimestamp(timestamp);
+    this.eventBusUnsubscribe = eventBus.on('timeline:navigate-to', ({ eventIndex, timestamp }) => {
+      if (eventIndex !== undefined && this.apexLog) {
+        this.navigateToEventIndex(eventIndex);
+        return;
+      }
+      if (timestamp !== undefined) {
+        this.navigateToTimestamp(timestamp);
+      }
     });
+  }
+
+  /**
+   * Navigate to a specific event using parser-assigned eventIndex.
+   */
+  public navigateToEventIndex(eventIndex: number): void {
+    if (!this.apexLog) {
+      return;
+    }
+
+    const result = findEventByEventIndex(this.apexLog, eventIndex);
+    this._navigateToSearchResult(result, 'eventIndex');
   }
 
   /**
@@ -239,13 +257,22 @@ export class ApexLogTimeline {
   public navigateToTimestamp(timestamp: number): void {
     // Find event by timestamp (binary search - events sorted by time)
     const result = findEventByTimestamp(this.events, timestamp);
+    this._navigateToSearchResult(result, 'timestamp');
+  }
+
+  private _navigateToSearchResult(
+    result: { event: LogEvent; depth: number } | null,
+    idMode: 'eventIndex' | 'timestamp',
+  ): void {
     if (!result) {
       return;
     }
 
-    // Create EventNode with original reference for selection
     const eventNode: EventNode = {
-      id: `${result.event.timestamp}-${result.depth}`,
+      id:
+        idMode === 'eventIndex'
+          ? `${result.event.eventIndex}-${result.depth}`
+          : `${result.event.timestamp}-${result.depth}`,
       timestamp: result.event.timestamp,
       duration: result.event.duration.total,
       type: result.event.type ?? result.event.category ?? 'UNKNOWN',
@@ -253,10 +280,7 @@ export class ApexLogTimeline {
       original: result.event,
     };
 
-    // Select the event (highlights it)
     this.flamechart.selectByEventNode(eventNode);
-
-    // Zoom to fit the event (with padding)
     const viewport = this.flamechart.getViewportManager();
     viewport?.focusOnEvent(result.event.timestamp, result.event.duration.total, result.depth);
     this.flamechart.requestRender();
@@ -417,7 +441,8 @@ export class ApexLogTimeline {
     // Cmd/Ctrl+Click on a frame navigates directly to call tree
     // Note: Only works on individual frames, not buckets (buckets are aggregated)
     if (eventNode && (modifiers?.metaKey || modifiers?.ctrlKey)) {
-      goToRow(eventNode.timestamp);
+      const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
+      goToRow({ eventIndex: originalEvent?.eventIndex, timestamp: eventNode.timestamp });
       return;
     }
 
@@ -455,7 +480,8 @@ export class ApexLogTimeline {
    * Navigates call tree to the selected frame.
    */
   private handleJumpToCallTree(eventNode: EventNode): void {
-    goToRow(eventNode.timestamp);
+    const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
+    goToRow({ eventIndex: originalEvent?.eventIndex, timestamp: eventNode.timestamp });
   }
 
   /**

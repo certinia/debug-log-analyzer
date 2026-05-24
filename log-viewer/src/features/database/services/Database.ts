@@ -25,17 +25,33 @@ export class DatabaseAccess {
     stack: Stack = [],
     line: LogEvent = DatabaseAccess._treeRoot,
   ): Stack {
+    return this._getStackByMatcher((child) => child.timestamp === timestamp, stack, line);
+  }
+
+  public getStackByEventIndex(
+    eventIndex: number,
+    stack: Stack = [],
+    line: LogEvent = DatabaseAccess._treeRoot,
+  ): Stack {
+    return this._getStackByMatcher((child) => child.eventIndex === eventIndex, stack, line);
+  }
+
+  private _getStackByMatcher(
+    matches: (child: LogEvent) => boolean,
+    stack: Stack,
+    line: LogEvent,
+  ): Stack {
     const children = line.children;
     const len = children.length;
     for (let i = 0; i < len; ++i) {
       const child = children[i];
       if (child?.isParent) {
         stack.push(child);
-        if (child.timestamp === timestamp) {
+        if (matches(child)) {
           return stack;
         }
 
-        const childStack = this.getStack(timestamp, stack, child);
+        const childStack = this._getStackByMatcher(matches, stack, child);
         if (childStack.length > 0) {
           return childStack;
         }

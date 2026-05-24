@@ -2,7 +2,7 @@
  * Copyright (c) 2024 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
 
 export interface EventSearchResult {
   event: LogEvent;
@@ -57,4 +57,27 @@ export function findEventByTimestamp(
   }
 
   return null;
+}
+
+/**
+ * Resolve an event directly by its parser-assigned eventIndex.
+ * This is stable and unique within a single parse.
+ */
+export function findEventByEventIndex(
+  apexLog: ApexLog,
+  eventIndex: number,
+): EventSearchResult | null {
+  const event = apexLog.eventsById[eventIndex];
+  if (!event) {
+    return null;
+  }
+
+  let depth = 0;
+  let parent = event.parent;
+  while (parent?.parent) {
+    depth++;
+    parent = parent.parent;
+  }
+
+  return { event, depth };
 }

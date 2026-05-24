@@ -34,6 +34,8 @@ export class ApexLogParser {
   lastTimestamp = 0;
   discontinuity = false;
   namespaces = new Set<string>();
+  /** Every event created during this parse, indexed by `LogEvent.eventIndex`. */
+  eventsById: LogEvent[] = [];
   governorLimits: GovernorLimits = {
     soqlQueries: { used: 0, limit: 0 },
     soslQueries: { used: 0, limit: 0 },
@@ -66,6 +68,7 @@ export class ApexLogParser {
     apexLog.parsingErrors = this.parsingErrors;
     apexLog.namespaces = Array.from(this.namespaces);
     apexLog.governorLimits = this.governorLimits;
+    apexLog.eventsById = this.eventsById;
 
     this.addGovernorLimits(apexLog);
 

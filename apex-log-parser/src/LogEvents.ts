@@ -104,6 +104,13 @@ export abstract class LogEvent {
   timestamp = 0;
 
   /**
+   * A globally-unique, monotonically-increasing index assigned at construction
+   * time within a single parse. Use this as a stable identifier when navigating
+   * between views — unlike `timestamp`, it is guaranteed unique per event.
+   */
+  eventIndex = 0;
+
+  /**
    * The timestamp when the node finished, in nanoseconds
    */
   exitStamp: number | null = null;
@@ -229,6 +236,8 @@ export abstract class LogEvent {
 
   constructor(parser: ApexLogParser, parts: string[]) {
     this.logParser = parser;
+    this.eventIndex = parser.eventsById.length;
+    parser.eventsById.push(this);
     const [timeData, type] = parts;
     if (type) {
       this.text = this.type = type as LogEventType;
@@ -359,6 +368,13 @@ export class ApexLog extends LogEvent {
    * Null if no wall-clock time could be parsed.
    */
   startTime: number | null = null;
+
+  /**
+   * Flat lookup of every parsed event by its `eventIndex`. Populated by the
+   * parser; used by cross-view navigation to resolve a stable id back to its
+   * `LogEvent` without relying on (non-unique) timestamps.
+   */
+  eventsById: LogEvent[] = [];
 
   /**
    * The endtime with nodes of 0 duration excluded

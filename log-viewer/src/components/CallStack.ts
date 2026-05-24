@@ -19,6 +19,8 @@ export class CallStack extends LitElement {
   @property({ type: Number })
   timestamp = -1;
   @property({ type: Number })
+  eventIndex = -1;
+  @property({ type: Number })
   startDepth = 1;
   @property({ type: Number })
   endDepth = -1;
@@ -79,11 +81,15 @@ export class CallStack extends LitElement {
   // 1. THE PERFORMANCE ENGINE: Process data BEFORE rendering
   protected willUpdate(changedProperties: PropertyValues) {
     if (
+      changedProperties.has('eventIndex') ||
       changedProperties.has('timestamp') ||
       changedProperties.has('startDepth') ||
       changedProperties.has('endDepth')
     ) {
-      const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() ?? [];
+      const stack =
+        this.eventIndex >= 0
+          ? (DatabaseAccess.instance()?.getStackByEventIndex(this.eventIndex).reverse() ?? [])
+          : (DatabaseAccess.instance()?.getStack(this.timestamp).reverse() ?? []);
 
       if (stack.length > 0) {
         // Run the heavy loop and formatting logic here, only when inputs change
@@ -126,6 +132,7 @@ export class CallStack extends LitElement {
     return html`<a
       @click=${this.onCallerClick}
       class="callstack__item code_text"
+      data-event-index="${line.eventIndex}"
       data-timestamp="${line.timestamp}"
       >${soqlBlock}</a
     >`;
@@ -143,10 +150,18 @@ export class CallStack extends LitElement {
 
     evt.stopPropagation();
     evt.preventDefault();
-    const target = evt.target as HTMLElement;
-    const dataTimestamp = target.getAttribute('data-timestamp');
+    const target = (evt.target as HTMLElement).closest('.callstack__item');
+    const dataEventIndex = target?.getAttribute('data-event-index');
+    const dataTimestamp = target?.getAttribute('data-timestamp');
+    if (dataEventIndex) {
+      goToRow({
+        eventIndex: parseInt(dataEventIndex, 10),
+        timestamp: dataTimestamp ? parseInt(dataTimestamp, 10) : undefined,
+      });
+      return;
+    }
     if (dataTimestamp) {
-      goToRow(parseInt(dataTimestamp));
+      goToRow(parseInt(dataTimestamp, 10));
     }
   }
 }
