@@ -57,6 +57,7 @@ export function createAggregatedTable(
     headerSortElement,
     columnCalcs: 'both',
     columnDefaults: commonColumnDefaults,
+    rowFormatter: callbacks.rowFormatter,
     columns: [
       {
         title: 'Name',

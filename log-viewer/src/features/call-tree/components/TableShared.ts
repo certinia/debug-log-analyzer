@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { Tabulator } from 'tabulator-tables';
+import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
 import { Find } from '../../../tabulator/module/Find.js';
@@ -20,6 +20,7 @@ export interface TableCallbacks {
   ) => boolean;
   onFilterCacheClear?: () => void;
   onRenderStarted: () => void;
+  rowFormatter?: (row: RowComponent) => void;
 }
 
 export function registerTableModules(): void {

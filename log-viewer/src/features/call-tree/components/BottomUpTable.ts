@@ -117,6 +117,7 @@ export function createBottomUpTable(
     groupStartOpen: false,
     groupToggleElement: 'header',
     columnDefaults: commonColumnDefaults,
+    rowFormatter: callbacks.rowFormatter,
   } as Options;
 
   const table = new Tabulator(container, {
