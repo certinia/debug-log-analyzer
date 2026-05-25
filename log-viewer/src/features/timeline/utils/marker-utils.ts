@@ -49,6 +49,7 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
       id: `marker-${markerIndex++}`,
       type: issue.type,
       startTime: issue.startTime,
+      eventIndex: issue.eventIndex,
       summary: issue.summary,
       metadata: issue.description,
     };

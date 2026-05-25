@@ -226,7 +226,7 @@ export class ApexLogTimeline {
 
     // Subscribe to EventBus for timeline navigation requests (from CalltreeView)
     this.eventBusUnsubscribe = eventBus.on('timeline:navigate-to', ({ eventIndex, timestamp }) => {
-      if (eventIndex !== undefined && this.apexLog) {
+      if (this.apexLog) {
         this.navigateToEventIndex(eventIndex);
         return;
       }
@@ -442,13 +442,17 @@ export class ApexLogTimeline {
     // Note: Only works on individual frames, not buckets (buckets are aggregated)
     if (eventNode && (modifiers?.metaKey || modifiers?.ctrlKey)) {
       const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
-      goToRow({ eventIndex: originalEvent?.eventIndex, timestamp: eventNode.timestamp });
+      if (originalEvent?.eventIndex !== undefined) {
+        goToRow({ eventIndex: originalEvent.eventIndex, timestamp: eventNode.timestamp });
+      }
       return;
     }
 
     // Cmd/Ctrl+Click on a marker navigates directly to call tree
     if (marker && (modifiers?.metaKey || modifiers?.ctrlKey)) {
-      goToRow(marker.startTime);
+      if (marker.eventIndex !== undefined) {
+        goToRow({ eventIndex: marker.eventIndex, timestamp: marker.startTime });
+      }
       return;
     }
 
@@ -481,7 +485,9 @@ export class ApexLogTimeline {
    */
   private handleJumpToCallTree(eventNode: EventNode): void {
     const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
-    goToRow({ eventIndex: originalEvent?.eventIndex, timestamp: eventNode.timestamp });
+    if (originalEvent?.eventIndex !== undefined) {
+      goToRow({ eventIndex: originalEvent.eventIndex, timestamp: eventNode.timestamp });
+    }
   }
 
   /**
@@ -489,7 +495,9 @@ export class ApexLogTimeline {
    * Navigates call tree to the marker's start time.
    */
   private handleJumpToCallTreeForMarker(marker: TimelineMarker): void {
-    goToRow(marker.startTime);
+    if (marker.eventIndex !== undefined) {
+      goToRow({ eventIndex: marker.eventIndex, timestamp: marker.startTime });
+    }
   }
 
   /**

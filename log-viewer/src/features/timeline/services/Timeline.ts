@@ -860,14 +860,15 @@ function onClickCanvas(): void {
   const isClick = mouseDownPosition.x === lastMouseX && mouseDownPosition.y === lastMouseY;
   if (!dragging && isClick) {
     const depth = getDepth(lastMouseY);
-    let timeStamp = findByPosition(timelineRoot.children, 0, lastMouseX, depth, false)?.timestamp;
-
-    if (!timeStamp) {
-      timeStamp = findLogIssue(lastMouseX)?.startTime;
+    const targetEvent = findByPosition(timelineRoot.children, 0, lastMouseX, depth, false);
+    if (targetEvent?.eventIndex !== undefined) {
+      goToRow({ eventIndex: targetEvent.eventIndex, timestamp: targetEvent.timestamp });
+      return;
     }
 
-    if (timeStamp) {
-      goToRow(timeStamp);
+    const marker = findLogIssue(lastMouseX);
+    if (marker?.eventIndex !== undefined) {
+      goToRow({ eventIndex: marker.eventIndex, timestamp: marker.startTime });
     }
   }
 }

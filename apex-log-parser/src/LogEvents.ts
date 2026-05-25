@@ -2300,7 +2300,7 @@ export class ExceptionThrownLine extends LogEvent {
       const truncateText = this.text.length > len;
       const summary = this.text.slice(0, len + 1) + (truncateText ? '…' : '');
       const message = truncateText ? this.text : '';
-      parser.addLogIssue(this.timestamp, summary, message, 'error');
+      parser.addLogIssue(this.timestamp, this.eventIndex, summary, message, 'error');
     }
   }
 }
@@ -2320,7 +2320,13 @@ export class FatalErrorLine extends LogEvent {
     const newLineIndex = this.text.indexOf('\n');
     const summary = newLineIndex > -1 ? this.text.slice(0, newLineIndex + 1) : this.text;
     const detailText = summary.length !== this.text.length ? this.text : '';
-    parser.addLogIssue(this.timestamp, 'FATAL ERROR! cause=' + summary, detailText, 'error');
+    parser.addLogIssue(
+      this.timestamp,
+      this.eventIndex,
+      'FATAL ERROR! cause=' + summary,
+      detailText,
+      'error',
+    );
   }
 }
 

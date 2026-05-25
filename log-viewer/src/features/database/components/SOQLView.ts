@@ -302,6 +302,7 @@ export class SOQLView extends LitElement {
 
   _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
     const eventIndexToSOQL = new Map<number, SOQLExecuteBeginLine>();
+    let nextRowId = 0;
 
     soqlLines?.forEach((line) => {
       eventIndexToSOQL.set(line.eventIndex, line);
@@ -312,6 +313,7 @@ export class SOQLView extends LitElement {
       for (const soql of soqlLines) {
         const explainLine = soql.children[0];
         soqlData.push({
+          id: ++nextRowId,
           isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
           relativeCost: explainLine?.relativeCost,
           soql: soql.text,
@@ -321,12 +323,20 @@ export class SOQLView extends LitElement {
           aggregations: soql.aggregations,
           eventIndex: soql.eventIndex,
           timestamp: soql.timestamp,
-          _children: [{ eventIndex: soql.eventIndex, timestamp: soql.timestamp, isDetail: true }],
+          _children: [
+            {
+              id: ++nextRowId,
+              eventIndex: soql.eventIndex,
+              timestamp: soql.timestamp,
+              isDetail: true,
+            },
+          ],
         });
       }
     }
 
     this.soqlTable = new Tabulator(soqlTableContainer, {
+      index: 'id',
       height: '100%',
       rowKeyboardNavigation: true,
       data: soqlData,
@@ -667,6 +677,7 @@ type VSCodeSaveFile = {
 };
 
 interface GridSOQLData {
+  id: number;
   isSelective?: boolean | null;
   relativeCost?: number | null;
   soql?: string;

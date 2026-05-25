@@ -585,6 +585,9 @@ export interface TimelineMarker {
    */
   startTime: number;
 
+  /** Parser-assigned event identity when the marker corresponds to a concrete event. */
+  eventIndex?: number;
+
   /**
    * Optional additional context about the marker.
    * May include error messages, reason codes, line numbers, or other diagnostic info.

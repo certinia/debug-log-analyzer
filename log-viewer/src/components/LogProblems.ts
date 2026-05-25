@@ -158,16 +158,15 @@ export class NotificationTag extends LitElement {
       const colorStyle = this.colorStyles.get(item.severity) || '';
 
       const buttonBar =
-        item.eventIndex !== null || item.timestamp !== null
+        item.eventIndex !== null
           ? html`<div class="button-bar">
               <vscode-button
                 aria-label="Go To Call Tree"
                 title="Go To Call Tree"
                 @click=${() => {
-                  goToRow({
-                    eventIndex: item.eventIndex ?? undefined,
-                    timestamp: item.timestamp ?? undefined,
-                  });
+                  if (item.eventIndex !== null) {
+                    goToRow({ eventIndex: item.eventIndex });
+                  }
                 }}
                 >Go To Call Tree</vscode-button
               >

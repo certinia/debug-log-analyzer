@@ -121,6 +121,7 @@ export class ApexLogParser {
     } else if (lastEntry && line.startsWith('*** Skipped')) {
       this.addLogIssue(
         lastEntry.timestamp,
+        lastEntry.eventIndex,
         'Skipped-Lines',
         `${line}. A section of the log has been skipped and the log has been truncated. Full details of this section of log can not be provided.`,
         'skip',
@@ -128,6 +129,7 @@ export class ApexLogParser {
     } else if (lastEntry && line.indexOf('MAXIMUM DEBUG LOG SIZE REACHED') !== -1) {
       this.addLogIssue(
         lastEntry.timestamp,
+        lastEntry.eventIndex,
         'Max-Size-reached',
         'The maximum log size has been reached. Part of the log has been truncated.',
         'skip',
@@ -268,6 +270,7 @@ export class ApexLogParser {
         // we found an entry event on its own e.g a `METHOD_ENTRY` without a `METHOD_EXIT` and got to the end of the log
         this.addLogIssue(
           currentLine.exitStamp,
+          currentLine.eventIndex,
           'Unexpected-End',
           'An entry event was found without a corresponding exit event e.g a `METHOD_ENTRY` event without a `METHOD_EXIT`',
           'unexpected',
@@ -276,6 +279,7 @@ export class ApexLogParser {
         if (currentLine.isTruncated) {
           this.updateLogIssue(
             currentLine.exitStamp,
+            currentLine.eventIndex,
             'Max-Size-reached',
             'The maximum log size has been reached. Part of the log has been truncated.',
             'skip',
@@ -322,6 +326,7 @@ export class ApexLogParser {
       // we found an exit event on its own e.g a `METHOD_EXIT` without a `METHOD_ENTRY`
       this.addLogIssue(
         endLine.timestamp,
+        endLine.eventIndex,
         'Unexpected-Exit',
         'An exit event was found without a corresponding entry event e.g a `METHOD_EXIT` event without a `METHOD_ENTRY`',
         'unexpected',
@@ -471,11 +476,18 @@ export class ApexLogParser {
     }
   }
 
-  public addLogIssue(startTime: number, summary: string, description: string, type: IssueType) {
+  public addLogIssue(
+    startTime: number,
+    eventIndex: number | undefined,
+    summary: string,
+    description: string,
+    type: IssueType,
+  ) {
     if (!this.reasons.has(summary)) {
       this.reasons.add(summary);
       this.logIssues.push({
         startTime: startTime,
+        eventIndex: eventIndex,
         summary: summary,
         description: description,
         type: type,
@@ -485,7 +497,13 @@ export class ApexLogParser {
     }
   }
 
-  private updateLogIssue(startTime: number, summary: string, description: string, type: IssueType) {
+  private updateLogIssue(
+    startTime: number,
+    eventIndex: number | undefined,
+    summary: string,
+    description: string,
+    type: IssueType,
+  ) {
     const elem = this.logIssues.findIndex((item) => {
       return item.summary === summary;
     });
@@ -494,7 +512,7 @@ export class ApexLogParser {
     }
     this.reasons.delete(summary);
 
-    this.addLogIssue(startTime, summary, description, type);
+    this.addLogIssue(startTime, eventIndex, summary, description, type);
   }
 
   private getDebugLevels(log: string): DebugLevel[] {

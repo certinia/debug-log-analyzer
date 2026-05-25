@@ -16,7 +16,7 @@ import type { RowComponent, Tabulator } from 'tabulator-tables';
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { findEventByEventIndex, findEventByTimestamp } from '../../../core/utility/EventSearch.js';
+import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { deepFilter } from '../utils/DetailsFilter.js';
@@ -82,8 +82,8 @@ export class CalltreeView extends LitElement {
     selectedTypes: new Set<string>(),
   };
   bottomUpGroupBy = 'None';
-  debugOnlyFilterCache = new Map<string, boolean>();
-  typeFilterCache = new Map<string, boolean>();
+  debugOnlyFilterCache = new Map<number | string, boolean>();
+  typeFilterCache = new Map<number | string, boolean>();
 
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
@@ -109,11 +109,10 @@ export class CalltreeView extends LitElement {
   }
 
   private _goToRowEvt = ((e: CustomEvent<{ eventIndex?: number; timestamp?: number }>) => {
-    if (typeof e.detail === 'number') {
-      this._goToRow(undefined, e.detail);
+    if (e.detail.eventIndex === undefined) {
       return;
     }
-    this._goToRow(e.detail.eventIndex, e.detail.timestamp);
+    this._goToRow(e.detail.eventIndex);
   }) as EventListener;
 
   constructor() {
@@ -572,7 +571,7 @@ export class CalltreeView extends LitElement {
     });
   }
 
-  async _goToRow(eventIndex?: number, timestamp?: number) {
+  async _goToRow(eventIndex: number) {
     if (!this.rootMethod) {
       return;
     }
@@ -592,14 +591,7 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    let treeRow: RowComponent | null = null;
-    if (eventIndex !== undefined) {
-      treeRow = await this._findByEventIndex(this.calltreeTable.getRows(), eventIndex);
-    }
-
-    if (!treeRow) {
-      treeRow = await this._findByTime(this.calltreeTable.getRows(), timestamp);
-    }
+    const treeRow = await this._findByEventIndex(this.calltreeTable.getRows(), eventIndex);
 
     if (!treeRow) {
       return;
@@ -684,7 +676,7 @@ export class CalltreeView extends LitElement {
     selectedNamespaces: string[],
     _namespace: string,
     data: TimeOrderRow | AggregatedRow | BottomUpRow,
-    filterParams: { filterCache: Map<string, boolean> },
+    filterParams: { filterCache: Map<number | string, boolean> },
   ): boolean => {
     if (selectedNamespaces.length === 0) {
       return true;
@@ -939,33 +931,12 @@ export class CalltreeView extends LitElement {
 
     return indexByEventIndex;
   }
-
-  private async _findByTime(
-    rows: RowComponent[],
-    timestamp?: number,
-  ): Promise<RowComponent | null> {
-    if (timestamp === undefined) {
-      return null;
-    }
-
-    if (!rows?.length || !this.rootMethod?.children) {
-      return null;
-    }
-
-    const result = findEventByTimestamp(this.rootMethod.children, timestamp);
-    if (!result) {
-      return null;
-    }
-
-    return this._materializeRowPath(rows, result.event);
-  }
 }
 
-export async function goToRow(target: number | { eventIndex?: number; timestamp?: number }) {
-  const detail = typeof target === 'number' ? { timestamp: target } : target;
+export async function goToRow(target: { eventIndex: number; timestamp?: number }) {
   document.dispatchEvent(
     new CustomEvent('calltree-go-to-row', {
-      detail,
+      detail: target,
     }),
   );
 }

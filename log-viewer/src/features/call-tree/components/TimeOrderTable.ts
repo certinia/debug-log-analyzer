@@ -32,9 +32,9 @@ export function createTimeOrderTable(
 ): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
 
-  const selfTimeFilterCache = new Map<string, boolean>();
-  const totalTimeFilterCache = new Map<string, boolean>();
-  const namespaceFilterCache = new Map<string, boolean>();
+  const selfTimeFilterCache = new Map<number | string, boolean>();
+  const totalTimeFilterCache = new Map<number | string, boolean>();
+  const namespaceFilterCache = new Map<number | string, boolean>();
 
   const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
   const governorLimits = rootMethod.governorLimits;
@@ -47,6 +47,7 @@ export function createTimeOrderTable(
 
   const table = new Tabulator(container, {
     data: tableData,
+    index: 'id',
     layout: 'fitColumns',
     placeholder: 'No Call Tree Available',
     height: '100%',

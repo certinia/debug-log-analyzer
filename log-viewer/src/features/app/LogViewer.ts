@@ -23,7 +23,7 @@ import { globalStyles } from '../../styles/global.styles.js';
 import './AppHeader.js';
 
 interface NavigateToTimelinePayload {
-  eventIndex?: number;
+  eventIndex: number;
   timestamp?: number;
 }
 
@@ -105,10 +105,7 @@ export class LogViewer extends LitElement {
     // Listen for navigation messages from the extension
     VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {
       const { cmd, payload } = event.data;
-      if (
-        cmd === 'navigateToTimeline' &&
-        (payload?.eventIndex !== undefined || payload?.timestamp !== undefined)
-      ) {
+      if (cmd === 'navigateToTimeline' && payload?.eventIndex !== undefined) {
         this._showTab('timeline-tab');
         eventBus.emit('timeline:navigate-to', {
           eventIndex: payload.eventIndex,
@@ -225,6 +222,7 @@ export class LogViewer extends LitElement {
       logMessage.summary = element.summary;
       logMessage.message = element.description;
       logMessage.severity = severity;
+      logMessage.eventIndex = element.eventIndex ?? null;
       logMessage.timestamp = element.startTime || null;
       localNotifications.push(logMessage);
     });

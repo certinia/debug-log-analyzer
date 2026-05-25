@@ -152,16 +152,10 @@ export class CallStack extends LitElement {
     evt.preventDefault();
     const target = (evt.target as HTMLElement).closest('.callstack__item');
     const dataEventIndex = target?.getAttribute('data-event-index');
-    const dataTimestamp = target?.getAttribute('data-timestamp');
-    if (dataEventIndex) {
-      goToRow({
-        eventIndex: parseInt(dataEventIndex, 10),
-        timestamp: dataTimestamp ? parseInt(dataTimestamp, 10) : undefined,
-      });
+    if (!dataEventIndex) {
       return;
     }
-    if (dataTimestamp) {
-      goToRow(parseInt(dataTimestamp, 10));
-    }
+
+    goToRow({ eventIndex: parseInt(dataEventIndex, 10) });
   }
 }

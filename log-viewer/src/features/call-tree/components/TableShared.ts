@@ -16,7 +16,7 @@ export interface TableCallbacks {
     selectedNamespaces: string[],
     namespace: string,
     data: TimeOrderRow | AggregatedRow | BottomUpRow,
-    filterParams: { filterCache: Map<string, boolean> },
+    filterParams: { filterCache: Map<number | string, boolean> },
   ) => boolean;
   onFilterCacheClear?: () => void;
   onRenderStarted: () => void;
