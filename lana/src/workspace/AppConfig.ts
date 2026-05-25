@@ -33,6 +33,9 @@ interface Config {
     };
     legacy: boolean;
   };
+  callTree: {
+    categoryColourise: boolean;
+  };
 }
 
 export function getConfig(): Config {

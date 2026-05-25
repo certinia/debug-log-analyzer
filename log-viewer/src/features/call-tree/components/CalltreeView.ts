@@ -139,9 +139,10 @@ export class CalltreeView extends LitElement {
     });
 
     getSettings().then((settings) => {
-      const { timeline } = settings;
+      const { timeline, callTree } = settings;
       addCustomThemes(timeline.customThemes);
       this._applyTheme(timeline.activeTheme ?? DEFAULT_THEME_NAME);
+      this._setCategoryColourise(callTree?.categoryColourise ?? false);
     });
   }
 
@@ -155,6 +156,10 @@ export class CalltreeView extends LitElement {
     this.style.setProperty('--ct-color-soql', theme.soql);
     this.style.setProperty('--ct-color-callout', theme.callout);
     this.style.setProperty('--ct-color-validation', theme.validation);
+  }
+
+  private _setCategoryColourise(enabled: boolean): void {
+    this.classList.toggle('category-colourise', enabled);
   }
 
   private _rowFormatter = (row: RowComponent): void => {
@@ -305,34 +310,59 @@ export class CalltreeView extends LitElement {
       }
 
       .tabulator-row.row-cat-apex .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-apex);
+      }
+      .tabulator-row.row-cat-code-unit .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-code-unit);
+      }
+      .tabulator-row.row-cat-system .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-system);
+      }
+      .tabulator-row.row-cat-automation .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-automation);
+      }
+      .tabulator-row.row-cat-dml .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-dml);
+      }
+      .tabulator-row.row-cat-soql .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-soql);
+      }
+      .tabulator-row.row-cat-callout .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-callout);
+      }
+      .tabulator-row.row-cat-validation .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-validation);
+      }
+
+      :host(.category-colourise) .tabulator-row.row-cat-apex .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-apex) 10%, transparent);
         color: var(--ct-color-apex);
       }
-      .tabulator-row.row-cat-code-unit .datagrid-code-text {
+      :host(.category-colourise) .tabulator-row.row-cat-code-unit .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-code-unit) 10%, transparent);
         color: var(--ct-color-code-unit);
       }
-      .tabulator-row.row-cat-system .datagrid-code-text {
+      :host(.category-colourise) .tabulator-row.row-cat-system .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-system) 10%, transparent);
         color: var(--ct-color-system);
       }
-      .tabulator-row.row-cat-automation .datagrid-code-text {
+      :host(.category-colourise) .tabulator-row.row-cat-automation .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-automation) 10%, transparent);
         color: var(--ct-color-automation);
       }
-      .tabulator-row.row-cat-dml .datagrid-code-text {
+      :host(.category-colourise) .tabulator-row.row-cat-dml .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-dml) 10%, transparent);
         color: var(--ct-color-dml);
       }
-      .tabulator-row.row-cat-soql .datagrid-code-text {
+      :host(.category-colourise) .tabulator-row.row-cat-soql .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-soql) 10%, transparent);
         color: var(--ct-color-soql);
       }
-      .tabulator-row.row-cat-callout .datagrid-code-text {
+      :host(.category-colourise) .tabulator-row.row-cat-callout .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-callout) 10%, transparent);
         color: var(--ct-color-callout);
       }
-      .tabulator-row.row-cat-validation .datagrid-code-text {
+      :host(.category-colourise) .tabulator-row.row-cat-validation .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-validation) 10%, transparent);
         color: var(--ct-color-validation);
       }

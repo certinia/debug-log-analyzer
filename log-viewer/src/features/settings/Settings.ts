@@ -29,6 +29,9 @@ export type LanaSettings = {
     };
     legacy: boolean;
   };
+  callTree: {
+    categoryColourise: boolean;
+  };
 };
 
 export function getSettings(): Promise<LanaSettings> {

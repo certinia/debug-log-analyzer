@@ -254,6 +254,13 @@
           "markdownDescription": "Enable/ disable the legacy timeline. Default is `false`.",
           "order": 2
         },
+        "lana.callTree.categoryColourise": {
+          "title": "Colourise Call Tree category names",
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "When enabled, applies a background tint and text colour to the Name column in the Call Tree based on the event category, matching the Timeline flame graph colours. When disabled (default), a small colour chip is shown instead.",
+          "order": 2
+        },
         "lana.timeline.colors": {
           "type": "object",
           "title": "Timeline Event Colors",
