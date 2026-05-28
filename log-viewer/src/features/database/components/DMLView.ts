@@ -394,7 +394,6 @@ export class DMLView extends LitElement {
             const data = cell.getData() as DMLRow;
             return `<call-stack
             eventIndex="${data.eventIndex}"
-            timestamp="${data.timestamp}"
             startDepth="0"
             endDepth="1"
           ></call-stack>`;
@@ -445,8 +444,8 @@ export class DMLView extends LitElement {
       ],
       rowFormatter: (row) => {
         const data = row.getData();
-        if (data.isDetail && data.eventIndex !== undefined && data.timestamp) {
-          const detailContainer = this.createDetailPanel(data.eventIndex, data.timestamp);
+        if (data.isDetail && data.eventIndex !== undefined) {
+          const detailContainer = this.createDetailPanel(data.eventIndex);
           row.getElement().replaceChildren(detailContainer);
         }
       },
@@ -554,13 +553,10 @@ export class DMLView extends LitElement {
     return this.holder;
   }
 
-  createDetailPanel(eventIndex: number, timestamp: number) {
+  createDetailPanel(eventIndex: number) {
     const detailContainer = document.createElement('div');
     detailContainer.className = 'row__details-container';
-    render(
-      html`<call-stack eventIndex=${eventIndex} timestamp=${timestamp}></call-stack>`,
-      detailContainer,
-    );
+    render(html`<call-stack eventIndex=${eventIndex}></call-stack>`, detailContainer);
 
     return detailContainer;
   }

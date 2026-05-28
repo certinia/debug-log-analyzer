@@ -224,14 +224,12 @@ export class ApexLogTimeline {
       this.flamechart.setHeatStripTimeSeries(null);
     }
 
-    // Subscribe to EventBus for timeline navigation requests (from CalltreeView)
-    this.eventBusUnsubscribe = eventBus.on('timeline:navigate-to', ({ eventIndex, timestamp }) => {
-      if (this.apexLog) {
-        this.navigateToEventIndex(eventIndex);
-        return;
-      }
-      if (timestamp !== undefined) {
-        this.navigateToTimestamp(timestamp);
+    // Subscribe to EventBus for timeline navigation requests (from CalltreeView and raw-log entry).
+    this.eventBusUnsubscribe = eventBus.on('timeline:navigate-to', (detail) => {
+      if (detail.eventIndex !== undefined) {
+        this.navigateToEventIndex(detail.eventIndex);
+      } else {
+        this.navigateToTimestamp(detail.timestamp);
       }
     });
   }
@@ -255,6 +253,9 @@ export class ApexLogTimeline {
    * Centers the viewport AND selects the event for visual highlighting.
    */
   public navigateToTimestamp(timestamp: number): void {
+    if (!this.events) {
+      return;
+    }
     // Find event by timestamp (binary search - events sorted by time)
     const result = findEventByTimestamp(this.events, timestamp);
     this._navigateToSearchResult(result, 'timestamp');
@@ -443,7 +444,7 @@ export class ApexLogTimeline {
     if (eventNode && (modifiers?.metaKey || modifiers?.ctrlKey)) {
       const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
       if (originalEvent?.eventIndex !== undefined) {
-        goToRow({ eventIndex: originalEvent.eventIndex, timestamp: eventNode.timestamp });
+        goToRow({ eventIndex: originalEvent.eventIndex });
       }
       return;
     }
@@ -451,7 +452,7 @@ export class ApexLogTimeline {
     // Cmd/Ctrl+Click on a marker navigates directly to call tree
     if (marker && (modifiers?.metaKey || modifiers?.ctrlKey)) {
       if (marker.eventIndex !== undefined) {
-        goToRow({ eventIndex: marker.eventIndex, timestamp: marker.startTime });
+        goToRow({ eventIndex: marker.eventIndex });
       }
       return;
     }
@@ -486,7 +487,7 @@ export class ApexLogTimeline {
   private handleJumpToCallTree(eventNode: EventNode): void {
     const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
     if (originalEvent?.eventIndex !== undefined) {
-      goToRow({ eventIndex: originalEvent.eventIndex, timestamp: eventNode.timestamp });
+      goToRow({ eventIndex: originalEvent.eventIndex });
     }
   }
 
@@ -496,7 +497,7 @@ export class ApexLogTimeline {
    */
   private handleJumpToCallTreeForMarker(marker: TimelineMarker): void {
     if (marker.eventIndex !== undefined) {
-      goToRow({ eventIndex: marker.eventIndex, timestamp: marker.startTime });
+      goToRow({ eventIndex: marker.eventIndex });
     }
   }
 

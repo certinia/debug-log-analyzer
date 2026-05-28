@@ -17,8 +17,6 @@ import { globalStyles } from '../styles/global.styles.js';
 @customElement('call-stack')
 export class CallStack extends LitElement {
   @property({ type: Number })
-  timestamp = -1;
-  @property({ type: Number })
   eventIndex = -1;
   @property({ type: Number })
   startDepth = 1;
@@ -82,14 +80,13 @@ export class CallStack extends LitElement {
   protected willUpdate(changedProperties: PropertyValues) {
     if (
       changedProperties.has('eventIndex') ||
-      changedProperties.has('timestamp') ||
       changedProperties.has('startDepth') ||
       changedProperties.has('endDepth')
     ) {
       const stack =
         this.eventIndex >= 0
           ? (DatabaseAccess.instance()?.getStackByEventIndex(this.eventIndex).reverse() ?? [])
-          : (DatabaseAccess.instance()?.getStack(this.timestamp).reverse() ?? []);
+          : [];
 
       if (stack.length > 0) {
         // Run the heavy loop and formatting logic here, only when inputs change
@@ -133,7 +130,6 @@ export class CallStack extends LitElement {
       @click=${this.onCallerClick}
       class="callstack__item code_text"
       data-event-index="${line.eventIndex}"
-      data-timestamp="${line.timestamp}"
       >${soqlBlock}</a
     >`;
   }

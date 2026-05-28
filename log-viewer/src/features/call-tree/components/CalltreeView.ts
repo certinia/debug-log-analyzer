@@ -108,10 +108,7 @@ export class CalltreeView extends LitElement {
     return (this.tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
   }
 
-  private _goToRowEvt = ((e: CustomEvent<{ eventIndex?: number; timestamp?: number }>) => {
-    if (e.detail.eventIndex === undefined) {
-      return;
-    }
+  private _goToRowEvt = ((e: CustomEvent<{ eventIndex: number }>) => {
     this._goToRow(e.detail.eventIndex);
   }) as EventListener;
 
@@ -843,7 +840,6 @@ export class CalltreeView extends LitElement {
         document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'timeline-tab' } }));
         eventBus.emit('timeline:navigate-to', {
           eventIndex: rowData.originalData.eventIndex,
-          timestamp: rowData.originalData.timestamp,
         });
         break;
 
@@ -933,7 +929,7 @@ export class CalltreeView extends LitElement {
   }
 }
 
-export async function goToRow(target: { eventIndex: number; timestamp?: number }) {
+export async function goToRow(target: { eventIndex: number }) {
   document.dispatchEvent(
     new CustomEvent('calltree-go-to-row', {
       detail: target,

@@ -20,14 +20,6 @@ export class DatabaseAccess {
     return DatabaseAccess._instance;
   }
 
-  public getStack(
-    timestamp: number,
-    stack: Stack = [],
-    line: LogEvent = DatabaseAccess._treeRoot,
-  ): Stack {
-    return this._getStackByMatcher((child) => child.timestamp === timestamp, stack, line);
-  }
-
   public getStackByEventIndex(
     eventIndex: number,
     stack: Stack = [],

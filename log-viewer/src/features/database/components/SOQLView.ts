@@ -405,7 +405,6 @@ export class SOQLView extends LitElement {
             const data = cell.getData() as GridSOQLData;
             return `<call-stack
             eventIndex=${data.eventIndex}
-            timestamp=${data.timestamp}
             startDepth="0"
             endDepth="1"
           ></call-stack>`;
@@ -642,7 +641,7 @@ export class SOQLView extends LitElement {
     const soqlLine = eventIndexToSOQL.get(eventIndex);
     render(
       html`<db-soql-detail-panel
-        timestamp=${soqlLine?.timestamp ?? 0}
+        eventIndex=${eventIndex}
         soql=${soqlLine?.text}
       ></db-soql-detail-panel>`,
       detailContainer,

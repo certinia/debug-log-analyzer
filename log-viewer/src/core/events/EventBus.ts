@@ -8,7 +8,11 @@
  */
 
 interface EventMap {
-  'timeline:navigate-to': { eventIndex: number; timestamp?: number };
+  // Supply eventIndex (preferred — unique) OR timestamp (fallback for raw-log entry where eventIndex isn't known).
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  'timeline:navigate-to':
+    | { eventIndex: number; timestamp?: never }
+    | { eventIndex?: never; timestamp: number };
 }
 
 type EventCallback<K extends keyof EventMap> = (detail: EventMap[K]) => void;

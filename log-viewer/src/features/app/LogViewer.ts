@@ -23,8 +23,7 @@ import { globalStyles } from '../../styles/global.styles.js';
 import './AppHeader.js';
 
 interface NavigateToTimelinePayload {
-  eventIndex: number;
-  timestamp?: number;
+  timestamp: number;
 }
 
 @customElement('log-viewer')
@@ -105,13 +104,11 @@ export class LogViewer extends LitElement {
     // Listen for navigation messages from the extension
     VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {
       const { cmd, payload } = event.data;
-      if (cmd === 'navigateToTimeline' && payload?.eventIndex !== undefined) {
-        this._showTab('timeline-tab');
-        eventBus.emit('timeline:navigate-to', {
-          eventIndex: payload.eventIndex,
-          timestamp: payload.timestamp,
-        });
+      if (cmd !== 'navigateToTimeline' || payload?.timestamp === undefined) {
+        return;
       }
+      this._showTab('timeline-tab');
+      eventBus.emit('timeline:navigate-to', { timestamp: payload.timestamp });
     });
   }
 
@@ -239,7 +236,7 @@ export class LogViewer extends LitElement {
   }
 
   async _readLog(logUri: string): Promise<string> {
-    let msg = '';
+    let msg;
     if (logUri) {
       try {
         const response = await fetch(logUri);
