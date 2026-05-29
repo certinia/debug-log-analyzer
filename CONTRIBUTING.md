@@ -17,6 +17,8 @@ Before you dive in, please make sure to review our [code of conduct](https://git
 
 For detailed instructions on setting up your development environment, refer to the [Development Guide](https://github.com/certinia/debug-log-analyzer/blob/main/DEVELOPING.md).
 
+> 🔖 Maintainers: see the [Release Guide](https://github.com/certinia/debug-log-analyzer/blob/main/RELEASING.md) for the versioning convention and how stable/pre-release publishing works.
+
 ## 🚀 Ready to Contribute?
 
 We can't wait to see your contributions! Whether it’s fixing a bug, adding a new feature, or improving the docs, we truly appreciate your time and effort.
