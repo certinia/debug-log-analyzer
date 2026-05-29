@@ -13,7 +13,7 @@ pnpm watch | build | test | lint | prettier-format
 
 ## Standards
 
-See `.specify/memory/constitution.md` for full guidelines.
+See `.claude/rules/` for full guidelines.
 
 - Strict TypeScript, no `any`
 - Performance: <3s for 10MB logs
