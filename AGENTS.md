@@ -33,6 +33,6 @@ Always use pnpm
 
 ## Important notes
 
-- See `.specify/memory/constitution.md` for Core principles, development standards, Release process
+- See `.claude/rules/` for core principles, development standards, release process
 - Conventional commit messages
 - Don't auto commit
