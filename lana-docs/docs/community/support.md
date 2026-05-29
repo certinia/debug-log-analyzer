@@ -25,4 +25,7 @@ If you see an idea you like then join the conversation to get your ideas into th
 
 ## 💬 Discussion
 
-For discussion about best practices or if you have any questions or need help, please start a [discussion on github](https://github.com/certinia/debug-log-analyzer/discussions)
+- **[All Discussions](https://github.com/certinia/debug-log-analyzer/discussions)** – Browse or start a discussion if nothing below fits.
+- **[Q&A](https://github.com/certinia/debug-log-analyzer/discussions/categories/q-a)** – Ask usage questions or get help troubleshooting.
+- **[Ideas](https://github.com/certinia/debug-log-analyzer/discussions/categories/ideas)** – Suggest or validate a feature before opening a feature request issue.
+- **[Announcements](https://github.com/certinia/debug-log-analyzer/discussions/categories/announcement)** – Stay up to date with releases and project news.
