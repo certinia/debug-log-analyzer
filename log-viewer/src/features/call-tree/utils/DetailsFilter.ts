@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-export type DeepFilterable<T> = { id: number | string; _children?: T[] | null };
+export type DeepFilterable<T> = { id: number; _children?: T[] | null };
 
 /**
  * Event types that count as "significant" for the Show Details filter even
@@ -26,7 +26,7 @@ export const EXCLUDED_DETAIL_TYPES: ReadonlySet<string> = new Set<string>([
 export function deepFilter<T extends DeepFilterable<T>>(
   rowData: T,
   predicate: (row: T) => boolean,
-  filterCache: Map<number | string, boolean>,
+  filterCache: Map<number, boolean>,
 ): boolean {
   const cached = filterCache.get(rowData.id);
   if (cached !== undefined) {

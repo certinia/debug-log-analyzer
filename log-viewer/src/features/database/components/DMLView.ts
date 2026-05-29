@@ -314,12 +314,10 @@ export class DMLView extends LitElement {
           rowCount: dml.dmlRowCount.self,
           timeTaken: dml.duration.total,
           eventIndex: dml.eventIndex,
-          timestamp: dml.timestamp,
           _children: [
             {
               id: ++nextRowId,
               eventIndex: dml.eventIndex,
-              timestamp: dml.timestamp,
               isDetail: true,
             },
           ],
@@ -594,7 +592,6 @@ interface DMLRow {
   rowCount?: number;
   timeTaken?: number;
   eventIndex?: number;
-  timestamp: number;
   isDetail?: boolean;
   _children?: DMLRow[];
 }

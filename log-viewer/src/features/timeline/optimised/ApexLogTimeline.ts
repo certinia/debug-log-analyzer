@@ -243,7 +243,7 @@ export class ApexLogTimeline {
     }
 
     const result = findEventByEventIndex(this.apexLog, eventIndex);
-    this._navigateToSearchResult(result, 'eventIndex');
+    this._navigateToSearchResult(result);
   }
 
   /**
@@ -258,22 +258,16 @@ export class ApexLogTimeline {
     }
     // Find event by timestamp (binary search - events sorted by time)
     const result = findEventByTimestamp(this.events, timestamp);
-    this._navigateToSearchResult(result, 'timestamp');
+    this._navigateToSearchResult(result);
   }
 
-  private _navigateToSearchResult(
-    result: { event: LogEvent; depth: number } | null,
-    idMode: 'eventIndex' | 'timestamp',
-  ): void {
+  private _navigateToSearchResult(result: { event: LogEvent; depth: number } | null): void {
     if (!result) {
       return;
     }
 
     const eventNode: EventNode = {
-      id:
-        idMode === 'eventIndex'
-          ? `${result.event.eventIndex}-${result.depth}`
-          : `${result.event.timestamp}-${result.depth}`,
+      id: `${result.event.eventIndex}-${result.depth}`,
       timestamp: result.event.timestamp,
       duration: result.event.duration.total,
       type: result.event.type ?? result.event.category ?? 'UNKNOWN',

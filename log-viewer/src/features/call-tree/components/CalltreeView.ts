@@ -82,8 +82,8 @@ export class CalltreeView extends LitElement {
     selectedTypes: new Set<string>(),
   };
   bottomUpGroupBy = 'None';
-  debugOnlyFilterCache = new Map<number | string, boolean>();
-  typeFilterCache = new Map<number | string, boolean>();
+  debugOnlyFilterCache = new Map<number, boolean>();
+  typeFilterCache = new Map<number, boolean>();
 
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
@@ -673,7 +673,7 @@ export class CalltreeView extends LitElement {
     selectedNamespaces: string[],
     _namespace: string,
     data: TimeOrderRow | AggregatedRow | BottomUpRow,
-    filterParams: { filterCache: Map<number | string, boolean> },
+    filterParams: { filterCache: Map<number, boolean> },
   ): boolean => {
     if (selectedNamespaces.length === 0) {
       return true;

@@ -322,12 +322,10 @@ export class SOQLView extends LitElement {
           timeTaken: soql.duration.total,
           aggregations: soql.aggregations,
           eventIndex: soql.eventIndex,
-          timestamp: soql.timestamp,
           _children: [
             {
               id: ++nextRowId,
               eventIndex: soql.eventIndex,
-              timestamp: soql.timestamp,
               isDetail: true,
             },
           ],
@@ -685,7 +683,6 @@ interface GridSOQLData {
   timeTaken?: number | null;
   aggregations?: number;
   eventIndex?: number;
-  timestamp: number;
   isDetail?: boolean;
   _children?: GridSOQLData[];
 }
