@@ -15,7 +15,7 @@ NOTE:
 
 - This is a community project. We will triage your bug as soon as we can.
 - Before raising a new bug, please check our [issue list](https://github.com/certinia/debug-log-analyzer/issues) to see if it has already been reported.
-- For general help, use [discussions](https://github.com/certinia/debug-log-analyzer/discussions) or [Salesforce Stack Exchange](https://salesforce.stackexchange.com/search?q=apex+log+analyzer).
+- For general help or if you are not sure this is a bug, use [Q&A discussions](https://github.com/certinia/debug-log-analyzer/discussions/categories/q-a) or [all discussions](https://github.com/certinia/debug-log-analyzer/discussions).
 
 ### 💡 Description
 
