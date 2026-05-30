@@ -259,6 +259,12 @@ interface RowStub {
 
 interface RendererForSetAnchor {
   setAnchor: (row: RowStub, offset: number) => void;
+  scrollToRowPosition: (
+    row: RowStub,
+    position: string | undefined,
+    ifVisible: boolean | undefined,
+  ) => Promise<void>;
+  scrollToRowNearestTop: (row: RowStub) => boolean;
   _cumHeight: (i: number) => number;
   _totalHeight: () => number;
   _setHeight: (i: number, h: number) => void;
@@ -402,15 +408,18 @@ describe('VirtualVerticalRenderer.setAnchor', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────
-// rerenderRows: scrollTop preservation
+// rerenderRows: scroll preservation
 //
-// Iteration 3 matches stock VirtualDomVertical's "scroll just stays" default
-// (tabulator_esm.mjs:25247). The renderer does NOT write scrollTop during
-// rerenderRows. Sort/filter/expand/collapse all preserve scrollTop by
-// letting the browser keep it. Opt-in middle-row anchoring is provided by
-// the ScrollAnchor module via setAnchor() — tested separately above.
+// rerenderRows mirrors stock VirtualDomVertical.rerenderRows
+// (tabulator_esm.mjs:25247): capture the row whose offsetTop is closest to
+// scrollTop BEFORE detach, then after re-render call setAnchor(row, offset)
+// to restore that row to the same Y inside the holder.
 //
-// This test asserts the contract: scrollTop is unchanged after rerenderRows.
+// The tests below cover the FALLBACK path: when renderedRange is empty
+// (initial state {top:0, bottom:-1}) and/or row stubs have parentNode=null,
+// no anchor is captured and the renderer falls back to a plain
+// _renderWindow() with scrollTop unchanged. The "anchor capture" block
+// below covers the active path with setAnchor spied.
 // ─────────────────────────────────────────────────────────────────────────
 
 interface RerenderRenderer extends RendererForSetAnchor {
@@ -562,6 +571,165 @@ describe('VirtualVerticalRenderer.rerenderRows scroll preservation', () => {
     r.rerenderRows();
 
     expect(tableEmpty).not.toHaveBeenCalled();
+  });
+});
+
+describe('VirtualVerticalRenderer.rerenderRows anchor capture', () => {
+  // These tests drive the active anchor-capture path: rows are attached
+  // (parentNode non-null) AND renderedRange spans the rendered window, so
+  // the pre-detach capture loop picks a row, and setAnchor is invoked to
+  // replay it after re-render.
+
+  interface AnchorableRenderer extends RerenderRenderer {
+    renderedRange: { top: number; bottom: number };
+    setAnchor: (row: RowStub, offset: number) => void;
+  }
+
+  it('captures the row closest to scrollTop and replays via setAnchor', () => {
+    // 10 rows × 40px. scrollTop=170 sits between row 4 (offsetTop 160) and
+    // row 5 (offsetTop 200). row 4 is closer (|−10| < |30|) — it should win.
+    const oldRows: RowStub[] = Array.from({ length: 10 }, (_, i) => makeRowStub(i * 40, true));
+    const { r, setDisplayRows } = makeRerenderRenderer(oldRows);
+    for (let i = 0; i < 10; i++) {
+      r._setHeight(i, 40);
+    }
+    r._flushEstimateUpdate();
+    r.elementVertical.scrollTop = 170;
+    r.elementVertical.scrollHeight = r._totalHeight();
+    stubRenderWindow(r);
+
+    const ar = r as unknown as AnchorableRenderer;
+    ar.renderedRange = { top: 0, bottom: 9 };
+
+    // Spy on setAnchor to verify capture targets + offset without depending
+    // on stub layout simulation.
+    const setAnchorSpy = jest.fn();
+    ar.setAnchor = setAnchorSpy;
+
+    setDisplayRows([...oldRows].reverse());
+    r.rerenderRows();
+
+    expect(setAnchorSpy).toHaveBeenCalledTimes(1);
+    const [anchorRow, anchorOffset] = setAnchorSpy.mock.calls[0]!;
+    expect(anchorRow).toBe(oldRows[4]);
+    expect(anchorOffset).toBe(-10); // 160 (offsetTop) − 170 (scrollTop)
+  });
+
+  it('falls back to _renderWindow when the captured anchor row is filtered out', () => {
+    const oldRows: RowStub[] = Array.from({ length: 10 }, (_, i) => makeRowStub(i * 40, true));
+    const { r, setDisplayRows } = makeRerenderRenderer(oldRows);
+    for (let i = 0; i < 10; i++) {
+      r._setHeight(i, 40);
+    }
+    r._flushEstimateUpdate();
+    r.elementVertical.scrollTop = 170;
+    r.elementVertical.scrollHeight = r._totalHeight();
+    stubRenderWindow(r);
+
+    const ar = r as unknown as AnchorableRenderer;
+    ar.renderedRange = { top: 0, bottom: 9 };
+
+    const setAnchorSpy = jest.fn();
+    ar.setAnchor = setAnchorSpy;
+
+    // Remove row 4 — the row anchor capture would pick.
+    setDisplayRows([...oldRows.slice(0, 4), ...oldRows.slice(5)]);
+    r.rerenderRows();
+
+    // Anchor captured but row removed → setAnchor not invoked, scrollTop
+    // preserved literally (browser-clamped if necessary).
+    expect(setAnchorSpy).not.toHaveBeenCalled();
+    expect(r.elementVertical.scrollTop).toBe(170);
+  });
+
+  it('skips capture and falls back when renderedRange is empty', () => {
+    // renderedRange defaults to {top:0, bottom:-1} (no rendered rows).
+    // Capture loop walks 0..−1 (no iterations) → no anchor → fallback.
+    const oldRows: RowStub[] = Array.from({ length: 5 }, (_, i) => makeRowStub(i * 40, true));
+    const { r } = makeRerenderRenderer(oldRows);
+    for (let i = 0; i < 5; i++) {
+      r._setHeight(i, 40);
+    }
+    r._flushEstimateUpdate();
+    r.elementVertical.scrollTop = 80;
+    r.elementVertical.scrollHeight = r._totalHeight();
+    stubRenderWindow(r);
+
+    const setAnchorSpy = jest.fn();
+    (r as unknown as AnchorableRenderer).setAnchor = setAnchorSpy;
+
+    r.rerenderRows();
+
+    expect(setAnchorSpy).not.toHaveBeenCalled();
+    expect(r.elementVertical.scrollTop).toBe(80);
+  });
+});
+
+describe('VirtualVerticalRenderer.scrollToRowPosition', () => {
+  // 5 rows at 50px each, clientHeight = 100.
+  // cumHeight: row0=0, row1=50, row2=100, row3=150, row4=200. Total = 250.
+  function makePositionRenderer(scrollTop = 0) {
+    const rows = [
+      makeRowStub(0),
+      makeRowStub(50),
+      makeRowStub(100),
+      makeRowStub(150),
+      makeRowStub(200),
+    ];
+    const r = makeRendererWithRows(rows);
+    for (let i = 0; i < rows.length; i++) r._setHeight(i, 50);
+    r._flushEstimateUpdate();
+    r.elementVertical.scrollTop = scrollTop;
+    r.elementVertical.scrollHeight = r._totalHeight();
+    stubRenderWindow(r);
+    return { r, rows };
+  }
+
+  it("'top': places the row at the top of the viewport", () => {
+    const { r, rows } = makePositionRenderer();
+    return r.scrollToRowPosition(rows[2]!, 'top', true).then(() => {
+      expect(r.elementVertical.scrollTop).toBe(100);
+    });
+  });
+
+  it("'center': places the row centered in the viewport", () => {
+    // offsetFromHolderTop = (100 - 50) / 2 = 25. scrollTop = 100 - 25 = 75.
+    const { r, rows } = makePositionRenderer();
+    return r.scrollToRowPosition(rows[2]!, 'center', true).then(() => {
+      expect(r.elementVertical.scrollTop).toBe(75);
+    });
+  });
+
+  it("'bottom': places the row flush with the viewport bottom", () => {
+    // offsetFromHolderTop = 100 - 50 = 50. scrollTop = 100 - 50 = 50.
+    const { r, rows } = makePositionRenderer();
+    return r.scrollToRowPosition(rows[2]!, 'bottom', true).then(() => {
+      expect(r.elementVertical.scrollTop).toBe(50);
+    });
+  });
+
+  it('ifVisible=false: skips scroll when row is already fully in view', () => {
+    // Row2 is at [100, 150]. Viewport [100, 200] → fully visible.
+    const { r, rows } = makePositionRenderer(100);
+    return r.scrollToRowPosition(rows[2]!, 'top', false).then(() => {
+      expect(r.elementVertical.scrollTop).toBe(100);
+    });
+  });
+
+  it('ifVisible=false: scrolls when row is outside the viewport', () => {
+    // Row2 is at [100, 150]. Viewport [0, 100] → not visible.
+    const { r, rows } = makePositionRenderer(0);
+    return r.scrollToRowPosition(rows[2]!, 'top', false).then(() => {
+      expect(r.elementVertical.scrollTop).toBe(100);
+    });
+  });
+
+  it('rejects when the row is not in displayRows', () => {
+    const { r } = makePositionRenderer();
+    const stranger = makeRowStub(999);
+    return expect(r.scrollToRowPosition(stranger, 'top', true)).rejects.toBe(
+      'Scroll Error - Row not visible',
+    );
   });
 });
 

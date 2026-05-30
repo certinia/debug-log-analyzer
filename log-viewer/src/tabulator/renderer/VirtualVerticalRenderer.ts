@@ -87,14 +87,6 @@ const DEFAULT_DEBUG = true;
 const OVERSCAN_MIN = 4;
 const OVERSCAN_MAX = 16;
 
-// Velocity threshold (px/ms) above which scrollRows renders visible rows only
-// (zero overscan). 2 px/ms ≈ one viewport-height per second — well above wheel
-// (~0.3 px/ms) and trackpad rates; only sustained scrollbar drag trips it.
-const FAST_SCROLL_THRESHOLD_PX_PER_MS = 2;
-// Idle period after the last scrollRows event before we fire a "settle" render
-// that fills the full overscan buffer. Long enough that fast drags don't
-// settle mid-drag; short enough that release feels instant.
-const SETTLE_DEBOUNCE_MS = 120;
 // Minimum holder-width delta (px) that counts as a real resize and invalidates
 // measured row heights. Ignores subpixel layout jitter on retina displays.
 const RESIZE_WIDTH_THRESHOLD_PX = 1;
@@ -102,7 +94,6 @@ const RESIZE_WIDTH_THRESHOLD_PX = 1;
 // `_invalidateMeasuredHeights` walk. During a resize-handle drag the
 // ResizeObserver fires per-pixel (~60 Hz); without debouncing the deinit
 // walk runs once per frame, far more expensive than the actual render.
-// Matches SETTLE_DEBOUNCE_MS for visual consistency on user release.
 const RESIZE_INVALIDATE_DEBOUNCE_MS = 120;
 
 interface DiffStats {
@@ -253,6 +244,12 @@ export class VirtualVerticalRenderer extends Renderer {
   // Width-change detection for resize-driven height invalidation. Text wrap
   // shifts when the holder width changes → all measured heights are stale.
   private lastClientWidth = 0;
+  // Track clientHeight too so resize() can no-op when neither dimension
+  // changed. Tabulator calls renderer.resize() from adjustTableSize on every
+  // restoreRedraw cascade (e.g. after a plain row click); without this guard
+  // we'd schedule a RAF _renderWindow that runs ONE FRAME later — visibly
+  // shifting the rendered window after the click has already painted.
+  private lastClientHeight = 0;
   private resizeObserver: ResizeObserver | null = null;
   // Debounce state for `_invalidateMeasuredHeights`. The deinit walk is O(n)
   // across every display row; firing it per-pixel of a resize-handle drag
@@ -262,13 +259,15 @@ export class VirtualVerticalRenderer extends Renderer {
   private resizeInvalidateTimer: ReturnType<typeof setTimeout> | null = null;
   private resizePendingInvalidate = false;
 
-  // Scroll-velocity tracking (EMA over scrollRows samples) and trailing settle
-  // timer. During sustained drag we render visible rows only; on release the
-  // settle timer fires one render that fills the full overscan buffer.
-  private lastScrollTop = 0;
-  private lastScrollTime = 0;
-  private currentVelocityPxPerMs = 0;
-  private settleTimer: ReturnType<typeof setTimeout> | null = null;
+  // Last scrollTop value we wrote programmatically (setAnchor / scrollToRow /
+  // pre-render clamp / clearRows zero-out). When the browser's resulting
+  // `scroll` event routes back into scrollRows() and `holder.scrollTop`
+  // matches this value, the event is ours — suppress the settle timer + RAF
+  // re-render that would otherwise fire 120 ms later with a freshly-flushed
+  // estimateHeight and visibly shift the rendered window. Set to NaN when
+  // there is no pending programmatic write (NaN !== anything, including
+  // itself — safer than `null` because it can never equal a real scrollTop).
+  private pendingProgrammaticScrollTop = NaN;
 
   // ---------------------------------------------------------------------------
   // Renderer lifecycle (called by RowManager)
@@ -293,6 +292,7 @@ export class VirtualVerticalRenderer extends Renderer {
     // prev value and only invalidates on actual width changes.
     const holder = self.elementVertical;
     this.lastClientWidth = holder.clientWidth;
+    this.lastClientHeight = holder.clientHeight;
 
     // ResizeObserver catches every holder resize, including ones tabulator's
     // outer redraw misses (sidebar toggle, flex parent resize without window
@@ -308,10 +308,6 @@ export class VirtualVerticalRenderer extends Renderer {
   destroy(): void {
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
-    if (this.settleTimer !== null) {
-      clearTimeout(this.settleTimer);
-      this.settleTimer = null;
-    }
     if (this.resizeInvalidateTimer !== null) {
       clearTimeout(this.resizeInvalidateTimer);
       this.resizeInvalidateTimer = null;
@@ -336,6 +332,7 @@ export class VirtualVerticalRenderer extends Renderer {
     this.vDomBottom = -1;
     this.renderedRange = { top: 0, bottom: -1 };
     this.rowsCountCached = 0;
+    this.pendingProgrammaticScrollTop = 0;
     this._self().elementVertical.scrollTop = 0;
     // Keep estimateHeight — useful seed for the next dataset.
   }
@@ -347,6 +344,7 @@ export class VirtualVerticalRenderer extends Renderer {
     // pipeline-driven re-render that routes through renderRows() instead
     // of rerenderRows() (renderMode-dependent in Tabulator core).
     if (this.rowsCountCached === 0) {
+      this.pendingProgrammaticScrollTop = 0;
       this._self().elementVertical.scrollTop = 0;
     }
     this._renderWindow();
@@ -354,20 +352,51 @@ export class VirtualVerticalRenderer extends Renderer {
 
   rerenderRows(callback?: () => void): void {
     // Mirror stock VirtualDomVertical.rerenderRows (tabulator_esm.mjs:25247).
-    // The renderer does NOT write scrollTop here and does NOT pre-reset
-    // paddings to 0. Both were iteration-1/2 mistakes: the padding reset
-    // collapses scrollHeight to ~clientHeight, after which any scrollTop
-    // write the browser sees is clamped to ~0. Letting the browser
-    // preserve scrollTop naturally — and letting _renderWindow's own
-    // overflow clamp (line ~779) handle the case where scrollTop exceeds
-    // the new maxScroll after a filter — matches stock's "scroll stays"
-    // default precisely.
     //
-    // Opt-in middle-row anchoring is provided by the ScrollAnchor module
-    // via the setAnchor() seam, which runs in renderComplete (after
-    // _renderWindow has set proper paddings, so its scrollTop write isn't
-    // clamped).
+    // Step 1 — Capture an anchor row BEFORE detach. Stock walks
+    // vDomTop..vDomBottom and picks the row whose offsetTop is closest to
+    // scrollTop, then replays with `_virtualRenderFill(topRow, true,
+    // topOffset)`. Our variable-height equivalent: walk renderedRange and
+    // pick the same row, then call `setAnchor(row, offsetFromHolderTop)`
+    // after re-rendering. Without this, scrollTop is preserved literally
+    // but row indices shift after sort/filter/tree-toggle → the user sees
+    // different content at the same Y (visible jump).
     const self = this._self();
+    const elementVertical = self.elementVertical;
+    const scrollTop = elementVertical.scrollTop;
+    const left = self.table.rowManager.element.scrollLeft;
+    const rowsBefore = self.table.rowManager.getDisplayRows();
+
+    let anchorRow: RowInternals | null = null;
+    let anchorOffsetFromHolderTop = 0;
+    let bestAbsDiff = Infinity;
+    for (let i = this.renderedRange.top; i <= this.renderedRange.bottom; i++) {
+      const row = rowsBefore[i];
+      if (!row) {
+        continue;
+      }
+      const el = row.getElement?.();
+      if (!el?.parentNode) {
+        continue;
+      }
+      // `offsetTop - scrollTop` is the row's Y inside the holder, which
+      // matches `setAnchor`'s `offsetFromHolderTop` parameter directly.
+      // Stock computes `scrollTop - offsetTop` (the negation) and replays
+      // via `_virtualRenderFill` — same captured information, opposite
+      // sign convention.
+      const diff = el.offsetTop - scrollTop;
+      const abs = Math.abs(diff);
+      if (abs < bestAbsDiff) {
+        bestAbsDiff = abs;
+        anchorRow = row;
+        anchorOffsetFromHolderTop = diff;
+      } else {
+        // Monotone walk: rows are in DOM order so |diff| can only
+        // increase past the closest match. Stock relies on the same break.
+        break;
+      }
+    }
+
     this._detachAllRendered();
     if (callback) {
       callback();
@@ -379,55 +408,61 @@ export class VirtualVerticalRenderer extends Renderer {
     // heightInitialized=false so _attachRanges' Phase B–D actually re-measures
     // them. Without this the fast path takes over and the empty Fenwick is
     // never repopulated with real heights.
-    const rows = self.table.rowManager.getDisplayRows();
-    for (const row of rows) {
+    const rowsAfter = self.table.rowManager.getDisplayRows();
+    for (const row of rowsAfter) {
       row.deinitializeHeight?.();
     }
-    this._renderWindow();
-    // Mirror stock VirtualDomVertical.rerenderRows tail
-    // (tabulator_esm.mjs:25247): notify RowManager when the new display is
-    // empty so the `.tabulator-placeholder` element shows. RowManager
-    // handles the initial-load empty case via earlier paths; this catches
-    // filter / sort / collapse-to-empty.
-    if (rows.length === 0) {
+
+    if (rowsAfter.length === 0) {
+      // Empty display: render once to clear paddings + DOM, then mirror
+      // stock's `tableEmpty()` so the `.tabulator-placeholder` element
+      // shows (tabulator_esm.mjs:25281).
+      this._renderWindow();
       self.table.rowManager.tableEmpty?.();
+    } else if (anchorRow && rowsAfter.indexOf(anchorRow) !== -1) {
+      // Replay the anchor — variable-height equivalent of stock's
+      // `_virtualRenderFill(topRow, true, topOffset)`. setAnchor's Pass 1
+      // places via Fenwick cumHeight (consistent ruler), Pass 2 snaps via
+      // DOM-truth offsetTop now that the anchor has measured heights.
+      this.setAnchor(anchorRow, anchorOffsetFromHolderTop);
+    } else {
+      // Anchor row was filtered or collapsed out (or no anchor was
+      // captured — e.g. first render). Fall back to a plain render
+      // anchored at the browser-preserved scrollTop. Future improvement:
+      // walk tree ancestors to find a surviving anchor.
+      this._renderWindow();
     }
+
+    // Mirror stock VirtualDomVertical.rerenderRows tail (tabulator_esm.mjs:25285):
+    // sync horizontal scroll after vertical re-render.
+    self.table.rowManager.scrollHorizontal(left);
   }
 
   scrollRows(_top: number, _dir: boolean): void {
-    // Track velocity (EMA) so _resolveOverscanRows can drop overscan to 0
-    // during sustained drag. Without this, fast-drag frames attach 30-40 rows
-    // each → ~150ms per frame from formatter cost → visible stutter.
-    const now = performance.now();
     const holder = this._self().elementVertical;
     const top = holder.scrollTop;
-    const dt = now - this.lastScrollTime;
-    if (dt > 0 && this.lastScrollTime !== 0) {
-      const sample = Math.abs(top - this.lastScrollTop) / dt;
-      // 0.7/0.3 EMA — single-sample velocity is too jittery on macOS
-      // momentum scroll. Tuned for fast scrollbar drag to converge to peak
-      // velocity within ~3 events (well under one paint).
-      this.currentVelocityPxPerMs = this.currentVelocityPxPerMs * 0.7 + sample * 0.3;
-    }
-    this.lastScrollTop = top;
-    this.lastScrollTime = now;
 
-    // Schedule a trailing settle render. On release, after SETTLE_DEBOUNCE_MS
-    // of quiet, render once with velocity=0 to fill the full overscan buffer.
-    if (this.settleTimer !== null) {
-      clearTimeout(this.settleTimer);
+    // Suppress scroll events triggered by our own programmatic scrollTop
+    // writes (setAnchor / scrollToRow / pre-render clamp / clearRows /
+    // renderRows zero-out). Each of those callers already re-rendered
+    // synchronously; the echoed scroll event would just schedule a
+    // redundant render that could fire AFTER estimateHeight has shifted
+    // and visibly move the rendered window. One-shot — clear after
+    // consuming. Exact value match is safe: even on a coincidental user
+    // scroll to the same value, the suppressed render would have
+    // produced an identical window.
+    if (top === this.pendingProgrammaticScrollTop) {
+      this.pendingProgrammaticScrollTop = NaN;
+      return;
     }
-    this.settleTimer = setTimeout(() => {
-      this.settleTimer = null;
-      this.currentVelocityPxPerMs = 0;
-      this._renderWindow();
-    }, SETTLE_DEBOUNCE_MS);
+    this.pendingProgrammaticScrollTop = NaN;
 
     // RAF-coalesce: browser scroll events during a drag fire faster than the
     // paint rate. Doing a full _renderWindow per event is wasted work — only
     // the latest event's scrollTop matters by the next paint. Cap to one
-    // render per RAF tick. The browser keeps the scrollbar thumb itself
-    // responsive at native rate; our content catches up at 60 Hz.
+    // render per RAF tick. Stock VirtualDomVertical doesn't need RAF
+    // coalescing because its per-event op is one incremental add/remove;
+    // ours is a from-scratch window render.
     if (this.rafScheduled) {
       return;
     }
@@ -473,7 +508,24 @@ export class VirtualVerticalRenderer extends Renderer {
         }
       }, RESIZE_INVALIDATE_DEBOUNCE_MS);
     }
+    const ch = this._self().elementVertical.clientHeight;
+    // Same subpixel threshold for both dimensions — retina layout jitter
+    // can wiggle clientHeight by 0.5px without anything meaningful changing.
+    const widthChanged = Math.abs(cw - this.lastClientWidth) > RESIZE_WIDTH_THRESHOLD_PX;
+    const heightChanged = Math.abs(ch - this.lastClientHeight) > RESIZE_WIDTH_THRESHOLD_PX;
     this.lastClientWidth = cw;
+    this.lastClientHeight = ch;
+
+    // No-op guard: Tabulator calls renderer.resize() from adjustTableSize on
+    // every restoreRedraw cascade (including plain row clicks). If neither
+    // dimension actually changed AND no width-driven invalidate is pending,
+    // there is nothing for the renderer to do — the previously-painted
+    // window is still correct. Without this guard the RAF below schedules
+    // a from-scratch _renderWindow that fires one paint later, visibly
+    // shifting the rendered window after the click has already painted.
+    if (!widthChanged && !heightChanged && !this.resizePendingInvalidate) {
+      return;
+    }
 
     // Window/container resize: the viewport may have grown past the
     // previously-rendered region. Our overscan (4–16 rows) is intentionally
@@ -536,6 +588,7 @@ export class VirtualVerticalRenderer extends Renderer {
     }
     this._resyncToRowsCount(false);
     const target = this._cumHeight(idx);
+    this.pendingProgrammaticScrollTop = target;
     this._self().elementVertical.scrollTop = target;
     // Render synchronously — programmatic scrolls need to land before the
     // next user input. (Bypass the RAF coalescing in scrollRows.)
@@ -573,7 +626,9 @@ export class VirtualVerticalRenderer extends Renderer {
     try {
       const target = this._cumHeight(idx) - offsetFromHolderTop;
       const maxScroll = Math.max(0, this._totalHeight() - clientHeight);
-      elementVertical.scrollTop = Math.max(0, Math.min(target, maxScroll));
+      const pass1 = Math.max(0, Math.min(target, maxScroll));
+      this.pendingProgrammaticScrollTop = pass1;
+      elementVertical.scrollTop = pass1;
     } finally {
       this._lockedEstimate = null;
     }
@@ -586,6 +641,7 @@ export class VirtualVerticalRenderer extends Renderer {
       const maxScrollPost = Math.max(0, elementVertical.scrollHeight - clientHeight);
       const corrected = Math.max(0, Math.min(desired, maxScrollPost));
       if (Math.abs(corrected - elementVertical.scrollTop) > 0.5) {
+        this.pendingProgrammaticScrollTop = corrected;
         elementVertical.scrollTop = corrected;
         this._renderWindow();
       }
@@ -598,6 +654,52 @@ export class VirtualVerticalRenderer extends Renderer {
       return true;
     }
     return Math.abs(this.vDomTop - idx) <= Math.abs(this.vDomBottom - idx);
+  }
+
+  scrollToRowPosition(
+    row: RowInternals,
+    position: string | undefined,
+    ifVisible: boolean | undefined,
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const idx = this._indexOfRow(row);
+      if (idx < 0) {
+        reject('Scroll Error - Row not visible');
+        return;
+      }
+
+      const ev = this._self().elementVertical;
+      const opts = this._self().table.options;
+
+      const useIfVisible = ifVisible ?? (opts['scrollToRowIfVisible'] as boolean | undefined);
+      if (useIfVisible === false) {
+        const rowTop = this._cumHeight(idx);
+        const rowBottom = this._cumHeight(idx + 1);
+        if (rowTop >= ev.scrollTop && rowBottom <= ev.scrollTop + ev.clientHeight) {
+          resolve();
+          return;
+        }
+      }
+
+      const rawPosition = position ?? (opts['scrollToRowPosition'] as string | undefined) ?? 'top';
+      const resolvedPosition =
+        rawPosition === 'nearest'
+          ? this.scrollToRowNearestTop(row)
+            ? 'top'
+            : 'bottom'
+          : rawPosition;
+
+      const rowHeight = this._heightOf(idx);
+      const offsetFromHolderTop =
+        resolvedPosition === 'middle' || resolvedPosition === 'center'
+          ? Math.max(0, (ev.clientHeight - rowHeight) / 2)
+          : resolvedPosition === 'bottom'
+            ? Math.max(0, ev.clientHeight - rowHeight)
+            : 0;
+
+      this.setAnchor(row, offsetFromHolderTop);
+      resolve();
+    });
   }
 
   visibleRows(includingBuffer?: boolean): RowInternals[] {
@@ -632,6 +734,17 @@ export class VirtualVerticalRenderer extends Renderer {
   private _renderWindow(): void {
     const debug = this._debugEnabled();
     const tStart = debug ? performance.now() : 0;
+    if (debug) {
+      // eslint-disable-next-line no-console
+      console.log(
+        '[VHR] _renderWindow start, scrollTop:',
+        this._self().elementVertical.scrollTop,
+        'vDomTop:',
+        this.vDomTop,
+        'vDomBottom:',
+        this.vDomBottom,
+      );
+    }
     const self = this._self();
     const rows = self.table.rowManager.getDisplayRows();
 
@@ -675,6 +788,7 @@ export class VirtualVerticalRenderer extends Renderer {
     const total = this._totalHeight();
     const maxScroll = Math.max(0, total - clientHeight);
     if (scrollTop > maxScroll) {
+      this.pendingProgrammaticScrollTop = maxScroll;
       elementVertical.scrollTop = maxScroll;
       scrollTop = maxScroll;
     }
@@ -771,8 +885,62 @@ export class VirtualVerticalRenderer extends Renderer {
     this.vDomBottom = newBottom;
     this.renderedRange = { top: newTop, bottom: newBottom };
 
+    // Estimate-drift compensation. _flushEstimateUpdate is about to shift
+    // `estimateHeight` based on rows measured during this render. For any
+    // next render whose newTop has unmeasured rows above it,
+    // `cumHeight(newTop) = measuredAbove + unmeasuredAbove × estimate`
+    // would shift by `Δ × unmeasuredAbove`. The browser preserves
+    // scrollTop literally, so without compensation the user sees a
+    // visible jump on the NEXT render (most painful after a large
+    // scrollbar drag — many new measurements at once).
+    //
+    // Apply the delta atomically right now: bump paddingTop AND
+    // scrollTop by the same amount so the visible content stays put.
+    // Compute the new estimate inline (instead of after
+    // _flushEstimateUpdate) because _cumHeight still respects the outer
+    // `_lockedEstimate`; we use the Fenwick prefix sums directly.
+    const oldEstimate = this.estimateHeight;
+    const newEstimate =
+      this.measuredCount > 0 ? Math.max(1, this.measuredSum / this.measuredCount) : oldEstimate;
+    if (newEstimate !== oldEstimate) {
+      const n = this.measuredHeight.length;
+      const topIdx = Math.min(newTop, n);
+      const measuredAbove = this.fenwickMeasured.prefixSum(topIdx);
+      const unmeasuredAbove = this.fenwickUnmeasuredCount.prefixSum(topIdx);
+      const newPaddingTop = measuredAbove + unmeasuredAbove * newEstimate;
+      const delta = newPaddingTop - paddingTop;
+      if (Math.abs(delta) > 0.5) {
+        self.tableElement.style.paddingTop = `${newPaddingTop}px`;
+        if (newBottom !== lastIdx) {
+          const bottomIdx = Math.min(newBottom + 1, n);
+          const totalMeasured = this.fenwickMeasured.prefixSum(n);
+          const totalUnmeasured = this.fenwickUnmeasuredCount.prefixSum(n);
+          const measuredBelow = totalMeasured - this.fenwickMeasured.prefixSum(bottomIdx);
+          const unmeasuredBelow =
+            totalUnmeasured - this.fenwickUnmeasuredCount.prefixSum(bottomIdx);
+          const newPaddingBottom = Math.max(0, measuredBelow + unmeasuredBelow * newEstimate);
+          self.tableElement.style.paddingBottom = `${newPaddingBottom}px`;
+        }
+        const adjusted = elementVertical.scrollTop + delta;
+        this.pendingProgrammaticScrollTop = adjusted;
+        elementVertical.scrollTop = adjusted;
+      }
+    }
+
     // End-of-render: now safe to update estimateHeight for next render.
     this._flushEstimateUpdate();
+
+    if (debug) {
+      // eslint-disable-next-line no-console
+      console.log(
+        '[VHR] _renderWindow end, scrollTop:',
+        self.elementVertical.scrollTop,
+        'vDomTop:',
+        newTop,
+        'vDomBottom:',
+        newBottom,
+      );
+    }
 
     if (debug) {
       const snapshot: DebugSnapshot = {
@@ -1165,22 +1333,6 @@ export class VirtualVerticalRenderer extends Renderer {
    * clamped to [OVERSCAN_MIN, OVERSCAN_MAX].
    */
   private _resolveOverscanRows(clientHeight: number): number {
-    // Fast path: during sustained scrollbar drag, size the overscan by
-    // CURRENT velocity, not a constant. Two paint frames of buffer at the
-    // current velocity covers one browser composite plus our own RAF render,
-    // so the leading edge never out-scrolls the rendered window between
-    // ticks. Clamped to [OVERSCAN_MIN, OVERSCAN_MAX] so a wild velocity
-    // spike can't blow up per-frame render cost. The trailing settle render
-    // in scrollRows() fills the full adaptive overscan on release — see
-    // SETTLE_DEBOUNCE_MS.
-    if (this.currentVelocityPxPerMs > FAST_SCROLL_THRESHOLD_PX_PER_MS) {
-      const FRAMES_OF_BUFFER = 2;
-      const FRAME_MS = 16;
-      const est = Math.max(1, this.estimateHeight);
-      const pixelsAhead = this.currentVelocityPxPerMs * FRAME_MS * FRAMES_OF_BUFFER;
-      const rowsAhead = Math.ceil(pixelsAhead / est);
-      return Math.max(OVERSCAN_MIN, Math.min(OVERSCAN_MAX, rowsAhead));
-    }
     const opts = this._self().table.options;
     const explicit = opts[OVERSCAN_OPTION];
     if (typeof explicit === 'number' && explicit >= 0 && Number.isFinite(explicit)) {
