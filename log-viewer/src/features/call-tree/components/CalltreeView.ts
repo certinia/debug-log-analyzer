@@ -782,6 +782,31 @@ export class CalltreeView extends LitElement {
     });
   }
 
+  // Resolve once Tabulator has rendered (e.g. after a treeExpand puts new rows
+  // in the DOM), with a two-frame fallback in case the expand triggers no
+  // redraw. A single rAF can race the virtual renderer and leave getTreeChildren
+  // empty mid-descent.
+  private _waitForTableRender(): Promise<void> {
+    const table = this.calltreeTable;
+    if (!table) {
+      return this._waitForNextFrame();
+    }
+
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        table.off('renderComplete', finish);
+        resolve();
+      };
+      table.on('renderComplete', finish);
+      requestAnimationFrame(() => requestAnimationFrame(finish));
+    });
+  }
+
   private _resetFindWidget() {
     document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
   }
@@ -891,24 +916,27 @@ export class CalltreeView extends LitElement {
     for (let i = 0; i < eventPath.length; i++) {
       const event = eventPath[i];
       if (!event) {
-        return null;
+        break;
       }
 
-      const rowIndex = this._indexRowsByEventIndex(currentRows);
-      matchedRow = rowIndex.get(event.eventIndex) ?? null;
-      if (!matchedRow) {
-        return null;
+      const nextRow = this._indexRowsByEventIndex(currentRows).get(event.eventIndex);
+      if (!nextRow) {
+        // Ancestor not present (e.g. hidden by an active filter). Fall back to
+        // the deepest row we did resolve so navigation lands on the nearest
+        // visible ancestor instead of silently doing nothing.
+        break;
       }
 
+      matchedRow = nextRow;
       if (i === eventPath.length - 1) {
-        return matchedRow;
+        break;
       }
 
       let children = matchedRow.getTreeChildren() ?? [];
       const rowData = matchedRow.getData() as TimeOrderRow;
       if (!children.length && rowData._children?.length && !matchedRow.isTreeExpanded()) {
         matchedRow.treeExpand();
-        await this._waitForNextFrame();
+        await this._waitForTableRender();
         children = matchedRow.getTreeChildren() ?? [];
       }
 
