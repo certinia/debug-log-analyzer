@@ -7,6 +7,12 @@
  * Provides stateful mocks for testing VS Code extension functionality.
  */
 
+// Type-only import (erased at runtime, so it does not clash with the jest
+// `vscode` module mapping). Typing factories against the real interfaces means
+// a drift from `@types/vscode` surfaces as ONE error at the factory, not at
+// every call site.
+import type { EndOfLine, TextDocument } from 'vscode';
+
 // Track subscriptions for cleanup
 const subscriptions: { dispose: jest.Mock }[] = [];
 
@@ -153,33 +159,14 @@ const createMockTextLine = (lineNumber: number, text: string): MockTextLine => (
   isEmptyOrWhitespace: text.trim().length === 0,
 });
 
-// Mock TextDocument
-export interface MockTextDocument {
-  uri: ReturnType<typeof Uri.file>;
-  fileName: string;
-  languageId: string;
-  version: number;
-  isDirty: boolean;
-  isUntitled: boolean;
-  isClosed: boolean;
-  eol: number;
-  lineCount: number;
-  getText: jest.Mock;
-  lineAt: jest.Mock;
-  positionAt: jest.Mock;
-  offsetAt: jest.Mock;
-  getWordRangeAtPosition: jest.Mock;
-  validatePosition: jest.Mock;
-  validateRange: jest.Mock;
-  save: jest.Mock;
-}
-
+// Mock TextDocument — typed against the real `vscode.TextDocument` so that any
+// future drift in `@types/vscode` is caught here rather than at call sites.
 export const createMockTextDocument = (options: {
   uri?: string;
   languageId?: string;
   content?: string;
   lines?: string[];
-}): MockTextDocument => {
+}): TextDocument => {
   const uri = options.uri || '/test/file.log';
   const lines = options.lines || options.content?.split('\n') || [];
 
@@ -191,18 +178,27 @@ export const createMockTextDocument = (options: {
     isDirty: false,
     isUntitled: false,
     isClosed: false,
-    eol: 1,
+    eol: 1 as EndOfLine,
+    encoding: 'utf8',
     lineCount: lines.length,
     getText: jest.fn(() => lines.join('\n')),
+    // The simplified mock Position/Range/TextLine classes don't implement every
+    // method of their vscode counterparts, so the methods that return them are
+    // cast to the real member type. The object literal itself stays assigned to
+    // `TextDocument`, so a missing property still errors here (drift detection).
     lineAt: jest.fn((lineOrPosition: number | Position) => {
       const lineNumber = typeof lineOrPosition === 'number' ? lineOrPosition : lineOrPosition.line;
       return createMockTextLine(lineNumber, lines[lineNumber] || '');
-    }),
-    positionAt: jest.fn((offset: number) => new Position(0, offset)),
+    }) as unknown as TextDocument['lineAt'],
+    positionAt: jest.fn(
+      (offset: number) => new Position(0, offset),
+    ) as unknown as TextDocument['positionAt'],
     offsetAt: jest.fn((position: Position) => position.line * 100 + position.character),
     getWordRangeAtPosition: jest.fn(),
-    validatePosition: jest.fn((pos: Position) => pos),
-    validateRange: jest.fn((range: Range) => range),
+    validatePosition: jest.fn(
+      (pos: Position) => pos,
+    ) as unknown as TextDocument['validatePosition'],
+    validateRange: jest.fn((range: Range) => range) as unknown as TextDocument['validateRange'],
     save: jest.fn().mockResolvedValue(true),
   };
 };
