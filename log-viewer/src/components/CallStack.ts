@@ -17,7 +17,7 @@ import { globalStyles } from '../styles/global.styles.js';
 @customElement('call-stack')
 export class CallStack extends LitElement {
   @property({ type: Number })
-  timestamp = -1;
+  eventIndex = -1;
   @property({ type: Number })
   startDepth = 1;
   @property({ type: Number })
@@ -79,11 +79,14 @@ export class CallStack extends LitElement {
   // 1. THE PERFORMANCE ENGINE: Process data BEFORE rendering
   protected willUpdate(changedProperties: PropertyValues) {
     if (
-      changedProperties.has('timestamp') ||
+      changedProperties.has('eventIndex') ||
       changedProperties.has('startDepth') ||
       changedProperties.has('endDepth')
     ) {
-      const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() ?? [];
+      const stack =
+        this.eventIndex >= 0
+          ? (DatabaseAccess.instance()?.getStackByEventIndex(this.eventIndex).reverse() ?? [])
+          : [];
 
       if (stack.length > 0) {
         // Run the heavy loop and formatting logic here, only when inputs change
@@ -126,7 +129,7 @@ export class CallStack extends LitElement {
     return html`<a
       @click=${this.onCallerClick}
       class="callstack__item code_text"
-      data-timestamp="${line.timestamp}"
+      data-event-index="${line.eventIndex}"
       >${soqlBlock}</a
     >`;
   }
@@ -143,10 +146,12 @@ export class CallStack extends LitElement {
 
     evt.stopPropagation();
     evt.preventDefault();
-    const target = evt.target as HTMLElement;
-    const dataTimestamp = target.getAttribute('data-timestamp');
-    if (dataTimestamp) {
-      goToRow(parseInt(dataTimestamp));
+    const target = (evt.target as HTMLElement).closest('.callstack__item');
+    const dataEventIndex = target?.getAttribute('data-event-index');
+    if (!dataEventIndex) {
+      return;
     }
+
+    goToRow({ eventIndex: parseInt(dataEventIndex, 10) });
   }
 }

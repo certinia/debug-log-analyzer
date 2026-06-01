@@ -93,5 +93,6 @@ export class Notification {
   summary = '';
   message: string | TemplateResult<1> = '';
   severity: NotificationSeverity = 'None';
+  eventIndex: number | null = null;
   timestamp: number | null = null;
 }

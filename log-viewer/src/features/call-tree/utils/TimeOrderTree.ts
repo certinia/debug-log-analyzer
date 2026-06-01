@@ -10,7 +10,7 @@ import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
  * One row per LogEvent for the time-order view; no merging at any level.
  */
 export interface TimeOrderRow {
-  id: string;
+  id: number;
   originalData: LogEvent;
   _children: TimeOrderRow[] | null;
   text: string;
@@ -34,9 +34,8 @@ export interface TimeOrderRow {
 
 /**
  * Builds the time-order view: one row per LogEvent at every level. Row ids
- * are a per-build monotonic counter (`tt-N`) so they are globally unique
- * within the returned tree, which lets `deepFilter` cache results across
- * cascaded Tabulator subtree filter passes without collision.
+ * use parser-assigned eventIndex values, which are globally unique within
+ * the parse and safe for deepFilter cache keys.
  */
 export function toTimeOrderTree(nodes: LogEvent[]): TimeOrderRow[] | undefined {
   const len = nodes.length;
@@ -44,10 +43,8 @@ export function toTimeOrderTree(nodes: LogEvent[]): TimeOrderRow[] | undefined {
     return undefined;
   }
 
-  let next = 0;
-
   function buildRow(event: LogEvent): TimeOrderRow {
-    const id = `tt-${++next}`;
+    const id = event.eventIndex;
     const children = event.children;
     const childCount = children.length;
     let mappedChildren: TimeOrderRow[] | null = null;

@@ -30,9 +30,9 @@ export function createAggregatedTable(
 ): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
 
-  const namespaceFilterCache = new Map<string, boolean>();
-  const totalTimeFilterCache = new Map<string, boolean>();
-  const selfTimeFilterCache = new Map<string, boolean>();
+  const namespaceFilterCache = new Map<number, boolean>();
+  const totalTimeFilterCache = new Map<number, boolean>();
+  const selfTimeFilterCache = new Map<number, boolean>();
 
   let childIndent: number | undefined;
 
@@ -41,6 +41,7 @@ export function createAggregatedTable(
 
   const table = new Tabulator(container, {
     data: toAggregatedCallTree(rootMethod.children),
+    index: 'id',
     layout: 'fitColumns',
     placeholder: 'No Call Tree Available',
     height: '100%',

@@ -101,6 +101,7 @@ export interface GovernorLimits extends Limits {
 
 export interface LogIssue {
   startTime?: number;
+  eventIndex?: number;
   summary: string;
   description: string;
   type: IssueType;

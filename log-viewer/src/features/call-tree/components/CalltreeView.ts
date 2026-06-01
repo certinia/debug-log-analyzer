@@ -16,7 +16,7 @@ import type { RowComponent, Tabulator } from 'tabulator-tables';
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { findEventByTimestamp } from '../../../core/utility/EventSearch.js';
+import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { deepFilter } from '../utils/DetailsFilter.js';
@@ -82,8 +82,8 @@ export class CalltreeView extends LitElement {
     selectedTypes: new Set<string>(),
   };
   bottomUpGroupBy = 'None';
-  debugOnlyFilterCache = new Map<string, boolean>();
-  typeFilterCache = new Map<string, boolean>();
+  debugOnlyFilterCache = new Map<number, boolean>();
+  typeFilterCache = new Map<number, boolean>();
 
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
@@ -108,8 +108,8 @@ export class CalltreeView extends LitElement {
     return (this.tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
   }
 
-  private _goToRowEvt = ((e: CustomEvent) => {
-    this._goToRow(e.detail.timestamp);
+  private _goToRowEvt = ((e: CustomEvent<{ eventIndex: number }>) => {
+    this._goToRow(e.detail.eventIndex);
   }) as EventListener;
 
   constructor() {
@@ -568,7 +568,7 @@ export class CalltreeView extends LitElement {
     });
   }
 
-  async _goToRow(timestamp: number) {
+  async _goToRow(eventIndex: number) {
     if (!this.rootMethod) {
       return;
     }
@@ -588,9 +588,13 @@ export class CalltreeView extends LitElement {
       return;
     }
 
-    const treeRow = this._findByTime(this.calltreeTable.getRows(), timestamp);
+    const treeRow = await this._findByEventIndex(this.calltreeTable.getRows(), eventIndex);
+
+    if (!treeRow) {
+      return;
+    }
     //@ts-expect-error This is a custom function added in by RowNavigation custom module
-    this.calltreeTable.goToRow(treeRow, { scrollIfVisible: true, focusRow: true });
+    await this.calltreeTable.goToRow(treeRow, { scrollIfVisible: true, focusRow: true });
   }
 
   async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
@@ -669,7 +673,7 @@ export class CalltreeView extends LitElement {
     selectedNamespaces: string[],
     _namespace: string,
     data: TimeOrderRow | AggregatedRow | BottomUpRow,
-    filterParams: { filterCache: Map<string, boolean> },
+    filterParams: { filterCache: Map<number, boolean> },
   ): boolean => {
     if (selectedNamespaces.length === 0) {
       return true;
@@ -778,6 +782,31 @@ export class CalltreeView extends LitElement {
     });
   }
 
+  // Resolve once Tabulator has rendered (e.g. after a treeExpand puts new rows
+  // in the DOM), with a two-frame fallback in case the expand triggers no
+  // redraw. A single rAF can race the virtual renderer and leave getTreeChildren
+  // empty mid-descent.
+  private _waitForTableRender(): Promise<void> {
+    const table = this.calltreeTable;
+    if (!table) {
+      return this._waitForNextFrame();
+    }
+
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        table.off('renderComplete', finish);
+        resolve();
+      };
+      table.on('renderComplete', finish);
+      requestAnimationFrame(() => requestAnimationFrame(finish));
+    });
+  }
+
   private _resetFindWidget() {
     document.dispatchEvent(new CustomEvent('lv-find-results', { detail: { totalMatches: 0 } }));
   }
@@ -835,7 +864,7 @@ export class CalltreeView extends LitElement {
       case 'show-in-timeline':
         document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'timeline-tab' } }));
         eventBus.emit('timeline:navigate-to', {
-          timestamp: rowData.originalData.timestamp,
+          eventIndex: rowData.originalData.eventIndex,
         });
         break;
 
@@ -851,56 +880,88 @@ export class CalltreeView extends LitElement {
     this.contextMenuRow = null;
   }
 
-  private _findByTime(rows: RowComponent[], timestamp: number): RowComponent | null {
-    if (!rows?.length || !this.rootMethod?.children) {
+  private async _findByEventIndex(
+    rows: RowComponent[],
+    eventIndex: number,
+  ): Promise<RowComponent | null> {
+    if (!rows?.length || !this.rootMethod) {
       return null;
     }
 
-    const result = findEventByTimestamp(this.rootMethod.children, timestamp);
+    const result = findEventByEventIndex(this.rootMethod, eventIndex);
     if (!result) {
       return null;
     }
 
-    return this._findRowByEvent(rows, result.event);
+    return this._materializeRowPath(rows, result.event);
   }
 
-  private _findRowByEvent(rows: RowComponent[], targetEvent: LogEvent): RowComponent | null {
-    let start = 0;
-    let end = rows.length - 1;
+  private async _materializeRowPath(
+    rows: RowComponent[],
+    targetEvent: LogEvent,
+  ): Promise<RowComponent | null> {
+    const eventPath: LogEvent[] = [];
+    let currentEvent: LogEvent | null = targetEvent;
 
-    while (start <= end) {
-      const mid = Math.floor((start + end) / 2);
-      const row = rows[mid];
-      if (!row) {
+    while (currentEvent && currentEvent.parent) {
+      eventPath.push(currentEvent);
+      currentEvent = currentEvent.parent;
+    }
+
+    eventPath.reverse();
+
+    let currentRows = rows;
+    let matchedRow: RowComponent | null = null;
+
+    for (let i = 0; i < eventPath.length; i++) {
+      const event = eventPath[i];
+      if (!event) {
         break;
       }
 
-      const rowEvent = (row.getData() as TimeOrderRow).originalData as LogEvent;
-      const endTime = rowEvent.exitStamp ?? rowEvent.timestamp;
-
-      if (rowEvent.timestamp === targetEvent.timestamp) {
-        return row;
+      const nextRow = this._indexRowsByEventIndex(currentRows).get(event.eventIndex);
+      if (!nextRow) {
+        // Ancestor not present (e.g. hidden by an active filter). Fall back to
+        // the deepest row we did resolve so navigation lands on the nearest
+        // visible ancestor instead of silently doing nothing.
+        break;
       }
 
-      if (targetEvent.timestamp >= rowEvent.timestamp && targetEvent.timestamp <= endTime) {
-        const childResult = this._findRowByEvent(row.getTreeChildren() ?? [], targetEvent);
-        return childResult ?? row;
+      matchedRow = nextRow;
+      if (i === eventPath.length - 1) {
+        break;
       }
 
-      if (targetEvent.timestamp > endTime) {
-        start = mid + 1;
-      } else {
-        end = mid - 1;
+      let children = matchedRow.getTreeChildren() ?? [];
+      const rowData = matchedRow.getData() as TimeOrderRow;
+      if (!children.length && rowData._children?.length && !matchedRow.isTreeExpanded()) {
+        matchedRow.treeExpand();
+        await this._waitForTableRender();
+        children = matchedRow.getTreeChildren() ?? [];
       }
+
+      currentRows = children;
     }
 
-    return null;
+    return matchedRow;
+  }
+
+  private _indexRowsByEventIndex(rows: RowComponent[]): Map<number, RowComponent> {
+    const indexByEventIndex = new Map<number, RowComponent>();
+    for (const row of rows) {
+      const rowData = row.getData() as TimeOrderRow;
+      indexByEventIndex.set(rowData.originalData.eventIndex, row);
+    }
+
+    return indexByEventIndex;
   }
 }
 
-export async function goToRow(timestamp: number) {
+export async function goToRow(target: { eventIndex: number }) {
   document.dispatchEvent(
-    new CustomEvent('calltree-go-to-row', { detail: { timestamp: timestamp } }),
+    new CustomEvent('calltree-go-to-row', {
+      detail: target,
+    }),
   );
 }
 

@@ -20,29 +20,26 @@ export class DatabaseAccess {
     return DatabaseAccess._instance;
   }
 
-  public getStack(
-    timestamp: number,
-    stack: Stack = [],
-    line: LogEvent = DatabaseAccess._treeRoot,
-  ): Stack {
-    const children = line.children;
-    const len = children.length;
-    for (let i = 0; i < len; ++i) {
-      const child = children[i];
-      if (child?.isParent) {
-        stack.push(child);
-        if (child.timestamp === timestamp) {
-          return stack;
-        }
-
-        const childStack = this.getStack(timestamp, stack, child);
-        if (childStack.length > 0) {
-          return childStack;
-        }
-        stack.pop();
-      }
+  public getStackByEventIndex(eventIndex: number): Stack {
+    const root = DatabaseAccess._treeRoot;
+    const event = root?.eventsById[eventIndex];
+    if (!event) {
+      return [];
     }
-    return [];
+
+    // Walk parent pointers from the event up to (but excluding) the tree root.
+    // O(depth) using the parser-assigned eventsById index, vs the previous
+    // O(n) full-tree scan. Returns the same top-down stack of parent events.
+    const stack: Stack = [];
+    let node: LogEvent | null = event;
+    while (node && node !== root) {
+      if (node.isParent) {
+        stack.push(node);
+      }
+      node = node.parent;
+    }
+    stack.reverse();
+    return stack;
   }
 
   public getSOQLLines(line: LogEvent = DatabaseAccess._treeRoot): SOQLExecuteBeginLine[] {
