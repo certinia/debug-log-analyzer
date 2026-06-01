@@ -311,7 +311,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "rm -rf out && pnpm -w run build"
+    "vscode:prepublish": "pnpm -w run build && pnpm -w run copy:package-docs"
   },
   "dependencies": {
     "@apexdevtools/apex-ls": "^6.0.2",
