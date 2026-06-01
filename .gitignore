@@ -8,3 +8,4 @@ dist/
 build/
 out/
 coverage/
+*.tsbuildinfo

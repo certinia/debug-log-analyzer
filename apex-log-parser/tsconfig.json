@@ -19,7 +19,8 @@
 
     "moduleResolution": "Bundler",
     "module": "ESNext",
-    "noEmit": true,
+    "composite": true,
+    "emitDeclarationOnly": true,
     "declaration": true,
     "declarationMap": true,
 
