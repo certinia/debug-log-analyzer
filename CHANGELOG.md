@@ -74,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Bottom-Up**: Starts from callees and expands to callers, with optional grouping by Namespace or Type.
   - **Go to Source**: Click method names to open source from **Time Order**, **Aggregated**, and **Bottom-Up** when symbols are available.
   - **Analysis Alignment**: Analysis now uses the same bottom-up table model for consistent caller attribution.
+  - **🎨 Category Coloring**: The Name column is colored by event category using the active timeline theme — a color chip by default, or a full background tint + colored text when enabled via **Settings → Apex Log Analyzer → colorize Call Tree category names**. ([#734])
 - 📄 **Raw Log Navigation**: Seamless navigation between raw log files and the log analysis. ([#204])
   - **Show in Raw Log**: Right-click timeline or call tree frames → "Show in Log File" to jump to the corresponding line.
   - **Show in Log Analysis**: Click the hover link on raw log lines to navigate back to the log analysis.
@@ -493,6 +494,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#98]: https://github.com/certinia/debug-log-analyzer/issues/98
 [#204]: https://github.com/certinia/debug-log-analyzer/issues/204
 [#714]: https://github.com/certinia/debug-log-analyzer/issues/714
+[#734]: https://github.com/certinia/debug-log-analyzer/issues/734
 [#245]: https://github.com/certinia/debug-log-analyzer/issues/245
 [#164]: https://github.com/certinia/debug-log-analyzer/issues/164
 [#535]: https://github.com/certinia/debug-log-analyzer/issues/535
