@@ -46,6 +46,9 @@ export class TimelineView extends LitElement {
   @property({ type: Number })
   navigateToTimestamp: number | undefined = undefined;
 
+  @property({ type: Number })
+  navigateToEventIndex: number | undefined = undefined;
+
   @state()
   activeTheme: string | null = null;
 
@@ -192,6 +195,7 @@ export class TimelineView extends LitElement {
         <timeline-flame-chart
           .apexLog=${this.timelineRoot}
           .themeName=${this.activeTheme}
+          .navigateToEventIndex=${this.navigateToEventIndex}
           .navigateToTimestamp=${this.navigateToTimestamp}
         ></timeline-flame-chart>
         <timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>`;

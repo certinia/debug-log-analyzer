@@ -7,11 +7,27 @@ type GoToRowOptions = { scrollIfVisible: boolean; focusRow: boolean };
 export class RowNavigation extends Module {
   static moduleName = 'rowNavigation';
   tableHolder: HTMLElement | null = null;
+  private pendingRenderResolvers: Array<() => void> = [];
+  private isRenderPending = false;
 
   constructor(table: Tabulator) {
     super(table);
     // @ts-expect-error registerTableFunction() needs adding to tabulator types
     this.registerTableFunction('goToRow', this.goToRow.bind(this));
+  }
+
+  initialize(): void {
+    this.table.on('renderStarted', () => {
+      this.isRenderPending = true;
+    });
+
+    this.table.on('renderComplete', () => {
+      this.isRenderPending = false;
+      const resolvers = this.pendingRenderResolvers.splice(0);
+      for (const resolve of resolvers) {
+        resolve();
+      }
+    });
   }
 
   async goToRow(
@@ -59,10 +75,24 @@ export class RowNavigation extends Module {
       this.tableHolder.focus();
     }
 
+    await this._waitForRenderComplete();
+    await this._scrollToRow(row, opts);
+  }
+
+  private _waitForRenderComplete(): Promise<void> {
+    if (!this.isRenderPending) {
+      return this._waitForNextFrame();
+    }
+
     return new Promise<void>((resolve) => {
-      // Need to wait for any pending redraws to finish before scrolling or it will not work
-      setTimeout(() => {
-        this._scrollToRow(row, opts).then(resolve);
+      this.pendingRenderResolvers.push(resolve);
+    });
+  }
+
+  private _waitForNextFrame(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
       });
     });
   }
@@ -86,9 +116,17 @@ export class RowNavigation extends Module {
     if (!this.tableHolder || !el.isConnected) {
       return false;
     }
-    const holderRect = this.tableHolder.getBoundingClientRect();
-    const rect = el.getBoundingClientRect();
-    return rect.top >= holderRect.top && rect.bottom <= holderRect.bottom;
+
+    const renderer = this.table.rowManager?.renderer as Record<string, unknown> | undefined;
+    const rowHeight =
+      (el as HTMLElement).offsetHeight || ((renderer?.vDomRowHeight as number) ?? 24);
+    const rowTop = (el as HTMLElement).offsetTop;
+    const rowBottom = rowTop + rowHeight;
+
+    const viewTop = this.tableHolder.scrollTop;
+    const viewBottom = viewTop + this.tableHolder.clientHeight;
+
+    return rowTop >= viewTop && rowBottom <= viewBottom;
   }
 
   // TODO: Remove once fixed upstream in tabulator-tables.
@@ -121,9 +159,16 @@ export class RowNavigation extends Module {
       }
     }
 
-    // Reading elem.offsetTop forces a layout flush — paddingBottom is included in
-    // scrollHeight before scrollTop is assigned.
-    const holderHeight = this.tableHolder.clientHeight;
-    this.tableHolder.scrollTop = elem.offsetTop - holderHeight / 2 + elem.offsetHeight / 2;
+    const holderRect = this.tableHolder.getBoundingClientRect();
+    const rowRect = elem.getBoundingClientRect();
+    const rowHeight =
+      rowRect.height || elem.offsetHeight || ((renderer?.vDomRowHeight as number) ?? 24);
+
+    const holderCenterY = holderRect.top + holderRect.height / 2;
+    const rowCenterY = rowRect.top + rowHeight / 2;
+    const delta = rowCenterY - holderCenterY;
+    if (Math.abs(delta) > 1) {
+      this.tableHolder.scrollTop += delta;
+    }
   }
 }

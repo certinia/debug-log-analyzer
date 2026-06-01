@@ -142,4 +142,5 @@ export class Notification {
   summary = '';
   message = '';
   severity: 'Error' | 'Warning' | 'Info' = 'Info';
+  eventIndex: number | null = null;
 }

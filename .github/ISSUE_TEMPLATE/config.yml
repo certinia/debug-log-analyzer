@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discussions
+    url: https://github.com/certinia/debug-log-analyzer/discussions
+    about: Browse all discussions or start a new one if nothing else fits.
+  - name: Ask a question
+    url: https://github.com/certinia/debug-log-analyzer/discussions/categories/q-a
+    about: Not sure if it's a bug? Ask in Q&A first.
+  - name: Discuss an idea
+    url: https://github.com/certinia/debug-log-analyzer/discussions/categories/ideas
+    about: Suggest or validate a feature idea before opening a feature request.

@@ -303,21 +303,30 @@ export class DMLView extends LitElement {
 
   _renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
     const dmlData: DMLRow[] = [];
+    let nextRowId = 0;
     if (dmlLines) {
       for (const dml of dmlLines) {
         dmlData.push({
+          id: ++nextRowId,
           dml: dml.text,
           namespace: dml.namespace,
           callerNamespace: getCallerNamespace(dml),
           rowCount: dml.dmlRowCount.self,
           timeTaken: dml.duration.total,
-          timestamp: dml.timestamp,
-          _children: [{ timestamp: dml.timestamp, isDetail: true }],
+          eventIndex: dml.eventIndex,
+          _children: [
+            {
+              id: ++nextRowId,
+              eventIndex: dml.eventIndex,
+              isDetail: true,
+            },
+          ],
         });
       }
     }
 
     this.dmlTable = new Tabulator(dmlTableContainer, {
+      index: 'id',
       height: '100%',
       clipboard: true,
       downloadEncoder: this.downlodEncoder('dml.csv'),
@@ -382,7 +391,7 @@ export class DMLView extends LitElement {
           formatter: (cell, _formatterParams, _onRendered) => {
             const data = cell.getData() as DMLRow;
             return `<call-stack
-            timestamp="${data.timestamp}"
+            eventIndex="${data.eventIndex}"
             startDepth="0"
             endDepth="1"
           ></call-stack>`;
@@ -433,8 +442,8 @@ export class DMLView extends LitElement {
       ],
       rowFormatter: (row) => {
         const data = row.getData();
-        if (data.isDetail && data.timestamp) {
-          const detailContainer = this.createDetailPanel(data.timestamp);
+        if (data.isDetail && data.eventIndex !== undefined) {
+          const detailContainer = this.createDetailPanel(data.eventIndex);
           row.getElement().replaceChildren(detailContainer);
         }
       },
@@ -465,7 +474,7 @@ export class DMLView extends LitElement {
       }
 
       const data = row.getData();
-      if (!(data.timestamp && data.dml)) {
+      if (!(data.eventIndex !== undefined && data.dml)) {
         return;
       }
 
@@ -542,10 +551,10 @@ export class DMLView extends LitElement {
     return this.holder;
   }
 
-  createDetailPanel(timestamp: number) {
+  createDetailPanel(eventIndex: number) {
     const detailContainer = document.createElement('div');
     detailContainer.className = 'row__details-container';
-    render(html`<call-stack timestamp=${timestamp}></call-stack>`, detailContainer);
+    render(html`<call-stack eventIndex=${eventIndex}></call-stack>`, detailContainer);
 
     return detailContainer;
   }
@@ -576,12 +585,13 @@ type VSCodeSaveFile = {
 };
 
 interface DMLRow {
+  id: number;
   dml?: string;
   namespace?: string;
   callerNamespace?: string;
   rowCount?: number;
   timeTaken?: number;
-  timestamp: number;
+  eventIndex?: number;
   isDetail?: boolean;
   _children?: DMLRow[];
 }

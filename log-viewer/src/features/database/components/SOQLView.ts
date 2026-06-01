@@ -301,10 +301,11 @@ export class SOQLView extends LitElement {
   }
 
   _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
-    const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
+    const eventIndexToSOQL = new Map<number, SOQLExecuteBeginLine>();
+    let nextRowId = 0;
 
     soqlLines?.forEach((line) => {
-      timestampToSOQl.set(line.timestamp, line);
+      eventIndexToSOQL.set(line.eventIndex, line);
     });
 
     const soqlData: GridSOQLData[] = [];
@@ -312,6 +313,7 @@ export class SOQLView extends LitElement {
       for (const soql of soqlLines) {
         const explainLine = soql.children[0];
         soqlData.push({
+          id: ++nextRowId,
           isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
           relativeCost: explainLine?.relativeCost,
           soql: soql.text,
@@ -319,13 +321,20 @@ export class SOQLView extends LitElement {
           rowCount: soql.soqlRowCount.self,
           timeTaken: soql.duration.total,
           aggregations: soql.aggregations,
-          timestamp: soql.timestamp,
-          _children: [{ timestamp: soql.timestamp, isDetail: true }],
+          eventIndex: soql.eventIndex,
+          _children: [
+            {
+              id: ++nextRowId,
+              eventIndex: soql.eventIndex,
+              isDetail: true,
+            },
+          ],
         });
       }
     }
 
     this.soqlTable = new Tabulator(soqlTableContainer, {
+      index: 'id',
       height: '100%',
       rowKeyboardNavigation: true,
       data: soqlData,
@@ -393,7 +402,7 @@ export class SOQLView extends LitElement {
           formatter: (cell, _formatterParams, _onRendered) => {
             const data = cell.getData() as GridSOQLData;
             return `<call-stack
-            timestamp=${data.timestamp}
+            eventIndex=${data.eventIndex}
             startDepth="0"
             endDepth="1"
           ></call-stack>`;
@@ -514,8 +523,8 @@ export class SOQLView extends LitElement {
       ],
       rowFormatter: (row) => {
         const data = row.getData();
-        if (data.isDetail && data.timestamp) {
-          const detailContainer = this.createSOQLDetailPanel(data.timestamp, timestampToSOQl);
+        if (data.isDetail && data.eventIndex !== undefined) {
+          const detailContainer = this.createSOQLDetailPanel(data.eventIndex, eventIndexToSOQL);
           row.getElement().replaceChildren(detailContainer);
         }
       },
@@ -546,7 +555,7 @@ export class SOQLView extends LitElement {
       }
 
       const data = row.getData();
-      if (!(data.timestamp && data.soql)) {
+      if (!(data.eventIndex !== undefined && data.soql)) {
         return;
       }
 
@@ -623,14 +632,14 @@ export class SOQLView extends LitElement {
     return this.holder;
   }
 
-  createSOQLDetailPanel(timestamp: number, timestampToSOQl: Map<number, SOQLExecuteBeginLine>) {
+  createSOQLDetailPanel(eventIndex: number, eventIndexToSOQL: Map<number, SOQLExecuteBeginLine>) {
     const detailContainer = document.createElement('div');
     detailContainer.className = 'row__details-container';
 
-    const soqlLine = timestampToSOQl.get(timestamp);
+    const soqlLine = eventIndexToSOQL.get(eventIndex);
     render(
       html`<db-soql-detail-panel
-        timestamp=${timestamp}
+        eventIndex=${eventIndex}
         soql=${soqlLine?.text}
       ></db-soql-detail-panel>`,
       detailContainer,
@@ -665,6 +674,7 @@ type VSCodeSaveFile = {
 };
 
 interface GridSOQLData {
+  id: number;
   isSelective?: boolean | null;
   relativeCost?: number | null;
   soql?: string;
@@ -672,7 +682,7 @@ interface GridSOQLData {
   rowCount?: number | null;
   timeTaken?: number | null;
   aggregations?: number;
-  timestamp: number;
+  eventIndex?: number;
   isDetail?: boolean;
   _children?: GridSOQLData[];
 }
