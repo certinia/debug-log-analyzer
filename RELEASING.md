@@ -11,7 +11,7 @@ This guide explains how maintainers release stable and pre-release versions.
 2. [Pre-Release Flow (Automated)](#-pre-release-flow-automated)
 3. [Stable Release Flow (Manual)](#-stable-release-flow-manual)
 4. [Marketplace README Limitation](#-marketplace-readme-limitation)
-5. [Marking Pre-Release-Only Features in the README](#-marking-pre-release-only-features-in-the-readme)
+5. [Marking Pre-Release-Only Features](#-marking-pre-release-only-features)
 
 ## 🔢 Versioning Convention
 
@@ -44,8 +44,7 @@ A stable release is cut by hand. Do these steps in order:
 1. **Update the changelog + readme.**
    - Rename `[Unreleased]` in the root [`CHANGELOG.md`](./CHANGELOG.md) to `## [X.Y.Z] YYYY-MM-DD` .
    - Only edit the **root** `CHANGELOG.md`
-   - Remove any `🧪 Pre-Release` markers in the root `README.md` for features that ship in this
-     release (see [Marking Pre-Release-Only Features](#-marking-pre-release-only-features-in-the-readme)).
+   - For features that ship in this release, remove their `🧪` badges in the root `README.md` (see [Marking Pre-Release-Only Features](#-marking-pre-release-only-features)).
 
 1. **Bump the version.** Set `version` in [`lana/package.json`](./lana/package.json) to the new stable version. Use the **next even minor** (`1.18.x` → `1.20.0`) for a feature release, or a patch bump (`1.18.1` → `1.18.2`) for a fix-only release. Commit these changes to the selected release branch.
 1. **Create a GitHub Release.** Tag the release with a name that **exactly equals** the
@@ -68,14 +67,27 @@ Practical consequences:
 - Keep the README channel-neutral.
 - Treat root `README.md`, `CHANGELOG.md`, and `LICENSE.txt` as the source of truth. Do not hand-edit the generated `lana/` copies.
 
-## 🧪 Marking Pre-Release-Only Features in the README
+## 🧪 Marking Pre-Release-Only Features
 
-Because the public README can show pre-release content to stable users (see above), make pre-release-only features clearly marked so stable users aren't misled about what they can use today.
+Because the public README can show pre-release content to stable users (see above), mark
+pre-release-only features clearly so stable users aren't misled about what they can use today.
+**Add the marker in the same PR that introduces the feature** (the PR template has a checklist
+reminder).
 
-Add a blockquote callout directly under the relevant feature in the root `README.md`:
+### README — inline `🧪` badge
+
+The README uses a compact inline badge so deeply nested feature lists stay readable. The legend is
+defined once near the top:
 
 ```md
-> 🧪 **Pre-Release** — available in the Pre-Release Version; not yet in the stable release.
+> 🧪 **Pre-Release only** — available in the [Pre-Release Version](#-try-the-pre-release-version); not yet in the stable release.
 ```
 
-When a feature graduates to stable, **removing its `🧪 Pre-Release` marker is part of the stable release checklist** (step 1 above).
+Then append `🧪` at the smallest accurate scope:
+
+- **Whole feature/section** is pre-release → on the section heading (e.g. `## 📄 Raw Log Navigation 🧪`).
+- **A single bullet** is pre-release → at the end of that bullet.
+- **Only part of a bullet** → right after the specific phrase (e.g. `… or Caller Namespace 🧪, or Query`).
+
+When a feature graduates to stable, **removing its `🧪` badge is part of the stable release
+checklist** (step 1 above).
