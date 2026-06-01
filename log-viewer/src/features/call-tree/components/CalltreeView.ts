@@ -142,7 +142,7 @@ export class CalltreeView extends LitElement {
       const { timeline, callTree } = settings;
       addCustomThemes(timeline.customThemes);
       this._applyTheme(timeline.activeTheme ?? DEFAULT_THEME_NAME);
-      this._setCategoryColourise(callTree?.categoryColourise ?? false);
+      this._setCategoryColorize(callTree?.categoryColorize ?? false);
     });
   }
 
@@ -158,8 +158,8 @@ export class CalltreeView extends LitElement {
     this.style.setProperty('--ct-color-validation', theme.validation);
   }
 
-  private _setCategoryColourise(enabled: boolean): void {
-    this.classList.toggle('category-colourise', enabled);
+  private _setCategoryColorize(enabled: boolean): void {
+    this.classList.toggle('category-colorize', enabled);
   }
 
   private _rowFormatter = (row: RowComponent): void => {
@@ -334,35 +334,35 @@ export class CalltreeView extends LitElement {
         border-left: 6px solid var(--ct-color-validation);
       }
 
-      :host(.category-colourise) .tabulator-row.row-cat-apex .datagrid-code-text {
+      :host(.category-colorize) .tabulator-row.row-cat-apex .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-apex) 10%, transparent);
         color: var(--ct-color-apex);
       }
-      :host(.category-colourise) .tabulator-row.row-cat-code-unit .datagrid-code-text {
+      :host(.category-colorize) .tabulator-row.row-cat-code-unit .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-code-unit) 10%, transparent);
         color: var(--ct-color-code-unit);
       }
-      :host(.category-colourise) .tabulator-row.row-cat-system .datagrid-code-text {
+      :host(.category-colorize) .tabulator-row.row-cat-system .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-system) 10%, transparent);
         color: var(--ct-color-system);
       }
-      :host(.category-colourise) .tabulator-row.row-cat-automation .datagrid-code-text {
+      :host(.category-colorize) .tabulator-row.row-cat-automation .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-automation) 10%, transparent);
         color: var(--ct-color-automation);
       }
-      :host(.category-colourise) .tabulator-row.row-cat-dml .datagrid-code-text {
+      :host(.category-colorize) .tabulator-row.row-cat-dml .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-dml) 10%, transparent);
         color: var(--ct-color-dml);
       }
-      :host(.category-colourise) .tabulator-row.row-cat-soql .datagrid-code-text {
+      :host(.category-colorize) .tabulator-row.row-cat-soql .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-soql) 10%, transparent);
         color: var(--ct-color-soql);
       }
-      :host(.category-colourise) .tabulator-row.row-cat-callout .datagrid-code-text {
+      :host(.category-colorize) .tabulator-row.row-cat-callout .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-callout) 10%, transparent);
         color: var(--ct-color-callout);
       }
-      :host(.category-colourise) .tabulator-row.row-cat-validation .datagrid-code-text {
+      :host(.category-colorize) .tabulator-row.row-cat-validation .datagrid-code-text {
         background-color: color-mix(in srgb, var(--ct-color-validation) 10%, transparent);
         color: var(--ct-color-validation);
       }

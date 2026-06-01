@@ -34,7 +34,7 @@ interface Config {
     legacy: boolean;
   };
   callTree: {
-    categoryColourise: boolean;
+    categoryColorize: boolean;
   };
 }
 

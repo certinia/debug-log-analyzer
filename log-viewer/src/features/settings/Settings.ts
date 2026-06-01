@@ -30,7 +30,7 @@ export type LanaSettings = {
     legacy: boolean;
   };
   callTree: {
-    categoryColourise: boolean;
+    categoryColorize: boolean;
   };
 };
 
