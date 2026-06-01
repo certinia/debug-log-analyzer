@@ -15,9 +15,15 @@ import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { eventBus } from '../../../core/events/EventBus.js';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import {
+  VSCodeExtensionMessenger,
+  vscodeMessenger,
+} from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
+import { getSettings } from '../../settings/Settings.js';
+import { DEFAULT_THEME_NAME } from '../../timeline/themes/Themes.js';
+import { addCustomThemes, getTheme } from '../../timeline/themes/ThemeSelector.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { deepFilter } from '../utils/DetailsFilter.js';
 import { expandCollapseAll } from '../utils/ExpandCollapse.js';
@@ -120,6 +126,49 @@ export class CalltreeView extends LitElement {
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
   }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this._applyTheme(DEFAULT_THEME_NAME);
+
+    VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
+      const { cmd, payload } = event.data;
+      if (cmd === 'switchTimelineTheme') {
+        this._applyTheme(payload.activeTheme ?? DEFAULT_THEME_NAME);
+      }
+    });
+
+    getSettings().then((settings) => {
+      const { timeline, callTree } = settings;
+      addCustomThemes(timeline.customThemes);
+      this._applyTheme(timeline.activeTheme ?? DEFAULT_THEME_NAME);
+      this._setCategoryColorize(callTree?.categoryColorize ?? false);
+    });
+  }
+
+  private _applyTheme(themeName: string): void {
+    const theme = getTheme(themeName);
+    this.style.setProperty('--ct-color-apex', theme.apex);
+    this.style.setProperty('--ct-color-code-unit', theme.codeUnit);
+    this.style.setProperty('--ct-color-system', theme.system);
+    this.style.setProperty('--ct-color-automation', theme.automation);
+    this.style.setProperty('--ct-color-dml', theme.dml);
+    this.style.setProperty('--ct-color-soql', theme.soql);
+    this.style.setProperty('--ct-color-callout', theme.callout);
+    this.style.setProperty('--ct-color-validation', theme.validation);
+  }
+
+  private _setCategoryColorize(enabled: boolean): void {
+    this.classList.toggle('category-colorize', enabled);
+  }
+
+  private _rowFormatter = (row: RowComponent): void => {
+    const data = row.getData() as { originalData?: { category?: string } };
+    const category = data.originalData?.category;
+    if (category) {
+      row.getElement().classList.add(`row-cat-${category.toLowerCase().replace(' ', '-')}`);
+    }
+  };
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
@@ -258,6 +307,64 @@ export class CalltreeView extends LitElement {
         visibility: hidden;
         opacity: 0;
         pointer-events: none;
+      }
+
+      .tabulator-row.row-cat-apex .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-apex);
+      }
+      .tabulator-row.row-cat-code-unit .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-code-unit);
+      }
+      .tabulator-row.row-cat-system .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-system);
+      }
+      .tabulator-row.row-cat-automation .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-automation);
+      }
+      .tabulator-row.row-cat-dml .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-dml);
+      }
+      .tabulator-row.row-cat-soql .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-soql);
+      }
+      .tabulator-row.row-cat-callout .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-callout);
+      }
+      .tabulator-row.row-cat-validation .datagrid-code-text {
+        border-left: 6px solid var(--ct-color-validation);
+      }
+
+      :host(.category-colorize) .tabulator-row.row-cat-apex .datagrid-code-text {
+        background-color: color-mix(in srgb, var(--ct-color-apex) 10%, transparent);
+        color: var(--ct-color-apex);
+      }
+      :host(.category-colorize) .tabulator-row.row-cat-code-unit .datagrid-code-text {
+        background-color: color-mix(in srgb, var(--ct-color-code-unit) 10%, transparent);
+        color: var(--ct-color-code-unit);
+      }
+      :host(.category-colorize) .tabulator-row.row-cat-system .datagrid-code-text {
+        background-color: color-mix(in srgb, var(--ct-color-system) 10%, transparent);
+        color: var(--ct-color-system);
+      }
+      :host(.category-colorize) .tabulator-row.row-cat-automation .datagrid-code-text {
+        background-color: color-mix(in srgb, var(--ct-color-automation) 10%, transparent);
+        color: var(--ct-color-automation);
+      }
+      :host(.category-colorize) .tabulator-row.row-cat-dml .datagrid-code-text {
+        background-color: color-mix(in srgb, var(--ct-color-dml) 10%, transparent);
+        color: var(--ct-color-dml);
+      }
+      :host(.category-colorize) .tabulator-row.row-cat-soql .datagrid-code-text {
+        background-color: color-mix(in srgb, var(--ct-color-soql) 10%, transparent);
+        color: var(--ct-color-soql);
+      }
+      :host(.category-colorize) .tabulator-row.row-cat-callout .datagrid-code-text {
+        background-color: color-mix(in srgb, var(--ct-color-callout) 10%, transparent);
+        color: var(--ct-color-callout);
+      }
+      :host(.category-colorize) .tabulator-row.row-cat-validation .datagrid-code-text {
+        background-color: color-mix(in srgb, var(--ct-color-validation) 10%, transparent);
+        color: var(--ct-color-validation);
       }
     `,
   ];
@@ -715,6 +822,7 @@ export class CalltreeView extends LitElement {
         const mouseEvent = e as MouseEvent;
         this._showRowContextMenu(row, mouseEvent.clientX, mouseEvent.clientY);
       },
+      rowFormatter: this._rowFormatter,
     });
     this.calltreeTable = table;
     await tableBuilt;
@@ -742,6 +850,7 @@ export class CalltreeView extends LitElement {
           this._clearSearchHighlights();
         }
       },
+      rowFormatter: this._rowFormatter,
     });
     this.aggregatedTreeTable = table;
     await tableBuilt;
@@ -765,6 +874,7 @@ export class CalltreeView extends LitElement {
             this._clearSearchHighlights();
           }
         },
+        rowFormatter: this._rowFormatter,
       },
       {
         selectableRows: 'highlight',

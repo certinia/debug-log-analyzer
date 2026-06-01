@@ -60,3 +60,11 @@ Debug Only and Type filtering are available in **Time Order** and **Aggregated**
 ### Keyboard Navigation
 
 The Call Tree can be navigated with the keyboard. The up and down keys will move between rows, the left and right keys will expand and collapse a parent within the tree.
+
+### Category Coloring
+
+The Name column is colored by each event's category — Apex, Code Unit, System, Automation, DML, SOQL, Callout and Validation — using the colors of the active timeline theme, so the Call Tree and the [Timeline themes](./timeline.md#themes) stay visually consistent.
+
+By default a small color chip is shown against each row. To color the full cell instead (background tint and colored text), enable **Settings → Apex Log Analyzer → Colorize Call Tree category names**.
+
+Colors follow the active timeline theme and update instantly when you switch themes via **Log: Timeline Theme**.
