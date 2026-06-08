@@ -47,7 +47,7 @@ export function createAggregatedTable(
     height: '100%',
     maxHeight: '100%',
     rowKeyboardNavigation: true,
-    scrollAnchor: true,
+    anchoringPolicy: true,
     // @ts-expect-error tabulator allows a function predicate but the types only declare Filter[]
     initialFilter: callbacks.showDetailsFilter,
     renderVertical: VirtualVerticalRenderer,

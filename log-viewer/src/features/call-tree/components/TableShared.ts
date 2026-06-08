@@ -3,11 +3,11 @@
  */
 import { Tabulator } from 'tabulator-tables';
 
+import { AnchoringPolicy } from '../../../tabulator/module/AnchoringPolicy.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
 import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
-import { ScrollAnchor } from '../../../tabulator/module/ScrollAnchor.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
 
@@ -24,7 +24,7 @@ export interface TableCallbacks {
 
 export function registerTableModules(): void {
   Tabulator.registerModule(Object.values(CommonModules));
-  Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, ScrollAnchor, Find]);
+  Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, AnchoringPolicy, Find]);
 }
 
 export function headerSortElement(_column: unknown, dir: string): string {

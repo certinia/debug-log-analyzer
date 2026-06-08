@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 
 import { VirtualVerticalRenderer } from '../VirtualVerticalRenderer';
 
@@ -36,13 +36,14 @@ interface RendererInternals {
   measuredSum: number;
   measuredCount: number;
   rowsCountCached: number;
-  _setHeight: (i: number, h: number) => void;
+  _setHeight: (i: number, h: number, dataKey?: object) => void;
   _heightOf: (i: number) => number;
   _cumHeight: (i: number) => number;
   _totalHeight: () => number;
   _findRowAt: (y: number) => number;
   _flushEstimateUpdate: () => void;
   _resyncToRowsCount: (wipe: boolean) => void;
+  _rebuildIndexFromCache: (rows: Array<{ data?: object }>) => void;
   _resolveOverscanRows: (clientHeight: number) => number;
   // Access to the underlying mock table so tests can mutate options.
   table: { options: Record<string, unknown> };
@@ -84,6 +85,62 @@ describe('VirtualVerticalRenderer height bookkeeping', () => {
     r._flushEstimateUpdate();
     expect(r.estimateHeight).toBe(75); // (50 + 100) / 2
     expect(r._heightOf(2)).toBe(75); // unmeasured row now uses new estimate
+  });
+
+  it('calibrates the estimate once then freezes it (Stage 2a — no later drift)', () => {
+    // The estimate must NOT keep tracking the running mean. At scale a drifting
+    // mean re-prices all unmeasured rows and lurches the coordinate space. After
+    // the first flush it is frozen; measuring taller rows later does not move it.
+    const r = makeRenderer(4);
+    r._setHeight(0, 20);
+    r._setHeight(1, 40);
+    r._flushEstimateUpdate();
+    expect(r.estimateHeight).toBe(30); // (20 + 40) / 2, calibrated + frozen
+
+    // Later, much taller rows are measured (e.g. wrapped text deep in the tree).
+    r._setHeight(2, 120);
+    r._setHeight(3, 120);
+    r._flushEstimateUpdate(); // frozen → no-op
+    expect(r.estimateHeight).toBe(30); // unchanged — NOT the new mean (75)
+  });
+
+  it('persists measured heights by data object and remaps them on rebuild (Stage 2b)', () => {
+    // Measure two rows keyed by their data-object references, then simulate a
+    // structural change that reorders them (e.g. a sort, or a tree toggle that
+    // shifts indices). The rebuild must re-seed each row's real height at its
+    // NEW index from the durable data→height cache — not reset everything to
+    // the estimate. Keying by object reference works without any id field:
+    // Tabulator reuses the same data objects across expand/collapse and
+    // updateData mutates them in place.
+    const dataA = { name: 'a' };
+    const dataB = { name: 'b' };
+    const r = makeRenderer(2);
+    r._setHeight(0, 50, dataA);
+    r._setHeight(1, 80, dataB);
+    expect(r.measuredCount).toBe(2);
+
+    // Rows swap positions; both survive (same data-object references).
+    r._rebuildIndexFromCache([{ data: dataB }, { data: dataA }]);
+
+    expect(r.measuredCount).toBe(2); // NOT reset to 0
+    expect(r._heightOf(0)).toBe(80); // dataB now at index 0
+    expect(r._heightOf(1)).toBe(50); // dataA now at index 1
+    expect(r._totalHeight()).toBe(130);
+  });
+
+  it('rebuild leaves unknown rows unmeasured (Stage 2b graceful fallback)', () => {
+    const dataA = { name: 'a' };
+    const r = makeRenderer(2);
+    r._setHeight(0, 50, dataA);
+
+    // One known data object, one never-measured data object, plus the
+    // defensive no-data case is covered by rows without `.data` elsewhere —
+    // unknown rows stay unmeasured and use the estimate.
+    r._rebuildIndexFromCache([{ data: dataA }, { data: { name: 'new' } }]);
+
+    expect(r.measuredCount).toBe(1);
+    expect(r._heightOf(0)).toBe(50);
+    expect(r._heightOf(1)).toBe(r.estimateHeight); // uncached → estimate
   });
 
   it('running stats track measurements even before estimate flush', () => {
@@ -284,13 +341,17 @@ interface RendererForSetAnchor {
   elementVertical: any;
 }
 
-function makeRowStub(offsetTop: number, attached = true): RowStub {
+function makeRowStub(offsetTop: number, attached = true, heightInitialized = true): RowStub {
   // `attached` controls Pass 2 (DOM-truth snap) reachability. setAnchor
   // tests want it true so Pass 2 runs and we exercise both passes.
   // rerenderRows anchor tests want it false: their row stubs can't
   // simulate the layout engine updating offsetTop after a re-render, so
   // letting Pass 2 read the stale stub offsetTop would corrupt Pass 1's
   // already-correct scrollTop.
+  // `heightInitialized` defaults to true (a previously-measured row).
+  // Pass false to simulate the row Tabulator's DataTree.expandRow /
+  // collapseRow just reinitialize()'d — anchor capture should prefer
+  // this row over the closest-to-scrollTop one.
   const el = {
     offsetTop,
     parentNode: attached ? { nodeType: 1 } : null,
@@ -298,7 +359,7 @@ function makeRowStub(offsetTop: number, attached = true): RowStub {
   };
   return {
     initialized: false,
-    heightInitialized: false,
+    heightInitialized,
     initialize: () => {},
     normalizeHeight: () => {},
     calcHeight: () => {},
@@ -391,6 +452,37 @@ describe('VirtualVerticalRenderer.setAnchor', () => {
     expect(r.elementVertical.scrollTop).toBe(0);
   });
 
+  it('reconciles: retries placement until the anchor enters the window, then DOM-corrects', () => {
+    // Stage 2d reconcile loop. Simulate the chicken-and-egg: the anchor row's
+    // element is detached (outside the window) on the first render, and only
+    // enters the window on the second render (its measurements grew the
+    // document). The loop must retry, then DOM-truth snap once it's in.
+    const rows = [makeRowStub(0), makeRowStub(50), makeRowStub(100)];
+    const r = makeRendererWithRows(rows);
+    for (let i = 0; i < rows.length; i++) {
+      r._setHeight(i, 50);
+    }
+    r._flushEstimateUpdate();
+    r.elementVertical.scrollHeight = 1000; // tall enough that 90 isn't clamped
+
+    const anchor = rows[2]!;
+    const el = anchor.getElement() as { parentNode: object | null; offsetTop: number };
+    el.parentNode = null; // not in the window initially
+    let renderCount = 0;
+    (r as unknown as { _renderWindow: () => void })._renderWindow = () => {
+      renderCount++;
+      if (renderCount >= 2) {
+        el.parentNode = { nodeType: 1 }; // second placement brings it into view
+      }
+    };
+
+    r.setAnchor(anchor as unknown as RowStub, 10);
+
+    expect(renderCount).toBeGreaterThanOrEqual(2); // it retried, didn't give up
+    // Converged to DOM-truth: offsetTop(100) − offset(10) = 90.
+    expect(r.elementVertical.scrollTop).toBe(90);
+  });
+
   it('is a no-op when the row is not in displayRows', () => {
     const rows = [makeRowStub(0), makeRowStub(40)];
     const r = makeRendererWithRows(rows);
@@ -407,19 +499,69 @@ describe('VirtualVerticalRenderer.setAnchor', () => {
   });
 });
 
+describe('VirtualVerticalRenderer.scrollToIndex', () => {
+  // 5 rows × 50px, clientHeight 100. cumHeight: 0, 50, 100, 150, 200.
+  // scrollHeight set tall enough that the DOM-truth snap is not clamped.
+  function makeAlignRenderer() {
+    const rows = [
+      makeRowStub(0),
+      makeRowStub(50),
+      makeRowStub(100),
+      makeRowStub(150),
+      makeRowStub(200),
+    ];
+    const r = makeRendererWithRows(rows);
+    for (let i = 0; i < rows.length; i++) {
+      r._setHeight(i, 50);
+    }
+    r._flushEstimateUpdate();
+    r.elementVertical.scrollHeight = 1000;
+    stubRenderWindow(r);
+    return r;
+  }
+
+  it("'start': row top lands at the holder top", () => {
+    const r = makeAlignRenderer();
+    (r as unknown as { scrollToIndex: (i: number, a?: unknown) => void }).scrollToIndex(3, 'start');
+    expect(r.elementVertical.scrollTop).toBe(150); // offsetTop(150) − 0
+  });
+
+  it("'center': row is centered in the viewport", () => {
+    const r = makeAlignRenderer();
+    (r as unknown as { scrollToIndex: (i: number, a?: unknown) => void }).scrollToIndex(
+      3,
+      'center',
+    );
+    expect(r.elementVertical.scrollTop).toBe(125); // 150 − (100−50)/2
+  });
+
+  it("'end': row bottom lands at the holder bottom", () => {
+    const r = makeAlignRenderer();
+    (r as unknown as { scrollToIndex: (i: number, a?: unknown) => void }).scrollToIndex(3, 'end');
+    expect(r.elementVertical.scrollTop).toBe(100); // 150 − (100−50)
+  });
+
+  it('numeric align: exact pixel offset from the holder top', () => {
+    const r = makeAlignRenderer();
+    (r as unknown as { scrollToIndex: (i: number, a?: unknown) => void }).scrollToIndex(3, 20);
+    expect(r.elementVertical.scrollTop).toBe(130); // 150 − 20
+  });
+
+  it('is a no-op for an out-of-range index', () => {
+    const r = makeAlignRenderer();
+    r.elementVertical.scrollTop = 25;
+    (r as unknown as { scrollToIndex: (i: number, a?: unknown) => void }).scrollToIndex(99);
+    expect(r.elementVertical.scrollTop).toBe(25);
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // rerenderRows: scroll preservation
 //
-// rerenderRows mirrors stock VirtualDomVertical.rerenderRows
-// (tabulator_esm.mjs:25247): capture the row whose offsetTop is closest to
-// scrollTop BEFORE detach, then after re-render call setAnchor(row, offset)
-// to restore that row to the same Y inside the holder.
-//
-// The tests below cover the FALLBACK path: when renderedRange is empty
-// (initial state {top:0, bottom:-1}) and/or row stubs have parentNode=null,
-// no anchor is captured and the renderer falls back to a plain
-// _renderWindow() with scrollTop unchanged. The "anchor capture" block
-// below covers the active path with setAnchor spied.
+// Stage 2d contract: rerenderRows renders at the browser-preserved scrollTop
+// and retains relative position via the rebuilt height cache — it does NOT
+// anchor. Anchoring (clicked row / middle row / edge snap) is the
+// AnchoringPolicy module's job, tested in module/__tests__/AnchoringPolicy.
 // ─────────────────────────────────────────────────────────────────────────
 
 interface RerenderRenderer extends RendererForSetAnchor {
@@ -492,7 +634,7 @@ describe('VirtualVerticalRenderer.rerenderRows scroll preservation', () => {
     r.rerenderRows();
 
     // Stock-matching behavior: scrollTop preserved. Middle-row anchoring is
-    // ScrollAnchor's job (opt-in), not the renderer's.
+    // the AnchoringPolicy module's job (opt-in), not the renderer's.
     expect(r.elementVertical.scrollTop).toBe(170);
   });
 
@@ -571,97 +713,6 @@ describe('VirtualVerticalRenderer.rerenderRows scroll preservation', () => {
     r.rerenderRows();
 
     expect(tableEmpty).not.toHaveBeenCalled();
-  });
-});
-
-describe('VirtualVerticalRenderer.rerenderRows anchor capture', () => {
-  // These tests drive the active anchor-capture path: rows are attached
-  // (parentNode non-null) AND renderedRange spans the rendered window, so
-  // the pre-detach capture loop picks a row, and setAnchor is invoked to
-  // replay it after re-render.
-
-  interface AnchorableRenderer extends RerenderRenderer {
-    renderedRange: { top: number; bottom: number };
-    setAnchor: (row: RowStub, offset: number) => void;
-  }
-
-  it('captures the row closest to scrollTop and replays via setAnchor', () => {
-    // 10 rows × 40px. scrollTop=170 sits between row 4 (offsetTop 160) and
-    // row 5 (offsetTop 200). row 4 is closer (|−10| < |30|) — it should win.
-    const oldRows: RowStub[] = Array.from({ length: 10 }, (_, i) => makeRowStub(i * 40, true));
-    const { r, setDisplayRows } = makeRerenderRenderer(oldRows);
-    for (let i = 0; i < 10; i++) {
-      r._setHeight(i, 40);
-    }
-    r._flushEstimateUpdate();
-    r.elementVertical.scrollTop = 170;
-    r.elementVertical.scrollHeight = r._totalHeight();
-    stubRenderWindow(r);
-
-    const ar = r as unknown as AnchorableRenderer;
-    ar.renderedRange = { top: 0, bottom: 9 };
-
-    // Spy on setAnchor to verify capture targets + offset without depending
-    // on stub layout simulation.
-    const setAnchorSpy = jest.fn();
-    ar.setAnchor = setAnchorSpy;
-
-    setDisplayRows([...oldRows].reverse());
-    r.rerenderRows();
-
-    expect(setAnchorSpy).toHaveBeenCalledTimes(1);
-    const [anchorRow, anchorOffset] = setAnchorSpy.mock.calls[0]!;
-    expect(anchorRow).toBe(oldRows[4]);
-    expect(anchorOffset).toBe(-10); // 160 (offsetTop) − 170 (scrollTop)
-  });
-
-  it('falls back to _renderWindow when the captured anchor row is filtered out', () => {
-    const oldRows: RowStub[] = Array.from({ length: 10 }, (_, i) => makeRowStub(i * 40, true));
-    const { r, setDisplayRows } = makeRerenderRenderer(oldRows);
-    for (let i = 0; i < 10; i++) {
-      r._setHeight(i, 40);
-    }
-    r._flushEstimateUpdate();
-    r.elementVertical.scrollTop = 170;
-    r.elementVertical.scrollHeight = r._totalHeight();
-    stubRenderWindow(r);
-
-    const ar = r as unknown as AnchorableRenderer;
-    ar.renderedRange = { top: 0, bottom: 9 };
-
-    const setAnchorSpy = jest.fn();
-    ar.setAnchor = setAnchorSpy;
-
-    // Remove row 4 — the row anchor capture would pick.
-    setDisplayRows([...oldRows.slice(0, 4), ...oldRows.slice(5)]);
-    r.rerenderRows();
-
-    // Anchor captured but row removed → setAnchor not invoked, scrollTop
-    // preserved literally (browser-clamped if necessary).
-    expect(setAnchorSpy).not.toHaveBeenCalled();
-    expect(r.elementVertical.scrollTop).toBe(170);
-  });
-
-  it('skips capture and falls back when renderedRange is empty', () => {
-    // renderedRange defaults to {top:0, bottom:-1} (no rendered rows).
-    // Capture loop walks 0..−1 (no iterations) → no anchor → fallback.
-    const oldRows: RowStub[] = Array.from({ length: 5 }, (_, i) => makeRowStub(i * 40, true));
-    const { r } = makeRerenderRenderer(oldRows);
-    for (let i = 0; i < 5; i++) {
-      r._setHeight(i, 40);
-    }
-    r._flushEstimateUpdate();
-    r.elementVertical.scrollTop = 80;
-    r.elementVertical.scrollHeight = r._totalHeight();
-    stubRenderWindow(r);
-
-    const setAnchorSpy = jest.fn();
-    (r as unknown as AnchorableRenderer).setAnchor = setAnchorSpy;
-
-    r.rerenderRows();
-
-    expect(setAnchorSpy).not.toHaveBeenCalled();
-    expect(r.elementVertical.scrollTop).toBe(80);
   });
 });
 

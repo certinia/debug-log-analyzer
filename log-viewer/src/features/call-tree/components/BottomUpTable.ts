@@ -100,7 +100,7 @@ export function createBottomUpTable(
     height: '100%',
     maxHeight: '100%',
     rowKeyboardNavigation: true,
-    scrollAnchor: true,
+    anchoringPolicy: true,
     initialFilter: callbacks.showDetailsFilter,
     renderVertical: VirtualVerticalRenderer,
     dataTree: true,
