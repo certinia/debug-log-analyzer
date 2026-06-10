@@ -7,6 +7,9 @@ const anchoringPolicyOption = 'anchoringPolicy' as const;
 
 interface AnchorableRenderer {
   setAnchor?: (row: unknown, offsetFromHolderTop: number) => void;
+  // Echo-suppressed scrollTop write (VirtualVerticalRenderer). Absent on the
+  // stock renderer, where a raw holder.scrollTop write is the expected path.
+  setScrollTop?: (top: number) => void;
 }
 
 /**
@@ -84,9 +87,15 @@ export class AnchoringPolicy extends Module {
       offsets.set(this._internal(row), row.getElement().offsetTop - scrollTop);
     }
 
+    // On a table that overflows by less than ~2 thresholds BOTH edges are
+    // "near"; break the tie by actual proximity so a user sitting at the
+    // bottom is not snapped to the top.
+    const nearTop = scrollTop <= AnchoringPolicy.boundaryThresholdPx;
+    const nearBottom = max - scrollTop <= AnchoringPolicy.boundaryThresholdPx;
+    const wasAtTop = nearTop && (!nearBottom || scrollTop <= max - scrollTop);
     this.capture = {
-      wasAtTop: scrollTop <= AnchoringPolicy.boundaryThresholdPx,
-      wasAtBottom: max - scrollTop <= AnchoringPolicy.boundaryThresholdPx,
+      wasAtTop,
+      wasAtBottom: nearBottom && !wasAtTop,
       offsets,
       middleRow: this._findMiddleVisibleRow(holder, visibleRows),
     };
@@ -105,9 +114,9 @@ export class AnchoringPolicy extends Module {
     }
 
     if (capture.wasAtTop) {
-      holder.scrollTop = 0;
+      this._writeScrollTop(holder, 0);
     } else if (capture.wasAtBottom) {
-      holder.scrollTop = Math.max(0, holder.scrollHeight - holder.clientHeight);
+      this._writeScrollTop(holder, Math.max(0, holder.scrollHeight - holder.clientHeight));
     } else if (capture.middleRow) {
       // The captured offset belongs to the ORIGINAL middle row; if it was
       // filtered/collapsed away, the nearest surviving ancestor takes its
@@ -159,6 +168,20 @@ export class AnchoringPolicy extends Module {
       return;
     }
     renderer.setAnchor(this._internal(row), offsetFromHolderTop);
+  }
+
+  /**
+   * Write scrollTop through the renderer's echo-suppressed seam when it
+   * exists — a raw write would echo as a user scroll and schedule a
+   * redundant render. Raw fallback for the stock renderer.
+   */
+  private _writeScrollTop(holder: HTMLElement, top: number) {
+    const renderer = this.table.rowManager?.renderer as AnchorableRenderer | undefined;
+    if (renderer?.setScrollTop) {
+      renderer.setScrollTop(top);
+    } else {
+      holder.scrollTop = top;
+    }
   }
 
   /**

@@ -332,6 +332,12 @@ export class VirtualVerticalRenderer extends Renderer {
    * toggle). Renders and retains relative position ONLY — anchoring policy
    * (which row to favour) lives in the AnchoringPolicy module, which applies
    * corrections via setAnchor after this returns, pre-paint.
+   *
+   * Stock divergence (deliberate): the pipeline `callback` runs with rows
+   * already detached and vDomTop/vDomBottom at the empty sentinel, whereas
+   * stock runs it against the still-rendered state. Tabulator's own
+   * callbacks are data-only; anything reading renderer window fields must
+   * not do so synchronously inside this callback.
    */
   rerenderRows(callback?: () => void): void {
     const self = this._self();
@@ -373,7 +379,7 @@ export class VirtualVerticalRenderer extends Renderer {
     // rendered, so a re-render here would visibly shift the window. ±1px
     // tolerance because browsers round fractional scrollTop writes. One-shot;
     // the NaN "nothing pending" case falls through naturally.
-    if (Math.abs(top - this.pendingProgrammaticScrollTop) < 1) {
+    if (Math.abs(top - this.pendingProgrammaticScrollTop) <= 1) {
       this.pendingProgrammaticScrollTop = NaN;
       return;
     }
@@ -551,6 +557,15 @@ export class VirtualVerticalRenderer extends Renderer {
   }
 
   /**
+   * Public echo-suppressed scrollTop write for external modules (e.g.
+   * AnchoringPolicy edge snaps). A raw `holder.scrollTop =` write would echo
+   * back through scrollRows as a user scroll and trigger a redundant render.
+   */
+  setScrollTop(top: number): void {
+    this._setScrollTop(top);
+  }
+
+  /**
    * Anchor a row at a given Y inside the holder — the single seam used by
    * the AnchoringPolicy module. Synchronous (no RAF), so the corrected
    * window is in the DOM on the same paint. Idempotent.
@@ -673,6 +688,9 @@ export class VirtualVerticalRenderer extends Renderer {
       const ev = self.elementVertical;
       const opts = self.table.options;
 
+      // Visibility judged from model coordinates (stock reads live DOM) —
+      // can be stale for up to RESIZE_INVALIDATE_DEBOUNCE_MS after a width
+      // change; accepted trade-off to avoid a layout read here.
       const useIfVisible = ifVisible ?? opts.scrollToRowIfVisible;
       if (useIfVisible === false) {
         const rowTop = this._cumHeight(idx);
@@ -811,7 +829,7 @@ export class VirtualVerticalRenderer extends Renderer {
 
     // Initial diff. Locked-estimate invariant keeps paddingTop = cumHeight
     // (newTop) stable against mid-render measurements at indices ≥ newTop.
-    this._diffRender(rows, newTop, newBottom);
+    const windowFilled = this._diffRender(rows, newTop, newBottom);
 
     // Coverage iteration: if the locked estimate over-counted heights, the
     // rendered window may stop short of a viewport edge (blank padding shows).
@@ -901,7 +919,7 @@ export class VirtualVerticalRenderer extends Renderer {
     // scroll that fully replaced the window) but not after incremental
     // scroll ticks — GroupRows uses it to fix table minWidth when only
     // group headers are visible.
-    if (!this.inScrollDrivenRender || this.lastDiffWasFill) {
+    if (!this.inScrollDrivenRender || windowFilled) {
       this._self().dispatch('render-virtual-fill');
     }
 
@@ -990,25 +1008,24 @@ export class VirtualVerticalRenderer extends Renderer {
   private detachRangesScratch: Array<[number, number]> = [];
   private attachRangesScratch: Array<[number, number]> = [];
 
-  // True when the last _diffRender replaced the window from scratch (empty
-  // before, or zero overlap) — the equivalent of stock's _virtualRenderFill,
-  // which gates the 'render-virtual-fill' dispatch on scroll renders.
-  private lastDiffWasFill = false;
-
   /**
    * Reconcile the rendered range to [newTop, newBottom]: detach rows that
    * left, attach (initialize + measure) rows that entered. estimateHeight is
    * never mutated here — see _flushEstimateUpdate.
+   *
+   * @returns true when the window was replaced from scratch (empty before,
+   * or zero overlap) — the equivalent of stock's `_virtualRenderFill`, which
+   * gates the 'render-virtual-fill' dispatch on scroll renders.
    */
-  private _diffRender(rows: RowInternals[], newTop: number, newBottom: number): void {
+  private _diffRender(rows: RowInternals[], newTop: number, newBottom: number): boolean {
     const oldTop = this.renderedRange.top;
     const oldBottom = this.renderedRange.bottom;
     const oldEmpty = oldBottom < oldTop;
     const newEmpty = newBottom < newTop;
-    this.lastDiffWasFill = false;
+    let wasFill = false;
 
     if (oldEmpty && newEmpty) {
-      return;
+      return false;
     }
 
     const detachRanges = this.detachRangesScratch;
@@ -1017,12 +1034,12 @@ export class VirtualVerticalRenderer extends Renderer {
     attachRanges.length = 0;
 
     if (oldEmpty) {
-      this.lastDiffWasFill = true;
+      wasFill = true;
       attachRanges.push([newTop, newBottom]);
     } else if (newEmpty) {
       detachRanges.push([oldTop, oldBottom]);
     } else if (newBottom < oldTop || newTop > oldBottom) {
-      this.lastDiffWasFill = true;
+      wasFill = true;
       detachRanges.push([oldTop, oldBottom]);
       attachRanges.push([newTop, newBottom]);
     } else {
@@ -1051,6 +1068,7 @@ export class VirtualVerticalRenderer extends Renderer {
     if (attachRanges.length > 0) {
       this._attachRanges(rows, attachRanges, newTop);
     }
+    return wasFill;
   }
 
   /**

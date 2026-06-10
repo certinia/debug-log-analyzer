@@ -7,7 +7,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
 import { VirtualVerticalRenderer } from '../VirtualVerticalRenderer';
-import { seedHeightIndex } from './rendererTestUtils';
+import { seedHeightIndex, type RowStubBase } from './rendererTestUtils';
 
 /**
  * _attachRanges phase behavior — needs jsdom (real DocumentFragment / div
@@ -15,18 +15,10 @@ import { seedHeightIndex } from './rendererTestUtils';
  * which runs in the node environment with plain-object mocks.
  */
 
-interface AttachRowStub {
-  initialized: boolean;
-  heightInitialized: boolean;
+// jsdom stub: real elements, with spied initialize/rendered.
+interface AttachRowStub extends RowStubBase<HTMLElement> {
   initialize: jest.Mock;
-  calcHeight: () => void;
-  setCellHeight: () => void;
-  clearCellHeight: () => void;
   rendered: jest.Mock;
-  getElement: () => HTMLElement;
-  getHeight: () => number | undefined;
-  deinitializeHeight?: () => void;
-  data?: object;
 }
 
 interface AttachRendererInternals {

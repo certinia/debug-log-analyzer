@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
 import { VirtualVerticalRenderer } from '../VirtualVerticalRenderer';
-import { seedHeightIndex } from './rendererTestUtils';
+import { seedHeightIndex, type RowStubBase } from './rendererTestUtils';
 
 /**
  * Minimal Tabulator surface needed by the Renderer base class constructor
@@ -270,18 +270,8 @@ describe('VirtualVerticalRenderer height bookkeeping', () => {
   });
 });
 
-interface RowStub {
-  initialized: boolean;
-  heightInitialized: boolean;
-  initialize: () => void;
-  calcHeight: () => void;
-  setCellHeight: () => void;
-  clearCellHeight: () => void;
-  rendered: () => void;
-  getElement: () => { offsetTop: number; parentNode: object | null; style: object };
-  getHeight: () => number;
-  deinitializeHeight?: () => void;
-}
+// Node-env stub: row elements are plain offset objects, not real DOM.
+type RowStub = RowStubBase<{ offsetTop: number; parentNode: object | null; style: object }>;
 
 interface RendererForSetAnchor {
   setAnchor: (row: RowStub, offset: number) => void;

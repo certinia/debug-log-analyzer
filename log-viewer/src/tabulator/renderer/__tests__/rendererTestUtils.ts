@@ -2,6 +2,27 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
+/**
+ * Shared shape of test row stubs, mirroring the renderer's `RowInternals`
+ * (including PseudoRow optionality). `TEl` differs per environment: the node
+ * suite uses plain offset objects, the jsdom attach suite real elements.
+ * Keep in sync with `RowInternals` in VirtualVerticalRenderer.ts — a single
+ * place to update when that interface changes.
+ */
+export interface RowStubBase<TEl> {
+  initialized: boolean;
+  heightInitialized: boolean;
+  initialize: (force?: boolean, inFragment?: boolean) => void;
+  calcHeight: (force?: boolean) => void;
+  setCellHeight: () => void;
+  clearCellHeight: () => void;
+  rendered: () => void;
+  getElement: () => TEl;
+  getHeight: () => number | undefined;
+  deinitializeHeight?: () => void;
+  data?: object;
+}
+
 /** Structural slice of VirtualVerticalRenderer's height-index internals. */
 export interface HeightIndexInternals {
   measuredHeight: Float64Array;

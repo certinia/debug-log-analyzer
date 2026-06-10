@@ -59,10 +59,13 @@ export class RowNavigation extends Module {
       this.tableHolder.focus();
     }
 
-    return new Promise<void>((resolve) => {
-      // Need to wait for any pending redraws to finish before scrolling or it will not work
+    return new Promise<void>((resolve, reject) => {
+      // Need to wait for any pending redraws to finish before scrolling or it will not work.
+      // Propagate rejection too — without it a failed scroll (row no longer in
+      // the display set) left this promise unsettled forever, hanging awaiting
+      // callers (e.g. Find's match navigation).
       setTimeout(() => {
-        this._scrollToRow(row, opts).then(resolve);
+        this._scrollToRow(row, opts).then(resolve, reject);
       });
     });
   }

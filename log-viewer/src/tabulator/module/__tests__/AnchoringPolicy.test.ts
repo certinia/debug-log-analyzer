@@ -189,6 +189,44 @@ describe('AnchoringPolicy', () => {
     expect(setAnchor).not.toHaveBeenCalled();
   });
 
+  it('tiny overflow: user at the bottom is snapped to the bottom, not the top', () => {
+    // Content exceeds the viewport by only 8px, so BOTH edges are within the
+    // boundary threshold. Proximity must break the tie — a user sitting at
+    // the bottom (scrollTop = max = 8) stays at the bottom.
+    const anchor = makeRow({ top: 0, height: 20 });
+    const { table, holder } = setup({
+      visibleRows: [anchor],
+      displayRows: [anchor],
+      holderScrollTop: 8,
+      holderScrollHeight: 108,
+      holderClientHeight: 100,
+    });
+
+    table.handlers.renderStarted?.[0]?.();
+    holder.scrollTop = 0; // browser/pipeline moved it during the re-render
+    table.handlers.renderComplete?.[0]?.();
+
+    expect(holder.scrollTop).toBe(8); // restored to maxScroll, not 0
+  });
+
+  it('edge snaps use the renderer setScrollTop seam when available (echo suppression)', () => {
+    const anchor = makeRow({ top: 10, height: 20 });
+    const { table, holder } = setup({
+      visibleRows: [anchor],
+      displayRows: [anchor],
+      holderScrollTop: 0,
+    });
+    const setScrollTop = jest.fn();
+    (table.rowManager.renderer as Record<string, unknown>)['setScrollTop'] = setScrollTop;
+
+    table.handlers.renderStarted?.[0]?.();
+    holder.scrollTop = 200;
+    table.handlers.renderComplete?.[0]?.();
+
+    expect(setScrollTop).toHaveBeenCalledWith(0);
+    expect(holder.scrollTop).toBe(200); // raw write NOT used when the seam exists
+  });
+
   it('bulk toggles under blockRedraw: dataTree events with no capture are ignored', () => {
     const anchor = makeRow({ top: 40, height: 20 });
     const { table, holder, setAnchor } = setup({
