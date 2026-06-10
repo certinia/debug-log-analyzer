@@ -4,6 +4,10 @@ on:
   release:
     types: [published]
 
+# Publishing uses VSCE/OVSX secrets, not the git token — read-only is enough.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest

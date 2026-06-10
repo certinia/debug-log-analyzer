@@ -5,13 +5,15 @@ on:
     - cron: '15 4 * * 2' # every tuesday at 4:15AM UTC
   workflow_dispatch:
 
+# Least-privilege default; only the publish job is elevated (to push the `pre` tag).
+permissions:
+  contents: read
+
 jobs:
   check:
     name: Check for pre release changes
     runs-on: ubuntu-latest
     if: github.repository_owner == 'certinia'
-    permissions:
-      contents: write
     outputs:
       exitstatus: ${{ steps.earlyexit.outputs.exitstatus }}
     steps:
@@ -55,6 +57,8 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     if: github.repository_owner == 'certinia' && needs.check.outputs.exitstatus == 'continue'
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v6

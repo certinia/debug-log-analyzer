@@ -7,6 +7,10 @@ on:
     branches: [main, release/**]
   workflow_dispatch:
 
+# Least-privilege default: CI only needs to read the repository.
+permissions:
+  contents: read
+
 jobs:
   verify_files:
     name: Verify Files
