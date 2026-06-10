@@ -11,7 +11,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: 9sako6/imgcmp@v2.0.4
+      - uses: 9sako6/imgcmp@96250a4f33dd989ab6cd28096e854309e3c17227 # v2.0.4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           paths-ignore-regexp: 'node_modules/.*'
