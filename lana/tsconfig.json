@@ -39,6 +39,7 @@
     "removeComments": true,
     "sourceMap": false
   },
-  "include": ["./src/**/*.ts", "../apex-log-parser/src/**/*.ts"],
-  "exclude": ["**/node_modules", "**/.*/"]
+  "include": ["./src/**/*.ts"],
+  "exclude": ["**/node_modules", "**/.*/"],
+  "references": [{ "path": "../apex-log-parser" }]
 }

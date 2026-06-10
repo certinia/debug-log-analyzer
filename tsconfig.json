@@ -1,0 +1,4 @@
+{
+  "files": [],
+  "references": [{ "path": "./apex-log-parser" }, { "path": "./log-viewer" }, { "path": "./lana" }]
+}
