@@ -24,7 +24,7 @@
     "prettier": "^3.8.3",
     "prettier-plugin-organize-imports": "^4.3.0",
     "rolldown": "1.0.3",
-    "rollup": "^4.60.4",
+    "rollup": "^4.61.1",
     "rollup-plugin-copy": "^3.5.0",
     "rollup-plugin-polyfill-node": "^0.13.0",
     "rollup-plugin-postcss": "^4.0.2",
