@@ -16,7 +16,7 @@ jobs:
       exitstatus: ${{ steps.earlyexit.outputs.exitstatus }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -55,23 +55,22 @@ jobs:
     if: github.repository_owner == 'certinia' && needs.check.outputs.exitstatus == 'continue'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v6
         with:
           version: 10
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'pnpm'
       - name: Install vsce + ovsx
         run: |
           pnpm add --global @vscode/vsce
           pnpm add --global ovsx
       - name: Dependencies
-        run: |
-          HUSKY=0 pnpm install
+        run: pnpm run ci:install
       - name: update pre-release version
         run: |
           echo "Updating pre-release version"
