@@ -40,9 +40,8 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-      # Full install (docs build needs lana-docs); ignore-scripts skips the only-allow preinstall.
       - name: Dependencies
-        run: pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
+        run: pnpm run ci:install
       - name: Build Site
         run: |
           cd lana-docs

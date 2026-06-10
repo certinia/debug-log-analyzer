@@ -45,7 +45,7 @@
     "lint": "concurrently -r -g 'eslint **/*.ts' 'prettier --cache **/*.{ts,css,md,scss} --check --experimental-cli' 'tsc --noemit --skipLibCheck -p apex-log-parser/tsconfig.json' 'tsc --noemit --skipLibCheck -p log-viewer/tsconfig.json' 'tsc --noemit --skipLibCheck -p lana/tsconfig.json'",
     "test": "jest",
     "test:ci": "jest --runInBand",
-    "ci:install": "pnpm install --frozen-lockfile --prefer-offline --ignore-scripts --filter=!./lana-docs",
+    "ci:install": "pnpm install --frozen-lockfile --prefer-offline --ignore-scripts",
     "prettier-format": "prettier '**/*.ts' --cache --write --experimental-cli"
   },
   "lint-staged": {
