@@ -22,7 +22,19 @@ export class Renderer {
     this.elementHorizontal = table?.columnManager?.element ?? null;
     this.tableElement = table?.rowManager?.tableElement ?? null;
   }
-  styleRow() {}
+  // Mirrors real Renderer.styleRow (tabulator_esm.mjs:23582) including its
+  // inverted naming quirk (index % 2 → "even" class). Optional-chained so
+  // node-env suites with plain-object row elements (no classList) stay safe.
+  styleRow(row: any, index: number) {
+    const rowEl = row.getElement();
+    if (index % 2) {
+      rowEl.classList?.add('tabulator-row-even');
+      rowEl.classList?.remove('tabulator-row-odd');
+    } else {
+      rowEl.classList?.add('tabulator-row-odd');
+      rowEl.classList?.remove('tabulator-row-even');
+    }
+  }
   rows() {
     return this.table?.rowManager?.getDisplayRows?.() ?? [];
   }

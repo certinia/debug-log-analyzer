@@ -4,57 +4,45 @@
 import { Renderer } from 'tabulator-tables';
 
 /**
- * Variable-height-aware vertical virtual renderer for Tabulator 6.4.0.
+ * Variable-height vertical virtual renderer for Tabulator 6.4.0 — a
+ * standalone replacement for stock `VirtualDomVertical` (uniform-height
+ * model). Enable per table with `renderVertical: VirtualVerticalRenderer`.
  *
- * Replaces tabulator's stock `VirtualDomVertical` (uniform-row-height model)
- * with a renderer that models per-row heights via two Fenwick trees:
- *
+ * Coordinate model — two Fenwick trees:
  *   cumHeight(i) = fenwickMeasured.prefix(i)
  *                + fenwickUnmeasuredCount.prefix(i) × estimateHeight
+ * giving O(log n) cumHeight/totalHeight/setHeight and O(log² n) findRowAt.
+ * `estimateHeight` is calibrated once from the first painted window, then
+ * frozen, and additionally locked per render call — the coordinate space
+ * never shifts under the user (see estimateFrozen / _lockedEstimate).
  *
- * The first tree sums measured row heights; the second counts unmeasured
- * rows. Together they give O(log n) `cumHeight(i)`, `totalHeight()`, and
- * `setHeight()`; `findRowAt(y)` is O(log² n) binary search over `cumHeight`.
+ * Render flow: scroll events coalesce into one `_scrollFrame` per paint
+ * (velocity-gated fling deferral skips renders nobody could see), which
+ * diff-renders the window — detach leavers, attach enterers via batched
+ * read/write phases (one forced reflow per attach call) — then idle time
+ * pre-warms cells just beyond the edges.
  *
- * `estimateHeight` is locked for the duration of a single `_renderWindow()`
- * call — measurements update the Fenwick trees and running stats but do not
- * mutate `estimateHeight` until end-of-render. This makes paddingTop math
- * stable across the render (mid-render measurements provably can't change
- * `cumHeight(newTop)` because Fenwick updates are at indices ≥ newTop), so
- * single-pass is correct — no iteration loop, no convergence cap.
- *
- * `scrollRows` is RAF-coalesced: browser scroll events accumulate into one
- * `_renderWindow()` call per paint, keeping content rendering at native 60 Hz
- * regardless of scroll-event frequency.
- *
- * Pass as a class reference to the table option:
- *   renderVertical: VirtualVerticalRenderer
+ * Cross-module contracts: AnchoringPolicy drives `setAnchor`; the Find
+ * module reads `vDomTop`/`vDomBottom`.
  */
 
 interface RowInternals {
   initialized: boolean;
   heightInitialized: boolean;
   initialize: (force?: boolean, inFragment?: boolean) => void;
-  normalizeHeight: (force?: boolean) => void;
   calcHeight: (force?: boolean) => void;
   setCellHeight: () => void;
   clearCellHeight: () => void;
   rendered: () => void;
   getElement: () => HTMLElement;
   getHeight: () => number;
-  // Tabulator internal: clears heightInitialized + outerHeight so the next
-  // calcHeight()/setCellHeight() pass re-measures from the DOM. Used by
-  // stock VirtualDomVertical.rerenderRows and by our resize-driven height
-  // invalidation (width-change wraps text differently → all heights stale).
+  // Clears heightInitialized + cached outerHeight so the next attach
+  // re-measures from the DOM.
   deinitializeHeight?: () => void;
-  // Tabulator stores the row's data object on `.data`. The OBJECT REFERENCE
-  // is a durable identity: DataTree's `generateChildren` creates new Row
-  // wrappers on each expand but around the SAME child data objects, and
-  // `Row.updateData` mutates `this.data` in place rather than replacing it
-  // (tabulator_esm.mjs). So `row.data` keys the Stage 2b height cache without
-  // requiring any id field — Tabulator's `options.index` ("id") is optional
-  // and nothing guarantees the data carries one. Defensively optional: a row
-  // without a data object is simply not cached and measured normally.
+  // The row's data OBJECT REFERENCE — a durable identity that survives
+  // DataTree re-wrapping and in-place updateData, so it keys the height
+  // cache without requiring an id field. Rows without one simply aren't
+  // cached.
   data?: object;
 }
 
@@ -65,16 +53,12 @@ interface RendererBase {
       tableElement: HTMLElement;
       getDisplayRows: () => RowInternals[];
       scrollHorizontal: (left: number) => void;
-      // Tabulator internal: shows the placeholder element when the display
-      // is empty (tabulator_esm.mjs RowManager). Stock VirtualDomVertical
-      // calls this at the end of rerenderRows; we mirror that.
+      // Shows the placeholder when the display is empty; mirrored at the
+      // end of rerenderRows like stock.
       tableEmpty?: () => void;
-      // Tabulator internal: RowManager copies `options.renderVertical` into
-      // this field at setRenderMode time (tabulator_esm.mjs:26706). When
-      // `renderVertical` is a class, this becomes a class reference and
-      // gets stringified into the `.tabulator-placeholder` element's
-      // `tabulator-render-mode` attribute (tabulator_esm.mjs:26804). We
-      // overwrite it with the string `'virtual'` in `initialize()`.
+      // RowManager copies `options.renderVertical` here verbatim — a CLASS
+      // reference that gets stringified into a DOM attribute. initialize()
+      // overwrites it with the string 'virtual' (stock bug workaround).
       renderMode?: string;
     };
     options: Record<string, unknown>;
@@ -87,17 +71,26 @@ interface RendererBase {
 
 const DEFAULT_ESTIMATE_HEIGHT = 30;
 const OVERSCAN_OPTION = 'variableHeightOverscanRows';
-const LEGACY_BUFFER_OPTION = 'renderVerticalBuffer';
 const OVERSCAN_MIN = 4;
 const OVERSCAN_MAX = 16;
 
-// Minimum holder-width delta (px) that counts as a real resize and invalidates
-// measured row heights. Ignores subpixel layout jitter on retina displays.
+// Idle pre-warm: build cells for rows this far beyond each window edge
+// during requestIdleCallback time, so scrolling into them pays only
+// measurement. Keep SMALL (~1.5 windows/side): larger spans build thousands
+// of never-visited cell trees whose GC churn caused warm-frame spikes.
+const IDLE_PREWARM_SPAN_ROWS = 48;
+// Stop a pre-warm slot when the idle deadline has less than this left.
+const IDLE_PREWARM_MIN_REMAINING_MS = 2;
+// Hard per-slot row cap, independent of the deadline: rIC callbacks are not
+// preemptible, so an uncapped slot on a generous (up to 50ms) deadline
+// blocks a scroll event into a dropped frame.
+const IDLE_PREWARM_MAX_ROWS_PER_SLOT = 24;
+
+// Minimum holder-width delta (px) that counts as a real resize (height
+// invalidation); ignores subpixel retina jitter.
 const RESIZE_WIDTH_THRESHOLD_PX = 1;
-// Idle period after the last resize event before we fire the O(n)
-// `_invalidateMeasuredHeights` walk. During a resize-handle drag the
-// ResizeObserver fires per-pixel (~60 Hz); without debouncing the deinit
-// walk runs once per frame, far more expensive than the actual render.
+// Quiet period before the O(n) height-invalidation walk runs — the
+// ResizeObserver fires per-pixel during a resize-handle drag.
 const RESIZE_INVALIDATE_DEBOUNCE_MS = 120;
 
 /**
@@ -118,10 +111,6 @@ class Fenwick {
   constructor(n: number) {
     this.n = n;
     this.tree = new Float64Array(n + 1);
-  }
-
-  size(): number {
-    return this.n;
   }
 
   resize(n: number): void {
@@ -174,142 +163,110 @@ class Fenwick {
 }
 
 export class VirtualVerticalRenderer extends Renderer {
-  // String tags read directly by RowManager (tabulator_esm.mjs:26706, :26855).
+  // String tags read directly by RowManager.
   renderMode = 'virtual';
-  // 'fill' tells RowManager to call adjustTableSize() after our renders so the
-  // container takes its size from the configured height/maxHeight.
+  // 'fill': RowManager calls adjustTableSize() after renders so the container
+  // sizes from the configured height/maxHeight.
   verticalFillMode = 'fill';
 
-  // Fenwick A: sum of measured heights. For unmeasured rows the entry is 0.
-  private fenwickMeasured = new Fenwick(0);
-  // Fenwick B: count of unmeasured rows. Starts at 1 per row; goes to 0 when
-  // that row is measured.
-  private fenwickUnmeasuredCount = new Fenwick(0);
-  // Shadow of measured per-row heights, used by setHeight to compute the
-  // Fenwick delta on re-measurement. 0 for unmeasured rows.
-  private measuredHeight: Float64Array = new Float64Array(0);
-  // Whether each row has been measured. Uint8 because we only need 0/1.
+  // Coordinate model (see class doc). Positional — rebuilt on every
+  // structural change.
+  private fenwickMeasured = new Fenwick(0); // Σ measured heights (0 if unmeasured)
+  private fenwickUnmeasuredCount = new Fenwick(0); // 1 per unmeasured row
+  private measuredHeight: Float64Array = new Float64Array(0); // shadow for re-measure deltas
   private isMeasured: Uint8Array = new Uint8Array(0);
-  // Stage 2b: durable measured heights keyed by the row's DATA OBJECT
-  // REFERENCE (not index, not an id field — Tabulator does not guarantee an
-  // id). The data object survives expand/collapse (DataTree re-wraps the same
-  // child data objects) and `updateData` (mutates in place), so it is a
-  // stable identity for ANY Tabulator data. The Fenwick/index arrays above
-  // are positional and rebuilt on every structural change; this cache
-  // survives them: `rerenderRows` re-seeds the index arrays from here, so
-  // rows measured once keep their real height across expand/collapse/sort/
-  // filter instead of resetting to the estimate. WeakMap → entries are
-  // garbage-collected with their data objects; "cleared" by reassignment on
-  // `clearRows` (new dataset) and `_invalidateMeasuredHeights` (width change
-  // → wrapping differs → heights stale).
+  // Durable heights keyed by data OBJECT REFERENCE (survives structural
+  // rebuilds — rerenderRows re-seeds the positional index from here).
+  // "Cleared" by reassignment on clearRows / width invalidation.
   private dataHeights = new WeakMap<object, number>();
 
   private estimateHeight = DEFAULT_ESTIMATE_HEIGHT;
   private measuredSum = 0;
   private measuredCount = 0;
-  // Stage 2a: the estimate is calibrated ONCE from the first painted window's
-  // real measurements, then frozen. A drifting running mean is catastrophic at
-  // scale — applied to all unmeasured rows via `_cumHeight`, a sub-0.1px change
-  // re-prices hundreds of thousands of rows and swings `totalHeight` by 100k+
-  // px mid-operation (relocating the window thousands of rows). A fixed
-  // estimate keeps the coordinate space stable across renders; per-row measured
-  // heights still refine accuracy locally via the Fenwick. Reset on `clearRows`
-  // so a new dataset recalibrates.
+  // INVARIANT: the estimate is calibrated once from the first painted window,
+  // then frozen — a drifting mean re-prices every unmeasured row and lurches
+  // the coordinate space by 100k+ px at scale. Reset only by clearRows.
   private estimateFrozen = false;
 
-  // Snapshot of `estimateHeight` taken at the start of `_renderWindow` and
-  // honoured by `_cumHeight` until the call returns. Keeps every cumHeight
-  // probe inside one render call self-consistent even though `_setHeight`
-  // mutates `measuredSum`/`measuredCount` during attach. Null outside a
-  // render call so `_cumHeight` reads the live value (e.g. test helpers).
+  // Per-render snapshot of estimateHeight honoured by _cumHeight, keeping all
+  // probes within one render self-consistent. Null outside renders.
   private _lockedEstimate: number | null = null;
 
+  // Rendered window, two views: vDomTop/vDomBottom are the stable post-render
+  // snapshot (read externally — Find module, visibleRows); renderedRange is
+  // the LIVE value _attachRanges reads mid-coverage-loop for insertion
+  // points. Equal at rest; do not merge (mutated in place to avoid churn).
   private vDomTop = 0;
-  private vDomBottom = -1; // inclusive; -1 = empty range
+  private vDomBottom = -1; // inclusive; -1 = empty
   private renderedRange: { top: number; bottom: number } = { top: 0, bottom: -1 };
 
   private rowsCountCached = 0;
 
-  // RAF coalescing for scrollRows.
+  // One scroll/render RAF slot (see _scheduleScrollRaf).
   private rafScheduled = false;
 
-  // Width-change detection for resize-driven height invalidation. Text wrap
-  // shifts when the holder width changes → all measured heights are stale.
+  // scrollTop seen by the previous _scrollFrame — the velocity reference for
+  // fling deferral. NaN = none recent (treated as fast).
+  private deferredScrollTop = NaN;
+
+  // Pending rIC handle for the pre-warmer; cancelled on destroy/clearRows.
+  private idlePrewarmHandle: number | null = null;
+
+  // Last scrollLeft piped to scrollHorizontal (which writes DOM + dispatches
+  // unconditionally — pipe only on change). NaN → first frame always pipes.
+  private lastPipedScrollLeft = NaN;
+
+  // Resize tracking: width change ⇒ text re-wraps ⇒ all heights stale;
+  // unchanged dimensions ⇒ resize() must no-op (Tabulator calls it on every
+  // restoreRedraw cascade, and a needless deferred render visibly shifts the
+  // window a frame after a click paints).
   private lastClientWidth = 0;
-  // Track clientHeight too so resize() can no-op when neither dimension
-  // changed. Tabulator calls renderer.resize() from adjustTableSize on every
-  // restoreRedraw cascade (e.g. after a plain row click); without this guard
-  // we'd schedule a RAF _renderWindow that runs ONE FRAME later — visibly
-  // shifting the rendered window after the click has already painted.
   private lastClientHeight = 0;
   private resizeObserver: ResizeObserver | null = null;
-  // Debounce state for `_invalidateMeasuredHeights`. The deinit walk is O(n)
-  // across every display row; firing it per-pixel of a resize-handle drag
-  // dominates per-frame cost. We mark `resizePendingInvalidate=true` on
-  // every width-change resize() and only run the walk once after
-  // RESIZE_INVALIDATE_DEBOUNCE_MS of quiet.
+  // Debounce for the O(n) invalidation walk — ResizeObserver fires per-pixel
+  // during a handle drag.
   private resizeInvalidateTimer: ReturnType<typeof setTimeout> | null = null;
   private resizePendingInvalidate = false;
 
-  // Set true while a `_renderWindow` triggered by user scrolling is running.
-  // Used by `_renderWindowLocked` to skip `_flushEstimateUpdate` during
-  // scrolls — matches stock VirtualDomVertical's sticky `vDomRowHeight`.
-  // Without this, scrolling into rows whose heights differ from the current
-  // estimate mid-scroll causes either a visible jump (no compensation) or a
-  // tugged-against-user-input feel (the B5 compensation attempt that this
-  // flag replaces).
+  // True while a user-scroll render runs. Gates the sticky-estimate rule
+  // (no estimate flush mid-scroll — stock's vDomRowHeight behaves the same;
+  // a mid-scroll mean shift either jumps or tugs against the user).
   private inScrollDrivenRender = false;
 
-  // Stage 2c: above-viewport measurement compensation (TanStack
-  // `scrollAdjustments`). During a scroll-driven render, rows prepended above
-  // the viewport get measured; each (real − previously-priced) delta would
-  // shift all visible content by that amount. `_setHeight` accumulates the
-  // deltas for rows above the viewport-top row (`renderVisTop`, set per
-  // render); `_renderWindowLocked` applies the sum to scrollTop at the end of
-  // the render so visible content stays pixel-stable. Mirrors stock
-  // `_addTopRow`'s `vDomTopPad -= paddingAdjust` and TanStack's
-  // `shouldAdjustScrollPositionOnItemSizeChange` default.
+  // Stage 2c (TanStack scrollAdjustments): _setHeight accumulates
+  // (real − priced) deltas for rows above the viewport top; the render
+  // applies the sum to scrollTop so visible content stays pixel-pinned.
   private pendingScrollAdjust = 0;
   private renderVisTop = -1; // -1 = not in a scroll-driven render
 
-  // Last scrollTop value we wrote programmatically (setAnchor / scrollToRow /
-  // pre-render clamp / clearRows zero-out). When the browser's resulting
-  // `scroll` event routes back into scrollRows() and `holder.scrollTop`
-  // matches this value, the event is ours — suppress the settle timer + RAF
-  // re-render that would otherwise fire 120 ms later with a freshly-flushed
-  // estimateHeight and visibly shift the rendered window. Set to NaN when
-  // there is no pending programmatic write (NaN !== anything, including
-  // itself — safer than `null` because it can never equal a real scrollTop).
+  // INVARIANT: every programmatic scrollTop write goes through _setScrollTop,
+  // which records the value here FIRST. scrollRows treats a matching scroll
+  // event (±1px — browsers round fractional writes) as our echo and swallows
+  // it instead of scheduling a redundant render. NaN = nothing pending
+  // (NaN never equals a real scrollTop).
   private pendingProgrammaticScrollTop = NaN;
 
   // ---------------------------------------------------------------------------
   // Renderer lifecycle (called by RowManager)
   // ---------------------------------------------------------------------------
 
+  /** RowManager lifecycle: one-time setup after construction. */
   initialize(): void {
-    // Stock Tabulator bug workaround: when `renderVertical` is a class (as
-    // with this renderer) RowManager sets its `renderMode` field to the
-    // class reference itself (tabulator_esm.mjs:26706, inside
-    // `setRenderMode`). That field is later written to the
-    // `.tabulator-placeholder` element's `tabulator-render-mode` attribute
-    // (tabulator_esm.mjs:26804), which stringifies the class — producing
-    // garbage like `class VirtualVerticalRenderer ...` in the DOM.
-    // Overwrite with the string `'virtual'` here, before the first
-    // placeholder render. Our `initialize()` runs immediately after the
-    // bad assignment (tabulator_esm.mjs:26709), so this is the earliest
-    // safe point.
+    // Stock bug workaround: RowManager stores the renderVertical CLASS in
+    // its renderMode field and later stringifies it into a DOM attribute.
+    // Overwrite with the string before the first placeholder render —
+    // initialize() runs immediately after the bad assignment.
     const self = this._self();
     self.table.rowManager.renderMode = this.renderMode;
 
-    // Seed lastClientWidth so the first real resize() call sees a meaningful
-    // prev value and only invalidates on actual width changes.
+    // Seed dimension caches so the first resize() only invalidates on a
+    // real change.
     const holder = self.elementVertical;
     this.lastClientWidth = holder.clientWidth;
     this.lastClientHeight = holder.clientHeight;
 
-    // ResizeObserver catches every holder resize, including ones tabulator's
-    // outer redraw misses (sidebar toggle, flex parent resize without window
-    // event). Routes through resize() so the width-change branch fires.
+    // ResizeObserver catches holder resizes tabulator's outer redraw misses
+    // (sidebar toggle, flex parent resize without a window event).
     if (typeof ResizeObserver !== 'undefined' && this.resizeObserver === null) {
       this.resizeObserver = new ResizeObserver(() => {
         this.resize();
@@ -318,6 +275,7 @@ export class VirtualVerticalRenderer extends Renderer {
     }
   }
 
+  /** RowManager lifecycle: release observers, timers, and idle callbacks. */
   destroy(): void {
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
@@ -326,56 +284,40 @@ export class VirtualVerticalRenderer extends Renderer {
       this.resizeInvalidateTimer = null;
     }
     this.resizePendingInvalidate = false;
+    this._cancelIdlePrewarm();
   }
 
   clearRows(): void {
     const tableElement = this._self().tableElement;
-    while (tableElement.firstChild) {
-      tableElement.removeChild(tableElement.firstChild);
-    }
+    this._detachAllRendered();
     tableElement.style.paddingTop = '0';
     tableElement.style.paddingBottom = '0';
-    this.fenwickMeasured = new Fenwick(0);
-    this.fenwickUnmeasuredCount = new Fenwick(0);
-    this.measuredHeight = new Float64Array(0);
-    this.isMeasured = new Uint8Array(0);
+    this._resetHeightIndex(0);
     this.dataHeights = new WeakMap(); // new dataset: previous heights are meaningless
-    this.measuredSum = 0;
-    this.measuredCount = 0;
-    this.vDomTop = 0;
-    this.vDomBottom = -1;
-    this.renderedRange = { top: 0, bottom: -1 };
-    this.rowsCountCached = 0;
-    this.pendingProgrammaticScrollTop = 0;
-    // New dataset: recalibrate the frozen estimate from its first window. Keep
-    // the current estimateHeight as the seed until that first flush lands.
+    this.deferredScrollTop = NaN;
+    this._cancelIdlePrewarm();
+    // Recalibrate the frozen estimate from the next dataset's first window;
+    // estimateHeight itself stays as the seed.
     this.estimateFrozen = false;
-    this._self().elementVertical.scrollTop = 0;
-    // Keep estimateHeight — useful seed for the next dataset.
+    this._setScrollTop(0);
   }
 
   renderRows(): void {
-    // Only zero scrollTop on a truly fresh render — no prior rendered state.
-    // After clearRows() (Tabulator's clear callback) rowsCountCached is 0,
-    // so this guard cleanly distinguishes fresh-mount / setData from a
-    // pipeline-driven re-render that routes through renderRows() instead
-    // of rerenderRows() (renderMode-dependent in Tabulator core).
+    // Zero scrollTop only on a truly fresh render (post-clearRows / setData);
+    // pipeline-driven re-renders that route through here keep their position.
     if (this.rowsCountCached === 0) {
-      this.pendingProgrammaticScrollTop = 0;
-      this._self().elementVertical.scrollTop = 0;
+      this._setScrollTop(0);
     }
     this._renderWindow();
   }
 
+  /**
+   * RowManager lifecycle: structural re-render (sort / filter / tree
+   * toggle). Renders and retains relative position ONLY — anchoring policy
+   * (which row to favour) lives in the AnchoringPolicy module, which applies
+   * corrections via setAnchor after this returns, pre-paint.
+   */
   rerenderRows(callback?: () => void): void {
-    // Renderer contract (Stage 2d): render + retain relative position ONLY.
-    // Anchoring policy — which row to favour (clicked / middle / edge) — lives
-    // in the AnchoringPolicy module, driven by the renderStarted /
-    // renderComplete / dataTreeRow* events that bracket this call. With the
-    // durable height cache rebuilt below (Stage 2b), a tree toggle leaves all
-    // above-viewport cumHeight identical, so rendering at the browser-
-    // preserved scrollTop already keeps the viewport stable; the policy
-    // applies corrections on top, synchronously before paint.
     const self = this._self();
     const left = self.table.rowManager.element.scrollLeft;
 
@@ -383,104 +325,146 @@ export class VirtualVerticalRenderer extends Renderer {
     if (callback) {
       callback();
     }
-    // Sort/filter/toggle changes row positions (and maybe count). Stage 2b:
-    // rebuild the positional Fenwick from the durable data→height cache so
-    // rows measured before keep their real height — `cumHeight`/`totalHeight`
-    // stay accurate instead of resetting to the estimate.
+    // Stage 2b: rebuild the positional index from the durable height cache
+    // so previously-measured rows keep their real height across the change.
     const rowsAfter = self.table.rowManager.getDisplayRows();
     this._rebuildIndexFromCache(rowsAfter);
-    // Rendered rows still re-measure via _attachRanges Phase B–D (confirms /
-    // refreshes the seeded height); off-screen cached rows keep their seeded
-    // value until they next enter the window.
+    // Rendered rows still re-measure on attach (confirming the seed);
+    // off-screen rows keep the seeded value until they enter the window.
     for (const row of rowsAfter) {
       row.deinitializeHeight?.();
     }
 
     this._renderWindow();
     if (rowsAfter.length === 0) {
-      // Empty display: mirror stock's `tableEmpty()` so the
-      // `.tabulator-placeholder` element shows (tabulator_esm.mjs:25281).
-      self.table.rowManager.tableEmpty?.();
+      self.table.rowManager.tableEmpty?.(); // show the placeholder, like stock
     }
-
-    // Mirror stock VirtualDomVertical.rerenderRows tail (tabulator_esm.mjs:25285):
-    // sync horizontal scroll after vertical re-render.
-    self.table.rowManager.scrollHorizontal(left);
+    self.table.rowManager.scrollHorizontal(left); // stock-parity tail
   }
 
+  /** RowManager lifecycle: holder scroll event (reads live scrollTop). */
   scrollRows(_top: number, _dir: boolean): void {
     const holder = this._self().elementVertical;
     const top = holder.scrollTop;
 
-    // Suppress scroll events triggered by our own programmatic scrollTop
-    // writes (setAnchor / scrollToRow / pre-render clamp / clearRows /
-    // renderRows zero-out). Each of those callers already re-rendered
-    // synchronously; the echoed scroll event would just schedule a
-    // redundant render that could fire AFTER state has shifted and
-    // visibly move the rendered window (verified: a 1837px LayoutShift
-    // attributable to this RAF in a tree-collapse profile capture).
-    //
-    // Use a 1 px tolerance, NOT exact equality. setAnchor's scrollTop
-    // computations (`el.offsetTop - offsetFromHolderTop`,
-    // `cumHeight(idx) - offset`) produce fractional values; browsers
-    // round scrollTop on write (integer on most, 0.5 px on retina), so
-    // the echoed scroll event reads a rounded value while
-    // `pendingProgrammaticScrollTop` holds the unrounded original →
-    // exact equality misses → suppression fails. One-shot — clear after
-    // consuming. NaN naturally falls through (Math.abs(NaN) is NaN,
-    // NaN < 1 is false), so the "no pending" case is not suppressed.
+    // Echo suppression: a scroll event matching pendingProgrammaticScrollTop
+    // is the browser echoing our own _setScrollTop write — the caller already
+    // rendered, so a re-render here would visibly shift the window. ±1px
+    // tolerance because browsers round fractional scrollTop writes. One-shot;
+    // the NaN "nothing pending" case falls through naturally.
     if (Math.abs(top - this.pendingProgrammaticScrollTop) < 1) {
       this.pendingProgrammaticScrollTop = NaN;
       return;
     }
     this.pendingProgrammaticScrollTop = NaN;
 
-    // RAF-coalesce: browser scroll events during a drag fire faster than the
-    // paint rate. Doing a full _renderWindow per event is wasted work — only
-    // the latest event's scrollTop matters by the next paint. Cap to one
-    // render per RAF tick. Stock VirtualDomVertical doesn't need RAF
-    // coalescing because its per-event op is one incremental add/remove;
-    // ours is a from-scratch window render.
+    // Coalesce to one _scrollFrame per paint — only the latest scrollTop
+    // matters by the next frame. A RAF requested inside a scroll handler
+    // runs in the SAME rendering update, so this adds no latency.
     if (this.rafScheduled) {
       return;
     }
+    this._scheduleScrollRaf(() => this._scrollFrame());
+  }
+
+  /**
+   * One per-paint scroll step — RAF-coalesced by scrollRows, and
+   * self-rescheduled while a fast fling is being deferred.
+   *
+   * Fast-fling deferral: while scrollTop moves faster than one viewport per
+   * frame AND nothing rendered intersects the viewport, a render would be a
+   * 100% window replacement discarded next frame — skip it and keep watching.
+   * Velocity (not overlap alone) is the gate so a gesture that slows back to
+   * readable speed renders immediately; delta 0 is the settle render. The
+   * RAF stability check deliberately replaces `scrollend`, which never fires
+   * while the scrollbar thumb is held still.
+   *
+   * Layout-read contract: ALL layout reads happen at frame entry, never
+   * after `_renderWindow`'s DOM writes — a post-write read forces a full
+   * style+layout flush per frame.
+   */
+  private _scrollFrame(): void {
+    const holder = this._self().elementVertical;
+    const scrollTop = holder.scrollTop;
+    // Consumed in the tail, read here per the layout-read contract above.
+    const scrollLeft = this._self().table.rowManager.element.scrollLeft;
+    // ResizeObserver-maintained cache; live read only before the first
+    // initialize()/resize() seeds it. The gate tolerates resize-lag.
+    const clientHeight = this.lastClientHeight || holder.clientHeight;
+
+    // Per-frame velocity. deferredScrollTop is NaN when no scroll frame ran
+    // recently → delta NaN → `!(delta <= clientHeight)` treats it as fast.
+    const delta = Math.abs(scrollTop - this.deferredScrollTop);
+    this.deferredScrollTop = scrollTop;
+
+    if (!(delta <= clientHeight) && this._zeroOverlap(scrollTop, clientHeight)) {
+      // Scroll events stop once the position stops changing — the settle
+      // check must self-schedule.
+      this._scheduleScrollRaf(() => this._scrollFrame());
+      return;
+    }
+
+    // Scroll-driven renders skip the estimate flush (sticky-estimate rule).
+    this.inScrollDrivenRender = true;
+    try {
+      this._renderWindow();
+    } finally {
+      this.inScrollDrivenRender = false;
+    }
+    // Pipe horizontal scroll (stock parity) only when it actually changed —
+    // Tabulator's scrollHorizontal writes DOM + dispatches unconditionally.
+    if (scrollLeft !== this.lastPipedScrollLeft) {
+      this.lastPipedScrollLeft = scrollLeft;
+      this._self().table.rowManager.scrollHorizontal(scrollLeft);
+    }
+  }
+
+  /** Book `fn` on the shared scroll RAF slot (see rafScheduled). */
+  private _scheduleScrollRaf(fn: () => void): void {
     this.rafScheduled = true;
     requestAnimationFrame(() => {
       this.rafScheduled = false;
-      // Mark this render as scroll-driven so _renderWindowLocked skips the
-      // estimate flush. try/finally ensures the flag clears even if the
-      // render throws.
-      this.inScrollDrivenRender = true;
-      try {
-        this._renderWindow();
-      } finally {
-        this.inScrollDrivenRender = false;
-      }
-      // Mirror stock VirtualDomVertical.scrollRows: pipe horizontal scroll
-      // through to the column manager (tabulator_esm.mjs:25288).
-      const left = this._self().table.rowManager.element.scrollLeft;
-      this._self().table.rowManager.scrollHorizontal(left);
+      fn();
     });
   }
 
+  /**
+   * The single way to write scrollTop programmatically: records the value in
+   * `pendingProgrammaticScrollTop` FIRST so scrollRows suppresses the echoed
+   * scroll event (see that field's comment for the 1px-tolerance rationale).
+   */
+  private _setScrollTop(top: number): void {
+    this.pendingProgrammaticScrollTop = top;
+    this._self().elementVertical.scrollTop = top;
+  }
+
+  /**
+   * True when nothing currently rendered intersects the viewport at
+   * `scrollTop` — the user is looking at pure padding and a render would
+   * replace the entire window. Two binary searches (O(log² n)), no DOM
+   * reads or writes. An empty rendered range counts as overlap (first
+   * paint must render).
+   */
+  private _zeroOverlap(scrollTop: number, clientHeight: number): boolean {
+    if (this.renderedRange.bottom < this.renderedRange.top) {
+      return false;
+    }
+    const visTop = this._findRowAt(scrollTop);
+    const visBottom = this._findRowAt(scrollTop + clientHeight);
+    return visBottom < this.renderedRange.top || visTop > this.renderedRange.bottom;
+  }
+
+  /**
+   * RowManager lifecycle + ResizeObserver entry: detect holder size changes.
+   * Width change ⇒ debounced full height invalidation (text re-wraps);
+   * during the drag we render with stale heights and snap correct on the
+   * trailing edge.
+   */
   resize(): void {
-    // Width change → text wrap differs → all measured heights are stale.
-    // Stock VirtualDomVertical survives this because tabulator's outer
-    // redraw(true) path calls rerenderRows() which calls deinitializeHeight()
-    // on every rendered row. That path isn't guaranteed to fire on every
-    // layout-affecting CSS change (sidebar toggle, flex parent resize without
-    // window event), so our ResizeObserver routes here unconditionally and
-    // we detect the width change ourselves.
-    const cw = this._self().elementVertical.clientWidth;
-    if (
-      this.lastClientWidth !== 0 &&
-      Math.abs(cw - this.lastClientWidth) > RESIZE_WIDTH_THRESHOLD_PX
-    ) {
-      // Defer the O(n) deinit walk to the trailing edge of the resize
-      // gesture. During the drag, render with stale measurements — wraps may
-      // be off by a line or two but it's not visible at 60 Hz, and the
-      // trailing invalidate + re-render snaps everything correct once the
-      // user releases.
+    const holder = this._self().elementVertical;
+    const cw = holder.clientWidth;
+    const widthChanged = Math.abs(cw - this.lastClientWidth) > RESIZE_WIDTH_THRESHOLD_PX;
+    if (this.lastClientWidth !== 0 && widthChanged) {
       this.resizePendingInvalidate = true;
       if (this.resizeInvalidateTimer !== null) {
         clearTimeout(this.resizeInvalidateTimer);
@@ -494,111 +478,61 @@ export class VirtualVerticalRenderer extends Renderer {
         }
       }, RESIZE_INVALIDATE_DEBOUNCE_MS);
     }
-    const ch = this._self().elementVertical.clientHeight;
+    const ch = holder.clientHeight;
     // Same subpixel threshold for both dimensions — retina layout jitter
     // can wiggle clientHeight by 0.5px without anything meaningful changing.
-    const widthChanged = Math.abs(cw - this.lastClientWidth) > RESIZE_WIDTH_THRESHOLD_PX;
     const heightChanged = Math.abs(ch - this.lastClientHeight) > RESIZE_WIDTH_THRESHOLD_PX;
     this.lastClientWidth = cw;
     this.lastClientHeight = ch;
 
-    // No-op guard: Tabulator calls renderer.resize() from adjustTableSize on
-    // every restoreRedraw cascade (including plain row clicks). If neither
-    // dimension actually changed AND no width-driven invalidate is pending,
-    // there is nothing for the renderer to do — the previously-painted
-    // window is still correct. Without this guard the RAF below schedules
-    // a from-scratch _renderWindow that fires one paint later, visibly
-    // shifting the rendered window after the click has already painted.
+    // No-op guard — see lastClientWidth/Height field comment.
     if (!widthChanged && !heightChanged && !this.resizePendingInvalidate) {
       return;
     }
 
-    // Window/container resize: the viewport may have grown past the
-    // previously-rendered region. Our overscan (4–16 rows) is intentionally
-    // small — much smaller than stock VirtualDomVertical's full-viewport
-    // buffer — so a resize that enlarges the viewport easily exposes
-    // paddingBottom as blank space below the rendered window. For fixedHeight
-    // tables (height: '100%') tabulator's adjustTableSize does NOT auto-
-    // trigger a re-render (tabulator_esm.mjs:26875 gates the resize-redraw
-    // on !fixedHeight), so we have to do it ourselves.
-    //
-    // The Renderer base contract says "DO NOT RERENDER IN THIS FUNCTION"
-    // (tabulator_esm.mjs:23558) — meaning synchronously. RAF-defer is safe
-    // and also guarantees DOM measurements (clientHeight, scrollHeight) have
-    // settled past whatever style writes adjustTableSize did before calling
-    // resize(). Reusing `rafScheduled` collapses scroll-during-resize into a
-    // single render per paint.
+    // A grown viewport can expose paddingBottom past the small overscan, and
+    // tabulator does NOT auto-re-render fixedHeight tables on resize
+    // (tabulator_esm.mjs:26875) — so render ourselves. RAF-deferred: the base
+    // contract forbids SYNCHRONOUS rerenders here (tabulator_esm.mjs:23558),
+    // and the shared slot collapses scroll-during-resize into one render.
     if (this.rafScheduled) {
       return;
     }
-    this.rafScheduled = true;
-    requestAnimationFrame(() => {
-      this.rafScheduled = false;
-      this._renderWindow();
-    });
+    this._scheduleScrollRaf(() => this._renderWindow());
   }
 
   /**
-   * Wipe the height cache so the next render re-measures every row from the
-   * DOM. Called when the holder width changes (text wrap may shift) or any
-   * other event invalidates previously measured heights. Keeps
-   * `estimateHeight` as a starting seed.
-   *
-   * Also flips currently-rendered rows back to `heightInitialized=false` via
-   * Tabulator's `Row.deinitializeHeight()`, so the next `_attachRanges` Phase
-   * B-D path measures them — without this, the guard at Phase B short-
-   * circuits and we'd never feed heights back into the empty Fenwick.
+   * Invalidate every measured height (holder width changed → text wrap may
+   * differ). The next render re-measures from the DOM; `estimateHeight`
+   * stays as the seed. Also drops the durable cache and deinitializes every
+   * row's height — without that, the heightInitialized fast path would feed
+   * stale pre-resize heights back into the empty Fenwick.
    */
   private _invalidateMeasuredHeights(): void {
-    this.measuredHeight.fill(0);
-    this.isMeasured.fill(0);
-    // Width changed → text wraps differently → every cached height is stale.
-    // Drop the durable cache too (WeakMap → reassign), else the next rerender
-    // would re-seed stale pre-resize heights.
+    this._resetHeightIndex(this.measuredHeight.length);
     this.dataHeights = new WeakMap();
-    this.fenwickMeasured.resetZero();
-    this.fenwickUnmeasuredCount.resetZero();
-    this.fenwickUnmeasuredCount.bulkInitConstant(1);
-    this.measuredSum = 0;
-    this.measuredCount = 0;
-    // Every row — not just currently rendered — must be flipped back to
-    // heightInitialized=false. Otherwise the Phase B–D guard in _attachRanges
-    // takes the fast path for previously-rendered rows that enter the window
-    // later, feeding stale (pre-width-change) heights back into the Fenwick.
-    const rows = this._self().table.rowManager.getDisplayRows();
-    for (const row of rows) {
+    for (const row of this._self().table.rowManager.getDisplayRows()) {
       row.deinitializeHeight?.();
     }
   }
 
+  /**
+   * Scroll so `row` sits at the top of the holder (RowManager entry point).
+   * Delegates to the anchor engine: gains clamping, the reconcile loop for
+   * far unmeasured targets, and the DOM-truth snap.
+   */
   scrollToRow(row: RowInternals): void {
     const idx = this._indexOfRow(row);
     if (idx < 0) {
       return;
     }
-    this._resyncToRowsCount(false);
-    const target = this._cumHeight(idx);
-    this.pendingProgrammaticScrollTop = target;
-    this._self().elementVertical.scrollTop = target;
-    // Render synchronously — programmatic scrolls need to land before the
-    // next user input. (Bypass the RAF coalescing in scrollRows.)
-    this._renderWindow();
+    this._anchorRowAt(idx, row, 0);
   }
 
   /**
-   * Public: declaratively anchor a row at a given Y inside the holder.
-   *
-   * Single seam between this renderer and any external anchoring module
-   * (e.g. opt-in AnchoringPolicy). After this call returns, the row's DOM
-   * element sits at `offsetFromHolderTop` pixels from the top of the
-   * holder, and the rendered window is in DOM.
-   *
-   * Two-pass implementation mirrors rerenderRows: Pass 1 places via Fenwick
-   * cumHeight (consistent ruler), Pass 2 snaps via DOM-truth offsetTop now
-   * that the anchor has measured heights.
-   *
-   * Idempotent. Bypasses RAF coalescing so external callers can guarantee
-   * the corrected window is in DOM on the same paint — no 1-frame flash.
+   * Anchor a row at a given Y inside the holder — the single seam used by
+   * the AnchoringPolicy module. Synchronous (no RAF), so the corrected
+   * window is in the DOM on the same paint. Idempotent.
    */
   setAnchor(row: RowInternals, offsetFromHolderTop: number): void {
     const idx = this._indexOfRow(row);
@@ -609,11 +543,9 @@ export class VirtualVerticalRenderer extends Renderer {
   }
 
   /**
-   * Public: scroll so the row at `index` sits at `align` inside the holder —
-   * 'start' (top edge), 'center', 'end' (bottom edge), or a number for an
-   * exact pixel offset from the holder top. Converges via the reconcile
-   * engine even when the target row has never been measured. The index+align
-   * face of the same primitive `setAnchor` exposes for row-object callers.
+   * Scroll so the row at `index` sits at `align` ('start' | 'center' |
+   * 'end', or an exact pixel offset from the holder top). Converges via the
+   * reconcile engine even for never-measured targets.
    */
   scrollToIndex(index: number, align: 'start' | 'center' | 'end' | number = 'start'): void {
     const row = this._self().table.rowManager.getDisplayRows()[index];
@@ -639,17 +571,11 @@ export class VirtualVerticalRenderer extends Renderer {
   }
 
   /**
-   * Reconcile engine (TanStack-style) shared by setAnchor / scrollToIndex.
-   *
-   * A single estimate-placed render can't reach a far row: the browser clamps
-   * scrollTop to the CURRENT document height, which is only tall enough once
-   * rows near the target render and grow the document. So we iterate: place
-   * via Fenwick cumHeight → render → if the anchor row is now in the window,
-   * DOM-truth snap and stop; else (its measurements just grew the document /
-   * refined cumHeight) re-place and render again. Bounded; bail if the window
-   * stops moving (no new info, so further iterations can't help). Each
-   * iteration's render locks the estimate internally; post-2a calibration the
-   * estimate is frozen anyway, so every iteration shares one ruler.
+   * Reconcile engine shared by scrollToRow / setAnchor / scrollToIndex.
+   * One estimate-placed render can't reach a far row (the browser clamps
+   * scrollTop to the current document height), so: place via cumHeight →
+   * render → DOM-truth snap once the row is in the window, else re-place.
+   * Bounded; bails when the window stops moving.
    */
   private _anchorRowAt(idx: number, row: RowInternals, offsetFromHolderTop: number): void {
     const self = this._self();
@@ -671,8 +597,7 @@ export class VirtualVerticalRenderer extends Renderer {
       } finally {
         this._lockedEstimate = null;
       }
-      this.pendingProgrammaticScrollTop = placed;
-      elementVertical.scrollTop = placed;
+      this._setScrollTop(placed);
       this._renderWindow();
 
       const el = row.getElement?.();
@@ -682,8 +607,7 @@ export class VirtualVerticalRenderer extends Renderer {
         const maxScrollPost = Math.max(0, elementVertical.scrollHeight - clientHeight);
         const corrected = Math.max(0, Math.min(desired, maxScrollPost));
         if (Math.abs(corrected - elementVertical.scrollTop) > 0.5) {
-          this.pendingProgrammaticScrollTop = corrected;
-          elementVertical.scrollTop = corrected;
+          this._setScrollTop(corrected);
           this._renderWindow();
         }
         break;
@@ -699,6 +623,7 @@ export class VirtualVerticalRenderer extends Renderer {
     }
   }
 
+  /** Renderer contract: is `row` nearer the window top than the bottom? */
   scrollToRowNearestTop(row: RowInternals): boolean {
     const idx = this._indexOfRow(row);
     if (idx < 0) {
@@ -707,6 +632,10 @@ export class VirtualVerticalRenderer extends Renderer {
     return Math.abs(this.vDomTop - idx) <= Math.abs(this.vDomBottom - idx);
   }
 
+  /**
+   * Renderer contract: scroll `row` to `position` ('top' | 'middle' |
+   * 'bottom' | 'nearest'), honouring the scrollToRow* table options.
+   */
   scrollToRowPosition(
     row: RowInternals,
     position: string | undefined,
@@ -719,13 +648,14 @@ export class VirtualVerticalRenderer extends Renderer {
         return;
       }
 
-      const ev = this._self().elementVertical;
-      const opts = this._self().table.options;
+      const self = this._self();
+      const ev = self.elementVertical;
+      const opts = self.table.options;
 
       const useIfVisible = ifVisible ?? (opts['scrollToRowIfVisible'] as boolean | undefined);
       if (useIfVisible === false) {
         const rowTop = this._cumHeight(idx);
-        const rowBottom = this._cumHeight(idx + 1);
+        const rowBottom = rowTop + this._heightOf(idx);
         if (rowTop >= ev.scrollTop && rowBottom <= ev.scrollTop + ev.clientHeight) {
           resolve();
           return;
@@ -751,27 +681,32 @@ export class VirtualVerticalRenderer extends Renderer {
     });
   }
 
+  /** RowManager lifecycle: rows in the window (optionally overscan too). */
   visibleRows(includingBuffer?: boolean): RowInternals[] {
-    const all = this._self().table.rowManager.getDisplayRows();
+    const self = this._self();
+    const all = self.table.rowManager.getDisplayRows();
     if (this.vDomBottom < this.vDomTop) {
       return [];
     }
     if (includingBuffer) {
       return all.slice(this.vDomTop, this.vDomBottom + 1);
     }
-    const elementVertical = this._self().elementVertical;
+    const elementVertical = self.elementVertical;
     const top = elementVertical.scrollTop;
     const bottom = top + elementVertical.clientHeight;
     const result: RowInternals[] = [];
+    // One Fenwick seed, then exact O(1) accumulation per row
+    // (rowTop + heightOf(i) === cumHeight(i + 1) by construction).
+    let rowTop = this._cumHeight(this.vDomTop);
     for (let i = this.vDomTop; i <= this.vDomBottom; i++) {
-      const rowTop = this._cumHeight(i);
-      const rowBottom = this._cumHeight(i + 1);
+      const rowBottom = rowTop + this._heightOf(i);
       if (rowBottom > top && rowTop < bottom) {
         const row = all[i];
         if (row) {
           result.push(row);
         }
       }
+      rowTop = rowBottom;
     }
     return result;
   }
@@ -788,12 +723,8 @@ export class VirtualVerticalRenderer extends Renderer {
       this._resyncToRowsCount(true);
     }
 
-    // Lock the estimate for the lifetime of this render call. Without this,
-    // mid-render measurements (via _setHeight inside _attachRanges) shift
-    // `estimateHeight` and every subsequent _cumHeight probe re-prices the
-    // unmeasured-row region with a different unit cost — _totalHeight drifts,
-    // paddingBottom drifts, and the scroll container's geometry mutates under
-    // the user. Use try/finally so a thrown exception still unlocks.
+    // Lock the estimate for this render call (see _lockedEstimate);
+    // try/finally so an exception still unlocks.
     this._lockedEstimate = this.estimateHeight;
     try {
       this._renderWindowLocked(rows);
@@ -805,37 +736,36 @@ export class VirtualVerticalRenderer extends Renderer {
   private _renderWindowLocked(rows: RowInternals[]): void {
     const self = this._self();
     const elementVertical = self.elementVertical;
-    const clientHeight = elementVertical.clientHeight;
+    // ResizeObserver-maintained cache instead of a live clientHeight read —
+    // this runs on every scroll frame and clientHeight forces style+layout
+    // when anything dirtied it earlier in the frame. Live read only before
+    // the first initialize()/resize() has seeded the cache.
+    const clientHeight =
+      this.lastClientHeight > 0 ? this.lastClientHeight : elementVertical.clientHeight;
 
     if (rows.length === 0) {
       this._detachAllRendered();
       self.tableElement.style.paddingTop = '0';
       self.tableElement.style.paddingBottom = '0';
-      this.vDomTop = 0;
-      this.vDomBottom = -1;
-      this.renderedRange = { top: 0, bottom: -1 };
       return;
     }
 
-    // Clamp scrollTop if the document just shrunk (sort/filter typically
-    // does this). Browser will eventually clamp on its own, but doing it up
-    // front means our findRowAt math operates on a valid scrollTop.
-    //
-    // Stage 2c: the bound depends on the render type. On STRUCTURAL renders
-    // the DOM hasn't reflowed the shrink yet, so the model `_totalHeight()` is
-    // the truth and the proactive clamp is correct. On SCROLL-driven renders
-    // the DOM is the truth: the browser already guarantees
-    // `scrollTop ≤ scrollHeight − clientHeight`, and clamping to a possibly-
-    // undershooting estimate total instead yanks the user back from a
-    // genuinely scrollable region on every wheel tick (the bottom "bounce").
+    // Pre-render clamp: if the document shrunk (sort/filter), pull scrollTop
+    // into range so findRowAt math is valid — and write it to the DOM, never
+    // just locally. Bound choice: structural renders trust the model (DOM
+    // hasn't reflowed yet); scroll-driven renders trust the DOM (clamping to
+    // an undershooting estimate would bounce the user off the bottom).
+    // Skipped entirely on scroll frames far from the end, where it provably
+    // cannot trigger — saves the per-frame scrollHeight read.
     let scrollTop = elementVertical.scrollTop;
-    const maxScroll = this.inScrollDrivenRender
-      ? Math.max(0, elementVertical.scrollHeight - clientHeight)
-      : Math.max(0, this._totalHeight() - clientHeight);
-    if (scrollTop > maxScroll) {
-      this.pendingProgrammaticScrollTop = maxScroll;
-      elementVertical.scrollTop = maxScroll;
-      scrollTop = maxScroll;
+    if (!(this.inScrollDrivenRender && scrollTop + 2 * clientHeight <= this._totalHeight())) {
+      const maxScroll = this.inScrollDrivenRender
+        ? Math.max(0, elementVertical.scrollHeight - clientHeight)
+        : Math.max(0, this._totalHeight() - clientHeight);
+      if (scrollTop > maxScroll) {
+        this._setScrollTop(maxScroll);
+        scrollTop = maxScroll;
+      }
     }
 
     // Row-domain window selection. Find the visible-row range first, then
@@ -859,24 +789,14 @@ export class VirtualVerticalRenderer extends Renderer {
     // (newTop) stable against mid-render measurements at indices ≥ newTop.
     this._diffRender(rows, newTop, newBottom);
 
-    // Coverage iteration. If the locked estimate over-counted row heights
-    // (e.g. after a dataTree expand introduces a swarm of shorter children),
-    // the initial render may not reach the viewport bottom — `cumHeight
-    // (newBottom + 1)` ends up less than `scrollTop + clientHeight` and the
-    // remaining viewport shows the paddingBottom spacer (a visible blank).
-    // Symmetric case at the top when user is scrolled down.
-    //
-    // After the initial diff, flush the running estimate so the unmeasured
-    // region's cumHeight contribution is more accurate, then re-check both
-    // edges. If a side falls short, extend it by one attach pass. Bounded at
-    // MAX_COVERAGE_ITER; convergence is typically 1–2 in practice.
+    // Coverage iteration: if the locked estimate over-counted heights, the
+    // rendered window may stop short of a viewport edge (blank padding shows).
+    // Re-check both edges with the just-measured rows and extend; bounded,
+    // converges in 1–2 passes. The locked estimate (not flushed mid-render)
+    // keeps the padding math stable across iterations.
     const MAX_COVERAGE_ITER = 4;
     let coverageIter = 0;
     while (coverageIter++ < MAX_COVERAGE_ITER) {
-      // No mid-render _flushEstimateUpdate: the locked estimate (see entry of
-      // _renderWindow) is what makes paddingTop/Bottom math stable across
-      // iterations. The single end-of-render flush below picks up the new
-      // measurements for the next render.
       let extended = false;
       const viewportBottomY = scrollTop + clientHeight;
 
@@ -888,7 +808,8 @@ export class VirtualVerticalRenderer extends Renderer {
           if (desired > newBottom) {
             this._attachRanges(rows, [[newBottom + 1, desired]], newTop);
             newBottom = desired;
-            this.renderedRange = { top: newTop, bottom: newBottom };
+            this.renderedRange.top = newTop;
+            this.renderedRange.bottom = newBottom;
             extended = true;
           }
         }
@@ -900,14 +821,13 @@ export class VirtualVerticalRenderer extends Renderer {
           const refinedVisTop = this._findRowAt(scrollTop);
           const desired = Math.max(0, refinedVisTop - overscanRows);
           if (desired < newTop) {
-            // _attachRanges reads renderedRange.top/bottom to choose
-            // insertBefore vs appendChild. With the OLD renderedRange.top
-            // still in place, the `to < renderedRange.top` check correctly
-            // routes the new range to insertBefore.
+            // The OLD renderedRange.top must still be in place here —
+            // _attachRanges uses it to route this range to insertBefore.
             const oldTop = newTop;
             this._attachRanges(rows, [[desired, oldTop - 1]], desired);
             newTop = desired;
-            this.renderedRange = { top: newTop, bottom: newBottom };
+            this.renderedRange.top = newTop;
+            this.renderedRange.bottom = newBottom;
             extended = true;
           }
         }
@@ -919,10 +839,8 @@ export class VirtualVerticalRenderer extends Renderer {
     }
 
     const paddingTop = this._cumHeight(newTop);
-    // When the window reaches the last row, force paddingBottom to 0
-    // instead of trusting the subtraction. Across thousands of Fenwick
-    // updates floating-point drift can leave a sub-pixel residual; the
-    // user sees a hairline gap below the last row at the very bottom.
+    // Force 0 at the last row — float drift in the subtraction would show
+    // as a hairline gap at the very bottom.
     const paddingBottom =
       newBottom === lastIdx ? 0 : Math.max(0, this._totalHeight() - this._cumHeight(newBottom + 1));
     self.tableElement.style.paddingTop = `${paddingTop}px`;
@@ -930,22 +848,19 @@ export class VirtualVerticalRenderer extends Renderer {
 
     this.vDomTop = newTop;
     this.vDomBottom = newBottom;
-    this.renderedRange = { top: newTop, bottom: newBottom };
+    this.renderedRange.top = newTop;
+    this.renderedRange.bottom = newBottom;
 
-    // Stage 2c: apply the above-viewport measurement compensation accumulated
-    // by `_setHeight` during this render. Rows prepended above the fold whose
-    // real height differs from what the coordinate space priced shift all
-    // visible content by the summed delta — absorb it into scrollTop so the
-    // content the user is looking at stays pinned (the scroll-up judder fix).
-    // No re-render: the shift is within the overscan buffer; the echoed scroll
-    // event is suppressed via pendingProgrammaticScrollTop.
+    // Stage 2c: absorb above-viewport measurement deltas into scrollTop so
+    // visible content stays pinned (the scroll-up judder fix). The
+    // scrollHeight read is an accepted necessary reflow — it must observe the
+    // paddings just written — and is only paid when deltas actually occurred.
     if (this.renderVisTop >= 0) {
       if (this.pendingScrollAdjust !== 0) {
         const domMax = Math.max(0, elementVertical.scrollHeight - clientHeight);
         const corrected = Math.max(0, Math.min(scrollTop + this.pendingScrollAdjust, domMax));
         if (Math.abs(corrected - elementVertical.scrollTop) > 0.5) {
-          this.pendingProgrammaticScrollTop = corrected;
-          elementVertical.scrollTop = corrected;
+          this._setScrollTop(corrected);
         }
       }
       this.pendingScrollAdjust = 0;
@@ -967,16 +882,96 @@ export class VirtualVerticalRenderer extends Renderer {
     if (!this.inScrollDrivenRender) {
       this._flushEstimateUpdate();
     }
+
+    // Build cells for rows just beyond the new window during idle time, so
+    // the next scroll into them pays only measurement (cold first-attach
+    // measured ~1.5-2.3× steady-state without this).
+    this._scheduleIdlePrewarm();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Idle pre-warm — off-frame cell construction for rows near the window
+  // ---------------------------------------------------------------------------
+
+  private _cancelIdlePrewarm(): void {
+    if (this.idlePrewarmHandle !== null && typeof cancelIdleCallback === 'function') {
+      cancelIdleCallback(this.idlePrewarmHandle);
+    }
+    this.idlePrewarmHandle = null;
   }
 
   /**
-   * Reconcile current rendered range to [newTop, newBottom] by detaching
-   * rows that left and attaching rows that entered.
-   *
-   * Newly-attached rows are initialized, normalized, and measured before
-   * this function returns. Measurements feed the Fenwick trees and the
-   * (measuredSum, measuredCount) running stats; estimateHeight is NOT
-   * mutated here (see _flushEstimateUpdate, called at end of render).
+   * (Re)schedule the idle pre-warmer. One callback in flight at a time; each
+   * render re-schedules so the walker always starts from the CURRENT window
+   * edges. No-op where requestIdleCallback is unavailable (jsdom/node tests)
+   * — pre-warm is purely an optimization, never load-bearing.
+   */
+  private _scheduleIdlePrewarm(): void {
+    if (typeof requestIdleCallback !== 'function') {
+      return;
+    }
+    this._cancelIdlePrewarm();
+    this.idlePrewarmHandle = requestIdleCallback((deadline) => {
+      this.idlePrewarmHandle = null;
+      this._idlePrewarm(deadline);
+    });
+  }
+
+  /**
+   * Build cells (off-DOM, inFragment flag) for rows beyond each window edge,
+   * walking outward and alternating sides. Strictly construction — no
+   * measurement, no Fenwick writes, so the coordinate space is untouched.
+   * Deadline- and slot-capped; re-schedules itself while work remains.
+   */
+  private _idlePrewarm(deadline: IdleDeadline): void {
+    if (this.renderedRange.bottom < this.renderedRange.top) {
+      return;
+    }
+    const rows = this._self().table.rowManager.getDisplayRows();
+    if (rows.length === 0) {
+      return;
+    }
+    let below = this.renderedRange.bottom + 1;
+    let above = this.renderedRange.top - 1;
+    const belowMax = Math.min(rows.length - 1, this.renderedRange.bottom + IDLE_PREWARM_SPAN_ROWS);
+    const aboveMin = Math.max(0, this.renderedRange.top - IDLE_PREWARM_SPAN_ROWS);
+    let nextBelow = true;
+    let built = 0;
+    while (below <= belowMax || above >= aboveMin) {
+      if (
+        deadline.timeRemaining() < IDLE_PREWARM_MIN_REMAINING_MS ||
+        built >= IDLE_PREWARM_MAX_ROWS_PER_SLOT
+      ) {
+        // Out of idle/slot budget with work remaining — continue next slot.
+        this._scheduleIdlePrewarm();
+        return;
+      }
+      let idx: number;
+      if (nextBelow && below <= belowMax) {
+        idx = below++;
+      } else if (above >= aboveMin) {
+        idx = above--;
+      } else {
+        idx = below++;
+      }
+      nextBelow = !nextBelow;
+      const row = rows[idx];
+      if (row && !row.initialized) {
+        row.initialize(false, true);
+        built++;
+      }
+    }
+  }
+
+  // Scratch buffers for _diffRender, reused across calls (it runs once per
+  // scroll frame; fresh arrays per frame are avoidable GC churn).
+  private detachRangesScratch: Array<[number, number]> = [];
+  private attachRangesScratch: Array<[number, number]> = [];
+
+  /**
+   * Reconcile the rendered range to [newTop, newBottom]: detach rows that
+   * left, attach (initialize + measure) rows that entered. estimateHeight is
+   * never mutated here — see _flushEstimateUpdate.
    */
   private _diffRender(rows: RowInternals[], newTop: number, newBottom: number): void {
     const oldTop = this.renderedRange.top;
@@ -988,8 +983,10 @@ export class VirtualVerticalRenderer extends Renderer {
       return;
     }
 
-    const detachRanges: Array<[number, number]> = [];
-    const attachRanges: Array<[number, number]> = [];
+    const detachRanges = this.detachRangesScratch;
+    const attachRanges = this.attachRangesScratch;
+    detachRanges.length = 0;
+    attachRanges.length = 0;
 
     if (oldEmpty) {
       attachRanges.push([newTop, newBottom]);
@@ -1027,23 +1024,18 @@ export class VirtualVerticalRenderer extends Renderer {
   }
 
   /**
-   * Attach the rows in `ranges`. Each range gets its own DocumentFragment
-   * to batch DOM writes. After insertion, rows go through five phased
-   * passes that batch reads and writes separately (matching tabulator's
-   * own `_quickNormalizeRowHeight` pattern at tabulator_esm.mjs:25808):
+   * Attach the rows in `ranges`: build cells off-DOM inside per-range
+   * DocumentFragments (writes only — no flush between inserts), then run the
+   * measurement phases ONCE over the union, reads and writes batched so the
+   * whole call costs a single forced reflow:
    *
-   *   A. initialize()      — writes (generate cells if needed)
-   *   B. clearCellHeight() — writes (reset stale per-cell heights)
-   *   C. calcHeight(true)  — reads offsetHeight, sets row.outerHeight
-   *   D. setCellHeight()   — writes (equalize cells to row height)
-   *   E. rendered()        — fires per-cell render callbacks
-   *
-   * Then a final pass reads `row.getHeight()` (returns the cached
-   * `outerHeight` from C — no new offsetHeight read, no extra reflow)
-   * and feeds the height cache via `_setHeight`.
-   *
-   * For a 30-row attach this is ~1 layout flush total instead of ~30 in
-   * the previous per-row interleaved version.
+   *   A. rendered()        — per-cell callbacks; content mutations land
+   *                          before measurement (first attach only on
+   *                          scroll renders)
+   *   B. clearCellHeight() — writes
+   *   C. calcHeight(true)  — reads offsetHeight — THE layout flush
+   *   D. setCellHeight()   — writes
+   *   E. getHeight()       — cached from C, feeds the Fenwick
    */
   private _attachRanges(
     rows: RowInternals[],
@@ -1052,30 +1044,54 @@ export class VirtualVerticalRenderer extends Renderer {
   ): void {
     const self = this._self();
     const tableElement = self.tableElement;
+    const allAttached: Array<{
+      row: RowInternals;
+      index: number;
+      wasUninitialized: boolean;
+      wasSettled: boolean;
+    }> = [];
 
     for (const [from, to] of ranges) {
       const fragment = document.createDocumentFragment();
-      const newlyAttached: Array<{ row: RowInternals; index: number }> = [];
+      const rangeStart = allAttached.length;
 
       for (let i = from; i <= to; i++) {
         const row = rows[i];
         if (!row) {
           continue;
         }
-        self.styleRow(row, i);
+        const wasUninitialized = !row.initialized;
+        // Parity classes only on first attach or structural renders: a
+        // row's index — hence its even/odd class — is scroll-invariant, so
+        // scroll re-attaches keep the class they already have.
+        if (wasUninitialized || !this.inScrollDrivenRender) {
+          self.styleRow(row, i);
+        }
+        // inFragment=true: cell construction off-DOM.
+        if (wasUninitialized) {
+          row.initialize(false, true);
+        }
         const el = row.getElement();
         if (el.parentNode && el.parentNode !== fragment) {
           el.parentNode.removeChild(el);
         }
         fragment.appendChild(el);
-        newlyAttached.push({ row, index: i });
+        // Settled = measured AND height-initialized AT ATTACH TIME. Must be
+        // captured here: Phase D (setCellHeight) flips heightInitialized to
+        // true, so reading it in Phase E would also match rows that were
+        // JUST re-measured and still need their Fenwick refresh.
+        const wasSettled = row.heightInitialized && this.isMeasured[i] === 1;
+        allAttached.push({ row, index: i, wasUninitialized, wasSettled });
       }
 
-      if (newlyAttached.length === 0) {
+      if (allAttached.length === rangeStart) {
         continue;
       }
 
-      // Insertion point.
+      // Insertion point. renderedRange/newTop are fixed for the whole call,
+      // so per-range evaluation is order-independent: an above-window range
+      // prepends via insertBefore(firstChild) whether it is processed
+      // before or after a below-window range.
       const isAbove =
         from <= newTop && to < this.renderedRange.top && this.renderedRange.bottom >= 0;
       const insertAtTop = to < newTop || (newTop <= from && from < this.renderedRange.top);
@@ -1084,107 +1100,79 @@ export class VirtualVerticalRenderer extends Renderer {
       } else {
         tableElement.appendChild(fragment);
       }
+    }
 
-      // Phase A: initialize (writes only).
-      for (const entry of newlyAttached) {
-        if (!entry.row.initialized) {
-          entry.row.initialize();
-        }
-      }
+    if (allAttached.length === 0) {
+      return;
+    }
 
-      // Phases B–D: clear/calc/setCellHeight — guarded by heightInitialized
-      // so previously-measured rows (e.g. after sort) hit the fast path.
-      // Always run, even during fast drag: skipping these makes rows render
-      // at un-normalized natural heights, which (a) visibly shifts adjacent
-      // rows and (b) leaves the row unmeasured in the Fenwick, so paddingTop
-      // computed from cumHeight doesn't match the actual DOM height stack.
-      for (const entry of newlyAttached) {
-        if (!entry.row.heightInitialized) {
-          entry.row.clearCellHeight();
-        }
-      }
-      for (const entry of newlyAttached) {
-        if (!entry.row.heightInitialized) {
-          entry.row.calcHeight(true);
-        }
-      }
-      for (const entry of newlyAttached) {
-        if (!entry.row.heightInitialized) {
-          entry.row.setCellHeight();
-        }
-      }
-
-      // Phase E: rendered() — fires per-cell callbacks.
-      for (const entry of newlyAttached) {
+    // Phase A: rendered(). On scroll renders, first-attach only — cell DOM
+    // persists across detach/attach, and re-dispatching cellRendered per
+    // cell per frame was the biggest live-tick cost. Structural renders
+    // fire for all rows, mirroring stock.
+    for (const entry of allAttached) {
+      if (!this.inScrollDrivenRender || entry.wasUninitialized) {
         entry.row.rendered();
       }
+    }
 
-      // Phase F: feed the height cache. row.getHeight() returns cached
-      // outerHeight from Phase C — no new offsetHeight read, no extra reflow.
-      for (const entry of newlyAttached) {
-        const h = entry.row.getHeight();
-        if (h > 0) {
-          this._setHeight(entry.index, h, entry.row.data);
-        }
+    // Phases B–D, guarded by heightInitialized (measured rows fast-path).
+    // Never skip for speed: unmeasured rows would render at un-normalized
+    // heights AND leave the Fenwick out of sync with the real DOM stack.
+    for (const entry of allAttached) {
+      if (!entry.row.heightInitialized) {
+        entry.row.clearCellHeight();
+      }
+    }
+    for (const entry of allAttached) {
+      if (!entry.row.heightInitialized) {
+        entry.row.calcHeight(true);
+      }
+    }
+    for (const entry of allAttached) {
+      if (!entry.row.heightInitialized) {
+        entry.row.setCellHeight();
+      }
+    }
+
+    // Phase E: feed the height cache. row.getHeight() returns cached
+    // outerHeight from Phase C — no new offsetHeight read, no extra reflow.
+    // Settled rows (measured + height-initialized at attach time, i.e. the
+    // B–D fast path) are skipped outright: their height can't have changed
+    // without something clearing heightInitialized first (deinitializeHeight
+    // / width invalidation), so _setHeight would just early-return anyway.
+    // Rows re-seeded by the Stage 2b rebuild (isMeasured=1 but
+    // heightInitialized false) still run — Phase C just re-measured them and
+    // the Fenwick must pick up the fresh value.
+    for (const entry of allAttached) {
+      if (entry.wasSettled) {
+        continue;
+      }
+      const h = entry.row.getHeight();
+      if (h > 0) {
+        this._setHeight(entry.index, h, entry.row.data);
       }
     }
   }
 
   private _detachAllRendered(): void {
-    const tableElement = this._self().tableElement;
-    while (tableElement.firstChild) {
-      tableElement.removeChild(tableElement.firstChild);
-    }
+    this._self().tableElement.replaceChildren();
     this.vDomTop = 0;
     this.vDomBottom = -1;
-    this.renderedRange = { top: 0, bottom: -1 };
-    // Note: _lastTopRow is NOT cleared here. rerenderRows() calls this
-    // detach as part of its tear-down, but needs _lastTopRow as the
-    // anchor for the subsequent reposition. clearRows() handles the
-    // "really empty" case.
+    this.renderedRange.top = 0;
+    this.renderedRange.bottom = -1;
   }
 
   // ---------------------------------------------------------------------------
   // Heights — Fenwick-backed
   // ---------------------------------------------------------------------------
 
-  private _resyncToRowsCount(wipe: boolean): void {
-    const rowsCount = this._self().table.rowManager.getDisplayRows().length;
-    const lengthChanged = this.measuredHeight.length !== rowsCount;
-    if (!wipe && !lengthChanged) {
-      return;
-    }
-    this.rowsCountCached = rowsCount;
-    if (lengthChanged) {
-      this.measuredHeight = new Float64Array(rowsCount);
-      this.isMeasured = new Uint8Array(rowsCount);
-      this.fenwickMeasured.resize(rowsCount);
-      this.fenwickUnmeasuredCount.resize(rowsCount);
-    } else {
-      this.measuredHeight.fill(0);
-      this.isMeasured.fill(0);
-      this.fenwickMeasured.resetZero();
-      this.fenwickUnmeasuredCount.resetZero();
-    }
-    // Initial state: all rows unmeasured. FenwickA all zeros (already);
-    // FenwickB filled with 1s (count of unmeasured per row = 1).
-    this.fenwickUnmeasuredCount.bulkInitConstant(1);
-    this.measuredSum = 0;
-    this.measuredCount = 0;
-    // Keep estimateHeight as a starting point for the new dataset.
-  }
-
   /**
-   * Stage 2b: rebuild the positional index arrays + Fenwick from the durable
-   * id→height cache for the new display order. Replaces the
-   * `_resyncToRowsCount(true)` wipe in `rerenderRows`: rows whose height was
-   * measured before (and survive the structural change) keep their real
-   * height, so `cumHeight`/`totalHeight` stay accurate instead of resetting to
-   * the estimate. Rows with no cached height (new, or never rendered) stay
-   * unmeasured and fall back to the estimate until they enter the window.
+   * Reset the positional height index to "all rows unmeasured" for
+   * `rowsCount` rows. Reallocates only on length change (in-place fill
+   * otherwise — avoids GC on same-size resets). estimateHeight is untouched.
    */
-  private _rebuildIndexFromCache(rows: RowInternals[]): void {
-    const rowsCount = rows.length;
+  private _resetHeightIndex(rowsCount: number): void {
     if (this.measuredHeight.length !== rowsCount) {
       this.measuredHeight = new Float64Array(rowsCount);
       this.isMeasured = new Uint8Array(rowsCount);
@@ -1196,13 +1184,33 @@ export class VirtualVerticalRenderer extends Renderer {
       this.fenwickMeasured.resetZero();
       this.fenwickUnmeasuredCount.resetZero();
     }
+    // Unmeasured-count tree starts at 1 per row.
     this.fenwickUnmeasuredCount.bulkInitConstant(1);
     this.measuredSum = 0;
     this.measuredCount = 0;
     this.rowsCountCached = rowsCount;
+  }
 
-    // Seed each row whose data object has a cached height. Direct
-    // first-measurement Fenwick writes (arrays were just zeroed).
+  /** Re-sync the height index to the current display-row count. */
+  private _resyncToRowsCount(wipe: boolean): void {
+    const rowsCount = this._self().table.rowManager.getDisplayRows().length;
+    if (!wipe && this.measuredHeight.length === rowsCount) {
+      return;
+    }
+    this._resetHeightIndex(rowsCount);
+  }
+
+  /**
+   * Stage 2b: reset the positional index for the new display order, then seed
+   * it from the durable data→height cache so previously-measured rows keep
+   * their real height across sort/filter/tree toggles. Uncached rows stay on
+   * the estimate until they enter the window.
+   */
+  private _rebuildIndexFromCache(rows: RowInternals[]): void {
+    const rowsCount = rows.length;
+    this._resetHeightIndex(rowsCount);
+
+    // Direct first-measurement Fenwick writes (arrays were just zeroed).
     for (let i = 0; i < rowsCount; i++) {
       const dataKey = rows[i]?.data;
       if (dataKey === undefined) {
@@ -1222,10 +1230,9 @@ export class VirtualVerticalRenderer extends Renderer {
   }
 
   /**
-   * Record a measurement. Updates Fenwicks and running stats. Does NOT
-   * mutate estimateHeight — that update is deferred to
-   * `_flushEstimateUpdate()` (called at end of render), preserving the
-   * locked-estimate invariant that makes single-pass rendering correct.
+   * Record a measurement: Fenwicks, running stats, and the durable cache.
+   * Never mutates estimateHeight (deferred to `_flushEstimateUpdate` —
+   * locked-estimate invariant).
    */
   private _setHeight(i: number, h: number, dataKey?: object): void {
     if (i < 0 || i >= this.measuredHeight.length) {
@@ -1234,32 +1241,26 @@ export class VirtualVerticalRenderer extends Renderer {
     if (!Number.isFinite(h) || h <= 0) {
       return;
     }
-    // Persist to the durable data→height cache (Stage 2b) regardless of
-    // whether this is a first or repeat measurement, so the value survives the
-    // next structural rebuild. No-op when the row has no data object.
-    if (dataKey !== undefined) {
-      this.dataHeights.set(dataKey, h);
-    }
     const wasMeasured = this.isMeasured[i] === 1;
     const oldH = this.measuredHeight[i] ?? 0;
     if (wasMeasured && oldH === h) {
       return;
     }
-    // Stage 2c: a row ABOVE the viewport-top row changed size relative to what
-    // the coordinate space priced it at (the locked estimate for a first
-    // measurement, the previous height for a re-measurement). Everything
-    // visible shifts by that delta — accumulate it; the render applies the sum
-    // to scrollTop so visible content stays pinned.
+    // Durable cache write only on first/changed measurements — unchanged
+    // repeats already hold the right entry, and this is per-row hot-path.
+    if (dataKey !== undefined) {
+      this.dataHeights.set(dataKey, h);
+    }
+    // Stage 2c: above-viewport size deltas shift everything visible —
+    // accumulate so the render pins content via scrollTop (see field).
     if (this.renderVisTop >= 0 && i < this.renderVisTop) {
       const prior = wasMeasured ? oldH : (this._lockedEstimate ?? this.estimateHeight);
       this.pendingScrollAdjust += h - prior;
     }
     if (wasMeasured) {
-      // Re-measurement: adjust FenwickA by delta. FenwickB unchanged.
       this.fenwickMeasured.update(i, h - oldH);
       this.measuredSum += h - oldH;
     } else {
-      // First measurement: add h to FenwickA, subtract 1 from FenwickB.
       this.fenwickMeasured.update(i, h);
       this.fenwickUnmeasuredCount.update(i, -1);
       this.isMeasured[i] = 1;
@@ -1269,10 +1270,8 @@ export class VirtualVerticalRenderer extends Renderer {
     this.measuredHeight[i] = h;
   }
 
+  /** One-shot estimate calibration; no-op once frozen (see estimateFrozen). */
   private _flushEstimateUpdate(): void {
-    // Calibrate once from the first painted window's measurements, then freeze.
-    // After freezing this is a no-op: the estimate never drifts again, so the
-    // coordinate space stays stable across scrolls and structural changes.
     if (this.estimateFrozen) {
       return;
     }
@@ -1302,11 +1301,8 @@ export class VirtualVerticalRenderer extends Renderer {
   }
 
   /**
-   * Return the largest row index i in [0, n-1] with cumHeight(i) ≤ y.
-   * Implemented as binary search over the cumHeight oracle. Each oracle
-   * call is O(log n) (two Fenwick prefix sums + a multiply), so the
-   * overall cost is O(log² n) — for 100K rows about 300 ops vs 100K ops
-   * for the previous O(n) prefix rebuild.
+   * Index of the row at document Y — binary search over the cumHeight
+   * oracle, O(log² n).
    */
   private _findRowAt(y: number): number {
     const n = this.measuredHeight.length;
@@ -1319,8 +1315,7 @@ export class VirtualVerticalRenderer extends Renderer {
     if (y >= this._totalHeight()) {
       return n - 1;
     }
-    // Find largest i with cumHeight(i) ≤ y, then return i-1 (the row at y).
-    // Same convention as the previous prefix-array binary search.
+    // Largest i with cumHeight(i) ≤ y, then i-1 = the row containing y.
     let lo = 0;
     let hi = n;
     while (lo < hi) {
@@ -1335,43 +1330,38 @@ export class VirtualVerticalRenderer extends Renderer {
   }
 
   /**
-   * Test helper: the per-row height (measured if known, else estimate).
-   * Used by unit tests; not on the hot path.
+   * The per-row height (measured if known, else estimate). O(1) — reads the
+   * shadow arrays, no Fenwick query. By construction,
+   * `cumHeight(i) + heightOf(i) === cumHeight(i + 1)`.
    */
   private _heightOf(i: number): number {
     if (i < 0 || i >= this.measuredHeight.length) {
       return 0;
     }
-    return this.isMeasured[i] === 1
-      ? (this.measuredHeight[i] ?? this.estimateHeight)
-      : this.estimateHeight;
+    const est = this._lockedEstimate ?? this.estimateHeight;
+    return this.isMeasured[i] === 1 ? (this.measuredHeight[i] ?? est) : est;
   }
 
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 
+  /** Typed view of the fields the Renderer base class sets at runtime. */
   private _self(): RendererBase {
     return this as unknown as RendererBase;
   }
 
   /**
    * Resolve the overscan row count for the current viewport. Reads the
-   * explicit `variableHeightOverscanRows` option first, falls back to the
-   * legacy `renderVerticalBuffer` pixel option (converted via the current
-   * estimate), and finally to an adaptive default based on viewport height
-   * clamped to [OVERSCAN_MIN, OVERSCAN_MAX].
+   * explicit `variableHeightOverscanRows` option first, falling back to an
+   * adaptive default based on viewport height clamped to
+   * [OVERSCAN_MIN, OVERSCAN_MAX].
    */
   private _resolveOverscanRows(clientHeight: number): number {
     const opts = this._self().table.options;
     const explicit = opts[OVERSCAN_OPTION];
     if (typeof explicit === 'number' && explicit >= 0 && Number.isFinite(explicit)) {
       return Math.max(0, Math.floor(explicit));
-    }
-    const legacyPx = opts[LEGACY_BUFFER_OPTION];
-    if (typeof legacyPx === 'number' && legacyPx > 0) {
-      const est = Math.max(1, this.estimateHeight);
-      return Math.max(OVERSCAN_MIN, Math.min(OVERSCAN_MAX, Math.round(legacyPx / est)));
     }
     const est = Math.max(1, this.estimateHeight);
     const adaptive = Math.round(clientHeight / 4 / est);

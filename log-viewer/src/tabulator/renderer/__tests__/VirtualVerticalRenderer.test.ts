@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
 import { VirtualVerticalRenderer } from '../VirtualVerticalRenderer';
+import { seedHeightIndex } from './rendererTestUtils';
 
 /**
  * Minimal Tabulator surface needed by the Renderer base class constructor
@@ -52,18 +53,7 @@ interface RendererInternals {
 function makeRenderer(rowsCount: number): RendererInternals {
   const Ctor = VirtualVerticalRenderer as unknown as new (table: unknown) => unknown;
   const r = new Ctor(makeMockTable()) as RendererInternals;
-  // Manually initialize per-row state for the requested row count. The
-  // renderer's real init pathway is driven by RowManager via tableBuilt /
-  // _resyncToRowsCount; we bypass it because our mock has zero display
-  // rows.
-  r.measuredHeight = new Float64Array(rowsCount);
-  r.isMeasured = new Uint8Array(rowsCount);
-  r.fenwickMeasured.resize(rowsCount);
-  r.fenwickUnmeasuredCount.resize(rowsCount);
-  r.fenwickUnmeasuredCount.bulkInitConstant(1);
-  r.measuredSum = 0;
-  r.measuredCount = 0;
-  r.rowsCountCached = rowsCount;
+  seedHeightIndex(r, rowsCount);
   return r;
 }
 
@@ -288,16 +278,6 @@ describe('VirtualVerticalRenderer height bookkeeping', () => {
     // Huge viewport → clamp to max 16.
     expect(r._resolveOverscanRows(10000)).toBe(16);
   });
-
-  it('overscan: legacy renderVerticalBuffer option is converted to row count', () => {
-    const r = makeRenderer(50);
-    // 300px / 30px estimate = 10 rows, within clamp.
-    r.table.options['renderVerticalBuffer'] = 300;
-    expect(r._resolveOverscanRows(600)).toBe(10);
-    // Huge legacy buffer clamped to max.
-    r.table.options['renderVerticalBuffer'] = 5000;
-    expect(r._resolveOverscanRows(600)).toBe(16);
-  });
 });
 
 interface RowStub {
@@ -380,7 +360,11 @@ function stubRenderWindow(r: RendererForSetAnchor): void {
 }
 
 function makeRendererWithRows(rows: RowStub[]): RendererForSetAnchor {
-  const tableElement = { style: { paddingTop: '0', paddingBottom: '0' }, firstChild: null };
+  const tableElement = {
+    style: { paddingTop: '0', paddingBottom: '0' },
+    firstChild: null,
+    replaceChildren: () => {},
+  };
   const elementVertical = {
     scrollTop: 0,
     clientHeight: 100,
@@ -400,15 +384,7 @@ function makeRendererWithRows(rows: RowStub[]): RendererForSetAnchor {
   };
   const Ctor = VirtualVerticalRenderer as unknown as new (table: unknown) => unknown;
   const r = new Ctor(table) as RendererForSetAnchor;
-  const n = rows.length;
-  r.measuredHeight = new Float64Array(n);
-  r.isMeasured = new Uint8Array(n);
-  r.fenwickMeasured.resize(n);
-  r.fenwickUnmeasuredCount.resize(n);
-  r.fenwickUnmeasuredCount.bulkInitConstant(1);
-  r.measuredSum = 0;
-  r.measuredCount = 0;
-  r.rowsCountCached = n;
+  seedHeightIndex(r, rows.length);
   return r;
 }
 
@@ -575,7 +551,11 @@ function makeRerenderRenderer(initialRows: RowStub[]): {
   setDisplayRows: (next: RowStub[]) => void;
   tableEmpty: jest.Mock;
 } {
-  const tableElement = { style: { paddingTop: '0', paddingBottom: '0' }, firstChild: null };
+  const tableElement = {
+    style: { paddingTop: '0', paddingBottom: '0' },
+    firstChild: null,
+    replaceChildren: () => {},
+  };
   const elementVertical = {
     scrollTop: 0,
     clientHeight: 100,
@@ -598,15 +578,7 @@ function makeRerenderRenderer(initialRows: RowStub[]): {
   };
   const Ctor = VirtualVerticalRenderer as unknown as new (table: unknown) => unknown;
   const r = new Ctor(table) as RerenderRenderer;
-  const n = initialRows.length;
-  r.measuredHeight = new Float64Array(n);
-  r.isMeasured = new Uint8Array(n);
-  r.fenwickMeasured.resize(n);
-  r.fenwickUnmeasuredCount.resize(n);
-  r.fenwickUnmeasuredCount.bulkInitConstant(1);
-  r.measuredSum = 0;
-  r.measuredCount = 0;
-  r.rowsCountCached = n;
+  seedHeightIndex(r, initialRows.length);
   return {
     r,
     setDisplayRows: (next) => {
@@ -818,5 +790,150 @@ describe('VirtualVerticalRenderer.initialize stock-bug workaround', () => {
     r.initialize();
 
     expect(rowManager.renderMode).toBe('virtual');
+  });
+});
+
+describe('VirtualVerticalRenderer fast-fling scroll deferral', () => {
+  interface DeferRenderer {
+    scrollRows: (top: number, dir: boolean) => void;
+    renderedRange: { top: number; bottom: number };
+  }
+
+  let rafQueue: Array<() => void>;
+  const realRaf = globalThis.requestAnimationFrame;
+
+  beforeEach(() => {
+    rafQueue = [];
+    (globalThis as { requestAnimationFrame: (cb: () => void) => number }).requestAnimationFrame = (
+      cb: () => void,
+    ) => {
+      rafQueue.push(cb);
+      return rafQueue.length;
+    };
+  });
+
+  afterEach(() => {
+    (
+      globalThis as { requestAnimationFrame: typeof globalThis.requestAnimationFrame }
+    ).requestAnimationFrame = realRaf;
+  });
+
+  function runNextRaf(): void {
+    const cb = rafQueue.shift();
+    expect(cb).toBeDefined();
+    cb?.();
+  }
+
+  function makeDeferSetup(): {
+    r: DeferRenderer;
+    renderWindow: jest.Mock;
+    holder: { scrollTop: number; clientHeight: number };
+  } {
+    // 1000 unmeasured rows at the default 30px estimate: row i sits at
+    // y = i * 30. Viewport is 100px tall; rendered window is rows [0, 10].
+    const rows = Array.from({ length: 1000 }, (_, i) => makeRowStub(i * 30, false));
+    const base = makeRendererWithRows(rows);
+    const r = base as unknown as DeferRenderer;
+    const renderWindow = jest.fn();
+    (base as unknown as { _renderWindow: () => void })._renderWindow = renderWindow as () => void;
+    r.renderedRange = { top: 0, bottom: 10 };
+    return { r, renderWindow, holder: base.elementVertical };
+  }
+
+  it('defers a zero-overlap scroll, then renders once scrollTop is stable', () => {
+    const { r, renderWindow, holder } = makeDeferSetup();
+    // Row 600 (y=18000) is far outside the rendered window [0, 10].
+    holder.scrollTop = 18000;
+    r.scrollRows(18000, false);
+
+    // Frame 1: deferred — no render, settle-watch RAF self-scheduled.
+    runNextRaf();
+    expect(renderWindow).not.toHaveBeenCalled();
+    expect(rafQueue.length).toBe(1);
+
+    // Frame 2: scrollTop unchanged → settled → full render fires.
+    runNextRaf();
+    expect(renderWindow).toHaveBeenCalledTimes(1);
+    expect(rafQueue.length).toBe(0);
+  });
+
+  it('keeps deferring while scrollTop changes, rendering only at the final position', () => {
+    const { r, renderWindow, holder } = makeDeferSetup();
+    holder.scrollTop = 18000;
+    r.scrollRows(18000, false);
+    runNextRaf(); // defer at 18000
+
+    holder.scrollTop = 24000; // still flinging, still zero overlap
+    runNextRaf(); // defer at 24000
+    expect(renderWindow).not.toHaveBeenCalled();
+
+    runNextRaf(); // 24000 stable → settle render
+    expect(renderWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders mid-gesture when the drag slows below one viewport per frame', () => {
+    const { r, renderWindow, holder } = makeDeferSetup();
+    // Fast: teleport far past the rendered window — defers.
+    holder.scrollTop = 18000;
+    r.scrollRows(18000, false);
+    runNextRaf();
+    expect(renderWindow).not.toHaveBeenCalled();
+
+    // User slows down but keeps dragging: 50px/frame < 100px viewport.
+    // Even though the rendered window [0, 10] is far behind (zero overlap),
+    // readable speed must render — waiting for a full stop would leave the
+    // viewport on blank padding for the rest of the gesture.
+    holder.scrollTop = 18050;
+    runNextRaf();
+    expect(renderWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders immediately when the new window overlaps the rendered window', () => {
+    const { r, renderWindow, holder } = makeDeferSetup();
+    // Row 5 (y=150) is inside the rendered window [0, 10] — a slow drag.
+    holder.scrollTop = 150;
+    r.scrollRows(150, false);
+
+    runNextRaf();
+    expect(renderWindow).toHaveBeenCalledTimes(1);
+    expect(rafQueue.length).toBe(0);
+  });
+
+  it('renders immediately when nothing is rendered yet', () => {
+    const { r, renderWindow, holder } = makeDeferSetup();
+    r.renderedRange = { top: 0, bottom: -1 };
+    holder.scrollTop = 18000;
+    r.scrollRows(18000, false);
+
+    runNextRaf();
+    expect(renderWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('pipes scrollHorizontal only when scrollLeft actually changes', () => {
+    const { r, holder } = makeDeferSetup();
+    const pipe = jest.fn();
+    const internals = r as unknown as {
+      table: { rowManager: { scrollHorizontal: jest.Mock; element: { scrollLeft?: number } } };
+    };
+    internals.table.rowManager.scrollHorizontal = pipe;
+
+    // Tabulator's scrollHorizontal writes DOM + dispatches unconditionally,
+    // so the renderer must skip the pipe when scrollLeft is unchanged.
+    holder.scrollTop = 150; // overlaps rendered window → renders immediately
+    r.scrollRows(150, false);
+    runNextRaf();
+    expect(pipe).toHaveBeenCalledTimes(1); // first frame always pipes
+
+    // Small steps stay inside the rendered window (no fling deferral).
+    holder.scrollTop = 200;
+    r.scrollRows(200, false);
+    runNextRaf();
+    expect(pipe).toHaveBeenCalledTimes(1); // scrollLeft unchanged → skipped
+
+    internals.table.rowManager.element.scrollLeft = 50;
+    holder.scrollTop = 250;
+    r.scrollRows(250, false);
+    runNextRaf();
+    expect(pipe).toHaveBeenCalledTimes(2); // horizontal change → piped
   });
 });
