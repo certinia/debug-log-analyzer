@@ -38,4 +38,10 @@ export class Renderer {
   rows() {
     return this.table?.rowManager?.getDisplayRows?.() ?? [];
   }
+  // Mirrors CoreFeature.dispatch (tabulator_esm.mjs:78) — chains to the
+  // table's eventBus so tests can spy on internal events like
+  // 'render-virtual-fill'.
+  dispatch(...args: unknown[]) {
+    this.table?.eventBus?.dispatch?.(...args);
+  }
 }

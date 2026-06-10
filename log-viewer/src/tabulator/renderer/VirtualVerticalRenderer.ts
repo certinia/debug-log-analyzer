@@ -26,24 +26,38 @@ import { Renderer } from 'tabulator-tables';
  * module reads `vDomTop`/`vDomBottom`.
  */
 
+/**
+ * The display-row surface this renderer touches. Display rows are a UNION of
+ * Tabulator `Row` objects and `PseudoRow`-backed group/calc rows: PseudoRows
+ * implement the methods below as no-ops but LACK `initialized`,
+ * `heightInitialized`, `deinitializeHeight`, and `data`, and their
+ * `getHeight()` returns undefined — hence the optional members. PseudoRows
+ * therefore flow through the attach pipeline untouched (no-op phases, no
+ * Fenwick write — they stay estimate-priced, matching stock).
+ */
 interface RowInternals {
-  initialized: boolean;
-  heightInitialized: boolean;
+  initialized?: boolean;
+  heightInitialized?: boolean;
   initialize: (force?: boolean, inFragment?: boolean) => void;
   calcHeight: (force?: boolean) => void;
   setCellHeight: () => void;
   clearCellHeight: () => void;
   rendered: () => void;
   getElement: () => HTMLElement;
-  getHeight: () => number;
-  // Clears heightInitialized + cached outerHeight so the next attach
-  // re-measures from the DOM.
+  getHeight: () => number | undefined;
+  // Row-only: clears heightInitialized + cached outerHeight so the next
+  // attach re-measures from the DOM.
   deinitializeHeight?: () => void;
-  // The row's data OBJECT REFERENCE — a durable identity that survives
+  // Row-only: the data OBJECT REFERENCE — a durable identity that survives
   // DataTree re-wrapping and in-place updateData, so it keys the height
-  // cache without requiring an id field. Rows without one simply aren't
-  // cached.
+  // cache without requiring an id field. Uncached rows are measured normally.
   data?: object;
+}
+
+/** Table options this renderer reads (set from typed app code). */
+interface RendererOptions {
+  scrollToRowPosition?: string;
+  scrollToRowIfVisible?: boolean;
 }
 
 interface RendererBase {
@@ -61,16 +75,18 @@ interface RendererBase {
       // overwrites it with the string 'virtual' (stock bug workaround).
       renderMode?: string;
     };
-    options: Record<string, unknown>;
+    options: RendererOptions;
   };
   elementVertical: HTMLElement;
   tableElement: HTMLElement;
   verticalFillMode: string;
   styleRow: (row: RowInternals, index: number) => void;
+  // CoreFeature.dispatch → table.eventBus (internal event chain). Stock
+  // fires 'render-virtual-fill' after every fill; GroupRows depends on it.
+  dispatch: (event: string) => void;
 }
 
 const DEFAULT_ESTIMATE_HEIGHT = 30;
-const OVERSCAN_OPTION = 'variableHeightOverscanRows';
 const OVERSCAN_MIN = 4;
 const OVERSCAN_MAX = 16;
 
@@ -342,6 +358,11 @@ export class VirtualVerticalRenderer extends Renderer {
     self.table.rowManager.scrollHorizontal(left); // stock-parity tail
   }
 
+  /** Renderer contract (stock parity): sync horizontal scroll position. */
+  scrollColumns(left: number): void {
+    this._self().table.rowManager.scrollHorizontal(left);
+  }
+
   /** RowManager lifecycle: holder scroll event (reads live scrollTop). */
   scrollRows(_top: number, _dir: boolean): void {
     const holder = this._self().elementVertical;
@@ -600,7 +621,7 @@ export class VirtualVerticalRenderer extends Renderer {
       this._setScrollTop(placed);
       this._renderWindow();
 
-      const el = row.getElement?.();
+      const el = row.getElement();
       if (el && el.parentNode) {
         // Anchor is in the window → DOM-truth snap, converged.
         const desired = el.offsetTop - offsetFromHolderTop;
@@ -652,7 +673,7 @@ export class VirtualVerticalRenderer extends Renderer {
       const ev = self.elementVertical;
       const opts = self.table.options;
 
-      const useIfVisible = ifVisible ?? (opts['scrollToRowIfVisible'] as boolean | undefined);
+      const useIfVisible = ifVisible ?? opts.scrollToRowIfVisible;
       if (useIfVisible === false) {
         const rowTop = this._cumHeight(idx);
         const rowBottom = rowTop + this._heightOf(idx);
@@ -662,7 +683,7 @@ export class VirtualVerticalRenderer extends Renderer {
         }
       }
 
-      const rawPosition = position ?? (opts['scrollToRowPosition'] as string | undefined) ?? 'top';
+      const rawPosition = position ?? opts.scrollToRowPosition ?? 'top';
       const resolvedPosition =
         rawPosition === 'nearest'
           ? this.scrollToRowNearestTop(row)
@@ -747,6 +768,9 @@ export class VirtualVerticalRenderer extends Renderer {
       this._detachAllRendered();
       self.tableElement.style.paddingTop = '0';
       self.tableElement.style.paddingBottom = '0';
+      // Stock dispatches after every fill, including empty ones — GroupRows
+      // relies on it to set minWidth when no data rows are visible.
+      self.dispatch('render-virtual-fill');
       return;
     }
 
@@ -867,20 +891,18 @@ export class VirtualVerticalRenderer extends Renderer {
       this.renderVisTop = -1;
     }
 
-    // Flush estimate only on non-scroll-driven renders. Stock's
-    // `vDomRowHeight` is the same way — updated inside `_virtualRenderFill`
-    // but NOT during incremental `scrollRows` ops. Doing it differently
-    // means: user scrolls into rows whose heights differ from the current
-    // estimate, the mean shifts mid-scroll, cumHeight for the new window
-    // shifts in lockstep, and scrollTop has to either visibly jump (no
-    // compensation) or get tugged against the user's input (compensation).
-    // Sticky estimate during scrolls sidesteps both: paddings only change
-    // due to actual per-row Fenwick updates (small deltas, no aggregate
-    // shift). The flush still happens on structural renders so the one-shot
-    // calibration (Stage 2a) lands; after that it is frozen and this is a
-    // no-op either way.
+    // Sticky-estimate rule: flush only on structural renders, like stock's
+    // vDomRowHeight (a mid-scroll mean shift would jump or tug the user).
     if (!this.inScrollDrivenRender) {
       this._flushEstimateUpdate();
+    }
+
+    // Stock-contract event: fired after every FILL (structural render, or a
+    // scroll that fully replaced the window) but not after incremental
+    // scroll ticks — GroupRows uses it to fix table minWidth when only
+    // group headers are visible.
+    if (!this.inScrollDrivenRender || this.lastDiffWasFill) {
+      this._self().dispatch('render-virtual-fill');
     }
 
     // Build cells for rows just beyond the new window during idle time, so
@@ -968,6 +990,11 @@ export class VirtualVerticalRenderer extends Renderer {
   private detachRangesScratch: Array<[number, number]> = [];
   private attachRangesScratch: Array<[number, number]> = [];
 
+  // True when the last _diffRender replaced the window from scratch (empty
+  // before, or zero overlap) — the equivalent of stock's _virtualRenderFill,
+  // which gates the 'render-virtual-fill' dispatch on scroll renders.
+  private lastDiffWasFill = false;
+
   /**
    * Reconcile the rendered range to [newTop, newBottom]: detach rows that
    * left, attach (initialize + measure) rows that entered. estimateHeight is
@@ -978,6 +1005,7 @@ export class VirtualVerticalRenderer extends Renderer {
     const oldBottom = this.renderedRange.bottom;
     const oldEmpty = oldBottom < oldTop;
     const newEmpty = newBottom < newTop;
+    this.lastDiffWasFill = false;
 
     if (oldEmpty && newEmpty) {
       return;
@@ -989,10 +1017,12 @@ export class VirtualVerticalRenderer extends Renderer {
     attachRanges.length = 0;
 
     if (oldEmpty) {
+      this.lastDiffWasFill = true;
       attachRanges.push([newTop, newBottom]);
     } else if (newEmpty) {
       detachRanges.push([oldTop, oldBottom]);
     } else if (newBottom < oldTop || newTop > oldBottom) {
+      this.lastDiffWasFill = true;
       detachRanges.push([oldTop, oldBottom]);
       attachRanges.push([newTop, newBottom]);
     } else {
@@ -1011,7 +1041,7 @@ export class VirtualVerticalRenderer extends Renderer {
     for (const [from, to] of detachRanges) {
       for (let i = from; i <= to; i++) {
         const row = rows[i];
-        const el = row?.getElement?.();
+        const el = row?.getElement();
         if (el && el.parentNode) {
           el.parentNode.removeChild(el);
         }
@@ -1080,7 +1110,7 @@ export class VirtualVerticalRenderer extends Renderer {
         // captured here: Phase D (setCellHeight) flips heightInitialized to
         // true, so reading it in Phase E would also match rows that were
         // JUST re-measured and still need their Fenwick refresh.
-        const wasSettled = row.heightInitialized && this.isMeasured[i] === 1;
+        const wasSettled = row.heightInitialized === true && this.isMeasured[i] === 1;
         allAttached.push({ row, index: i, wasUninitialized, wasSettled });
       }
 
@@ -1148,8 +1178,10 @@ export class VirtualVerticalRenderer extends Renderer {
       if (entry.wasSettled) {
         continue;
       }
+      // PseudoRows (groups) return undefined here — they stay unmeasured
+      // and estimate-priced, matching stock.
       const h = entry.row.getHeight();
-      if (h > 0) {
+      if (h !== undefined && h > 0) {
         this._setHeight(entry.index, h, entry.row.data);
       }
     }
@@ -1352,17 +1384,12 @@ export class VirtualVerticalRenderer extends Renderer {
   }
 
   /**
-   * Resolve the overscan row count for the current viewport. Reads the
-   * explicit `variableHeightOverscanRows` option first, falling back to an
-   * adaptive default based on viewport height clamped to
-   * [OVERSCAN_MIN, OVERSCAN_MAX].
+   * Adaptive overscan row count for the current viewport (~quarter viewport
+   * of rows), clamped to [OVERSCAN_MIN, OVERSCAN_MAX]. Deliberately small —
+   * render cost is linear in rendered rows; coverage iteration and idle
+   * pre-warm absorb the cases a bigger buffer would.
    */
   private _resolveOverscanRows(clientHeight: number): number {
-    const opts = this._self().table.options;
-    const explicit = opts[OVERSCAN_OPTION];
-    if (typeof explicit === 'number' && explicit >= 0 && Number.isFinite(explicit)) {
-      return Math.max(0, Math.floor(explicit));
-    }
     const est = Math.max(1, this.estimateHeight);
     const adaptive = Math.round(clientHeight / 4 / est);
     return Math.max(OVERSCAN_MIN, Math.min(OVERSCAN_MAX, adaptive));

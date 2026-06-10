@@ -46,8 +46,6 @@ interface RendererInternals {
   _resyncToRowsCount: (wipe: boolean) => void;
   _rebuildIndexFromCache: (rows: Array<{ data?: object }>) => void;
   _resolveOverscanRows: (clientHeight: number) => number;
-  // Access to the underlying mock table so tests can mutate options.
-  table: { options: Record<string, unknown> };
 }
 
 function makeRenderer(rowsCount: number): RendererInternals {
@@ -258,14 +256,6 @@ describe('VirtualVerticalRenderer height bookkeeping', () => {
     expect(r._cumHeight(0)).toBe(0);
   });
 
-  it('overscan: explicit option wins over adaptive', () => {
-    const r = makeRenderer(50);
-    r.table.options['variableHeightOverscanRows'] = 12;
-    expect(r._resolveOverscanRows(600)).toBe(12);
-    r.table.options['variableHeightOverscanRows'] = 0;
-    expect(r._resolveOverscanRows(600)).toBe(0); // explicit 0 honoured
-  });
-
   it('overscan: adaptive default scales with viewport but is clamped to [4, 16]', () => {
     const r = makeRenderer(50);
     // estimateHeight defaults to 30. Adaptive = round(clientHeight / 4 / 30).
@@ -284,7 +274,6 @@ interface RowStub {
   initialized: boolean;
   heightInitialized: boolean;
   initialize: () => void;
-  normalizeHeight: () => void;
   calcHeight: () => void;
   setCellHeight: () => void;
   clearCellHeight: () => void;
@@ -341,7 +330,6 @@ function makeRowStub(offsetTop: number, attached = true, heightInitialized = tru
     initialized: false,
     heightInitialized,
     initialize: () => {},
-    normalizeHeight: () => {},
     calcHeight: () => {},
     setCellHeight: () => {},
     clearCellHeight: () => {},

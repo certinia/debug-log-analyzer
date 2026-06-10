@@ -19,14 +19,14 @@ interface AttachRowStub {
   initialized: boolean;
   heightInitialized: boolean;
   initialize: jest.Mock;
-  normalizeHeight: () => void;
   calcHeight: () => void;
   setCellHeight: () => void;
   clearCellHeight: () => void;
   rendered: jest.Mock;
   getElement: () => HTMLElement;
-  getHeight: () => number;
-  data: object;
+  getHeight: () => number | undefined;
+  deinitializeHeight?: () => void;
+  data?: object;
 }
 
 interface AttachRendererInternals {
@@ -59,7 +59,6 @@ function makeAttachSetup(rowCount: number): {
       initialize: jest.fn(() => {
         row.initialized = true;
       }),
-      normalizeHeight: () => {},
       calcHeight: () => {},
       setCellHeight: () => {},
       clearCellHeight: () => {},
@@ -235,5 +234,84 @@ describe('VirtualVerticalRenderer._attachRanges styleRow once per row lifetime',
     for (const row of rows) {
       expect(hasParityClass(row.getElement())).toBe(true);
     }
+  });
+});
+
+describe('VirtualVerticalRenderer render-virtual-fill dispatch (stock contract)', () => {
+  interface RenderInternals {
+    _renderWindow: () => void;
+    inScrollDrivenRender: boolean;
+    table: { rowManager: { element: { scrollTop: number } }; eventBus: { dispatch: jest.Mock } };
+  }
+
+  function makeRenderSetup(rowCount: number): { rr: RenderInternals; dispatched: jest.Mock } {
+    const { r } = makeAttachSetup(rowCount);
+    const rr = r as unknown as RenderInternals;
+    const dispatched = jest.fn();
+    rr.table.eventBus.dispatch = dispatched;
+    return { rr, dispatched };
+  }
+
+  const fillCalls = (dispatched: jest.Mock) =>
+    dispatched.mock.calls.filter((c) => c[0] === 'render-virtual-fill').length;
+
+  it('dispatches after structural renders, including empty ones', () => {
+    const { rr, dispatched } = makeRenderSetup(50);
+    rr._renderWindow();
+    expect(fillCalls(dispatched)).toBe(1);
+
+    const empty = makeRenderSetup(0);
+    empty.rr._renderWindow();
+    expect(fillCalls(empty.dispatched)).toBe(1);
+  });
+
+  it('skips incremental scroll renders but fires on full window replacement', () => {
+    const { rr, dispatched } = makeRenderSetup(200);
+    rr._renderWindow(); // initial fill
+    expect(fillCalls(dispatched)).toBe(1);
+
+    // Incremental: small scroll, window overlaps — like stock's add/remove
+    // path, no dispatch.
+    rr.table.rowManager.element.scrollTop = 60;
+    rr.inScrollDrivenRender = true;
+    rr._renderWindow();
+    expect(fillCalls(dispatched)).toBe(1);
+
+    // Teleport: zero overlap — like stock's big-scroll _virtualRenderFill.
+    rr.table.rowManager.element.scrollTop = 4000;
+    rr._renderWindow();
+    rr.inScrollDrivenRender = false;
+    expect(fillCalls(dispatched)).toBe(2);
+  });
+});
+
+describe('VirtualVerticalRenderer PseudoRow (group row) tolerance', () => {
+  it('attaches PseudoRow-shaped rows without measuring or throwing', () => {
+    const { r, rows, tableElement } = makeAttachSetup(5);
+    // Tabulator PseudoRow surface: the shared methods are no-ops, getHeight
+    // returns undefined, and initialized/heightInitialized/
+    // deinitializeHeight/data do not exist.
+    const pseudoEl = document.createElement('div');
+    const pseudo = {
+      initialize: jest.fn(),
+      calcHeight: () => {},
+      setCellHeight: () => {},
+      clearCellHeight: () => {},
+      rendered: jest.fn(),
+      getElement: () => pseudoEl,
+      getHeight: () => undefined,
+    } as unknown as AttachRowStub;
+    rows[2] = pseudo;
+
+    expect(() => r._attachRanges(rows, [[0, 4]], 0)).not.toThrow();
+    expect(pseudoEl.parentNode).toBe(tableElement);
+    // No height recorded: PseudoRows stay estimate-priced, like stock.
+    expect(r.isMeasured[2]).toBe(0);
+    // The deinit walk rerenderRows performs must tolerate the missing method.
+    expect(() => {
+      for (const row of rows) {
+        row.deinitializeHeight?.();
+      }
+    }).not.toThrow();
   });
 });
