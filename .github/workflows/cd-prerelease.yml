@@ -86,25 +86,29 @@ jobs:
           cd lana
           vsce package --pre-release --no-dependencies
       - name: Publish to VS Code Marketplace + Open VSX Registry
+        # Tokens via env (not -p) so they don't appear in the process list.
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
+          OVSX_PAT: ${{ secrets.OVSX_TOKEN }}
         run: |
           cd lana
           echo "Verify vsce token has not expired"
-          vsce verify-pat -p ${{ secrets.VSCE_TOKEN }}
+          vsce verify-pat
 
           echo "
           Verify ovsx token has not expired"
-          ovsx verify-pat -p ${{ secrets.OVSX_TOKEN }}
+          ovsx verify-pat
 
-          versionNum=$(cat package.json | jq -r '.version')
-          pkgPath=lana-${versionNum}.vsix
+          versionNum=$(jq -r '.version' package.json)
+          pkgPath="lana-${versionNum}.vsix"
 
           echo "Publish to vsce
           vsix name: $pkgPath"
-          vsce publish --packagePath ${pkgPath} --no-dependencies --pre-release --skip-duplicate -p ${{ secrets.VSCE_TOKEN }}
+          vsce publish --packagePath "${pkgPath}" --no-dependencies --pre-release --skip-duplicate
 
           echo "
           Publish to ovsx"
-          ovsx publish ${pkgPath} --no-dependencies --pre-release --skip-duplicate -p ${{ secrets.OVSX_TOKEN }}
+          ovsx publish "${pkgPath}" --no-dependencies --pre-release --skip-duplicate
       - name: Update pre-release tag
         run: |
           echo "Updating pre release tag"
