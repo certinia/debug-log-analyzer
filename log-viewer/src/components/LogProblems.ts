@@ -157,18 +157,21 @@ export class NotificationTag extends LitElement {
     sortedNotifications.forEach((item, index) => {
       const colorStyle = this.colorStyles.get(item.severity) || '';
 
-      const buttonBar = item.timestamp
-        ? html`<div class="button-bar">
-            <vscode-button
-              aria-label="Go To Call Tree"
-              title="Go To Call Tree"
-              @click=${() => {
-                goToRow(item.timestamp ?? 0);
-              }}
-              >Go To Call Tree</vscode-button
-            >
-          </div>`
-        : '';
+      const buttonBar =
+        item.eventIndex !== null
+          ? html`<div class="button-bar">
+              <vscode-button
+                aria-label="Go To Call Tree"
+                title="Go To Call Tree"
+                @click=${() => {
+                  if (item.eventIndex !== null) {
+                    goToRow({ eventIndex: item.eventIndex });
+                  }
+                }}
+                >Go To Call Tree</vscode-button
+              >
+            </div>`
+          : '';
 
       const content = html`<div class="text-container">
         ${item.message
@@ -198,5 +201,6 @@ export class LogProblem {
   summary = '';
   message = '';
   severity: 'Error' | 'Warning' | 'Info' | 'none' = 'none';
+  eventIndex: number | null = null;
   timestamp: number | null = null;
 }

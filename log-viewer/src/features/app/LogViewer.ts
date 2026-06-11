@@ -47,6 +47,9 @@ export class LogViewer extends LitElement {
   _selectedTab = 'timeline-tab';
 
   @state()
+  private _navigateToEventIndex: number | undefined = undefined;
+
+  @state()
   private _navigateToTimestamp: number | undefined = undefined;
 
   static styles = [
@@ -101,10 +104,11 @@ export class LogViewer extends LitElement {
     // Listen for navigation messages from the extension
     VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {
       const { cmd, payload } = event.data;
-      if (cmd === 'navigateToTimeline' && payload?.timestamp) {
-        this._showTab('timeline-tab');
-        eventBus.emit('timeline:navigate-to', { timestamp: payload.timestamp });
+      if (cmd !== 'navigateToTimeline' || payload?.timestamp === undefined) {
+        return;
       }
+      this._showTab('timeline-tab');
+      eventBus.emit('timeline:navigate-to', { timestamp: payload.timestamp });
     });
   }
 
@@ -152,6 +156,7 @@ export class LogViewer extends LitElement {
         <vscode-panel-view id="view1">
           <timeline-view
             .timelineRoot="${this.timelineRoot}"
+            .navigateToEventIndex="${this._navigateToEventIndex}"
             .navigateToTimestamp="${this._navigateToTimestamp}"
           ></timeline-view>
         </vscode-panel-view>
@@ -214,6 +219,7 @@ export class LogViewer extends LitElement {
       logMessage.summary = element.summary;
       logMessage.message = element.description;
       logMessage.severity = severity;
+      logMessage.eventIndex = element.eventIndex ?? null;
       logMessage.timestamp = element.startTime || null;
       localNotifications.push(logMessage);
     });
@@ -221,15 +227,16 @@ export class LogViewer extends LitElement {
 
     this.parserIssues = this.parserIssuesToMessages(apexLog);
 
-    // Navigate to timestamp if requested (passed as prop to timeline-view)
-    if (data.navigateToTimestamp !== undefined) {
+    // Navigate to event location if requested (passed as prop to timeline-view)
+    if (data.navigateToEventIndex !== undefined || data.navigateToTimestamp !== undefined) {
       this._showTab('timeline-tab');
+      this._navigateToEventIndex = data.navigateToEventIndex;
       this._navigateToTimestamp = data.navigateToTimestamp;
     }
   }
 
   async _readLog(logUri: string): Promise<string> {
-    let msg = '';
+    let msg;
     if (logUri) {
       try {
         const response = await fetch(logUri);
@@ -302,5 +309,6 @@ interface LogDataEvent {
   logUri?: string;
   logPath?: string;
   logData?: string;
+  navigateToEventIndex?: number;
   navigateToTimestamp?: number;
 }

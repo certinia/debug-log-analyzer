@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { Tabulator } from 'tabulator-tables';
+import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import { AnchoringPolicy } from '../../../tabulator/module/AnchoringPolicy.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
@@ -16,10 +16,11 @@ export interface TableCallbacks {
     selectedNamespaces: string[],
     namespace: string,
     data: TimeOrderRow | AggregatedRow | BottomUpRow,
-    filterParams: { filterCache: Map<string, boolean> },
+    filterParams: { filterCache: Map<number, boolean> },
   ) => boolean;
   onFilterCacheClear?: () => void;
   onRenderStarted: () => void;
+  rowFormatter?: (row: RowComponent) => void;
 }
 
 export function registerTableModules(): void {

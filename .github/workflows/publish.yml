@@ -4,40 +4,51 @@ on:
   release:
     types: [published]
 
+# Publishing uses VSCE/OVSX secrets, not the git token — read-only is enough.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'pnpm'
       - name: Install vsce + ovsx
         run: |
           pnpm add --global @vscode/vsce
           pnpm add --global ovsx
       - name: Dependencies
-        run: |
-          HUSKY=0 pnpm install
+        run: pnpm run ci:install
       - name: Build extension
         run: |
           cd lana
           vsce package --no-dependencies
       - name: Publish to VS Code Marketplace + Open VSX Registry
+        # Secrets and the release tag are passed via env (not interpolated into the
+        # shell) to avoid leaking tokens in the process list and shell injection.
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
+          OVSX_PAT: ${{ secrets.OVSX_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           cd lana
           echo "Verify vsce token has not expired"
-          vsce verify-pat -p ${{ secrets.VSCE_TOKEN }}
+          vsce verify-pat
           echo "Verify ovsx token has not expired"
-          ovsx verify-pat -p ${{ secrets.OVSX_TOKEN }}
+          ovsx verify-pat
 
           echo "Publish to vsce"
-          vsce publish --packagePath lana-${{ github.event.release.tag_name }}.vsix --no-dependencies -p ${{ secrets.VSCE_TOKEN }}
+          vsce publish --packagePath "lana-${TAG}.vsix" --no-dependencies
           echo "Publish to ovsx"
-          ovsx publish lana-${{ github.event.release.tag_name }}.vsix --no-dependencies -p ${{ secrets.OVSX_TOKEN }}
+          ovsx publish "lana-${TAG}.vsix" --no-dependencies

@@ -7,62 +7,76 @@ on:
     branches: [main, release/**]
   workflow_dispatch:
 
+# Least-privilege default: CI only needs to read the repository.
+permissions:
+  contents: read
+
 jobs:
   verify_files:
     name: Verify Files
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'pnpm'
       - name: Install Packages
-        run: HUSKY=0 pnpm install
+        run: pnpm run ci:install
       - name: Lint Files
         run: pnpm run lint
 
   tests:
-    name: Run Log-viewer Tests
+    # Split per jest project so they run on parallel runners and failures are isolated.
+    # Kept as --runInBand: on 2-vCPU runners the worker pool is slower than serial.
+    name: Test (${{ matrix.project }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [apex-log-parser, log-viewer, lana]
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'pnpm'
       - name: Install Packages
-        run: HUSKY=0 pnpm install
+        run: pnpm run ci:install
       - name: Tests
-        run: |
-          pnpm run test:ci
+        run: pnpm exec jest --selectProjects ${{ matrix.project }} --runInBand
 
   build:
     name: Verify VSCode Package Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'pnpm'
       - name: Install vsce
         run: pnpm add --global @vscode/vsce
       - name: Install Dependencies
-        run: |
-          HUSKY=0 pnpm install
+        run: pnpm run ci:install
       - name: Build VSCode Package
         run: |
           cd lana

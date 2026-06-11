@@ -111,7 +111,7 @@ Ensure all tests pass before submitting your pull request.
 
 ## 📦 Packaging the Extension
 
-This is for information only packaging and releasing is handled in Github.
+This is for information only - packaging and releasing are handled in GitHub (see [RELEASING.md](./RELEASING.md) for the maintainer guide).
 Once you're ready to package the extension for distribution:
 
 1. Ensure that you’ve installed the dependencies:

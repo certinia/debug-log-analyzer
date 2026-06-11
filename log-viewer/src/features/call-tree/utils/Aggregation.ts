@@ -13,7 +13,7 @@ import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
  */
 export interface AggregatedRow {
   /** Unique identifier for the row */
-  id: string;
+  id: number;
   /** Unique grouping key for this function signature */
   key: string;
   /** Display name */
@@ -56,7 +56,7 @@ export interface AggregatedRow {
  */
 export interface BottomUpRow {
   /** Unique identifier for the row */
-  id: string;
+  id: number;
   /** Unique grouping key for this function signature */
   key: string;
   /** Internal interned int id matching {@link key}; used for fast child-bucket
@@ -135,7 +135,7 @@ export function toAggregatedCallTree(rootChildren: LogEvent[]): AggregatedRow[] 
   // Per-build monotonic counter; row ids must be globally unique within this
   // tree so deepFilter caches don't collide across cascaded subtree passes.
   let next = 0;
-  const idFor = (): string => `agg-${++next}`;
+  const idFor = (): number => ++next;
 
   // Group root-level events by signature with call stack tracking
   const rootMap = new Map<string, AggregatedRow>();
@@ -176,7 +176,7 @@ export function toAggregatedCallTree(rootChildren: LogEvent[]): AggregatedRow[] 
 function aggregateChildrenRecursive(
   instances: LogEvent[],
   parentStackKey: string,
-  idFor: () => string,
+  idFor: () => number,
 ): AggregatedRow[] | null {
   const childMap = new Map<string, AggregatedRow>();
   // Create a new stack for each aggregation level, starting with the parent stack key
@@ -334,7 +334,7 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
   // Per-build monotonic counter; row ids must be globally unique within this
   // tree so deepFilter caches don't collide across cascaded subtree passes.
   let next = 0;
-  const idFor = (): string => `bu-${++next}`;
+  const idFor = (): number => ++next;
 
   const enter = (node: LogEvent): void => {
     const eventKey = getEventKey(node);
@@ -516,7 +516,7 @@ function sortBuckets(rows: BottomUpRow[]): void {
 function createEmptyAggregatedRow(
   key: string,
   event: LogEvent,
-  idFor: () => string,
+  idFor: () => number,
 ): AggregatedRow {
   return {
     id: idFor(),
@@ -544,7 +544,7 @@ function createEmptyBottomUpRow(
   key: string,
   keyId: number,
   event: LogEvent,
-  idFor: () => string,
+  idFor: () => number,
 ): BottomUpRow {
   return {
     id: idFor(),

@@ -19,8 +19,9 @@
 
     "moduleResolution": "Bundler",
     "module": "ESNext",
-    "noEmit": true,
+    "composite": true,
     "declaration": true,
+    "emitDeclarationOnly": true,
     "declarationMap": true,
 
     "strictFunctionTypes": true,

@@ -7,11 +7,27 @@ type GoToRowOptions = { scrollIfVisible: boolean; focusRow: boolean };
 export class RowNavigation extends Module {
   static moduleName = 'rowNavigation';
   tableHolder: HTMLElement | null = null;
+  private pendingRenderResolvers: Array<() => void> = [];
+  private isRenderPending = false;
 
   constructor(table: Tabulator) {
     super(table);
     // @ts-expect-error registerTableFunction() needs adding to tabulator types
     this.registerTableFunction('goToRow', this.goToRow.bind(this));
+  }
+
+  initialize(): void {
+    this.table.on('renderStarted', () => {
+      this.isRenderPending = true;
+    });
+
+    this.table.on('renderComplete', () => {
+      this.isRenderPending = false;
+      const resolvers = this.pendingRenderResolvers.splice(0);
+      for (const resolve of resolvers) {
+        resolve();
+      }
+    });
   }
 
   async goToRow(
@@ -59,13 +75,24 @@ export class RowNavigation extends Module {
       this.tableHolder.focus();
     }
 
-    return new Promise<void>((resolve, reject) => {
-      // Need to wait for any pending redraws to finish before scrolling or it will not work.
-      // Propagate rejection too — without it a failed scroll (row no longer in
-      // the display set) left this promise unsettled forever, hanging awaiting
-      // callers (e.g. Find's match navigation).
-      setTimeout(() => {
-        this._scrollToRow(row, opts).then(resolve, reject);
+    await this._waitForRenderComplete();
+    await this._scrollToRow(row, opts);
+  }
+
+  private _waitForRenderComplete(): Promise<void> {
+    if (!this.isRenderPending) {
+      return this._waitForNextFrame();
+    }
+
+    return new Promise<void>((resolve) => {
+      this.pendingRenderResolvers.push(resolve);
+    });
+  }
+
+  private _waitForNextFrame(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
       });
     });
   }

@@ -95,6 +95,7 @@ export function createBottomUpTable(
 
   const tabulatorOptions = {
     data: toBottomUpTree(rootMethod.children),
+    index: 'id',
     layout: 'fitColumns',
     placeholder: options.placeholder ?? 'No Call Tree Available',
     height: '100%',
@@ -119,6 +120,7 @@ export function createBottomUpTable(
     groupStartOpen: false,
     groupToggleElement: 'header',
     columnDefaults: commonColumnDefaults,
+    rowFormatter: callbacks.rowFormatter,
   } as Options;
 
   const table = new Tabulator(container, {

@@ -1,21 +1,8 @@
-# Apex Log Analyzer
+<!-- Canonical instructions live in AGENTS.md and .claude/rules/. Edit those, NOT this
+     import stub. This file only wires AGENTS.md into Claude Code. -->
 
-VS Code extension for Salesforce debug log analysis.
+@AGENTS.md
 
-## Structure
+## Claude Code
 
-- `lana/` - VS Code extension
-- `log-viewer/` - Webview UI (NO vscode imports allowed)
-
-## Commands
-
-pnpm watch | build | test | lint | prettier-format
-
-## Standards
-
-See `.specify/memory/constitution.md` for full guidelines.
-
-- Strict TypeScript, no `any`
-- Performance: <3s for 10MB logs
-- Tests required for features
-- Conventional commits, no auto-commit
+- Area rules in `.claude/rules/` load by path; see the Rules manifest in AGENTS.md.

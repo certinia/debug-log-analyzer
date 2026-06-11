@@ -54,3 +54,7 @@ settings.json
   }
 }
 ```
+
+## Call Tree category coloring
+
+The Call Tree colors its Name column by event category using the active timeline theme. A color chip is shown by default; enable **Colorize Call Tree category names** under `preferences -> extensions -> Apex Log Analyzer` to tint the whole cell instead. See [Call Tree → Category Coloring](./features/calltree.md#category-coloring).

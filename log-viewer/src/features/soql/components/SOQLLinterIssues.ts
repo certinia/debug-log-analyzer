@@ -22,7 +22,7 @@ export class SOQLLinterIssues extends LitElement {
   soql = '';
 
   @property({ type: Number })
-  timestamp = 0;
+  eventIndex = -1;
 
   @state()
   issues: SOQLLinterRule[] = [];
@@ -48,9 +48,16 @@ export class SOQLLinterIssues extends LitElement {
   ];
 
   async updated(changedProperties: PropertyValues): Promise<void> {
-    if (changedProperties.has('soql')) {
-      const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() || [];
-      const soqlLine = stack[0] as SOQLExecuteBeginLine;
+    if (changedProperties.has('soql') || changedProperties.has('eventIndex')) {
+      const stack =
+        this.eventIndex >= 0
+          ? (DatabaseAccess.instance()?.getStackByEventIndex(this.eventIndex).reverse() ?? [])
+          : [];
+      const soqlLine = stack[0] as SOQLExecuteBeginLine | undefined;
+      if (!soqlLine) {
+        this.issues = [];
+        return;
+      }
       this.issues = this.getIssuesFromSOQLLine(soqlLine);
       this.issues = this.issues.concat(await new SOQLLinter().lint(soqlLine.text, stack));
       this.issues.sort((a, b) => {

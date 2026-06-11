@@ -87,6 +87,13 @@ export class TimelineFlameChart extends LitElement {
   navigateToTimestamp: number | undefined = undefined;
 
   /**
+   * Event index to navigate to after initialization.
+   * Preferred over timestamp because it is unique within a parse.
+   */
+  @property({ type: Number })
+  navigateToEventIndex: number | undefined = undefined;
+
+  /**
    * Optional configuration options.
    */
   @state()
@@ -151,8 +158,10 @@ export class TimelineFlameChart extends LitElement {
       this.apexLogTimeline = new ApexLogTimeline();
       await this.apexLogTimeline.init(this.containerRef, this.apexLog, optionsWithTheme);
 
-      // Navigate to timestamp after initialization completes
-      if (this.navigateToTimestamp !== undefined) {
+      // Navigate after initialization completes, preferring unique eventIndex.
+      if (this.navigateToEventIndex !== undefined) {
+        this.apexLogTimeline.navigateToEventIndex(this.navigateToEventIndex);
+      } else if (this.navigateToTimestamp !== undefined) {
         this.apexLogTimeline.navigateToTimestamp(this.navigateToTimestamp);
       }
     } catch (error) {
