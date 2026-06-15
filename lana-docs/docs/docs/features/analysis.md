@@ -12,7 +12,7 @@ keywords:
     filter salesforce logs,
     salesforce developer tools,
   ]
-image: https://github.com/certinia/debug-log-analyzer/blob/main/lana/assets/v1.18/lana-analysis.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-analysis.png
 hide_title: true
 ---
 
