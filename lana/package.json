@@ -129,6 +129,13 @@
       "type": "object",
       "title": "Apex Log Analyzer",
       "properties": {
+        "lana.callTree.categoryColorize": {
+          "title": "Colorize Call Tree category names",
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "When enabled, applies a background tint and text color to the Name column in the Call Tree based on the event category, matching the Timeline flame graph colors. When disabled (default), a small color chip is shown instead.",
+          "order": 2
+        },
         "lana.timeline.activeTheme": {
           "type": "string",
           "default": "50 shades of green",
@@ -252,13 +259,6 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Enable/ disable the legacy timeline. Default is `false`.",
-          "order": 2
-        },
-        "lana.callTree.categoryColorize": {
-          "title": "Colorize Call Tree category names",
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "When enabled, applies a background tint and text color to the Name column in the Call Tree based on the event category, matching the Timeline flame graph colors. When disabled (default), a small color chip is shown instead.",
           "order": 2
         },
         "lana.timeline.colors": {
