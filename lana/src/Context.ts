@@ -15,6 +15,7 @@ import type { Display } from './display/Display.js';
 import { WhatsNewNotification } from './display/WhatsNewNotification.js';
 import { RawLogFoldingProvider } from './folding/RawLogFoldingProvider.js';
 import { ApexLogLanguageDetector } from './language/ApexLogLanguageDetector.js';
+import { RawLogSymbolProvider } from './symbols/RawLogSymbolProvider.js';
 import { VSWorkspace } from './workspace/VSWorkspace.js';
 
 export class Context {
@@ -42,6 +43,7 @@ export class Context {
     LogTimingDecoration.apply(this);
     RawLogLineDecoration.apply(this);
     RawLogFoldingProvider.apply(this);
+    RawLogSymbolProvider.apply(this);
     WhatsNewNotification.apply(this);
   }
 }
