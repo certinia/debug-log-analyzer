@@ -15,7 +15,7 @@ keywords:
     timeline minimap,
     log navigation,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline.png
 hide_title: true
 ---
 
@@ -23,7 +23,7 @@ hide_title: true
 
 Use the Timeline to visualize code execution, event durations, and performance bottlenecks. Zoom, pan, navigate with the minimap overview, and interact with detailed tooltips for efficient Salesforce apex log analysis and debugging.
 
-![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png)
+![Timeline view screenshot showing a color-coded flame chart of Salesforce event types such as DB, Method, and SOQL, visualizing code execution duration and performance](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline.png)
 
 The new experimental timeline is up to **7X faster** than the legacy timeline, with improved performance especially for large logs. It includes text labels on frames, faster zoom/pan operations, and a more natural time axis scaling.
 
@@ -140,7 +140,7 @@ Release the mouse button to zoom the viewport to fit the selected area exactly.
 ## Tooltip
 
 <img
-src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline-tooltip.png"
+src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline-tooltip.png"
 alt="Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts"
 style={{
   width: '50%', height:'auto', maxWidth:'400px'
@@ -161,6 +161,14 @@ The tooltip provides the following information:
 ## Minimap
 
 The minimap gives you instant context of your entire log. Spot hotspots at a glance, jump anywhere with a click, and always know exactly where you are—all without scrolling.
+
+<img
+src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline-minimap.gif"
+alt="The Timeline minimap: a density skyline of the whole log with a viewport lens that pans and zooms the main timeline."
+style={{
+  width: '50%', height:'auto', maxWidth:'400px'
+}}
+loading="lazy"/>
 
 ### What the Minimap Shows
 
@@ -216,6 +224,14 @@ When hovering over the viewport lens or dragging, a label appears showing:
 ## Governor Limits Strip
 
 The Governor Limits strip displays Salesforce governor limit usage over time, positioned below the main timeline. It provides instant visual feedback on limit consumption to help identify potential limit breaches.
+
+<img
+src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline-gov-strip.gif"
+alt="The Governor Limits strip below the Timeline, showing limit usage over time with traffic-light coloring."
+style={{
+  width: '50%', height:'auto', maxWidth:'400px'
+}}
+loading="lazy"/>
 
 ### Display Modes
 

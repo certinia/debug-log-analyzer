@@ -113,7 +113,7 @@ const config: Config = {
       isCloseable: true,
     },
     // Replace with your project's social card
-    image: `https://raw.githubusercontent.com/${organizationName}/${projectName}/main/lana/assets/v1.18/lana-preview.gif`,
+    image: `https://raw.githubusercontent.com/${organizationName}/${projectName}/main/lana/assets/1_20/preview.gif`,
     metadata: [
       {
         name: 'keywords',

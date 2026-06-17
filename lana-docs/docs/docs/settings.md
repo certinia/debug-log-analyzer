@@ -10,25 +10,30 @@ keywords:
     salesforce developer tools,
     apex log analyzer settings,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/settings-color-lana.webp
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/vscode/settings-custom-themes.png
 ---
 
-## Timeline color settings
+## Timeline themes
 
-The default colors shown on the timeline can be changed in the VSCode settings.\
-Either in the UI `preferences -> extensions -> Apex Log Analyzer`
+The Timeline flame graph and the Call Tree Name column are colored by event category using the active theme. Configure themes from `preferences -> extensions -> Apex Log Analyzer` or in `settings.json`.
+
+### Select a theme
+
+Use `lana.timeline.activeTheme` to pick one of the built-in themes — for example _50 Shades of Green_, _Catppuccin_, _Dracula_, _Nord_, or _Salesforce_ — or the name of a custom theme you have defined.
+
+Or run **Log: Timeline Theme** from the Command Palette to switch theme without opening settings — the Timeline and Call Tree update instantly.
+
+### Custom themes
+
+Define your own with `lana.timeline.customThemes`. Each key is a theme name and each value sets the eight category colors: `apex`, `codeUnit`, `system`, `automation`, `dml`, `soql`, `callout` and `validation`. Set `lana.timeline.activeTheme` to a custom theme's name to use it.
 
 <img
-src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/settings-color-lana.webp"
-alt="Screenshot of Apex Log Analyzer VS Code extension color settings, showing customizable timeline colors for Salesforce debug log analysis"
+src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/vscode/settings-custom-themes.png"
+alt="Screenshot of the lana.timeline.customThemes setting in settings.json, showing two custom themes with a color swatch beside each category hex value"
 style={{
   width: '50%', height:'auto', maxWidth:'400px'
 }}
 loading="lazy"/>
-
-or
-
-settings.json
 
 ```json
 "lana.timeline.customThemes": {
@@ -55,6 +60,18 @@ settings.json
 }
 ```
 
+### Legacy timeline colors
+
+`lana.timeline.colors` sets per-event-type colors and applies **only** to the legacy timeline (`lana.timeline.legacy: true`). Prefer themes above for the current timeline.
+
+<img
+src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/vscode/settings-timeline-color-legacy.png"
+alt="Screenshot of Apex Log Analyzer VS Code extension color settings, showing customizable timeline colors for Salesforce debug log analysis"
+style={{
+  width: '50%', height:'auto', maxWidth:'400px'
+}}
+loading="lazy"/>
+
 ## Call Tree category coloring
 
-The Call Tree colors its Name column by event category using the active timeline theme. A color chip is shown by default; enable **Colorize Call Tree category names** under `preferences -> extensions -> Apex Log Analyzer` to tint the whole cell instead. See [Call Tree → Category Coloring](./features/calltree.md#category-coloring).
+The Call Tree colors its Name column by event category using the active timeline theme. A color chip is shown by default; enable **Colorize Call Tree category names** (`lana.callTree.categoryColorize`) under `preferences -> extensions -> Apex Log Analyzer` to tint the whole cell instead. See [Call Tree → Category Coloring](./features/calltree.md#category-coloring).

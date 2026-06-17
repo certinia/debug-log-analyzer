@@ -26,6 +26,14 @@ Right-click any frame in the Timeline or Call Tree and select **Show in Log File
 | --------------- | -------------------------------------- |
 | Show in Raw Log | Right-click frame → "Show in Log File" |
 
+<img
+src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline-goto-log.gif"
+alt="Jumping from a Timeline frame to the matching line in the raw .log file."
+style={{
+  width: '50%', height:'auto', maxWidth:'400px'
+}}
+loading="lazy"/>
+
 ### Show in Log Analysis
 
 From a raw `.log` file, hover over any log line to see event metrics. Click **Show in Log Analysis** to navigate back to the Timeline or Call Tree with the corresponding frame selected.

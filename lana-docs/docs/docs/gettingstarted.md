@@ -13,7 +13,7 @@ keywords: [
     vscode salesforce extension,
     apex debugging,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline.png
 ---
 
 ## Installation
@@ -22,7 +22,7 @@ Search for `Apex Log Analyzer` from the extensions side bar in VS Code and click
 install from the VS Code market place by clicking install on [Visual Studio Code Market Place: Apex Log Analyzer](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
 
 <img
-src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-install.png"
+src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/vscode/install.png"
 alt="Screenshot showing installing the apex log analyzer extension from vscode marketplace"
 style={{
     width: '50%', height:'auto', maxWidth:'400px'
@@ -54,7 +54,7 @@ With the `.log` file open in VSCode.
    or
 1. Click the 'Log: Show Apex Log Analysis' code lens at the top of the file\
    <img
-   src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-showanalysis-lens.webp"
+   src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/vscode/show-analysis-lens.webp"
    alt="Screenshot showing the Log: Show Apex Log Analysis code lense in a log file"
    style={{
        width: '50%', height:'auto', maxWidth:'400px'

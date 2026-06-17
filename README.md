@@ -3,7 +3,7 @@
 **Analyze Salesforce Apex Debug logs with blazing speed.**  
 Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers. Instantly visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep insight into complex transactions and optimize slow Apex methods faster than ever.
 
-![Apex Log Analyzer Preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-preview.gif)
+![Apex Log Analyzer Preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/preview.gif)
 
 [Installation](#%EF%B8%8F-installation 'Install Apex Log Analyzer in VS Code') |
 [Debug Log Levels](#%EF%B8%8F-recommended-debug-log-levels 'Go to Recommended Debug Log Levels') |
@@ -91,7 +91,7 @@ The Timeline view shows a live visualization of your Salesforce Apex log executi
 
 Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail, Tooltips, Context Menu, Search & Highlight, 19 Curated Themes. 🧪
 
-![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png)
+![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline.png)
 
 > 🧠 Great for spotting long-running operations, inefficient queries, and bottlenecks.
 
@@ -106,7 +106,7 @@ Explore nested method calls with performance metrics:
 - **Keyboard Navigation**
 - **Click to go to Code** – Jump to the source method in your project
 
-![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-calltree.png)
+![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/calltree.png)
 
 ## 🧠 Apex Analysis
 
@@ -117,7 +117,7 @@ See which methods are the slowest, most frequent. or expensive.
 - **Filter to specific event types**
 - **Copy or Export to CSV**
 
-![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-analysis.png)
+![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/analysis.png)
 
 ## 🗄️ Database Analysis
 
@@ -130,7 +130,7 @@ Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues.
 - **Sort by SOQL or DML, Duration, Selectivity, Aggregates, Row Count**
 - **Copy or Export to CSV**
 
-![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-database.png)
+![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png)
 
 ## 🔍 Global Search
 
