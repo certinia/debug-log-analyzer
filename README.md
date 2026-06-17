@@ -83,13 +83,13 @@ Use `Log: Retrieve Apex Log And Show Analysis` from the Command Palette.
 
 The Timeline view shows a live visualization of your Salesforce Apex log execution — including methods, SOQL queries, DML operations, workflows, flows, and more.
 
-- **⚡ Fast** – Blazing-fast zoom, pan, and rendering even on massive logs (500k+ lines). 🧪
-- **🗺️ Minimap** – Bird's-eye view with skyline density overview, viewport lens, and instant teleport. 🧪
-- **📊 Governor Limits Strip** – At-a-glance limit usage with traffic light coloring. Expand for detailed step chart. 🧪
-- **📏 Measure & Zoom** – `Shift+Drag` to measure durations, `Alt/Option+Drag` to area-zoom, precision keyboard controls. 🧪
-- **🕐 Wall-Clock Time** – Toggle between elapsed and real-time (HH:MM:SS.mmm) on the time axis via the toolbar clock button. 🧪
+- **⚡ Fast** – Blazing-fast zoom, pan, and rendering even on massive logs (500k+ lines).
+- **🗺️ Minimap** – Bird's-eye view with skyline density overview, viewport lens, and instant teleport.
+- **📊 Governor Limits Strip** – At-a-glance limit usage with traffic light coloring. Expand for detailed step chart.
+- **📏 Measure & Zoom** – `Shift+Drag` to measure durations, `Alt/Option+Drag` to area-zoom, precision keyboard controls.
+- **🕐 Wall-Clock Time** – Toggle between elapsed and real-time (HH:MM:SS.mmm) on the time axis via the toolbar clock button.
 
-Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail, Tooltips, Context Menu, Search & Highlight, 19 Curated Themes. 🧪
+Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail, Tooltips, Context Menu, Search & Highlight, 19 Curated Themes.
 
 ![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline.png)
 
@@ -100,7 +100,7 @@ Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail,
 Explore nested method calls with performance metrics:
 
 - **Metrics**: Self Time, Total Time, SOQL/DML/Thrown Counts, SOQL/DML/Rows
-- **Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution 🧪
+- **Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution
 - **Filter by Namespace, Type or Duration**
 - **Toggle Debug-Only + Detail Events**
 - **Keyboard Navigation**
@@ -112,7 +112,7 @@ Explore nested method calls with performance metrics:
 
 See which methods are the slowest, most frequent. or expensive.
 
-- **Group by Type, Namespace, or Caller Namespace 🧪**
+- **Group by Type, Namespace, or Caller Namespace **
 - **Sort by Duration, Count, Name, Type or Namespace**
 - **Filter to specific event types**
 - **Copy or Export to CSV**
@@ -124,7 +124,7 @@ See which methods are the slowest, most frequent. or expensive.
 Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues.
 
 - **SOQL + DML Duration, Selectivity, Aggregates, Row Count**
-- **Group by Namespace, Caller Namespace 🧪, or Query**
+- **Group by Namespace, Caller Namespace , or Query**
 - **View the Call Stack**
 - **SOQL Optimization Tips**
 - **Sort by SOQL or DML, Duration, Selectivity, Aggregates, Row Count**
@@ -143,7 +143,7 @@ Search across all visualizations:
 
 Quickly step through matches, auto-expand parents, and automatically show timeline tooltips.
 
-## 📄 Raw Log Navigation 🧪
+## 📄 Raw Log Navigation
 
 Seamlessly navigate between the visual analysis and your raw `.log` files:
 
@@ -192,7 +192,7 @@ The same npm package works in Cursor and other MCP clients. See the [`@certinia/
 
 ## 🎨 Customization
 
-Adjust event colors with custom timeline themes in `settings.json`: 🧪
+Adjust event colors with custom timeline themes in `settings.json`:
 
 ```json
 "lana.timeline.customThemes": {
