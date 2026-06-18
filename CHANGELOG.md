@@ -454,30 +454,30 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 - Timeline Shrink-to-fit checkbox was replaced with zoom feature ([#33][#33]).
 
-## [1.3.5] - December 2020
+## [1.3.5] - 2020-12-14
 
 - Fix issue #7 Command 'lana.showLogFile' not found.
 - Fix issue #3 Cannot read property 'path' of undefined.
 
-## [1.3.4] - December 2020
+## [1.3.4] - 2020-12-11
 
 - Fix issue #4 with Windows paths.
 
-## [1.3.3] - December 2020
+## [1.3.3] - 2020-12-10
 
 - Synchronise versions.
 
-## [1.3.2] - December 2020
+## [1.3.2] - 2020-12-09
 
 - Details for Visual Studio Code Marketplace listing.
 - Improvements to READMEs.
 
-## [1.3.1] - December 2020
+## [1.3.1] - 2020-12-09
 
 - Small changes to command labels.
 - Improvements to READMEs.
 
-## [1.3] - September 2020
+## [1.3] - 2020-12-08
 
 - When opening a source file, open at correct line.
 - Misc Visual tweaks.
