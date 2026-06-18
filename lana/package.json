@@ -125,76 +125,69 @@
         }
       ]
     },
-    "configuration": {
-      "type": "object",
-      "title": "Apex Log Analyzer",
-      "properties": {
-        "lana.timeline.activeTheme": {
-          "type": "string",
-          "default": "50 shades of green",
-          "markdownDescription": "Select a timeline theme or enter the name of a custom theme defined in `#lana.timeline.customThemes#`",
-          "order": 0,
-          "anyOf": [
-            {
-              "enum": [
-                "50 Shades of Green",
-                "50 Shades of Green Bright",
-                "Botanical Twilight",
-                "Catppuccin",
-                "Chrome",
-                "Dracula",
-                "Dusty Aurora",
-                "Firefox",
-                "Flame",
-                "Forest Floor",
-                "Garish",
-                "Material",
-                "Modern",
-                "Monokai Pro",
-                "Nord",
-                "Nord Forest",
-                "Okabe-Ito",
-                "Salesforce",
-                "Solarized"
-              ]
-            },
-            {
-              "type": "string"
-            }
-          ]
-        },
-        "lana.timeline.customThemes": {
-          "type": "object",
-          "title": "Custom Timeline themes",
-          "description": "Define custom themes. Keys are theme names, values are theme definitions.",
-          "order": 1,
-          "default": {
-            "Custom": {
-              "apex": "#2B8F81",
-              "codeUnit": "#88AE58",
-              "system": "#8D6E63",
-              "automation": "#51A16E",
-              "dml": "#B06868",
-              "soql": "#6D4C7D",
-              "callout": "#CCA033",
-              "validation": "#5C8FA6"
-            }
+    "configuration": [
+      {
+        "type": "object",
+        "id": "lana",
+        "title": "Call Tree",
+        "order": 0,
+        "properties": {
+          "lana.callTree.categoryColorize": {
+            "title": "Colorize Call Tree category names",
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Tint the Call Tree Name column by event category, matching the Timeline colors, instead of showing a small color chip. Default: `false`",
+            "order": 0
+          }
+        }
+      },
+      {
+        "type": "object",
+        "id": "lana",
+        "title": "Timeline",
+        "order": 1,
+        "properties": {
+          "lana.timeline.activeTheme": {
+            "type": "string",
+            "default": "50 shades of green",
+            "markdownDescription": "Select a timeline theme or enter the name of a custom theme defined in `#lana.timeline.customThemes#`",
+            "order": 0,
+            "anyOf": [
+              {
+                "enum": [
+                  "50 Shades of Green",
+                  "50 Shades of Green Bright",
+                  "Botanical Twilight",
+                  "Catppuccin",
+                  "Chrome",
+                  "Dracula",
+                  "Dusty Aurora",
+                  "Firefox",
+                  "Flame",
+                  "Forest Floor",
+                  "Garish",
+                  "Material",
+                  "Modern",
+                  "Monokai Pro",
+                  "Nord",
+                  "Nord Forest",
+                  "Okabe-Ito",
+                  "Salesforce",
+                  "Solarized"
+                ]
+              },
+              {
+                "type": "string"
+              }
+            ]
           },
-          "additionalProperties": {
+          "lana.timeline.customThemes": {
             "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "apex",
-              "codeUnit",
-              "system",
-              "automation",
-              "dml",
-              "soql",
-              "callout",
-              "validation"
-            ],
-            "properties": {
-              "default": {
+            "title": "Custom Timeline themes",
+            "description": "Define custom themes. Keys are theme names, values are theme definitions.",
+            "order": 1,
+            "default": {
+              "Custom": {
                 "apex": "#2B8F81",
                 "codeUnit": "#88AE58",
                 "system": "#8D6E63",
@@ -203,119 +196,138 @@
                 "soql": "#6D4C7D",
                 "callout": "#CCA033",
                 "validation": "#5C8FA6"
-              },
-              "apex": {
-                "type": "string",
-                "format": "color-hex",
-                "default": "#2B8F81"
-              },
-              "codeUnit": {
-                "type": "string",
-                "format": "color-hex",
-                "default": "#88AE58"
-              },
-              "system": {
-                "type": "string",
-                "format": "color-hex",
-                "default": "#8D6E63"
-              },
-              "automation": {
-                "type": "string",
-                "format": "color-hex",
-                "default": "#51A16E"
-              },
-              "dml": {
-                "type": "string",
-                "format": "color-hex",
-                "default": "#B06868"
-              },
-              "soql": {
-                "type": "string",
-                "format": "color-hex",
-                "default": "#6D4C7D"
-              },
-              "callout": {
-                "type": "string",
-                "format": "color-hex",
-                "default": "#CCA033"
-              },
-              "validation": {
-                "type": "string",
-                "format": "color-hex",
-                "default": "#5C8FA6"
+              }
+            },
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "apex",
+                "codeUnit",
+                "system",
+                "automation",
+                "dml",
+                "soql",
+                "callout",
+                "validation"
+              ],
+              "properties": {
+                "default": {
+                  "apex": "#2B8F81",
+                  "codeUnit": "#88AE58",
+                  "system": "#8D6E63",
+                  "automation": "#51A16E",
+                  "dml": "#B06868",
+                  "soql": "#6D4C7D",
+                  "callout": "#CCA033",
+                  "validation": "#5C8FA6"
+                },
+                "apex": {
+                  "type": "string",
+                  "format": "color-hex",
+                  "default": "#2B8F81"
+                },
+                "codeUnit": {
+                  "type": "string",
+                  "format": "color-hex",
+                  "default": "#88AE58"
+                },
+                "system": {
+                  "type": "string",
+                  "format": "color-hex",
+                  "default": "#8D6E63"
+                },
+                "automation": {
+                  "type": "string",
+                  "format": "color-hex",
+                  "default": "#51A16E"
+                },
+                "dml": {
+                  "type": "string",
+                  "format": "color-hex",
+                  "default": "#B06868"
+                },
+                "soql": {
+                  "type": "string",
+                  "format": "color-hex",
+                  "default": "#6D4C7D"
+                },
+                "callout": {
+                  "type": "string",
+                  "format": "color-hex",
+                  "default": "#CCA033"
+                },
+                "validation": {
+                  "type": "string",
+                  "format": "color-hex",
+                  "default": "#5C8FA6"
+                }
               }
             }
-          }
-        },
-        "lana.timeline.legacy": {
-          "title": "Enable/ disable the legacy timeline. Default is false.",
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "Enable/ disable the legacy timeline. Default is `false`.",
-          "order": 2
-        },
-        "lana.callTree.categoryColorize": {
-          "title": "Colorize Call Tree category names",
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "When enabled, applies a background tint and text color to the Name column in the Call Tree based on the event category, matching the Timeline flame graph colors. When disabled (default), a small color chip is shown instead.",
-          "order": 2
-        },
-        "lana.timeline.colors": {
-          "type": "object",
-          "title": "Timeline Event Colors",
-          "description": "Hex colors used for each log event type on the legacy Timeline.",
-          "additionalProperties": false,
-          "order": 3,
-          "default": {
-            "Code Unit": "#88AE58",
-            "Workflow": "#51A16E",
-            "Method": "#2B8F81",
-            "DML": "#B06868",
-            "SOQL": "#6D4C7D",
-            "System Method": "#8D6E63"
           },
-          "properties": {
-            "Code Unit": {
-              "type": "string",
-              "default": "#88AE58",
-              "description": "Hex color for Code Unit timeline events.",
-              "format": "color-hex"
+          "lana.timeline.legacy": {
+            "title": "Use legacy Timeline",
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Temporary fallback to the legacy Timeline; will be removed in a future release. Default: `false`",
+            "order": 2
+          },
+          "lana.timeline.colors": {
+            "type": "object",
+            "title": "Timeline Event Colors",
+            "markdownDescription": "Hex colors for each event type on the **legacy** Timeline (`#lana.timeline.legacy#`), which is being phased out. The current Timeline is themed via `#lana.timeline.activeTheme#` / `#lana.timeline.customThemes#`.",
+            "additionalProperties": false,
+            "order": 3,
+            "default": {
+              "Code Unit": "#88AE58",
+              "Workflow": "#51A16E",
+              "Method": "#2B8F81",
+              "DML": "#B06868",
+              "SOQL": "#6D4C7D",
+              "System Method": "#8D6E63"
             },
-            "Workflow": {
-              "type": "string",
-              "default": "#51A16E",
-              "description": "Hex color for Workflow timeline events.",
-              "format": "color-hex"
-            },
-            "Method": {
-              "type": "string",
-              "default": "#2B8F81",
-              "description": "Hex color for Method timeline events.",
-              "format": "color-hex"
-            },
-            "DML": {
-              "type": "string",
-              "default": "#B06868",
-              "description": "Hex color for DML timeline events.",
-              "format": "color-hex"
-            },
-            "SOQL": {
-              "type": "string",
-              "default": "#6D4C7D",
-              "description": "Hex color for SOQL timeline events.",
-              "format": "color-hex"
-            },
-            "System Method": {
-              "type": "string",
-              "default": "#8D6E63",
-              "description": "Hex color for System Method timeline events.",
-              "format": "color-hex"
+            "properties": {
+              "Code Unit": {
+                "type": "string",
+                "default": "#88AE58",
+                "description": "Hex color for Code Unit timeline events.",
+                "format": "color-hex"
+              },
+              "Workflow": {
+                "type": "string",
+                "default": "#51A16E",
+                "description": "Hex color for Workflow timeline events.",
+                "format": "color-hex"
+              },
+              "Method": {
+                "type": "string",
+                "default": "#2B8F81",
+                "description": "Hex color for Method timeline events.",
+                "format": "color-hex"
+              },
+              "DML": {
+                "type": "string",
+                "default": "#B06868",
+                "description": "Hex color for DML timeline events.",
+                "format": "color-hex"
+              },
+              "SOQL": {
+                "type": "string",
+                "default": "#6D4C7D",
+                "description": "Hex color for SOQL timeline events.",
+                "format": "color-hex"
+              },
+              "System Method": {
+                "type": "string",
+                "default": "#8D6E63",
+                "description": "Hex color for System Method timeline events.",
+                "format": "color-hex"
+              }
             }
           }
         }
       }
-    }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "rm -rf out && pnpm -w run build"
@@ -323,8 +335,8 @@
   "dependencies": {
     "@apexdevtools/apex-ls": "^6.0.2",
     "@apexdevtools/apex-parser": "5.1.0-beta.1",
-    "@salesforce/apex-node": "^8.4.26",
-    "@salesforce/core": "^8.31.0",
+    "@salesforce/apex-node": "^8.4.28",
+    "@salesforce/core": "^8.31.2",
     "antlr4": "4.13.2"
   },
   "devDependencies": {

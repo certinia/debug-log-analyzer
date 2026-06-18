@@ -129,10 +129,16 @@ const config: Config = {
       },
       items: [
         {
-          type: 'doc',
-          docId: 'docs/features/features',
-          position: 'left',
+          type: 'dropdown',
           label: 'Docs',
+          to: '/docs/gettingstarted',
+          position: 'left',
+          items: [
+            { to: '/docs/gettingstarted', label: 'Getting Started' },
+            { to: '/docs/features', label: 'Features' },
+            { to: '/docs/settings', label: 'Settings' },
+            { to: '/community/changelog', label: 'Changelog' },
+          ],
         },
         {
           type: 'docSidebar',
@@ -141,14 +147,16 @@ const config: Config = {
           label: 'Community',
         },
         {
+          href: 'https://marketplace.visualstudio.com/items?itemName=financialforce.lana',
+          position: 'right',
+          label: 'Install',
+          className: 'navbar-install-link',
+        },
+        {
           href: `https://github.com/${organizationName}/${projectName}`,
           position: 'right',
           'aria-label': 'GitHub Repository', // eslint-disable-line @typescript-eslint/naming-convention
           className: 'header-github-link',
-        },
-        {
-          type: 'search',
-          position: 'right',
         },
       ],
     },

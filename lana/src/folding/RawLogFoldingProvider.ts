@@ -2,9 +2,12 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import {
+  EventEmitter,
   FoldingRange,
   FoldingRangeKind,
   languages,
+  window,
+  workspace,
   type FoldingContext,
   type FoldingRangeProvider,
   type TextDocument,
@@ -14,9 +17,13 @@ import type { LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
 import { LogEventCache } from '../cache/LogEventCache.js';
+import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 import { TIMESTAMP_REGEX } from '../log-utils.js';
 
 class RawLogFoldingProvider implements FoldingRangeProvider {
+  private readonly changeEmitter = new EventEmitter<void>();
+  readonly onDidChangeFoldingRanges = this.changeEmitter.event;
+
   async provideFoldingRanges(
     document: TextDocument,
     _context: FoldingContext,
@@ -73,15 +80,47 @@ class RawLogFoldingProvider implements FoldingRangeProvider {
     }
   }
 
+  /**
+   * Warm the parse cache for an Apex log document and signal VS Code to re-request
+   * folding ranges once the data is ready. Without this, a slow first parse loses the
+   * race against VS Code's initial folding request and folding never appears until an
+   * unrelated action forces a re-evaluation.
+   */
+  private warmAndSignal(document: TextDocument): void {
+    if (document.uri.scheme !== 'file' || !isApexLogContent(document)) {
+      return;
+    }
+
+    void LogEventCache.getApexLog(document.uri.fsPath).then((apexLog) => {
+      if (apexLog) {
+        this.changeEmitter.fire();
+      }
+    });
+  }
+
   static apply(context: Context): void {
     const docSelector = [{ scheme: 'file', language: 'apexlog' }];
+    const provider = new RawLogFoldingProvider();
 
-    const disposable = languages.registerFoldingRangeProvider(
-      docSelector,
-      new RawLogFoldingProvider(),
+    context.context.subscriptions.push(
+      provider.changeEmitter,
+      languages.registerFoldingRangeProvider(docSelector, provider),
+      workspace.onDidOpenTextDocument((doc) => {
+        provider.warmAndSignal(doc);
+      }),
+      // Reopening a closed editor often re-attaches the retained document model
+      // without re-firing onDidOpenTextDocument, so also signal on editor activation.
+      window.onDidChangeActiveTextEditor((editor) => {
+        if (editor) {
+          provider.warmAndSignal(editor.document);
+        }
+      }),
     );
 
-    context.context.subscriptions.push(disposable);
+    // Cover logs already open when the extension activates.
+    for (const doc of workspace.textDocuments) {
+      provider.warmAndSignal(doc);
+    }
   }
 }
 

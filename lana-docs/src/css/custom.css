@@ -47,3 +47,27 @@ div[class^='announcementBar_'] {
   font-size: 20px;
   font-weight: 700;
 }
+
+/* Keep filled primary buttons readable on hover (Docusaurus Link buttons
+   otherwise inherit the green anchor link-hover color, hiding the text). */
+.button--primary:hover {
+  color: var(--ifm-button-color, #fff);
+}
+
+.navbar-install-link {
+  border: 1px solid var(--ifm-color-primary);
+  border-radius: var(--ifm-button-border-radius, 0.4rem);
+  padding: 0.35rem 0.85rem;
+  margin-left: 0.5rem;
+  color: var(--ifm-color-primary);
+  transition:
+    background-color var(--ifm-transition-fast) var(--ifm-transition-timing-default),
+    color var(--ifm-transition-fast) var(--ifm-transition-timing-default);
+}
+
+/* Higher specificity than Docusaurus's own .navbar__link:hover (which would
+   otherwise turn the text green on the green hover background). */
+.navbar__link.navbar-install-link:hover {
+  background-color: var(--ifm-color-primary);
+  color: var(--ifm-button-color, #fff);
+}

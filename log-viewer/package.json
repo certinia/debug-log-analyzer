@@ -10,12 +10,12 @@
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "antlr4": "4.13.2",
     "lit": "^3.3.3",
-    "pixi.js": "^8.18.1",
-    "tabulator-tables": "^6.4.0"
+    "pixi.js": "^8.19.0",
+    "tabulator-tables": "^6.5.1"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/tabulator-tables": "^6.3.3",
+    "@types/tabulator-tables": "^6.3.4",
     "postcss": "^8.5.15",
     "sass": "~1.78.0",
     "typescript": "^6.0.3"
