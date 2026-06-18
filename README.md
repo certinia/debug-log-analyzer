@@ -124,7 +124,7 @@ See which methods are the slowest, most frequent. or expensive.
 Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues.
 
 - **SOQL + DML Duration, Selectivity, Aggregates, Row Count**
-- **Group by Namespace, Caller Namespace , or Query**
+- **Group by Namespace, Caller Namespace or Query**
 - **View the Call Stack**
 - **SOQL Optimization Tips**
 - **Sort by SOQL or DML, Duration, Selectivity, Aggregates, Row Count**
