@@ -108,8 +108,7 @@ const config: Config = {
   themeConfig: {
     announcementBar: {
       id: 'lana-1_20_0', // Unique ID to prevent showing again if dismissed
-      content:
-        '🎉️ <b><a target="_blank" rel="noopener noreferrer" href="https://marketplace.visualstudio.com/items?itemName=financialforce.lana">Apex Log Analyzer v1.20</a> is out!<b>',
+      content: `🎉️ <b><a href="/${projectName}/community/changelog">Apex Log Analyzer v1.20</a> is out!</b>`,
       isCloseable: true,
     },
     // Replace with your project's social card
