@@ -34,11 +34,12 @@ hide_table_of_contents: true
 ---
 
 import Link from '@docusaurus/Link';
+import GitHubStars from '@site/src/components/GitHubStars';
 import styles from './styles.module.css';
 
 <div className={styles.homePage}>
   <div>
-    <h1 classname={styles.homePageHeader}>🚀 Apex Log Analyzer</h1>
+    <h1 className={styles.homePageHeader}>🚀 Apex Log Analyzer</h1>
 
     <p className={styles.homePageDescription}>
     Apex Log Analyzer for VS Code lets Salesforce developers debug Apex logs instantly with <strong>flame charts</strong>, <strong>call trees</strong>, and <strong>SOQL/DML</strong> insights - <strong>find bottlenecks fast</strong>
@@ -46,15 +47,7 @@ import styles from './styles.module.css';
 
     <div className={styles.heroButtons}>
       <Link className="button button--primary button--lg" to="/docs/gettingstarted">Get Started</Link>
-      <span className={styles.indexCtasGitHubButtonWrapper}>
-        <iframe
-          className={styles.indexCtasGitHubButton}
-          src="https://ghbtns.com/github-btn.html?user=certinia&amp;repo=debug-log-analyzer&amp;type=star&amp;count=true&amp;size=large"
-          width={160}
-          height={30}
-          title="GitHub Stars"
-        />
-      </span>
+      <GitHubStars />
     </div>
 
   </div>
@@ -85,7 +78,7 @@ import styles from './styles.module.css';
           <h3>Fast Log Parsing</h3>
         </div>
         <div className="card__body">
-          <p>Processes massive Apex debug logs in fast using a high-performance parser - no lag, no waiting.</p>
+          <p>Processes massive Apex debug logs fast using a high-performance parser - no lag, no waiting.</p>
         </div>
       </div>
 

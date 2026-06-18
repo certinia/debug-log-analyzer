@@ -13,7 +13,7 @@ keywords:
     visual studio code extension,
     salesforce developer tools,
   ]
-image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-calltree.png
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/calltree.png
 hide_title: true
 ---
 
@@ -21,7 +21,7 @@ hide_title: true
 
 The Call Tree helps efficently visualize and navigate the call stack in Salesfroce Apex debug logs. Learn to expand and collapse method calls, sort and filter by execution metrics, and quickly jump to code locations in Visual Studio Code. Enhance your Salesforce debugging and performance analysis with detailed insights into DML, SOQL, and execution times.
 
-![Call Tree Screenshot displaying an expandable and collapsible call stack with event types, method signatures, timing metrics, and aggregated DML, SOQL, Throws, and Row counts.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-calltree.png)
+![Call Tree Screenshot displaying an expandable and collapsible call stack with event types, method signatures, timing metrics, and aggregated DML, SOQL, Throws, and Row counts.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/calltree.png)
 
 Each row shows event type, details such as method signature, self and total time as well as aggregated DML, SOQL, Throws and Row counts.
 
@@ -40,6 +40,8 @@ The Call Tree supports three separate views, toggled via the toolbar:
    In this view, roots are callees and expanded rows are caller context.
    Best when you want to find which methods are hogging the most time and see the different caller paths that led to them.
 
+![The Call Tree's three view modes side by side: Time Order, Aggregated and Bottom-Up.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/calltree-combined.png)
+
 ### Go to Code
 
 Clicking the link in the event column will open the corresponding file and line, if that file exists in the current workspace.
@@ -57,13 +59,25 @@ Each column can be sorted by clicking the column header, this will sort the rows
 
 Debug Only and Type filtering are available in **Time Order** and **Aggregated**. The Details filter is available in all three views. The **Bottom-Up** view has its own grouping controls (None, Namespace, Caller Namespace, Type).
 
+### SOQL Formatting
+
+SOQL and SOSL query rows are reformatted onto multiple lines and syntax highlighted, so keywords, fields and bind variables are easy to read at a glance.
+
+<img
+src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/calltree-soql-format.png"
+alt="A SOQL query in the Call Tree Name column, formatted across multiple lines with syntax-highlighted keywords, fields and bind variables."
+style={{
+  width: '50%', height:'auto', maxWidth:'400px'
+}}
+loading="lazy"/>
+
 ### Keyboard Navigation
 
 The Call Tree can be navigated with the keyboard. The up and down keys will move between rows, the left and right keys will expand and collapse a parent within the tree.
 
 ### Category Coloring
 
-The Name column is colored by each event's category — Apex, Code Unit, System, Automation, DML, SOQL, Callout and Validation — using the colors of the active timeline theme, so the Call Tree and the [Timeline themes](./timeline.md#themes) stay visually consistent.
+The Name column is colored by each event's category — Apex, Code Unit, System, Automation, DML, SOQL, Callout and Validation — using the colors of the active timeline theme, so the Call Tree and the [Timeline themes](./timeline.mdx#themes) stay visually consistent.
 
 By default a small color chip is shown against each row. To color the full cell instead (background tint and colored text), enable **Settings → Apex Log Analyzer → Colorize Call Tree category names**.
 
