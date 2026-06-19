@@ -485,7 +485,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Add explorer menu item.
 - Provide more information when selecting log to download.
 
-<!-- Unreleased -->
+<!-- v1.20.0 -->
 
 [#605]: https://github.com/certinia/debug-log-analyzer/issues/605
 [#604]: https://github.com/certinia/debug-log-analyzer/issues/604
