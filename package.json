@@ -35,9 +35,9 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "prepare": "husky",
-    "bump-prerelease": "node ./scripts/pre-release.js",
-    "build": "pnpm run typecheck && NODE_ENV=production pnpm run build:dev",
-    "build:fast": "pnpm run typecheck && NODE_ENV=production pnpm run build:dev:fast",
+    "bump-prerelease": "node ./scripts/pre-release.mjs",
+    "build": "node --run typecheck && NODE_ENV=production node --run build:dev",
+    "build:fast": "node --run typecheck && NODE_ENV=production node --run build:dev:fast",
     "build:dev": "rm -rf lana/out && rollup -c rollup.config.mjs",
     "build:dev:fast": "rolldown -c rolldown.config.ts",
     "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",

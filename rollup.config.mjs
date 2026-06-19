@@ -17,7 +17,6 @@ const _filename = fileURLToPath(import.meta.url);
 const _dirname = path.dirname(_filename);
 
 const production = process.env.NODE_ENV === 'production';
-console.log('Package mode:', production ? 'production' : 'development');
 export default [
   {
     input: './lana/src/Main.ts',
