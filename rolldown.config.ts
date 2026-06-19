@@ -45,7 +45,6 @@ function preserveAntlrATN(): Plugin {
 }
 
 const production = process.env.NODE_ENV === 'production';
-console.log('Package mode:', production ? 'production' : 'development');
 export default defineConfig([
   {
     input: './lana/src/Main.ts',
