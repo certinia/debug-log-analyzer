@@ -20,7 +20,6 @@ import { addCustomThemes, getTheme } from '../../timeline/themes/ThemeSelector.j
 
 // Maps a LogEvent.category string to its TimelineColors key, so a row can point at the
 // matching `--ct-color-<key>` host variable. Single source of truth for the set.
-/* eslint-disable @typescript-eslint/naming-convention */
 const CATEGORY_THEME_VAR: Readonly<Record<string, keyof TimelineColors>> = {
   Apex: 'apex',
   System: 'system',
@@ -31,7 +30,6 @@ const CATEGORY_THEME_VAR: Readonly<Record<string, keyof TimelineColors>> = {
   Validation: 'validation',
   Callout: 'callout',
 };
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export const categoryColoringStyles = css`
   .tabulator-row .datagrid-code-text {
