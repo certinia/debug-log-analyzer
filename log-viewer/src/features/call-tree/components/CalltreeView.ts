@@ -19,6 +19,11 @@ import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenge
 import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
+import {
+  categoryColoringStyles,
+  categoryRowFormatter,
+  wireCategoryColoring,
+} from '../utils/CategoryColoring.js';
 import { deepFilter } from '../utils/DetailsFilter.js';
 import { expandCollapseAll } from '../utils/ExpandCollapse.js';
 import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
@@ -119,6 +124,11 @@ export class CalltreeView extends LitElement {
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    wireCategoryColoring(this);
   }
 
   disconnectedCallback(): void {
@@ -260,6 +270,7 @@ export class CalltreeView extends LitElement {
         pointer-events: none;
       }
     `,
+    categoryColoringStyles,
   ];
 
   render() {
@@ -715,6 +726,7 @@ export class CalltreeView extends LitElement {
         const mouseEvent = e as MouseEvent;
         this._showRowContextMenu(row, mouseEvent.clientX, mouseEvent.clientY);
       },
+      rowFormatter: categoryRowFormatter,
     });
     this.calltreeTable = table;
     await tableBuilt;
@@ -742,6 +754,7 @@ export class CalltreeView extends LitElement {
           this._clearSearchHighlights();
         }
       },
+      rowFormatter: categoryRowFormatter,
     });
     this.aggregatedTreeTable = table;
     await tableBuilt;
@@ -765,6 +778,7 @@ export class CalltreeView extends LitElement {
             this._clearSearchHighlights();
           }
         },
+        rowFormatter: categoryRowFormatter,
       },
       {
         selectableRows: 'highlight',

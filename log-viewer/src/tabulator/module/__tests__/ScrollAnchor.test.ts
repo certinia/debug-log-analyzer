@@ -1,8 +1,4 @@
-/**
- * Copyright (c) 2026 Certinia Inc. All rights reserved.
- */
 import { describe, expect, it, jest } from '@jest/globals';
-
 import { ScrollAnchor } from '../ScrollAnchor';
 
 function rect(top: number, height: number) {
@@ -63,9 +59,7 @@ describe('ScrollAnchor', () => {
       on: jest.fn(),
       element: { querySelector: jest.fn() },
       getRows: jest.fn((type?: string) => {
-        if (type === 'visible') {
-          return [r1, r2, r3];
-        }
+        if (type === 'visible') return [r1, r2, r3];
         return [];
       }),
     };

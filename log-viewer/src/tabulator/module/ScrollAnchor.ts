@@ -6,6 +6,22 @@ import { Module, type RowComponent, type Tabulator } from 'tabulator-tables';
 const scrollAnchorOption = 'scrollAnchor' as const;
 
 /**
+ * ⚠️ STOCK-RENDERER FALLBACK — NOT REGISTERED.
+ *
+ * The call-tree views use the custom `VirtualVerticalRenderer` with the
+ * `AnchoringPolicy` module; this module is the last version that worked with
+ * Tabulator's STOCK `VirtualDomVertical` renderer (restored from commit
+ * 7cdf35e5, the parent of the custom-renderer commit), kept in source so the
+ * stock renderer can be reinstated quickly if ever needed.
+ *
+ * To switch a call-tree view back to the stock renderer:
+ *   1. Remove `renderVertical: VirtualVerticalRenderer` and
+ *      `anchoringPolicy: true` from the table config.
+ *   2. Register this module in `TableShared.registerTableModules()` and set
+ *      `scrollAnchor: true` in the table config.
+ *   3. Uncomment the `_centerRow`/`_isVisible` workaround in
+ *      `RowNavigation` (the methods and their call in `_scrollToRow`).
+ *
  * Pixel-accurate, data-agnostic scroll anchoring across table re-renders.
  *
  * Capture (renderStarted): the middle visible row, its Y offset inside the
