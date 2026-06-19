@@ -343,6 +343,6 @@
     "@types/jest": "^30.0.0",
     "@types/node": "~22.16.5",
     "@types/vscode": "~1.100.0",
-    "typescript": "^6.0.3"
+    "typescript": "npm:@typescript/typescript6@^6.0.1"
   }
 }

@@ -18,6 +18,6 @@
     "@types/tabulator-tables": "^6.3.4",
     "postcss": "^8.5.15",
     "sass": "~1.78.0",
-    "typescript": "^6.0.3"
+    "typescript": "npm:@typescript/typescript6@^6.0.1"
   }
 }

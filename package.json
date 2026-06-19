@@ -13,7 +13,6 @@
     "@swc/jest": "^0.2.39",
     "@types/jest": "^30.0.0",
     "@typescript-eslint/parser": "^8.61.1",
-    "@typescript/native-preview": "7.0.0-dev.20260527.2",
     "concurrently": "^10.0.3",
     "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
@@ -30,7 +29,8 @@
     "rollup-plugin-polyfill-node": "^0.13.0",
     "rollup-plugin-postcss": "^4.0.2",
     "rollup-plugin-swc3": "^0.12.1",
-    "typescript": "^6.0.3",
+    "typescript": "npm:@typescript/typescript6@^6.0.1",
+    "typescript-7": "npm:typescript@rc",
     "typescript-eslint": "^8.61.1"
   },
   "scripts": {
@@ -43,8 +43,8 @@
     "build:dev:fast": "rm -rf lana/out && rolldown -c rolldown.config.ts",
     "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",
     "watch:fast": "rm -rf lana/out && rolldown -w -c rolldown.config.ts",
-    "typecheck": "tsgo -b",
-    "typecheck:tsc": "tsc -b",
+    "typecheck": "tsc -b",
+    "typecheck:tsc6": "tsc6 -b",
     "lint": "concurrently -r -g 'eslint **/*.ts' 'prettier --cache **/*.{ts,css,md,scss} --check --experimental-cli' 'pnpm run typecheck'",
     "test": "jest",
     "test:ci": "jest --runInBand",
