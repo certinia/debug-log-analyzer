@@ -418,7 +418,7 @@ export interface CulledRenderData {
  * Timeline rendering constants.
  * Using UPPER_CASE naming for constants (standard convention).
  */
-/* eslint-disable @typescript-eslint/naming-convention */
+
 export const TIMELINE_CONSTANTS = {
   /** Height of each event rectangle in pixels. */
   EVENT_HEIGHT: 15,
@@ -452,7 +452,6 @@ export const TIMELINE_CONSTANTS = {
     RESIZE_DELAY_MS: 200,
   },
 } as const;
-/* eslint-enable @typescript-eslint/naming-convention */
 
 // ============================================================================
 // BUCKET RENDERING CONSTANTS
@@ -461,7 +460,7 @@ export const TIMELINE_CONSTANTS = {
 /**
  * Constants for sub-pixel bucket rendering (barcode pattern).
  */
-/* eslint-disable @typescript-eslint/naming-convention */
+
 export const BUCKET_CONSTANTS = {
   /** Total bucket width in pixels (block + gap) */
   BUCKET_WIDTH: 2,
@@ -500,7 +499,6 @@ export const BUCKET_CONSTANTS = {
     'Validation',
   ] as const,
 } as const;
-/* eslint-enable @typescript-eslint/naming-convention */
 
 /**
  * Type for category names in priority order.
@@ -628,7 +626,7 @@ export const MARKER_ALPHA = 0.2;
  * Constants for text label rendering on timeline rectangles.
  * Used by TextLabelRenderer for LOD-based visibility and truncation.
  */
-/* eslint-disable @typescript-eslint/naming-convention */
+
 export const TEXT_LABEL_CONSTANTS = {
   /** Minimum rectangle width (px) to display any text */
   MIN_VISIBLE_WIDTH: 12,
@@ -666,7 +664,6 @@ export const TEXT_LABEL_CONSTANTS = {
     LIGHT_THEME_COLOR: 0x1e1e1e,
   },
 } as const;
-/* eslint-enable @typescript-eslint/naming-convention */
 
 /**
  * Severity levels in ascending order (lowest to highest).
@@ -977,7 +974,7 @@ export interface SegmentTreeQueryResult {
 /**
  * Constants for segment tree construction and traversal.
  */
-/* eslint-disable @typescript-eslint/naming-convention */
+
 export const SEGMENT_TREE_CONSTANTS = {
   /**
    * Branching factor for tree construction.
@@ -992,7 +989,6 @@ export const SEGMENT_TREE_CONSTANTS = {
    */
   MIN_NODE_SPAN: 1,
 } as const;
-/* eslint-enable @typescript-eslint/naming-convention */
 
 // ============================================================================
 // INTERACTION MODE TYPES
@@ -1002,13 +998,12 @@ export const SEGMENT_TREE_CONSTANTS = {
  * Types of drag interactions in the timeline.
  * Used for unified mode handling in TimelineInteractionHandler.
  */
-/* eslint-disable @typescript-eslint/naming-convention */
+
 export const InteractionModeType = {
   MEASURE: 'measure',
   AREA_ZOOM: 'areaZoom',
   RESIZE: 'resize',
 } as const;
-/* eslint-enable @typescript-eslint/naming-convention */
 
 export type InteractionModeType = (typeof InteractionModeType)[keyof typeof InteractionModeType];
 
