@@ -16,6 +16,11 @@ import type { ApexLog } from 'apex-log-parser';
 import { isVisible } from '../../../core/utility/Util.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
+import {
+  categoryColoringStyles,
+  categoryRowFormatter,
+  wireCategoryColoring,
+} from '../../call-tree/utils/CategoryColoring.js';
 import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
@@ -111,6 +116,7 @@ export class AnalysisView extends LitElement {
         width: auto;
       }
     `,
+    categoryColoringStyles,
   ];
 
   @property()
@@ -139,6 +145,11 @@ export class AnalysisView extends LitElement {
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    wireCategoryColoring(this);
   }
 
   disconnectedCallback(): void {
@@ -371,6 +382,7 @@ export class AnalysisView extends LitElement {
             this._clearSearchHighlights();
           }
         },
+        rowFormatter: categoryRowFormatter,
       },
       {
         placeholder: 'No Analysis Available',

@@ -3,7 +3,7 @@
 **Analyze Salesforce Apex Debug logs with blazing speed.**  
 Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers. Instantly visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep insight into complex transactions and optimize slow Apex methods faster than ever.
 
-![Apex Log Analyzer Preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-preview.gif)
+![Apex Log Analyzer Preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/preview.gif)
 
 [Installation](#%EF%B8%8F-installation 'Install Apex Log Analyzer in VS Code') |
 [Debug Log Levels](#%EF%B8%8F-recommended-debug-log-levels 'Go to Recommended Debug Log Levels') |
@@ -25,6 +25,8 @@ Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers.
 
 > ✨ Works with any `.log` Salesforce debug log file.
 
+> 🧪 **Pre-Release only** — available in the [Pre-Release Version](#-try-the-pre-release-version); not yet in the stable release.
+
 ## 🛠️ Installation
 
 ### 📦 Install Apex Log Analyzer in VS Code
@@ -41,7 +43,7 @@ You can install Apex Log Analyzer directly from Visual Studio Code, the command 
 
 [➡️ Install Apex Log Analyzer on Visual Studio Code Marketplace](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
 
-#### 🧪 Option 3: Install via Command Line
+#### >\_ Option 3: Install via Command Line
 
 ```bash
 code install financialforce.lana
@@ -89,7 +91,7 @@ The Timeline view shows a live visualization of your Salesforce Apex log executi
 
 Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail, Tooltips, Context Menu, Search & Highlight, 19 Curated Themes.
 
-![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png)
+![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline.png)
 
 > 🧠 Great for spotting long-running operations, inefficient queries, and bottlenecks.
 
@@ -104,31 +106,31 @@ Explore nested method calls with performance metrics:
 - **Keyboard Navigation**
 - **Click to go to Code** – Jump to the source method in your project
 
-![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-calltree.png)
+![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/calltree.png)
 
 ## 🧠 Apex Analysis
 
 See which methods are the slowest, most frequent. or expensive.
 
-- **Group by Type, Namespace, or Caller Namespace**
+- **Group by Type, Namespace, or Caller Namespace **
 - **Sort by Duration, Count, Name, Type or Namespace**
 - **Filter to specific event types**
 - **Copy or Export to CSV**
 
-![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-analysis.png)
+![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/analysis.png)
 
 ## 🗄️ Database Analysis
 
 Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues.
 
 - **SOQL + DML Duration, Selectivity, Aggregates, Row Count**
-- **Group by Namespace, Caller Namespace, or Query**
+- **Group by Namespace, Caller Namespace or Query**
 - **View the Call Stack**
 - **SOQL Optimization Tips**
 - **Sort by SOQL or DML, Duration, Selectivity, Aggregates, Row Count**
 - **Copy or Export to CSV**
 
-![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-database.png)
+![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png)
 
 ## 🔍 Global Search
 
@@ -190,7 +192,7 @@ The same npm package works in Cursor and other MCP clients. See the [`@certinia/
 
 ## 🎨 Customization
 
-Adjust event colors in `settings.json`:
+Adjust event colors with custom timeline themes in `settings.json`:
 
 ```json
 "lana.timeline.customThemes": {

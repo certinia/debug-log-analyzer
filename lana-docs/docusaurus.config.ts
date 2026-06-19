@@ -107,13 +107,12 @@ const config: Config = {
   ],
   themeConfig: {
     announcementBar: {
-      id: 'lana-1.18.0', // Unique ID to prevent showing again if dismissed
-      content:
-        '🎉️ <b><a target="_blank" rel="noopener noreferrer" href="https://marketplace.visualstudio.com/items?itemName=financialforce.lana">Apex Log Analyzer v1.18</a> is out!<b>',
+      id: 'lana-1_20_0', // Unique ID to prevent showing again if dismissed
+      content: `🎉️ <b><a href="/${projectName}/community/changelog">Apex Log Analyzer v1.20</a> is out!</b>`,
       isCloseable: true,
     },
     // Replace with your project's social card
-    image: `https://raw.githubusercontent.com/${organizationName}/${projectName}/main/lana/assets/v1.18/lana-preview.gif`,
+    image: `https://raw.githubusercontent.com/${organizationName}/${projectName}/main/lana/assets/1_20/preview.gif`,
     metadata: [
       {
         name: 'keywords',
@@ -130,10 +129,16 @@ const config: Config = {
       },
       items: [
         {
-          type: 'doc',
-          docId: 'docs/features/features',
-          position: 'left',
+          type: 'dropdown',
           label: 'Docs',
+          to: '/docs/gettingstarted',
+          position: 'left',
+          items: [
+            { to: '/docs/gettingstarted', label: 'Getting Started' },
+            { to: '/docs/features', label: 'Features' },
+            { to: '/docs/settings', label: 'Settings' },
+            { to: '/community/changelog', label: 'Changelog' },
+          ],
         },
         {
           type: 'docSidebar',
@@ -142,14 +147,16 @@ const config: Config = {
           label: 'Community',
         },
         {
+          href: 'https://marketplace.visualstudio.com/items?itemName=financialforce.lana',
+          position: 'right',
+          label: 'Install',
+          className: 'navbar-install-link',
+        },
+        {
           href: `https://github.com/${organizationName}/${projectName}`,
           position: 'right',
           'aria-label': 'GitHub Repository', // eslint-disable-line @typescript-eslint/naming-convention
           className: 'header-github-link',
-        },
-        {
-          type: 'search',
-          position: 'right',
         },
       ],
     },
