@@ -46,7 +46,6 @@ export const keyMap: Map<string, TimelineGroup> = new Map([
   ['SOQL', { label: 'SOQL', fillColor: '#6D4C7D' }],
 ]);
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const LEGACY_CATEGORY_MAP: Record<string, string> = {
   Apex: 'Method',
   'Code Unit': 'Code Unit',
@@ -57,7 +56,6 @@ const LEGACY_CATEGORY_MAP: Record<string, string> = {
   Callout: 'Method',
   Validation: 'System Method',
 };
-/* eslint-enable @typescript-eslint/naming-convention */
 
 class State {
   public isRedrawQueued = true;

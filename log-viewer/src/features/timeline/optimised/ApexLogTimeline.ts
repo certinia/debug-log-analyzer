@@ -361,7 +361,7 @@ export class ApexLogTimeline {
   private themeToColors(themeName: string) {
     const theme = getTheme(themeName);
     // Convert TimelineColors keys to the format expected by FlameChart
-    /* eslint-disable @typescript-eslint/naming-convention */
+
     return {
       Apex: theme.apex,
       'Code Unit': theme.codeUnit,
@@ -372,7 +372,6 @@ export class ApexLogTimeline {
       Callout: theme.callout,
       Validation: theme.validation,
     };
-    /* eslint-enable @typescript-eslint/naming-convention */
   }
 
   // ============================================================================

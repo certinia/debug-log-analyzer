@@ -29,7 +29,7 @@ export class ShowInLogAnalysis {
       return;
     }
 
-    let panel = LogView.getCurrentView();
+    const panel = LogView.getCurrentView();
     const logPath = LogView.getLogPath();
 
     // If panel doesn't exist, open the log analysis view first
@@ -44,7 +44,7 @@ export class ShowInLogAnalysis {
 
       // Set pending navigation so it's sent after log is parsed
       LogView.setPendingNavigation(timestamp);
-      panel = await LogView.createView(context, Promise.resolve(), logFilePath);
+      await LogView.createView(context, Promise.resolve(), logFilePath);
       return; // Navigation will happen via fetchLog payload
     } else {
       // Panel exists - reveal it first

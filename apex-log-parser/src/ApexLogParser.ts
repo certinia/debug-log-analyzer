@@ -152,8 +152,8 @@ export class ApexLogParser {
 
     const hascrlf = log.indexOf('\r\n', startIndex) > -1;
     let lastEntry = null;
-    let lfIndex = null;
-    let eolIndex = (lfIndex = log.indexOf('\n', startIndex));
+    let lfIndex = log.indexOf('\n', startIndex);
+    let eolIndex = lfIndex;
     let crlfIndex = -1;
 
     while (eolIndex !== -1) {

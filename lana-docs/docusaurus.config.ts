@@ -155,7 +155,7 @@ const config: Config = {
         {
           href: `https://github.com/${organizationName}/${projectName}`,
           position: 'right',
-          'aria-label': 'GitHub Repository', // eslint-disable-line @typescript-eslint/naming-convention
+          'aria-label': 'GitHub Repository',
           className: 'header-github-link',
         },
       ],

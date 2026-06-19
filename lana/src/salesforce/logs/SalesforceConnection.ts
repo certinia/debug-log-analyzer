@@ -10,7 +10,7 @@ export async function getSalesforceConnection(wsPath: string): Promise<Connectio
   setupPinoBundlerPaths();
 
   // Dynamic import for code splitting. Improves performance by reducing the amount of JS that is loaded and parsed at the start.
-  // eslint-disable-next-line @typescript-eslint/naming-convention
+
   const { ConfigAggregator, OrgConfigProperties, Org } = await import('@salesforce/core');
 
   const aggregator = await ConfigAggregator.create({ projectPath: wsPath });

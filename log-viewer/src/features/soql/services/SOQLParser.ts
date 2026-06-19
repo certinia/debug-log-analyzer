@@ -18,33 +18,33 @@ export class SOQLTree {
   isSimpleSelect(): boolean {
     const selectList = this._queryContext.selectList();
     const selectEntries = selectList.selectEntry_list();
-    return selectEntries.every((selectEntry) => selectEntry.fieldName() != null);
+    return selectEntries.every((selectEntry) => selectEntry.fieldName() !== null);
   }
 
   /* Return true for queries only containing WHERE, ORDER BY & LIMIT clauses */
   isTrivialQuery(): boolean {
     return (
-      this._queryContext.usingScope() == null &&
-      this._queryContext.withClause() == null &&
-      this._queryContext.groupByClause() == null &&
-      this._queryContext.offsetClause() == null &&
-      this._queryContext.allRowsClause() == null &&
+      this._queryContext.usingScope() === null &&
+      this._queryContext.withClause() === null &&
+      this._queryContext.groupByClause() === null &&
+      this._queryContext.offsetClause() === null &&
+      this._queryContext.allRowsClause() === null &&
       this._queryContext.forClauses().getChildCount() === 0 &&
-      this._queryContext.updateList() == null
+      this._queryContext.updateList() === null
     );
   }
 
   /* Return true if query has ORDER BY */
   isOrdered(): boolean {
-    return this._queryContext.orderByClause() != null;
+    return this._queryContext.orderByClause() !== null;
   }
 
   /* Return limit value if defined, maybe a number or a bound expression */
   limitValue(): number | string | undefined {
     const limitClause = this._queryContext.limitClause();
-    if (limitClause == null) {
+    if (limitClause === null) {
       return undefined;
-    } else if (limitClause.IntegerLiteral() != null) {
+    } else if (limitClause.IntegerLiteral() !== null) {
       return parseInt(limitClause.IntegerLiteral()?.getText() as string);
     } else {
       return limitClause.boundExpression()?.getText() as string;
@@ -66,7 +66,7 @@ export class SOQLTree {
 export class SOQLParser {
   async parse(query: string): Promise<SOQLTree> {
     // Dynamic import for code splitting. Improves performance by reducing the amount of JS that is loaded and parsed at the start.
-    // eslint-disable-next-line @typescript-eslint/naming-convention
+
     const { ApexParserFactory, ApexErrorListener } = await import('@apexdevtools/apex-parser');
 
     class ThrowingErrorListener extends ApexErrorListener {

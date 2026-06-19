@@ -1,6 +1,6 @@
 // __mocks__/tabulator-tables.ts
 export class Module {
-  constructor(table?: any) {
+  constructor(_table?: unknown) {
     // this.table = table;
   }
   registerTableOption() {}

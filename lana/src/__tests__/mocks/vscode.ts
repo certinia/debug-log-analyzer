@@ -324,12 +324,12 @@ export const window = {
     dispose: jest.fn(),
   })),
   setStatusBarMessage: jest.fn(() => ({ dispose: jest.fn() })),
-  withProgress: jest.fn((options, task) => task({ report: jest.fn() })),
+  withProgress: jest.fn((_options, task) => task({ report: jest.fn() })),
 };
 
 // Mock commands
 export const commands = {
-  registerCommand: jest.fn((command: string, callback: (...args: unknown[]) => unknown) => {
+  registerCommand: jest.fn((_command: string, _callback: (...args: unknown[]) => unknown) => {
     const disposable = { dispose: jest.fn() };
     subscriptions.push(disposable);
     return disposable;
@@ -340,7 +340,7 @@ export const commands = {
 
 // Mock languages
 export const languages = {
-  registerFoldingRangeProvider: jest.fn((selector, provider) => {
+  registerFoldingRangeProvider: jest.fn((_selector, _provider) => {
     const disposable = { dispose: jest.fn() };
     subscriptions.push(disposable);
     return disposable;
