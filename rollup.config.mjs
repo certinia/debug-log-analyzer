@@ -32,10 +32,6 @@ export default [
       alias({
         entries: [
           {
-            find: 'apex-log-parser',
-            replacement: path.resolve(_dirname, 'apex-log-parser/src/index.ts'),
-          },
-          {
             find: 'antlr4',
             replacement: path.resolve(_dirname, 'node_modules/antlr4/dist/antlr4.node.mjs'),
           },
@@ -100,10 +96,6 @@ export default [
       alias({
         entries: [
           {
-            find: 'eventemitter3',
-            replacement: path.resolve(_dirname, 'node_modules/eventemitter3/index.js'),
-          },
-          {
             find: 'antlr4',
             replacement: path.resolve(_dirname, 'node_modules/antlr4/dist/antlr4.web.mjs'),
           },
@@ -119,6 +111,7 @@ export default [
         defineRollupSwcOption({
           // All options are optional
           include: /\.[mc]?[jt]sx?$/,
+
           exclude: 'node_modules',
           tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
           jsc: {
@@ -137,7 +130,7 @@ export default [
       postcss({
         extensions: ['.css', '.scss'],
         minimize: true,
-        plugins: [postcssUrl({ url: 'inline', encodeType: 'base64' })],
+        plugins: [postcssUrl({ url: 'inline' })],
       }),
       copy({
         hook: 'closeBundle',

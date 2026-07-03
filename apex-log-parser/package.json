@@ -3,5 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "description": "Apex debug log parser for Salesforce",
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
 }
