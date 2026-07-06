@@ -130,9 +130,6 @@ importers:
       '@salesforce/core':
         specifier: ^8.31.2
         version: 8.31.2
-      antlr4:
-        specifier: 4.13.2
-        version: 4.13.2
     devDependencies:
       '@types/jest':
         specifier: ^30.0.0
