@@ -78,9 +78,10 @@ export function getMethodLine(rootNode: ApexNode, fullyQualifiedSymbol: string):
       currentRoot,
       qualifiedMethodName,
       outerClassName,
+      namespace,
     );
     if (!methodNode) {
-      methodNode = findConstructorNode(currentRoot, qualifiedMethodName, outerClassName);
+      methodNode = findConstructorNode(currentRoot, qualifiedMethodName, outerClassName, namespace);
     }
 
     if (methodNode) {
@@ -114,19 +115,19 @@ function findMethodNode(
   root: ApexNode,
   symbol: string,
   outerClassName: string,
+  namespace: string,
 ): ApexMethodNode | undefined {
   const [methodName, params = ''] = symbol.slice(0, -1).split('(');
-  // Try again but with the class name removed from args list. args from the debug log are fully qualified but they are not necessarily in the file,
-  // as we only need to qualify for external types to the file.
-  // (MyClass.ObjectArg) vs (ObjectArg) where MyClass is current class.
-  const paramsWithoutClassName = params.replaceAll(outerClassName + '.', '');
+  const unqualifiedParams = stripParamQualifiers(params, outerClassName, namespace);
 
   return root.children?.find((child) => {
     if (child.nature === 'Method' && normalizeText(child.name ?? '') === methodName) {
       const methodChild = child as ApexMethodNode;
       const methodParams = normalizeText(methodChild.params);
       return (
-        params === undefined || methodParams === params || methodParams === paramsWithoutClassName
+        params === undefined ||
+        methodParams === params ||
+        stripParamQualifiers(methodParams, outerClassName, namespace) === unqualifiedParams
       );
     }
     return false;
@@ -137,12 +138,10 @@ function findConstructorNode(
   root: ApexNode,
   symbol: string,
   outerClassName: string,
+  namespace: string,
 ): ApexConstructorNode | undefined {
   const [constructorName, params = ''] = symbol.slice(0, -1).split('(');
-  // Try again but with the class name removed from args list. args from the debug log are fully qualified but they are not necessarily in the file,
-  // as we only need to qualify for external types to the file.
-  // (MyClass.ObjectArg) vs (ObjectArg) where MyClass is current class.
-  const paramsWithoutClassName = params.replaceAll(outerClassName + '.', '');
+  const unqualifiedParams = stripParamQualifiers(params, outerClassName, namespace);
 
   return root.children?.find((child) => {
     if (child.nature === 'Constructor' && normalizeText(child.name ?? '') === constructorName) {
@@ -151,11 +150,23 @@ function findConstructorNode(
       return (
         params === undefined ||
         constructorParams === params ||
-        constructorParams === paramsWithoutClassName
+        stripParamQualifiers(constructorParams, outerClassName, namespace) === unqualifiedParams
       );
     }
     return false;
   }) as ApexConstructorNode;
+}
+
+// Parameter types from the debug log are fully qualified, but the source file only
+// qualifies types external to it. Strip the outer class, namespace, and System.
+// qualifiers from both sides so qualified and unqualified names compare equal.
+// (MyClass.ObjectArg)/(myns.ObjectArg)/(System.List) vs (ObjectArg)/(List).
+function stripParamQualifiers(params: string, outerClassName: string, namespace: string): string {
+  let stripped = params.replaceAll(outerClassName + '.', '');
+  if (namespace) {
+    stripped = stripped.replaceAll(namespace + '.', '');
+  }
+  return stripped.replaceAll('system.', '');
 }
 
 function normalizeText(text: string): string {

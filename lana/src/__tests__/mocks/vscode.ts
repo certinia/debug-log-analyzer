@@ -119,6 +119,9 @@ export const Uri = {
   })),
 };
 
+// Mock RelativePattern (constructor used for glob searches)
+export const RelativePattern = jest.fn();
+
 // Mock FoldingRange class
 export class FoldingRange {
   readonly start: number;
@@ -260,6 +263,10 @@ export const workspace = {
   onDidChangeTextDocument: jest.fn(() => ({ dispose: jest.fn() })),
   onDidSaveTextDocument: jest.fn(() => ({ dispose: jest.fn() })),
   openTextDocument: jest.fn(),
+  findFiles: jest.fn(),
+  asRelativePath: jest.fn((uri: { fsPath: string } | string) =>
+    typeof uri === 'string' ? uri : uri.fsPath,
+  ),
   fs: {
     readFile: jest.fn(),
     writeFile: jest.fn(),
@@ -520,6 +527,7 @@ export default {
   Position,
   Range,
   Uri,
+  RelativePattern,
   FoldingRange,
   FoldingRangeKind,
   Hover,

@@ -145,6 +145,18 @@ describe('ApexSymbolLocator', () => {
       expect(result.isExactMatch).toBe(true);
     });
 
+    it('should match a method param qualified with the System namespace', () => {
+      const result = getMethodLine(root, 'MyClass.bar(System.Integer)');
+      expect(result.line).toBe(3);
+      expect(result.isExactMatch).toBe(true);
+    });
+
+    it('should match a method param qualified with the org namespace', () => {
+      const result = getMethodLine(root, 'myns.MyClass.bar(myns.Integer)');
+      expect(result.line).toBe(3);
+      expect(result.isExactMatch).toBe(true);
+    });
+
     it('should find method line for inner class method', () => {
       const result = getMethodLine(root, 'MyClass.Inner.bar(Integer)');
       expect(result.line).toBe(9);
@@ -207,13 +219,15 @@ describe('ApexSymbolLocator', () => {
       expect(result.isExactMatch).toBe(true);
     });
 
-    it('should find overloaded constructor with multiple parameters + custom types but missing class prefix', () => {
+    it('should find overloaded constructor + custom types regardless of class-prefix placement', () => {
+      // Within MyClass, `InnerClass` and `MyClass.InnerClass` are the same type, so this
+      // resolves to the line 13 constructor even though the qualifier is on a different arg.
       const result = getMethodLine(
         root,
         'MyClass(Map<Id, InnerClass>, Map<Id, MyClass.InnerClass>, String, Integer)',
       );
-      expect(result.line).toBe(1);
-      expect(result.isExactMatch).toBe(false);
+      expect(result.line).toBe(13);
+      expect(result.isExactMatch).toBe(true);
     });
 
     it('should find inner constructors', () => {
