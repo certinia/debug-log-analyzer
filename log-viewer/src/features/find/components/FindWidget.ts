@@ -1,17 +1,16 @@
 //totod: event types
 
-import { provideVSCodeDesignSystem, vsCodeTextField } from '@vscode/webview-ui-toolkit';
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import '#vscode-elements/vscode-textfield.js';
+import '#vscode-elements/vscode-toolbar-button.js';
+import type { VscodeTextfield } from '#vscode-elements/vscode-textfield.js';
+import { LitElement, css, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
 // styles
-import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 
 // web components
 import '../../../components/VsIconCheckbox.js';
-
-provideVSCodeDesignSystem().register(vsCodeTextField());
 
 @customElement('find-widget')
 export class FindWidget extends LitElement {
@@ -38,11 +37,8 @@ export class FindWidget extends LitElement {
 
   static styles = [
     globalStyles,
-    unsafeCSS(codiconStyles),
     css`
       :host {
-        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
-
         font-size: 12px;
       }
 
@@ -83,6 +79,7 @@ export class FindWidget extends LitElement {
       }
 
       .find-input-box {
+        width: 197px;
         height: 25px;
         vertical-align: middle;
         box-sizing: border-box;
@@ -102,8 +99,9 @@ export class FindWidget extends LitElement {
         height: 25px;
       }
 
-      .find-button:focus {
-        border: 1px solid transparent;
+      .find-button:focus-within {
+        color: var(--vscode-inputOption-activeForeground);
+        border: 1px solid var(--vscode-inputOption-activeBorder);
         cursor: pointer;
         user-select: none;
         -webkit-user-select: none;
@@ -111,11 +109,6 @@ export class FindWidget extends LitElement {
         box-sizing: border-box;
         width: 22px;
         height: 22px;
-      }
-
-      .find-button:focus {
-        color: var(--vscode-inputOption-activeForeground);
-        border: 1px solid var(--vscode-inputOption-activeBorder);
       }
 
       .matches-count {
@@ -135,43 +128,46 @@ export class FindWidget extends LitElement {
 
   render() {
     return html`<div class="wrapper ${this.isVisble ? 'visible' : ''}">
-      <vscode-text-field
+      <vscode-textfield
         placeholder="Find"
-        aria-label="Find"
+        label="Find"
         class="find-input-box"
         @click=${this._findInputClick}
       >
-        <section slot="end" class="find-input__controls">
+        <section slot="content-after" class="find-input__controls">
           <vs-icon-checkbox
+            icon="case-sensitive"
             showSelected="true"
             title="Match Case"
             class="find-control"
             @click=${this._matchCase}
-          >
-            <span class="codicon codicon-case-sensitive"></span>
-          </vs-icon-checkbox>
+          ></vs-icon-checkbox>
         </section>
-      </vscode-text-field>
+      </vscode-textfield>
       <div class="matches-count">${this._getMatchesText()}</div>
 
       <div class="find-actions">
-        <vscode-button
-          appearance="icon"
+        <vscode-toolbar-button
+          icon="arrow-up"
+          label="Previous Match"
           title="Previous Match"
           class="find-button"
           @click=${this._previousMatch}
-          ><span class="codicon codicon-arrow-up"></span
-        ></vscode-button>
-        <vscode-button
-          appearance="icon"
+        ></vscode-toolbar-button>
+        <vscode-toolbar-button
+          icon="arrow-down"
+          label="Next Match"
           title="Next Match"
           class="find-button"
           @click=${this._nextMatch}
-          ><span class="codicon codicon-arrow-down"></span
-        ></vscode-button>
-        <vscode-button appearance="icon" title="Close" class="find-button" @click=${this._closeFind}
-          ><span class="codicon codicon-close"></span
-        ></vscode-button>
+        ></vscode-toolbar-button>
+        <vscode-toolbar-button
+          icon="close"
+          label="Close"
+          title="Close"
+          class="find-button"
+          @click=${this._closeFind}
+        ></vscode-toolbar-button>
       </div>
     </div>`;
   }
@@ -205,7 +201,7 @@ export class FindWidget extends LitElement {
       this.isVisble = true;
       this.nextMatchDirection = true; // Reset to forward direction
       inputBox.focus();
-      inputBox.select();
+      inputBox.wrappedElement.select();
     }
   }
 
@@ -246,7 +242,7 @@ export class FindWidget extends LitElement {
   }
 
   get inputbox() {
-    return this.shadowRoot?.querySelector<HTMLInputElement>('.find-input-box');
+    return this.shadowRoot?.querySelector<VscodeTextfield>('.find-input-box');
   }
 
   _updateCounts(e: { detail: { totalMatches: number; count?: number } }) {

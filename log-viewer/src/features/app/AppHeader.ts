@@ -1,12 +1,6 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import {
-  provideVSCodeDesignSystem,
-  vsCodePanelTab,
-  vsCodePanelView,
-  vsCodePanels,
-} from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
@@ -25,8 +19,6 @@ import '../timeline/components/TimelineView.js';
 // styles
 import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../styles/global.styles.js';
-
-provideVSCodeDesignSystem().register(vsCodePanelTab(), vsCodePanelView(), vsCodePanels());
 
 @customElement('app-header')
 export class AppHeader extends LitElement {
@@ -58,7 +50,6 @@ export class AppHeader extends LitElement {
     `,
   ];
 
-  // TODO: use @change on vscode-panels to detect tab change instead of @click on <vscode-panel-tab
   render() {
     return html`
       <nav-bar

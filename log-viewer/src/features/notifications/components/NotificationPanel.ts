@@ -1,15 +1,12 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeButton, vsCodeDivider } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
 import { notificationStyles } from '../../../styles/notification.styles.js';
-
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider());
 
 @customElement('notification-panel')
 export class NotificationPanel extends LitElement {
@@ -28,7 +25,7 @@ export class NotificationPanel extends LitElement {
         max-height: 540px;
         width: 320px;
         padding: 8px 4px 8px 4px;
-        border: calc(var(--border-width) * 1px) solid var(--divider-background);
+        border: 1px solid var(--divider-background);
         box-shadow: rgba(0, 0, 0, 0.5) 0px 4px 20px;
         border-radius: 4px;
         overflow: scroll;

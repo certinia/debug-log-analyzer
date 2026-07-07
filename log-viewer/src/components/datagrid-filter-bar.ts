@@ -1,14 +1,11 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
-
-provideVSCodeDesignSystem().register();
 
 @customElement('datagrid-filter-bar')
 export class DatagridFilterBar extends LitElement {

@@ -40,4 +40,19 @@ export const globalStyles = css`
     color: var(--vscode-editor-findMatchHighlightForeground);
     background-color: var(--vscode-editor-findMatchBackground, #8b8000);
   }
+
+  /* vscode-button shows its focus ring + hover background on any focus
+     (including mouse click); restrict that to keyboard focus like the
+     native VS Code button */
+  vscode-button:focus:not(:focus-visible)::part(base) {
+    outline: none;
+  }
+
+  vscode-button:focus:not(:hover)::part(base) {
+    background-color: var(--vscode-button-background);
+  }
+
+  vscode-button[secondary]:focus:not(:hover)::part(base) {
+    background-color: var(--vscode-button-secondaryBackground);
+  }
 `;

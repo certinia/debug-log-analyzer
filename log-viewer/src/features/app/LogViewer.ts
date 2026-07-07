@@ -1,6 +1,10 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
+import '#vscode-elements/vscode-tab-header.js';
+import '#vscode-elements/vscode-tab-panel.js';
+import '#vscode-elements/vscode-tabs.js';
+import type { VscTabsSelectEvent } from '@vscode-elements/elements/dist/vscode-tabs/vscode-tabs.js';
 import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
@@ -25,6 +29,10 @@ import './AppHeader.js';
 interface NavigateToTimelinePayload {
   timestamp: number;
 }
+
+// Tab ids in display order; vscode-tabs is index based so this maps
+// index <-> id for the string-id based 'show-tab' events used app-wide.
+const TAB_IDS = ['timeline-tab', 'tree-tab', 'analysis-tab', 'database-tab'];
 
 @customElement('log-viewer')
 export class LogViewer extends LitElement {
@@ -61,32 +69,38 @@ export class LogViewer extends LitElement {
         flex-direction: column;
         height: 100%;
         padding: 0px 8px 0px 8px;
-
-        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
-        --panel-tab-active-foreground: var(--vscode-panelTitle-activeBorder);
-        --panel-tab-selected-text: var(--vscode-panelTitle-activeForeground, #e7e7e7);
       }
 
-      vscode-panels {
+      vscode-tabs {
+        --vscode-panel-background: var(--vscode-editor-background);
+
+        display: flex;
+        flex-direction: column;
         height: 100%;
+        min-height: 0;
       }
 
-      vscode-panels::part(tabpanel) {
+      vscode-tab-panel {
+        flex: 1;
+        min-height: 0;
         overflow: auto;
+        box-sizing: border-box;
+        /* the toolkit's vscode-panel-view padding */
+        padding: 10px 6px;
         box-shadow: inset 0 calc(max(1px, 0.0625rem) * 1)
           var(--vscode-panelSectionHeader-background);
       }
 
-      vscode-panel-view {
-        height: 100%;
-      }
-
-      vscode-panel-tab[aria-selected='true'] {
-        color: var(--panel-tab-selected-text);
-      }
-
-      vscode-panel-tab:hover {
-        color: var(--panel-tab-selected-text);
+      /* icon + label as one flex row, like the toolkit's tabs; also restores
+         the previous label styling — vscode-tab-header's panel mode defaults
+         to 11px uppercase */
+      vscode-tab-header .tab-header {
+        display: flex;
+        align-items: center;
+        column-gap: 0.3em;
+        font-family: var(--vscode-font-family);
+        font-size: var(--vscode-font-size, 13px);
+        text-transform: none;
       }
     `,
   ];
@@ -123,58 +137,48 @@ export class LogViewer extends LitElement {
         .timelineRoot=${this.timelineRoot}
       ></app-header>
 
-      <vscode-panels activeid="${this._selectedTab}">
-        <vscode-panel-tab
-          id="timeline-tab"
-          data-show="timeline-view"
-          @click="${this._showTabHTMLElem}"
-        >
-          <span class="codicon codicon-graph">&nbsp;</span>
-          <span>Timeline</span>
-        </vscode-panel-tab>
-        <vscode-panel-tab
-          id="tree-tab"
-          data-show="call-tree-view"
-          @click="${this._showTabHTMLElem}"
-        >
-          <span class="codicon codicon-list-tree">&nbsp;</span>
-          <span>Call Tree</span>
-        </vscode-panel-tab>
-        <vscode-panel-tab
-          id="analysis-tab"
-          data-show="analysis-view"
-          @click="${this._showTabHTMLElem}"
-        >
-          <span class="codicon codicon-code">&nbsp;</span>
-          <span>Analysis</span>
-        </vscode-panel-tab>
-        <vscode-panel-tab id="database-tab" data-show="db-view" @click="${this._showTabHTMLElem}">
-          <span class="codicon codicon-database">&nbsp;</span>
-          <span>Database</span>
-        </vscode-panel-tab>
+      <vscode-tabs
+        panel
+        .selectedIndex="${TAB_IDS.indexOf(this._selectedTab)}"
+        @vsc-tabs-select="${this._onTabSelect}"
+      >
+        <vscode-tab-header slot="header">
+          <span class="tab-header"><span class="codicon codicon-graph"></span>Timeline</span>
+        </vscode-tab-header>
+        <vscode-tab-header slot="header">
+          <span class="tab-header"><span class="codicon codicon-list-tree"></span>Call Tree</span>
+        </vscode-tab-header>
+        <vscode-tab-header slot="header">
+          <span class="tab-header"><span class="codicon codicon-code"></span>Analysis</span>
+        </vscode-tab-header>
+        <vscode-tab-header slot="header">
+          <span class="tab-header"><span class="codicon codicon-database"></span>Database</span>
+        </vscode-tab-header>
 
-        <vscode-panel-view id="view1">
+        <vscode-tab-panel>
           <timeline-view
             .timelineRoot="${this.timelineRoot}"
             .navigateToEventIndex="${this._navigateToEventIndex}"
             .navigateToTimestamp="${this._navigateToTimestamp}"
           ></timeline-view>
-        </vscode-panel-view>
-        <vscode-panel-view id="view2">
+        </vscode-tab-panel>
+        <vscode-tab-panel>
           <call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view>
-        </vscode-panel-view>
-        <vscode-panel-view id="view3">
+        </vscode-tab-panel>
+        <vscode-tab-panel>
           <analysis-view .timelineRoot="${this.timelineRoot}"> </analysis-view>
-        </vscode-panel-view>
-        <vscode-panel-view id="view4">
+        </vscode-tab-panel>
+        <vscode-tab-panel>
           <database-view .timelineRoot="${this.timelineRoot}"></database-view>
-        </vscode-panel-view>
-      </vscode-panels>`;
+        </vscode-tab-panel>
+      </vscode-tabs>`;
   }
 
-  _showTabHTMLElem(e: Event) {
-    const input = e.currentTarget as HTMLElement;
-    this._showTab(input.id);
+  _onTabSelect(e: VscTabsSelectEvent) {
+    const tabId = TAB_IDS[e.detail.selectedIndex];
+    if (tabId) {
+      this._showTab(tabId);
+    }
   }
 
   _showTabEvent(e: Event) {

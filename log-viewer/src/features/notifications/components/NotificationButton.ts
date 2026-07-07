@@ -1,12 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import {
-  provideVSCodeDesignSystem,
-  vsCodeBadge,
-  vsCodeButton,
-  vsCodeDivider,
-} from '@vscode/webview-ui-toolkit';
+import '#vscode-elements/vscode-divider.js';
 import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
@@ -15,9 +10,8 @@ import { globalStyles } from '../../../styles/global.styles.js';
 import { notificationStyles } from '../../../styles/notification.styles.js';
 
 // web components
+import '../../../components/IconButton.js';
 import './NotificationPanel.js';
-
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDivider(), vsCodeBadge());
 
 @customElement('notification-button')
 export class NotificationButton extends LitElement {
@@ -122,7 +116,7 @@ export class NotificationButton extends LitElement {
       <icon-button
         ariaLabel="Notifications"
         title="Notifications"
-        icon="codicon-bell"
+        icon="bell"
         .badgeCount="${count}"
         @click=${this._toggleNotifications}
       ></icon-button>
