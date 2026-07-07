@@ -201,7 +201,7 @@ export class FindWidget extends LitElement {
       this.isVisble = true;
       this.nextMatchDirection = true; // Reset to forward direction
       inputBox.focus();
-      inputBox.wrappedElement.select();
+      inputBox.wrappedElement?.select();
     }
   }
 

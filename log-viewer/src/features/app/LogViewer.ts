@@ -55,6 +55,9 @@ export class LogViewer extends LitElement {
   _selectedTab = 'timeline-tab';
 
   @state()
+  _selectedIndex = 0;
+
+  @state()
   private _navigateToEventIndex: number | undefined = undefined;
 
   @state()
@@ -139,7 +142,7 @@ export class LogViewer extends LitElement {
 
       <vscode-tabs
         panel
-        .selectedIndex="${TAB_IDS.indexOf(this._selectedTab)}"
+        .selectedIndex="${this._selectedIndex}"
         @vsc-tabs-select="${this._onTabSelect}"
       >
         <vscode-tab-header slot="header">
@@ -189,6 +192,10 @@ export class LogViewer extends LitElement {
   _showTab(tabId: string) {
     if (this._selectedTab !== tabId) {
       this._selectedTab = tabId;
+      const index = TAB_IDS.indexOf(tabId);
+      if (index !== -1) {
+        this._selectedIndex = index;
+      }
 
       // Not really happy this is here, find needs a refactor
       const findEvt = {
