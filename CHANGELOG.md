@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- ♻️ Replaced the deprecated `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576])
+
 ## [1.20.0] 2026-06-18
 
 ### Added
@@ -484,6 +490,10 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Misc Visual tweaks.
 - Add explorer menu item.
 - Provide more information when selecting log to download.
+
+<!-- Unreleased -->
+
+[#576]: https://github.com/certinia/debug-log-analyzer/issues/576
 
 <!-- v1.20.0 -->
 
