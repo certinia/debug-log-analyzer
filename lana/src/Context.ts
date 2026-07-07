@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { workspace, type ExtensionContext } from 'vscode';
+import type { ExtensionContext } from 'vscode';
 
 import { LogEventCache } from './cache/LogEventCache.js';
 import { ShowAnalysisCodeLens } from './codelenses/ShowAnalysisCodeLens.js';
@@ -16,22 +16,16 @@ import { WhatsNewNotification } from './display/WhatsNewNotification.js';
 import { RawLogFoldingProvider } from './folding/RawLogFoldingProvider.js';
 import { ApexLogLanguageDetector } from './language/ApexLogLanguageDetector.js';
 import { RawLogSymbolProvider } from './symbols/RawLogSymbolProvider.js';
-import { VSWorkspace } from './workspace/VSWorkspace.js';
+import { VSWorkspaceManager } from './workspace/VSWorkspaceManager.js';
 
 export class Context {
   context: ExtensionContext;
   display: Display;
-  workspaces: VSWorkspace[] = [];
+  workspaceManager = new VSWorkspaceManager();
 
   constructor(context: ExtensionContext, display: Display) {
     this.context = context;
     this.display = display;
-
-    if (workspace.workspaceFolders) {
-      this.workspaces = workspace.workspaceFolders.map((folder) => {
-        return new VSWorkspace(folder);
-      });
-    }
 
     ApexLogLanguageDetector.apply(this);
     LogEventCache.apply(this);

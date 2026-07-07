@@ -89,6 +89,27 @@ export class Range {
   }
 }
 
+// Mock Selection class (a Range anchored between two positions)
+export class Selection extends Range {
+  readonly anchor: Position;
+  readonly active: Position;
+
+  constructor(anchor: Position, active: Position) {
+    super(anchor, active);
+    this.anchor = anchor;
+    this.active = active;
+  }
+}
+
+// Mock ViewColumn enum (members used by the extension)
+export const ViewColumn = {
+  Active: -1,
+  Beside: -2,
+  One: 1,
+  Two: 2,
+} as const;
+export type ViewColumn = (typeof ViewColumn)[keyof typeof ViewColumn];
+
 // Mock Uri class
 export const Uri = {
   file: jest.fn((path: string) => ({
@@ -118,6 +139,9 @@ export const Uri = {
     fsPath: [base.fsPath, ...pathSegments].join('/'),
   })),
 };
+
+// Mock RelativePattern (constructor used for glob searches)
+export const RelativePattern = jest.fn();
 
 // Mock FoldingRange class
 export class FoldingRange {
@@ -260,6 +284,10 @@ export const workspace = {
   onDidChangeTextDocument: jest.fn(() => ({ dispose: jest.fn() })),
   onDidSaveTextDocument: jest.fn(() => ({ dispose: jest.fn() })),
   openTextDocument: jest.fn(),
+  findFiles: jest.fn(),
+  asRelativePath: jest.fn((uri: { fsPath: string } | string) =>
+    typeof uri === 'string' ? uri : uri.fsPath,
+  ),
   fs: {
     readFile: jest.fn(),
     writeFile: jest.fn(),
@@ -519,7 +547,10 @@ export const resetMocks = (): void => {
 export default {
   Position,
   Range,
+  Selection,
+  ViewColumn,
   Uri,
+  RelativePattern,
   FoldingRange,
   FoldingRangeKind,
   Hover,
