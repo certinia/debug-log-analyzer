@@ -10,6 +10,7 @@ import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
 import MinMaxFilter from '../../../tabulator/filters/MinMax.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
+import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import { sumDurationTotalForRootEvents } from '../../analysis/services/CallStackSum.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
@@ -58,7 +59,7 @@ export function createBottomUpTable(
   options: BottomUpTableOptions = {},
 ): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
-  Tabulator.registerModule([GroupCalcs, GroupSort]);
+  Tabulator.registerModule([GroupCalcs, GroupChildIndent, GroupSort]);
 
   const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
   const nameFormatter = createCalltreeNameFormatter(excludedTypes);

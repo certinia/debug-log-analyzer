@@ -138,6 +138,21 @@ $codicon-chevron-down: '\eab4';
       }
     }
 
+    // Group member indent. `.lana-grouped` (toggled by `GroupChildIndent`) only defines
+    // the var; consumers fall back to 0px, so a regroup is a targeted var invalidation.
+    &.lana-grouped {
+      --lana-group-indent: var(--lana-indent-unit, 9px);
+    }
+
+    .tabulator-calcs {
+      --lana-group-indent: 0px; // calc rows stay flush
+    }
+
+    // Indented call-tree cells carry an inline calc() that wins over this rule.
+    .tabulator-cell:first-child {
+      padding-left: calc(4px + var(--lana-group-indent, 0px)); // = stock 4px when ungrouped
+    }
+
     .tabulator-row .tabulator-cell .tabulator-data-tree-control {
       height: 16px;
       width: 16px;

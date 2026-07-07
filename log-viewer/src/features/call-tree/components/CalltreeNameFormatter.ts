@@ -18,11 +18,13 @@ export function createCalltreeNameFormatter(excludedTypes: Set<LogEventType>) {
     const row = cell.getRow();
     // @ts-expect-error _row is private to tabulator but is the only way to get the tree level in a formatter
     const treeLevel: number = row._row.modules.dataTree?.index ?? 0;
-    const levelIndent = treeLevel * childIndent;
-    if (levelIndent) {
+    // Group indent comes from `--lana-group-indent` (DataGrid.scss) so it stays live as
+    // grouping toggles; level-0 cells get theirs purely from CSS, with no inline style.
+    const treeIndent = treeLevel * childIndent;
+    if (treeIndent) {
       const cellElem = cell.getElement();
-      cellElem.style.paddingLeft = `${levelIndent + 4}px`;
-      cellElem.style.textIndent = `-${levelIndent}px`;
+      cellElem.style.paddingLeft = `calc(${treeIndent + 4}px + var(--lana-group-indent, 0px))`;
+      cellElem.style.textIndent = `-${treeIndent}px`;
     }
 
     const { originalData: node } = cell.getData() as { originalData: LogEvent };

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832])
+
+## [Unreleased]
+
 ### Added
 
 - ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart built for massive logs and up to **7X faster**. ([#446] [#251] [#92] [#564])
@@ -485,6 +491,10 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 - Provide more information when selecting log to download.
 
 <!-- Unreleased -->
+
+[#832]: https://github.com/certinia/debug-log-analyzer/issues/832
+
+<!-- v1.20.0 -->
 
 [#605]: https://github.com/certinia/debug-log-analyzer/issues/605
 [#604]: https://github.com/certinia/debug-log-analyzer/issues/604

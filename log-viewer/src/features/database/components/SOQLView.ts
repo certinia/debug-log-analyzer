@@ -27,6 +27,7 @@ import { DatabaseAccess } from '../services/Database.js';
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
 import Number from '../../../tabulator/format/Number.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
+import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
 import { Find } from '../../../tabulator/module/Find.js';
@@ -241,6 +242,7 @@ export class SOQLView extends LitElement {
           RowNavigation,
           Find,
           GroupCalcs,
+          GroupChildIndent,
           GroupSort,
         ]);
         this._renderSOQLTable(tableWrapper, this.soqlLines);
