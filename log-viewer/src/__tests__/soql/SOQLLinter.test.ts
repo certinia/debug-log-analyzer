@@ -1,14 +1,15 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { ApexLogParser } from '../../core/log-parser/ApexLogParser.js';
-import { LogEvent } from '../../core/log-parser/LogEvents.js';
+import { describe, expect, it } from '@jest/globals';
+import { ApexLogParser, LogEvent } from 'apex-log-parser';
+
 import { SOQLLinter } from '../../features/soql/services/SOQLLinter.js';
 
 class DummySOQLLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
-    this.subCategory = 'Code Unit';
+    this.category = 'Code Unit';
     this.cpuType = 'method';
     this.exitTypes = ['CODE_UNIT_FINISHED'];
   }

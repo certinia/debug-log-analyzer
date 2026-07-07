@@ -41,6 +41,7 @@ related #
 - [ ] 🔖 README.md
 - [ ] 🔖 CHANGELOG.md
 - [ ] 📖 help site
+- [ ] 🧪 Marked any pre-release-only features (README `🧪` badge — see [RELEASING.md](../RELEASING.md#-marking-pre-release-only-features))
 - [ ] 🙅 not needed
 
 ## Anything else we need to know? [optional]

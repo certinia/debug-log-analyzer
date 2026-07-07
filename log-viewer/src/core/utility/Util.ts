@@ -3,49 +3,57 @@
  */
 
 /**
+ * Options for formatting durations.
+ */
+export interface FormatDurationOptions {
+  /**
+   * If true, omits spaces between values and units (e.g., "5ms" instead of "5 ms").
+   * Useful for compact displays like the minimap axis.
+   */
+  compact?: boolean;
+}
+
+/**
  * Formats a duration in nanoseconds into a human-readable string.
  *
- * Automatically selects the most appropriate unit (microseconds, milliseconds, seconds, or minutes)
+ * Automatically selects the most appropriate unit (milliseconds, seconds, or minutes)
  * based on the magnitude of the duration. Applies appropriate precision for each unit.
  *
  * @param ns - The duration in nanoseconds to format
+ * @param options - Optional formatting options
  * @returns A formatted string representing the duration with appropriate units:
- * - Microseconds (µs) for durations < 0.1ms
- * - Milliseconds (ms) for durations < 1000ms
+ * - Milliseconds (ms) for durations < 1000ms (with up to 3 decimal places for sub-ms)
  * - Seconds (s) for durations < 60s
  * - Minutes and seconds (e.g., "2m 30s") for durations ≥ 60s
  *
  * @example
  * ```typescript
- * formatDuration(5000);        // "5 µs"
- * formatDuration(1500000);     // "1.5 ms"
- * formatDuration(2500000000);  // "2.5 s"
- * formatDuration(90000000000); // "1m 30s"
+ * formatDuration(50000);                      // "0.05 ms"
+ * formatDuration(1500000);                    // "1.5 ms"
+ * formatDuration(2500000000);                 // "2.5 s"
+ * formatDuration(90000000000);                // "1m 30s"
+ * formatDuration(50000, { compact: true });   // "0.05ms"
  * ```
  */
-export function formatDuration(ns: number) {
+export function formatDuration(ns: number, options?: FormatDurationOptions): string {
+  const space = options?.compact ? '' : ' ';
+
   if (!ns) {
-    return '0 ms';
+    return `0${space}ms`;
   }
 
   const ms = ns / 1e6;
 
-  // microseconds (< 0.01 ms)
-  if (ms < 0.1) {
-    const us = ns / 1e3;
-    const precision = us < 10 ? 100 : us < 100 ? 10 : 1;
-    return `${round(us, precision)} µs`;
-  }
-
   if (ms < 1000) {
-    const precision = ms < 10 ? 100 : ms < 100 ? 10 : 1;
-    return `${round(ms, precision)} ms`;
+    // Precision: 3 decimals for sub-ms, 2 for <10ms, 1 for <100ms, 0 for >=100ms
+    const precision = ms < 1 ? 1000 : ms < 10 ? 100 : ms < 100 ? 10 : 1;
+    return `${round(ms, precision)}${space}ms`;
   }
 
   const s = ms / 1000;
   if (s < 60) {
     const precision = s < 10 ? 100 : s < 100 ? 10 : 1;
-    return `${round(s, precision)} s`;
+    return `${round(s, precision)}${space}s`;
   }
 
   const m = Math.floor(s / 60);
@@ -56,11 +64,73 @@ export function formatDuration(ns: number) {
   }
 
   const secStr = sec === Math.floor(sec) ? `${sec}s` : `${round(sec, 10)}s`;
-  return `${m}m ${secStr}`;
+  return `${m}m${space}${secStr}`;
 }
 
 function round(value: number, precision: number): number {
   return Math.round(value * precision) / precision;
+}
+
+/**
+ * Formats a time range showing start and end times with an arrow separator.
+ *
+ * Used by measurement overlay and minimap lens labels for consistent formatting.
+ *
+ * @param startTimeNs - Start time in nanoseconds
+ * @param endTimeNs - End time in nanoseconds
+ * @returns Formatted string like "1.2 s → 3.7 s"
+ *
+ * @example
+ * ```typescript
+ * formatTimeRange(1200000000, 3700000000);  // "1.2 s → 3.7 s"
+ * formatTimeRange(0, 150000000);            // "0 ms → 150 ms"
+ * ```
+ */
+export function formatTimeRange(startTimeNs: number, endTimeNs: number): string {
+  return `${formatDuration(startTimeNs)} → ${formatDuration(endTimeNs)}`;
+}
+
+/**
+ * Formats milliseconds-since-midnight to `HH:MM:SS.mmm` wall-clock time string.
+ *
+ * @param ms - Milliseconds since midnight (0–86,400,000)
+ * @returns Formatted time string like "14:30:05.122"
+ */
+export function formatWallClockTime(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const millis = Math.round(ms % 1000);
+  const seconds = totalSeconds % 60;
+  const minutes = Math.floor(totalSeconds / 60) % 60;
+  const hours = Math.floor(totalSeconds / 3600) % 24;
+
+  return (
+    String(hours).padStart(2, '0') +
+    ':' +
+    String(minutes).padStart(2, '0') +
+    ':' +
+    String(seconds).padStart(2, '0') +
+    '.' +
+    String(millis).padStart(3, '0')
+  );
+}
+
+/**
+ * Computes the wall-clock time (ms since midnight) for any event given:
+ * - The wall-clock start time of the log (from ApexLog.startTime)
+ * - The nanosecond timestamp of the first event (ApexLog.timestamp)
+ * - The nanosecond timestamp of the target event
+ *
+ * @param startTimeMs - Wall-clock time of the first event, in ms since midnight
+ * @param firstTimestampNs - Nanosecond timestamp of the first event
+ * @param eventTimestampNs - Nanosecond timestamp of the event to compute
+ * @returns Wall-clock time in milliseconds since midnight
+ */
+export function computeWallClockMs(
+  startTimeMs: number,
+  firstTimestampNs: number,
+  eventTimestampNs: number,
+): number {
+  return startTimeMs + (eventTimestampNs - firstTimestampNs) / 1_000_000;
 }
 
 export function debounce<T extends unknown[]>(callBack: (...args: T) => unknown) {

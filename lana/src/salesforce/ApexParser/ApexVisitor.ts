@@ -1,44 +1,93 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type {
-  ApexParserVisitor,
-  ClassDeclarationContext,
-  FormalParametersContext,
-  MethodDeclarationContext,
+import {
+  ApexParserBaseVisitor,
+  type ApexErrorNode,
+  type ApexParserRuleContext,
+  type ApexParseTree,
+  type ApexRuleNode,
+  type ApexTerminalNode,
+  type ClassDeclarationContext,
+  type ConstructorDeclarationContext,
+  type FormalParametersContext,
+  type MethodDeclarationContext,
 } from '@apexdevtools/apex-parser';
-import type { ErrorNode, ParseTree, RuleNode, TerminalNode } from 'antlr4ts/tree';
 
-type ApexNature = 'Class' | 'Method';
+type ApexNature = 'Constructor' | 'Class' | 'Method';
 
+/**
+ * Represents a node in the Apex syntax tree.
+ * Can be either a class or method declaration with optional child nodes.
+ */
 export interface ApexNode {
+  /** The type of Apex construct (Class or Method) */
   nature?: ApexNature;
+  /** The name of the class or method */
   name?: string;
+  /** Child nodes (nested classes or methods) */
   children?: ApexNode[];
+  /** Line number where the node is declared */
   line?: number;
+  /** Character position of the identifier on the line */
+  idCharacter?: number;
 }
 
-export type ApexMethodNode = ApexNode & {
-  nature: 'Method';
-  params: string;
+/**
+ * Represents a class declaration node in the Apex syntax tree.
+ * All properties are required (non-optional) to ensure complete class metadata.
+ */
+export interface ApexClassNode extends ApexNode {
+  /** Indicates this node represents a class declaration */
+  nature: 'Class';
+  /** Line number where the class is declared */
   line: number;
+  /** Character position of the class identifier on the line */
+  idCharacter: number;
+}
+
+export interface ApexParamNode extends ApexNode {
+  /** Indicates this node represents a method declaration */
+  nature: 'Method' | 'Constructor';
+  /** Comma-separated list of parameter types for the method */
+  params: string;
+  /** Line number where the method is declared */
+  line: number;
+  /** Character position of the method identifier on the line */
+  idCharacter: number;
+}
+
+/**
+ * Represents a method declaration node in the Apex syntax tree.
+ * All properties are required (non-optional) to ensure complete method metadata.
+ */
+export interface ApexMethodNode extends ApexParamNode {
+  /** Indicates this node represents a method declaration */
+  nature: 'Method';
+}
+
+export interface ApexConstructorNode extends ApexParamNode {
+  /** Indicates this node represents a method declaration */
+  nature: 'Constructor';
+}
+
+type VisitableApex = ApexParseTree & {
+  accept(visitor: ApexVisitor): ApexNode;
 };
 
-type VisitableApex = ParseTree & {
-  accept<Result>(visitor: ApexParserVisitor<Result>): Result;
-};
-
-export class ApexVisitor implements ApexParserVisitor<ApexNode> {
-  visit(ctx: ParseTree): ApexNode {
+export class ApexVisitor extends ApexParserBaseVisitor<ApexNode> {
+  override visit(ctx: ApexParseTree): ApexNode {
     return ctx ? (ctx as VisitableApex).accept(this) : {};
   }
 
-  visitChildren(ctx: RuleNode): ApexNode {
+  override visitChildren(ctx: ApexRuleNode): ApexNode {
     const children: ApexNode[] = [];
+    const rule = ctx as ApexParserRuleContext;
+    const childCount = rule.getChildCount();
 
-    for (let index = 0; index < ctx.childCount; index++) {
-      const child = ctx.getChild(index);
-      const node = this.visit(child);
+    for (let index = 0; index < childCount; index++) {
+      const child = rule.getChild(index);
+      const node = child ? this.visit(child) : undefined;
       if (!node) {
         continue;
       }
@@ -49,36 +98,59 @@ export class ApexVisitor implements ApexParserVisitor<ApexNode> {
     return { children };
   }
 
-  visitClassDeclaration(ctx: ClassDeclarationContext): ApexNode {
+  visitClassDeclaration = (ctx: ClassDeclarationContext): ApexClassNode => {
+    const { start } = ctx;
+    const ident = ctx.id();
+
     return {
       nature: 'Class',
-      name: ctx.id().Identifier()?.toString() ?? '',
+      name: ident.getText() ?? '',
       children: ctx.children?.length ? this.visitChildren(ctx).children : [],
-      line: ctx.start.line,
+      line: start.line,
+      idCharacter: ident.start.column ?? 0,
     };
-  }
+  };
 
-  visitMethodDeclaration(ctx: MethodDeclarationContext): ApexMethodNode {
+  visitConstructorDeclaration = (ctx: ConstructorDeclarationContext): ApexConstructorNode => {
+    const { start } = ctx;
+    const idContexts = ctx.qualifiedName().id_list();
+    const constructorName = idContexts[idContexts.length - 1];
+
     return {
-      nature: 'Method',
-      name: ctx.id().Identifier()?.toString() ?? '',
+      nature: 'Constructor',
+      name: constructorName?.getText() ?? '',
       children: ctx.children?.length ? this.visitChildren(ctx).children : [],
       params: this.getParameters(ctx.formalParameters()),
-      line: ctx.start.line,
+      line: start.line,
+      idCharacter: start.column ?? 0,
     };
-  }
+  };
 
-  visitTerminal(_ctx: TerminalNode): ApexNode {
+  visitMethodDeclaration = (ctx: MethodDeclarationContext): ApexMethodNode => {
+    const { start } = ctx;
+    const ident = ctx.id();
+
+    return {
+      nature: 'Method',
+      name: ident.getText() ?? '',
+      children: ctx.children?.length ? this.visitChildren(ctx).children : [],
+      params: this.getParameters(ctx.formalParameters()),
+      line: start.line,
+      idCharacter: ident.start.column ?? 0,
+    };
+  };
+
+  override visitTerminal(_ctx: ApexTerminalNode): ApexNode {
     return {};
   }
 
-  visitErrorNode(_ctx: ErrorNode): ApexNode {
+  override visitErrorNode(_ctx: ApexErrorNode): ApexNode {
     return {};
   }
 
   private getParameters(ctx: FormalParametersContext): string {
-    const paramsList = ctx.formalParameterList()?.formalParameter();
-    return paramsList?.map((param) => param.typeRef().text).join(', ') ?? '';
+    const paramsList = ctx.formalParameterList()?.formalParameter_list();
+    return paramsList?.map((param) => param.typeRef().getText()).join(',') ?? '';
   }
 
   private forNode(node: ApexNode, anonHandler: (n: ApexNode) => void) {

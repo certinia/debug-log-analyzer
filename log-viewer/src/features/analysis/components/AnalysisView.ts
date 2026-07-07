@@ -10,28 +10,25 @@ import {
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { Tabulator, type GlobalTooltipOption, type RowComponent } from 'tabulator-tables';
+import type { RowComponent, Tabulator } from 'tabulator-tables';
 
-import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
-import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { formatDuration, isVisible } from '../../../core/utility/Util.js';
-import { sumRootNodesOnly } from '../services/CallStackSum.js';
-import { group } from '../services/RowGrouper.js';
+import type { ApexLog } from 'apex-log-parser';
+import { isVisible } from '../../../core/utility/Util.js';
+import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
+import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
+import {
+  categoryColoringStyles,
+  categoryRowFormatter,
+  wireCategoryColoring,
+} from '../../call-tree/utils/CategoryColoring.js';
+import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
 
-// Tabulator custom modules, imports + styles
-import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
-import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
-import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
-import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find, formatter } from '../../../tabulator/module/Find.js';
-import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
-import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
-import codiconStyles from '../../../styles/codicon.css';
+import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
 // Components
 import '../../../components/GridSkeleton.js';
@@ -49,9 +46,12 @@ export class AnalysisView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
     unsafeCSS(codiconStyles),
+    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+
         height: 100%;
         width: 100%;
         display: flex;
@@ -78,9 +78,19 @@ export class AnalysisView extends LitElement {
         width: 100%;
       }
 
+      .header-bar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 4px;
+      }
+
       .filter-container {
         display: flex;
-        gap: 5px;
+        gap: 4px;
+      }
+
+      .align__end {
+        align-items: end;
       }
 
       .dropdown-container {
@@ -92,14 +102,21 @@ export class AnalysisView extends LitElement {
 
         label {
           display: block;
-          color: var(--vscode-foreground);
+          color: var(--vscode-descriptionForeground);
           cursor: pointer;
-          font-size: var(--vscode-font-size);
-          line-height: normal;
-          margin-bottom: 2px;
+          font-size: calc(var(--vscode-font-size) * 0.9);
+          font-weight: 400;
+          line-height: 1.4;
+          margin-bottom: 4px;
+          user-select: none;
         }
       }
+
+      vscode-dropdown::part(listbox) {
+        width: auto;
+      }
     `,
+    categoryColoringStyles,
   ];
 
   @property()
@@ -116,12 +133,30 @@ export class AnalysisView extends LitElement {
   totalMatches = 0;
   blockClearHighlights = true;
 
+  filterState = { showDetails: false };
+
+  // Precomputed at tree-build time on each BottomUpRow; the filter is a
+  // single boolean read with no walk and no cache.
+  _showDetailsFilter = (data: BottomUpRow): boolean => data._hasDetailsDeep;
+
   constructor() {
     super();
 
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    wireCategoryColoring(this);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('lv-find', this._findEvt);
+    document.removeEventListener('lv-find-match', this._findEvt);
+    document.removeEventListener('lv-find-close', this._findEvt);
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -140,13 +175,40 @@ export class AnalysisView extends LitElement {
     return html`
       <div class="analysis-view">
         <datagrid-filter-bar>
-          <div slot="filters" class="dropdown-container">
-            <label for="groupby-dropdown"><strong>Group by</strong></label>
-            <vscode-dropdown id="groupby-dropdown" @change="${this._groupBy}">
-              <vscode-option>None</vscode-option>
-              <vscode-option>Namespace</vscode-option>
-              <vscode-option>Type</vscode-option>
-            </vscode-dropdown>
+          <div slot="filters" class="filter-container align__end">
+            <vscode-button
+              appearance="secondary"
+              aria-label="Expand all"
+              title="Expand all"
+              @click=${this._expandButtonClick}
+              >Expand</vscode-button
+            >
+            <vscode-button
+              appearance="secondary"
+              aria-label="Collapse all"
+              title="Collapse all"
+              @click=${this._collapseButtonClick}
+              >Collapse</vscode-button
+            >
+
+            <vscode-checkbox class="align__end" @change="${this._handleShowDetailsChange}"
+              >Details</vscode-checkbox
+            >
+
+            <div class="dropdown-container">
+              <label id="groupby-dropdown-label" for="groupby-dropdown">Group by</label>
+              <vscode-dropdown
+                id="groupby-dropdown"
+                aria-label="Group by"
+                aria-labelledby="groupby-dropdown-label"
+                @change="${this._groupBy}"
+              >
+                <vscode-option>None</vscode-option>
+                <vscode-option>Namespace</vscode-option>
+                <vscode-option>Caller Namespace</vscode-option>
+                <vscode-option>Type</vscode-option>
+              </vscode-dropdown>
+            </div>
           </div>
 
           <div slot="actions">
@@ -195,11 +257,50 @@ export class AnalysisView extends LitElement {
 
   _groupBy(event: Event) {
     const target = event.target as HTMLInputElement;
-    const fieldName = target.value.toLowerCase();
+    const fieldName =
+      target.value === 'Caller Namespace' ? 'callerNamespace' : target.value.toLowerCase();
     if (this.analysisTable) {
       //@ts-expect-error This is a custom function added in the GroupSort custom module
       this.analysisTable?.setSortedGroupBy(fieldName !== 'none' ? fieldName : '');
     }
+  }
+
+  _handleShowDetailsChange(event: Event) {
+    const target = event.target as HTMLInputElement;
+    this.filterState.showDetails = target.checked;
+    this._updateFiltering();
+  }
+
+  _updateFiltering() {
+    const table = this.analysisTable;
+    if (!table) {
+      return;
+    }
+    table.blockRedraw();
+    table.clearFilter(false);
+    if (!this.filterState.showDetails) {
+      table.addFilter(this._showDetailsFilter);
+    }
+    table.restoreRedraw();
+  }
+
+  _expandButtonClick() {
+    this._expandCollapseAll(true);
+  }
+
+  _collapseButtonClick() {
+    this._expandCollapseAll(false);
+  }
+
+  _expandCollapseAll(expand: boolean) {
+    const table = this.analysisTable;
+    if (!table?.modules?.dataTree) {
+      return;
+    }
+    table.blockRedraw();
+    expandCollapseAll(table.getRows(), expand);
+    table.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
+    table.restoreRedraw();
   }
 
   _appendTableWhenVisible() {
@@ -238,30 +339,23 @@ export class AnalysisView extends LitElement {
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
-      if (!clearHighlights) {
+      if (!clearHighlights && isTableVisible) {
         document.dispatchEvent(
           new CustomEvent('lv-find-results', { detail: { totalMatches: result.totalMatches } }),
         );
       }
     }
 
-    if (this.totalMatches <= 0) {
+    if (this.totalMatches <= 0 || !isTableVisible) {
       return;
     }
     this.blockClearHighlights = true;
-    this.analysisTable?.blockRedraw();
     const currentRow = this.findMap[this.findArgs.count];
-    const rows = [
-      currentRow,
-      this.findMap[this.findArgs.count + 1],
-      this.findMap[this.findArgs.count - 1],
-    ];
-    rows.forEach((row) => {
-      row?.reformat();
+    //@ts-expect-error This is a custom function added in by Find custom module
+    await this.analysisTable.setCurrentMatch(this.findArgs.count, currentRow, {
+      scrollIfVisible: false,
+      focusRow: false,
     });
-    //@ts-expect-error This is a custom function added in by RowNavigation custom module
-    this.analysisTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
-    this.analysisTable?.restoreRedraw();
     this.blockClearHighlights = false;
   }
 
@@ -270,166 +364,50 @@ export class AnalysisView extends LitElement {
       return;
     }
 
-    Tabulator.registerModule(Object.values(CommonModules));
-    Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, Find, GroupCalcs, GroupSort]);
+    const { table, tableBuilt } = createBottomUpTable(
+      this._tableWrapper,
+      rootMethod,
+      {
+        namespaceFilter: () => true,
+        showDetailsFilter: this._showDetailsFilter,
+        onFilterCacheClear: () => {
+          if (!this.blockClearHighlights && this.totalMatches > 0) {
+            this._resetFindWidget();
+            this._clearSearchHighlights();
+          }
+        },
+        onRenderStarted: () => {
+          if (!this.blockClearHighlights && this.totalMatches > 0) {
+            this._resetFindWidget();
+            this._clearSearchHighlights();
+          }
+        },
+        rowFormatter: categoryRowFormatter,
+      },
+      {
+        placeholder: 'No Analysis Available',
+        selectableRows: 'highlight',
+        enableClipboardAndDownload: true,
+        exportFileName: 'analysis.csv',
+      },
+    );
+    this.analysisTable = table;
 
-    const durationFormatterParams = { totalValue: rootMethod.duration.total };
-    const tooltipContent: GlobalTooltipOption = (_event, cell, _onRender) => {
-      return formatDuration(cell.getValue());
-    };
-
-    this.analysisTable = new Tabulator(this._tableWrapper, {
-      rowKeyboardNavigation: true,
-      selectableRows: 'highlight',
-      data: group(rootMethod),
-      layout: 'fitColumns',
-      placeholder: 'No Analysis Available',
-      columnCalcs: 'table',
-      clipboard: true,
-      downloadEncoder: function (fileContents: string, mimeType) {
-        const vscodeHost = vscodeMessenger.getVsCodeAPI();
-        if (vscodeHost) {
-          vscodeMessenger.send<VSCodeSaveFile>('saveFile', {
-            fileContent: fileContents,
-            options: {
-              defaultFileName: 'analysis.csv',
-            },
-          });
-          return false;
-        }
-
-        return new Blob([fileContents], { type: mimeType });
-      },
-      dataTree: true, // temporary: fixes a disappearing table issue when scroll is dragged (needs fix in Tabulator)
-      downloadRowRange: 'all',
-      downloadConfig: {
-        columnHeaders: true,
-        columnGroups: true,
-        rowGroups: true,
-        columnCalcs: false,
-        dataTree: true,
-      },
-      //@ts-expect-error types need update array is valid
-      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
-      clipboardCopyRowRange: 'all',
-      height: '100%',
-      maxHeight: '100%',
-      groupCalcs: true,
-      groupSort: true,
-      groupClosedShowCalcs: true,
-      groupStartOpen: false,
-      groupToggleElement: 'header',
-      rowFormatter: (row: RowComponent) => {
-        formatter(row, this.findArgs);
-      },
-      columnDefaults: {
-        title: 'default',
-        resizable: true,
-        headerSortStartingDir: 'desc',
-        headerTooltip: true,
-        headerWordWrap: true,
-      },
-      tooltipDelay: 100,
-      initialSort: [{ column: 'selfTime', dir: 'desc' }],
-      headerSortElement: function (column, dir) {
-        switch (dir) {
-          case 'asc':
-            return "<div class='sort-by--top'></div>";
-            break;
-          case 'desc':
-            return "<div class='sort-by--bottom'></div>";
-            break;
-          default:
-            return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
-        }
-      },
-      columns: [
-        {
-          title: 'Name',
-          field: 'name',
-          formatter: 'textarea',
-          headerSortStartingDir: 'asc',
-          sorter: 'string',
-          headerSortTristate: true,
-          cssClass: 'datagrid-code-text',
-          bottomCalc: () => {
-            return 'Total';
-          },
-          widthGrow: 5,
-        },
-        {
-          title: 'Namespace',
-          field: 'namespace',
-          headerSortStartingDir: 'desc',
-          width: 150,
-          sorter: 'string',
-          tooltip: true,
-          headerFilter: 'list',
-          headerFilterFunc: 'in',
-          headerFilterParams: {
-            valuesLookup: 'all',
-            clearable: true,
-            multiselect: true,
-          },
-          headerFilterLiveFilter: false,
-        },
-        {
-          title: 'Type',
-          field: 'type',
-          headerSortStartingDir: 'asc',
-          width: 150,
-          sorter: 'string',
-          tooltip: true,
-        },
-        {
-          title: 'Count',
-          field: 'count',
-          sorter: 'number',
-          cssClass: 'number-cell',
-          width: 65,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          bottomCalc: 'sum',
-        },
-        {
-          title: 'Total Time (ms)',
-          field: 'totalTime',
-          sorter: 'number',
-          width: 165,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          bottomCalc: sumRootNodesOnly,
-          bottomCalcFormatter: progressFormatterMS,
-          bottomCalcFormatterParams: durationFormatterParams,
-          formatter: progressFormatterMS,
-          formatterParams: durationFormatterParams,
-          accessorDownload: NumberAccessor,
-          tooltip: tooltipContent,
-        },
-        {
-          title: 'Self Time (ms)',
-          field: 'selfTime',
-          sorter: 'number',
-          width: 165,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          bottomCalc: 'sum',
-          bottomCalcFormatter: progressFormatterMS,
-          bottomCalcFormatterParams: durationFormatterParams,
-          formatter: progressFormatterMS,
-          formatterParams: durationFormatterParams,
-          accessorDownload: NumberAccessor,
-          tooltip: tooltipContent,
-        },
-      ],
-    });
-
-    this.analysisTable.on('renderStarted', () => {
+    this.analysisTable.on('dataSorted', () => {
       if (!this.blockClearHighlights && this.totalMatches > 0) {
         this._resetFindWidget();
         this._clearSearchHighlights();
       }
     });
+
+    this.analysisTable.on('dataGrouped', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
+    });
+
+    await tableBuilt;
   }
 
   _resetFindWidget() {
@@ -440,17 +418,10 @@ export class AnalysisView extends LitElement {
     this.findArgs.text = '';
     this.findArgs.count = 0;
     //@ts-expect-error This is a custom function added in by Find custom module
-    this.analysisTable.clearFindHighlights(Object.values(this.findMap));
+    this.analysisTable.clearFindHighlights();
     this.findMap = {};
     this.totalMatches = 0;
   }
 }
-
-type VSCodeSaveFile = {
-  fileContent: string;
-  options: {
-    defaultFileName: string;
-  };
-};
 
 type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

@@ -1,0 +1,420 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
+
+export type CPUType = 'loading' | 'custom' | 'method' | 'free' | 'system' | 'pkg' | '';
+
+export const LOG_LEVEL = {
+  Error: 'ERROR',
+  Warn: 'WARN',
+  Info: 'INFO',
+  Debug: 'DEBUG',
+  Fine: 'FINE',
+  Finer: 'FINER',
+  Finest: 'FINEST',
+} as const;
+
+export type LogLevel = (typeof LOG_LEVEL)[keyof typeof LOG_LEVEL] | '';
+
+export type IssueType = 'unexpected' | 'error' | 'skip';
+
+export type LineNumber = number | 'EXTERNAL' | null; // an actual line-number or 'EXTERNAL'
+
+/**
+ * Original Salesforce debug log categories as defined in SF Setup > Debug Log Levels.
+ * These are the categories users configure in the Salesforce UI.
+ * See: https://help.salesforce.com/s/articleView?id=platform.code_setting_debug_log_levels.htm
+ */
+export const DEBUG_CATEGORY = {
+  Database: 'Database',
+  Workflow: 'Workflow',
+  NBA: 'NBA',
+  Validation: 'Validation',
+  Callout: 'Callout',
+  ApexCode: 'Apex Code',
+  ApexProfiling: 'Apex Profiling',
+  Visualforce: 'Visualforce',
+  System: 'System',
+  DataAccess: 'Data Access',
+  Wave: 'Wave',
+} as const;
+
+/** Original Salesforce debug log category (from Debug Log Levels UI). */
+export type DebugCategory = (typeof DEBUG_CATEGORY)[keyof typeof DEBUG_CATEGORY] | '';
+
+/**
+ * Timeline display categories - our simplified/enhanced view of SF categories.
+ * Split Database → DML + SOQL, merge Flow + Workflow → Automation.
+ */
+export const LOG_CATEGORY = {
+  Apex: 'Apex',
+  System: 'System',
+  CodeUnit: 'Code Unit',
+  Automation: 'Automation',
+  DML: 'DML',
+  SOQL: 'SOQL',
+  Validation: 'Validation',
+  Callout: 'Callout',
+} as const;
+
+export type LogCategory = (typeof LOG_CATEGORY)[keyof typeof LOG_CATEGORY] | '';
+
+/** Readonly array of all category values (for building Sets, iterating, etc.) */
+export const ALL_LOG_CATEGORIES: readonly LogCategory[] = Object.values(LOG_CATEGORY);
+
+/** @deprecated Use LogCategory instead */
+export type LogSubCategory = LogCategory;
+
+export interface Limits {
+  soqlQueries: { used: number; limit: number };
+  soslQueries: { used: number; limit: number };
+  queryRows: { used: number; limit: number };
+  dmlStatements: { used: number; limit: number };
+  publishImmediateDml: { used: number; limit: number };
+  dmlRows: { used: number; limit: number };
+  cpuTime: { used: number; limit: number };
+  heapSize: { used: number; limit: number };
+  callouts: { used: number; limit: number };
+  emailInvocations: { used: number; limit: number };
+  futureCalls: { used: number; limit: number };
+  queueableJobsAddedToQueue: { used: number; limit: number };
+  mobileApexPushCalls: { used: number; limit: number };
+}
+
+/**
+ * A single governor limit usage snapshot at a point in time.
+ */
+export interface GovernorSnapshot {
+  /** Timestamp in nanoseconds when this limit snapshot was recorded. */
+  timestamp: number;
+  /** Namespace the limits apply to (e.g., 'default', 'MyPackage'). */
+  namespace: string;
+  /** The limit values at this timestamp. */
+  limits: Limits;
+}
+
+export interface GovernorLimits extends Limits {
+  byNamespace: Map<string, Limits>;
+  /** Point-in-time snapshots of governor limit usage, ordered by timestamp ascending. */
+  snapshots: GovernorSnapshot[];
+}
+
+export interface LogIssue {
+  startTime?: number;
+  eventIndex?: number;
+  summary: string;
+  description: string;
+  type: IssueType;
+}
+
+export type LogLineConstructor<P, T> = new (parser: P, parts: string[]) => T;
+
+export type LogEventType = (typeof _logEventNames)[number];
+
+export interface SelfTotal {
+  self: number;
+  total: number;
+}
+
+// eslint-disable-next-line no-useless-assignment -- only read in a type position (LogEventType above), which the rule's runtime scope analysis can't see
+const _logEventNames = [
+  'ADD_SCREEN_POP_ACTION',
+  'ADD_SKILL_REQUIREMENT_ACTION',
+  'AE_PERSIST_VALIDATION',
+  'APP_ANALYTICS_ERROR',
+  'APP_ANALYTICS_FINE',
+  'APP_ANALYTICS_WARN',
+  'APP_CONTAINER_INITIATED',
+  'ASSET_DIFF_DETAIL',
+  'ASSET_DIFF_SUMMARY',
+  'BULK_COUNTABLE_STATEMENT_EXECUTE',
+  'BULK_DML_RETRY',
+  'BULK_HEAP_ALLOCATE',
+  'CALLOUT_REQUEST',
+  'CALLOUT_REQUEST_FINALIZE',
+  'CALLOUT_REQUEST_PREPARE',
+  'CALLOUT_RESPONSE',
+  'CODE_UNIT_FINISHED',
+  'CODE_UNIT_STARTED',
+  'CONSTRUCTOR_ENTRY',
+  'CONSTRUCTOR_EXIT',
+  'CUMULATIVE_LIMIT_USAGE',
+  'CUMULATIVE_LIMIT_USAGE_END',
+  'CUMULATIVE_PROFILING',
+  'CUMULATIVE_PROFILING_BEGIN',
+  'CUMULATIVE_PROFILING_END',
+  'CURSOR_CREATE_BEGIN',
+  'CURSOR_CREATE_END',
+  'CURSOR_FETCH',
+  'CURSOR_FETCH_PAGE',
+  'DATA_ACCESS_EVALUATION',
+  'DATAWEAVE_USER_DEBUG',
+  'DML_BEGIN',
+  'DML_END',
+  'DUPLICATE_DETECTION_BEGIN',
+  'DUPLICATE_DETECTION_END',
+  'DUPLICATE_DETECTION_MATCH_INVOCATION_DETAILS',
+  'DUPLICATE_DETECTION_MATCH_INVOCATION_SUMMARY',
+  'DUPLICATE_DETECTION_RULE_INVOCATION',
+  'DUPLICATE_RULE_FILTER',
+  'DUPLICATE_RULE_FILTER_INVOCATION',
+  'DUPLICATE_RULE_FILTER_RESULT',
+  'DUPLICATE_RULE_FILTER_VALUE',
+  'EMAIL_QUEUE',
+  'END_CALL',
+  'ENTERING_MANAGED_PKG',
+  'EVENT_SERVICE_PUB_BEGIN',
+  'EVENT_SERVICE_PUB_DETAIL',
+  'EVENT_SERVICE_PUB_END',
+  'EVENT_SERVICE_SUB_BEGIN',
+  'EVENT_SERVICE_SUB_DETAIL',
+  'EVENT_SERVICE_SUB_END',
+  'EXCEPTION_THROWN',
+  'EXECUTION_FINISHED',
+  'EXECUTION_STARTED',
+  'EXTERNAL_SERVICE_CALLBACK',
+  'EXTERNAL_SERVICE_REQUEST',
+  'EXTERNAL_SERVICE_RESPONSE',
+  'FATAL_ERROR',
+  'FLOW_ACTIONCALL_DETAIL',
+  'FLOW_ASSIGNMENT_DETAIL',
+  'FLOW_BULK_ELEMENT_BEGIN',
+  'FLOW_BULK_ELEMENT_DETAIL',
+  'FLOW_BULK_ELEMENT_END',
+  'FLOW_BULK_ELEMENT_LIMIT_USAGE',
+  'FLOW_BULK_ELEMENT_NOT_SUPPORTED',
+  'FLOW_COLLECTION_PROCESSOR_DETAIL',
+  'FLOW_CREATE_INTERVIEW_BEGIN',
+  'FLOW_CREATE_INTERVIEW_END',
+  'FLOW_CREATE_INTERVIEW_ERROR',
+  'FLOW_ELEMENT_BEGIN',
+  'FLOW_ELEMENT_DEFERRED',
+  'FLOW_ELEMENT_END',
+  'FLOW_ELEMENT_ERROR',
+  'FLOW_ELEMENT_FAULT',
+  'FLOW_ELEMENT_LIMIT_USAGE',
+  'FLOW_INTERVIEW_FINISHED',
+  'FLOW_INTERVIEW_FINISHED_LIMIT_USAGE',
+  'FLOW_INTERVIEW_PAUSED',
+  'FLOW_INTERVIEW_RESUMED',
+  'FLOW_LOOP_DETAIL',
+  'FLOW_RULE_DETAIL',
+  'FLOW_SCHEDULED_PATH_QUEUED',
+  'FLOW_SCREEN_DETAIL',
+  'FLOW_START_INTERVIEW_BEGIN',
+  'FLOW_START_INTERVIEW_END',
+  'FLOW_START_INTERVIEW_LIMIT_USAGE',
+  'FLOW_START_INTERVIEWS_BEGIN',
+  'FLOW_START_INTERVIEWS_END',
+  'FLOW_START_INTERVIEWS_ERROR',
+  'FLOW_START_SCHEDULED_RECORDS',
+  'FLOW_SUBFLOW_DETAIL',
+  'FLOW_VALUE_ASSIGNMENT',
+  'FLOW_WAIT_EVENT_RESUMING_DETAIL',
+  'FLOW_WAIT_EVENT_WAITING_DETAIL',
+  'FLOW_WAIT_RESUMING_DETAIL',
+  'FLOW_WAIT_WAITING_DETAIL',
+  'FOR_UPDATE_LOCKS_RELEASE',
+  'FORMULA_BUILD',
+  'FORMULA_EVALUATE_BEGIN',
+  'FORMULA_EVALUATE_END',
+  'FUNCTION_INVOCATION_REQUEST',
+  'FUNCTION_INVOCATION_RESPONSE',
+  'HEAP_ALLOCATE',
+  'HEAP_DEALLOCATE',
+  'HEAP_DUMP',
+  'IDEAS_QUERY_EXECUTE',
+  'INVOCABLE_ACTION_DETAIL',
+  'INVOCABLE_ACTION_ERROR',
+  'JSON_DIFF_DETAIL',
+  'JSON_DIFF_SUMMARY',
+  'LIMIT_USAGE',
+  'LIMIT_USAGE_FOR_NS',
+  'MATCH_ENGINE_BEGIN',
+  'MATCH_ENGINE_END',
+  'MATCH_ENGINE_INVOCATION',
+  'METHOD_ENTRY',
+  'METHOD_EXIT',
+  'NAMED_CREDENTIAL_REQUEST',
+  'NAMED_CREDENTIAL_RESPONSE',
+  'NAMED_CREDENTIAL_RESPONSE_DETAIL',
+  'NBA_NODE_BEGIN',
+  'NBA_NODE_DETAIL',
+  'NBA_NODE_END',
+  'NBA_NODE_ERROR',
+  'NBA_OFFER_INVALID',
+  'NBA_STRATEGY_BEGIN',
+  'NBA_STRATEGY_END',
+  'NBA_STRATEGY_ERROR',
+  'ORG_CACHE_CONTAINS',
+  'ORG_CACHE_GET',
+  'ORG_CACHE_GET_BEGIN',
+  'ORG_CACHE_GET_CAPACITY',
+  'ORG_CACHE_GET_END',
+  'ORG_CACHE_GET_PARTITION',
+  'ORG_CACHE_MEMORY_USAGE',
+  'ORG_CACHE_PUT',
+  'ORG_CACHE_PUT_BEGIN',
+  'ORG_CACHE_PUT_END',
+  'ORG_CACHE_REMOVE',
+  'ORG_CACHE_REMOVE_BEGIN',
+  'ORG_CACHE_REMOVE_END',
+  'PLAY_PROMPT',
+  'POLICY_RULE_DEFINITION_CONDITION_EVALUATION_RESPONSE',
+  'POLICY_RULE_EVALUATION_REQUEST',
+  'POLICY_RULE_EVALUATION_RESPONSE',
+  'POLICY_RULE_EVALUATION_SKIPPED',
+  'POLICY_RULE_EVALUATION_START',
+  'POP_TRACE_FLAGS',
+  'PUSH_NOTIFICATION_INVALID_APP',
+  'PUSH_NOTIFICATION_INVALID_CERTIFICATE',
+  'PUSH_NOTIFICATION_INVALID_CONFIGURATION',
+  'PUSH_NOTIFICATION_INVALID_NOTIFICATION',
+  'PUSH_NOTIFICATION_INVALID_PAYLOAD',
+  'PUSH_NOTIFICATION_NO_DEVICES',
+  'PUSH_NOTIFICATION_NOT_ENABLED',
+  'PUSH_NOTIFICATION_SENT',
+  'PUSH_TRACE_FLAGS',
+  'QUERY_MORE_BEGIN',
+  'QUERY_MORE_END',
+  'QUERY_MORE_ITERATIONS',
+  'QUERY_SQL_LOG',
+  'REFERENCED_OBJECT_LIST',
+  'RLM_CONFIGURATOR_BEGIN',
+  'RLM_CONFIGURATOR_DEPLOY',
+  'RLM_CONFIGURATOR_END',
+  'RLM_CONFIGURATOR_STATS',
+  'RLM_PRICING_BEGIN',
+  'RLM_PRICING_END',
+  'ROUTE_WORK_ACTION',
+  'RULES_EXECUTION_DETAIL',
+  'RULES_EXECUTION_SUMMARY',
+  'SAVEPOINT_RELEASE',
+  'SAVEPOINT_RESET',
+  'SAVEPOINT_ROLLBACK',
+  'SAVEPOINT_SET',
+  'SCHEDULED_FLOW_DETAIL',
+  'SCRIPT_EXECUTION',
+  'SESSION_CACHE_CONTAINS',
+  'SESSION_CACHE_GET',
+  'SESSION_CACHE_GET_BEGIN',
+  'SESSION_CACHE_GET_CAPACITY',
+  'SESSION_CACHE_GET_END',
+  'SESSION_CACHE_GET_PARTITION',
+  'SESSION_CACHE_MEMORY_USAGE',
+  'SESSION_CACHE_PUT',
+  'SESSION_CACHE_PUT_BEGIN',
+  'SESSION_CACHE_PUT_END',
+  'SESSION_CACHE_REMOVE',
+  'SESSION_CACHE_REMOVE_BEGIN',
+  'SESSION_CACHE_REMOVE_END',
+  'SLA_CASE_MILESTONE',
+  'SLA_END',
+  'SLA_EVAL_MILESTONE',
+  'SLA_NULL_START_DATE',
+  'SLA_PROCESS_CASE',
+  'SOQL_EXECUTE_BEGIN',
+  'SOQL_EXECUTE_END',
+  'SOQL_EXECUTE_EXPLAIN',
+  'SOSL_EXECUTE_BEGIN',
+  'SOSL_EXECUTE_END',
+  'STACK_FRAME_VARIABLE_LIST',
+  'STATEMENT_EXECUTE',
+  'STATIC_VARIABLE_LIST',
+  'SYSTEM_CONSTRUCTOR_ENTRY',
+  'SYSTEM_CONSTRUCTOR_EXIT',
+  'SYSTEM_METHOD_ENTRY',
+  'SYSTEM_METHOD_EXIT',
+  'SYSTEM_MODE_ENTER',
+  'SYSTEM_MODE_EXIT',
+  'TEMPLATE_PROCESSING_ERROR',
+  'TEMPLATED_ASSET',
+  'TESTING_LIMITS',
+  'TOTAL_EMAIL_RECIPIENTS_QUEUED',
+  'TRANSFORMATION_SUMMARY',
+  'USER_DEBUG',
+  'USER_DEBUG_DEBUG',
+  'USER_DEBUG_ERROR',
+  'USER_DEBUG_FINE',
+  'USER_DEBUG_FINER',
+  'USER_DEBUG_FINEST',
+  'USER_DEBUG_INFO',
+  'USER_DEBUG_WARN',
+  'USER_INFO',
+  'USER_MODE_PERMSET_APPLIED',
+  'VALIDATION_ERROR',
+  'VALIDATION_FAIL',
+  'VALIDATION_FORMULA',
+  'VALIDATION_PASS',
+  'VALIDATION_RULE',
+  'VARIABLE_ASSIGNMENT',
+  'VARIABLE_SCOPE_BEGIN',
+  'VARIABLE_SCOPE_END',
+  'VF_APEX_CALL',
+  'VF_APEX_CALL_END',
+  'VF_APEX_CALL_START',
+  'VF_DESERIALIZE_CONTINUATION_STATE_BEGIN',
+  'VF_DESERIALIZE_CONTINUATION_STATE_END',
+  'VF_DESERIALIZE_VIEWSTATE_BEGIN',
+  'VF_DESERIALIZE_VIEWSTATE_END',
+  'VF_EVALUATE_FORMULA_BEGIN',
+  'VF_EVALUATE_FORMULA_END',
+  'VF_PAGE_MESSAGE',
+  'VF_SERIALIZE_CONTINUATION_STATE_BEGIN',
+  'VF_SERIALIZE_CONTINUATION_STATE_END',
+  'VF_SERIALIZE_VIEWSTATE_BEGIN',
+  'VF_SERIALIZE_VIEWSTATE_END',
+  'WAVE_APP_LIFECYCLE',
+  'WF_ACTION',
+  'WF_ACTIONS_END',
+  'WF_ACTION_TASK',
+  'WF_APEX_ACTION',
+  'WF_APPROVAL',
+  'WF_APPROVAL_REMOVE',
+  'WF_APPROVAL_SUBMIT',
+  'WF_APPROVAL_SUBMITTER',
+  'WF_ASSIGN',
+  'WF_CHATTER_POST',
+  'WF_CRITERIA_BEGIN',
+  'WF_CRITERIA_END',
+  'WF_EMAIL_ALERT',
+  'WF_EMAIL_SENT',
+  'WF_ENQUEUE_ACTIONS',
+  'WF_ESCALATION_ACTION',
+  'WF_ESCALATION_RULE',
+  'WF_EVAL_ENTRY_CRITERIA',
+  'WF_FIELD_UPDATE',
+  'WF_FLOW_ACTION_BEGIN',
+  'WF_FLOW_ACTION_DETAIL',
+  'WF_FLOW_ACTION_END',
+  'WF_FLOW_ACTION_ERROR',
+  'WF_FLOW_ACTION_ERROR_DETAIL',
+  'WF_FORMULA',
+  'WF_HARD_REJECT',
+  'WF_KNOWLEDGE_ACTION',
+  'WF_NEXT_APPROVER',
+  'WF_NO_PROCESS_FOUND',
+  'WF_OUTBOUND_MSG',
+  'WF_PROCESS_FOUND',
+  'WF_PROCESS_NODE',
+  'WF_QUICK_CREATE',
+  'WF_REASSIGN_RECORD',
+  'WF_RESPONSE_NOTIFY',
+  'WF_RULE_ENTRY_ORDER',
+  'WF_RULE_EVAL_BEGIN',
+  'WF_RULE_EVAL_END',
+  'WF_RULE_EVAL_VALUE',
+  'WF_RULE_FILTER',
+  'WF_RULE_INVOCATION',
+  'WF_RULE_NOT_EVALUATED',
+  'WF_SEND_ACTION',
+  'WF_SOFT_REJECT',
+  'WF_SPOOL_ACTION_BEGIN',
+  'WF_TIME_TRIGGER',
+  'WF_TIME_TRIGGERS_BEGIN',
+  'XDS_DETAIL',
+  'XDS_REQUEST_DETAIL',
+  'XDS_RESPONSE',
+  'XDS_RESPONSE_DETAIL',
+  'XDS_RESPONSE_ERROR',
+] as const;

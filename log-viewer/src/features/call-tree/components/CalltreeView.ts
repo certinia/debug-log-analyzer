@@ -3,6 +3,7 @@
  */
 import {
   provideVSCodeDesignSystem,
+  vsCodeButton,
   vsCodeCheckbox,
   vsCodeDropdown,
   vsCodeOption,
@@ -10,32 +11,61 @@ import {
 import { css, html, LitElement, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
-import { Tabulator, type RowComponent } from 'tabulator-tables';
+import type { RowComponent, Tabulator } from 'tabulator-tables';
 
-import type { ApexLog, LogEvent } from '../../../core/log-parser/LogEvents.js';
-import type { LogEventType } from '../../../core/log-parser/types.js';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
+import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { formatDuration, isVisible } from '../../../core/utility/Util.js';
+import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
+import { isVisible } from '../../../core/utility/Util.js';
+import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
+import {
+  categoryColoringStyles,
+  categoryRowFormatter,
+  wireCategoryColoring,
+} from '../utils/CategoryColoring.js';
+import { deepFilter } from '../utils/DetailsFilter.js';
+import { expandCollapseAll } from '../utils/ExpandCollapse.js';
+import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
 
-// Tabulator custom modules, imports + styles
-import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
-import MinMaxFilter from '../../../tabulator/filters/MinMax.js';
-import { progressFormatter } from '../../../tabulator/format/Progress.js';
-import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find, formatter } from '../../../tabulator/module/Find.js';
-import { MiddleRowFocus } from '../../../tabulator/module/MiddleRowFocus.js';
-import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
-import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
 // web components
+import '../../../components/ContextMenu.js';
+import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/GridSkeleton.js';
 
-provideVSCodeDesignSystem().register(vsCodeCheckbox(), vsCodeDropdown(), vsCodeOption());
+// Table creation functions
+import { createAggregatedTable } from './AggregatedTable.js';
+import { createBottomUpTable } from './BottomUpTable.js';
+import { createTimeOrderTable } from './TimeOrderTable.js';
+
+import codiconStyles from '@vscode/codicons/dist/codicon.css';
+
+provideVSCodeDesignSystem().register(
+  vsCodeButton(),
+  vsCodeCheckbox(),
+  vsCodeDropdown(),
+  vsCodeOption(),
+);
+
+type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
+
+const DEBUG_VALUE_TYPES: ReadonlySet<string> = new Set([
+  'USER_DEBUG',
+  'DATAWEAVE_USER_DEBUG',
+  'USER_DEBUG_FINER',
+  'USER_DEBUG_FINEST',
+  'USER_DEBUG_FINE',
+  'USER_DEBUG_DEBUG',
+  'USER_DEBUG_INFO',
+  'USER_DEBUG_WARN',
+  'USER_DEBUG_ERROR',
+]);
 
 @customElement('call-tree-view')
 export class CalltreeView extends LitElement {
@@ -45,14 +75,20 @@ export class CalltreeView extends LitElement {
   @state()
   isVisible = false;
 
-  filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: string[] } = {
+  @state()
+  viewMode: ViewMode = 'time-order';
+
+  aggregatedTreeTable: Tabulator | null = null;
+  bottomUpTreeTable: Tabulator | null = null;
+
+  filterState: { showDetails: boolean; debugOnly: boolean; selectedTypes: Set<string> } = {
     showDetails: false,
     debugOnly: false,
-    selectedTypes: [],
+    selectedTypes: new Set<string>(),
   };
-  debugOnlyFilterCache = new Map<string, boolean>();
-  showDetailsFilterCache = new Map<string, boolean>();
-  typeFilterCache = new Map<string, boolean>();
+  bottomUpGroupBy = 'None';
+  debugOnlyFilterCache = new Map<number, boolean>();
+  typeFilterCache = new Map<number, boolean>();
 
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
@@ -69,20 +105,39 @@ export class CalltreeView extends LitElement {
   tableContainer: HTMLDivElement | null = null;
   rootMethod: ApexLog | null = null;
 
+  private contextMenu: ContextMenu | null = null;
+  private contextMenuRow: TimeOrderRow | null = null;
+  private viewSwitchEpoch = 0;
+
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (this.tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
   }
 
+  private _goToRowEvt = ((e: CustomEvent<{ eventIndex: number }>) => {
+    this._goToRow(e.detail.eventIndex);
+  }) as EventListener;
+
   constructor() {
     super();
 
-    document.addEventListener('calltree-go-to-row', ((e: CustomEvent) => {
-      this._goToRow(e.detail.timestamp);
-    }) as EventListener);
-
+    document.addEventListener('calltree-go-to-row', this._goToRowEvt);
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    wireCategoryColoring(this);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('calltree-go-to-row', this._goToRowEvt);
+    document.removeEventListener('lv-find', this._findEvt);
+    document.removeEventListener('lv-find-match', this._findEvt);
+    document.removeEventListener('lv-find-close', this._findEvt);
+    this._destroyCurrentTable();
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -95,11 +150,19 @@ export class CalltreeView extends LitElement {
     }
   }
 
+  firstUpdated(): void {
+    this.contextMenu = this.renderRoot.querySelector('context-menu');
+  }
+
   static styles = [
     unsafeCSS(dataGridStyles),
+    unsafeCSS(codiconStyles),
+    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+
         height: 100%;
         width: 100%;
         display: flex;
@@ -117,12 +180,7 @@ export class CalltreeView extends LitElement {
         width: 100%;
         min-height: 0;
         min-width: 0;
-      }
-
-      #call-tree-table {
-        display: inline-block;
-        height: 100%;
-        width: 100%;
+        position: relative;
       }
 
       .header-bar {
@@ -132,7 +190,7 @@ export class CalltreeView extends LitElement {
 
       .filter-container {
         display: flex;
-        gap: 5px;
+        gap: 4px;
       }
 
       .filter-section {
@@ -145,15 +203,17 @@ export class CalltreeView extends LitElement {
         flex-flow: column nowrap;
         align-items: flex-start;
         justify-content: flex-start;
-      }
 
-      .dropdown-container label {
-        display: block;
-        color: var(--vscode-foreground);
-        cursor: pointer;
-        font-size: var(--vscode-font-size);
-        line-height: normal;
-        margin-bottom: 2px;
+        label {
+          display: block;
+          color: var(--vscode-descriptionForeground);
+          cursor: pointer;
+          font-size: calc(var(--vscode-font-size) * 0.9);
+          font-weight: 400;
+          line-height: 1.4;
+          margin-bottom: 4px;
+          user-select: none;
+        }
       }
 
       vscode-dropdown::part(listbox) {
@@ -163,16 +223,82 @@ export class CalltreeView extends LitElement {
       .align__end {
         align-items: end;
       }
+
+      .view-mode-buttons {
+        display: flex;
+        gap: 0;
+        align-self: flex-end;
+      }
+
+      .view-mode-buttons vscode-button {
+        height: 26px;
+      }
+
+      .view-mode-buttons vscode-button::part(control) {
+        border-radius: 0;
+        min-width: auto;
+        padding: 0 8px;
+        height: 100%;
+      }
+
+      .view-mode-buttons vscode-button:first-child::part(control) {
+        border-radius: 2px 0 0 2px;
+      }
+
+      .view-mode-buttons vscode-button:last-child::part(control) {
+        border-radius: 0 2px 2px 0;
+      }
+
+      #call-tree-table,
+      #aggregated-tree-table,
+      #bottom-up-tree-table {
+        display: inline-block;
+        height: 100%;
+        width: 100%;
+      }
+
+      .table-host {
+        height: 100%;
+        width: 100%;
+        position: absolute;
+        inset: 0;
+      }
+
+      .table-host.is-hidden {
+        visibility: hidden;
+        opacity: 0;
+        pointer-events: none;
+      }
     `,
+    categoryColoringStyles,
   ];
 
   render() {
     const skeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : '';
+    const isTimeOrder = this.viewMode === 'time-order';
 
     return html`
       <div id="call-tree-container">
         <div>
           <div class="header-bar">
+            <div class="view-mode-buttons" role="radiogroup" aria-label="View mode">
+              <vscode-button
+                appearance="${this.viewMode === 'time-order' ? '' : 'secondary'}"
+                @click="${() => this._setViewMode('time-order')}"
+                >Time Order</vscode-button
+              >
+              <vscode-button
+                appearance="${this.viewMode === 'aggregated' ? '' : 'secondary'}"
+                @click="${() => this._setViewMode('aggregated')}"
+                >Aggregated</vscode-button
+              >
+              <vscode-button
+                appearance="${this.viewMode === 'bottom-up' ? '' : 'secondary'}"
+                @click="${() => this._setViewMode('bottom-up')}"
+                >Bottom-Up</vscode-button
+              >
+            </div>
+
             <div class="filter-container align__end">
               <vscode-button appearance="secondary" @click="${this._expandButtonClick}"
                 >Expand</vscode-button
@@ -182,38 +308,66 @@ export class CalltreeView extends LitElement {
               >
             </div>
 
-            <div class="filter-section">
-              <strong>Filter</strong>
-              <div class="filter-container align__end">
-                <vscode-checkbox class="align__end" @change="${this._handleShowDetailsChange}"
-                  >Details</vscode-checkbox
-                >
+            <div class="filter-container align__end">
+              <vscode-checkbox class="align__end" @change="${this._handleShowDetailsChange}"
+                >Details</vscode-checkbox
+              >
 
-                <vscode-checkbox class="align__end" @change="${this._handleDebugOnlyChange}"
-                  >Debug Only</vscode-checkbox
-                >
+              ${isTimeOrder || this.viewMode === 'aggregated'
+                ? html`
+                    <vscode-checkbox class="align__end" @change="${this._handleDebugOnlyChange}"
+                      >Debug Only</vscode-checkbox
+                    >
 
-                <div class="dropdown-container">
-                  <label for="types">Type:</label>
-                  <vscode-dropdown @change="${this._handleTypeFilter}">
-                    <vscode-option>None</vscode-option>
-                    ${this.isVisible
-                      ? repeat(
-                          this._getAllTypes(this.timelineRoot?.children ?? []),
-                          (type, _index) => html`<vscode-option>${type}</vscode-option>`,
-                        )
-                      : ''}
-                  </vscode-dropdown>
-                </div>
-              </div>
+                    <div class="dropdown-container">
+                      <label for="types">Type:</label>
+                      <vscode-dropdown @change="${this._handleTypeFilter}">
+                        <vscode-option>None</vscode-option>
+                        ${this.isVisible
+                          ? repeat(
+                              this._getAllTypes(this.timelineRoot?.children ?? []),
+                              (type, _index) => html`<vscode-option>${type}</vscode-option>`,
+                            )
+                          : ''}
+                      </vscode-dropdown>
+                    </div>
+                  `
+                : ''}
             </div>
+
+            ${this.viewMode === 'bottom-up'
+              ? html`
+                  <div class="dropdown-container">
+                    <label for="bottomup-groupby">Group by:</label>
+                    <vscode-dropdown
+                      id="bottomup-groupby"
+                      @change="${this._handleBottomUpGroupBy}"
+                      current-value="${this.bottomUpGroupBy}"
+                    >
+                      <vscode-option>None</vscode-option>
+                      <vscode-option>Namespace</vscode-option>
+                      <vscode-option>Caller Namespace</vscode-option>
+                      <vscode-option>Type</vscode-option>
+                    </vscode-dropdown>
+                  </div>
+                `
+              : ''}
           </div>
         </div>
 
         <div id="call-tree-table-container">
           ${skeleton}
-          <div id="call-tree-table"></div>
+          <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
+            <div id="call-tree-table"></div>
+          </div>
+          <div class="table-host ${this.viewMode === 'aggregated' ? '' : 'is-hidden'}">
+            <div id="aggregated-tree-table"></div>
+          </div>
+          <div class="table-host ${this.viewMode === 'bottom-up' ? '' : 'is-hidden'}">
+            <div id="bottom-up-tree-table"></div>
+          </div>
         </div>
+        <context-menu @menu-select="${this._handleContextMenuSelect}"></context-menu>
       </div>
     `;
   }
@@ -232,12 +386,12 @@ export class CalltreeView extends LitElement {
   }
 
   _flat(arr: LogEvent[], target: LogEvent[]) {
-    arr.forEach((el) => {
-      target.push(el);
-      if (el.children.length > 0) {
-        this._flat(el.children, target);
+    for (const evt of arr) {
+      target.push(evt);
+      if (evt.children.length > 0) {
+        this._flat(evt.children, target);
       }
-    });
+    }
   }
 
   _flatten(arr: LogEvent[]) {
@@ -258,28 +412,109 @@ export class CalltreeView extends LitElement {
     this._updateFiltering();
   }
 
+  async _setViewMode(newMode: ViewMode): Promise<void> {
+    if (newMode === this.viewMode) {
+      return;
+    }
+
+    // Reset search when switching views
+    if (this.totalMatches > 0 || this.findArgs.text !== '') {
+      const oldTable = this._getActiveTable();
+      this._resetFindWidget();
+      if (oldTable) {
+        //@ts-expect-error This is a custom function added in by Find custom module
+        oldTable.clearFindHighlights();
+      }
+      this.findArgs.text = '';
+      this.findArgs.count = 0;
+      this.findMap = {};
+      this.totalMatches = 0;
+    }
+
+    const switchEpoch = ++this.viewSwitchEpoch;
+    this.viewMode = newMode;
+    await this.updateComplete;
+    await this._waitForNextFrame();
+
+    if (switchEpoch !== this.viewSwitchEpoch || !this.rootMethod) {
+      return;
+    }
+
+    if (this.viewMode === 'time-order') {
+      const container = this.renderRoot?.querySelector<HTMLDivElement>('#call-tree-table');
+      if (container) {
+        await this._renderCallTree(container, this.rootMethod);
+        this._updateFiltering();
+      }
+    } else if (this.viewMode === 'aggregated') {
+      const container = this.renderRoot?.querySelector<HTMLDivElement>('#aggregated-tree-table');
+      if (container) {
+        await this._renderAggregatedTree(container, this.rootMethod);
+        this._updateFiltering();
+      }
+    } else if (this.viewMode === 'bottom-up') {
+      const container = this.renderRoot?.querySelector<HTMLDivElement>('#bottom-up-tree-table');
+      if (container) {
+        await this._renderBottomUpTree(container, this.rootMethod);
+      }
+    }
+
+    if (switchEpoch !== this.viewSwitchEpoch) {
+      return;
+    }
+  }
+
+  private _destroyCurrentTable(): void {
+    if (this.calltreeTable) {
+      this.calltreeTable.destroy();
+      this.calltreeTable = null;
+    }
+    if (this.aggregatedTreeTable) {
+      this.aggregatedTreeTable.destroy();
+      this.aggregatedTreeTable = null;
+    }
+    if (this.bottomUpTreeTable) {
+      this.bottomUpTreeTable.destroy();
+      this.bottomUpTreeTable = null;
+    }
+  }
+
+  _handleBottomUpGroupBy(event: Event) {
+    const target = event.target as HTMLInputElement;
+    this.bottomUpGroupBy = target.value;
+    const fieldName =
+      target.value === 'Caller Namespace' ? 'callerNamespace' : target.value.toLowerCase();
+    if (this.bottomUpTreeTable) {
+      // @ts-expect-error setSortedGroupBy is added by the GroupSort custom module
+      this.bottomUpTreeTable.setSortedGroupBy(fieldName !== 'none' ? fieldName : '');
+    }
+  }
+
   _handleTypeFilter(event: CustomEvent<{ selectedOptions: [{ value: string }] }>) {
-    this.filterState.selectedTypes = [];
-    event.detail.selectedOptions.forEach((element) => {
-      this.filterState.selectedTypes.push(element.value);
-    });
+    this.filterState.selectedTypes = new Set(event.detail.selectedOptions.map((e) => e.value));
     this._updateFiltering();
   }
 
   _updateFiltering() {
-    if (!this.calltreeTable) {
+    const activeTable = this._getActiveTable();
+    if (!activeTable) {
       return;
     }
+
+    this.debugOnlyFilterCache.clear();
+    this.typeFilterCache.clear();
+
     const filtersToAdd = [];
 
-    // if debug only we want to show everything and apply the debug only filter.
-    // So we make sure this will be the only filter applied
-    if (this.filterState.debugOnly) {
+    const isBottomUp = this.viewMode === 'bottom-up';
+
+    if (!isBottomUp && this.filterState.debugOnly) {
       filtersToAdd.push(this._debugFilter);
     } else {
       if (
-        this.filterState.selectedTypes.length > 0 &&
-        this.filterState.selectedTypes[0] !== 'None'
+        !isBottomUp &&
+        this.filterState.selectedTypes.size > 0 &&
+        !this.filterState.selectedTypes.has('None')
       ) {
         filtersToAdd.push(this._typeFilter);
       }
@@ -289,33 +524,45 @@ export class CalltreeView extends LitElement {
       }
     }
 
-    this.calltreeTable.blockRedraw();
-    this.calltreeTable.clearFilter(false);
+    activeTable.blockRedraw();
+    activeTable.clearFilter(false);
     filtersToAdd.forEach((filter) => {
-      // @ts-expect-error valid
-      this.calltreeTable.addFilter(filter);
+      activeTable.addFilter(filter);
     });
-    this.calltreeTable.restoreRedraw();
+    activeTable.restoreRedraw();
+  }
+
+  private _getActiveTable(): Tabulator | null {
+    switch (this.viewMode) {
+      case 'time-order':
+        return this.calltreeTable;
+      case 'aggregated':
+        return this.aggregatedTreeTable;
+      case 'bottom-up':
+        return this.bottomUpTreeTable;
+    }
   }
 
   _expandButtonClick() {
-    if (!this.calltreeTable?.modules?.dataTree) {
+    const table = this._getActiveTable();
+    if (!table?.modules?.dataTree) {
       return;
     }
-    this.calltreeTable.blockRedraw();
-    this._expandCollapseAll(this.calltreeTable.getRows(), true);
-    this.calltreeTable.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
-    this.calltreeTable.restoreRedraw();
+    table.blockRedraw();
+    expandCollapseAll(table.getRows(), true);
+    table.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
+    table.restoreRedraw();
   }
 
   _collapseButtonClick() {
-    if (!this.calltreeTable?.modules?.dataTree) {
+    const table = this._getActiveTable();
+    if (!table?.modules?.dataTree) {
       return;
     }
-    this.calltreeTable.blockRedraw();
-    this._expandCollapseAll(this.calltreeTable.getRows(), false);
-    this.calltreeTable.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
-    this.calltreeTable.restoreRedraw();
+    table.blockRedraw();
+    expandCollapseAll(table.getRows(), false);
+    table.element?.querySelector<HTMLElement>('.tabulator-tableholder')?.focus();
+    table.restoreRedraw();
   }
 
   _appendTableWhenVisible() {
@@ -327,28 +574,43 @@ export class CalltreeView extends LitElement {
     isVisible(this).then((isVisible) => {
       this.isVisible = isVisible;
       if (this.rootMethod && this._callTreeTableWrapper) {
-        this._renderCallTree(this._callTreeTableWrapper, this.rootMethod);
+        void this._renderCallTree(this._callTreeTableWrapper, this.rootMethod);
       }
     });
   }
 
-  async _goToRow(timestamp: number) {
-    if (!this._callTreeTableWrapper || !this.rootMethod) {
+  async _goToRow(eventIndex: number) {
+    if (!this.rootMethod) {
       return;
     }
     document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'tree-tab' } }));
+
+    if (this.viewMode !== 'time-order') {
+      this.viewMode = 'time-order';
+      await this.updateComplete;
+    }
+
+    if (!this._callTreeTableWrapper) {
+      return;
+    }
+
     await this._renderCallTree(this._callTreeTableWrapper, this.rootMethod);
     if (!this.calltreeTable) {
       return;
     }
 
-    const treeRow = this._findByTime(this.calltreeTable.getRows(), timestamp);
+    const treeRow = await this._findByEventIndex(this.calltreeTable.getRows(), eventIndex);
+
+    if (!treeRow) {
+      return;
+    }
     //@ts-expect-error This is a custom function added in by RowNavigation custom module
-    this.calltreeTable.goToRow(treeRow, { scrollIfVisible: true, focusRow: true });
+    await this.calltreeTable.goToRow(treeRow, { scrollIfVisible: true, focusRow: true });
   }
 
   async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
-    const isTableVisible = !!this.calltreeTable?.element?.clientHeight;
+    const activeTable = this._getActiveTable();
+    const isTableVisible = !!activeTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
     }
@@ -367,503 +629,195 @@ export class CalltreeView extends LitElement {
     if (newSearch || clearHighlights) {
       this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
-      const result = await this.calltreeTable.find(this.findArgs);
+      const result = await activeTable.find(this.findArgs);
       this.blockClearHighlights = false;
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
 
-      if (!clearHighlights) {
+      if (!clearHighlights && isTableVisible) {
         document.dispatchEvent(
           new CustomEvent('lv-find-results', { detail: { totalMatches: result.totalMatches } }),
         );
       }
     }
 
-    // Highlight the current row and reset the previous or next depending on whether we are stepping forward or back.
-    if (this.totalMatches <= 0) {
+    if (this.totalMatches <= 0 || !isTableVisible) {
       return;
     }
     this.blockClearHighlights = true;
-    this.calltreeTable?.blockRedraw();
     const currentRow = this.findMap[this.findArgs.count];
-    const rows = [
-      currentRow,
-      this.findMap[this.findArgs.count + 1],
-      this.findMap[this.findArgs.count - 1],
-    ];
-    rows.forEach((row) => {
-      row?.reformat();
+    //@ts-expect-error This is a custom function added in by Find custom module
+    await activeTable.setCurrentMatch(this.findArgs.count, currentRow, {
+      scrollIfVisible: false,
+      focusRow: false,
     });
-
-    if (currentRow) {
-      //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      this.calltreeTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
-    }
-    this.calltreeTable?.restoreRedraw();
     this.blockClearHighlights = false;
   }
 
-  _highlight(inputString: string, substring: string) {
-    const regex = new RegExp(substring, 'gi');
-    const resultString = inputString.replace(
-      regex,
-      '<span style="background-color:yellow;border:1px solid lightgrey">$&</span>',
-    );
-    return resultString;
-  }
+  // Show-Details predicate is precomputed at tree-build time (see
+  // `_hasDetailsDeep` in TimeOrderTree/Aggregation), so the Tabulator filter
+  // is a single boolean read — no per-toggle tree walk, no cache.
+  _showDetailsFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
+    data._hasDetailsDeep;
 
-  _showDetailsFilter = (data: CalltreeRow) => {
-    const excludedTypes = new Set<string>([
-      'CUMULATIVE_LIMIT_USAGE',
-      'LIMIT_USAGE_FOR_NS',
-      'CUMULATIVE_PROFILING',
-      'CUMULATIVE_PROFILING_BEGIN',
-    ]);
-
-    return this._deepFilter(
+  _debugFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
+    deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
       data,
-      (rowData) => {
-        const logLine = rowData.originalData;
-        return (
-          logLine.duration.total > 0 ||
-          logLine.exitTypes.length > 0 ||
-          logLine.discontinuity ||
-          !!(logLine.type && excludedTypes.has(logLine.type))
-        );
-      },
-      {
-        filterCache: this.showDetailsFilterCache,
-      },
+      (row) => !!(row.originalData.type && DEBUG_VALUE_TYPES.has(row.originalData.type)),
+      this.debugOnlyFilterCache,
     );
-  };
 
-  _debugFilter = (data: CalltreeRow) => {
-    const debugValues = new Set<string>([
-      'USER_DEBUG',
-      'DATAWEAVE_USER_DEBUG',
-      'USER_DEBUG_FINER',
-      'USER_DEBUG_FINEST',
-      'USER_DEBUG_FINE',
-      'USER_DEBUG_DEBUG',
-      'USER_DEBUG_INFO',
-      'USER_DEBUG_WARN',
-      'USER_DEBUG_ERROR',
-    ]);
-    return this._deepFilter(
+  _typeFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
+    deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
       data,
-      (rowData) => {
-        return !!(rowData.originalData.type && debugValues.has(rowData.originalData.type));
-      },
-      {
-        filterCache: this.debugOnlyFilterCache,
-      },
-    );
-  };
-
-  _typeFilter = (data: CalltreeRow) => {
-    return this._deepFilter(
-      data,
-      (rowData) => {
-        if (!rowData.originalData.type) {
+      (row) => {
+        const type = row.originalData.type;
+        if (!type) {
           return false;
         }
-
-        return this.filterState.selectedTypes.includes(rowData.originalData.type);
+        return this.filterState.selectedTypes.has(type);
       },
-      {
-        filterCache: this.typeFilterCache,
-      },
+      this.typeFilterCache,
     );
-  };
 
   _namespaceFilter = (
     selectedNamespaces: string[],
-    namespace: string,
-    data: CalltreeRow,
-    filterParams: { columnName: string; filterCache: Map<string, boolean> },
-  ) => {
+    _namespace: string,
+    data: TimeOrderRow | AggregatedRow | BottomUpRow,
+    filterParams: { filterCache: Map<number, boolean> },
+  ): boolean => {
     if (selectedNamespaces.length === 0) {
       return true;
     }
-
-    return this._deepFilter(
+    return deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
       data,
-      (rowData) => {
-        return selectedNamespaces.includes(rowData.originalData.namespace || '');
-      },
-      {
-        filterCache: filterParams.filterCache,
-      },
+      (row) => selectedNamespaces.includes(row.namespace || ''),
+      filterParams.filterCache,
     );
   };
-
-  private _deepFilter(
-    rowData: CalltreeRow,
-    filterFunction: (rowData: CalltreeRow) => boolean,
-    filterParams: { filterCache: Map<string, boolean> },
-  ): boolean {
-    const cachedMatch = filterParams.filterCache.get(rowData.id);
-    if (cachedMatch !== null && cachedMatch !== undefined) {
-      return cachedMatch;
-    }
-
-    let childMatch = false;
-    const children = rowData._children || [];
-    let len = children.length;
-    while (--len >= 0) {
-      const childRow = children[len];
-      if (childRow) {
-        const match = this._deepFilter(childRow, filterFunction, filterParams);
-
-        if (match) {
-          childMatch = true;
-          break;
-        }
-      }
-    }
-
-    filterParams.filterCache.set(rowData.id, childMatch);
-    if (childMatch) {
-      return true;
-    }
-
-    return filterFunction(rowData);
-  }
 
   private async _renderCallTree(
     callTreeTableContainer: HTMLDivElement,
     rootMethod: ApexLog,
   ): Promise<void> {
     if (this.calltreeTable) {
-      // Ensure the table is fully visible before attempting to do things e.g go to rows.
-      // Otherwise there are visible rendering issues.
-      await new Promise((resolve, reject) => {
-        const visibilityObserver = new IntersectionObserver(
-          (entries, observer) => {
-            const entry = entries[0];
-            const visible = entry?.isIntersecting && entry?.intersectionRatio > 0;
-            if (visible) {
-              resolve(true);
-              observer.disconnect();
-            } else {
-              reject();
-            }
-          },
-          { threshold: 1 },
-        );
-        visibilityObserver.observe(callTreeTableContainer);
-      });
-      return new Promise((resolve) => setTimeout(resolve));
+      await this._waitForNextFrame();
+      return;
     }
 
-    return new Promise((resolve) => {
-      Tabulator.registerModule(Object.values(CommonModules));
-      Tabulator.registerModule([RowKeyboardNavigation, RowNavigation, MiddleRowFocus, Find]);
-
-      const selfTimeFilterCache = new Map<string, boolean>();
-      const totalTimeFilterCache = new Map<string, boolean>();
-      const namespaceFilterCache = new Map<string, boolean>();
-
-      const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
-      const governorLimits = rootMethod.governorLimits;
-
-      let childIndent;
-      this.calltreeTable = new Tabulator(callTreeTableContainer, {
-        data: this._toCallTree(rootMethod.children),
-        layout: 'fitColumns',
-        placeholder: 'No Call Tree Available',
-        height: '100%',
-        maxHeight: '100%',
-        //  custom property for datagrid/module/RowKeyboardNavigation
-        rowKeyboardNavigation: true,
-        //  custom property for module/MiddleRowFocus
-        middleRowFocus: true,
-        dataTree: true,
-        dataTreeChildColumnCalcs: true, // todo: fix
-        dataTreeBranchElement: '<span/>',
-        tooltipDelay: 100,
-        selectableRows: 1,
-        // @ts-expect-error it is possible to pass a function to intitialFilter the types need updating
-        initialFilter: this._showDetailsFilter,
-        headerSortElement: function (column, dir) {
-          switch (dir) {
-            case 'asc':
-              return "<div class='sort-by--top'></div>";
-              break;
-            case 'desc':
-              return "<div class='sort-by--bottom'></div>";
-              break;
-            default:
-              return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
-          }
-        },
-        rowFormatter: (row: RowComponent) => {
-          formatter(row, this.findArgs);
-        },
-        columnCalcs: 'both',
-        columnDefaults: {
-          title: 'default',
-          resizable: true,
-          headerSortStartingDir: 'desc',
-          headerTooltip: true,
-          headerWordWrap: true,
-        },
-        columns: [
-          {
-            title: 'Name',
-            field: 'text',
-            headerSortTristate: true,
-            bottomCalc: () => {
-              return 'Total';
-            },
-            cssClass: 'datagrid-textarea datagrid-code-text',
-            formatter: (cell, _formatterParams, _onRendered) => {
-              const cellElem = cell.getElement();
-              const row = cell.getRow();
-              // @ts-expect-error: _row is private. This is temporary and I will patch the text wrap behaviour in the library.
-              const dataTree = row._row.modules.dataTree;
-              const treeLevel = dataTree?.index ?? 0;
-              childIndent ??= row.getTable().options.dataTreeChildIndent || 0;
-              const levelIndent = treeLevel * childIndent;
-              cellElem.style.paddingLeft = `${levelIndent + 4}px`;
-              cellElem.style.textIndent = `-${levelIndent}px`;
-
-              const node = (cell.getData() as CalltreeRow).originalData;
-              let text = node.text;
-              if (node.hasValidSymbols) {
-                const link = document.createElement('a');
-                link.setAttribute('href', '#!');
-                link.textContent = text;
-                return link;
-              }
-
-              if (node.type && !excludedTypes.has(node.type) && node.type !== text) {
-                text = node.type + ': ' + text;
-              }
-
-              const textSpan = document.createElement('span');
-              textSpan.textContent = text;
-              return textSpan;
-            },
-            variableHeight: true,
-            cellClick: (e, cell) => {
-              const { type } = window.getSelection() ?? {};
-              if (type === 'Range') {
-                return;
-              }
-
-              if (!(e.target as HTMLElement).matches('a')) {
-                return;
-              }
-              const node = (cell.getData() as CalltreeRow).originalData;
-              if (node.hasValidSymbols) {
-                vscodeMessenger.send<string>('openType', node.text);
-              }
-            },
-            widthGrow: 5,
-          },
-          {
-            title: 'Namespace',
-            field: 'namespace',
-            sorter: 'string',
-            width: 100,
-            headerFilter: 'list',
-            headerFilterFunc: this._namespaceFilter,
-            headerFilterFuncParams: { filterCache: namespaceFilterCache },
-            headerFilterParams: {
-              values: rootMethod.namespaces,
-              clearable: true,
-              multiselect: true,
-            },
-            headerFilterLiveFilter: false,
-          },
-          {
-            title: 'DML Count',
-            field: 'dmlCount.total',
-            sorter: 'number',
-            cssClass: 'number-cell',
-            width: 60,
-            bottomCalc: 'max',
-            bottomCalcFormatter: progressFormatter,
-            bottomCalcFormatterParams: {
-              precision: 0,
-              totalValue: governorLimits.dmlStatements.limit,
-              showPercentageText: false,
-            },
-            formatter: progressFormatter,
-            formatterParams: {
-              precision: 0,
-              totalValue: governorLimits.dmlStatements.limit,
-              showPercentageText: false,
-            },
-            hozAlign: 'right',
-            headerHozAlign: 'right',
-            tooltip(_event, cell, _onRender) {
-              const maxDmlStatements = governorLimits.dmlStatements.limit;
-              return cell.getValue() + (maxDmlStatements > 0 ? '/' + maxDmlStatements : '');
-            },
-          },
-          {
-            title: 'SOQL Count',
-            field: 'soqlCount.total',
-            sorter: 'number',
-            cssClass: 'number-cell',
-            width: 60,
-            bottomCalc: 'max',
-            bottomCalcFormatter: progressFormatter,
-            bottomCalcFormatterParams: {
-              precision: 0,
-              totalValue: governorLimits.soqlQueries.limit,
-              showPercentageText: false,
-            },
-            formatter: progressFormatter,
-            formatterParams: {
-              precision: 0,
-              totalValue: governorLimits.soqlQueries.limit,
-              showPercentageText: false,
-            },
-            hozAlign: 'right',
-            headerHozAlign: 'right',
-            tooltip(_event, cell, _onRender) {
-              const maxSoql = governorLimits.soqlQueries.limit;
-              return cell.getValue() + (maxSoql > 0 ? '/' + maxSoql : '');
-            },
-          },
-          {
-            title: 'Throws Count',
-            field: 'totalThrownCount',
-            sorter: 'number',
-            cssClass: 'number-cell',
-            width: 60,
-            hozAlign: 'right',
-            headerHozAlign: 'right',
-            bottomCalc: 'max',
-          },
-          {
-            title: 'DML Rows',
-            field: 'dmlRowCount.total',
-            sorter: 'number',
-            cssClass: 'number-cell',
-            width: 60,
-            bottomCalc: 'max',
-            bottomCalcFormatter: progressFormatter,
-            bottomCalcFormatterParams: {
-              precision: 0,
-              totalValue: governorLimits.dmlRows.limit,
-              showPercentageText: false,
-            },
-            formatter: progressFormatter,
-            formatterParams: {
-              precision: 0,
-              totalValue: governorLimits.dmlRows.limit,
-              showPercentageText: false,
-            },
-            hozAlign: 'right',
-            headerHozAlign: 'right',
-            tooltip(_event, cell, _onRender) {
-              const maxDmlRows = governorLimits.dmlRows.limit;
-              return cell.getValue() + (maxDmlRows > 0 ? '/' + maxDmlRows : '');
-            },
-          },
-          {
-            title: 'SOQL Rows',
-            field: 'soqlRowCount.total',
-            sorter: 'number',
-            cssClass: 'number-cell',
-            width: 60,
-            bottomCalc: 'max',
-            bottomCalcFormatter: progressFormatter,
-            bottomCalcFormatterParams: {
-              precision: 0,
-              totalValue: governorLimits.queryRows.limit,
-              showPercentageText: false,
-            },
-            formatter: progressFormatter,
-            formatterParams: {
-              precision: 0,
-              totalValue: governorLimits.queryRows.limit,
-              showPercentageText: false,
-            },
-            hozAlign: 'right',
-            headerHozAlign: 'right',
-            tooltip(_event, cell, _onRender) {
-              const maxQueryRows = governorLimits.queryRows.limit;
-              return cell.getValue() + (maxQueryRows > 0 ? '/' + maxQueryRows : '');
-            },
-          },
-          {
-            title: 'Total Time (ms)',
-            field: 'duration.total',
-            sorter: 'number',
-            headerSortTristate: true,
-            width: 150,
-            hozAlign: 'right',
-            headerHozAlign: 'right',
-            formatter: progressFormatterMS,
-            formatterParams: {
-              precision: 2,
-              totalValue: rootMethod.duration.total,
-            },
-            bottomCalcFormatter: progressFormatterMS,
-            bottomCalc: 'max',
-            bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-            headerFilter: MinMaxEditor,
-            headerFilterFunc: MinMaxFilter,
-            headerFilterFuncParams: { columnName: 'duration', filterCache: totalTimeFilterCache },
-            headerFilterLiveFilter: false,
-            tooltip(_event, cell, _onRender) {
-              return formatDuration(cell.getValue());
-            },
-          },
-          {
-            title: 'Self Time (ms)',
-            field: 'duration.self',
-            sorter: 'number',
-            headerSortTristate: true,
-            width: 150,
-            hozAlign: 'right',
-            headerHozAlign: 'right',
-            bottomCalc: 'sum',
-            bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-            bottomCalcFormatter: progressFormatterMS,
-            formatter: progressFormatterMS,
-            formatterParams: {
-              precision: 2,
-              totalValue: rootMethod.duration.total,
-            },
-            headerFilter: MinMaxEditor,
-            headerFilterFunc: MinMaxFilter,
-            headerFilterFuncParams: {
-              columnName: 'duration.self',
-              filterCache: selfTimeFilterCache,
-            },
-            headerFilterLiveFilter: false,
-            tooltip(_event, cell, _onRender) {
-              return formatDuration(cell.getValue());
-            },
-          },
-        ],
-      });
-
-      this.calltreeTable.on('dataFiltered', () => {
-        totalTimeFilterCache.clear();
-        selfTimeFilterCache.clear();
-        namespaceFilterCache.clear();
+    const { table, tableBuilt } = createTimeOrderTable(callTreeTableContainer, rootMethod, {
+      showDetailsFilter: this._showDetailsFilter,
+      namespaceFilter: this._namespaceFilter,
+      onFilterCacheClear: () => {
         this.debugOnlyFilterCache.clear();
-        this.showDetailsFilterCache.clear();
         this.typeFilterCache.clear();
-      });
-
-      this.calltreeTable.on('renderStarted', () => {
+      },
+      onRenderStarted: () => {
         if (!this.blockClearHighlights && this.totalMatches > 0) {
           this._resetFindWidget();
           this._clearSearchHighlights();
         }
-      });
+      },
+      onContextMenu: (e, row) => {
+        if (window.getSelection()?.type === 'Range') {
+          return;
+        }
+        e.preventDefault();
+        const mouseEvent = e as MouseEvent;
+        this._showRowContextMenu(row, mouseEvent.clientX, mouseEvent.clientY);
+      },
+      rowFormatter: categoryRowFormatter,
+    });
+    this.calltreeTable = table;
+    await tableBuilt;
+  }
 
-      this.calltreeTable.on('tableBuilt', () => {
+  private async _renderAggregatedTree(
+    container: HTMLDivElement,
+    rootMethod: ApexLog,
+  ): Promise<void> {
+    if (this.aggregatedTreeTable) {
+      await this._waitForNextFrame();
+      return;
+    }
+
+    const { table, tableBuilt } = createAggregatedTable(container, rootMethod, {
+      namespaceFilter: this._namespaceFilter,
+      showDetailsFilter: this._showDetailsFilter,
+      onFilterCacheClear: () => {
+        this.debugOnlyFilterCache.clear();
+        this.typeFilterCache.clear();
+      },
+      onRenderStarted: () => {
+        if (!this.blockClearHighlights && this.totalMatches > 0) {
+          this._resetFindWidget();
+          this._clearSearchHighlights();
+        }
+      },
+      rowFormatter: categoryRowFormatter,
+    });
+    this.aggregatedTreeTable = table;
+    await tableBuilt;
+  }
+
+  private async _renderBottomUpTree(container: HTMLDivElement, rootMethod: ApexLog): Promise<void> {
+    if (this.bottomUpTreeTable) {
+      await this._waitForNextFrame();
+      return;
+    }
+
+    const { table, tableBuilt } = createBottomUpTable(
+      container,
+      rootMethod,
+      {
+        namespaceFilter: this._namespaceFilter,
+        showDetailsFilter: this._showDetailsFilter,
+        onRenderStarted: () => {
+          if (!this.blockClearHighlights && this.totalMatches > 0) {
+            this._resetFindWidget();
+            this._clearSearchHighlights();
+          }
+        },
+        rowFormatter: categoryRowFormatter,
+      },
+      {
+        selectableRows: 'highlight',
+        enableClipboardAndDownload: true,
+        exportFileName: 'bottom-up.csv',
+      },
+    );
+    this.bottomUpTreeTable = table;
+    await tableBuilt;
+  }
+
+  private _waitForNextFrame(): Promise<void> {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+  }
+
+  // Resolve once Tabulator has rendered (e.g. after a treeExpand puts new rows
+  // in the DOM), with a two-frame fallback in case the expand triggers no
+  // redraw. A single rAF can race the virtual renderer and leave getTreeChildren
+  // empty mid-descent.
+  private _waitForTableRender(): Promise<void> {
+    const table = this.calltreeTable;
+    if (!table) {
+      return this._waitForNextFrame();
+    }
+
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        table.off('renderComplete', finish);
         resolve();
-      });
+      };
+      table.on('renderComplete', finish);
+      requestAnimationFrame(() => requestAnimationFrame(finish));
     });
   }
 
@@ -874,119 +828,154 @@ export class CalltreeView extends LitElement {
   private _clearSearchHighlights() {
     this.findArgs.text = '';
     this.findArgs.count = 0;
+    const activeTable = this._getActiveTable();
     //@ts-expect-error This is a custom function added in by Find custom module
-    this.calltreeTable.clearFindHighlights(Object.values(this.findMap));
+    activeTable?.clearFindHighlights();
     this.findMap = {};
     this.totalMatches = 0;
   }
 
-  private _expandCollapseAll(rows: RowComponent[], expand: boolean = true) {
-    const len = rows.length;
-    for (let i = 0; i < len; ++i) {
-      const row = rows[i];
-      if (!row) {
-        continue;
-      }
-
-      if (expand) {
-        row.treeExpand();
-      } else {
-        row.treeCollapse();
-      }
-      this._expandCollapseAll(row.getTreeChildren() ?? [], expand);
+  private _showRowContextMenu(row: RowComponent, clientX: number, clientY: number): void {
+    if (!this.contextMenu) {
+      return;
     }
+
+    const rowData = row.getData() as TimeOrderRow;
+    this.contextMenuRow = rowData;
+
+    const items: { id: string; label: string; separator?: boolean; shortcut?: string }[] = [];
+
+    items.push({ id: 'show-in-timeline', label: 'Show in Timeline' });
+
+    if (rowData.originalData.hasValidSymbols) {
+      items.push({ id: 'go-to-source', label: 'Go to Source' });
+    }
+
+    if (rowData.originalData.timestamp) {
+      items.push({ id: 'show-in-log', label: 'Show in Log File' });
+    }
+
+    items.push(
+      { id: 'separator-1', label: '', separator: true },
+      { id: 'copy-name', label: 'Copy Name' },
+    );
+
+    this.contextMenu.show(items, clientX, clientY);
   }
 
-  private _toCallTree(nodes: LogEvent[]): CalltreeRow[] | undefined {
-    const len = nodes.length;
-    if (!len) {
-      return undefined;
+  private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>): void {
+    if (!this.contextMenuRow) {
+      return;
     }
 
-    const results: CalltreeRow[] = [];
-    for (let i = 0; i < len; ++i) {
-      const node = nodes[i];
-      if (!node) {
-        continue;
-      }
-      const children = node.children.length ? this._toCallTree(node.children) : null;
-      results.push({
-        id: node.timestamp + '-' + i,
-        originalData: node,
-        _children: children,
-        text: node.text,
-        namespace: node.namespace,
-        duration: node.duration,
-        dmlCount: node.dmlCount,
-        soqlCount: node.soqlCount,
-        dmlRowCount: node.dmlRowCount,
-        soqlRowCount: node.soqlRowCount,
-        totalThrownCount: node.totalThrownCount,
-      });
+    const rowData = this.contextMenuRow;
+
+    switch (e.detail.itemId) {
+      case 'show-in-log':
+        vscodeMessenger.send('goToLogLine', { timestamp: rowData.originalData.timestamp });
+        break;
+
+      case 'show-in-timeline':
+        document.dispatchEvent(new CustomEvent('show-tab', { detail: { tabid: 'timeline-tab' } }));
+        eventBus.emit('timeline:navigate-to', {
+          eventIndex: rowData.originalData.eventIndex,
+        });
+        break;
+
+      case 'go-to-source':
+        vscodeMessenger.send<string>('openType', rowData.originalData.text);
+        break;
+
+      case 'copy-name':
+        navigator.clipboard.writeText(rowData.text);
+        break;
     }
-    return results;
+
+    this.contextMenuRow = null;
   }
 
-  private _findByTime(rows: RowComponent[], timeStamp: number): RowComponent | null {
-    if (!rows) {
+  private async _findByEventIndex(
+    rows: RowComponent[],
+    eventIndex: number,
+  ): Promise<RowComponent | null> {
+    if (!rows?.length || !this.rootMethod) {
       return null;
     }
 
-    let start = 0,
-      end = rows.length - 1;
-
-    // Iterate as long as the beginning does not encounter the end.
-    while (start <= end) {
-      // find out the middle index
-      const mid = Math.floor((start + end) / 2);
-      const row = rows[mid];
-
-      if (!row) {
-        break;
-      }
-      const node = (row.getData() as CalltreeRow).originalData as LogEvent;
-
-      // Return True if the element is present in the middle.
-      const endTime = node.exitStamp ?? node.timestamp;
-      const isInRange = timeStamp >= node.timestamp && timeStamp <= endTime;
-      if (timeStamp === node.timestamp) {
-        return row;
-      } else if (isInRange) {
-        return this._findByTime(row.getTreeChildren() ?? [], timeStamp);
-      }
-      // Otherwise, look in the left or right half
-      else if (timeStamp > endTime) {
-        start = mid + 1;
-      } else if (timeStamp < node.timestamp) {
-        end = mid - 1;
-      } else {
-        return null;
-      }
+    const result = findEventByEventIndex(this.rootMethod, eventIndex);
+    if (!result) {
+      return null;
     }
 
-    return null;
+    return this._materializeRowPath(rows, result.event);
+  }
+
+  private async _materializeRowPath(
+    rows: RowComponent[],
+    targetEvent: LogEvent,
+  ): Promise<RowComponent | null> {
+    const eventPath: LogEvent[] = [];
+    let currentEvent: LogEvent | null = targetEvent;
+
+    while (currentEvent && currentEvent.parent) {
+      eventPath.push(currentEvent);
+      currentEvent = currentEvent.parent;
+    }
+
+    eventPath.reverse();
+
+    let currentRows = rows;
+    let matchedRow: RowComponent | null = null;
+
+    for (let i = 0; i < eventPath.length; i++) {
+      const event = eventPath[i];
+      if (!event) {
+        break;
+      }
+
+      const nextRow = this._indexRowsByEventIndex(currentRows).get(event.eventIndex);
+      if (!nextRow) {
+        // Ancestor not present (e.g. hidden by an active filter). Fall back to
+        // the deepest row we did resolve so navigation lands on the nearest
+        // visible ancestor instead of silently doing nothing.
+        break;
+      }
+
+      matchedRow = nextRow;
+      if (i === eventPath.length - 1) {
+        break;
+      }
+
+      let children = matchedRow.getTreeChildren() ?? [];
+      const rowData = matchedRow.getData() as TimeOrderRow;
+      if (!children.length && rowData._children?.length && !matchedRow.isTreeExpanded()) {
+        matchedRow.treeExpand();
+        await this._waitForTableRender();
+        children = matchedRow.getTreeChildren() ?? [];
+      }
+
+      currentRows = children;
+    }
+
+    return matchedRow;
+  }
+
+  private _indexRowsByEventIndex(rows: RowComponent[]): Map<number, RowComponent> {
+    const indexByEventIndex = new Map<number, RowComponent>();
+    for (const row of rows) {
+      const rowData = row.getData() as TimeOrderRow;
+      indexByEventIndex.set(rowData.originalData.eventIndex, row);
+    }
+
+    return indexByEventIndex;
   }
 }
 
-interface CalltreeRow {
-  id: string;
-  originalData: LogEvent;
-  _children: CalltreeRow[] | undefined | null;
-  text: string;
-  duration: CountTotals;
-  namespace: string;
-  dmlCount: CountTotals;
-  soqlCount: CountTotals;
-  dmlRowCount: CountTotals;
-  soqlRowCount: CountTotals;
-  totalThrownCount: number;
-}
-
-type CountTotals = { self: number; total: number };
-
-export async function goToRow(timestamp: number) {
+export async function goToRow(target: { eventIndex: number }) {
   document.dispatchEvent(
-    new CustomEvent('calltree-go-to-row', { detail: { timestamp: timestamp } }),
+    new CustomEvent('calltree-go-to-row', {
+      detail: target,
+    }),
   );
 }
 

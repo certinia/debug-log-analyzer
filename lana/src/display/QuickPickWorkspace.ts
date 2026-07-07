@@ -4,7 +4,7 @@
 import { parse } from 'path';
 import { window } from 'vscode';
 
-import { Context } from '../Context.js';
+import type { Context } from '../Context.js';
 import { Item, Options, QuickPick } from './QuickPick.js';
 
 export class QuickPickWorkspace {

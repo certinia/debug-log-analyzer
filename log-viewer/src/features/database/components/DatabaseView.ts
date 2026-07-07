@@ -5,7 +5,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog } from 'apex-log-parser';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -43,6 +43,13 @@ export class DatabaseView extends LitElement {
     document.addEventListener('db-find-results', this._findResults as EventListener);
     document.addEventListener('lv-find-match', this._findHandler as EventListener);
     document.addEventListener('lv-find', this._findHandler as EventListener);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('db-find-results', this._findResults as EventListener);
+    document.removeEventListener('lv-find-match', this._findHandler as EventListener);
+    document.removeEventListener('lv-find', this._findHandler as EventListener);
   }
 
   static styles = [

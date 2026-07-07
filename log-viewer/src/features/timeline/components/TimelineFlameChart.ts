@@ -12,12 +12,11 @@
 import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
-import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
-import { getSettings } from '../../settings/Settings.js';
+import type { ApexLog } from 'apex-log-parser';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
-
-import type { TimelineOptions } from '../types/timeline.types.js';
-import { TimelineError } from '../types/timeline.types.js';
+import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
+import type { EditorColors, TimelineOptions } from '../types/flamechart.types.js';
+import { TimelineError } from '../types/flamechart.types.js';
 
 import { tooltipStyles } from '../styles/timeline.css.js';
 
@@ -77,10 +76,27 @@ export class TimelineFlameChart extends LitElement {
   @property({ type: Object })
   apexLog: ApexLog | null = null;
 
+  @property()
+  themeName: string | null = null;
+
+  /**
+   * Timestamp to navigate to after initialization.
+   * Used when opening the timeline from a raw log file hover.
+   */
+  @property({ type: Number })
+  navigateToTimestamp: number | undefined = undefined;
+
+  /**
+   * Event index to navigate to after initialization.
+   * Preferred over timestamp because it is unique within a parse.
+   */
+  @property({ type: Number })
+  navigateToEventIndex: number | undefined = undefined;
+
   /**
    * Optional configuration options.
    */
-  @property({ type: Object })
+  @state()
   options: TimelineOptions = {};
 
   // ============================================================================
@@ -108,6 +124,10 @@ export class TimelineFlameChart extends LitElement {
     ) {
       this.initializeTimeline();
     }
+
+    if (changedProperties.has('themeName') || changedProperties.has('themeName')) {
+      this.apexLogTimeline?.setTheme(this.themeName ?? '');
+    }
   }
 
   /**
@@ -129,21 +149,73 @@ export class TimelineFlameChart extends LitElement {
     try {
       this.errorMessage = null;
 
-      // Fetch settings for custom colors
-      const settings = await getSettings();
-      const customColors = settings.timeline.colors;
-
-      // Merge custom colors with options
-      const optionsWithColors: TimelineOptions = {
+      const optionsWithTheme = {
         ...this.options,
-        colors: customColors,
+        themeName: this.themeName,
+        editorColors: this.extractEditorColors(),
       };
 
       this.apexLogTimeline = new ApexLogTimeline();
-      await this.apexLogTimeline.init(this.containerRef, this.apexLog, optionsWithColors);
+      await this.apexLogTimeline.init(this.containerRef, this.apexLog, optionsWithTheme);
+
+      // Navigate after initialization completes, preferring unique eventIndex.
+      if (this.navigateToEventIndex !== undefined) {
+        this.apexLogTimeline.navigateToEventIndex(this.navigateToEventIndex);
+      } else if (this.navigateToTimestamp !== undefined) {
+        this.apexLogTimeline.navigateToTimestamp(this.navigateToTimestamp);
+      }
     } catch (error) {
       this.handleError(error);
     }
+  }
+
+  /**
+   * Set the time display mode on the axis (called by parent TimelineView).
+   */
+  public setTimeDisplayMode(mode: 'elapsed' | 'wallClock'): void {
+    this.apexLogTimeline?.setTimeDisplayMode(mode);
+  }
+
+  // ============================================================================
+  // COLOR EXTRACTION
+  // ============================================================================
+
+  /**
+   * Extract resolved editor colors from CSS custom properties (--tl-*).
+   * These are passed to PixiJS renderers so they don't read CSS directly.
+   */
+  private extractEditorColors(): EditorColors {
+    const style = getComputedStyle(this);
+    return {
+      cursorForeground: parseColorToHex(
+        style.getPropertyValue('--tl-cursor-foreground').trim() || '#fff',
+        0xffffff,
+      ),
+      focusBorder: parseColorToHex(
+        style.getPropertyValue('--tl-focus-border').trim() || '#007fd4',
+        0x007fd4,
+      ),
+      findMatchBackground: parseColorToHex(
+        style.getPropertyValue('--tl-find-match-background').trim() || '#ff9632',
+        0xea5c00,
+      ),
+      widgetBackground: parseColorToHex(
+        style.getPropertyValue('--tl-widget-background').trim() || '#252526',
+        0x252526,
+      ),
+      lineNumberForeground: parseColorToHex(
+        style.getPropertyValue('--tl-line-number-foreground').trim() || '#808080',
+        0x808080,
+      ),
+      selectionBackground: parseColorToHex(
+        style.getPropertyValue('--tl-selection-background').trim() || 'rgba(38, 79, 120, 0.5)',
+        0x264f78,
+      ),
+      selectionHighlightBorder: parseColorToHex(
+        style.getPropertyValue('--tl-selection-highlight-border').trim() || '#007fd4',
+        0x007fd4,
+      ),
+    };
   }
 
   // ============================================================================

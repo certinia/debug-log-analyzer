@@ -17,6 +17,8 @@ Before you dive in, please make sure to review our [code of conduct](https://git
 
 For detailed instructions on setting up your development environment, refer to the [Development Guide](https://github.com/certinia/debug-log-analyzer/blob/main/DEVELOPING.md).
 
+> 🔖 Maintainers: see the [Release Guide](https://github.com/certinia/debug-log-analyzer/blob/main/RELEASING.md) for the versioning convention and how stable/pre-release publishing works.
+
 ## 🚀 Ready to Contribute?
 
 We can't wait to see your contributions! Whether it’s fixing a bug, adding a new feature, or improving the docs, we truly appreciate your time and effort.
@@ -34,6 +36,10 @@ We can't wait to see your contributions! Whether it’s fixing a bug, adding a n
 
 - We follow a simple format for commit messages: [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 - Use the imperative mood in the subject line (e.g., "fix: date parsing in log parser" rather than "fixed date parsing in log parser").
+
+## 🧪 New Features
+
+> 🧪 Adding a user-facing feature that isn't in the stable release yet? Add a `🧪` badge in `README.md` in the same PR so stable users aren't misled. See [Marking Pre-Release-Only Features](https://github.com/certinia/debug-log-analyzer/blob/main/RELEASING.md#-marking-pre-release-only-features).
 
 ## 💬 Need Help?
 

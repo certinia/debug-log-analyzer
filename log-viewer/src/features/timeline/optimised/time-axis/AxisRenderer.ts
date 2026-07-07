@@ -1,0 +1,287 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
+
+/**
+ * AxisRenderer
+ *
+ * Renders time scale axis with dynamic labels and tick marks using PixiJS Sprites.
+ * Adapts tick density and label precision based on zoom level.
+ *
+ * Performance optimizations:
+ * - Uses SpritePool for grid lines (automatic GPU batching)
+ * - Sprites are pooled and reused (no GC overhead after warmup)
+ * - Labels use PIXI.Text (optimal for dynamic text with caching)
+ *
+ * Tick levels (zoom-dependent):
+ * - Seconds: Major ticks at 1s, 2s, 5s, 10s intervals
+ * - Milliseconds: Major ticks at 1ms, 2ms, 5ms, 10ms intervals
+ * - Microseconds: Major ticks at 1μs, 2μs, 5μs, 10μs intervals
+ * - Nanoseconds: Major ticks at 1ns, 2ns, 5ns, 10ns intervals
+ */
+
+import { Container, Text } from 'pixi.js';
+import type { ViewportState } from '../../types/flamechart.types.js';
+import { SpritePool } from '../SpritePool.js';
+import { NS_PER_MS, formatMilliseconds, selectInterval } from './timeAxisConstants.js';
+
+/**
+ * Axis rendering configuration.
+ */
+interface AxisConfig {
+  /** Height of axis area in pixels */
+  height: number;
+  /** Color of axis line and ticks */
+  lineColor: number;
+  /** Color of axis labels */
+  textColor: string;
+  /** Font size for labels */
+  fontSize: number;
+  /** Minimum spacing between labels in pixels */
+  minLabelSpacing: number;
+}
+
+/**
+ * Time interval for tick marks.
+ */
+interface TickInterval {
+  /** Interval duration in nanoseconds */
+  interval: number;
+  /** Skip factor (1 = show all, 2 = show every 2nd, 5 = show every 5th) */
+  skipFactor: number;
+}
+
+export class AxisRenderer {
+  private spritePool: SpritePool;
+  private labelsContainer: Container;
+  private screenSpaceContainer: Container | null = null;
+  private config: AxisConfig;
+  private labelCache: Map<string, Text> = new Map();
+  /** Grid line color */
+  private gridLineColor: number;
+
+  constructor(container: Container, config?: Partial<AxisConfig>) {
+    // Default configuration
+    this.config = {
+      height: 30,
+      lineColor: 0x808080, // Medium gray that works in light and dark themes
+      textColor: '#808080', // Medium gray that works in light and dark themes
+      fontSize: 11,
+      minLabelSpacing: 80,
+      ...config,
+    };
+
+    this.gridLineColor = this.config.lineColor;
+
+    // Create sprite pool for grid lines (in world space - will be transformed with stage)
+    this.spritePool = new SpritePool(container);
+
+    // Labels container - will be added to screen space container when provided
+    this.labelsContainer = new Container();
+  }
+
+  /**
+   * Set the screen-space container for labels (not affected by stage transforms).
+   * This container should be added directly to app.stage at root level.
+   */
+  public setScreenSpaceContainer(container: Container): void {
+    this.screenSpaceContainer = container;
+
+    // Move labels to screen space container
+    if (this.labelsContainer.parent) {
+      this.labelsContainer.parent.removeChild(this.labelsContainer);
+    }
+    this.screenSpaceContainer.addChild(this.labelsContainer);
+
+    // Set up coordinate system for labels (top-left origin, Y pointing down for text)
+    this.labelsContainer.position.set(0, 0);
+    this.labelsContainer.scale.set(1, 1);
+  }
+
+  /**
+   * Render axis based on current viewport state.
+   *
+   * Implements dynamic tick calculation and label density management.
+   * @param viewport - Current viewport state
+   */
+  public render(viewport: ViewportState): void {
+    // Release all sprites back to pool
+    this.spritePool.releaseAll();
+    this.clearLabels();
+
+    // Calculate visible time range
+    const timeStart = viewport.offsetX / viewport.zoom;
+    const timeEnd = (viewport.offsetX + viewport.displayWidth) / viewport.zoom;
+
+    // Calculate appropriate tick interval based on zoom
+    const tickInterval = this.calculateTickInterval(viewport);
+
+    // Render tick marks (vertical lines from top to bottom, behind rectangles)
+    this.renderTicks(viewport, timeStart, timeEnd, tickInterval);
+  }
+
+  /**
+   * Clean up resources.
+   */
+  public destroy(): void {
+    this.spritePool.destroy();
+    this.labelsContainer.destroy();
+    this.labelCache.clear();
+  }
+
+  // ============================================================================
+  // PRIVATE: TICK CALCULATION
+  // ============================================================================
+
+  /**
+   * Calculate appropriate tick interval based on zoom level.
+   *
+   * Uses 1-2-5 sequence for millisecond intervals.
+   * Implements skip factor when labels would be too close.
+   */
+  private calculateTickInterval(viewport: ViewportState): TickInterval {
+    // Calculate pixels per nanosecond
+    const pixelsPerNs = viewport.zoom;
+
+    // Target: one label every minLabelSpacing pixels
+    const targetIntervalNs = this.config.minLabelSpacing / pixelsPerNs;
+
+    // Convert to milliseconds
+    const targetIntervalMs = targetIntervalNs / NS_PER_MS;
+
+    // Find appropriate interval using 1-2-5 sequence
+    const { interval, skipFactor } = selectInterval(targetIntervalMs);
+
+    return {
+      interval: interval * NS_PER_MS, // Convert back to nanoseconds
+      skipFactor,
+    };
+  }
+
+  // ============================================================================
+  // PRIVATE: RENDERING
+  // ============================================================================
+
+  /**
+   * Render vertical tick lines with labels at the top.
+   */
+  private renderTicks(
+    viewport: ViewportState,
+    timeStart: number,
+    timeEnd: number,
+    tickInterval: TickInterval,
+  ): void {
+    // Calculate first tick position (snap to interval boundary)
+    // Go back one extra tick to ensure we cover the left edge
+    const firstTickIndex = Math.floor(timeStart / tickInterval.interval) - 1;
+
+    // Calculate last tick position
+    // Go forward one extra tick to ensure we cover the right edge
+    const lastTickIndex = Math.ceil(timeEnd / tickInterval.interval) + 1;
+
+    // Track rendered pixel positions to prevent duplicates
+    const renderedPixels = new Set<number>();
+
+    // Render all ticks in range
+    for (let i = firstTickIndex; i <= lastTickIndex; i++) {
+      const time = i * tickInterval.interval;
+
+      // Calculate screen position and round to pixel
+      const screenX = time * viewport.zoom;
+      const pixelX = Math.round(screenX);
+
+      // Skip if we already rendered a line at this pixel position
+      if (renderedPixels.has(pixelX)) {
+        continue;
+      }
+      renderedPixels.add(pixelX);
+
+      // Calculate if this tick should show a label based on global position
+      // This ensures labels stay consistent when panning
+      const shouldShowLabel = i % tickInterval.skipFactor === 0;
+
+      this.renderVerticalLine(screenX, viewport.displayHeight, time, shouldShowLabel, viewport);
+    }
+  }
+
+  /**
+   * Render a vertical line from top to bottom with optional label at top.
+   */
+  private renderVerticalLine(
+    screenX: number,
+    viewportHeight: number,
+    timeNs: number,
+    showLabel: boolean,
+    viewport: ViewportState,
+  ): void {
+    // Round screen position to prevent sub-pixel rendering issues
+    const roundedX = Math.round(screenX);
+
+    // Draw vertical line using sprite (1px wide, full height)
+    const sprite = this.spritePool.acquire();
+    sprite.position.set(roundedX, 0);
+    sprite.width = 1;
+    sprite.height = viewportHeight;
+    sprite.tint = this.gridLineColor;
+
+    // Add label at top if requested
+    if (showLabel && this.screenSpaceContainer) {
+      const timeMs = timeNs / NS_PER_MS;
+      const labelText = formatMilliseconds(timeMs);
+
+      // Only show label if not empty (skip zero)
+      if (labelText) {
+        const label = this.getOrCreateLabel(labelText);
+
+        // Calculate screen-space X position (accounting for stage pan)
+        // screenX is in world space, need to convert to screen space
+        const screenSpaceX = screenX - viewport.offsetX;
+
+        // Position label in screen space (top-left origin, Y pointing down)
+        // No minimap offset needed - main timeline has its own canvas
+        label.x = screenSpaceX - 3; // 3px to the left of line
+        label.y = 5; // 5px from top
+        label.anchor.set(1, 0); // Right-align to line, align top
+      }
+    }
+  }
+
+  // ============================================================================
+  // PRIVATE: LABEL MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Get or create a PIXI.Text label from cache.
+   * Reuses labels to avoid constant object creation.
+   */
+  private getOrCreateLabel(text: string): Text {
+    let label = this.labelCache.get(text);
+
+    if (!label) {
+      label = new Text({
+        text,
+        style: {
+          fontFamily: 'monospace',
+          fontSize: this.config.fontSize,
+          fill: this.config.textColor,
+        },
+      });
+      this.labelCache.set(text, label);
+      this.labelsContainer.addChild(label);
+    }
+
+    // Make label visible
+    label.visible = true;
+
+    return label;
+  }
+
+  /**
+   * Hide all labels (for next render pass).
+   */
+  private clearLabels(): void {
+    for (const label of this.labelCache.values()) {
+      label.visible = false;
+    }
+  }
+}

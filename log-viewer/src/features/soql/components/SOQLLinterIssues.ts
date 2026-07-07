@@ -4,7 +4,7 @@
 import { LitElement, css, html, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import type { SOQLExecuteBeginLine } from '../../../core/log-parser/LogEvents.js';
+import type { SOQLExecuteBeginLine } from 'apex-log-parser';
 import { DatabaseAccess } from '../../database/services/Database.js';
 import {
   SEVERITY_TYPES,
@@ -22,7 +22,7 @@ export class SOQLLinterIssues extends LitElement {
   soql = '';
 
   @property({ type: Number })
-  timestamp = 0;
+  eventIndex = -1;
 
   @state()
   issues: SOQLLinterRule[] = [];
@@ -48,11 +48,18 @@ export class SOQLLinterIssues extends LitElement {
   ];
 
   async updated(changedProperties: PropertyValues): Promise<void> {
-    if (changedProperties.has('soql')) {
-      const stack = DatabaseAccess.instance()?.getStack(this.timestamp).reverse() || [];
-      const soqlLine = stack[0] as SOQLExecuteBeginLine;
+    if (changedProperties.has('soql') || changedProperties.has('eventIndex')) {
+      const stack =
+        this.eventIndex >= 0
+          ? (DatabaseAccess.instance()?.getStackByEventIndex(this.eventIndex).reverse() ?? [])
+          : [];
+      const soqlLine = stack[0] as SOQLExecuteBeginLine | undefined;
+      if (!soqlLine) {
+        this.issues = [];
+        return;
+      }
       this.issues = this.getIssuesFromSOQLLine(soqlLine);
-      this.issues = this.issues.concat(await new SOQLLinter().lint(this.soql, stack));
+      this.issues = this.issues.concat(await new SOQLLinter().lint(soqlLine.text, stack));
       this.issues.sort((a, b) => {
         return SEVERITY_TYPES.indexOf(a.severity) - SEVERITY_TYPES.indexOf(b.severity);
       });

@@ -4,14 +4,16 @@
 import {
   provideVSCodeDesignSystem,
   vsCodeButton,
-  vsCodeCheckbox,
+  vsCodeDropdown,
+  vsCodeOption,
 } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
-import type { ApexLog, DMLBeginLine } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog, DMLBeginLine } from 'apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
+import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { DatabaseAccess } from '../services/Database.js';
 
@@ -21,13 +23,13 @@ import Number from '../../../tabulator/format/Number.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find, formatter } from '../../../tabulator/module/Find.js';
+import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
-import codiconStyles from '../../../styles/codicon.css';
+import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 import databaseViewStyles from './DatabaseView.scss';
 
@@ -36,7 +38,14 @@ import '../../../components/CallStack.js';
 import '../../../components/datagrid-filter-bar.js';
 import './DatabaseSection.js';
 
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeCheckbox());
+provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDropdown(), vsCodeOption());
+
+const groupLabelsToFields = new Map<string, string>([
+  ['DML', 'dml'],
+  ['Namespace', 'namespace'],
+  ['Caller Namespace', 'callerNamespace'],
+  ['None', ''],
+]);
 
 @customElement('dml-view')
 export class DMLView extends LitElement {
@@ -71,6 +80,12 @@ export class DMLView extends LitElement {
     document.addEventListener('lv-find-close', this._findEvt);
   }
 
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('lv-find', this._findEvt);
+    document.removeEventListener('lv-find-close', this._findEvt);
+  }
+
   updated(changedProperties: PropertyValues): void {
     if (
       this.timelineRoot &&
@@ -92,6 +107,8 @@ export class DMLView extends LitElement {
     globalStyles,
     css`
       :host {
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+
         display: flex;
         flex-direction: column;
         width: 100%;
@@ -107,6 +124,29 @@ export class DMLView extends LitElement {
         width: 100%;
         margin-bottom: 1rem;
       }
+
+      .dropdown-container {
+        box-sizing: border-box;
+        display: flex;
+        flex-flow: column nowrap;
+        align-items: flex-start;
+        justify-content: flex-start;
+
+        label {
+          display: block;
+          color: var(--vscode-descriptionForeground);
+          cursor: pointer;
+          font-size: calc(var(--vscode-font-size) * 0.9);
+          font-weight: 400;
+          line-height: 1.4;
+          margin-bottom: 4px;
+          user-select: none;
+        }
+      }
+
+      vscode-dropdown::part(listbox) {
+        width: auto;
+      }
     `,
   ];
 
@@ -117,11 +157,18 @@ export class DMLView extends LitElement {
       <database-section title="DML Statements" .dbLines="${this.dmlLines}"></database-section>
 
       <datagrid-filter-bar>
-        <div slot="filters">
-          <strong>Group by</strong>
-          <div>
-            <vscode-checkbox @change="${this._dmlGroupBy}" checked>DML</vscode-checkbox>
-          </div>
+        <div slot="filters" class="dropdown-container">
+          <label for="dml-groupby-dropdown">Group by</label>
+          <vscode-dropdown
+            id="dml-groupby-dropdown"
+            aria-label="Group by"
+            aria-labelledby="dml-groupby-dropdown"
+            @change="${this._dmlGroupBy}"
+          >
+            <vscode-option>DML</vscode-option>
+            <vscode-option>Caller Namespace</vscode-option>
+            <vscode-option>None</vscode-option>
+          </vscode-dropdown>
         </div>
 
         <div slot="actions">
@@ -164,9 +211,13 @@ export class DMLView extends LitElement {
   }) as EventListener;
 
   _dmlGroupBy(event: Event) {
+    if (!this.dmlTable) {
+      return;
+    }
     const target = event.target as HTMLInputElement;
+    const groupValue = groupLabelsToFields.get(target.value) ?? '';
     //@ts-expect-error This is a custom function added in the GroupSort custom module
-    this.dmlTable?.setSortedGroupBy(target.checked ? 'dml' : '');
+    this.dmlTable.setSortedGroupBy(groupValue);
   }
 
   get _dmlTableWrapper(): HTMLDivElement | null {
@@ -199,24 +250,19 @@ export class DMLView extends LitElement {
   }
 
   // todo: fix search on grouped data
-  _highlightMatches(highlightIndex: number) {
+  async _highlightMatches(highlightIndex: number) {
     if (!this.dmlTable?.element?.clientHeight) {
       return;
     }
 
     this.findArgs.count = highlightIndex;
     const currentRow = this.findMap[highlightIndex];
-    const rows = [currentRow, this.findMap[this.oldIndex]];
     this.blockClearHighlights = true;
-    this.dmlTable.blockRedraw();
-    rows.forEach((row) => {
-      row?.reformat();
+    //@ts-expect-error This is a custom function added in by Find custom module
+    await this.dmlTable.setCurrentMatch(highlightIndex, currentRow, {
+      scrollIfVisible: false,
+      focusRow: false,
     });
-    if (currentRow) {
-      //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      this.dmlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
-    }
-    this.dmlTable.restoreRedraw();
     this.blockClearHighlights = false;
     this.oldIndex = highlightIndex;
   }
@@ -228,10 +274,6 @@ export class DMLView extends LitElement {
     }
 
     const newFindArgs = JSON.parse(JSON.stringify(e.detail));
-    if (!isTableVisible) {
-      newFindArgs.text = '';
-    }
-
     const newSearch =
       newFindArgs.text !== this.findArgs.text ||
       newFindArgs.options.matchCase !== this.findArgs.options?.matchCase;
@@ -261,19 +303,30 @@ export class DMLView extends LitElement {
 
   _renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
     const dmlData: DMLRow[] = [];
+    let nextRowId = 0;
     if (dmlLines) {
       for (const dml of dmlLines) {
         dmlData.push({
+          id: ++nextRowId,
           dml: dml.text,
+          namespace: dml.namespace,
+          callerNamespace: getCallerNamespace(dml),
           rowCount: dml.dmlRowCount.self,
           timeTaken: dml.duration.total,
-          timestamp: dml.timestamp,
-          _children: [{ timestamp: dml.timestamp, isDetail: true }],
+          eventIndex: dml.eventIndex,
+          _children: [
+            {
+              id: ++nextRowId,
+              eventIndex: dml.eventIndex,
+              isDetail: true,
+            },
+          ],
         });
       }
     }
 
     this.dmlTable = new Tabulator(dmlTableContainer, {
+      index: 'id',
       height: '100%',
       clipboard: true,
       downloadEncoder: this.downlodEncoder('dml.csv'),
@@ -338,11 +391,25 @@ export class DMLView extends LitElement {
           formatter: (cell, _formatterParams, _onRendered) => {
             const data = cell.getData() as DMLRow;
             return `<call-stack
-            timestamp="${data.timestamp}"
+            eventIndex="${data.eventIndex}"
             startDepth="0"
             endDepth="1"
           ></call-stack>`;
           },
+        },
+        {
+          title: 'Caller Namespace',
+          field: 'callerNamespace',
+          sorter: 'string',
+          width: 120,
+          headerFilter: 'list',
+          headerFilterFunc: 'in',
+          headerFilterParams: {
+            valuesLookup: 'all',
+            clearable: true,
+            multiselect: true,
+          },
+          headerFilterLiveFilter: false,
         },
         {
           title: 'Row Count',
@@ -375,14 +442,10 @@ export class DMLView extends LitElement {
       ],
       rowFormatter: (row) => {
         const data = row.getData();
-        if (data.isDetail && data.timestamp) {
-          const detailContainer = this.createDetailPanel(data.timestamp);
+        if (data.isDetail && data.eventIndex !== undefined) {
+          const detailContainer = this.createDetailPanel(data.eventIndex);
           row.getElement().replaceChildren(detailContainer);
         }
-
-        requestAnimationFrame(() => {
-          formatter(row, this.findArgs);
-        });
       },
     });
 
@@ -411,7 +474,7 @@ export class DMLView extends LitElement {
       }
 
       const data = row.getData();
-      if (!(data.timestamp && data.dml)) {
+      if (!(data.eventIndex !== undefined && data.dml)) {
         return;
       }
 
@@ -467,7 +530,7 @@ export class DMLView extends LitElement {
     this.findArgs.text = '';
     this.findArgs.count = 0;
     //@ts-expect-error This is a custom function added in by Find custom module
-    this.dmlTable.clearFindHighlights(Object.values(this.findMap));
+    this.dmlTable.clearFindHighlights();
     this.findMap = {};
     this.totalMatches = 0;
 
@@ -488,10 +551,10 @@ export class DMLView extends LitElement {
     return this.holder;
   }
 
-  createDetailPanel(timestamp: number) {
+  createDetailPanel(eventIndex: number) {
     const detailContainer = document.createElement('div');
     detailContainer.className = 'row__details-container';
-    render(html`<call-stack timestamp=${timestamp}></call-stack>`, detailContainer);
+    render(html`<call-stack eventIndex=${eventIndex}></call-stack>`, detailContainer);
 
     return detailContainer;
   }
@@ -522,10 +585,13 @@ type VSCodeSaveFile = {
 };
 
 interface DMLRow {
+  id: number;
   dml?: string;
+  namespace?: string;
+  callerNamespace?: string;
   rowCount?: number;
   timeTaken?: number;
-  timestamp: number;
+  eventIndex?: number;
   isDetail?: boolean;
   _children?: DMLRow[];
 }

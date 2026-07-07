@@ -16,9 +16,11 @@ import {
   type RowComponent,
 } from 'tabulator-tables';
 
-import type { ApexLog, SOQLExecuteBeginLine } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
+import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { DatabaseAccess } from '../services/Database.js';
 
 // Tabulator custom modules, imports + styles
@@ -27,13 +29,13 @@ import Number from '../../../tabulator/format/Number.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
-import { Find, formatter } from '../../../tabulator/module/Find.js';
+import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
-import codiconStyles from '../../../styles/codicon.css';
+import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 import databaseViewStyles from './DatabaseView.scss';
 
@@ -82,6 +84,12 @@ export class SOQLView extends LitElement {
     document.addEventListener('lv-find-close', this._findEvt);
   }
 
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    document.removeEventListener('lv-find', this._findEvt);
+    document.removeEventListener('lv-find-close', this._findEvt);
+  }
+
   updated(changedProperties: PropertyValues): void {
     if (
       this.timelineRoot &&
@@ -100,9 +108,12 @@ export class SOQLView extends LitElement {
     unsafeCSS(dataGridStyles),
     unsafeCSS(databaseViewStyles),
     unsafeCSS(codiconStyles),
+    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
+        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
+
         display: flex;
         flex-direction: column;
         width: 100%;
@@ -127,12 +138,18 @@ export class SOQLView extends LitElement {
 
         label {
           display: block;
-          color: var(--vscode-foreground);
+          color: var(--vscode-descriptionForeground);
           cursor: pointer;
-          font-size: var(--vscode-font-size);
-          line-height: normal;
-          margin-bottom: 2px;
+          font-size: calc(var(--vscode-font-size) * 0.9);
+          font-weight: 400;
+          line-height: 1.4;
+          margin-bottom: 4px;
+          user-select: none;
         }
+      }
+
+      vscode-dropdown::part(listbox) {
+        width: auto;
       }
     `,
   ];
@@ -144,8 +161,13 @@ export class SOQLView extends LitElement {
 
       <datagrid-filter-bar>
         <div slot="filters" class="dropdown-container">
-          <label for="soql-groupby-dropdown"><strong>Group by</strong></label>
-          <vscode-dropdown id="soql-groupby-dropdown" @change="${this._soqlGroupBy}">
+          <label for="soql-groupby-dropdown">Group by</label>
+          <vscode-dropdown
+            id="soql-groupby-dropdown"
+            aria-label="Group by"
+            aria-labelledby="soql-groupby-dropdown"
+            @change="${this._soqlGroupBy}"
+          >
             <vscode-option>SOQL</vscode-option>
             <vscode-option>Namespace</vscode-option>
             <vscode-option>None</vscode-option>
@@ -226,7 +248,7 @@ export class SOQLView extends LitElement {
     });
   }
 
-  _highlightMatches(highlightIndex: number) {
+  async _highlightMatches(highlightIndex: number) {
     if (!this.soqlTable?.element?.clientHeight) {
       return;
     }
@@ -234,17 +256,11 @@ export class SOQLView extends LitElement {
     this.findArgs.count = highlightIndex;
     const currentRow = this.findMap[highlightIndex];
     this.blockClearHighlights = true;
-    this.soqlTable.blockRedraw();
-    const rows = [currentRow, this.findMap[this.oldIndex]];
-    rows.forEach((row) => {
-      row?.reformat();
+    //@ts-expect-error This is a custom function added in by Find custom module
+    await this.soqlTable.setCurrentMatch(highlightIndex, currentRow, {
+      scrollIfVisible: false,
+      focusRow: false,
     });
-
-    if (currentRow) {
-      //@ts-expect-error This is a custom function added in by RowNavigation custom module
-      this.soqlTable.goToRow(currentRow, { scrollIfVisible: false, focusRow: false });
-    }
-    this.soqlTable.restoreRedraw();
     this.blockClearHighlights = false;
 
     this.oldIndex = highlightIndex;
@@ -285,10 +301,11 @@ export class SOQLView extends LitElement {
   }
 
   _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
-    const timestampToSOQl = new Map<number, SOQLExecuteBeginLine>();
+    const eventIndexToSOQL = new Map<number, SOQLExecuteBeginLine>();
+    let nextRowId = 0;
 
     soqlLines?.forEach((line) => {
-      timestampToSOQl.set(line.timestamp, line);
+      eventIndexToSOQL.set(line.eventIndex, line);
     });
 
     const soqlData: GridSOQLData[] = [];
@@ -296,6 +313,7 @@ export class SOQLView extends LitElement {
       for (const soql of soqlLines) {
         const explainLine = soql.children[0];
         soqlData.push({
+          id: ++nextRowId,
           isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
           relativeCost: explainLine?.relativeCost,
           soql: soql.text,
@@ -303,13 +321,20 @@ export class SOQLView extends LitElement {
           rowCount: soql.soqlRowCount.self,
           timeTaken: soql.duration.total,
           aggregations: soql.aggregations,
-          timestamp: soql.timestamp,
-          _children: [{ timestamp: soql.timestamp, isDetail: true }],
+          eventIndex: soql.eventIndex,
+          _children: [
+            {
+              id: ++nextRowId,
+              eventIndex: soql.eventIndex,
+              isDetail: true,
+            },
+          ],
         });
       }
     }
 
     this.soqlTable = new Tabulator(soqlTableContainer, {
+      index: 'id',
       height: '100%',
       rowKeyboardNavigation: true,
       data: soqlData,
@@ -330,6 +355,7 @@ export class SOQLView extends LitElement {
       keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
       clipboardCopyRowRange: 'all',
       groupCalcs: true,
+      groupHeader: soqlGroupHeader,
       groupSort: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
@@ -376,7 +402,7 @@ export class SOQLView extends LitElement {
           formatter: (cell, _formatterParams, _onRendered) => {
             const data = cell.getData() as GridSOQLData;
             return `<call-stack
-            timestamp=${data.timestamp}
+            eventIndex=${data.eventIndex}
             startDepth="0"
             endDepth="1"
           ></call-stack>`;
@@ -497,14 +523,10 @@ export class SOQLView extends LitElement {
       ],
       rowFormatter: (row) => {
         const data = row.getData();
-        if (data.isDetail && data.timestamp) {
-          const detailContainer = this.createSOQLDetailPanel(data.timestamp, timestampToSOQl);
+        if (data.isDetail && data.eventIndex !== undefined) {
+          const detailContainer = this.createSOQLDetailPanel(data.eventIndex, eventIndexToSOQL);
           row.getElement().replaceChildren(detailContainer);
         }
-
-        requestAnimationFrame(() => {
-          formatter(row, this.findArgs);
-        });
       },
     });
 
@@ -533,7 +555,7 @@ export class SOQLView extends LitElement {
       }
 
       const data = row.getData();
-      if (!(data.timestamp && data.soql)) {
+      if (!(data.eventIndex !== undefined && data.soql)) {
         return;
       }
 
@@ -589,13 +611,13 @@ export class SOQLView extends LitElement {
     this.findArgs.text = '';
     this.findArgs.count = 0;
     //@ts-expect-error This is a custom function added in by Find custom module
-    this.soqlTable.clearFindHighlights(Object.values(this.findMap));
+    this.soqlTable.clearFindHighlights();
     this.findMap = {};
     this.totalMatches = 0;
 
     document.dispatchEvent(
       new CustomEvent('db-find-results', {
-        detail: { totalMatches: this.totalMatches, type: 'dml' },
+        detail: { totalMatches: this.totalMatches, type: 'soql' },
       }),
     );
   }
@@ -610,14 +632,14 @@ export class SOQLView extends LitElement {
     return this.holder;
   }
 
-  createSOQLDetailPanel(timestamp: number, timestampToSOQl: Map<number, SOQLExecuteBeginLine>) {
+  createSOQLDetailPanel(eventIndex: number, eventIndexToSOQL: Map<number, SOQLExecuteBeginLine>) {
     const detailContainer = document.createElement('div');
     detailContainer.className = 'row__details-container';
 
-    const soqlLine = timestampToSOQl.get(timestamp);
+    const soqlLine = eventIndexToSOQL.get(eventIndex);
     render(
       html`<db-soql-detail-panel
-        timestamp=${timestamp}
+        eventIndex=${eventIndex}
         soql=${soqlLine?.text}
       ></db-soql-detail-panel>`,
       detailContainer,
@@ -652,6 +674,7 @@ type VSCodeSaveFile = {
 };
 
 interface GridSOQLData {
+  id: number;
   isSelective?: boolean | null;
   relativeCost?: number | null;
   soql?: string;
@@ -659,7 +682,7 @@ interface GridSOQLData {
   rowCount?: number | null;
   timeTaken?: number | null;
   aggregations?: number;
-  timestamp: number;
+  eventIndex?: number;
   isDetail?: boolean;
   _children?: GridSOQLData[];
 }

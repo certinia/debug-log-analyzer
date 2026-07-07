@@ -6,16 +6,31 @@ import { vscodeMessenger } from '../../core/messaging/VSCodeExtensionMessenger.j
 /* eslint-disable @typescript-eslint/naming-convention */
 export type LanaSettings = {
   timeline: {
+    activeTheme: string;
     colors: {
-      'Code Unit': '#88AE58';
-      Workflow: '#51A16E';
-      Method: '#2B8F81';
-      Flow: '#337986';
-      DML: '#285663';
-      SOQL: '#5D4963';
-      'System Method': '#5C3444';
+      Method: string;
+      'Code Unit': string;
+      'System Method': string;
+      Workflow: string;
+      DML: string;
+      SOQL: string;
     };
-    experimental: { timeline: boolean };
+    customThemes: {
+      [key: string]: {
+        apex: string;
+        codeUnit: string;
+        system: string;
+        automation: string;
+        dml: string;
+        soql: string;
+        callout: string;
+        validation: string;
+      };
+    };
+    legacy: boolean;
+  };
+  callTree: {
+    categoryColorize: boolean;
   };
 };
 

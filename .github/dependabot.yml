@@ -3,5 +3,9 @@ updates:
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
-      interval: 'daily' # Check the npm registry for updates every day (weekdays)
+      interval: 'daily'
     versioning-strategy: auto
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'

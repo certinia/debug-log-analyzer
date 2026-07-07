@@ -1,20 +1,22 @@
+import path from 'node:path';
+import process from 'node:process';
+import { fileURLToPath } from 'node:url';
+
 // Rollup plugins
 import alias from '@rollup/plugin-alias';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
-import path from 'path';
+import postcssUrl from 'postcss-url';
 import copy from 'rollup-plugin-copy';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
 import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _filename = fileURLToPath(import.meta.url);
+const _dirname = path.dirname(_filename);
 
 const production = process.env.NODE_ENV === 'production';
-console.log('Package mode:', production ? 'production' : 'development');
 export default [
   {
     input: './lana/src/Main.ts',
@@ -27,7 +29,15 @@ export default [
 
     external: ['vscode'],
     plugins: [
-      nodeResolve({ preferBuiltins: true, dedupe: ['@salesforce/core'] }),
+      alias({
+        entries: [
+          {
+            find: 'antlr4',
+            replacement: path.resolve(_dirname, 'node_modules/antlr4/dist/antlr4.node.mjs'),
+          },
+        ],
+      }),
+      nodeResolve({ preferBuiltins: true }),
       commonjs(),
       json(),
       swc(
@@ -37,16 +47,39 @@ export default [
           tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
           jsc: {
             minify: {
-              compress: production,
-              mangle: production
-                ? {
-                    keep_classnames: true,
-                  }
-                : false,
+              compress: production ? { keep_classnames: true, keep_fnames: true } : false,
+              mangle: production ? { keep_classnames: true } : false,
             },
           },
         }),
       ),
+      // Copy runtime dependency files for salesforce bundle compatibility
+      copy({
+        targets: [
+          // Pino worker files (thread-stream requires these at runtime)
+          {
+            src: 'node_modules/.pnpm/thread-stream@*/node_modules/thread-stream/lib/worker.js',
+            dest: 'lana/out',
+            rename: 'thread-stream-worker.js',
+          },
+          {
+            src: 'node_modules/.pnpm/pino@*/node_modules/pino/lib/worker.js',
+            dest: 'lana/out',
+            rename: 'pino-worker.js',
+          },
+          {
+            src: 'node_modules/.pnpm/pino@*/node_modules/pino/file.js',
+            dest: 'lana/out',
+            rename: 'pino-file.js',
+          },
+          // @salesforce/core logger transform stream (pino transport pipeline)
+          {
+            src: 'node_modules/.pnpm/@salesforce+core@*/node_modules/@salesforce/core/lib/logger/transformStream.js',
+            dest: 'lana/out',
+            rename: 'salesforce-transform-stream.js',
+          },
+        ],
+      }),
     ],
   },
   {
@@ -63,8 +96,8 @@ export default [
       alias({
         entries: [
           {
-            find: 'eventemitter3',
-            replacement: path.resolve(__dirname, 'node_modules/eventemitter3/index.js'),
+            find: 'antlr4',
+            replacement: path.resolve(_dirname, 'node_modules/antlr4/dist/antlr4.web.mjs'),
           },
         ],
       }),
@@ -78,6 +111,7 @@ export default [
         defineRollupSwcOption({
           // All options are optional
           include: /\.[mc]?[jt]sx?$/,
+
           exclude: 'node_modules',
           tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
           jsc: {
@@ -96,20 +130,15 @@ export default [
       postcss({
         extensions: ['.css', '.scss'],
         minimize: true,
+        plugins: [postcssUrl({ url: 'inline' })],
       }),
       copy({
         hook: 'closeBundle',
         targets: [
           {
-            src: [
-              'log-viewer/out/*',
-              'log-viewer/index.html',
-              'lana/certinia-icon-color.png',
-              'node_modules/@vscode/codicons/dist/codicon.ttf',
-            ],
+            src: ['log-viewer/out/*', 'log-viewer/index.html', 'lana/certinia-icon-color.png'],
             dest: 'lana/out',
           },
-          { src: ['CHANGELOG.md', 'LICENSE.txt', 'README.md'], dest: 'lana' },
         ],
       }),
     ],

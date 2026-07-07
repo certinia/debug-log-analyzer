@@ -16,7 +16,7 @@ export class DatabaseSOQLDetailPanel extends LitElement {
   @property({ type: String })
   soql = '';
   @property({ type: Number })
-  timestamp = null;
+  eventIndex = -1;
 
   static styles = [
     globalStyles,
@@ -40,8 +40,8 @@ export class DatabaseSOQLDetailPanel extends LitElement {
 
   render() {
     return html`
-      <call-stack timestamp=${this.timestamp}></call-stack>
-      <soql-issues timestamp=${this.timestamp} soql=${this.soql}></soql-issues>
+      <call-stack eventIndex=${this.eventIndex}></call-stack>
+      <soql-issues eventIndex=${this.eventIndex} soql=${this.soql}></soql-issues>
     `;
   }
 }

@@ -1,8 +1,9 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
-export const tooltipStyles = `
+export const tooltipStyles = `${soqlSyntaxStyles}
    #timeline-tooltip {
         display: none;
         position: absolute;
@@ -18,21 +19,20 @@ export const tooltipStyles = `
         padding: 5px;
         border-radius: 4px;
         border-left: 4px solid;
-        background-color: var(--vscode-editor-background);
-        color: var(--vscode-editor-foreground);
+        background-color: var(--tl-hover-background);
+        color: var(--tl-hover-foreground);
         font-family: monospace;
         font-size: 0.92rem;
-        pointer-events: none;
+        pointer-events: auto;
         transition: opacity 0.15s ease;
       }
 
       .tooltip-header {
         font-weight: 500;
         margin-bottom: 10px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        line-height: 1em;
+        line-height: 1.3em;
         white-space: pre-wrap;
+        word-break: break-all;
       }
 
       .tooltip-row {
@@ -48,6 +48,8 @@ export const tooltipStyles = `
         white-space: nowrap;
         text-overflow: ellipsis;
         padding-right: 12px;
+        color: var(--tl-description-foreground, #999);
+        opacity: 0.9;
       }
 
       .tooltip-value {
@@ -55,9 +57,7 @@ export const tooltipStyles = `
         font-variant-numeric: tabular-nums;
         font-weight: 500;
         font-family: monospace;
-        opacity: 0.9;
         text-align: right;
         white-space: pre-wrap;
-        color: var(--vscode-descriptionForeground, #999)
       }
 `;

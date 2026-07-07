@@ -5,22 +5,97 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.20.0] 2026-06-18
 
 ### Added
 
-- ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart that is up to **7X faster**. ([#446] [#251])
-  - Enable it via **Settings -> Apex Log Analyzer -> Timeline -> Experimental -> Timeline**.
-  - Generally Improved performance, especially for large logs.
-  - Zoom and pan functionalities are now **7X faster**.
-  - Time axis scales better, with larger gaps between the markers on longer logs.
+- ⚡ **Timeline**: A brand new **experimental** timeline Flame Chart built for massive logs and up to **7X faster**. ([#446] [#251] [#92] [#564])
+  - **⚡ Performance**: Improved performance to handle huge Apex debug logs.
+    - Zoom + pan are **7X faster** with smoother motion.
+  - **Minimap**: Navigate massive logs at a glance with the new minimap overview. ([#245] [#446])
+    - **Skyline Overview**: Density-based visualization shows stack depth and event distribution across the entire timeline. Color-coded categories and logarithmic opacity reveal hotspots instantly.
+    - **Viewport Lens**: A window highlights exactly what's visible in the main timeline - both time range and depth. Drag to create zoom selections, resize edges to adjust, or teleport with `Cmd/Ctrl+Click`.
+    - **Cursor Mirroring**: Hover on the minimap to see a guide line on the main timeline.
+    - **Rich Interactions**:
+      - **Drag anywhere** → draw a new zoom selection
+      - **Drag lens edges** → resize the viewport
+      - **Shift+Drag inside lens** → pan the viewport
+      - **Cmd/Ctrl+Click** → instantly teleport the lens
+      - **Scroll** → zoom (vertical) or pan (horizontal)
+      - **Double-click** → reset to full timeline view
+    - **Keyboard shortcuts** (when hovering minimap): Arrow keys pan, `W`/`S` zoom, `Home`/`End` jump, `0` resets.
+  - **📊 Governor Limits Visualization**: New metric strip showing governor limit usage over time. ([#714])
+    - **Traffic Light Coloring**: Instant visual feedback on limit consumption (safe/warning/critical/breach zones).
+    - **Collapsed Mode**: Compact heat-style strip showing max usage across all metrics.
+    - **Expanded Mode**: Full step chart with individual metric lines (click chevron or `Shift+Click` to toggle).
+    - **Smart Tooltips**: Hover to see detailed breakdown with top metrics, always-visible core limits (CPU, Heap, SOQL, DML), and usage percentages.
+    - **Tier Classification**: Metrics auto-classified by usage - Tier 1 (top 3), Tier 2 (>80%), Tier 3 (others aggregated).
+    - **Synced Navigation**: Zoom, pan, and cursor synchronized with main timeline.
+  - **Adaptive Frame Bucketing**: Reveals nested frame detail and stack structure as you zoom, automatically adjusting frame granularity to understand complex call hierarchies.
+  - **Dynamic Frame Labels**: Labels automatically appear on timeline frames as you zoom and pan, making log scanning and navigation effortless without manually hovering to see event details. ([#92])
+  - **Keyboard and Mouse Navigation**: Comprehensive interaction controls for the timeline. ([#573] [#366] [#296] [#295] [#535])
+    - **Selection & Focus**:
+      - **Frame Selection**: Click to select and highlight a frame without navigating away.
+      - **Frame Navigation**: Arrow keys traverse the call stack (Up=child, Down=parent, Left/Right=siblings).
+      - **Focus/Zoom to Frame**: Double-click or press `Enter`/`Z` to zoom and fit the selected frame. ([#535] [#295])
+    - **Pan & Zoom**: ([#296])
+      - **Zoom**: Scroll wheel (mouse-anchored), or `W`/`S`/`+`/`-` keys.
+      - **Horizontal Pan**: `Alt/Option+Scroll`, trackpad swipe, `A`/`D` keys, or click and drag.
+      - **Vertical Pan**: `Shift+Scroll` or `Shift+W`/`Shift+S` to pan through stack depth.
+      - **Reset Zoom**: Press `Home` or `0` to reset zoom and fit all content.
+      - **Area Zoom**: `Alt/Option+Drag` to select a time range and instantly zoom to fit it. ([#164])
+    - **Measure Range**: `Shift+Drag` to measure the duration between two points; resize by dragging edges; double-click or click the zoom icon to zoom to the measured range. ([#164])
+      - `Esc` or click empty space to dismis the range.
+    - **Actions & Shortcuts**: ([#573] [#366])
+      - **Jump to Call Tree**: Press `J` or `Cmd/Ctrl+Click` to navigate to the frame in the Call Tree.
+      - **Context Menu**: Right-click for Go to Source, Copy Name, Copy Details, and Copy Call Stack.
+      - **Copy**: `Cmd/Ctrl+C` copies the selected frame name.
+      - **Marker Navigation**: Click markers to select; arrow Left/Right to navigate between markers.
+      - **Clear Selection**: Press `Escape` to deselect the current frame or marker.
+  - **⏱️ Time Axis Auto-Spacing**: Markers intelligently and naturally auto-space as you zoom.
+  - **🕐 Wall-Clock Time**: Toggle between elapsed time and wall-clock time (HH:MM:SS.mmm) on the time axis. Click the clock button in the timeline toolbar to switch modes. Tooltips also show the wall-clock start → end time for each event. ([#685])
+  - **🔍 Search + Highlight**: Dims non-matches for fast scanning.
+  - **Timeline Categories**: Redesigned timeline categories for clearer, more meaningful event grouping. ([#98])
+    - Apex (Apex code), Automation (Workflow, NBA), Callout, Code Unit, DML, SOQL, System (System, Visualforce), Validation
+  - **🎨 Themes**:
+    - 18 curated timeline themes plus the default theme has been improved for better contrast and readability.
+    - Add your own multiple custom themes via **Settings -> Apex Log Analyzer -> Timeline -> Custom Themes**.
+    - Fast theme switching via **Command Palette**: **Log: Timeline Theme** or **Settings -> Apex Log Analyzer -> Timeline -> Active Theme**.
+  - **Full support for all original Timeline features** including:
+    - Zoom and pan navigation (mouse + keyboard)
+    - Search with result highlighting
+    - Frame tooltips on hover
+    - Markers for errors, skipped lines, and truncation
+    - Click to navigate to Call Tree (now on key press of `J` or `Cmd/Ctrl+Click`)
+  - **Legacy Support**: Toggle the legacy timeline anytime via **Settings -> Apex Log Analyzer -> Timeline -> Legacy**.
+- 🌲 **Call Tree Views**: Detailed **Time Order**, **Aggregated**, and **Bottom-Up** views. ([#333])
+  - **Time Order**: Chronological call stack for frame-by-frame execution flow.
+  - **Aggregated**: Groups repeated calls to surface the highest-impact methods quickly.
+  - **Bottom-Up**: Starts from callees and expands to callers, with optional grouping by Namespace or Type.
+  - **Go to Source**: Click method names to open source from **Time Order**, **Aggregated**, and **Bottom-Up** when symbols are available.
+  - **Analysis Alignment**: Analysis now uses the same bottom-up table model for consistent caller attribution.
+  - **🎨 Category Coloring**: The Name column is colored by event category using the active timeline theme - a color chip by default, or a full background tint + colored text when enabled via **Settings → Apex Log Analyzer → colorize Call Tree category names**. ([#734])
+- 📄 **Raw Log Navigation**: Seamless navigation between raw log files and the log analysis. ([#204])
+  - **Show in Raw Log**: Right-click timeline or call tree frames → "Show in Log File" to jump to the corresponding line.
+  - **Show in Log Analysis**: Click the hover link on raw log lines to navigate back to the log analysis.
+  - **Code Folding**: Collapse/expand matching start/end events (METHOD_ENTRY/EXIT, CODE_UNIT, DML, SOQL, etc.).
+  - **Outline, Breadcrumbs & Sticky Scroll**: Outline view, breadcrumbs, and sticky scroll in the editor.
+  - **Line Decorations**: Duration appears as ghost text at the end of the cursor line (e.g., `1.23s (self: 45ms)`).
+  - **Hover Details**: Hover near the ghost text to see SOQL/DML counts, row counts, and exception info.
+  - **Total Duration**: First line shows total log execution time.
+  - **Syntax Highlighting**: Apex debug log files are automatically recognized and syntax highlighted for improved readability.
+- 🏷️ **Group by Caller Namespace**: New grouping option across the Analysis, Bottom-Up, and DML views. Groups rows by the namespace of their **direct caller** (the immediate parent code unit), making it easy to see cross-package activity. ([#604])
+- 🎨 **SOQL Syntax Highlighting & Pretty-Printing**: SOQL queries are now syntax-highlighted and pretty-printed wherever they appear - Database view, Call Tree, Timeline tooltips, and call-stack rows. Keywords, functions, strings, numbers, and bind variables are themed. ([#605])
 
 ### Changed
 
-- 🎯 **Call Tree Go To**: Go-to links in call tree now navigate to method definition instead of where method was called from ([#632] [#200])
-- ⚡ **Log Parsing**: Improved performance ([#552])
-- ✨ **Duration Formatting**: Human-readable duration formatting in tooltips (30000 ms -> 30s and 0.01 ms -> 10 µs) ([#671])
-- 🎯 **Number Precision**: Total and Self Time column precision changed to 2 decimal places for improved readability ([#671])
+- 🎯 **Call Tree Go To**: Go-to links in call tree now navigate to method definition instead of where method was called from. ([#632] [#200])
+- 🔍 **Search Navigation**: `Shift+Enter` navigates to the previous search result; hold `Enter` to continuously navigate.
+- ⚡ **Search Performance**: Up to 10x faster search on large logs. ([#627])
+- ⚡ **Log Parsing**: Improved performance. ([#552])
+- ✨ **Duration Formatting**: Human-readable duration formatting in tooltips (30000 ms -> 30s and 0.01 ms -> 10 µs). ([#671])
+- 🎯 **Number Precision**: Total and Self Time column precision changed to 2 decimal places for improved readability. ([#671])
+- 🎨 **Navigation Bar**: Redesigned to better match VS Code’s look and feel. ([#694])
 
 ## [1.18.1] 2025-07-09
 
@@ -187,7 +262,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Export to CSV` not working when a log was opened in a new VSCode window and not associated to a workspace ([#363][#363]).
 
-## [1.8.0]
+## [1.8.0] - 2023-10-19
 
 Skipped due to adopting odd numbering for pre releases and even number for releases.
 
@@ -380,38 +455,57 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 - Timeline Shrink-to-fit checkbox was replaced with zoom feature ([#33][#33]).
 
-## [1.3.5] - December 2020
+## [1.3.5] - 2020-12-14
 
 - Fix issue #7 Command 'lana.showLogFile' not found.
 - Fix issue #3 Cannot read property 'path' of undefined.
 
-## [1.3.4] - December 2020
+## [1.3.4] - 2020-12-11
 
 - Fix issue #4 with Windows paths.
 
-## [1.3.3] - December 2020
+## [1.3.3] - 2020-12-10
 
 - Synchronise versions.
 
-## [1.3.2] - December 2020
+## [1.3.2] - 2020-12-09
 
 - Details for Visual Studio Code Marketplace listing.
 - Improvements to READMEs.
 
-## [1.3.1] - December 2020
+## [1.3.1] - 2020-12-09
 
 - Small changes to command labels.
 - Improvements to READMEs.
 
-## [1.3] - September 2020
+## [1.3] - 2020-12-08
 
 - When opening a source file, open at correct line.
 - Misc Visual tweaks.
 - Add explorer menu item.
 - Provide more information when selecting log to download.
 
-<!-- Unreleased -->
+<!-- v1.20.0 -->
 
+[#605]: https://github.com/certinia/debug-log-analyzer/issues/605
+[#604]: https://github.com/certinia/debug-log-analyzer/issues/604
+[#333]: https://github.com/certinia/debug-log-analyzer/issues/333
+[#627]: https://github.com/certinia/debug-log-analyzer/issues/627
+[#685]: https://github.com/certinia/debug-log-analyzer/issues/685
+[#98]: https://github.com/certinia/debug-log-analyzer/issues/98
+[#204]: https://github.com/certinia/debug-log-analyzer/issues/204
+[#714]: https://github.com/certinia/debug-log-analyzer/issues/714
+[#734]: https://github.com/certinia/debug-log-analyzer/issues/734
+[#245]: https://github.com/certinia/debug-log-analyzer/issues/245
+[#164]: https://github.com/certinia/debug-log-analyzer/issues/164
+[#535]: https://github.com/certinia/debug-log-analyzer/issues/535
+[#295]: https://github.com/certinia/debug-log-analyzer/issues/295
+[#296]: https://github.com/certinia/debug-log-analyzer/issues/296
+[#366]: https://github.com/certinia/debug-log-analyzer/issues/366
+[#573]: https://github.com/certinia/debug-log-analyzer/issues/573
+[#564]: https://github.com/certinia/debug-log-analyzer/issues/564
+[#92]: https://github.com/certinia/debug-log-analyzer/issues/92
+[#694]: https://github.com/certinia/debug-log-analyzer/issues/694
 [#446]: https://github.com/certinia/debug-log-analyzer/issues/446
 [#251]: https://github.com/certinia/debug-log-analyzer/issues/251
 [#671]: https://github.com/certinia/debug-log-analyzer/issues/671

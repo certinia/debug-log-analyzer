@@ -25,6 +25,9 @@ export class DatagridFilterBar extends LitElement {
 
       .filter-bar {
         display: flex;
+        .filter-bar__filters {
+          display: flex;
+        }
       }
 
       .filter-bar .filter-bar__actions--right {

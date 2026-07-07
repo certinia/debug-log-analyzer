@@ -1,14 +1,22 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { LitElement, css, html, unsafeCSS } from 'lit';
+import { customElement, property, query, state } from 'lit/decorators.js';
 
-import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
+import type { ApexLog } from 'apex-log-parser';
+import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getSettings } from '../../settings/Settings.js';
-import { type TimelineGroup } from '../services/Timeline.js';
+import { type TimelineGroup, keyMap, setColors } from '../services/Timeline.js';
+
+import { DEFAULT_THEME_NAME, type TimelineColors } from '../themes/Themes.js';
+import { addCustomThemes, getTheme } from '../themes/ThemeSelector.js';
+
+import type { TimeDisplayMode } from '../types/flamechart.types.js';
+import type { TimelineFlameChart } from './TimelineFlameChart.js';
 
 // styles
+import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 
 // web components
@@ -17,15 +25,44 @@ import './TimelineKey.js';
 import './TimelineLegacy.js';
 import './TimelineSkeleton.js';
 
+interface ThemeSettings {
+  [key: string]: {
+    apex: string;
+    codeUnit: string;
+    system: string;
+    automation: string;
+    dml: string;
+    soql: string;
+    callout: string;
+    validation: string;
+  };
+}
+
 @customElement('timeline-view')
 export class TimelineView extends LitElement {
   @property()
   timelineRoot: ApexLog | null = null;
-  @property()
-  timelineKeys: TimelineGroup[] = [];
+
+  @property({ type: Number })
+  navigateToTimestamp: number | undefined = undefined;
+
+  @property({ type: Number })
+  navigateToEventIndex: number | undefined = undefined;
 
   @state()
-  private isNewTimelineEnabled: boolean | null = null;
+  activeTheme: string | null = null;
+
+  @state()
+  private timelineKeys: TimelineGroup[] = [];
+
+  @state()
+  private useLegacyTimeline: boolean | null = null;
+
+  @state()
+  private timeDisplayMode: TimeDisplayMode = 'elapsed';
+
+  @query('timeline-flame-chart')
+  private flameChartRef!: TimelineFlameChart;
 
   constructor() {
     super();
@@ -33,39 +70,205 @@ export class TimelineView extends LitElement {
 
   static styles = [
     globalStyles,
+    unsafeCSS(codiconStyles),
     css`
       :host {
+        /* Editor */
+        --tl-editor-background: var(--vscode-editor-background);
+        --tl-editor-foreground: var(--vscode-editor-foreground);
+        --tl-cursor-foreground: var(--vscode-editorCursor-foreground, #fff);
+        --tl-focus-border: var(--vscode-focusBorder, #007fd4);
+        --tl-line-number-foreground: var(--vscode-editorLineNumber-foreground, #808080);
+
+        /* Find/selection */
+        --tl-find-match-background: var(--vscode-editor-findMatchBackground, #ff9632);
+        --tl-selection-background: var(--vscode-editor-selectionBackground, rgba(38, 79, 120, 0.5));
+        --tl-selection-highlight-border: var(--vscode-editor-selectionHighlightBorder, transparent);
+
+        /* Widgets */
+        --tl-widget-background: var(--vscode-editorWidget-background, #252526);
+        --tl-widget-border: var(--vscode-editorWidget-border, #454545);
+        --tl-widget-foreground: var(--vscode-editorWidget-foreground, #cccccc);
+
+        /* Hover/tooltip */
+        --tl-hover-background: var(
+          --vscode-editorHoverWidget-background,
+          var(--vscode-editorWidget-background, #252526)
+        );
+        --tl-hover-border: var(
+          --vscode-editorHoverWidget-border,
+          var(--vscode-editorWidget-border, #454545)
+        );
+        --tl-hover-foreground: var(
+          --vscode-editorHoverWidget-foreground,
+          var(--vscode-editorWidget-foreground, #cccccc)
+        );
+
+        /* Text */
+        --tl-description-foreground: var(--vscode-descriptionForeground, #999);
+        --tl-font-family: var(--vscode-font-family, sans-serif);
+
+        /* Buttons */
+        --tl-button-secondary-background: var(--vscode-button-secondaryBackground, #3a3d41);
+        --tl-button-secondary-foreground: var(--vscode-button-secondaryForeground, #cccccc);
+        --tl-button-secondary-hover-background: var(
+          --vscode-button-secondaryHoverBackground,
+          #45494e
+        );
+
+        /* Toolbar */
+        --tl-toolbar-hover-background: var(--vscode-toolbar-hoverBackground);
+
+        --button-icon-hover-background: var(--tl-toolbar-hover-background);
+
         display: flex;
         flex-direction: column;
         flex: 1;
         position: relative;
         width: 100%;
-        height: 80%;
+        height: 90%;
+      }
+
+      .timeline-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+        flex: 0 0 auto;
+      }
+
+      vscode-button {
+        height: 22px;
+        width: 22px;
       }
     `,
   ];
 
   async connectedCallback() {
     super.connectedCallback();
-    const settings = await getSettings();
-    this.isNewTimelineEnabled = settings.timeline.experimental.timeline;
+
+    VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
+      const { cmd, payload } = event.data;
+      if (cmd === 'switchTimelineTheme' && this.activeTheme !== payload.activeTheme) {
+        this.setTheme(payload.activeTheme ?? DEFAULT_THEME_NAME);
+      }
+    });
+
+    getSettings().then((settings) => {
+      const { timeline } = settings;
+      this.useLegacyTimeline = timeline.legacy;
+
+      if (!this.useLegacyTimeline) {
+        addCustomThemes(this.toTheme(timeline.customThemes));
+        this.setTheme(timeline.activeTheme ?? DEFAULT_THEME_NAME);
+      } else {
+        setColors(timeline.colors);
+        this.timelineKeys = Array.from(keyMap.values());
+      }
+    });
   }
 
   render() {
-    let timelineBody;
-    if (!this.timelineRoot || this.isNewTimelineEnabled === null) {
-      timelineBody = html`<timeline-skeleton></timeline-skeleton>`;
-    } else if (this.isNewTimelineEnabled) {
-      timelineBody = html`<timeline-flame-chart
-        .apexLog=${this.timelineRoot}
-      ></timeline-flame-chart>`;
-    } else {
-      timelineBody = html`<timeline-legacy .apexLog=${this.timelineRoot}></timeline-legacy>`;
+    if (!this.timelineRoot || this.useLegacyTimeline === null) {
+      return html`<timeline-skeleton></timeline-skeleton>
+        <timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>`;
     }
 
-    return html`
-      ${timelineBody}
-      <timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>
-    `;
+    if (!this.useLegacyTimeline) {
+      const hasWallClock = this.timelineRoot?.startTime !== null;
+      const isWallClock = this.timeDisplayMode === 'wallClock';
+
+      return html`${hasWallClock
+          ? html`<div class="timeline-toolbar">
+              <vscode-button
+                appearance="icon"
+                aria-label="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
+                @click=${() => this.toggleTimeDisplay()}
+              >
+                <span
+                  class="codicon ${isWallClock ? 'codicon-history' : 'codicon-clockface'}"
+                  title="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
+                ></span>
+              </vscode-button>
+            </div>`
+          : ''}
+        <timeline-flame-chart
+          .apexLog=${this.timelineRoot}
+          .themeName=${this.activeTheme}
+          .navigateToEventIndex=${this.navigateToEventIndex}
+          .navigateToTimestamp=${this.navigateToTimestamp}
+        ></timeline-flame-chart>
+        <timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>`;
+    }
+    return html`<timeline-legacy
+        .apexLog=${this.timelineRoot}
+        .themeName=${this.activeTheme}
+      ></timeline-legacy
+      ><timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>`;
+  }
+
+  private toggleTimeDisplay(): void {
+    this.timeDisplayMode = this.timeDisplayMode === 'elapsed' ? 'wallClock' : 'elapsed';
+    this.flameChartRef?.setTimeDisplayMode(this.timeDisplayMode);
+  }
+
+  private setTheme(themeName: string) {
+    this.activeTheme = themeName ?? DEFAULT_THEME_NAME;
+    this.timelineKeys = this.toTimelineKeys(getTheme(themeName));
+  }
+
+  private toTheme(themeSettings: ThemeSettings): { [key: string]: TimelineColors } {
+    const themes: { [key: string]: TimelineColors } = {};
+    for (const [name, colors] of Object.entries(themeSettings)) {
+      themes[name] = {
+        apex: colors.apex,
+        codeUnit: colors.codeUnit,
+        system: colors.system,
+        automation: colors.automation,
+        dml: colors.dml,
+        soql: colors.soql,
+        callout: colors.callout,
+        validation: colors.validation,
+      };
+    }
+    return themes;
+  }
+
+  private toTimelineKeys(colors: TimelineColors): TimelineGroup[] {
+    return [
+      {
+        label: 'Apex',
+        fillColor: colors.apex,
+      },
+      {
+        label: 'Code Unit',
+        fillColor: colors.codeUnit,
+      },
+      {
+        label: 'System',
+        fillColor: colors.system,
+      },
+      {
+        label: 'Automation',
+        fillColor: colors.automation,
+      },
+      {
+        label: 'DML',
+        fillColor: colors.dml,
+      },
+      {
+        label: 'SOQL',
+        fillColor: colors.soql,
+      },
+      {
+        label: 'Callout',
+        fillColor: colors.callout,
+      },
+      //NOTE: add back once the parser is updated to include validation events
+      // {
+      //   label: 'Validation',
+      //   fillColor: colors.validation,
+      // },
+    ];
   }
 }

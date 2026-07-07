@@ -1,52 +1,32 @@
+import process from 'node:process';
+
 import { defineConfig } from 'rolldown';
 
 // rolldown plugins
 import nodePolyfills from '@rolldown/plugin-node-polyfills';
 
 // rollup plugins
+import postcssUrl from 'postcss-url';
 import copy from 'rollup-plugin-copy';
 import postcss from 'rollup-plugin-postcss';
-import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
-
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const getSwcOptions = (dirPath: string) =>
-  defineRollupSwcOption({
-    include: /\.[mc]?[jt]sx?$/,
-    exclude: 'node_modules',
-    tsconfig: production ? `${dirPath}/tsconfig.json` : `${dirPath}/tsconfig-dev.json`,
-    jsc: {
-      transform: { useDefineForClassFields: false },
-      minify: {
-        compress: production,
-        mangle: production
-          ? {
-              keepClassNames: true,
-            }
-          : false,
-      },
-    },
-  });
 
 const production = process.env.NODE_ENV === 'production';
-console.log('Package mode:', production ? 'production' : 'development');
 export default defineConfig([
   {
     input: './lana/src/Main.ts',
     output: {
       format: 'esm',
       dir: './lana/out',
+      cleanDir: true,
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
+      keepNames: true,
+      minify: production,
     },
     tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
     platform: 'node',
+
     external: ['vscode'],
-    plugins: [swc(getSwcOptions('./lana'))],
   },
   {
     input: { bundle: './log-viewer/src/Main.ts' },
@@ -54,15 +34,14 @@ export default defineConfig([
       {
         format: 'esm',
         dir: './log-viewer/out',
+        cleanDir: true,
         chunkFileNames: 'log-viewer-[name].js',
         sourcemap: false,
+        keepNames: true,
+        minify: production,
       },
     ],
     platform: 'browser',
-    resolve: {
-      alias: { eventemitter3: path.resolve(__dirname, 'node_modules/eventemitter3/index.js') },
-    },
-    keepNames: true,
     moduleTypes: {
       '.css': 'js',
     },
@@ -72,21 +51,15 @@ export default defineConfig([
       postcss({
         extensions: ['.css', '.scss'],
         minimize: true,
+        plugins: [postcssUrl({ url: 'inline' })],
       }),
-      swc(getSwcOptions('./log-viewer')),
       copy({
         hook: 'closeBundle',
         targets: [
           {
-            src: [
-              'log-viewer/out/*',
-              'log-viewer/index.html',
-              'lana/certinia-icon-color.png',
-              'node_modules/@vscode/codicons/dist/codicon.ttf',
-            ],
+            src: ['log-viewer/out/*', 'log-viewer/index.html', 'lana/certinia-icon-color.png'],
             dest: 'lana/out',
           },
-          { src: ['CHANGELOG.md', 'LICENSE.txt', 'README.md'], dest: 'lana' },
         ],
       }),
     ],

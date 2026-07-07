@@ -5,7 +5,7 @@ export const skeletonStyles = css`
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     background-color: rgb(229 231 235);
     border-radius: 0.25rem;
-    min-width: 5ch;
+    min-width: 1ch;
     width: 100%;
   }
 

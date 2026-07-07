@@ -5,20 +5,24 @@ on:
     - cron: '15 4 * * 2' # every tuesday at 4:15AM UTC
   workflow_dispatch:
 
+# Least-privilege default; only the publish job is elevated (to push the `pre` tag).
+permissions:
+  contents: read
+
 jobs:
   check:
     name: Check for pre release changes
     runs-on: ubuntu-latest
     if: github.repository_owner == 'certinia'
-    permissions:
-      contents: write
     outputs:
       exitstatus: ${{ steps.earlyexit.outputs.exitstatus }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
 
       - id: earlyexit
         name: Should publish pre release
@@ -53,25 +57,26 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     if: github.repository_owner == 'certinia' && needs.check.outputs.exitstatus == 'continue'
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v6
         with:
           version: 10
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'pnpm'
       - name: Install vsce + ovsx
         run: |
           pnpm add --global @vscode/vsce
           pnpm add --global ovsx
       - name: Dependencies
-        run: |
-          HUSKY=0 pnpm install
+        run: pnpm run ci:install
       - name: update pre-release version
         run: |
           echo "Updating pre-release version"
@@ -81,25 +86,29 @@ jobs:
           cd lana
           vsce package --pre-release --no-dependencies
       - name: Publish to VS Code Marketplace + Open VSX Registry
+        # Tokens via env (not -p) so they don't appear in the process list.
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
+          OVSX_PAT: ${{ secrets.OVSX_TOKEN }}
         run: |
           cd lana
           echo "Verify vsce token has not expired"
-          vsce verify-pat -p ${{ secrets.VSCE_TOKEN }}
+          vsce verify-pat
 
           echo "
           Verify ovsx token has not expired"
-          ovsx verify-pat -p ${{ secrets.OVSX_TOKEN }}
+          ovsx verify-pat
 
-          versionNum=$(cat package.json | jq -r '.version')
-          pkgPath=lana-${versionNum}.vsix
+          versionNum=$(jq -r '.version' package.json)
+          pkgPath="lana-${versionNum}.vsix"
 
           echo "Publish to vsce
           vsix name: $pkgPath"
-          vsce publish --packagePath ${pkgPath} --no-dependencies --pre-release --skip-duplicate -p ${{ secrets.VSCE_TOKEN }}
+          vsce publish --packagePath "${pkgPath}" --no-dependencies --pre-release --skip-duplicate
 
           echo "
           Publish to ovsx"
-          ovsx publish ${pkgPath} --no-dependencies --pre-release --skip-duplicate -p ${{ secrets.OVSX_TOKEN }}
+          ovsx publish "${pkgPath}" --no-dependencies --pre-release --skip-duplicate
       - name: Update pre-release tag
         run: |
           echo "Updating pre release tag"

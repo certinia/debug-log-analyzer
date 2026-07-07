@@ -38,128 +38,151 @@ $footerTextColor: var(--vscode-editor-foreground); //footer text color
 $footerBorderColor: transparent; //footer border color
 $footerSeparatorColor: transparent; //footer bottom separator color
 $footerActiveColor: #d00 !default; //footer bottom active text color
-@import '~tabulator-tables/src/scss/tabulator.scss';
-@import '../editors/MinMax';
-@import '../format/Progress';
 
-.tabulator {
-  .tabulator-tableholder {
-    overflow-x: hidden;
-    .tabulator-table {
-      display: block;
+// Demote upstream tabulator styles (and our scss-mixin partials that build
+// on them) into a cascade layer so any unlayered rule — at any specificity —
+// wins. The neutralising overrides for upstream's hard-coded colours go
+// inside the SAME layer so they beat upstream within the layer, but lose to
+// any unlayered child-span colour (e.g. classed token spans) automatically.
+@layer tabulator {
+  @import '~tabulator-tables/src/scss/tabulator.scss';
+  @import '../editors/MinMax';
+  @import '../format/Progress';
+
+  .tabulator {
+    .tabulator-tableholder {
+      overflow-x: hidden;
+      overflow-anchor: none;
+      .tabulator-table {
+        display: block;
+        background-color: default;
+      }
+    }
+
+    .tabulator-header-filter {
+      input[type='search'] {
+        color: var(--vscode-editor-foreground);
+        background-color: var(--vscode-dropdown-background, default);
+        border: 1px solid var(--vscode-dropdown-border, transparent);
+        width: 50%;
+        box-sizing: border-box;
+        position: relative;
+        padding: 2px 4px;
+        box-sizing: border-box;
+        border-radius: 2px;
+        appearance: textfield !important;
+      }
+      input[type='search']:focus {
+        outline: var(--vscode-focusBorder, default) solid 1px;
+      }
+    }
+
+    .tabulator-row {
       background-color: default;
-    }
-  }
+      .tabulator-row-even {
+        background-color: default;
+      }
 
-  .tabulator-header-filter {
-    input[type='search'] {
-      color: var(--vscode-editor-foreground);
-      background-color: var(--vscode-dropdown-background, default);
-      border: 1px solid var(--vscode-dropdown-border, transparent);
-      width: 50%;
-      box-sizing: border-box;
-      position: relative;
-      padding: 2px 4px;
-      box-sizing: border-box;
-      border-radius: 2px;
-      appearance: textfield !important;
-    }
-    input[type='search']:focus {
-      outline: var(--vscode-focusBorder, default) solid 1px;
-    }
-  }
+      &.tabulator-group {
+        font-family: monospace;
+        background: unset;
+        border-bottom: unset;
+        border-right: unset;
+        border-top: unset;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding: unset;
+        &:hover {
+          background-color: $rowHoverBackground;
+        }
 
-  .tabulator-row {
-    background-color: default;
-    .tabulator-row-even {
-      background-color: default;
+        // Neutralise upstream `.tabulator-row.tabulator-group span { color: #d00 }`
+        // so plain text in group headers inherits the theme foreground. Lives in
+        // the same layer as the rule it's overriding — that keeps it out of the
+        // way of any descendant span with its own colour.
+        span {
+          margin-left: unset;
+          color: inherit;
+        }
+      }
     }
 
-    &.tabulator-group {
+    .datagrid-code-text {
       font-family: monospace;
-      background: unset;
-      border-bottom: unset;
-      border-right: unset;
-      border-top: unset;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      padding: unset;
-      &:hover {
-        background-color: $rowHoverBackground;
-      }
-
-      span {
-        margin-left: unset;
-        color: unset;
-      }
+      font-weight: var(--vscode-font-weight, normal);
+      font-size: var(--vscode-editor-font-size, 0.9em);
     }
-  }
 
-  .datagrid-code-text {
-    font-family: monospace;
-    font-weight: var(--vscode-font-weight, normal);
-    font-size: var(--vscode-editor-font-size, 0.9em);
+    .tabulator-row.tabulator-selected {
+      color: var(--vscode-list-activeSelectionForeground);
+    }
+
+    .tabulator-cell.datagrid-textarea {
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      min-height: 0;
+      height: 100%;
+      display: inline-block;
+    }
+
+    input[type='checkbox'] {
+      vertical-align: middle;
+    }
+
+    .sort-by {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .sort-by--bottom {
+      color: rgb(102, 102, 102);
+      border-bottom: none;
+      border-top: 6px solid rgb(102, 102, 102);
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+    }
+    .sort-by--top {
+      color: rgb(102, 102, 102);
+      border-bottom: 6px solid rgb(102, 102, 102);
+      border-top: none;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+    }
+
+    .number-cell {
+      font-variant-numeric: tabular-nums;
+    }
   }
 
   .tabulator-tooltip {
-    background: var(--vscode-editor-background);
+    // Match timeline tooltip styling for consistency
+    background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+    color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editor-foreground));
     overflow-wrap: anywhere;
-  }
-  .tabulator-row.tabulator-selected {
-    color: var(--vscode-list-activeSelectionForeground);
-  }
-
-  .tabulator-cell.datagrid-textarea {
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
-    min-height: 0;
-    height: 100%;
-  }
-
-  input[type='checkbox'] {
-    vertical-align: middle;
-  }
-
-  .sort-by {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .sort-by--bottom {
-    color: rgb(102, 102, 102);
-    border-bottom: none;
-    border-top: 6px solid rgb(102, 102, 102);
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-  }
-  .sort-by--top {
-    color: rgb(102, 102, 102);
-    border-bottom: 6px solid rgb(102, 102, 102);
-    border-top: none;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-  }
-
-  .number-cell {
+    font-family: monospace;
+    font-size: 0.92rem;
     font-variant-numeric: tabular-nums;
+    padding: 5px;
+    border-radius: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   }
-}
 
-.tabulator-edit-list {
-  border-color: var(--vscode-focusBorder, default);
+  .tabulator-edit-list {
+    border-color: var(--vscode-focusBorder, default);
 
-  .tabulator-edit-list-item {
-    color: var(--vscode-editor-foreground, 'white');
-    &.active {
-      background-color: var(--vscode-list-activeSelectionBackground);
+    .tabulator-edit-list-item {
       color: var(--vscode-editor-foreground, 'white');
-    }
+      &.active {
+        background-color: var(--vscode-list-activeSelectionBackground);
+        color: var(--vscode-editor-foreground, 'white');
+      }
 
-    &:hover {
-      background-color: var(--vscode-list-activeSelectionBackground);
-      color: var(--vscode-editor-foreground, 'white');
+      &:hover {
+        background-color: var(--vscode-list-activeSelectionBackground);
+        color: var(--vscode-editor-foreground, 'white');
+      }
     }
   }
 }

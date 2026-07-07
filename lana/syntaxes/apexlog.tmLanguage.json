@@ -1,0 +1,4 @@
+{
+  "scopeName": "source.apexlog",
+  "patterns": [{ "include": "text.log" }]
+}

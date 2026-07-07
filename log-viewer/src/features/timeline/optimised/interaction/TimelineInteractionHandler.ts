@@ -1,0 +1,1167 @@
+/*
+ * Copyright (c) 2025 Certinia Inc. All rights reserved.
+ */
+
+/**
+ * TimelineInteractionHandler
+ *
+ * Handles user interactions (wheel, mouse, keyboard) for timeline navigation.
+ * Manages zoom (wheel), pan (drag), and event selection.
+ */
+
+import {
+  type DragModeState,
+  InteractionModeType,
+  type ModifierKeys,
+} from '../../types/flamechart.types.js';
+import type { TimelineViewport } from '../TimelineViewport.js';
+
+/**
+ * Configuration for interaction behavior.
+ */
+export interface InteractionOptions {
+  /** Enable zoom via mouse wheel. Default: true */
+  enableZoom?: boolean;
+
+  /** Enable pan via mouse drag. Default: true */
+  enablePan?: boolean;
+
+  /** Zoom sensitivity multiplier. Default: 1.0 */
+  zoomSensitivity?: number;
+
+  /** Invert zoom direction. Default: false */
+  invertZoom?: boolean;
+}
+
+/**
+ * Callback for interaction events.
+ */
+export interface InteractionCallbacks {
+  /** Called when viewport changes (zoom or pan). */
+  onViewportChange?: () => void;
+
+  /** Called when mouse position changes over timeline. */
+  onMouseMove?: (x: number, y: number) => void;
+
+  /** Called when mouse clicks on timeline. */
+  onClick?: (x: number, y: number, modifiers?: ModifierKeys) => void;
+
+  /** Called when mouse double-clicks on timeline. */
+  onDoubleClick?: (x: number, y: number) => void;
+
+  /** Called when hover state over event changes. Returns true if over an event. */
+  onHoverChange?: (isOverEvent: boolean) => void;
+
+  /** Called when mouse leaves the canvas. */
+  onMouseLeave?: () => void;
+
+  /** Called when drag operation starts (mouse or touch). */
+  onDragStart?: () => void;
+
+  /** Called when right-click (context menu) occurs on timeline.
+   * @param screenX - Canvas-relative X coordinate (for hit testing)
+   * @param screenY - Canvas-relative Y coordinate (for hit testing)
+   * @param clientX - Client X coordinate (for menu positioning)
+   * @param clientY - Client Y coordinate (for menu positioning)
+   */
+  onContextMenu?: (screenX: number, screenY: number, clientX: number, clientY: number) => void;
+
+  /** Called when Shift+drag measurement starts.
+   * @param screenX - Canvas-relative X coordinate
+   */
+  onMeasureStart?: (screenX: number) => void;
+
+  /** Called during Shift+drag measurement to update end position.
+   * @param screenX - Canvas-relative X coordinate
+   */
+  onMeasureUpdate?: (screenX: number) => void;
+
+  /** Called when Shift+drag measurement ends (mouse released after drag). */
+  onMeasureEnd?: () => void;
+
+  /** Called when measurement is cancelled (shift/mouse released without drag). */
+  onMeasureCancel?: () => void;
+
+  /** Called when Alt+drag area zoom starts.
+   * @param screenX - Canvas-relative X coordinate
+   */
+  onAreaZoomStart?: (screenX: number) => void;
+
+  /** Called during Alt+drag to update area zoom selection.
+   * @param screenX - Canvas-relative X coordinate
+   */
+  onAreaZoomUpdate?: (screenX: number) => void;
+
+  /** Called when Alt+drag ends and area zoom should be applied. */
+  onAreaZoomEnd?: () => void;
+
+  /** Called when area zoom is cancelled (alt released without drag). */
+  onAreaZoomCancel?: () => void;
+
+  /** Called when resize of measurement edge starts. */
+  onResizeStart?: (screenX: number, edge: 'left' | 'right') => void;
+
+  /** Called during resize drag. */
+  onResizeUpdate?: (screenX: number) => void;
+
+  /** Called when resize ends. */
+  onResizeEnd?: () => void;
+
+  /** Called when resize is cancelled (e.g., via Escape key). */
+  onResizeCancel?: () => void;
+
+  /** Check if mouse is over a measurement resize edge. Returns edge name or null. */
+  getMeasurementResizeEdge?: (screenX: number) => 'left' | 'right' | null;
+}
+
+export class TimelineInteractionHandler {
+  private canvas: HTMLCanvasElement;
+  private viewport: TimelineViewport;
+  private options: Required<InteractionOptions>;
+  private callbacks: InteractionCallbacks;
+
+  // Interaction state
+  private isDragging = false;
+  private lastMouseX = 0;
+  private lastMouseY = 0;
+  private lastTouchX = 0;
+  private lastTouchY = 0;
+  private isOverEvent = false;
+
+  // Track if actual panning occurred during mousedown-to-mouseup (to distinguish click from drag)
+  private didPanDuringClick = false;
+  private mouseDownX = 0;
+  private mouseDownY = 0;
+  private static readonly DRAG_THRESHOLD = 3; // px - movement required to count as drag
+
+  // Unified drag mode state (replaces separate isMeasuring, isAreaZooming, isResizing flags)
+  private activeMode: DragModeState | null = null;
+
+  // Auto-scroll state for drag modes
+  private static readonly EDGE_ZONE = 50; // px from edge to trigger auto-scroll
+  private static readonly AUTO_SCROLL_SPEED = 10; // px per frame
+  private autoScrollId: number | null = null;
+  private autoScrollYId: number | null = null;
+
+  // Double-click detection state
+  private lastClickTime = 0;
+  private lastClickX = 0;
+  private lastClickY = 0;
+  private static readonly DOUBLE_CLICK_THRESHOLD = 300; // ms
+  private static readonly DOUBLE_CLICK_DISTANCE = 5; // px
+
+  // Event listener references for cleanup
+
+  // Stores handlers; supports registering subtype-specific handlers (e.g. MouseEvent, WheelEvent)
+  // by casting to the base Event signature internally.
+  private boundHandlers: Map<string, (e: Event) => void> = new Map();
+
+  /**
+   * Register an event handler that may use a more specific Event subtype.
+   * Stored internally as (e: Event) => void for uniform cleanup.
+   */
+  private registerBoundHandler<E extends Event>(key: string, handler: (e: E) => void): void {
+    this.boundHandlers.set(key, handler as (e: Event) => void);
+  }
+
+  constructor(
+    canvas: HTMLCanvasElement,
+    viewport: TimelineViewport,
+    options: InteractionOptions = {},
+    callbacks: InteractionCallbacks = {},
+  ) {
+    this.canvas = canvas;
+    this.viewport = viewport;
+    this.callbacks = callbacks;
+
+    // Apply default options
+    this.options = {
+      enableZoom: options.enableZoom ?? true,
+      enablePan: options.enablePan ?? true,
+      zoomSensitivity: options.zoomSensitivity ?? 1.0,
+      invertZoom: options.invertZoom ?? false,
+    };
+
+    this.attachEventListeners();
+  }
+
+  /**
+   * Clean up event listeners.
+   */
+  public destroy(): void {
+    this.detachEventListeners();
+  }
+
+  // ============================================================================
+  // DRAG MODE HELPERS
+  // ============================================================================
+
+  /**
+   * Start a drag mode (measure, area zoom, or resize).
+   */
+  private startDragMode(
+    type: InteractionModeType,
+    screenX: number,
+    clientX: number,
+    clientY: number,
+    edge?: 'left' | 'right',
+  ): void {
+    this.activeMode = {
+      type,
+      isActive: true,
+      startX: screenX,
+      didDrag: false,
+      lastScreenX: screenX,
+      lastScreenY: 0,
+      mouseDownX: clientX,
+      mouseDownY: clientY,
+      edge,
+    };
+  }
+
+  /**
+   * Check if drag threshold has been exceeded for the active mode.
+   * Updates didDrag flag if threshold is exceeded.
+   *
+   * @returns true if threshold was just crossed, false otherwise
+   */
+  private checkDragThreshold(clientX: number, clientY: number): boolean {
+    if (!this.activeMode || this.activeMode.didDrag) {
+      return false;
+    }
+
+    const distanceX = Math.abs(clientX - this.activeMode.mouseDownX);
+    const distanceY = Math.abs(clientY - this.activeMode.mouseDownY);
+    const distance = Math.max(distanceX, distanceY);
+
+    if (distance >= TimelineInteractionHandler.DRAG_THRESHOLD) {
+      this.activeMode.didDrag = true;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Update the active mode's last screen position.
+   */
+  private updateModePosition(screenX: number, screenY: number): void {
+    if (this.activeMode) {
+      this.activeMode.lastScreenX = screenX;
+      this.activeMode.lastScreenY = screenY;
+    }
+  }
+
+  /**
+   * Handle auto-scroll in X direction based on screen position.
+   */
+  private handleAutoScrollX(screenX: number): void {
+    const viewportState = this.viewport.getState();
+    if (screenX < TimelineInteractionHandler.EDGE_ZONE) {
+      this.startAutoScroll('left');
+    } else if (screenX > viewportState.displayWidth - TimelineInteractionHandler.EDGE_ZONE) {
+      this.startAutoScroll('right');
+    } else {
+      this.stopAutoScroll();
+    }
+  }
+
+  /**
+   * Handle auto-scroll in Y direction based on screen position.
+   */
+  private handleAutoScrollY(screenY: number): void {
+    const viewportState = this.viewport.getState();
+    if (screenY < TimelineInteractionHandler.EDGE_ZONE) {
+      this.startAutoScrollY('up');
+    } else if (screenY > viewportState.displayHeight - TimelineInteractionHandler.EDGE_ZONE) {
+      this.startAutoScrollY('down');
+    } else {
+      this.stopAutoScrollY();
+    }
+  }
+
+  /**
+   * Get the appropriate update callback for the current mode.
+   */
+  private invokeUpdateCallback(screenX: number): void {
+    if (!this.activeMode) {
+      return;
+    }
+
+    switch (this.activeMode.type) {
+      case InteractionModeType.MEASURE:
+        this.callbacks.onMeasureUpdate?.(screenX);
+        break;
+      case InteractionModeType.AREA_ZOOM:
+        this.callbacks.onAreaZoomUpdate?.(screenX);
+        break;
+      case InteractionModeType.RESIZE:
+        this.callbacks.onResizeUpdate?.(screenX);
+        break;
+    }
+  }
+
+  /**
+   * End the active drag mode with success (drag occurred).
+   */
+  private endDragMode(): void {
+    if (!this.activeMode) {
+      return;
+    }
+
+    switch (this.activeMode.type) {
+      case InteractionModeType.MEASURE:
+        this.callbacks.onMeasureEnd?.();
+        break;
+      case InteractionModeType.AREA_ZOOM:
+        this.callbacks.onAreaZoomEnd?.();
+        break;
+      case InteractionModeType.RESIZE:
+        this.callbacks.onResizeEnd?.();
+        break;
+    }
+
+    this.activeMode = null;
+  }
+
+  /**
+   * Cancel the active drag mode (no drag occurred or escape pressed).
+   */
+  private cancelDragMode(): void {
+    if (!this.activeMode) {
+      return;
+    }
+
+    switch (this.activeMode.type) {
+      case InteractionModeType.MEASURE:
+        this.callbacks.onMeasureCancel?.();
+        break;
+      case InteractionModeType.AREA_ZOOM:
+        this.callbacks.onAreaZoomCancel?.();
+        break;
+      case InteractionModeType.RESIZE:
+        this.callbacks.onResizeCancel?.();
+        break;
+    }
+
+    this.activeMode = null;
+  }
+
+  /**
+   * Check if any drag mode is currently active.
+   */
+  private isDragModeActive(): boolean {
+    return this.activeMode !== null && this.activeMode.isActive;
+  }
+
+  // ============================================================================
+  // EVENT LISTENER SETUP
+  // ============================================================================
+
+  /**
+   * Attach event listeners to canvas.
+   */
+  private attachEventListeners(): void {
+    // Wheel for zoom
+    if (this.options.enableZoom) {
+      const wheelHandler = this.handleWheel.bind(this);
+      this.canvas.addEventListener('wheel', wheelHandler, { passive: false });
+      this.registerBoundHandler('wheel', wheelHandler);
+    }
+
+    // Mouse events for pan and selection
+    if (this.options.enablePan) {
+      const mouseDownHandler = this.handleMouseDown.bind(this);
+      const mouseMoveHandler = this.handleMouseMove.bind(this);
+      const mouseUpHandler = this.handleMouseUp.bind(this);
+
+      this.canvas.addEventListener('mousedown', mouseDownHandler);
+      this.canvas.addEventListener('mousemove', mouseMoveHandler);
+      this.canvas.addEventListener('mouseup', mouseUpHandler);
+      this.registerBoundHandler('mousedown', mouseDownHandler);
+      this.registerBoundHandler('mousemove', mouseMoveHandler);
+      this.registerBoundHandler('mouseup', mouseUpHandler);
+
+      // Touch events for swipe/pan on touch devices
+      const touchStartHandler = this.handleTouchStart.bind(this);
+      const touchMoveHandler = this.handleTouchMove.bind(this);
+      const touchEndHandler = this.handleTouchEnd.bind(this);
+
+      this.canvas.addEventListener('touchstart', touchStartHandler, { passive: false });
+      this.canvas.addEventListener('touchmove', touchMoveHandler, { passive: false });
+      this.canvas.addEventListener('touchend', touchEndHandler);
+
+      this.registerBoundHandler('touchstart', touchStartHandler);
+      this.registerBoundHandler('touchmove', touchMoveHandler);
+      this.registerBoundHandler('touchend', touchEndHandler);
+    }
+
+    // Click for event selection
+    const clickHandler = this.handleClick.bind(this);
+    this.canvas.addEventListener('click', clickHandler);
+    this.registerBoundHandler('click', clickHandler);
+
+    // Mouse leave for hiding tooltips
+    const mouseLeaveHandler = this.handleMouseLeave.bind(this);
+    this.canvas.addEventListener('mouseleave', mouseLeaveHandler);
+    this.registerBoundHandler('mouseleave', mouseLeaveHandler);
+
+    // Context menu (right-click)
+    const contextMenuHandler = this.handleContextMenu.bind(this);
+    this.canvas.addEventListener('contextmenu', contextMenuHandler);
+    this.registerBoundHandler('contextmenu', contextMenuHandler);
+
+    // Keyup for shift release during measurement
+    const keyUpHandler = this.handleKeyUp.bind(this);
+    document.addEventListener('keyup', keyUpHandler);
+    this.registerBoundHandler('keyup', keyUpHandler);
+
+    // Keydown for Escape to cancel measure/area zoom
+    const keyDownHandler = this.handleKeyDown.bind(this);
+    document.addEventListener('keydown', keyDownHandler);
+    this.registerBoundHandler('keydown', keyDownHandler);
+  }
+
+  /**
+   * Remove event listeners from canvas.
+   */
+  private detachEventListeners(): void {
+    if (this.options.enableZoom) {
+      const wheelHandler = this.boundHandlers.get('wheel');
+      if (wheelHandler) {
+        this.canvas.removeEventListener('wheel', wheelHandler);
+      }
+    }
+
+    if (this.options.enablePan) {
+      const mouseDownHandler = this.boundHandlers.get('mousedown');
+      const mouseMoveHandler = this.boundHandlers.get('mousemove');
+      const mouseUpHandler = this.boundHandlers.get('mouseup');
+
+      if (mouseDownHandler) {
+        this.canvas.removeEventListener('mousedown', mouseDownHandler);
+      }
+      if (mouseMoveHandler) {
+        this.canvas.removeEventListener('mousemove', mouseMoveHandler);
+      }
+      if (mouseUpHandler) {
+        this.canvas.removeEventListener('mouseup', mouseUpHandler);
+      }
+
+      // Remove touch event listeners
+      const touchStartHandler = this.boundHandlers.get('touchstart');
+      const touchMoveHandler = this.boundHandlers.get('touchmove');
+      const touchEndHandler = this.boundHandlers.get('touchend');
+
+      if (touchStartHandler) {
+        this.canvas.removeEventListener('touchstart', touchStartHandler);
+      }
+      if (touchMoveHandler) {
+        this.canvas.removeEventListener('touchmove', touchMoveHandler);
+      }
+      if (touchEndHandler) {
+        this.canvas.removeEventListener('touchend', touchEndHandler);
+      }
+    }
+
+    const clickHandler = this.boundHandlers.get('click');
+    if (clickHandler) {
+      this.canvas.removeEventListener('click', clickHandler);
+    }
+
+    const mouseLeaveHandler = this.boundHandlers.get('mouseleave');
+    if (mouseLeaveHandler) {
+      this.canvas.removeEventListener('mouseleave', mouseLeaveHandler);
+    }
+
+    const contextMenuHandler = this.boundHandlers.get('contextmenu');
+    if (contextMenuHandler) {
+      this.canvas.removeEventListener('contextmenu', contextMenuHandler);
+    }
+
+    const keyUpHandler = this.boundHandlers.get('keyup');
+    if (keyUpHandler) {
+      document.removeEventListener('keyup', keyUpHandler);
+    }
+
+    const keyDownHandler = this.boundHandlers.get('keydown');
+    if (keyDownHandler) {
+      document.removeEventListener('keydown', keyDownHandler);
+    }
+
+    this.boundHandlers.clear();
+
+    // Clean up auto-scroll
+    this.stopAutoScroll();
+    this.stopAutoScrollY();
+  }
+
+  // ============================================================================
+  // EVENT HANDLERS
+  // ============================================================================
+
+  /**
+   * Handle wheel event for zoom and pan.
+   *
+   * Implements:
+   * - Shift + wheel: Vertical pan (scroll up/down in stack depth) - respects natural scrolling
+   * - Alt/Option + wheel: Horizontal pan (scroll left/right in time)
+   * - Horizontal wheel (deltaX): Pan (trackpad swipe left/right)
+   * - Vertical wheel (deltaY): Mouse-anchored zoom
+   * - Mouse cursor position remains over the same timeline point during zoom
+   * - Prevents page scroll
+   */
+  private handleWheel(event: WheelEvent): void {
+    event.preventDefault();
+
+    // Shift + wheel/swipe = Force pan (skip zoom, useful when frame is selected)
+    // Choose horizontal or vertical pan based on dominant delta direction
+    if (event.shiftKey && this.options.enablePan) {
+      let changed: boolean;
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+        // Horizontal swipe with Shift = horizontal pan
+        changed = this.viewport.panBy(event.deltaX, 0);
+      } else {
+        // Vertical wheel with Shift = vertical pan (stack depth)
+        changed = this.viewport.panBy(0, event.deltaY);
+      }
+      if (changed && this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange();
+      }
+      return;
+    }
+
+    // Alt/Option + wheel = Horizontal pan (time axis)
+    // Uses deltaY as horizontal movement (since wheel primarily produces deltaY)
+    if (event.altKey && this.options.enablePan) {
+      const changed = this.viewport.panBy(-event.deltaY, 0);
+      if (changed && this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange();
+      }
+      return;
+    }
+
+    // Handle horizontal pan (trackpad swipe left/right)
+    if (Math.abs(event.deltaX) > Math.abs(event.deltaY) && this.options.enablePan) {
+      // Horizontal wheel event detected - treat as pan
+      const changed = this.viewport.panBy(event.deltaX, 0);
+
+      // Notify callback if viewport changed
+      if (changed && this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange();
+      }
+      return;
+    }
+
+    // Handle vertical zoom
+    if (!this.options.enableZoom) {
+      return;
+    }
+
+    // Get mouse position relative to canvas
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+
+    // Calculate zoom delta
+    // deltaY is positive when scrolling down, negative when scrolling up
+    // Standard behavior: scroll up = zoom in, scroll down = zoom out
+    let zoomDelta = -event.deltaY;
+
+    // Apply zoom inversion if enabled
+    if (this.options.invertZoom) {
+      zoomDelta = -zoomDelta;
+    }
+
+    // Normalize wheel delta (different browsers report different scales)
+    // Use deltaMode to handle different units (pixels, lines, pages)
+    let normalizedDelta = zoomDelta;
+    if (event.deltaMode === 1) {
+      // Lines - multiply by typical line height
+      normalizedDelta *= 15;
+    } else if (event.deltaMode === 2) {
+      // Pages - multiply by typical page height
+      normalizedDelta *= 800;
+    }
+
+    // Calculate zoom factor
+    // Use exponential scaling for smooth zoom feel
+    const zoomFactor = 1 + normalizedDelta * 0.001 * this.options.zoomSensitivity;
+
+    // Get current zoom and calculate new zoom
+    const currentState = this.viewport.getState();
+    const newZoom = currentState.zoom * zoomFactor;
+
+    // Apply zoom with mouse position as anchor
+    const changed = this.viewport.setZoom(newZoom, mouseX);
+
+    // Mark as panning during zoom to prevent accidental selection
+    // (trackpad gestures can sometimes trigger concurrent click events)
+    if (changed) {
+      this.didPanDuringClick = true;
+    }
+
+    // Notify callback if viewport changed
+    if (changed && this.callbacks.onViewportChange) {
+      this.callbacks.onViewportChange();
+    }
+  }
+
+  /**
+   * Handle mouse down - start drag, measurement, or area zoom operation.
+   * Shift+drag starts measurement mode instead of panning.
+   * Alt+drag starts area zoom mode instead of panning.
+   */
+  private handleMouseDown(event: MouseEvent): void {
+    // Only handle left mouse button
+    if (event.button !== 0) {
+      return;
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    const screenX = event.clientX - rect.left;
+
+    // Check for Alt+drag to start area zoom (check before Shift since Alt takes priority)
+    if (event.altKey && this.callbacks.onAreaZoomStart) {
+      this.startDragMode(InteractionModeType.AREA_ZOOM, screenX, event.clientX, event.clientY);
+      this.canvas.style.cursor = 'zoom-in';
+      this.callbacks.onAreaZoomStart(screenX);
+      return;
+    }
+
+    // Check for click on measurement resize edge (before Shift+drag check)
+    const resizeEdge = this.callbacks.getMeasurementResizeEdge?.(screenX);
+    if (resizeEdge && this.callbacks.onResizeStart) {
+      this.startDragMode(
+        InteractionModeType.RESIZE,
+        screenX,
+        event.clientX,
+        event.clientY,
+        resizeEdge,
+      );
+      this.canvas.style.cursor = 'ew-resize';
+      this.callbacks.onResizeStart(screenX, resizeEdge);
+      return;
+    }
+
+    // Check for Shift+drag to start measurement
+    if (event.shiftKey && this.callbacks.onMeasureStart) {
+      this.startDragMode(InteractionModeType.MEASURE, screenX, event.clientX, event.clientY);
+      this.canvas.style.cursor = 'col-resize';
+      this.callbacks.onMeasureStart(screenX);
+      return;
+    }
+
+    if (!this.options.enablePan) {
+      return;
+    }
+
+    this.isDragging = true;
+    this.didPanDuringClick = false; // Reset - will be set true if we actually pan
+    this.lastMouseX = event.clientX;
+    this.lastMouseY = event.clientY;
+    this.mouseDownX = event.clientX;
+    this.mouseDownY = event.clientY;
+
+    // Change cursor to grabbing
+    this.canvas.style.cursor = 'grabbing';
+  }
+
+  /**
+   * Handle mouse move - perform drag, measurement, area zoom, or update hover state.
+   */
+  private handleMouseMove(event: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const screenX = event.clientX - rect.left;
+    const screenY = event.clientY - rect.top;
+
+    // Handle active drag mode (measure, area zoom, or resize)
+    if (this.isDragModeActive()) {
+      // Check drag threshold and update position
+      this.checkDragThreshold(event.clientX, event.clientY);
+      this.updateModePosition(screenX, screenY);
+      this.invokeUpdateCallback(screenX);
+
+      // Auto-scroll when dragging near viewport edges (X direction)
+      this.handleAutoScrollX(screenX);
+
+      // Auto-scroll when dragging near viewport edges (Y direction)
+      this.handleAutoScrollY(screenY);
+
+      return;
+    }
+
+    if (this.isDragging && this.options.enablePan) {
+      // Check if we've moved enough to start actual panning (vs just a click with slight movement)
+      if (!this.didPanDuringClick) {
+        const distanceX = Math.abs(event.clientX - this.mouseDownX);
+        const distanceY = Math.abs(event.clientY - this.mouseDownY);
+        const distance = Math.max(distanceX, distanceY);
+
+        if (distance >= TimelineInteractionHandler.DRAG_THRESHOLD) {
+          // We've exceeded the drag threshold - this is a real drag, not a click
+          this.didPanDuringClick = true;
+
+          // Notify callback that drag started (used to cancel keyboard animations)
+          this.callbacks.onDragStart?.();
+        } else {
+          // Haven't moved enough yet - don't start panning
+          return;
+        }
+      }
+
+      // Calculate delta from last position
+      const deltaX = event.clientX - this.lastMouseX;
+      const deltaY = event.clientY - this.lastMouseY;
+
+      // Update pan (note: negative delta because we're dragging the viewport)
+      const changed = this.viewport.panBy(-deltaX, -deltaY);
+
+      // Update last position
+      this.lastMouseX = event.clientX;
+      this.lastMouseY = event.clientY;
+
+      // Notify callback if viewport changed
+      if (changed && this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange();
+      }
+    } else {
+      // Not dragging - update mouse position for hover effects
+      if (this.callbacks.onMouseMove) {
+        this.callbacks.onMouseMove(screenX, screenY);
+      }
+
+      // Check for resize handle hover and update cursor
+      const resizeEdge = this.callbacks.getMeasurementResizeEdge?.(screenX) ?? null;
+      if (resizeEdge) {
+        this.canvas.style.cursor = 'ew-resize';
+      } else if (this.canvas.style.cursor === 'ew-resize') {
+        // Reset cursor when leaving resize zone
+        this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+      }
+    }
+  }
+
+  /**
+   * Handle mouse up - end drag, measurement, or area zoom operation.
+   */
+  private handleMouseUp(event: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    // Handle active drag mode end (measure, area zoom, or resize)
+    if (this.isDragModeActive()) {
+      this.stopAutoScroll();
+      this.stopAutoScrollY();
+
+      // If drag occurred, finalize; otherwise cancel
+      // Note: Resize mode always finalizes (no cancel needed)
+      if (this.activeMode!.didDrag) {
+        this.endDragMode();
+        // IMPORTANT: Set this flag to skip the click event that fires after mouseup
+        this.didPanDuringClick = true;
+      } else if (this.activeMode!.type !== InteractionModeType.RESIZE) {
+        // Only measure and area zoom have cancel callbacks for non-drag clicks
+        this.cancelDragMode();
+      } else {
+        // Resize with no drag - just clear the mode
+        this.activeMode = null;
+      }
+
+      // Restore cursor
+      this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+      return;
+    }
+
+    if (!this.isDragging) {
+      return;
+    }
+
+    this.isDragging = false;
+    // Note: didPanDuringClick is NOT reset here - it's read by handleClick which fires after mouseup
+
+    // Restore cursor based on whether we're over an event
+    this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+
+    // Update mouse position for hover effects after drag ends
+    // This ensures tooltip state is updated immediately when panning stops
+    if (this.callbacks.onMouseMove) {
+      this.callbacks.onMouseMove(mouseX, mouseY);
+    }
+  }
+
+  /**
+   * Handle click - event selection and double-click detection.
+   */
+  private handleClick(event: MouseEvent): void {
+    // Skip click processing if we panned during this mousedown-click sequence
+    // (The click event fires after mouseup, so didPanDuringClick is still valid)
+    if (this.didPanDuringClick) {
+      return;
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    const currentTime = Date.now();
+
+    // Check for double-click
+    const timeSinceLastClick = currentTime - this.lastClickTime;
+    const distanceX = Math.abs(mouseX - this.lastClickX);
+    const distanceY = Math.abs(mouseY - this.lastClickY);
+    const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+
+    const isDoubleClick =
+      timeSinceLastClick < TimelineInteractionHandler.DOUBLE_CLICK_THRESHOLD &&
+      distance < TimelineInteractionHandler.DOUBLE_CLICK_DISTANCE;
+
+    // Extract modifier keys from event
+    const modifiers: ModifierKeys = {
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+    };
+
+    if (isDoubleClick) {
+      // Reset click state to prevent triple-click being detected as double
+      this.lastClickTime = 0;
+
+      if (this.callbacks.onDoubleClick) {
+        this.callbacks.onDoubleClick(mouseX, mouseY);
+      }
+    } else {
+      // Single click - update tracking state
+      this.lastClickTime = currentTime;
+      this.lastClickX = mouseX;
+      this.lastClickY = mouseY;
+
+      if (this.callbacks.onClick) {
+        this.callbacks.onClick(mouseX, mouseY, modifiers);
+      }
+    }
+  }
+
+  /**
+   * Handle context menu (right-click).
+   * Passes both canvas-relative (for hit testing) and client coordinates (for menu positioning).
+   */
+  private handleContextMenu(event: MouseEvent): void {
+    // Prevent default browser context menu
+    event.preventDefault();
+
+    if (!this.callbacks.onContextMenu) {
+      return;
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    const screenX = event.clientX - rect.left; // Canvas-relative for hit test
+    const screenY = event.clientY - rect.top;
+
+    // Pass both coordinate systems: screen coords for hit test, client coords for menu positioning
+    this.callbacks.onContextMenu(screenX, screenY, event.clientX, event.clientY);
+  }
+
+  /**
+   * Handle keyup event.
+   * Note: Measurement and area zoom only end on mouse up, not key release.
+   * This allows users to release Shift/Alt while still holding mouse button.
+   */
+  private handleKeyUp(_event: KeyboardEvent): void {
+    // No-op: Measurement and area zoom only end on mouse up, not key release
+    // This allows users to release Shift/Alt while still holding mouse button
+  }
+
+  /**
+   * Handle keydown event.
+   * Escape cancels active measure or area zoom operations.
+   */
+  private handleKeyDown(event: KeyboardEvent): void {
+    if (event.key !== 'Escape') {
+      return;
+    }
+
+    // Cancel any active drag mode (measure, area zoom, or resize)
+    if (this.isDragModeActive()) {
+      this.stopAutoScroll();
+      this.stopAutoScrollY();
+      this.cancelDragMode();
+      this.canvas.style.cursor = this.isOverEvent ? 'pointer' : 'grab';
+      event.preventDefault();
+      return;
+    }
+  }
+
+  /**
+   * Start auto-scrolling the viewport in the given direction.
+   * During drag modes (measurement, area zoom, or resize), updates the boundary
+   * after each pan so it moves smoothly with the viewport.
+   *
+   * @param direction - Scroll direction
+   */
+  private startAutoScroll(direction: 'left' | 'right'): void {
+    if (this.autoScrollId !== null) {
+      return; // Already scrolling
+    }
+
+    const scroll = () => {
+      const delta =
+        direction === 'left'
+          ? -TimelineInteractionHandler.AUTO_SCROLL_SPEED
+          : TimelineInteractionHandler.AUTO_SCROLL_SPEED;
+      const changed = this.viewport.panBy(delta, 0);
+
+      if (changed) {
+        // Notify viewport change
+        this.callbacks.onViewportChange?.();
+
+        // During drag mode, update the boundary position after pan
+        // The screenX stays the same but the TIME at that screenX has changed
+        if (this.isDragModeActive()) {
+          this.invokeUpdateCallback(this.activeMode!.lastScreenX);
+        }
+      }
+
+      this.autoScrollId = requestAnimationFrame(scroll);
+    };
+
+    this.autoScrollId = requestAnimationFrame(scroll);
+  }
+
+  /**
+   * Stop auto-scrolling the viewport (X direction).
+   */
+  private stopAutoScroll(): void {
+    if (this.autoScrollId !== null) {
+      cancelAnimationFrame(this.autoScrollId);
+      this.autoScrollId = null;
+    }
+  }
+
+  /**
+   * Start auto-scrolling the viewport vertically when mouse is near top/bottom edge.
+   * Used during measurement, area zoom, and resize operations.
+   *
+   * @param direction - Scroll direction ('up' or 'down')
+   */
+  private startAutoScrollY(direction: 'up' | 'down'): void {
+    if (this.autoScrollYId !== null) {
+      return; // Already scrolling
+    }
+
+    const scroll = () => {
+      const delta =
+        direction === 'up'
+          ? -TimelineInteractionHandler.AUTO_SCROLL_SPEED
+          : TimelineInteractionHandler.AUTO_SCROLL_SPEED;
+      const changed = this.viewport.panBy(0, delta);
+
+      if (changed) {
+        // Notify viewport change
+        this.callbacks.onViewportChange?.();
+      }
+
+      this.autoScrollYId = requestAnimationFrame(scroll);
+    };
+
+    this.autoScrollYId = requestAnimationFrame(scroll);
+  }
+
+  /**
+   * Stop auto-scrolling the viewport (Y direction).
+   */
+  private stopAutoScrollY(): void {
+    if (this.autoScrollYId !== null) {
+      cancelAnimationFrame(this.autoScrollYId);
+      this.autoScrollYId = null;
+    }
+  }
+
+  /**
+   * Handle mouse leave - end drag and notify when cursor exits canvas.
+   * Note: Measurement and area zoom do NOT end on mouse leave - only on mouse up or key release.
+   */
+  private handleMouseLeave(event: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const viewportState = this.viewport.getState();
+
+    // If in a drag mode and mouse left on left/right edge, update to edge and start auto-scroll
+    if (this.isDragModeActive()) {
+      if (mouseX <= 0) {
+        // Mouse left on left side - update to left edge (0) and start auto-scroll left
+        this.updateModePosition(0, this.activeMode!.lastScreenY);
+        this.invokeUpdateCallback(0);
+        this.startAutoScroll('left');
+      } else if (mouseX >= viewportState.displayWidth) {
+        // Mouse left on right side - update to right edge and start auto-scroll right
+        this.updateModePosition(viewportState.displayWidth, this.activeMode!.lastScreenY);
+        this.invokeUpdateCallback(viewportState.displayWidth);
+        this.startAutoScroll('right');
+      }
+      // If mouse left top/bottom, just keep the current position
+    }
+
+    // End any active drag operation when cursor leaves canvas
+    if (this.isDragging) {
+      this.isDragging = false;
+      this.canvas.style.cursor = 'grab';
+    }
+
+    // Mark as panned to prevent click from firing when mouse returns
+    this.didPanDuringClick = true;
+
+    if (this.callbacks.onMouseLeave) {
+      this.callbacks.onMouseLeave();
+    }
+  }
+
+  // ============================================================================
+  // TOUCH EVENT HANDLERS
+  // ============================================================================
+
+  /**
+   * Handle touch start - begin swipe/pan gesture.
+   */
+  private handleTouchStart(event: TouchEvent): void {
+    event.preventDefault(); // Prevent default touch behavior (scrolling)
+
+    if (!this.options.enablePan || event.touches.length === 0) {
+      return;
+    }
+
+    // Only handle single-finger touch for pan
+    if (event.touches.length === 1) {
+      const touch = event.touches[0];
+      if (!touch) {
+        return;
+      }
+
+      this.isDragging = true;
+      this.lastTouchX = touch.clientX;
+      this.lastTouchY = touch.clientY;
+
+      // Notify callback that drag started (used to cancel keyboard animations)
+      this.callbacks.onDragStart?.();
+
+      // Change cursor to grabbing
+      this.canvas.style.cursor = 'grabbing';
+    }
+  }
+
+  /**
+   * Handle touch move - perform swipe/pan gesture.
+   */
+  private handleTouchMove(event: TouchEvent): void {
+    event.preventDefault(); // Prevent default touch behavior (scrolling)
+
+    if (!this.isDragging || !this.options.enablePan || event.touches.length === 0) {
+      return;
+    }
+
+    // Only handle single-finger touch for pan
+    if (event.touches.length === 1) {
+      const touch = event.touches[0];
+      if (!touch) {
+        return;
+      }
+
+      // Calculate delta from last position
+      const deltaX = touch.clientX - this.lastTouchX;
+      const deltaY = touch.clientY - this.lastTouchY;
+
+      // Update pan (note: negative delta because we're dragging the viewport)
+      const changed = this.viewport.panBy(-deltaX, -deltaY);
+
+      // Update last position
+      this.lastTouchX = touch.clientX;
+      this.lastTouchY = touch.clientY;
+
+      // Notify callback if viewport changed
+      if (changed && this.callbacks.onViewportChange) {
+        this.callbacks.onViewportChange();
+      }
+    }
+  }
+
+  /**
+   * Handle touch end - end swipe/pan gesture.
+   */
+  private handleTouchEnd(_event: TouchEvent): void {
+    if (!this.isDragging) {
+      return;
+    }
+
+    this.isDragging = false;
+
+    // Restore cursor
+    this.canvas.style.cursor = 'grab';
+
+    // Update position for hover effects after touch ends
+    // Use last tracked touch position since changedTouches may not have coordinates
+    if (this.callbacks.onMouseMove) {
+      const rect = this.canvas.getBoundingClientRect();
+      // Use the last known touch position converted to canvas coordinates
+      const mouseX = this.lastTouchX - rect.left;
+      const mouseY = this.lastTouchY - rect.top;
+      this.callbacks.onMouseMove(mouseX, mouseY);
+    }
+  }
+
+  // ============================================================================
+  // PUBLIC API
+  // ============================================================================
+
+  /**
+   * Enable or disable zoom interaction.
+   */
+  public setZoomEnabled(enabled: boolean): void {
+    if (this.options.enableZoom === enabled) {
+      return;
+    }
+
+    this.options.enableZoom = enabled;
+
+    // Reattach listeners
+    this.detachEventListeners();
+    this.attachEventListeners();
+  }
+
+  /**
+   * Enable or disable pan interaction.
+   */
+  public setPanEnabled(enabled: boolean): void {
+    if (this.options.enablePan === enabled) {
+      return;
+    }
+
+    this.options.enablePan = enabled;
+
+    // Reattach listeners
+    this.detachEventListeners();
+    this.attachEventListeners();
+  }
+
+  /**
+   * Set zoom sensitivity.
+   */
+  public setZoomSensitivity(sensitivity: number): void {
+    this.options.zoomSensitivity = Math.max(0.1, Math.min(10, sensitivity));
+  }
+
+  /**
+   * Update cursor based on hover state over events.
+   * @param isOverEvent - Whether cursor is over an event
+   */
+  public updateCursor(isOverEvent: boolean): void {
+    if (this.isDragging || this.isDragModeActive()) {
+      // Don't change cursor while dragging or in a drag mode
+      return;
+    }
+
+    if (isOverEvent !== this.isOverEvent) {
+      this.isOverEvent = isOverEvent;
+      this.canvas.style.cursor = isOverEvent ? 'pointer' : 'grab';
+    }
+  }
+}

@@ -1,13 +1,13 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { type LogRecord } from '@salesforce/apex-node';
+import type { LogRecord } from '@salesforce/apex-node';
 import { existsSync } from 'fs';
 import { join, parse } from 'path';
 import { window, type WebviewPanel } from 'vscode';
 
 import { appName } from '../AppSettings.js';
-import { Context } from '../Context.js';
+import type { Context } from '../Context.js';
 import { Item, Options, QuickPick } from '../display/QuickPick.js';
 import { QuickPickWorkspace } from '../display/QuickPickWorkspace.js';
 import { GetLogFile } from '../salesforce/logs/GetLogFile.js';
@@ -41,11 +41,10 @@ export class RetrieveLogFile {
 
   private static async safeCommand(context: Context): Promise<WebviewPanel | void> {
     try {
-      return RetrieveLogFile.command(context);
+      return await RetrieveLogFile.command(context);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       context.display.showErrorMessage(`Error loading logfile: ${msg}`);
-      return Promise.resolve();
     }
   }
 

@@ -8,9 +8,9 @@
  * Helper functions for extracting and validating  markers from ApexLog.
  */
 
-import type { ApexLog } from '../../../core/log-parser/LogEvents.js';
-import type { TimelineMarker } from '../types/timeline.types.js';
-import { isMarkerType } from '../types/timeline.types.js';
+import type { ApexLog } from 'apex-log-parser';
+import type { TimelineMarker } from '../types/flamechart.types.js';
+import { isMarkerType } from '../types/flamechart.types.js';
 
 /**
  * Extracts markers from ApexLog.logIssues array.
@@ -33,6 +33,7 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
 
   const markers: TimelineMarker[] = [];
 
+  let markerIndex = 0;
   for (const issue of log.logIssues) {
     // Validate type using type guard
     if (!isMarkerType(issue.type)) {
@@ -45,8 +46,10 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
     }
 
     const marker: TimelineMarker = {
+      id: `marker-${markerIndex++}`,
       type: issue.type,
       startTime: issue.startTime,
+      eventIndex: issue.eventIndex,
       summary: issue.summary,
       metadata: issue.description,
     };
@@ -68,6 +71,10 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
  * @returns True if marker is valid, false otherwise
  */
 export function validateMarker(marker: TimelineMarker): boolean {
+  if (!marker.id) {
+    return false;
+  }
+
   if (!isMarkerType(marker.type)) {
     return false;
   }
