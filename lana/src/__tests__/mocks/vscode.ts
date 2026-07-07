@@ -89,6 +89,27 @@ export class Range {
   }
 }
 
+// Mock Selection class (a Range anchored between two positions)
+export class Selection extends Range {
+  readonly anchor: Position;
+  readonly active: Position;
+
+  constructor(anchor: Position, active: Position) {
+    super(anchor, active);
+    this.anchor = anchor;
+    this.active = active;
+  }
+}
+
+// Mock ViewColumn enum (members used by the extension)
+export const ViewColumn = {
+  Active: -1,
+  Beside: -2,
+  One: 1,
+  Two: 2,
+} as const;
+export type ViewColumn = (typeof ViewColumn)[keyof typeof ViewColumn];
+
 // Mock Uri class
 export const Uri = {
   file: jest.fn((path: string) => ({
@@ -526,6 +547,8 @@ export const resetMocks = (): void => {
 export default {
   Position,
   Range,
+  Selection,
+  ViewColumn,
   Uri,
   RelativePattern,
   FoldingRange,

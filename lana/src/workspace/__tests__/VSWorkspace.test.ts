@@ -55,6 +55,16 @@ describe('VSWorkspace', () => {
       expect(vsWorkspace.getProjectsForNamespace('')).toHaveLength(1);
       expect(mockProjects[0]!.buildClassIndex).toHaveBeenCalled();
     });
+
+    it('should group a project with a null namespace under the default namespace', async () => {
+      const mockProjects = [new SfdxProject('project1', null as unknown as string, [])];
+
+      (getProjects as jest.Mock).mockResolvedValue(mockProjects);
+
+      await vsWorkspace.parseSfdxProjects();
+
+      expect(vsWorkspace.getProjectsForNamespace('')).toHaveLength(1);
+    });
   });
 
   describe('getProjectsForNamespace', () => {
