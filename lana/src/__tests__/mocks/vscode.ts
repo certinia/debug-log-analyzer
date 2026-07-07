@@ -140,6 +140,43 @@ export const FoldingRangeKind = {
 } as const;
 export type FoldingRangeKind = (typeof FoldingRangeKind)[keyof typeof FoldingRangeKind];
 
+// Mock EventEmitter
+export class EventEmitter<T> {
+  private listeners: ((e: T) => void)[] = [];
+  readonly event = (listener: (e: T) => void): { dispose: () => void } => {
+    this.listeners.push(listener);
+    return { dispose: jest.fn() };
+  };
+  fire(data: T): void {
+    this.listeners.forEach((listener) => listener(data));
+  }
+  dispose = jest.fn();
+}
+
+// Mock SymbolKind enum (only the members used by the extension)
+export const SymbolKind = {
+  Method: 5,
+} as const;
+export type SymbolKind = (typeof SymbolKind)[keyof typeof SymbolKind];
+
+// Mock DocumentSymbol
+export class DocumentSymbol {
+  name: string;
+  detail: string;
+  kind: SymbolKind;
+  range: Range;
+  selectionRange: Range;
+  children: DocumentSymbol[] = [];
+
+  constructor(name: string, detail: string, kind: SymbolKind, range: Range, selectionRange: Range) {
+    this.name = name;
+    this.detail = detail;
+    this.kind = kind;
+    this.range = range;
+    this.selectionRange = selectionRange;
+  }
+}
+
 // Mock TextLine
 export interface MockTextLine {
   lineNumber: number;
@@ -206,6 +243,7 @@ export const createMockTextDocument = (options: {
 // Mock workspace
 export const workspace = {
   workspaceFolders: [] as { uri: ReturnType<typeof Uri.file>; name: string; index: number }[],
+  textDocuments: [] as TextDocument[],
   getConfiguration: jest.fn(() => ({
     get: jest.fn(),
     has: jest.fn(() => false),
@@ -286,12 +324,12 @@ export const window = {
     dispose: jest.fn(),
   })),
   setStatusBarMessage: jest.fn(() => ({ dispose: jest.fn() })),
-  withProgress: jest.fn((options, task) => task({ report: jest.fn() })),
+  withProgress: jest.fn((_options, task) => task({ report: jest.fn() })),
 };
 
 // Mock commands
 export const commands = {
-  registerCommand: jest.fn((command: string, callback: (...args: unknown[]) => unknown) => {
+  registerCommand: jest.fn((_command: string, _callback: (...args: unknown[]) => unknown) => {
     const disposable = { dispose: jest.fn() };
     subscriptions.push(disposable);
     return disposable;
@@ -302,7 +340,7 @@ export const commands = {
 
 // Mock languages
 export const languages = {
-  registerFoldingRangeProvider: jest.fn((selector, provider) => {
+  registerFoldingRangeProvider: jest.fn((_selector, _provider) => {
     const disposable = { dispose: jest.fn() };
     subscriptions.push(disposable);
     return disposable;
@@ -313,6 +351,11 @@ export const languages = {
     return disposable;
   }),
   registerCodeLensProvider: jest.fn(() => {
+    const disposable = { dispose: jest.fn() };
+    subscriptions.push(disposable);
+    return disposable;
+  }),
+  registerDocumentSymbolProvider: jest.fn(() => {
     const disposable = { dispose: jest.fn() };
     subscriptions.push(disposable);
     return disposable;

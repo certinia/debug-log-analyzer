@@ -116,6 +116,7 @@ export interface SelfTotal {
   total: number;
 }
 
+// eslint-disable-next-line no-useless-assignment -- only read in a type position (LogEventType above), which the rule's runtime scope analysis can't see
 const _logEventNames = [
   'ADD_SCREEN_POP_ACTION',
   'ADD_SKILL_REQUIREMENT_ACTION',

@@ -3,7 +3,7 @@
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-import { FoldingRangeKind, languages } from 'vscode';
+import { FoldingRangeKind, languages, window, workspace } from 'vscode';
 
 import {
   createMockApexLog,
@@ -317,12 +317,98 @@ describe('RawLogFoldingProvider', () => {
       );
     });
 
-    it('should add disposable to context subscriptions', () => {
+    it('should register an onDidOpenTextDocument listener', () => {
       const mockContext = createMockContext();
 
       RawLogFoldingProvider.apply(mockContext as unknown as import('../../Context.js').Context);
 
-      expect(mockContext.context.subscriptions.length).toBe(1);
+      expect(workspace.onDidOpenTextDocument).toHaveBeenCalledTimes(1);
+    });
+
+    it('should add disposables to context subscriptions', () => {
+      const mockContext = createMockContext();
+
+      RawLogFoldingProvider.apply(mockContext as unknown as import('../../Context.js').Context);
+
+      // emitter + folding provider registration + open listener + active-editor listener
+      expect(mockContext.context.subscriptions.length).toBe(4);
+    });
+  });
+
+  describe('signals VS Code when a log is parsed', () => {
+    // An EXECUTION_STARTED line makes isApexLogContent() return true.
+    const apexLogLines = ['16:35:06.2 (2706460)|EXECUTION_STARTED'];
+
+    function applyAndCapture() {
+      const mockContext = createMockContext();
+      RawLogFoldingProvider.apply(mockContext as unknown as import('../../Context.js').Context);
+
+      const registeredProvider = (languages.registerFoldingRangeProvider as jest.Mock).mock
+        .calls[0]?.[1] as RawLogFoldingProvider;
+      const openHandler = (workspace.onDidOpenTextDocument as jest.Mock).mock.calls[0]?.[0] as (
+        doc: unknown,
+      ) => void;
+      const activeEditorHandler = (window.onDidChangeActiveTextEditor as jest.Mock).mock
+        .calls[0]?.[0] as (editor: unknown) => void;
+
+      return { registeredProvider, openHandler, activeEditorHandler };
+    }
+
+    const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+    it('warms the cache and fires onDidChangeFoldingRanges when an apex log opens', async () => {
+      const { registeredProvider, openHandler } = applyAndCapture();
+      const fired = jest.fn();
+      registeredProvider.onDidChangeFoldingRanges?.(fired);
+
+      mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [] }));
+      const doc = createMockTextDocument({ lines: apexLogLines, uri: '/test/file.log' });
+      openHandler(doc);
+      await flush();
+
+      expect(mockGetApexLog).toHaveBeenCalledWith('/test/file.log');
+      expect(fired).toHaveBeenCalledTimes(1);
+    });
+
+    it('warms the cache and fires when an apex log editor becomes active (reopen)', async () => {
+      const { registeredProvider, activeEditorHandler } = applyAndCapture();
+      const fired = jest.fn();
+      registeredProvider.onDidChangeFoldingRanges?.(fired);
+
+      mockGetApexLog.mockResolvedValueOnce(createMockApexLog({ children: [] }));
+      const doc = createMockTextDocument({ lines: apexLogLines, uri: '/test/file.log' });
+      activeEditorHandler({ document: doc });
+      await flush();
+
+      expect(mockGetApexLog).toHaveBeenCalledWith('/test/file.log');
+      expect(fired).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not warm or signal for a non-apex-log document', async () => {
+      const { registeredProvider, openHandler } = applyAndCapture();
+      const fired = jest.fn();
+      registeredProvider.onDidChangeFoldingRanges?.(fired);
+
+      const doc = createMockTextDocument({ lines: ['just some text'], uri: '/test/notes.log' });
+      openHandler(doc);
+      await flush();
+
+      expect(mockGetApexLog).not.toHaveBeenCalled();
+      expect(fired).not.toHaveBeenCalled();
+    });
+
+    it('does not fire when the log fails to parse', async () => {
+      const { registeredProvider, openHandler } = applyAndCapture();
+      const fired = jest.fn();
+      registeredProvider.onDidChangeFoldingRanges?.(fired);
+
+      mockGetApexLog.mockResolvedValueOnce(null);
+      const doc = createMockTextDocument({ lines: apexLogLines, uri: '/test/file.log' });
+      openHandler(doc);
+      await flush();
+
+      expect(mockGetApexLog).toHaveBeenCalledWith('/test/file.log');
+      expect(fired).not.toHaveBeenCalled();
     });
   });
 });

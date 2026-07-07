@@ -12,6 +12,7 @@ import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
+import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { sumDurationTotalForRootEvents } from '../../analysis/services/CallStackSum.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { toBottomUpTree, type BottomUpRow } from '../utils/Aggregation.js';
@@ -101,8 +102,9 @@ export function createBottomUpTable(
     height: '100%',
     maxHeight: '100%',
     rowKeyboardNavigation: true,
-    scrollAnchor: true,
+    anchoringPolicy: true,
     initialFilter: callbacks.showDetailsFilter,
+    renderVertical: VirtualVerticalRenderer,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',

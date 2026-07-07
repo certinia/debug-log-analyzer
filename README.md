@@ -3,7 +3,7 @@
 **Analyze Salesforce Apex Debug logs with blazing speed.**  
 Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers. Instantly visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep insight into complex transactions and optimize slow Apex methods faster than ever.
 
-![Apex Log Analyzer Preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-preview.gif)
+![Apex Log Analyzer Preview](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/preview.gif)
 
 [Installation](#%EF%B8%8F-installation 'Install Apex Log Analyzer in VS Code') |
 [Debug Log Levels](#%EF%B8%8F-recommended-debug-log-levels 'Go to Recommended Debug Log Levels') |
@@ -83,15 +83,15 @@ Use `Log: Retrieve Apex Log And Show Analysis` from the Command Palette.
 
 The Timeline view shows a live visualization of your Salesforce Apex log execution — including methods, SOQL queries, DML operations, workflows, flows, and more.
 
-- **⚡ Fast** – Blazing-fast zoom, pan, and rendering even on massive logs (500k+ lines). 🧪
-- **🗺️ Minimap** – Bird's-eye view with skyline density overview, viewport lens, and instant teleport. 🧪
-- **📊 Governor Limits Strip** – At-a-glance limit usage with traffic light coloring. Expand for detailed step chart. 🧪
-- **📏 Measure & Zoom** – `Shift+Drag` to measure durations, `Alt/Option+Drag` to area-zoom, precision keyboard controls. 🧪
-- **🕐 Wall-Clock Time** – Toggle between elapsed and real-time (HH:MM:SS.mmm) on the time axis via the toolbar clock button. 🧪
+- **⚡ Fast** – Blazing-fast zoom, pan, and rendering even on massive logs (500k+ lines).
+- **🗺️ Minimap** – Bird's-eye view with skyline density overview, viewport lens, and instant teleport.
+- **📊 Governor Limits Strip** – At-a-glance limit usage with traffic light coloring. Expand for detailed step chart.
+- **📏 Measure & Zoom** – `Shift+Drag` to measure durations, `Alt/Option+Drag` to area-zoom, precision keyboard controls.
+- **🕐 Wall-Clock Time** – Toggle between elapsed and real-time (HH:MM:SS.mmm) on the time axis via the toolbar clock button.
 
-Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail, Tooltips, Context Menu, Search & Highlight, 19 Curated Themes. 🧪
+Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail, Tooltips, Context Menu, Search & Highlight, 19 Curated Themes.
 
-![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-timeline.png)
+![Flame Chart](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline.png)
 
 > 🧠 Great for spotting long-running operations, inefficient queries, and bottlenecks.
 
@@ -100,38 +100,38 @@ Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail,
 Explore nested method calls with performance metrics:
 
 - **Metrics**: Self Time, Total Time, SOQL/DML/Thrown Counts, SOQL/DML/Rows
-- **Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution 🧪
+- **Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution
 - **Group Bottom-Up by Namespace or Type**
 - **Filter by Namespace, Type or Duration**
 - **Toggle Debug-Only + Detail Events**
 - **Keyboard Navigation**
 - **Click to go to Code** – Jump to the source method in your project
 
-![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-calltree.png)
+![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/calltree.png)
 
 ## 🧠 Apex Analysis
 
 See which methods are the slowest, most frequent. or expensive.
 
-- **Group by Type, Namespace, or Caller Namespace 🧪**
+- **Group by Type, Namespace, or Caller Namespace **
 - **Sort by Duration, Count, Name, Type or Namespace**
 - **Filter to specific event types**
 - **Copy or Export to CSV**
 
-![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-analysis.png)
+![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/analysis.png)
 
 ## 🗄️ Database Analysis
 
 Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues.
 
 - **SOQL + DML Duration, Selectivity, Aggregates, Row Count**
-- **Group by Namespace, Caller Namespace 🧪, or Query**
+- **Group by Namespace, Caller Namespace or Query**
 - **View the Call Stack**
 - **SOQL Optimization Tips**
 - **Sort by SOQL or DML, Duration, Selectivity, Aggregates, Row Count**
 - **Copy or Export to CSV**
 
-![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/v1.18/lana-database.png)
+![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png)
 
 ## 🔍 Global Search
 
@@ -144,7 +144,7 @@ Search across all visualizations:
 
 Quickly step through matches, auto-expand parents, and automatically show timeline tooltips.
 
-## 📄 Raw Log Navigation 🧪
+## 📄 Raw Log Navigation
 
 Seamlessly navigate between the visual analysis and your raw `.log` files:
 
@@ -193,7 +193,7 @@ The same npm package works in Cursor and other MCP clients. See the [`@certinia/
 
 ## 🎨 Customization
 
-Adjust event colors with custom timeline themes in `settings.json`: 🧪
+Adjust event colors with custom timeline themes in `settings.json`:
 
 ```json
 "lana.timeline.customThemes": {

@@ -47,11 +47,11 @@ export class VSCodeExtensionMessenger {
   public request<T>(message: string, payload?: T): Promise<T> {
     const reqId = crypto.randomUUID();
     return new Promise((resolve, reject) => {
-      const listener = (incomingPayload: any, error: unknown) => {
+      const listener = (incomingPayload: unknown, error: unknown) => {
         if (error) {
           reject(error);
         } else {
-          resolve(incomingPayload);
+          resolve(incomingPayload as T);
         }
         VSCodeExtensionMessenger.listeners.delete(reqId);
       };

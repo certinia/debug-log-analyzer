@@ -57,13 +57,13 @@ jest.mock('pixi.js', () => {
   const actual = jest.requireActual('pixi.js');
   return {
     ...(actual as Record<string, unknown>),
-    // eslint-disable-next-line @typescript-eslint/naming-convention
+
     Sprite: jest.fn().mockImplementation(() => {
       const mock = new MockSprite();
       createdMockSpritesGlobal.push(mock);
       return mock;
     }),
-    // eslint-disable-next-line @typescript-eslint/naming-convention
+
     Texture: {
       WHITE: {},
     },

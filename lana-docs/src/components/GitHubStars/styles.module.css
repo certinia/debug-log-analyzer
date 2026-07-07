@@ -1,0 +1,68 @@
+.root {
+  display: inline-flex;
+  align-items: stretch;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+/* GitHub-style "Star" button: neutral grey, GitHub mark + label. */
+.starButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  font-weight: 600;
+  color: var(--ifm-font-color-base);
+  background: var(--ifm-color-emphasis-100);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-button-border-radius);
+  transition: background-color var(--ifm-transition-fast) var(--ifm-transition-timing-default);
+}
+
+.starButton:hover {
+  background: var(--ifm-color-emphasis-200);
+  color: var(--ifm-font-color-base);
+  text-decoration: none;
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+/* Attached count box with a small left caret, like GitHub's social-count. */
+.countBubble {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  font-weight: 600;
+  color: var(--ifm-font-color-base);
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: var(--ifm-button-border-radius);
+  transition: color var(--ifm-transition-fast) var(--ifm-transition-timing-default);
+}
+
+/* Caret: border triangle pointing left toward the button. */
+.countBubble::before,
+.countBubble::after {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: var(--ifm-color-emphasis-300);
+}
+
+.countBubble::after {
+  border-right-color: var(--ifm-background-surface-color);
+  margin-right: -1px;
+}
+
+/* Hover uses the Docusaurus link-hover color (adapts with the theme). */
+.countBubble:hover {
+  color: var(--ifm-link-hover-color);
+  text-decoration: none;
+}

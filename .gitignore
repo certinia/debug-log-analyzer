@@ -8,5 +8,4 @@ dist/
 build/
 out/
 coverage/
-
-tsconfig.tsbuildinfo
+*.tsbuildinfo
