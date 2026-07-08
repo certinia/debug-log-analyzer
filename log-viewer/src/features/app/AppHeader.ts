@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
@@ -17,7 +17,6 @@ import '../find/components/FindWidget.js';
 import '../timeline/components/TimelineView.js';
 
 // styles
-import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../styles/global.styles.js';
 
 @customElement('app-header')
@@ -39,7 +38,6 @@ export class AppHeader extends LitElement {
 
   static styles = [
     globalStyles,
-    unsafeCSS(codiconStyles),
     css`
       :host {
         background-color: var(--vscode-tab-activeBackground);

@@ -24,7 +24,6 @@ import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
-import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
@@ -36,7 +35,6 @@ import '../../../components/datagrid-filter-bar.js';
 export class AnalysisView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
-    unsafeCSS(codiconStyles),
     unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`

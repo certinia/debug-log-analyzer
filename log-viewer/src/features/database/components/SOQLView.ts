@@ -32,7 +32,6 @@ import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
-import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 import databaseViewStyles from './DatabaseView.scss';
 
@@ -102,7 +101,6 @@ export class SOQLView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
     unsafeCSS(databaseViewStyles),
-    unsafeCSS(codiconStyles),
     unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`

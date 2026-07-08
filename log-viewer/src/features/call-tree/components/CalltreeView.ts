@@ -41,8 +41,6 @@ import { createAggregatedTable } from './AggregatedTable.js';
 import { createBottomUpTable } from './BottomUpTable.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
-import codiconStyles from '@vscode/codicons/dist/codicon.css';
-
 type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
 
 const DEBUG_VALUE_TYPES: ReadonlySet<string> = new Set([
@@ -146,7 +144,6 @@ export class CalltreeView extends LitElement {
 
   static styles = [
     unsafeCSS(dataGridStyles),
-    unsafeCSS(codiconStyles),
     unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`

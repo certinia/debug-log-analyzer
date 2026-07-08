@@ -1,11 +1,12 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
+import '#vscode-elements/vscode-icon.js';
 import '#vscode-elements/vscode-tab-header.js';
 import '#vscode-elements/vscode-tab-panel.js';
 import '#vscode-elements/vscode-tabs.js';
 import type { VscTabsSelectEvent } from '@vscode-elements/elements/dist/vscode-tabs/vscode-tabs.js';
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { parse, type ApexLog } from 'apex-log-parser';
@@ -20,7 +21,6 @@ import {
 } from '../notifications/components/NotificationPanel.js';
 
 // styles
-import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../styles/global.styles.js';
 
 // web components
@@ -65,7 +65,6 @@ export class LogViewer extends LitElement {
 
   static styles = [
     globalStyles,
-    unsafeCSS(codiconStyles),
     css`
       :host {
         display: flex;
@@ -146,16 +145,16 @@ export class LogViewer extends LitElement {
         @vsc-tabs-select="${this._onTabSelect}"
       >
         <vscode-tab-header slot="header">
-          <span class="tab-header"><span class="codicon codicon-graph"></span>Timeline</span>
+          <span class="tab-header"><vscode-icon name="graph"></vscode-icon>Timeline</span>
         </vscode-tab-header>
         <vscode-tab-header slot="header">
-          <span class="tab-header"><span class="codicon codicon-list-tree"></span>Call Tree</span>
+          <span class="tab-header"><vscode-icon name="list-tree"></vscode-icon>Call Tree</span>
         </vscode-tab-header>
         <vscode-tab-header slot="header">
-          <span class="tab-header"><span class="codicon codicon-code"></span>Analysis</span>
+          <span class="tab-header"><vscode-icon name="code"></vscode-icon>Analysis</span>
         </vscode-tab-header>
         <vscode-tab-header slot="header">
-          <span class="tab-header"><span class="codicon codicon-database"></span>Database</span>
+          <span class="tab-header"><vscode-icon name="database"></vscode-icon>Database</span>
         </vscode-tab-header>
 
         <vscode-tab-panel>

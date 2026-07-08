@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +16,11 @@ import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
 
 const _filename = fileURLToPath(import.meta.url);
 const _dirname = path.dirname(_filename);
+
+// Resolve the codicons dist dir via Node resolution so it works regardless of
+// pnpm hoisting (avoids a hard-coded node_modules path).
+const nodeRequire = createRequire(import.meta.url);
+const codiconsDist = path.dirname(nodeRequire.resolve('@vscode/codicons/dist/codicon.css'));
 
 const production = process.env.NODE_ENV === 'production';
 export default [
@@ -137,6 +143,10 @@ export default [
         targets: [
           {
             src: ['log-viewer/out/*', 'log-viewer/index.html', 'lana/certinia-icon-color.png'],
+            dest: 'lana/out',
+          },
+          {
+            src: path.join(codiconsDist, 'codicon.{css,ttf}'),
             dest: 'lana/out',
           },
         ],
