@@ -22,7 +22,7 @@
     "lint-staged": "^17.0.7",
     "postcss-url": "^10.1.4",
     "prettier": "^3.8.4",
-    "rolldown": "1.1.1",
+    "rolldown": "1.1.4",
     "rollup": "^4.62.0",
     "rollup-plugin-copy": "^3.5.0",
     "rollup-plugin-polyfill-node": "^0.13.0",
