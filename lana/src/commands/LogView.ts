@@ -53,9 +53,12 @@ export class LogView {
     const logViewerRoot = join(context.context.extensionPath, 'out');
     const index = join(logViewerRoot, 'index.html');
     const bundleUri = panel.webview.asWebviewUri(Uri.file(join(logViewerRoot, 'bundle.js')));
+    const codiconUri = panel.webview.asWebviewUri(Uri.file(join(logViewerRoot, 'codicon.css')));
     const indexSrc = await this.getFile(index);
     panel.iconPath = Uri.file(join(logViewerRoot, 'certinia-icon-color.png'));
-    panel.webview.html = indexSrc.replace(/bundle\.js/gi, bundleUri.toString(true));
+    panel.webview.html = indexSrc
+      .replace(/bundle\.js/gi, bundleUri.toString(true))
+      .replace(/codicon\.css/gi, codiconUri.toString(true));
 
     panel.onDidDispose(
       () => {

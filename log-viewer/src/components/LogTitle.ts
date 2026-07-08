@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-toolkit';
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
@@ -10,8 +9,6 @@ import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
 
-provideVSCodeDesignSystem().register(vsCodeButton());
-
 @customElement('log-title')
 export class LogTitle extends LitElement {
   @property()
@@ -19,9 +16,7 @@ export class LogTitle extends LitElement {
 
   @property()
   logPath = '';
-  /**
-   * --button-icon styles come from @vscode/webview-ui-toolkit as they are hardcoded in vscode at the moment. @vscode/webview-ui-toolkit needs to be in use for these to work.
-   */
+
   static styles = [
     globalStyles,
     skeletonStyles,
@@ -40,8 +35,8 @@ export class LogTitle extends LitElement {
       .title-item {
         padding-block: 2px;
         padding-inline: 6px;
-        background: var(--button-icon-background, rgba(90, 93, 94, 0.31));
-        border-radius: var(--button-icon-corner-radius, 5px);
+        background: transparent;
+        border-radius: 5px;
         font-weight: var(--text-weight-semibold, 600);
         font-size: 1.1rem;
         overflow: hidden;

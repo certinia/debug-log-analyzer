@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeBadge, vsCodeButton } from '@vscode/webview-ui-toolkit';
+import '#vscode-elements/vscode-button.js';
 import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
@@ -18,8 +18,6 @@ import './BadgeBase.js';
 import './Divider.js';
 import './IconButton.js';
 import './IconButtonSkeleton.js';
-
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeBadge());
 
 @customElement('log-problems')
 export class NotificationTag extends LitElement {
@@ -55,8 +53,6 @@ export class NotificationTag extends LitElement {
     skeletonStyles,
     css`
       :host {
-        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
-
         ${notificationStyles}
         display: inline-flex;
         flex: 0 0 auto;
@@ -125,7 +121,7 @@ export class NotificationTag extends LitElement {
       <icon-button
         ariaLabel="${title}"
         title="${title}"
-        icon="codicon-warning"
+        icon="warning"
         .badgeCount="${count}"
         @click=${this._togglePanel}
       ></icon-button>

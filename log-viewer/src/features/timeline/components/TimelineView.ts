@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import '#vscode-elements/vscode-toolbar-button.js';
+import { LitElement, css, html } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
@@ -16,7 +17,6 @@ import type { TimeDisplayMode } from '../types/flamechart.types.js';
 import type { TimelineFlameChart } from './TimelineFlameChart.js';
 
 // styles
-import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 
 // web components
@@ -70,7 +70,6 @@ export class TimelineView extends LitElement {
 
   static styles = [
     globalStyles,
-    unsafeCSS(codiconStyles),
     css`
       :host {
         /* Editor */
@@ -119,8 +118,6 @@ export class TimelineView extends LitElement {
         /* Toolbar */
         --tl-toolbar-hover-background: var(--vscode-toolbar-hoverBackground);
 
-        --button-icon-hover-background: var(--tl-toolbar-hover-background);
-
         display: flex;
         flex-direction: column;
         flex: 1;
@@ -135,11 +132,6 @@ export class TimelineView extends LitElement {
         justify-content: flex-end;
         gap: 4px;
         flex: 0 0 auto;
-      }
-
-      vscode-button {
-        height: 22px;
-        width: 22px;
       }
     `,
   ];
@@ -180,16 +172,12 @@ export class TimelineView extends LitElement {
 
       return html`${hasWallClock
           ? html`<div class="timeline-toolbar">
-              <vscode-button
-                appearance="icon"
-                aria-label="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
+              <vscode-toolbar-button
+                icon="${isWallClock ? 'history' : 'clockface'}"
+                label="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
+                title="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
                 @click=${() => this.toggleTimeDisplay()}
-              >
-                <span
-                  class="codicon ${isWallClock ? 'codicon-history' : 'codicon-clockface'}"
-                  title="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
-                ></span>
-              </vscode-button>
+              ></vscode-toolbar-button>
             </div>`
           : ''}
         <timeline-flame-chart

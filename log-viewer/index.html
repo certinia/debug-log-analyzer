@@ -8,6 +8,9 @@
       name="description"
       content="Analyze Salesforce Apex Debug logs - Instantly visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep insight into complex transactions and optimize slow Apex methods"
     />
+    <!-- href is rewritten to a webview URI by the extension (see LogView.ts); required by
+         @vscode-elements' vscode-icon, which reads this link by id for the codicon font -->
+    <link rel="stylesheet" id="vscode-codicon-stylesheet" href="codicon.css" />
     <style>
       html {
         width: 100%;

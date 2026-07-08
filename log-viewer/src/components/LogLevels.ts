@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
+import '#vscode-elements/vscode-badge.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
@@ -32,10 +33,11 @@ export class LogLevels extends LitElement {
         font-family: var(--vscode-editor-font-family);
       }
 
-      vscode-tag::part(control) {
-        --badge-background: var(--vscode-textBlockQuote-background);
-        --button-border: none;
-        --badge-foreground: none;
+      vscode-badge {
+        --vscode-badge-background: var(--vscode-textBlockQuote-background);
+        --vscode-badge-foreground: var(--vscode-editor-foreground);
+        --vscode-font-family: var(--vscode-editor-font-family);
+
         font-family: var(--vscode-editor-font-family);
         font-size: 0.9rem;
       }
@@ -70,10 +72,10 @@ export class LogLevels extends LitElement {
     return html`${repeat(
       this.logSettings,
       ({ logCategory, logLevel }) =>
-        html`<vscode-tag>
+        html`<vscode-badge>
           <span class="setting__title">${logCategory}:</span>
           <span class="setting__level">${logLevel}</span>
-        </vscode-tag>`,
+        </vscode-badge>`,
     )}`;
   }
 }

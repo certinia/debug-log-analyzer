@@ -1,12 +1,9 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import {
-  provideVSCodeDesignSystem,
-  vsCodeButton,
-  vsCodeDropdown,
-  vsCodeOption,
-} from '@vscode/webview-ui-toolkit';
+import '#vscode-elements/vscode-option.js';
+import '../../../components/VsSelect.js';
+import '#vscode-elements/vscode-toolbar-button.js';
 import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
@@ -36,7 +33,6 @@ import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
-import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 import databaseViewStyles from './DatabaseView.scss';
 
@@ -45,8 +41,6 @@ import '../../../components/CallStack.js';
 import '../../../components/datagrid-filter-bar.js';
 import './DatabaseSOQLDetailPanel.js';
 import './DatabaseSection.js';
-
-provideVSCodeDesignSystem().register(vsCodeButton(), vsCodeDropdown(), vsCodeOption());
 
 @customElement('soql-view')
 export class SOQLView extends LitElement {
@@ -108,13 +102,10 @@ export class SOQLView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
     unsafeCSS(databaseViewStyles),
-    unsafeCSS(codiconStyles),
     unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
-        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
-
         display: flex;
         flex-direction: column;
         width: 100%;
@@ -148,10 +139,6 @@ export class SOQLView extends LitElement {
           user-select: none;
         }
       }
-
-      vscode-dropdown::part(listbox) {
-        width: auto;
-      }
     `,
   ];
 
@@ -163,35 +150,26 @@ export class SOQLView extends LitElement {
       <datagrid-filter-bar>
         <div slot="filters" class="dropdown-container">
           <label for="soql-groupby-dropdown">Group by</label>
-          <vscode-dropdown
-            id="soql-groupby-dropdown"
-            aria-label="Group by"
-            aria-labelledby="soql-groupby-dropdown"
-            @change="${this._soqlGroupBy}"
-          >
+          <vs-select id="soql-groupby-dropdown" label="Group by" @change="${this._soqlGroupBy}">
             <vscode-option>SOQL</vscode-option>
             <vscode-option>Namespace</vscode-option>
             <vscode-option>None</vscode-option>
-          </vscode-dropdown>
+          </vs-select>
         </div>
 
         <div slot="actions">
-          <vscode-button
-            appearance="icon"
-            aria-label="Export to CSV"
+          <vscode-toolbar-button
+            icon="desktop-download"
+            label="Export to CSV"
             title="Export to CSV"
             @click=${this._exportToCSV}
-          >
-            <span class="codicon codicon-desktop-download"></span>
-          </vscode-button>
-          <vscode-button
-            appearance="icon"
-            aria-label="Copy to clipboard"
+          ></vscode-toolbar-button>
+          <vscode-toolbar-button
+            icon="copy"
+            label="Copy to clipboard"
             title="Copy to clipboard"
             @click=${this._copyToClipboard}
-          >
-            <span class="codicon codicon-copy"></span>
-          </vscode-button>
+          ></vscode-toolbar-button>
         </div>
       </datagrid-filter-bar>
 

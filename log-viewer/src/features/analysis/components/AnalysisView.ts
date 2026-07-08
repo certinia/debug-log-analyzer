@@ -1,13 +1,11 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import {
-  provideVSCodeDesignSystem,
-  vsCodeButton,
-  vsCodeCheckbox,
-  vsCodeDropdown,
-  vsCodeOption,
-} from '@vscode/webview-ui-toolkit';
+import '#vscode-elements/vscode-button.js';
+import '#vscode-elements/vscode-checkbox.js';
+import '#vscode-elements/vscode-option.js';
+import '../../../components/VsSelect.js';
+import '#vscode-elements/vscode-toolbar-button.js';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
@@ -26,7 +24,6 @@ import { expandCollapseAll } from '../../call-tree/utils/ExpandCollapse.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
-import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
@@ -34,24 +31,14 @@ import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import '../../../components/GridSkeleton.js';
 import '../../../components/datagrid-filter-bar.js';
 
-provideVSCodeDesignSystem().register(
-  vsCodeButton(),
-  vsCodeCheckbox(),
-  vsCodeDropdown(),
-  vsCodeOption(),
-);
-
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
-    unsafeCSS(codiconStyles),
     unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
-        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
-
         height: 100%;
         width: 100%;
         display: flex;
@@ -93,6 +80,12 @@ export class AnalysisView extends LitElement {
         align-items: end;
       }
 
+      /* cancel the checkbox's built-in 4px vertical margins so it bottom-aligns
+         like the previous 18px-tall toolkit checkbox */
+      vscode-checkbox {
+        margin: -4px 0;
+      }
+
       .dropdown-container {
         box-sizing: border-box;
         display: flex;
@@ -110,10 +103,6 @@ export class AnalysisView extends LitElement {
           margin-bottom: 4px;
           user-select: none;
         }
-      }
-
-      vscode-dropdown::part(listbox) {
-        width: auto;
       }
     `,
     categoryColoringStyles,
@@ -177,14 +166,14 @@ export class AnalysisView extends LitElement {
         <datagrid-filter-bar>
           <div slot="filters" class="filter-container align__end">
             <vscode-button
-              appearance="secondary"
+              secondary
               aria-label="Expand all"
               title="Expand all"
               @click=${this._expandButtonClick}
               >Expand</vscode-button
             >
             <vscode-button
-              appearance="secondary"
+              secondary
               aria-label="Collapse all"
               title="Collapse all"
               @click=${this._collapseButtonClick}
@@ -197,37 +186,28 @@ export class AnalysisView extends LitElement {
 
             <div class="dropdown-container">
               <label id="groupby-dropdown-label" for="groupby-dropdown">Group by</label>
-              <vscode-dropdown
-                id="groupby-dropdown"
-                aria-label="Group by"
-                aria-labelledby="groupby-dropdown-label"
-                @change="${this._groupBy}"
-              >
+              <vs-select id="groupby-dropdown" label="Group by" @change="${this._groupBy}">
                 <vscode-option>None</vscode-option>
                 <vscode-option>Namespace</vscode-option>
                 <vscode-option>Caller Namespace</vscode-option>
                 <vscode-option>Type</vscode-option>
-              </vscode-dropdown>
+              </vs-select>
             </div>
           </div>
 
           <div slot="actions">
-            <vscode-button
-              appearance="icon"
-              aria-label="Export to CSV"
+            <vscode-toolbar-button
+              icon="desktop-download"
+              label="Export to CSV"
               title="Export to CSV"
               @click=${this._exportToCSV}
-            >
-              <span class="codicon codicon-desktop-download"></span>
-            </vscode-button>
-            <vscode-button
-              appearance="icon"
-              aria-label="Copy to clipboard"
+            ></vscode-toolbar-button>
+            <vscode-toolbar-button
+              icon="copy"
+              label="Copy to clipboard"
               title="Copy to clipboard"
               @click=${this._copyToClipboard}
-            >
-              <span class="codicon codicon-copy"></span>
-            </vscode-button>
+            ></vscode-toolbar-button>
           </div>
         </datagrid-filter-bar>
 

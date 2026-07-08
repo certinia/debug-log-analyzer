@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeButton } from '@vscode/webview-ui-toolkit';
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import '#vscode-elements/vscode-toolbar-button.js';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
@@ -10,7 +10,6 @@ import { formatDuration } from '../core/utility/Util.js';
 import type { Notification } from '../features/notifications/components/NotificationPanel.js';
 
 // styles
-import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../styles/global.styles.js';
 import { notificationStyles } from '../styles/notification.styles.js';
 
@@ -23,8 +22,6 @@ import './DotSeparator.js';
 import './LogMeta.js';
 import './LogProblems.js';
 import './LogTitle.js';
-
-provideVSCodeDesignSystem().register(vsCodeButton());
 
 @customElement('nav-bar')
 export class NavBar extends LitElement {
@@ -48,21 +45,13 @@ export class NavBar extends LitElement {
 
   static styles = [
     globalStyles,
-    unsafeCSS(codiconStyles),
     css`
       :host {
-        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
-
         display: flex;
         flex-direction: column;
         justify-content: center;
         color: var(--vscode-editor-foreground);
         ${notificationStyles}
-      }
-
-      vscode-button {
-        height: 22px;
-        width: 22px;
       }
 
       .navbar {
@@ -117,16 +106,14 @@ export class NavBar extends LitElement {
         </div>
         <div class="navbar--right">
           <notification-button .notifications="${this.parserIssues}"></notification-button>
-          <vscode-button
-            appearance="icon"
-            aria-label="Help"
+          <vscode-toolbar-button
+            icon="question"
+            label="Help"
             title="Help"
             @click=${() => {
               vscodeMessenger.send('openHelp');
             }}
-          >
-            <span class="codicon codicon-question"></span>
-          </vscode-button>
+          ></vscode-toolbar-button>
         </div>
       </div>
     `;

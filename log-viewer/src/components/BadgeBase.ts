@@ -1,15 +1,13 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { provideVSCodeDesignSystem, vsCodeTag } from '@vscode/webview-ui-toolkit';
+import '#vscode-elements/vscode-badge.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
-
-provideVSCodeDesignSystem().register(vsCodeTag());
 
 @customElement('badge-base')
 export class BadgeBase extends LitElement {
@@ -28,35 +26,30 @@ export class BadgeBase extends LitElement {
     globalStyles,
     skeletonStyles,
     css`
-      :host {
-      }
-
       .tag {
+        --vscode-font-family: monospace;
+        --vscode-badge-background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+        --vscode-badge-foreground: var(--vscode-editor-foreground);
+
         font-family: monospace;
         font-size: inherit;
       }
 
-      .tag::part(control) {
-        color: var(--vscode-editor-foreground);
-        background-color: var(--button-icon-hover-background, rgba(90, 93, 94, 0.31));
-        text-transform: inherit;
-        border: none;
-      }
-      .success-tag::part(control) {
-        background-color: rgba(128, 255, 128, 0.2);
+      .success-tag {
+        --vscode-badge-background: rgba(128, 255, 128, 0.2);
       }
 
-      .failure-tag::part(control) {
-        background-color: var(--notification-error-background);
+      .failure-tag {
+        --vscode-badge-background: var(--notification-error-background);
       }
     `,
   ];
 
   render() {
     if (this.isloading) {
-      return html`<vscode-tag class="tag skeleton">&nbsp;</vscode-tag>`;
+      return html`<vscode-badge class="tag skeleton">&nbsp;</vscode-badge>`;
     }
     const statusTag = this.colorMap.get(this.status);
-    return html`<vscode-tag class="tag ${statusTag}"><slot></slot></vscode-tag>`;
+    return html`<vscode-badge class="tag ${statusTag}"><slot></slot></vscode-badge>`;
   }
 }

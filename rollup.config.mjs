@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+import path from 'node:path';
 import process from 'node:process';
 
 // Rollup plugins
@@ -9,6 +11,11 @@ import copy from 'rollup-plugin-copy';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import postcss from 'rollup-plugin-postcss';
 import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
+
+// Resolve the codicons dist dir via Node resolution so it works regardless of
+// pnpm hoisting (avoids a hard-coded node_modules path).
+const nodeRequire = createRequire(import.meta.url);
+const codiconsDist = path.dirname(nodeRequire.resolve('@vscode/codicons/dist/codicon.css'));
 
 const production = process.env.NODE_ENV === 'production';
 export default [
@@ -73,6 +80,11 @@ export default [
   },
   {
     input: { bundle: './log-viewer/src/Main.ts' },
+    // @vscode-elements ships tsc output with the inline `(this && this.__decorate)` helper.
+    // Declaring a top-level `this` for those files stops rollup's THIS_IS_UNDEFINED warning; use
+    // `globalThis` (a real binding rollup won't flag) — `globalThis.__decorate` is undefined so the
+    // guard still falls back to the inline helper, i.e. no behaviour change.
+    moduleContext: (id) => (id.includes('/@vscode-elements/elements/') ? 'globalThis' : undefined),
     output: [
       {
         format: 'es',
@@ -117,6 +129,10 @@ export default [
         targets: [
           {
             src: ['log-viewer/out/*', 'log-viewer/index.html', 'lana/certinia-icon-color.png'],
+            dest: 'lana/out',
+          },
+          {
+            src: path.join(codiconsDist, 'codicon.{css,ttf}'),
             dest: 'lana/out',
           },
         ],

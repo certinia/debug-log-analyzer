@@ -1,13 +1,10 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import {
-  provideVSCodeDesignSystem,
-  vsCodeButton,
-  vsCodeCheckbox,
-  vsCodeDropdown,
-  vsCodeOption,
-} from '@vscode/webview-ui-toolkit';
+import '#vscode-elements/vscode-button.js';
+import '#vscode-elements/vscode-checkbox.js';
+import '#vscode-elements/vscode-option.js';
+import '../../../components/VsSelect.js';
 import { css, html, LitElement, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
@@ -43,15 +40,6 @@ import '../../../components/GridSkeleton.js';
 import { createAggregatedTable } from './AggregatedTable.js';
 import { createBottomUpTable } from './BottomUpTable.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
-
-import codiconStyles from '@vscode/codicons/dist/codicon.css';
-
-provideVSCodeDesignSystem().register(
-  vsCodeButton(),
-  vsCodeCheckbox(),
-  vsCodeDropdown(),
-  vsCodeOption(),
-);
 
 type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
 
@@ -156,13 +144,10 @@ export class CalltreeView extends LitElement {
 
   static styles = [
     unsafeCSS(dataGridStyles),
-    unsafeCSS(codiconStyles),
     unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
-        --button-icon-hover-background: var(--vscode-toolbar-hoverBackground);
-
         height: 100%;
         width: 100%;
         display: flex;
@@ -216,12 +201,14 @@ export class CalltreeView extends LitElement {
         }
       }
 
-      vscode-dropdown::part(listbox) {
-        width: auto;
-      }
-
       .align__end {
         align-items: end;
+      }
+
+      /* cancel the checkbox's built-in 4px vertical margins so it bottom-aligns
+         like the previous 18px-tall toolkit checkbox */
+      vscode-checkbox {
+        margin: -4px 0;
       }
 
       .view-mode-buttons {
@@ -234,19 +221,23 @@ export class CalltreeView extends LitElement {
         height: 26px;
       }
 
-      .view-mode-buttons vscode-button::part(control) {
-        border-radius: 0;
-        min-width: auto;
+      .view-mode-buttons vscode-button::part(base) {
         padding: 0 8px;
-        height: 100%;
       }
 
-      .view-mode-buttons vscode-button:first-child::part(control) {
-        border-radius: 2px 0 0 2px;
+      .view-mode-buttons vscode-button:first-child {
+        --vsc-border-left-radius: 2px;
+        --vsc-border-right-radius: 0;
       }
 
-      .view-mode-buttons vscode-button:last-child::part(control) {
-        border-radius: 0 2px 2px 0;
+      .view-mode-buttons vscode-button:not(:first-child):not(:last-child) {
+        --vsc-border-left-radius: 0;
+        --vsc-border-right-radius: 0;
+      }
+
+      .view-mode-buttons vscode-button:last-child {
+        --vsc-border-left-radius: 0;
+        --vsc-border-right-radius: 2px;
       }
 
       #call-tree-table,
@@ -283,27 +274,25 @@ export class CalltreeView extends LitElement {
           <div class="header-bar">
             <div class="view-mode-buttons" role="radiogroup" aria-label="View mode">
               <vscode-button
-                appearance="${this.viewMode === 'time-order' ? '' : 'secondary'}"
+                ?secondary="${this.viewMode !== 'time-order'}"
                 @click="${() => this._setViewMode('time-order')}"
                 >Time Order</vscode-button
               >
               <vscode-button
-                appearance="${this.viewMode === 'aggregated' ? '' : 'secondary'}"
+                ?secondary="${this.viewMode !== 'aggregated'}"
                 @click="${() => this._setViewMode('aggregated')}"
                 >Aggregated</vscode-button
               >
               <vscode-button
-                appearance="${this.viewMode === 'bottom-up' ? '' : 'secondary'}"
+                ?secondary="${this.viewMode !== 'bottom-up'}"
                 @click="${() => this._setViewMode('bottom-up')}"
                 >Bottom-Up</vscode-button
               >
             </div>
 
             <div class="filter-container align__end">
-              <vscode-button appearance="secondary" @click="${this._expandButtonClick}"
-                >Expand</vscode-button
-              >
-              <vscode-button appearance="secondary" @click="${this._collapseButtonClick}"
+              <vscode-button secondary @click="${this._expandButtonClick}">Expand</vscode-button>
+              <vscode-button secondary @click="${this._collapseButtonClick}"
                 >Collapse</vscode-button
               >
             </div>
@@ -321,7 +310,7 @@ export class CalltreeView extends LitElement {
 
                     <div class="dropdown-container">
                       <label for="types">Type:</label>
-                      <vscode-dropdown @change="${this._handleTypeFilter}">
+                      <vs-select label="Type" @change="${this._handleTypeFilter}">
                         <vscode-option>None</vscode-option>
                         ${this.isVisible
                           ? repeat(
@@ -329,7 +318,7 @@ export class CalltreeView extends LitElement {
                               (type, _index) => html`<vscode-option>${type}</vscode-option>`,
                             )
                           : ''}
-                      </vscode-dropdown>
+                      </vs-select>
                     </div>
                   `
                 : ''}
@@ -339,16 +328,17 @@ export class CalltreeView extends LitElement {
               ? html`
                   <div class="dropdown-container">
                     <label for="bottomup-groupby">Group by:</label>
-                    <vscode-dropdown
+                    <vs-select
                       id="bottomup-groupby"
+                      label="Group by"
                       @change="${this._handleBottomUpGroupBy}"
-                      current-value="${this.bottomUpGroupBy}"
+                      .value="${this.bottomUpGroupBy}"
                     >
                       <vscode-option>None</vscode-option>
                       <vscode-option>Namespace</vscode-option>
                       <vscode-option>Caller Namespace</vscode-option>
                       <vscode-option>Type</vscode-option>
-                    </vscode-dropdown>
+                    </vs-select>
                   </div>
                 `
               : ''}
@@ -490,8 +480,9 @@ export class CalltreeView extends LitElement {
     }
   }
 
-  _handleTypeFilter(event: CustomEvent<{ selectedOptions: [{ value: string }] }>) {
-    this.filterState.selectedTypes = new Set(event.detail.selectedOptions.map((e) => e.value));
+  _handleTypeFilter(event: Event) {
+    const target = event.target as HTMLInputElement;
+    this.filterState.selectedTypes = new Set(target.value ? [target.value] : []);
     this._updateFiltering();
   }
 
