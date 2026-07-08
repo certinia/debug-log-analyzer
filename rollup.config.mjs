@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import process from 'node:process';
 
 // Rollup plugins
@@ -79,6 +80,11 @@ export default [
   },
   {
     input: { bundle: './log-viewer/src/Main.ts' },
+    // @vscode-elements ships tsc output with the inline `(this && this.__decorate)` helper.
+    // Declaring a top-level `this` for those files stops rollup's THIS_IS_UNDEFINED warning; use
+    // `globalThis` (a real binding rollup won't flag) — `globalThis.__decorate` is undefined so the
+    // guard still falls back to the inline helper, i.e. no behaviour change.
+    moduleContext: (id) => (id.includes('/@vscode-elements/elements/') ? 'globalThis' : undefined),
     output: [
       {
         format: 'es',
