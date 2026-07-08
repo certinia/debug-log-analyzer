@@ -14,6 +14,20 @@
       "localRoot": "${workspaceFolder}/lana"
     },
     {
+      // Debug a worktree's build from the root window. Enter the worktree path,
+      // relative to the repo root, when prompted (the box pre-fills a common
+      // location). Run the "watch: worktree" task first for rebuild-on-change.
+      "name": "Run Extension (Worktree)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/${input:worktree}/lana",
+        "--disable-extensions"
+      ],
+      "outFiles": ["${workspaceFolder}/${input:worktree}/lana/out/**/*.js"],
+      "localRoot": "${workspaceFolder}/${input:worktree}/lana"
+    },
+    {
       "name": "Extension Tests",
       "type": "extensionHost",
       "request": "launch",
@@ -24,6 +38,14 @@
       "outFiles": ["${workspaceFolder}/lana/out/test/**/*.js"],
       "preLaunchTask": "${defaultBuildTask}",
       "localRoot": "${workspaceFolder}/lana"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "worktree",
+      "type": "promptString",
+      "description": "Worktree path relative to the repo root (e.g. .claude/worktrees/<name> or ../<sibling>)",
+      "default": ".claude/worktrees/"
     }
   ]
 }
