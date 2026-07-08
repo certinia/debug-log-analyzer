@@ -39,6 +39,15 @@ $footerBorderColor: transparent; //footer border color
 $footerSeparatorColor: transparent; //footer bottom separator color
 $footerActiveColor: #d00 !default; //footer bottom active text color
 
+$codicon-chevron-right: '\eab6';
+$codicon-chevron-down: '\eab4';
+
+@mixin codicon-chevron {
+  font-family: 'codicon';
+  font-size: 14px;
+  line-height: 16px;
+}
+
 // Demote upstream tabulator styles (and our scss-mixin partials that build
 // on them) into a cascade layer so any unlayered rule — at any specificity —
 // wins. The neutralising overrides for upstream's hard-coded colours go
@@ -97,6 +106,27 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
           background-color: $rowHoverBackground;
         }
 
+        .tabulator-arrow {
+          width: 16px;
+          height: 16px;
+          margin-right: 4px;
+          border: none;
+          text-align: center;
+
+          &::before {
+            @include codicon-chevron;
+            content: $codicon-chevron-right;
+          }
+        }
+
+        &.tabulator-group-visible .tabulator-arrow {
+          border: none; // override upstream's more-specific expanded-state border
+
+          &::before {
+            content: $codicon-chevron-down;
+          }
+        }
+
         // Neutralise upstream `.tabulator-row.tabulator-group span { color: #d00 }`
         // so plain text in group headers inherits the theme foreground. Lives in
         // the same layer as the rule it's overriding — that keeps it out of the
@@ -105,6 +135,60 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
           margin-left: unset;
           color: inherit;
         }
+      }
+    }
+
+    // Group member indent. `.lana-grouped` (toggled by `GroupChildIndent`) only defines
+    // the var; consumers fall back to 0px, so a regroup is a targeted var invalidation.
+    &.lana-grouped {
+      --lana-group-indent: var(--lana-indent-unit, 9px);
+    }
+
+    .tabulator-calcs {
+      --lana-group-indent: 0px; // calc rows stay flush
+    }
+
+    // Indented call-tree cells carry an inline calc() that wins over this rule.
+    .tabulator-cell:first-child {
+      padding-left: calc(4px + var(--lana-group-indent, 0px)); // = stock 4px when ungrouped
+    }
+
+    .tabulator-row .tabulator-cell .tabulator-data-tree-control {
+      height: 16px;
+      width: 16px;
+      margin-right: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      text-indent: 0; // cancel the name cell's hanging indent so the glyph stays in the control box
+
+      @media (hover: hover) and (pointer: fine) {
+        &:hover {
+          background: transparent;
+        }
+      }
+
+      .tabulator-data-tree-control-expand,
+      .tabulator-data-tree-control-collapse {
+        height: auto;
+        width: auto;
+        background: transparent;
+
+        &::after {
+          content: none;
+        }
+
+        &::before {
+          @include codicon-chevron;
+        }
+      }
+
+      .tabulator-data-tree-control-expand::before {
+        content: $codicon-chevron-right;
+      }
+
+      .tabulator-data-tree-control-collapse::before {
+        content: $codicon-chevron-down;
       }
     }
 

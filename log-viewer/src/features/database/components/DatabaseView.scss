@@ -2,7 +2,8 @@
 
 .row__details-container {
   height: 100%;
-  padding: 4px 4px 6px 4px;
+  // Indent the panel one tree level under its parent statement; grouped adds another level.
+  padding: 4px 4px 6px calc(4px + var(--lana-indent-unit, 9px) + var(--lana-group-indent, 0px));
   background-color: var(--vscode-editorHoverWidget-background);
 }
 .db-group-row {
