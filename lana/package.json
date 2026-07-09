@@ -341,7 +341,7 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "~22.16.5",
-    "@types/vscode": "~1.100.0",
+    "@types/vscode": "~1.125.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }
