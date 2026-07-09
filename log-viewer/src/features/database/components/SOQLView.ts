@@ -354,14 +354,12 @@ export class SOQLView extends LitElement {
         headerTooltip: true,
         headerWordWrap: true,
       },
-      headerSortElement: function (column, dir) {
+      headerSortElement: function (_column, dir) {
         switch (dir) {
           case 'asc':
             return "<div class='sort-by--top'></div>";
-            break;
           case 'desc':
             return "<div class='sort-by--bottom'></div>";
-            break;
           default:
             return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
         }
@@ -411,7 +409,7 @@ export class SOQLView extends LitElement {
 
             return (aRowData.relativeCost || 0) - (bRowData.relativeCost || 0);
           },
-          tooltip: function (e, cell, _onRendered) {
+          tooltip: function (_e, cell, _onRendered) {
             const { isSelective, relativeCost } = cell.getData() as GridSOQLData;
             let title;
             if (isSelective === null) {
@@ -510,7 +508,7 @@ export class SOQLView extends LitElement {
       },
     });
 
-    this.soqlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
+    this.soqlTable.on('groupClick', (_e: UIEvent, group: GroupComponent) => {
       const { type } = window.getSelection() ?? {};
       if (type === 'Range') {
         return;
@@ -528,7 +526,7 @@ export class SOQLView extends LitElement {
       }
     });
 
-    this.soqlTable.on('rowClick', function (e, row) {
+    this.soqlTable.on('rowClick', function (_e, row) {
       const { type } = window.getSelection() ?? {};
       if (type === 'Range') {
         return;

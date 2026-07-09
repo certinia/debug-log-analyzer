@@ -173,7 +173,7 @@ class TriggerNonSelectiveQuery implements SOQLLinterRule {
     'An exception will occur when a non-selective query in a trigger executes against an object that contains more than 1 million records. To avoid this error, ensure that the query is selective';
   severity: Severity = 'Warning';
 
-  test(soqlTree: SOQLTree, stack: Stack): boolean {
+  test(_soqlTree: SOQLTree, stack: Stack): boolean {
     const inTriggerCtxt = stack.find((entry) => {
       return entry.text.includes(' trigger event ');
     });
