@@ -20,7 +20,7 @@
     "@types/jest": "^30.0.0",
     "@types/tabulator-tables": "^6.3.5",
     "postcss": "^8.5.16",
-    "sass": "~1.78.0",
+    "sass": "~1.101.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }
