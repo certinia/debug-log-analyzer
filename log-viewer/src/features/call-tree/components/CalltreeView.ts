@@ -302,46 +302,52 @@ export class CalltreeView extends LitElement {
                 >Details</vscode-checkbox
               >
 
-              ${isTimeOrder || this.viewMode === 'aggregated'
-                ? html`
-                    <vscode-checkbox class="align__end" @change="${this._handleDebugOnlyChange}"
-                      >Debug Only</vscode-checkbox
-                    >
+              ${
+                isTimeOrder || this.viewMode === 'aggregated'
+                  ? html`
+                      <vscode-checkbox class="align__end" @change="${this._handleDebugOnlyChange}"
+                        >Debug Only</vscode-checkbox
+                      >
 
+                      <div class="dropdown-container">
+                        <label for="types">Type:</label>
+                        <vs-select label="Type" @change="${this._handleTypeFilter}">
+                          <vscode-option>None</vscode-option>
+                          ${
+                            this.isVisible
+                              ? repeat(
+                                  this._getAllTypes(this.timelineRoot?.children ?? []),
+                                  (type, _index) => html`<vscode-option>${type}</vscode-option>`,
+                                )
+                              : ''
+                          }
+                        </vs-select>
+                      </div>
+                    `
+                  : ''
+              }
+            </div>
+
+            ${
+              this.viewMode === 'bottom-up'
+                ? html`
                     <div class="dropdown-container">
-                      <label for="types">Type:</label>
-                      <vs-select label="Type" @change="${this._handleTypeFilter}">
+                      <label for="bottomup-groupby">Group by:</label>
+                      <vs-select
+                        id="bottomup-groupby"
+                        label="Group by"
+                        @change="${this._handleBottomUpGroupBy}"
+                        .value="${this.bottomUpGroupBy}"
+                      >
                         <vscode-option>None</vscode-option>
-                        ${this.isVisible
-                          ? repeat(
-                              this._getAllTypes(this.timelineRoot?.children ?? []),
-                              (type, _index) => html`<vscode-option>${type}</vscode-option>`,
-                            )
-                          : ''}
+                        <vscode-option>Namespace</vscode-option>
+                        <vscode-option>Caller Namespace</vscode-option>
+                        <vscode-option>Type</vscode-option>
                       </vs-select>
                     </div>
                   `
-                : ''}
-            </div>
-
-            ${this.viewMode === 'bottom-up'
-              ? html`
-                  <div class="dropdown-container">
-                    <label for="bottomup-groupby">Group by:</label>
-                    <vs-select
-                      id="bottomup-groupby"
-                      label="Group by"
-                      @change="${this._handleBottomUpGroupBy}"
-                      .value="${this.bottomUpGroupBy}"
-                    >
-                      <vscode-option>None</vscode-option>
-                      <vscode-option>Namespace</vscode-option>
-                      <vscode-option>Caller Namespace</vscode-option>
-                      <vscode-option>Type</vscode-option>
-                    </vs-select>
-                  </div>
-                `
-              : ''}
+                : ''
+            }
           </div>
         </div>
 
