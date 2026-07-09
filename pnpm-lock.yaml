@@ -122,8 +122,8 @@ importers:
         specifier: ^6.0.2
         version: 6.0.2
       '@apexdevtools/apex-parser':
-        specifier: 5.1.0-beta.1
-        version: 5.1.0-beta.1
+        specifier: 5.1.0
+        version: 5.1.0
       '@salesforce/apex-node':
         specifier: ^8.4.34
         version: 8.4.34
@@ -190,8 +190,8 @@ importers:
   log-viewer:
     dependencies:
       '@apexdevtools/apex-parser':
-        specifier: 5.1.0-beta.1
-        version: 5.1.0-beta.1
+        specifier: 5.1.0
+        version: 5.1.0
       '@vscode-elements/elements':
         specifier: ^2.5.1
         version: 2.5.1(@vscode/codicons@0.0.45)
@@ -324,8 +324,8 @@ packages:
     resolution: {integrity: sha512-RlaWpAFudE0GvUcim/xLBNw5ipNgT0Yd1eM7jeZJS0R9qn5DxeUGY3636zfgKgWkK04075y1fgNbPsIi/EjKiw==}
     engines: {node: '>=8.0.0'}
 
-  '@apexdevtools/apex-parser@5.1.0-beta.1':
-    resolution: {integrity: sha512-IBuDgIMNypFJ9KXQDPZ44tbroj7Qi+to+l7fTqz+PiiXSw1MRFJfIPznO0oZcY68rohyEaMfeLWG2fYAPNc7hQ==}
+  '@apexdevtools/apex-parser@5.1.0':
+    resolution: {integrity: sha512-DPThB5oMnJ9b62weMpufGQfJjtZ+5UHP5Ne8nOqsDDCAVP3P2yRL80p1qX5BpPxyOowhTJ9RF/3qhat0vCrv4g==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
     bundledDependencies:
       - antlr4
@@ -8962,7 +8962,7 @@ snapshots:
       antlr4ts: 0.5.0-alpha.4
       node-dir: 0.1.17
 
-  '@apexdevtools/apex-parser@5.1.0-beta.1': {}
+  '@apexdevtools/apex-parser@5.1.0': {}
 
   '@apexdevtools/vf-parser@1.1.0':
     dependencies:

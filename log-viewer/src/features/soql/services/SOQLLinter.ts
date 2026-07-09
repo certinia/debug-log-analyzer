@@ -66,10 +66,10 @@ class LeadingPercentWildcardRule implements SOQLLinterRule {
     const whereClause = qryCtxt.whereClause();
     if (whereClause) {
       const hasLeadingWildcard = whereClause
-        .logicalExpression()
-        .conditionalExpression_list()
+        .whereLogicalExpression()
+        .whereConditionalExpression_list()
         .find((exp) => {
-          const fieldExp = exp.fieldExpression();
+          const fieldExp = exp.whereFieldExpression()?.fieldExpression();
           if (
             fieldExp?.comparisonOperator().LIKE() &&
             fieldExp.value().StringLiteral()?.getText().startsWith("'%")
@@ -96,12 +96,12 @@ class NegativeFilterOperatorRule implements SOQLLinterRule {
     const qryCtxt = soqlTree._queryContext;
     const whereClause = qryCtxt.whereClause();
     if (whereClause) {
-      const exp = whereClause.logicalExpression();
+      const exp = whereClause.whereLogicalExpression();
 
       const hasNegativeOp =
         exp.NOT() ||
-        exp.conditionalExpression_list().find((exp) => {
-          const operator = exp.fieldExpression()?.comparisonOperator();
+        exp.whereConditionalExpression_list().find((exp) => {
+          const operator = exp.whereFieldExpression()?.fieldExpression()?.comparisonOperator();
 
           if (
             operator &&
@@ -148,10 +148,10 @@ class LastModifiedDateSystemModStampIndexRule implements SOQLLinterRule {
     const whereClause = qryCtxt.whereClause();
     if (whereClause) {
       const result = whereClause
-        .logicalExpression()
-        .conditionalExpression_list()
+        .whereLogicalExpression()
+        .whereConditionalExpression_list()
         .find((exp) => {
-          const fieldExp = exp.fieldExpression();
+          const fieldExp = exp.whereFieldExpression()?.fieldExpression();
           if (
             fieldExp?.fieldName()?.getText().toLowerCase().endsWith('lastmodifieddate') &&
             fieldExp.comparisonOperator().LT()
