@@ -8,7 +8,7 @@
     "#vscode-elements/*.js": "@vscode-elements/elements/dist/*/index.js"
   },
   "dependencies": {
-    "@apexdevtools/apex-parser": "5.1.0-beta.1",
+    "@apexdevtools/apex-parser": "5.1.0",
     "@vscode-elements/elements": "^2.5.1",
     "@vscode/codicons": "^0.0.45",
     "antlr4": "4.13.2",
