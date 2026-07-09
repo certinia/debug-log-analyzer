@@ -30,6 +30,15 @@ export default [
 
     external: ['vscode'],
     plugins: [
+      // Externalize every `node:` builtin. preferBuiltins covers the ones in
+      // module.builtinModules, but experimental builtins (e.g. node:sqlite, pulled in
+      // transitively via undici's optional SqliteCacheStore) are excluded from that list,
+      // so rollup can't resolve them. They're runtime builtins on the Node extension host —
+      // this declares them external, matching rolldown's platform: 'node' behaviour.
+      {
+        name: 'external-node-builtins',
+        resolveId: (id) => (id.startsWith('node:') ? { id, external: true } : null),
+      },
       // 'node' isn't applied by default, but antlr4's exports map has only node/browser
       // conditions (no default) so it fails to resolve without it (rolldown gets this
       // from platform: 'node').
