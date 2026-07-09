@@ -1,43 +1,11 @@
+@use 'sass:meta';
+
 // I prefer the table with no borders but if we want to add one I think this works best
 // var(--vscode-sideBar-border)
 
-//Main Theme Variables
-$backgroundColor: var(--vscode-editor-background); //background color of tabulator
-$borderColor: transparent; //border to tabulator
-$textSize: var(--vscode-editor-font-size); //table text size
-
-//header theming
-$headerBackgroundColor: transparent; //border to tabulator
-$headerTextColor: var(--vscode-editor-foreground); //header text color
-$headerBorderColor: transparent; //header border color
-$headerSeparatorColor: transparent; //header bottom separator color
-$headerMargin: 4px !default; //padding round header
-
-//column header arrows
-$sortArrowHover: #555 !default;
-$sortArrowActive: #666 !default;
-$sortArrowInactive: #bbb !default;
-
-//row theming
-$rowBackgroundColor: $backgroundColor; //table row background color
-$rowAltBackgroundColor: transparent; //table row background color
-$rowBorderColor: transparent; //table border color
-$rowTextColor: var(--vscode-editor-foreground); //table text color
-$rowHoverBackground: var(--vscode-list-hoverBackground); //row background color on hover
-//row background color when selected
-$rowSelectedBackground: var(--vscode-list-activeSelectionBackground);
-//row background color when selected and hovered
-$rowSelectedBackgroundHover: var(--vscode-list-activeSelectionBackground);
-
-$editBoxColor: var(--vscode-focusBorder, #1d68cd); //border color for edit boxes
-$errorColor: #dd0000 !default; //error indication
-
-//footer theming
-$footerBackgroundColor: transparent; //border to tabulator
-$footerTextColor: var(--vscode-editor-foreground); //footer text color
-$footerBorderColor: transparent; //footer border color
-$footerSeparatorColor: transparent; //footer bottom separator color
-$footerActiveColor: #d00 !default; //footer bottom active text color
+// Row-hover colour is the only theme value also referenced by our own rules below, so it
+// stays a variable; every other tabulator theme value is inlined into the config map below.
+$rowHoverBackground: var(--vscode-list-hoverBackground);
 
 $codicon-chevron-right: '\eab6';
 $codicon-chevron-down: '\eab4';
@@ -54,9 +22,50 @@ $codicon-chevron-down: '\eab4';
 // inside the SAME layer so they beat upstream within the layer, but lose to
 // any unlayered child-span colour (e.g. classed token spans) automatically.
 @layer tabulator {
-  @import '~tabulator-tables/src/scss/tabulator.scss';
-  @import '../editors/MinMax';
-  @import '../format/Progress';
+  // Load upstream tabulator's SCSS, configuring its !default theme variables with our
+  // vscode-themed values. meta.load-css (unlike @use) is legal inside @layer, so the
+  // upstream styles stay demoted. These styles are adopted into each view's shadow root
+  // (via `unsafeCSS(dataGridStyles)`), so the editor/formatter CSS must be loaded here
+  // too — the `.ts` `import './*.css'` side-effects only reach the light DOM.
+  // Order matches the original @import order — within one @layer, source order breaks
+  // equal-specificity ties, so tabulator must load before the editor/formatter overrides.
+  @include meta.load-css(
+    '~tabulator-tables/src/scss/tabulator',
+    // resolved via sass loadPaths (node_modules)
+    $with: (
+        backgroundColor: var(--vscode-editor-background),
+        borderColor: transparent,
+        textSize: var(--vscode-editor-font-size),
+        // header
+        headerBackgroundColor: transparent,
+        headerTextColor: var(--vscode-editor-foreground),
+        headerBorderColor: transparent,
+        headerSeparatorColor: transparent,
+        headerMargin: 4px,
+        // column header sort arrows
+        sortArrowHover: #555,
+        sortArrowActive: #666,
+        sortArrowInactive: #bbb,
+        // rows
+        rowBackgroundColor: var(--vscode-editor-background),
+        rowAltBackgroundColor: transparent,
+        rowBorderColor: transparent,
+        rowTextColor: var(--vscode-editor-foreground),
+        rowHoverBackground: $rowHoverBackground,
+        rowSelectedBackground: var(--vscode-list-activeSelectionBackground),
+        rowSelectedBackgroundHover: var(--vscode-list-activeSelectionBackground),
+        editBoxColor: var(--vscode-focusBorder, #1d68cd),
+        errorColor: #dd0000,
+        // footer
+        footerBackgroundColor: transparent,
+        footerTextColor: var(--vscode-editor-foreground),
+        footerBorderColor: transparent,
+        footerSeparatorColor: transparent,
+        footerActiveColor: #d00
+      )
+  );
+  @include meta.load-css('../editors/MinMax.css');
+  @include meta.load-css('../format/Progress.css');
 
   .tabulator {
     .tabulator-tableholder {

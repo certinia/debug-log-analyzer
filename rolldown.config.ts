@@ -58,6 +58,9 @@ export default defineConfig([
       postcss({
         extensions: ['.css', '.scss'],
         minimize: true,
+        // rollup-plugin-postcss only supports the legacy sass.render() API; silence its
+        // deprecation warning (our SCSS itself uses the modern module system).
+        use: { sass: { silenceDeprecations: ['legacy-js-api'] }, stylus: {}, less: {} },
         plugins: [postcssUrl({ url: 'inline' })],
       }),
       copy({
