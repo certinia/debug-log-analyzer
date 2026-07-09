@@ -30,7 +30,7 @@ $codicon-chevron-down: '\eab4';
   // Order matches the original @import order — within one @layer, source order breaks
   // equal-specificity ties, so tabulator must load before the editor/formatter overrides.
   @include meta.load-css(
-    '~tabulator-tables/src/scss/tabulator',
+    'tabulator-tables/src/scss/tabulator',
     // resolved via sass loadPaths (node_modules)
     $with: (
         backgroundColor: var(--vscode-editor-background),

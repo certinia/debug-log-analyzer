@@ -6,11 +6,11 @@ import process from 'node:process';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
-import postcssUrl from 'postcss-url';
 import copy from 'rollup-plugin-copy';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
-import postcss from 'rollup-plugin-postcss';
 import { defineRollupSwcOption, swc } from 'rollup-plugin-swc3';
+
+import css from './scripts/rollup-plugin-css.mjs';
 
 // Resolve the codicons dist dir via Node resolution so it works regardless of
 // pnpm hoisting (avoids a hard-coded node_modules path).
@@ -119,14 +119,7 @@ export default [
           },
         }),
       ),
-      postcss({
-        extensions: ['.css', '.scss'],
-        minimize: true,
-        // rollup-plugin-postcss only supports the legacy sass.render() API; silence its
-        // deprecation warning (our SCSS itself uses the modern module system).
-        use: { sass: { silenceDeprecations: ['legacy-js-api'] }, stylus: {}, less: {} },
-        plugins: [postcssUrl({ url: 'inline' })],
-      }),
+      css({ minify: production }),
       copy({
         hook: 'closeBundle',
         targets: [
