@@ -345,14 +345,12 @@ export class DMLView extends LitElement {
         headerTooltip: true,
         headerWordWrap: true,
       },
-      headerSortElement: function (column, dir) {
+      headerSortElement: function (_column, dir) {
         switch (dir) {
           case 'asc':
             return "<div class='sort-by--top'></div>";
-            break;
           case 'desc':
             return "<div class='sort-by--bottom'></div>";
-            break;
           default:
             return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
         }
@@ -429,7 +427,7 @@ export class DMLView extends LitElement {
       },
     });
 
-    this.dmlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
+    this.dmlTable.on('groupClick', (_e: UIEvent, group: GroupComponent) => {
       const { type } = window.getSelection() ?? {};
       if (type === 'Range') {
         return;
@@ -447,7 +445,7 @@ export class DMLView extends LitElement {
       }
     });
 
-    this.dmlTable.on('rowClick', function (e, row) {
+    this.dmlTable.on('rowClick', function (_e, row) {
       const { type } = window.getSelection() ?? {};
       if (type === 'Range') {
         return;
