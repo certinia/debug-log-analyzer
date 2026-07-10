@@ -13,7 +13,7 @@
  * - Show top 3 by percentage (if not already in always-show list)
  * - Show any metric ≥80%
  * - Combine remaining into "Other: X metrics" summary
- * - Sort by percentage descending
+ * - Sort shown rows by global peak percentage (stable order across the timeline)
  *
  * Design:
  * - Follows existing HeatStripRenderer tooltip patterns
@@ -178,7 +178,8 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
    * 2. Show top 3 by percentage (if not already in always-show list) - only if percent > 0
    * 3. Show any metric ≥80%
    * 4. Combine remaining metrics with value > 0 into "Other: X metrics" summary
-   * 5. Sort by percentage descending
+   * 5. Sort shown rows by each metric's global peak percentage (stable across the timeline),
+   *    so rows keep a fixed slot rather than reshuffling as the cursor moves
    */
   private buildTooltipRows(
     dataPoint: MetricStripDataPoint,
@@ -238,17 +239,22 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       }
     }
 
-    // Sort visible metrics by percentage (highest first)
-    visibleMetrics.sort((a, b) => b.percent - a.percent);
+    // Sort visible metrics by each metric's global peak percentage (highest first).
+    // Using the peak (not the value at the cursor) keeps rows in a fixed slot as the cursor
+    // moves along the timeline, so the tooltip is stable and easy to scan/compare.
+    visibleMetrics.sort((a, b) => b.metric.globalMaxPercent - a.metric.globalMaxPercent);
 
     // Render visible metric rows
     for (const { metric, percent, rawValue } of visibleMetrics) {
       const percentStr = (percent * 100).toFixed(1).padStart(5);
       const percentColor = getPercentColor(percent);
       const lineColor = hexToCSS(metric.color);
-      const rawValueStr = rawValue
-        ? formatMetricValueWithParens(rawValue.used, rawValue.limit, metric.unit)
-        : '';
+      // Always show the "out of" value, even at 0% / before the metric's first observation, so the
+      // limit (headroom) is always visible. Limit is fixed across the series; fall back to the
+      // classified metric's limit when there's no data point for it at this timestamp.
+      const limit = rawValue?.limit ?? metric.limit;
+      const rawValueStr =
+        limit > 0 ? formatMetricValueWithParens(rawValue?.used ?? 0, limit, metric.unit) : '';
       // Ghost text: only when the count we tracked from detailed events falls below the
       // corrective cumulative total (the log dropped events Salesforce still counted).
       const ghost =

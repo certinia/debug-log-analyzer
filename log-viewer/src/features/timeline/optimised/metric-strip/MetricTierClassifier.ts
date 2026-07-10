@@ -83,11 +83,11 @@ export class MetricTierClassifier {
     // Step 1: Aggregate events by timestamp (sum used values across namespaces)
     const aggregatedByTime = this.aggregateByTimestamp(timeSeries);
 
-    // Step 2: Calculate global max percentage for each metric
-    const metricMaxPercents = this.calculateMetricMaxPercents(aggregatedByTime, timeSeries);
+    // Step 2: Calculate global max percentage and authoritative limit for each metric
+    const { maxPercents, limits } = this.calculateMetricMaxPercents(aggregatedByTime, timeSeries);
 
     // Step 3: Classify metrics into tiers
-    const classifiedMetrics = this.classifyMetrics(metricMaxPercents, timeSeries);
+    const classifiedMetrics = this.classifyMetrics(maxPercents, limits, timeSeries);
 
     // Step 4: Build data points with tier classification
     const { points, globalMaxPercent } = this.buildDataPoints(
@@ -259,20 +259,23 @@ export class MetricTierClassifier {
   }
 
   /**
-   * Calculate the global maximum percentage for each metric.
+   * Calculate the global maximum percentage and authoritative limit for each metric.
+   * The limit is fixed across the series, so the largest one seen is captured for display.
    */
   private calculateMetricMaxPercents(
     aggregatedByTime: Map<number, Map<string, { used: number; limit: number; tracked?: number }>>,
     timeSeries: HeatStripTimeSeries,
-  ): Map<string, number> {
+  ): { maxPercents: Map<string, number>; limits: Map<string, number> } {
     const maxPercents = new Map<string, number>();
+    const limits = new Map<string, number>();
 
     // Initialize all metrics with 0
     for (const metricId of timeSeries.metrics.keys()) {
       maxPercents.set(metricId, 0);
+      limits.set(metricId, 0);
     }
 
-    // Find max percentage for each metric
+    // Find max percentage (and capture the limit) for each metric
     for (const timestampData of aggregatedByTime.values()) {
       for (const [metricId, value] of timestampData) {
         if (value.limit > 0) {
@@ -281,11 +284,14 @@ export class MetricTierClassifier {
           if (percent > currentMax) {
             maxPercents.set(metricId, percent);
           }
+          if (value.limit > (limits.get(metricId) ?? 0)) {
+            limits.set(metricId, value.limit);
+          }
         }
       }
     }
 
-    return maxPercents;
+    return { maxPercents, limits };
   }
 
   /**
@@ -294,6 +300,7 @@ export class MetricTierClassifier {
    */
   private classifyMetrics(
     metricMaxPercents: Map<string, number>,
+    metricLimits: Map<string, number>,
     timeSeries: HeatStripTimeSeries,
   ): MetricStripClassifiedMetric[] {
     // Create array of metrics with their max percents for sorting
@@ -302,6 +309,7 @@ export class MetricTierClassifier {
       displayName: string;
       priority: number;
       maxPercent: number;
+      limit: number;
       unit: string;
     }> = [];
 
@@ -312,6 +320,7 @@ export class MetricTierClassifier {
         displayName: metricDef?.displayName ?? metricId,
         priority: metricDef?.priority ?? 999,
         maxPercent,
+        limit: metricLimits.get(metricId) ?? 0,
         unit: metricDef?.unit ?? '',
       });
     }
@@ -350,6 +359,7 @@ export class MetricTierClassifier {
         displayName: metric.displayName,
         tier,
         globalMaxPercent: metric.maxPercent,
+        limit: metric.limit,
         color: getRankBasedColor(tier, rankInTier),
         priority: metric.priority,
         unit: metric.unit,

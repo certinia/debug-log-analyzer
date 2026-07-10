@@ -838,6 +838,8 @@ export interface MetricStripClassifiedMetric {
   tier: 1 | 2 | 3;
   /** Maximum percentage reached across all timestamps (0-1+) */
   globalMaxPercent: number;
+  /** Authoritative limit for this metric ("out of" total), fixed across the series. 0 if unknown. */
+  limit: number;
   /** Line color for this metric (hex number 0xRRGGBB) */
   color: number;
   /** Priority for ordering (lower = higher priority, shown first) */

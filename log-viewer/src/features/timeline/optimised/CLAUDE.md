@@ -10,7 +10,8 @@ The module follows a **pure orchestrator** pattern where FlameChart is a generic
 
 **Critical: Files in `timeline/optimised/` must NOT import from `log-parser` or `LogEvents.js`.**
 
-Exception: `ApexLogTimeline.ts` is the adapter layer and may import log-parser types.
+Exception: the adapter-layer files `ApexLogTimeline.ts` and `apex-limit-series.ts` may import
+log-parser types. Keep any file that imports them out of `metric-strip/`, which stays Apex-agnostic.
 
 ### Import Rules
 
@@ -49,8 +50,9 @@ The metric strip visualization (governor limits) is rendered below the main time
 - `MetricStripOrchestrator` manages the metric strip lifecycle and interactions
 - `MetricStripRenderer` renders step charts for governor limit metrics
 - `MetricTierClassifier` processes `HeatStripTimeSeries` data and classifies metrics into tiers
-- `ApexLogTimeline` transforms `GovernorSnapshot[]` → `HeatStripTimeSeries`
-- Apex-specific display names, units, and priority order are defined ONLY in ApexLogTimeline
+- `apex-limit-series.ts` transforms `ApexLog` (snapshots + event tree) → `HeatStripTimeSeries`;
+  `ApexLogTimeline` calls it during `init()`
+- Apex-specific display names, units, and priority order are defined ONLY in `apex-limit-series.ts`
 
 The metric strip supports collapsed (heat-style) and expanded (step chart) views, toggled via a chevron icon.
 
