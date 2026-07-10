@@ -56,7 +56,7 @@ function createEvent(options: EventOptions): LogEvent {
     dmlCount: { self: options.dmlSelf ?? 0, total: options.dmlTotal ?? 0 },
     soqlCount: { self: options.soqlSelf ?? 0, total: options.soqlTotal ?? 0 },
     soslCount: { self: 0, total: 0 },
-    totalThrownCount: options.thrown ?? 0,
+    thrownCount: { self: options.thrown ?? 0, total: options.thrown ?? 0 },
     exitTypes: [],
   } as unknown as LogEvent;
 
@@ -240,7 +240,7 @@ describe('toBottomUpTree', () => {
       soqlCount: { self: 9, total: 15 },
       dmlRowCount: { self: 21, total: 24 },
       soqlRowCount: { self: 33, total: 39 },
-      totalThrownCount: 3,
+      thrownCount: { total: 3 },
     });
 
     const callers = childRow._children ?? [];
@@ -256,7 +256,7 @@ describe('toBottomUpTree', () => {
       soqlCount: { self: 3, total: 5 },
       dmlRowCount: { self: 7, total: 8 },
       soqlRowCount: { self: 11, total: 13 },
-      totalThrownCount: 1,
+      thrownCount: { total: 1 },
     });
 
     expect(callerB.originalData.text).toBe('ParentB');
@@ -268,7 +268,7 @@ describe('toBottomUpTree', () => {
       soqlCount: { self: 6, total: 10 },
       dmlRowCount: { self: 14, total: 16 },
       soqlRowCount: { self: 22, total: 26 },
-      totalThrownCount: 2,
+      thrownCount: { total: 2 },
     });
   });
 
@@ -376,7 +376,7 @@ describe('toBottomUpTree', () => {
     expect(hotMethod.soqlCount).toEqual({ self: 6, total: 11 });
     expect(hotMethod.dmlRowCount).toEqual({ self: 35, total: 55 });
     expect(hotMethod.soqlRowCount).toEqual({ self: 22, total: 34 });
-    expect(hotMethod.totalThrownCount).toBe(7);
+    expect(hotMethod.thrownCount.total).toBe(7);
 
     const callers = hotMethod._children ?? [];
     const callerA = findRowByText(callers, 'ParentA');
@@ -612,7 +612,7 @@ describe('toBottomUpTree', () => {
     expect(searchRow.dmlRowCount.total).toBe(100); // outermost only
     expect(searchRow.soqlRowCount.self).toBe(15);
     expect(searchRow.soqlRowCount.total).toBe(50); // outermost only
-    expect(searchRow.totalThrownCount).toBe(3); // outermost only
+    expect(searchRow.thrownCount.total).toBe(3); // outermost only
   });
 
   it('keeps totalTime greater than or equal to totalSelfTime for all bottom-up rows', () => {
@@ -910,7 +910,7 @@ describe('toBottomUpTree', () => {
     const limitOnly = findRowByText(rows, 'LimitOnly');
     expect(limitOnly.callCount).toBe(1);
     expect(limitOnly.dmlCount.self).toBe(1);
-    expect(limitOnly.totalThrownCount).toBe(1);
+    expect(limitOnly.thrownCount.total).toBe(1);
   });
 
   it('orders roots deterministically by totalSelfTime desc, then name asc for ties', () => {

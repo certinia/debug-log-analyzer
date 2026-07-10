@@ -334,14 +334,14 @@
   },
   "dependencies": {
     "@apexdevtools/apex-ls": "^6.0.2",
-    "@apexdevtools/apex-parser": "5.1.0-beta.1",
-    "@salesforce/apex-node": "^8.4.28",
-    "@salesforce/core": "^8.31.2"
+    "@apexdevtools/apex-parser": "5.1.0",
+    "@salesforce/apex-node": "^8.4.34",
+    "@salesforce/core": "^8.32.2"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "~22.16.5",
     "@types/vscode": "~1.100.0",
-    "typescript": "npm:@typescript/typescript6@^6.0.1"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }

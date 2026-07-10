@@ -38,8 +38,8 @@ export interface AggregatedRow {
   dmlRowCount: SelfTotal;
   /** Total SOQL rows */
   soqlRowCount: SelfTotal;
-  /** Total exceptions thrown */
-  totalThrownCount: number;
+  /** Total + self exceptions thrown */
+  thrownCount: SelfTotal;
   /** Aggregated children (callees grouped by signature) */
   _children?: AggregatedRow[] | null;
   /** References to original events for drill-down */
@@ -86,8 +86,8 @@ export interface BottomUpRow {
   dmlRowCount: SelfTotal;
   /** Total SOQL rows */
   soqlRowCount: SelfTotal;
-  /** Total exceptions thrown */
-  totalThrownCount: number;
+  /** Total + self exceptions thrown */
+  thrownCount: SelfTotal;
   /** Callers (parent functions) as children - lazy loaded */
   _children?: BottomUpRow[] | null;
   /**
@@ -243,7 +243,8 @@ function addEventToAggregatedRowWithStack(
   row.dmlRowCount.total += event.dmlRowCount.total;
   row.soqlRowCount.self += event.soqlRowCount.self;
   row.soqlRowCount.total += event.soqlRowCount.total;
-  row.totalThrownCount += event.totalThrownCount;
+  row.thrownCount.self += event.thrownCount.self;
+  row.thrownCount.total += event.thrownCount.total;
   row.instances.push(event);
 }
 
@@ -277,7 +278,7 @@ function addEventToAggregatedRowWithStack(
  *   - soqlCount.self / soqlCount.total
  *   - dmlRowCount.self / dmlRowCount.total
  *   - soqlRowCount.self / soqlRowCount.total
- *   - totalThrownCount (treated like a total metric for attribution)
+ *   - thrownCount.self / thrownCount.total
  */
 type FrameContext = {
   frame: LogEvent;
@@ -357,7 +358,7 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
       soqlTotal: node.soqlCount.total,
       dmlRowTotal: node.dmlRowCount.total,
       soqlRowTotal: node.soqlRowCount.total,
-      thrownTotal: node.totalThrownCount,
+      thrownTotal: node.thrownCount.total,
     };
 
     if (prior) {
@@ -366,7 +367,7 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
       prior.soqlTotal -= node.soqlCount.total;
       prior.dmlRowTotal -= node.dmlRowCount.total;
       prior.soqlRowTotal -= node.soqlRowCount.total;
-      prior.thrownTotal -= node.totalThrownCount;
+      prior.thrownTotal -= node.thrownCount.total;
     }
     activeByName.set(stackKey, ctx);
     dfs.push({ node, childIdx: 0, ctx });
@@ -382,6 +383,7 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
     const soqlSelf = node.soqlCount.self;
     const dmlRowSelf = node.dmlRowCount.self;
     const soqlRowSelf = node.soqlRowCount.self;
+    const thrownSelf = node.thrownCount.self;
     const totalTime = ctx.totalTime;
     const dmlTotal = ctx.dmlTotal;
     const soqlTotal = ctx.soqlTotal;
@@ -419,8 +421,11 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
       if (soqlRowTotal) {
         b.soqlRowCount.total += soqlRowTotal;
       }
+      if (thrownSelf) {
+        b.thrownCount.self += thrownSelf;
+      }
       if (thrownTotal) {
-        b.totalThrownCount += thrownTotal;
+        b.thrownCount.total += thrownTotal;
       }
     };
 
@@ -532,7 +537,7 @@ function createEmptyAggregatedRow(
     soqlCount: { self: 0, total: 0 },
     dmlRowCount: { self: 0, total: 0 },
     soqlRowCount: { self: 0, total: 0 },
-    totalThrownCount: 0,
+    thrownCount: { self: 0, total: 0 },
     _children: null,
     instances: [],
     originalData: event,
@@ -562,7 +567,7 @@ function createEmptyBottomUpRow(
     soqlCount: { self: 0, total: 0 },
     dmlRowCount: { self: 0, total: 0 },
     soqlRowCount: { self: 0, total: 0 },
-    totalThrownCount: 0,
+    thrownCount: { self: 0, total: 0 },
     _children: null,
     instances: [],
     originalData: event,

@@ -36,7 +36,9 @@ function createIndicator(
     screenStartX,
     screenEndX,
     screenWidth: screenEndX - screenStartX,
+    exactWidth: screenEndX - screenStartX,
     color: 0xff0000,
+    alpha: 0.2,
     isVisible: true,
   };
 }
@@ -236,6 +238,38 @@ describe('MarkerHitTest', () => {
 
         // Miss the marker
         expect(hitTestMarkers(2, 100, [indicator])).toBeNull(); // worldX = 102
+      });
+    });
+
+    describe('exception aggregation', () => {
+      const exceptionMarker = (id: string, summary: string): TimelineMarker => ({
+        id,
+        type: 'exception',
+        summary,
+        startTime: 1000,
+      });
+
+      it('aggregates overlapping exceptions into a count with the messages', () => {
+        const indicators = [
+          createIndicator(exceptionMarker('e1', 'NullPointer'), 100, 102),
+          createIndicator(exceptionMarker('e2', 'LimitException'), 100, 102),
+          createIndicator(exceptionMarker('e3', 'DmlException'), 101, 103),
+        ];
+
+        const result = hitTestMarkers(1, 100, indicators); // worldX = 101, hits all three
+
+        expect(result?.summary).toBe('3 exceptions');
+        expect(result?.metadata).toContain('NullPointer');
+        expect(result?.metadata).toContain('DmlException');
+      });
+
+      it('returns the single exception message when only one is hit', () => {
+        const marker = exceptionMarker('e1', 'NullPointer');
+        const indicator = createIndicator(marker, 100, 102);
+
+        const result = hitTestMarkers(1, 100, [indicator]); // worldX = 101
+
+        expect(result?.summary).toBe('NullPointer');
       });
     });
   });

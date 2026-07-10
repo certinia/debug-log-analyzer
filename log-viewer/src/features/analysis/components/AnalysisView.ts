@@ -74,35 +74,7 @@ export class AnalysisView extends LitElement {
       .filter-container {
         display: flex;
         gap: 4px;
-      }
-
-      .align__end {
-        align-items: end;
-      }
-
-      /* cancel the checkbox's built-in 4px vertical margins so it bottom-aligns
-         like the previous 18px-tall toolkit checkbox */
-      vscode-checkbox {
-        margin: -4px 0;
-      }
-
-      .dropdown-container {
-        box-sizing: border-box;
-        display: flex;
-        flex-flow: column nowrap;
-        align-items: flex-start;
-        justify-content: flex-start;
-
-        label {
-          display: block;
-          color: var(--vscode-descriptionForeground);
-          cursor: pointer;
-          font-size: calc(var(--vscode-font-size) * 0.9);
-          font-weight: 400;
-          line-height: 1.4;
-          margin-bottom: 4px;
-          user-select: none;
-        }
+        align-items: flex-end;
       }
     `,
     categoryColoringStyles,
@@ -164,7 +136,7 @@ export class AnalysisView extends LitElement {
     return html`
       <div class="analysis-view">
         <datagrid-filter-bar>
-          <div slot="filters" class="filter-container align__end">
+          <div slot="filters" class="filter-container">
             <vscode-button
               secondary
               aria-label="Expand all"
@@ -180,20 +152,21 @@ export class AnalysisView extends LitElement {
               >Collapse</vscode-button
             >
 
-            <vscode-checkbox class="align__end" @change="${this._handleShowDetailsChange}"
-              >Details</vscode-checkbox
-            >
-
-            <div class="dropdown-container">
-              <label id="groupby-dropdown-label" for="groupby-dropdown">Group by</label>
-              <vs-select id="groupby-dropdown" label="Group by" @change="${this._groupBy}">
-                <vscode-option>None</vscode-option>
-                <vscode-option>Namespace</vscode-option>
-                <vscode-option>Caller Namespace</vscode-option>
-                <vscode-option>Type</vscode-option>
-              </vs-select>
-            </div>
+            <vscode-checkbox @change="${this._handleShowDetailsChange}">Details</vscode-checkbox>
           </div>
+
+          <vs-select
+            slot="group"
+            id="groupby-dropdown"
+            prefix="Group"
+            label="Group by"
+            @change="${this._groupBy}"
+          >
+            <vscode-option>None</vscode-option>
+            <vscode-option>Namespace</vscode-option>
+            <vscode-option>Caller Namespace</vscode-option>
+            <vscode-option>Type</vscode-option>
+          </vs-select>
 
           <div slot="actions">
             <vscode-toolbar-button

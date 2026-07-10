@@ -21,7 +21,8 @@ import { isMarkerType } from '../types/flamechart.types.js';
  * Mapping rules:
  * - 'skip' → skip (skipped lines)
  * - 'unexpected' → unexpected (incomplete entries)
- * - 'error' → error (system errors)
+ * - 'error' issues are dropped here: exceptions are surfaced instead via
+ *   {@link extractExceptionMarkers}, which covers LimitException/FATAL_ERROR.
  *
  * @param log - Parsed Apex log containing logIssues array
  * @returns Array of validated Marker objects
@@ -40,6 +41,12 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
       continue;
     }
 
+    // Exceptions are drawn from the exception events (see extractExceptionMarkers),
+    // so skip 'error' issues here to avoid a duplicated red channel.
+    if (issue.type === 'error') {
+      continue;
+    }
+
     // Validate startTime
     if (issue.startTime === undefined || issue.startTime < 0) {
       continue;
@@ -49,6 +56,7 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
       id: `marker-${markerIndex++}`,
       type: issue.type,
       startTime: issue.startTime,
+      endTime: issue.endTime,
       eventIndex: issue.eventIndex,
       summary: issue.summary,
       metadata: issue.description,
@@ -59,6 +67,42 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
 
   // Sort by startTime for efficient end time resolution later
   markers.sort((a, b) => a.startTime - b.startTime);
+
+  return markers;
+}
+
+/**
+ * Extracts exception markers from the parsed log's exception events
+ * (EXCEPTION_THROWN and FATAL_ERROR).
+ *
+ * These are point-in-time markers (no endTime) rendered as red hairlines. The
+ * renderer aggregates lines that collapse to the same pixel when zoomed out.
+ *
+ * @param log - Parsed Apex log containing the exceptions array
+ * @returns Array of exception markers in log order
+ */
+export function extractExceptionMarkers(log: ApexLog): TimelineMarker[] {
+  if (!log.exceptions || log.exceptions.length === 0) {
+    return [];
+  }
+
+  const markers: TimelineMarker[] = [];
+  let markerIndex = 0;
+  for (const event of log.exceptions) {
+    if (event.timestamp < 0) {
+      continue;
+    }
+
+    const message = event.text || event.type?.toString() || 'Exception';
+    markers.push({
+      id: `exception-${markerIndex++}`,
+      type: 'exception',
+      startTime: event.timestamp,
+      eventIndex: event.eventIndex,
+      summary: message.split('\n', 1)[0] ?? message,
+      metadata: message,
+    });
+  }
 
   return markers;
 }

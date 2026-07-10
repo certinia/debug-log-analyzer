@@ -2,7 +2,7 @@
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
 import { LitElement, css, html } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, state } from 'lit/decorators.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
@@ -24,17 +24,39 @@ export class DatagridFilterBar extends LitElement {
         display: flex;
         .filter-bar__filters {
           display: flex;
+          align-items: flex-end;
         }
       }
 
       .filter-bar .filter-bar__actions--right {
-        align-items: center;
+        align-items: flex-end;
         display: flex;
         flex: 1 1 auto;
+        gap: 8px;
         justify-content: flex-end;
+      }
+
+      .filter-bar__group {
+        align-items: flex-end;
+        display: flex;
+      }
+
+      /* Divider between the grouping control and the action buttons. */
+      .filter-bar__group.has-group::after {
+        align-self: stretch;
+        border-right: 1px solid var(--vscode-widget-border, transparent);
+        content: '';
+        margin: 2px 8px;
       }
     `,
   ];
+
+  @state()
+  private _hasGroup = false;
+
+  private _onGroupSlotChange(event: Event) {
+    this._hasGroup = (event.target as HTMLSlotElement).assignedElements().length > 0;
+  }
 
   render() {
     return html`<div class="filter-bar">
@@ -44,6 +66,9 @@ export class DatagridFilterBar extends LitElement {
       </div>
 
       <div class="filter-bar__actions--right">
+        <div class="filter-bar__group ${this._hasGroup ? 'has-group' : ''}">
+          <slot name="group" @slotchange=${this._onGroupSlotChange}></slot>
+        </div>
         <slot name="actions"></slot>
       </div>
     </div>`;

@@ -66,10 +66,10 @@ class LeadingPercentWildcardRule implements SOQLLinterRule {
     const whereClause = qryCtxt.whereClause();
     if (whereClause) {
       const hasLeadingWildcard = whereClause
-        .logicalExpression()
-        .conditionalExpression_list()
+        .whereLogicalExpression()
+        .whereConditionalExpression_list()
         .find((exp) => {
-          const fieldExp = exp.fieldExpression();
+          const fieldExp = exp.whereFieldExpression()?.fieldExpression();
           if (
             fieldExp?.comparisonOperator().LIKE() &&
             fieldExp.value().StringLiteral()?.getText().startsWith("'%")
@@ -96,12 +96,12 @@ class NegativeFilterOperatorRule implements SOQLLinterRule {
     const qryCtxt = soqlTree._queryContext;
     const whereClause = qryCtxt.whereClause();
     if (whereClause) {
-      const exp = whereClause.logicalExpression();
+      const exp = whereClause.whereLogicalExpression();
 
       const hasNegativeOp =
         exp.NOT() ||
-        exp.conditionalExpression_list().find((exp) => {
-          const operator = exp.fieldExpression()?.comparisonOperator();
+        exp.whereConditionalExpression_list().find((exp) => {
+          const operator = exp.whereFieldExpression()?.fieldExpression()?.comparisonOperator();
 
           if (
             operator &&
@@ -148,10 +148,10 @@ class LastModifiedDateSystemModStampIndexRule implements SOQLLinterRule {
     const whereClause = qryCtxt.whereClause();
     if (whereClause) {
       const result = whereClause
-        .logicalExpression()
-        .conditionalExpression_list()
+        .whereLogicalExpression()
+        .whereConditionalExpression_list()
         .find((exp) => {
-          const fieldExp = exp.fieldExpression();
+          const fieldExp = exp.whereFieldExpression()?.fieldExpression();
           if (
             fieldExp?.fieldName()?.getText().toLowerCase().endsWith('lastmodifieddate') &&
             fieldExp.comparisonOperator().LT()
@@ -173,7 +173,7 @@ class TriggerNonSelectiveQuery implements SOQLLinterRule {
     'An exception will occur when a non-selective query in a trigger executes against an object that contains more than 1 million records. To avoid this error, ensure that the query is selective';
   severity: Severity = 'Warning';
 
-  test(soqlTree: SOQLTree, stack: Stack): boolean {
+  test(_soqlTree: SOQLTree, stack: Stack): boolean {
     const inTriggerCtxt = stack.find((entry) => {
       return entry.text.includes(' trigger event ');
     });

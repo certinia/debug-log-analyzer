@@ -166,7 +166,7 @@ export function createTimeOrderTable(
       },
       {
         title: 'Throws Count',
-        field: 'totalThrownCount',
+        field: 'thrownCount.total',
         sorter: 'number',
         cssClass: 'number-cell',
         width: 60,

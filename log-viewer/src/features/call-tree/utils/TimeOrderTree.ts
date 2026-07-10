@@ -21,7 +21,7 @@ export interface TimeOrderRow {
   soqlCount: SelfTotal;
   dmlRowCount: SelfTotal;
   soqlRowCount: SelfTotal;
-  totalThrownCount: number;
+  thrownCount: SelfTotal;
   /**
    * True when this row is itself a "detail" (the per-row predicate matches —
    * non-zero `duration.total`, `isParent`, `discontinuity`, or a type in
@@ -77,7 +77,7 @@ export function toTimeOrderTree(nodes: LogEvent[]): TimeOrderRow[] | undefined {
       soqlCount: event.soqlCount,
       dmlRowCount: event.dmlRowCount,
       soqlRowCount: event.soqlRowCount,
-      totalThrownCount: event.totalThrownCount,
+      thrownCount: event.thrownCount,
       _hasDetailsDeep: selfIsDetail || childHasDetailsDeep,
     };
   }
