@@ -28,12 +28,20 @@ import type {
 } from '../../types/flamechart.types.js';
 import type { NavigationMaps } from '../../utils/tree-converter.js';
 import type { FrameNavDirection } from '../interaction/KeyboardHandler.js';
+import { markerDuration } from '../markers/MarkerProcessor.js';
 import { SelectionHighlightRenderer } from '../selection/SelectionHighlightRenderer.js';
 import { SelectionNavigator, type MarkerNavDirection } from '../selection/SelectionNavigator.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 
 // Re-export types for convenience
 export type { MarkerNavDirection };
+
+/**
+ * Fraction of the total timeline used as the zoom window when focusing a point marker
+ * (an exception has no width). Keeps some context around the point instead of zooming to
+ * the maximum level on a zero-width range.
+ */
+const MARKER_POINT_ZOOM_FRACTION = 0.02;
 
 /**
  * Callbacks for selection orchestrator events.
@@ -204,7 +212,6 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
 
     // Initialize selection highlight renderer
     this.selectionRenderer = new SelectionHighlightRenderer(worldContainer, findMatchColor);
-    this.selectionRenderer.setMarkerContext(markers, totalDuration);
   }
 
   /**
@@ -476,12 +483,8 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
       return;
     }
 
-    // Calculate marker duration (extends to next marker or timeline end)
-    const markers = this.selectionNavigator?.getMarkers() ?? [];
-    const markerIndex = markers.findIndex((m) => m.id === selectedMarker.id);
-    const nextMarker = markers[markerIndex + 1];
-    const markerEnd = nextMarker?.startTime ?? this.totalDuration;
-    const duration = markerEnd - selectedMarker.startTime;
+    // Center on the marker's own range (bounded truncation) or its point (exception).
+    const duration = markerDuration(selectedMarker);
 
     // Use middle depth for centering (markers span all depths)
     const middleDepth = Math.floor(this.maxDepth / 2);
@@ -518,17 +521,21 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
       return;
     }
 
-    // Calculate marker duration (extends to next marker or timeline end)
-    const markers = this.selectionNavigator?.getMarkers() ?? [];
-    const markerIndex = markers.findIndex((m) => m.id === selectedMarker.id);
-    const nextMarker = markers[markerIndex + 1];
-    const markerEnd = nextMarker?.startTime ?? this.totalDuration;
-    const duration = markerEnd - selectedMarker.startTime;
+    // Zoom to the marker's own range. A bounded truncation zooms to [start, end]. A point
+    // marker (exception) has no width, so zoom to a small context window centered on it
+    // instead of a degenerate zero-width zoom (which would clamp to max zoom).
+    let focusStart = selectedMarker.startTime;
+    let duration = markerDuration(selectedMarker);
+    if (duration <= 0) {
+      duration = this.totalDuration * MARKER_POINT_ZOOM_FRACTION;
+      // Shift left by half the window so the point ends up centered.
+      focusStart = Math.max(0, selectedMarker.startTime - duration / 2);
+    }
 
     // Use middle depth for focusing (markers span all depths)
     const middleDepth = Math.floor(this.maxDepth / 2);
 
-    this.callbacks.onFocusOnMarker(selectedMarker.startTime, duration, middleDepth);
+    this.callbacks.onFocusOnMarker(focusStart, duration, middleDepth);
   }
 
   // ============================================================================

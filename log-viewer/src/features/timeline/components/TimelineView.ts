@@ -170,18 +170,16 @@ export class TimelineView extends LitElement {
       const hasWallClock = this.timelineRoot?.startTime !== null;
       const isWallClock = this.timeDisplayMode === 'wallClock';
 
-      return html`${
-          hasWallClock
-            ? html`<div class="timeline-toolbar">
-                <vscode-toolbar-button
-                  icon="${isWallClock ? 'history' : 'clockface'}"
-                  label="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
-                  title="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
-                  @click=${() => this.toggleTimeDisplay()}
-                ></vscode-toolbar-button>
-              </div>`
-            : ''
-        }
+      return html`${hasWallClock
+          ? html`<div class="timeline-toolbar">
+              <vscode-toolbar-button
+                icon="${isWallClock ? 'history' : 'clockface'}"
+                label="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
+                title="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
+                @click=${() => this.toggleTimeDisplay()}
+              ></vscode-toolbar-button>
+            </div>`
+          : ''}
         <timeline-flame-chart
           .apexLog=${this.timelineRoot}
           .themeName=${this.activeTheme}

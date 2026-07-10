@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- 🔴 **Timeline exception markers**: exceptions show as red lines, with a **Throws** count in method tooltips. ([#828])
+
 ### Changed
 
+- 🚧 **Timeline truncation markers** now end where the log recovers, so trusted sections are no longer greyed out. ([#828])
 - 🎛️ **Modernised dropdowns**: searchable, compact controls that carry the field and value in one place (e.g. `Group: Namespace`, `Type: All`) ([#848]).
 - 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832]).
 - ♻️ Replaced the deprecated `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).
@@ -496,6 +501,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- Unreleased -->
 
 [#576]: https://github.com/certinia/debug-log-analyzer/issues/576
+[#828]: https://github.com/certinia/debug-log-analyzer/issues/828
 [#832]: https://github.com/certinia/debug-log-analyzer/issues/832
 [#848]: https://github.com/certinia/debug-log-analyzer/issues/848
 

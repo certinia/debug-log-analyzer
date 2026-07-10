@@ -39,7 +39,7 @@ import {
   type ViewportState,
 } from '../types/flamechart.types.js';
 import type { SearchCursor } from '../types/search.types.js';
-import { extractMarkers } from '../utils/marker-utils.js';
+import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer } from './FrameTooltipRenderer.js';
@@ -121,7 +121,7 @@ export class ApexLogTimeline {
       apexLog: apexLog,
     });
 
-    const markers = extractMarkers(this.apexLog);
+    const markers = extractMarkers(this.apexLog).concat(extractExceptionMarkers(this.apexLog));
     this.events = this.extractEvents();
 
     // Derive categories from shared constant (ensures compile-time sync with color map)

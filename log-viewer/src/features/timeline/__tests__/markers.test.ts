@@ -183,33 +183,17 @@ describe('TimelineMarkerRenderer', () => {
     });
   });
 
-  describe('T008: End Time Resolution Algorithm', () => {
-    it('should resolve endTime to next marker startTime when null', () => {
+  describe('End Time Resolution', () => {
+    it('should render a bounded marker across its exact range', () => {
+      // zoom = DISPLAY_WIDTH / TOTAL_DURATION = 0.001px per ns
       const markers: TimelineMarker[] = [
-        { id: 'marker-skip', type: 'skip', startTime: 100_000, summary: 'First' },
-        { id: 'marker-error', type: 'error', startTime: 500_000, summary: 'Second' },
-      ];
-
-      renderer = new TimelineMarkerRenderer(
-        mockContainer as unknown as PIXI.Container,
-        viewport,
-        markers,
-      );
-      renderer.render();
-
-      // Get visible sprites sorted by x position
-      const visibleSprites = createdMockSprites
-        .filter((s) => s.visible && s.width > 0)
-        .sort((a, b) => a.x - b.x);
-
-      // First marker should span from 100_000 to 500_000
-      // Second marker should span to timeline end
-      expect(visibleSprites.length).toBe(2);
-    });
-
-    it('should resolve endTime to timeline end for last marker', () => {
-      const markers: TimelineMarker[] = [
-        { id: 'marker-error', type: 'error', startTime: 500_000, summary: 'Only marker' },
+        {
+          id: 'marker-skip',
+          type: 'skip',
+          startTime: 100_000,
+          endTime: 300_000,
+          summary: 'Bounded',
+        },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -220,9 +204,33 @@ describe('TimelineMarkerRenderer', () => {
       renderer.render();
 
       const visibleSprites = createdMockSprites.filter((s) => s.visible && s.width > 0);
-
-      // Marker should render to end of visible timeline
       expect(visibleSprites.length).toBe(1);
+      // (300_000 - 100_000) * 0.001 = 200px, drawn at its exact width (gap is owned by the
+      // following marker, so a lone band is not inset).
+      expect(visibleSprites[0]!.width).toBeCloseTo(200, 0);
+    });
+
+    it('should render a marker with no endTime as a min-width point (not extended to next marker)', () => {
+      const markers: TimelineMarker[] = [
+        { id: 'marker-skip', type: 'skip', startTime: 100_000, summary: 'Point' },
+        { id: 'marker-error', type: 'error', startTime: 500_000, summary: 'Second' },
+      ];
+
+      renderer = new TimelineMarkerRenderer(
+        mockContainer as unknown as PIXI.Container,
+        viewport,
+        markers,
+      );
+      renderer.render();
+
+      const visibleSprites = createdMockSprites
+        .filter((s) => s.visible && s.width > 0)
+        .sort((a, b) => a.x - b.x);
+
+      expect(visibleSprites.length).toBe(2);
+      // A point clamps to MARKER_MIN_WIDTH_PX (2) minus the 1px gap = 1px,
+      // NOT the 400px distance to the next marker.
+      expect(visibleSprites[0]!.width).toBeLessThan(5);
     });
 
     it('should handle multiple markers in sequence', () => {
@@ -269,7 +277,13 @@ describe('TimelineMarkerRenderer', () => {
       // Markers that end before the viewport starts should be culled
       const markers: TimelineMarker[] = [
         { id: 'marker-error', type: 'error', startTime: 100_000, summary: 'First marker' },
-        { id: 'marker-skip', type: 'skip', startTime: 200_000, summary: 'Second marker' },
+        {
+          id: 'marker-skip',
+          type: 'skip',
+          startTime: 200_000,
+          endTime: 1_000_000,
+          summary: 'Second marker',
+        },
       ];
 
       // Zoom in 10x first (so we can actually pan)
@@ -279,8 +293,8 @@ describe('TimelineMarkerRenderer', () => {
       // Now pan to the right so first marker is outside view
       // At 0.01 zoom: visible time = 1000/0.01 = 100_000ns
       // Pan to 250_000: viewport shows 250_000 to 350_000
-      // First marker: 100_000 to 200_000 - ends before 250_000, should be culled
-      // Second marker: 200_000 to 1_000_000 - overlaps 250_000, should be visible
+      // First marker: point at 100_000 - before 250_000, should be culled
+      // Second marker: bounded 200_000 to 1_000_000 - overlaps 250_000, should be visible
       viewport.setPan(250_000 * viewport.getState().zoom, 0);
 
       renderer = new TimelineMarkerRenderer(
@@ -292,7 +306,7 @@ describe('TimelineMarkerRenderer', () => {
 
       const visibleSprites = createdMockSprites.filter((s) => s.visible && s.width > 0);
 
-      // First marker should be culled (ends at 200_000 < viewport start 250_000)
+      // First marker should be culled (point at 100_000 < viewport start 250_000)
       // Second marker should be visible (200_000 to 1_000_000 overlaps 250_000)
       expect(visibleSprites.length).toBe(1);
       expect(visibleSprites[0]!.tint).toBe(MARKER_COLORS.skip);
@@ -347,11 +361,17 @@ describe('TimelineMarkerRenderer', () => {
       expect(visibleSprites.length).toBe(2);
     });
 
-    it('should not render markers with width < 1px', () => {
-      // Create viewport with very small zoom so markers appear very narrow
+    it('should keep sub-pixel bounded markers visible via the min-width clamp', () => {
+      // A tiny bounded marker (1ns wide) would be sub-pixel at default zoom.
+      // Instead of being culled, it clamps to MARKER_MIN_WIDTH_PX so it stays visible.
       const markers: TimelineMarker[] = [
-        { id: 'marker-skip', type: 'skip', startTime: 100_000, summary: 'First' },
-        { id: 'marker-error', type: 'error', startTime: 100_001, summary: 'Second (1ns later)' },
+        {
+          id: 'marker-skip',
+          type: 'skip',
+          startTime: 100_000,
+          endTime: 100_001,
+          summary: 'Tiny bounded marker',
+        },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -361,11 +381,11 @@ describe('TimelineMarkerRenderer', () => {
       );
       renderer.render();
 
-      const visibleSprites = createdMockSprites.filter((s) => s.visible && s.width >= 1);
+      const visibleSprites = createdMockSprites.filter((s) => s.visible && s.width > 0);
 
-      // At least the second marker should render (extends to end)
-      // First marker (1ns wide) may be too small at default zoom
-      expect(visibleSprites.length).toBeGreaterThanOrEqual(1);
+      // Clamped to min width rather than culled.
+      expect(visibleSprites.length).toBe(1);
+      expect(visibleSprites[0]!.width).toBeGreaterThan(0);
     });
   });
 
@@ -435,7 +455,13 @@ describe('TimelineMarkerRenderer', () => {
 
     it('should return marker when hit', () => {
       const markers: TimelineMarker[] = [
-        { id: 'marker-error', type: 'error', startTime: 100_000, summary: 'Test error' },
+        {
+          id: 'marker-error',
+          type: 'error',
+          startTime: 100_000,
+          endTime: 300_000,
+          summary: 'Test error',
+        },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -461,8 +487,20 @@ describe('TimelineMarkerRenderer', () => {
       // Error: 200_000 to timeline end
       // At time 250_000, both markers overlap
       const markers: TimelineMarker[] = [
-        { id: 'marker-skip', type: 'skip', startTime: 100_000, summary: 'Skip marker' },
-        { id: 'marker-error', type: 'error', startTime: 200_000, summary: 'Error marker' },
+        {
+          id: 'marker-skip',
+          type: 'skip',
+          startTime: 100_000,
+          endTime: 300_000,
+          summary: 'Skip marker',
+        },
+        {
+          id: 'marker-error',
+          type: 'error',
+          startTime: 200_000,
+          endTime: 1_000_000,
+          summary: 'Error marker',
+        },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -495,7 +533,13 @@ describe('TimelineMarkerRenderer', () => {
 
     it('should work correctly with panned viewport', () => {
       const markers: TimelineMarker[] = [
-        { id: 'marker-error', type: 'error', startTime: 500_000, summary: 'Test error' },
+        {
+          id: 'marker-error',
+          type: 'error',
+          startTime: 500_000,
+          endTime: 700_000,
+          summary: 'Test error',
+        },
       ];
 
       // Pan viewport to show the marker area
@@ -519,7 +563,13 @@ describe('TimelineMarkerRenderer', () => {
 
     it('should ignore Y coordinate for full-height indicators', () => {
       const markers: TimelineMarker[] = [
-        { id: 'marker-error', type: 'error', startTime: 100_000, summary: 'Test error' },
+        {
+          id: 'marker-error',
+          type: 'error',
+          startTime: 100_000,
+          endTime: 300_000,
+          summary: 'Test error',
+        },
       ];
 
       renderer = new TimelineMarkerRenderer(
@@ -579,6 +629,54 @@ describe('TimelineMarkerRenderer', () => {
       const errorSprites = visibleSprites.filter((s) => s.tint === MARKER_COLORS.error);
       expect(skipSprites.length).toBe(1);
       expect(errorSprites.length).toBe(1);
+    });
+  });
+
+  describe('exception spacing and bucketing', () => {
+    it('collapses a dense exception cluster to fewer sprites but keeps them hit-testable', () => {
+      // At default zoom (0.001px/ns) these three exceptions are within ~0.2px of each other.
+      const markers: TimelineMarker[] = [
+        { id: 'e1', type: 'exception', startTime: 100_000, summary: 'NullPointer' },
+        { id: 'e2', type: 'exception', startTime: 100_100, summary: 'LimitException' },
+        { id: 'e3', type: 'exception', startTime: 100_200, summary: 'DmlException' },
+      ];
+
+      renderer = new TimelineMarkerRenderer(
+        mockContainer as unknown as PIXI.Container,
+        viewport,
+        markers,
+      );
+      renderer.render();
+
+      // The cluster collapses to a single drawn hairline...
+      const visibleSprites = createdMockSprites.filter((s) => s.visible && s.width > 0);
+      expect(visibleSprites.length).toBe(1);
+
+      // ...but all three still hit-test, so the tooltip reports the aggregated count.
+      // Hover at ~101px: within the min-width hit region of all three (starts 100/100.1/100.2).
+      const result = renderer.hitTest(101, 300);
+      expect(result?.summary).toBe('3 exceptions');
+    });
+
+    it('keeps a visible gap between two well-separated exceptions', () => {
+      const markers: TimelineMarker[] = [
+        { id: 'e1', type: 'exception', startTime: 100_000, summary: 'First' },
+        { id: 'e2', type: 'exception', startTime: 500_000, summary: 'Second' },
+      ];
+
+      renderer = new TimelineMarkerRenderer(
+        mockContainer as unknown as PIXI.Container,
+        viewport,
+        markers,
+      );
+      renderer.render();
+
+      const sprites = createdMockSprites
+        .filter((s) => s.visible && s.width > 0)
+        .sort((a, b) => a.x - b.x);
+      expect(sprites.length).toBe(2);
+      // Gap between the first sprite's end and the second's start is >= 1px.
+      expect(sprites[1]!.x - (sprites[0]!.x + sprites[0]!.width)).toBeGreaterThanOrEqual(1);
     });
   });
 

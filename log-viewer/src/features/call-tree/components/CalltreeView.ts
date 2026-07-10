@@ -278,58 +278,52 @@ export class CalltreeView extends LitElement {
             <div class="filter-container">
               <vscode-checkbox @change="${this._handleShowDetailsChange}">Details</vscode-checkbox>
 
-              ${
-                isTimeOrder || this.viewMode === 'aggregated'
-                  ? html`
-                      <vscode-checkbox @change="${this._handleDebugOnlyChange}"
-                        >Debug Only</vscode-checkbox
-                      >
-
-                      <vs-select
-                        prefix="Type"
-                        label="Type"
-                        emptyValue=""
-                        combobox
-                        filter="fuzzy"
-                        @change="${this._handleTypeFilter}"
-                      >
-                        <vscode-option ?selected="${this.typeFilter === 'All'}">All</vscode-option>
-                        ${
-                          this.isVisible
-                            ? repeat(
-                                this._getAllTypes(this.timelineRoot?.children ?? []),
-                                (type, _index) =>
-                                  html`<vscode-option ?selected="${this.typeFilter === type}"
-                                    >${type}</vscode-option
-                                  >`,
-                              )
-                            : ''
-                        }
-                      </vs-select>
-                    `
-                  : ''
-              }
-            </div>
-
-            ${
-              this.viewMode === 'bottom-up'
+              ${isTimeOrder || this.viewMode === 'aggregated'
                 ? html`
-                    <vs-select
-                      class="group-end"
-                      id="bottomup-groupby"
-                      prefix="Group"
-                      label="Group by"
-                      @change="${this._handleBottomUpGroupBy}"
-                      .value="${this.bottomUpGroupBy}"
+                    <vscode-checkbox @change="${this._handleDebugOnlyChange}"
+                      >Debug Only</vscode-checkbox
                     >
-                      <vscode-option>None</vscode-option>
-                      <vscode-option>Namespace</vscode-option>
-                      <vscode-option>Caller Namespace</vscode-option>
-                      <vscode-option>Type</vscode-option>
+
+                    <vs-select
+                      prefix="Type"
+                      label="Type"
+                      emptyValue=""
+                      combobox
+                      filter="fuzzy"
+                      @change="${this._handleTypeFilter}"
+                    >
+                      <vscode-option ?selected="${this.typeFilter === 'All'}">All</vscode-option>
+                      ${this.isVisible
+                        ? repeat(
+                            this._getAllTypes(this.timelineRoot?.children ?? []),
+                            (type, _index) =>
+                              html`<vscode-option ?selected="${this.typeFilter === type}"
+                                >${type}</vscode-option
+                              >`,
+                          )
+                        : ''}
                     </vs-select>
                   `
-                : ''
-            }
+                : ''}
+            </div>
+
+            ${this.viewMode === 'bottom-up'
+              ? html`
+                  <vs-select
+                    class="group-end"
+                    id="bottomup-groupby"
+                    prefix="Group"
+                    label="Group by"
+                    @change="${this._handleBottomUpGroupBy}"
+                    .value="${this.bottomUpGroupBy}"
+                  >
+                    <vscode-option>None</vscode-option>
+                    <vscode-option>Namespace</vscode-option>
+                    <vscode-option>Caller Namespace</vscode-option>
+                    <vscode-option>Type</vscode-option>
+                  </vs-select>
+                `
+              : ''}
           </div>
         </div>
 

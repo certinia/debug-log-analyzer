@@ -3,7 +3,14 @@
  */
 
 export type TokenKind =
-  'keyword' | 'function' | 'string' | 'number' | 'bind' | 'punct' | 'ident' | 'ws';
+  | 'keyword'
+  | 'function'
+  | 'string'
+  | 'number'
+  | 'bind'
+  | 'punct'
+  | 'ident'
+  | 'ws';
 
 export interface Token {
   kind: TokenKind;

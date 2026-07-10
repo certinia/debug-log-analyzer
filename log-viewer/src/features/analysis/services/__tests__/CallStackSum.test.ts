@@ -30,7 +30,7 @@ function createEvent(options: EventOptions): LogEvent {
     dmlCount: { self: 0, total: 0 },
     soqlCount: { self: 0, total: 0 },
     soslCount: { self: 0, total: 0 },
-    totalThrownCount: 0,
+    thrownCount: { self: 0, total: 0 },
   } as unknown as LogEvent;
 
   if (options.parent) {
