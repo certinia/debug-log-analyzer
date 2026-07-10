@@ -8,9 +8,9 @@ import { defineConfig } from 'rolldown';
 import nodePolyfills from '@rolldown/plugin-node-polyfills';
 
 // rollup plugins
-import postcssUrl from 'postcss-url';
 import copy from 'rollup-plugin-copy';
-import postcss from 'rollup-plugin-postcss';
+
+import css from './scripts/rollup-plugin-css.mjs';
 
 // Resolve the codicons dist dir via Node resolution so it works regardless of
 // pnpm hoisting (avoids a hard-coded node_modules path).
@@ -51,15 +51,12 @@ export default defineConfig([
     platform: 'browser',
     moduleTypes: {
       '.css': 'js',
+      '.scss': 'js',
     },
     tsconfig: production ? './log-viewer/tsconfig.json' : './log-viewer/tsconfig-dev.json',
     plugins: [
       nodePolyfills(),
-      postcss({
-        extensions: ['.css', '.scss'],
-        minimize: true,
-        plugins: [postcssUrl({ url: 'inline' })],
-      }),
+      css({ minify: production }),
       copy({
         hook: 'closeBundle',
         targets: [

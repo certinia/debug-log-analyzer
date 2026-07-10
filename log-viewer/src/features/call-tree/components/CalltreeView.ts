@@ -75,6 +75,7 @@ export class CalltreeView extends LitElement {
     selectedTypes: new Set<string>(),
   };
   bottomUpGroupBy = 'None';
+  typeFilter = 'All';
   debugOnlyFilterCache = new Map<number, boolean>();
   typeFilterCache = new Map<number, boolean>();
 
@@ -171,50 +172,27 @@ export class CalltreeView extends LitElement {
       .header-bar {
         display: flex;
         gap: 10px;
+        align-items: flex-end;
       }
 
       .filter-container {
         display: flex;
         gap: 4px;
+        align-items: flex-end;
       }
 
       .filter-section {
         display: block;
       }
 
-      .dropdown-container {
-        box-sizing: border-box;
-        display: flex;
-        flex-flow: column nowrap;
-        align-items: flex-start;
-        justify-content: flex-start;
-
-        label {
-          display: block;
-          color: var(--vscode-descriptionForeground);
-          cursor: pointer;
-          font-size: calc(var(--vscode-font-size) * 0.9);
-          font-weight: 400;
-          line-height: 1.4;
-          margin-bottom: 4px;
-          user-select: none;
-        }
-      }
-
-      .align__end {
-        align-items: end;
-      }
-
-      /* cancel the checkbox's built-in 4px vertical margins so it bottom-aligns
-         like the previous 18px-tall toolkit checkbox */
-      vscode-checkbox {
-        margin: -4px 0;
+      /* push the grouping control to the right edge of the header bar */
+      .group-end {
+        margin-left: auto;
       }
 
       .view-mode-buttons {
         display: flex;
         gap: 0;
-        align-self: flex-end;
       }
 
       .view-mode-buttons vscode-button {
@@ -290,56 +268,60 @@ export class CalltreeView extends LitElement {
               >
             </div>
 
-            <div class="filter-container align__end">
+            <div class="filter-container">
               <vscode-button secondary @click="${this._expandButtonClick}">Expand</vscode-button>
               <vscode-button secondary @click="${this._collapseButtonClick}"
                 >Collapse</vscode-button
               >
             </div>
 
-            <div class="filter-container align__end">
-              <vscode-checkbox class="align__end" @change="${this._handleShowDetailsChange}"
-                >Details</vscode-checkbox
-              >
+            <div class="filter-container">
+              <vscode-checkbox @change="${this._handleShowDetailsChange}">Details</vscode-checkbox>
 
               ${isTimeOrder || this.viewMode === 'aggregated'
                 ? html`
-                    <vscode-checkbox class="align__end" @change="${this._handleDebugOnlyChange}"
+                    <vscode-checkbox @change="${this._handleDebugOnlyChange}"
                       >Debug Only</vscode-checkbox
                     >
 
-                    <div class="dropdown-container">
-                      <label for="types">Type:</label>
-                      <vs-select label="Type" @change="${this._handleTypeFilter}">
-                        <vscode-option>None</vscode-option>
-                        ${this.isVisible
-                          ? repeat(
-                              this._getAllTypes(this.timelineRoot?.children ?? []),
-                              (type, _index) => html`<vscode-option>${type}</vscode-option>`,
-                            )
-                          : ''}
-                      </vs-select>
-                    </div>
+                    <vs-select
+                      prefix="Type"
+                      label="Type"
+                      emptyValue=""
+                      combobox
+                      filter="fuzzy"
+                      @change="${this._handleTypeFilter}"
+                    >
+                      <vscode-option ?selected="${this.typeFilter === 'All'}">All</vscode-option>
+                      ${this.isVisible
+                        ? repeat(
+                            this._getAllTypes(this.timelineRoot?.children ?? []),
+                            (type, _index) =>
+                              html`<vscode-option ?selected="${this.typeFilter === type}"
+                                >${type}</vscode-option
+                              >`,
+                          )
+                        : ''}
+                    </vs-select>
                   `
                 : ''}
             </div>
 
             ${this.viewMode === 'bottom-up'
               ? html`
-                  <div class="dropdown-container">
-                    <label for="bottomup-groupby">Group by:</label>
-                    <vs-select
-                      id="bottomup-groupby"
-                      label="Group by"
-                      @change="${this._handleBottomUpGroupBy}"
-                      .value="${this.bottomUpGroupBy}"
-                    >
-                      <vscode-option>None</vscode-option>
-                      <vscode-option>Namespace</vscode-option>
-                      <vscode-option>Caller Namespace</vscode-option>
-                      <vscode-option>Type</vscode-option>
-                    </vs-select>
-                  </div>
+                  <vs-select
+                    class="group-end"
+                    id="bottomup-groupby"
+                    prefix="Group"
+                    label="Group by"
+                    @change="${this._handleBottomUpGroupBy}"
+                    .value="${this.bottomUpGroupBy}"
+                  >
+                    <vscode-option>None</vscode-option>
+                    <vscode-option>Namespace</vscode-option>
+                    <vscode-option>Caller Namespace</vscode-option>
+                    <vscode-option>Type</vscode-option>
+                  </vs-select>
                 `
               : ''}
           </div>
@@ -482,6 +464,7 @@ export class CalltreeView extends LitElement {
 
   _handleTypeFilter(event: Event) {
     const target = event.target as HTMLInputElement;
+    this.typeFilter = target.value || 'All';
     this.filterState.selectedTypes = new Set(target.value ? [target.value] : []);
     this._updateFiltering();
   }
@@ -505,7 +488,7 @@ export class CalltreeView extends LitElement {
       if (
         !isBottomUp &&
         this.filterState.selectedTypes.size > 0 &&
-        !this.filterState.selectedTypes.has('None')
+        !this.filterState.selectedTypes.has('All')
       ) {
         filtersToAdd.push(this._typeFilter);
       }

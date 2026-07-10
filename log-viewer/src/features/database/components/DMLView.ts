@@ -116,25 +116,6 @@ export class DMLView extends LitElement {
         width: 100%;
         margin-bottom: 1rem;
       }
-
-      .dropdown-container {
-        box-sizing: border-box;
-        display: flex;
-        flex-flow: column nowrap;
-        align-items: flex-start;
-        justify-content: flex-start;
-
-        label {
-          display: block;
-          color: var(--vscode-descriptionForeground);
-          cursor: pointer;
-          font-size: calc(var(--vscode-font-size) * 0.9);
-          font-weight: 400;
-          line-height: 1.4;
-          margin-bottom: 4px;
-          user-select: none;
-        }
-      }
     `,
   ];
 
@@ -145,14 +126,17 @@ export class DMLView extends LitElement {
       <database-section title="DML Statements" .dbLines="${this.dmlLines}"></database-section>
 
       <datagrid-filter-bar>
-        <div slot="filters" class="dropdown-container">
-          <label for="dml-groupby-dropdown">Group by</label>
-          <vs-select id="dml-groupby-dropdown" label="Group by" @change="${this._dmlGroupBy}">
-            <vscode-option>DML</vscode-option>
-            <vscode-option>Caller Namespace</vscode-option>
-            <vscode-option>None</vscode-option>
-          </vs-select>
-        </div>
+        <vs-select
+          slot="filters"
+          id="dml-groupby-dropdown"
+          prefix="Group"
+          label="Group by"
+          @change="${this._dmlGroupBy}"
+        >
+          <vscode-option>DML</vscode-option>
+          <vscode-option>Caller Namespace</vscode-option>
+          <vscode-option>None</vscode-option>
+        </vs-select>
 
         <div slot="actions">
           <vscode-toolbar-button
@@ -345,14 +329,12 @@ export class DMLView extends LitElement {
         headerTooltip: true,
         headerWordWrap: true,
       },
-      headerSortElement: function (column, dir) {
+      headerSortElement: function (_column, dir) {
         switch (dir) {
           case 'asc':
             return "<div class='sort-by--top'></div>";
-            break;
           case 'desc':
             return "<div class='sort-by--bottom'></div>";
-            break;
           default:
             return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
         }
@@ -429,7 +411,7 @@ export class DMLView extends LitElement {
       },
     });
 
-    this.dmlTable.on('groupClick', (e: UIEvent, group: GroupComponent) => {
+    this.dmlTable.on('groupClick', (_e: UIEvent, group: GroupComponent) => {
       const { type } = window.getSelection() ?? {};
       if (type === 'Range') {
         return;
@@ -447,7 +429,7 @@ export class DMLView extends LitElement {
       }
     });
 
-    this.dmlTable.on('rowClick', function (e, row) {
+    this.dmlTable.on('rowClick', function (_e, row) {
       const { type } = window.getSelection() ?? {};
       if (type === 'Range') {
         return;

@@ -23,6 +23,10 @@ Always use pnpm.
 - `pnpm lint` — type + lint check
 - `pnpm prettier-format` — auto-format
 
+**Compilers** — `typecheck` = native TS7 (`tsc`); `typecheck:tsc6` = classic 6.0 (`tsc6`).
+Keep the `@typescript/typescript6` alias + `tsc6`: `typescript-eslint` and Docusaurus need
+the TS ≤6.0 API (lands in TS 7.1). Don't remove until typescript-eslint supports TS7.
+
 ## Core principles
 
 - **Type safety** — strict TypeScript, no `any` (use `unknown` + justification if unavoidable).
