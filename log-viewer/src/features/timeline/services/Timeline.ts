@@ -23,6 +23,7 @@ interface TimelineColors {
 /* eslint-enable @typescript-eslint/naming-convention */
 
 const truncationColors: Map<string, string> = new Map([
+  ['exception', 'rgba(229, 72, 77, 0.9)'],
   ['error', 'rgba(255, 128, 128, 0.2)'],
   ['skip', 'rgb(30, 128, 255, 0.2)'],
   ['unexpected', 'rgba(128, 128, 255, 0.2)'],
@@ -435,7 +436,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 
     if (thisEntry?.startTime) {
       const startTime = thisEntry.startTime,
-        endTime = nextEntry?.startTime ?? timelineRoot.exitStamp;
+        endTime = thisEntry.endTime ?? nextEntry?.startTime ?? timelineRoot.exitStamp;
 
       let x = startTime * state.zoom - state.offsetX;
       let w = (endTime - startTime) * state.zoom;
@@ -702,6 +703,11 @@ function findTimelineTooltip(
             govLimits.soslQueries.limit,
           ),
         });
+      }
+
+      if (target.thrownCount.total) {
+        // No `self`: always 0 on a method (the throw is a child leaf).
+        rows.push({ label: 'Throws:', value: `${target.thrownCount.total}` });
       }
     }
 

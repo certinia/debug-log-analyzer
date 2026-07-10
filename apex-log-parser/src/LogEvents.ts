@@ -225,9 +225,24 @@ export abstract class LogEvent {
   };
 
   /**
-   * The total number of exceptions thrown (EXCEPTION_THROWN) in this node and child nodes
+   * Total + self counts for exceptions thrown (EXCEPTION_THROWN).
+   *
+   * `self` is seeded on the EXCEPTION_THROWN leaf node (like DML/SOQL), so a method's
+   * `thrownCount.self` is always 0 (the throw is a child, not the method itself). Because
+   * only methods are hoverable on the timeline, `self` is deliberately omitted from the
+   * Throws tooltip row — it would only ever read "(self 0)". The field keeps the SelfTotal
+   * shape for consistency with the other metrics and so the leaf carries `self: 1`.
    */
-  totalThrownCount = 0;
+  thrownCount: SelfTotal = {
+    /**
+     * The net number of exceptions thrown directly by this node.
+     */
+    self: 0,
+    /**
+     * The total number of exceptions thrown in this node and child nodes
+     */
+    total: 0,
+  };
 
   /**
    * The line types which would legitimately end this method
@@ -375,6 +390,12 @@ export class ApexLog extends LogEvent {
    * `LogEvent` without relying on (non-unique) timestamps.
    */
   eventsById: LogEvent[] = [];
+
+  /**
+   * Every exception event (EXCEPTION_THROWN, FATAL_ERROR) in log order.
+   * Used by the timeline to mark where exceptions were thrown.
+   */
+  exceptions: LogEvent[] = [];
 
   /**
    * The endtime with nodes of 0 duration excluded
@@ -2285,12 +2306,13 @@ export class ExceptionThrownLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.ApexCode;
   discontinuity = true;
   acceptsText = true;
-  totalThrownCount = 1;
+  thrownCount = { self: 1, total: 1 };
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
+    parser.exceptions.push(this);
   }
 
   onAfter(parser: ApexLogParser, _next?: LogEvent): void {
@@ -2314,6 +2336,7 @@ export class FatalErrorLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = parts[2] || '';
+    parser.exceptions.push(this);
   }
 
   onAfter(parser: ApexLogParser, _next?: LogEvent): void {

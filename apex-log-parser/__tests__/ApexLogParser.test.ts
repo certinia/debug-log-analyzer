@@ -303,6 +303,84 @@ describe('parseLog tests', () => {
       'FATAL ERROR! cause=System.LimitException: c2g:Too many SOQL queries: 101',
     );
   });
+  it('Skipped-Lines endTime resolves to the next entry event, ignoring detail lines', async () => {
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
+      '*** Skipped 22606355 bytes of detailed log\n' +
+      '15:20:52.222 (500)|HEAP_ALLOCATE|[52]|Bytes:3\n' +
+      '15:20:52.222 (800)|METHOD_ENTRY|[190]|01p4J00000FpS6u|CODAUnitOfWork.other()\n' +
+      '15:20:52.222 (900)|METHOD_EXIT|[190]|01p4J00000FpS6u|CODAUnitOfWork.other()\n' +
+      '15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const apexLog = parse(log);
+
+    const skip = apexLog.logIssues.find((issue) => issue.summary === 'Skipped-Lines');
+    // Ends at the following METHOD_ENTRY (800), not the HEAP_ALLOCATE detail line (500).
+    expect(skip?.endTime).toBe(800);
+  });
+
+  it('Max-Size-reached endTime resolves to the next event when one follows', async () => {
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
+      '*********** MAXIMUM DEBUG LOG SIZE REACHED ***********\n' +
+      '16:16:04.97 (1000)|FATAL_ERROR|System.LimitException: Apex CPU time limit exceeded\n';
+
+    const apexLog = parse(log);
+
+    const maxSize = apexLog.logIssues.find((issue) => issue.summary === 'Max-Size-reached');
+    // Ends at the trailing FATAL_ERROR so the trusted terminal event is not shaded.
+    expect(maxSize?.endTime).toBe(1000);
+  });
+
+  it('Max-Size-reached endTime falls back to the log end when nothing follows', async () => {
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
+      '15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
+      '*********** MAXIMUM DEBUG LOG SIZE REACHED ***********\n';
+
+    const apexLog = parse(log);
+
+    const maxSize = apexLog.logIssues.find((issue) => issue.summary === 'Max-Size-reached');
+    expect(maxSize?.endTime).toBe(apexLog.exitStamp);
+  });
+
+  it('Collects exception events (EXCEPTION_THROWN and FATAL_ERROR)', async () => {
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
+      '16:16:04.97 (500)|EXCEPTION_THROWN|[60]|System.NullPointerException: boom\n' +
+      '15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
+      '16:16:04.97 (1500)|FATAL_ERROR|System.LimitException: Apex CPU time limit exceeded\n' +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const apexLog = parse(log);
+
+    expect(apexLog.exceptions.map((exc) => exc.type)).toEqual(['EXCEPTION_THROWN', 'FATAL_ERROR']);
+  });
+
+  it('thrownCount is seeded on the exception leaf and rolled up as total on the method', async () => {
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
+      '16:16:04.97 (500)|EXCEPTION_THROWN|[60]|System.NullPointerException: boom\n' +
+      '15:20:52.222 (1000)|METHOD_EXIT|[185]|01p4J00000FpS6t|CODAUnitOfWork.getNextIdInternal()\n' +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const apexLog = parse(log);
+
+    // children[0] is the EXECUTION_STARTED wrapper; the method is its child.
+    const method = apexLog.children[0]!.children[0]!;
+    // The method rolls up the throw as a total; self stays 0 (the throw is a child node).
+    expect(method.thrownCount).toEqual({ self: 0, total: 1 });
+
+    const thrown = method.children.find((child) => child.type === 'EXCEPTION_THROWN');
+    expect(thrown?.thrownCount).toEqual({ self: 1, total: 1 });
+  });
+
   it('Methods should have line-numbers', async () => {
     const log =
       '09:18:22.6 (0)|EXECUTION_STARTED\n\n' +
@@ -1341,7 +1419,7 @@ describe('Aggregating Totals', () => {
       dmlRowCount: { total: 0, self: 0 },
       soqlRowCount: { total: 0, self: 0 },
       soslRowCount: { total: 0, self: 0 },
-      totalThrownCount: 0,
+      thrownCount: { total: 0, self: 0 },
     };
 
     const apexLog = parse(log1);
@@ -1365,7 +1443,7 @@ describe('Aggregating Totals', () => {
             dmlRowCount: { total: 5, self: 0 },
             soqlRowCount: { total: 3, self: 0 },
             soslRowCount: { total: 400, self: 0 },
-            totalThrownCount: 3,
+            thrownCount: { total: 3, self: 0 },
             logLine: logArray[0],
             children: [
               // ns.MyClass.myMethod()
@@ -1377,7 +1455,7 @@ describe('Aggregating Totals', () => {
                 dmlRowCount: { total: 5, self: 0 },
                 soqlRowCount: { total: 3, self: 0 },
                 soslRowCount: { total: 400, self: 0 },
-                totalThrownCount: 3,
+                thrownCount: { total: 3, self: 0 },
                 logLine: logArray[1],
                 children: [
                   // ns.MyClass.soql()
@@ -1436,7 +1514,7 @@ describe('Aggregating Totals', () => {
                     duration: { total: 6, self: 4 },
                     soslCount: { total: 2, self: 0 },
                     soslRowCount: { total: 400, self: 0 },
-                    totalThrownCount: 1,
+                    thrownCount: { total: 1, self: 0 },
                     logLine: logArray[14],
                     children: [
                       {
@@ -1444,7 +1522,7 @@ describe('Aggregating Totals', () => {
                         duration: { total: 1, self: 1 },
                         soslCount: { total: 1, self: 1 },
                         soslRowCount: { total: 250, self: 250 },
-                        totalThrownCount: 0,
+                        thrownCount: { total: 0, self: 0 },
                         logLine: logArray[15],
                       },
                       {
@@ -1452,25 +1530,25 @@ describe('Aggregating Totals', () => {
                         duration: { total: 1, self: 1 },
                         soslCount: { total: 1, self: 1 },
                         soslRowCount: { total: 150, self: 150 },
-                        totalThrownCount: 0,
+                        thrownCount: { total: 0, self: 0 },
                         logLine: logArray[17],
                       },
                       // Exception
                       {
                         ...defaultCounts,
-                        totalThrownCount: 1,
+                        thrownCount: { total: 1, self: 1 },
                       },
                     ],
                   },
                   // Exception
                   {
                     ...defaultCounts,
-                    totalThrownCount: 1,
+                    thrownCount: { total: 1, self: 1 },
                   },
                   // Exception
                   {
                     ...defaultCounts,
-                    totalThrownCount: 1,
+                    thrownCount: { total: 1, self: 1 },
                   },
                 ],
               },

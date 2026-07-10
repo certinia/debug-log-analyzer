@@ -22,7 +22,10 @@ export interface MarkerIndicator {
   screenStartX: number;
   screenEndX: number;
   screenWidth: number;
+  /** Unclamped width in px (0 for a point marker). Used for gap/bucket layout. */
+  exactWidth: number;
   color: number;
+  alpha: number;
   isVisible: boolean;
 }
 
@@ -74,5 +77,23 @@ export function hitTestMarkers(
 
   // Multiple hits - return highest severity
   hits.sort((a, b) => SEVERITY_RANK[b.type] - SEVERITY_RANK[a.type]);
-  return hits[0]!;
+  const top = hits[0]!;
+
+  // Aggregate overlapping exception hairlines into a single tooltip with a count,
+  // so a dense cluster reads as "N exceptions" rather than a single one.
+  if (top.type === 'exception') {
+    const exceptions = hits.filter((hit) => hit.type === 'exception');
+    if (exceptions.length > 1) {
+      const shown = exceptions.slice(0, 5).map((exc) => exc.summary);
+      const remainder = exceptions.length - shown.length;
+      const metadata = shown.join('\n') + (remainder > 0 ? `\n…and ${remainder} more` : '');
+      return {
+        ...top,
+        summary: `${exceptions.length} exceptions`,
+        metadata,
+      };
+    }
+  }
+
+  return top;
 }

@@ -16,10 +16,18 @@
 
 import type { Container } from 'pixi.js';
 import type { TimelineMarker } from '../../types/flamechart.types.js';
-import { MARKER_ALPHA, MARKER_COLORS, SEVERITY_RANK } from '../../types/flamechart.types.js';
+import {
+  MARKER_ALPHA_BY_TYPE,
+  MARKER_BUCKET_PX,
+  MARKER_COLORS,
+  MARKER_GAP_PX,
+  MARKER_MIN_WIDTH_PX,
+  SEVERITY_RANK,
+} from '../../types/flamechart.types.js';
 import { SpritePool } from '../SpritePool.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 import { hitTestMarkers, type MarkerIndicator } from './MarkerHitTest.js';
+import { layoutMarkerRects } from './MarkerProcessor.js';
 
 /**
  * Renders marker indicators as semi-transparent vertical bands using sprites.
@@ -87,9 +95,9 @@ export class TimelineMarkerRenderer {
 
     // Get viewport bounds for culling
     const bounds = this.viewport.getBounds();
-    const timelineEndTime = bounds.timeEnd; // Use viewport end as timeline end
+    const renderState = this.viewport.getState();
 
-    // Process all markers (typically <10 for typical logs)
+    // Process all markers (typically <10 truncation markers; exceptions can be many)
     this.visibleIndicators = [];
 
     for (let i = 0; i < this.markers.length; i++) {
@@ -98,8 +106,9 @@ export class TimelineMarkerRenderer {
         continue;
       }
 
-      const nextMarker = this.markers[i + 1];
-      const resolvedEndTime = nextMarker?.startTime ?? timelineEndTime;
+      // A bounded marker (endTime set) shades its exact range; an unbounded marker is a
+      // point at startTime. We no longer extend to the next marker's start.
+      const resolvedEndTime = marker.endTime ?? marker.startTime;
 
       // T009: Viewport culling - skip markers outside visible time range
       // Marker is visible if it overlaps [bounds.timeStart, bounds.timeEnd]
@@ -109,47 +118,42 @@ export class TimelineMarkerRenderer {
 
       // T010: Transform to world coordinates for rendering
       // World coordinates = time * zoom (no offset - container handles transform)
-      const viewportState = this.viewport.getState();
-      const worldStartX = marker.startTime * viewportState.zoom;
-      const worldEndX = resolvedEndTime * viewportState.zoom;
-      const worldWidth = worldEndX - worldStartX;
+      const worldStartX = marker.startTime * renderState.zoom;
+      const exactWidth = resolvedEndTime * renderState.zoom - worldStartX;
 
-      // Skip if width is too small (less than 1 pixel)
-      if (worldWidth < 1) {
-        continue;
-      }
+      // Clamp to a minimum width so markers stay visible when zoomed out.
+      const worldWidth = Math.max(exactWidth, MARKER_MIN_WIDTH_PX);
 
       const indicator: MarkerIndicator = {
         marker,
         resolvedEndTime,
         screenStartX: worldStartX,
-        screenEndX: worldEndX,
+        screenEndX: worldStartX + worldWidth,
         screenWidth: worldWidth,
+        exactWidth: Math.max(exactWidth, 0),
         color: MARKER_COLORS[marker.type],
+        alpha: MARKER_ALPHA_BY_TYPE[marker.type],
         isVisible: true,
       };
 
       this.visibleIndicators.push(indicator);
     }
 
-    // Apply 1px gap for negative space separation between adjacent markers
-    const gap = 1;
-    const halfGap = gap / 2;
-    const viewportState = this.viewport.getState();
-
-    // Draw all indicators as sprites
-    for (const indicator of this.visibleIndicators) {
+    // Resolve overlapping markers into gapped, min-width rectangles (dense points collapse
+    // to one line). Hit testing still uses every indicator, so bucketed markers still count.
+    const rects = layoutMarkerRects(
+      this.visibleIndicators,
+      MARKER_MIN_WIDTH_PX,
+      MARKER_GAP_PX,
+      MARKER_BUCKET_PX,
+    );
+    for (const rect of rects) {
       const sprite = this.spritePool.acquire();
-
-      // Apply gap to create separation between adjacent markers
-      const gappedX = indicator.screenStartX + halfGap;
-      const gappedWidth = Math.max(0, indicator.screenWidth - gap);
-
-      sprite.position.set(gappedX, 0);
-      sprite.width = gappedWidth;
-      sprite.height = viewportState.displayHeight;
-      sprite.tint = indicator.color;
-      sprite.alpha = MARKER_ALPHA;
+      sprite.position.set(rect.x, 0);
+      sprite.width = rect.width;
+      sprite.height = renderState.displayHeight;
+      sprite.tint = rect.color;
+      sprite.alpha = rect.alpha;
     }
   }
 

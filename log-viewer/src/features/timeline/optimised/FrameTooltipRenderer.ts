@@ -249,8 +249,10 @@ export class FrameTooltipRenderer {
    * Converts PixiJS numeric colors (0xRRGGBB) to CSS hex strings (#RRGGBB).
    */
   private getTruncationColor(type: string): string {
-    // Map truncation types to CSS colors matching TRUNCATION_COLORS
+    // Map marker types to CSS colors matching MARKER_COLORS
     switch (type) {
+      case 'exception':
+        return '#e5484d'; // saturated red - discrete failure
       case 'error':
         return '#ff808033'; // rgba(255, 128, 128, 0.2)
       case 'skip':
@@ -366,6 +368,12 @@ export class FrameTooltipRenderer {
               govLimits?.soslQueries.limit,
             ),
           });
+        }
+
+        if (event.thrownCount.total) {
+          // No `self`: on a method (the only hoverable frame) self is always 0 because the
+          // throw is a child leaf, so it would only ever read "(self 0)".
+          rows.push({ label: 'Throws:', value: `${event.thrownCount.total}` });
         }
       }
 

@@ -310,7 +310,7 @@ describe('log-utils', () => {
       it('should include thrown count when present', () => {
         const event = createMockLogEvent({
           duration: { self: 0, total: 0 },
-          totalThrownCount: 2,
+          thrownCount: { self: 2, total: 2 },
         });
 
         const parts = buildMetricParts(event);
@@ -321,7 +321,7 @@ describe('log-utils', () => {
       it('should not include thrown when zero', () => {
         const event = createMockLogEvent({
           duration: { self: 0, total: 0 },
-          totalThrownCount: 0,
+          thrownCount: { self: 0, total: 0 },
         });
 
         const parts = buildMetricParts(event);
@@ -332,7 +332,7 @@ describe('log-utils', () => {
       it('should include warning emoji for exceptions', () => {
         const event = createMockLogEvent({
           duration: { self: 0, total: 0 },
-          totalThrownCount: 1,
+          thrownCount: { self: 1, total: 1 },
         });
 
         const parts = buildMetricParts(event);
@@ -349,7 +349,7 @@ describe('log-utils', () => {
           soqlRowCount: { self: 0, total: 100 },
           dmlCount: { self: 1, total: 3 },
           dmlRowCount: { self: 0, total: 50 },
-          totalThrownCount: 1,
+          thrownCount: { self: 1, total: 1 },
         });
 
         const parts = buildMetricParts(event);
@@ -370,7 +370,7 @@ describe('log-utils', () => {
           soqlRowCount: { self: 0, total: 0 },
           dmlCount: { self: 0, total: 0 },
           dmlRowCount: { self: 0, total: 0 },
-          totalThrownCount: 0,
+          thrownCount: { self: 0, total: 0 },
         });
 
         const parts = buildMetricParts(event);

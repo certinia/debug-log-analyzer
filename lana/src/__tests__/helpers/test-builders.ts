@@ -26,7 +26,7 @@ type PartialLogEvent = Partial<{
   soqlRowCount: { self: number; total: number };
   dmlCount: { self: number; total: number };
   dmlRowCount: { self: number; total: number };
-  totalThrownCount: number;
+  thrownCount: { self: number; total: number };
   lineNumber: number | 'EXTERNAL' | null;
   namespace: string;
   logLine: string;
@@ -68,7 +68,7 @@ export function createMockLogEvent(overrides: PartialLogEvent = {}): LogEvent {
     dmlCount: { self: 0, total: 0 },
     soqlCount: { self: 0, total: 0 },
     soslCount: { self: 0, total: 0 },
-    totalThrownCount: 0,
+    thrownCount: { self: 0, total: 0 },
     exitTypes: [],
     recalculateDurations: jest.fn(),
   };
@@ -121,7 +121,7 @@ export function createMockApexLog(overrides: PartialApexLog = {}): ApexLog {
     dmlCount: { self: 0, total: 0 },
     soqlCount: { self: 0, total: 0 },
     soslCount: { self: 0, total: 0 },
-    totalThrownCount: 0,
+    thrownCount: { self: 0, total: 0 },
     exitTypes: [],
     recalculateDurations: jest.fn(),
     setTimes: jest.fn(),

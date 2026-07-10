@@ -28,7 +28,14 @@
 import * as PIXI from 'pixi.js';
 import { formatDuration, formatTimeRange } from '../../../../core/utility/Util.js';
 import type { TimelineMarker } from '../../types/flamechart.types.js';
-import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
+import {
+  MARKER_ALPHA_BY_TYPE,
+  MARKER_BUCKET_PX,
+  MARKER_COLORS,
+  MARKER_GAP_PX,
+  MARKER_MIN_WIDTH_PX,
+} from '../../types/flamechart.types.js';
+import { layoutMarkerRects, type MarkerLayoutItem } from '../markers/MarkerProcessor.js';
 import { createRectangleShader } from '../RectangleShader.js';
 import { MinimapAxisRenderer } from './MinimapAxisRenderer.js';
 import { MinimapBarGeometry } from './MinimapBarGeometry.js';
@@ -585,8 +592,6 @@ export class MinimapRenderer {
     markers: TimelineMarker[],
     _minimapHeight: number,
   ): void {
-    const state = manager.getState();
-
     // Axis is at TOP - chart area is below it
     // When heat strip has data, chart ends above the heat strip track
     const axisHeight = this.axisRenderer.getHeight();
@@ -594,33 +599,25 @@ export class MinimapRenderer {
     const chartBottom = manager.getChartBottom();
     const chartHeight = chartBottom - chartTop;
 
-    // Apply 1px gap for negative space separation between adjacent markers
-    // Same approach as TimelineMarkerRenderer: 0.5px inset from each edge
-    const gap = 1;
-    const halfGap = gap / 2;
-
-    for (let i = 0; i < markers.length; i++) {
-      const marker = markers[i]!;
-
-      // Calculate marker bounds
+    // Build layout items in minimap-X space. A bounded marker shades its exact range; an
+    // unbounded marker is a point. Sorted by startX for the shared gap/bucket layout.
+    const items: MarkerLayoutItem[] = markers.map((marker) => {
       const startX = manager.timeToMinimapX(marker.startTime);
+      const exactEndX = manager.timeToMinimapX(marker.endTime ?? marker.startTime);
+      return {
+        screenStartX: startX,
+        exactWidth: Math.max(exactEndX - startX, 0),
+        color: MARKER_COLORS[marker.type],
+        alpha: MARKER_ALPHA_BY_TYPE[marker.type],
+      };
+    });
+    items.sort((a, b) => a.screenStartX - b.screenStartX);
 
-      // Marker extends to next marker or end of timeline
-      const nextMarker = markers[i + 1];
-      const endTime = nextMarker?.startTime ?? state.totalDuration;
-      const endX = manager.timeToMinimapX(endTime);
-
-      const color = MARKER_COLORS[marker.type];
-
-      // Apply gap to create separation between adjacent markers
-      const gappedStartX = startX + halfGap;
-      const gappedWidth = Math.max(0, endX - startX - gap);
-
+    const rects = layoutMarkerRects(items, MARKER_MIN_WIDTH_PX, MARKER_GAP_PX, MARKER_BUCKET_PX);
+    for (const rect of rects) {
       // Draw marker band (full height of chart area below axis)
-      if (gappedWidth > 0) {
-        this.markerGraphics.rect(gappedStartX, chartTop, gappedWidth, chartHeight);
-        this.markerGraphics.fill({ color, alpha: MARKER_ALPHA });
-      }
+      this.markerGraphics.rect(rect.x, chartTop, rect.width, chartHeight);
+      this.markerGraphics.fill({ color: rect.color, alpha: rect.alpha });
     }
   }
 

@@ -53,7 +53,7 @@ function createEvent(options: EventOptions): LogEvent {
     dmlCount: { self: options.dmlSelf ?? 0, total: options.dmlTotal ?? 0 },
     soqlCount: { self: options.soqlSelf ?? 0, total: options.soqlTotal ?? 0 },
     soslCount: { self: 0, total: 0 },
-    totalThrownCount: options.thrown ?? 0,
+    thrownCount: { self: options.thrown ?? 0, total: options.thrown ?? 0 },
     exitTypes: [],
   } as unknown as LogEvent;
 
