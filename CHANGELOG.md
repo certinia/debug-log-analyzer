@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- 📊 **Timeline governor limits**: tooltip rows keep a stable order and always show the `used / limit` value, so figures no longer jump around as you move the pointer. ([#827])
 - 🚧 **Timeline truncation markers** now end where the log recovers, so trusted sections are no longer greyed out. ([#828])
 - 🎛️ **Modernised dropdowns**: searchable, compact controls that carry the field and value in one place (e.g. `Group: Namespace`, `Type: All`) ([#848]).
 - 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832]).
@@ -501,9 +502,9 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- Unreleased -->
 
 [#576]: https://github.com/certinia/debug-log-analyzer/issues/576
-[#828]: https://github.com/certinia/debug-log-analyzer/issues/828
 [#832]: https://github.com/certinia/debug-log-analyzer/issues/832
 [#848]: https://github.com/certinia/debug-log-analyzer/issues/848
+[#827]: https://github.com/certinia/debug-log-analyzer/issues/827
 
 <!-- v1.20.0 -->
 

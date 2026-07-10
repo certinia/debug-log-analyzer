@@ -839,8 +839,10 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.metricStripGapDiv.style.display = display;
     }
 
-    // Trigger resize to recalculate main timeline height after visibility change
-    if (this.container && isVisible) {
+    // Trigger resize to recalculate main timeline height after any visibility change.
+    // Must run when hiding too: resize() zeroes the strip's height/gap so the main
+    // timeline reclaims the space (otherwise the root frame is pushed off the bottom).
+    if (this.container) {
       const { width, height } = this.container.getBoundingClientRect();
       this.resize(width, height);
     }

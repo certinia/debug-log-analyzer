@@ -17,7 +17,7 @@
  * LogEvent should only be referenced here in ApexLogTimeline to convert to generic EventNode for FlameChart and not in FlameChart or its dependencies.
  */
 
-import type { ApexLog, GovernorSnapshot, Limits, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { ContextMenu } from '../../../components/ContextMenu.js';
 import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
 import { eventBus } from '../../../core/events/EventBus.js';
@@ -31,8 +31,6 @@ import {
   type EventNode,
   type FindEventDetail,
   type FindResultsEventDetail,
-  type HeatStripMetric,
-  type HeatStripTimeSeries,
   type ModifierKeys,
   type TimelineMarker,
   type TimelineOptions,
@@ -43,39 +41,7 @@ import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.j
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer } from './FrameTooltipRenderer.js';
-
-/**
- * Apex-specific metric definitions for heat strip visualization.
- * "Big 4" limits (CPU, SOQL, DML, Heap) have priority < 4 and are always shown.
- * Other limits have priority >= 4 and are only shown when > 0%.
- */
-const APEX_METRICS: Map<keyof Limits, HeatStripMetric> = new Map([
-  ['cpuTime', { id: 'cpuTime', displayName: 'CPU Time', unit: 'ms', priority: 0 }],
-  ['soqlQueries', { id: 'soqlQueries', displayName: 'SOQL Queries', unit: '', priority: 1 }],
-  ['dmlStatements', { id: 'dmlStatements', displayName: 'DML Statements', unit: '', priority: 2 }],
-  ['heapSize', { id: 'heapSize', displayName: 'Heap Size', unit: 'bytes', priority: 3 }],
-  ['queryRows', { id: 'queryRows', displayName: 'Query Rows', unit: '', priority: 4 }],
-  ['soslQueries', { id: 'soslQueries', displayName: 'SOSL Queries', unit: '', priority: 5 }],
-  ['dmlRows', { id: 'dmlRows', displayName: 'DML Rows', unit: '', priority: 6 }],
-  [
-    'publishImmediateDml',
-    { id: 'publishImmediateDml', displayName: 'Publish Immediate DML', unit: '', priority: 7 },
-  ],
-  ['callouts', { id: 'callouts', displayName: 'Callouts', unit: '', priority: 8 }],
-  [
-    'emailInvocations',
-    { id: 'emailInvocations', displayName: 'Email Invocations', unit: '', priority: 9 },
-  ],
-  ['futureCalls', { id: 'futureCalls', displayName: 'Future Calls', unit: '', priority: 10 }],
-  [
-    'queueableJobsAddedToQueue',
-    { id: 'queueableJobsAddedToQueue', displayName: 'Queueable Jobs', unit: '', priority: 11 },
-  ],
-  [
-    'mobileApexPushCalls',
-    { id: 'mobileApexPushCalls', displayName: 'Mobile Push Calls', unit: '', priority: 12 },
-  ],
-]);
+import { buildApexLimitTimeSeries } from './apex-limit-series.js';
 
 interface ApexTimelineOptions extends TimelineOptions {
   themeName?: string | null;
@@ -216,13 +182,11 @@ export class ApexLogTimeline {
     // Wire up search event listeners
     this.enableSearch();
 
-    // Transform and set heat strip time series data for visualization
-    if (apexLog.governorLimits.snapshots.length > 0) {
-      const heatStripSeries = this.transformGovernorToHeatStrip(apexLog.governorLimits.snapshots);
-      this.flamechart.setHeatStripTimeSeries(heatStripSeries);
-    } else {
-      this.flamechart.setHeatStripTimeSeries(null);
-    }
+    // Build the dense governor-limit series (cumulative snapshots + granular events).
+    const heatStripSeries = buildApexLimitTimeSeries(this.apexLog, this.events);
+    this.flamechart.setHeatStripTimeSeries(
+      heatStripSeries.events.length > 0 ? heatStripSeries : null,
+    );
 
     // Subscribe to EventBus for timeline navigation requests (from CalltreeView and raw-log entry).
     this.eventBusUnsubscribe = eventBus.on('timeline:navigate-to', (detail) => {
@@ -1048,43 +1012,5 @@ export class ApexLogTimeline {
     });
 
     document.dispatchEvent(event);
-  }
-
-  // ============================================================================
-  // APEX-SPECIFIC DATA TRANSFORMATION
-  // ============================================================================
-
-  /**
-   * Transform Apex-specific governor snapshots to generic HeatStripTimeSeries.
-   * This converts Apex governor limits data to the generic format expected by
-   * the heat strip visualization components.
-   *
-   * @param snapshots - Apex governor limit snapshots
-   * @returns Generic heat strip time series
-   */
-  private transformGovernorToHeatStrip(snapshots: GovernorSnapshot[]): HeatStripTimeSeries {
-    // Convert APEX_METRICS to string-keyed Map for the generic interface
-    const metrics = new Map<string, HeatStripMetric>();
-    for (const [key, metric] of APEX_METRICS) {
-      metrics.set(key, metric);
-    }
-
-    // Transform snapshots to events
-    const events = snapshots.map((snapshot) => {
-      const values = new Map<string, { used: number; limit: number }>();
-      for (const [key, value] of Object.entries(snapshot.limits) as [
-        keyof Limits,
-        { used: number; limit: number },
-      ][]) {
-        values.set(key, { used: value.used, limit: value.limit });
-      }
-      return {
-        timestamp: snapshot.timestamp,
-        namespace: snapshot.namespace,
-        values,
-      };
-    });
-
-    return { metrics, events };
   }
 }
