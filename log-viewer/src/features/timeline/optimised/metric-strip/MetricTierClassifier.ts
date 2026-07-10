@@ -226,8 +226,11 @@ export class MetricTierClassifier {
    */
   private aggregateByTimestamp(
     timeSeries: HeatStripTimeSeries,
-  ): Map<number, Map<string, { used: number; limit: number }>> {
-    const aggregated = new Map<number, Map<string, { used: number; limit: number }>>();
+  ): Map<number, Map<string, { used: number; limit: number; tracked?: number }>> {
+    const aggregated = new Map<
+      number,
+      Map<string, { used: number; limit: number; tracked?: number }>
+    >();
 
     for (const event of timeSeries.events) {
       let timestampData = aggregated.get(event.timestamp);
@@ -236,13 +239,18 @@ export class MetricTierClassifier {
         aggregated.set(event.timestamp, timestampData);
       }
 
-      // Sum used values across namespaces for each metric
+      // Sum used values across namespaces for each metric (tracked follows used).
       for (const [metricId, value] of event.values) {
         const existing = timestampData.get(metricId);
         if (existing) {
+          existing.tracked = (existing.tracked ?? existing.used) + (value.tracked ?? value.used);
           existing.used += value.used;
         } else {
-          timestampData.set(metricId, { used: value.used, limit: value.limit });
+          timestampData.set(metricId, {
+            used: value.used,
+            limit: value.limit,
+            tracked: value.tracked,
+          });
         }
       }
     }
@@ -254,7 +262,7 @@ export class MetricTierClassifier {
    * Calculate the global maximum percentage for each metric.
    */
   private calculateMetricMaxPercents(
-    aggregatedByTime: Map<number, Map<string, { used: number; limit: number }>>,
+    aggregatedByTime: Map<number, Map<string, { used: number; limit: number; tracked?: number }>>,
     timeSeries: HeatStripTimeSeries,
   ): Map<string, number> {
     const maxPercents = new Map<string, number>();
@@ -355,7 +363,7 @@ export class MetricTierClassifier {
    * Build data points with tier-based aggregation.
    */
   private buildDataPoints(
-    aggregatedByTime: Map<number, Map<string, { used: number; limit: number }>>,
+    aggregatedByTime: Map<number, Map<string, { used: number; limit: number; tracked?: number }>>,
     classifiedMetrics: MetricStripClassifiedMetric[],
     _timeSeries: HeatStripTimeSeries,
   ): { points: MetricStripDataPoint[]; globalMaxPercent: number } {
@@ -374,14 +382,14 @@ export class MetricTierClassifier {
     for (const timestamp of timestamps) {
       const timestampData = aggregatedByTime.get(timestamp)!;
       const values = new Map<string, number>();
-      const rawValues = new Map<string, { used: number; limit: number }>();
+      const rawValues = new Map<string, { used: number; limit: number; tracked?: number }>();
       let tier3Max = 0;
 
       for (const [metricId, value] of timestampData) {
         if (value.limit > 0) {
           const percent = value.used / value.limit;
           values.set(metricId, percent);
-          rawValues.set(metricId, { used: value.used, limit: value.limit });
+          rawValues.set(metricId, { used: value.used, limit: value.limit, tracked: value.tracked });
 
           // Track global max
           if (percent > globalMaxPercent) {

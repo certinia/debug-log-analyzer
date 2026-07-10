@@ -17,7 +17,7 @@
  * LogEvent should only be referenced here in ApexLogTimeline to convert to generic EventNode for FlameChart and not in FlameChart or its dependencies.
  */
 
-import type { ApexLog, GovernorSnapshot, Limits, LogEvent } from 'apex-log-parser';
+import type { ApexLog, HeapAllocateLine, Limits, LimitUsageLine, LogEvent } from 'apex-log-parser';
 import { ContextMenu } from '../../../components/ContextMenu.js';
 import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
 import { eventBus } from '../../../core/events/EventBus.js';
@@ -43,6 +43,10 @@ import { extractMarkers } from '../utils/marker-utils.js';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer } from './FrameTooltipRenderer.js';
+import {
+  buildGovernorTimeSeries,
+  type LimitObservation as GranularObservation,
+} from './metric-strip/governor-timeline.js';
 
 /**
  * Apex-specific metric definitions for heat strip visualization.
@@ -75,6 +79,27 @@ const APEX_METRICS: Map<keyof Limits, HeatStripMetric> = new Map([
     'mobileApexPushCalls',
     { id: 'mobileApexPushCalls', displayName: 'Mobile Push Calls', unit: '', priority: 12 },
   ],
+]);
+
+/**
+ * Standard synchronous Apex governor limits, used as a fallback so a metric can render from
+ * granular usage alone when the log has no cumulative limit event. Any limit reported by the log
+ * (LIMIT_USAGE_FOR_NS / LIMIT_USAGE / flow) overrides these.
+ */
+const DEFAULT_LIMITS = new Map<string, number>([
+  ['soqlQueries', 100],
+  ['queryRows', 50000],
+  ['soslQueries', 20],
+  ['dmlStatements', 150],
+  ['publishImmediateDml', 150],
+  ['dmlRows', 10000],
+  ['cpuTime', 10000],
+  ['heapSize', 6000000],
+  ['callouts', 100],
+  ['emailInvocations', 10],
+  ['futureCalls', 50],
+  ['queueableJobsAddedToQueue', 50],
+  ['mobileApexPushCalls', 10],
 ]);
 
 interface ApexTimelineOptions extends TimelineOptions {
@@ -216,13 +241,11 @@ export class ApexLogTimeline {
     // Wire up search event listeners
     this.enableSearch();
 
-    // Transform and set heat strip time series data for visualization
-    if (apexLog.governorLimits.snapshots.length > 0) {
-      const heatStripSeries = this.transformGovernorToHeatStrip(apexLog.governorLimits.snapshots);
-      this.flamechart.setHeatStripTimeSeries(heatStripSeries);
-    } else {
-      this.flamechart.setHeatStripTimeSeries(null);
-    }
+    // Build the dense governor-limit series (cumulative snapshots + granular events).
+    const heatStripSeries = this.buildLimitTimeSeries();
+    this.flamechart.setHeatStripTimeSeries(
+      heatStripSeries.events.length > 0 ? heatStripSeries : null,
+    );
 
     // Subscribe to EventBus for timeline navigation requests (from CalltreeView and raw-log entry).
     this.eventBusUnsubscribe = eventBus.on('timeline:navigate-to', (detail) => {
@@ -1055,36 +1078,126 @@ export class ApexLogTimeline {
   // ============================================================================
 
   /**
-   * Transform Apex-specific governor snapshots to generic HeatStripTimeSeries.
-   * This converts Apex governor limits data to the generic format expected by
-   * the heat strip visualization components.
+   * Build the dense governor-limit time series for the metric strip.
    *
-   * @param snapshots - Apex governor limit snapshots
-   * @returns Generic heat strip time series
+   * Combines two sources into one stream of observations and folds them (see
+   * governor-timeline.ts): cumulative `LIMIT_USAGE_FOR_NS` snapshots act as multi-metric
+   * correctives, while detailed log events (SOQL/DML/SOSL/callout/heap and the single-line
+   * `LIMIT_USAGE` / flow `*_LIMIT_USAGE` reports) add intermediate data points so the line
+   * rises as usage happens rather than only at code-unit boundaries.
    */
-  private transformGovernorToHeatStrip(snapshots: GovernorSnapshot[]): HeatStripTimeSeries {
-    // Convert APEX_METRICS to string-keyed Map for the generic interface
+  private buildLimitTimeSeries(): HeatStripTimeSeries {
     const metrics = new Map<string, HeatStripMetric>();
     for (const [key, metric] of APEX_METRICS) {
       metrics.set(key, metric);
     }
 
-    // Transform snapshots to events
-    const events = snapshots.map((snapshot) => {
-      const values = new Map<string, { used: number; limit: number }>();
-      for (const [key, value] of Object.entries(snapshot.limits) as [
+    const apexLog = this.apexLog;
+    if (!apexLog) {
+      return { metrics, events: [] };
+    }
+
+    const observations: GranularObservation[] = [];
+
+    // Authoritative limit per metric = max limit reported by any cumulative snapshot, else the
+    // default. Fixed for the whole series so the "out of" total never flips (e.g. heap 6MB→12MB).
+    const metricLimits = new Map<string, number>(DEFAULT_LIMITS);
+
+    // Cumulative snapshots — authoritative multi-metric correctives (transaction usage).
+    for (const snapshot of apexLog.governorLimits.snapshots) {
+      for (const [metric, value] of Object.entries(snapshot.limits) as [
         keyof Limits,
         { used: number; limit: number },
       ][]) {
-        values.set(key, { used: value.used, limit: value.limit });
+        observations.push({
+          kind: 'absolute',
+          timestamp: snapshot.timestamp,
+          namespace: snapshot.namespace,
+          metric,
+          used: value.used,
+        });
+        if (value.limit > 0) {
+          metricLimits.set(metric, Math.max(metricLimits.get(metric) ?? 0, value.limit));
+        }
       }
-      return {
-        timestamp: snapshot.timestamp,
-        namespace: snapshot.namespace,
-        values,
-      };
-    });
+    }
 
-    return { metrics, events };
+    const pushDelta = (
+      timestamp: number,
+      namespace: string,
+      metric: keyof Limits,
+      delta: number,
+    ): void => {
+      if (delta) {
+        observations.push({ kind: 'delta', timestamp, namespace, metric, delta });
+      }
+    };
+
+    // Detailed events — granular deltas and finer-grained absolute reports. Walk the FULL tree:
+    // this.events holds only top-level nodes, but SOQL/DML/heap events live deep in the call tree.
+    // Iterative DFS avoids stack overflow on large logs. Counts are read from the parser's per-event
+    // counters, each from its canonical owner event to avoid double-counting.
+    const stack: LogEvent[] = [...this.events];
+    while (stack.length > 0) {
+      const event = stack.pop()!;
+      const children = event.children;
+      if (children) {
+        for (let i = 0; i < children.length; i++) {
+          stack.push(children[i]!);
+        }
+      }
+
+      const timestamp = event.timestamp;
+      const namespace = event.namespace || 'default';
+      switch (event.type) {
+        case 'SOQL_EXECUTE_BEGIN':
+          // Row count is copied onto the begin line by its onEnd, so read both here (not on END).
+          pushDelta(timestamp, namespace, 'soqlQueries', event.soqlCount.self);
+          pushDelta(timestamp, namespace, 'queryRows', event.soqlRowCount.self);
+          break;
+        case 'SOSL_EXECUTE_BEGIN':
+          pushDelta(timestamp, namespace, 'soslQueries', event.soslCount.self);
+          break;
+        case 'DML_BEGIN':
+          pushDelta(timestamp, namespace, 'dmlStatements', event.dmlCount.self);
+          pushDelta(timestamp, namespace, 'dmlRows', event.dmlRowCount.self);
+          break;
+        case 'CALLOUT_REQUEST':
+          pushDelta(timestamp, namespace, 'callouts', 1);
+          break;
+        case 'HEAP_ALLOCATE':
+        case 'BULK_HEAP_ALLOCATE':
+          // Allocation bytes can be negative in the log, so add as-is (a negative lowers heap).
+          pushDelta(timestamp, namespace, 'heapSize', (event as HeapAllocateLine).bytes);
+          break;
+        case 'HEAP_DEALLOCATE':
+          // Deallocation always takes away.
+          pushDelta(timestamp, namespace, 'heapSize', -Math.abs((event as HeapAllocateLine).bytes));
+          break;
+        case 'LIMIT_USAGE':
+        case 'FLOW_START_INTERVIEW_LIMIT_USAGE':
+        case 'FLOW_INTERVIEW_FINISHED_LIMIT_USAGE':
+        case 'FLOW_ELEMENT_LIMIT_USAGE':
+        case 'FLOW_BULK_ELEMENT_LIMIT_USAGE': {
+          const usage = (event as LimitUsageLine).limitUsage;
+          // Flow CPU time is flow-scoped with a different limit (15000 vs the 10000 apex limit),
+          // so skip it here — CPU stays sourced from LIMIT_USAGE_FOR_NS to keep percentages consistent.
+          if (usage && !(event.type !== 'LIMIT_USAGE' && usage.metric === 'cpuTime')) {
+            observations.push({
+              kind: 'absolute',
+              timestamp,
+              namespace,
+              metric: usage.metric,
+              used: usage.used,
+            });
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    return buildGovernorTimeSeries(observations, metrics, metricLimits);
   }
 }

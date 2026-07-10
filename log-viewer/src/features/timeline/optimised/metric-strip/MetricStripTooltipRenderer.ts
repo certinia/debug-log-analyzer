@@ -28,6 +28,7 @@ import type {
 import { BaseTooltipRenderer } from '../rendering/BaseTooltipRenderer.js';
 import {
   formatMetricValueWithParens,
+  formatNumber,
   getPercentColor,
   hexToCSS,
   TOOLTIP_CSS,
@@ -248,13 +249,19 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
       const rawValueStr = rawValue
         ? formatMetricValueWithParens(rawValue.used, rawValue.limit, metric.unit)
         : '';
+      // Ghost text: only when the count we tracked from detailed events falls below the
+      // corrective cumulative total (the log dropped events Salesforce still counted).
+      const ghost =
+        rawValue && rawValue.tracked !== undefined && rawValue.tracked < rawValue.used
+          ? ` <span style="font-style:italic;opacity:0.65;">(${formatNumber(Math.round(rawValue.tracked))} seen)</span>`
+          : '';
 
       rows.push(
         `<div style="display:grid;grid-template-columns:12px 120px 55px auto;gap:4px;align-items:center;margin:2px 0;">` +
           `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${lineColor};"></span>` +
           `<span style="color:${TOOLTIP_CSS.descriptionForeground}">${metric.displayName}</span>` +
           `<span style="text-align:right;font-weight:500;color:${percentColor}">${percentStr}%</span>` +
-          `<span style="color:${TOOLTIP_CSS.descriptionForegroundMuted};">${rawValueStr}</span>` +
+          `<span style="color:${TOOLTIP_CSS.descriptionForegroundMuted};">${rawValueStr}${ghost}</span>` +
           `</div>`,
       );
     }

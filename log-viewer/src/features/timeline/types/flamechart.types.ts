@@ -766,10 +766,16 @@ export interface HeatStripMetric {
  * Represents current usage and limit for a single metric.
  */
 export interface HeatStripMetricValue {
-  /** Current usage value */
+  /** Current usage value (corrected: last cumulative baseline + granular deltas since). */
   used: number;
   /** Maximum allowed value (limit) */
   limit: number;
+  /**
+   * Increment-only total from detailed events, set only for delta-tracked metrics and only
+   * when it diverges below `used` (i.e. the log dropped events the cumulative snapshot counted).
+   * Undefined means no divergence / metric has no granular source.
+   */
+  tracked?: number;
 }
 
 /**
@@ -844,10 +850,12 @@ export interface MetricStripClassifiedMetric {
  * Raw metric value with used and limit.
  */
 export interface MetricStripRawValue {
-  /** Current usage value */
+  /** Current usage value (corrected line value). */
   used: number;
   /** Maximum allowed value (limit) */
   limit: number;
+  /** Increment-only tracked total, present only when it diverges below `used`. See HeatStripMetricValue.tracked. */
+  tracked?: number;
 }
 
 /**

@@ -16,6 +16,8 @@ import type {
   SelfTotal,
 } from './types.js';
 import { DEBUG_CATEGORY, LOG_CATEGORY, LOG_LEVEL } from './types.js';
+import type { LimitObservation } from './limits.js';
+import { parseCodedLimit, parseLabelledLimit, parseTotalLimit } from './limits.js';
 
 /**
  * All log lines extend this base class.
@@ -475,15 +477,23 @@ export function parseRows(text: string | null | undefined): number {
   throw new Error(`Unable to parse row count: '${text}'`);
 }
 
+/** Parse a byte count from a "Bytes:N" fragment (e.g. "Bytes:152" → 152, "Bytes:-4" → -4). */
+function parseBytes(fragment: string | undefined): number {
+  return fragment?.startsWith('Bytes:') ? Number(fragment.slice(6)) || 0 : 0;
+}
+
 /* Log line entry Parsers */
 
 export class BulkHeapAllocateLine extends LogEvent {
   debugLevel = LOG_LEVEL.Finest;
   debugCategory = DEBUG_CATEGORY.ApexCode;
   logCategory = 'Apex Code';
+  /** Bytes allocated by this bulk allocation (from the "Bytes:N" fragment). */
+  bytes = 0;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = parts[2] || '';
+    this.bytes = parseBytes(parts[2]);
   }
 }
 
@@ -1065,19 +1075,25 @@ export class SOSLExecuteEndLine extends LogEvent {
 export class HeapAllocateLine extends LogEvent {
   debugLevel = LOG_LEVEL.Finer;
   debugCategory = DEBUG_CATEGORY.ApexCode;
+  /** Bytes allocated by this line. Example: "|HEAP_ALLOCATE|[84]|Bytes:152" → 152. */
+  bytes = 0;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
+    this.bytes = parseBytes(parts[3]);
   }
 }
 
 export class HeapDeallocateLine extends LogEvent {
   debugLevel = LOG_LEVEL.Finer;
   debugCategory = DEBUG_CATEGORY.ApexCode;
+  /** Bytes deallocated by this line (from the "Bytes:N" fragment, when present). */
+  bytes = 0;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
+    this.bytes = parseBytes(parts[3]);
   }
 }
 
@@ -1164,31 +1180,22 @@ export class LimitUsageLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.ApexProfiling;
   debugLevel = LOG_LEVEL.Finest;
   namespace = 'default';
+  /**
+   * Governor-limit observation parsed from this line, or null for non-governor codes.
+   * Example: "|LIMIT_USAGE|[89]|SOQL|1|100" → { metric: 'soqlQueries', used: 1, limit: 100 }.
+   */
+  limitUsage: LimitObservation | null = null;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] + ' ' + parts[4] + ' out of ' + parts[5];
+    this.limitUsage = parseCodedLimit(parts[3], parts[4], parts[5]);
   }
 }
 
 export class LimitUsageForNSLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.ApexProfiling;
   debugLevel = LOG_LEVEL.Finest;
-  static limitsKeys = new Map<string, string>([
-    ['Number of SOQL queries', 'soqlQueries'],
-    ['Number of query rows', 'queryRows'],
-    ['Number of SOSL queries', 'soslQueries'],
-    ['Number of DML statements', 'dmlStatements'],
-    ['Number of Publish Immediate DML', 'publishImmediateDml'],
-    ['Number of DML rows', 'dmlRows'],
-    ['Maximum CPU time', 'cpuTime'],
-    ['Maximum heap size', 'heapSize'],
-    ['Number of callouts', 'callouts'],
-    ['Number of Email Invocations', 'emailInvocations'],
-    ['Number of future calls', 'futureCalls'],
-    ['Number of queueable jobs added to the queue', 'queueableJobsAddedToQueue'],
-    ['Number of Mobile Apex push calls', 'mobileApexPushCalls'],
-  ]);
 
   namespace = 'default';
 
@@ -1202,15 +1209,14 @@ export class LimitUsageForNSLine extends LogEvent {
     // Parse the namespace from the first line (before any newline)
     this.namespace = this.text.slice(0, this.text.indexOf('\n')).replace(/\(|\)/g, '');
 
-    // Clean up the text for easier parsing
+    // Clean up the text for display
     const cleanedText = this.text
       .replace(/^\s+/gm, '')
       .replaceAll('******* CLOSE TO LIMIT', '')
       .replaceAll(' out of ', '/');
     this.text = cleanedText;
 
-    // Split into lines and parse each line for limits
-    const lines = cleanedText.split('\n');
+    // Parse each "Label: used/limit" line via the shared limit parser.
     const limits: Limits = {
       soqlQueries: { used: 0, limit: 0 },
       soslQueries: { used: 0, limit: 0 },
@@ -1227,20 +1233,10 @@ export class LimitUsageForNSLine extends LogEvent {
       mobileApexPushCalls: { used: 0, limit: 0 },
     };
 
-    for (const line of lines) {
-      // Match lines like: "Maximum CPU time: 15008/10000"
-      const match = line.match(/^(.+?):\s*([\d,]+)\/([\d,]+)/);
-      if (match) {
-        const key: keyof Limits = LimitUsageForNSLine.limitsKeys.get(
-          match[1]!.trim(),
-        ) as keyof Limits;
-        if (key) {
-          const used = parseInt(match[2]!.replace(/,/g, ''), 10);
-          const limit = parseInt(match[3]!.replace(/,/g, ''), 10);
-          if (key) {
-            limits[key] = { used, limit };
-          }
-        }
+    for (const line of cleanedText.split('\n')) {
+      const observation = parseLabelledLimit(line);
+      if (observation) {
+        limits[observation.metric] = { used: observation.used, limit: observation.limit };
       }
     }
 
@@ -1593,9 +1589,12 @@ export class FlowStartInterviewBeginLine extends DurationLogEvent {
 export class FlowStartInterviewLimitUsageLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Finer;
+  /** Governor-limit observation. Example: "SOQL queries: 0 out of 100". */
+  limitUsage: LimitObservation | null = null;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = parts[2] || '';
+    this.limitUsage = parseLabelledLimit(this.text);
   }
 }
 
@@ -1731,18 +1730,24 @@ export class FlowElementFaultLine extends LogEvent {
 export class FlowElementLimitUsageLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Finer;
+  /** Governor-limit observation. Example: "2 ms CPU time, total 10 out of 15000". */
+  limitUsage: LimitObservation | null = null;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = `${parts[2]}`;
+    this.limitUsage = parseTotalLimit(this.text);
   }
 }
 
 export class FlowInterviewFinishedLimitUsageLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Finer;
+  /** Governor-limit observation. Example: "SOQL queries: 0 out of 100". */
+  limitUsage: LimitObservation | null = null;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = `${parts[2]}`;
+    this.limitUsage = parseLabelledLimit(this.text);
   }
 }
 
@@ -1821,9 +1826,12 @@ export class FlowBulkElementNotSupportedLine extends LogEvent {
 export class FlowBulkElementLimitUsageLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Finer;
+  /** Governor-limit observation. Example: "1 SOQL queries, total 1 out of 100". */
+  limitUsage: LimitObservation | null = null;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = parts[2] || '';
+    this.limitUsage = parseTotalLimit(this.text);
   }
 }
 
