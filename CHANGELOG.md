@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832])
-- ♻️ Replaced the deprecated `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576])
+- 🎛️ **Modernised dropdowns**: searchable, compact controls that carry the field and value in one place (e.g. `Group: Namespace`, `Type: All`) ([#848]).
+- 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832]).
+- ♻️ Replaced the deprecated `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).
 
 ## [1.20.0] 2026-06-18
 
@@ -496,6 +497,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 [#576]: https://github.com/certinia/debug-log-analyzer/issues/576
 [#832]: https://github.com/certinia/debug-log-analyzer/issues/832
+[#848]: https://github.com/certinia/debug-log-analyzer/issues/848
 
 <!-- v1.20.0 -->
 
