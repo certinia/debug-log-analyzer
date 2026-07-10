@@ -4,7 +4,12 @@
 import type { LogRecord } from '@salesforce/apex-node';
 import { existsSync } from 'fs';
 import { join, parse } from 'path';
-import { window, type WebviewPanel } from 'vscode';
+import {
+  window,
+  type QuickPick as VSCodeQuickPick,
+  type QuickPickItem,
+  type WebviewPanel,
+} from 'vscode';
 
 import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
@@ -50,20 +55,21 @@ export class RetrieveLogFile {
 
   private static async command(context: Context): Promise<WebviewPanel | void> {
     const ws = await QuickPickWorkspace.pickOrReturn(context);
-    const [logFiles] = await Promise.all([
-      GetLogFiles.apply(ws),
-      RetrieveLogFile.showLoadingPicker(),
-    ]);
-
-    const logFileId = await RetrieveLogFile.getLogFile(logFiles);
-    if (logFileId) {
-      const logFilePath = this.getLogFilePath(ws, logFileId);
-      const writeLogFile = this.writeLogFile(ws, logFilePath);
-      return LogView.createView(context, writeLogFile, logFilePath);
+    const loadingPicker = RetrieveLogFile.showLoadingPicker();
+    try {
+      const logFiles = await GetLogFiles.apply(ws);
+      const logFileId = await RetrieveLogFile.getLogFile(logFiles);
+      if (logFileId) {
+        const logFilePath = this.getLogFilePath(ws, logFileId);
+        const writeLogFile = this.writeLogFile(ws, logFilePath);
+        return LogView.createView(context, writeLogFile, logFilePath);
+      }
+    } finally {
+      loadingPicker.dispose();
     }
   }
 
-  private static async showLoadingPicker(): Promise<QuickPick> {
+  private static showLoadingPicker(): VSCodeQuickPick<QuickPickItem> {
     const qp = window.createQuickPick();
     qp.placeholder = 'Select a logfile';
     qp.busy = true;
