@@ -168,8 +168,7 @@ export class ScrollAnchor extends Module {
       const internalRow = row._getSelf() as unknown;
       const rendererRows = (renderer?.rows as (() => unknown[]) | undefined)?.();
       const fill = renderer?._virtualRenderFill as
-        | ((index: number, force?: boolean) => void)
-        | undefined;
+        ((index: number, force?: boolean) => void) | undefined;
       if (rendererRows && fill) {
         const index = rendererRows.indexOf(internalRow);
         if (index > -1) {

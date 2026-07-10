@@ -30,7 +30,7 @@ interface MockRow {
   getElement: () => MockElement;
   getTreeParent: () => MockRow | false;
   _getSelf: () => unknown;
-  __internal: object;
+  internalRow: object;
 }
 
 interface MockElement {
@@ -47,7 +47,7 @@ function makeRow(opts: RowOpts = {}): MockRow {
   };
   const internal = {};
   return {
-    __internal: internal,
+    internalRow: internal,
     getElement: () => elem,
     getTreeParent: () => opts.parent ?? false,
     _getSelf: () => internal,
@@ -81,7 +81,7 @@ function setup(opts: SetupOpts = {}) {
   // VirtualVerticalRenderer exposes. Mock it to assert exact call args.
   const setAnchor = jest.fn((_row: unknown, _offset: number) => {});
   const renderer: Record<string, unknown> = { setAnchor };
-  const displayInternals = (opts.displayRows ?? []).map((r) => r.__internal);
+  const displayInternals = (opts.displayRows ?? []).map((r) => r.internalRow);
   const table = {
     handlers,
     on: jest.fn((evt: string, fn: (...args: unknown[]) => void) => {
@@ -126,7 +126,7 @@ describe('AnchoringPolicy', () => {
     table.handlers.renderComplete?.[0]?.();
 
     expect(setAnchor).toHaveBeenCalledTimes(1);
-    expect(setAnchor).toHaveBeenCalledWith(anchor.__internal, 40);
+    expect(setAnchor).toHaveBeenCalledWith(anchor.internalRow, 40);
   });
 
   it('tree toggle: pins the CLICKED row at its captured offset (overrides generic restore)', () => {
@@ -150,8 +150,8 @@ describe('AnchoringPolicy', () => {
     // Generic restore (middle row r2 at offset 30) then precise restore
     // (clicked r3 at offset 60). The precise call wins by running last.
     expect(setAnchor).toHaveBeenCalledTimes(2);
-    expect(setAnchor).toHaveBeenNthCalledWith(1, r2.__internal, 30);
-    expect(setAnchor).toHaveBeenNthCalledWith(2, r3.__internal, 60);
+    expect(setAnchor).toHaveBeenNthCalledWith(1, r2.internalRow, 30);
+    expect(setAnchor).toHaveBeenNthCalledWith(2, r3.internalRow, 60);
   });
 
   it('was-at-top: snaps scrollTop to 0; a following toggle event does not re-anchor', () => {
@@ -279,12 +279,12 @@ describe('AnchoringPolicy', () => {
 
     table.handlers.renderStarted?.[0]?.();
     // Child collapsed/filtered away post-render.
-    table.rowManager.getDisplayRows = () => [parent.__internal];
+    table.rowManager.getDisplayRows = () => [parent.internalRow];
     table.handlers.renderComplete?.[0]?.();
 
     expect(setAnchor).toHaveBeenCalledTimes(1);
     // Child's captured offset: offsetTop(220) − scrollTop(200) = 20.
-    expect(setAnchor).toHaveBeenCalledWith(parent.__internal, 20);
+    expect(setAnchor).toHaveBeenCalledWith(parent.internalRow, 20);
   });
 
   it('anchor removed with no surviving ancestor: cedes to the renderer default', () => {
@@ -298,7 +298,7 @@ describe('AnchoringPolicy', () => {
     });
 
     table.handlers.renderStarted?.[0]?.();
-    table.rowManager.getDisplayRows = () => [survivor.__internal];
+    table.rowManager.getDisplayRows = () => [survivor.internalRow];
 
     const scrollBefore = holder.scrollTop;
     table.handlers.renderComplete?.[0]?.();
@@ -324,6 +324,6 @@ describe('AnchoringPolicy', () => {
     // Only the generic (middle visible row) restore — no precise call for a
     // row whose pre-toggle offset was never captured.
     expect(setAnchor).toHaveBeenCalledTimes(1);
-    expect(setAnchor).toHaveBeenCalledWith(visible.__internal, 40);
+    expect(setAnchor).toHaveBeenCalledWith(visible.internalRow, 40);
   });
 });

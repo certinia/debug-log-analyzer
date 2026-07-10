@@ -678,7 +678,9 @@ describe('VirtualVerticalRenderer.scrollToRowPosition', () => {
       makeRowStub(200),
     ];
     const r = makeRendererWithRows(rows);
-    for (let i = 0; i < rows.length; i++) r._setHeight(i, 50);
+    for (let i = 0; i < rows.length; i++) {
+      r._setHeight(i, 50);
+    }
     r._flushEstimateUpdate();
     r.elementVertical.scrollTop = scrollTop;
     r.elementVertical.scrollHeight = r._totalHeight();

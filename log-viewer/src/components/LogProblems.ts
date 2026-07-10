@@ -170,12 +170,14 @@ export class NotificationTag extends LitElement {
           : '';
 
       const content = html`<div class="text-container">
-        ${item.message
-          ? html`<details>
-              <summary>${item.summary}</summary>
-              <div class="text-container">${item.message}</div>
-            </details>`
-          : item.summary}
+        ${
+          item.message
+            ? html`<details>
+                <summary>${item.summary}</summary>
+                <div class="text-container">${item.message}</div>
+              </details>`
+            : item.summary
+        }
         ${buttonBar}
       </div>`;
 
