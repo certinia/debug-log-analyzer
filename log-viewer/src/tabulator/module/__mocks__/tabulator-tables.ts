@@ -10,13 +10,21 @@ export class Module {
 // tabulator_esm.mjs:23488) reads table.rowManager.element / tableElement
 // and stores them as properties; we replicate that shape so tests of a
 // concrete renderer subclass can construct without touching real DOM.
+interface MockTable {
+  rowManager?: { element?: unknown; tableElement?: unknown; getDisplayRows?: () => unknown[] };
+  columnManager?: { element?: unknown };
+  eventBus?: { dispatch?: (...args: unknown[]) => void };
+}
+interface MockRowEl {
+  getElement: () => { classList?: DOMTokenList };
+}
 export class Renderer {
-  table: any;
-  elementVertical: any;
-  elementHorizontal: any;
-  tableElement: any;
+  table?: MockTable;
+  elementVertical: unknown;
+  elementHorizontal: unknown;
+  tableElement: unknown;
   verticalFillMode = 'fit';
-  constructor(table?: any) {
+  constructor(table?: MockTable) {
     this.table = table;
     this.elementVertical = table?.rowManager?.element ?? null;
     this.elementHorizontal = table?.columnManager?.element ?? null;
@@ -25,7 +33,7 @@ export class Renderer {
   // Mirrors real Renderer.styleRow (tabulator_esm.mjs:23582) including its
   // inverted naming quirk (index % 2 → "even" class). Optional-chained so
   // node-env suites with plain-object row elements (no classList) stay safe.
-  styleRow(row: any, index: number) {
+  styleRow(row: MockRowEl, index: number) {
     const rowEl = row.getElement();
     if (index % 2) {
       rowEl.classList?.add('tabulator-row-even');
