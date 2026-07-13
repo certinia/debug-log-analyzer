@@ -3,7 +3,7 @@
   "private": true,
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@prettier/plugin-oxc": "^0.2.0",
+    "@prettier/plugin-oxc": "^0.2.1",
     "@rolldown/plugin-node-polyfills": "^1.0.3",
     "@rollup/plugin-alias": "^6.0.0",
     "@rollup/plugin-commonjs": "^29.0.3",
