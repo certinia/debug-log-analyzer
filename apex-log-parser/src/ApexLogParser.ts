@@ -452,6 +452,7 @@ export class ApexLogParser {
           parent.soslRowCount.total += child.soslRowCount.total;
           parent.duration.self -= child.duration.total;
           parent.thrownCount.total += child.thrownCount.total;
+          parent.heapAllocated.total += child.heapAllocated.total;
         }
       }
     }

@@ -138,6 +138,33 @@
             "default": false,
             "markdownDescription": "Tint the Call Tree Name column by event category, matching the Timeline colors, instead of showing a small color chip. Default: `false`",
             "order": 0
+          },
+          "lana.callTree.columnView": {
+            "title": "Column view",
+            "type": "string",
+            "default": "General",
+            "enum": [
+              "General",
+              "Time",
+              "Governor Limits",
+              "Database",
+              "Memory"
+            ],
+            "markdownDescription": "The column view applied to the Call Tree and Analysis tables. Default: `General`",
+            "order": 1
+          },
+          "lana.callTree.columnOverrides": {
+            "title": "Column view overrides",
+            "type": "object",
+            "default": {},
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "markdownDescription": "Per-view column customisations for the Call Tree and Analysis tables (view id → visible column fields). Set automatically when you show/hide columns from a table's header menu; reset a view from that menu to clear its entry.",
+            "order": 2
           }
         }
       },
@@ -324,6 +351,63 @@
                 "format": "color-hex"
               }
             }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "id": "lana",
+        "title": "Database",
+        "order": 2,
+        "properties": {
+          "lana.database.soql.columnView": {
+            "title": "SOQL column view",
+            "type": "string",
+            "default": "General",
+            "enum": [
+              "General",
+              "Performance",
+              "Query Plan"
+            ],
+            "markdownDescription": "The column view applied to the Database SOQL table. Default: `General`",
+            "order": 0
+          },
+          "lana.database.soql.columnOverrides": {
+            "title": "SOQL column view overrides",
+            "type": "object",
+            "default": {},
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "markdownDescription": "Per-view column customisations for the Database SOQL table (view id → visible column fields). Set automatically when you show/hide columns from the table's header menu.",
+            "order": 1
+          },
+          "lana.database.dml.columnView": {
+            "title": "DML column view",
+            "type": "string",
+            "default": "General",
+            "enum": [
+              "General",
+              "Timing"
+            ],
+            "markdownDescription": "The column view applied to the Database DML table. Default: `General`",
+            "order": 2
+          },
+          "lana.database.dml.columnOverrides": {
+            "title": "DML column view overrides",
+            "type": "object",
+            "default": {},
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "markdownDescription": "Per-view column customisations for the Database DML table (view id → visible column fields). Set automatically when you show/hide columns from the table's header menu.",
+            "order": 3
           }
         }
       }

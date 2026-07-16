@@ -8,14 +8,18 @@ import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenge
 import { formatDuration } from '../../../core/utility/Util.js';
 import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
 import { minMaxTreeFilter } from '../../../tabulator/filters/MinMax.js';
-import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
+import { annotateGovernorCost } from '../utils/GovernorCost.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../utils/TimeOrderTree.js';
 import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
 import {
   commonColumnDefaults,
+  createGovernorColumn,
+  createGovernorCostColumn,
+  createGovernorPeakColumn,
+  createHeapColumn,
   headerSortElement,
   registerTableModules,
   type TableCallbacks,
@@ -41,6 +45,7 @@ export function createTimeOrderTable(
   const governorLimits = rootMethod.governorLimits;
 
   const tableData = toTimeOrderTree(rootMethod.children);
+  annotateGovernorCost(tableData, governorLimits);
   const nameFormatter = createCalltreeNameFormatter(excludedTypes);
 
   const tableRef: { current: Tabulator | undefined } = { current: undefined };
@@ -73,6 +78,8 @@ export function createTimeOrderTable(
       {
         title: 'Name',
         field: 'text',
+        frozen: true,
+        minWidth: 200,
         headerSortTristate: true,
         bottomCalc: () => 'Total',
         cssClass: 'datagrid-textarea datagrid-code-text',
@@ -93,6 +100,7 @@ export function createTimeOrderTable(
           }
         },
         widthGrow: 5,
+        widthShrink: 1,
       },
       {
         title: 'Namespace',
@@ -111,59 +119,45 @@ export function createTimeOrderTable(
         headerFilterLiveFilter: false,
       },
       {
+        title: 'Caller Namespace',
+        field: 'callerNamespace',
+        sorter: 'string',
+        width: 120,
+        visible: false,
+      },
+      createGovernorColumn({
         title: 'DML Count',
         field: 'dmlCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 70,
-        minWidth: 60,
-        bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatter,
-        bottomCalcFormatterParams: {
-          precision: 0,
-          totalValue: governorLimits.dmlStatements.limit,
-          showPercentageText: false,
-        },
-        formatter: progressFormatter,
-        formatterParams: {
-          precision: 0,
-          totalValue: governorLimits.dmlStatements.limit,
-          showPercentageText: false,
-        },
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        tooltip(_event, cell, _onRender) {
-          const maxDmlStatements = governorLimits.dmlStatements.limit;
-          return cell.getValue() + (maxDmlStatements > 0 ? '/' + maxDmlStatements : '');
-        },
-      },
-      {
+        limit: governorLimits.dmlStatements.limit,
+      }),
+      createGovernorColumn({
+        title: 'DML Count (self)',
+        field: 'dmlCount.self',
+        limit: governorLimits.dmlStatements.limit,
+        visible: false,
+      }),
+      createGovernorColumn({
         title: 'SOQL Count',
         field: 'soqlCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 70,
-        minWidth: 60,
-        bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatter,
-        bottomCalcFormatterParams: {
-          precision: 0,
-          totalValue: governorLimits.soqlQueries.limit,
-          showPercentageText: false,
-        },
-        formatter: progressFormatter,
-        formatterParams: {
-          precision: 0,
-          totalValue: governorLimits.soqlQueries.limit,
-          showPercentageText: false,
-        },
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        tooltip(_event, cell, _onRender) {
-          const maxSoql = governorLimits.soqlQueries.limit;
-          return cell.getValue() + (maxSoql > 0 ? '/' + maxSoql : '');
-        },
-      },
+        limit: governorLimits.soqlQueries.limit,
+      }),
+      createGovernorColumn({
+        title: 'SOQL Count (self)',
+        field: 'soqlCount.self',
+        limit: governorLimits.soqlQueries.limit,
+        visible: false,
+      }),
+      createGovernorColumn({
+        title: 'SOSL Count',
+        field: 'soslCount.total',
+        limit: governorLimits.soslQueries.limit,
+      }),
+      createGovernorColumn({
+        title: 'SOSL Count (self)',
+        field: 'soslCount.self',
+        limit: governorLimits.soslQueries.limit,
+        visible: false,
+      }),
       {
         title: 'Throws Count',
         field: 'thrownCount.total',
@@ -174,58 +168,39 @@ export function createTimeOrderTable(
         headerHozAlign: 'right',
         bottomCalc: 'sum',
       },
-      {
+      createGovernorColumn({
         title: 'DML Rows',
         field: 'dmlRowCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 60,
-        bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatter,
-        bottomCalcFormatterParams: {
-          precision: 0,
-          totalValue: governorLimits.dmlRows.limit,
-          showPercentageText: false,
-        },
-        formatter: progressFormatter,
-        formatterParams: {
-          precision: 0,
-          totalValue: governorLimits.dmlRows.limit,
-          showPercentageText: false,
-        },
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        tooltip(_event, cell, _onRender) {
-          const maxDmlRows = governorLimits.dmlRows.limit;
-          return cell.getValue() + (maxDmlRows > 0 ? '/' + maxDmlRows : '');
-        },
-      },
-      {
+        limit: governorLimits.dmlRows.limit,
+      }),
+      createGovernorColumn({
+        title: 'DML Rows (self)',
+        field: 'dmlRowCount.self',
+        limit: governorLimits.dmlRows.limit,
+        visible: false,
+      }),
+      createGovernorColumn({
         title: 'SOQL Rows',
         field: 'soqlRowCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 60,
-        bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatter,
-        bottomCalcFormatterParams: {
-          precision: 0,
-          totalValue: governorLimits.queryRows.limit,
-          showPercentageText: false,
-        },
-        formatter: progressFormatter,
-        formatterParams: {
-          precision: 0,
-          totalValue: governorLimits.queryRows.limit,
-          showPercentageText: false,
-        },
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        tooltip(_event, cell, _onRender) {
-          const maxQueryRows = governorLimits.queryRows.limit;
-          return cell.getValue() + (maxQueryRows > 0 ? '/' + maxQueryRows : '');
-        },
-      },
+        limit: governorLimits.queryRows.limit,
+      }),
+      createGovernorColumn({
+        title: 'SOQL Rows (self)',
+        field: 'soqlRowCount.self',
+        limit: governorLimits.queryRows.limit,
+        visible: false,
+      }),
+      createGovernorColumn({
+        title: 'SOSL Rows',
+        field: 'soslRowCount.total',
+        limit: governorLimits.queryRows.limit,
+      }),
+      createGovernorColumn({
+        title: 'SOSL Rows (self)',
+        field: 'soslRowCount.self',
+        limit: governorLimits.queryRows.limit,
+        visible: false,
+      }),
       {
         title: 'Total Time (ms)',
         field: 'duration.total',
@@ -277,6 +252,10 @@ export function createTimeOrderTable(
           return formatDuration(cell.getValue());
         },
       },
+      createHeapColumn(governorLimits),
+      createHeapColumn(governorLimits, 'heapAllocated.self', 'Heap (self)', false),
+      createGovernorCostColumn(governorLimits),
+      createGovernorPeakColumn(governorLimits),
     ],
   });
   tableRef.current = table;

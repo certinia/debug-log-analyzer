@@ -34,12 +34,22 @@ export interface AggregatedRow {
   dmlCount: SelfTotal;
   /** Total SOQL count */
   soqlCount: SelfTotal;
+  /** Total SOSL count */
+  soslCount: SelfTotal;
   /** Total DML rows */
   dmlRowCount: SelfTotal;
   /** Total SOQL rows */
   soqlRowCount: SelfTotal;
+  /** Total SOSL rows */
+  soslRowCount: SelfTotal;
   /** Total + self exceptions thrown */
   thrownCount: SelfTotal;
+  /** Total + self heap bytes allocated */
+  heapAllocated: SelfTotal;
+  /** Average governor consumption across all reported governors (0–100%). */
+  governorCost: number;
+  /** The single tightest governor consumed on this path (0–100+%). */
+  governorCostMax: number;
   /** Aggregated children (callees grouped by signature) */
   _children?: AggregatedRow[] | null;
   /** References to original events for drill-down */
@@ -82,12 +92,22 @@ export interface BottomUpRow {
   dmlCount: SelfTotal;
   /** Total SOQL count */
   soqlCount: SelfTotal;
+  /** Total SOSL count */
+  soslCount: SelfTotal;
   /** Total DML rows */
   dmlRowCount: SelfTotal;
   /** Total SOQL rows */
   soqlRowCount: SelfTotal;
+  /** Total SOSL rows */
+  soslRowCount: SelfTotal;
   /** Total + self exceptions thrown */
   thrownCount: SelfTotal;
+  /** Total + self heap bytes allocated */
+  heapAllocated: SelfTotal;
+  /** Average governor consumption across all reported governors (0–100%). */
+  governorCost: number;
+  /** The single tightest governor consumed on this path (0–100+%). */
+  governorCostMax: number;
   /** Callers (parent functions) as children - lazy loaded */
   _children?: BottomUpRow[] | null;
   /**
@@ -239,12 +259,18 @@ function addEventToAggregatedRowWithStack(
   row.dmlCount.total += event.dmlCount.total;
   row.soqlCount.self += event.soqlCount.self;
   row.soqlCount.total += event.soqlCount.total;
+  row.soslCount.self += event.soslCount.self;
+  row.soslCount.total += event.soslCount.total;
   row.dmlRowCount.self += event.dmlRowCount.self;
   row.dmlRowCount.total += event.dmlRowCount.total;
   row.soqlRowCount.self += event.soqlRowCount.self;
   row.soqlRowCount.total += event.soqlRowCount.total;
+  row.soslRowCount.self += event.soslRowCount.self;
+  row.soslRowCount.total += event.soslRowCount.total;
   row.thrownCount.self += event.thrownCount.self;
   row.thrownCount.total += event.thrownCount.total;
+  row.heapAllocated.self += event.heapAllocated.self;
+  row.heapAllocated.total += event.heapAllocated.total;
   row.instances.push(event);
 }
 
@@ -276,8 +302,10 @@ function addEventToAggregatedRowWithStack(
  *   - duration.self / duration.total
  *   - dmlCount.self / dmlCount.total
  *   - soqlCount.self / soqlCount.total
+ *   - soslCount.self / soslCount.total
  *   - dmlRowCount.self / dmlRowCount.total
  *   - soqlRowCount.self / soqlRowCount.total
+ *   - soslRowCount.self / soslRowCount.total
  *   - thrownCount.self / thrownCount.total
  */
 type FrameContext = {
@@ -290,9 +318,12 @@ type FrameContext = {
   totalTime: number;
   dmlTotal: number;
   soqlTotal: number;
+  soslTotal: number;
   dmlRowTotal: number;
   soqlRowTotal: number;
+  soslRowTotal: number;
   thrownTotal: number;
+  heapTotal: number;
 };
 
 type DfsEntry = {
@@ -356,18 +387,24 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
       totalTime: node.duration.total,
       dmlTotal: node.dmlCount.total,
       soqlTotal: node.soqlCount.total,
+      soslTotal: node.soslCount.total,
       dmlRowTotal: node.dmlRowCount.total,
       soqlRowTotal: node.soqlRowCount.total,
+      soslRowTotal: node.soslRowCount.total,
       thrownTotal: node.thrownCount.total,
+      heapTotal: node.heapAllocated.total,
     };
 
     if (prior) {
       prior.totalTime -= node.duration.total;
       prior.dmlTotal -= node.dmlCount.total;
       prior.soqlTotal -= node.soqlCount.total;
+      prior.soslTotal -= node.soslCount.total;
       prior.dmlRowTotal -= node.dmlRowCount.total;
       prior.soqlRowTotal -= node.soqlRowCount.total;
+      prior.soslRowTotal -= node.soslRowCount.total;
       prior.thrownTotal -= node.thrownCount.total;
+      prior.heapTotal -= node.heapAllocated.total;
     }
     activeByName.set(stackKey, ctx);
     dfs.push({ node, childIdx: 0, ctx });
@@ -381,15 +418,21 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
     const selfTime = node.duration.self;
     const dmlSelf = node.dmlCount.self;
     const soqlSelf = node.soqlCount.self;
+    const soslSelf = node.soslCount.self;
     const dmlRowSelf = node.dmlRowCount.self;
     const soqlRowSelf = node.soqlRowCount.self;
+    const soslRowSelf = node.soslRowCount.self;
     const thrownSelf = node.thrownCount.self;
+    const heapSelf = node.heapAllocated.self;
     const totalTime = ctx.totalTime;
     const dmlTotal = ctx.dmlTotal;
     const soqlTotal = ctx.soqlTotal;
+    const soslTotal = ctx.soslTotal;
     const dmlRowTotal = ctx.dmlRowTotal;
     const soqlRowTotal = ctx.soqlRowTotal;
+    const soslRowTotal = ctx.soslRowTotal;
     const thrownTotal = ctx.thrownTotal;
+    const heapTotal = ctx.heapTotal;
 
     // Closure captures the hoisted locals; zero-delta guards skip no-op writes
     // for logs without heavy DB work.
@@ -409,6 +452,12 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
       if (soqlTotal) {
         b.soqlCount.total += soqlTotal;
       }
+      if (soslSelf) {
+        b.soslCount.self += soslSelf;
+      }
+      if (soslTotal) {
+        b.soslCount.total += soslTotal;
+      }
       if (dmlRowSelf) {
         b.dmlRowCount.self += dmlRowSelf;
       }
@@ -421,11 +470,23 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
       if (soqlRowTotal) {
         b.soqlRowCount.total += soqlRowTotal;
       }
+      if (soslRowSelf) {
+        b.soslRowCount.self += soslRowSelf;
+      }
+      if (soslRowTotal) {
+        b.soslRowCount.total += soslRowTotal;
+      }
       if (thrownSelf) {
         b.thrownCount.self += thrownSelf;
       }
       if (thrownTotal) {
         b.thrownCount.total += thrownTotal;
+      }
+      if (heapSelf) {
+        b.heapAllocated.self += heapSelf;
+      }
+      if (heapTotal) {
+        b.heapAllocated.total += heapTotal;
       }
     };
 
@@ -535,9 +596,14 @@ function createEmptyAggregatedRow(
     avgSelfTime: 0,
     dmlCount: { self: 0, total: 0 },
     soqlCount: { self: 0, total: 0 },
+    soslCount: { self: 0, total: 0 },
     dmlRowCount: { self: 0, total: 0 },
     soqlRowCount: { self: 0, total: 0 },
+    soslRowCount: { self: 0, total: 0 },
     thrownCount: { self: 0, total: 0 },
+    heapAllocated: { self: 0, total: 0 },
+    governorCost: 0,
+    governorCostMax: 0,
     _children: null,
     instances: [],
     originalData: event,
@@ -565,9 +631,14 @@ function createEmptyBottomUpRow(
     avgSelfTime: 0,
     dmlCount: { self: 0, total: 0 },
     soqlCount: { self: 0, total: 0 },
+    soslCount: { self: 0, total: 0 },
     dmlRowCount: { self: 0, total: 0 },
     soqlRowCount: { self: 0, total: 0 },
+    soslRowCount: { self: 0, total: 0 },
     thrownCount: { self: 0, total: 0 },
+    heapAllocated: { self: 0, total: 0 },
+    governorCost: 0,
+    governorCostMax: 0,
     _children: null,
     instances: [],
     originalData: event,

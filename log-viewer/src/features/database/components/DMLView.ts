@@ -12,11 +12,21 @@ import type { ApexLog, DMLBeginLine } from 'apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { isVisible } from '../../../core/utility/Util.js';
+import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { DatabaseAccess } from '../services/Database.js';
+import {
+  applyColumnView,
+  buildColumnMenuItems,
+  DML_VIEWS,
+  getColumnView,
+  getTableFields,
+  toggleField,
+} from '../../../tabulator/ColumnViews.js';
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
 import Number from '../../../tabulator/format/Number.js';
+import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
@@ -32,8 +42,13 @@ import databaseViewStyles from './DatabaseView.scss';
 
 // web components
 import '../../../components/CallStack.js';
+import '../../../components/ContextMenu.js';
+import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/datagrid-filter-bar.js';
 import './DatabaseSection.js';
+
+/** The DML column is always shown in the DML table. */
+const ALWAYS_VISIBLE = ['dml'];
 
 const groupLabelsToFields = new Map<string, string>([
   ['DML', 'dml'],
@@ -68,6 +83,14 @@ export class DMLView extends LitElement {
   totalMatches = 0;
   blockClearHighlights = true;
 
+  @state()
+  columnView = 'General';
+
+  /** Per-view column overrides (view id → visible fields); empty until edited. */
+  @state()
+  private columnOverrides: Record<string, string[]> = {};
+  private contextMenu: ContextMenu | null = null;
+
   constructor() {
     super();
 
@@ -79,6 +102,17 @@ export class DMLView extends LitElement {
     super.disconnectedCallback();
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
+  }
+
+  firstUpdated(): void {
+    this.contextMenu = this.renderRoot.querySelector('context-menu');
+    void this._loadColumnSettings();
+  }
+
+  private async _loadColumnSettings(): Promise<void> {
+    const settings = await getSettings();
+    this.columnOverrides = settings.database?.dml?.columnOverrides ?? {};
+    this._setColumnView(settings.database?.dml?.columnView ?? 'General');
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -128,6 +162,22 @@ export class DMLView extends LitElement {
       <datagrid-filter-bar>
         <vs-select
           slot="filters"
+          id="dml-column-view"
+          prefix="Columns"
+          label="Column view"
+          @change="${this._handleColumnViewChange}"
+          .value="${this.columnView}"
+        >
+          ${DML_VIEWS.map(
+            (view) =>
+              html`<vscode-option value="${view.id}" ?selected="${this.columnView === view.id}"
+                >${this.columnOverrides[view.id] ? `${view.id} •` : view.id}</vscode-option
+              >`,
+          )}
+        </vs-select>
+
+        <vs-select
+          slot="filters"
           id="dml-groupby-dropdown"
           prefix="Group"
           label="Group by"
@@ -158,7 +208,75 @@ export class DMLView extends LitElement {
         ${dmlSkeleton}
         <div id="db-dml-table"></div>
       </div>
+      <context-menu @menu-select="${this._handleColumnMenuSelect}"></context-menu>
     `;
+  }
+
+  private _handleColumnViewChange(event: Event) {
+    const id = (event.target as HTMLInputElement).value || 'General';
+    this._setColumnView(id);
+    updateSetting('database.dml.columnView', id);
+  }
+
+  /** Effective fields for a view id: the user override, else the built-in preset. */
+  private _columnViewFields(id: string): string[] | null {
+    return this.columnOverrides[id] ?? getColumnView(DML_VIEWS, id)?.fields ?? null;
+  }
+
+  private _setColumnView(id: string) {
+    this.columnView = id;
+    if (this.dmlTable) {
+      applyColumnView(this.dmlTable, this._columnViewFields(id), ALWAYS_VISIBLE);
+    }
+  }
+
+  /** Applies the active view and wires the header menu once the table is built. */
+  private _initTableColumns(table: Tabulator) {
+    applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
+    const header = table.element.querySelector<HTMLElement>('.tabulator-header');
+    header?.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      if (this.contextMenu) {
+        const hasOverride = !!this.columnOverrides[this.columnView];
+        this.contextMenu.show(
+          buildColumnMenuItems(table, this.columnView, DML_VIEWS, ALWAYS_VISIBLE, hasOverride),
+          event.clientX,
+          event.clientY,
+        );
+      }
+    });
+  }
+
+  private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
+    const { itemId } = e.detail;
+    const table = this.dmlTable;
+    if (!table) {
+      return;
+    }
+    if (itemId.startsWith('view:')) {
+      const id = itemId.slice('view:'.length);
+      this._setColumnView(id);
+      updateSetting('database.dml.columnView', id);
+      return;
+    }
+    if (itemId.startsWith('col:')) {
+      const field = itemId.slice('col:'.length);
+      const fields = toggleField(
+        this._columnViewFields(this.columnView),
+        field,
+        getTableFields(table),
+      );
+      this.columnOverrides = { ...this.columnOverrides, [this.columnView]: fields };
+      applyColumnView(table, fields, ALWAYS_VISIBLE);
+      updateSetting('database.dml.columnOverrides', this.columnOverrides);
+      return;
+    }
+    if (itemId === 'reset' && this.columnOverrides[this.columnView]) {
+      const { [this.columnView]: _removed, ...rest } = this.columnOverrides;
+      this.columnOverrides = rest;
+      applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
+      updateSetting('database.dml.columnOverrides', this.columnOverrides);
+    }
   }
 
   _copyToClipboard() {
@@ -267,6 +385,7 @@ export class DMLView extends LitElement {
 
   _renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
     const dmlData: DMLRow[] = [];
+    const dmlRowLimit = this.timelineRoot?.governorLimits.dmlRows.limit ?? 0;
     let nextRowId = 0;
     if (dmlLines) {
       for (const dml of dmlLines) {
@@ -374,14 +493,30 @@ export class DMLView extends LitElement {
           headerFilterLiveFilter: false,
         },
         {
+          title: 'Namespace',
+          field: 'namespace',
+          sorter: 'string',
+          width: 120,
+          visible: false,
+        },
+        {
           title: 'Row Count',
           field: 'rowCount',
           sorter: 'number',
           cssClass: 'number-cell',
           width: 90,
-          bottomCalc: 'sum',
           hozAlign: 'right',
           headerHozAlign: 'right',
+          formatter: progressFormatter,
+          formatterParams: { precision: 0, totalValue: dmlRowLimit, showPercentageText: false },
+          bottomCalc: 'sum',
+          bottomCalcFormatter: progressFormatter,
+          bottomCalcFormatterParams: {
+            precision: 0,
+            totalValue: dmlRowLimit,
+            showPercentageText: false,
+          },
+          tooltip: (_e, cell) => cell.getValue() + (dmlRowLimit > 0 ? '/' + dmlRowLimit : ''),
         },
         {
           title: 'Time Taken (ms)',
@@ -450,6 +585,9 @@ export class DMLView extends LitElement {
       holder.style.overflowAnchor = 'none';
       //@ts-expect-error This is a custom function added in the GroupSort custom module
       this.dmlTable?.setSortedGroupBy('dml');
+      if (this.dmlTable) {
+        this._initTableColumns(this.dmlTable);
+      }
     });
 
     this.dmlTable.on('renderComplete', () => {

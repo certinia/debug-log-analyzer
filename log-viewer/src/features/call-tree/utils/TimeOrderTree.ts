@@ -19,9 +19,16 @@ export interface TimeOrderRow {
   duration: SelfTotal;
   dmlCount: SelfTotal;
   soqlCount: SelfTotal;
+  soslCount: SelfTotal;
   dmlRowCount: SelfTotal;
   soqlRowCount: SelfTotal;
+  soslRowCount: SelfTotal;
   thrownCount: SelfTotal;
+  heapAllocated: SelfTotal;
+  /** Average governor consumption across all reported governors (0–100%). */
+  governorCost: number;
+  /** The single tightest governor consumed on this path (0–100+%). */
+  governorCostMax: number;
   /**
    * True when this row is itself a "detail" (the per-row predicate matches —
    * non-zero `duration.total`, `isParent`, `discontinuity`, or a type in
@@ -75,9 +82,14 @@ export function toTimeOrderTree(nodes: LogEvent[]): TimeOrderRow[] | undefined {
       duration: event.duration,
       dmlCount: event.dmlCount,
       soqlCount: event.soqlCount,
+      soslCount: event.soslCount,
       dmlRowCount: event.dmlRowCount,
       soqlRowCount: event.soqlRowCount,
+      soslRowCount: event.soslRowCount,
       thrownCount: event.thrownCount,
+      heapAllocated: event.heapAllocated,
+      governorCost: 0,
+      governorCostMax: 0,
       _hasDetailsDeep: selfIsDetail || childHasDetailsDeep,
     };
   }

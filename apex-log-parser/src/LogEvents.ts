@@ -247,6 +247,24 @@ export abstract class LogEvent {
   };
 
   /**
+   * Total + self heap bytes allocated (HEAP_ALLOCATE / BULK_HEAP_ALLOCATE).
+   *
+   * `self` is seeded on the allocation leaf node (like DML/SOQL counts), so a method's
+   * `heapAllocated.self` is typically 0 and `heapAllocated.total` is the sum of allocations
+   * in this node and its children.
+   */
+  heapAllocated: SelfTotal = {
+    /**
+     * The net bytes allocated directly by this node.
+     */
+    self: 0,
+    /**
+     * The total bytes allocated in this node and child nodes
+     */
+    total: 0,
+  };
+
+  /**
    * The line types which would legitimately end this method
    */
   exitTypes: LogEventType[] = [];
@@ -515,6 +533,7 @@ export class BulkHeapAllocateLine extends LogEvent {
     super(parser, parts);
     this.text = parts[2] || '';
     this.bytes = parseBytes(parts[2]);
+    this.heapAllocated.self = this.heapAllocated.total = this.bytes;
   }
 }
 
@@ -1103,6 +1122,7 @@ export class HeapAllocateLine extends LogEvent {
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
     this.bytes = parseBytes(parts[3]);
+    this.heapAllocated.self = this.heapAllocated.total = this.bytes;
   }
 }
 

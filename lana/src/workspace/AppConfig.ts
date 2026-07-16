@@ -35,6 +35,12 @@ interface Config {
   };
   callTree: {
     categoryColorize: boolean;
+    columnView: string;
+    columnOverrides: Record<string, string[]>;
+  };
+  database: {
+    soql: { columnView: string; columnOverrides: Record<string, string[]> };
+    dml: { columnView: string; columnOverrides: Record<string, string[]> };
   };
 }
 

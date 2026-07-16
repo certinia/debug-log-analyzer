@@ -75,6 +75,10 @@ interface RendererBase {
       // overwrites it with the string 'virtual' (stock bug workaround).
       renderMode?: string;
     };
+    // Total width of all visible columns; used to size the table box so
+    // horizontally-overflowing rows span the full width (frozen sticky cells
+    // need a full-width containing block).
+    columnManager: { getWidth: () => number };
     options: RendererOptions;
   };
   elementVertical: HTMLElement;
@@ -228,6 +232,10 @@ export class VirtualVerticalRenderer extends Renderer {
   // Pending rIC handle for the pre-warmer; cancelled on destroy/clearRows.
   private idlePrewarmHandle: number | null = null;
 
+  // Last column-total width written to tableElement.minWidth; skips redundant
+  // per-frame style writes (see _syncTableWidth).
+  private lastTableMinWidth = -1;
+
   // Last scrollLeft piped to scrollHorizontal (which writes DOM + dispatches
   // unconditionally — pipe only on change). NaN → first frame always pipes.
   private lastPipedScrollLeft = NaN;
@@ -367,6 +375,21 @@ export class VirtualVerticalRenderer extends Renderer {
   /** Renderer contract (stock parity): sync horizontal scroll position. */
   scrollColumns(left: number): void {
     this._self().table.rowManager.scrollHorizontal(left);
+  }
+
+  /**
+   * Size the table box to the full column width. Virtual rows are viewport-
+   * width with cells overflowing; without this the sticky containing block is
+   * only viewport-wide and frozen body cells scroll away. Stock renderers get
+   * full-width rows for free; the virtual renderer must set it explicitly.
+   */
+  private _syncTableWidth(): void {
+    const self = this._self();
+    const width = self.table.columnManager.getWidth();
+    if (width !== this.lastTableMinWidth) {
+      this.lastTableMinWidth = width;
+      self.tableElement.style.minWidth = `${width}px`;
+    }
   }
 
   /** RowManager lifecycle: holder scroll event (reads live scrollTop). */
@@ -786,6 +809,7 @@ export class VirtualVerticalRenderer extends Renderer {
       this._detachAllRendered();
       self.tableElement.style.paddingTop = '0';
       self.tableElement.style.paddingBottom = '0';
+      this._syncTableWidth();
       // Stock dispatches after every fill, including empty ones — GroupRows
       // relies on it to set minWidth when no data rows are visible.
       self.dispatch('render-virtual-fill');
@@ -887,6 +911,7 @@ export class VirtualVerticalRenderer extends Renderer {
       newBottom === lastIdx ? 0 : Math.max(0, this._totalHeight() - this._cumHeight(newBottom + 1));
     self.tableElement.style.paddingTop = `${paddingTop}px`;
     self.tableElement.style.paddingBottom = `${paddingBottom}px`;
+    this._syncTableWidth();
 
     this.vDomTop = newTop;
     this.vDomBottom = newBottom;

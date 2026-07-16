@@ -16,7 +16,7 @@ function makeMockTable(): unknown {
       getDisplayRows: () => [],
       scrollHorizontal: () => {},
     },
-    columnManager: { element: {} },
+    columnManager: { element: {}, getWidth: () => 200 },
     options: {},
     eventBus: { _events: {}, dispatch: () => {} },
   };
@@ -356,7 +356,7 @@ function makeRendererWithRows(rows: RowStub[]): RendererForSetAnchor {
       getDisplayRows: () => rows,
       scrollHorizontal: () => {},
     },
-    columnManager: { element: {} },
+    columnManager: { element: {}, getWidth: () => 200 },
     options: {},
     eventBus: { _events: {}, dispatch: () => {} },
   };
@@ -550,7 +550,7 @@ function makeRerenderRenderer(initialRows: RowStub[]): {
       scrollHorizontal: () => {},
       tableEmpty,
     },
-    columnManager: { element: {} },
+    columnManager: { element: {}, getWidth: () => 200 },
     options: {},
     eventBus: { _events: {}, dispatch: () => {} },
   };
@@ -759,7 +759,7 @@ describe('VirtualVerticalRenderer.initialize stock-bug workaround', () => {
     };
     const table = {
       rowManager,
-      columnManager: { element: {} },
+      columnManager: { element: {}, getWidth: () => 200 },
       options: {},
       eventBus: { _events: {}, dispatch: () => {} },
     };

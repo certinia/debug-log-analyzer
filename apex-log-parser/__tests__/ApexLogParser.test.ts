@@ -381,6 +381,32 @@ describe('parseLog tests', () => {
     expect(thrown?.thrownCount).toEqual({ self: 1, total: 1 });
   });
 
+  it('heapAllocated is seeded on the allocation leaf and rolled up as total on ancestors', async () => {
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|Outer.run()\n' +
+      '15:20:52.222 (300)|HEAP_ALLOCATE|[52]|Bytes:10\n' +
+      '15:20:52.222 (400)|METHOD_ENTRY|[190]|01p4J00000FpS6u|Inner.work()\n' +
+      '15:20:52.222 (500)|HEAP_ALLOCATE|[60]|Bytes:32\n' +
+      '15:20:52.222 (600)|METHOD_EXIT|[190]|01p4J00000FpS6u|Inner.work()\n' +
+      '15:20:52.222 (700)|METHOD_EXIT|[185]|01p4J00000FpS6t|Outer.run()\n' +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const apexLog = parse(log);
+
+    // children[0] is the EXECUTION_STARTED wrapper; Outer.run() is its child.
+    const outer = apexLog.children[0]!.children[0]!;
+    const inner = outer.children.find((child) => child.type === 'METHOD_ENTRY')!;
+
+    // The allocation leaf carries self === total === bytes.
+    const outerAlloc = outer.children.find((child) => child.type === 'HEAP_ALLOCATE');
+    expect(outerAlloc?.heapAllocated).toEqual({ self: 10, total: 10 });
+
+    // Inner rolls up its own 32 bytes; Outer rolls up both (10 + 32).
+    expect(inner.heapAllocated).toEqual({ self: 0, total: 32 });
+    expect(outer.heapAllocated).toEqual({ self: 0, total: 42 });
+  });
+
   it('Methods should have line-numbers', async () => {
     const log =
       '09:18:22.6 (0)|EXECUTION_STARTED\n\n' +

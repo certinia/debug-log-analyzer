@@ -31,6 +31,12 @@ export type LanaSettings = {
   };
   callTree: {
     categoryColorize: boolean;
+    columnView: string;
+    columnOverrides: Record<string, string[]>;
+  };
+  database: {
+    soql: { columnView: string; columnOverrides: Record<string, string[]> };
+    dml: { columnView: string; columnOverrides: Record<string, string[]> };
   };
 };
 
@@ -38,4 +44,9 @@ export function getSettings(): Promise<LanaSettings> {
   return vscodeMessenger.request<LanaSettings>('getConfig').then((msg) => {
     return msg;
   });
+}
+
+/** Persists a `lana.*` setting via the extension (fire-and-forget). */
+export function updateSetting(section: string, value: unknown): void {
+  vscodeMessenger.send('updateConfig', { section, value });
 }

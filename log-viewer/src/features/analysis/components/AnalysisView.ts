@@ -7,12 +7,25 @@ import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog } from 'apex-log-parser';
+import '#vscode-elements/vscode-option.js';
+import '../../../components/ContextMenu.js';
+import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { isVisible } from '../../../core/utility/Util.js';
+import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
+import {
+  applyColumnView,
+  buildColumnMenuItems,
+  CALL_TREE_VIEWS,
+  getColumnView,
+  getTableFields,
+  toggleField,
+} from '../../../tabulator/ColumnViews.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
 import {
   categoryColoringStyles,
@@ -30,6 +43,9 @@ import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 // Components
 import '../../../components/GridSkeleton.js';
 import '../../../components/datagrid-filter-bar.js';
+
+/** The Name column is always shown in the analysis table. */
+const ALWAYS_VISIBLE = ['text'];
 
 @customElement('analysis-view')
 export class AnalysisView extends LitElement {
@@ -84,6 +100,14 @@ export class AnalysisView extends LitElement {
   timelineRoot: ApexLog | null = null;
 
   analysisTable: Tabulator | null = null;
+
+  @state()
+  columnView = 'General';
+
+  /** Per-view column overrides (view id → visible fields); empty until edited. */
+  @state()
+  private columnOverrides: Record<string, string[]> = {};
+  private contextMenu: ContextMenu | null = null;
   tableContainer: HTMLDivElement | null = null;
   findMap: { [key: number]: RowComponent } = {};
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
@@ -118,6 +142,17 @@ export class AnalysisView extends LitElement {
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
+  }
+
+  firstUpdated(): void {
+    this.contextMenu = this.renderRoot.querySelector('context-menu');
+    void this._loadColumnSettings();
+  }
+
+  private async _loadColumnSettings(): Promise<void> {
+    const settings = await getSettings();
+    this.columnOverrides = settings.callTree?.columnOverrides ?? {};
+    this._setColumnView(settings.callTree?.columnView ?? 'General');
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -168,6 +203,24 @@ export class AnalysisView extends LitElement {
             <vscode-option>Type</vscode-option>
           </vs-select>
 
+          <vs-select
+            slot="group"
+            id="column-view"
+            prefix="Columns"
+            label="Column view"
+            @change="${this._handleColumnViewChange}"
+            .value="${this.columnView}"
+          >
+            ${repeat(
+              CALL_TREE_VIEWS,
+              (view) => view.id,
+              (view) =>
+                html`<vscode-option value="${view.id}" ?selected="${this.columnView === view.id}"
+                  >${this.columnOverrides[view.id] ? `${view.id} •` : view.id}</vscode-option
+                >`,
+            )}
+          </vs-select>
+
           <div slot="actions">
             <vscode-toolbar-button
               icon="desktop-download"
@@ -188,8 +241,81 @@ export class AnalysisView extends LitElement {
           ${skeleton}
           <div id="analysis-table"></div>
         </div>
+        <context-menu @menu-select="${this._handleColumnMenuSelect}"></context-menu>
       </div>
     `;
+  }
+
+  private _handleColumnViewChange(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const id = target.value || 'General';
+    this._setColumnView(id);
+    updateSetting('callTree.columnView', id);
+  }
+
+  /** Effective fields for a view id: the user override, else the built-in preset. */
+  private _columnViewFields(id: string): string[] | null {
+    return this.columnOverrides[id] ?? getColumnView(CALL_TREE_VIEWS, id)?.fields ?? null;
+  }
+
+  private _setColumnView(id: string) {
+    this.columnView = id;
+    if (this.analysisTable) {
+      applyColumnView(this.analysisTable, this._columnViewFields(id), ALWAYS_VISIBLE);
+    }
+  }
+
+  /** Applies the active view and wires the header menu once the table is built. */
+  private _initTableColumns(table: Tabulator) {
+    applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
+    const header = table.element.querySelector<HTMLElement>('.tabulator-header');
+    header?.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      if (this.contextMenu) {
+        const hasOverride = !!this.columnOverrides[this.columnView];
+        this.contextMenu.show(
+          buildColumnMenuItems(
+            table,
+            this.columnView,
+            CALL_TREE_VIEWS,
+            ALWAYS_VISIBLE,
+            hasOverride,
+          ),
+          event.clientX,
+          event.clientY,
+        );
+      }
+    });
+  }
+
+  private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
+    const { itemId } = e.detail;
+    const table = this.analysisTable;
+    if (!table) {
+      return;
+    }
+    if (itemId.startsWith('view:')) {
+      this._setColumnView(itemId.slice('view:'.length));
+      return;
+    }
+    if (itemId.startsWith('col:')) {
+      const field = itemId.slice('col:'.length);
+      const fields = toggleField(
+        this._columnViewFields(this.columnView),
+        field,
+        getTableFields(table),
+      );
+      this.columnOverrides = { ...this.columnOverrides, [this.columnView]: fields };
+      applyColumnView(table, fields, ALWAYS_VISIBLE);
+      updateSetting('callTree.columnOverrides', this.columnOverrides);
+      return;
+    }
+    if (itemId === 'reset' && this.columnOverrides[this.columnView]) {
+      const { [this.columnView]: _removed, ...rest } = this.columnOverrides;
+      this.columnOverrides = rest;
+      applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
+      updateSetting('callTree.columnOverrides', this.columnOverrides);
+    }
   }
 
   _copyToClipboard() {
@@ -361,6 +487,7 @@ export class AnalysisView extends LitElement {
     });
 
     await tableBuilt;
+    this._initTableColumns(this.analysisTable);
   }
 
   _resetFindWidget() {
