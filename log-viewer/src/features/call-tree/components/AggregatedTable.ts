@@ -72,7 +72,9 @@ export function createAggregatedTable(
       {
         title: 'Name',
         field: 'text',
-        frozen: true,
+        // Sticky column parked: frozen layout fights the vertical virtual renderer.
+        // Re-add with _syncTableWidth in VirtualVerticalRenderer.
+        // frozen: true,
         minWidth: 200,
         headerSortTristate: true,
         bottomCalc: () => 'Total',
@@ -229,6 +231,11 @@ export function createAggregatedTable(
         limit: rootMethod.governorLimits.queryRows.limit,
         visible: false,
       }),
+      createHeapColumn(rootMethod.governorLimits),
+      createHeapColumn(rootMethod.governorLimits, 'heapAllocated.self', 'Heap (self)', false),
+      createGovernorCostColumn(rootMethod.governorLimits),
+      createGovernorPeakColumn(rootMethod.governorLimits),
+      // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',
         field: 'totalTime',
@@ -288,10 +295,6 @@ export function createAggregatedTable(
         formatterParams: { precision: 2, totalValue: rootMethod.duration.total },
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
-      createHeapColumn(rootMethod.governorLimits),
-      createHeapColumn(rootMethod.governorLimits, 'heapAllocated.self', 'Heap (self)', false),
-      createGovernorCostColumn(rootMethod.governorLimits),
-      createGovernorPeakColumn(rootMethod.governorLimits),
     ],
   });
   tableRef.current = table;

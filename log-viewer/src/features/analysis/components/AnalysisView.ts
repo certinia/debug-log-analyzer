@@ -171,7 +171,7 @@ export class AnalysisView extends LitElement {
     return html`
       <div class="analysis-view">
         <datagrid-filter-bar>
-          <div slot="filters" class="filter-container">
+          <div slot="table-actions" class="filter-container">
             <vscode-button
               secondary
               aria-label="Expand all"
@@ -187,6 +187,27 @@ export class AnalysisView extends LitElement {
               >Collapse</vscode-button
             >
 
+            <vs-select
+              id="column-view"
+              prefix="Columns"
+              label="Column view"
+              @change="${this._handleColumnViewChange}"
+              @vs-reset-option="${this._onResetOption}"
+              .value="${this.columnView}"
+              .resettableValues="${Object.keys(this.columnOverrides)}"
+            >
+              ${repeat(
+                CALL_TREE_VIEWS,
+                (view) => view.id,
+                (view) =>
+                  html`<vscode-option value="${view.id}" ?selected="${this.columnView === view.id}"
+                    >${view.id}</vscode-option
+                  >`,
+              )}
+            </vs-select>
+          </div>
+
+          <div slot="filters" class="filter-container">
             <vscode-checkbox @change="${this._handleShowDetailsChange}">Details</vscode-checkbox>
           </div>
 
@@ -203,25 +224,13 @@ export class AnalysisView extends LitElement {
             <vscode-option>Type</vscode-option>
           </vs-select>
 
-          <vs-select
-            slot="group"
-            id="column-view"
-            prefix="Columns"
-            label="Column view"
-            @change="${this._handleColumnViewChange}"
-            .value="${this.columnView}"
-          >
-            ${repeat(
-              CALL_TREE_VIEWS,
-              (view) => view.id,
-              (view) =>
-                html`<vscode-option value="${view.id}" ?selected="${this.columnView === view.id}"
-                  >${this.columnOverrides[view.id] ? `${view.id} •` : view.id}</vscode-option
-                >`,
-            )}
-          </vs-select>
-
           <div slot="actions">
+            <vscode-toolbar-button
+              icon="list-selection"
+              label="Columns"
+              title="Columns"
+              @click=${this._openColumnMenu}
+            ></vscode-toolbar-button>
             <vscode-toolbar-button
               icon="desktop-download"
               label="Export to CSV"
@@ -271,21 +280,44 @@ export class AnalysisView extends LitElement {
     const header = table.element.querySelector<HTMLElement>('.tabulator-header');
     header?.addEventListener('contextmenu', (event) => {
       event.preventDefault();
-      if (this.contextMenu) {
-        const hasOverride = !!this.columnOverrides[this.columnView];
-        this.contextMenu.show(
-          buildColumnMenuItems(
-            table,
-            this.columnView,
-            CALL_TREE_VIEWS,
-            ALWAYS_VISIBLE,
-            hasOverride,
-          ),
-          event.clientX,
-          event.clientY,
-        );
-      }
+      this._showColumnMenu(event.clientX, event.clientY);
     });
+  }
+
+  private _showColumnMenu(x: number, y: number) {
+    if (!this.contextMenu || !this.analysisTable) {
+      return;
+    }
+    this.contextMenu.show(
+      buildColumnMenuItems(
+        this.analysisTable,
+        this.columnView,
+        CALL_TREE_VIEWS,
+        ALWAYS_VISIBLE,
+        Object.keys(this.columnOverrides),
+      ),
+      x,
+      y,
+    );
+  }
+
+  private _openColumnMenu(event: Event) {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this._showColumnMenu(rect.left, rect.bottom);
+  }
+
+  /** Rebuilds the open column menu so checkmarks/reset icons reflect current state. */
+  private _refreshColumnMenu() {
+    if (!this.contextMenu?.isVisible() || !this.analysisTable) {
+      return;
+    }
+    this.contextMenu.items = buildColumnMenuItems(
+      this.analysisTable,
+      this.columnView,
+      CALL_TREE_VIEWS,
+      ALWAYS_VISIBLE,
+      Object.keys(this.columnOverrides),
+    );
   }
 
   private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
@@ -296,6 +328,7 @@ export class AnalysisView extends LitElement {
     }
     if (itemId.startsWith('view:')) {
       this._setColumnView(itemId.slice('view:'.length));
+      this._refreshColumnMenu();
       return;
     }
     if (itemId.startsWith('col:')) {
@@ -308,14 +341,31 @@ export class AnalysisView extends LitElement {
       this.columnOverrides = { ...this.columnOverrides, [this.columnView]: fields };
       applyColumnView(table, fields, ALWAYS_VISIBLE);
       updateSetting('callTree.columnOverrides', this.columnOverrides);
+      this._refreshColumnMenu();
       return;
     }
-    if (itemId === 'reset' && this.columnOverrides[this.columnView]) {
-      const { [this.columnView]: _removed, ...rest } = this.columnOverrides;
-      this.columnOverrides = rest;
-      applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
-      updateSetting('callTree.columnOverrides', this.columnOverrides);
+    if (itemId.startsWith('reset:')) {
+      this._resetColumns(itemId.slice('reset:'.length));
+      this._refreshColumnMenu();
     }
+  }
+
+  private _onResetOption(event: CustomEvent<{ value: string }>) {
+    this._resetColumns(event.detail.value);
+  }
+
+  /** Clears a view's override, restoring its built-in columns (defaults to the active view). */
+  private _resetColumns(id: string = this.columnView) {
+    const table = this.analysisTable;
+    if (!table || !this.columnOverrides[id]) {
+      return;
+    }
+    const { [id]: _removed, ...rest } = this.columnOverrides;
+    this.columnOverrides = rest;
+    if (id === this.columnView) {
+      applyColumnView(table, this._columnViewFields(id), ALWAYS_VISIBLE);
+    }
+    updateSetting('callTree.columnOverrides', this.columnOverrides);
   }
 
   _copyToClipboard() {

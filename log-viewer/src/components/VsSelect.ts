@@ -1,11 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
+import '#vscode-elements/vscode-icon.js';
+
 import { VscodeSingleSelect } from '#vscode-elements/vscode-single-select.js';
-import { css, html, type TemplateResult } from 'lit';
+import { css, html, nothing, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
+import { repeat } from 'lit/directives/repeat.js';
 
 import { selectFaceText } from './selectFaceText.js';
 
@@ -85,6 +88,16 @@ export const selectSizingStyles = css`
   .combobox-face .face-prefix {
     padding-left: 4px;
   }
+
+  /* Rows carrying a reset affordance lay the icon out at the trailing edge. */
+  .option.resettable-option {
+    display: flex;
+    align-items: center;
+  }
+
+  .option-reset {
+    margin-left: auto;
+  }
 `;
 
 /** vscode-single-select where the control fits the selected value and the popup its widest option. */
@@ -100,6 +113,13 @@ export class VsSelect extends VscodeSingleSelect {
   @property({ type: String })
   emptyValue = 'None';
 
+  /**
+   * Option values shown as "edited": each gets a trailing reset icon (and a `•`
+   * marker on both the row and the face). Empty → default select behaviour.
+   */
+  @property({ attribute: false })
+  resettableValues: string[] = [];
+
   private _faceContent(): TemplateResult {
     const { prefixText, valueText } = selectFaceText({
       prefix: this.prefix,
@@ -107,10 +127,82 @@ export class VsSelect extends VscodeSingleSelect {
       value: this.value,
       emptyValue: this.emptyValue,
     });
+    const marker = this.resettableValues.includes(this.value) ? ' •' : '';
     return html`${prefixText ? html`<span class="face-prefix">${prefixText}</span>` : ''}<span
         class="face-value"
-        >${valueText}</span
+        >${valueText}${marker}</span
       >`;
+  }
+
+  private _onResetOption(event: Event, value: string): void {
+    // Keep the click from selecting/closing the row it lives in.
+    event.stopPropagation();
+    this.dispatchEvent(
+      new CustomEvent('vs-reset-option', { detail: { value }, bubbles: true, composed: true }),
+    );
+  }
+
+  protected override _renderOptions(): TemplateResult | TemplateResult[] {
+    if (this.resettableValues.length === 0) {
+      return super._renderOptions();
+    }
+
+    return html`
+      <ul
+        aria-label=${ifDefined(this.label ?? undefined)}
+        class="options"
+        id="select-listbox"
+        role="listbox"
+        tabindex="-1"
+        @click=${this._onOptionClick}
+        @mouseover=${this._onOptionMouseOver}
+      >
+        ${repeat(
+          this._opts.options,
+          (op) => op.index,
+          (op, index) => {
+            if (!op.visible) {
+              return nothing;
+            }
+            const active = op.index === this._opts.activeIndex && !op.disabled;
+            const selected = this._opts.getIsIndexSelected(op.index);
+            const edited = this.resettableValues.includes(op.value);
+            const optionClasses = {
+              active,
+              disabled: op.disabled,
+              option: true,
+              'single-select': true,
+              'resettable-option': edited,
+              selected,
+            };
+            return html`
+              <li
+                aria-selected=${selected ? 'true' : 'false'}
+                class=${classMap(optionClasses)}
+                data-index=${op.index}
+                data-filtered-index=${index}
+                id=${`op-${op.index}`}
+                role="option"
+                tabindex="-1"
+              >
+                <span class="option-label">${op.label}${edited ? ' •' : ''}</span>
+                ${
+                  edited
+                    ? html`<vscode-icon
+                        name="discard"
+                        action-icon
+                        class="option-reset"
+                        title="Reset ${op.label} columns"
+                        @click=${(event: Event) => this._onResetOption(event, op.value)}
+                      ></vscode-icon>`
+                    : nothing
+                }
+              </li>
+            `;
+          },
+        )}
+      </ul>
+    `;
   }
 
   protected override _renderSelectFace(): TemplateResult {

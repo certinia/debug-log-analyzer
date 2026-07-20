@@ -232,9 +232,9 @@ export class VirtualVerticalRenderer extends Renderer {
   // Pending rIC handle for the pre-warmer; cancelled on destroy/clearRows.
   private idlePrewarmHandle: number | null = null;
 
-  // Last column-total width written to tableElement.minWidth; skips redundant
-  // per-frame style writes (see _syncTableWidth).
-  private lastTableMinWidth = -1;
+  // Parked with the sticky Name column — re-add alongside _syncTableWidth().
+  // Dedupes per-frame tableElement.minWidth writes.
+  // private lastTableMinWidth = -1;
 
   // Last scrollLeft piped to scrollHorizontal (which writes DOM + dispatches
   // unconditionally — pipe only on change). NaN → first frame always pipes.
@@ -378,19 +378,20 @@ export class VirtualVerticalRenderer extends Renderer {
   }
 
   /**
-   * Size the table box to the full column width. Virtual rows are viewport-
-   * width with cells overflowing; without this the sticky containing block is
-   * only viewport-wide and frozen body cells scroll away. Stock renderers get
-   * full-width rows for free; the virtual renderer must set it explicitly.
+   * Sizes the table box to full column width so the sticky frozen column's
+   * containing block spans all columns (virtual rows are only viewport-wide).
+   *
+   * Parked with the sticky Name column: the full-width box fights the vertical
+   * renderer. Re-add with `lastTableMinWidth` (above) and the two call sites.
    */
-  private _syncTableWidth(): void {
-    const self = this._self();
-    const width = self.table.columnManager.getWidth();
-    if (width !== this.lastTableMinWidth) {
-      this.lastTableMinWidth = width;
-      self.tableElement.style.minWidth = `${width}px`;
-    }
-  }
+  // private _syncTableWidth(): void {
+  //   const self = this._self();
+  //   const width = self.table.columnManager.getWidth();
+  //   if (width !== this.lastTableMinWidth) {
+  //     this.lastTableMinWidth = width;
+  //     self.tableElement.style.minWidth = `${width}px`;
+  //   }
+  // }
 
   /** RowManager lifecycle: holder scroll event (reads live scrollTop). */
   scrollRows(_top: number, _dir: boolean): void {
@@ -809,7 +810,7 @@ export class VirtualVerticalRenderer extends Renderer {
       this._detachAllRendered();
       self.tableElement.style.paddingTop = '0';
       self.tableElement.style.paddingBottom = '0';
-      this._syncTableWidth();
+      // this._syncTableWidth(); // disabled with the sticky Name column (see below)
       // Stock dispatches after every fill, including empty ones — GroupRows
       // relies on it to set minWidth when no data rows are visible.
       self.dispatch('render-virtual-fill');
@@ -911,7 +912,7 @@ export class VirtualVerticalRenderer extends Renderer {
       newBottom === lastIdx ? 0 : Math.max(0, this._totalHeight() - this._cumHeight(newBottom + 1));
     self.tableElement.style.paddingTop = `${paddingTop}px`;
     self.tableElement.style.paddingBottom = `${paddingBottom}px`;
-    this._syncTableWidth();
+    // this._syncTableWidth(); // disabled with the sticky Name column (see below)
 
     this.vDomTop = newTop;
     this.vDomBottom = newBottom;

@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - 🔴 **Timeline exception markers**: exceptions show as red lines, with a **Throws** count in method tooltips. ([#828])
-- 🧩 **Column views**: switch the Call Tree, Analysis and Database (SOQL/DML) tables between preset column sets (`General`, `Time`, `Governor Limits`, `Database`, `Memory`), show/hide individual columns from the header right-click menu, and **Reset** a view to its defaults. Choices persist per view. ([#298])
+- 🧩 **Column views**: switch the Call Tree, Analysis and Database (SOQL/DML) tables between preset column sets (`General`, `Time`, `Governor Limits`, `Database`, `Memory`)
+  - Show/hide individual columns from the **Columns** toolbar button or the header right-click menu; inline **reset** to restore defaults. Choices persist per view. ([#298])
 - 📊 New Call Tree columns: **SOSL Count/Rows**, **Heap Allocated** (+ Self), **Avg Self Time**, and optional **Self** variants for every governor metric — surfaced through the `Governor Limits`, `Database` and `Memory` views. ([#298])
 - 🔎 **Database tables**: Row Count renders as a **% bar** against the governor limit, and SOQL gains a **Query Plan** view (Relative Cost, Leading Operation, SObject Type, Cardinality). ([#298])
 
@@ -509,6 +510,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#848]: https://github.com/certinia/debug-log-analyzer/issues/848
 [#827]: https://github.com/certinia/debug-log-analyzer/issues/827
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
+[#32]: https://github.com/certinia/debug-log-analyzer/issues/32
 
 <!-- v1.20.0 -->
 

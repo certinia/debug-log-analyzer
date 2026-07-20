@@ -182,20 +182,24 @@ const CHECKED = '✓ ';
 const UNCHECKED = '  ';
 
 /**
- * Builds the column-header context menu: the preset views (active one ticked),
- * a per-column visibility toggle for every column except the always-visible
- * ones, then a Reset item (enabled only when the active view is overridden).
+ * Builds the column-header context menu: the preset views (active one ticked,
+ * edited ones carrying an inline reset icon), then a per-column visibility
+ * toggle for every column except the always-visible ones.
  */
 export function buildColumnMenuItems(
   table: Tabulator,
   activeViewId: string,
   views: ColumnView[],
   alwaysVisible: string[],
-  hasOverride: boolean,
+  editedViewIds: string[],
 ): ContextMenuItem[] {
   const items: ContextMenuItem[] = views.map((view) => ({
     id: `view:${view.id}`,
     label: `${activeViewId === view.id ? CHECKED : UNCHECKED}${view.id}`,
+    keepOpen: true,
+    ...(editedViewIds.includes(view.id)
+      ? { action: { id: `reset:${view.id}`, icon: 'discard', title: `Reset ${view.id} columns` } }
+      : {}),
   }));
 
   items.push({ id: 'view-sep', label: '', separator: true });
@@ -209,13 +213,9 @@ export function buildColumnMenuItems(
     items.push({
       id: `col:${field}`,
       label: `${column.isVisible() ? CHECKED : UNCHECKED}${title}`,
+      keepOpen: true,
     });
   }
-
-  items.push(
-    { id: 'reset-sep', label: '', separator: true },
-    { id: 'reset', label: 'Reset columns', disabled: !hasOverride },
-  );
 
   return items;
 }

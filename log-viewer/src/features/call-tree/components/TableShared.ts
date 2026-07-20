@@ -70,7 +70,7 @@ export function formatBytes(bytes: number): string {
 }
 
 /**
- * The shared "Gov. Cost (%)" column — the average governor consumption across all
+ * The shared "Gov. Avg (%)" column — the average governor consumption across all
  * governors on a call path (see {@link governorCost}), rendered as a progress
  * bar. Reused across all call-tree/analysis tables. `governorCost` is populated
  * by {@link annotateGovernorCost}; the tooltip breaks the average down per metric.
@@ -78,7 +78,7 @@ export function formatBytes(bytes: number): string {
 export function createGovernorCostColumn(governorLimits: GovernorLimits): ColumnDefinition {
   const formatterParams = { precision: 0, totalValue: 100, showPercentageText: false };
   return {
-    title: 'Gov. Cost (%)',
+    title: 'Gov. Avg (%)',
     field: 'governorCost',
     sorter: 'number',
     cssClass: 'number-cell',
@@ -102,21 +102,21 @@ export function createGovernorCostColumn(governorLimits: GovernorLimits): Column
         const limit = m.label === 'Heap' ? formatBytes(m.limit) : `${m.limit}`;
         return `${m.label} ${used}/${limit} (${m.percent.toFixed(1)}%)`;
       });
-      return `${total.toFixed(1)}% avg across all governors<br>${rows.join('<br>')}`;
+      return `${total.toFixed(1)}% — average utilisation across all governors<br>${rows.join('<br>')}`;
     },
   };
 }
 
 /**
- * The "Peak Limit (%)" column — the single tightest governor consumed on a path
+ * The "Gov. Peak (%)" column — the single tightest governor consumed on a path
  * (see {@link governorCostMax}), rendered as a bar. Complements the averaged
- * Gov. Cost column; hidden by default (surfaced by the Governor Limits view or a
+ * Gov. Avg column; hidden by default (surfaced by the Governor Limits view or a
  * user toggle). The tooltip names which governor is the peak.
  */
 export function createGovernorPeakColumn(governorLimits: GovernorLimits): ColumnDefinition {
   const formatterParams = { precision: 0, totalValue: 100, showPercentageText: false };
   return {
-    title: 'Peak Limit (%)',
+    title: 'Gov. Peak (%)',
     field: 'governorCostMax',
     visible: false,
     sorter: 'number',
@@ -138,7 +138,7 @@ export function createGovernorPeakColumn(governorLimits: GovernorLimits): Column
       }
       const used = top.label === 'Heap' ? formatBytes(top.used) : `${top.used}`;
       const limit = top.label === 'Heap' ? formatBytes(top.limit) : `${top.limit}`;
-      return `Peak ${top.label} ${used}/${limit} (${peak.toFixed(1)}%)`;
+      return `Tightest single governor: ${top.label} ${used}/${limit} (${peak.toFixed(1)}%)`;
     },
   };
 }

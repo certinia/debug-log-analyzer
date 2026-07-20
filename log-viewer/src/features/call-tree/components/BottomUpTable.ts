@@ -138,7 +138,9 @@ export function createBottomUpTable(
       {
         title: 'Name',
         field: 'text',
-        frozen: true,
+        // Sticky column parked: frozen layout fights the vertical virtual renderer.
+        // Re-add with _syncTableWidth in VirtualVerticalRenderer.
+        // frozen: true,
         minWidth: 200,
         headerSortTristate: true,
         bottomCalc: () => 'Total',
@@ -281,6 +283,11 @@ export function createBottomUpTable(
         limit: rootMethod.governorLimits.queryRows.limit,
         visible: false,
       }),
+      createHeapColumn(rootMethod.governorLimits),
+      createHeapColumn(rootMethod.governorLimits, 'heapAllocated.self', 'Heap (self)', false),
+      createGovernorCostColumn(rootMethod.governorLimits),
+      createGovernorPeakColumn(rootMethod.governorLimits),
+      // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',
         field: 'totalTime',
@@ -339,10 +346,6 @@ export function createBottomUpTable(
         formatterParams: { precision: 2, totalValue: rootMethod.duration.total },
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
-      createHeapColumn(rootMethod.governorLimits),
-      createHeapColumn(rootMethod.governorLimits, 'heapAllocated.self', 'Heap (self)', false),
-      createGovernorCostColumn(rootMethod.governorLimits),
-      createGovernorPeakColumn(rootMethod.governorLimits),
     ],
     ...tabulatorOptionOverrides,
   });

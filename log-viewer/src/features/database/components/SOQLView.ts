@@ -165,23 +165,25 @@ export class SOQLView extends LitElement {
 
       <datagrid-filter-bar>
         <vs-select
-          slot="filters"
+          slot="table-actions"
           id="soql-column-view"
           prefix="Columns"
           label="Column view"
           @change="${this._handleColumnViewChange}"
+          @vs-reset-option="${this._onResetOption}"
           .value="${this.columnView}"
+          .resettableValues="${Object.keys(this.columnOverrides)}"
         >
           ${SOQL_VIEWS.map(
             (view) =>
               html`<vscode-option value="${view.id}" ?selected="${this.columnView === view.id}"
-                >${this.columnOverrides[view.id] ? `${view.id} •` : view.id}</vscode-option
+                >${view.id}</vscode-option
               >`,
           )}
         </vs-select>
 
         <vs-select
-          slot="filters"
+          slot="group"
           id="soql-groupby-dropdown"
           prefix="Group"
           label="Group by"
@@ -193,6 +195,12 @@ export class SOQLView extends LitElement {
         </vs-select>
 
         <div slot="actions">
+          <vscode-toolbar-button
+            icon="list-selection"
+            label="Columns"
+            title="Columns"
+            @click=${this._openColumnMenu}
+          ></vscode-toolbar-button>
           <vscode-toolbar-button
             icon="desktop-download"
             label="Export to CSV"
@@ -240,15 +248,44 @@ export class SOQLView extends LitElement {
     const header = table.element.querySelector<HTMLElement>('.tabulator-header');
     header?.addEventListener('contextmenu', (event) => {
       event.preventDefault();
-      if (this.contextMenu) {
-        const hasOverride = !!this.columnOverrides[this.columnView];
-        this.contextMenu.show(
-          buildColumnMenuItems(table, this.columnView, SOQL_VIEWS, ALWAYS_VISIBLE, hasOverride),
-          event.clientX,
-          event.clientY,
-        );
-      }
+      this._showColumnMenu(event.clientX, event.clientY);
     });
+  }
+
+  private _showColumnMenu(x: number, y: number) {
+    if (!this.contextMenu || !this.soqlTable) {
+      return;
+    }
+    this.contextMenu.show(
+      buildColumnMenuItems(
+        this.soqlTable,
+        this.columnView,
+        SOQL_VIEWS,
+        ALWAYS_VISIBLE,
+        Object.keys(this.columnOverrides),
+      ),
+      x,
+      y,
+    );
+  }
+
+  private _openColumnMenu(event: Event) {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this._showColumnMenu(rect.left, rect.bottom);
+  }
+
+  /** Rebuilds the open column menu so checkmarks/reset icons reflect current state. */
+  private _refreshColumnMenu() {
+    if (!this.contextMenu?.isVisible() || !this.soqlTable) {
+      return;
+    }
+    this.contextMenu.items = buildColumnMenuItems(
+      this.soqlTable,
+      this.columnView,
+      SOQL_VIEWS,
+      ALWAYS_VISIBLE,
+      Object.keys(this.columnOverrides),
+    );
   }
 
   private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
@@ -261,6 +298,7 @@ export class SOQLView extends LitElement {
       const id = itemId.slice('view:'.length);
       this._setColumnView(id);
       updateSetting('database.soql.columnView', id);
+      this._refreshColumnMenu();
       return;
     }
     if (itemId.startsWith('col:')) {
@@ -273,14 +311,31 @@ export class SOQLView extends LitElement {
       this.columnOverrides = { ...this.columnOverrides, [this.columnView]: fields };
       applyColumnView(table, fields, ALWAYS_VISIBLE);
       updateSetting('database.soql.columnOverrides', this.columnOverrides);
+      this._refreshColumnMenu();
       return;
     }
-    if (itemId === 'reset' && this.columnOverrides[this.columnView]) {
-      const { [this.columnView]: _removed, ...rest } = this.columnOverrides;
-      this.columnOverrides = rest;
-      applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
-      updateSetting('database.soql.columnOverrides', this.columnOverrides);
+    if (itemId.startsWith('reset:')) {
+      this._resetColumns(itemId.slice('reset:'.length));
+      this._refreshColumnMenu();
     }
+  }
+
+  private _onResetOption(event: CustomEvent<{ value: string }>) {
+    this._resetColumns(event.detail.value);
+  }
+
+  /** Clears a view's override, restoring its built-in columns (defaults to the active view). */
+  private _resetColumns(id: string = this.columnView) {
+    const table = this.soqlTable;
+    if (!table || !this.columnOverrides[id]) {
+      return;
+    }
+    const { [id]: _removed, ...rest } = this.columnOverrides;
+    this.columnOverrides = rest;
+    if (id === this.columnView) {
+      applyColumnView(table, this._columnViewFields(id), ALWAYS_VISIBLE);
+    }
+    updateSetting('database.soql.columnOverrides', this.columnOverrides);
   }
 
   _copyToClipboard() {
@@ -597,24 +652,6 @@ export class SOQLView extends LitElement {
           tooltip: (_e, cell) => cell.getValue() + (queryRowLimit > 0 ? '/' + queryRowLimit : ''),
         },
         {
-          title: 'Time Taken (ms)',
-          field: 'timeTaken',
-          sorter: 'number',
-          cssClass: 'number-cell',
-          width: 120,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          formatter: Number,
-          formatterParams: {
-            thousand: false,
-            precision: 2,
-          },
-          accessorDownload: NumberAccessor,
-          bottomCalcFormatter: Number,
-          bottomCalc: 'sum',
-          bottomCalcFormatterParams: { precision: 2 },
-        },
-        {
           title: 'Aggregations',
           field: 'aggregations',
           sorter: 'number',
@@ -674,6 +711,25 @@ export class SOQLView extends LitElement {
           sorter: 'string',
           width: 140,
           visible: false,
+        },
+        // Time column sits at the far right.
+        {
+          title: 'Time Taken (ms)',
+          field: 'timeTaken',
+          sorter: 'number',
+          cssClass: 'number-cell',
+          width: 120,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          formatter: Number,
+          formatterParams: {
+            thousand: false,
+            precision: 2,
+          },
+          accessorDownload: NumberAccessor,
+          bottomCalcFormatter: Number,
+          bottomCalc: 'sum',
+          bottomCalcFormatterParams: { precision: 2 },
         },
       ],
       rowFormatter: (row) => {

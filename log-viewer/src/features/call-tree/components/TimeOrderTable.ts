@@ -78,7 +78,9 @@ export function createTimeOrderTable(
       {
         title: 'Name',
         field: 'text',
-        frozen: true,
+        // Sticky column parked: frozen layout fights the vertical virtual renderer.
+        // Re-add with _syncTableWidth in VirtualVerticalRenderer.
+        // frozen: true,
         minWidth: 200,
         headerSortTristate: true,
         bottomCalc: () => 'Total',
@@ -201,6 +203,11 @@ export function createTimeOrderTable(
         limit: governorLimits.queryRows.limit,
         visible: false,
       }),
+      createHeapColumn(governorLimits),
+      createHeapColumn(governorLimits, 'heapAllocated.self', 'Heap (self)', false),
+      createGovernorCostColumn(governorLimits),
+      createGovernorPeakColumn(governorLimits),
+      // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',
         field: 'duration.total',
@@ -252,10 +259,6 @@ export function createTimeOrderTable(
           return formatDuration(cell.getValue());
         },
       },
-      createHeapColumn(governorLimits),
-      createHeapColumn(governorLimits, 'heapAllocated.self', 'Heap (self)', false),
-      createGovernorCostColumn(governorLimits),
-      createGovernorPeakColumn(governorLimits),
     ],
   });
   tableRef.current = table;

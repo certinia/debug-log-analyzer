@@ -2,7 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 
-import { ConfigurationTarget, workspace } from 'vscode';
+import { ConfigurationTarget, workspace, type Memento } from 'vscode';
 
 interface Config {
   timeline: {
@@ -65,4 +65,32 @@ export function getConfig(): Config {
 export function updateConfig(section: string, value: unknown): Thenable<void> {
   const config = workspace.getConfiguration('lana');
   return config.update(section, value, ConfigurationTarget.Global);
+}
+
+/**
+ * Column overrides are opaque per-view field maps — private UI state, not user
+ * preferences — so they persist in globalState rather than editable settings.
+ */
+export const COLUMN_OVERRIDE_SECTIONS = [
+  'callTree.columnOverrides',
+  'database.soql.columnOverrides',
+  'database.dml.columnOverrides',
+] as const;
+
+type ColumnOverrides = Record<string, string[]>;
+
+export function getColumnOverrides(globalState: Memento): Record<string, ColumnOverrides> {
+  const overrides: Record<string, ColumnOverrides> = {};
+  for (const section of COLUMN_OVERRIDE_SECTIONS) {
+    overrides[section] = globalState.get<ColumnOverrides>(section, {});
+  }
+  return overrides;
+}
+
+export function updateColumnOverride(
+  globalState: Memento,
+  section: string,
+  value: unknown,
+): Thenable<void> {
+  return globalState.update(section, value);
 }

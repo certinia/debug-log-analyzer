@@ -141,20 +141,22 @@ describe('toggleField', () => {
 });
 
 describe('buildColumnMenuItems', () => {
-  it('lists views, per-column toggles, and a Reset item', () => {
+  it('lists views and per-column toggles, with no standalone Reset item', () => {
     const { table } = fakeTable(['text', 'namespace', 'governorCost']);
-    const items = buildColumnMenuItems(table, 'General', CALL_TREE_VIEWS, ALWAYS_VISIBLE, false);
+    const items = buildColumnMenuItems(table, 'General', CALL_TREE_VIEWS, ALWAYS_VISIBLE, []);
     expect(items.some((i) => i.id === 'view:General')).toBe(true);
     expect(items.some((i) => i.id === 'col:namespace')).toBe(true);
     // Always-visible column has no toggle.
     expect(items.some((i) => i.id === 'col:text')).toBe(false);
-    expect(items.find((i) => i.id === 'reset')?.disabled).toBe(true);
+    // Reset is now an inline per-view action, not a standalone item.
+    expect(items.some((i) => i.id === 'reset')).toBe(false);
   });
 
-  it('enables Reset only when the view is overridden', () => {
+  it('adds an inline reset action only to edited view rows', () => {
     const { table } = fakeTable(['text', 'namespace']);
-    const items = buildColumnMenuItems(table, 'Time', CALL_TREE_VIEWS, ALWAYS_VISIBLE, true);
-    expect(items.find((i) => i.id === 'reset')?.disabled).toBe(false);
+    const items = buildColumnMenuItems(table, 'Time', CALL_TREE_VIEWS, ALWAYS_VISIBLE, ['Time']);
+    expect(items.find((i) => i.id === 'view:Time')?.action?.id).toBe('reset:Time');
+    expect(items.find((i) => i.id === 'view:General')?.action).toBeUndefined();
   });
 });
 
