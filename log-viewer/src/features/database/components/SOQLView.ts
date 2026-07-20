@@ -560,7 +560,7 @@ export class SOQLView extends LitElement {
           },
           width: 40,
           hozAlign: 'center',
-          vertAlign: 'middle',
+          vertAlign: 'top',
           sorter: function (a, b, aRow, bRow, _column, dir, _sorterParams) {
             // Always Sort null values to the bottom (when we do not have selectivity)
             if (a === null) {
