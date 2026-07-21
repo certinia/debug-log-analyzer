@@ -182,6 +182,99 @@ export function createGovernorColumn(opts: {
 }
 
 /**
+ * The shared governor-metric column block common to every call-tree table
+ * (aggregated, bottom-up, time-order): the DML/SOQL/SOSL count & row columns
+ * (Total + hidden Self variants), the Throws Count column, the two Heap columns,
+ * and the Gov. Avg/Peak columns — in display order. Extracted so the block stays
+ * identical across all three tables; spread into each table's `columns` after
+ * its view-specific leading columns (Name, Namespace, …).
+ */
+export function createGovernorMetricColumns(governorLimits: GovernorLimits): ColumnDefinition[] {
+  return [
+    createGovernorColumn({
+      title: 'DML Count',
+      field: 'dmlCount.total',
+      limit: governorLimits.dmlStatements.limit,
+    }),
+    createGovernorColumn({
+      title: 'DML Count (self)',
+      field: 'dmlCount.self',
+      limit: governorLimits.dmlStatements.limit,
+      visible: false,
+    }),
+    createGovernorColumn({
+      title: 'SOQL Count',
+      field: 'soqlCount.total',
+      limit: governorLimits.soqlQueries.limit,
+    }),
+    createGovernorColumn({
+      title: 'SOQL Count (self)',
+      field: 'soqlCount.self',
+      limit: governorLimits.soqlQueries.limit,
+      visible: false,
+    }),
+    createGovernorColumn({
+      title: 'SOSL Count',
+      field: 'soslCount.total',
+      limit: governorLimits.soslQueries.limit,
+    }),
+    createGovernorColumn({
+      title: 'SOSL Count (self)',
+      field: 'soslCount.self',
+      limit: governorLimits.soslQueries.limit,
+      visible: false,
+    }),
+    {
+      title: 'Throws Count',
+      field: 'thrownCount.total',
+      sorter: 'number',
+      cssClass: 'number-cell',
+      width: 60,
+      hozAlign: 'right',
+      headerHozAlign: 'right',
+      bottomCalc: 'sum',
+    },
+    createGovernorColumn({
+      title: 'DML Rows',
+      field: 'dmlRowCount.total',
+      limit: governorLimits.dmlRows.limit,
+    }),
+    createGovernorColumn({
+      title: 'DML Rows (self)',
+      field: 'dmlRowCount.self',
+      limit: governorLimits.dmlRows.limit,
+      visible: false,
+    }),
+    createGovernorColumn({
+      title: 'SOQL Rows',
+      field: 'soqlRowCount.total',
+      limit: governorLimits.queryRows.limit,
+    }),
+    createGovernorColumn({
+      title: 'SOQL Rows (self)',
+      field: 'soqlRowCount.self',
+      limit: governorLimits.queryRows.limit,
+      visible: false,
+    }),
+    createGovernorColumn({
+      title: 'SOSL Rows',
+      field: 'soslRowCount.total',
+      limit: governorLimits.queryRows.limit,
+    }),
+    createGovernorColumn({
+      title: 'SOSL Rows (self)',
+      field: 'soslRowCount.self',
+      limit: governorLimits.queryRows.limit,
+      visible: false,
+    }),
+    createHeapColumn(governorLimits),
+    createHeapColumn(governorLimits, 'heapAllocated.self', 'Heap (self)', false),
+    createGovernorCostColumn(governorLimits),
+    createGovernorPeakColumn(governorLimits),
+  ];
+}
+
+/**
  * The shared "Heap Allocated" column — bytes allocated on a call path, rendered
  * as a bar relative to the heap governor limit. Reused across all
  * call-tree/analysis tables. Pass a `heapAllocated.self` field + `visible: false`

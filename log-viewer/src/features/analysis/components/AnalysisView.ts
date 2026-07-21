@@ -12,7 +12,6 @@ import { repeat } from 'lit/directives/repeat.js';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog } from 'apex-log-parser';
-import '#vscode-elements/vscode-option.js';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { isVisible } from '../../../core/utility/Util.js';
@@ -327,7 +326,9 @@ export class AnalysisView extends LitElement {
       return;
     }
     if (itemId.startsWith('view:')) {
-      this._setColumnView(itemId.slice('view:'.length));
+      const id = itemId.slice('view:'.length);
+      this._setColumnView(id);
+      updateSetting('callTree.columnView', id);
       this._refreshColumnMenu();
       return;
     }

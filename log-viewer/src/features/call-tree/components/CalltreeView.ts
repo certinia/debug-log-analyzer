@@ -1021,7 +1021,9 @@ export class CalltreeView extends LitElement {
     // open (keepOpen), so refresh its items live and leave contextMenuTable set —
     // it's cleared on menu-close.
     if (itemId.startsWith('view:')) {
-      this._setColumnView(itemId.slice('view:'.length));
+      const id = itemId.slice('view:'.length);
+      this._setColumnView(id);
+      updateSetting('callTree.columnView', id);
       this._refreshColumnMenu();
       return;
     }
