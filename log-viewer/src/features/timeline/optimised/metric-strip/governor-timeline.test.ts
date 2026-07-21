@@ -9,13 +9,16 @@ const METRICS = new Map<string, HeatStripMetric>([
   ['soqlQueries', { id: 'soqlQueries', displayName: 'SOQL Queries', unit: '', priority: 1 }],
   ['queryRows', { id: 'queryRows', displayName: 'Query Rows', unit: '', priority: 2 }],
   ['cpuTime', { id: 'cpuTime', displayName: 'CPU Time', unit: 'ms', priority: 0 }],
+  ['heapSize', { id: 'heapSize', displayName: 'Heap Size', unit: 'bytes', priority: 3 }],
 ]);
 
 // Authoritative fixed limits. soqlQueries → threshold 1 (per-event); queryRows → threshold 100.
+// heapSize → threshold floor(6000000/500) = 12000, so heap deltas below use ≥12000 magnitudes.
 const LIMITS = new Map<string, number>([
   ['soqlQueries', 100],
   ['queryRows', 50000],
   ['cpuTime', 10000],
+  ['heapSize', 6000000],
 ]);
 
 const delta = (
@@ -116,5 +119,46 @@ describe('buildGovernorTimeSeries', () => {
     const observations = Array.from({ length: 5 }, (_, i) => delta(i + 1, 'soqlQueries', 1));
     const series = build(observations);
     expect(series.events.length).toBe(5);
+  });
+});
+
+// Heap deltas can go negative (a deallocation is a negative HEAP_ALLOCATE), and its
+// cumulative "Maximum heap size" correction is often the only source (FINE logs emit
+// no HEAP_ALLOCATE events).
+describe('buildGovernorTimeSeries — heap reconciliation', () => {
+  const heapUsed = (obs: LimitObservation[]) =>
+    build(obs).events.map((e) => e.values.get('heapSize')?.used);
+  const heapTracked = (obs: LimitObservation[]) =>
+    build(obs).events.map((e) => e.values.get('heapSize')?.tracked);
+
+  it('falls on a negative delta (deallocation via negative HEAP_ALLOCATE)', () => {
+    const obs = [
+      delta(10, 'heapSize', 100000),
+      delta(20, 'heapSize', 50000),
+      delta(30, 'heapSize', -40000),
+    ];
+    expect(heapUsed(obs)).toEqual([100000, 150000, 110000]);
+    expect(heapTracked(obs)).toEqual([undefined, undefined, undefined]);
+  });
+
+  it('re-baselines to the authoritative cumulative, then keeps tracking, flagging divergence', () => {
+    const obs = [
+      delta(10, 'heapSize', 50000),
+      absolute(20, 'heapSize', 200000), // peak > tracked 50000: snaps up, then +30000
+      delta(30, 'heapSize', 30000),
+    ];
+    expect(heapUsed(obs)).toEqual([50000, 200000, 230000]);
+    // Our lower observed count is surfaced (grey) once cumulative-anchored.
+    expect(heapTracked(obs)).toEqual([undefined, 50000, 80000]);
+  });
+
+  it('steps to the cumulative with no divergence when there are no HEAP_ALLOCATE events (FINE log)', () => {
+    const obs = [
+      absolute(10, 'heapSize', 0),
+      absolute(20, 'heapSize', 219591),
+      absolute(30, 'heapSize', 219591),
+    ];
+    expect(heapUsed(obs)).toEqual([0, 219591, 219591]);
+    expect(heapTracked(obs)).toEqual([undefined, undefined, undefined]);
   });
 });

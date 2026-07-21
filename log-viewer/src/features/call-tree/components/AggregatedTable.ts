@@ -8,13 +8,13 @@ import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenge
 import { formatDuration } from '../../../core/utility/Util.js';
 import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
 import { minMaxTreeFilter } from '../../../tabulator/filters/MinMax.js';
-import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { toAggregatedCallTree, type AggregatedRow } from '../utils/Aggregation.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import {
   commonColumnDefaults,
+  createGovernorMetricColumns,
   headerSortElement,
   registerTableModules,
   type TableCallbacks,
@@ -40,8 +40,10 @@ export function createAggregatedTable(
   const tableRef: { current: Tabulator | undefined } = { current: undefined };
   const selfTimeBottomCalc = makeSumSelfTimeAllVisible(() => tableRef.current);
 
+  const tableData = toAggregatedCallTree(rootMethod.children, rootMethod.governorLimits);
+
   const table = new Tabulator(container, {
-    data: toAggregatedCallTree(rootMethod.children),
+    data: tableData,
     index: 'id',
     layout: 'fitColumns',
     placeholder: 'No Call Tree Available',
@@ -65,6 +67,10 @@ export function createAggregatedTable(
       {
         title: 'Name',
         field: 'text',
+        // Sticky column parked: frozen layout fights the vertical virtual renderer.
+        // Re-add with _syncTableWidth in VirtualVerticalRenderer.
+        // frozen: true,
+        minWidth: 200,
         headerSortTristate: true,
         bottomCalc: () => 'Total',
         cssClass: 'datagrid-textarea datagrid-code-text',
@@ -108,6 +114,7 @@ export function createAggregatedTable(
           }
         },
         widthGrow: 5,
+        widthShrink: 1,
       },
       {
         title: 'Namespace',
@@ -126,6 +133,13 @@ export function createAggregatedTable(
         headerFilterLiveFilter: false,
       },
       {
+        title: 'Caller Namespace',
+        field: 'callerNamespace',
+        sorter: 'string',
+        width: 120,
+        visible: false,
+      },
+      {
         title: 'Calls',
         field: 'callCount',
         sorter: 'number',
@@ -136,122 +150,8 @@ export function createAggregatedTable(
         headerHozAlign: 'right',
         bottomCalc: 'sum',
       },
-      {
-        title: 'DML Count',
-        field: 'dmlCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 70,
-        minWidth: 60,
-        bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatter,
-        bottomCalcFormatterParams: {
-          precision: 0,
-          totalValue: rootMethod.governorLimits.dmlStatements.limit,
-          showPercentageText: false,
-        },
-        formatter: progressFormatter,
-        formatterParams: {
-          precision: 0,
-          totalValue: rootMethod.governorLimits.dmlStatements.limit,
-          showPercentageText: false,
-        },
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        tooltip(_event, cell, _onRender) {
-          const maxDmlStatements = rootMethod.governorLimits.dmlStatements.limit;
-          return cell.getValue() + (maxDmlStatements > 0 ? '/' + maxDmlStatements : '');
-        },
-      },
-      {
-        title: 'SOQL Count',
-        field: 'soqlCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 70,
-        minWidth: 60,
-        bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatter,
-        bottomCalcFormatterParams: {
-          precision: 0,
-          totalValue: rootMethod.governorLimits.soqlQueries.limit,
-          showPercentageText: false,
-        },
-        formatter: progressFormatter,
-        formatterParams: {
-          precision: 0,
-          totalValue: rootMethod.governorLimits.soqlQueries.limit,
-          showPercentageText: false,
-        },
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        tooltip(_event, cell, _onRender) {
-          const maxSoql = rootMethod.governorLimits.soqlQueries.limit;
-          return cell.getValue() + (maxSoql > 0 ? '/' + maxSoql : '');
-        },
-      },
-      {
-        title: 'Throws Count',
-        field: 'thrownCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 60,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
-      {
-        title: 'DML Rows',
-        field: 'dmlRowCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 60,
-        bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatter,
-        bottomCalcFormatterParams: {
-          precision: 0,
-          totalValue: rootMethod.governorLimits.dmlRows.limit,
-          showPercentageText: false,
-        },
-        formatter: progressFormatter,
-        formatterParams: {
-          precision: 0,
-          totalValue: rootMethod.governorLimits.dmlRows.limit,
-          showPercentageText: false,
-        },
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        tooltip(_event, cell, _onRender) {
-          const maxDmlRows = rootMethod.governorLimits.dmlRows.limit;
-          return cell.getValue() + (maxDmlRows > 0 ? '/' + maxDmlRows : '');
-        },
-      },
-      {
-        title: 'SOQL Rows',
-        field: 'soqlRowCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 60,
-        bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatter,
-        bottomCalcFormatterParams: {
-          precision: 0,
-          totalValue: rootMethod.governorLimits.queryRows.limit,
-          showPercentageText: false,
-        },
-        formatter: progressFormatter,
-        formatterParams: {
-          precision: 0,
-          totalValue: rootMethod.governorLimits.queryRows.limit,
-          showPercentageText: false,
-        },
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        tooltip(_event, cell, _onRender) {
-          const maxQueryRows = rootMethod.governorLimits.queryRows.limit;
-          return cell.getValue() + (maxQueryRows > 0 ? '/' + maxQueryRows : '');
-        },
-      },
+      ...createGovernorMetricColumns(rootMethod.governorLimits),
+      // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',
         field: 'totalTime',
@@ -296,6 +196,19 @@ export function createAggregatedTable(
         headerFilterFunc: minMaxTreeFilter,
         headerFilterFuncParams: { columnName: 'totalSelfTime', filterCache: selfTimeFilterCache },
         headerFilterLiveFilter: false,
+        tooltip: (_event, cell) => formatDuration(cell.getValue()),
+      },
+      {
+        title: 'Avg Self Time (ms)',
+        field: 'avgSelfTime',
+        sorter: 'number',
+        headerSortTristate: true,
+        width: 150,
+        minWidth: 120,
+        hozAlign: 'right',
+        headerHozAlign: 'right',
+        formatter: progressFormatterMS,
+        formatterParams: { precision: 2, totalValue: rootMethod.duration.total },
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
     ],

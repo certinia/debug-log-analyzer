@@ -99,8 +99,9 @@ Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail,
 
 Explore nested method calls with performance metrics:
 
-- **Metrics**: Self Time, Total Time, SOQL/DML/Thrown Counts, SOQL/DML/Rows
-- **Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution
+- **Metrics**: Self Time, Total Time, SOQL/DML/SOSL Counts + Rows, Heap, Governor Limit Avg + Peak, Thrown
+- **Call Tree Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution
+- **Column Views** – Switch preset column sets (General, Time, Governor Limits, Database, Memory), show/hide columns from the header menu, reset to defaults
 - **Group Bottom-Up by Namespace or Type**
 - **Filter by Namespace, Type or Duration**
 - **Toggle Debug-Only + Detail Events**
@@ -114,6 +115,7 @@ Explore nested method calls with performance metrics:
 See which methods are the slowest, most frequent. or expensive.
 
 - **Group by Type, Namespace, or Caller Namespace **
+- **Column Views** – Preset column sets, show/hide columns, reset to defaults
 - **Sort by Duration, Count, Name, Type or Namespace**
 - **Filter to specific event types**
 - **Copy or Export to CSV**
@@ -126,6 +128,7 @@ Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues.
 
 - **SOQL + DML Duration, Selectivity, Aggregates, Row Count**
 - **Group by Namespace, Caller Namespace or Query**
+- **Column Views** – Preset column sets (incl. a SOQL Query Plan view), show/hide columns, reset to defaults
 - **View the Call Stack**
 - **SOQL Optimization Tips**
 - **Sort by SOQL or DML, Duration, Selectivity, Aggregates, Row Count**

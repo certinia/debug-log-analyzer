@@ -37,6 +37,10 @@ If the grouping is removed the sorting applies the same but across all rows inst
 
 1. In the SOQL view show Log events for specific namespaces using the namespace column filter
 
+### Column Views
+
+Switch column sets from the **Columns** button in the toolbar (or the header right-click menu). SOQL offers **General**, **Performance** and **Query Plan** (Relative Cost, Leading Operation, SObject Type, Cardinality); DML offers **General** and **Timing**. Show or hide individual columns there; an edited view shows a **reset** icon. Choices persist per table.
+
 ### Group
 
 By default rows are grouped by the SOQL/ DML text, grouping can be removed and the rows shows as a flat list using the _Group by_ item in the header menu. The groups are default sorted with the groups with the most items at the top.

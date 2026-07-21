@@ -18,6 +18,7 @@ import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { toBottomUpTree, type BottomUpRow } from '../utils/Aggregation.js';
 import {
   commonColumnDefaults,
+  createGovernorMetricColumns,
   headerSortElement,
   registerTableModules,
   type TableCallbacks,
@@ -94,8 +95,10 @@ export function createBottomUpTable(
       }
     : {};
 
+  const tableData = toBottomUpTree(rootMethod.children, rootMethod.governorLimits);
+
   const tabulatorOptions = {
-    data: toBottomUpTree(rootMethod.children),
+    data: tableData,
     index: 'id',
     layout: 'fitColumns',
     placeholder: options.placeholder ?? 'No Call Tree Available',
@@ -130,6 +133,10 @@ export function createBottomUpTable(
       {
         title: 'Name',
         field: 'text',
+        // Sticky column parked: frozen layout fights the vertical virtual renderer.
+        // Re-add with _syncTableWidth in VirtualVerticalRenderer.
+        // frozen: true,
+        minWidth: 200,
         headerSortTristate: true,
         bottomCalc: () => 'Total',
         cssClass: 'datagrid-textarea datagrid-code-text',
@@ -152,6 +159,7 @@ export function createBottomUpTable(
           }
         },
         widthGrow: 5,
+        widthShrink: 1,
       },
       {
         title: 'Namespace',
@@ -167,6 +175,13 @@ export function createBottomUpTable(
           multiselect: true,
         },
         headerFilterLiveFilter: false,
+      },
+      {
+        title: 'Caller Namespace',
+        field: 'callerNamespace',
+        sorter: 'string',
+        width: 120,
+        visible: false,
       },
       {
         title: 'Type',
@@ -187,6 +202,8 @@ export function createBottomUpTable(
         headerHozAlign: 'right',
         bottomCalc: 'sum',
       },
+      ...createGovernorMetricColumns(rootMethod.governorLimits),
+      // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',
         field: 'totalTime',
@@ -229,6 +246,20 @@ export function createBottomUpTable(
         headerFilter: MinMaxEditor,
         headerFilterFunc: MinMaxFilter,
         headerFilterLiveFilter: false,
+        tooltip: (_event, cell) => formatDuration(cell.getValue()),
+      },
+      {
+        title: 'Avg Self Time (ms)',
+        field: 'avgSelfTime',
+        sorter: 'number',
+        headerSortTristate: true,
+        width: 165,
+        minWidth: 120,
+        hozAlign: 'right',
+        headerHozAlign: 'right',
+        visible: false,
+        formatter: progressFormatterMS,
+        formatterParams: { precision: 2, totalValue: rootMethod.duration.total },
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
     ],

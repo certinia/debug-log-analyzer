@@ -160,13 +160,14 @@ export function buildApexLimitTimeSeries(
       case 'CALLOUT_REQUEST':
         pushDelta(timestamp, namespace, 'callouts', 1);
         break;
+      // A deallocation is normally a negative HEAP_ALLOCATE (|Bytes:-N|), so add as-is;
+      // HEAP_DEALLOCATE is a rarer distinct form. Each is one event type, so applying
+      // both cases never double-subtracts a free.
       case 'HEAP_ALLOCATE':
       case 'BULK_HEAP_ALLOCATE':
-        // Allocation bytes can be negative in the log, so add as-is (a negative lowers heap).
         pushDelta(timestamp, namespace, 'heapSize', (event as HeapAllocateLine).bytes);
         break;
       case 'HEAP_DEALLOCATE':
-        // Deallocation always takes away.
         pushDelta(timestamp, namespace, 'heapSize', -Math.abs((event as HeapAllocateLine).bytes));
         break;
       case 'LIMIT_USAGE':

@@ -11,7 +11,13 @@ import type { Context } from '../Context.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
 import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
-import { getConfig } from '../workspace/AppConfig.js';
+import {
+  COLUMN_OVERRIDE_SECTIONS,
+  getColumnOverrides,
+  getConfig,
+  updateColumnOverride,
+  updateConfig,
+} from '../workspace/AppConfig.js';
 
 interface WebViewLogFileRequest<T = unknown> {
   requestId: string;
@@ -102,11 +108,28 @@ export class LogView {
           }
 
           case 'getConfig': {
+            const config = getConfig();
+            const overrides = getColumnOverrides(context.context.globalState);
+            config.callTree.columnOverrides = overrides['callTree.columnOverrides'] ?? {};
+            config.database.soql.columnOverrides = overrides['database.soql.columnOverrides'] ?? {};
+            config.database.dml.columnOverrides = overrides['database.dml.columnOverrides'] ?? {};
             panel.webview.postMessage({
               requestId,
               cmd: 'getConfig',
-              payload: getConfig(),
+              payload: config,
             });
+            break;
+          }
+
+          case 'updateConfig': {
+            const { section, value } = payload as { section: string; value: unknown };
+            if (section) {
+              if ((COLUMN_OVERRIDE_SECTIONS as readonly string[]).includes(section)) {
+                updateColumnOverride(context.context.globalState, section, value);
+              } else {
+                updateConfig(section, value);
+              }
+            }
             break;
           }
 

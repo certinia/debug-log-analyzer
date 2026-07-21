@@ -48,6 +48,8 @@ $codicon-chevron-down: '\eab4';
         sortArrowInactive: #bbb,
         // rows
         rowBackgroundColor: var(--vscode-editor-background),
+        // Must stay a Sass colour literal — tabulator.scss runs color.adjust() on it
+        // for calc rows (so it can't be a CSS var).
         rowAltBackgroundColor: transparent,
         rowBorderColor: transparent,
         rowTextColor: var(--vscode-editor-foreground),
@@ -69,13 +71,26 @@ $codicon-chevron-down: '\eab4';
 
   .tabulator {
     .tabulator-tableholder {
-      overflow-x: hidden;
+      overflow-x: auto;
       overflow-anchor: none;
       .tabulator-table {
         display: block;
-        background-color: default;
       }
     }
+
+    // Parked with the sticky Name column (see the commented `frozen: true` in the
+    // call-tree tables). Frozen cells use `background-color: inherit`, so they are only
+    // opaque where the row/section is opaque; even rows, calc/total rows and the header
+    // are transparent and would let scrolling columns show through. Re-add with the
+    // frozen column. (Selected/hovered rows are excluded so the Name cell keeps its
+    // inherited state colour; the last selector covers the sortable-header :hover state.)
+    // .tabulator-row.tabulator-row-even:not(.tabulator-selected):not(:hover)
+    //   .tabulator-cell.tabulator-frozen,
+    // .tabulator-row.tabulator-calcs .tabulator-cell.tabulator-frozen,
+    // .tabulator-header .tabulator-col.tabulator-frozen,
+    // .tabulator-header .tabulator-col.tabulator-frozen.tabulator-col-sorter-element:hover {
+    //   background-color: var(--vscode-editor-background);
+    // }
 
     .tabulator-header-filter {
       input[type='search'] {
@@ -96,11 +111,6 @@ $codicon-chevron-down: '\eab4';
     }
 
     .tabulator-row {
-      background-color: default;
-      .tabulator-row-even {
-        background-color: default;
-      }
-
       &.tabulator-group {
         font-family: monospace;
         background: unset;

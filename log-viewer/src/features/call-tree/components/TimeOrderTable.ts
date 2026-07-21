@@ -8,7 +8,6 @@ import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenge
 import { formatDuration } from '../../../core/utility/Util.js';
 import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
 import { minMaxTreeFilter } from '../../../tabulator/filters/MinMax.js';
-import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
@@ -16,6 +15,7 @@ import { toTimeOrderTree, type TimeOrderRow } from '../utils/TimeOrderTree.js';
 import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
 import {
   commonColumnDefaults,
+  createGovernorMetricColumns,
   headerSortElement,
   registerTableModules,
   type TableCallbacks,
@@ -40,7 +40,7 @@ export function createTimeOrderTable(
   const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
   const governorLimits = rootMethod.governorLimits;
 
-  const tableData = toTimeOrderTree(rootMethod.children);
+  const tableData = toTimeOrderTree(rootMethod.children, governorLimits);
   const nameFormatter = createCalltreeNameFormatter(excludedTypes);
 
   const tableRef: { current: Tabulator | undefined } = { current: undefined };
@@ -73,6 +73,10 @@ export function createTimeOrderTable(
       {
         title: 'Name',
         field: 'text',
+        // Sticky column parked: frozen layout fights the vertical virtual renderer.
+        // Re-add with _syncTableWidth in VirtualVerticalRenderer.
+        // frozen: true,
+        minWidth: 200,
         headerSortTristate: true,
         bottomCalc: () => 'Total',
         cssClass: 'datagrid-textarea datagrid-code-text',
@@ -93,6 +97,7 @@ export function createTimeOrderTable(
           }
         },
         widthGrow: 5,
+        widthShrink: 1,
       },
       {
         title: 'Namespace',
@@ -111,121 +116,14 @@ export function createTimeOrderTable(
         headerFilterLiveFilter: false,
       },
       {
-        title: 'DML Count',
-        field: 'dmlCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 70,
-        minWidth: 60,
-        bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatter,
-        bottomCalcFormatterParams: {
-          precision: 0,
-          totalValue: governorLimits.dmlStatements.limit,
-          showPercentageText: false,
-        },
-        formatter: progressFormatter,
-        formatterParams: {
-          precision: 0,
-          totalValue: governorLimits.dmlStatements.limit,
-          showPercentageText: false,
-        },
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        tooltip(_event, cell, _onRender) {
-          const maxDmlStatements = governorLimits.dmlStatements.limit;
-          return cell.getValue() + (maxDmlStatements > 0 ? '/' + maxDmlStatements : '');
-        },
+        title: 'Caller Namespace',
+        field: 'callerNamespace',
+        sorter: 'string',
+        width: 120,
+        visible: false,
       },
-      {
-        title: 'SOQL Count',
-        field: 'soqlCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 70,
-        minWidth: 60,
-        bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatter,
-        bottomCalcFormatterParams: {
-          precision: 0,
-          totalValue: governorLimits.soqlQueries.limit,
-          showPercentageText: false,
-        },
-        formatter: progressFormatter,
-        formatterParams: {
-          precision: 0,
-          totalValue: governorLimits.soqlQueries.limit,
-          showPercentageText: false,
-        },
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        tooltip(_event, cell, _onRender) {
-          const maxSoql = governorLimits.soqlQueries.limit;
-          return cell.getValue() + (maxSoql > 0 ? '/' + maxSoql : '');
-        },
-      },
-      {
-        title: 'Throws Count',
-        field: 'thrownCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 60,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
-      {
-        title: 'DML Rows',
-        field: 'dmlRowCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 60,
-        bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatter,
-        bottomCalcFormatterParams: {
-          precision: 0,
-          totalValue: governorLimits.dmlRows.limit,
-          showPercentageText: false,
-        },
-        formatter: progressFormatter,
-        formatterParams: {
-          precision: 0,
-          totalValue: governorLimits.dmlRows.limit,
-          showPercentageText: false,
-        },
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        tooltip(_event, cell, _onRender) {
-          const maxDmlRows = governorLimits.dmlRows.limit;
-          return cell.getValue() + (maxDmlRows > 0 ? '/' + maxDmlRows : '');
-        },
-      },
-      {
-        title: 'SOQL Rows',
-        field: 'soqlRowCount.total',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 60,
-        bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatter,
-        bottomCalcFormatterParams: {
-          precision: 0,
-          totalValue: governorLimits.queryRows.limit,
-          showPercentageText: false,
-        },
-        formatter: progressFormatter,
-        formatterParams: {
-          precision: 0,
-          totalValue: governorLimits.queryRows.limit,
-          showPercentageText: false,
-        },
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        tooltip(_event, cell, _onRender) {
-          const maxQueryRows = governorLimits.queryRows.limit;
-          return cell.getValue() + (maxQueryRows > 0 ? '/' + maxQueryRows : '');
-        },
-      },
+      ...createGovernorMetricColumns(governorLimits),
+      // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',
         field: 'duration.total',

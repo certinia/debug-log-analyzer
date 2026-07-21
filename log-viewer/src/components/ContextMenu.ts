@@ -26,6 +26,8 @@
  * ```
  */
 
+import '#vscode-elements/vscode-icon.js';
+
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
@@ -40,6 +42,13 @@ export interface ContextMenuItem {
   separator?: boolean;
   /** If true, the item is grayed out and not clickable */
   disabled?: boolean;
+  /** If true, selecting the item (or its action) leaves the menu open (multi-toggle). */
+  keepOpen?: boolean;
+  /**
+   * Optional trailing action icon (e.g. per-row reset). Clicking it emits
+   * `menu-select` with `action.id` instead of the row's own id.
+   */
+  action?: { id: string; icon: string; title: string };
 }
 
 /**
@@ -103,6 +112,15 @@ export class ContextMenu extends LitElement {
       margin-left: 32px;
       opacity: 0.7;
       font-size: 12px;
+    }
+
+    .item-action {
+      margin-left: 12px;
+      opacity: 0.7;
+    }
+
+    .item-action:hover {
+      opacity: 1;
     }
 
     .separator {
@@ -206,8 +224,26 @@ export class ContextMenu extends LitElement {
         composed: true,
       }),
     );
-    this.hide();
-    this.dispatchEvent(new CustomEvent('menu-close', { bubbles: true, composed: true }));
+    if (!item.keepOpen) {
+      this.hide();
+      this.dispatchEvent(new CustomEvent('menu-close', { bubbles: true, composed: true }));
+    }
+  }
+
+  private handleActionClick(event: Event, actionId: string, keepOpen?: boolean): void {
+    // Keep the click from triggering the row's own select.
+    event.stopPropagation();
+    this.dispatchEvent(
+      new CustomEvent('menu-select', {
+        detail: { itemId: actionId },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    if (!keepOpen) {
+      this.hide();
+      this.dispatchEvent(new CustomEvent('menu-close', { bubbles: true, composed: true }));
+    }
   }
 
   private adjustPosition(): void {
@@ -257,6 +293,18 @@ export class ContextMenu extends LitElement {
       >
         <span class="label">${item.label}</span>
         ${item.shortcut ? html`<span class="shortcut">${item.shortcut}</span>` : nothing}
+        ${
+          item.action
+            ? html`<vscode-icon
+                name="${item.action.icon}"
+                action-icon
+                class="item-action"
+                title="${item.action.title}"
+                @click="${(event: Event) =>
+                  this.handleActionClick(event, item.action!.id, item.keepOpen)}"
+              ></vscode-icon>`
+            : nothing
+        }
       </div>
     `;
   }
