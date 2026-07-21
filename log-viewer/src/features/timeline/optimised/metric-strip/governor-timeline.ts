@@ -9,13 +9,16 @@
  * time series for the metric strip. Boundary-safe: no parser imports.
  *
  * Model (per namespace, per metric):
- * - `tracked`  — increment-only running total from detailed events we count. Never corrected.
+ * - `tracked`  — running total of counted deltas. Counters only increment; heap deltas may go
+ *   negative (a deallocation is a negative HEAP_ALLOCATE), so the heap line can fall.
  * - `displayed` = baseline + (tracked − trackedAtBaseline), the value drawn on the line.
  *
  * Two observation kinds:
  * - `delta`    — adds to `tracked` (and therefore to `displayed`); marks the metric delta-tracked.
  * - `absolute` — corrective. Sets the baseline to `max(reported, displayed)`. The `max` floor keeps
  *   monotonic counters from dipping when a subset-scoped report or fluctuating heap comes in low.
+ *   For heap, `reported` is the authoritative cumulative "Maximum heap size" (a peak, often our only
+ *   source since FINE logs emit no HEAP_ALLOCATE events).
  *
  * At each observation timestamp a single combined point is emitted, summing the last-known
  * per-namespace values (carry-forward step merge). `tracked` is surfaced on the emitted value only
