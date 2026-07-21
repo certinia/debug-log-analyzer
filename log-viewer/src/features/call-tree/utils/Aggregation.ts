@@ -2,10 +2,11 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent, SelfTotal } from 'apex-log-parser';
+import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { Multiset } from '../../../core/utility/Multiset.js';
 import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
+import { setGovernorCost } from './GovernorCost.js';
 
 /**
  * Represents a row in the aggregated call tree view.
@@ -147,7 +148,10 @@ function getStackKey(event: LogEvent): string {
  * are merged together, with aggregated metrics.
  * Uses Multiset call-stack tracking to prevent double-counting of recursive calls.
  */
-export function toAggregatedCallTree(rootChildren: LogEvent[]): AggregatedRow[] {
+export function toAggregatedCallTree(
+  rootChildren: LogEvent[],
+  governorLimits?: GovernorLimits,
+): AggregatedRow[] {
   if (rootChildren.length === 0) {
     return [];
   }
@@ -180,8 +184,11 @@ export function toAggregatedCallTree(rootChildren: LogEvent[]): AggregatedRow[] 
   for (const row of rootMap.values()) {
     const firstInstance = row.instances[0];
     const stackKey = firstInstance ? getStackKey(firstInstance) : row.key;
-    row._children = aggregateChildrenRecursive(row.instances, stackKey, idFor);
+    row._children = aggregateChildrenRecursive(row.instances, stackKey, idFor, governorLimits);
     calculateAverages(row);
+    if (governorLimits) {
+      setGovernorCost(row, governorLimits);
+    }
     row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.originalData.type);
   }
 
@@ -197,6 +204,7 @@ function aggregateChildrenRecursive(
   instances: LogEvent[],
   parentStackKey: string,
   idFor: () => number,
+  governorLimits?: GovernorLimits,
 ): AggregatedRow[] | null {
   const childMap = new Map<string, AggregatedRow>();
   // Create a new stack for each aggregation level, starting with the parent stack key
@@ -226,8 +234,11 @@ function aggregateChildrenRecursive(
   for (const row of childMap.values()) {
     const firstInstance = row.instances[0];
     const stackKey = firstInstance ? getStackKey(firstInstance) : row.key;
-    row._children = aggregateChildrenRecursive(row.instances, stackKey, idFor);
+    row._children = aggregateChildrenRecursive(row.instances, stackKey, idFor, governorLimits);
     calculateAverages(row);
+    if (governorLimits) {
+      setGovernorCost(row, governorLimits);
+    }
     row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.originalData.type);
   }
 
@@ -351,7 +362,10 @@ type DfsEntry = {
  * Zero-delta guards on the DML/SOQL/row/thrown accumulators avoid the no-op
  * `bucket.x += 0` writes that dominate logs without heavy DB work.
  */
-export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
+export function toBottomUpTree(
+  rootChildren: LogEvent[],
+  governorLimits?: GovernorLimits,
+): BottomUpRow[] {
   if (rootChildren.length === 0) {
     return [];
   }
@@ -541,7 +555,7 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
     }
   }
 
-  return finalizeBuckets(rootBuckets);
+  return finalizeBuckets(rootBuckets, governorLimits);
 }
 
 /**
@@ -549,20 +563,26 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
  * (primary metric total-self desc, then name asc) at every level. Empty child
  * arrays are collapsed to null so Tabulator's dataTree renders a leaf indicator.
  */
-function finalizeBuckets(rootBuckets: Map<number, BottomUpRow>): BottomUpRow[] {
+function finalizeBuckets(
+  rootBuckets: Map<number, BottomUpRow>,
+  governorLimits?: GovernorLimits,
+): BottomUpRow[] {
   const roots = Array.from(rootBuckets.values());
   for (const row of roots) {
-    finalizeBucketRecursive(row);
+    finalizeBucketRecursive(row, governorLimits);
   }
   sortBuckets(roots);
   return roots;
 }
 
-function finalizeBucketRecursive(row: BottomUpRow): void {
+function finalizeBucketRecursive(row: BottomUpRow, governorLimits?: GovernorLimits): void {
   calculateBottomUpAverages(row);
+  if (governorLimits) {
+    setGovernorCost(row, governorLimits);
+  }
   if (row._children && row._children.length > 0) {
     for (const child of row._children) {
-      finalizeBucketRecursive(child);
+      finalizeBucketRecursive(child, governorLimits);
     }
     sortBuckets(row._children);
   }

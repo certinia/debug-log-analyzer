@@ -23,6 +23,7 @@ import {
   CALL_TREE_VIEWS,
   getColumnView,
   getTableFields,
+  resolveColumnView,
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
 import type { BottomUpRow } from '../../call-tree/utils/Aggregation.js';
@@ -151,7 +152,7 @@ export class AnalysisView extends LitElement {
   private async _loadColumnSettings(): Promise<void> {
     const settings = await getSettings();
     this.columnOverrides = settings.callTree?.columnOverrides ?? {};
-    this._setColumnView(settings.callTree?.columnView ?? 'General');
+    this._setColumnView(resolveColumnView(CALL_TREE_VIEWS, settings.callTree?.columnView));
   }
 
   updated(changedProperties: PropertyValues): void {

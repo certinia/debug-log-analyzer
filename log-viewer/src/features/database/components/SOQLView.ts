@@ -26,6 +26,7 @@ import {
   buildColumnMenuItems,
   getColumnView,
   getTableFields,
+  resolveColumnView,
   SOQL_VIEWS,
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
@@ -117,7 +118,7 @@ export class SOQLView extends LitElement {
   private async _loadColumnSettings(): Promise<void> {
     const settings = await getSettings();
     this.columnOverrides = settings.database?.soql?.columnOverrides ?? {};
-    this._setColumnView(settings.database?.soql?.columnView ?? 'General');
+    this._setColumnView(resolveColumnView(SOQL_VIEWS, settings.database?.soql?.columnView));
   }
 
   updated(changedProperties: PropertyValues): void {

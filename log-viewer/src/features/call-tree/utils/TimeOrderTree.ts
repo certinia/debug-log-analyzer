@@ -1,10 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent, SelfTotal } from 'apex-log-parser';
+import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
 
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
+import { setGovernorCost } from './GovernorCost.js';
 
 /**
  * One row per LogEvent for the time-order view; no merging at any level.
@@ -44,7 +45,10 @@ export interface TimeOrderRow {
  * use parser-assigned eventIndex values, which are globally unique within
  * the parse and safe for deepFilter cache keys.
  */
-export function toTimeOrderTree(nodes: LogEvent[]): TimeOrderRow[] | undefined {
+export function toTimeOrderTree(
+  nodes: LogEvent[],
+  governorLimits?: GovernorLimits,
+): TimeOrderRow[] | undefined {
   const len = nodes.length;
   if (!len) {
     return undefined;
@@ -72,7 +76,7 @@ export function toTimeOrderTree(nodes: LogEvent[]): TimeOrderRow[] | undefined {
       duration.total > 0 ||
       discontinuity ||
       !!(type && EXCLUDED_DETAIL_TYPES.has(type));
-    return {
+    const row: TimeOrderRow = {
       id,
       originalData: event,
       _children: mappedChildren,
@@ -92,6 +96,10 @@ export function toTimeOrderTree(nodes: LogEvent[]): TimeOrderRow[] | undefined {
       governorCostMax: 0,
       _hasDetailsDeep: selfIsDetail || childHasDetailsDeep,
     };
+    if (governorLimits) {
+      setGovernorCost(row, governorLimits);
+    }
+    return row;
   }
 
   const results = new Array<TimeOrderRow>(len);

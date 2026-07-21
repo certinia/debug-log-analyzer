@@ -11,7 +11,6 @@ import { minMaxTreeFilter } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
-import { annotateGovernorCost } from '../utils/GovernorCost.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../utils/TimeOrderTree.js';
 import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
 import {
@@ -41,8 +40,7 @@ export function createTimeOrderTable(
   const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
   const governorLimits = rootMethod.governorLimits;
 
-  const tableData = toTimeOrderTree(rootMethod.children);
-  annotateGovernorCost(tableData, governorLimits);
+  const tableData = toTimeOrderTree(rootMethod.children, governorLimits);
   const nameFormatter = createCalltreeNameFormatter(excludedTypes);
 
   const tableRef: { current: Tabulator | undefined } = { current: undefined };

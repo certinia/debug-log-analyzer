@@ -73,7 +73,7 @@ export function formatBytes(bytes: number): string {
  * The shared "Gov. Avg (%)" column — the average governor consumption across all
  * governors on a call path (see {@link governorCost}), rendered as a progress
  * bar. Reused across all call-tree/analysis tables. `governorCost` is populated
- * by {@link annotateGovernorCost}; the tooltip breaks the average down per metric.
+ * during tree build; the tooltip breaks the average down per metric.
  */
 export function createGovernorCostColumn(governorLimits: GovernorLimits): ColumnDefinition {
   const formatterParams = { precision: 0, totalValue: 100, showPercentageText: false };
@@ -256,17 +256,31 @@ export function createGovernorMetricColumns(governorLimits: GovernorLimits): Col
       limit: governorLimits.queryRows.limit,
       visible: false,
     }),
-    createGovernorColumn({
+    // SOSL rows have no governor limit (only SOSL queries is limited, to 20),
+    // so these are plain counts rather than progress bars against a limit.
+    {
       title: 'SOSL Rows',
       field: 'soslRowCount.total',
-      limit: governorLimits.queryRows.limit,
-    }),
-    createGovernorColumn({
+      sorter: 'number',
+      cssClass: 'number-cell',
+      width: 70,
+      minWidth: 60,
+      hozAlign: 'right',
+      headerHozAlign: 'right',
+      bottomCalc: 'sum',
+    },
+    {
       title: 'SOSL Rows (self)',
       field: 'soslRowCount.self',
-      limit: governorLimits.queryRows.limit,
       visible: false,
-    }),
+      sorter: 'number',
+      cssClass: 'number-cell',
+      width: 70,
+      minWidth: 60,
+      hozAlign: 'right',
+      headerHozAlign: 'right',
+      bottomCalc: 'sum',
+    },
     createHeapColumn(governorLimits),
     createHeapColumn(governorLimits, 'heapAllocated.self', 'Heap (self)', false),
     createGovernorCostColumn(governorLimits),

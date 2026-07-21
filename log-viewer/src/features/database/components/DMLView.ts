@@ -20,6 +20,7 @@ import {
   DML_VIEWS,
   getColumnView,
   getTableFields,
+  resolveColumnView,
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
 
@@ -112,7 +113,7 @@ export class DMLView extends LitElement {
   private async _loadColumnSettings(): Promise<void> {
     const settings = await getSettings();
     this.columnOverrides = settings.database?.dml?.columnOverrides ?? {};
-    this._setColumnView(settings.database?.dml?.columnView ?? 'General');
+    this._setColumnView(resolveColumnView(DML_VIEWS, settings.database?.dml?.columnView));
   }
 
   updated(changedProperties: PropertyValues): void {

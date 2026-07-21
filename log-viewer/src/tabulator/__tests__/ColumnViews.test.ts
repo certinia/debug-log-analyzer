@@ -12,6 +12,7 @@ import {
   getColumnView,
   getTableFields,
   getVisibleFields,
+  resolveColumnView,
   SOQL_VIEWS,
   toggleField,
 } from '../ColumnViews.js';
@@ -157,6 +158,17 @@ describe('buildColumnMenuItems', () => {
     const items = buildColumnMenuItems(table, 'Time', CALL_TREE_VIEWS, ALWAYS_VISIBLE, ['Time']);
     expect(items.find((i) => i.id === 'view:Time')?.action?.id).toBe('reset:Time');
     expect(items.find((i) => i.id === 'view:General')?.action).toBeUndefined();
+  });
+});
+
+describe('resolveColumnView', () => {
+  it('returns the id when it matches a known view', () => {
+    expect(resolveColumnView(CALL_TREE_VIEWS, 'Governor Limits')).toBe('Governor Limits');
+  });
+
+  it('falls back to the first view for an unknown or missing id', () => {
+    expect(resolveColumnView(CALL_TREE_VIEWS, 'Renamed')).toBe(CALL_TREE_VIEWS[0]!.id);
+    expect(resolveColumnView(SOQL_VIEWS, undefined)).toBe(SOQL_VIEWS[0]!.id);
   });
 });
 

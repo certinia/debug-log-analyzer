@@ -5,7 +5,6 @@ import { describe, expect, it } from '@jest/globals';
 import type { GovernorLimits } from 'apex-log-parser';
 
 import {
-  annotateGovernorCost,
   governorCost,
   governorCostBreakdown,
   governorCostMax,
@@ -39,13 +38,14 @@ function row(overrides: Partial<Record<string, number>> = {}): GovernorCostRow {
   };
 }
 
-// COST_METRICS has 7 entries; limits() reports a limit for all 7 (SOQL Rows and
-// SOSL Rows both use the queryRows limit), so the divisor is 7 in these tests.
-const REPORTED_GOVERNORS = 7;
+// COST_METRICS has 6 entries (SOQL, DML, SOSL, SOQL Rows, DML Rows, Heap);
+// limits() reports a limit for all 6, so the divisor is 6 in these tests. SOSL
+// rows are excluded — they have no governor limit.
+const REPORTED_GOVERNORS = 6;
 
 describe('governorCost', () => {
   it('averages each governor as a percentage of its own limit, across all reported governors', () => {
-    // SOQL 50% + DML 10% + Heap 50%, four others 0% → (50 + 10 + 50) / 7
+    // SOQL 50% + DML 10% + Heap 50%, three others 0% → (50 + 10 + 50) / 6
     expect(governorCost(row({ soql: 50, dml: 15, heap: 3000000 }), limits())).toBeCloseTo(
       110 / REPORTED_GOVERNORS,
       5,
@@ -59,7 +59,6 @@ describe('governorCost', () => {
       sosl: 20,
       soqlRows: 50000,
       dmlRows: 10000,
-      soslRows: 50000,
       heap: 6000000,
     });
     expect(governorCost(maxed, limits())).toBeCloseTo(100, 5);
@@ -121,14 +120,13 @@ describe('governorCostBreakdown', () => {
   });
 });
 
-describe('annotateGovernorCost', () => {
-  it('populates governorCost across the row tree', () => {
-    type TreeRow = GovernorCostRow & { _children: TreeRow[] | null };
-    const child: TreeRow = { ...row({ dml: 150 }), _children: null };
-    const parent: TreeRow = { ...row({ soql: 25 }), _children: [child] };
-    annotateGovernorCost([parent], limits());
-    // Each averaged over the 7 reported governors: parent SOQL 25%, child DML 100%.
-    expect(parent.governorCost).toBeCloseTo(25 / REPORTED_GOVERNORS, 5);
-    expect(child.governorCost).toBeCloseTo(100 / REPORTED_GOVERNORS, 5);
+describe('SOSL rows', () => {
+  it('do not contribute to governor cost — they have no governor limit', () => {
+    // SOSL rows are not governed (only SOSL queries, to 20) and do not count
+    // against the SOQL query-rows limit, so a path consuming only SOSL rows
+    // scores 0 across every measure.
+    expect(governorCost(row({ soslRows: 50000 }), limits())).toBe(0);
+    expect(governorCostMax(row({ soslRows: 50000 }), limits())).toBe(0);
+    expect(governorCostBreakdown(row({ soslRows: 50000 }), limits())).toEqual([]);
   });
 });

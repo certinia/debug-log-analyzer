@@ -109,6 +109,15 @@ export function getColumnView(views: ColumnView[], id: string): ColumnView | und
 }
 
 /**
+ * The persisted view id if it still matches a known view, else the first
+ * (default) view. Guards against a stale setting after a preset is renamed or
+ * removed — falling back to a curated view rather than showing every column.
+ */
+export function resolveColumnView(views: ColumnView[], id: string | undefined): string {
+  return views.find((view) => view.id === id)?.id ?? views[0]!.id;
+}
+
+/**
  * Shows/hides table columns to match `fields`. `null` shows every column
  * (the General view). `alwaysVisible` fields are shown regardless. Fields that
  * don't exist in this table are ignored, so one preset works across tables with
@@ -131,9 +140,11 @@ export function applyColumnView(
       column.hide();
     }
   }
-  // show()/hide() alone don't re-run the fitColumns width distribution, so the
-  // flex (Name) column wouldn't reclaim space freed by hidden columns. A light
-  // redraw re-lays-out columns and re-renders the visible window.
+  // Stock tabulator: column.show()/hide() flip cell visibility but do NOT re-run
+  // the fitColumns width distribution or normalizeHeight — the flex (Name) column
+  // wouldn't reclaim space freed by hidden columns and wrapped-row heights would
+  // go stale. redraw() runs layoutRefresh (widths + heights) and re-renders the
+  // visible window. Required — do not remove.
   table.redraw();
 }
 

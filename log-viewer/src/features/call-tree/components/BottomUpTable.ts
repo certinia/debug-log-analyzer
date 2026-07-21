@@ -16,7 +16,6 @@ import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVert
 import { sumDurationTotalForRootEvents } from '../../analysis/services/CallStackSum.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { toBottomUpTree, type BottomUpRow } from '../utils/Aggregation.js';
-import { annotateGovernorCost } from '../utils/GovernorCost.js';
 import {
   commonColumnDefaults,
   createGovernorMetricColumns,
@@ -96,8 +95,7 @@ export function createBottomUpTable(
       }
     : {};
 
-  const tableData = toBottomUpTree(rootMethod.children);
-  annotateGovernorCost(tableData, rootMethod.governorLimits);
+  const tableData = toBottomUpTree(rootMethod.children, rootMethod.governorLimits);
 
   const tabulatorOptions = {
     data: tableData,

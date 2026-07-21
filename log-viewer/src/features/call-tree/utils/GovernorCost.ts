@@ -42,7 +42,9 @@ interface CostMetric {
 /**
  * Metrics that are attributed per call-tree node (and therefore comparable to
  * their limit per path). CPU time and callouts are intentionally excluded —
- * they are only tracked globally, not per node.
+ * they are only tracked globally, not per node. SOSL rows are also excluded:
+ * they have no governor limit (only SOSL *queries* is limited, to 20) and do
+ * not count against the SOQL query-rows limit.
  */
 const COST_METRICS: CostMetric[] = [
   { label: 'SOQL', used: (r) => r.soqlCount.total, limit: (l) => l.soqlQueries.limit },
@@ -50,7 +52,6 @@ const COST_METRICS: CostMetric[] = [
   { label: 'SOSL', used: (r) => r.soslCount.total, limit: (l) => l.soslQueries.limit },
   { label: 'SOQL Rows', used: (r) => r.soqlRowCount.total, limit: (l) => l.queryRows.limit },
   { label: 'DML Rows', used: (r) => r.dmlRowCount.total, limit: (l) => l.dmlRows.limit },
-  { label: 'SOSL Rows', used: (r) => r.soslRowCount.total, limit: (l) => l.queryRows.limit },
   { label: 'Heap', used: (r) => r.heapAllocated.total, limit: (l) => l.heapSize.limit },
 ];
 
@@ -124,21 +125,12 @@ export function governorCostBreakdown(
 }
 
 /**
- * Populates {@link GovernorCostRow.governorCost} across a call-tree row array
- * and its `_children`. Runs once after the tree is built — governor cost is a
- * pure function of already-aggregated totals, so it lives in the call-tree
- * layer rather than the parser.
+ * Sets {@link GovernorCostRow.governorCost} and {@link GovernorCostRow.governorCostMax}
+ * on a single row from its already-aggregated totals. Called from each tree
+ * builder at the point a row is finalized, so governor cost is computed in the
+ * same pass that builds the tree (no separate traversal).
  */
-export function annotateGovernorCost<T extends GovernorCostRow & { _children?: T[] | null }>(
-  rows: T[] | null | undefined,
-  limits: GovernorLimits,
-): void {
-  if (!rows) {
-    return;
-  }
-  for (const row of rows) {
-    row.governorCost = governorCost(row, limits);
-    row.governorCostMax = governorCostMax(row, limits);
-    annotateGovernorCost(row._children, limits);
-  }
+export function setGovernorCost(row: GovernorCostRow, limits: GovernorLimits): void {
+  row.governorCost = governorCost(row, limits);
+  row.governorCostMax = governorCostMax(row, limits);
 }

@@ -48,6 +48,7 @@ import {
   CALL_TREE_VIEWS,
   getColumnView,
   getTableFields,
+  resolveColumnView,
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
@@ -170,7 +171,7 @@ export class CalltreeView extends LitElement {
   private async _loadColumnSettings(): Promise<void> {
     const settings = await getSettings();
     this.columnOverrides = settings.callTree?.columnOverrides ?? {};
-    this._setColumnView(settings.callTree?.columnView ?? 'General');
+    this._setColumnView(resolveColumnView(CALL_TREE_VIEWS, settings.callTree?.columnView));
   }
 
   static styles = [
@@ -629,8 +630,10 @@ export class CalltreeView extends LitElement {
     const { [id]: _removed, ...rest } = this.columnOverrides;
     this.columnOverrides = rest;
     if (id === this.columnView) {
+      // Resolve the restored fields once (identical for every table).
+      const fields = this._columnViewFields(id);
       for (const table of this._tables) {
-        applyColumnView(table, this._columnViewFields(id), ALWAYS_VISIBLE);
+        applyColumnView(table, fields, ALWAYS_VISIBLE);
       }
     }
     updateSetting('callTree.columnOverrides', this.columnOverrides);

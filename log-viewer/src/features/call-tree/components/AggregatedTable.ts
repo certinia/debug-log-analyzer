@@ -12,7 +12,6 @@ import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { toAggregatedCallTree, type AggregatedRow } from '../utils/Aggregation.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
-import { annotateGovernorCost } from '../utils/GovernorCost.js';
 import {
   commonColumnDefaults,
   createGovernorMetricColumns,
@@ -41,8 +40,7 @@ export function createAggregatedTable(
   const tableRef: { current: Tabulator | undefined } = { current: undefined };
   const selfTimeBottomCalc = makeSumSelfTimeAllVisible(() => tableRef.current);
 
-  const tableData = toAggregatedCallTree(rootMethod.children);
-  annotateGovernorCost(tableData, rootMethod.governorLimits);
+  const tableData = toAggregatedCallTree(rootMethod.children, rootMethod.governorLimits);
 
   const table = new Tabulator(container, {
     data: tableData,
