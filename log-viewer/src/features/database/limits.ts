@@ -20,3 +20,32 @@ export const APEX_GOVERNOR_LIMITS_DOC =
  * table, not summed against a transaction limit.
  */
 export const SOSL_ROWS_PER_QUERY_LIMIT = 2000;
+
+/** Derived SOSL-rows metric fields (label/found are supplied by the caller). */
+export interface SoslRowsMetric {
+  used: number | null;
+  limit: number;
+  note?: string;
+}
+
+/**
+ * SOSL rows aren't reported as a transaction total, so the ceiling is derived:
+ * {@link SOSL_ROWS_PER_QUERY_LIMIT} × the SOSL-query limit. Only meaningful when the
+ * log captured that limit (`hasLimits`); otherwise this degrades to "limit n/a"
+ * (`used` null, no ceiling, no note) like every other metric.
+ */
+export function soslRowsMetric(
+  seenRows: number,
+  soslQueriesLimit: number,
+  hasLimits: boolean,
+): SoslRowsMetric {
+  const limit = soslQueriesLimit * SOSL_ROWS_PER_QUERY_LIMIT;
+  return {
+    used: hasLimits ? seenRows : null,
+    limit,
+    note:
+      limit > 0
+        ? `Up to ${SOSL_ROWS_PER_QUERY_LIMIT.toLocaleString()} rows per SOSL query × ${soslQueriesLimit} queries = ${limit.toLocaleString()} max per transaction.`
+        : undefined,
+  };
+}

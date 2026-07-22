@@ -157,7 +157,7 @@ export class DatabaseMetricCard extends LitElement {
     if (metric.used === null) {
       return html`<span
         class="stat__used na"
-        title="The consumed figure needs cumulative limit usage in the log — raise the database log level to FINE or above."
+        title="The consumed figure needs cumulative limit usage in the log. Raise the database log level to FINE or above."
         >limit n/a</span
       >`;
     }

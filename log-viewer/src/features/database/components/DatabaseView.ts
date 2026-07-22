@@ -14,7 +14,7 @@ import type {
 } from 'apex-log-parser';
 
 import { isVisible } from '../../../core/utility/Util.js';
-import { SOSL_ROWS_PER_QUERY_LIMIT } from '../limits.js';
+import { soslRowsMetric } from '../limits.js';
 import { DatabaseAccess } from '../services/Database.js';
 
 // styles
@@ -253,18 +253,14 @@ export class DatabaseView extends LitElement {
       },
     ];
     if (kind === 'sosl') {
-      // SOSL rows aren't reported as a transaction total, but there's a hard
-      // ceiling: at most 2,000 rows per query × the SOSL-query limit (20). Meter
-      // the total against that derived ceiling; the per-query cap is on hover and
-      // metered per row in the table.
-      const maxQueries = limits?.soslQueries.limit || 20;
+      // SOSL rows aren't a transaction total — the ceiling is derived from the
+      // SOSL-query limit; without a snapshot it degrades to "limit n/a". The
+      // per-query cap is shown on hover and metered per row in the table.
       const total = this._rows(kind);
       metrics.push({
         label: 'Rows',
         found: total,
-        used: total,
-        limit: maxQueries * SOSL_ROWS_PER_QUERY_LIMIT,
-        note: `Up to ${SOSL_ROWS_PER_QUERY_LIMIT.toLocaleString()} rows per SOSL query × ${maxQueries} queries = ${(maxQueries * SOSL_ROWS_PER_QUERY_LIMIT).toLocaleString()} max per transaction.`,
+        ...soslRowsMetric(total, limits?.soslQueries.limit ?? 0, this._hasLimits),
       });
     } else {
       metrics.push({
