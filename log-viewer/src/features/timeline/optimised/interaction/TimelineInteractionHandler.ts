@@ -15,6 +15,7 @@ import {
   type ModifierKeys,
 } from '../../types/flamechart.types.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
+import { wheelZoomFactor } from '../ViewportUtils.js';
 
 /**
  * Configuration for interaction behavior.
@@ -561,30 +562,14 @@ export class TimelineInteractionHandler {
     const rect = this.canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
 
-    // Calculate zoom delta
-    // deltaY is positive when scrolling down, negative when scrolling up
-    // Standard behavior: scroll up = zoom in, scroll down = zoom out
-    let zoomDelta = -event.deltaY;
-
-    // Apply zoom inversion if enabled
-    if (this.options.invertZoom) {
-      zoomDelta = -zoomDelta;
-    }
-
-    // Normalize wheel delta (different browsers report different scales)
-    // Use deltaMode to handle different units (pixels, lines, pages)
-    let normalizedDelta = zoomDelta;
-    if (event.deltaMode === 1) {
-      // Lines - multiply by typical line height
-      normalizedDelta *= 15;
-    } else if (event.deltaMode === 2) {
-      // Pages - multiply by typical page height
-      normalizedDelta *= 800;
-    }
-
-    // Calculate zoom factor
-    // Use exponential scaling for smooth zoom feel
-    const zoomFactor = 1 + normalizedDelta * 0.001 * this.options.zoomSensitivity;
+    // Clamped, exponential zoom factor shared with the minimap and metric-strip
+    // wheel handlers for consistent feel across platforms and devices.
+    // invertZoom flips scroll direction by negating deltaY before mapping.
+    const zoomFactor = wheelZoomFactor(
+      this.options.invertZoom ? -event.deltaY : event.deltaY,
+      event.deltaMode,
+      this.options.zoomSensitivity,
+    );
 
     // Get current zoom and calculate new zoom
     const currentState = this.viewport.getState();

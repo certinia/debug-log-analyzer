@@ -19,6 +19,7 @@
  * - Hover: Show vertical guide on other view (cursor mirror)
  */
 
+import { wheelZoomFactor } from '../ViewportUtils.js';
 import type { MinimapDragMode, MinimapViewport } from './MinimapViewport.js';
 
 /**
@@ -273,9 +274,7 @@ export class MinimapInteractionHandler {
     }
 
     // Vertical scroll = zoom
-    const zoomDelta = -event.deltaY;
-    const normalizedDelta = event.deltaMode === 1 ? zoomDelta * 15 : zoomDelta;
-    const zoomFactor = 1 + normalizedDelta * 0.001;
+    const zoomFactor = wheelZoomFactor(event.deltaY, event.deltaMode);
 
     this.callbacks.onZoom(zoomFactor, anchorTimeNs);
   }

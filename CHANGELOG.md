@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🚧 **Timeline truncation markers** now end where the log recovers, so trusted sections are no longer greyed out. ([#828])
 - 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832]).
 
+### Fixed
+
+- 🖱️ **Timeline wheel zoom**: consistent, smooth zoom across platforms and input devices — a Windows mouse wheel no longer over-zooms in large jumps, fast scrolls stay bounded, and zooming in then back out returns to the same level.
+
 ## [1.20.0] 2026-06-18
 
 ### Added
