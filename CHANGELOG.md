@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.1] 2026-07-22
+
+### Fixed
+
+- 🪟 **Timeline on Windows**: fixed the Flame Chart failing to load — with zoom, pan and keyboard navigation all appearing unresponsive — under fractional display scaling (125% / 150% / 175%). ([#863])
+
 ## [1.20.0] 2026-06-18
 
 ### Added
@@ -659,3 +665,4 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#242]: https://github.com/certinia/debug-log-analyzer/issues/242
 [#235]: https://github.com/certinia/debug-log-analyzer/issues/235
 [#264]: https://github.com/certinia/debug-log-analyzer/issues/264
+[#863]: https://github.com/certinia/debug-log-analyzer/issues/863
