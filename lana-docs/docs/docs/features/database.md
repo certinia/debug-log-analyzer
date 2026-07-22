@@ -5,8 +5,11 @@ description: Database insights help Salesforce developers analyze SOQL and DML o
 keywords:
   [
     salesforce database analysis,
-    soql optimization,
-    dml performance,
+    soql,
+    sosl,
+    dml,
+    optimization,
+    performance,
     apex query tuning,
     salesforce log analysis,
     database insights,
@@ -19,9 +22,19 @@ hide_title: true
 
 ## 💾 Database
 
-Database insights help Salesforce developers analyze SOQL and DML operations, assess query selectivity, performance, and aggregations, and optimize Apex code using advanced sorting, grouping, filtering, call stack tracing, and CSV export tools.
+Database insights help Salesforce developers analyze DML, SOQL and SOSL operations, assess query selectivity, performance, and aggregations, and optimize Apex code using advanced sorting, grouping, filtering, call stack tracing, and CSV export tools.
 
-![Database view screenshot displaying SOQL and DML operations with row counts, execution times, selectivity indicators, and aggregation details for Salesforce log analysis.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png)
+![Database view screenshot displaying DML, SOQL and SOSL operations with row counts, execution times, selectivity indicators, and aggregation details for Salesforce log analysis.](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png)
+
+The tab has separate **DML**, **SOQL** and **SOSL** sections
+
+### Governor limits
+
+- **Overview strip** — SOQL, SOSL, DML and query/DML rows as `used / limit`, coloured as they near the limit.
+- **Tracked vs consumed** — per section, statements seen in the log vs the number Salesforce counted (`CUMULATIVE_LIMIT_USAGE`). A gap is usually custom metadata (`__mdt`), which is free unless the query selects a long text area field or runs in a Flow.
+- **SOSL rows** — metered per query against the 2,000-rows-per-query cap.
+
+> Consumed figures need the Apex Profiling log category. Without it, sections show the tracked count and mark the limit _n/a_.
 
 The _Selectivity_ column will have a green tick if the query is selective, a red cross if it is not and will be blank if the selectivity could not be determine. Sorting on this column will sort the rows by relative query cost, this number can be seen by hovering the cell on the selectivity column.
 
@@ -39,15 +52,15 @@ If the grouping is removed the sorting applies the same but across all rows inst
 
 ### Column Views
 
-Switch column sets from the **Columns** button in the toolbar (or the header right-click menu). SOQL offers **General**, **Performance** and **Query Plan** (Relative Cost, Leading Operation, SObject Type, Cardinality); DML offers **General** and **Timing**. Show or hide individual columns there; an edited view shows a **reset** icon. Choices persist per table.
+Switch column sets from the **Columns** button in the toolbar (or the header right-click menu). SOQL offers **General** (incl. the **Object** column), **Performance**, **Query Plan** (Relative Cost, Leading Operation, SObject Type, Cardinality) and **Limits**; DML offers **General**, **Timing** and **Limits**; SOSL offers **General** and **Timing**. Show or hide individual columns there; an edited view shows a **reset** icon. Choices persist per table.
 
 ### Group
 
-By default rows are grouped by the SOQL/ DML text, grouping can be removed and the rows shows as a flat list using the _Group by_ item in the header menu. The groups are default sorted with the groups with the most items at the top.
+By default rows are grouped by the SOQL/ DML text, grouping can be removed and the rows shows as a flat list using the _Group by_ dropdown. The groups are default sorted with the groups with the most items at the top.
 
-SOQL Statements can also be grouped by package namespace including the default namespace
+SOQL and DML can be grouped by **Object** (the queried/target SObject), **Namespace**, or **Caller Namespace**, as well as the statement text. SOSL can be grouped by Namespace or Caller Namespace.
 
-Rows can also be grouped by **Caller Namespace** — the namespace of the direct caller that issued the DML. This makes it easy to see which package's code is responsible for that DML, even though the time is attributed to the default namespace.
+**Caller Namespace** is the namespace of the direct caller that issued the statement — handy for seeing which package's code is responsible, even when the time is attributed to the default namespace.
 
 ### DML / SOQL Call Stack
 

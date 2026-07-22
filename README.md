@@ -124,15 +124,17 @@ See which methods are the slowest, most frequent. or expensive.
 
 ## 🗄️ Database Analysis
 
-Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues.
+Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues, and see how each contributes to governor limits.
 
-- **SOQL + DML Duration, Selectivity, Aggregates, Row Count**
-- **Group by Namespace, Caller Namespace or Query**
+- **Governor limit overview** – SOQL, SOSL, DML and query/DML rows shown as `used / limit` at the top of the tab.
+- **Tracked vs consumed** – each section reconciles statements seen in the log against the governor-counted total, so you can spot queries that didn't count (e.g. custom metadata).
+- **Separate SOQL, DML and SOSL tables** – SOSL is fully searchable, with its rows metered against the 2,000-per-query cap.
+- **Object column + Group by Object / Namespace / Caller Namespace / Query**
+- **SOQL Duration, Selectivity, Aggregates, Row Count**
 - **Column Views** – Preset column sets (incl. a SOQL Query Plan view), show/hide columns, reset to defaults
-- **View the Call Stack**
-- **SOQL Optimization Tips**
-- **Sort by SOQL or DML, Duration, Selectivity, Aggregates, Row Count**
-- **Copy or Export to CSV**
+- **View the Call Stack**, **SOQL Optimization Tips**, **Sort**, **Copy or Export to CSV**
+
+<!-- TODO: re-capture database.png for the redesigned Database tab (governor strip, DML/SOQL/SOSL sections). Optionally add a sosl.png. -->
 
 ![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png)
 
