@@ -37,6 +37,7 @@ export type LanaSettings = {
   database: {
     soql: { columnView: string; columnOverrides: Record<string, string[]> };
     dml: { columnView: string; columnOverrides: Record<string, string[]> };
+    sosl: { columnView: string; columnOverrides: Record<string, string[]> };
   };
 };
 

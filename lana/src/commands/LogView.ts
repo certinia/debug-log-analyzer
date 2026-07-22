@@ -113,6 +113,7 @@ export class LogView {
             config.callTree.columnOverrides = overrides['callTree.columnOverrides'] ?? {};
             config.database.soql.columnOverrides = overrides['database.soql.columnOverrides'] ?? {};
             config.database.dml.columnOverrides = overrides['database.dml.columnOverrides'] ?? {};
+            config.database.sosl.columnOverrides = overrides['database.sosl.columnOverrides'] ?? {};
             panel.webview.postMessage({
               requestId,
               cmd: 'getConfig',

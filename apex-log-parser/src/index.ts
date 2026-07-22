@@ -38,6 +38,7 @@ export {
   MethodEntryLine,
   SOQLExecuteBeginLine,
   SOQLExecuteExplainLine,
+  SOSLExecuteBeginLine,
   parseObjectNamespace,
   parseRows,
   parseVfNamespace,

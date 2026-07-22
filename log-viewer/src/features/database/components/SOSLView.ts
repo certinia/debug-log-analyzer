@@ -1,25 +1,17 @@
 /*
- * Copyright (c) 2022 Certinia Inc. All rights reserved.
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
 import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import {
-  Tabulator,
-  type ColumnComponent,
-  type GroupComponent,
-  type RowComponent,
-} from 'tabulator-tables';
+import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
-import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
+import type { ApexLog, SOSLExecuteBeginLine } from 'apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
-import { deriveSoqlObject } from '../services/sobjectClassification.js';
-import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
-import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
+import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
 import {
   applyColumnView,
@@ -27,7 +19,7 @@ import {
   getColumnView,
   getTableFields,
   resolveColumnView,
-  SOQL_VIEWS,
+  SOSL_VIEWS,
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
 
@@ -35,6 +27,7 @@ import {
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
 import Number from '../../../tabulator/format/Number.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
+import { SOSL_ROWS_PER_QUERY_LIMIT } from '../limits.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
@@ -53,47 +46,37 @@ import '../../../components/CallStack.js';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/datagrid-filter-bar.js';
-import './DatabaseSOQLDetailPanel.js';
 
-/** The SOQL column is always shown in the SOQL table. */
-const ALWAYS_VISIBLE = ['soql'];
+/** The SOSL column is always shown in the SOSL table. */
+const ALWAYS_VISIBLE = ['sosl'];
 
-// Group-by dropdown label → row field. Labels that don't map 1:1 to a field
-// name (Object, Caller Namespace) need this indirection.
 const groupLabelsToFields = new Map<string, string>([
-  ['SOQL', 'soql'],
-  ['Object', 'objectType'],
+  ['SOSL', 'sosl'],
   ['Namespace', 'namespace'],
   ['Caller Namespace', 'callerNamespace'],
   ['None', ''],
 ]);
 
-@customElement('soql-view')
-export class SOQLView extends LitElement {
+const countFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+
+@customElement('sosl-view')
+export class SOSLView extends LitElement {
   @property()
   timelineRoot: ApexLog | null = null;
 
   @property()
   highlightIndex: number = 0;
 
-  /** SOQL lines to display; supplied by the parent DatabaseView. */
-  @property({ attribute: false })
-  lines: SOQLExecuteBeginLine[] = [];
-
-  @state()
+  @property()
   oldIndex: number = 0;
 
-  soqlTable: Tabulator | null = null;
+  /** SOSL lines to display; supplied by the parent DatabaseView. */
+  @property({ attribute: false })
+  lines: SOSLExecuteBeginLine[] = [];
+
+  soslTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
   table: HTMLElement | null = null;
-
-  @state()
-  columnView = 'General';
-
-  /** Per-view column overrides (view id → visible fields); empty until edited. */
-  @state()
-  private columnOverrides: Record<string, string[]> = {};
-  private contextMenu: ContextMenu | null = null;
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
     count: 0,
@@ -103,9 +86,13 @@ export class SOQLView extends LitElement {
   totalMatches = 0;
   blockClearHighlights = true;
 
-  get _soqlTableWrapper(): HTMLDivElement | null {
-    return this.renderRoot?.querySelector('#db-soql-table');
-  }
+  @state()
+  columnView = 'General';
+
+  /** Per-view column overrides (view id → visible fields); empty until edited. */
+  @state()
+  private columnOverrides: Record<string, string[]> = {};
+  private contextMenu: ContextMenu | null = null;
 
   constructor() {
     super();
@@ -127,8 +114,8 @@ export class SOQLView extends LitElement {
 
   private async _loadColumnSettings(): Promise<void> {
     const settings = await getSettings();
-    this.columnOverrides = settings.database?.soql?.columnOverrides ?? {};
-    this._setColumnView(resolveColumnView(SOQL_VIEWS, settings.database?.soql?.columnView));
+    this.columnOverrides = settings.database?.sosl?.columnOverrides ?? {};
+    this._setColumnView(resolveColumnView(SOSL_VIEWS, settings.database?.sosl?.columnView));
   }
 
   updated(changedProperties: PropertyValues): void {
@@ -147,7 +134,6 @@ export class SOQLView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
     unsafeCSS(databaseViewStyles),
-    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
@@ -156,25 +142,27 @@ export class SOQLView extends LitElement {
         width: 100%;
       }
 
-      #soql-table-container {
+      #sosl-table-container {
         height: 100%;
       }
 
-      #db-soql-table {
+      #db-sosl-table {
         overflow: hidden;
         table-layout: fixed;
+        width: 100%;
         margin-bottom: 1rem;
       }
     `,
   ];
 
   render() {
-    const soqlSkeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : ``;
+    const soslSkeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : ``;
+
     return html`
       <datagrid-filter-bar>
         <vs-select
           slot="table-actions"
-          id="soql-column-view"
+          id="sosl-column-view"
           prefix="Columns"
           label="Column view"
           @change="${this._handleColumnViewChange}"
@@ -182,7 +170,7 @@ export class SOQLView extends LitElement {
           .value="${this.columnView}"
           .resettableValues="${Object.keys(this.columnOverrides)}"
         >
-          ${SOQL_VIEWS.map(
+          ${SOSL_VIEWS.map(
             (view) =>
               html`<vscode-option value="${view.id}" ?selected="${this.columnView === view.id}"
                 >${view.id}</vscode-option
@@ -192,13 +180,12 @@ export class SOQLView extends LitElement {
 
         <vs-select
           slot="group"
-          id="soql-groupby-dropdown"
+          id="sosl-groupby-dropdown"
           prefix="Group"
           label="Group by"
-          @change="${this._soqlGroupBy}"
+          @change="${this._soslGroupBy}"
         >
-          <vscode-option>SOQL</vscode-option>
-          <vscode-option>Object</vscode-option>
+          <vscode-option>SOSL</vscode-option>
           <vscode-option>Namespace</vscode-option>
           <vscode-option>Caller Namespace</vscode-option>
           <vscode-option>None</vscode-option>
@@ -226,9 +213,9 @@ export class SOQLView extends LitElement {
         </div>
       </datagrid-filter-bar>
 
-      <div id="soql-table-container">
-        ${soqlSkeleton}
-        <div id="db-soql-table"></div>
+      <div id="sosl-table-container">
+        ${soslSkeleton}
+        <div id="db-sosl-table"></div>
       </div>
       <context-menu @menu-select="${this._handleColumnMenuSelect}"></context-menu>
     `;
@@ -237,20 +224,20 @@ export class SOQLView extends LitElement {
   private _handleColumnViewChange(event: Event) {
     const id = (event.target as HTMLInputElement).value || 'General';
     this._setColumnView(id);
-    updateSetting('database.soql.columnView', id);
+    updateSetting('database.sosl.columnView', id);
   }
 
   /** Effective fields for a view id: the user override, else the built-in preset. */
   private _columnViewFields(id: string): string[] | null {
-    return this.columnOverrides[id] ?? getColumnView(SOQL_VIEWS, id)?.fields ?? null;
+    return this.columnOverrides[id] ?? getColumnView(SOSL_VIEWS, id)?.fields ?? null;
   }
 
   private _setColumnView(id: string) {
     this.columnView = id;
     // Only apply once the table is laid out; otherwise tableBuilt → _initTableColumns
     // applies the current view (redraw on an unrendered table throws).
-    if (this.soqlTable?.element?.clientHeight) {
-      applyColumnView(this.soqlTable, this._columnViewFields(id), ALWAYS_VISIBLE);
+    if (this.soslTable?.element?.clientHeight) {
+      applyColumnView(this.soslTable, this._columnViewFields(id), ALWAYS_VISIBLE);
     }
   }
 
@@ -265,14 +252,14 @@ export class SOQLView extends LitElement {
   }
 
   private _showColumnMenu(x: number, y: number) {
-    if (!this.contextMenu || !this.soqlTable) {
+    if (!this.contextMenu || !this.soslTable) {
       return;
     }
     this.contextMenu.show(
       buildColumnMenuItems(
-        this.soqlTable,
+        this.soslTable,
         this.columnView,
-        SOQL_VIEWS,
+        SOSL_VIEWS,
         ALWAYS_VISIBLE,
         Object.keys(this.columnOverrides),
       ),
@@ -288,13 +275,13 @@ export class SOQLView extends LitElement {
 
   /** Rebuilds the open column menu so checkmarks/reset icons reflect current state. */
   private _refreshColumnMenu() {
-    if (!this.contextMenu?.isVisible() || !this.soqlTable) {
+    if (!this.contextMenu?.isVisible() || !this.soslTable) {
       return;
     }
     this.contextMenu.items = buildColumnMenuItems(
-      this.soqlTable,
+      this.soslTable,
       this.columnView,
-      SOQL_VIEWS,
+      SOSL_VIEWS,
       ALWAYS_VISIBLE,
       Object.keys(this.columnOverrides),
     );
@@ -302,14 +289,14 @@ export class SOQLView extends LitElement {
 
   private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
     const { itemId } = e.detail;
-    const table = this.soqlTable;
+    const table = this.soslTable;
     if (!table) {
       return;
     }
     if (itemId.startsWith('view:')) {
       const id = itemId.slice('view:'.length);
       this._setColumnView(id);
-      updateSetting('database.soql.columnView', id);
+      updateSetting('database.sosl.columnView', id);
       this._refreshColumnMenu();
       return;
     }
@@ -322,7 +309,7 @@ export class SOQLView extends LitElement {
       );
       this.columnOverrides = { ...this.columnOverrides, [this.columnView]: fields };
       applyColumnView(table, fields, ALWAYS_VISIBLE);
-      updateSetting('database.soql.columnOverrides', this.columnOverrides);
+      updateSetting('database.sosl.columnOverrides', this.columnOverrides);
       this._refreshColumnMenu();
       return;
     }
@@ -338,7 +325,7 @@ export class SOQLView extends LitElement {
 
   /** Clears a view's override, restoring its built-in columns (defaults to the active view). */
   private _resetColumns(id: string = this.columnView) {
-    const table = this.soqlTable;
+    const table = this.soslTable;
     if (!table || !this.columnOverrides[id]) {
       return;
     }
@@ -347,38 +334,42 @@ export class SOQLView extends LitElement {
     if (id === this.columnView) {
       applyColumnView(table, this._columnViewFields(id), ALWAYS_VISIBLE);
     }
-    updateSetting('database.soql.columnOverrides', this.columnOverrides);
+    updateSetting('database.sosl.columnOverrides', this.columnOverrides);
   }
 
   _copyToClipboard() {
-    this.soqlTable?.copyToClipboard('all');
+    this.soslTable?.copyToClipboard('all');
   }
 
   _exportToCSV() {
-    this.soqlTable?.download('csv', 'soql.csv', { bom: true, delimiter: ',' });
+    this.soslTable?.download('csv', 'sosl.csv', { bom: true, delimiter: ',' });
   }
 
   _findEvt = ((event: FindEvt) => {
     this._find(event);
   }) as EventListener;
 
-  _soqlGroupBy(event: Event) {
-    if (!this.soqlTable) {
+  _soslGroupBy(event: Event) {
+    if (!this.soslTable) {
       return;
     }
     const target = event.target as HTMLInputElement;
     const groupValue = groupLabelsToFields.get(target.value) ?? '';
     //@ts-expect-error This is a custom function added in the GroupSort custom module
-    this.soqlTable.setSortedGroupBy(groupValue);
+    this.soslTable.setSortedGroupBy(groupValue);
+  }
+
+  get _soslTableWrapper(): HTMLDivElement | null {
+    return this.renderRoot?.querySelector('#db-sosl-table');
   }
 
   _appendTableWhenVisible() {
-    if (this.soqlTable) {
+    if (this.soslTable) {
       return;
     }
 
     isVisible(this).then((isVisible) => {
-      const tableWrapper = this._soqlTableWrapper;
+      const tableWrapper = this._soslTableWrapper;
       if (tableWrapper && this.timelineRoot && isVisible) {
         Tabulator.registerModule(Object.values(CommonModules));
         Tabulator.registerModule([
@@ -389,13 +380,13 @@ export class SOQLView extends LitElement {
           GroupChildIndent,
           GroupSort,
         ]);
-        this._renderSOQLTable(tableWrapper, this.lines);
+        this._renderSOSLTable(tableWrapper, this.lines);
       }
     });
   }
 
   async _highlightMatches(highlightIndex: number) {
-    if (!this.soqlTable?.element?.clientHeight) {
+    if (!this.soslTable?.element?.clientHeight) {
       return;
     }
 
@@ -403,17 +394,16 @@ export class SOQLView extends LitElement {
     const currentRow = this.findMap[highlightIndex];
     this.blockClearHighlights = true;
     //@ts-expect-error This is a custom function added in by Find custom module
-    await this.soqlTable.setCurrentMatch(highlightIndex, currentRow, {
+    await this.soslTable.setCurrentMatch(highlightIndex, currentRow, {
       scrollIfVisible: false,
       focusRow: false,
     });
     this.blockClearHighlights = false;
-
     this.oldIndex = highlightIndex;
   }
 
   async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
-    const isTableVisible = !!this.soqlTable?.element?.clientHeight;
+    const isTableVisible = !!this.soslTable?.element?.clientHeight;
     if (!isTableVisible && !this.totalMatches) {
       return;
     }
@@ -431,7 +421,7 @@ export class SOQLView extends LitElement {
     if (newSearch || clearHighlights) {
       this.blockClearHighlights = true;
       //@ts-expect-error This is a custom function added in by Find custom module
-      const result = await this.soqlTable.find(this.findArgs);
+      const result = await this.soslTable.find(this.findArgs);
       this.blockClearHighlights = false;
       this.totalMatches = result.totalMatches;
       this.findMap = result.matchIndexes;
@@ -439,47 +429,30 @@ export class SOQLView extends LitElement {
       if (!clearHighlights) {
         document.dispatchEvent(
           new CustomEvent('db-find-results', {
-            detail: { totalMatches: result.totalMatches, type: 'soql' },
+            detail: { totalMatches: result.totalMatches, type: 'sosl' },
           }),
         );
       }
     }
   }
 
-  _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
-    const eventIndexToSOQL = new Map<number, SOQLExecuteBeginLine>();
-    const queryRowLimit = this.timelineRoot?.governorLimits.queryRows.limit ?? 0;
+  _renderSOSLTable(soslTableContainer: HTMLElement, soslLines: SOSLExecuteBeginLine[]) {
+    const soslData: SOSLRow[] = [];
     let nextRowId = 0;
-
-    soqlLines?.forEach((line) => {
-      eventIndexToSOQL.set(line.eventIndex, line);
-    });
-
-    const soqlData: GridSOQLData[] = [];
-    if (soqlLines) {
-      for (const soql of soqlLines) {
-        const explainLine = soql.children[0];
-        soqlData.push({
+    if (soslLines) {
+      for (const sosl of soslLines) {
+        soslData.push({
           id: ++nextRowId,
-          isSelective: explainLine?.relativeCost ? explainLine.relativeCost <= 1 : null,
-          relativeCost: explainLine?.relativeCost,
-          soql: soql.text,
-          namespace: soql.namespace,
-          callerNamespace: getCallerNamespace(soql),
-          rowCount: soql.soqlRowCount.self,
-          timeTaken: soql.duration.total,
-          aggregations: soql.aggregations,
-          objectType: deriveSoqlObject(soql),
-          leadingOperationType: explainLine?.leadingOperationType ?? null,
-          sObjectType: explainLine?.sObjectType ?? null,
-          cardinality: explainLine?.cardinality ?? null,
-          sObjectCardinality: explainLine?.sObjectCardinality ?? null,
-          fields: explainLine?.fields?.join(', ') ?? null,
-          eventIndex: soql.eventIndex,
+          sosl: sosl.text,
+          namespace: sosl.namespace,
+          callerNamespace: getCallerNamespace(sosl),
+          rowCount: sosl.soslRowCount.self,
+          timeTaken: sosl.duration.total,
+          eventIndex: sosl.eventIndex,
           _children: [
             {
               id: ++nextRowId,
-              eventIndex: soql.eventIndex,
+              eventIndex: sosl.eventIndex,
               isDetail: true,
             },
           ],
@@ -487,16 +460,11 @@ export class SOQLView extends LitElement {
       }
     }
 
-    this.soqlTable = new Tabulator(soqlTableContainer, {
+    this.soslTable = new Tabulator(soslTableContainer, {
       index: 'id',
       height: '100%',
-      rowKeyboardNavigation: true,
-      data: soqlData,
-      layout: 'fitColumns',
-      placeholder: 'No SOQL queries found',
-      columnCalcs: 'table',
       clipboard: true,
-      downloadEncoder: this.downlodEncoder('soql.csv'),
+      downloadEncoder: this.downlodEncoder('sosl.csv'),
       downloadRowRange: 'all',
       downloadConfig: {
         columnHeaders: true,
@@ -508,16 +476,20 @@ export class SOQLView extends LitElement {
       //@ts-expect-error types need update array is valid
       keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
       clipboardCopyRowRange: 'all',
+      rowKeyboardNavigation: true,
+      data: soslData,
+      layout: 'fitColumns',
+      placeholder: 'No SOSL queries found',
+      columnCalcs: 'table',
       groupCalcs: true,
-      groupHeader: soqlGroupHeader,
       groupSort: true,
       groupClosedShowCalcs: true,
       groupStartOpen: false,
       groupToggleElement: false,
-      selectableRows: 'highlight',
       selectableRowsCheck: function (row: RowComponent) {
         return !row.getData().isDetail;
       },
+      selectableRows: 'highlight',
       dataTree: true,
       dataTreeBranchElement: false,
       dataTreeStartExpanded: false,
@@ -540,11 +512,9 @@ export class SOQLView extends LitElement {
       },
       columns: [
         {
-          title: 'SOQL',
-          field: 'soql',
-          headerSortStartingDir: 'asc',
+          title: 'SOSL',
+          field: 'sosl',
           sorter: 'string',
-          tooltip: true,
           bottomCalc: () => {
             return 'Total';
           },
@@ -552,89 +522,13 @@ export class SOQLView extends LitElement {
           cssClass: 'datagrid-textarea datagrid-code-text',
           variableHeight: true,
           formatter: (cell, _formatterParams, _onRendered) => {
-            const data = cell.getData() as GridSOQLData;
+            const data = cell.getData() as SOSLRow;
             return `<call-stack
-            eventIndex=${data.eventIndex}
+            eventIndex="${data.eventIndex}"
             startDepth="0"
             endDepth="1"
           ></call-stack>`;
           },
-        },
-        {
-          title: 'Selective',
-          field: 'isSelective',
-          formatter: 'tickCross',
-          formatterParams: {
-            allowEmpty: true,
-          },
-          width: 40,
-          hozAlign: 'center',
-          vertAlign: 'top',
-          sorter: function (a, b, aRow, bRow, _column, dir, _sorterParams) {
-            // Always Sort null values to the bottom (when we do not have selectivity)
-            if (a === null) {
-              return dir === 'asc' ? 1 : -1;
-            } else if (b === null) {
-              return dir === 'asc' ? -1 : 1;
-            }
-
-            const aRowData = aRow.getData();
-            const bRowData = bRow.getData();
-
-            return (aRowData.relativeCost || 0) - (bRowData.relativeCost || 0);
-          },
-          tooltip: function (_e, cell, _onRendered) {
-            const { isSelective, relativeCost } = cell.getData() as GridSOQLData;
-            let title;
-            if (isSelective === null) {
-              title = 'Selectivity could not be determined.';
-            } else if (isSelective) {
-              title = 'Query is selective.';
-            } else {
-              title = 'Query is not selective.';
-            }
-
-            if (relativeCost) {
-              title += `<br>Relative cost: ${relativeCost}`;
-            }
-            return title;
-          },
-          accessorDownload: function (
-            _value: unknown,
-            data: GridSOQLData,
-            _type: 'data' | 'download' | 'clipboard',
-            _accessorParams: unknown,
-            _column?: ColumnComponent,
-            _row?: RowComponent,
-          ): number | null | undefined {
-            return data.relativeCost;
-          },
-          accessorClipboard: function (
-            _value: unknown,
-            data: GridSOQLData,
-            _type: 'data' | 'download' | 'clipboard',
-            _accessorParams: unknown,
-            _column?: ColumnComponent,
-            _row?: RowComponent,
-          ): number | null | undefined {
-            return data.relativeCost;
-          },
-        },
-        {
-          title: 'Object',
-          field: 'objectType',
-          sorter: 'string',
-          width: 150,
-          visible: false,
-          headerFilter: 'list',
-          headerFilterFunc: 'in',
-          headerFilterParams: {
-            valuesLookup: 'all',
-            clearable: true,
-            multiselect: true,
-          },
-          headerFilterLiveFilter: false,
-          formatter: (cell) => (cell.getValue() as string | null) ?? '—',
         },
         {
           title: 'Namespace',
@@ -658,6 +552,8 @@ export class SOQLView extends LitElement {
           visible: false,
         },
         {
+          // SOSL's row limit is per query (2,000), not a transaction total — so
+          // each row meters against that per-query cap; the footer is a plain sum.
           title: 'Row Count',
           field: 'rowCount',
           sorter: 'number',
@@ -666,84 +562,23 @@ export class SOQLView extends LitElement {
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatter,
-          formatterParams: { precision: 0, totalValue: queryRowLimit, showPercentageText: false },
-          bottomCalc: 'sum',
-          bottomCalcFormatter: progressFormatter,
-          bottomCalcFormatterParams: {
+          formatterParams: {
             precision: 0,
-            totalValue: queryRowLimit,
+            totalValue: SOSL_ROWS_PER_QUERY_LIMIT,
             showPercentageText: false,
           },
-          tooltip: (_e, cell) => cell.getValue() + (queryRowLimit > 0 ? '/' + queryRowLimit : ''),
-        },
-        {
-          title: 'Aggregations',
-          field: 'aggregations',
-          sorter: 'number',
-          cssClass: 'number-cell',
-          width: 100,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
+          // The group/total is a plain sum (a per-query bar there would be
+          // meaningless); use an integer formatter, NOT the ns→ms `Number` one.
           bottomCalc: 'sum',
+          bottomCalcFormatter: (cell) => countFormat.format((cell.getValue() as number) ?? 0),
+          tooltip: (_e, cell) => `${cell.getValue()} / ${SOSL_ROWS_PER_QUERY_LIMIT} per query`,
         },
-        {
-          title: 'Relative Cost',
-          field: 'relativeCost',
-          sorter: 'number',
-          cssClass: 'number-cell',
-          width: 110,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          visible: false,
-        },
-        {
-          title: 'Leading Operation',
-          field: 'leadingOperationType',
-          sorter: 'string',
-          width: 140,
-          visible: false,
-        },
-        {
-          title: 'SObject Type',
-          field: 'sObjectType',
-          sorter: 'string',
-          width: 130,
-          visible: false,
-        },
-        {
-          title: 'Cardinality',
-          field: 'cardinality',
-          sorter: 'number',
-          cssClass: 'number-cell',
-          width: 110,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          visible: false,
-        },
-        {
-          title: 'SObject Cardinality',
-          field: 'sObjectCardinality',
-          sorter: 'number',
-          cssClass: 'number-cell',
-          width: 140,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          visible: false,
-        },
-        {
-          title: 'Indexed Fields',
-          field: 'fields',
-          sorter: 'string',
-          width: 140,
-          visible: false,
-        },
-        // Time column sits at the far right.
         {
           title: 'Time Taken (ms)',
           field: 'timeTaken',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 120,
+          width: 110,
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: Number,
@@ -760,129 +595,121 @@ export class SOQLView extends LitElement {
       rowFormatter: (row) => {
         const data = row.getData();
         if (data.isDetail && data.eventIndex !== undefined) {
-          const detailContainer = this.createSOQLDetailPanel(data.eventIndex, eventIndexToSOQL);
+          const detailContainer = this.createDetailPanel(data.eventIndex);
           row.getElement().replaceChildren(detailContainer);
         }
       },
     });
 
-    this.soqlTable.on('groupClick', (_e: UIEvent, group: GroupComponent) => {
+    this.soslTable.on('groupClick', (_e: UIEvent, group: GroupComponent) => {
       const { type } = window.getSelection() ?? {};
       if (type === 'Range') {
         return;
       }
-      group.toggle();
 
-      if (this.soqlTable && group.isVisible()) {
-        this.soqlTable.blockRedraw();
+      group.toggle();
+      if (this.soslTable && group.isVisible()) {
+        this.soslTable.blockRedraw();
         for (const row of group.getRows()) {
           if (row.getTreeChildren() && !row.isTreeExpanded()) {
             row.treeExpand();
           }
         }
-        this.soqlTable.restoreRedraw();
+        this.soslTable.restoreRedraw();
       }
     });
 
-    this.soqlTable.on('rowClick', function (_e, row) {
+    this.soslTable.on('rowClick', function (_e, row) {
       const { type } = window.getSelection() ?? {};
       if (type === 'Range') {
         return;
       }
 
       const data = row.getData();
-      if (!(data.eventIndex !== undefined && data.soql)) {
+      if (!(data.eventIndex !== undefined && data.sosl)) {
         return;
       }
 
       const origRowHeight = row.getElement().offsetHeight;
       row.treeToggle();
-      row.getCell('soql').getElement().style.height = origRowHeight + 'px';
+      row.getCell('sosl').getElement().style.height = origRowHeight + 'px';
     });
 
-    this.soqlTable.on('tableBuilt', () => {
+    this.soslTable.on('tableBuilt', () => {
       const holder = this._getTableHolder();
       holder.style.overflowAnchor = 'none';
       //@ts-expect-error This is a custom function added in the GroupSort custom module
-      this.soqlTable?.setSortedGroupBy('soql');
-      if (this.soqlTable) {
-        this._initTableColumns(this.soqlTable);
+      this.soslTable?.setSortedGroupBy('sosl');
+      if (this.soslTable) {
+        this._initTableColumns(this.soslTable);
       }
     });
 
-    this.soqlTable.on('dataSorted', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.soqlTable.on('dataGrouped', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.soqlTable.on('dataFiltering', () => {
-      if (!this.blockClearHighlights && this.totalMatches > 0) {
-        this._resetFindWidget();
-        this._clearSearchHighlights();
-      }
-    });
-
-    this.soqlTable.on('renderComplete', () => {
+    this.soslTable.on('renderComplete', () => {
       const holder = this._getTableHolder();
       const table = this._getTable();
       holder.style.minHeight = Math.min(holder.clientHeight, table.clientHeight) + 'px';
+    });
+
+    this.soslTable.on('dataSorted', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
+    });
+
+    this.soslTable.on('dataGrouped', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
+    });
+
+    this.soslTable.on('dataFiltering', () => {
+      if (!this.blockClearHighlights && this.totalMatches > 0) {
+        this._resetFindWidget();
+        this._clearSearchHighlights();
+      }
     });
   }
 
   _resetFindWidget() {
     document.dispatchEvent(
       new CustomEvent('db-find-results', {
-        detail: { totalMatches: 0, type: 'soql' },
+        detail: { totalMatches: 0, type: 'sosl' },
       }),
     );
   }
 
-  _clearSearchHighlights() {
+  private _clearSearchHighlights() {
     this.findArgs.text = '';
     this.findArgs.count = 0;
     //@ts-expect-error This is a custom function added in by Find custom module
-    this.soqlTable.clearFindHighlights();
+    this.soslTable.clearFindHighlights();
     this.findMap = {};
     this.totalMatches = 0;
 
     document.dispatchEvent(
       new CustomEvent('db-find-results', {
-        detail: { totalMatches: this.totalMatches, type: 'soql' },
+        detail: { totalMatches: this.totalMatches, type: 'sosl' },
       }),
     );
   }
 
   _getTable() {
-    this.table ??= this.soqlTable?.element.querySelector('.tabulator-table') as HTMLElement;
+    this.table ??= this.soslTable?.element.querySelector('.tabulator-table') as HTMLElement;
     return this.table;
   }
 
   _getTableHolder() {
-    this.holder ??= this.soqlTable?.element.querySelector('.tabulator-tableholder') as HTMLElement;
+    this.holder = this.soslTable?.element.querySelector('.tabulator-tableholder') as HTMLElement;
     return this.holder;
   }
 
-  createSOQLDetailPanel(eventIndex: number, eventIndexToSOQL: Map<number, SOQLExecuteBeginLine>) {
+  createDetailPanel(eventIndex: number) {
     const detailContainer = document.createElement('div');
     detailContainer.className = 'row__details-container';
-
-    const soqlLine = eventIndexToSOQL.get(eventIndex);
-    render(
-      html`<db-soql-detail-panel
-        eventIndex=${eventIndex}
-        soql=${soqlLine?.text}
-      ></db-soql-detail-panel>`,
-      detailContainer,
-    );
+    render(html`<call-stack eventIndex=${eventIndex}></call-stack>`, detailContainer);
 
     return detailContainer;
   }
@@ -912,25 +739,16 @@ type VSCodeSaveFile = {
   };
 };
 
-interface GridSOQLData {
+interface SOSLRow {
   id: number;
-  isSelective?: boolean | null;
-  relativeCost?: number | null;
-  soql?: string;
+  sosl?: string;
   namespace?: string;
   callerNamespace?: string;
-  rowCount?: number | null;
-  timeTaken?: number | null;
-  aggregations?: number;
-  objectType?: string | null;
-  leadingOperationType?: string | null;
-  sObjectType?: string | null;
-  cardinality?: number | null;
-  sObjectCardinality?: number | null;
-  fields?: string | null;
+  rowCount?: number;
+  timeTaken?: number;
   eventIndex?: number;
   isDetail?: boolean;
-  _children?: GridSOQLData[];
+  _children?: SOSLRow[];
 }
 
 type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

@@ -962,11 +962,17 @@ export class DMLBeginLine extends DurationLogEvent {
     total: 1,
   };
   namespace = 'default';
+  /** The SObject the DML targets (e.g. `Account`), from the `Type:` field. Null if absent. */
+  sObjectType: string | null = null;
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['DML_END'], LOG_CATEGORY.DML, 'free');
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = 'DML ' + parts[3] + ' ' + parts[4];
+    const typePart = parts[4];
+    if (typePart?.startsWith('Type:')) {
+      this.sObjectType = typePart.slice('Type:'.length);
+    }
     const rowCountString = parts[5];
     this.dmlRowCount.total = this.dmlRowCount.self = rowCountString ? parseRows(rowCountString) : 0;
   }

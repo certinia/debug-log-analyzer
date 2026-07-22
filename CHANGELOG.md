@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 🗄️ **Database tab: governor-limit visibility + SOSL**. ([#162])
+  - 📏 **Limit gauge strip**: SOQL, SOSL, DML, query/DML rows, CPU and heap shown as `used / limit`, colored as they approach the limit.
+  - 🧮 **Found vs Counted**: each section reconciles statements found in the log against the governor-counted total, flagging queries that didn't consume the limit (e.g. custom metadata).
+  - 🏷️ **Object column** (SOQL/DML): the queried SObject, with grouping by object. Custom metadata (`__mdt`) is visible via its suffix — a reminder those queries may be free (they don't count toward the SOQL limit unless they select a long text area field or run in a Flow).
+  - 🔎 **SOSL table**: a dedicated, searchable table with column views, grouping and CSV export.
 - 🔴 **Timeline exception markers**: exceptions show as red lines, with a **Throws** count in method tooltips. ([#828])
 - 🧩 **Call Tree, Analysis and Database tables** gain configurable columns and views. ([#298])
   - 🗂️ **Column views**: switch each table between column sets (`General`, `Time`, `Governor Limits`, `Database`, `Memory`); edit a view by showing/hiding columns from the **Columns** toolbar button or the header right-click menu, with inline **reset** to restore defaults; choices persist per view.
@@ -511,6 +516,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#848]: https://github.com/certinia/debug-log-analyzer/issues/848
 [#827]: https://github.com/certinia/debug-log-analyzer/issues/827
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
+[#162]: https://github.com/certinia/debug-log-analyzer/issues/162
 [#32]: https://github.com/certinia/debug-log-analyzer/issues/32
 
 <!-- v1.20.0 -->

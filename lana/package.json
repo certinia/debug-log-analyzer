@@ -354,7 +354,8 @@
             "enum": [
               "General",
               "Performance",
-              "Query Plan"
+              "Query Plan",
+              "Limits"
             ],
             "markdownDescription": "The column view applied to the Database SOQL table. Default: `General`",
             "order": 0
@@ -365,10 +366,22 @@
             "default": "General",
             "enum": [
               "General",
-              "Timing"
+              "Timing",
+              "Limits"
             ],
             "markdownDescription": "The column view applied to the Database DML table. Default: `General`",
             "order": 2
+          },
+          "lana.database.sosl.columnView": {
+            "title": "SOSL column view",
+            "type": "string",
+            "default": "General",
+            "enum": [
+              "General",
+              "Timing"
+            ],
+            "markdownDescription": "The column view applied to the Database SOSL table. Default: `General`",
+            "order": 4
           }
         }
       }
