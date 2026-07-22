@@ -14,6 +14,7 @@ import {
   getVisibleFields,
   resolveColumnView,
   SOQL_VIEWS,
+  SOSL_VIEWS,
   toggleField,
 } from '../ColumnViews.js';
 
@@ -231,8 +232,17 @@ describe('view sets', () => {
     );
   });
 
-  it('SOQL views are General/Performance/Query Plan (no redundant Rows & Time)', () => {
-    expect(SOQL_VIEWS.map((v) => v.id)).toEqual(['General', 'Performance', 'Query Plan']);
+  it('SOQL views are General/Performance/Query Plan/Limits', () => {
+    expect(SOQL_VIEWS.map((v) => v.id)).toEqual(['General', 'Performance', 'Query Plan', 'Limits']);
+  });
+
+  it('SOQL and DML expose the object-type column by default', () => {
+    expect(getColumnView(SOQL_VIEWS, 'General')?.fields).toContain('objectType');
+    expect(getColumnView(DML_VIEWS, 'General')?.fields).toContain('objectType');
+  });
+
+  it('SOSL views are General/Timing', () => {
+    expect(SOSL_VIEWS.map((v) => v.id)).toEqual(['General', 'Timing']);
   });
 
   it('getTableFields returns every column field in order', () => {

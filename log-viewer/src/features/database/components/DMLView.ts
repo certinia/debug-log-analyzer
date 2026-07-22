@@ -13,7 +13,6 @@ import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenge
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
-import { DatabaseAccess } from '../services/Database.js';
 import {
   applyColumnView,
   buildColumnMenuItems,
@@ -46,13 +45,13 @@ import '../../../components/CallStack.js';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/datagrid-filter-bar.js';
-import './DatabaseSection.js';
 
 /** The DML column is always shown in the DML table. */
 const ALWAYS_VISIBLE = ['dml'];
 
 const groupLabelsToFields = new Map<string, string>([
   ['DML', 'dml'],
+  ['Object', 'objectType'],
   ['Namespace', 'namespace'],
   ['Caller Namespace', 'callerNamespace'],
   ['None', ''],
@@ -69,8 +68,9 @@ export class DMLView extends LitElement {
   @property()
   oldIndex: number = 0;
 
-  @state()
-  dmlLines: DMLBeginLine[] = [];
+  /** DML lines to display; supplied by the parent DatabaseView. */
+  @property({ attribute: false })
+  lines: DMLBeginLine[] = [];
 
   dmlTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
@@ -119,8 +119,7 @@ export class DMLView extends LitElement {
   updated(changedProperties: PropertyValues): void {
     if (
       this.timelineRoot &&
-      changedProperties.has('timelineRoot') &&
-      !changedProperties.get('timelineRoot')
+      (changedProperties.has('lines') || changedProperties.has('timelineRoot'))
     ) {
       this._appendTableWhenVisible();
     }
@@ -158,8 +157,6 @@ export class DMLView extends LitElement {
     const dmlSkeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : ``;
 
     return html`
-      <database-section title="DML Statements" .dbLines="${this.dmlLines}"></database-section>
-
       <datagrid-filter-bar>
         <vs-select
           slot="table-actions"
@@ -187,6 +184,8 @@ export class DMLView extends LitElement {
           @change="${this._dmlGroupBy}"
         >
           <vscode-option>DML</vscode-option>
+          <vscode-option>Object</vscode-option>
+          <vscode-option>Namespace</vscode-option>
           <vscode-option>Caller Namespace</vscode-option>
           <vscode-option>None</vscode-option>
         </vs-select>
@@ -234,7 +233,9 @@ export class DMLView extends LitElement {
 
   private _setColumnView(id: string) {
     this.columnView = id;
-    if (this.dmlTable) {
+    // Only apply once the table is laid out; otherwise tableBuilt → _initTableColumns
+    // applies the current view (redraw on an unrendered table throws).
+    if (this.dmlTable?.element?.clientHeight) {
       applyColumnView(this.dmlTable, this._columnViewFields(id), ALWAYS_VISIBLE);
     }
   }
@@ -366,13 +367,9 @@ export class DMLView extends LitElement {
       return;
     }
 
-    isVisible(this).then(async (isVisible) => {
-      const treeRoot = this.timelineRoot;
+    isVisible(this).then((isVisible) => {
       const tableWrapper = this._dmlTableWrapper;
-      if (tableWrapper && treeRoot && isVisible) {
-        const dbAccess = await DatabaseAccess.create(treeRoot);
-        this.dmlLines = dbAccess.getDMLLines();
-
+      if (tableWrapper && this.timelineRoot && isVisible) {
         Tabulator.registerModule(Object.values(CommonModules));
         Tabulator.registerModule([
           RowKeyboardNavigation,
@@ -382,7 +379,7 @@ export class DMLView extends LitElement {
           GroupChildIndent,
           GroupSort,
         ]);
-        this._renderDMLTable(tableWrapper, this.dmlLines);
+        this._renderDMLTable(tableWrapper, this.lines);
       }
     });
   }
@@ -448,6 +445,7 @@ export class DMLView extends LitElement {
         dmlData.push({
           id: ++nextRowId,
           dml: dml.text,
+          objectType: dml.sObjectType,
           namespace: dml.namespace,
           callerNamespace: getCallerNamespace(dml),
           rowCount: dml.dmlRowCount.self,
@@ -547,6 +545,22 @@ export class DMLView extends LitElement {
             multiselect: true,
           },
           headerFilterLiveFilter: false,
+        },
+        {
+          title: 'Object',
+          field: 'objectType',
+          sorter: 'string',
+          width: 150,
+          visible: false,
+          headerFilter: 'list',
+          headerFilterFunc: 'in',
+          headerFilterParams: {
+            valuesLookup: 'all',
+            clearable: true,
+            multiselect: true,
+          },
+          headerFilterLiveFilter: false,
+          formatter: (cell) => (cell.getValue() as string | null) ?? '—',
         },
         {
           title: 'Namespace',
@@ -743,6 +757,7 @@ type VSCodeSaveFile = {
 interface DMLRow {
   id: number;
   dml?: string;
+  objectType?: string | null;
   namespace?: string;
   callerNamespace?: string;
   rowCount?: number;

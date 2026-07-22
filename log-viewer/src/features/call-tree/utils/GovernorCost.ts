@@ -43,8 +43,9 @@ interface CostMetric {
  * Metrics that are attributed per call-tree node (and therefore comparable to
  * their limit per path). CPU time and callouts are intentionally excluded —
  * they are only tracked globally, not per node. SOSL rows are also excluded:
- * they have no governor limit (only SOSL *queries* is limited, to 20) and do
- * not count against the SOQL query-rows limit.
+ * they have no per-transaction limit to accumulate against (the 2,000-row cap
+ * is per query) and don't count against the SOQL query-rows limit; only SOSL
+ * *queries* is a transaction total (limited to 20).
  */
 const COST_METRICS: CostMetric[] = [
   { label: 'SOQL', used: (r) => r.soqlCount.total, limit: (l) => l.soqlQueries.limit },

@@ -1,7 +1,13 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { type ApexLog, DMLBeginLine, type LogEvent, SOQLExecuteBeginLine } from 'apex-log-parser';
+import {
+  type ApexLog,
+  DMLBeginLine,
+  type LogEvent,
+  SOQLExecuteBeginLine,
+  SOSLExecuteBeginLine,
+} from 'apex-log-parser';
 
 export type Stack = LogEvent[];
 
@@ -75,6 +81,25 @@ export class DatabaseAccess {
       if (child?.isParent) {
         // results = results.concat(this.getDMLLines(child));
         Array.prototype.push.apply(results, this.getDMLLines(child));
+      }
+    }
+
+    return results;
+  }
+
+  public getSOSLLines(line: LogEvent = DatabaseAccess._treeRoot): SOSLExecuteBeginLine[] {
+    const results: SOSLExecuteBeginLine[] = [];
+
+    const children = line.children;
+    const len = children.length;
+    for (let i = 0; i < len; ++i) {
+      const child = children[i];
+      if (child instanceof SOSLExecuteBeginLine) {
+        results.push(child);
+      }
+
+      if (child?.isParent) {
+        Array.prototype.push.apply(results, this.getSOSLLines(child));
       }
     }
 

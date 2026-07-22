@@ -9,20 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 🗄️ **Database tab + configurable table columns**: governor-limit visibility, a SOSL table, and column views across tables. ([#162] [#298])
+  - 📏 **Governor-limit overview** (Database): SOQL, SOSL, DML and query/DML rows shown as `used / limit`, colored as they approach the limit.
+  - 🧮 **Found vs Counted** (Database): each section reconciles statements found in the log against the governor-counted total, flagging queries that didn't consume the limit (e.g. custom metadata, which is free unless it selects a long text area field or runs in a Flow).
+  - 🔎 **SOSL table**: a dedicated, searchable Database table.
+  - 🗂️ **Column views** (Call Tree, Analysis, Database): switch preset column sets, show/hide columns from the **Columns** button or the header right-click menu, inline **reset** to restore defaults; choices persist per view.
+  - 🏷️ **New columns**: **Object** (queried/target SObject, with group-by) on SOQL/DML; **SOSL Count/Rows**, **Avg Self Time** and optional **Self** variants for every governor metric; **Heap Allocated** (+ Self) via the `Memory` view and Timeline strip; and a SOQL **Query Plan** view (Relative Cost, Leading Operation, SObject Type, Cardinality).
 - 🔴 **Timeline exception markers**: exceptions show as red lines, with a **Throws** count in method tooltips. ([#828])
-- 🧩 **Call Tree, Analysis and Database tables** gain configurable columns and views. ([#298])
-  - 🗂️ **Column views**: switch each table between column sets (`General`, `Time`, `Governor Limits`, `Database`, `Memory`); edit a view by showing/hiding columns from the **Columns** toolbar button or the header right-click menu, with inline **reset** to restore defaults; choices persist per view.
-  - 📊 **New columns**: **SOSL Count/Rows**, **Avg Self Time**, and optional **Self** variants for every governor metric.
-  - 🧠 **Heap / memory analysis**: **Heap Allocated** (+ Self) columns, surfaced through the `Memory` view and the Timeline governor limit strip.
-  - 🔎 **SOQL Query Plan** view: Relative Cost, Leading Operation, SObject Type and Cardinality.
 
 ### Changed
 
+- ♻️ Replaced the deprecated `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).
+- 🎛️ **Modernised dropdowns**: searchable, compact controls that carry the field and value in one place (e.g. `Group: Namespace`, `Type: All`) ([#848]).
 - 📊 **Timeline governor limits**: tooltip rows keep a stable order and always show the `used / limit` value, so figures no longer jump around as you move the pointer. ([#827])
 - 🚧 **Timeline truncation markers** now end where the log recovers, so trusted sections are no longer greyed out. ([#828])
-- 🎛️ **Modernised dropdowns**: searchable, compact controls that carry the field and value in one place (e.g. `Group: Namespace`, `Type: All`) ([#848]).
 - 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832]).
-- ♻️ Replaced the deprecated `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).
 
 ## [1.20.0] 2026-06-18
 
@@ -511,6 +512,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#848]: https://github.com/certinia/debug-log-analyzer/issues/848
 [#827]: https://github.com/certinia/debug-log-analyzer/issues/827
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
+[#162]: https://github.com/certinia/debug-log-analyzer/issues/162
 [#32]: https://github.com/certinia/debug-log-analyzer/issues/32
 
 <!-- v1.20.0 -->

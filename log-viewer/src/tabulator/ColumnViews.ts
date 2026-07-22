@@ -90,17 +90,31 @@ export const CALL_TREE_VIEWS: ColumnView[] = [
 
 /** Column views for the SOQL database table. */
 export const SOQL_VIEWS: ColumnView[] = [
-  { id: 'General', fields: ['isSelective', 'namespace', 'rowCount', 'timeTaken', 'aggregations'] },
+  {
+    // Object is visible by default (its __mdt suffix flags the "does this count
+    // toward the SOQL limit?" case of #162). The derived Counts column lives in
+    // the focused Limits view to avoid duplicating that signal.
+    id: 'General',
+    fields: ['isSelective', 'objectType', 'namespace', 'rowCount', 'timeTaken', 'aggregations'],
+  },
   { id: 'Performance', fields: ['isSelective', 'relativeCost', 'rowCount', 'timeTaken'] },
   {
     id: 'Query Plan',
     fields: ['relativeCost', 'leadingOperationType', 'sObjectType', 'cardinality'],
   },
+  { id: 'Limits', fields: ['objectType', 'namespace', 'rowCount', 'timeTaken'] },
 ];
 
 /** Column views for the DML database table. */
 export const DML_VIEWS: ColumnView[] = [
-  { id: 'General', fields: ['callerNamespace', 'rowCount', 'timeTaken'] },
+  { id: 'General', fields: ['objectType', 'callerNamespace', 'rowCount', 'timeTaken'] },
+  { id: 'Timing', fields: ['rowCount', 'timeTaken'] },
+  { id: 'Limits', fields: ['objectType', 'callerNamespace', 'rowCount'] },
+];
+
+/** Column views for the SOSL database table. */
+export const SOSL_VIEWS: ColumnView[] = [
+  { id: 'General', fields: ['namespace', 'callerNamespace', 'rowCount', 'timeTaken'] },
   { id: 'Timing', fields: ['rowCount', 'timeTaken'] },
 ];
 

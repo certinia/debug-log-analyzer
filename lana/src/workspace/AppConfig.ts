@@ -41,6 +41,7 @@ interface Config {
   database: {
     soql: { columnView: string; columnOverrides: Record<string, string[]> };
     dml: { columnView: string; columnOverrides: Record<string, string[]> };
+    sosl: { columnView: string; columnOverrides: Record<string, string[]> };
   };
 }
 
@@ -75,6 +76,7 @@ export const COLUMN_OVERRIDE_SECTIONS = [
   'callTree.columnOverrides',
   'database.soql.columnOverrides',
   'database.dml.columnOverrides',
+  'database.sosl.columnOverrides',
 ] as const;
 
 type ColumnOverrides = Record<string, string[]>;
