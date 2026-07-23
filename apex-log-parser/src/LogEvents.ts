@@ -320,6 +320,17 @@ export abstract class LogEvent {
     }
   }
 
+  /**
+   * Seeds this heap-allocation leaf's net/gross/peak metrics from a signed byte delta
+   * (negative = deallocation) and advances the parser's running live-heap total. Shared
+   * by {@link HeapAllocateLine} and {@link BulkHeapAllocateLine}.
+   */
+  protected seedHeapLeaf(parser: ApexLogParser, bytes: number): void {
+    this.heapAllocated.self = this.heapAllocated.total = bytes;
+    this.heapGross.self = this.heapGross.total = bytes > 0 ? bytes : 0;
+    this.heapPeak = parser.trackHeapAllocation(bytes);
+  }
+
   private parseTimestamp(text: string): number {
     const start = text.indexOf('(');
     if (start !== -1) {
@@ -559,9 +570,7 @@ export class BulkHeapAllocateLine extends LogEvent {
     super(parser, parts);
     this.text = parts[2] || '';
     this.bytes = parseBytes(parts[2]);
-    this.heapAllocated.self = this.heapAllocated.total = this.bytes;
-    this.heapGross.self = this.heapGross.total = this.bytes > 0 ? this.bytes : 0;
-    this.heapPeak = parser.trackHeapAllocation(this.bytes);
+    this.seedHeapLeaf(parser, this.bytes);
   }
 }
 
@@ -1156,9 +1165,7 @@ export class HeapAllocateLine extends LogEvent {
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
     this.bytes = parseBytes(parts[3]);
-    this.heapAllocated.self = this.heapAllocated.total = this.bytes;
-    this.heapGross.self = this.heapGross.total = this.bytes > 0 ? this.bytes : 0;
-    this.heapPeak = parser.trackHeapAllocation(this.bytes);
+    this.seedHeapLeaf(parser, this.bytes);
   }
 }
 
