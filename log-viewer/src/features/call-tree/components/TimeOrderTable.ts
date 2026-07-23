@@ -16,6 +16,7 @@ import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
 import {
   commonColumnDefaults,
   createGovernorMetricColumns,
+  createSelfSumHeapFooters,
   headerSortElement,
   registerTableModules,
   type TableCallbacks,
@@ -45,6 +46,7 @@ export function createTimeOrderTable(
 
   const tableRef: { current: Tabulator | undefined } = { current: undefined };
   const selfTimeBottomCalc = makeSumSelfTimeAllVisible(() => tableRef.current);
+  const heapFooters = createSelfSumHeapFooters(() => tableRef.current);
 
   const table = new Tabulator(container, {
     data: tableData,
@@ -122,7 +124,7 @@ export function createTimeOrderTable(
         width: 120,
         visible: false,
       },
-      ...createGovernorMetricColumns(governorLimits),
+      ...createGovernorMetricColumns(governorLimits, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',

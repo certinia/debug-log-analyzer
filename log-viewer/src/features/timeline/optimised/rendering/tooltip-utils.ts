@@ -11,6 +11,8 @@
  * - HeatStripTooltipRenderer (minimap metrics)
  */
 
+import { formatInteger } from '../../../../core/utility/Util.js';
+
 // ============================================================================
 // TRAFFIC LIGHT THRESHOLDS
 // ============================================================================
@@ -79,7 +81,7 @@ export const PERCENT_COLORS = {
  * @returns Formatted string with locale-specific thousands separators
  */
 export function formatNumber(value: number): string {
-  return value.toLocaleString();
+  return formatInteger(value);
 }
 
 /**

@@ -60,6 +60,7 @@ const CALL_TREE_FIELDS = [
   'soqlRowCount.total',
   'totalTime',
   'totalSelfTime',
+  'heapPeak',
   'heapAllocated.total',
   'governorCost',
 ];
@@ -92,21 +93,13 @@ describe('applyColumnView', () => {
 
   it('ignores preset fields absent from this table', () => {
     // Bottom-up lacks the count columns; the Governor Limits preset must not error.
-    const { table } = fakeTable([
-      'text',
-      'type',
-      'totalTime',
-      'heapAllocated.total',
-      'governorCost',
-    ]);
+    const { table } = fakeTable(['text', 'type', 'totalTime', 'heapPeak', 'governorCost']);
     applyColumnView(
       table,
       getColumnView(CALL_TREE_VIEWS, 'Governor Limits')!.fields,
       ALWAYS_VISIBLE,
     );
-    expect(getVisibleFields(table).sort()).toEqual(
-      ['governorCost', 'heapAllocated.total', 'text'].sort(),
-    );
+    expect(getVisibleFields(table).sort()).toEqual(['governorCost', 'heapPeak', 'text'].sort());
   });
 
   it('honours a non-default always-visible field (DB tables)', () => {
@@ -191,7 +184,7 @@ describe('view sets', () => {
     expect(general.some((f) => f.endsWith('.self') && f !== 'duration.self')).toBe(false);
   });
 
-  it('General shows Heap but omits the near-always-zero SOSL columns', () => {
+  it('General shows Heap (net) but omits the near-always-zero SOSL columns', () => {
     const general = getColumnView(CALL_TREE_VIEWS, 'General')!.fields!;
     expect(general).toContain('heapAllocated.total');
     expect(general).not.toContain('soslCount.total');
@@ -214,10 +207,13 @@ describe('view sets', () => {
     }
   });
 
-  it('Memory view shows heap self and total', () => {
+  it('Memory view shows net, gross and peak heap', () => {
     const memory = getColumnView(CALL_TREE_VIEWS, 'Memory')!.fields!;
-    expect(memory).toContain('heapAllocated.self');
     expect(memory).toContain('heapAllocated.total');
+    expect(memory).toContain('heapAllocated.self');
+    expect(memory).toContain('heapGross.total');
+    expect(memory).toContain('heapGross.self');
+    expect(memory).toContain('heapPeak');
   });
 
   it('SOQL Query Plan view exposes the explain-plan columns', () => {

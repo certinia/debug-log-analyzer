@@ -15,6 +15,7 @@ import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import {
   commonColumnDefaults,
   createGovernorMetricColumns,
+  createSelfSumHeapFooters,
   headerSortElement,
   registerTableModules,
   type TableCallbacks,
@@ -39,6 +40,7 @@ export function createAggregatedTable(
 
   const tableRef: { current: Tabulator | undefined } = { current: undefined };
   const selfTimeBottomCalc = makeSumSelfTimeAllVisible(() => tableRef.current);
+  const heapFooters = createSelfSumHeapFooters(() => tableRef.current);
 
   const tableData = toAggregatedCallTree(rootMethod.children, rootMethod.governorLimits);
 
@@ -150,7 +152,7 @@ export function createAggregatedTable(
         headerHozAlign: 'right',
         bottomCalc: 'sum',
       },
-      ...createGovernorMetricColumns(rootMethod.governorLimits),
+      ...createGovernorMetricColumns(rootMethod.governorLimits, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',

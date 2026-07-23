@@ -58,9 +58,17 @@ Switch column sets from the **Columns** button in the toolbar (or the header rig
 1. **Time** – call count and self/total/average time.
 1. **Governor Limits** – DML/SOQL/SOSL counts + rows, throws, heap, and governor limit usage (avg + peak).
 1. **Database** – DML/SOQL/SOSL counts + rows.
-1. **Memory** – heap self and total.
+1. **Memory** – heap net (retained), gross (churn) and peak live heap, each total + self.
 
 Show or hide individual columns from the same menu; an edited view shows a **reset** icon. Choices persist per view.
+
+### Heap analysis
+
+Heap is a tricky governor limit, since memory gets freed as well as allocated and a single number hides what actually happened. Every method and call path carries three heap metrics (each with a total and self variant), shown together in the **Memory** view:
+
+1. **Net** – bytes retained (allocated minus freed). Can be negative where a path frees more than it allocates.
+1. **Gross** - bytes allocated, ignoring frees, allocation churn and GC pressure. An allocate-then-free loop has near-zero net but large gross.
+1. **Peak** – highest live heap reached while the path ran. The number comparable to the heap governor limit, so it also drives the Governor Avg/Peak columns.
 
 ### Filtering
 
@@ -76,12 +84,15 @@ Debug Only and Type filtering are available in **Time Order** and **Aggregated**
 SOQL and SOSL query rows are reformatted onto multiple lines and syntax highlighted, so keywords, fields and bind variables are easy to read at a glance.
 
 <img
-src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/calltree-soql-format.png"
-alt="A SOQL query in the Call Tree Name column, formatted across multiple lines with syntax-highlighted keywords, fields and bind variables."
-style={{
-  width: '50%', height:'auto', maxWidth:'400px'
-}}
-loading="lazy"/>
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/calltree-soql-format.png"
+  alt="A SOQL query in the Call Tree Name column, formatted across multiple lines with syntax-highlighted keywords, fields and bind variables."
+  style={{
+    width: '50%',
+    height: 'auto',
+    maxWidth: '400px',
+  }}
+  loading="lazy"
+/>
 
 ### Keyboard Navigation
 

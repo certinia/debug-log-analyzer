@@ -14,7 +14,12 @@ export interface GovernorCostRow {
   dmlRowCount: SelfTotal;
   soqlRowCount: SelfTotal;
   soslRowCount: SelfTotal;
+  /** Signed net heap (alloc − free) — retention. */
   heapAllocated: SelfTotal;
+  /** Gross heap allocated (positive allocations only) — churn. */
+  heapGross: SelfTotal;
+  /** Peak live heap (bytes) reached in this path's subtree — the limit-comparable heap value. */
+  heapPeak: number;
   /**
    * Average governor consumption on this path (0–100%): the mean of every
    * governor's own `used/limit × 100`, across all governors that have a reported
@@ -46,6 +51,11 @@ interface CostMetric {
  * they have no per-transaction limit to accumulate against (the 2,000-row cap
  * is per query) and don't count against the SOQL query-rows limit; only SOSL
  * *queries* is a transaction total (limited to 20).
+ *
+ * Heap uses `heapPeak` (peak live heap in the subtree), NOT `heapAllocated.total`:
+ * heap is the only non-monotonic governor, so its signed net allocation can be
+ * negative and does not compose against the limit. `heapPeak` is ≥ 0 and composes,
+ * so it is the value comparable to the heap limit per path.
  */
 const COST_METRICS: CostMetric[] = [
   { label: 'SOQL', used: (r) => r.soqlCount.total, limit: (l) => l.soqlQueries.limit },
@@ -53,7 +63,7 @@ const COST_METRICS: CostMetric[] = [
   { label: 'SOSL', used: (r) => r.soslCount.total, limit: (l) => l.soslQueries.limit },
   { label: 'SOQL Rows', used: (r) => r.soqlRowCount.total, limit: (l) => l.queryRows.limit },
   { label: 'DML Rows', used: (r) => r.dmlRowCount.total, limit: (l) => l.dmlRows.limit },
-  { label: 'Heap', used: (r) => r.heapAllocated.total, limit: (l) => l.heapSize.limit },
+  { label: 'Heap', used: (r) => r.heapPeak, limit: (l) => l.heapSize.limit },
 ];
 
 /**
