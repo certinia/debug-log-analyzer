@@ -247,22 +247,48 @@ export abstract class LogEvent {
   };
 
   /**
-   * Total + self heap bytes allocated (HEAP_ALLOCATE / BULK_HEAP_ALLOCATE).
+   * Signed NET heap bytes (alloc − free) for HEAP_ALLOCATE / BULK_HEAP_ALLOCATE. A negative
+   * `HEAP_ALLOCATE` is a deallocation, so this is signed: `+` grows the heap, `−` is net
+   * cleanup, `~0` is neutral ("allocated then freed — no lasting footprint"). This is the
+   * primary "does this path retain heap" metric. It is NOT the churn volume (see
+   * {@link heapGross}) nor the governor-comparable peak (see {@link heapPeak}).
    *
-   * `self` is seeded on the allocation leaf node (like DML/SOQL counts), so a method's
-   * `heapAllocated.self` is typically 0 and `heapAllocated.total` is the sum of allocations
-   * in this node and its children.
+   * `self` is the net directly in this node's own body: seeded as `bytes` on each allocation
+   * leaf, and (in `aggregateTotals`) summed onto the enclosing method from its direct leaf
+   * children only — so a method's `self` excludes allocations in sub-methods. `total` is the
+   * net across this node and all descendants.
    */
   heapAllocated: SelfTotal = {
     /**
-     * The net bytes allocated directly by this node.
+     * The net bytes retained directly by this node (excluding sub-methods).
      */
     self: 0,
     /**
-     * The total bytes allocated in this node and child nodes
+     * The total net bytes retained in this node and child nodes
      */
     total: 0,
   };
+
+  /**
+   * GROSS heap bytes allocated (positive HEAP_ALLOCATE only; frees ignored) — the churn / GC
+   * pressure a path creates regardless of whether it frees. Distinct from {@link heapAllocated}
+   * (net) and {@link heapPeak} (max live): an allocate-then-free loop has net ≈ 0 and a small
+   * peak but a large gross. Same self/total aggregation as {@link heapAllocated}.
+   */
+  heapGross: SelfTotal = {
+    /** Gross bytes allocated directly by this node (excluding sub-methods). */
+    self: 0,
+    /** Total gross bytes allocated in this node and child nodes. */
+    total: 0,
+  };
+
+  /**
+   * Peak live heap (bytes) reached while this node's subtree was executing — the max of the
+   * running live-heap total (signed HEAP_ALLOCATE deltas) over the node's window, clamped at
+   * 0. Always ≥ 0 and composes (child ≤ parent ≤ root), so the root equals the transaction
+   * peak. This is the heap number comparable to the heap governor limit.
+   */
+  heapPeak = 0;
 
   /**
    * The line types which would legitimately end this method
@@ -534,6 +560,8 @@ export class BulkHeapAllocateLine extends LogEvent {
     this.text = parts[2] || '';
     this.bytes = parseBytes(parts[2]);
     this.heapAllocated.self = this.heapAllocated.total = this.bytes;
+    this.heapGross.self = this.heapGross.total = this.bytes > 0 ? this.bytes : 0;
+    this.heapPeak = parser.trackHeapAllocation(this.bytes);
   }
 }
 
@@ -1129,6 +1157,8 @@ export class HeapAllocateLine extends LogEvent {
     this.text = parts[3] || '';
     this.bytes = parseBytes(parts[3]);
     this.heapAllocated.self = this.heapAllocated.total = this.bytes;
+    this.heapGross.self = this.heapGross.total = this.bytes > 0 ? this.bytes : 0;
+    this.heapPeak = parser.trackHeapAllocation(this.bytes);
   }
 }
 

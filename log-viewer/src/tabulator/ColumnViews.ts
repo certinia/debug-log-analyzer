@@ -46,6 +46,7 @@ export const CALL_TREE_VIEWS: ColumnView[] = [
       'dmlRowCount.total',
       'soqlRowCount.total',
       'heapAllocated.total',
+      'heapPeak',
       'totalTime',
       'totalSelfTime',
       'duration.total',
@@ -73,7 +74,7 @@ export const CALL_TREE_VIEWS: ColumnView[] = [
       ...LIMIT_COUNT_TOTALS,
       ...LIMIT_ROW_TOTALS,
       'thrownCount.total',
-      'heapAllocated.total',
+      'heapPeak',
       'governorCost',
       'governorCostMax',
     ],
@@ -84,7 +85,15 @@ export const CALL_TREE_VIEWS: ColumnView[] = [
   },
   {
     id: 'Memory',
-    fields: ['namespace', 'heapAllocated.self', 'heapAllocated.total', 'governorCost'],
+    fields: [
+      'namespace',
+      'heapAllocated.total',
+      'heapAllocated.self',
+      'heapGross.total',
+      'heapGross.self',
+      'heapPeak',
+      'governorCost',
+    ],
   },
 ];
 

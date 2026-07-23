@@ -17,6 +17,7 @@ import {
 } from '../../../core/utility/Util.js';
 import { formatSOQL } from '../../soql/format/formatter.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
+import { formatNumber } from './rendering/tooltip-utils.js';
 
 /**
  * Configuration options for tooltip behavior.
@@ -374,6 +375,17 @@ export class FrameTooltipRenderer {
           // No `self`: on a method (the only hoverable frame) self is always 0 because the
           // throw is a child leaf, so it would only ever read "(self 0)".
           rows.push({ label: 'Throws:', value: `${event.thrownCount.total}` });
+        }
+
+        if (event.heapAllocated.total || event.heapAllocated.self) {
+          // Net heap retained (alloc − free): total for the subtree, self for this method's
+          // own body. ~0 net (allocated then freed) shows no row. Gross/peak live in the grid.
+          rows.push({
+            label: 'heap:',
+            value: `${formatNumber(event.heapAllocated.total)} bytes (self ${formatNumber(
+              event.heapAllocated.self,
+            )})`,
+          });
         }
       }
 

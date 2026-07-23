@@ -4,6 +4,7 @@
 import type { GovernorLimits } from 'apex-log-parser';
 import { Tabulator, type ColumnDefinition, type RowComponent } from 'tabulator-tables';
 
+import { formatInteger } from '../../../core/utility/Util.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { AnchoringPolicy } from '../../../tabulator/module/AnchoringPolicy.js';
 import * as CommonModules from '../../../tabulator/module/CommonModules.js';
@@ -54,21 +55,6 @@ export const commonColumnDefaults = {
   widthShrink: 0,
 };
 
-/** Bytes → human-readable (e.g. 1536 → "1.5 KB"), for heap columns/tooltips. */
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  const units = ['KB', 'MB', 'GB'];
-  let value = bytes / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit++;
-  }
-  return `${value.toFixed(1)} ${units[unit]}`;
-}
-
 /**
  * The shared "Gov. Avg (%)" column — the average governor consumption across all
  * governors on a call path (see {@link governorCost}), rendered as a progress
@@ -98,8 +84,8 @@ export function createGovernorCostColumn(governorLimits: GovernorLimits): Column
         return `${total.toFixed(1)}%`;
       }
       const rows = breakdown.map((m) => {
-        const used = m.label === 'Heap' ? formatBytes(m.used) : `${m.used}`;
-        const limit = m.label === 'Heap' ? formatBytes(m.limit) : `${m.limit}`;
+        const used = m.label === 'Heap' ? formatInteger(m.used) : `${m.used}`;
+        const limit = m.label === 'Heap' ? formatInteger(m.limit) : `${m.limit}`;
         return `${m.label} ${used}/${limit} (${m.percent.toFixed(1)}%)`;
       });
       return `${total.toFixed(1)}% — average utilisation across all governors<br>${rows.join('<br>')}`;
@@ -136,8 +122,8 @@ export function createGovernorPeakColumn(governorLimits: GovernorLimits): Column
       if (!top) {
         return `${peak.toFixed(1)}%`;
       }
-      const used = top.label === 'Heap' ? formatBytes(top.used) : `${top.used}`;
-      const limit = top.label === 'Heap' ? formatBytes(top.limit) : `${top.limit}`;
+      const used = top.label === 'Heap' ? formatInteger(top.used) : `${top.used}`;
+      const limit = top.label === 'Heap' ? formatInteger(top.limit) : `${top.limit}`;
       return `Tightest single governor: ${top.label} ${used}/${limit} (${peak.toFixed(1)}%)`;
     },
   };
@@ -189,7 +175,19 @@ export function createGovernorColumn(opts: {
  * identical across all three tables; spread into each table's `columns` after
  * its view-specific leading columns (Name, Namespace, …).
  */
-export function createGovernorMetricColumns(governorLimits: GovernorLimits): ColumnDefinition[] {
+/** Per-table footer (`bottomCalc`) for each heap column, so heap totals/self match the
+ * table's time-column aggregation. Peak always uses 'max'. */
+export interface HeapFooterCalcs {
+  netTotal: ColumnDefinition['bottomCalc'];
+  netSelf: ColumnDefinition['bottomCalc'];
+  grossTotal: ColumnDefinition['bottomCalc'];
+  grossSelf: ColumnDefinition['bottomCalc'];
+}
+
+export function createGovernorMetricColumns(
+  governorLimits: GovernorLimits,
+  heapFooters: HeapFooterCalcs,
+): ColumnDefinition[] {
   return [
     createGovernorColumn({
       title: 'DML Count',
@@ -281,30 +279,62 @@ export function createGovernorMetricColumns(governorLimits: GovernorLimits): Col
       headerHozAlign: 'right',
       bottomCalc: 'sum',
     },
-    createHeapColumn(governorLimits),
-    createHeapColumn(governorLimits, 'heapAllocated.self', 'Heap (self)', false),
+    createHeapBytesColumn(
+      'heapAllocated.total',
+      'Heap Net (bytes)',
+      'Net bytes retained on this path (alloc − free); may be negative',
+      heapFooters.netTotal,
+    ),
+    createHeapBytesColumn(
+      'heapAllocated.self',
+      'Heap Net self (bytes)',
+      'Net bytes retained directly by this node (excluding sub-methods); may be negative',
+      heapFooters.netSelf,
+      false,
+    ),
+    createHeapBytesColumn(
+      'heapPeak',
+      'Heap Peak (bytes)',
+      'Peak live heap on this path (matches the "Maximum heap size" governor)',
+      'max',
+    ),
+    createHeapBytesColumn(
+      'heapGross.total',
+      'Heap Alloc (bytes)',
+      'Total bytes allocated on this path (ignores frees; churn)',
+      heapFooters.grossTotal,
+      false,
+    ),
+    createHeapBytesColumn(
+      'heapGross.self',
+      'Heap Alloc self (bytes)',
+      'Bytes allocated directly by this node (excluding sub-methods; ignores frees)',
+      heapFooters.grossSelf,
+      false,
+    ),
     createGovernorCostColumn(governorLimits),
     createGovernorPeakColumn(governorLimits),
   ];
 }
 
 /**
- * The shared "Heap Allocated" column — bytes allocated on a call path, rendered
- * as a bar relative to the heap governor limit. Reused across all
- * call-tree/analysis tables. Pass a `heapAllocated.self` field + `visible: false`
- * for the Self variant.
+ * A shared plain-number heap column: every heap value (net, gross, peak — total & self)
+ * renders identically as a thousand-separated integer in bytes (no bar, no %), so the
+ * columns scan uniformly. The unit lives in the title. `bottomCalc` is supplied by the
+ * caller so each table's footer can match its time-column aggregation (per-table sum vs
+ * call-stack-dedup for totals, sum-all-visible for self, 'max' for peak).
  */
-export function createHeapColumn(
-  governorLimits: GovernorLimits,
-  field = 'heapAllocated.total',
-  title = 'Heap Allocated',
+export function createHeapBytesColumn(
+  field: string,
+  title: string,
+  headerTooltip: string,
+  bottomCalc: ColumnDefinition['bottomCalc'],
   visible?: boolean,
 ): ColumnDefinition {
-  const limit = governorLimits.heapSize.limit;
-  const formatterParams = { precision: 0, totalValue: limit, showPercentageText: false };
   return {
     title,
     field,
+    headerTooltip,
     visible,
     sorter: 'number',
     cssClass: 'number-cell',
@@ -312,14 +342,11 @@ export function createHeapColumn(
     minWidth: 70,
     hozAlign: 'right',
     headerHozAlign: 'right',
-    formatter: progressFormatter,
-    formatterParams,
-    bottomCalc: 'sum',
-    bottomCalcFormatter: progressFormatter,
-    bottomCalcFormatterParams: formatterParams,
+    formatter: (cell) => formatInteger((cell.getValue() ?? 0) as number),
+    bottomCalc,
+    bottomCalcFormatter: (cell) => formatInteger((cell.getValue() ?? 0) as number),
     tooltip(_event, cell) {
-      const used = (cell.getValue() ?? 0) as number;
-      return limit > 0 ? `${formatBytes(used)} / ${formatBytes(limit)}` : formatBytes(used);
+      return formatInteger((cell.getValue() ?? 0) as number);
     },
   };
 }

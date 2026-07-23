@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEventType } from 'apex-log-parser';
+import type { ApexLog, LogEvent, LogEventType } from 'apex-log-parser';
 import { Tabulator, type Options } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
@@ -13,7 +13,10 @@ import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
-import { sumDurationTotalForRootEvents } from '../../analysis/services/CallStackSum.js';
+import {
+  sumDurationTotalForRootEvents,
+  sumTotalForRootEvents,
+} from '../../analysis/services/CallStackSum.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { toBottomUpTree, type BottomUpRow } from '../utils/Aggregation.js';
 import {
@@ -71,6 +74,22 @@ export function createBottomUpTable(
     data: BottomUpRow[],
     _calcParams: unknown,
   ): number => sumDurationTotalForRootEvents(data.map((row) => row.instances));
+
+  // Heap totals need the same call-stack dedup as totalTime: bottom-up buckets overlap, so a
+  // naive sum double-counts nested allocations. Self sums plainly (self never overlaps).
+  const heapTotalBottomCalc =
+    (valueOf: (node: LogEvent) => number) =>
+    (_values: number[], data: BottomUpRow[], _calcParams: unknown): number =>
+      sumTotalForRootEvents(
+        data.map((row) => row.instances),
+        valueOf,
+      );
+  const heapFooters = {
+    netTotal: heapTotalBottomCalc((node) => node.heapAllocated.total),
+    grossTotal: heapTotalBottomCalc((node) => node.heapGross.total),
+    netSelf: 'sum' as const,
+    grossSelf: 'sum' as const,
+  };
 
   const { enableClipboardAndDownload, exportFileName, ...tabulatorOptionOverrides } = options;
 
@@ -202,7 +221,7 @@ export function createBottomUpTable(
         headerHozAlign: 'right',
         bottomCalc: 'sum',
       },
-      ...createGovernorMetricColumns(rootMethod.governorLimits),
+      ...createGovernorMetricColumns(rootMethod.governorLimits, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',

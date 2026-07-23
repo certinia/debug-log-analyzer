@@ -11,7 +11,7 @@ import { minMaxTreeFilter } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { toAggregatedCallTree, type AggregatedRow } from '../utils/Aggregation.js';
-import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
+import { makeSumFieldAllVisible, makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import {
   commonColumnDefaults,
   createGovernorMetricColumns,
@@ -39,6 +39,20 @@ export function createAggregatedTable(
 
   const tableRef: { current: Tabulator | undefined } = { current: undefined };
   const selfTimeBottomCalc = makeSumSelfTimeAllVisible(() => tableRef.current);
+  // Heap footers mirror the time columns: totals are a plain sum (top-level rows are the
+  // non-overlapping call-stack roots), self sums every visible row (self never overlaps).
+  const heapFooters = {
+    netTotal: 'sum' as const,
+    grossTotal: 'sum' as const,
+    netSelf: makeSumFieldAllVisible(
+      () => tableRef.current,
+      (row) => row.heapAllocated.self,
+    ),
+    grossSelf: makeSumFieldAllVisible(
+      () => tableRef.current,
+      (row) => row.heapGross.self,
+    ),
+  };
 
   const tableData = toAggregatedCallTree(rootMethod.children, rootMethod.governorLimits);
 
@@ -150,7 +164,7 @@ export function createAggregatedTable(
         headerHozAlign: 'right',
         bottomCalc: 'sum',
       },
-      ...createGovernorMetricColumns(rootMethod.governorLimits),
+      ...createGovernorMetricColumns(rootMethod.governorLimits, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',

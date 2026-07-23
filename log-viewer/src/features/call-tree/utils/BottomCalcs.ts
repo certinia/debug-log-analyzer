@@ -36,7 +36,10 @@ function getRowSelfTime(row: CalltreeRowUnion): number {
  * collect rows through a data-only table-centric helper that applies the
  * active filter rules without DataTree child-row initialization side effects.
  */
-export function makeSumSelfTimeAllVisible(getTable: () => Tabulator | undefined) {
+export function makeSumFieldAllVisible(
+  getTable: () => Tabulator | undefined,
+  valueOf: (row: CalltreeRowUnion) => number,
+) {
   return (_values: number[], _data: CalltreeRowUnion[], _calcParams: unknown): number => {
     const table = getTable() as BottomCalcTable | undefined;
     if (!table) {
@@ -48,9 +51,14 @@ export function makeSumSelfTimeAllVisible(getTable: () => Tabulator | undefined)
     const allVisibleRows = getFilteredDataTreeRows(table);
 
     for (const row of allVisibleRows) {
-      total += getRowSelfTime(row);
+      total += valueOf(row);
     }
 
     return total;
   };
+}
+
+/** {@link makeSumFieldAllVisible} specialised to self-time (the original behaviour). */
+export function makeSumSelfTimeAllVisible(getTable: () => Tabulator | undefined) {
+  return makeSumFieldAllVisible(getTable, getRowSelfTime);
 }

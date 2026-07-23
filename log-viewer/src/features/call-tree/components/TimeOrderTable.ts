@@ -10,7 +10,7 @@ import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
 import { minMaxTreeFilter } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
-import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
+import { makeSumFieldAllVisible, makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../utils/TimeOrderTree.js';
 import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
 import {
@@ -45,6 +45,20 @@ export function createTimeOrderTable(
 
   const tableRef: { current: Tabulator | undefined } = { current: undefined };
   const selfTimeBottomCalc = makeSumSelfTimeAllVisible(() => tableRef.current);
+  // Heap footers mirror the time columns (top-down): totals sum the non-overlapping roots,
+  // self sums every visible row.
+  const heapFooters = {
+    netTotal: 'sum' as const,
+    grossTotal: 'sum' as const,
+    netSelf: makeSumFieldAllVisible(
+      () => tableRef.current,
+      (row) => row.heapAllocated.self,
+    ),
+    grossSelf: makeSumFieldAllVisible(
+      () => tableRef.current,
+      (row) => row.heapGross.self,
+    ),
+  };
 
   const table = new Tabulator(container, {
     data: tableData,
@@ -122,7 +136,7 @@ export function createTimeOrderTable(
         width: 120,
         visible: false,
       },
-      ...createGovernorMetricColumns(governorLimits),
+      ...createGovernorMetricColumns(governorLimits, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',
