@@ -144,6 +144,36 @@ $codicon-chevron-down: '\eab4';
           margin-left: unset;
           color: inherit;
         }
+
+        // SOQL group headers (SOQLView only): truncate the query but keep the
+        // (count) pinned/visible. Scoped via :has so other group headers are
+        // untouched.
+        // inline-flex (not flex): the cell must stay in the row's inline-block
+        // flow so the sibling calc cells keep lining up under their columns.
+        .tabulator-cell:has(.soql-group-header) {
+          display: inline-flex;
+          align-items: center;
+        }
+        .soql-group-header {
+          display: flex;
+          flex: 1 1 auto;
+          min-width: 0;
+          align-items: center;
+        }
+        .soql-group-header__q {
+          // 0 grow: the query takes only the width it needs (shrinking with
+          // ellipsis when long) so the count sits right after it, not pushed
+          // to the far edge of the wide first column.
+          flex: 0 1 auto;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .soql-group-header__count {
+          flex: 0 0 auto;
+          margin-left: 6px;
+        }
       }
     }
 

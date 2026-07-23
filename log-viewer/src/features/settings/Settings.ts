@@ -32,10 +32,20 @@ export type LanaSettings = {
   callTree: {
     categoryColorize: boolean;
   };
+  database: {
+    detailPanel: {
+      position: 'left' | 'right' | 'bottom';
+      size: number;
+    };
+  };
 };
 
 export function getSettings(): Promise<LanaSettings> {
   return vscodeMessenger.request<LanaSettings>('getConfig').then((msg) => {
     return msg;
   });
+}
+
+export function setSetting(section: string, value: unknown): void {
+  vscodeMessenger.send('updateConfig', { section, value });
 }

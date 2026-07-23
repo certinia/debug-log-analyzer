@@ -4,7 +4,7 @@
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
-import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
@@ -31,7 +31,6 @@ import { globalStyles } from '../../../styles/global.styles.js';
 import databaseViewStyles from './DatabaseView.scss';
 
 // web components
-import '../../../components/CallStack.js';
 import '../../../components/datagrid-filter-bar.js';
 import './DatabaseSection.js';
 
@@ -140,6 +139,12 @@ export class DMLView extends LitElement {
 
         <div slot="actions">
           <vscode-toolbar-button
+            icon="layout"
+            label="Toggle details panel"
+            title="Toggle details panel"
+            @click=${this._toggleDetailPanel}
+          ></vscode-toolbar-button>
+          <vscode-toolbar-button
             icon="desktop-download"
             label="Export to CSV"
             title="Export to CSV"
@@ -163,6 +168,14 @@ export class DMLView extends LitElement {
 
   _copyToClipboard() {
     this.dmlTable?.copyToClipboard('all');
+  }
+
+  _toggleDetailPanel() {
+    document.dispatchEvent(new CustomEvent('db-toggle-panel'));
+  }
+
+  deselectRows() {
+    this.dmlTable?.deselectRow();
   }
 
   _exportToCSV() {
@@ -278,13 +291,6 @@ export class DMLView extends LitElement {
           rowCount: dml.dmlRowCount.self,
           timeTaken: dml.duration.total,
           eventIndex: dml.eventIndex,
-          _children: [
-            {
-              id: ++nextRowId,
-              eventIndex: dml.eventIndex,
-              isDetail: true,
-            },
-          ],
         });
       }
     }
@@ -315,13 +321,7 @@ export class DMLView extends LitElement {
       groupClosedShowCalcs: true,
       groupStartOpen: false,
       groupToggleElement: false,
-      selectableRowsCheck: function (row: RowComponent) {
-        return !row.getData().isDetail;
-      },
       selectableRows: 'highlight',
-      dataTree: true,
-      dataTreeBranchElement: false,
-      dataTreeStartExpanded: false,
       columnDefaults: {
         title: 'default',
         resizable: true,
@@ -344,20 +344,12 @@ export class DMLView extends LitElement {
           title: 'DML',
           field: 'dml',
           sorter: 'string',
+          tooltip: true,
           bottomCalc: () => {
             return 'Total';
           },
           headerSortTristate: true,
-          cssClass: 'datagrid-textarea datagrid-code-text',
-          variableHeight: true,
-          formatter: (cell, _formatterParams, _onRendered) => {
-            const data = cell.getData() as DMLRow;
-            return `<call-stack
-            eventIndex="${data.eventIndex}"
-            startDepth="0"
-            endDepth="1"
-          ></call-stack>`;
-          },
+          cssClass: 'datagrid-code-text',
         },
         {
           title: 'Caller Namespace',
@@ -402,13 +394,6 @@ export class DMLView extends LitElement {
           bottomCalcFormatterParams: { precision: 2 },
         },
       ],
-      rowFormatter: (row) => {
-        const data = row.getData();
-        if (data.isDetail && data.eventIndex !== undefined) {
-          const detailContainer = this.createDetailPanel(data.eventIndex);
-          row.getElement().replaceChildren(detailContainer);
-        }
-      },
     });
 
     this.dmlTable.on('groupClick', (_e: UIEvent, group: GroupComponent) => {
@@ -418,31 +403,22 @@ export class DMLView extends LitElement {
       }
 
       group.toggle();
-      if (this.dmlTable && group.isVisible()) {
-        this.dmlTable.blockRedraw();
-        for (const row of group.getRows()) {
-          if (row.getTreeChildren() && !row.isTreeExpanded()) {
-            row.treeExpand();
-          }
-        }
-        this.dmlTable.restoreRedraw();
-      }
     });
 
-    this.dmlTable.on('rowClick', function (_e, row) {
-      const { type } = window.getSelection() ?? {};
-      if (type === 'Range') {
+    // Drive the detail panel off selection (not click) so keyboard row
+    // navigation updates it too. RowKeyboardNavigation keeps a single row
+    // selected across mouse and arrow-key navigation.
+    this.dmlTable.on('rowSelectionChanged', (_data, rows) => {
+      const data = rows[0]?.getData() as DMLRow | undefined;
+      if (!data || data.eventIndex === undefined || !data.dml) {
         return;
       }
 
-      const data = row.getData();
-      if (!(data.eventIndex !== undefined && data.dml)) {
-        return;
-      }
-
-      const origRowHeight = row.getElement().offsetHeight;
-      row.treeToggle();
-      row.getCell('dml').getElement().style.height = origRowHeight + 'px';
+      document.dispatchEvent(
+        new CustomEvent('db-row-select', {
+          detail: { eventIndex: data.eventIndex, type: 'dml' },
+        }),
+      );
     });
 
     this.dmlTable.on('tableBuilt', () => {
@@ -513,14 +489,6 @@ export class DMLView extends LitElement {
     return this.holder;
   }
 
-  createDetailPanel(eventIndex: number) {
-    const detailContainer = document.createElement('div');
-    detailContainer.className = 'row__details-container';
-    render(html`<call-stack eventIndex=${eventIndex}></call-stack>`, detailContainer);
-
-    return detailContainer;
-  }
-
   downlodEncoder(defaultFileName: string) {
     return function (fileContents: string, mimeType: string) {
       const vscode = vscodeMessenger.getVsCodeAPI();
@@ -554,8 +522,6 @@ interface DMLRow {
   rowCount?: number;
   timeTaken?: number;
   eventIndex?: number;
-  isDetail?: boolean;
-  _children?: DMLRow[];
 }
 
 type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

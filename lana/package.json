@@ -326,6 +326,33 @@
             }
           }
         }
+      },
+      {
+        "type": "object",
+        "id": "lana",
+        "title": "Database",
+        "order": 2,
+        "properties": {
+          "lana.database.detailPanel.position": {
+            "title": "Database details panel position",
+            "type": "string",
+            "enum": [
+              "left",
+              "right",
+              "bottom"
+            ],
+            "default": "right",
+            "markdownDescription": "Where the details panel docks in the Database view when a DML or SOQL row is selected. Default: `right`",
+            "order": 0
+          },
+          "lana.database.detailPanel.size": {
+            "title": "Database details panel size",
+            "type": "number",
+            "default": 300,
+            "markdownDescription": "Size of the Database details panel in pixels (width when docked left/right, height when docked bottom). Default: `300`",
+            "order": 1
+          }
+        }
       }
     ]
   },

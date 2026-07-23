@@ -39,5 +39,7 @@ export function soqlGroupHeader(value: unknown, count: number, data: unknown): s
     return '';
   }
   const inner = formatSOQL(value, { mode: 'inline', dialect });
-  return `<span class="soql-block">${inner}</span> (${count})`;
+  // Query truncates (single-line ellipsis) but the count is pinned so it stays
+  // visible — see the `.soql-group-header*` rules in DataGrid.scss.
+  return `<span class="soql-group-header"><span class="soql-group-header__q soql-block soql-inline">${inner}</span><span class="soql-group-header__count">(${count})</span></span>`;
 }

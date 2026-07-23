@@ -11,7 +11,7 @@ import type { Context } from '../Context.js';
 import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
 import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
-import { getConfig } from '../workspace/AppConfig.js';
+import { getConfig, updateConfig } from '../workspace/AppConfig.js';
 
 interface WebViewLogFileRequest<T = unknown> {
   requestId: string;
@@ -107,6 +107,14 @@ export class LogView {
               cmd: 'getConfig',
               payload: getConfig(),
             });
+            break;
+          }
+
+          case 'updateConfig': {
+            const { section, value } = payload as { section: string; value: unknown };
+            if (section) {
+              updateConfig(section, value);
+            }
             break;
           }
 

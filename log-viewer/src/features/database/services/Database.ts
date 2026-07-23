@@ -20,6 +20,11 @@ export class DatabaseAccess {
     return DatabaseAccess._instance;
   }
 
+  /** The parser event for an eventIndex, or null if unknown. */
+  public getEventByIndex(eventIndex: number): LogEvent | null {
+    return DatabaseAccess._treeRoot?.eventsById[eventIndex] ?? null;
+  }
+
   public getStackByEventIndex(eventIndex: number): Stack {
     const root = DatabaseAccess._treeRoot;
     const event = root?.eventsById[eventIndex];

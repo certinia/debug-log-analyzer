@@ -36,6 +36,12 @@ interface Config {
   callTree: {
     categoryColorize: boolean;
   };
+  database: {
+    detailPanel: {
+      position: 'left' | 'right' | 'bottom';
+      size: number;
+    };
+  };
 }
 
 export function getConfig(): Config {

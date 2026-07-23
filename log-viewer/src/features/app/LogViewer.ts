@@ -87,8 +87,8 @@ export class LogViewer extends LitElement {
         min-height: 0;
         overflow: auto;
         box-sizing: border-box;
-        /* the toolkit's vscode-panel-view padding */
-        padding: 10px 6px;
+        /* No padding here: each view owns its own inset so a docked details
+           panel can sit flush to the window edge. */
         box-shadow: inset 0 calc(max(1px, 0.0625rem) * 1)
           var(--vscode-panelSectionHeader-background);
       }
