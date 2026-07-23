@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🚧 **Timeline truncation markers** now end where the log recovers, so trusted sections are no longer greyed out. ([#828])
 - 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832]).
 
+## [1.20.1] 2026-07-23
+
+### Fixed
+
+- 🪟 **Timeline on Windows**: fixed the Flame Chart failing to load due to fractional display scaling (125% / 150% / 175%) - zoom, pan and keyboard navigation all appeared unresponsive ([#863]).
+
 ## [1.20.0] 2026-06-18
 
 ### Added
@@ -514,6 +520,10 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
 [#162]: https://github.com/certinia/debug-log-analyzer/issues/162
 [#32]: https://github.com/certinia/debug-log-analyzer/issues/32
+
+<!-- v1.20.1 -->
+
+[#863]: https://github.com/certinia/debug-log-analyzer/issues/863
 
 <!-- v1.20.0 -->
 
