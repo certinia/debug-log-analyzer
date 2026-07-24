@@ -57,13 +57,13 @@ export class LogView {
     const logDir = logUri ? Utils.dirname(logUri) : context.context.extensionUri;
 
     const panel = WebView.apply('logFile', `Log: ${logName}`, [
-      Utils.joinPath(context.context.extensionUri, 'out'),
+      Utils.joinPath(context.context.extensionUri, 'dist'),
       logDir,
     ]);
     this.currentPanel = panel;
     this.currentLogUri = logUri;
 
-    const logViewerRoot = Utils.joinPath(context.context.extensionUri, 'out');
+    const logViewerRoot = Utils.joinPath(context.context.extensionUri, 'dist');
     const indexUri = Utils.joinPath(logViewerRoot, 'index.html');
     const bundleUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'bundle.js'));
     const codiconUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'codicon.css'));

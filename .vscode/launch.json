@@ -10,7 +10,7 @@
       "type": "extensionHost",
       "request": "launch",
       "args": ["--extensionDevelopmentPath=${workspaceFolder}/lana", "--disable-extensions"],
-      "outFiles": ["${workspaceFolder}/lana/out/**/*.js"],
+      "outFiles": ["${workspaceFolder}/lana/dist/**/*.js"],
       "localRoot": "${workspaceFolder}/lana"
     },
     {
@@ -24,7 +24,7 @@
         "--extensionDevelopmentPath=${workspaceFolder}/${input:worktree}/lana",
         "--disable-extensions"
       ],
-      "outFiles": ["${workspaceFolder}/${input:worktree}/lana/out/**/*.js"],
+      "outFiles": ["${workspaceFolder}/${input:worktree}/lana/dist/**/*.js"],
       "localRoot": "${workspaceFolder}/${input:worktree}/lana"
     },
     {
@@ -33,9 +33,9 @@
       "request": "launch",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "--extensionTestsPath=${workspaceFolder}/lana/out/test/suite/index"
+        "--extensionTestsPath=${workspaceFolder}/lana/dist/test/suite/index"
       ],
-      "outFiles": ["${workspaceFolder}/lana/out/test/**/*.js"],
+      "outFiles": ["${workspaceFolder}/lana/dist/test/**/*.js"],
       "preLaunchTask": "${defaultBuildTask}",
       "localRoot": "${workspaceFolder}/lana"
     }

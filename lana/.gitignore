@@ -10,7 +10,7 @@
 
 *.vsix
 
-out/
+dist/
 node_modules/*
 
 README.md

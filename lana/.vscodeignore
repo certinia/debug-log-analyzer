@@ -2,7 +2,7 @@
 **
 // inlcude only the following in the extension
 !.vscodeignore
-!out/
+!dist/
 !syntaxes/
 !package.json
 !CHANGELOG.md

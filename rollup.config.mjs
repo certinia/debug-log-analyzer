@@ -23,7 +23,7 @@ export default [
     input: './lana/src/Main.ts',
     output: {
       format: 'es',
-      dir: './lana/out',
+      dir: './lana/dist',
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
     },
@@ -64,7 +64,7 @@ export default [
     input: './lana/src/Main.web.ts',
     output: {
       format: 'es',
-      dir: './lana/out/web',
+      dir: './lana/dist/web',
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
     },
@@ -138,11 +138,11 @@ export default [
         targets: [
           {
             src: ['log-viewer/out/*', 'log-viewer/index.html', 'lana/certinia-icon-color.png'],
-            dest: 'lana/out',
+            dest: 'lana/dist',
           },
           {
             src: path.join(codiconsDist, 'codicon.{css,ttf}'),
-            dest: 'lana/out',
+            dest: 'lana/dist',
           },
         ],
       }),
