@@ -16,11 +16,17 @@ type EventOptions = {
   dmlTotal?: number;
   soqlSelf?: number;
   soqlTotal?: number;
+  soslSelf?: number;
+  soslTotal?: number;
   dmlRowSelf?: number;
   dmlRowTotal?: number;
   soqlRowSelf?: number;
   soqlRowTotal?: number;
+  soslRowSelf?: number;
+  soslRowTotal?: number;
   thrown?: number;
+  heapSelf?: number;
+  heapTotal?: number;
 };
 
 let nextTimestamp = 1;
@@ -52,11 +58,14 @@ function createEvent(options: EventOptions): LogEvent {
     duration: { self: options.self, total: options.total },
     dmlRowCount: { self: options.dmlRowSelf ?? 0, total: options.dmlRowTotal ?? 0 },
     soqlRowCount: { self: options.soqlRowSelf ?? 0, total: options.soqlRowTotal ?? 0 },
-    soslRowCount: { self: 0, total: 0 },
+    soslRowCount: { self: options.soslRowSelf ?? 0, total: options.soslRowTotal ?? 0 },
     dmlCount: { self: options.dmlSelf ?? 0, total: options.dmlTotal ?? 0 },
     soqlCount: { self: options.soqlSelf ?? 0, total: options.soqlTotal ?? 0 },
-    soslCount: { self: 0, total: 0 },
+    soslCount: { self: options.soslSelf ?? 0, total: options.soslTotal ?? 0 },
     thrownCount: { self: options.thrown ?? 0, total: options.thrown ?? 0 },
+    heapAllocated: { self: options.heapSelf ?? 0, total: options.heapTotal ?? 0 },
+    heapGross: { self: 0, total: 0 },
+    heapPeak: 0,
     exitTypes: [],
   } as unknown as LogEvent;
 
@@ -1104,5 +1113,57 @@ describe('_hasDetailsDeep precomputation', () => {
     const rows = toBottomUpTree(root.children);
     const limit = findRowByText(rows, 'LimitUsage');
     expect(limit._hasDetailsDeep).toBe(true);
+  });
+});
+
+describe('SOSL rollup', () => {
+  it('aggregated: sums SOSL count and rows across instances', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    // Two calls to the same signature; their SOSL metrics are summed on the row.
+    createEvent({
+      text: 'Search',
+      self: 1,
+      total: 1,
+      parent: root,
+      soslSelf: 1,
+      soslTotal: 1,
+      soslRowSelf: 10,
+      soslRowTotal: 10,
+    });
+    createEvent({
+      text: 'Search',
+      self: 1,
+      total: 1,
+      parent: root,
+      soslSelf: 1,
+      soslTotal: 1,
+      soslRowSelf: 5,
+      soslRowTotal: 5,
+    });
+
+    const rows = toAggregatedCallTree(root.children);
+    const searchRow = findRowByText(rows, 'Search');
+    expect(searchRow.soslCount.total).toBe(2);
+    expect(searchRow.soslRowCount.total).toBe(15);
+  });
+
+  it('bottom-up: attributes SOSL self/total to the callee bucket', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    const caller = createEvent({ text: 'Caller', self: 0, total: 2, parent: root });
+    createEvent({
+      text: 'Callee',
+      self: 2,
+      total: 2,
+      parent: caller,
+      soslSelf: 1,
+      soslTotal: 1,
+      soslRowSelf: 7,
+      soslRowTotal: 7,
+    });
+
+    const rows = toBottomUpTree(root.children);
+    const callee = findRowByText(rows, 'Callee');
+    expect(callee.soslCount.self).toBe(1);
+    expect(callee.soslRowCount.total).toBe(7);
   });
 });

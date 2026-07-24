@@ -4,6 +4,7 @@
 import '#vscode-elements/vscode-button.js';
 import '#vscode-elements/vscode-checkbox.js';
 import '#vscode-elements/vscode-option.js';
+import '#vscode-elements/vscode-toolbar-button.js';
 import '../../../components/VsSelect.js';
 import { css, html, LitElement, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
@@ -15,6 +16,7 @@ import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
+import { getSettings, updateSetting } from '../../settings/Settings.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import {
   categoryColoringStyles,
@@ -35,13 +37,26 @@ import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/GridSkeleton.js';
+import '../../../components/datagrid-filter-bar.js';
 
 // Table creation functions
 import { createAggregatedTable } from './AggregatedTable.js';
 import { createBottomUpTable } from './BottomUpTable.js';
+import {
+  applyColumnView,
+  buildColumnMenuItems,
+  CALL_TREE_VIEWS,
+  getColumnView,
+  getTableFields,
+  resolveColumnView,
+  toggleField,
+} from '../../../tabulator/ColumnViews.js';
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
 type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
+
+/** The Name column is always shown in the call-tree tables. */
+const ALWAYS_VISIBLE = ['text'];
 
 const DEBUG_VALUE_TYPES: ReadonlySet<string> = new Set([
   'USER_DEBUG',
@@ -94,8 +109,17 @@ export class CalltreeView extends LitElement {
   tableContainer: HTMLDivElement | null = null;
   rootMethod: ApexLog | null = null;
 
+  @state()
+  columnView = 'General';
+
+  /** Per-view column overrides (view id → visible fields); empty until edited. */
+  @state()
+  private columnOverrides: Record<string, string[]> = {};
+
   private contextMenu: ContextMenu | null = null;
   private contextMenuRow: TimeOrderRow | null = null;
+  /** The table whose header was right-clicked (for column-toggle actions). */
+  private contextMenuTable: Tabulator | null = null;
   private viewSwitchEpoch = 0;
 
   get _callTreeTableWrapper(): HTMLDivElement | null {
@@ -141,6 +165,13 @@ export class CalltreeView extends LitElement {
 
   firstUpdated(): void {
     this.contextMenu = this.renderRoot.querySelector('context-menu');
+    void this._loadColumnSettings();
+  }
+
+  private async _loadColumnSettings(): Promise<void> {
+    const settings = await getSettings();
+    this.columnOverrides = settings.callTree?.columnOverrides ?? {};
+    this._setColumnView(resolveColumnView(CALL_TREE_VIEWS, settings.callTree?.columnView));
   }
 
   static styles = [
@@ -172,25 +203,10 @@ export class CalltreeView extends LitElement {
         position: relative;
       }
 
-      .header-bar {
-        display: flex;
-        gap: 10px;
-        align-items: flex-end;
-      }
-
       .filter-container {
         display: flex;
         gap: 4px;
         align-items: flex-end;
-      }
-
-      .filter-section {
-        display: block;
-      }
-
-      /* push the grouping control to the right edge of the header bar */
-      .group-end {
-        margin-left: auto;
       }
 
       .view-mode-buttons {
@@ -252,8 +268,8 @@ export class CalltreeView extends LitElement {
     return html`
       <div id="call-tree-container">
         <div>
-          <div class="header-bar">
-            <div class="view-mode-buttons" role="radiogroup" aria-label="View mode">
+          <datagrid-filter-bar>
+            <div slot="global" class="view-mode-buttons" role="radiogroup" aria-label="View mode">
               <vscode-button
                 ?secondary="${this.viewMode !== 'time-order'}"
                 @click="${() => this._setViewMode('time-order')}"
@@ -271,14 +287,35 @@ export class CalltreeView extends LitElement {
               >
             </div>
 
-            <div class="filter-container">
+            <div slot="table-actions" class="filter-container">
               <vscode-button secondary @click="${this._expandButtonClick}">Expand</vscode-button>
               <vscode-button secondary @click="${this._collapseButtonClick}"
                 >Collapse</vscode-button
               >
+
+              <vs-select
+                id="column-view"
+                prefix="Columns"
+                label="Column view"
+                @change="${this._handleColumnViewChange}"
+                @vs-reset-option="${this._onResetOption}"
+                .value="${this.columnView}"
+                .resettableValues="${Object.keys(this.columnOverrides)}"
+              >
+                ${repeat(
+                  CALL_TREE_VIEWS,
+                  (view) => view.id,
+                  (view) =>
+                    html`<vscode-option
+                      value="${view.id}"
+                      ?selected="${this.columnView === view.id}"
+                      >${view.id}</vscode-option
+                    >`,
+                )}
+              </vs-select>
             </div>
 
-            <div class="filter-container">
+            <div slot="filters" class="filter-container">
               <vscode-checkbox @change="${this._handleShowDetailsChange}">Details</vscode-checkbox>
 
               ${
@@ -318,7 +355,7 @@ export class CalltreeView extends LitElement {
               this.viewMode === 'bottom-up'
                 ? html`
                     <vs-select
-                      class="group-end"
+                      slot="group"
                       id="bottomup-groupby"
                       prefix="Group"
                       label="Group by"
@@ -333,7 +370,16 @@ export class CalltreeView extends LitElement {
                   `
                 : ''
             }
-          </div>
+
+            <div slot="actions">
+              <vscode-toolbar-button
+                icon="list-selection"
+                label="Columns"
+                title="Columns"
+                @click="${this._openColumnMenu}"
+              ></vscode-toolbar-button>
+            </div>
+          </datagrid-filter-bar>
         </div>
 
         <div id="call-tree-table-container">
@@ -348,7 +394,10 @@ export class CalltreeView extends LitElement {
             <div id="bottom-up-tree-table"></div>
           </div>
         </div>
-        <context-menu @menu-select="${this._handleContextMenuSelect}"></context-menu>
+        <context-menu
+          @menu-select="${this._handleContextMenuSelect}"
+          @menu-close="${this._onColumnMenuClose}"
+        ></context-menu>
       </div>
     `;
   }
@@ -469,6 +518,128 @@ export class CalltreeView extends LitElement {
       // @ts-expect-error setSortedGroupBy is added by the GroupSort custom module
       this.bottomUpTreeTable.setSortedGroupBy(fieldName !== 'none' ? fieldName : '');
     }
+  }
+
+  private _handleColumnViewChange(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const id = target.value || 'General';
+    this._setColumnView(id);
+    updateSetting('callTree.columnView', id);
+  }
+
+  /** Effective fields for a view id: the user override, else the built-in preset. */
+  private _columnViewFields(id: string): string[] | null {
+    return this.columnOverrides[id] ?? getColumnView(CALL_TREE_VIEWS, id)?.fields ?? null;
+  }
+
+  private get _tables(): Tabulator[] {
+    return [this.calltreeTable, this.aggregatedTreeTable, this.bottomUpTreeTable].filter(
+      (table): table is Tabulator => !!table,
+    );
+  }
+
+  private _setColumnView(id: string) {
+    this.columnView = id;
+    const fields = this._columnViewFields(id);
+    for (const table of this._tables) {
+      applyColumnView(table, fields, ALWAYS_VISIBLE);
+    }
+  }
+
+  /** Applies the active view and wires the header menu once a table is built. */
+  private _initTableColumns(table: Tabulator) {
+    applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
+    const header = table.element.querySelector<HTMLElement>('.tabulator-header');
+    header?.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      this._showHeaderContextMenu(table, event.clientX, event.clientY);
+    });
+  }
+
+  private _showHeaderContextMenu(table: Tabulator, clientX: number, clientY: number) {
+    if (!this.contextMenu) {
+      return;
+    }
+    this.contextMenuRow = null;
+    this.contextMenuTable = table;
+    this.contextMenu.show(
+      buildColumnMenuItems(
+        table,
+        this.columnView,
+        CALL_TREE_VIEWS,
+        ALWAYS_VISIBLE,
+        Object.keys(this.columnOverrides),
+      ),
+      clientX,
+      clientY,
+    );
+  }
+
+  private _openColumnMenu(event: Event) {
+    const table = this._getActiveTable();
+    if (!table) {
+      return;
+    }
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this._showHeaderContextMenu(table, rect.left, rect.bottom);
+  }
+
+  /** Rebuilds the open column menu so checkmarks/reset icons reflect current state. */
+  private _refreshColumnMenu() {
+    if (!this.contextMenu?.isVisible() || !this.contextMenuTable) {
+      return;
+    }
+    this.contextMenu.items = buildColumnMenuItems(
+      this.contextMenuTable,
+      this.columnView,
+      CALL_TREE_VIEWS,
+      ALWAYS_VISIBLE,
+      Object.keys(this.columnOverrides),
+    );
+  }
+
+  private _onColumnMenuClose() {
+    this.contextMenuTable = null;
+    this.contextMenuRow = null;
+  }
+
+  /** Toggles a column in the active view's override, shared across all tables. */
+  private _toggleColumn(field: string) {
+    const table = this.contextMenuTable;
+    if (!table) {
+      return;
+    }
+    const fields = toggleField(
+      this._columnViewFields(this.columnView),
+      field,
+      getTableFields(table),
+    );
+    this.columnOverrides = { ...this.columnOverrides, [this.columnView]: fields };
+    for (const t of this._tables) {
+      applyColumnView(t, fields, ALWAYS_VISIBLE);
+    }
+    updateSetting('callTree.columnOverrides', this.columnOverrides);
+  }
+
+  private _onResetOption(event: CustomEvent<{ value: string }>) {
+    this._resetColumns(event.detail.value);
+  }
+
+  /** Clears a view's override, restoring its built-in columns (defaults to the active view). */
+  private _resetColumns(id: string = this.columnView) {
+    if (!this.columnOverrides[id]) {
+      return;
+    }
+    const { [id]: _removed, ...rest } = this.columnOverrides;
+    this.columnOverrides = rest;
+    if (id === this.columnView) {
+      // Resolve the restored fields once (identical for every table).
+      const fields = this._columnViewFields(id);
+      for (const table of this._tables) {
+        applyColumnView(table, fields, ALWAYS_VISIBLE);
+      }
+    }
+    updateSetting('callTree.columnOverrides', this.columnOverrides);
   }
 
   _handleTypeFilter(event: Event) {
@@ -713,6 +884,7 @@ export class CalltreeView extends LitElement {
     });
     this.calltreeTable = table;
     await tableBuilt;
+    this._initTableColumns(table);
   }
 
   private async _renderAggregatedTree(
@@ -741,6 +913,7 @@ export class CalltreeView extends LitElement {
     });
     this.aggregatedTreeTable = table;
     await tableBuilt;
+    this._initTableColumns(table);
   }
 
   private async _renderBottomUpTree(container: HTMLDivElement, rootMethod: ApexLog): Promise<void> {
@@ -771,6 +944,7 @@ export class CalltreeView extends LitElement {
     );
     this.bottomUpTreeTable = table;
     await tableBuilt;
+    this._initTableColumns(table);
   }
 
   private _waitForNextFrame(): Promise<void> {
@@ -847,6 +1021,29 @@ export class CalltreeView extends LitElement {
   }
 
   private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>): void {
+    const { itemId } = e.detail;
+
+    // Column-header menu actions (see _showHeaderContextMenu). These keep the menu
+    // open (keepOpen), so refresh its items live and leave contextMenuTable set —
+    // it's cleared on menu-close.
+    if (itemId.startsWith('view:')) {
+      const id = itemId.slice('view:'.length);
+      this._setColumnView(id);
+      updateSetting('callTree.columnView', id);
+      this._refreshColumnMenu();
+      return;
+    }
+    if (itemId.startsWith('col:')) {
+      this._toggleColumn(itemId.slice('col:'.length));
+      this._refreshColumnMenu();
+      return;
+    }
+    if (itemId.startsWith('reset:')) {
+      this._resetColumns(itemId.slice('reset:'.length));
+      this._refreshColumnMenu();
+      return;
+    }
+
     if (!this.contextMenuRow) {
       return;
     }

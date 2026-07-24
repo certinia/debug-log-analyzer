@@ -85,7 +85,7 @@ The Timeline view shows a live visualization of your Salesforce Apex log executi
 
 - **⚡ Fast** – Blazing-fast zoom, pan, and rendering even on massive logs (500k+ lines).
 - **🗺️ Minimap** – Bird's-eye view with skyline density overview, viewport lens, and instant teleport.
-- **📊 Governor Limits Strip** – At-a-glance limit usage with traffic light coloring. Expand for detailed step chart.
+- **📊 Governor Limits Strip** – At-a-glance limit usage with traffic light coloring, built from individual log events so every limit (heap included) updates as it's consumed, not just at cumulative snapshots. Expand for a detailed step chart.
 - **📏 Measure & Zoom** – `Shift+Drag` to measure durations, `Alt/Option+Drag` to area-zoom, precision keyboard controls.
 - **🕐 Wall-Clock Time** – Toggle between elapsed and real-time (HH:MM:SS.mmm) on the time axis via the toolbar clock button.
 
@@ -99,8 +99,9 @@ Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail,
 
 Explore nested method calls with performance metrics:
 
-- **Metrics**: Self Time, Total Time, SOQL/DML/Thrown Counts, SOQL/DML/Rows
-- **Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution
+- **Metrics**: Self Time, Total Time, SOQL/DML/SOSL Counts + Rows, Heap (net/gross/peak), Governor Limit Avg + Peak, Thrown
+- **Call Tree Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution
+- **Column Views** – Switch preset column sets (General, Time, Governor Limits, Database, Memory), show/hide columns from the header menu, reset to defaults
 - **Group Bottom-Up by Namespace or Type**
 - **Filter by Namespace, Type or Duration**
 - **Toggle Debug-Only + Detail Events**
@@ -114,6 +115,7 @@ Explore nested method calls with performance metrics:
 See which methods are the slowest, most frequent. or expensive.
 
 - **Group by Type, Namespace, or Caller Namespace **
+- **Column Views** – Preset column sets, show/hide columns, reset to defaults
 - **Sort by Duration, Count, Name, Type or Namespace**
 - **Filter to specific event types**
 - **Copy or Export to CSV**
@@ -122,16 +124,30 @@ See which methods are the slowest, most frequent. or expensive.
 
 ## 🗄️ Database Analysis
 
-Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues.
+Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues, and see how each contributes to governor limits.
 
-- **SOQL + DML Duration, Selectivity, Aggregates, Row Count**
-- **Group by Namespace, Caller Namespace or Query**
-- **View the Call Stack**
-- **SOQL Optimization Tips**
-- **Sort by SOQL or DML, Duration, Selectivity, Aggregates, Row Count**
-- **Copy or Export to CSV**
+- **Governor limit overview** – SOQL, SOSL, DML and query/DML rows shown as `used / limit` at the top of the tab.
+- **Tracked vs consumed** – each section reconciles statements seen in the log against the governor-counted total, so you can spot queries that didn't count (e.g. custom metadata).
+- **Separate SOQL, DML and SOSL tables** – SOSL is fully searchable, with its rows metered against the 2,000-per-query cap.
+- **Object column + Group by Object / Namespace / Caller Namespace / Query**
+- **SOQL Duration, Selectivity, Aggregates, Row Count**
+- **Column Views** – Preset column sets (incl. a SOQL Query Plan view), show/hide columns, reset to defaults
+- **View the Call Stack**, **SOQL Optimization Tips**, **Sort**, **Copy or Export to CSV**
+
+<!-- TODO: re-capture database.png for the redesigned Database tab (governor strip, DML/SOQL/SOSL sections). Optionally add a sosl.png. -->
 
 ![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png)
+
+## 📊 Governor Limit Tracking
+
+Salesforce enforces governor limits per transaction. This extension tracks them _throughout_ the log, not just as a final tally:
+
+- **Everywhere you look** – limit usage on the Timeline strip, per-path columns in the Call Tree (average + tightest peak), and a `used / limit` overview on the Database tab.
+- **Tracked vs consumed** – reconciles what the log shows against the governor-counted total, so you can spot work that didn't count against a limit (e.g. custom metadata SOQL).
+- **🧠 Heap, in depth** – heap is the tricky one, since memory gets freed as well as allocated and a single number hides what happened. Every method and call path carries three heap metrics:
+  - **Net** – bytes retained (allocated minus freed); the lasting footprint.
+  - **Gross** – bytes allocated, ignoring frees; allocation churn and GC pressure.
+  - **Peak** – highest live heap reached on the path; the number the heap governor actually enforces.
 
 ## 🔍 Global Search
 

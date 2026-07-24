@@ -1,12 +1,22 @@
 /*
  * Copyright (c) 2021 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
 
+// components
+import './Divider.js';
+
+/**
+ * Shared grid toolbar. Content is grouped into sections, left→right:
+ *   global · table-actions · filters   (left cluster)
+ *   group · actions                    (right cluster, right-aligned)
+ * A vertical divider is drawn between adjacent non-empty sections; the flexible
+ * gap separates the left cluster from the right-aligned grouping/actions.
+ */
 @customElement('datagrid-filter-bar')
 export class DatagridFilterBar extends LitElement {
   static styles = [
@@ -22,54 +32,89 @@ export class DatagridFilterBar extends LitElement {
 
       .filter-bar {
         display: flex;
-        .filter-bar__filters {
-          display: flex;
-          align-items: flex-end;
-        }
+        align-items: flex-end;
+        gap: 8px;
+        width: 100%;
       }
 
-      .filter-bar .filter-bar__actions--right {
-        align-items: flex-end;
+      .filter-bar__left,
+      .filter-bar__right {
         display: flex;
-        flex: 1 1 auto;
+        align-items: flex-end;
         gap: 8px;
+      }
+
+      /* Right cluster consumes the slack and right-aligns grouping + actions. */
+      .filter-bar__right {
+        flex: 1 1 auto;
         justify-content: flex-end;
       }
 
-      .filter-bar__group {
-        align-items: flex-end;
+      .section {
         display: flex;
+        align-items: flex-end;
+        gap: 4px;
       }
 
-      /* Divider between the grouping control and the action buttons. */
-      .filter-bar__group.has-group::after {
+      .section[hidden] {
+        display: none;
+      }
+
+      divider-line {
         align-self: stretch;
-        border-right: 1px solid var(--vscode-widget-border, transparent);
-        content: '';
-        margin: 2px 8px;
+        margin: 2px 0;
       }
     `,
   ];
 
-  @state()
-  private _hasGroup = false;
+  @state() private _hasGlobal = false;
+  @state() private _hasTableActions = false;
+  @state() private _hasFilters = false;
+  @state() private _hasGroup = false;
+  @state() private _hasActions = false;
 
-  private _onGroupSlotChange(event: Event) {
-    this._hasGroup = (event.target as HTMLSlotElement).assignedElements().length > 0;
+  private _slotChange(
+    prop: '_hasGlobal' | '_hasTableActions' | '_hasFilters' | '_hasGroup' | '_hasActions',
+  ) {
+    return (event: Event) => {
+      this[prop] = (event.target as HTMLSlotElement).assignedElements().length > 0;
+    };
+  }
+
+  private _divider() {
+    return html`<divider-line orientation="vertical"></divider-line>`;
   }
 
   render() {
+    // Dividers sit between adjacent non-empty sections within each cluster.
+    const tableActionsDivider = this._hasGlobal && this._hasTableActions;
+    const filtersDivider = this._hasFilters && (this._hasGlobal || this._hasTableActions);
+    const actionsDivider = this._hasGroup && this._hasActions;
+
+    // Empty sections are hidden so they don't add stray gaps.
     return html`<div class="filter-bar">
-      <div class="filter-bar__filters">
-        <slot></slot>
-        <slot name="filters"></slot>
+      <div class="filter-bar__left">
+        <div class="section" ?hidden=${!this._hasGlobal}>
+          <slot name="global" @slotchange=${this._slotChange('_hasGlobal')}></slot>
+        </div>
+        ${tableActionsDivider ? this._divider() : nothing}
+        <div class="section" ?hidden=${!this._hasTableActions}>
+          <slot name="table-actions" @slotchange=${this._slotChange('_hasTableActions')}></slot>
+        </div>
+        ${filtersDivider ? this._divider() : nothing}
+        <div class="section" ?hidden=${!this._hasFilters}>
+          <slot name="filters" @slotchange=${this._slotChange('_hasFilters')}></slot>
+        </div>
       </div>
 
-      <div class="filter-bar__actions--right">
-        <div class="filter-bar__group ${this._hasGroup ? 'has-group' : ''}">
-          <slot name="group" @slotchange=${this._onGroupSlotChange}></slot>
+      <div class="filter-bar__right">
+        <div class="section" ?hidden=${!this._hasGroup}>
+          <slot name="group" @slotchange=${this._slotChange('_hasGroup')}></slot>
         </div>
-        <slot name="actions"></slot>
+        ${actionsDivider ? this._divider() : nothing}
+        <div class="section" ?hidden=${!this._hasActions}>
+          <slot name="actions" @slotchange=${this._slotChange('_hasActions')}></slot>
+        </div>
       </div>
     </div>`;
   }

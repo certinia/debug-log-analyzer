@@ -31,6 +31,10 @@ Each column can be sorted by clicking the column header, this will sort the rows
 
 1. Show Log events for specific namespaces using the namespace column filter
 
+### Column Views
+
+The same presets as the Call Tree (General, Time, Governor Limits, Database, Memory), from the **Columns** button in the toolbar (or the header right-click menu). Show or hide individual columns there; an edited view shows a **reset** icon. Choices persist per view.
+
 ### Group
 
 The rows can be grouped by Type, Namespace, or Caller Namespace.

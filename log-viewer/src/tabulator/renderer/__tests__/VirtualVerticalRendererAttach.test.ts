@@ -68,7 +68,7 @@ function makeAttachSetup(rowCount: number): {
       getDisplayRows: () => rows,
       scrollHorizontal: () => {},
     },
-    columnManager: { element: {} },
+    columnManager: { element: {}, getWidth: () => 200 },
     options: {},
     eventBus: { _events: {}, dispatch: () => {} },
   };

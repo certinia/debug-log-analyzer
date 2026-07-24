@@ -31,8 +31,13 @@ export type LanaSettings = {
   };
   callTree: {
     categoryColorize: boolean;
+    columnView: string;
+    columnOverrides: Record<string, string[]>;
   };
   database: {
+    soql: { columnView: string; columnOverrides: Record<string, string[]> };
+    dml: { columnView: string; columnOverrides: Record<string, string[]> };
+    sosl: { columnView: string; columnOverrides: Record<string, string[]> };
     detailPanel: {
       position: 'left' | 'right' | 'bottom';
       size: number;
@@ -46,6 +51,7 @@ export function getSettings(): Promise<LanaSettings> {
   });
 }
 
-export function setSetting(section: string, value: unknown): void {
+/** Persists a `lana.*` setting via the extension (fire-and-forget). */
+export function updateSetting(section: string, value: unknown): void {
   vscodeMessenger.send('updateConfig', { section, value });
 }

@@ -247,6 +247,50 @@ export abstract class LogEvent {
   };
 
   /**
+   * Signed NET heap bytes (alloc − free) for HEAP_ALLOCATE / BULK_HEAP_ALLOCATE. A negative
+   * `HEAP_ALLOCATE` is a deallocation, so this is signed: `+` grows the heap, `−` is net
+   * cleanup, `~0` is neutral ("allocated then freed — no lasting footprint"). This is the
+   * primary "does this path retain heap" metric. It is NOT the churn volume (see
+   * {@link heapGross}) nor the governor-comparable peak (see {@link heapPeak}).
+   *
+   * `self` is the net directly in this node's own body: seeded as `bytes` on each allocation
+   * leaf, and (in `aggregateTotals`) summed onto the enclosing method from its direct leaf
+   * children only — so a method's `self` excludes allocations in sub-methods. `total` is the
+   * net across this node and all descendants.
+   */
+  heapAllocated: SelfTotal = {
+    /**
+     * The net bytes retained directly by this node (excluding sub-methods).
+     */
+    self: 0,
+    /**
+     * The total net bytes retained in this node and child nodes
+     */
+    total: 0,
+  };
+
+  /**
+   * GROSS heap bytes allocated (positive HEAP_ALLOCATE only; frees ignored) — the churn / GC
+   * pressure a path creates regardless of whether it frees. Distinct from {@link heapAllocated}
+   * (net) and {@link heapPeak} (max live): an allocate-then-free loop has net ≈ 0 and a small
+   * peak but a large gross. Same self/total aggregation as {@link heapAllocated}.
+   */
+  heapGross: SelfTotal = {
+    /** Gross bytes allocated directly by this node (excluding sub-methods). */
+    self: 0,
+    /** Total gross bytes allocated in this node and child nodes. */
+    total: 0,
+  };
+
+  /**
+   * Peak live heap (bytes) reached while this node's subtree was executing — the max of the
+   * running live-heap total (signed HEAP_ALLOCATE deltas) over the node's window, clamped at
+   * 0. Always ≥ 0 and composes (child ≤ parent ≤ root), so the root equals the transaction
+   * peak. This is the heap number comparable to the heap governor limit.
+   */
+  heapPeak = 0;
+
+  /**
    * The line types which would legitimately end this method
    */
   exitTypes: LogEventType[] = [];
@@ -274,6 +318,17 @@ export abstract class LogEvent {
     if (this.exitStamp) {
       this.duration.total = this.duration.self = this.exitStamp - this.timestamp;
     }
+  }
+
+  /**
+   * Seeds this heap-allocation leaf's net/gross/peak metrics from a signed byte delta
+   * (negative = deallocation) and advances the parser's running live-heap total. Shared
+   * by {@link HeapAllocateLine} and {@link BulkHeapAllocateLine}.
+   */
+  protected seedHeapLeaf(parser: ApexLogParser, bytes: number): void {
+    this.heapAllocated.self = this.heapAllocated.total = bytes;
+    this.heapGross.self = this.heapGross.total = bytes > 0 ? bytes : 0;
+    this.heapPeak = parser.trackHeapAllocation(bytes);
   }
 
   private parseTimestamp(text: string): number {
@@ -515,6 +570,7 @@ export class BulkHeapAllocateLine extends LogEvent {
     super(parser, parts);
     this.text = parts[2] || '';
     this.bytes = parseBytes(parts[2]);
+    this.seedHeapLeaf(parser, this.bytes);
   }
 }
 
@@ -943,11 +999,17 @@ export class DMLBeginLine extends DurationLogEvent {
     total: 1,
   };
   namespace = 'default';
+  /** The SObject the DML targets (e.g. `Account`), from the `Type:` field. Null if absent. */
+  sObjectType: string | null = null;
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['DML_END'], LOG_CATEGORY.DML, 'free');
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = 'DML ' + parts[3] + ' ' + parts[4];
+    const typePart = parts[4];
+    if (typePart?.startsWith('Type:')) {
+      this.sObjectType = typePart.slice('Type:'.length);
+    }
     const rowCountString = parts[5];
     this.dmlRowCount.total = this.dmlRowCount.self = rowCountString ? parseRows(rowCountString) : 0;
   }
@@ -1103,6 +1165,7 @@ export class HeapAllocateLine extends LogEvent {
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
     this.bytes = parseBytes(parts[3]);
+    this.seedHeapLeaf(parser, this.bytes);
   }
 }
 

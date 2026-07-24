@@ -1,7 +1,7 @@
 {
   "name": "lana",
   "displayName": "Apex Log Analyzer",
-  "version": "1.20.0",
+  "version": "1.20.1",
   "description": "Salesforce Apex Debug Log Analyzer: Blazing-fast VS Code extension for Salesforce. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.",
   "keywords": [
     "analysis",
@@ -138,6 +138,20 @@
             "default": false,
             "markdownDescription": "Tint the Call Tree Name column by event category, matching the Timeline colors, instead of showing a small color chip. Default: `false`",
             "order": 0
+          },
+          "lana.callTree.columnView": {
+            "title": "Column view",
+            "type": "string",
+            "default": "General",
+            "enum": [
+              "General",
+              "Time",
+              "Governor Limits",
+              "Database",
+              "Memory"
+            ],
+            "markdownDescription": "The column view applied to the Call Tree and Analysis tables. Default: `General`",
+            "order": 1
           }
         }
       },
@@ -324,33 +338,6 @@
                 "format": "color-hex"
               }
             }
-          }
-        }
-      },
-      {
-        "type": "object",
-        "id": "lana",
-        "title": "Database",
-        "order": 2,
-        "properties": {
-          "lana.database.detailPanel.position": {
-            "title": "Database details panel position",
-            "type": "string",
-            "enum": [
-              "left",
-              "right",
-              "bottom"
-            ],
-            "default": "right",
-            "markdownDescription": "Where the details panel docks in the Database view when a DML or SOQL row is selected. Default: `right`",
-            "order": 0
-          },
-          "lana.database.detailPanel.size": {
-            "title": "Database details panel size",
-            "type": "number",
-            "default": 300,
-            "markdownDescription": "Size of the Database details panel in pixels (width when docked left/right, height when docked bottom). Default: `300`",
-            "order": 1
           }
         }
       }

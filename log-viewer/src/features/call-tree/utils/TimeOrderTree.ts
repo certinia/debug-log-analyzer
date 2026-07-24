@@ -1,10 +1,11 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent, SelfTotal } from 'apex-log-parser';
+import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
 
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
+import { setGovernorCost } from './GovernorCost.js';
 
 /**
  * One row per LogEvent for the time-order view; no merging at any level.
@@ -19,9 +20,20 @@ export interface TimeOrderRow {
   duration: SelfTotal;
   dmlCount: SelfTotal;
   soqlCount: SelfTotal;
+  soslCount: SelfTotal;
   dmlRowCount: SelfTotal;
   soqlRowCount: SelfTotal;
+  soslRowCount: SelfTotal;
   thrownCount: SelfTotal;
+  heapAllocated: SelfTotal;
+  /** Total + self gross heap bytes allocated (frees ignored) — churn */
+  heapGross: SelfTotal;
+  /** Peak live heap (bytes) reached in this node's subtree — the limit-comparable value */
+  heapPeak: number;
+  /** Average governor consumption across all reported governors (0–100%). */
+  governorCost: number;
+  /** The single tightest governor consumed on this path (0–100+%). */
+  governorCostMax: number;
   /**
    * True when this row is itself a "detail" (the per-row predicate matches —
    * non-zero `duration.total`, `isParent`, `discontinuity`, or a type in
@@ -37,7 +49,10 @@ export interface TimeOrderRow {
  * use parser-assigned eventIndex values, which are globally unique within
  * the parse and safe for deepFilter cache keys.
  */
-export function toTimeOrderTree(nodes: LogEvent[]): TimeOrderRow[] | undefined {
+export function toTimeOrderTree(
+  nodes: LogEvent[],
+  governorLimits?: GovernorLimits,
+): TimeOrderRow[] | undefined {
   const len = nodes.length;
   if (!len) {
     return undefined;
@@ -65,7 +80,7 @@ export function toTimeOrderTree(nodes: LogEvent[]): TimeOrderRow[] | undefined {
       duration.total > 0 ||
       discontinuity ||
       !!(type && EXCLUDED_DETAIL_TYPES.has(type));
-    return {
+    const row: TimeOrderRow = {
       id,
       originalData: event,
       _children: mappedChildren,
@@ -75,11 +90,22 @@ export function toTimeOrderTree(nodes: LogEvent[]): TimeOrderRow[] | undefined {
       duration: event.duration,
       dmlCount: event.dmlCount,
       soqlCount: event.soqlCount,
+      soslCount: event.soslCount,
       dmlRowCount: event.dmlRowCount,
       soqlRowCount: event.soqlRowCount,
+      soslRowCount: event.soslRowCount,
       thrownCount: event.thrownCount,
+      heapAllocated: event.heapAllocated,
+      heapGross: event.heapGross,
+      heapPeak: event.heapPeak,
+      governorCost: 0,
+      governorCostMax: 0,
       _hasDetailsDeep: selfIsDetail || childHasDetailsDeep,
     };
+    if (governorLimits) {
+      setGovernorCost(row, governorLimits);
+    }
+    return row;
   }
 
   const results = new Array<TimeOrderRow>(len);

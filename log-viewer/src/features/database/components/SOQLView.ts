@@ -16,13 +16,25 @@ import {
 import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
+import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { deriveSoqlObject } from '../services/sobjectClassification.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
-import { DatabaseAccess } from '../services/Database.js';
+import { getSettings, updateSetting } from '../../settings/Settings.js';
+import {
+  applyColumnView,
+  buildColumnMenuItems,
+  getColumnView,
+  getTableFields,
+  resolveColumnView,
+  SOQL_VIEWS,
+  toggleField,
+} from '../../../tabulator/ColumnViews.js';
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
 import Number from '../../../tabulator/format/Number.js';
+import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
@@ -37,8 +49,23 @@ import { globalStyles } from '../../../styles/global.styles.js';
 import databaseViewStyles from './DatabaseView.scss';
 
 // web components
+import '../../../components/ContextMenu.js';
+import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/datagrid-filter-bar.js';
 import './DatabaseSection.js';
+
+/** The SOQL column is always shown in the SOQL table. */
+const ALWAYS_VISIBLE = ['soql'];
+
+// Group-by dropdown label → row field. Labels that don't map 1:1 to a field
+// name (Object, Caller Namespace) need this indirection.
+const groupLabelsToFields = new Map<string, string>([
+  ['SOQL', 'soql'],
+  ['Object', 'objectType'],
+  ['Namespace', 'namespace'],
+  ['Caller Namespace', 'callerNamespace'],
+  ['None', ''],
+]);
 
 @customElement('soql-view')
 export class SOQLView extends LitElement {
@@ -48,15 +75,24 @@ export class SOQLView extends LitElement {
   @property()
   highlightIndex: number = 0;
 
-  @state()
-  oldIndex: number = 0;
+  /** SOQL lines to display; supplied by the parent DatabaseView. */
+  @property({ attribute: false })
+  lines: SOQLExecuteBeginLine[] = [];
 
   @state()
-  soqlLines: SOQLExecuteBeginLine[] = [];
+  oldIndex: number = 0;
 
   soqlTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
   table: HTMLElement | null = null;
+
+  @state()
+  columnView = 'General';
+
+  /** Per-view column overrides (view id → visible fields); empty until edited. */
+  @state()
+  private columnOverrides: Record<string, string[]> = {};
+  private contextMenu: ContextMenu | null = null;
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
     count: 0,
@@ -83,11 +119,21 @@ export class SOQLView extends LitElement {
     document.removeEventListener('lv-find-close', this._findEvt);
   }
 
+  firstUpdated(): void {
+    this.contextMenu = this.renderRoot.querySelector('context-menu');
+    void this._loadColumnSettings();
+  }
+
+  private async _loadColumnSettings(): Promise<void> {
+    const settings = await getSettings();
+    this.columnOverrides = settings.database?.soql?.columnOverrides ?? {};
+    this._setColumnView(resolveColumnView(SOQL_VIEWS, settings.database?.soql?.columnView));
+  }
+
   updated(changedProperties: PropertyValues): void {
     if (
       this.timelineRoot &&
-      changedProperties.has('timelineRoot') &&
-      !changedProperties.get('timelineRoot')
+      (changedProperties.has('lines') || changedProperties.has('timelineRoot'))
     ) {
       this._appendTableWhenVisible();
     }
@@ -124,18 +170,36 @@ export class SOQLView extends LitElement {
   render() {
     const soqlSkeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : ``;
     return html`
-      <database-section title="SOQL Statements" .dbLines="${this.soqlLines}"></database-section>
-
       <datagrid-filter-bar>
         <vs-select
-          slot="filters"
+          slot="table-actions"
+          id="soql-column-view"
+          prefix="Columns"
+          label="Column view"
+          @change="${this._handleColumnViewChange}"
+          @vs-reset-option="${this._onResetOption}"
+          .value="${this.columnView}"
+          .resettableValues="${Object.keys(this.columnOverrides)}"
+        >
+          ${SOQL_VIEWS.map(
+            (view) =>
+              html`<vscode-option value="${view.id}" ?selected="${this.columnView === view.id}"
+                >${view.id}</vscode-option
+              >`,
+          )}
+        </vs-select>
+
+        <vs-select
+          slot="group"
           id="soql-groupby-dropdown"
           prefix="Group"
           label="Group by"
           @change="${this._soqlGroupBy}"
         >
           <vscode-option>SOQL</vscode-option>
+          <vscode-option>Object</vscode-option>
           <vscode-option>Namespace</vscode-option>
+          <vscode-option>Caller Namespace</vscode-option>
           <vscode-option>None</vscode-option>
         </vs-select>
 
@@ -145,6 +209,12 @@ export class SOQLView extends LitElement {
             label="Toggle details panel"
             title="Toggle details panel"
             @click=${this._toggleDetailPanel}
+          ></vscode-toolbar-button>
+          <vscode-toolbar-button
+            icon="list-selection"
+            label="Columns"
+            title="Columns"
+            @click=${this._openColumnMenu}
           ></vscode-toolbar-button>
           <vscode-toolbar-button
             icon="desktop-download"
@@ -165,7 +235,124 @@ export class SOQLView extends LitElement {
         ${soqlSkeleton}
         <div id="db-soql-table"></div>
       </div>
+      <context-menu @menu-select="${this._handleColumnMenuSelect}"></context-menu>
     `;
+  }
+
+  private _handleColumnViewChange(event: Event) {
+    const id = (event.target as HTMLInputElement).value || 'General';
+    this._setColumnView(id);
+    updateSetting('database.soql.columnView', id);
+  }
+
+  /** Effective fields for a view id: the user override, else the built-in preset. */
+  private _columnViewFields(id: string): string[] | null {
+    return this.columnOverrides[id] ?? getColumnView(SOQL_VIEWS, id)?.fields ?? null;
+  }
+
+  private _setColumnView(id: string) {
+    this.columnView = id;
+    // Only apply once the table is laid out; otherwise tableBuilt → _initTableColumns
+    // applies the current view (redraw on an unrendered table throws).
+    if (this.soqlTable?.element?.clientHeight) {
+      applyColumnView(this.soqlTable, this._columnViewFields(id), ALWAYS_VISIBLE);
+    }
+  }
+
+  /** Applies the active view and wires the header menu once the table is built. */
+  private _initTableColumns(table: Tabulator) {
+    applyColumnView(table, this._columnViewFields(this.columnView), ALWAYS_VISIBLE);
+    const header = table.element.querySelector<HTMLElement>('.tabulator-header');
+    header?.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      this._showColumnMenu(event.clientX, event.clientY);
+    });
+  }
+
+  private _showColumnMenu(x: number, y: number) {
+    if (!this.contextMenu || !this.soqlTable) {
+      return;
+    }
+    this.contextMenu.show(
+      buildColumnMenuItems(
+        this.soqlTable,
+        this.columnView,
+        SOQL_VIEWS,
+        ALWAYS_VISIBLE,
+        Object.keys(this.columnOverrides),
+      ),
+      x,
+      y,
+    );
+  }
+
+  private _openColumnMenu(event: Event) {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this._showColumnMenu(rect.left, rect.bottom);
+  }
+
+  /** Rebuilds the open column menu so checkmarks/reset icons reflect current state. */
+  private _refreshColumnMenu() {
+    if (!this.contextMenu?.isVisible() || !this.soqlTable) {
+      return;
+    }
+    this.contextMenu.items = buildColumnMenuItems(
+      this.soqlTable,
+      this.columnView,
+      SOQL_VIEWS,
+      ALWAYS_VISIBLE,
+      Object.keys(this.columnOverrides),
+    );
+  }
+
+  private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
+    const { itemId } = e.detail;
+    const table = this.soqlTable;
+    if (!table) {
+      return;
+    }
+    if (itemId.startsWith('view:')) {
+      const id = itemId.slice('view:'.length);
+      this._setColumnView(id);
+      updateSetting('database.soql.columnView', id);
+      this._refreshColumnMenu();
+      return;
+    }
+    if (itemId.startsWith('col:')) {
+      const field = itemId.slice('col:'.length);
+      const fields = toggleField(
+        this._columnViewFields(this.columnView),
+        field,
+        getTableFields(table),
+      );
+      this.columnOverrides = { ...this.columnOverrides, [this.columnView]: fields };
+      applyColumnView(table, fields, ALWAYS_VISIBLE);
+      updateSetting('database.soql.columnOverrides', this.columnOverrides);
+      this._refreshColumnMenu();
+      return;
+    }
+    if (itemId.startsWith('reset:')) {
+      this._resetColumns(itemId.slice('reset:'.length));
+      this._refreshColumnMenu();
+    }
+  }
+
+  private _onResetOption(event: CustomEvent<{ value: string }>) {
+    this._resetColumns(event.detail.value);
+  }
+
+  /** Clears a view's override, restoring its built-in columns (defaults to the active view). */
+  private _resetColumns(id: string = this.columnView) {
+    const table = this.soqlTable;
+    if (!table || !this.columnOverrides[id]) {
+      return;
+    }
+    const { [id]: _removed, ...rest } = this.columnOverrides;
+    this.columnOverrides = rest;
+    if (id === this.columnView) {
+      applyColumnView(table, this._columnViewFields(id), ALWAYS_VISIBLE);
+    }
+    updateSetting('database.soql.columnOverrides', this.columnOverrides);
   }
 
   _copyToClipboard() {
@@ -193,8 +380,7 @@ export class SOQLView extends LitElement {
       return;
     }
     const target = event.target as HTMLInputElement;
-    const fieldName = target.value.toLowerCase();
-    const groupValue = fieldName !== 'none' ? fieldName : '';
+    const groupValue = groupLabelsToFields.get(target.value) ?? '';
     //@ts-expect-error This is a custom function added in the GroupSort custom module
     this.soqlTable.setSortedGroupBy(groupValue);
   }
@@ -204,12 +390,9 @@ export class SOQLView extends LitElement {
       return;
     }
 
-    isVisible(this).then(async (isVisible) => {
-      const treeRoot = this.timelineRoot;
+    isVisible(this).then((isVisible) => {
       const tableWrapper = this._soqlTableWrapper;
-      if (tableWrapper && treeRoot && isVisible) {
-        this.soqlLines = (await DatabaseAccess.create(treeRoot)).getSOQLLines();
-
+      if (tableWrapper && this.timelineRoot && isVisible) {
         Tabulator.registerModule(Object.values(CommonModules));
         Tabulator.registerModule([
           RowKeyboardNavigation,
@@ -219,7 +402,7 @@ export class SOQLView extends LitElement {
           GroupChildIndent,
           GroupSort,
         ]);
-        this._renderSOQLTable(tableWrapper, this.soqlLines);
+        this._renderSOQLTable(tableWrapper, this.lines);
       }
     });
   }
@@ -277,6 +460,7 @@ export class SOQLView extends LitElement {
   }
 
   _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
+    const queryRowLimit = this.timelineRoot?.governorLimits.queryRows.limit ?? 0;
     let nextRowId = 0;
 
     const soqlData: GridSOQLData[] = [];
@@ -289,9 +473,16 @@ export class SOQLView extends LitElement {
           relativeCost: explainLine?.relativeCost,
           soql: soql.text,
           namespace: soql.namespace,
+          callerNamespace: getCallerNamespace(soql),
           rowCount: soql.soqlRowCount.self,
           timeTaken: soql.duration.total,
           aggregations: soql.aggregations,
+          objectType: deriveSoqlObject(soql),
+          leadingOperationType: explainLine?.leadingOperationType ?? null,
+          sObjectType: explainLine?.sObjectType ?? null,
+          cardinality: explainLine?.cardinality ?? null,
+          sObjectCardinality: explainLine?.sObjectCardinality ?? null,
+          fields: explainLine?.fields?.join(', ') ?? null,
           eventIndex: soql.eventIndex,
         });
       }
@@ -364,7 +555,7 @@ export class SOQLView extends LitElement {
           },
           width: 40,
           hozAlign: 'center',
-          vertAlign: 'middle',
+          vertAlign: 'top',
           sorter: function (a, b, aRow, bRow, _column, dir, _sorterParams) {
             // Always Sort null values to the bottom (when we do not have selectivity)
             if (a === null) {
@@ -416,6 +607,22 @@ export class SOQLView extends LitElement {
           },
         },
         {
+          title: 'Object',
+          field: 'objectType',
+          sorter: 'string',
+          width: 150,
+          visible: false,
+          headerFilter: 'list',
+          headerFilterFunc: 'in',
+          headerFilterParams: {
+            valuesLookup: 'all',
+            clearable: true,
+            multiselect: true,
+          },
+          headerFilterLiveFilter: false,
+          formatter: (cell) => (cell.getValue() as string | null) ?? '—',
+        },
+        {
           title: 'Namespace',
           field: 'namespace',
           sorter: 'string',
@@ -430,6 +637,13 @@ export class SOQLView extends LitElement {
           headerFilterLiveFilter: false,
         },
         {
+          title: 'Caller Namespace',
+          field: 'callerNamespace',
+          sorter: 'string',
+          width: 120,
+          visible: false,
+        },
+        {
           title: 'Row Count',
           field: 'rowCount',
           sorter: 'number',
@@ -437,8 +651,79 @@ export class SOQLView extends LitElement {
           width: 100,
           hozAlign: 'right',
           headerHozAlign: 'right',
+          formatter: progressFormatter,
+          formatterParams: { precision: 0, totalValue: queryRowLimit, showPercentageText: false },
+          bottomCalc: 'sum',
+          bottomCalcFormatter: progressFormatter,
+          bottomCalcFormatterParams: {
+            precision: 0,
+            totalValue: queryRowLimit,
+            showPercentageText: false,
+          },
+          tooltip: (_e, cell) => cell.getValue() + (queryRowLimit > 0 ? '/' + queryRowLimit : ''),
+        },
+        {
+          title: 'Aggregations',
+          field: 'aggregations',
+          sorter: 'number',
+          cssClass: 'number-cell',
+          width: 100,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
           bottomCalc: 'sum',
         },
+        {
+          title: 'Relative Cost',
+          field: 'relativeCost',
+          sorter: 'number',
+          cssClass: 'number-cell',
+          width: 110,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          visible: false,
+        },
+        {
+          title: 'Leading Operation',
+          field: 'leadingOperationType',
+          sorter: 'string',
+          width: 140,
+          visible: false,
+        },
+        {
+          title: 'SObject Type',
+          field: 'sObjectType',
+          sorter: 'string',
+          width: 130,
+          visible: false,
+        },
+        {
+          title: 'Cardinality',
+          field: 'cardinality',
+          sorter: 'number',
+          cssClass: 'number-cell',
+          width: 110,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          visible: false,
+        },
+        {
+          title: 'SObject Cardinality',
+          field: 'sObjectCardinality',
+          sorter: 'number',
+          cssClass: 'number-cell',
+          width: 140,
+          hozAlign: 'right',
+          headerHozAlign: 'right',
+          visible: false,
+        },
+        {
+          title: 'Indexed Fields',
+          field: 'fields',
+          sorter: 'string',
+          width: 140,
+          visible: false,
+        },
+        // Time column sits at the far right.
         {
           title: 'Time Taken (ms)',
           field: 'timeTaken',
@@ -456,16 +741,6 @@ export class SOQLView extends LitElement {
           bottomCalcFormatter: Number,
           bottomCalc: 'sum',
           bottomCalcFormatterParams: { precision: 2 },
-        },
-        {
-          title: 'Aggregations',
-          field: 'aggregations',
-          sorter: 'number',
-          cssClass: 'number-cell',
-          width: 100,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          bottomCalc: 'sum',
         },
       ],
     });
@@ -499,6 +774,9 @@ export class SOQLView extends LitElement {
       holder.style.overflowAnchor = 'none';
       //@ts-expect-error This is a custom function added in the GroupSort custom module
       this.soqlTable?.setSortedGroupBy('soql');
+      if (this.soqlTable) {
+        this._initTableColumns(this.soqlTable);
+      }
     });
 
     this.soqlTable.on('dataSorted', () => {
@@ -593,9 +871,16 @@ interface GridSOQLData {
   relativeCost?: number | null;
   soql?: string;
   namespace?: string;
+  callerNamespace?: string;
   rowCount?: number | null;
   timeTaken?: number | null;
   aggregations?: number;
+  objectType?: string | null;
+  leadingOperationType?: string | null;
+  sObjectType?: string | null;
+  cardinality?: number | null;
+  sObjectCardinality?: number | null;
+  fields?: string | null;
   eventIndex?: number;
 }
 

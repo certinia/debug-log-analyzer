@@ -33,6 +33,8 @@ export class ApexLogParser {
   reasons: Set<string> = new Set<string>();
   lastTimestamp = 0;
   discontinuity = false;
+  /** Running live heap (signed HEAP_ALLOCATE deltas) maintained in log order. */
+  runningHeap = 0;
   namespaces = new Set<string>();
   /** Every event created during this parse, indexed by `LogEvent.eventIndex`. */
   eventsById: LogEvent[] = [];
@@ -123,6 +125,17 @@ export class ApexLogParser {
     }
   }
 
+  /**
+   * Applies a signed heap allocation to the running live-heap total (a negative `bytes` is a
+   * deallocation) and returns the resulting live-heap level, clamped at 0. Called by the heap
+   * allocation leaf events in log order; the returned value seeds their `heapPeak`, which is
+   * then rolled up (by max) to the enclosing methods in {@link aggregateTotals}.
+   */
+  trackHeapAllocation(bytes: number): number {
+    this.runningHeap += bytes;
+    return Math.max(0, this.runningHeap);
+  }
+
   private addGovernorLimits(apexLog: ApexLog) {
     const totalLimits = apexLog.governorLimits;
     if (totalLimits) {
@@ -139,6 +152,20 @@ export class ApexLogParser {
           currentLimit.used += value.used;
         }
       }
+
+      // Heap is a transaction-wide PEAK, never a per-namespace sum and never the last block
+      // (heap falls as memory is freed, so last-block/sum both misreport it — see #862 for
+      // why global limits aren't summed). Take the highest heap any snapshot reported, and the
+      // computed peak live heap (from HEAP_ALLOCATE events — more precise, and the only source
+      // when a log has no "Maximum heap size" line). The limit (denominator) is left as the
+      // per-namespace value the loop set; correcting it needs certified-pool detection (#862).
+      let reportedHeapPeak = 0;
+      for (const snapshot of apexLog.governorLimits.snapshots) {
+        if (snapshot.limits.heapSize.used > reportedHeapPeak) {
+          reportedHeapPeak = snapshot.limits.heapSize.used;
+        }
+      }
+      totalLimits.heapSize.used = Math.max(reportedHeapPeak, apexLog.heapPeak);
     }
   }
 
@@ -452,6 +479,20 @@ export class ApexLogParser {
           parent.soslRowCount.total += child.soslRowCount.total;
           parent.duration.self -= child.duration.total;
           parent.thrownCount.total += child.thrownCount.total;
+          parent.heapAllocated.total += child.heapAllocated.total;
+          parent.heapGross.total += child.heapGross.total;
+          // Direct/self heap: attribute only leaf allocation children (HEAP_ALLOCATE /
+          // BULK_HEAP_ALLOCATE, which are not `isParent`) to the enclosing method, so
+          // `.self` = bytes allocated by this method's own body, excluding sub-methods.
+          if (!child.isParent) {
+            parent.heapAllocated.self += child.heapAllocated.self;
+            parent.heapGross.self += child.heapGross.self;
+          }
+          // Peak live heap composes by max (not sum): a parent's peak is the highest
+          // reached anywhere in its subtree, so root.heapPeak = the transaction peak.
+          if (child.heapPeak > parent.heapPeak) {
+            parent.heapPeak = child.heapPeak;
+          }
         }
       }
     }
