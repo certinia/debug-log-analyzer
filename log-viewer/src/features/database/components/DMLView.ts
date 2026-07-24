@@ -191,12 +191,6 @@ export class DMLView extends LitElement {
 
         <div slot="actions">
           <vscode-toolbar-button
-            icon="layout"
-            label="Toggle details panel"
-            title="Toggle details panel"
-            @click=${this._toggleDetailPanel}
-          ></vscode-toolbar-button>
-          <vscode-toolbar-button
             icon="list-selection"
             label="Columns"
             title="Columns"
@@ -343,10 +337,6 @@ export class DMLView extends LitElement {
 
   _copyToClipboard() {
     this.dmlTable?.copyToClipboard('all');
-  }
-
-  _toggleDetailPanel() {
-    document.dispatchEvent(new CustomEvent('db-toggle-panel'));
   }
 
   deselectRows() {

@@ -84,7 +84,7 @@ export class DbVitals extends LitElement {
     const explain = line.children[0];
     const rows: TemplateResult[] = [];
     this._row(rows, 'Rows', line.soqlRowCount.total ?? '—');
-    this._row(rows, 'Time (ms)', formatMs(line.duration.total));
+    this._row(rows, 'Time', `${formatMs(line.duration.total)} ms`);
     this._row(rows, 'Namespace', line.namespace || '—');
     this._row(rows, 'Selective', this._selectivityPill(explain?.relativeCost ?? null));
     if (explain) {
@@ -116,7 +116,7 @@ export class DbVitals extends LitElement {
   private _renderDml(line: DMLBeginLine) {
     const rows: TemplateResult[] = [];
     this._row(rows, 'Rows', line.dmlRowCount.total ?? '—');
-    this._row(rows, 'Time (ms)', formatMs(line.duration.total));
+    this._row(rows, 'Time', `${formatMs(line.duration.total)} ms`);
     this._row(rows, 'Namespace', line.namespace || '—');
     this._row(rows, 'Caller namespace', getCallerNamespace(line));
     this._row(rows, 'Line', line.lineNumber ?? '—');

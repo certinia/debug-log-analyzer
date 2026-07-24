@@ -42,6 +42,9 @@ export class DetailDock extends LitElement {
         color: var(--vscode-sideBar-foreground, var(--vscode-foreground));
         font-family: var(--vscode-font-family);
         font-size: var(--vscode-font-size);
+        /* Match the docked edge (the DockLayout gutter) so the panel reads as a
+           deliberate region rather than blending into the tab header above. */
+        border-top: 1px solid var(--vscode-sideBar-border, transparent);
       }
 
       .actions {

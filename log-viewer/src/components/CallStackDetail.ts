@@ -3,13 +3,15 @@
  */
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { type CellComponent, type RowComponent, Tabulator } from 'tabulator-tables';
+import { type CellComponent, Tabulator } from 'tabulator-tables';
 
-import { goToRow } from '../features/call-tree/components/CalltreeView.js';
+import {
+  headerSortElement,
+  registerTableModules,
+} from '../features/call-tree/components/TableShared.js';
 import { formatSOQL } from '../features/soql/format/formatter.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
-import * as CommonModules from '../tabulator/module/CommonModules.js';
 import { progressFormatterMS } from '../tabulator/format/ProgressMS.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import { buildCallStackData, type CallStackRow } from './callStackData.js';
@@ -43,6 +45,17 @@ export class CallStackDetail extends LitElement {
         min-height: 0;
         width: 100%;
       }
+      /* Right-align the value block so the tabular-nums digits line up. */
+      #call-stack-table .progress-wrapper {
+        display: flex;
+        justify-content: flex-end;
+      }
+      /* Frame: single line, ellipsis — never wrap. */
+      #call-stack-table .tabulator-cell.truncate {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
     `,
   ];
 
@@ -68,7 +81,7 @@ export class CallStackDetail extends LitElement {
     this._table?.destroy();
 
     const { rows, rootTotal } = buildCallStackData(this.eventIndex);
-    Tabulator.registerModule(Object.values(CommonModules));
+    registerTableModules();
     this._table = new Tabulator(container, {
       index: 'eventIndex',
       data: rows,
@@ -76,23 +89,39 @@ export class CallStackDetail extends LitElement {
       layout: 'fitColumns',
       placeholder: 'No call stack available',
       columnCalcs: false,
+      // Arrow-key row navigation, matching the Call Tree tab.
+      // @ts-expect-error custom option registered by the RowKeyboardNavigation module (types not updated)
+      rowKeyboardNavigation: true,
+      selectableRows: 'highlight',
+      headerSortElement,
       columnDefaults: {
         resizable: true,
-        headerSort: false,
         headerTooltip: true,
+        headerSortStartingDir: 'desc',
       },
       columns: [
         {
           title: 'Frame',
           field: 'text',
-          widthGrow: 3,
+          // Frame absorbs the slack and shrinks + truncates first; the time
+          // columns hold a fixed content width. Below Frame's minWidth the table
+          // scrolls horizontally, like the main Call Tree tab.
+          sorter: 'string',
+          widthGrow: 1,
+          widthShrink: 1,
+          minWidth: 140,
+          cssClass: 'truncate',
           tooltip: true,
           formatter: frameFormatter,
         },
         {
           title: 'Total (ms)',
           field: 'duration.total',
-          width: 120,
+          sorter: 'number',
+          width: 150,
+          minWidth: 150,
+          widthGrow: 0,
+          widthShrink: 0,
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatterMS,
@@ -101,7 +130,11 @@ export class CallStackDetail extends LitElement {
         {
           title: 'Self (ms)',
           field: 'duration.self',
-          width: 110,
+          sorter: 'number',
+          width: 150,
+          minWidth: 150,
+          widthGrow: 0,
+          widthShrink: 0,
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatterMS,
@@ -109,15 +142,9 @@ export class CallStackDetail extends LitElement {
         },
       ],
     });
-
-    this._table.on('rowClick', (_e: UIEvent, row: RowComponent) => {
-      const { type } = window.getSelection() ?? {};
-      if (type === 'Range') {
-        return;
-      }
-      const data = row.getData() as CallStackRow;
-      goToRow({ eventIndex: data.eventIndex });
-    });
+    // No rowClick navigation: clicking a frame selects it (RowKeyboardNavigation)
+    // and never jumps to the main Call Tree tab. The call stack is flat, so there
+    // is nothing to expand/collapse.
   }
 
   render() {
