@@ -44,6 +44,10 @@ export class AppHeader extends LitElement {
         display: flex;
         flex-direction: column;
         gap: 2px;
+        min-width: 0;
+        /* Match the tabs' box inset (LogViewer 8px + this 8px == tabs' 8px + their internal
+           8px) so the log-title, first level chip, and first tab share one left/right guide. */
+        padding: 0 8px;
       }
     `,
   ];
