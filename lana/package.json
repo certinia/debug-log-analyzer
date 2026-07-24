@@ -344,44 +344,27 @@
       {
         "type": "object",
         "id": "lana",
-        "title": "Database",
-        "order": 2,
+        "title": "Side Bar",
+        "order": 3,
         "properties": {
-          "lana.database.soql.columnView": {
-            "title": "SOQL column view",
+          "lana.sidePanel.position": {
+            "title": "Position",
             "type": "string",
-            "default": "General",
+            "default": "right",
             "enum": [
-              "General",
-              "Performance",
-              "Query Plan",
-              "Limits"
+              "left",
+              "right",
+              "bottom"
             ],
-            "markdownDescription": "The column view applied to the Database SOQL table. Default: `General`",
+            "markdownDescription": "Where the detail side bar docks. Default: `right`",
             "order": 0
           },
-          "lana.database.dml.columnView": {
-            "title": "DML column view",
-            "type": "string",
-            "default": "General",
-            "enum": [
-              "General",
-              "Timing",
-              "Limits"
-            ],
-            "markdownDescription": "The column view applied to the Database DML table. Default: `General`",
-            "order": 2
-          },
-          "lana.database.sosl.columnView": {
-            "title": "SOSL column view",
-            "type": "string",
-            "default": "General",
-            "enum": [
-              "General",
-              "Timing"
-            ],
-            "markdownDescription": "The column view applied to the Database SOSL table. Default: `General`",
-            "order": 4
+          "lana.sidePanel.size": {
+            "title": "Size",
+            "type": "number",
+            "default": 500,
+            "markdownDescription": "The docked side bar's width (or height when docked to the bottom), in pixels. Default: `500`",
+            "order": 1
           }
         }
       }

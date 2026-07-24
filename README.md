@@ -132,7 +132,8 @@ Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues, a
 - **Object column + Group by Object / Namespace / Caller Namespace / Query**
 - **SOQL Duration, Selectivity, Aggregates, Row Count**
 - **Column Views** – Preset column sets (incl. a SOQL Query Plan view), show/hide columns, reset to defaults
-- **View the Call Stack**, **SOQL Optimization Tips**, **Sort**, **Copy or Export to CSV**
+- **Detail side bar** – select a row to inspect its **vitals**, **call stack**, a scoped **call tree** (Time Order / Aggregated / Bottom-Up) and **SOQL optimization tips**; dock it left, right or bottom
+- **Sort**, **Copy or Export to CSV**
 
 <!-- TODO: re-capture database.png for the redesigned Database tab (governor strip, DML/SOQL/SOSL sections). Optionally add a sosl.png. -->
 

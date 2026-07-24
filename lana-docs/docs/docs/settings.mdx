@@ -75,3 +75,12 @@ loading="lazy"/>
 ## Call Tree category coloring
 
 The Call Tree colors its Name column by event category using the active timeline theme. A color chip is shown by default; enable **Colorize Call Tree category names** (`lana.callTree.categoryColorize`) under `preferences -> extensions -> Apex Log Analyzer` to tint the whole cell instead. See [Call Tree → Category Coloring](./features/calltree.mdx#category-coloring).
+
+## Detail side bar
+
+The Database tab's detail side bar (see [Database → Detail side bar](./features/database.md#detail-side-bar)) remembers where you dock it and how big it is:
+
+- `lana.sidePanel.position` – where it docks: `right` (default), `left` or `bottom`.
+- `lana.sidePanel.size` – its width (or height when docked to the bottom), in pixels.
+
+Both update as you drag or re-dock the panel, so you rarely need to edit them by hand.

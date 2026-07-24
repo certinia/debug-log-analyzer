@@ -59,6 +59,9 @@ export class AnalysisView extends LitElement {
         width: 100%;
         display: flex;
         gap: 1rem;
+        /* inset previously provided by the tab panel's padding */
+        padding: 10px 6px;
+        box-sizing: border-box;
       }
 
       .analysis-view {

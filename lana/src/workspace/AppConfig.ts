@@ -43,6 +43,11 @@ interface Config {
     dml: { columnView: string; columnOverrides: Record<string, string[]> };
     sosl: { columnView: string; columnOverrides: Record<string, string[]> };
   };
+  // App-wide detail side bar (currently only the Database view feeds it).
+  sidePanel: {
+    position: 'left' | 'right' | 'bottom';
+    size: number;
+  };
 }
 
 export function getConfig(): Config {
@@ -79,6 +84,20 @@ export const COLUMN_OVERRIDE_SECTIONS = [
   'database.sosl.columnOverrides',
 ] as const;
 
+/**
+ * The Database column-view presets persist privately in globalState (they are
+ * not registered `lana.*` settings). `callTree.columnView` stays a public
+ * setting.
+ */
+export const COLUMN_VIEW_SECTIONS = [
+  'database.soql.columnView',
+  'database.dml.columnView',
+  'database.sosl.columnView',
+] as const;
+
+/** All sections routed to globalState instead of editable `lana.*` settings. */
+export const PRIVATE_SECTIONS = [...COLUMN_OVERRIDE_SECTIONS, ...COLUMN_VIEW_SECTIONS] as const;
+
 type ColumnOverrides = Record<string, string[]>;
 
 export function getColumnOverrides(globalState: Memento): Record<string, ColumnOverrides> {
@@ -89,10 +108,21 @@ export function getColumnOverrides(globalState: Memento): Record<string, ColumnO
   return overrides;
 }
 
-export function updateColumnOverride(
+export function getColumnViews(globalState: Memento): Record<string, string> {
+  const views: Record<string, string> = {};
+  for (const section of COLUMN_VIEW_SECTIONS) {
+    views[section] = globalState.get<string>(section, 'General');
+  }
+  return views;
+}
+
+export function updatePrivateSection(
   globalState: Memento,
   section: string,
   value: unknown,
 ): Thenable<void> {
   return globalState.update(section, value);
 }
+
+/** Alias retained for callers that persist column overrides specifically. */
+export const updateColumnOverride = updatePrivateSection;

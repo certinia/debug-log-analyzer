@@ -62,13 +62,16 @@ SOQL and DML can be grouped by **Object** (the queried/target SObject), **Namesp
 
 **Caller Namespace** is the namespace of the direct caller that issued the statement — handy for seeing which package's code is responsible, even when the time is attributed to the default namespace.
 
-### DML / SOQL Call Stack
+### Detail side bar
 
-Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occurred in the call tree.
+Selecting a SOQL or DML row opens a side bar with details for that statement. It can be docked to the **right**, **left** or **bottom** (the choice persists via `lana.sidePanel.position`), resized, and toggled from the button above the tables. It opens automatically on the first selection; after that it stays as you left it.
 
-### SOQL Analysis
+The side bar has:
 
-For SOQL rows, to the right of the Call Stack is SOQL Analysis which shows information about SOQL performance for the given query and how to improve it.
+- **Vitals** – a compact readout (rows, time, namespace, selectivity, line, …) for the selected statement.
+- **Call stack** – the parent frames that led to the statement, with total/self time and % of the enclosing frame; sortable.
+- **Call tree** – the statement scoped within its execution, switchable between **Time Order**, **Aggregated** and **Bottom-Up** (like the Chrome DevTools performance panel). Totals are relative to the selection, so a DML that fires triggers shows the triggered work beneath it.
+- **SOQL issues** (SOQL only) – optimization tips describing the query's performance and how to improve it.
 
 ### Export to CSV + copy to clipboard
 

@@ -39,6 +39,11 @@ export type LanaSettings = {
     dml: { columnView: string; columnOverrides: Record<string, string[]> };
     sosl: { columnView: string; columnOverrides: Record<string, string[]> };
   };
+  // App-wide detail side bar (currently only the Database view feeds it).
+  sidePanel: {
+    position: 'left' | 'right' | 'bottom';
+    size: number;
+  };
 };
 
 export function getSettings(): Promise<LanaSettings> {

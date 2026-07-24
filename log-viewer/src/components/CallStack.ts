@@ -22,6 +22,10 @@ export class CallStack extends LitElement {
   startDepth = 1;
   @property({ type: Number })
   endDepth = -1;
+  // When true (e.g. inside the details panel), fill the container and scroll
+  // normally instead of the 30vh cap + hover-to-scroll used in grid cells.
+  @property({ type: Boolean })
+  unbounded = false;
 
   // Internal state to hold the pre-formatted Lit templates
   @state()
@@ -45,6 +49,12 @@ export class CallStack extends LitElement {
 
       :host(:hover) {
         overflow: scroll;
+      }
+
+      :host([unbounded]),
+      :host([unbounded]:hover) {
+        max-height: none;
+        overflow: auto;
       }
 
       details summary {

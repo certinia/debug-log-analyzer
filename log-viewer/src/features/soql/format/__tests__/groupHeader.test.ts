@@ -20,7 +20,11 @@ describe('soqlGroupHeader', () => {
     const data = [{ originalData: { type: 'SOQL_EXECUTE_BEGIN' } }];
     const html = soqlGroupHeader('SELECT Id FROM Account', 2, data);
     expect(html).toContain('soql-block');
+    // single-line so the group-header cell ellipsizes instead of wrapping
+    expect(html).toContain('soql-inline');
     expect(html).toContain('<span class="soql-tok-keyword">SELECT</span>');
+    // count is pinned in its own element so it stays visible when the query truncates
+    expect(html).toContain('soql-group-header__count');
     expect(html).toContain('(2)');
   });
 
