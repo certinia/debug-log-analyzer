@@ -21,6 +21,8 @@ import { computeVisibleCount } from './logLevelsOverflow.js';
 const OVERFLOW_RESERVE = 56;
 /** Gap between chips, in px — the source of truth for both the `.items` CSS gap and the fit math. */
 const ITEMS_GAP = 6;
+/** Shared by the overflow button's `popovertarget` and the panel's `id` — must match. */
+const PANEL_ID = 'log-levels-panel';
 
 /**
  * Read-only display of the log's captured debug levels in the app header: one chip per
@@ -40,9 +42,6 @@ export class LogLevels extends LitElement {
   @property()
   logSettings: DebugLevel[] | null = null;
 
-  @state()
-  private open = false;
-
   /** How many leading items fit inline; the rest are CSS-hidden and shown in the panel. */
   @state()
   private visibleCount = Number.POSITIVE_INFINITY;
@@ -52,12 +51,6 @@ export class LogLevels extends LitElement {
   /** Per-chip widths (px), measured once with all chips visible; drives sync overflow. */
   private itemWidths: number[] | null = null;
 
-  private readonly _onDocumentClick = (event: MouseEvent): void => {
-    if (!event.composedPath().includes(this)) {
-      this.open = false;
-    }
-  };
-
   static styles = [
     globalStyles,
     skeletonStyles,
@@ -66,10 +59,6 @@ export class LogLevels extends LitElement {
         display: block;
         min-width: 0;
         font-size: 11px;
-      }
-
-      .container {
-        position: relative;
       }
 
       .bar {
@@ -146,6 +135,7 @@ export class LogLevels extends LitElement {
         white-space: nowrap;
         cursor: pointer;
         flex: 0 0 auto;
+        anchor-name: --log-levels-overflow;
       }
 
       .overflow:hover {
@@ -166,7 +156,8 @@ export class LogLevels extends LitElement {
         transition: transform 120ms ease;
       }
 
-      .overflow.is-open .overflow__chevron {
+      /* Native popover drives open/close; :has() flips the chevron while it's shown. */
+      .container:has([popover]:popover-open) .overflow__chevron {
         transform: rotate(180deg);
       }
 
@@ -176,12 +167,14 @@ export class LogLevels extends LitElement {
         }
       }
 
-      /* Native-menu chrome for the pop-out. */
+      /* Native-menu chrome for the pop-out. Top-layer popover, anchored bottom-right to
+         the overflow button (escapes the header's overflow-x: clip). */
       .panel {
-        position: absolute;
-        top: calc(100% + 6px);
-        right: 0;
-        z-index: 999;
+        position: fixed;
+        position-anchor: --log-levels-overflow;
+        position-area: bottom span-left;
+        inset: auto;
+        margin: 6px 0 0 0;
         min-width: 200px;
         max-width: min(92vw, 340px);
         padding: 6px;
@@ -230,7 +223,6 @@ export class LogLevels extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
-    document.addEventListener('click', this._onDocumentClick);
     // Re-measure once webview fonts finish loading (chip widths can shift).
     void document.fonts?.ready.then(() => {
       this._resetMeasurement();
@@ -254,7 +246,6 @@ export class LogLevels extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener('click', this._onDocumentClick);
     this.resizeObserver?.disconnect();
   }
 
@@ -262,7 +253,8 @@ export class LogLevels extends LitElement {
   private _resetMeasurement(): void {
     this.itemWidths = null;
     this.visibleCount = Number.POSITIVE_INFINITY;
-    this.open = false; // nothing is hidden until re-measured, so close any open panel
+    // Nothing is hidden until re-measured, so the overflow button (and its popover)
+    // unmount — the native popover closes itself when its invoker leaves the DOM.
   }
 
   protected willUpdate(changed: PropertyValues): void {
@@ -292,13 +284,6 @@ export class LogLevels extends LitElement {
       return;
     }
     this.visibleCount = computeVisibleCount(widths, avail, ITEMS_GAP, OVERFLOW_RESERVE);
-    if (this.visibleCount >= widths.length) {
-      this.open = false; // everything fits → no overflow control, so close the panel
-    }
-  }
-
-  private _toggle(): void {
-    this.open = !this.open;
   }
 
   render() {
@@ -318,6 +303,7 @@ export class LogLevels extends LitElement {
     const visible = Math.min(this.visibleCount, total);
     const hiddenItems = this.logSettings.slice(visible);
     const hiddenCount = hiddenItems.length;
+    const hasOverflow = hiddenCount > 0;
 
     return html`<div class="container">
       <div class="bar">
@@ -329,14 +315,13 @@ export class LogLevels extends LitElement {
           )}
         </div>
         ${
-          hiddenCount > 0
+          hasOverflow
             ? html`<divider-line orientation="vertical" class="sep"></divider-line>
                 <button
-                  class="overflow ${this.open ? 'is-open' : ''}"
+                  class="overflow"
+                  popovertarget=${PANEL_ID}
                   aria-haspopup="true"
-                  aria-expanded=${this.open}
                   title="Show ${hiddenCount} more log level${hiddenCount === 1 ? '' : 's'}"
-                  @click=${this._toggle}
                 >
                   <span class="overflow__count">+${hiddenCount}</span>
                   <vscode-icon
@@ -349,8 +334,8 @@ export class LogLevels extends LitElement {
         }
       </div>
       ${
-        this.open && hiddenCount > 0
-          ? html`<div class="panel">
+        hasOverflow
+          ? html`<div class="panel" id=${PANEL_ID} popover>
               <div class="panel__head">Log levels</div>
               ${repeat(
                 hiddenItems,
