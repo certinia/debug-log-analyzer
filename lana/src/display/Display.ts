@@ -23,7 +23,9 @@ export class Display {
     window.showErrorMessage(s, options);
   }
 
-  showFile(path: string, options: TextDocumentShowOptions = {}): void {
-    commands.executeCommand('vscode.open', Uri.file(path.trim()), options);
+  /** Open a file by path (desktop) or URI string (web-safe). */
+  showFile(pathOrUri: string | Uri, options: TextDocumentShowOptions = {}): void {
+    const uri = typeof pathOrUri === 'string' ? Uri.parse(pathOrUri.trim()) : pathOrUri;
+    commands.executeCommand('vscode.open', uri, options);
   }
 }

@@ -354,7 +354,7 @@ describe('RawLogFoldingProvider', () => {
       return { registeredProvider, openHandler, activeEditorHandler };
     }
 
-    const flush = () => new Promise((resolve) => setImmediate(resolve));
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
     it('warms the cache and fires onDidChangeFoldingRanges when an apex log opens', async () => {
       const { registeredProvider, openHandler } = applyAndCapture();
@@ -366,7 +366,7 @@ describe('RawLogFoldingProvider', () => {
       openHandler(doc);
       await flush();
 
-      expect(mockGetApexLog).toHaveBeenCalledWith('/test/file.log');
+      expect(mockGetApexLog).toHaveBeenCalledWith('file:///test/file.log');
       expect(fired).toHaveBeenCalledTimes(1);
     });
 
@@ -380,7 +380,7 @@ describe('RawLogFoldingProvider', () => {
       activeEditorHandler({ document: doc });
       await flush();
 
-      expect(mockGetApexLog).toHaveBeenCalledWith('/test/file.log');
+      expect(mockGetApexLog).toHaveBeenCalledWith('file:///test/file.log');
       expect(fired).toHaveBeenCalledTimes(1);
     });
 
@@ -407,7 +407,7 @@ describe('RawLogFoldingProvider', () => {
       openHandler(doc);
       await flush();
 
-      expect(mockGetApexLog).toHaveBeenCalledWith('/test/file.log');
+      expect(mockGetApexLog).toHaveBeenCalledWith('file:///test/file.log');
       expect(fired).not.toHaveBeenCalled();
     });
   });

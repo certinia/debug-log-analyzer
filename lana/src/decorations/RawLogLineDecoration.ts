@@ -88,9 +88,9 @@ export class RawLogLineDecoration {
     }
 
     const timestamp = parseInt(match[1], 10);
-    const filePath = document.uri.fsPath;
+    const uriString = document.uri.toString();
 
-    const apexLog = await LogEventCache.getApexLog(filePath);
+    const apexLog = await LogEventCache.getApexLog(uriString);
     if (!apexLog) {
       this.clearDecorations(editor);
       return;
@@ -109,7 +109,7 @@ export class RawLogLineDecoration {
     const endOfLine = line.range.end;
     const decoration: DecorationOptions = {
       range: new Range(endOfLine, endOfLine),
-      hoverMessage: this.buildHoverMessage(event, timestamp, filePath),
+      hoverMessage: this.buildHoverMessage(event, timestamp, uriString),
       renderOptions: {
         after: {
           contentText: durationText,

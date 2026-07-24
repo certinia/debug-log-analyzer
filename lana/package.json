@@ -31,6 +31,7 @@
   ],
   "type": "module",
   "main": "out/Main.js",
+  "browser": "out/web/Main.web.js",
   "icon": "./certinia-icon-color.png",
   "galleryBanner": {
     "color": "#000000",
@@ -52,9 +53,19 @@
   "categories": [
     "Other"
   ],
+  "extensionDependencies": [
+    "salesforce.salesforcedx-vscode-services"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
   "activationEvents": [
     "onLanguage:apexlog",
-    "onStartupFinished"
+    "onStartupFinished",
+    "onFileSystem:memfs"
   ],
   "contributes": {
     "commands": [
@@ -391,10 +402,10 @@
     "vscode:prepublish": "pnpm -w run build && pnpm -w run copy:package-docs"
   },
   "dependencies": {
-    "@apexdevtools/apex-ls": "^6.0.2",
     "@apexdevtools/apex-parser": "5.1.0",
-    "@salesforce/apex-node": "^8.4.34",
-    "@salesforce/core": "^8.32.2"
+    "@salesforce/vscode-services": "^67.6.0",
+    "effect": "^3.22.0",
+    "vscode-uri": "^3.1.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

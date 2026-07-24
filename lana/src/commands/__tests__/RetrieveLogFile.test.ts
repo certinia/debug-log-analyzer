@@ -20,16 +20,11 @@ jest.mock('../../display/QuickPickWorkspace.js', () => ({
   },
 }));
 
-jest.mock('../../salesforce/logs/GetLogFiles.js', () => ({
-  GetLogFiles: {
-    apply: jest.fn(),
-  },
-}));
-
-jest.mock('../../salesforce/logs/GetLogFile.js', () => ({
-  GetLogFile: {
-    apply: jest.fn(),
-  },
+jest.mock('../../services/salesforceServices.js', () => ({
+  listLogs: jest.fn(),
+  getLogBody: jest.fn(),
+  writeFile: jest.fn(),
+  fileOrFolderExists: jest.fn(),
 }));
 
 jest.mock('../LogView.js', () => ({
@@ -64,33 +59,57 @@ jest.mock('../../display/QuickPick.js', () => ({
   },
 }));
 
-jest.mock('fs', () => ({
-  existsSync: jest.fn(),
+jest.mock('../../workspace/VSWorkspace.js', () => ({
+  VSWorkspace: class {
+    workspaceFolder: { uri: { toString: () => string }; name: string; index: number };
+    constructor(workspaceFolder: { uri: { toString: () => string }; name: string; index: number }) {
+      this.workspaceFolder = workspaceFolder;
+    }
+    get uri(): string {
+      return this.workspaceFolder.uri.toString();
+    }
+    name(): string {
+      return this.workspaceFolder.name;
+    }
+  },
 }));
 
-import { existsSync } from 'fs';
-import { commands } from 'vscode';
+import { commands, Uri } from 'vscode';
 
 import { QuickPick } from '../../display/QuickPick.js';
 import { QuickPickWorkspace } from '../../display/QuickPickWorkspace.js';
-import { GetLogFile } from '../../salesforce/logs/GetLogFile.js';
-import { GetLogFiles } from '../../salesforce/logs/GetLogFiles.js';
+import {
+  fileOrFolderExists,
+  getLogBody,
+  listLogs,
+  writeFile,
+} from '../../services/salesforceServices.js';
+import { VSWorkspace } from '../../workspace/VSWorkspace.js';
 import { LogView } from '../LogView.js';
 
 const mockPickOrReturn = QuickPickWorkspace.pickOrReturn as jest.Mock;
-const mockGetLogFiles = GetLogFiles.apply as jest.Mock;
-const mockGetLogFile = GetLogFile.apply as jest.Mock;
+const mockListLogs = listLogs as jest.Mock;
+const mockGetLogBody = getLogBody as jest.Mock;
+const mockWriteFile = writeFile as jest.Mock;
+const mockFileOrFolderExists = fileOrFolderExists as jest.Mock;
 const mockQuickPickPick = QuickPick.pick as jest.Mock;
-const mockExistsSync = existsSync as jest.Mock;
 const mockCreateView = LogView.createView as jest.Mock;
 const mockRegisterCommand = commands.registerCommand as jest.Mock;
 
 describe('RetrieveLogFile', () => {
+  const mockWorkspace = new VSWorkspace({
+    uri: Uri.parse('file:///test/workspace'),
+    name: 'test-workspace',
+    index: 0,
+  });
+
   beforeEach(() => {
-    mockPickOrReturn.mockResolvedValue('/test/workspace');
-    mockGetLogFiles.mockResolvedValue([]);
+    mockPickOrReturn.mockResolvedValue(mockWorkspace);
+    mockListLogs.mockResolvedValue([]);
     mockQuickPickPick.mockResolvedValue([]);
-    mockExistsSync.mockReturnValue(false);
+    mockFileOrFolderExists.mockResolvedValue(false);
+    mockGetLogBody.mockResolvedValue('log content');
+    mockWriteFile.mockResolvedValue(undefined);
     (window.createQuickPick as jest.Mock).mockReturnValue({
       items: [],
       busy: false,
@@ -145,7 +164,7 @@ describe('RetrieveLogFile', () => {
 
     it('should call QuickPickWorkspace.pickOrReturn first', async () => {
       mockPickOrReturn.mockResolvedValue('/test/workspace');
-      mockGetLogFiles.mockResolvedValue([]);
+      mockListLogs.mockResolvedValue([]);
       mockQuickPickPick.mockResolvedValue([]);
 
       const mockContext = createMockContext();
@@ -157,9 +176,14 @@ describe('RetrieveLogFile', () => {
       expect(mockPickOrReturn).toHaveBeenCalled();
     });
 
-    it('should call GetLogFiles.apply with workspace path', async () => {
-      mockPickOrReturn.mockResolvedValue('/my/workspace');
-      mockGetLogFiles.mockResolvedValue([]);
+    it('should call listLogs to fetch ApexLog records from org', async () => {
+      const myWs = new VSWorkspace({
+        uri: Uri.parse('file:///my/workspace'),
+        name: 'my-workspace',
+        index: 0,
+      });
+      mockPickOrReturn.mockResolvedValue(myWs);
+      mockListLogs.mockResolvedValue([]);
       mockQuickPickPick.mockResolvedValue([]);
 
       const mockContext = createMockContext();
@@ -168,12 +192,12 @@ describe('RetrieveLogFile', () => {
       const commandCallback = getCommandCallback();
       await commandCallback();
 
-      expect(mockGetLogFiles).toHaveBeenCalledWith('/my/workspace');
+      expect(mockListLogs).toHaveBeenCalled();
     });
 
     it('should return undefined when no log is selected', async () => {
-      mockPickOrReturn.mockResolvedValue('/test/workspace');
-      mockGetLogFiles.mockResolvedValue([
+      mockPickOrReturn.mockResolvedValue(mockWorkspace);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'log1',
           LogUser: { Name: 'User' },
@@ -198,8 +222,8 @@ describe('RetrieveLogFile', () => {
     });
 
     it('should create view when log is selected', async () => {
-      mockPickOrReturn.mockResolvedValue('/test/workspace');
-      mockGetLogFiles.mockResolvedValue([
+      mockPickOrReturn.mockResolvedValue(mockWorkspace);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'selected-log-id',
           LogUser: { Name: 'User' },
@@ -212,8 +236,9 @@ describe('RetrieveLogFile', () => {
       ]);
       // Return selected item with logId
       mockQuickPickPick.mockResolvedValue([{ logId: 'selected-log-id' }]);
-      mockExistsSync.mockReturnValue(false);
-      mockGetLogFile.mockResolvedValue(undefined);
+      mockFileOrFolderExists.mockResolvedValue(false);
+      mockGetLogBody.mockResolvedValue('log content');
+      mockWriteFile.mockResolvedValue(undefined);
       mockCreateView.mockResolvedValue({ panel: 'mock' });
 
       const mockContext = createMockContext();
@@ -224,12 +249,14 @@ describe('RetrieveLogFile', () => {
 
       expect(mockCreateView).toHaveBeenCalled();
       const createViewCall = mockCreateView.mock.calls[0];
-      expect(createViewCall[2]).toContain('selected-log-id.log');
+      const logUri = createViewCall[2];
+      expect(logUri).toHaveProperty('toString');
+      expect(logUri.toString()).toContain('selected-log-id.log');
     });
 
     it('should skip download when log file already exists', async () => {
-      mockPickOrReturn.mockResolvedValue('/test/workspace');
-      mockGetLogFiles.mockResolvedValue([
+      mockPickOrReturn.mockResolvedValue(mockWorkspace);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'existing-log',
           LogUser: { Name: 'User' },
@@ -242,7 +269,7 @@ describe('RetrieveLogFile', () => {
       ]);
       mockQuickPickPick.mockResolvedValue([{ logId: 'existing-log' }]);
       // File already exists
-      mockExistsSync.mockReturnValue(true);
+      mockFileOrFolderExists.mockResolvedValue(true);
       mockCreateView.mockResolvedValue({ panel: 'mock' });
 
       const mockContext = createMockContext();
@@ -251,14 +278,15 @@ describe('RetrieveLogFile', () => {
       const commandCallback = getCommandCallback();
       await commandCallback();
 
-      // GetLogFile should NOT be called since file exists
-      expect(mockGetLogFile).not.toHaveBeenCalled();
+      // getLogBody + writeFile should NOT be called since file exists
+      expect(mockGetLogBody).not.toHaveBeenCalled();
+      expect(mockWriteFile).not.toHaveBeenCalled();
       expect(mockCreateView).toHaveBeenCalled();
     });
 
     it('should download log file when it does not exist', async () => {
-      mockPickOrReturn.mockResolvedValue('/test/workspace');
-      mockGetLogFiles.mockResolvedValue([
+      mockPickOrReturn.mockResolvedValue(mockWorkspace);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'new-log',
           LogUser: { Name: 'User' },
@@ -271,8 +299,9 @@ describe('RetrieveLogFile', () => {
       ]);
       mockQuickPickPick.mockResolvedValue([{ logId: 'new-log' }]);
       // File does not exist
-      mockExistsSync.mockReturnValue(false);
-      mockGetLogFile.mockResolvedValue(undefined);
+      mockFileOrFolderExists.mockResolvedValue(false);
+      mockGetLogBody.mockResolvedValue('fetched log content');
+      mockWriteFile.mockResolvedValue(undefined);
       mockCreateView.mockResolvedValue({ panel: 'mock' });
 
       const mockContext = createMockContext();
@@ -281,12 +310,9 @@ describe('RetrieveLogFile', () => {
       const commandCallback = getCommandCallback();
       await commandCallback();
 
-      // GetLogFile SHOULD be called since file doesn't exist
-      expect(mockGetLogFile).toHaveBeenCalledWith(
-        '/test/workspace',
-        expect.stringContaining('.sfdx/tools/debug/logs'),
-        'new-log',
-      );
+      // getLogBody + writeFile SHOULD be called since file doesn't exist
+      expect(mockGetLogBody).toHaveBeenCalledWith('new-log');
+      expect(mockWriteFile).toHaveBeenCalledWith(expect.anything(), 'fetched log content');
     });
   });
 
@@ -307,8 +333,8 @@ describe('RetrieveLogFile', () => {
     });
 
     const getCapturedDescription = async (durationMs: number): Promise<string> => {
-      mockPickOrReturn.mockResolvedValue('/test/workspace');
-      mockGetLogFiles.mockResolvedValue([createLogWithDuration(durationMs)]);
+      mockPickOrReturn.mockResolvedValue(mockWorkspace);
+      mockListLogs.mockResolvedValue([createLogWithDuration(durationMs)]);
 
       let capturedDesc = '';
       mockQuickPickPick.mockImplementation((items: Array<{ desc: string }>) => {
@@ -387,8 +413,8 @@ describe('RetrieveLogFile', () => {
 
     it('should format undefined/falsy duration as "0 ms"', async () => {
       // Test with undefined cast to number (becomes NaN which is falsy)
-      mockPickOrReturn.mockResolvedValue('/test/workspace');
-      mockGetLogFiles.mockResolvedValue([
+      mockPickOrReturn.mockResolvedValue(mockWorkspace);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'test-log',
           LogUser: { Name: 'User' },
@@ -448,8 +474,8 @@ describe('RetrieveLogFile', () => {
         },
       ];
 
-      mockPickOrReturn.mockResolvedValue('/test/workspace');
-      mockGetLogFiles.mockResolvedValue(logs);
+      mockPickOrReturn.mockResolvedValue(mockWorkspace);
+      mockListLogs.mockResolvedValue(logs);
 
       // Capture the items passed to QuickPick
       let capturedItems: Array<{ logId: string }> = [];
@@ -472,8 +498,8 @@ describe('RetrieveLogFile', () => {
     });
 
     it('should format log item name as "User - Operation"', async () => {
-      mockPickOrReturn.mockResolvedValue('/test/workspace');
-      mockGetLogFiles.mockResolvedValue([
+      mockPickOrReturn.mockResolvedValue(mockWorkspace);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'log1',
           LogUser: { Name: 'John Doe' },
@@ -502,8 +528,8 @@ describe('RetrieveLogFile', () => {
     });
 
     it('should format log item description with size in KB and duration', async () => {
-      mockPickOrReturn.mockResolvedValue('/test/workspace');
-      mockGetLogFiles.mockResolvedValue([
+      mockPickOrReturn.mockResolvedValue(mockWorkspace);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'log1',
           LogUser: { Name: 'User' },
@@ -533,8 +559,8 @@ describe('RetrieveLogFile', () => {
     });
 
     it('should format log item detail with date, status, and ID', async () => {
-      mockPickOrReturn.mockResolvedValue('/test/workspace');
-      mockGetLogFiles.mockResolvedValue([
+      mockPickOrReturn.mockResolvedValue(mockWorkspace);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'ABC123XYZ',
           LogUser: { Name: 'User' },
@@ -564,8 +590,8 @@ describe('RetrieveLogFile', () => {
     });
 
     it('should return null when QuickPick returns empty array', async () => {
-      mockPickOrReturn.mockResolvedValue('/test/workspace');
-      mockGetLogFiles.mockResolvedValue([
+      mockPickOrReturn.mockResolvedValue(mockWorkspace);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'log1',
           LogUser: { Name: 'User' },
@@ -637,10 +663,15 @@ describe('RetrieveLogFile', () => {
     });
   });
 
-  describe('getLogFilePath', () => {
-    it('should construct path with .sfdx/tools/debug/logs directory', async () => {
-      mockPickOrReturn.mockResolvedValue('/my/project');
-      mockGetLogFiles.mockResolvedValue([
+  describe('getLogFileUri', () => {
+    it('should construct URI with .sfdx/tools/debug/logs directory', async () => {
+      const myWs = new VSWorkspace({
+        uri: Uri.parse('file:///my/project'),
+        name: 'my-project',
+        index: 0,
+      });
+      mockPickOrReturn.mockResolvedValue(myWs);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'test-log-123',
           LogUser: { Name: 'User' },
@@ -652,7 +683,7 @@ describe('RetrieveLogFile', () => {
         },
       ]);
       mockQuickPickPick.mockResolvedValue([{ logId: 'test-log-123' }]);
-      mockExistsSync.mockReturnValue(true);
+      mockFileOrFolderExists.mockResolvedValue(true);
       mockCreateView.mockResolvedValue({ panel: 'mock' });
 
       const mockContext = createMockContext();
@@ -661,16 +692,21 @@ describe('RetrieveLogFile', () => {
       const lastCall = mockRegisterCommand.mock.calls[mockRegisterCommand.mock.calls.length - 1];
       await lastCall[1]();
 
-      // Verify the path passed to createView
+      // Verify the URI passed to createView
       const createViewCall = mockCreateView.mock.calls[0];
-      const logFilePath = createViewCall[2];
+      const logUri = createViewCall[2];
 
-      expect(logFilePath).toBe('/my/project/.sfdx/tools/debug/logs/test-log-123.log');
+      expect(logUri.toString()).toContain('.sfdx/tools/debug/logs/test-log-123.log');
     });
 
     it('should append .log extension to fileId', async () => {
-      mockPickOrReturn.mockResolvedValue('/workspace');
-      mockGetLogFiles.mockResolvedValue([
+      const myWs = new VSWorkspace({
+        uri: Uri.parse('file:///workspace'),
+        name: 'workspace',
+        index: 0,
+      });
+      mockPickOrReturn.mockResolvedValue(myWs);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'myLogId',
           LogUser: { Name: 'User' },
@@ -682,7 +718,7 @@ describe('RetrieveLogFile', () => {
         },
       ]);
       mockQuickPickPick.mockResolvedValue([{ logId: 'myLogId' }]);
-      mockExistsSync.mockReturnValue(true);
+      mockFileOrFolderExists.mockResolvedValue(true);
       mockCreateView.mockResolvedValue({ panel: 'mock' });
 
       const mockContext = createMockContext();
@@ -692,16 +728,21 @@ describe('RetrieveLogFile', () => {
       await lastCall[1]();
 
       const createViewCall = mockCreateView.mock.calls[0];
-      const logFilePath = createViewCall[2];
+      const logUri = createViewCall[2];
 
-      expect(logFilePath).toContain('myLogId.log');
+      expect(logUri.toString()).toContain('myLogId.log');
     });
   });
 
   describe('writeLogFile', () => {
-    it('should call GetLogFile.apply when file does not exist', async () => {
-      mockPickOrReturn.mockResolvedValue('/test/ws');
-      mockGetLogFiles.mockResolvedValue([
+    it('should call getLogBody + writeFile when file does not exist', async () => {
+      const testWs = new VSWorkspace({
+        uri: Uri.parse('file:///test/ws'),
+        name: 'test-ws',
+        index: 0,
+      });
+      mockPickOrReturn.mockResolvedValue(testWs);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'download-me',
           LogUser: { Name: 'User' },
@@ -713,8 +754,9 @@ describe('RetrieveLogFile', () => {
         },
       ]);
       mockQuickPickPick.mockResolvedValue([{ logId: 'download-me' }]);
-      mockExistsSync.mockReturnValue(false);
-      mockGetLogFile.mockResolvedValue(undefined);
+      mockFileOrFolderExists.mockResolvedValue(false);
+      mockGetLogBody.mockResolvedValue('fetched body');
+      mockWriteFile.mockResolvedValue(undefined);
       mockCreateView.mockResolvedValue({ panel: 'mock' });
 
       const mockContext = createMockContext();
@@ -723,16 +765,18 @@ describe('RetrieveLogFile', () => {
       const lastCall = mockRegisterCommand.mock.calls[mockRegisterCommand.mock.calls.length - 1];
       await lastCall[1]();
 
-      expect(mockGetLogFile).toHaveBeenCalledWith(
-        '/test/ws',
-        '/test/ws/.sfdx/tools/debug/logs',
-        'download-me',
-      );
+      expect(mockGetLogBody).toHaveBeenCalledWith('download-me');
+      expect(mockWriteFile).toHaveBeenCalledWith(expect.anything(), 'fetched body');
     });
 
-    it('should NOT call GetLogFile.apply when file exists', async () => {
-      mockPickOrReturn.mockResolvedValue('/test/ws');
-      mockGetLogFiles.mockResolvedValue([
+    it('should NOT call getLogBody/writeFile when file exists', async () => {
+      const testWs = new VSWorkspace({
+        uri: Uri.parse('file:///test/ws'),
+        name: 'test-ws',
+        index: 0,
+      });
+      mockPickOrReturn.mockResolvedValue(testWs);
+      mockListLogs.mockResolvedValue([
         {
           Id: 'already-exists',
           LogUser: { Name: 'User' },
@@ -744,7 +788,7 @@ describe('RetrieveLogFile', () => {
         },
       ]);
       mockQuickPickPick.mockResolvedValue([{ logId: 'already-exists' }]);
-      mockExistsSync.mockReturnValue(true);
+      mockFileOrFolderExists.mockResolvedValue(true);
       mockCreateView.mockResolvedValue({ panel: 'mock' });
 
       const mockContext = createMockContext();
@@ -753,7 +797,8 @@ describe('RetrieveLogFile', () => {
       const lastCall = mockRegisterCommand.mock.calls[mockRegisterCommand.mock.calls.length - 1];
       await lastCall[1]();
 
-      expect(mockGetLogFile).not.toHaveBeenCalled();
+      expect(mockGetLogBody).not.toHaveBeenCalled();
+      expect(mockWriteFile).not.toHaveBeenCalled();
     });
   });
 });

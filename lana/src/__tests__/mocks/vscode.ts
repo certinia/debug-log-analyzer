@@ -89,34 +89,17 @@ export class Range {
   }
 }
 
-// Mock Uri class
+// Use the real vscode-uri URI class for compatibility with Utils.joinPath
+import { URI, Utils } from 'vscode-uri';
+
+// Mock Uri class - delegates to real vscode-uri URI
 export const Uri = {
-  file: jest.fn((path: string) => ({
-    scheme: 'file',
-    authority: '',
-    path,
-    fsPath: path,
-    query: '',
-    fragment: '',
-    with: jest.fn(),
-    toString: jest.fn(() => `file://${path}`),
-    toJSON: jest.fn(() => ({ scheme: 'file', path, fsPath: path })),
-  })),
-  parse: jest.fn((value: string) => ({
-    scheme: value.startsWith('file://') ? 'file' : 'unknown',
-    authority: '',
-    path: value.replace('file://', ''),
-    fsPath: value.replace('file://', ''),
-    query: '',
-    fragment: '',
-    with: jest.fn(),
-    toString: jest.fn(() => value),
-  })),
-  joinPath: jest.fn((base, ...pathSegments) => ({
-    ...base,
-    path: [base.path, ...pathSegments].join('/'),
-    fsPath: [base.fsPath, ...pathSegments].join('/'),
-  })),
+  file: (path: string) => URI.file(path),
+  parse: (value: string) => URI.parse(value),
+  joinPath: (base: URI, ...pathSegments: string[]) => {
+    // Use real Utils.joinPath for compatibility
+    return Utils.joinPath(base, ...pathSegments);
+  },
 };
 
 // Mock FoldingRange class

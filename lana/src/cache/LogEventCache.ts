@@ -1,12 +1,12 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { readFile } from 'fs/promises';
 import { workspace } from 'vscode';
 
 import { parse, type ApexLog, type LogEvent } from 'apex-log-parser';
 
 import type { Context } from '../Context.js';
+import { readFile } from '../services/salesforceServices.js';
 
 export interface EventSearchResult {
   event: LogEvent;
@@ -15,19 +15,19 @@ export interface EventSearchResult {
 
 export class LogEventCache {
   private static readonly MAX_CACHE_SIZE = 10;
-  private static cache = new Map<string, ApexLog>();
+  private static cache = new Map<string, ApexLog>(); // Key is URI.toString()
 
-  static async getApexLog(filePath: string): Promise<ApexLog | null> {
-    const cached = LogEventCache.cache.get(filePath);
+  static async getApexLog(uriString: string): Promise<ApexLog | null> {
+    const cached = LogEventCache.cache.get(uriString);
     if (cached) {
       // Move to end (most recently used)
-      LogEventCache.cache.delete(filePath);
-      LogEventCache.cache.set(filePath, cached);
+      LogEventCache.cache.delete(uriString);
+      LogEventCache.cache.set(uriString, cached);
       return cached;
     }
 
     try {
-      const content = await readFile(filePath, 'utf-8');
+      const content = await readFile(uriString);
       const apexLog = parse(content);
 
       // Evict oldest if at capacity
@@ -38,7 +38,7 @@ export class LogEventCache {
         }
       }
 
-      LogEventCache.cache.set(filePath, apexLog);
+      LogEventCache.cache.set(uriString, apexLog);
       return apexLog;
     } catch {
       return null;
@@ -49,15 +49,15 @@ export class LogEventCache {
     return LogEventCache.searchEvents(apexLog.children, timestamp, 0);
   }
 
-  static clearCache(filePath: string): void {
-    LogEventCache.cache.delete(filePath);
+  static clearCache(uriString: string): void {
+    LogEventCache.cache.delete(uriString);
   }
 
   static apply(context: Context): void {
     context.context.subscriptions.push(
       workspace.onDidCloseTextDocument((doc) => {
         if (doc.languageId === 'apexlog') {
-          LogEventCache.clearCache(doc.uri.fsPath);
+          LogEventCache.clearCache(doc.uri.toString());
         }
       }),
     );

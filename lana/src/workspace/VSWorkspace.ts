@@ -10,9 +10,16 @@ export class VSWorkspace {
     this.workspaceFolder = workspaceFolder;
   }
 
+  /** URI string (works on desktop file:// and web vscode-vfs://memfs:// schemes). */
+  get uri(): string {
+    return this.workspaceFolder.uri.toString();
+  }
+
+  /** @deprecated Use `uri` for web-safe code. Desktop-only fsPath. */
   path(): string {
     return this.workspaceFolder.uri.fsPath;
   }
+
   name(): string {
     return this.workspaceFolder.name;
   }

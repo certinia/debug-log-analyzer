@@ -36,6 +36,23 @@ export default defineConfig([
     external: ['vscode'],
   },
   {
+    input: { Main: './lana/src/Main.web.ts' },
+    output: {
+      format: 'esm',
+      dir: './lana/out/web',
+      // cleanDir omitted — desktop bundle already cleaned lana/out parent
+      chunkFileNames: 'lana-[name].js',
+      sourcemap: false,
+      keepNames: true,
+      minify: production,
+    },
+    tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
+    platform: 'browser',
+
+    external: ['vscode'],
+    plugins: [nodePolyfills()],
+  },
+  {
     input: { bundle: './log-viewer/src/Main.ts' },
     output: [
       {
