@@ -26,6 +26,11 @@ export class DatabaseAccess {
     return DatabaseAccess._instance;
   }
 
+  /** The parsed log root (for log-level metadata like governor limits/namespaces). */
+  public getApexLog(): ApexLog | null {
+    return DatabaseAccess._treeRoot ?? null;
+  }
+
   /** The parser event for an eventIndex, or null if unknown. */
   public getEventByIndex(eventIndex: number): LogEvent | null {
     return DatabaseAccess._treeRoot?.eventsById[eventIndex] ?? null;

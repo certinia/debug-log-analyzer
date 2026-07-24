@@ -340,6 +340,33 @@
             }
           }
         }
+      },
+      {
+        "type": "object",
+        "id": "lana",
+        "title": "Side Bar",
+        "order": 3,
+        "properties": {
+          "lana.sidePanel.position": {
+            "title": "Position",
+            "type": "string",
+            "default": "right",
+            "enum": [
+              "left",
+              "right",
+              "bottom"
+            ],
+            "markdownDescription": "Where the detail side bar docks. Default: `right`",
+            "order": 0
+          },
+          "lana.sidePanel.size": {
+            "title": "Size",
+            "type": "number",
+            "default": 500,
+            "markdownDescription": "The docked side bar's width (or height when docked to the bottom), in pixels. Default: `500`",
+            "order": 1
+          }
+        }
       }
     ]
   },

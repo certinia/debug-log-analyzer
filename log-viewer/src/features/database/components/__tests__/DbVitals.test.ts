@@ -54,18 +54,11 @@ describe('DbVitals field order', () => {
   it('orders SOQL vitals by usefulness with namespace elevated', async () => {
     const el = await mount(soqlIndex, 'soql');
     // No explain line at this log level, so the query-plan fields are omitted.
-    expect(labels(el)).toEqual([
-      'Rows',
-      'Time (ms)',
-      'Namespace',
-      'Selective',
-      'Aggregations',
-      'Line',
-    ]);
+    expect(labels(el)).toEqual(['Rows', 'Time', 'Namespace', 'Selective', 'Aggregations', 'Line']);
   });
 
   it('orders DML vitals by usefulness', async () => {
     const el = await mount(dmlIndex, 'dml');
-    expect(labels(el)).toEqual(['Rows', 'Time (ms)', 'Namespace', 'Caller namespace', 'Line']);
+    expect(labels(el)).toEqual(['Rows', 'Time', 'Namespace', 'Caller namespace', 'Line']);
   });
 });

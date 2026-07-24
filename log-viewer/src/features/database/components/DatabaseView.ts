@@ -28,6 +28,7 @@ import { buildDatabaseSections, type DetailSelection } from './databaseSections.
 import type { SOQLView } from './SOQLView.js';
 
 // web components
+import '#vscode-elements/vscode-icon.js';
 import '../../../components/DockLayout.js';
 import './DMLView.js';
 import './DatabaseSection.js';
@@ -81,7 +82,10 @@ export class DatabaseView extends LitElement {
   @state()
   panelVisible = false;
   @state()
-  panelSize = 300;
+  panelSize = 500;
+  // The panel auto-opens only on the first row selection; after that the user
+  // controls it with the toggle (a closed panel stays closed).
+  private _hasAutoOpened = false;
 
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
@@ -101,7 +105,7 @@ export class DatabaseView extends LitElement {
 
     getSettings()
       .then((settings) => {
-        const panel = settings?.database?.detailPanel;
+        const panel = settings?.sidePanel;
         if (panel) {
           this.dock = panel.position;
           this.panelSize = panel.size;
@@ -176,6 +180,18 @@ export class DatabaseView extends LitElement {
         box-sizing: border-box;
       }
 
+      .db-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        flex: 0 0 auto;
+      }
+      .db-toolbar vscode-icon {
+        color: var(--vscode-icon-foreground);
+      }
+      .db-toolbar vscode-icon:hover {
+        background-color: var(--vscode-toolbar-hoverBackground);
+      }
+
       governor-summary {
         border-bottom: 1px solid var(--vscode-panel-border);
       }
@@ -227,6 +243,15 @@ export class DatabaseView extends LitElement {
         @dock-collapse=${this._hidePanel}
       >
         <div class="db-grids" slot="main">
+          <div class="db-toolbar">
+            <vscode-icon
+              action-icon
+              name="layout"
+              label="Toggle details panel"
+              title="Toggle details panel"
+              @click=${this._togglePanel}
+            ></vscode-icon>
+          </div>
           <governor-summary .metrics="${this._stripMetrics()}"></governor-summary>
           ${this._renderSection('dml')} ${this._renderSection('soql')}
           ${this._renderSection('sosl')}
@@ -241,7 +266,12 @@ export class DatabaseView extends LitElement {
 
   private async _select(selection: DetailSelection) {
     this.selection = selection;
-    this.panelVisible = true;
+    // Open on the first selection only; afterwards selecting just refreshes the
+    // content, so a panel the user has closed stays closed.
+    if (!this._hasAutoOpened) {
+      this._hasAutoOpened = true;
+      this.panelVisible = true;
+    }
     // Only one statement is "selected" across both grids at a time.
     const other = selection.type === 'dml' ? this._soqlView : this._dmlView;
     other?.deselectRows();
@@ -262,12 +292,14 @@ export class DatabaseView extends LitElement {
 
   private _onDockPositionChange = (e: CustomEvent<{ position: DockPosition }>) => {
     this.dock = e.detail.position;
-    updateSetting('database.detailPanel.position', this.dock);
+    updateSetting('sidePanel.position', this.dock);
   };
 
+  // `dock-resize` fires once on pointer-up (not during the drag), so this write
+  // already lands on interaction-end — no debounce needed.
   private _onDockResize = (e: CustomEvent<{ size: number }>) => {
     this.panelSize = e.detail.size;
-    updateSetting('database.detailPanel.size', this.panelSize);
+    updateSetting('sidePanel.size', this.panelSize);
   };
 
   private _hidePanel = () => {

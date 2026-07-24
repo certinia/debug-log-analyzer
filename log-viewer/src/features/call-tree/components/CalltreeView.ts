@@ -37,6 +37,8 @@ import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/GridSkeleton.js';
+import '../../../components/ViewModeSwitch.js';
+import type { ViewModeOption } from '../../../components/ViewModeSwitch.js';
 import '../../../components/datagrid-filter-bar.js';
 
 // Table creation functions
@@ -54,6 +56,12 @@ import {
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
 type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
+
+const CALL_TREE_VIEW_MODES: ViewModeOption[] = [
+  { value: 'time-order', label: 'Time Order' },
+  { value: 'aggregated', label: 'Aggregated' },
+  { value: 'bottom-up', label: 'Bottom-Up' },
+];
 
 /** The Name column is always shown in the call-tree tables. */
 const ALWAYS_VISIBLE = ['text'];
@@ -209,34 +217,6 @@ export class CalltreeView extends LitElement {
         align-items: flex-end;
       }
 
-      .view-mode-buttons {
-        display: flex;
-        gap: 0;
-      }
-
-      .view-mode-buttons vscode-button {
-        height: 26px;
-      }
-
-      .view-mode-buttons vscode-button::part(base) {
-        padding: 0 8px;
-      }
-
-      .view-mode-buttons vscode-button:first-child {
-        --vsc-border-left-radius: 2px;
-        --vsc-border-right-radius: 0;
-      }
-
-      .view-mode-buttons vscode-button:not(:first-child):not(:last-child) {
-        --vsc-border-left-radius: 0;
-        --vsc-border-right-radius: 0;
-      }
-
-      .view-mode-buttons vscode-button:last-child {
-        --vsc-border-left-radius: 0;
-        --vsc-border-right-radius: 2px;
-      }
-
       #call-tree-table,
       #aggregated-tree-table,
       #bottom-up-tree-table {
@@ -269,23 +249,14 @@ export class CalltreeView extends LitElement {
       <div id="call-tree-container">
         <div>
           <datagrid-filter-bar>
-            <div slot="global" class="view-mode-buttons" role="radiogroup" aria-label="View mode">
-              <vscode-button
-                ?secondary="${this.viewMode !== 'time-order'}"
-                @click="${() => this._setViewMode('time-order')}"
-                >Time Order</vscode-button
-              >
-              <vscode-button
-                ?secondary="${this.viewMode !== 'aggregated'}"
-                @click="${() => this._setViewMode('aggregated')}"
-                >Aggregated</vscode-button
-              >
-              <vscode-button
-                ?secondary="${this.viewMode !== 'bottom-up'}"
-                @click="${() => this._setViewMode('bottom-up')}"
-                >Bottom-Up</vscode-button
-              >
-            </div>
+            <view-mode-switch
+              slot="global"
+              aria-label="View mode"
+              .options=${CALL_TREE_VIEW_MODES}
+              value=${this.viewMode}
+              @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
+                this._setViewMode(e.detail.value as ViewMode)}
+            ></view-mode-switch>
 
             <div slot="table-actions" class="filter-container">
               <vscode-button secondary @click="${this._expandButtonClick}">Expand</vscode-button>

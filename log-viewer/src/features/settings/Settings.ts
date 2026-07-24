@@ -38,10 +38,11 @@ export type LanaSettings = {
     soql: { columnView: string; columnOverrides: Record<string, string[]> };
     dml: { columnView: string; columnOverrides: Record<string, string[]> };
     sosl: { columnView: string; columnOverrides: Record<string, string[]> };
-    detailPanel: {
-      position: 'left' | 'right' | 'bottom';
-      size: number;
-    };
+  };
+  // App-wide detail side bar (currently only the Database view feeds it).
+  sidePanel: {
+    position: 'left' | 'right' | 'bottom';
+    size: number;
   };
 };
 

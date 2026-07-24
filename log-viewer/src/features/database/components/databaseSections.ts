@@ -8,6 +8,7 @@ import { computeSoqlIssues } from '../../soql/components/SOQLLinterIssues.js';
 
 // web components
 import '../../../components/CallStackDetail.js';
+import '../../../components/CallTreeDetail.js';
 import '../../soql/components/SOQLLinterIssues.js';
 import './DbVitals.js';
 
@@ -34,6 +35,11 @@ export async function buildDatabaseSections(selection: DetailSelection): Promise
       id: 'callstack',
       title: 'Call stack',
       content: html`<call-stack-detail eventIndex=${eventIndex}></call-stack-detail>`,
+    },
+    {
+      id: 'calltree',
+      title: 'Call tree',
+      content: html`<call-tree-detail eventIndex=${eventIndex}></call-tree-detail>`,
     },
   ];
 
