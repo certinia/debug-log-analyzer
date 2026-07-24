@@ -3,7 +3,7 @@
  */
 
 /**
- * How many leading chips fit in `avail` px, given their measured `widths` and the `gap`
+ * How many leading items fit in `avail` px, given their measured `widths` and the `gap`
  * between them. If they don't all fit, `reserve` px are held back for the overflow
  * control before counting. Pure (no DOM) so it can be unit-tested.
  */

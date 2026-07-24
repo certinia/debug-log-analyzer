@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { computeVisibleCount } from '../logLevelsOverflow.js';
+import { computeVisibleCount } from '../overflowFit.js';
 
 describe('computeVisibleCount', () => {
   const widths = [50, 50, 50]; // gap 10 → cumulative right edges: 50, 110, 170
