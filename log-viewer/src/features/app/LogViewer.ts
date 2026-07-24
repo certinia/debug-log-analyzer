@@ -70,6 +70,11 @@ export class LogViewer extends LitElement {
         display: flex;
         flex-direction: column;
         height: 100%;
+        min-width: 0;
+        /* keep the layout bounded to the viewport so header children (e.g. the
+           log-levels row) can detect overflow rather than widening the page.
+           clip (not hidden) avoids forcing overflow-y to auto. */
+        overflow-x: clip;
         padding: 0px 8px 0px 8px;
       }
 

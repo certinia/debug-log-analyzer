@@ -71,6 +71,12 @@ export class NavBar extends LitElement {
         flex: 1 1 auto;
       }
 
+      /* Cancel log-title's inner 6px so its text sits on the shared header left guide
+         (the hover background keeps its padding). */
+      .navbar--left > log-title {
+        margin-left: -6px;
+      }
+
       .navbar--left-meta {
         display: flex;
         align-items: center;
@@ -83,7 +89,6 @@ export class NavBar extends LitElement {
         display: flex;
         align-items: center;
         gap: 4px;
-        padding-right: 4px;
         flex: 0 0 auto;
       }
     `,
