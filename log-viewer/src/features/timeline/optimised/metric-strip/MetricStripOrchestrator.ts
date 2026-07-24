@@ -28,6 +28,7 @@ import type {
   ViewportState,
 } from '../../types/flamechart.types.js';
 import { MeshAxisRenderer } from '../time-axis/MeshAxisRenderer.js';
+import { wheelZoomFactor } from '../ViewportUtils.js';
 import { MetricStripRenderer } from './MetricStripRenderer.js';
 import { MetricStripTooltipRenderer } from './MetricStripTooltipRenderer.js';
 import { MetricTierClassifier } from './MetricTierClassifier.js';
@@ -604,13 +605,9 @@ export class MetricStripOrchestrator {
       return;
     }
 
-    // Vertical scroll → zoom at cursor position
-    // Normalize wheel delta (match TimelineInteractionHandler behavior)
-    let normalizedDelta = -event.deltaY;
-    if (event.deltaMode === 1) {
-      normalizedDelta *= 15; // Lines mode
-    }
-    const zoomFactor = 1 + normalizedDelta * 0.001;
+    // Vertical scroll → zoom at cursor position (shared with the main flame
+    // chart and minimap wheel handlers for consistent feel).
+    const zoomFactor = wheelZoomFactor(event.deltaY, event.deltaMode);
     const timeNs = this.screenXToTime(event.offsetX);
     if (timeNs !== null) {
       this.callbacks.onZoom?.(zoomFactor, timeNs);
