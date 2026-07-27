@@ -29,7 +29,7 @@ Each column can be sorted by clicking the column header, this will sort the rows
 
 ### Filtering
 
-1. Show Log events for specific namespaces using the namespace column filter
+1. **Details** – events with 0 time are hidden by default; toggle to show them from the **filters** .
 
 ### Column Views
 
