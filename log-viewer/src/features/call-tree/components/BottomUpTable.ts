@@ -6,8 +6,6 @@ import { Tabulator, type Options } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
-import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
-import MinMaxFilter from '../../../tabulator/filters/MinMax.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
@@ -186,14 +184,6 @@ export function createBottomUpTable(
         sorter: 'string',
         width: 100,
         minWidth: 80,
-        headerFilter: 'list',
-        headerFilterFunc: 'in',
-        headerFilterParams: {
-          values: rootMethod.namespaces,
-          clearable: true,
-          multiselect: true,
-        },
-        headerFilterLiveFilter: false,
       },
       {
         title: 'Caller Namespace',
@@ -240,9 +230,6 @@ export function createBottomUpTable(
         bottomCalcFormatter: progressFormatterMS,
         bottomCalc: totalTimeBottomCalc,
         bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        headerFilter: MinMaxEditor,
-        headerFilterFunc: MinMaxFilter,
-        headerFilterLiveFilter: false,
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
       {
@@ -262,9 +249,6 @@ export function createBottomUpTable(
         bottomCalcFormatter: progressFormatterMS,
         bottomCalc: 'sum',
         bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        headerFilter: MinMaxEditor,
-        headerFilterFunc: MinMaxFilter,
-        headerFilterLiveFilter: false,
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
       {

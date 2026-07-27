@@ -2,7 +2,6 @@
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
 import '#vscode-elements/vscode-button.js';
-import '#vscode-elements/vscode-checkbox.js';
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
@@ -41,8 +40,8 @@ import { globalStyles } from '../../../styles/global.styles.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
 // Components
-import '../../../components/GridSkeleton.js';
 import '../../../components/datagrid-filter-bar.js';
+import '../../../components/GridSkeleton.js';
 
 /** The Name column is always shown in the analysis table. */
 const ALWAYS_VISIBLE = ['text'];
@@ -91,6 +90,15 @@ export class AnalysisView extends LitElement {
         display: flex;
         gap: 4px;
         align-items: flex-end;
+      }
+
+      .filter-container vscode-button {
+        height: var(--filter-control-height);
+      }
+
+      .filter-container vscode-button::part(base) {
+        padding: var(--filter-control-padding);
+        font-size: var(--filter-control-font-size);
       }
     `,
     categoryColoringStyles,
@@ -188,6 +196,7 @@ export class AnalysisView extends LitElement {
             >
 
             <vs-select
+              dense
               id="column-view"
               prefix="Columns"
               label="Column view"
@@ -208,10 +217,18 @@ export class AnalysisView extends LitElement {
           </div>
 
           <div slot="filters" class="filter-container">
-            <vscode-checkbox @change="${this._handleShowDetailsChange}">Details</vscode-checkbox>
+            <button
+              type="button"
+              class="filter-control pill-toggle"
+              aria-pressed="${this.filterState.showDetails}"
+              @click="${this._handleShowDetailsChange}"
+            >
+              Details
+            </button>
           </div>
 
           <vs-select
+            dense
             slot="group"
             id="groupby-dropdown"
             prefix="Group"
@@ -396,9 +413,9 @@ export class AnalysisView extends LitElement {
     }
   }
 
-  _handleShowDetailsChange(event: Event) {
-    const target = event.target as HTMLInputElement;
-    this.filterState.showDetails = target.checked;
+  _handleShowDetailsChange() {
+    this.filterState.showDetails = !this.filterState.showDetails;
+    this.requestUpdate();
     this._updateFiltering();
   }
 
@@ -499,7 +516,6 @@ export class AnalysisView extends LitElement {
       this._tableWrapper,
       rootMethod,
       {
-        namespaceFilter: () => true,
         showDetailsFilter: this._showDetailsFilter,
         onFilterCacheClear: () => {
           if (!this.blockClearHighlights && this.totalMatches > 0) {

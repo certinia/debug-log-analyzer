@@ -6,8 +6,6 @@ import { Tabulator } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
-import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
-import { minMaxTreeFilter } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { toAggregatedCallTree, type AggregatedRow } from '../utils/Aggregation.js';
@@ -31,10 +29,6 @@ export function createAggregatedTable(
   callbacks: AggregatedTableCallbacks,
 ): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
-
-  const namespaceFilterCache = new Map<number, boolean>();
-  const totalTimeFilterCache = new Map<number, boolean>();
-  const selfTimeFilterCache = new Map<number, boolean>();
 
   let childIndent: number | undefined;
 
@@ -124,15 +118,6 @@ export function createAggregatedTable(
         sorter: 'string',
         width: 100,
         minWidth: 80,
-        headerFilter: 'list',
-        headerFilterFunc: callbacks.namespaceFilter,
-        headerFilterFuncParams: { filterCache: namespaceFilterCache },
-        headerFilterParams: {
-          values: rootMethod.namespaces,
-          clearable: true,
-          multiselect: true,
-        },
-        headerFilterLiveFilter: false,
       },
       {
         title: 'Caller Namespace',
@@ -171,10 +156,6 @@ export function createAggregatedTable(
         bottomCalcFormatter: progressFormatterMS,
         bottomCalc: 'sum',
         bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        headerFilter: MinMaxEditor,
-        headerFilterFunc: minMaxTreeFilter,
-        headerFilterFuncParams: { columnName: 'totalTime', filterCache: totalTimeFilterCache },
-        headerFilterLiveFilter: false,
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
       {
@@ -194,10 +175,6 @@ export function createAggregatedTable(
         bottomCalcFormatter: progressFormatterMS,
         bottomCalc: selfTimeBottomCalc,
         bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        headerFilter: MinMaxEditor,
-        headerFilterFunc: minMaxTreeFilter,
-        headerFilterFuncParams: { columnName: 'totalSelfTime', filterCache: selfTimeFilterCache },
-        headerFilterLiveFilter: false,
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
       {
@@ -217,18 +194,15 @@ export function createAggregatedTable(
   });
   tableRef.current = table;
 
-  // Filter caches are cleared once per render via `renderStarted`. Row ids
-  // produced by `toAggregatedCallTree` are globally unique within a build
-  // (per-build monotonic counter), so cached `deepFilter` results stay valid
-  // across the cascaded `filter.filter()` passes Tabulator runs for each
-  // expanded subtree — `getChildren` → `filter.filter(config.children)`
-  // would otherwise fire `dataFiltered` multiple times per user action,
-  // defeating the cache. If row ids ever lose their uniqueness guarantee
-  // this must move back to `dataFiltered`.
+  // The host's filter caches (search/type/debug/namespace/duration) are cleared once per
+  // render via `renderStarted` — see CalltreeView's `onFilterCacheClear`. Row ids produced
+  // by `toAggregatedCallTree` are globally unique within a build (per-build monotonic
+  // counter), so cached `deepFilter` results stay valid across the cascaded
+  // `filter.filter()` passes Tabulator runs for each expanded subtree —
+  // `getChildren` → `filter.filter(config.children)` would otherwise fire `dataFiltered`
+  // multiple times per user action, defeating the cache. If row ids ever lose their
+  // uniqueness guarantee this must move back to `dataFiltered`.
   table.on('renderStarted', () => {
-    namespaceFilterCache.clear();
-    totalTimeFilterCache.clear();
-    selfTimeFilterCache.clear();
     callbacks.onFilterCacheClear?.();
     callbacks.onRenderStarted();
   });
