@@ -66,10 +66,13 @@ $codicon-chevron-down: '\eab4';
         footerActiveColor: #d00
       )
   );
-  @include meta.load-css('../editors/MinMax.css');
   @include meta.load-css('../format/Progress.css');
 
   .tabulator {
+    .tabulator-header {
+      border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-editorGroup-border));
+    }
+
     .tabulator-tableholder {
       overflow-x: auto;
       overflow-anchor: none;
@@ -91,24 +94,6 @@ $codicon-chevron-down: '\eab4';
     // .tabulator-header .tabulator-col.tabulator-frozen.tabulator-col-sorter-element:hover {
     //   background-color: var(--vscode-editor-background);
     // }
-
-    .tabulator-header-filter {
-      input[type='search'] {
-        color: var(--vscode-editor-foreground);
-        background-color: var(--vscode-dropdown-background, default);
-        border: 1px solid var(--vscode-dropdown-border, transparent);
-        width: 50%;
-        box-sizing: border-box;
-        position: relative;
-        padding: 2px 4px;
-        box-sizing: border-box;
-        border-radius: 2px;
-        appearance: textfield !important;
-      }
-      input[type='search']:focus {
-        outline: var(--vscode-focusBorder, default) solid 1px;
-      }
-    }
 
     .tabulator-row {
       &.tabulator-group {

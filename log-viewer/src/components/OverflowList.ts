@@ -48,11 +48,17 @@ export class OverflowList extends LitElement {
   @property({ attribute: 'min-visible', type: Number })
   minVisible = 0;
 
+  /** Codicon shown on the toggle. Default chevron (rotates on open); e.g. `filter`
+   *  for a filters overflow — a non-chevron icon does not rotate. */
+  @property({ attribute: 'icon' })
+  icon = 'chevron-down';
+
   /** How many items fit inline; the rest are moved into the popover menu. */
   @state()
   private visibleCount = Number.POSITIVE_INFINITY;
 
   private resizeObserver?: ResizeObserver;
+  private childResizeObserver?: ResizeObserver;
   private mutationObserver?: MutationObserver;
   private lastWidth = -1;
   /** Per-item widths (px), measured once with all items inline; drives sync overflow. */
@@ -129,8 +135,9 @@ export class OverflowList extends LitElement {
         transition: transform 120ms ease;
       }
 
-      /* Native popover drives open/close; :has() flips the chevron while it's shown. */
-      .container:has([popover]:popover-open) .overflow__chevron {
+      /* Native popover drives open/close; :has() flips the chevron while it's shown.
+         Only the default chevron rotates — a filter/other icon stays put. */
+      .container:has([popover]:popover-open) .overflow__chevron--rotate {
         transform: rotate(180deg);
       }
 
@@ -145,6 +152,12 @@ export class OverflowList extends LitElement {
       .panel {
         position: fixed;
         position-anchor: --overflow-list-toggle;
+        /* Flip above / to the other side when the default placement would run
+           off-screen, so the whole menu stays visible near an edge. */
+        position-try-fallbacks:
+          flip-block,
+          flip-inline,
+          flip-block flip-inline;
         inset: auto;
         margin: 6px 0 0 0;
         min-width: 200px;
@@ -204,18 +217,49 @@ export class OverflowList extends LitElement {
       }
     });
     this.resizeObserver.observe(this);
+    // A child can change its own width without any host resize or childList change
+    // (e.g. a filter pill's label ↔ "label: min–max" summary, inside its shadow DOM).
+    // Re-measure when an INLINE child's width diverges from the cached value. Items in
+    // the overflow slot are skipped so slot reassignment can't feed back into a loop.
+    this.childResizeObserver = new ResizeObserver(() => {
+      if (!this.itemWidths) {
+        return;
+      }
+      const children = [...this.children] as HTMLElement[];
+      const stale = children.some(
+        (el, i) =>
+          el.getAttribute('slot') !== 'overflow' &&
+          this.itemWidths !== null &&
+          el.offsetWidth !== this.itemWidths[i],
+      );
+      if (stale) {
+        this._resetMeasurement();
+        this.requestUpdate();
+      }
+    });
     // Items are light-DOM children, not a reactive property, so watch for set changes here.
     this.mutationObserver = new MutationObserver(() => {
+      this._observeChildren();
       this._resetMeasurement();
       this.requestUpdate();
     });
     this.mutationObserver.observe(this, { childList: true });
+    this._observeChildren();
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this.resizeObserver?.disconnect();
+    this.childResizeObserver?.disconnect();
     this.mutationObserver?.disconnect();
+  }
+
+  /** (Re)point the per-child ResizeObserver at the current child set. */
+  private _observeChildren(): void {
+    this.childResizeObserver?.disconnect();
+    for (const child of this.children) {
+      this.childResizeObserver?.observe(child);
+    }
   }
 
   /** Drop cached widths and show every item, so the next render can re-measure them. */
@@ -250,10 +294,17 @@ export class OverflowList extends LitElement {
     for (const child of children) {
       child.removeAttribute('slot');
     }
+    // Hidden (e.g. mounted in an inactive tab panel): every offsetWidth is 0,
+    // which would cache as "everything fits" and never collapse. Defer without
+    // caching — the ResizeObserver fires on reveal (0 → width) and re-measures.
+    const avail = items.clientWidth;
+    if (avail === 0) {
+      return;
+    }
     // Custom elements upgrade synchronously (defined before use), so offsetWidth is accurate.
     this.itemWidths = children.map((el) => el.offsetWidth);
-    this.lastWidth = items.clientWidth;
-    this._recompute(this.lastWidth);
+    this.lastWidth = avail;
+    this._recompute(avail);
   }
 
   /** Set `visibleCount` from cached widths + `collapse-from`/`min-visible`, then re-slot. */
@@ -299,7 +350,11 @@ export class OverflowList extends LitElement {
       title="Show ${hiddenCount} more"
     >
       <span class="overflow__count">+${hiddenCount}</span>
-      <vscode-icon name="chevron-down" class="overflow__chevron" size="14"></vscode-icon>
+      <vscode-icon
+        name=${this.icon}
+        class="overflow__chevron ${this.icon === 'chevron-down' ? 'overflow__chevron--rotate' : ''}"
+        size="14"
+      ></vscode-icon>
     </button>`;
     // Toggle pins to the collapse end, with the divider always adjacent to the items.
     const toggle =

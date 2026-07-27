@@ -72,12 +72,11 @@ Heap is a tricky governor limit, since memory gets freed as well as allocated an
 
 ### Filtering
 
-1. Details (events with 0 time) are hidden by default but can be shown/ hidden.
-1. Show only debug statements using the Debug Only filter.
-1. Show Log events for specific namespaces using the namespace column filter
-1. Min and Max filtering can be done on the _Total Time_ and _Self Time_ columns.
-
-Debug Only and Type filtering are available in **Time Order** and **Aggregated**. The Details filter is available in all three views. The **Bottom-Up** view has its own grouping controls (None, Namespace, Caller Namespace, Type).
+1. **Details** – events with 0 time are hidden by default; toggle to show them (all views).
+1. **Debug Only** – show only debug statements (**Time Order** and **Aggregated**).
+1. **Type** – keep a single event type (**Time Order** and **Aggregated**).
+1. **Namespace** – keep one or more namespaces from the dropdown.
+1. **Total Time** / **Self Time** – set a _min–max_ range.
 
 ### SOQL Formatting
 

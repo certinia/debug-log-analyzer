@@ -25,8 +25,9 @@ import {
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
-import Number from '../../../tabulator/format/Number.js';
+import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
+import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
@@ -35,6 +36,7 @@ import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
+import { commonColumnDefaults, headerSortElement } from '../../call-tree/components/TableShared.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -44,7 +46,10 @@ import databaseViewStyles from './DatabaseView.scss';
 import '../../../components/CallStack.js';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
+import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
+import '../../../components/datagrid-range-filter.js';
+import '../../../components/OverflowList.js';
 
 /** The DML column is always shown in the DML table. */
 const ALWAYS_VISIBLE = ['dml'];
@@ -91,6 +96,15 @@ export class DMLView extends LitElement {
   @state()
   private columnOverrides: Record<string, string[]> = {};
   private contextMenu: ContextMenu | null = null;
+
+  @state()
+  private callerNamespaces: string[] = [];
+  @state()
+  private objects: string[] = [];
+  private callerNamespaceSelected: string[] = [];
+  private objectSelected: string[] = [];
+  private rowCountRange: FilterRange = { start: null, end: null };
+  private timeTakenRange: FilterRange = { start: null, end: null };
 
   constructor() {
     super();
@@ -158,7 +172,30 @@ export class DMLView extends LitElement {
 
     return html`
       <datagrid-filter-bar>
+        <overflow-list slot="filters" menu-heading="Filters" icon="filter">
+          <datagrid-facet-filter
+            label="Caller Namespace"
+            .values="${this.callerNamespaces}"
+            @datagrid-facet-change="${this._handleCallerNamespaceFacet}"
+          ></datagrid-facet-filter>
+          <datagrid-facet-filter
+            label="Object"
+            .values="${this.objects}"
+            @datagrid-facet-change="${this._handleObjectFacet}"
+          ></datagrid-facet-filter>
+          <datagrid-range-filter
+            label="Row Count"
+            @datagrid-range-change="${this._handleRowCountRange}"
+          ></datagrid-range-filter>
+          <datagrid-range-filter
+            label="Time Taken"
+            unit="ms"
+            @datagrid-range-change="${this._handleTimeTakenRange}"
+          ></datagrid-range-filter>
+        </overflow-list>
+
         <vs-select
+          dense
           slot="table-actions"
           id="dml-column-view"
           prefix="Columns"
@@ -177,6 +214,7 @@ export class DMLView extends LitElement {
         </vs-select>
 
         <vs-select
+          dense
           slot="group"
           id="dml-groupby-dropdown"
           prefix="Group"
@@ -336,6 +374,42 @@ export class DMLView extends LitElement {
     updateSetting('database.dml.columnOverrides', this.columnOverrides);
   }
 
+  private _handleCallerNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
+    this.callerNamespaceSelected = event.detail.selected;
+    this.dmlTable?.refreshFilter();
+  }
+
+  private _handleObjectFacet(event: CustomEvent<{ selected: string[] }>) {
+    this.objectSelected = event.detail.selected;
+    this.dmlTable?.refreshFilter();
+  }
+
+  private _handleRowCountRange(event: CustomEvent<{ range: FilterRange }>) {
+    this.rowCountRange = event.detail.range;
+    this.dmlTable?.refreshFilter();
+  }
+
+  private _handleTimeTakenRange(event: CustomEvent<{ range: FilterRange }>) {
+    this.timeTakenRange = event.detail.range;
+    this.dmlTable?.refreshFilter();
+  }
+
+  private _callerNamespaceFilter = (data: DMLRow): boolean =>
+    !!data.isDetail ||
+    this.callerNamespaceSelected.length === 0 ||
+    this.callerNamespaceSelected.includes(data.callerNamespace ?? '');
+
+  private _objectFilter = (data: DMLRow): boolean =>
+    !!data.isDetail ||
+    this.objectSelected.length === 0 ||
+    this.objectSelected.includes(data.objectType ?? '');
+
+  private _rowCountFilter = (data: DMLRow): boolean =>
+    !!data.isDetail || inCountRange(this.rowCountRange, data.rowCount ?? 0);
+
+  private _timeTakenFilter = (data: DMLRow): boolean =>
+    !!data.isDetail || inMsRange(this.timeTakenRange, data.timeTaken ?? 0);
+
   _copyToClipboard() {
     this.dmlTable?.copyToClipboard('all');
   }
@@ -438,7 +512,6 @@ export class DMLView extends LitElement {
 
   _renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
     const dmlData: DMLRow[] = [];
-    const dmlRowLimit = this.timelineRoot?.governorLimits.dmlRows.limit ?? 0;
     let nextRowId = 0;
     if (dmlLines) {
       for (const dml of dmlLines) {
@@ -461,6 +534,17 @@ export class DMLView extends LitElement {
         });
       }
     }
+
+    // Bars fill relative to this grid's own totals (the Total row's sum), not a governor limit.
+    const dmlRowCountTotal = dmlData.reduce((sum, row) => sum + (row.rowCount ?? 0), 0);
+    const dmlTimeTakenTotal = dmlData.reduce((sum, row) => sum + (row.timeTaken ?? 0), 0);
+
+    this.callerNamespaces = [
+      ...new Set(dmlData.map((row) => row.callerNamespace).filter((v): v is string => !!v)),
+    ].sort();
+    this.objects = [
+      ...new Set(dmlData.map((row) => row.objectType).filter((v): v is string => !!v)),
+    ].sort();
 
     this.dmlTable = new Tabulator(dmlTableContainer, {
       index: 'id',
@@ -495,28 +579,14 @@ export class DMLView extends LitElement {
       dataTree: true,
       dataTreeBranchElement: false,
       dataTreeStartExpanded: false,
-      columnDefaults: {
-        title: 'default',
-        resizable: true,
-        headerSortStartingDir: 'desc',
-        headerTooltip: true,
-        headerWordWrap: true,
-      },
-      headerSortElement: function (_column, dir) {
-        switch (dir) {
-          case 'asc':
-            return "<div class='sort-by--top'></div>";
-          case 'desc':
-            return "<div class='sort-by--bottom'></div>";
-          default:
-            return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
-        }
-      },
+      columnDefaults: commonColumnDefaults,
+      headerSortElement,
       columns: [
         {
           title: 'DML',
           field: 'dml',
           sorter: 'string',
+          widthGrow: 5,
           bottomCalc: () => {
             return 'Total';
           },
@@ -536,37 +606,21 @@ export class DMLView extends LitElement {
           title: 'Caller Namespace',
           field: 'callerNamespace',
           sorter: 'string',
-          width: 120,
-          headerFilter: 'list',
-          headerFilterFunc: 'in',
-          headerFilterParams: {
-            valuesLookup: 'all',
-            clearable: true,
-            multiselect: true,
-          },
-          headerFilterLiveFilter: false,
+          width: 100,
         },
         {
           title: 'Object',
           field: 'objectType',
           sorter: 'string',
-          width: 150,
+          width: 110,
           visible: false,
-          headerFilter: 'list',
-          headerFilterFunc: 'in',
-          headerFilterParams: {
-            valuesLookup: 'all',
-            clearable: true,
-            multiselect: true,
-          },
-          headerFilterLiveFilter: false,
           formatter: (cell) => (cell.getValue() as string | null) ?? '—',
         },
         {
           title: 'Namespace',
           field: 'namespace',
           sorter: 'string',
-          width: 120,
+          width: 100,
           visible: false,
         },
         {
@@ -578,15 +632,20 @@ export class DMLView extends LitElement {
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatter,
-          formatterParams: { precision: 0, totalValue: dmlRowLimit, showPercentageText: false },
+          formatterParams: {
+            precision: 0,
+            totalValue: dmlRowCountTotal,
+            showPercentageText: false,
+          },
           bottomCalc: 'sum',
           bottomCalcFormatter: progressFormatter,
           bottomCalcFormatterParams: {
             precision: 0,
-            totalValue: dmlRowLimit,
+            totalValue: dmlRowCountTotal,
             showPercentageText: false,
           },
-          tooltip: (_e, cell) => cell.getValue() + (dmlRowLimit > 0 ? '/' + dmlRowLimit : ''),
+          tooltip: (_e, cell) =>
+            cell.getValue() + (dmlRowCountTotal > 0 ? '/' + dmlRowCountTotal : ''),
         },
         {
           title: 'Time Taken (ms)',
@@ -596,15 +655,20 @@ export class DMLView extends LitElement {
           width: 110,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          formatter: Number,
+          formatter: progressFormatterMS,
           formatterParams: {
-            thousand: false,
             precision: 2,
+            totalValue: dmlTimeTakenTotal,
+            showPercentageText: false,
           },
           accessorDownload: NumberAccessor,
-          bottomCalcFormatter: Number,
           bottomCalc: 'sum',
-          bottomCalcFormatterParams: { precision: 2 },
+          bottomCalcFormatter: progressFormatterMS,
+          bottomCalcFormatterParams: {
+            precision: 2,
+            totalValue: dmlTimeTakenTotal,
+            showPercentageText: false,
+          },
         },
       ],
       rowFormatter: (row) => {
@@ -657,6 +721,10 @@ export class DMLView extends LitElement {
       this.dmlTable?.setSortedGroupBy('dml');
       if (this.dmlTable) {
         this._initTableColumns(this.dmlTable);
+        this.dmlTable.addFilter(this._callerNamespaceFilter);
+        this.dmlTable.addFilter(this._objectFilter);
+        this.dmlTable.addFilter(this._rowCountFilter);
+        this.dmlTable.addFilter(this._timeTakenFilter);
       }
     });
 

@@ -42,18 +42,41 @@ export class DatagridFilterBar extends LitElement {
         display: flex;
         align-items: flex-end;
         gap: 8px;
+        /* Allow the clusters to shrink below content width so a section's
+           overflow-list receives a constrained width and can collapse. */
+        min-width: 0;
       }
 
-      /* Right cluster consumes the slack and right-aligns grouping + actions. */
-      .filter-bar__right {
+      /* Left cluster consumes the slack (via its growable filters section) so a
+         collapsed overflow-list regains width and can re-expand on widen; the
+         right cluster then sits at the far edge with no growth. */
+      .filter-bar__left {
         flex: 1 1 auto;
-        justify-content: flex-end;
+      }
+
+      .filter-bar__right {
+        flex: 0 0 auto;
       }
 
       .section {
         display: flex;
         align-items: flex-end;
         gap: 4px;
+        /* Shrinkable so the filters section can hand its overflow-list a
+           bounded width (min-width:auto would keep it at content size). */
+        min-width: 0;
+      }
+
+      /* Filters section takes the left cluster's slack and passes it to its
+         slotted overflow-list, so the list always knows the full width
+         available and can re-expand collapsed items when the bar widens. */
+      .section--grow {
+        flex: 1 1 auto;
+      }
+
+      .section--grow ::slotted([slot='filters']) {
+        flex: 1 1 auto;
+        min-width: 0;
       }
 
       .section[hidden] {
@@ -102,7 +125,7 @@ export class DatagridFilterBar extends LitElement {
           <slot name="table-actions" @slotchange=${this._slotChange('_hasTableActions')}></slot>
         </div>
         ${filtersDivider ? this._divider() : nothing}
-        <div class="section" ?hidden=${!this._hasFilters}>
+        <div class="section section--grow" ?hidden=${!this._hasFilters}>
           <slot name="filters" @slotchange=${this._slotChange('_hasFilters')}></slot>
         </div>
       </div>

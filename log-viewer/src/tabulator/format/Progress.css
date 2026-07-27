@@ -4,10 +4,10 @@
 }
 .progress-bar {
   position: absolute;
-  background: #a97d0f;
-  opacity: 0.3;
   height: 100%;
+  opacity: 0.3;
   right: 0;
+  background: #a97d0f;
 }
 .progress-bar__text {
   position: relative;

@@ -19,7 +19,7 @@ Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers.
 - **🌲 [Interactive Call Tree](#-call-tree)** – Dive into execution stacks with timing, row counts, and DML/ SOQL metrics.
 - **📊 [Apex](#-apex-analysis) + [Database](#%EF%B8%8F-database-analysis) Analysis** – Identify slow-performing SOQL, high-impact DML, and time-heavy Apex methods.
 - **📄 [Raw Log Navigation](#-raw-log-navigation)** – Jump between analysis views and raw log files with code folding, hover details, and bidirectional navigation.
-- **🧠 Smart Filtering + Sorting** – Focus on what matters: filter by namespace, event type, or duration.
+- **🧠 Smart Filtering + Sorting** – Focus on what matters: filter by namespace, object, type, or a value range.
 - **🔍 Deep Search** – Find events across the flame chart, call tree, and database tables.
 - **📤 Export + Share** – Copy or Export Salesforce debug log insights for analysis or collaboration.
 
@@ -103,8 +103,7 @@ Explore nested method calls with performance metrics:
 - **Call Tree Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution
 - **Column Views** – Switch preset column sets (General, Time, Governor Limits, Database, Memory), show/hide columns from the header menu, reset to defaults
 - **Group Bottom-Up by Namespace or Type**
-- **Filter by Namespace, Type or Duration**
-- **Toggle Debug-Only + Detail Events**
+- **Filter bar** – Namespace, event Type, and a Total/Self Time range, plus **Details** and **Debug Only** toggles
 - **Keyboard Navigation**
 - **Click to go to Code** – Jump to the source method in your project
 
@@ -117,7 +116,7 @@ See which methods are the slowest, most frequent. or expensive.
 - **Group by Type, Namespace, or Caller Namespace **
 - **Column Views** – Preset column sets, show/hide columns, reset to defaults
 - **Sort by Duration, Count, Name, Type or Namespace**
-- **Filter to specific event types**
+- **Filter** – show or hide zero-time events (Details)
 - **Copy or Export to CSV**
 
 ![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/analysis.png)
@@ -130,11 +129,10 @@ Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues, a
 - **Tracked vs consumed** – each section reconciles statements seen in the log against the governor-counted total, so you can spot queries that didn't count (e.g. custom metadata).
 - **Separate SOQL, DML and SOSL tables** – SOSL is fully searchable, with its rows metered against the 2,000-per-query cap.
 - **Object column + Group by Object / Namespace / Caller Namespace / Query**
+- **Filter bar** – Namespace, Object, Caller Namespace, and a Row Count / Time Taken range
 - **SOQL Duration, Selectivity, Aggregates, Row Count**
 - **Column Views** – Preset column sets (incl. a SOQL Query Plan view), show/hide columns, reset to defaults
 - **View the Call Stack**, **SOQL Optimization Tips**, **Sort**, **Copy or Export to CSV**
-
-<!-- TODO: re-capture database.png for the redesigned Database tab (governor strip, DML/SOQL/SOSL sections). Optionally add a sosl.png. -->
 
 ![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png)
 
