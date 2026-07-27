@@ -6,13 +6,15 @@ import { customElement, property } from 'lit/decorators.js';
 import { type CellComponent, Tabulator } from 'tabulator-tables';
 
 import {
+  commonColumnDefaults,
+  createDurationBarColumn,
   headerSortElement,
   registerTableModules,
 } from '../features/call-tree/components/TableShared.js';
 import { formatSOQL } from '../features/soql/format/formatter.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { progressFormatterMS } from '../tabulator/format/ProgressMS.js';
+import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import { buildCallStackData, type CallStackRow } from './callStackData.js';
 
@@ -81,6 +83,8 @@ export class CallStackDetail extends LitElement {
     this._table?.destroy();
 
     const { rows, rootTotal } = buildCallStackData(this.eventIndex);
+    const barParams = { precision: 2, totalValue: rootTotal };
+    const barWidth = progressColumnWidth(rootTotal);
     registerTableModules();
     this._table = new Tabulator(container, {
       index: 'eventIndex',
@@ -88,17 +92,13 @@ export class CallStackDetail extends LitElement {
       height: '100%',
       layout: 'fitColumns',
       placeholder: 'No call stack available',
-      columnCalcs: false,
+      columnCalcs: 'table',
       // Arrow-key row navigation, matching the Call Tree tab.
       // @ts-expect-error custom option registered by the RowKeyboardNavigation module (types not updated)
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
       headerSortElement,
-      columnDefaults: {
-        resizable: true,
-        headerTooltip: true,
-        headerSortStartingDir: 'desc',
-      },
+      columnDefaults: commonColumnDefaults,
       columns: [
         {
           title: 'Frame',
@@ -110,36 +110,27 @@ export class CallStackDetail extends LitElement {
           widthGrow: 1,
           widthShrink: 1,
           minWidth: 140,
-          cssClass: 'truncate',
+          cssClass: 'datagrid-code-text truncate',
           tooltip: true,
           formatter: frameFormatter,
+          bottomCalc: () => 'Total',
         },
-        {
+        // The outermost frame's total (= the stack root); a plain sum would
+        // double-count the nested chain, so Total uses 'max'.
+        createDurationBarColumn({
           title: 'Total (ms)',
           field: 'duration.total',
-          sorter: 'number',
-          width: 150,
-          minWidth: 150,
-          widthGrow: 0,
-          widthShrink: 0,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          formatter: progressFormatterMS,
-          formatterParams: { precision: 2, totalValue: rootTotal },
-        },
-        {
+          barWidth,
+          barParams,
+          bottomCalc: 'max',
+        }),
+        createDurationBarColumn({
           title: 'Self (ms)',
           field: 'duration.self',
-          sorter: 'number',
-          width: 150,
-          minWidth: 150,
-          widthGrow: 0,
-          widthShrink: 0,
-          hozAlign: 'right',
-          headerHozAlign: 'right',
-          formatter: progressFormatterMS,
-          formatterParams: { precision: 2, totalValue: rootTotal },
-        },
+          barWidth,
+          barParams,
+          bottomCalc: 'sum',
+        }),
       ],
     });
     // No rowClick navigation: clicking a frame selects it (RowKeyboardNavigation)

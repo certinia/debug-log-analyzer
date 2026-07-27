@@ -24,8 +24,13 @@ jest.mock('../../features/call-tree/components/CalltreeView.js', () => ({ goToRo
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
 
+// Tabulator mounts into the inner `#${id}` grid; the `is-hidden` visibility
+// toggle lives on its `.table-host` wrapper (keeps Lit off the mount's class).
 function hidden(el: CallTreeDetail, id: string): boolean {
-  return !!el.shadowRoot?.querySelector(`#${id}`)?.classList.contains('is-hidden');
+  return !!el.shadowRoot
+    ?.querySelector(`#${id}`)
+    ?.closest('.table-host')
+    ?.classList.contains('is-hidden');
 }
 
 async function mount(): Promise<CallTreeDetail> {
@@ -37,7 +42,7 @@ async function mount(): Promise<CallTreeDetail> {
 }
 
 describe('CallTreeDetail view mode', () => {
-  it('shows the active mode host and switches on view-mode-change', async () => {
+  it('defaults to Time Order and switches on view-mode-change', async () => {
     expect(customElements.get('call-tree-detail')).toBeDefined();
     const el = await mount();
     const view = el.shadowRoot?.querySelector('view-mode-switch');

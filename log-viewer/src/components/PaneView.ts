@@ -16,6 +16,10 @@ export interface PaneSection {
   content: TemplateResult;
   /** Optional count/label shown as a badge in the section header. */
   badge?: string;
+  /** Default collapsed state (vertical only), seeded on first render. */
+  collapsed?: boolean;
+  /** Default flex-grow weight when open, seeded on first render (default 1). */
+  weight?: number;
 }
 
 export type PaneOrientation = 'vertical' | 'horizontal';
@@ -181,7 +185,8 @@ export class PaneView extends LitElement {
   private _renderPane(section: PaneSection) {
     const open = this._isOpen(section.id);
     const collapsible = this._collapsible;
-    const style = open ? `flex: ${this._weights[section.id] ?? 1} 1 0` : 'flex: 0 0 auto';
+    const weight = this._weights[section.id] ?? section.weight ?? 1;
+    const style = open ? `flex: ${weight} 1 0` : 'flex: 0 0 auto';
 
     return html`<div class="pane" data-id=${section.id} ?data-open=${open} style=${style}>
       <div
@@ -216,12 +221,26 @@ export class PaneView extends LitElement {
     return this.orientation === 'vertical';
   }
 
+  /** Section's `collapsed` default (when the user hasn't toggled it yet). */
+  private _defaultCollapsed(id: string): boolean {
+    return this.sections.find((s) => s.id === id)?.collapsed ?? false;
+  }
+
   private _isOpen(id: string) {
-    return this._collapsible ? !this._collapsed[id] : true;
+    return this._collapsible ? !(this._collapsed[id] ?? this._defaultCollapsed(id)) : true;
   }
 
   private _toggle(id: string) {
-    this._collapsed = { ...this._collapsed, [id]: !this._collapsed[id] };
+    // New collapsed state = the current open state (open → collapse, and vice
+    // versa), starting from the effective (possibly default) state.
+    this._collapsed = { ...this._collapsed, [id]: this._isOpen(id) };
+    this.dispatchEvent(
+      new CustomEvent('pane-toggle', {
+        detail: { collapsed: this._collapsed },
+        bubbles: true,
+        composed: true,
+      }),
+    );
     this.requestUpdate();
   }
 

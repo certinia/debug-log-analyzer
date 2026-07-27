@@ -26,6 +26,7 @@ import {
 import { deepFilter } from '../utils/DetailsFilter.js';
 import { expandCollapseAll } from '../utils/ExpandCollapse.js';
 import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
+import { waitForNextFrame } from './TableShared.js';
 
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
@@ -435,7 +436,7 @@ export class CalltreeView extends LitElement {
     const switchEpoch = ++this.viewSwitchEpoch;
     this.viewMode = newMode;
     await this.updateComplete;
-    await this._waitForNextFrame();
+    await waitForNextFrame();
 
     if (switchEpoch !== this.viewSwitchEpoch || !this.rootMethod) {
       return;
@@ -826,7 +827,7 @@ export class CalltreeView extends LitElement {
     rootMethod: ApexLog,
   ): Promise<void> {
     if (this.calltreeTable) {
-      await this._waitForNextFrame();
+      await waitForNextFrame();
       return;
     }
 
@@ -863,7 +864,7 @@ export class CalltreeView extends LitElement {
     rootMethod: ApexLog,
   ): Promise<void> {
     if (this.aggregatedTreeTable) {
-      await this._waitForNextFrame();
+      await waitForNextFrame();
       return;
     }
 
@@ -889,7 +890,7 @@ export class CalltreeView extends LitElement {
 
   private async _renderBottomUpTree(container: HTMLDivElement, rootMethod: ApexLog): Promise<void> {
     if (this.bottomUpTreeTable) {
-      await this._waitForNextFrame();
+      await waitForNextFrame();
       return;
     }
 
@@ -918,12 +919,6 @@ export class CalltreeView extends LitElement {
     this._initTableColumns(table);
   }
 
-  private _waitForNextFrame(): Promise<void> {
-    return new Promise((resolve) => {
-      requestAnimationFrame(() => resolve());
-    });
-  }
-
   // Resolve once Tabulator has rendered (e.g. after a treeExpand puts new rows
   // in the DOM), with a two-frame fallback in case the expand triggers no
   // redraw. A single rAF can race the virtual renderer and leave getTreeChildren
@@ -931,7 +926,7 @@ export class CalltreeView extends LitElement {
   private _waitForTableRender(): Promise<void> {
     const table = this.calltreeTable;
     if (!table) {
-      return this._waitForNextFrame();
+      return waitForNextFrame();
     }
 
     return new Promise<void>((resolve) => {

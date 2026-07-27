@@ -47,6 +47,8 @@ interface Config {
   sidePanel: {
     position: 'left' | 'right' | 'bottom';
     size: number;
+    // Per-section collapsed state, keyed by section id — private globalState.
+    collapsed: Record<string, boolean>;
   };
 }
 
@@ -96,9 +98,17 @@ export const COLUMN_VIEW_SECTIONS = [
 ] as const;
 
 /** All sections routed to globalState instead of editable `lana.*` settings. */
-export const PRIVATE_SECTIONS = [...COLUMN_OVERRIDE_SECTIONS, ...COLUMN_VIEW_SECTIONS] as const;
+export const PRIVATE_SECTIONS = [
+  ...COLUMN_OVERRIDE_SECTIONS,
+  ...COLUMN_VIEW_SECTIONS,
+  'sidePanel.collapsed',
+] as const;
 
 type ColumnOverrides = Record<string, string[]>;
+
+export function getSidePanelCollapsed(globalState: Memento): Record<string, boolean> {
+  return globalState.get<Record<string, boolean>>('sidePanel.collapsed', {});
+}
 
 export function getColumnOverrides(globalState: Memento): Record<string, ColumnOverrides> {
   const overrides: Record<string, ColumnOverrides> = {};

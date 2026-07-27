@@ -43,6 +43,7 @@ export type LanaSettings = {
   sidePanel: {
     position: 'left' | 'right' | 'bottom';
     size: number;
+    collapsed: Record<string, boolean>;
   };
 };
 

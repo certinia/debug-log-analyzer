@@ -4,7 +4,7 @@
 import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { DMLBeginLine, SOQLExecuteBeginLine } from 'apex-log-parser';
+import { DMLBeginLine, SOQLExecuteBeginLine, SOSLExecuteBeginLine } from 'apex-log-parser';
 import { formatMs } from '../../../core/utility/Duration.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { DatabaseAccess } from '../services/Database.js';
@@ -14,14 +14,14 @@ import { globalStyles } from '../../../styles/global.styles.js';
 // web components
 import '../../../components/CodeBlock.js';
 
-/** Compact "vitals" readout for the selected DML/SOQL statement. */
+/** Compact "vitals" readout for the selected DML/SOQL/SOSL statement. */
 @customElement('db-vitals')
 export class DbVitals extends LitElement {
   @property({ type: Number })
   eventIndex = -1;
 
   @property({ type: String })
-  type: 'dml' | 'soql' = 'soql';
+  type: 'dml' | 'soql' | 'sosl' = 'soql';
 
   static styles = [
     globalStyles,
@@ -29,19 +29,36 @@ export class DbVitals extends LitElement {
     css`
       :host {
         display: block;
+        container-type: inline-size;
       }
       code-block {
         margin-bottom: var(--space-2);
       }
+      /* Each pair stacks (label above value) by default so a narrow dock never
+         scrolls or crushes the value; it relays out to two columns
+         (label | value) once there's room. The grid owns the columns and each
+         row uses subgrid so every label/value lines up across rows. */
       .grid {
         display: grid;
-        grid-template-columns: auto 1fr;
-        gap: var(--space-1) var(--space-3);
-        align-items: baseline;
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-2) var(--space-3);
+      }
+      .row {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-template-columns: subgrid;
+        row-gap: 2px;
+      }
+      @container (min-width: 240px) {
+        .grid {
+          grid-template-columns: max-content minmax(0, 1fr);
+        }
+        .row {
+          align-items: baseline;
+        }
       }
       .label {
         color: var(--vscode-descriptionForeground);
-        white-space: nowrap;
       }
       .value {
         font-family: var(--vscode-editor-font-family, monospace);
@@ -73,11 +90,32 @@ export class DbVitals extends LitElement {
     if (!line) {
       return html`<div class="empty">No details available.</div>`;
     }
-    return this.type === 'soql' && line instanceof SOQLExecuteBeginLine
-      ? this._renderSoql(line)
-      : line instanceof DMLBeginLine
-        ? this._renderDml(line)
-        : html`<div class="empty">No details available.</div>`;
+    if (this.type === 'soql' && line instanceof SOQLExecuteBeginLine) {
+      return this._renderSoql(line);
+    }
+    if (this.type === 'sosl' && line instanceof SOSLExecuteBeginLine) {
+      return this._renderSimple(line, line.soslRowCount.total);
+    }
+    if (line instanceof DMLBeginLine) {
+      return this._renderSimple(line, line.dmlRowCount.total);
+    }
+    return html`<div class="empty">No details available.</div>`;
+  }
+
+  /** DML and SOSL share the same vitals (Rows/Time/Namespace/Caller/Line);
+   *  only the row-count source differs. */
+  private _renderSimple(line: DMLBeginLine | SOSLExecuteBeginLine, rowCount: number | undefined) {
+    const rows: TemplateResult[] = [];
+    this._row(rows, 'Rows', rowCount ?? '—');
+    this._row(rows, 'Time', `${formatMs(line.duration.total)} ms`);
+    this._row(rows, 'Namespace', line.namespace || '—');
+    this._row(rows, 'Caller namespace', getCallerNamespace(line));
+    this._row(rows, 'Line', line.lineNumber ?? '—');
+
+    return html`
+      <code-block language="plain" .code=${line.text}></code-block>
+      <div class="grid">${rows}</div>
+    `;
   }
 
   private _renderSoql(line: SOQLExecuteBeginLine) {
@@ -113,22 +151,12 @@ export class DbVitals extends LitElement {
     `;
   }
 
-  private _renderDml(line: DMLBeginLine) {
-    const rows: TemplateResult[] = [];
-    this._row(rows, 'Rows', line.dmlRowCount.total ?? '—');
-    this._row(rows, 'Time', `${formatMs(line.duration.total)} ms`);
-    this._row(rows, 'Namespace', line.namespace || '—');
-    this._row(rows, 'Caller namespace', getCallerNamespace(line));
-    this._row(rows, 'Line', line.lineNumber ?? '—');
-
-    return html`
-      <code-block language="plain" .code=${line.text}></code-block>
-      <div class="grid">${rows}</div>
-    `;
-  }
-
   private _row(rows: TemplateResult[], label: string, value: unknown) {
-    rows.push(html`<span class="label">${label}</span><span class="value">${value}</span>`);
+    rows.push(
+      html`<div class="row"
+        ><span class="label">${label}</span><span class="value">${value}</span></div
+      >`,
+    );
   }
 
   private _selectivityPill(relativeCost: number | null) {

@@ -26,6 +26,7 @@ import { getSettings, updateSetting } from '../../settings/Settings.js';
 import type { DMLView } from './DMLView.js';
 import { buildDatabaseSections, type DetailSelection } from './databaseSections.js';
 import type { SOQLView } from './SOQLView.js';
+import type { SOSLView } from './SOSLView.js';
 
 // web components
 import '#vscode-elements/vscode-icon.js';
@@ -86,6 +87,8 @@ export class DatabaseView extends LitElement {
   // The panel auto-opens only on the first row selection; after that the user
   // controls it with the toggle (a closed panel stays closed).
   private _hasAutoOpened = false;
+  // Persisted per-section collapsed state (globalState), keyed by section id.
+  private _collapsedSections: Record<string, boolean> = {};
 
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
@@ -109,6 +112,7 @@ export class DatabaseView extends LitElement {
         if (panel) {
           this.dock = panel.position;
           this.panelSize = panel.size;
+          this._collapsedSections = panel.collapsed ?? {};
         }
       })
       .catch(() => {
@@ -241,6 +245,7 @@ export class DatabaseView extends LitElement {
         @dock-resize=${this._onDockResize}
         @dock-hide=${this._hidePanel}
         @dock-collapse=${this._hidePanel}
+        @pane-toggle=${this._onPaneToggle}
       >
         <div class="db-grids" slot="main">
           <div class="db-toolbar">
@@ -272,11 +277,25 @@ export class DatabaseView extends LitElement {
       this._hasAutoOpened = true;
       this.panelVisible = true;
     }
-    // Only one statement is "selected" across both grids at a time.
-    const other = selection.type === 'dml' ? this._soqlView : this._dmlView;
-    other?.deselectRows();
-    this.sections = await buildDatabaseSections(selection);
+    // Only one statement is "selected" across the three grids at a time —
+    // clear the other two.
+    const grids = [
+      ['dml', this._dmlView],
+      ['soql', this._soqlView],
+      ['sosl', this._soslView],
+    ] as const;
+    for (const [type, view] of grids) {
+      if (selection.type !== type) {
+        view?.deselectRows();
+      }
+    }
+    this.sections = await buildDatabaseSections(selection, this._collapsedSections);
   }
+
+  private _onPaneToggle = (e: CustomEvent<{ collapsed: Record<string, boolean> }>) => {
+    this._collapsedSections = { ...this._collapsedSections, ...e.detail.collapsed };
+    updateSetting('sidePanel.collapsed', this._collapsedSections);
+  };
 
   private _togglePanel = () => {
     this.panelVisible = !this.panelVisible;
@@ -288,6 +307,10 @@ export class DatabaseView extends LitElement {
 
   private get _soqlView(): SOQLView | null {
     return this.renderRoot?.querySelector('soql-view') ?? null;
+  }
+
+  private get _soslView(): SOSLView | null {
+    return this.renderRoot?.querySelector('sosl-view') ?? null;
   }
 
   private _onDockPositionChange = (e: CustomEvent<{ position: DockPosition }>) => {

@@ -14,7 +14,7 @@ import './DbVitals.js';
 
 export interface DetailSelection {
   eventIndex: number;
-  type: 'dml' | 'soql';
+  type: 'dml' | 'soql' | 'sosl';
 }
 
 /**
@@ -22,23 +22,36 @@ export interface DetailSelection {
  * components resolve their own data from `DatabaseAccess` by eventIndex; only
  * the SOQL issue count is pre-resolved here so it can badge the section header.
  */
-export async function buildDatabaseSections(selection: DetailSelection): Promise<PaneSection[]> {
+export async function buildDatabaseSections(
+  selection: DetailSelection,
+  collapsed: Record<string, boolean> = {},
+): Promise<PaneSection[]> {
   const { eventIndex, type } = selection;
+  // Persisted collapsed state wins over the per-section default.
+  const isCollapsed = (id: string, fallback = false) => collapsed[id] ?? fallback;
 
+  // Each section opens at its own default height (leftover-space share); SOQL
+  // issues is the smallest but still open.
   const sections: PaneSection[] = [
     {
       id: 'vitals',
       title: 'Vitals',
+      weight: 2,
+      collapsed: isCollapsed('vitals'),
       content: html`<db-vitals eventIndex=${eventIndex} type=${type}></db-vitals>`,
     },
     {
       id: 'callstack',
       title: 'Call stack',
+      weight: 3,
+      collapsed: isCollapsed('callstack'),
       content: html`<call-stack-detail eventIndex=${eventIndex}></call-stack-detail>`,
     },
     {
       id: 'calltree',
       title: 'Call tree',
+      weight: 4,
+      collapsed: isCollapsed('calltree'),
       content: html`<call-tree-detail eventIndex=${eventIndex}></call-tree-detail>`,
     },
   ];
@@ -48,7 +61,9 @@ export async function buildDatabaseSections(selection: DetailSelection): Promise
     sections.push({
       id: 'issues',
       title: 'SOQL issues',
+      weight: 1,
       badge: issues.length ? String(issues.length) : undefined,
+      collapsed: isCollapsed('issues'),
       content: html`<soql-issues unbounded .issues=${issues}></soql-issues>`,
     });
   }

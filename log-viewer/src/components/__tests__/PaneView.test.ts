@@ -88,4 +88,36 @@ describe('PaneView', () => {
     // All three open → two sashes between neighbours.
     expect(el.shadowRoot?.querySelectorAll('.pane-sash').length).toBe(2);
   });
+
+  it('seeds collapsed defaults from section.collapsed', async () => {
+    const el = document.createElement('pane-view') as PaneView;
+    el.orientation = 'vertical';
+    el.sections = [
+      { id: 'a', title: 'A', content: html`<div>A</div>` },
+      { id: 'b', title: 'B', content: html`<div>B</div>`, collapsed: true },
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(body(el, 'a')).not.toBeNull();
+    expect(body(el, 'b')).toBeNull();
+  });
+
+  it('emits pane-toggle with the collapsed map and keeps state across same-id updates', async () => {
+    const el = await mount('vertical');
+    let last: Record<string, boolean> | undefined;
+    el.addEventListener('pane-toggle', (e) => {
+      last = (e as CustomEvent<{ collapsed: Record<string, boolean> }>).detail.collapsed;
+    });
+
+    header(el, 'a')?.click();
+    await el.updateComplete;
+    expect(last?.a).toBe(true);
+    expect(body(el, 'a')).toBeNull();
+
+    // A new selection re-supplies the same section ids — the user's collapse
+    // survives (defaults are only re-seeded when the id-set changes).
+    el.sections = sections.map((s) => ({ ...s }));
+    await el.updateComplete;
+    expect(body(el, 'a')).toBeNull();
+  });
 });

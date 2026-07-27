@@ -14,16 +14,18 @@ import {
 import { formatDuration, formatInteger } from '../core/utility/Util.js';
 import {
   commonColumnDefaults,
+  createDurationBarColumn,
   headerSortElement,
   registerTableModules,
+  waitForNextFrame,
 } from '../features/call-tree/components/TableShared.js';
 import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCalcs.js';
 import { formatSOQL } from '../features/soql/format/formatter.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { progressFormatterMS } from '../tabulator/format/ProgressMS.js';
+import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
-import { buildScopedCallTree } from './scopedCallTree.js';
+import { buildScopedCallTree, type ScopedCallTree } from './scopedCallTree.js';
 import './ViewModeSwitch.js';
 import type { ViewModeOption } from './ViewModeSwitch.js';
 
@@ -73,12 +75,11 @@ function compactNameFormatter(cell: CellComponent): HTMLElement {
 }
 
 /**
- * The selected statement's enclosing execution as a compact call tree,
- * switchable between Time Order / Aggregated / Bottom-Up (Chrome-perf style).
- * Reuses the Call Tree tab's data transforms, name formatter and bottom-calc
- * helpers, but only the Name / Total / Self (+ Count) columns so it fits the
- * side bar without horizontal scroll. Tables build lazily per mode and rebuild
- * when the selection changes.
+ * The scoped call tree for the selected statement, switchable between Time Order
+ * / Aggregated / Bottom-Up (Chrome-perf style). Reuses the Call Tree tab's data
+ * transforms, name formatter and bottom-calc helpers with a compact
+ * Name / Total / Self (+ Count) column set; tables build lazily per mode and
+ * rebuild when the selection changes.
  */
 @customElement('call-tree-detail')
 export class CallTreeDetail extends LitElement {
@@ -93,6 +94,13 @@ export class CallTreeDetail extends LitElement {
     aggregated: null,
     'bottom-up': null,
   };
+
+  // The scoped tree (all three representations) for the current eventIndex,
+  // computed once per selection and shared across the mode tables.
+  private _scoped: ScopedCallTree | null = null;
+
+  // Guards against a slow view-switch resolving after a newer one.
+  private _switchEpoch = 0;
 
   static styles = [
     globalStyles,
@@ -121,6 +129,13 @@ export class CallTreeDetail extends LitElement {
       .table-host.is-hidden {
         display: none;
       }
+      /* Tabulator mounts into this inner div, whose class Lit never rewrites.
+         Binding a class on the mount element itself would clobber the tabulator
+         classes Tabulator adds imperatively on every re-render, breaking the
+         header layout. */
+      .grid {
+        height: 100%;
+      }
       /* Name: single line, ellipsis — never wrap. */
       .table-host .tabulator-cell.truncate {
         white-space: nowrap;
@@ -132,10 +147,14 @@ export class CallTreeDetail extends LitElement {
 
   updated(changed: PropertyValues) {
     if (changed.has('eventIndex')) {
-      // The scoped root changed — drop every table so each rebuilds on demand.
+      // The scoped root changed — drop every table so each rebuilds on demand,
+      // and recompute the scoped tree once (all three modes share it).
       this._destroyTables();
+      this._scoped = buildScopedCallTree(this.eventIndex);
     }
-    void this._ensureActiveTable();
+    if (changed.has('eventIndex') || changed.has('viewMode')) {
+      void this._showActive();
+    }
   }
 
   disconnectedCallback(): void {
@@ -150,12 +169,28 @@ export class CallTreeDetail extends LitElement {
     }
   }
 
-  private async _ensureActiveTable(): Promise<void> {
-    const mode = this.viewMode;
-    if (this._tables[mode]) {
+  private async _showActive(): Promise<void> {
+    const epoch = ++this._switchEpoch;
+    // Wait for the now-visible host to lay out before Tabulator measures column
+    // widths — building against a hidden/zero-width host makes columns overlap.
+    await this.updateComplete;
+    await waitForNextFrame();
+    // Bail if a newer switch superseded this one, or the component was
+    // disconnected mid-wait (e.g. the pane collapsed) — otherwise we'd build a
+    // Tabulator into detached DOM that disconnectedCallback already ran past,
+    // leaking it.
+    if (epoch !== this._switchEpoch || !this.isConnected) {
       return;
     }
-    const scoped = buildScopedCallTree(this.eventIndex);
+
+    const mode = this.viewMode;
+    const existing = this._tables[mode];
+    if (existing) {
+      existing.redraw(); // re-fit the layout for the now-visible host
+      return;
+    }
+
+    const scoped = this._scoped;
     if (!scoped) {
       return;
     }
@@ -211,6 +246,7 @@ export class CallTreeDetail extends LitElement {
   private _columns(mode: ViewMode, rootTotal: number): ColumnDefinition[] {
     const isTimeOrder = mode === 'time-order';
     const barParams = { precision: 2, totalValue: rootTotal, showPercentageText: true };
+    const barWidth = progressColumnWidth(rootTotal);
 
     const columns: ColumnDefinition[] = [
       {
@@ -221,45 +257,27 @@ export class CallTreeDetail extends LitElement {
         // scrolls horizontally.
         formatter: compactNameFormatter,
         cssClass: 'datagrid-code-text truncate',
-        headerSort: false,
+        sorter: 'string',
         widthGrow: 1,
         widthShrink: 1,
         minWidth: 140,
         bottomCalc: () => 'Total',
       },
-      {
+      createDurationBarColumn({
         title: 'Total (ms)',
         field: 'duration.total',
-        sorter: 'number',
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        width: 150,
-        minWidth: 150,
-        widthGrow: 0,
-        widthShrink: 0,
-        formatter: progressFormatterMS,
-        formatterParams: barParams,
+        barWidth,
+        barParams,
         bottomCalc: 'sum',
-        bottomCalcFormatter: progressFormatterMS,
-        bottomCalcFormatterParams: barParams,
         tooltip: (_e, cell: CellComponent) => formatDuration(cell.getValue()),
-      },
-      {
+      }),
+      createDurationBarColumn({
         title: 'Self (ms)',
         field: 'duration.self',
-        sorter: 'number',
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        width: 150,
-        minWidth: 150,
-        widthGrow: 0,
-        widthShrink: 0,
-        formatter: progressFormatterMS,
-        formatterParams: barParams,
+        barWidth,
+        barParams,
         bottomCalc: makeSumSelfTimeAllVisible(() => this._tables[mode] ?? undefined),
-        bottomCalcFormatter: progressFormatterMS,
-        bottomCalcFormatterParams: barParams,
-      },
+      }),
     ];
 
     // Time Order rows are single calls, so a count only makes sense once frames
@@ -294,18 +312,15 @@ export class CallTreeDetail extends LitElement {
           this._setViewMode(e.detail.value as ViewMode)}
       ></view-mode-switch>
       <div class="tables">
-        <div
-          id="time-order-tree"
-          class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}"
-        ></div>
-        <div
-          id="aggregated-tree"
-          class="table-host ${this.viewMode === 'aggregated' ? '' : 'is-hidden'}"
-        ></div>
-        <div
-          id="bottom-up-tree"
-          class="table-host ${this.viewMode === 'bottom-up' ? '' : 'is-hidden'}"
-        ></div>
+        <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
+          <div id="time-order-tree" class="grid"></div>
+        </div>
+        <div class="table-host ${this.viewMode === 'aggregated' ? '' : 'is-hidden'}">
+          <div id="aggregated-tree" class="grid"></div>
+        </div>
+        <div class="table-host ${this.viewMode === 'bottom-up' ? '' : 'is-hidden'}">
+          <div id="bottom-up-tree" class="grid"></div>
+        </div>
       </div>
     `;
   }

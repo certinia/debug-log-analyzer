@@ -21,6 +21,8 @@ const log =
   '17:33:36.2 (1672655920)|SOQL_EXECUTE_BEGIN|[198]|Aggregations:0|SELECT Id FROM Account\n' +
   '17:33:36.2 (1678684460)|SOQL_EXECUTE_END|[198]|Rows:3\n' +
   '07:54:17.2 (1684126610)|DML_BEGIN|[774]|Op:Insert|Type:codaCompany__c|Rows:2\n' +
+  '17:33:36.2 (1690000000)|SOSL_EXECUTE_BEGIN|[210]|FIND {Acme}\n' +
+  '17:33:36.2 (1695000000)|SOSL_EXECUTE_END|[210]|Rows:5\n' +
   '09:18:22.6 (7300000)|CODE_UNIT_FINISHED|apex://pkg.Entry\n' +
   '09:18:22.6 (7400000)|EXECUTION_FINISHED\n';
 
@@ -30,7 +32,7 @@ function labels(el: DbVitals): string[] {
   );
 }
 
-async function mount(eventIndex: number, type: 'soql' | 'dml'): Promise<DbVitals> {
+async function mount(eventIndex: number, type: 'soql' | 'dml' | 'sosl'): Promise<DbVitals> {
   const el = document.createElement('db-vitals') as DbVitals;
   el.eventIndex = eventIndex;
   el.type = type;
@@ -42,12 +44,14 @@ async function mount(eventIndex: number, type: 'soql' | 'dml'): Promise<DbVitals
 describe('DbVitals field order', () => {
   let soqlIndex = -1;
   let dmlIndex = -1;
+  let soslIndex = -1;
 
   beforeAll(async () => {
     const apexLog = parse(log);
     await DatabaseAccess.create(apexLog);
     soqlIndex = apexLog.eventsById.find((e) => e.text === 'SELECT Id FROM Account')!.eventIndex;
     dmlIndex = apexLog.eventsById.find((e) => e.text?.startsWith('DML'))!.eventIndex;
+    soslIndex = apexLog.eventsById.find((e) => e.text?.startsWith('SOSL'))!.eventIndex;
     expect(customElements.get('db-vitals')).toBeDefined();
   });
 
@@ -59,6 +63,11 @@ describe('DbVitals field order', () => {
 
   it('orders DML vitals by usefulness', async () => {
     const el = await mount(dmlIndex, 'dml');
+    expect(labels(el)).toEqual(['Rows', 'Time', 'Namespace', 'Caller namespace', 'Line']);
+  });
+
+  it('orders SOSL vitals like DML (no query plan)', async () => {
+    const el = await mount(soslIndex, 'sosl');
     expect(labels(el)).toEqual(['Rows', 'Time', 'Namespace', 'Caller namespace', 'Line']);
   });
 });
