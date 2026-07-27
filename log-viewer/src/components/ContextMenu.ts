@@ -33,6 +33,10 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import { globalStyles } from '../styles/global.styles.js';
 
+/** Gutter kept between the menu and the viewport edges (px). Shared by the CSS
+ *  height cap and the off-screen position clamp so a shifted menu still fits. */
+const GUTTER = 12;
+
 export interface ContextMenuItem {
   /** Unique identifier for the menu item */
   id: string;
@@ -82,6 +86,13 @@ export class ContextMenu extends LitElement {
 
       .menu {
         min-width: 180px;
+        /* Never exceed the viewport (leave a gutter top + bottom); scroll the
+           overflow so every field stays reachable on a short screen. border-box
+           keeps the padding inside the cap; keep the 24px (2 * GUTTER) in sync
+           with the constant used by adjustPosition(). */
+        box-sizing: border-box;
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
         padding: 6px 0;
         font-size: var(--filter-popover-row-font-size);
         outline: none;
@@ -128,6 +139,7 @@ export class ContextMenu extends LitElement {
 
       /* Purely visual — the row's own click handles the toggle. */
       .menu-item .vs-checkbox {
+        margin-right: 8px;
         pointer-events: none;
       }
 
@@ -146,6 +158,8 @@ export class ContextMenu extends LitElement {
 
   private boundHandleClickOutside = this.handleClickOutside.bind(this);
   private boundHandleKeyDown = this.handleKeyDown.bind(this);
+  /** Re-clamp the open menu when the window/webview resizes so it can't drift off-screen. */
+  private boundHandleResize = (): void => this.adjustPosition();
 
   /**
    * Show the context menu at the specified screen coordinates.
@@ -170,6 +184,7 @@ export class ContextMenu extends LitElement {
     requestAnimationFrame(() => {
       document.addEventListener('mousedown', this.boundHandleClickOutside, true);
       document.addEventListener('keydown', this.boundHandleKeyDown, true);
+      window.addEventListener('resize', this.boundHandleResize);
 
       // Adjust position if menu goes off-screen (after render)
       this.updateComplete.then(() => this.adjustPosition());
@@ -190,6 +205,7 @@ export class ContextMenu extends LitElement {
 
     document.removeEventListener('mousedown', this.boundHandleClickOutside, true);
     document.removeEventListener('keydown', this.boundHandleKeyDown, true);
+    window.removeEventListener('resize', this.boundHandleResize);
 
     this._visible = false;
     this.removeAttribute('visible');
@@ -261,19 +277,25 @@ export class ContextMenu extends LitElement {
       return;
     }
 
+    // Reset to the anchor first so repeated calls (e.g. on resize) re-clamp from
+    // the original point rather than compounding a previous shift.
+    this.style.left = `${this.x}px`;
+    this.style.top = `${this.y}px`;
+
     const rect = menu.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
     // Adjust horizontal position if menu goes off right edge
     if (this.x + rect.width > viewportWidth) {
-      const newLeft = Math.max(0, viewportWidth - rect.width - 8);
+      const newLeft = Math.max(GUTTER, viewportWidth - rect.width - GUTTER);
       this.style.left = `${newLeft}px`;
     }
 
-    // Adjust vertical position if menu goes off bottom edge
+    // Adjust vertical position if menu goes off bottom edge. The CSS max-height
+    // caps rect.height at viewportHeight - 2*GUTTER, so this always fits.
     if (this.y + rect.height > viewportHeight) {
-      const newTop = Math.max(0, viewportHeight - rect.height - 8);
+      const newTop = Math.max(GUTTER, viewportHeight - rect.height - GUTTER);
       this.style.top = `${newTop}px`;
     }
   }
