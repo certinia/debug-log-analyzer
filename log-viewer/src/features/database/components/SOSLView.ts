@@ -9,6 +9,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, SOSLExecuteBeginLine } from 'apex-log-parser';
+import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { isVisible } from '../../../core/utility/Util.js';
@@ -586,11 +587,10 @@ export class SOSLView extends LitElement {
       if (!data || data.eventIndex === undefined || !data.sosl) {
         return;
       }
-      document.dispatchEvent(
-        new CustomEvent('db-row-select', {
-          detail: { eventIndex: data.eventIndex, type: 'sosl' },
-        }),
-      );
+      eventBus.emit('detail:select', {
+        source: 'database',
+        selection: { kind: 'event', eventIndex: data.eventIndex, type: 'sosl' },
+      });
     });
 
     this.soslTable.on('tableBuilt', () => {

@@ -7,11 +7,31 @@
  * Decouples components - emitters don't need to know about listeners.
  */
 
+/** Which tab a detail selection came from — the app-wide side bar follows the
+ *  active tab, keyed by source. */
+export type DetailSource = 'timeline' | 'calltree' | 'analysis' | 'database';
+
+/**
+ * A selection to inspect in the side bar. A single frame maps to one `eventIndex`;
+ * an aggregate row (Call Tree Aggregated/Bottom-Up, Analysis) scopes to all its
+ * occurrences (`instances` = their eventIndexes), aggregated.
+ */
+export type DetailSelection =
+  | { kind: 'event'; eventIndex: number; type?: 'dml' | 'soql' | 'sosl' }
+  | { kind: 'aggregate'; instances: number[]; label: string };
+
 interface EventMap {
   // Supply eventIndex (preferred — unique) OR timestamp (fallback for raw-log entry where eventIndex isn't known).
 
   'timeline:navigate-to':
     { eventIndex: number; timestamp?: never } | { eventIndex?: never; timestamp: number };
+
+  // A tab's current selection changed — the app-wide side bar rebuilds its
+  // content for this source. `selection: null` clears that source's selection.
+  'detail:select': { source: DetailSource; selection: DetailSelection | null };
+
+  // App-level request to show/hide (or force a state on) the side bar.
+  'detail:toggle': { visible?: boolean };
 }
 
 type EventCallback<K extends keyof EventMap> = (detail: EventMap[K]) => void;

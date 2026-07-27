@@ -14,6 +14,7 @@ import {
 } from 'tabulator-tables';
 
 import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
+import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
@@ -752,11 +753,10 @@ export class SOQLView extends LitElement {
         return;
       }
 
-      document.dispatchEvent(
-        new CustomEvent('db-row-select', {
-          detail: { eventIndex: data.eventIndex, type: 'soql' },
-        }),
-      );
+      eventBus.emit('detail:select', {
+        source: 'database',
+        selection: { kind: 'event', eventIndex: data.eventIndex, type: 'soql' },
+      });
     });
 
     this.soqlTable.on('tableBuilt', () => {

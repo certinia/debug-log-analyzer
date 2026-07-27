@@ -13,6 +13,7 @@ import type {
   SOSLExecuteBeginLine,
 } from 'apex-log-parser';
 
+import { eventBus } from '../../../core/events/EventBus.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
 import { DatabaseAccess } from '../services/Database.js';
@@ -20,17 +21,11 @@ import { DatabaseAccess } from '../services/Database.js';
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
 
-import type { DockPosition } from '../../../components/DetailDock.js';
-import type { PaneSection } from '../../../components/PaneView.js';
-import { getSettings, updateSetting } from '../../settings/Settings.js';
 import type { DMLView } from './DMLView.js';
-import { buildDatabaseSections, type DetailSelection } from './databaseSections.js';
 import type { SOQLView } from './SOQLView.js';
 import type { SOSLView } from './SOSLView.js';
 
 // web components
-import '#vscode-elements/vscode-icon.js';
-import '../../../components/DockLayout.js';
 import './DMLView.js';
 import './DatabaseSection.js';
 import type { DatabaseMetric } from './DatabaseMetricCard.js';
@@ -72,24 +67,6 @@ export class DatabaseView extends LitElement {
   @state()
   soslHighlightIndex = 0;
 
-  @state()
-  selection: DetailSelection | null = null;
-  @state()
-  sections: PaneSection[] = [];
-  @state()
-  dock: DockPosition = 'right';
-  // Visibility is transient session state: the panel starts hidden and opens on
-  // the first row selection (persisting it would show an empty panel on load).
-  @state()
-  panelVisible = false;
-  @state()
-  panelSize = 500;
-  // The panel auto-opens only on the first row selection; after that the user
-  // controls it with the toggle (a closed panel stays closed).
-  private _hasAutoOpened = false;
-  // Persisted per-section collapsed state (globalState), keyed by section id.
-  private _collapsedSections: Record<string, boolean> = {};
-
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
     count: 0,
@@ -97,27 +74,33 @@ export class DatabaseView extends LitElement {
   };
   findMap = {};
 
+  private _offDetailSelect: (() => void) | null = null;
+
   constructor() {
     super();
 
     document.addEventListener('db-find-results', this._findResults as EventListener);
     document.addEventListener('lv-find-match', this._findHandler as EventListener);
     document.addEventListener('lv-find', this._findHandler as EventListener);
-    document.addEventListener('db-row-select', this._rowSelect as EventListener);
-    document.addEventListener('db-toggle-panel', this._togglePanel as EventListener);
 
-    getSettings()
-      .then((settings) => {
-        const panel = settings?.sidePanel;
-        if (panel) {
-          this.dock = panel.position;
-          this.panelSize = panel.size;
-          this._collapsedSections = panel.collapsed ?? {};
+    // Only one statement is "selected" across the three grids at a time — when
+    // one grid reports a selection, clear the other two. (The app-wide side bar
+    // owns rendering the detail; this just keeps the grids mutually exclusive.)
+    this._offDetailSelect = eventBus.on('detail:select', (d) => {
+      if (d.source !== 'database' || d.selection?.kind !== 'event') {
+        return;
+      }
+      const grids = [
+        ['dml', this._dmlView],
+        ['soql', this._soqlView],
+        ['sosl', this._soslView],
+      ] as const;
+      for (const [type, view] of grids) {
+        if (d.selection.type !== type) {
+          view?.deselectRows();
         }
-      })
-      .catch(() => {
-        /* settings unavailable (e.g. outside the extension host) — keep defaults */
-      });
+      }
+    });
   }
 
   disconnectedCallback(): void {
@@ -125,8 +108,8 @@ export class DatabaseView extends LitElement {
     document.removeEventListener('db-find-results', this._findResults as EventListener);
     document.removeEventListener('lv-find-match', this._findHandler as EventListener);
     document.removeEventListener('lv-find', this._findHandler as EventListener);
-    document.removeEventListener('db-row-select', this._rowSelect as EventListener);
-    document.removeEventListener('db-toggle-panel', this._togglePanel as EventListener);
+    this._offDetailSelect?.();
+    this._offDetailSelect = null;
   }
 
   updated(changed: PropertyValues): void {
@@ -167,12 +150,6 @@ export class DatabaseView extends LitElement {
         background-color: var(--vscode-editor-background);
       }
 
-      dock-layout {
-        flex: 1 1 auto;
-        min-width: 0;
-        min-height: 0;
-      }
-
       .db-grids {
         display: flex;
         flex-direction: column;
@@ -182,18 +159,6 @@ export class DatabaseView extends LitElement {
         /* the inset the tab panel used to provide — kept off the docked panel */
         padding: 10px 6px;
         box-sizing: border-box;
-      }
-
-      .db-toolbar {
-        display: flex;
-        justify-content: flex-end;
-        flex: 0 0 auto;
-      }
-      .db-toolbar vscode-icon {
-        color: var(--vscode-icon-foreground);
-      }
-      .db-toolbar vscode-icon:hover {
-        background-color: var(--vscode-toolbar-hoverBackground);
       }
 
       governor-summary {
@@ -235,71 +200,12 @@ export class DatabaseView extends LitElement {
 
   render() {
     return html`
-      <dock-layout
-        dock=${this.dock}
-        .size=${this.panelSize}
-        ?visible=${this.panelVisible}
-        .sections=${this.sections}
-        emptyText="Select a DML, SOQL or SOSL row to inspect it."
-        @dock-position-change=${this._onDockPositionChange}
-        @dock-resize=${this._onDockResize}
-        @dock-hide=${this._hidePanel}
-        @dock-collapse=${this._hidePanel}
-        @pane-toggle=${this._onPaneToggle}
-      >
-        <div class="db-grids" slot="main">
-          <div class="db-toolbar">
-            <vscode-icon
-              action-icon
-              name="layout"
-              label="Toggle details panel"
-              title="Toggle details panel"
-              @click=${this._togglePanel}
-            ></vscode-icon>
-          </div>
-          <governor-summary .metrics="${this._stripMetrics()}"></governor-summary>
-          ${this._renderSection('dml')} ${this._renderSection('soql')}
-          ${this._renderSection('sosl')}
-        </div>
-      </dock-layout>
+      <div class="db-grids">
+        <governor-summary .metrics="${this._stripMetrics()}"></governor-summary>
+        ${this._renderSection('dml')} ${this._renderSection('soql')} ${this._renderSection('sosl')}
+      </div>
     `;
   }
-
-  private _rowSelect = (e: CustomEvent<DetailSelection>) => {
-    void this._select(e.detail);
-  };
-
-  private async _select(selection: DetailSelection) {
-    this.selection = selection;
-    // Open on the first selection only; afterwards selecting just refreshes the
-    // content, so a panel the user has closed stays closed.
-    if (!this._hasAutoOpened) {
-      this._hasAutoOpened = true;
-      this.panelVisible = true;
-    }
-    // Only one statement is "selected" across the three grids at a time —
-    // clear the other two.
-    const grids = [
-      ['dml', this._dmlView],
-      ['soql', this._soqlView],
-      ['sosl', this._soslView],
-    ] as const;
-    for (const [type, view] of grids) {
-      if (selection.type !== type) {
-        view?.deselectRows();
-      }
-    }
-    this.sections = await buildDatabaseSections(selection, this._collapsedSections);
-  }
-
-  private _onPaneToggle = (e: CustomEvent<{ collapsed: Record<string, boolean> }>) => {
-    this._collapsedSections = { ...this._collapsedSections, ...e.detail.collapsed };
-    updateSetting('sidePanel.collapsed', this._collapsedSections);
-  };
-
-  private _togglePanel = () => {
-    this.panelVisible = !this.panelVisible;
-  };
 
   private get _dmlView(): DMLView | null {
     return this.renderRoot?.querySelector('dml-view') ?? null;
@@ -312,22 +218,6 @@ export class DatabaseView extends LitElement {
   private get _soslView(): SOSLView | null {
     return this.renderRoot?.querySelector('sosl-view') ?? null;
   }
-
-  private _onDockPositionChange = (e: CustomEvent<{ position: DockPosition }>) => {
-    this.dock = e.detail.position;
-    updateSetting('sidePanel.position', this.dock);
-  };
-
-  // `dock-resize` fires once on pointer-up (not during the drag), so this write
-  // already lands on interaction-end — no debounce needed.
-  private _onDockResize = (e: CustomEvent<{ size: number }>) => {
-    this.panelSize = e.detail.size;
-    updateSetting('sidePanel.size', this.panelSize);
-  };
-
-  private _hidePanel = () => {
-    this.panelVisible = false;
-  };
 
   private _renderSection(kind: SectionKind) {
     const collapsed = this.collapsed[kind];
