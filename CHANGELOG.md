@@ -22,8 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 🗂️ **Column views** (Call Tree, Analysis, Database): switch preset column sets, show/hide columns from the **Columns** button or the header right-click menu, inline **reset** to restore defaults; choices persist per view.
   - 🏷️ **New columns**: **Object** (queried/target SObject, with group-by) on SOQL/DML; **SOSL Count/Rows**, **Avg Self Time** and optional **Self** variants for every governor metric; and a SOQL **Query Plan** view (Relative Cost, Leading Operation, SObject Type, Cardinality).
 - 🔴 **Timeline exception markers**: exceptions show as red lines, with a **Throws** count in method tooltips. ([#828])
-- 🔍 **Search across the whole table** (Call Tree, Analysis, Database): `Cmd/Ctrl+F` now matches the entire tree/list — including collapsed groups and rows scrolled out of view — not just what's on screen. ([#488] [#539])
-- 🧰 **Filter bar** (Call Tree, Database): filters now live in one toolbar above each table instead of in the column headers. Keep only the rows you care about — by **Namespace**, **Object** or **Caller Namespace** (multi-select, showing how many are picked), or by a **Row Count** / **Time Taken** min–max range; active filters are highlighted. On a narrow window the filters collapse behind a **Filter** button that opens them in a panel. ([#604] [#112] [#538] [#299])
+- 🧰 **Filter bar** (Call Tree, Database): filters now live in one toolbar above each table instead of in the column headers. Keep only the rows you care about — by **Namespace**, **Object** or **Caller Namespace** (multi-select, showing how many are picked), or by a **Row Count** / **Time Taken** min–max range; active filters are highlighted. On a narrow window the filters collapse behind a **Filter** button that opens them in a panel. ([#873])
 
 ### Changed
 
@@ -531,6 +530,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 
 <!-- Unreleased -->
 
+[#873]: https://github.com/certinia/debug-log-analyzer/issues/873
 [#576]: https://github.com/certinia/debug-log-analyzer/issues/576
 [#832]: https://github.com/certinia/debug-log-analyzer/issues/832
 [#848]: https://github.com/certinia/debug-log-analyzer/issues/848
@@ -542,7 +542,6 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- v1.20.1 -->
 
 [#863]: https://github.com/certinia/debug-log-analyzer/issues/863
-[#538]: https://github.com/certinia/debug-log-analyzer/issues/538
 
 <!-- v1.20.0 -->
 
