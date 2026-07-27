@@ -430,11 +430,20 @@ export class ApexLogTimeline {
       if (this.tooltipRenderer) {
         this.tooltipRenderer.hide();
       }
+      eventBus.emit('detail:select', { source: 'timeline', selection: null });
       return;
     }
 
     // Selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
+    // The app-wide detail side bar shows the selected frame's detail.
+    const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
+    if (originalEvent?.eventIndex !== undefined) {
+      eventBus.emit('detail:select', {
+        source: 'timeline',
+        selection: { kind: 'event', eventIndex: originalEvent.eventIndex },
+      });
+    }
   }
 
   /**
@@ -467,11 +476,19 @@ export class ApexLogTimeline {
       if (this.tooltipRenderer) {
         this.tooltipRenderer.hide();
       }
+      eventBus.emit('detail:select', { source: 'timeline', selection: null });
       return;
     }
 
     // Marker selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
+    // Markers only carry an eventIndex when they map to a log event.
+    if (marker.eventIndex !== undefined) {
+      eventBus.emit('detail:select', {
+        source: 'timeline',
+        selection: { kind: 'event', eventIndex: marker.eventIndex },
+      });
+    }
   }
 
   /**

@@ -28,23 +28,52 @@ export interface ScopedRow {
 export interface ScopedCallTree {
   /** The selected node's total time (ns) — the % denominator for the bars. */
   rootTotal: number;
-  timeOrder: ScopedRow[];
-  aggregated: ScopedRow[];
-  bottomUp: ScopedRow[];
+  /** The three views are built on first read and cached (only one is visible). */
+  readonly timeOrder: ScopedRow[];
+  readonly aggregated: ScopedRow[];
+  readonly bottomUp: ScopedRow[];
+  /** True when a subtree hit {@link NODE_BUDGET} and was cut short. */
+  truncated: boolean;
 }
 
-/** The selected node + its real subtree, with real durations. */
-function realSubtree(event: LogEvent): ScopedRow {
-  const kids = event.children;
-  return {
+/**
+ * Cap on materialised nodes per selection. A broad frame selected as an
+ * aggregate would otherwise expand `occurrences × whole subtree` — millions of
+ * nodes on a large log — blocking the UI thread well past the 50ms budget.
+ */
+const NODE_BUDGET = 20_000;
+
+interface Budget {
+  left: number;
+  truncated: boolean;
+}
+
+/** The selected node + its real subtree, with real durations, within `budget`. */
+function realSubtree(event: LogEvent, budget: Budget): ScopedRow {
+  const row: ScopedRow = {
     id: event.eventIndex,
     originalData: event,
     text: event.text,
     type: event.type ?? '',
     duration: { total: event.duration.total, self: event.duration.self },
     callCount: 1,
-    _children: kids.length ? kids.map(realSubtree) : null,
+    _children: null,
   };
+  budget.left -= 1;
+
+  // Check the budget per child, not just before descending: a single node can
+  // have more direct children than the whole budget allows.
+  const children: ScopedRow[] = [];
+  for (const kid of event.children) {
+    if (budget.left <= 0) {
+      // Keep the nodes built so far (their totals are intact) and stop.
+      budget.truncated = true;
+      break;
+    }
+    children.push(realSubtree(kid, budget));
+  }
+  row._children = children.length ? children : null;
+  return row;
 }
 
 /**
@@ -55,39 +84,73 @@ function realSubtree(event: LogEvent): ScopedRow {
  * node and its descendants keep their real durations. Returns the three views
  * (time-order / aggregated / bottom-up) or null when nothing is selected.
  */
-export function buildScopedCallTree(eventIndex: number): ScopedCallTree | null {
+export function buildScopedCallTree(
+  eventIndex: number,
+  instances?: number[] | null,
+): ScopedCallTree | null {
   const db = DatabaseAccess.instance();
   const apexLog = db?.getApexLog();
-  const selected = db && eventIndex >= 0 ? db.getEventByIndex(eventIndex) : null;
-  if (!db || !apexLog || !selected) {
+  if (!db || !apexLog) {
     return null;
   }
 
-  const rootTotal = selected.duration.total;
-
-  // Wrap the selected node in its ancestor chain, innermost first, attributing
-  // the selection's total up the path with no self time.
-  let node = realSubtree(selected);
-  let parent = selected.parent;
-  while (parent && parent !== apexLog) {
-    node = {
-      id: parent.eventIndex,
-      originalData: parent,
-      text: parent.text,
-      type: parent.type ?? '',
-      duration: { total: rootTotal, self: 0 },
-      callCount: 1,
-      _children: [node],
-    };
-    parent = parent.parent;
+  // An aggregate selection scopes to every occurrence of the frame; a single
+  // selection to just itself.
+  const indexes = instances?.length ? instances : eventIndex >= 0 ? [eventIndex] : [];
+  const selectedEvents = indexes
+    .map((i) => db.getEventByIndex(i))
+    .filter((e): e is LogEvent => e !== null);
+  if (!selectedEvents.length) {
+    return null;
   }
 
-  const timeOrder = [node];
+  // Percentages are relative to the whole selection (summed across occurrences).
+  const rootTotal = selectedEvents.reduce((sum, e) => sum + e.duration.total, 0);
+
+  // Wrap each occurrence in its ancestor chain, innermost first, attributing that
+  // occurrence's total up its path with no self time. Aggregation then merges
+  // paths that share frames.
+  const budget: Budget = { left: NODE_BUDGET, truncated: false };
+  const roots = selectedEvents.map((selected) => {
+    let node = realSubtree(selected, budget);
+    let parent = selected.parent;
+    while (parent && parent !== apexLog) {
+      node = {
+        id: parent.eventIndex,
+        originalData: parent,
+        text: parent.text,
+        type: parent.type ?? '',
+        duration: { total: selected.duration.total, self: 0 },
+        callCount: 1,
+        _children: [node],
+      };
+      parent = parent.parent;
+    }
+    return node;
+  });
+
+  // Only one view is on screen, so build each on first read and cache it —
+  // aggregate()/buildBottomUp() are full walks of every retained subtree.
+  let timeOrder: ScopedRow[] | null = null;
+  let aggregated: ScopedRow[] | null = null;
+  let bottomUp: ScopedRow[] | null = null;
   return {
     rootTotal,
-    timeOrder,
-    aggregated: aggregate(timeOrder),
-    bottomUp: buildBottomUp(timeOrder),
+    truncated: budget.truncated,
+    get timeOrder(): ScopedRow[] {
+      // Many occurrences usually share ancestors, so merge the paths for a
+      // readable tree; a single occurrence keeps its exact chain.
+      timeOrder ??= roots.length > 1 ? aggregate(roots) : roots;
+      return timeOrder;
+    },
+    get aggregated(): ScopedRow[] {
+      aggregated ??= aggregate(roots);
+      return aggregated;
+    },
+    get bottomUp(): ScopedRow[] {
+      bottomUp ??= buildBottomUp(roots);
+      return bottomUp;
+    },
   };
 }
 

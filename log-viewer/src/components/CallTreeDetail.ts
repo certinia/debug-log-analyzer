@@ -78,13 +78,18 @@ function compactNameFormatter(cell: CellComponent): HTMLElement {
  * The scoped call tree for the selected statement, switchable between Time Order
  * / Aggregated / Bottom-Up (Chrome-perf style). Reuses the Call Tree tab's data
  * transforms, name formatter and bottom-calc helpers with a compact
- * Name / Total / Self (+ Count) column set; tables build lazily per mode and
+ * Name / Total / Self (+ Calls) column set; tables build lazily per mode and
  * rebuild when the selection changes.
  */
 @customElement('call-tree-detail')
 export class CallTreeDetail extends LitElement {
   @property({ type: Number })
   eventIndex = -1;
+
+  /** Occurrence eventIndexes when the selection is an aggregate row; the tree
+   *  then scopes to every occurrence, aggregated. */
+  @property({ attribute: false })
+  instances: number[] | null = null;
 
   @state()
   private viewMode: ViewMode = 'time-order';
@@ -146,13 +151,14 @@ export class CallTreeDetail extends LitElement {
   ];
 
   updated(changed: PropertyValues) {
-    if (changed.has('eventIndex')) {
+    const scopeChanged = changed.has('eventIndex') || changed.has('instances');
+    if (scopeChanged) {
       // The scoped root changed — drop every table so each rebuilds on demand,
       // and recompute the scoped tree once (all three modes share it).
       this._destroyTables();
-      this._scoped = buildScopedCallTree(this.eventIndex);
+      this._scoped = buildScopedCallTree(this.eventIndex, this.instances);
     }
-    if (changed.has('eventIndex') || changed.has('viewMode')) {
+    if (scopeChanged || changed.has('viewMode')) {
       void this._showActive();
     }
   }
@@ -284,7 +290,7 @@ export class CallTreeDetail extends LitElement {
     // are grouped (aggregated / bottom-up).
     if (!isTimeOrder) {
       columns.push({
-        title: 'Count',
+        title: 'Calls',
         field: 'callCount',
         sorter: 'number',
         hozAlign: 'right',

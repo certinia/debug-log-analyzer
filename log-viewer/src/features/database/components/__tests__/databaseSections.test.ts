@@ -9,7 +9,7 @@ import { describe, expect, it } from '@jest/globals';
 // this suite only exercises the section-assembly logic.
 jest.mock('../../../../components/CallStackDetail.js', () => ({}));
 jest.mock('../../../../components/CallTreeDetail.js', () => ({}));
-jest.mock('../DbVitals.js', () => ({}));
+jest.mock('../../../../components/EventVitals.js', () => ({}));
 jest.mock('../../../soql/components/SOQLLinterIssues.js', () => ({
   computeSoqlIssues: async () => [
     { severity: 'Warning', summary: 'w', message: 'm' },

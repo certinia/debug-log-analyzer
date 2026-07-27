@@ -5,7 +5,7 @@ import { css } from 'lit';
 
 /**
  * Spacing + radius scale shared by the database detail-panel components
- * (DetailDock / PaneView / DbVitals / CodeBlock). Declared on `:host` so each
+ * (DetailDock / PaneView / EventVitals / CodeBlock). Declared on `:host` so each
  * shadow root resolves the tokens. Scoped to the side-panel feature — not part
  * of the app-wide global styles.
  */

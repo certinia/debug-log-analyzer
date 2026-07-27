@@ -9,8 +9,8 @@ import { computeSoqlIssues } from '../../soql/components/SOQLLinterIssues.js';
 // web components
 import '../../../components/CallStackDetail.js';
 import '../../../components/CallTreeDetail.js';
+import '../../../components/EventVitals.js';
 import '../../soql/components/SOQLLinterIssues.js';
-import './DbVitals.js';
 
 export interface DetailSelection {
   eventIndex: number;
@@ -30,15 +30,15 @@ export async function buildDatabaseSections(
   // Persisted collapsed state wins over the per-section default.
   const isCollapsed = (id: string, fallback = false) => collapsed[id] ?? fallback;
 
-  // Each section opens at its own default height (leftover-space share); SOQL
-  // issues is the smallest but still open.
+  // Each section opens at its own default height (leftover-space share); the
+  // call tree gets the most, SOQL issues the least (but still open).
   const sections: PaneSection[] = [
     {
       id: 'vitals',
-      title: 'Vitals',
-      weight: 2,
+      title: 'Details',
+      weight: 3,
       collapsed: isCollapsed('vitals'),
-      content: html`<db-vitals eventIndex=${eventIndex} type=${type}></db-vitals>`,
+      content: html`<event-vitals eventIndex=${eventIndex} type=${type}></event-vitals>`,
     },
     {
       id: 'callstack',

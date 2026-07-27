@@ -4,10 +4,11 @@
 import type { GovernorLimits, SelfTotal } from 'apex-log-parser';
 
 /**
- * Minimal per-node metric shape needed to derive the governor cost. Every
- * call-tree row model (time-order, aggregated, bottom-up) satisfies this.
+ * The governor usage a node reports — all that's needed to *derive* cost. Both
+ * the call-tree row models and the parser's `LogEvent` satisfy this, so the
+ * derivations below work directly off an event (used by the detail side bar).
  */
-export interface GovernorCostRow {
+export interface GovernorUsage {
   dmlCount: SelfTotal;
   soqlCount: SelfTotal;
   soslCount: SelfTotal;
@@ -20,6 +21,13 @@ export interface GovernorCostRow {
   heapGross: SelfTotal;
   /** Peak live heap (bytes) reached in this path's subtree — the limit-comparable heap value. */
   heapPeak: number;
+}
+
+/**
+ * Minimal per-node metric shape needed to derive the governor cost. Every
+ * call-tree row model (time-order, aggregated, bottom-up) satisfies this.
+ */
+export interface GovernorCostRow extends GovernorUsage {
   /**
    * Average governor consumption on this path (0–100%): the mean of every
    * governor's own `used/limit × 100`, across all governors that have a reported
@@ -39,7 +47,7 @@ export interface GovernorCostRow {
 interface CostMetric {
   label: string;
   /** Reads the node's cumulative usage for this metric. */
-  used: (row: GovernorCostRow) => number;
+  used: (row: GovernorUsage) => number;
   /** Reads the log's maximum for this metric. */
   limit: (limits: GovernorLimits) => number;
 }
@@ -74,7 +82,7 @@ const COST_METRICS: CostMetric[] = [
  * the single tightest one. Governors never reported in the log (limit 0) are
  * excluded from both the sum and the divisor.
  */
-export function governorCost(row: GovernorCostRow, limits: GovernorLimits): number {
+export function governorCost(row: GovernorUsage, limits: GovernorLimits): number {
   let total = 0;
   let count = 0;
   for (const metric of COST_METRICS) {
@@ -93,7 +101,7 @@ export function governorCost(row: GovernorCostRow, limits: GovernorLimits): numb
  * "am I about to breach one specific limit" signal, complementing the averaged
  * {@link governorCost}.
  */
-export function governorCostMax(row: GovernorCostRow, limits: GovernorLimits): number {
+export function governorCostMax(row: GovernorUsage, limits: GovernorLimits): number {
   let max = 0;
   for (const metric of COST_METRICS) {
     const limit = metric.limit(limits);
@@ -121,7 +129,7 @@ export interface GovernorCostMetric {
  * breakdown behind the summed Gov. Cost figure in the column tooltip.
  */
 export function governorCostBreakdown(
-  row: GovernorCostRow,
+  row: GovernorUsage,
   limits: GovernorLimits,
 ): GovernorCostMetric[] {
   const metrics: GovernorCostMetric[] = [];

@@ -5,8 +5,9 @@ import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { type DetailSelection, type DetailSource, eventBus } from '../core/events/EventBus.js';
-import { buildDatabaseSections } from '../features/database/components/databaseSections.js';
+import { debounce } from '../core/utility/Util.js';
 import { getSettings, updateSetting } from '../features/settings/Settings.js';
+import { buildDetailSections } from './detailSections.js';
 import { globalStyles } from '../styles/global.styles.js';
 import type { DockPosition } from './DetailDock.js';
 import './DockLayout.js';
@@ -46,6 +47,8 @@ export class DetailSidebar extends LitElement {
   private _selections = new Map<DetailSource, DetailSelection>();
   // Auto-open only on the first selection; afterwards the user's toggle wins.
   private _hasAutoOpened = false;
+  // Guards against a slow rebuild resolving after a newer selection.
+  private _rebuildEpoch = 0;
   // Persisted per-section collapse (globalState), keyed by section id.
   private _collapsedSections: Record<string, boolean> = {};
   private _unsubscribe: Array<() => void> = [];
@@ -132,7 +135,7 @@ export class DetailSidebar extends LitElement {
     }
     // Only rebuild if the change is for the tab currently on screen.
     if (TAB_TO_SOURCE[this.activeTab] === detail.source) {
-      void this._rebuild();
+      this._scheduleRebuild();
     }
   }
 
@@ -140,24 +143,26 @@ export class DetailSidebar extends LitElement {
     this.panelVisible = detail.visible ?? !this.panelVisible;
   }
 
+  /**
+   * Coalesced to one rebuild per frame: holding an arrow key in the timeline
+   * fires a selection per keydown (~20-30/s), and each rebuild re-creates the
+   * section tables. Trailing rAF means we only ever build the latest selection.
+   */
+  private _scheduleRebuild = debounce(() => {
+    void this._rebuild();
+  });
+
   private async _rebuild(): Promise<void> {
+    const epoch = ++this._rebuildEpoch;
     const source = TAB_TO_SOURCE[this.activeTab];
     const selection = source ? (this._selections.get(source) ?? null) : null;
-    this.sections = selection ? await this._buildSections(source!, selection) : [];
-  }
-
-  private async _buildSections(
-    source: DetailSource,
-    selection: DetailSelection,
-  ): Promise<PaneSection[]> {
-    // Phase 1: only Database is wired; other sources gain builders in later phases.
-    if (source === 'database' && selection.kind === 'event' && selection.type) {
-      return buildDatabaseSections(
-        { eventIndex: selection.eventIndex, type: selection.type },
-        this._collapsedSections,
-      );
+    const sections = selection
+      ? await buildDetailSections(source!, selection, this._collapsedSections)
+      : [];
+    // Drop a slow build that a newer selection already superseded.
+    if (epoch === this._rebuildEpoch) {
+      this.sections = sections;
     }
-    return [];
   }
 
   private _onDockPositionChange = (e: CustomEvent<{ position: DockPosition }>) => {

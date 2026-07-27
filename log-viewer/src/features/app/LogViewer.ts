@@ -15,6 +15,7 @@ import {
   VSCodeExtensionMessenger,
   vscodeMessenger,
 } from '../../core/messaging/VSCodeExtensionMessenger.js';
+import { DatabaseAccess } from '../database/services/Database.js';
 import {
   Notification,
   type NotificationSeverity,
@@ -227,6 +228,10 @@ export class LogViewer extends LitElement {
     const logData = data.logData || (await this._readLog(logUri || ''));
 
     const apexLog = parse(logData);
+
+    // The event-lookup service backs the detail side bar on every tab, so it is
+    // created with the parsed log rather than by whichever tab loads first.
+    await DatabaseAccess.create(apexLog);
 
     this.logSize = apexLog.size;
     this.timelineRoot = apexLog;

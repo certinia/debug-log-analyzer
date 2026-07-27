@@ -12,7 +12,7 @@ import { repeat } from 'lit/directives/repeat.js';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
-import { eventBus } from '../../../core/events/EventBus.js';
+import { eventBus, type DetailSource } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
@@ -857,6 +857,7 @@ export class CalltreeView extends LitElement {
     this.calltreeTable = table;
     await tableBuilt;
     this._initTableColumns(table);
+    this._emitDetailSelection(table);
   }
 
   private async _renderAggregatedTree(
@@ -886,6 +887,7 @@ export class CalltreeView extends LitElement {
     this.aggregatedTreeTable = table;
     await tableBuilt;
     this._initTableColumns(table);
+    this._emitDetailSelection(table);
   }
 
   private async _renderBottomUpTree(container: HTMLDivElement, rootMethod: ApexLog): Promise<void> {
@@ -917,6 +919,35 @@ export class CalltreeView extends LitElement {
     this.bottomUpTreeTable = table;
     await tableBuilt;
     this._initTableColumns(table);
+    this._emitDetailSelection(table);
+  }
+
+  /**
+   * Feed the app-wide detail side bar off row selection. A Time Order row is a
+   * single event; Aggregated/Bottom-Up rows merge many calls, so they scope to
+   * every occurrence (`instances`).
+   */
+  private _emitDetailSelection(table: Tabulator, source: DetailSource = 'calltree'): void {
+    table.on('rowSelectionChanged', (_data, rows) => {
+      const data = rows[0]?.getData() as
+        { originalData?: LogEvent; instances?: LogEvent[]; text?: string } | undefined;
+      const event = data?.originalData;
+      if (!event) {
+        eventBus.emit('detail:select', { source, selection: null });
+        return;
+      }
+      const occurrences = data.instances?.length ? data.instances : null;
+      eventBus.emit('detail:select', {
+        source,
+        selection: occurrences
+          ? {
+              kind: 'aggregate',
+              instances: occurrences.map((e) => e.eventIndex),
+              label: data.text ?? event.text,
+            }
+          : { kind: 'event', eventIndex: event.eventIndex },
+      });
+    });
   }
 
   // Resolve once Tabulator has rendered (e.g. after a treeExpand puts new rows
