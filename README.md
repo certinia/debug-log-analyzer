@@ -134,8 +134,6 @@ Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues, a
 - **Column Views** – Preset column sets (incl. a SOQL Query Plan view), show/hide columns, reset to defaults
 - **View the Call Stack**, **SOQL Optimization Tips**, **Sort**, **Copy or Export to CSV**
 
-<!-- TODO: re-capture database.png for the redesigned Database tab (governor strip, DML/SOQL/SOSL sections). Optionally add a sosl.png. -->
-
 ![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png)
 
 ## 📊 Governor Limit Tracking
