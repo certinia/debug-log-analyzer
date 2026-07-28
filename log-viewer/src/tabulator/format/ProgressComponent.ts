@@ -7,6 +7,11 @@ type ProgressOptions = {
   precision?: number;
 };
 
+// The fill is only useful once it's wide enough to see — below this, round up
+// to a hairline sliver rather than disappearing entirely (a real value like
+// 12/50,000 rows rounds to 0% but is still non-zero usage worth showing).
+const MIN_VISIBLE_PERCENT = 1;
+
 export function progressComponent(
   value: number,
   totalValue: number,
@@ -17,15 +22,16 @@ export function progressComponent(
   const roundedValue = (value || 0).toFixed(precision);
 
   if (totalValue !== null && totalValue !== undefined) {
-    const percentComplete = totalValue !== 0 ? Math.round((value / totalValue) * 100) : 0;
+    const exactPercent = totalValue !== 0 ? (value / totalValue) * 100 : 0;
+    const percentComplete = Math.round(exactPercent);
 
     const wrapper = document.createElement('div');
     wrapper.className = 'progress-wrapper';
 
-    if (percentComplete) {
+    if (value > 0 && totalValue > 0) {
       const bar = document.createElement('div');
       bar.className = 'progress-bar';
-      bar.style.width = `${percentComplete}%`;
+      bar.style.width = `${Math.max(exactPercent, MIN_VISIBLE_PERCENT)}%`;
       wrapper.appendChild(bar);
     }
 

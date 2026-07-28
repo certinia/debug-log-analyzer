@@ -48,7 +48,8 @@ If the grouping is removed the sorting applies the same but across all rows inst
 
 ### Filtering
 
-1. In the SOQL view show Log events for specific namespaces using the namespace column filter
+1. **Namespace**, **Object** or **Caller Namespace** — pick one or more values to keep.
+1. **Row Count** and **Time Taken** — set a _min–max_ range.
 
 ### Column Views
 

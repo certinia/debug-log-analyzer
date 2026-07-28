@@ -17,18 +17,10 @@ import * as CommonModules from '../../../tabulator/module/CommonModules.js';
 import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
-import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import { makeSumFieldAllVisible } from '../utils/BottomCalcs.js';
 import { governorCostBreakdown, type GovernorCostRow } from '../utils/GovernorCost.js';
-import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
 
 export interface TableCallbacks {
-  namespaceFilter: (
-    selectedNamespaces: string[],
-    namespace: string,
-    data: TimeOrderRow | AggregatedRow | BottomUpRow,
-    filterParams: { filterCache: Map<number, boolean> },
-  ) => boolean;
   onFilterCacheClear?: () => void;
   onRenderStarted: () => void;
   rowFormatter?: (row: RowComponent) => void;

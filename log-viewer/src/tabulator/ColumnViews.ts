@@ -101,10 +101,10 @@ export const CALL_TREE_VIEWS: ColumnView[] = [
 export const SOQL_VIEWS: ColumnView[] = [
   {
     // Object is visible by default (its __mdt suffix flags the "does this count
-    // toward the SOQL limit?" case of #162). The derived Counts column lives in
-    // the focused Limits view to avoid duplicating that signal.
+    // toward the SOQL limit?" case of #162). isSelective/aggregations still
+    // available via the Performance view and the column menu.
     id: 'General',
-    fields: ['isSelective', 'objectType', 'namespace', 'rowCount', 'timeTaken', 'aggregations'],
+    fields: ['objectType', 'namespace', 'rowCount', 'timeTaken'],
   },
   { id: 'Performance', fields: ['isSelective', 'relativeCost', 'rowCount', 'timeTaken'] },
   {
@@ -246,7 +246,8 @@ export function buildColumnMenuItems(
     const title = String(column.getDefinition().title ?? field);
     items.push({
       id: `col:${field}`,
-      label: `${column.isVisible() ? CHECKED : UNCHECKED}${title}`,
+      label: title,
+      checked: column.isVisible(),
       keepOpen: true,
     });
   }

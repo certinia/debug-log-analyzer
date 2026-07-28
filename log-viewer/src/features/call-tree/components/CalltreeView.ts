@@ -2,7 +2,6 @@
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
 import '#vscode-elements/vscode-button.js';
-import '#vscode-elements/vscode-checkbox.js';
 import '#vscode-elements/vscode-option.js';
 import '#vscode-elements/vscode-toolbar-button.js';
 import '../../../components/VsSelect.js';
@@ -29,6 +28,8 @@ import { expandCollapseAll } from '../utils/ExpandCollapse.js';
 import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
 import { waitForNextFrame } from './TableShared.js';
 
+import { inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
+
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
 
 // styles
@@ -41,7 +42,10 @@ import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/GridSkeleton.js';
 import '../../../components/ViewModeSwitch.js';
 import type { ViewModeOption } from '../../../components/ViewModeSwitch.js';
+import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
+import '../../../components/datagrid-range-filter.js';
+import '../../../components/OverflowList.js';
 
 // Table creation functions
 import { createAggregatedTable } from './AggregatedTable.js';
@@ -101,14 +105,19 @@ export class CalltreeView extends LitElement {
   };
   bottomUpGroupBy = 'None';
   typeFilter = 'All';
+  namespaceSelected: string[] = [];
+  totalTimeRange: FilterRange = { start: null, end: null };
+  selfTimeRange: FilterRange = { start: null, end: null };
   debugOnlyFilterCache = new Map<number, boolean>();
   typeFilterCache = new Map<number, boolean>();
+  namespaceFilterCache = new Map<number, boolean>();
+  totalTimeFilterCache = new Map<number, boolean>();
+  selfTimeFilterCache = new Map<number, boolean>();
 
   findMap: { [key: number]: RowComponent } = {};
   totalMatches = 0;
 
   blockClearHighlights = true;
-  searchString = '';
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
     count: 0,
@@ -219,6 +228,15 @@ export class CalltreeView extends LitElement {
         align-items: flex-end;
       }
 
+      .filter-container vscode-button {
+        height: var(--filter-control-height);
+      }
+
+      .filter-container vscode-button::part(base) {
+        padding: var(--filter-control-padding);
+        font-size: var(--filter-control-font-size);
+      }
+
       #call-tree-table,
       #aggregated-tree-table,
       #bottom-up-tree-table {
@@ -267,6 +285,7 @@ export class CalltreeView extends LitElement {
               >
 
               <vs-select
+                dense
                 id="column-view"
                 prefix="Columns"
                 label="Column view"
@@ -288,22 +307,24 @@ export class CalltreeView extends LitElement {
               </vs-select>
             </div>
 
-            <div slot="filters" class="filter-container">
-              <vscode-checkbox @change="${this._handleShowDetailsChange}">Details</vscode-checkbox>
+            <overflow-list slot="filters" menu-heading="Filters" icon="filter">
+              <datagrid-facet-filter
+                label="Namespace"
+                .values="${this.rootMethod?.namespaces ?? []}"
+                @datagrid-facet-change="${this._handleNamespaceFacet}"
+              ></datagrid-facet-filter>
 
               ${
                 isTimeOrder || this.viewMode === 'aggregated'
                   ? html`
-                      <vscode-checkbox @change="${this._handleDebugOnlyChange}"
-                        >Debug Only</vscode-checkbox
-                      >
-
                       <vs-select
+                        dense
                         prefix="Type"
                         label="Type"
                         emptyValue=""
                         combobox
                         filter="fuzzy"
+                        .filterActive="${this.typeFilter !== 'All'}"
                         @change="${this._handleTypeFilter}"
                       >
                         <vscode-option ?selected="${this.typeFilter === 'All'}">All</vscode-option>
@@ -322,12 +343,49 @@ export class CalltreeView extends LitElement {
                     `
                   : ''
               }
-            </div>
+
+              <datagrid-range-filter
+                label="Total Time"
+                unit="ms"
+                @datagrid-range-change="${this._handleTotalTimeRange}"
+              ></datagrid-range-filter>
+
+              <datagrid-range-filter
+                label="Self Time"
+                unit="ms"
+                @datagrid-range-change="${this._handleSelfTimeRange}"
+              ></datagrid-range-filter>
+
+              <button
+                type="button"
+                class="filter-control pill-toggle"
+                aria-pressed="${this.filterState.showDetails}"
+                @click="${this._handleShowDetailsChange}"
+              >
+                Details
+              </button>
+
+              ${
+                isTimeOrder || this.viewMode === 'aggregated'
+                  ? html`
+                      <button
+                        type="button"
+                        class="filter-control pill-toggle"
+                        aria-pressed="${this.filterState.debugOnly}"
+                        @click="${this._handleDebugOnlyChange}"
+                      >
+                        Debug Only
+                      </button>
+                    `
+                  : ''
+              }
+            </overflow-list>
 
             ${
               this.viewMode === 'bottom-up'
                 ? html`
                     <vs-select
+                      dense
                       slot="group"
                       id="bottomup-groupby"
                       prefix="Group"
@@ -403,15 +461,15 @@ export class CalltreeView extends LitElement {
     return flattened;
   }
 
-  _handleShowDetailsChange(event: Event) {
-    const target = event.target as HTMLInputElement;
-    this.filterState.showDetails = target.checked;
+  _handleShowDetailsChange() {
+    this.filterState.showDetails = !this.filterState.showDetails;
+    this.requestUpdate();
     this._updateFiltering();
   }
 
-  _handleDebugOnlyChange(event: Event) {
-    const target = event.target as HTMLInputElement;
-    this.filterState.debugOnly = target.checked;
+  _handleDebugOnlyChange() {
+    this.filterState.debugOnly = !this.filterState.debugOnly;
+    this.requestUpdate();
     this._updateFiltering();
   }
 
@@ -459,6 +517,7 @@ export class CalltreeView extends LitElement {
       const container = this.renderRoot?.querySelector<HTMLDivElement>('#bottom-up-tree-table');
       if (container) {
         await this._renderBottomUpTree(container, this.rootMethod);
+        this._updateFiltering();
       }
     }
 
@@ -619,6 +678,26 @@ export class CalltreeView extends LitElement {
     const target = event.target as HTMLInputElement;
     this.typeFilter = target.value || 'All';
     this.filterState.selectedTypes = new Set(target.value ? [target.value] : []);
+    // typeFilter is a plain field (not @state), so the Type select's
+    // `.filterActive` binding doesn't repaint until some other reactive
+    // update happens to coincide — force it so the active border shows on
+    // the very first pick, not a later render.
+    this.requestUpdate();
+    this._updateFiltering();
+  }
+
+  _handleNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
+    this.namespaceSelected = event.detail.selected;
+    this._updateFiltering();
+  }
+
+  _handleTotalTimeRange(event: CustomEvent<{ range: FilterRange }>) {
+    this.totalTimeRange = event.detail.range;
+    this._updateFiltering();
+  }
+
+  _handleSelfTimeRange(event: CustomEvent<{ range: FilterRange }>) {
+    this.selfTimeRange = event.detail.range;
     this._updateFiltering();
   }
 
@@ -630,8 +709,23 @@ export class CalltreeView extends LitElement {
 
     this.debugOnlyFilterCache.clear();
     this.typeFilterCache.clear();
+    this.namespaceFilterCache.clear();
+    this.totalTimeFilterCache.clear();
+    this.selfTimeFilterCache.clear();
 
     const filtersToAdd = [];
+
+    if (this.namespaceSelected.length > 0) {
+      filtersToAdd.push(this._namespaceBarFilter);
+    }
+
+    if (this.totalTimeRange.start !== null || this.totalTimeRange.end !== null) {
+      filtersToAdd.push(this._totalTimeBarFilter);
+    }
+
+    if (this.selfTimeRange.start !== null || this.selfTimeRange.end !== null) {
+      filtersToAdd.push(this._selfTimeBarFilter);
+    }
 
     const isBottomUp = this.viewMode === 'bottom-up';
 
@@ -807,21 +901,31 @@ export class CalltreeView extends LitElement {
       this.typeFilterCache,
     );
 
-  _namespaceFilter = (
-    selectedNamespaces: string[],
-    _namespace: string,
-    data: TimeOrderRow | AggregatedRow | BottomUpRow,
-    filterParams: { filterCache: Map<number, boolean> },
-  ): boolean => {
-    if (selectedNamespaces.length === 0) {
-      return true;
-    }
-    return deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
+  _namespaceBarFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
+    deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
       data,
-      (row) => selectedNamespaces.includes(row.namespace || ''),
-      filterParams.filterCache,
+      (row) => this.namespaceSelected.includes(row.namespace || ''),
+      this.namespaceFilterCache,
     );
-  };
+
+  _totalTimeBarFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
+    deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
+      data,
+      (row) =>
+        inMsRange(this.totalTimeRange, 'totalTime' in row ? row.totalTime : row.duration.total),
+      this.totalTimeFilterCache,
+    );
+
+  _selfTimeBarFilter = (data: TimeOrderRow | AggregatedRow | BottomUpRow): boolean =>
+    deepFilter<TimeOrderRow | AggregatedRow | BottomUpRow>(
+      data,
+      (row) =>
+        inMsRange(
+          this.selfTimeRange,
+          'totalSelfTime' in row ? row.totalSelfTime : row.duration.self,
+        ),
+      this.selfTimeFilterCache,
+    );
 
   private async _renderCallTree(
     callTreeTableContainer: HTMLDivElement,
@@ -834,10 +938,12 @@ export class CalltreeView extends LitElement {
 
     const { table, tableBuilt } = createTimeOrderTable(callTreeTableContainer, rootMethod, {
       showDetailsFilter: this._showDetailsFilter,
-      namespaceFilter: this._namespaceFilter,
       onFilterCacheClear: () => {
         this.debugOnlyFilterCache.clear();
         this.typeFilterCache.clear();
+        this.namespaceFilterCache.clear();
+        this.totalTimeFilterCache.clear();
+        this.selfTimeFilterCache.clear();
       },
       onRenderStarted: () => {
         if (!this.blockClearHighlights && this.totalMatches > 0) {
@@ -871,11 +977,13 @@ export class CalltreeView extends LitElement {
     }
 
     const { table, tableBuilt } = createAggregatedTable(container, rootMethod, {
-      namespaceFilter: this._namespaceFilter,
       showDetailsFilter: this._showDetailsFilter,
       onFilterCacheClear: () => {
         this.debugOnlyFilterCache.clear();
         this.typeFilterCache.clear();
+        this.namespaceFilterCache.clear();
+        this.totalTimeFilterCache.clear();
+        this.selfTimeFilterCache.clear();
       },
       onRenderStarted: () => {
         if (!this.blockClearHighlights && this.totalMatches > 0) {
@@ -901,7 +1009,6 @@ export class CalltreeView extends LitElement {
       container,
       rootMethod,
       {
-        namespaceFilter: this._namespaceFilter,
         showDetailsFilter: this._showDetailsFilter,
         onRenderStarted: () => {
           if (!this.blockClearHighlights && this.totalMatches > 0) {

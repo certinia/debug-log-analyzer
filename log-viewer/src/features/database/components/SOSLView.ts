@@ -29,9 +29,9 @@ import {
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
-import Number from '../../../tabulator/format/Number.js';
+import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
-import { SOSL_ROWS_PER_QUERY_LIMIT } from '../limits.js';
+import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
@@ -40,6 +40,7 @@ import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
+import { commonColumnDefaults, headerSortElement } from '../../call-tree/components/TableShared.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -49,7 +50,10 @@ import databaseViewStyles from './DatabaseView.scss';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { showStatementRowMenu } from './rowContextMenu.js';
+import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
+import '../../../components/datagrid-range-filter.js';
+import '../../../components/OverflowList.js';
 
 /** The SOSL column is always shown in the SOSL table. */
 const ALWAYS_VISIBLE = ['sosl'];
@@ -60,8 +64,6 @@ const groupLabelsToFields = new Map<string, string>([
   ['Caller Namespace', 'callerNamespace'],
   ['None', ''],
 ]);
-
-const countFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 
 @customElement('sosl-view')
 export class SOSLView extends LitElement {
@@ -99,6 +101,12 @@ export class SOSLView extends LitElement {
   private contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private contextMenuEventIndex: number | null = null;
+
+  @state()
+  private namespaces: string[] = [];
+  private namespaceSelected: string[] = [];
+  private rowCountRange: FilterRange = { start: null, end: null };
+  private timeTakenRange: FilterRange = { start: null, end: null };
 
   constructor() {
     super();
@@ -167,7 +175,25 @@ export class SOSLView extends LitElement {
 
     return html`
       <datagrid-filter-bar>
+        <overflow-list slot="filters" menu-heading="Filters" icon="filter">
+          <datagrid-facet-filter
+            label="Namespace"
+            .values="${this.namespaces}"
+            @datagrid-facet-change="${this._handleNamespaceFacet}"
+          ></datagrid-facet-filter>
+          <datagrid-range-filter
+            label="Row Count"
+            @datagrid-range-change="${this._handleRowCountRange}"
+          ></datagrid-range-filter>
+          <datagrid-range-filter
+            label="Time Taken"
+            unit="ms"
+            @datagrid-range-change="${this._handleTimeTakenRange}"
+          ></datagrid-range-filter>
+        </overflow-list>
+
         <vs-select
+          dense
           slot="table-actions"
           id="sosl-column-view"
           prefix="Columns"
@@ -186,6 +212,7 @@ export class SOSLView extends LitElement {
         </vs-select>
 
         <vs-select
+          dense
           slot="group"
           id="sosl-groupby-dropdown"
           prefix="Group"
@@ -355,6 +382,30 @@ export class SOSLView extends LitElement {
     updateSetting('database.sosl.columnOverrides', this.columnOverrides);
   }
 
+  private _handleNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
+    this.namespaceSelected = event.detail.selected;
+    this.soslTable?.refreshFilter();
+  }
+
+  private _handleRowCountRange(event: CustomEvent<{ range: FilterRange }>) {
+    this.rowCountRange = event.detail.range;
+    this.soslTable?.refreshFilter();
+  }
+
+  private _handleTimeTakenRange(event: CustomEvent<{ range: FilterRange }>) {
+    this.timeTakenRange = event.detail.range;
+    this.soslTable?.refreshFilter();
+  }
+
+  private _namespaceFilter = (data: SOSLRow): boolean =>
+    this.namespaceSelected.length === 0 || this.namespaceSelected.includes(data.namespace ?? '');
+
+  private _rowCountFilter = (data: SOSLRow): boolean =>
+    inCountRange(this.rowCountRange, data.rowCount ?? 0);
+
+  private _timeTakenFilter = (data: SOSLRow): boolean =>
+    inMsRange(this.timeTakenRange, data.timeTaken ?? 0);
+
   _copyToClipboard() {
     this.soslTable?.copyToClipboard('all');
   }
@@ -471,6 +522,14 @@ export class SOSLView extends LitElement {
       }
     }
 
+    this.namespaces = [
+      ...new Set(soslData.map((row) => row.namespace).filter((v): v is string => !!v)),
+    ].sort();
+
+    // Bars fill relative to this grid's own totals (the Total row's sum), not a governor limit.
+    const soslRowCountTotal = soslData.reduce((sum, row) => sum + (row.rowCount ?? 0), 0);
+    const soslTimeTakenTotal = soslData.reduce((sum, row) => sum + (row.timeTaken ?? 0), 0);
+
     this.soslTable = new Tabulator(soslTableContainer, {
       index: 'id',
       height: '100%',
@@ -498,29 +557,15 @@ export class SOSLView extends LitElement {
       groupStartOpen: false,
       groupToggleElement: false,
       selectableRows: 'highlight',
-      columnDefaults: {
-        title: 'default',
-        resizable: true,
-        headerSortStartingDir: 'desc',
-        headerTooltip: true,
-        headerWordWrap: true,
-      },
-      headerSortElement: function (_column, dir) {
-        switch (dir) {
-          case 'asc':
-            return "<div class='sort-by--top'></div>";
-          case 'desc':
-            return "<div class='sort-by--bottom'></div>";
-          default:
-            return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
-        }
-      },
+      columnDefaults: commonColumnDefaults,
+      headerSortElement,
       columns: [
         {
           title: 'SOSL',
           field: 'sosl',
           sorter: 'string',
           tooltip: true,
+          widthGrow: 5,
           bottomCalc: () => {
             return 'Total';
           },
@@ -532,26 +577,16 @@ export class SOSLView extends LitElement {
           title: 'Namespace',
           field: 'namespace',
           sorter: 'string',
-          width: 120,
-          headerFilter: 'list',
-          headerFilterFunc: 'in',
-          headerFilterParams: {
-            valuesLookup: 'all',
-            clearable: true,
-            multiselect: true,
-          },
-          headerFilterLiveFilter: false,
+          width: 100,
         },
         {
           title: 'Caller Namespace',
           field: 'callerNamespace',
           sorter: 'string',
-          width: 120,
+          width: 100,
           visible: false,
         },
         {
-          // SOSL's row limit is per query (2,000), not a transaction total — so
-          // each row meters against that per-query cap; the footer is a plain sum.
           title: 'Row Count',
           field: 'rowCount',
           sorter: 'number',
@@ -562,14 +597,18 @@ export class SOSLView extends LitElement {
           formatter: progressFormatter,
           formatterParams: {
             precision: 0,
-            totalValue: SOSL_ROWS_PER_QUERY_LIMIT,
+            totalValue: soslRowCountTotal,
             showPercentageText: false,
           },
-          // The group/total is a plain sum (a per-query bar there would be
-          // meaningless); use an integer formatter, NOT the ns→ms `Number` one.
           bottomCalc: 'sum',
-          bottomCalcFormatter: (cell) => countFormat.format((cell.getValue() as number) ?? 0),
-          tooltip: (_e, cell) => `${cell.getValue()} / ${SOSL_ROWS_PER_QUERY_LIMIT} per query`,
+          bottomCalcFormatter: progressFormatter,
+          bottomCalcFormatterParams: {
+            precision: 0,
+            totalValue: soslRowCountTotal,
+            showPercentageText: false,
+          },
+          tooltip: (_e, cell) =>
+            cell.getValue() + (soslRowCountTotal > 0 ? '/' + soslRowCountTotal : ''),
         },
         {
           title: 'Time Taken (ms)',
@@ -579,15 +618,20 @@ export class SOSLView extends LitElement {
           width: 110,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          formatter: Number,
+          formatter: progressFormatterMS,
           formatterParams: {
-            thousand: false,
             precision: 2,
+            totalValue: soslTimeTakenTotal,
+            showPercentageText: false,
           },
           accessorDownload: NumberAccessor,
-          bottomCalcFormatter: Number,
           bottomCalc: 'sum',
-          bottomCalcFormatterParams: { precision: 2 },
+          bottomCalcFormatter: progressFormatterMS,
+          bottomCalcFormatterParams: {
+            precision: 2,
+            totalValue: soslTimeTakenTotal,
+            showPercentageText: false,
+          },
         },
       ],
     });
@@ -623,6 +667,9 @@ export class SOSLView extends LitElement {
       this.soslTable?.setSortedGroupBy('sosl');
       if (this.soslTable) {
         this._initTableColumns(this.soslTable);
+        this.soslTable.addFilter(this._namespaceFilter);
+        this.soslTable.addFilter(this._rowCountFilter);
+        this.soslTable.addFilter(this._timeTakenFilter);
       }
     });
 

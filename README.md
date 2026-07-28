@@ -25,6 +25,7 @@ Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers.
 - **🔍 [Search the whole log](#-global-search)** – One search across the flame chart, call tree and database tables.
 - **📄 [Jump to the raw log](#-raw-log-navigation)** – Move between the analysis and the log file itself, in both directions.
 - **🤖 [Ask an AI about a log](#-ai-assistant-mcp-server)** – An MCP server so your assistant can analyze logs with you.
+- **🧠 [Filter to what matters](#%EF%B8%8F-database-analysis)** – Narrow any grid by namespace, object or type, or to a value range.
 
 > ✨ Works with any `.log` Salesforce debug log file.
 
@@ -107,8 +108,7 @@ Explore nested method calls with performance metrics:
 - **Call Tree Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution
 - **Column Views** – Switch preset column sets (General, Time, Governor Limits, Database, Memory), show/hide columns from the header menu, reset to defaults
 - **Group Bottom-Up by Namespace or Type**
-- **Filter by Namespace, Type or Duration**
-- **Toggle Debug-Only + Detail Events**
+- **Filter bar** – Namespace, event Type, and a Total/Self Time range, plus **Details** and **Debug Only** toggles
 - **Keyboard Navigation**
 - **Click to go to Code** – Jump to the source method in your project
 - **[Inspector](#-inspector-) 🧪** – Select a row to inspect just that call path
@@ -133,7 +133,7 @@ See which methods are the slowest, most frequent. or expensive.
 - **Group by Type, Namespace, or Caller Namespace **
 - **Column Views** – Preset column sets, show/hide columns, reset to defaults
 - **Sort by Duration, Count, Name, Type or Namespace**
-- **Filter to specific event types**
+- **Filter** – show or hide zero-time events (Details)
 - **Copy or Export to CSV**
 
 ![Analysis](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/analysis.png)
@@ -146,6 +146,7 @@ Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues, a
 - **Tracked vs consumed** – each section reconciles statements seen in the log against the governor-counted total, so you can spot queries that didn't count (e.g. custom metadata).
 - **Separate SOQL, DML and SOSL tables** – SOSL is fully searchable, with its rows metered against the 2,000-per-query cap.
 - **Object column + Group by Object / Namespace / Caller Namespace / Query**
+- **Filter bar** – Namespace, Object, Caller Namespace, and a Row Count / Time Taken range
 - **SOQL Duration, Selectivity, Aggregates, Row Count**
 - **Column Views** – Preset column sets (incl. a SOQL Query Plan view), show/hide columns, reset to defaults
 - **Show in Call Tree** – right-click a statement to jump to it in the full Call Tree
