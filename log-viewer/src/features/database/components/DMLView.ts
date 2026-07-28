@@ -12,6 +12,7 @@ import type { ApexLog, DMLBeginLine } from 'apex-log-parser';
 import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
 import {
@@ -44,6 +45,7 @@ import databaseViewStyles from './DatabaseView.scss';
 // web components
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
+import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
 import '../../../components/datagrid-filter-bar.js';
 
 /** The DML column is always shown in the DML table. */
@@ -91,6 +93,8 @@ export class DMLView extends LitElement {
   @state()
   private columnOverrides: Record<string, string[]> = {};
   private contextMenu: ContextMenu | null = null;
+  /** eventIndex of the row whose context menu is open. */
+  private contextMenuEventIndex: number | null = null;
 
   constructor() {
     super();
@@ -216,7 +220,7 @@ export class DMLView extends LitElement {
         ${dmlSkeleton}
         <div id="db-dml-table"></div>
       </div>
-      <context-menu @menu-select="${this._handleColumnMenuSelect}"></context-menu>
+      <context-menu @menu-select="${this._handleContextMenuSelect}"></context-menu>
     `;
   }
 
@@ -286,10 +290,48 @@ export class DMLView extends LitElement {
     );
   }
 
-  private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
+  /**
+   * Row right-click menu. Shares the one `<context-menu>` with the column menu —
+   * whose ids are all prefixed (`view:`/`col:`/`reset:`), so row ids can't clash.
+   */
+  private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
+    if (!this.contextMenu || window.getSelection()?.type === 'Range') {
+      return;
+    }
+    event.preventDefault();
+
+    // Match the click behaviour (RowKeyboardNavigation) so the detail panel
+    // follows the right-clicked row.
+    for (const selected of this.dmlTable?.getSelectedRows() ?? []) {
+      selected.deselect();
+    }
+    row.select();
+
+    const { eventIndex } = row.getData() as DMLRow;
+    if (eventIndex === undefined) {
+      return;
+    }
+    this.contextMenuEventIndex = eventIndex;
+    this.contextMenu.show(
+      new ContextMenuBuilder()
+        .addGroup([{ id: 'show-in-call-tree', label: 'Show in Call Tree' }])
+        .build(),
+      event.clientX,
+      event.clientY,
+    );
+  }
+
+  private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>) {
     const { itemId } = e.detail;
     const table = this.dmlTable;
     if (!table) {
+      return;
+    }
+    if (itemId === 'show-in-call-tree') {
+      const eventIndex = this.contextMenuEventIndex;
+      if (eventIndex !== null) {
+        void goToRow({ eventIndex });
+      }
       return;
     }
     if (itemId.startsWith('view:')) {
@@ -614,6 +656,10 @@ export class DMLView extends LitElement {
         source: 'database',
         selection: { kind: 'event', eventIndex: data.eventIndex, type: 'dml' },
       });
+    });
+
+    this.dmlTable.on('rowContext', (e, row) => {
+      this._showRowContextMenu(e as MouseEvent, row);
     });
 
     this.dmlTable.on('tableBuilt', () => {

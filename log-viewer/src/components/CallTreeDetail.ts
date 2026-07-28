@@ -20,11 +20,14 @@ import {
   waitForNextFrame,
 } from '../features/call-tree/components/TableShared.js';
 import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCalcs.js';
-import { formatSOQL } from '../features/soql/format/formatter.js';
+import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
+import './ContextMenu.js';
+import type { ContextMenu } from './ContextMenu.js';
+import { panelRowMenuItems, runPanelRowAction } from './panelRowMenu.js';
 import { buildScopedCallTree, type ScopedCallTree } from './scopedCallTree.js';
 import './ViewModeSwitch.js';
 import type { ViewModeOption } from './ViewModeSwitch.js';
@@ -64,10 +67,7 @@ function compactNameFormatter(cell: CellComponent): HTMLElement {
   const isSoql = type === 'SOQL_EXECUTE_BEGIN';
   const isSosl = type === 'SOSL_EXECUTE_BEGIN';
   if ((isSoql || isSosl) && text) {
-    const span = document.createElement('span');
-    span.className = 'soql-block soql-inline';
-    span.innerHTML = formatSOQL(text, { mode: 'inline', dialect: isSosl ? 'sosl' : 'soql' });
-    return span;
+    return soqlInlineElement(text, isSosl ? 'sosl' : 'soql');
   }
 
   const label = type && type !== text && !EXCLUDED_TYPES.has(type) ? `${type}: ${text}` : text;
@@ -106,6 +106,14 @@ export class CallTreeDetail extends LitElement {
 
   // Guards against a slow view-switch resolving after a newer one.
   private _switchEpoch = 0;
+
+  private _contextMenu: ContextMenu | null = null;
+  /** eventIndex of the row whose context menu is open. */
+  private _menuEventIndex = -1;
+
+  firstUpdated(): void {
+    this._contextMenu = this.renderRoot.querySelector('context-menu');
+  }
 
   static styles = [
     globalStyles,
@@ -225,16 +233,22 @@ export class CallTreeDetail extends LitElement {
       dataTreeChildColumnCalcs: false,
       dataTreeBranchElement: '<span/>',
       columnCalcs: 'table',
-      // Arrow-key row navigation, matching the Call Tree tab.
-      // @ts-expect-error custom option registered by the RowKeyboardNavigation module (types not updated)
+      // Arrow-key row navigation, matching the Call Tree tab. Custom option
+      // registered by the RowKeyboardNavigation module (absent from the types).
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
+      // Ctrl/Cmd+C copies the table, matching the main grids.
+      clipboard: true,
+      clipboardCopyRowRange: 'all',
+      // @ts-expect-error types need update, an array of bindings is valid
+      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
       headerSortElement,
       columnDefaults: commonColumnDefaults,
       columns: this._columns(mode, scoped.rootTotal),
     });
-    // Clicking a row toggles its subtree (never navigates to the main Call Tree
-    // tab). The tree-control arrow handles its own toggle, so skip those clicks.
+    // Clicking a row toggles its subtree — jumping to the main Call Tree tab is
+    // an explicit right-click action. The tree-control arrow handles its own
+    // toggle, so skip those clicks.
     table.on('rowClick', (e: UIEvent, row: RowComponent) => {
       if (window.getSelection()?.type === 'Range') {
         return;
@@ -246,7 +260,32 @@ export class CallTreeDetail extends LitElement {
         row.treeToggle();
       }
     });
+    table.on('rowContext', (e, row) => {
+      this._showRowMenu(e as MouseEvent, row, table);
+    });
     this._tables[mode] = table;
+  }
+
+  /** Row right-click menu: reveal in the Call Tree tab, or copy the frame. */
+  private _showRowMenu(event: MouseEvent, row: RowComponent, table: Tabulator) {
+    if (!this._contextMenu || window.getSelection()?.type === 'Range') {
+      return;
+    }
+    event.preventDefault();
+
+    for (const selected of table.getSelectedRows()) {
+      selected.deselect();
+    }
+    row.select();
+
+    // Aggregated/bottom-up rows merge occurrences; `originalData` is the
+    // representative frame, so the action lands on that occurrence.
+    const { originalData } = row.getData() as { originalData?: LogEvent };
+    this._menuEventIndex = originalData?.eventIndex ?? -1;
+    if (this._menuEventIndex < 0) {
+      return;
+    }
+    this._contextMenu.show(panelRowMenuItems(), event.clientX, event.clientY);
   }
 
   private _columns(mode: ViewMode, rootTotal: number): ColumnDefinition[] {
@@ -328,6 +367,10 @@ export class CallTreeDetail extends LitElement {
           <div id="bottom-up-tree" class="grid"></div>
         </div>
       </div>
+      <context-menu
+        @menu-select=${(e: CustomEvent<{ itemId: string }>) =>
+          runPanelRowAction(e.detail.itemId, this._menuEventIndex)}
+      ></context-menu>
     `;
   }
 

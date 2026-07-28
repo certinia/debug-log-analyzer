@@ -18,8 +18,10 @@ import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { goToRow } from '../../call-tree/navigation.js';
 import { deriveSoqlObject } from '../services/sobjectClassification.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
+import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
 import {
@@ -52,6 +54,7 @@ import databaseViewStyles from './DatabaseView.scss';
 // web components
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
+import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
 import '../../../components/datagrid-filter-bar.js';
 import './DatabaseSection.js';
 
@@ -94,6 +97,8 @@ export class SOQLView extends LitElement {
   @state()
   private columnOverrides: Record<string, string[]> = {};
   private contextMenu: ContextMenu | null = null;
+  /** eventIndex of the row whose context menu is open. */
+  private contextMenuEventIndex: number | null = null;
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
     count: 0,
@@ -230,7 +235,7 @@ export class SOQLView extends LitElement {
         ${soqlSkeleton}
         <div id="db-soql-table"></div>
       </div>
-      <context-menu @menu-select="${this._handleColumnMenuSelect}"></context-menu>
+      <context-menu @menu-select="${this._handleContextMenuSelect}"></context-menu>
     `;
   }
 
@@ -300,10 +305,48 @@ export class SOQLView extends LitElement {
     );
   }
 
-  private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
+  /**
+   * Row right-click menu. Shares the one `<context-menu>` with the column menu —
+   * whose ids are all prefixed (`view:`/`col:`/`reset:`), so row ids can't clash.
+   */
+  private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
+    if (!this.contextMenu || window.getSelection()?.type === 'Range') {
+      return;
+    }
+    event.preventDefault();
+
+    // Match the click behaviour (RowKeyboardNavigation) so the detail panel
+    // follows the right-clicked row.
+    for (const selected of this.soqlTable?.getSelectedRows() ?? []) {
+      selected.deselect();
+    }
+    row.select();
+
+    const { eventIndex } = row.getData() as GridSOQLData;
+    if (eventIndex === undefined) {
+      return;
+    }
+    this.contextMenuEventIndex = eventIndex;
+    this.contextMenu.show(
+      new ContextMenuBuilder()
+        .addGroup([{ id: 'show-in-call-tree', label: 'Show in Call Tree' }])
+        .build(),
+      event.clientX,
+      event.clientY,
+    );
+  }
+
+  private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>) {
     const { itemId } = e.detail;
     const table = this.soqlTable;
     if (!table) {
+      return;
+    }
+    if (itemId === 'show-in-call-tree') {
+      const eventIndex = this.contextMenuEventIndex;
+      if (eventIndex !== null) {
+        void goToRow({ eventIndex });
+      }
       return;
     }
     if (itemId.startsWith('view:')) {
@@ -536,6 +579,7 @@ export class SOQLView extends LitElement {
           },
           headerSortTristate: true,
           cssClass: 'datagrid-code-text',
+          formatter: (cell) => soqlInlineElement(cell.getValue() as string, 'soql'),
         },
         {
           title: 'Selective',
@@ -757,6 +801,10 @@ export class SOQLView extends LitElement {
         source: 'database',
         selection: { kind: 'event', eventIndex: data.eventIndex, type: 'soql' },
       });
+    });
+
+    this.soqlTable.on('rowContext', (e, row) => {
+      this._showRowContextMenu(e as MouseEvent, row);
     });
 
     this.soqlTable.on('tableBuilt', () => {

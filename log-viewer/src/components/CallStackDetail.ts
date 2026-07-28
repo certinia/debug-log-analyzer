@@ -3,7 +3,7 @@
  */
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { type CellComponent, Tabulator } from 'tabulator-tables';
+import { type CellComponent, type RowComponent, Tabulator } from 'tabulator-tables';
 
 import {
   commonColumnDefaults,
@@ -11,12 +11,15 @@ import {
   headerSortElement,
   registerTableModules,
 } from '../features/call-tree/components/TableShared.js';
-import { formatSOQL } from '../features/soql/format/formatter.js';
+import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import { buildCallStackData, type CallStackRow } from './callStackData.js';
+import './ContextMenu.js';
+import type { ContextMenu } from './ContextMenu.js';
+import { panelRowMenuItems, runPanelRowAction } from './panelRowMenu.js';
 
 /**
  * The lineage of parent frames that led to an event, outermost first, as a
@@ -30,6 +33,13 @@ export class CallStackDetail extends LitElement {
   eventIndex = -1;
 
   private _table: Tabulator | null = null;
+  private _contextMenu: ContextMenu | null = null;
+  /** eventIndex of the row whose context menu is open. */
+  private _menuEventIndex = -1;
+
+  firstUpdated(): void {
+    this._contextMenu = this.renderRoot.querySelector('context-menu');
+  }
 
   static styles = [
     globalStyles,
@@ -93,10 +103,15 @@ export class CallStackDetail extends LitElement {
       layout: 'fitColumns',
       placeholder: 'No call stack available',
       columnCalcs: 'table',
-      // Arrow-key row navigation, matching the Call Tree tab.
-      // @ts-expect-error custom option registered by the RowKeyboardNavigation module (types not updated)
+      // Arrow-key row navigation, matching the Call Tree tab. Custom option
+      // registered by the RowKeyboardNavigation module (absent from the types).
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
+      // Ctrl/Cmd+C copies the table, matching the main grids.
+      clipboard: true,
+      clipboardCopyRowRange: 'all',
+      // @ts-expect-error types need update, an array of bindings is valid
+      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
       headerSortElement,
       columnDefaults: commonColumnDefaults,
       columns: [
@@ -133,13 +148,37 @@ export class CallStackDetail extends LitElement {
         }),
       ],
     });
-    // No rowClick navigation: clicking a frame selects it (RowKeyboardNavigation)
-    // and never jumps to the main Call Tree tab. The call stack is flat, so there
-    // is nothing to expand/collapse.
+    // No rowClick navigation: clicking a frame only selects it
+    // (RowKeyboardNavigation) — jumping to the main Call Tree tab is an explicit
+    // right-click action. The call stack is flat, so there is nothing to toggle.
+    this._table.on('rowContext', (e, row) => {
+      this._showRowMenu(e as MouseEvent, row);
+    });
+  }
+
+  /** Row right-click menu: reveal in the Call Tree tab, or copy the frame. */
+  private _showRowMenu(event: MouseEvent, row: RowComponent) {
+    if (!this._contextMenu || window.getSelection()?.type === 'Range') {
+      return;
+    }
+    event.preventDefault();
+
+    for (const selected of this._table?.getSelectedRows() ?? []) {
+      selected.deselect();
+    }
+    row.select();
+
+    const { eventIndex } = row.getData() as CallStackRow;
+    this._menuEventIndex = eventIndex;
+    this._contextMenu.show(panelRowMenuItems(), event.clientX, event.clientY);
   }
 
   render() {
-    return html`<div id="call-stack-table"></div>`;
+    return html`<div id="call-stack-table"></div>
+      <context-menu
+        @menu-select=${(e: CustomEvent<{ itemId: string }>) =>
+          runPanelRowAction(e.detail.itemId, this._menuEventIndex)}
+      ></context-menu>`;
   }
 }
 
@@ -148,10 +187,7 @@ function frameFormatter(cell: CellComponent): HTMLElement | string {
   const isSoql = data.type === 'SOQL_EXECUTE_BEGIN';
   const isSosl = data.type === 'SOSL_EXECUTE_BEGIN';
   if ((isSoql || isSosl) && data.text) {
-    const span = document.createElement('span');
-    span.className = 'soql-block soql-inline';
-    span.innerHTML = formatSOQL(data.text, { mode: 'inline', dialect: isSosl ? 'sosl' : 'soql' });
-    return span;
+    return soqlInlineElement(data.text, isSosl ? 'sosl' : 'soql');
   }
   return data.text ?? '';
 }
