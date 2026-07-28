@@ -18,8 +18,6 @@ jest.mock('tabulator-tables', () => ({
 }));
 // vscode-button needs ElementInternals.setFormValue (absent in jsdom).
 jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-// Avoid the heavy Call Tree tab import (only goToRow is used here).
-jest.mock('../../features/call-tree/components/CalltreeView.js', () => ({ goToRow: () => {} }));
 
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';

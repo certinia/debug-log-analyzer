@@ -23,8 +23,8 @@ import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
 import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { findEventByEventIndex, findEventByTimestamp } from '../../../core/utility/EventSearch.js';
-import { formatDuration } from '../../../core/utility/Util.js';
-import { goToRow } from '../../call-tree/components/CalltreeView.js';
+import { goToRow } from '../../call-tree/navigation.js';
+import { formatCallStack, formatEventDetails } from '../../call-tree/utils/eventText.js';
 import { getTheme } from '../themes/ThemeSelector.js';
 import {
   BUCKET_CONSTANTS,
@@ -792,59 +792,7 @@ export class ApexLogTimeline {
       // Fallback for nodes without original
       return `Name: ${eventNode.text}\nType: ${eventNode.type}`;
     }
-
-    const lines: string[] = [];
-    lines.push(`Name: ${logEvent.text}${logEvent.suffix ?? ''}`);
-
-    if (logEvent.type) {
-      lines.push(`Type: ${logEvent.type}`);
-    }
-
-    if (logEvent.exitStamp && logEvent.duration.total) {
-      let durationStr = formatDuration(logEvent.duration.total);
-      if (logEvent.cpuType === 'free') {
-        durationStr += ' (free)';
-      } else if (logEvent.duration.self) {
-        durationStr += ` (self ${formatDuration(logEvent.duration.self)})`;
-      }
-      lines.push(`Duration: ${durationStr}`);
-    }
-
-    // Add metrics (only if non-zero)
-    const govLimits = this.apexLog?.governorLimits;
-
-    if (logEvent.dmlCount.total) {
-      lines.push(`DML: ${this.formatLimit(logEvent.dmlCount, govLimits?.dmlStatements.limit)}`);
-    }
-    if (logEvent.dmlRowCount.total) {
-      lines.push(`DML Rows: ${this.formatLimit(logEvent.dmlRowCount, govLimits?.dmlRows.limit)}`);
-    }
-    if (logEvent.soqlCount.total) {
-      lines.push(`SOQL: ${this.formatLimit(logEvent.soqlCount, govLimits?.soqlQueries.limit)}`);
-    }
-    if (logEvent.soqlRowCount.total) {
-      lines.push(
-        `SOQL Rows: ${this.formatLimit(logEvent.soqlRowCount, govLimits?.queryRows.limit)}`,
-      );
-    }
-    if (logEvent.soslCount.total) {
-      lines.push(`SOSL: ${this.formatLimit(logEvent.soslCount, govLimits?.soslQueries.limit)}`);
-    }
-    if (logEvent.soslRowCount.total) {
-      lines.push(
-        `SOSL Rows: ${this.formatLimit(logEvent.soslRowCount, govLimits?.soslQueries.limit)}`,
-      );
-    }
-
-    return lines.join('\n');
-  }
-
-  /**
-   * Format a metric with limit for clipboard.
-   */
-  private formatLimit(metric: { total: number; self: number }, limit?: number): string {
-    const outOf = limit ? `/${limit}` : '';
-    return `${metric.total}${outOf} (self ${metric.self})`;
+    return formatEventDetails(logEvent, this.apexLog?.governorLimits);
   }
 
   /**
@@ -853,20 +801,7 @@ export class ApexLogTimeline {
    */
   private formatCallStack(eventNode: EventNode): string {
     const logEvent = (eventNode as EventNode & { original?: LogEvent }).original;
-    if (!logEvent) {
-      return eventNode.text;
-    }
-
-    // Build call stack by traversing up parent chain
-    const stack: LogEvent[] = [];
-    let current: LogEvent | null = logEvent;
-    while (current?.type) {
-      stack.unshift(current); // Prepend to get root-first order
-      current = current.parent;
-    }
-
-    // Format as call stack (one entry per line)
-    return stack.map((event) => event.text + (event.suffix ?? '')).join('\n');
+    return logEvent ? formatCallStack(logEvent) : eventNode.text;
   }
 
   /**

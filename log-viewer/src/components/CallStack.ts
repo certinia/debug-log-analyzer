@@ -6,7 +6,7 @@ import { LitElement, css, html, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import type { LogEvent } from 'apex-log-parser';
-import { goToRow } from '../features/call-tree/components/CalltreeView.js';
+import { goToRow } from '../features/call-tree/navigation.js';
 import { DatabaseAccess } from '../features/database/services/Database.js';
 import { formatSOQLToTemplate } from '../features/soql/format/formatter.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';

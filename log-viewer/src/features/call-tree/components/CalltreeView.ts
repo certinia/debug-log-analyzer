@@ -17,6 +17,7 @@ import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenge
 import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { CALLTREE_GO_TO_ROW } from '../navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import {
   categoryColoringStyles,
@@ -142,7 +143,7 @@ export class CalltreeView extends LitElement {
   constructor() {
     super();
 
-    document.addEventListener('calltree-go-to-row', this._goToRowEvt);
+    document.addEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
@@ -155,7 +156,7 @@ export class CalltreeView extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener('calltree-go-to-row', this._goToRowEvt);
+    document.removeEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
@@ -1146,14 +1147,6 @@ export class CalltreeView extends LitElement {
 
     return indexByEventIndex;
   }
-}
-
-export async function goToRow(target: { eventIndex: number }) {
-  document.dispatchEvent(
-    new CustomEvent('calltree-go-to-row', {
-      detail: target,
-    }),
-  );
 }
 
 type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

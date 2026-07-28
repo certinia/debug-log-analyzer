@@ -4,7 +4,7 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import type { ApexLog, LogEvent, LogIssue } from 'apex-log-parser';
 import { debounce, formatDuration } from '../../../core/utility/Util.js';
-import { goToRow } from '../../call-tree/components/CalltreeView.js';
+import { goToRow } from '../../call-tree/navigation.js';
 
 export interface TimelineGroup {
   label: string;

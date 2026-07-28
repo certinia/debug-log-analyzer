@@ -5,7 +5,7 @@ import '#vscode-elements/vscode-button.js';
 import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { goToRow } from '../features/call-tree/components/CalltreeView.js';
+import { goToRow } from '../features/call-tree/navigation.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
