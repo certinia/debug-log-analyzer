@@ -70,3 +70,26 @@ describe('CallTreeDetail view mode', () => {
     expect(hidden(el, 'time-order-tree')).toBe(true);
   });
 });
+
+describe('CallTreeDetail details toggle', () => {
+  it('starts off and toggles on click', async () => {
+    const el = await mount();
+    const toggle = el.shadowRoot?.querySelector<HTMLButtonElement>('.pill-toggle');
+
+    expect(toggle?.getAttribute('aria-pressed')).toBe('false');
+
+    toggle?.click();
+    await el.updateComplete;
+
+    expect(el.shadowRoot?.querySelector('.pill-toggle')?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('says the times are relative to the selection', async () => {
+    const el = await mount();
+    expect(el.shadowRoot?.querySelector('.note')?.textContent).toContain(
+      'relative to the selection',
+    );
+    // Nothing was truncated (no table built), so no warning.
+    expect(el.shadowRoot?.querySelector('.note .warn')).toBeNull();
+  });
+});

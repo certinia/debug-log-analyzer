@@ -5,7 +5,7 @@
 import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { Multiset } from '../../../core/utility/Multiset.js';
-import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
+import { computeHasDetailsDeep } from './DetailsFilter.js';
 import { setGovernorCost } from './GovernorCost.js';
 
 /**
@@ -709,32 +709,4 @@ function calculateBottomUpAverages(row: BottomUpRow): void {
   if (row.callCount > 0) {
     row.avgSelfTime = row.totalSelfTime / row.callCount;
   }
-}
-
-/**
- * Show-Details predicate, rolled up across children. Called post-order after
- * `_children` is set and each child's own `_hasDetailsDeep` is populated.
- * Generic over `AggregatedRow` (type lives on `originalData`) and `BottomUpRow`
- * (type lives on the row directly) — caller passes whichever applies.
- */
-function computeHasDetailsDeep<T extends { _children?: T[] | null; _hasDetailsDeep: boolean }>(
-  row: T,
-  totalTime: number,
-  type: string | null | undefined,
-): boolean {
-  if (totalTime > 0) {
-    return true;
-  }
-  if (type && EXCLUDED_DETAIL_TYPES.has(type)) {
-    return true;
-  }
-  const children = row._children;
-  if (children) {
-    for (let i = 0, len = children.length; i < len; i++) {
-      if (children[i]!._hasDetailsDeep) {
-        return true;
-      }
-    }
-  }
-  return false;
 }

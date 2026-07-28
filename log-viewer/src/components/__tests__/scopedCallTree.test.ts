@@ -93,6 +93,42 @@ describe('buildScopedCallTree', () => {
     expect(callers).toEqual(['m2', 'm1', 'exec']);
   });
 
+  it('bottom-up: every caller counts the call it contributed, never zero', () => {
+    const tree = buildScopedCallTree(4)!;
+    const counts: number[] = [];
+    let node: ScopedRow | undefined = tree.bottomUp[0];
+    while (node) {
+      counts.push(node.callCount);
+      node = node._children?.[0];
+    }
+    // soql + its three callers, each crediting the one call.
+    expect(counts).toEqual([1, 1, 1, 1]);
+  });
+
+  it('marks zero-duration bookkeeping rows as details, keeping those with timed descendants', () => {
+    const scope = ev(200, 'METHOD_ENTRY', 'scope', { total: 50, self: 0 });
+    const heap = ev(201, 'HEAP_ALLOCATE', 'Bytes:8', { total: 0, self: 0 });
+    const statement = ev(202, 'STATEMENT_EXECUTE', '[12]', { total: 0, self: 0 });
+    const timed = ev(203, 'METHOD_ENTRY', 'timed', { total: 50, self: 50 });
+    scope.parent = root;
+    scope.children = [heap, statement];
+    heap.parent = scope;
+    statement.parent = scope;
+    statement.children = [timed];
+    timed.parent = statement;
+    byId.set(scope.eventIndex, scope);
+
+    const tree = buildScopedCallTree(scope.eventIndex)!;
+    const selected = tree.timeOrder[0]!;
+    const [heapRow, statementRow] = selected._children!;
+    // The selection always shows; a bare heap allocation does not.
+    expect(selected._hasDetailsDeep).toBe(true);
+    expect(heapRow!._hasDetailsDeep).toBe(false);
+    // Zero duration itself, but it is the only way to reach `timed`.
+    expect(statementRow!._hasDetailsDeep).toBe(true);
+    expect(statementRow!._children![0]!._hasDetailsDeep).toBe(true);
+  });
+
   it('aggregated: linear path stays one node per frame', () => {
     const tree = buildScopedCallTree(4)!;
     const texts: string[] = [];
