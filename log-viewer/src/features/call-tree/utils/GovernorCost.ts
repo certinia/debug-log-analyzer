@@ -6,7 +6,7 @@ import type { GovernorLimits, SelfTotal } from 'apex-log-parser';
 /**
  * The governor usage a node reports — all that's needed to *derive* cost. Both
  * the call-tree row models and the parser's `LogEvent` satisfy this, so the
- * derivations below work directly off an event (used by the inspector).
+ * derivations below work off either without a conversion step.
  */
 export interface GovernorUsage {
   dmlCount: SelfTotal;
