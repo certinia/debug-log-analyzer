@@ -20,7 +20,7 @@ hide_title: true
 
 Select anything — a Timeline frame, a Call Tree or Analysis row, a SOQL/DML/SOSL statement — and the inspector shows it in depth without you leaving the tab you're working in.
 
-It docks to the **right**, **left** or **bottom**, resizes by dragging its edge, and is toggled from the button in the header. It opens automatically on your first selection; after that it stays as you left it. Position and size persist — see [Settings](../settings.mdx#inspector).
+It docks to the **right**, **left** or **bottom**, resizes by dragging its edge, and is toggled from the button in the header. It opens automatically on your first selection; once you have opened or closed it yourself, it stays that way — including the next time you open a log. Position and size persist — see [Settings](../settings.mdx#inspector).
 
 ### Sections
 
@@ -29,7 +29,7 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 - **Call tree** – The selection scoped within its own execution, switchable between **Time Order**, **Aggregated** and **Bottom-Up** (as in the Chrome DevTools performance panel). Totals are relative to the selection, so a DML that fires triggers shows the triggered work beneath it. This scoping is what makes it different from the [Call Tree](./calltree.mdx) tab, which always shows the whole log.
 - **SOQL issues** – SOQL only: optimization tips describing the query's performance and how to improve it.
 
-Collapse any section you don't need by clicking its header; the collapsed state is remembered.
+Collapse any section you don't need by clicking its header, or drag the divider between two sections to resize them. Both are remembered, as is the Call tree's view mode — it's one panel, so the layout you set follows you from tab to tab.
 
 ### Row actions
 
