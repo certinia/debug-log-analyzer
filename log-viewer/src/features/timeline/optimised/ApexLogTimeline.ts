@@ -21,6 +21,7 @@ import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { ContextMenu } from '../../../components/ContextMenu.js';
 import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
 import { eventBus } from '../../../core/events/EventBus.js';
+import { copyToClipboard } from '../../../core/utility/Clipboard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { findEventByEventIndex, findEventByTimestamp } from '../../../core/utility/EventSearch.js';
 import { goToRow } from '../../call-tree/navigation.js';
@@ -156,10 +157,10 @@ export class ApexLogTimeline {
           this.handleContextMenu(target, screenX, screenY, clientX, clientY);
         },
         onCopy: (eventNode) => {
-          this.copyToClipboard(eventNode.text);
+          copyToClipboard(eventNode.text);
         },
         onCopyMarker: (marker) => {
-          this.copyToClipboard(marker.summary);
+          copyToClipboard(marker.summary);
         },
       },
       // Pass precomputed data to skip redundant O(n) traversals
@@ -709,10 +710,10 @@ export class ApexLogTimeline {
           this.flamechart.focusOnSelectedMarker();
           break;
         case 'copy-summary':
-          this.copyToClipboard(marker.summary);
+          copyToClipboard(marker.summary);
           break;
         case 'copy-marker-details':
-          this.copyToClipboard(this.formatMarkerDetails(marker));
+          copyToClipboard(this.formatMarkerDetails(marker));
           break;
       }
       return;
@@ -735,13 +736,13 @@ export class ApexLogTimeline {
         this.flamechart.focusOnSelectedFrame();
         break;
       case 'copy-name':
-        this.copyToClipboard(event.text);
+        copyToClipboard(event.text);
         break;
       case 'copy-details':
-        this.copyToClipboard(this.formatEventDetails(event));
+        copyToClipboard(this.formatEventDetails(event));
         break;
       case 'copy-call-stack':
-        this.copyToClipboard(this.formatCallStack(event));
+        copyToClipboard(this.formatCallStack(event));
         break;
       case 'show-in-log':
         this.handleShowInLog(event);
@@ -771,15 +772,6 @@ export class ApexLogTimeline {
     if (logEvent?.hasValidSymbols) {
       vscodeMessenger.send<string>('openType', logEvent.text);
     }
-  }
-
-  /**
-   * Copy text to clipboard.
-   */
-  private copyToClipboard(text: string): void {
-    navigator.clipboard.writeText(text).catch(() => {
-      // Silently fail - clipboard API may not be available in all contexts
-    });
   }
 
   /**

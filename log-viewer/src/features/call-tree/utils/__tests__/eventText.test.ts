@@ -20,6 +20,8 @@ type EventOptions = {
   soqlRowSelf?: number;
   dmlTotal?: number;
   dmlSelf?: number;
+  soslRowTotal?: number;
+  soslRowSelf?: number;
 };
 
 let nextTimestamp = 1;
@@ -38,7 +40,7 @@ function createEvent(options: EventOptions): LogEvent {
     duration: { self: options.self ?? 0, total: options.total ?? 0 },
     dmlRowCount: { self: 0, total: 0 },
     soqlRowCount: { self: options.soqlRowSelf ?? 0, total: options.soqlRowTotal ?? 0 },
-    soslRowCount: { self: 0, total: 0 },
+    soslRowCount: { self: options.soslRowSelf ?? 0, total: options.soslRowTotal ?? 0 },
     dmlCount: { self: options.dmlSelf ?? 0, total: options.dmlTotal ?? 0 },
     soqlCount: { self: options.soqlSelf ?? 0, total: options.soqlTotal ?? 0 },
     soslCount: { self: 0, total: 0 },
@@ -99,6 +101,21 @@ describe('formatEventDetails', () => {
     expect(details).toContain('SOQL Rows: 300/50000 (self 300)');
     // No DML on this frame, so no DML lines at all.
     expect(details).not.toContain('DML');
+  });
+
+  it('meters SOSL rows against the per-query cap, not the query-count limit', () => {
+    const sosl = createEvent({
+      text: 'FIND {Acme}',
+      type: 'SOSL_EXECUTE_BEGIN',
+      soslRowTotal: 137,
+      soslRowSelf: 137,
+    });
+    // 20 is the SOSL *query* limit — using it here would read "137/20".
+    expect(formatEventDetails(sosl, limits)).toContain('SOSL Rows: 137/2000 (self 137)');
+
+    // A method that merely contains SOSL work has no per-query cap to report.
+    const method = createEvent({ text: 'MyClass.search()', soslRowTotal: 137, soslRowSelf: 0 });
+    expect(formatEventDetails(method, limits)).toContain('SOSL Rows: 137 (self 0)');
   });
 
   it('drops the limit denominator when no limits are supplied', () => {

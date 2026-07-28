@@ -48,7 +48,7 @@ import databaseViewStyles from './DatabaseView.scss';
 // web components
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
-import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
+import { showStatementRowMenu } from './rowContextMenu.js';
 import '../../../components/datagrid-filter-bar.js';
 
 /** The SOSL column is always shown in the SOSL table. */
@@ -294,35 +294,8 @@ export class SOSLView extends LitElement {
     );
   }
 
-  /**
-   * Row right-click menu. Shares the one `<context-menu>` with the column menu —
-   * whose ids are all prefixed (`view:`/`col:`/`reset:`), so row ids can't clash.
-   */
   private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
-    if (!this.contextMenu || window.getSelection()?.type === 'Range') {
-      return;
-    }
-    event.preventDefault();
-
-    // Match the click behaviour (RowKeyboardNavigation) so the detail panel
-    // follows the right-clicked row.
-    for (const selected of this.soslTable?.getSelectedRows() ?? []) {
-      selected.deselect();
-    }
-    row.select();
-
-    const { eventIndex } = row.getData() as SOSLRow;
-    if (eventIndex === undefined) {
-      return;
-    }
-    this.contextMenuEventIndex = eventIndex;
-    this.contextMenu.show(
-      new ContextMenuBuilder()
-        .addGroup([{ id: 'show-in-call-tree', label: 'Show in Call Tree' }])
-        .build(),
-      event.clientX,
-      event.clientY,
-    );
+    this.contextMenuEventIndex = showStatementRowMenu(event, row, this.soslTable, this.contextMenu);
   }
 
   private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>) {

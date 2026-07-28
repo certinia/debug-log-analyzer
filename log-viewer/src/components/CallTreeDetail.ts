@@ -16,6 +16,7 @@ import {
   commonColumnDefaults,
   createDurationBarColumn,
   headerSortElement,
+  clipboardCopyOptions,
   registerTableModules,
   waitForNextFrame,
 } from '../features/call-tree/components/TableShared.js';
@@ -27,7 +28,7 @@ import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
-import { panelRowMenuItems, runPanelRowAction } from './panelRowMenu.js';
+import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import { buildScopedCallTree, type ScopedCallTree } from './scopedCallTree.js';
 import './ViewModeSwitch.js';
 import type { ViewModeOption } from './ViewModeSwitch.js';
@@ -233,15 +234,11 @@ export class CallTreeDetail extends LitElement {
       dataTreeChildColumnCalcs: false,
       dataTreeBranchElement: '<span/>',
       columnCalcs: 'table',
-      // Arrow-key row navigation, matching the Call Tree tab. Custom option
-      // registered by the RowKeyboardNavigation module (absent from the types).
+      // Arrow-key row navigation, matching the Call Tree tab.
+      // @ts-expect-error custom option registered by the RowKeyboardNavigation module
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
-      // Ctrl/Cmd+C copies the table, matching the main grids.
-      clipboard: true,
-      clipboardCopyRowRange: 'all',
-      // @ts-expect-error types need update, an array of bindings is valid
-      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
+      ...clipboardCopyOptions,
       headerSortElement,
       columnDefaults: commonColumnDefaults,
       columns: this._columns(mode, scoped.rootTotal),
@@ -285,7 +282,7 @@ export class CallTreeDetail extends LitElement {
     if (this._menuEventIndex < 0) {
       return;
     }
-    this._contextMenu.show(panelRowMenuItems(), event.clientX, event.clientY);
+    this._contextMenu.show(PANEL_ROW_MENU_ITEMS, event.clientX, event.clientY);
   }
 
   private _columns(mode: ViewMode, rootTotal: number): ColumnDefinition[] {

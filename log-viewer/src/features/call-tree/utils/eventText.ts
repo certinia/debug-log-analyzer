@@ -4,6 +4,7 @@
 import type { GovernorLimits, LogEvent } from 'apex-log-parser';
 
 import { formatDuration } from '../../../core/utility/Util.js';
+import { SOSL_ROWS_PER_QUERY_LIMIT } from '../../database/limits.js';
 
 /** The frame's display name, including any parser-supplied suffix. */
 export function eventName(event: LogEvent): string {
@@ -38,7 +39,13 @@ export function formatEventDetails(event: LogEvent, limits?: GovernorLimits): st
     ['SOQL', event.soqlCount, limits?.soqlQueries.limit],
     ['SOQL Rows', event.soqlRowCount, limits?.queryRows.limit],
     ['SOSL', event.soslCount, limits?.soslQueries.limit],
-    ['SOSL Rows', event.soslRowCount, limits?.soslQueries.limit],
+    // SOSL rows have no cumulative transaction limit — only a per-query cap,
+    // so it is a meaningful denominator for a SOSL statement and nothing else.
+    [
+      'SOSL Rows',
+      event.soslRowCount,
+      event.type === 'SOSL_EXECUTE_BEGIN' ? SOSL_ROWS_PER_QUERY_LIMIT : undefined,
+    ],
   ];
   for (const [label, metric, limit] of metrics) {
     if (metric.total) {

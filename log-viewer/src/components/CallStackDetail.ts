@@ -9,6 +9,7 @@ import {
   commonColumnDefaults,
   createDurationBarColumn,
   headerSortElement,
+  clipboardCopyOptions,
   registerTableModules,
 } from '../features/call-tree/components/TableShared.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
@@ -19,7 +20,7 @@ import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import { buildCallStackData, type CallStackRow } from './callStackData.js';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
-import { panelRowMenuItems, runPanelRowAction } from './panelRowMenu.js';
+import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 
 /**
  * The lineage of parent frames that led to an event, outermost first, as a
@@ -103,15 +104,11 @@ export class CallStackDetail extends LitElement {
       layout: 'fitColumns',
       placeholder: 'No call stack available',
       columnCalcs: 'table',
-      // Arrow-key row navigation, matching the Call Tree tab. Custom option
-      // registered by the RowKeyboardNavigation module (absent from the types).
+      // Arrow-key row navigation, matching the Call Tree tab.
+      // @ts-expect-error custom option registered by the RowKeyboardNavigation module
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
-      // Ctrl/Cmd+C copies the table, matching the main grids.
-      clipboard: true,
-      clipboardCopyRowRange: 'all',
-      // @ts-expect-error types need update, an array of bindings is valid
-      keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
+      ...clipboardCopyOptions,
       headerSortElement,
       columnDefaults: commonColumnDefaults,
       columns: [
@@ -170,7 +167,7 @@ export class CallStackDetail extends LitElement {
 
     const { eventIndex } = row.getData() as CallStackRow;
     this._menuEventIndex = eventIndex;
-    this._contextMenu.show(panelRowMenuItems(), event.clientX, event.clientY);
+    this._contextMenu.show(PANEL_ROW_MENU_ITEMS, event.clientX, event.clientY);
   }
 
   render() {
