@@ -3,7 +3,7 @@
  */
 import '#vscode-elements/vscode-icon.js';
 import '#vscode-elements/vscode-badge.js';
-import { LitElement, css, html, nothing, type TemplateResult } from 'lit';
+import { LitElement, css, html, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 // styles
@@ -40,9 +40,19 @@ export class PaneView extends LitElement {
   @property({ type: String })
   orientation: PaneOrientation = 'vertical';
 
-  // Transient per-session state.
-  @state()
-  private _collapsed: Record<string, boolean> = {};
+  /**
+   * Collapsed sections, keyed by section id — owned by the consumer, which is
+   * the only thing that knows how far the state should carry (per tab, per
+   * session). Overrides `section.collapsed`, which is only the default seed.
+   */
+  @property({ attribute: false })
+  collapsed: Record<string, boolean> = {};
+
+  /** Persisted pane sizes (px, used as flex weights), keyed by section id. */
+  @property({ attribute: false })
+  paneSizes: Record<string, number> = {};
+
+  // Live drag sizes; supersede `paneSizes` until the consumer stores them.
   @state()
   private _weights: Record<string, number> = {};
 
@@ -169,6 +179,14 @@ export class PaneView extends LitElement {
     `,
   ];
 
+  willUpdate(changed: PropertyValues): void {
+    // The consumer has stored a new set, so the live drag sizes it supersedes
+    // must not keep masking it.
+    if (changed.has('paneSizes')) {
+      this._weights = {};
+    }
+  }
+
   render() {
     const items: TemplateResult[] = [];
     this.sections.forEach((section, index) => {
@@ -185,7 +203,7 @@ export class PaneView extends LitElement {
   private _renderPane(section: PaneSection) {
     const open = this._isOpen(section.id);
     const collapsible = this._collapsible;
-    const weight = this._weights[section.id] ?? section.weight ?? 1;
+    const weight = this._weights[section.id] ?? this.paneSizes[section.id] ?? section.weight ?? 1;
     const style = open ? `flex: ${weight} 1 0` : 'flex: 0 0 auto';
 
     return html`<div class="pane" data-id=${section.id} ?data-open=${open} style=${style}>
@@ -227,21 +245,20 @@ export class PaneView extends LitElement {
   }
 
   private _isOpen(id: string) {
-    return this._collapsible ? !(this._collapsed[id] ?? this._defaultCollapsed(id)) : true;
+    return this._collapsible ? !(this.collapsed[id] ?? this._defaultCollapsed(id)) : true;
   }
 
   private _toggle(id: string) {
     // New collapsed state = the current open state (open → collapse, and vice
-    // versa), starting from the effective (possibly default) state.
-    this._collapsed = { ...this._collapsed, [id]: this._isOpen(id) };
+    // versa), starting from the effective (possibly default) state. The consumer
+    // owns the record, so it re-renders us with the new one.
     this.dispatchEvent(
       new CustomEvent('pane-toggle', {
-        detail: { collapsed: this._collapsed },
+        detail: { collapsed: { ...this.collapsed, [id]: this._isOpen(id) } },
         bubbles: true,
         composed: true,
       }),
     );
-    this.requestUpdate();
   }
 
   private _onHeaderKey(e: KeyboardEvent, id: string) {
@@ -304,6 +321,7 @@ export class PaneView extends LitElement {
     sashEl.removeEventListener('pointermove', this._onSashMove);
     sashEl.removeEventListener('pointerup', this._endSash);
     this._sash = null;
+    this._emitResize();
   };
 
   private _resetSash(aId: string, bId: string) {
@@ -311,5 +329,17 @@ export class PaneView extends LitElement {
       (this._weights[aId] ?? this._paneSize(aId)) + (this._weights[bId] ?? this._paneSize(bId));
     this._weights = { ...this._weights, [aId]: total / 2, [bId]: total / 2 };
     this.requestUpdate();
+    this._emitResize();
+  }
+
+  /** Fires on interaction-end only, so the consumer's write isn't per-frame. */
+  private _emitResize() {
+    this.dispatchEvent(
+      new CustomEvent('pane-resize', {
+        detail: { sizes: { ...this._weights } },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 }

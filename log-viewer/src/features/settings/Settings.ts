@@ -43,7 +43,14 @@ export type LanaSettings = {
   inspector: {
     position: 'left' | 'right' | 'bottom';
     size: number;
+    /** Collapsed sections, keyed by section id — shared by every tab. */
     collapsed: Record<string, boolean>;
+    /** Pane sizes (px, used as flex weights), keyed by section id. */
+    paneSizes: Record<string, number>;
+    /** Last open/closed state; `null` means never toggled, so it may auto-open. */
+    visible: boolean | null;
+    /** Last Call tree view mode. */
+    callTreeMode: string;
   };
 };
 

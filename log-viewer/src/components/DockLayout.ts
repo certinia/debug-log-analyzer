@@ -39,6 +39,13 @@ export class DockLayout extends LitElement {
   @property({ type: String })
   emptyText = 'Nothing selected.';
 
+  /** Collapsed sections and pane sizes, owned and persisted by the consumer. */
+  @property({ attribute: false })
+  collapsed: Record<string, boolean> = {};
+
+  @property({ attribute: false })
+  paneSizes: Record<string, number> = {};
+
   // Live drag state (transient); when set, overrides `size` while dragging.
   @state()
   private _liveSize: number | null = null;
@@ -125,6 +132,8 @@ export class DockLayout extends LitElement {
                   style=${this._dockSizeStyle()}
                   .sections=${this.sections}
                   .emptyText=${this.emptyText}
+                  .collapsed=${this.collapsed}
+                  .paneSizes=${this.paneSizes}
                   dock=${this.dock}
                 ></detail-dock>
               `

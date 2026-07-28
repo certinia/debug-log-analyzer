@@ -25,7 +25,7 @@ describe('buildDatabaseSections', () => {
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree', 'issues']);
     expect(sections.find((s) => s.id === 'issues')?.badge).toBe('2');
     // SOQL issues open by default, but the smallest section.
-    expect(sections.find((s) => s.id === 'issues')?.collapsed).toBe(false);
+    expect(sections.find((s) => s.id === 'issues')?.collapsed).toBeUndefined();
     expect(sections.find((s) => s.id === 'issues')?.weight).toBe(1);
   });
 
@@ -37,13 +37,5 @@ describe('buildDatabaseSections', () => {
   it('builds vitals + call stack + call tree (no issues) for a SOSL selection', async () => {
     const sections = await buildDatabaseSections({ eventIndex: 7, type: 'sosl' });
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
-  });
-
-  it('applies persisted collapsed state over the defaults', async () => {
-    const sections = await buildDatabaseSections(
-      { eventIndex: 3, type: 'soql' },
-      { callstack: true },
-    );
-    expect(sections.find((s) => s.id === 'callstack')?.collapsed).toBe(true);
   });
 });

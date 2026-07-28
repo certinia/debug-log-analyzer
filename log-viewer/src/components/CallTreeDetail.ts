@@ -21,6 +21,7 @@ import {
   waitForNextFrame,
 } from '../features/call-tree/components/TableShared.js';
 import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCalcs.js';
+import { getSettings, updateSetting } from '../features/settings/Settings.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
@@ -111,6 +112,25 @@ export class CallTreeDetail extends LitElement {
   private _contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private _menuEventIndex = -1;
+  // Set once the user picks a mode, so a late settings load can't overrule them.
+  private _modeIsUserChoice = false;
+
+  constructor() {
+    super();
+    // The mode is remembered UI state, so it's read here rather than threaded
+    // through the section builders.
+    getSettings()
+      .then((settings) => {
+        const mode = settings?.inspector?.callTreeMode;
+        if (!this._modeIsUserChoice && VIEW_MODES.some((option) => option.value === mode)) {
+          this.viewMode = mode as ViewMode;
+          this.requestUpdate();
+        }
+      })
+      .catch(() => {
+        /* settings unavailable (e.g. outside the extension host) — keep the default */
+      });
+  }
 
   firstUpdated(): void {
     this._contextMenu = this.renderRoot.querySelector('context-menu');
@@ -372,7 +392,9 @@ export class CallTreeDetail extends LitElement {
   }
 
   private _setViewMode(mode: ViewMode) {
+    this._modeIsUserChoice = true;
     this.viewMode = mode;
+    updateSetting('inspector.callTreeMode', mode);
     // @state field initializer shadows the accessor under @swc/jest; nudge it.
     this.requestUpdate();
   }

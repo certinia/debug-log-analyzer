@@ -25,8 +25,8 @@ const TAB_TO_SOURCE: Record<string, DetailSource> = {
  * The app-wide inspector. Lives at the app root (sibling of the tab strip,
  * via a forwarded `main` slot) so it crosscuts every tab. It follows the active
  * tab: each source's latest selection is remembered, and it shows the active
- * tab's selection. Persists dock position/size (public settings) and per-section
- * collapse (private globalState); visibility is transient (opens on first select).
+ * tab's selection. Persists dock position/size (public settings) plus its
+ * open/closed state, section collapse and pane sizes (private globalState).
  */
 @customElement('log-inspector')
 export class LogInspector extends LitElement {
@@ -43,14 +43,21 @@ export class LogInspector extends LitElement {
   @state()
   private panelSize = 500;
 
+  // Collapse and pane sizes are keyed by section id and shared by every tab:
+  // it's one panel, so "I don't need the Call stack" and a divider drag are
+  // statements about the section, not about the tab that fed it.
+  @state()
+  private collapsedSections: Record<string, boolean> = {};
+  @state()
+  private paneSizes: Record<string, number> = {};
+
   // Latest selection per source; the bar renders the active tab's entry.
   private _selections = new Map<DetailSource, DetailSelection>();
-  // Auto-open only on the first selection; afterwards the user's toggle wins.
-  private _hasAutoOpened = false;
+  // The user's last open/closed choice, or null if they've never made one —
+  // which is the only state that lets a selection auto-open the panel.
+  private _visiblePref: boolean | null = null;
   // Guards against a slow rebuild resolving after a newer selection.
   private _rebuildEpoch = 0;
-  // Persisted per-section collapse (globalState), keyed by section id.
-  private _collapsedSections: Record<string, boolean> = {};
   private _unsubscribe: Array<() => void> = [];
 
   constructor() {
@@ -65,7 +72,14 @@ export class LogInspector extends LitElement {
         if (panel) {
           this.dock = panel.position;
           this.panelSize = panel.size;
-          this._collapsedSections = panel.collapsed ?? {};
+          this.collapsedSections = panel.collapsed ?? {};
+          this.paneSizes = panel.paneSizes ?? {};
+          this._visiblePref = panel.visible ?? null;
+          // Settings can land after the first selection has already auto-opened
+          // the panel, so an explicit choice always overrides that.
+          if (this._visiblePref !== null) {
+            this.panelVisible = this._visiblePref;
+          }
         }
       })
       .catch(() => {
@@ -111,36 +125,50 @@ export class LogInspector extends LitElement {
         .size=${this.panelSize}
         ?visible=${this.panelVisible}
         .sections=${this.sections}
+        .collapsed=${this.collapsedSections}
+        .paneSizes=${this.paneSizes}
         emptyText="Select a row to inspect it."
         @dock-position-change=${this._onDockPositionChange}
         @dock-resize=${this._onDockResize}
         @dock-hide=${this._hidePanel}
         @dock-collapse=${this._hidePanel}
         @pane-toggle=${this._onPaneToggle}
+        @pane-resize=${this._onPaneResize}
       >
         <slot slot="main" name="main"></slot>
       </dock-layout>
     `;
   }
 
+  private get _activeSource(): DetailSource | undefined {
+    return TAB_TO_SOURCE[this.activeTab];
+  }
+
   private _onSelect(detail: { source: DetailSource; selection: DetailSelection | null }): void {
     if (detail.selection) {
       this._selections.set(detail.source, detail.selection);
-      if (!this._hasAutoOpened) {
-        this._hasAutoOpened = true;
+      // Auto-open only for a user who has never opened or closed it themselves.
+      if (this._visiblePref === null) {
         this.panelVisible = true;
       }
     } else {
       this._selections.delete(detail.source);
     }
     // Only rebuild if the change is for the tab currently on screen.
-    if (TAB_TO_SOURCE[this.activeTab] === detail.source) {
+    if (this._activeSource === detail.source) {
       this._scheduleRebuild();
     }
   }
 
   private _onToggle(detail: { visible?: boolean }): void {
-    this.panelVisible = detail.visible ?? !this.panelVisible;
+    this._setVisible(detail.visible ?? !this.panelVisible);
+  }
+
+  /** Every open/close is the user's, so each one is remembered. */
+  private _setVisible(visible: boolean): void {
+    this.panelVisible = visible;
+    this._visiblePref = visible;
+    updateSetting('inspector.visible', visible);
   }
 
   /**
@@ -154,11 +182,9 @@ export class LogInspector extends LitElement {
 
   private async _rebuild(): Promise<void> {
     const epoch = ++this._rebuildEpoch;
-    const source = TAB_TO_SOURCE[this.activeTab];
+    const source = this._activeSource;
     const selection = source ? (this._selections.get(source) ?? null) : null;
-    const sections = selection
-      ? await buildDetailSections(source!, selection, this._collapsedSections)
-      : [];
+    const sections = source ? await buildDetailSections(source, selection) : [];
     // Drop a slow build that a newer selection already superseded.
     if (epoch === this._rebuildEpoch) {
       this.sections = sections;
@@ -178,12 +204,18 @@ export class LogInspector extends LitElement {
   };
 
   private _onPaneToggle = (e: CustomEvent<{ collapsed: Record<string, boolean> }>) => {
-    this._collapsedSections = { ...this._collapsedSections, ...e.detail.collapsed };
-    updateSetting('inspector.collapsed', this._collapsedSections);
+    this.collapsedSections = { ...this.collapsedSections, ...e.detail.collapsed };
+    updateSetting('inspector.collapsed', this.collapsedSections);
+  };
+
+  // `pane-resize` fires on pointer-up, so this write lands on interaction-end.
+  private _onPaneResize = (e: CustomEvent<{ sizes: Record<string, number> }>) => {
+    this.paneSizes = { ...this.paneSizes, ...e.detail.sizes };
+    updateSetting('inspector.paneSizes', this.paneSizes);
   };
 
   private _hidePanel = () => {
-    this.panelVisible = false;
+    this._setVisible(false);
   };
 }
 

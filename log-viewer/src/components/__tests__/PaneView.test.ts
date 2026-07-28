@@ -18,10 +18,17 @@ const sections: PaneSection[] = [
   { id: 'c', title: 'C', content: html`<div class="content-c">C body</div>` },
 ];
 
+/**
+ * Collapse is controlled: the consumer owns the record and feeds it back. Mount
+ * with that loop wired, the way the inspector does.
+ */
 async function mount(orientation: PaneOrientation): Promise<PaneView> {
   const el = document.createElement('pane-view') as PaneView;
   el.sections = sections;
   el.orientation = orientation;
+  el.addEventListener('pane-toggle', (e) => {
+    el.collapsed = (e as CustomEvent<{ collapsed: Record<string, boolean> }>).detail.collapsed;
+  });
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -114,10 +121,54 @@ describe('PaneView', () => {
     expect(last?.a).toBe(true);
     expect(body(el, 'a')).toBeNull();
 
-    // A new selection re-supplies the same section ids — the user's collapse
-    // survives (defaults are only re-seeded when the id-set changes).
+    // A new selection re-supplies the same section ids — the consumer still owns
+    // the collapse record, so the user's collapse survives.
     el.sections = sections.map((s) => ({ ...s }));
     await el.updateComplete;
     expect(body(el, 'a')).toBeNull();
+  });
+
+  it('takes collapse from the collapsed property, overriding section defaults', async () => {
+    const el = document.createElement('pane-view') as PaneView;
+    el.orientation = 'vertical';
+    el.sections = [
+      { id: 'a', title: 'A', content: html`<div>A</div>` },
+      { id: 'b', title: 'B', content: html`<div>B</div>`, collapsed: true },
+    ];
+    // Inverts both defaults: the consumer's record wins.
+    el.collapsed = { a: true, b: false };
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(body(el, 'a')).toBeNull();
+    expect(body(el, 'b')).not.toBeNull();
+  });
+
+  it('does not collapse when the consumer ignores pane-toggle (fully controlled)', async () => {
+    const el = document.createElement('pane-view') as PaneView;
+    el.orientation = 'vertical';
+    el.sections = sections;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    header(el, 'a')?.click();
+    await el.updateComplete;
+    expect(body(el, 'a')).not.toBeNull();
+  });
+
+  it('uses persisted pane sizes as the flex weights', async () => {
+    const el = document.createElement('pane-view') as PaneView;
+    el.orientation = 'vertical';
+    el.sections = [
+      { id: 'a', title: 'A', content: html`<div>A</div>`, weight: 3 },
+      { id: 'b', title: 'B', content: html`<div>B</div>` },
+    ];
+    el.paneSizes = { a: 120 };
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const pane = (id: string) => el.shadowRoot?.querySelector(`.pane[data-id="${id}"]`);
+    expect(pane('a')?.getAttribute('style')).toContain('flex: 120 1 0');
+    // No persisted size → the section's own default weight.
+    expect(pane('b')?.getAttribute('style')).toContain('flex: 1 1 0');
   });
 });

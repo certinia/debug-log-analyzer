@@ -18,6 +18,11 @@ jest.mock('tabulator-tables', () => ({
 }));
 // vscode-button needs ElementInternals.setFormValue (absent in jsdom).
 jest.mock('#vscode-elements/vscode-button.js', () => ({}));
+// The view mode persists through the extension host, which isn't there.
+jest.mock('../../features/settings/Settings.js', () => ({
+  getSettings: () => Promise.resolve({}),
+  updateSetting: () => {},
+}));
 
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';

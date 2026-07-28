@@ -47,8 +47,11 @@ interface Config {
   inspector: {
     position: 'left' | 'right' | 'bottom';
     size: number;
-    // Per-section collapsed state, keyed by section id — private globalState.
+    // The rest is private globalState (see INSPECTOR_STATE_SECTIONS), not settings.
     collapsed: Record<string, boolean>;
+    paneSizes: Record<string, number>;
+    visible: boolean | null;
+    callTreeMode: string;
   };
 }
 
@@ -97,17 +100,39 @@ export const COLUMN_VIEW_SECTIONS = [
   'database.sosl.columnView',
 ] as const;
 
+/**
+ * The inspector's layout state (which sections are collapsed, their sizes, the
+ * call tree's view mode, whether the panel is open) is remembered UI state
+ * rather than a preference, so it persists in globalState. Dock position and
+ * size stay public `lana.inspector.*` settings.
+ */
+export const INSPECTOR_STATE_SECTIONS = [
+  'inspector.collapsed',
+  'inspector.paneSizes',
+  'inspector.visible',
+  'inspector.callTreeMode',
+] as const;
+
 /** All sections routed to globalState instead of editable `lana.*` settings. */
 export const PRIVATE_SECTIONS = [
   ...COLUMN_OVERRIDE_SECTIONS,
   ...COLUMN_VIEW_SECTIONS,
-  'inspector.collapsed',
+  ...INSPECTOR_STATE_SECTIONS,
 ] as const;
 
 type ColumnOverrides = Record<string, string[]>;
+type InspectorState = Pick<
+  Config['inspector'],
+  'collapsed' | 'paneSizes' | 'visible' | 'callTreeMode'
+>;
 
-export function getInspectorCollapsed(globalState: Memento): Record<string, boolean> {
-  return globalState.get<Record<string, boolean>>('inspector.collapsed', {});
+export function getInspectorState(globalState: Memento): InspectorState {
+  return {
+    collapsed: globalState.get<Record<string, boolean>>('inspector.collapsed', {}),
+    paneSizes: globalState.get<Record<string, number>>('inspector.paneSizes', {}),
+    visible: globalState.get<boolean | null>('inspector.visible', null),
+    callTreeMode: globalState.get<string>('inspector.callTreeMode', 'time-order'),
+  };
 }
 
 export function getColumnOverrides(globalState: Memento): Record<string, ColumnOverrides> {
