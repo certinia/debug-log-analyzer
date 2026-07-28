@@ -13,6 +13,7 @@ import type { RowComponent, Tabulator } from 'tabulator-tables';
 import type { ApexLog } from 'apex-log-parser';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
+import { eventBus } from '../../../core/events/EventBus.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
@@ -58,6 +59,9 @@ export class AnalysisView extends LitElement {
         width: 100%;
         display: flex;
         gap: 1rem;
+        /* inset previously provided by the tab panel's padding */
+        padding: 10px 6px;
+        box-sizing: border-box;
       }
 
       .analysis-view {
@@ -552,6 +556,28 @@ export class AnalysisView extends LitElement {
         this._resetFindWidget();
         this._clearSearchHighlights();
       }
+    });
+
+    // Feed the inspector. Analysis rows merge many calls, so they
+    // scope to every occurrence of the method.
+    this.analysisTable.on('rowSelectionChanged', (_data, rows) => {
+      const data = rows[0]?.getData() as BottomUpRow | undefined;
+      const event = data?.originalData;
+      if (!event) {
+        eventBus.emit('detail:select', { source: 'analysis', selection: null });
+        return;
+      }
+      const occurrences = data.instances?.length ? data.instances : null;
+      eventBus.emit('detail:select', {
+        source: 'analysis',
+        selection: occurrences
+          ? {
+              kind: 'aggregate',
+              instances: occurrences.map((e) => e.eventIndex),
+              label: data.text ?? event.text,
+            }
+          : { kind: 'event', eventIndex: event.eventIndex },
+      });
     });
 
     await tableBuilt;

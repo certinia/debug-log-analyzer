@@ -201,7 +201,7 @@ export function createBottomUpTable(
         tooltip: true,
       },
       {
-        title: 'Count',
+        title: 'Calls',
         field: 'callCount',
         sorter: 'number',
         cssClass: 'number-cell',

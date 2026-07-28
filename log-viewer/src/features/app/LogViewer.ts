@@ -15,6 +15,7 @@ import {
   VSCodeExtensionMessenger,
   vscodeMessenger,
 } from '../../core/messaging/VSCodeExtensionMessenger.js';
+import { DatabaseAccess } from '../database/services/Database.js';
 import {
   Notification,
   type NotificationSeverity,
@@ -25,6 +26,7 @@ import { globalStyles } from '../../styles/global.styles.js';
 
 // web components
 import './AppHeader.js';
+import '../../components/LogInspector.js';
 
 interface NavigateToTimelinePayload {
   timestamp: number;
@@ -83,7 +85,10 @@ export class LogViewer extends LitElement {
 
         display: flex;
         flex-direction: column;
-        height: 100%;
+        /* Slotted into the inspector's main area, so fill it as a flex
+           item rather than relying on height:100%. */
+        flex: 1 1 auto;
+        min-width: 0;
         min-height: 0;
       }
 
@@ -92,8 +97,8 @@ export class LogViewer extends LitElement {
         min-height: 0;
         overflow: auto;
         box-sizing: border-box;
-        /* the toolkit's vscode-panel-view padding */
-        padding: 10px 6px;
+        /* No padding here: each view owns its own inset so a docked details
+           panel can sit flush to the window edge. */
         box-shadow: inset 0 calc(max(1px, 0.0625rem) * 1)
           var(--vscode-panelSectionHeader-background);
       }
@@ -144,41 +149,43 @@ export class LogViewer extends LitElement {
         .timelineRoot=${this.timelineRoot}
       ></app-header>
 
-      <vscode-tabs
-        panel
-        .selectedIndex="${this._selectedIndex}"
-        @vsc-tabs-select="${this._onTabSelect}"
-      >
-        <vscode-tab-header slot="header">
-          <span class="tab-header"><vscode-icon name="graph"></vscode-icon>Timeline</span>
-        </vscode-tab-header>
-        <vscode-tab-header slot="header">
-          <span class="tab-header"><vscode-icon name="list-tree"></vscode-icon>Call Tree</span>
-        </vscode-tab-header>
-        <vscode-tab-header slot="header">
-          <span class="tab-header"><vscode-icon name="code"></vscode-icon>Analysis</span>
-        </vscode-tab-header>
-        <vscode-tab-header slot="header">
-          <span class="tab-header"><vscode-icon name="database"></vscode-icon>Database</span>
-        </vscode-tab-header>
+      <log-inspector .activeTab=${this._selectedTab}>
+        <vscode-tabs
+          slot="main"
+          panel
+          .selectedIndex="${this._selectedIndex}"
+          @vsc-tabs-select="${this._onTabSelect}"
+        >
+          <vscode-tab-header slot="header">
+            <span class="tab-header"><vscode-icon name="graph"></vscode-icon>Timeline</span>
+          </vscode-tab-header>
+          <vscode-tab-header slot="header">
+            <span class="tab-header"><vscode-icon name="list-tree"></vscode-icon>Call Tree</span>
+          </vscode-tab-header>
+          <vscode-tab-header slot="header">
+            <span class="tab-header"><vscode-icon name="code"></vscode-icon>Analysis</span>
+          </vscode-tab-header>
+          <vscode-tab-header slot="header">
+            <span class="tab-header"><vscode-icon name="database"></vscode-icon>Database</span>
+          </vscode-tab-header>
 
-        <vscode-tab-panel>
-          <timeline-view
-            .timelineRoot="${this.timelineRoot}"
-            .navigateToEventIndex="${this._navigateToEventIndex}"
-            .navigateToTimestamp="${this._navigateToTimestamp}"
-          ></timeline-view>
-        </vscode-tab-panel>
-        <vscode-tab-panel>
-          <call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view>
-        </vscode-tab-panel>
-        <vscode-tab-panel>
-          <analysis-view .timelineRoot="${this.timelineRoot}"> </analysis-view>
-        </vscode-tab-panel>
-        <vscode-tab-panel>
-          <database-view .timelineRoot="${this.timelineRoot}"></database-view>
-        </vscode-tab-panel>
-      </vscode-tabs>`;
+          <vscode-tab-panel>
+            <timeline-view
+              .timelineRoot="${this.timelineRoot}"
+              .navigateToEventIndex="${this._navigateToEventIndex}"
+              .navigateToTimestamp="${this._navigateToTimestamp}"
+            ></timeline-view>
+          </vscode-tab-panel>
+          <vscode-tab-panel>
+            <call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view>
+          </vscode-tab-panel>
+          <vscode-tab-panel>
+            <analysis-view .timelineRoot="${this.timelineRoot}"> </analysis-view>
+          </vscode-tab-panel>
+          <vscode-tab-panel>
+            <database-view .timelineRoot="${this.timelineRoot}"></database-view>
+          </vscode-tab-panel> </vscode-tabs
+      ></log-inspector>`;
   }
 
   _onTabSelect(e: VscTabsSelectEvent) {
@@ -221,6 +228,10 @@ export class LogViewer extends LitElement {
     const logData = data.logData || (await this._readLog(logUri || ''));
 
     const apexLog = parse(logData);
+
+    // The event-lookup service backs the inspector on every tab, so it is
+    // created with the parsed log rather than by whichever tab loads first.
+    await DatabaseAccess.create(apexLog);
 
     this.logSize = apexLog.size;
     this.timelineRoot = apexLog;

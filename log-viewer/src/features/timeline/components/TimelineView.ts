@@ -124,6 +124,9 @@ export class TimelineView extends LitElement {
         position: relative;
         width: 100%;
         height: 90%;
+        /* inset previously provided by the tab panel's padding */
+        padding: 10px 6px;
+        box-sizing: border-box;
       }
 
       .timeline-toolbar {

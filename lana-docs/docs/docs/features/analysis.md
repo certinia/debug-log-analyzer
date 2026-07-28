@@ -46,6 +46,10 @@ In this model, roots are callees and parent/child relationships represent caller
 1. Caller Namespace: Shows the rows aggregated by the namespace of the direct caller (the immediate parent code unit). Useful for seeing which package triggered work in another package.
 1. Type: Shows the rows aggregated by namespace event type e.g `METHOD_ENTRY`, `DML_ENTRY`
 
+### Inspect a row
+
+Selecting a row fills the [inspector](./inspector.md) with that method's governor metrics, its call stack, and a call tree scoped to it — so you can see where an expensive method was called from without leaving the Analysis table.
+
 ### Export to CSV + copy to clipboard
 
 Use `Export to CSV` above the table to save the table content to a file or `Copy to Clipboard`.

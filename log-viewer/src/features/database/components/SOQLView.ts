@@ -4,7 +4,7 @@
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
-import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
   Tabulator,
@@ -14,11 +14,14 @@ import {
 } from 'tabulator-tables';
 
 import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
+import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { goToRow } from '../../call-tree/navigation.js';
 import { deriveSoqlObject } from '../services/sobjectClassification.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
+import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
 import {
@@ -51,14 +54,14 @@ import { globalStyles } from '../../../styles/global.styles.js';
 import databaseViewStyles from './DatabaseView.scss';
 
 // web components
-import '../../../components/CallStack.js';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
+import { showStatementRowMenu } from './rowContextMenu.js';
 import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
 import '../../../components/datagrid-range-filter.js';
 import '../../../components/OverflowList.js';
-import './DatabaseSOQLDetailPanel.js';
+import './DatabaseSection.js';
 
 /** The SOQL column is always shown in the SOQL table. */
 const ALWAYS_VISIBLE = ['soql'];
@@ -99,6 +102,8 @@ export class SOQLView extends LitElement {
   @state()
   private columnOverrides: Record<string, string[]> = {};
   private contextMenu: ContextMenu | null = null;
+  /** eventIndex of the row whose context menu is open. */
+  private contextMenuEventIndex: number | null = null;
 
   @state()
   private objects: string[] = [];
@@ -269,7 +274,7 @@ export class SOQLView extends LitElement {
         ${soqlSkeleton}
         <div id="db-soql-table"></div>
       </div>
-      <context-menu @menu-select="${this._handleColumnMenuSelect}"></context-menu>
+      <context-menu @menu-select="${this._handleContextMenuSelect}"></context-menu>
     `;
   }
 
@@ -339,10 +344,21 @@ export class SOQLView extends LitElement {
     );
   }
 
-  private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
+  private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
+    this.contextMenuEventIndex = showStatementRowMenu(event, row, this.soqlTable, this.contextMenu);
+  }
+
+  private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>) {
     const { itemId } = e.detail;
     const table = this.soqlTable;
     if (!table) {
+      return;
+    }
+    if (itemId === 'show-in-call-tree') {
+      const eventIndex = this.contextMenuEventIndex;
+      if (eventIndex !== null) {
+        void goToRow({ eventIndex });
+      }
       return;
     }
     if (itemId.startsWith('view:')) {
@@ -410,23 +426,23 @@ export class SOQLView extends LitElement {
   }
 
   private _objectFilter = (data: GridSOQLData): boolean =>
-    !!data.isDetail ||
-    this.objectSelected.length === 0 ||
-    this.objectSelected.includes(data.objectType ?? '');
+    this.objectSelected.length === 0 || this.objectSelected.includes(data.objectType ?? '');
 
   private _namespaceFilter = (data: GridSOQLData): boolean =>
-    !!data.isDetail ||
-    this.namespaceSelected.length === 0 ||
-    this.namespaceSelected.includes(data.namespace ?? '');
+    this.namespaceSelected.length === 0 || this.namespaceSelected.includes(data.namespace ?? '');
 
   private _rowCountFilter = (data: GridSOQLData): boolean =>
-    !!data.isDetail || inCountRange(this.rowCountRange, data.rowCount ?? 0);
+    inCountRange(this.rowCountRange, data.rowCount ?? 0);
 
   private _timeTakenFilter = (data: GridSOQLData): boolean =>
-    !!data.isDetail || inMsRange(this.timeTakenRange, data.timeTaken ?? 0);
+    inMsRange(this.timeTakenRange, data.timeTaken ?? 0);
 
   _copyToClipboard() {
     this.soqlTable?.copyToClipboard('all');
+  }
+
+  deselectRows() {
+    this.soqlTable?.deselectRow();
   }
 
   _exportToCSV() {
@@ -522,12 +538,7 @@ export class SOQLView extends LitElement {
   }
 
   _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
-    const eventIndexToSOQL = new Map<number, SOQLExecuteBeginLine>();
     let nextRowId = 0;
-
-    soqlLines?.forEach((line) => {
-      eventIndexToSOQL.set(line.eventIndex, line);
-    });
 
     const soqlData: GridSOQLData[] = [];
     if (soqlLines) {
@@ -550,13 +561,6 @@ export class SOQLView extends LitElement {
           sObjectCardinality: explainLine?.sObjectCardinality ?? null,
           fields: explainLine?.fields?.join(', ') ?? null,
           eventIndex: soql.eventIndex,
-          _children: [
-            {
-              id: ++nextRowId,
-              eventIndex: soql.eventIndex,
-              isDetail: true,
-            },
-          ],
         });
       }
     }
@@ -600,12 +604,6 @@ export class SOQLView extends LitElement {
       groupStartOpen: false,
       groupToggleElement: false,
       selectableRows: 'highlight',
-      selectableRowsCheck: function (row: RowComponent) {
-        return !row.getData().isDetail;
-      },
-      dataTree: true,
-      dataTreeBranchElement: false,
-      dataTreeStartExpanded: false,
       columnDefaults: commonColumnDefaults,
       headerSortElement,
       columns: [
@@ -620,16 +618,8 @@ export class SOQLView extends LitElement {
             return 'Total';
           },
           headerSortTristate: true,
-          cssClass: 'datagrid-textarea datagrid-code-text',
-          variableHeight: true,
-          formatter: (cell, _formatterParams, _onRendered) => {
-            const data = cell.getData() as GridSOQLData;
-            return `<call-stack
-            eventIndex=${data.eventIndex}
-            startDepth="0"
-            endDepth="1"
-          ></call-stack>`;
-          },
+          cssClass: 'datagrid-code-text',
+          formatter: (cell) => soqlInlineElement(cell.getValue() as string, 'soql'),
         },
         {
           title: 'Selective',
@@ -822,13 +812,6 @@ export class SOQLView extends LitElement {
           },
         },
       ],
-      rowFormatter: (row) => {
-        const data = row.getData();
-        if (data.isDetail && data.eventIndex !== undefined) {
-          const detailContainer = this.createSOQLDetailPanel(data.eventIndex, eventIndexToSOQL);
-          row.getElement().replaceChildren(detailContainer);
-        }
-      },
     });
 
     this.soqlTable.on('groupClick', (_e: UIEvent, group: GroupComponent) => {
@@ -837,32 +820,25 @@ export class SOQLView extends LitElement {
         return;
       }
       group.toggle();
-
-      if (this.soqlTable && group.isVisible()) {
-        this.soqlTable.blockRedraw();
-        for (const row of group.getRows()) {
-          if (row.getTreeChildren() && !row.isTreeExpanded()) {
-            row.treeExpand();
-          }
-        }
-        this.soqlTable.restoreRedraw();
-      }
     });
 
-    this.soqlTable.on('rowClick', function (_e, row) {
-      const { type } = window.getSelection() ?? {};
-      if (type === 'Range') {
+    // Drive the detail panel off selection (not click) so keyboard row
+    // navigation updates it too. RowKeyboardNavigation keeps a single row
+    // selected across mouse and arrow-key navigation.
+    this.soqlTable.on('rowSelectionChanged', (_data, rows) => {
+      const data = rows[0]?.getData() as GridSOQLData | undefined;
+      if (!data || data.eventIndex === undefined || !data.soql) {
         return;
       }
 
-      const data = row.getData();
-      if (!(data.eventIndex !== undefined && data.soql)) {
-        return;
-      }
+      eventBus.emit('detail:select', {
+        source: 'database',
+        selection: { kind: 'event', eventIndex: data.eventIndex, type: 'soql' },
+      });
+    });
 
-      const origRowHeight = row.getElement().offsetHeight;
-      row.treeToggle();
-      row.getCell('soql').getElement().style.height = origRowHeight + 'px';
+    this.soqlTable.on('rowContext', (e, row) => {
+      this._showRowContextMenu(e as MouseEvent, row);
     });
 
     this.soqlTable.on('tableBuilt', () => {
@@ -940,22 +916,6 @@ export class SOQLView extends LitElement {
     return this.holder;
   }
 
-  createSOQLDetailPanel(eventIndex: number, eventIndexToSOQL: Map<number, SOQLExecuteBeginLine>) {
-    const detailContainer = document.createElement('div');
-    detailContainer.className = 'row__details-container';
-
-    const soqlLine = eventIndexToSOQL.get(eventIndex);
-    render(
-      html`<db-soql-detail-panel
-        eventIndex=${eventIndex}
-        soql=${soqlLine?.text}
-      ></db-soql-detail-panel>`,
-      detailContainer,
-    );
-
-    return detailContainer;
-  }
-
   downlodEncoder(defaultFileName: string) {
     return function (fileContents: string, mimeType: string) {
       const vscode = vscodeMessenger.getVsCodeAPI();
@@ -998,8 +958,6 @@ interface GridSOQLData {
   sObjectCardinality?: number | null;
   fields?: string | null;
   eventIndex?: number;
-  isDetail?: boolean;
-  _children?: GridSOQLData[];
 }
 
 type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

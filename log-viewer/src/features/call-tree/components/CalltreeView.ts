@@ -11,11 +11,12 @@ import { repeat } from 'lit/directives/repeat.js';
 import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
-import { eventBus } from '../../../core/events/EventBus.js';
+import { eventBus, type DetailSource } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { CALLTREE_GO_TO_ROW } from '../navigation.js';
 import type { AggregatedRow, BottomUpRow } from '../utils/Aggregation.js';
 import {
   categoryColoringStyles,
@@ -25,6 +26,7 @@ import {
 import { deepFilter } from '../utils/DetailsFilter.js';
 import { expandCollapseAll } from '../utils/ExpandCollapse.js';
 import type { TimeOrderRow } from '../utils/TimeOrderTree.js';
+import { waitForNextFrame } from './TableShared.js';
 
 import { inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 
@@ -38,6 +40,8 @@ import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import '../../../components/GridSkeleton.js';
+import '../../../components/ViewModeSwitch.js';
+import type { ViewModeOption } from '../../../components/ViewModeSwitch.js';
 import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
 import '../../../components/datagrid-range-filter.js';
@@ -58,6 +62,12 @@ import {
 import { createTimeOrderTable } from './TimeOrderTable.js';
 
 type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
+
+const CALL_TREE_VIEW_MODES: ViewModeOption[] = [
+  { value: 'time-order', label: 'Time Order' },
+  { value: 'aggregated', label: 'Aggregated' },
+  { value: 'bottom-up', label: 'Bottom-Up' },
+];
 
 /** The Name column is always shown in the call-tree tables. */
 const ALWAYS_VISIBLE = ['text'];
@@ -142,7 +152,7 @@ export class CalltreeView extends LitElement {
   constructor() {
     super();
 
-    document.addEventListener('calltree-go-to-row', this._goToRowEvt);
+    document.addEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
@@ -155,7 +165,7 @@ export class CalltreeView extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener('calltree-go-to-row', this._goToRowEvt);
+    document.removeEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
@@ -192,6 +202,9 @@ export class CalltreeView extends LitElement {
         height: 100%;
         width: 100%;
         display: flex;
+        /* inset previously provided by the tab panel's padding */
+        padding: 10px 6px;
+        box-sizing: border-box;
       }
 
       #call-tree-container {
@@ -215,35 +228,13 @@ export class CalltreeView extends LitElement {
         align-items: flex-end;
       }
 
-      .view-mode-buttons {
-        display: flex;
-        gap: 0;
-      }
-
-      .view-mode-buttons vscode-button,
       .filter-container vscode-button {
         height: var(--filter-control-height);
       }
 
-      .view-mode-buttons vscode-button::part(base),
       .filter-container vscode-button::part(base) {
         padding: var(--filter-control-padding);
         font-size: var(--filter-control-font-size);
-      }
-
-      .view-mode-buttons vscode-button:first-child {
-        --vsc-border-left-radius: 2px;
-        --vsc-border-right-radius: 0;
-      }
-
-      .view-mode-buttons vscode-button:not(:first-child):not(:last-child) {
-        --vsc-border-left-radius: 0;
-        --vsc-border-right-radius: 0;
-      }
-
-      .view-mode-buttons vscode-button:last-child {
-        --vsc-border-left-radius: 0;
-        --vsc-border-right-radius: 2px;
       }
 
       #call-tree-table,
@@ -278,23 +269,14 @@ export class CalltreeView extends LitElement {
       <div id="call-tree-container">
         <div>
           <datagrid-filter-bar>
-            <div slot="global" class="view-mode-buttons" role="radiogroup" aria-label="View mode">
-              <vscode-button
-                ?secondary="${this.viewMode !== 'time-order'}"
-                @click="${() => this._setViewMode('time-order')}"
-                >Time Order</vscode-button
-              >
-              <vscode-button
-                ?secondary="${this.viewMode !== 'aggregated'}"
-                @click="${() => this._setViewMode('aggregated')}"
-                >Aggregated</vscode-button
-              >
-              <vscode-button
-                ?secondary="${this.viewMode !== 'bottom-up'}"
-                @click="${() => this._setViewMode('bottom-up')}"
-                >Bottom-Up</vscode-button
-              >
-            </div>
+            <view-mode-switch
+              slot="global"
+              aria-label="View mode"
+              .options=${CALL_TREE_VIEW_MODES}
+              value=${this.viewMode}
+              @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
+                this._setViewMode(e.detail.value as ViewMode)}
+            ></view-mode-switch>
 
             <div slot="table-actions" class="filter-container">
               <vscode-button secondary @click="${this._expandButtonClick}">Expand</vscode-button>
@@ -513,7 +495,7 @@ export class CalltreeView extends LitElement {
     const switchEpoch = ++this.viewSwitchEpoch;
     this.viewMode = newMode;
     await this.updateComplete;
-    await this._waitForNextFrame();
+    await waitForNextFrame();
 
     if (switchEpoch !== this.viewSwitchEpoch || !this.rootMethod) {
       return;
@@ -950,7 +932,7 @@ export class CalltreeView extends LitElement {
     rootMethod: ApexLog,
   ): Promise<void> {
     if (this.calltreeTable) {
-      await this._waitForNextFrame();
+      await waitForNextFrame();
       return;
     }
 
@@ -982,6 +964,7 @@ export class CalltreeView extends LitElement {
     this.calltreeTable = table;
     await tableBuilt;
     this._initTableColumns(table);
+    this._emitDetailSelection(table);
   }
 
   private async _renderAggregatedTree(
@@ -989,7 +972,7 @@ export class CalltreeView extends LitElement {
     rootMethod: ApexLog,
   ): Promise<void> {
     if (this.aggregatedTreeTable) {
-      await this._waitForNextFrame();
+      await waitForNextFrame();
       return;
     }
 
@@ -1013,11 +996,12 @@ export class CalltreeView extends LitElement {
     this.aggregatedTreeTable = table;
     await tableBuilt;
     this._initTableColumns(table);
+    this._emitDetailSelection(table);
   }
 
   private async _renderBottomUpTree(container: HTMLDivElement, rootMethod: ApexLog): Promise<void> {
     if (this.bottomUpTreeTable) {
-      await this._waitForNextFrame();
+      await waitForNextFrame();
       return;
     }
 
@@ -1043,11 +1027,34 @@ export class CalltreeView extends LitElement {
     this.bottomUpTreeTable = table;
     await tableBuilt;
     this._initTableColumns(table);
+    this._emitDetailSelection(table);
   }
 
-  private _waitForNextFrame(): Promise<void> {
-    return new Promise((resolve) => {
-      requestAnimationFrame(() => resolve());
+  /**
+   * Feed the inspector off row selection. A Time Order row is a
+   * single event; Aggregated/Bottom-Up rows merge many calls, so they scope to
+   * every occurrence (`instances`).
+   */
+  private _emitDetailSelection(table: Tabulator, source: DetailSource = 'calltree'): void {
+    table.on('rowSelectionChanged', (_data, rows) => {
+      const data = rows[0]?.getData() as
+        { originalData?: LogEvent; instances?: LogEvent[]; text?: string } | undefined;
+      const event = data?.originalData;
+      if (!event) {
+        eventBus.emit('detail:select', { source, selection: null });
+        return;
+      }
+      const occurrences = data.instances?.length ? data.instances : null;
+      eventBus.emit('detail:select', {
+        source,
+        selection: occurrences
+          ? {
+              kind: 'aggregate',
+              instances: occurrences.map((e) => e.eventIndex),
+              label: data.text ?? event.text,
+            }
+          : { kind: 'event', eventIndex: event.eventIndex },
+      });
     });
   }
 
@@ -1058,7 +1065,7 @@ export class CalltreeView extends LitElement {
   private _waitForTableRender(): Promise<void> {
     const table = this.calltreeTable;
     if (!table) {
-      return this._waitForNextFrame();
+      return waitForNextFrame();
     }
 
     return new Promise<void>((resolve) => {
@@ -1247,14 +1254,6 @@ export class CalltreeView extends LitElement {
 
     return indexByEventIndex;
   }
-}
-
-export async function goToRow(target: { eventIndex: number }) {
-  document.dispatchEvent(
-    new CustomEvent('calltree-go-to-row', {
-      detail: target,
-    }),
-  );
 }
 
 type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

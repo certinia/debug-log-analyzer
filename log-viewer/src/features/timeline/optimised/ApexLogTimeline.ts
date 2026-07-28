@@ -21,10 +21,11 @@ import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { ContextMenu } from '../../../components/ContextMenu.js';
 import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
 import { eventBus } from '../../../core/events/EventBus.js';
+import { copyToClipboard } from '../../../core/utility/Clipboard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { findEventByEventIndex, findEventByTimestamp } from '../../../core/utility/EventSearch.js';
-import { formatDuration } from '../../../core/utility/Util.js';
-import { goToRow } from '../../call-tree/components/CalltreeView.js';
+import { goToRow } from '../../call-tree/navigation.js';
+import { formatCallStack, formatEventDetails } from '../../call-tree/utils/eventText.js';
 import { getTheme } from '../themes/ThemeSelector.js';
 import {
   BUCKET_CONSTANTS,
@@ -156,10 +157,10 @@ export class ApexLogTimeline {
           this.handleContextMenu(target, screenX, screenY, clientX, clientY);
         },
         onCopy: (eventNode) => {
-          this.copyToClipboard(eventNode.text);
+          copyToClipboard(eventNode.text);
         },
         onCopyMarker: (marker) => {
-          this.copyToClipboard(marker.summary);
+          copyToClipboard(marker.summary);
         },
       },
       // Pass precomputed data to skip redundant O(n) traversals
@@ -430,11 +431,20 @@ export class ApexLogTimeline {
       if (this.tooltipRenderer) {
         this.tooltipRenderer.hide();
       }
+      eventBus.emit('detail:select', { source: 'timeline', selection: null });
       return;
     }
 
     // Selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
+    // The inspector shows the selected frame's detail.
+    const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
+    if (originalEvent?.eventIndex !== undefined) {
+      eventBus.emit('detail:select', {
+        source: 'timeline',
+        selection: { kind: 'event', eventIndex: originalEvent.eventIndex },
+      });
+    }
   }
 
   /**
@@ -467,11 +477,19 @@ export class ApexLogTimeline {
       if (this.tooltipRenderer) {
         this.tooltipRenderer.hide();
       }
+      eventBus.emit('detail:select', { source: 'timeline', selection: null });
       return;
     }
 
     // Marker selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
+    // Markers only carry an eventIndex when they map to a log event.
+    if (marker.eventIndex !== undefined) {
+      eventBus.emit('detail:select', {
+        source: 'timeline',
+        selection: { kind: 'event', eventIndex: marker.eventIndex },
+      });
+    }
   }
 
   /**
@@ -692,10 +710,10 @@ export class ApexLogTimeline {
           this.flamechart.focusOnSelectedMarker();
           break;
         case 'copy-summary':
-          this.copyToClipboard(marker.summary);
+          copyToClipboard(marker.summary);
           break;
         case 'copy-marker-details':
-          this.copyToClipboard(this.formatMarkerDetails(marker));
+          copyToClipboard(this.formatMarkerDetails(marker));
           break;
       }
       return;
@@ -718,13 +736,13 @@ export class ApexLogTimeline {
         this.flamechart.focusOnSelectedFrame();
         break;
       case 'copy-name':
-        this.copyToClipboard(event.text);
+        copyToClipboard(event.text);
         break;
       case 'copy-details':
-        this.copyToClipboard(this.formatEventDetails(event));
+        copyToClipboard(this.formatEventDetails(event));
         break;
       case 'copy-call-stack':
-        this.copyToClipboard(this.formatCallStack(event));
+        copyToClipboard(this.formatCallStack(event));
         break;
       case 'show-in-log':
         this.handleShowInLog(event);
@@ -757,15 +775,6 @@ export class ApexLogTimeline {
   }
 
   /**
-   * Copy text to clipboard.
-   */
-  private copyToClipboard(text: string): void {
-    navigator.clipboard.writeText(text).catch(() => {
-      // Silently fail - clipboard API may not be available in all contexts
-    });
-  }
-
-  /**
    * Format event details for clipboard (similar to tooltip content).
    */
   private formatEventDetails(eventNode: EventNode): string {
@@ -775,59 +784,7 @@ export class ApexLogTimeline {
       // Fallback for nodes without original
       return `Name: ${eventNode.text}\nType: ${eventNode.type}`;
     }
-
-    const lines: string[] = [];
-    lines.push(`Name: ${logEvent.text}${logEvent.suffix ?? ''}`);
-
-    if (logEvent.type) {
-      lines.push(`Type: ${logEvent.type}`);
-    }
-
-    if (logEvent.exitStamp && logEvent.duration.total) {
-      let durationStr = formatDuration(logEvent.duration.total);
-      if (logEvent.cpuType === 'free') {
-        durationStr += ' (free)';
-      } else if (logEvent.duration.self) {
-        durationStr += ` (self ${formatDuration(logEvent.duration.self)})`;
-      }
-      lines.push(`Duration: ${durationStr}`);
-    }
-
-    // Add metrics (only if non-zero)
-    const govLimits = this.apexLog?.governorLimits;
-
-    if (logEvent.dmlCount.total) {
-      lines.push(`DML: ${this.formatLimit(logEvent.dmlCount, govLimits?.dmlStatements.limit)}`);
-    }
-    if (logEvent.dmlRowCount.total) {
-      lines.push(`DML Rows: ${this.formatLimit(logEvent.dmlRowCount, govLimits?.dmlRows.limit)}`);
-    }
-    if (logEvent.soqlCount.total) {
-      lines.push(`SOQL: ${this.formatLimit(logEvent.soqlCount, govLimits?.soqlQueries.limit)}`);
-    }
-    if (logEvent.soqlRowCount.total) {
-      lines.push(
-        `SOQL Rows: ${this.formatLimit(logEvent.soqlRowCount, govLimits?.queryRows.limit)}`,
-      );
-    }
-    if (logEvent.soslCount.total) {
-      lines.push(`SOSL: ${this.formatLimit(logEvent.soslCount, govLimits?.soslQueries.limit)}`);
-    }
-    if (logEvent.soslRowCount.total) {
-      lines.push(
-        `SOSL Rows: ${this.formatLimit(logEvent.soslRowCount, govLimits?.soslQueries.limit)}`,
-      );
-    }
-
-    return lines.join('\n');
-  }
-
-  /**
-   * Format a metric with limit for clipboard.
-   */
-  private formatLimit(metric: { total: number; self: number }, limit?: number): string {
-    const outOf = limit ? `/${limit}` : '';
-    return `${metric.total}${outOf} (self ${metric.self})`;
+    return formatEventDetails(logEvent, this.apexLog?.governorLimits);
   }
 
   /**
@@ -836,20 +793,7 @@ export class ApexLogTimeline {
    */
   private formatCallStack(eventNode: EventNode): string {
     const logEvent = (eventNode as EventNode & { original?: LogEvent }).original;
-    if (!logEvent) {
-      return eventNode.text;
-    }
-
-    // Build call stack by traversing up parent chain
-    const stack: LogEvent[] = [];
-    let current: LogEvent | null = logEvent;
-    while (current?.type) {
-      stack.unshift(current); // Prepend to get root-first order
-      current = current.parent;
-    }
-
-    // Format as call stack (one entry per line)
-    return stack.map((event) => event.text + (event.suffix ?? '')).join('\n');
+    return logEvent ? formatCallStack(logEvent) : eventNode.text;
   }
 
   /**

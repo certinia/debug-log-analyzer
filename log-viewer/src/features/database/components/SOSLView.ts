@@ -4,15 +4,19 @@
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
-import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, SOSLExecuteBeginLine } from 'apex-log-parser';
+import { eventBus } from '../../../core/events/EventBus.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { soqlInlineElement } from '../../soql/format/inlineCell.js';
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import {
   applyColumnView,
   buildColumnMenuItems,
@@ -43,9 +47,9 @@ import { globalStyles } from '../../../styles/global.styles.js';
 import databaseViewStyles from './DatabaseView.scss';
 
 // web components
-import '../../../components/CallStack.js';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
+import { showStatementRowMenu } from './rowContextMenu.js';
 import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
 import '../../../components/datagrid-range-filter.js';
@@ -95,6 +99,8 @@ export class SOSLView extends LitElement {
   @state()
   private columnOverrides: Record<string, string[]> = {};
   private contextMenu: ContextMenu | null = null;
+  /** eventIndex of the row whose context menu is open. */
+  private contextMenuEventIndex: number | null = null;
 
   @state()
   private namespaces: string[] = [];
@@ -142,6 +148,7 @@ export class SOSLView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
     unsafeCSS(databaseViewStyles),
+    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
@@ -244,7 +251,7 @@ export class SOSLView extends LitElement {
         ${soslSkeleton}
         <div id="db-sosl-table"></div>
       </div>
-      <context-menu @menu-select="${this._handleColumnMenuSelect}"></context-menu>
+      <context-menu @menu-select="${this._handleContextMenuSelect}"></context-menu>
     `;
   }
 
@@ -314,10 +321,21 @@ export class SOSLView extends LitElement {
     );
   }
 
-  private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
+  private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
+    this.contextMenuEventIndex = showStatementRowMenu(event, row, this.soslTable, this.contextMenu);
+  }
+
+  private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>) {
     const { itemId } = e.detail;
     const table = this.soslTable;
     if (!table) {
+      return;
+    }
+    if (itemId === 'show-in-call-tree') {
+      const eventIndex = this.contextMenuEventIndex;
+      if (eventIndex !== null) {
+        void goToRow({ eventIndex });
+      }
       return;
     }
     if (itemId.startsWith('view:')) {
@@ -380,15 +398,13 @@ export class SOSLView extends LitElement {
   }
 
   private _namespaceFilter = (data: SOSLRow): boolean =>
-    !!data.isDetail ||
-    this.namespaceSelected.length === 0 ||
-    this.namespaceSelected.includes(data.namespace ?? '');
+    this.namespaceSelected.length === 0 || this.namespaceSelected.includes(data.namespace ?? '');
 
   private _rowCountFilter = (data: SOSLRow): boolean =>
-    !!data.isDetail || inCountRange(this.rowCountRange, data.rowCount ?? 0);
+    inCountRange(this.rowCountRange, data.rowCount ?? 0);
 
   private _timeTakenFilter = (data: SOSLRow): boolean =>
-    !!data.isDetail || inMsRange(this.timeTakenRange, data.timeTaken ?? 0);
+    inMsRange(this.timeTakenRange, data.timeTaken ?? 0);
 
   _copyToClipboard() {
     this.soslTable?.copyToClipboard('all');
@@ -502,13 +518,6 @@ export class SOSLView extends LitElement {
           rowCount: sosl.soslRowCount.self,
           timeTaken: sosl.duration.total,
           eventIndex: sosl.eventIndex,
-          _children: [
-            {
-              id: ++nextRowId,
-              eventIndex: sosl.eventIndex,
-              isDetail: true,
-            },
-          ],
         });
       }
     }
@@ -547,13 +556,7 @@ export class SOSLView extends LitElement {
       groupClosedShowCalcs: true,
       groupStartOpen: false,
       groupToggleElement: false,
-      selectableRowsCheck: function (row: RowComponent) {
-        return !row.getData().isDetail;
-      },
       selectableRows: 'highlight',
-      dataTree: true,
-      dataTreeBranchElement: false,
-      dataTreeStartExpanded: false,
       columnDefaults: commonColumnDefaults,
       headerSortElement,
       columns: [
@@ -561,21 +564,14 @@ export class SOSLView extends LitElement {
           title: 'SOSL',
           field: 'sosl',
           sorter: 'string',
+          tooltip: true,
           widthGrow: 5,
           bottomCalc: () => {
             return 'Total';
           },
           headerSortTristate: true,
-          cssClass: 'datagrid-textarea datagrid-code-text',
-          variableHeight: true,
-          formatter: (cell, _formatterParams, _onRendered) => {
-            const data = cell.getData() as SOSLRow;
-            return `<call-stack
-            eventIndex="${data.eventIndex}"
-            startDepth="0"
-            endDepth="1"
-          ></call-stack>`;
-          },
+          cssClass: 'datagrid-code-text',
+          formatter: (cell) => soqlInlineElement(cell.getValue() as string, 'sosl'),
         },
         {
           title: 'Namespace',
@@ -638,47 +634,30 @@ export class SOSLView extends LitElement {
           },
         },
       ],
-      rowFormatter: (row) => {
-        const data = row.getData();
-        if (data.isDetail && data.eventIndex !== undefined) {
-          const detailContainer = this.createDetailPanel(data.eventIndex);
-          row.getElement().replaceChildren(detailContainer);
-        }
-      },
     });
 
     this.soslTable.on('groupClick', (_e: UIEvent, group: GroupComponent) => {
-      const { type } = window.getSelection() ?? {};
-      if (type === 'Range') {
+      if (window.getSelection()?.type === 'Range') {
         return;
       }
-
       group.toggle();
-      if (this.soslTable && group.isVisible()) {
-        this.soslTable.blockRedraw();
-        for (const row of group.getRows()) {
-          if (row.getTreeChildren() && !row.isTreeExpanded()) {
-            row.treeExpand();
-          }
-        }
-        this.soslTable.restoreRedraw();
-      }
     });
 
-    this.soslTable.on('rowClick', function (_e, row) {
-      const { type } = window.getSelection() ?? {};
-      if (type === 'Range') {
+    // Drive the detail panel off selection (not click) so keyboard row
+    // navigation updates it too, matching the SOQL/DML grids.
+    this.soslTable.on('rowSelectionChanged', (_data, rows) => {
+      const data = rows[0]?.getData() as SOSLRow | undefined;
+      if (!data || data.eventIndex === undefined || !data.sosl) {
         return;
       }
+      eventBus.emit('detail:select', {
+        source: 'database',
+        selection: { kind: 'event', eventIndex: data.eventIndex, type: 'sosl' },
+      });
+    });
 
-      const data = row.getData();
-      if (!(data.eventIndex !== undefined && data.sosl)) {
-        return;
-      }
-
-      const origRowHeight = row.getElement().offsetHeight;
-      row.treeToggle();
-      row.getCell('sosl').getElement().style.height = origRowHeight + 'px';
+    this.soslTable.on('rowContext', (e, row) => {
+      this._showRowContextMenu(e as MouseEvent, row);
     });
 
     this.soslTable.on('tableBuilt', () => {
@@ -755,12 +734,8 @@ export class SOSLView extends LitElement {
     return this.holder;
   }
 
-  createDetailPanel(eventIndex: number) {
-    const detailContainer = document.createElement('div');
-    detailContainer.className = 'row__details-container';
-    render(html`<call-stack eventIndex=${eventIndex}></call-stack>`, detailContainer);
-
-    return detailContainer;
+  deselectRows() {
+    this.soslTable?.deselectRow();
   }
 
   downlodEncoder(defaultFileName: string) {
@@ -796,8 +771,6 @@ interface SOSLRow {
   rowCount?: number;
   timeTaken?: number;
   eventIndex?: number;
-  isDetail?: boolean;
-  _children?: SOSLRow[];
 }
 
 type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

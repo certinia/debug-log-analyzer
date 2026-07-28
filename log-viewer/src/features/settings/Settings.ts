@@ -39,6 +39,12 @@ export type LanaSettings = {
     dml: { columnView: string; columnOverrides: Record<string, string[]> };
     sosl: { columnView: string; columnOverrides: Record<string, string[]> };
   };
+  // The app-wide inspector, fed by a selection on any tab.
+  inspector: {
+    position: 'left' | 'right' | 'bottom';
+    size: number;
+    collapsed: Record<string, boolean>;
+  };
 };
 
 export function getSettings(): Promise<LanaSettings> {

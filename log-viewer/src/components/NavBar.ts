@@ -5,6 +5,7 @@ import '#vscode-elements/vscode-toolbar-button.js';
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import { eventBus } from '../core/events/EventBus.js';
 import { vscodeMessenger } from '../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../core/utility/Util.js';
 import type { Notification } from '../features/notifications/components/NotificationPanel.js';
@@ -110,6 +111,15 @@ export class NavBar extends LitElement {
           </div>
         </div>
         <div class="navbar--right">
+          <vscode-toolbar-button
+            icon="layout-sidebar-right"
+            label="Toggle Inspector"
+            title="Toggle Inspector"
+            @click=${() => {
+              eventBus.emit('detail:toggle', {});
+            }}
+          ></vscode-toolbar-button>
+          <divider-line orientation="vertical"></divider-line>
           <notification-button .notifications="${this.parserIssues}"></notification-button>
           <vscode-toolbar-button
             icon="question"

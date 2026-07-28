@@ -15,13 +15,17 @@ Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers.
 
 ## 🚀 Key Features
 
-- **🔥 [Timeline](#-timeline)** – Visualize every method, SOQL query, and DML operation in your Apex logs with an interactive flame chart and minimap navigation.
-- **🌲 [Interactive Call Tree](#-call-tree)** – Dive into execution stacks with timing, row counts, and DML/ SOQL metrics.
-- **📊 [Apex](#-apex-analysis) + [Database](#%EF%B8%8F-database-analysis) Analysis** – Identify slow-performing SOQL, high-impact DML, and time-heavy Apex methods.
-- **📄 [Raw Log Navigation](#-raw-log-navigation)** – Jump between analysis views and raw log files with code folding, hover details, and bidirectional navigation.
-- **🧠 Smart Filtering + Sorting** – Focus on what matters: filter by namespace, object, type, or a value range.
-- **🔍 Deep Search** – Find events across the flame chart, call tree, and database tables.
-- **📤 Export + Share** – Copy or Export Salesforce debug log insights for analysis or collaboration.
+- **🔥 [See where the time went](#-timeline)** – An interactive flame chart of the whole transaction, with a minimap for navigating massive logs.
+- **🌲 [Follow the execution](#-call-tree)** – The full call tree in time order, aggregated, or bottom-up, with timing, row counts and DML/SOQL metrics.
+- **🧭 [Inspect anything](#-inspector-) 🧪** – Select any frame or statement and the dockable inspector shows its vitals, call stack and its own call tree.
+- **🗄️ [Find the slow SOQL, DML and SOSL](#%EF%B8%8F-database-analysis)** – Every statement with its timing, row counts and selectivity, so the expensive ones stand out.
+- **📊 [Stay inside governor limits](#-governor-limits--heap)** – Usage against the limit for every governor, and where in the transaction you consumed it.
+- **🧠 [Understand heap](#-governor-limits--heap)** – Net, gross and peak per method, so allocate-then-free churn no longer looks like a leak.
+- **📈 [Find the hot Apex](#-apex-analysis)** – Group by method or namespace to see what actually costs you time.
+- **🔍 [Search the whole log](#-global-search)** – One search across the flame chart, call tree and database tables.
+- **📄 [Jump to the raw log](#-raw-log-navigation)** – Move between the analysis and the log file itself, in both directions.
+- **🤖 [Ask an AI about a log](#-ai-assistant-mcp-server)** – An MCP server so your assistant can analyze logs with you.
+- **🧠 [Filter to what matters](#%EF%B8%8F-database-analysis)** – Narrow any grid by namespace, object or type, or to a value range.
 
 > ✨ Works with any `.log` Salesforce debug log file.
 
@@ -88,6 +92,7 @@ The Timeline view shows a live visualization of your Salesforce Apex log executi
 - **📊 Governor Limits Strip** – At-a-glance limit usage with traffic light coloring, built from individual log events so every limit (heap included) updates as it's consumed, not just at cumulative snapshots. Expand for a detailed step chart.
 - **📏 Measure & Zoom** – `Shift+Drag` to measure durations, `Alt/Option+Drag` to area-zoom, precision keyboard controls.
 - **🕐 Wall-Clock Time** – Toggle between elapsed and real-time (HH:MM:SS.mmm) on the time axis via the toolbar clock button.
+- **🧭 [Inspector](#-inspector-) 🧪** – Select a frame to inspect it alongside the chart.
 
 Also: Frame Selection & Navigation, Dynamic Frame Labels, Adaptive Frame Detail, Tooltips, Context Menu, Search & Highlight, 19 Curated Themes.
 
@@ -106,8 +111,20 @@ Explore nested method calls with performance metrics:
 - **Filter bar** – Namespace, event Type, and a Total/Self Time range, plus **Details** and **Debug Only** toggles
 - **Keyboard Navigation**
 - **Click to go to Code** – Jump to the source method in your project
+- **[Inspector](#-inspector-) 🧪** – Select a row to inspect just that call path
 
 ![Call Tree](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/calltree.png)
+
+## 🧭 Inspector 🧪
+
+Select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL statement — and inspect it without leaving the tab you're on:
+
+- **Details** – Type, timing, and every governor metric the selection consumed as `used / limit`. Queries are syntax highlighted, with a click to copy.
+- **Call stack** – The frames that led to the selection, with total and self time.
+- **Call tree** – The selection's own subtree, in Time Order, Aggregated or Bottom-Up. Scoped to what you picked, which is what makes it different from the Call Tree tab.
+- **SOQL issues** – Optimization tips for the selected query.
+- **Dock it where you want** – Left, right or bottom; drag to resize, collapse the sections you don't need. Your layout is remembered.
+- **Right-click a row** for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
 
 ## 🧠 Apex Analysis
 
@@ -132,11 +149,13 @@ Highlight slow Salesforce SOQL queries, non-selective filters, and DML issues, a
 - **Filter bar** – Namespace, Object, Caller Namespace, and a Row Count / Time Taken range
 - **SOQL Duration, Selectivity, Aggregates, Row Count**
 - **Column Views** – Preset column sets (incl. a SOQL Query Plan view), show/hide columns, reset to defaults
-- **View the Call Stack**, **SOQL Optimization Tips**, **Sort**, **Copy or Export to CSV**
+- **Show in Call Tree** – right-click a statement to jump to it in the full Call Tree
+- **[Inspector](#-inspector-) 🧪** – select a statement to inspect it, including its SOQL optimization tips
+- **Sort**, **Copy or Export to CSV**
 
 ![Database](https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/database.png)
 
-## 📊 Governor Limit Tracking
+## 📊 Governor Limits + Heap
 
 Salesforce enforces governor limits per transaction. This extension tracks them _throughout_ the log, not just as a final tally:
 

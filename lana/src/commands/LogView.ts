@@ -12,11 +12,13 @@ import { OpenFileInPackage } from '../display/OpenFileInPackage.js';
 import { WebView } from '../display/WebView.js';
 import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
 import {
-  COLUMN_OVERRIDE_SECTIONS,
+  PRIVATE_SECTIONS,
   getColumnOverrides,
+  getColumnViews,
   getConfig,
-  updateColumnOverride,
+  getInspectorCollapsed,
   updateConfig,
+  updatePrivateSection,
 } from '../workspace/AppConfig.js';
 
 interface WebViewLogFileRequest<T = unknown> {
@@ -114,6 +116,11 @@ export class LogView {
             config.database.soql.columnOverrides = overrides['database.soql.columnOverrides'] ?? {};
             config.database.dml.columnOverrides = overrides['database.dml.columnOverrides'] ?? {};
             config.database.sosl.columnOverrides = overrides['database.sosl.columnOverrides'] ?? {};
+            const columnViews = getColumnViews(context.context.globalState);
+            config.database.soql.columnView = columnViews['database.soql.columnView'] ?? 'General';
+            config.database.dml.columnView = columnViews['database.dml.columnView'] ?? 'General';
+            config.database.sosl.columnView = columnViews['database.sosl.columnView'] ?? 'General';
+            config.inspector.collapsed = getInspectorCollapsed(context.context.globalState);
             panel.webview.postMessage({
               requestId,
               cmd: 'getConfig',
@@ -125,8 +132,8 @@ export class LogView {
           case 'updateConfig': {
             const { section, value } = payload as { section: string; value: unknown };
             if (section) {
-              if ((COLUMN_OVERRIDE_SECTIONS as readonly string[]).includes(section)) {
-                updateColumnOverride(context.context.globalState, section, value);
+              if ((PRIVATE_SECTIONS as readonly string[]).includes(section)) {
+                updatePrivateSection(context.context.globalState, section, value);
               } else {
                 updateConfig(section, value);
               }
