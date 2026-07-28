@@ -15,7 +15,7 @@ export interface ViewModeOption {
 /**
  * A segmented "view mode" switch: a joined row of buttons where one is active.
  * Presentation only — the consumer owns `value` and reacts to `view-mode-change`.
- * Shared by the Call Tree tab and the database detail side bar so both render
+ * Shared by the Call Tree tab and the inspector so both render
  * identically.
  */
 @customElement('view-mode-switch')

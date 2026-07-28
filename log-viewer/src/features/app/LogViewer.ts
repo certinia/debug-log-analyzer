@@ -26,7 +26,7 @@ import { globalStyles } from '../../styles/global.styles.js';
 
 // web components
 import './AppHeader.js';
-import '../../components/DetailSidebar.js';
+import '../../components/LogInspector.js';
 
 interface NavigateToTimelinePayload {
   timestamp: number;
@@ -85,7 +85,7 @@ export class LogViewer extends LitElement {
 
         display: flex;
         flex-direction: column;
-        /* Slotted into the detail side bar's main area, so fill it as a flex
+        /* Slotted into the inspector's main area, so fill it as a flex
            item rather than relying on height:100%. */
         flex: 1 1 auto;
         min-width: 0;
@@ -149,7 +149,7 @@ export class LogViewer extends LitElement {
         .timelineRoot=${this.timelineRoot}
       ></app-header>
 
-      <detail-sidebar .activeTab=${this._selectedTab}>
+      <log-inspector .activeTab=${this._selectedTab}>
         <vscode-tabs
           slot="main"
           panel
@@ -185,7 +185,7 @@ export class LogViewer extends LitElement {
           <vscode-tab-panel>
             <database-view .timelineRoot="${this.timelineRoot}"></database-view>
           </vscode-tab-panel> </vscode-tabs
-      ></detail-sidebar>`;
+      ></log-inspector>`;
   }
 
   _onTabSelect(e: VscTabsSelectEvent) {
@@ -229,7 +229,7 @@ export class LogViewer extends LitElement {
 
     const apexLog = parse(logData);
 
-    // The event-lookup service backs the detail side bar on every tab, so it is
+    // The event-lookup service backs the inspector on every tab, so it is
     // created with the parsed log rather than by whichever tab loads first.
     await DatabaseAccess.create(apexLog);
 

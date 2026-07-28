@@ -84,7 +84,7 @@ export class DatabaseView extends LitElement {
     document.addEventListener('lv-find', this._findHandler as EventListener);
 
     // Only one statement is "selected" across the three grids at a time — when
-    // one grid reports a selection, clear the other two. (The app-wide side bar
+    // one grid reports a selection, clear the other two. (The inspector
     // owns rendering the detail; this just keeps the grids mutually exclusive.)
     this._offDetailSelect = eventBus.on('detail:select', (d) => {
       if (d.source !== 'database' || d.selection?.kind !== 'event') {

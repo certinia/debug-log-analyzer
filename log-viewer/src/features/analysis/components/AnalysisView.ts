@@ -542,7 +542,7 @@ export class AnalysisView extends LitElement {
       }
     });
 
-    // Feed the app-wide detail side bar. Analysis rows merge many calls, so they
+    // Feed the inspector. Analysis rows merge many calls, so they
     // scope to every occurrence of the method.
     this.analysisTable.on('rowSelectionChanged', (_data, rows) => {
       const data = rows[0]?.getData() as BottomUpRow | undefined;

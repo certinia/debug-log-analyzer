@@ -436,7 +436,7 @@ export class ApexLogTimeline {
 
     // Selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
-    // The app-wide detail side bar shows the selected frame's detail.
+    // The inspector shows the selected frame's detail.
     const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
     if (originalEvent?.eventIndex !== undefined) {
       eventBus.emit('detail:select', {

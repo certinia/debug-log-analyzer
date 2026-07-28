@@ -23,7 +23,7 @@ import { panelTokens } from './panelTokens.js';
 import './CodeBlock.js';
 import type { CodeLanguage } from './CodeBlock.js';
 
-/** Times in the side bar are exact to 3dp; the grids stay at 2dp. */
+/** Times in the inspector are exact to 3dp; the grids stay at 2dp. */
 const MS_PRECISION = 3;
 
 /** Salesforce's own definitions, shown on hover so the label needn't explain itself. */

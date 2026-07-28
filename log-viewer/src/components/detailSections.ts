@@ -13,7 +13,7 @@ import './CallTreeDetail.js';
 import './EventVitals.js';
 
 /**
- * Build the side bar's sections for a selection from any tab. Every source gets
+ * Build the inspector's sections for a selection from any tab. Every source gets
  * the same shared trio — Details, Call stack, Call tree — scoped to the
  * selection; the Database view keeps its richer set (Vitals + SOQL issues) via
  * {@link buildDatabaseSections}.

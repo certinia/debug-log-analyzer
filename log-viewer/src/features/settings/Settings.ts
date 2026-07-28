@@ -39,8 +39,8 @@ export type LanaSettings = {
     dml: { columnView: string; columnOverrides: Record<string, string[]> };
     sosl: { columnView: string; columnOverrides: Record<string, string[]> };
   };
-  // App-wide detail side bar (currently only the Database view feeds it).
-  sidePanel: {
+  // The app-wide inspector, fed by a selection on any tab.
+  inspector: {
     position: 'left' | 'right' | 'bottom';
     size: number;
     collapsed: Record<string, boolean>;

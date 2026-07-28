@@ -113,8 +113,8 @@ export class NavBar extends LitElement {
         <div class="navbar--right">
           <vscode-toolbar-button
             icon="layout-sidebar-right"
-            label="Toggle detail side bar"
-            title="Toggle detail side bar"
+            label="Toggle Inspector"
+            title="Toggle Inspector"
             @click=${() => {
               eventBus.emit('detail:toggle', {});
             }}

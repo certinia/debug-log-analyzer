@@ -25,6 +25,8 @@ const sidebars: SidebarsConfig = {
         'docs/features/calltree',
         'docs/features/analysis',
         'docs/features/database',
+        'docs/features/inspector',
+        'docs/features/governor-limits-heap',
         'docs/features/find',
         'docs/features/raw-log',
         'docs/features/mcp',

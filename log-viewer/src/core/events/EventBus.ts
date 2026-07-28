@@ -7,12 +7,12 @@
  * Decouples components - emitters don't need to know about listeners.
  */
 
-/** Which tab a detail selection came from — the app-wide side bar follows the
+/** Which tab a detail selection came from — the inspector follows the
  *  active tab, keyed by source. */
 export type DetailSource = 'timeline' | 'calltree' | 'analysis' | 'database';
 
 /**
- * A selection to inspect in the side bar. A single frame maps to one `eventIndex`;
+ * A selection to inspect in the inspector. A single frame maps to one `eventIndex`;
  * an aggregate row (Call Tree Aggregated/Bottom-Up, Analysis) scopes to all its
  * occurrences (`instances` = their eventIndexes), aggregated.
  */
@@ -26,11 +26,11 @@ interface EventMap {
   'timeline:navigate-to':
     { eventIndex: number; timestamp?: never } | { eventIndex?: never; timestamp: number };
 
-  // A tab's current selection changed — the app-wide side bar rebuilds its
+  // A tab's current selection changed — the inspector rebuilds its
   // content for this source. `selection: null` clears that source's selection.
   'detail:select': { source: DetailSource; selection: DetailSelection | null };
 
-  // App-level request to show/hide (or force a state on) the side bar.
+  // App-level request to show/hide (or force a state on) the inspector.
   'detail:toggle': { visible?: boolean };
 }
 

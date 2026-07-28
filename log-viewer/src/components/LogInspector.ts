@@ -13,7 +13,7 @@ import type { DockPosition } from './DetailDock.js';
 import './DockLayout.js';
 import type { PaneSection } from './PaneView.js';
 
-/** Maps the LogViewer tab id to the detail source that feeds the side bar. */
+/** Maps the LogViewer tab id to the detail source that feeds the inspector. */
 const TAB_TO_SOURCE: Record<string, DetailSource> = {
   'timeline-tab': 'timeline',
   'tree-tab': 'calltree',
@@ -22,15 +22,15 @@ const TAB_TO_SOURCE: Record<string, DetailSource> = {
 };
 
 /**
- * The app-wide detail side bar. Lives at the app root (sibling of the tab strip,
+ * The app-wide inspector. Lives at the app root (sibling of the tab strip,
  * via a forwarded `main` slot) so it crosscuts every tab. It follows the active
- * tab: each source's latest selection is remembered, and the bar shows the active
+ * tab: each source's latest selection is remembered, and it shows the active
  * tab's selection. Persists dock position/size (public settings) and per-section
  * collapse (private globalState); visibility is transient (opens on first select).
  */
-@customElement('detail-sidebar')
-export class DetailSidebar extends LitElement {
-  /** The active LogViewer tab id (e.g. `database-tab`); the bar follows it. */
+@customElement('log-inspector')
+export class LogInspector extends LitElement {
+  /** The active LogViewer tab id (e.g. `database-tab`); the inspector follows it. */
   @property({ type: String })
   activeTab = '';
 
@@ -61,7 +61,7 @@ export class DetailSidebar extends LitElement {
     );
     getSettings()
       .then((settings) => {
-        const panel = settings?.sidePanel;
+        const panel = settings?.inspector;
         if (panel) {
           this.dock = panel.position;
           this.panelSize = panel.size;
@@ -167,19 +167,19 @@ export class DetailSidebar extends LitElement {
 
   private _onDockPositionChange = (e: CustomEvent<{ position: DockPosition }>) => {
     this.dock = e.detail.position;
-    updateSetting('sidePanel.position', this.dock);
+    updateSetting('inspector.position', this.dock);
   };
 
   // `dock-resize` fires once on pointer-up, so this write already lands on
   // interaction-end — no debounce needed.
   private _onDockResize = (e: CustomEvent<{ size: number }>) => {
     this.panelSize = e.detail.size;
-    updateSetting('sidePanel.size', this.panelSize);
+    updateSetting('inspector.size', this.panelSize);
   };
 
   private _onPaneToggle = (e: CustomEvent<{ collapsed: Record<string, boolean> }>) => {
     this._collapsedSections = { ...this._collapsedSections, ...e.detail.collapsed };
-    updateSetting('sidePanel.collapsed', this._collapsedSections);
+    updateSetting('inspector.collapsed', this._collapsedSections);
   };
 
   private _hidePanel = () => {
@@ -189,6 +189,6 @@ export class DetailSidebar extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'detail-sidebar': DetailSidebar;
+    'log-inspector': LogInspector;
   }
 }

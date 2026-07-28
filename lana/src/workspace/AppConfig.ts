@@ -43,8 +43,8 @@ interface Config {
     dml: { columnView: string; columnOverrides: Record<string, string[]> };
     sosl: { columnView: string; columnOverrides: Record<string, string[]> };
   };
-  // App-wide detail side bar (currently only the Database view feeds it).
-  sidePanel: {
+  // The app-wide inspector, fed by a selection on any tab.
+  inspector: {
     position: 'left' | 'right' | 'bottom';
     size: number;
     // Per-section collapsed state, keyed by section id — private globalState.
@@ -101,13 +101,13 @@ export const COLUMN_VIEW_SECTIONS = [
 export const PRIVATE_SECTIONS = [
   ...COLUMN_OVERRIDE_SECTIONS,
   ...COLUMN_VIEW_SECTIONS,
-  'sidePanel.collapsed',
+  'inspector.collapsed',
 ] as const;
 
 type ColumnOverrides = Record<string, string[]>;
 
-export function getSidePanelCollapsed(globalState: Memento): Record<string, boolean> {
-  return globalState.get<Record<string, boolean>>('sidePanel.collapsed', {});
+export function getInspectorCollapsed(globalState: Memento): Record<string, boolean> {
+  return globalState.get<Record<string, boolean>>('inspector.collapsed', {});
 }
 
 export function getColumnOverrides(globalState: Memento): Record<string, ColumnOverrides> {

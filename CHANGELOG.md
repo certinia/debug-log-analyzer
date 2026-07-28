@@ -15,11 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Peak** – highest live heap reached on the path; the number comparable to the heap governor limit.
   - Shown together in the **Memory** view (total + self), and used by the Governor Avg/Peak columns and the Call Tree heap column. Method tooltips show net heap retained.
   - The Timeline governor strip plots heap as it's allocated, so you can see where it spikes.
-- 🗄️ **Database tab**: governor-limit visibility, a SOSL table, and a dockable detail side bar. ([#162] [#113])
+- 🧭 **Inspector**: select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL statement and inspect it without leaving the tab you're on. ([#113])
+  - **Details**: type, timing, and every governor metric the selection consumed as `used / limit`.
+  - **Call stack**: the frames that led to the selection, with total and self time.
+  - **Call tree**: the selected frames own subtree, switchable between **Time Order**, **Aggregated** and **Bottom-Up**.
+  - Dock it left, right or bottom, drag to resize, and collapse the sections you don't need — the layout is remembered.
+  - Right-click a row for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
+- 🗄️ **Database Analysis**: governor-limit visibility and SOSL usage. ([#162])
   - 📏 **Governor-limit overview**: SOQL, SOSL, DML and query/DML rows shown as `used / limit`, colored as they approach the limit.
   - 🧮 **Found vs Counted**: each section reconciles statements found in the log against the governor-counted total, flagging queries that didn't consume the limit (e.g. custom metadata, which is free unless it selects a long text area field or runs in a Flow).
-  - 🔎 **SOSL table**: a dedicated, searchable Database table.
-  - 🧭 **Detail side bar**: pick a SOQL or DML row to inspect its vitals, call stack and scoped call tree (with SOQL lint issues); dock it left, right or bottom.
+  - 🔎 **SOSL table**: a dedicated, searchable Database table for SOSL.
+  - 🧭 **Show in Call Tree**: right-click any SOQL, DML or SOSL statement to jump to it in the full Call Tree.
 - 🗂️ **Configurable table columns** (Call Tree, Analysis, Database). ([#298])
   - 🗂️ **Column views**: switch preset column sets, show/hide columns from the **Columns** button or the header right-click menu, inline **reset** to restore defaults; choices persist per view.
   - 🏷️ **New columns**: **Object** (queried/target SObject, with group-by) on SOQL/DML; **SOSL Count/Rows**, **Avg Self Time** and optional **Self** variants for every governor metric; and a SOQL **Query Plan** view (Relative Cost, Leading Operation, SObject Type, Cardinality).

@@ -64,11 +64,7 @@ Show or hide individual columns from the same menu; an edited view shows a **res
 
 ### Heap analysis
 
-Heap is a tricky governor limit, since memory gets freed as well as allocated and a single number hides what actually happened. Every method and call path carries three heap metrics (each with a total and self variant), shown together in the **Memory** view:
-
-1. **Net** – bytes retained (allocated minus freed). Can be negative where a path frees more than it allocates.
-1. **Gross** - bytes allocated, ignoring frees, allocation churn and GC pressure. An allocate-then-free loop has near-zero net but large gross.
-1. **Peak** – highest live heap reached while the path ran. The number comparable to the heap governor limit, so it also drives the Governor Avg/Peak columns.
+The **Memory** view carries three heap metrics per call path — **net** (retained), **gross** (churn) and **peak** (highest live heap) — each with a total and self variant. See [Governor limits + heap](./governor-limits-heap.md#heap-net-gross-and-peak) for how to read them together.
 
 ### Filtering
 
@@ -97,6 +93,10 @@ SOQL and SOSL query rows are reformatted onto multiple lines and syntax highligh
 ### Keyboard Navigation
 
 The Call Tree can be navigated with the keyboard. The up and down keys will move between rows, the left and right keys will expand and collapse a parent within the tree.
+
+### Inspect a row
+
+Selecting a row fills the [inspector](./inspector.md) with that call path — its governor metrics, the stack that led to it, and a call tree scoped to just that row, which you can read in Time Order, Aggregated or Bottom-Up independently of the tab's own view mode.
 
 ### Category Coloring
 

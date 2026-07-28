@@ -12,7 +12,7 @@ export function eventName(event: LogEvent): string {
 
 /**
  * Plain-text details for a frame — name, type, duration and any non-zero
- * governor metrics. Shared by the timeline's and the detail side bar's
+ * governor metrics. Shared by the timeline's and the inspector's
  * "Copy Details" actions so both put identical text on the clipboard.
  */
 export function formatEventDetails(event: LogEvent, limits?: GovernorLimits): string {

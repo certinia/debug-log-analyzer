@@ -344,10 +344,10 @@
       {
         "type": "object",
         "id": "lana",
-        "title": "Side Bar",
+        "title": "Inspector",
         "order": 3,
         "properties": {
-          "lana.sidePanel.position": {
+          "lana.inspector.position": {
             "title": "Position",
             "type": "string",
             "default": "right",
@@ -356,14 +356,14 @@
               "right",
               "bottom"
             ],
-            "markdownDescription": "Where the detail side bar docks. Default: `right`",
+            "markdownDescription": "Where the inspector docks. Default: `right`",
             "order": 0
           },
-          "lana.sidePanel.size": {
+          "lana.inspector.size": {
             "title": "Size",
             "type": "number",
             "default": 500,
-            "markdownDescription": "The docked side bar's width (or height when docked to the bottom), in pixels. Default: `500`",
+            "markdownDescription": "The docked inspector's width (or height when docked to the bottom), in pixels. Default: `500`",
             "order": 1
           }
         }

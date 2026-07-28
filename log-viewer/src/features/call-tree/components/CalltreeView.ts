@@ -924,7 +924,7 @@ export class CalltreeView extends LitElement {
   }
 
   /**
-   * Feed the app-wide detail side bar off row selection. A Time Order row is a
+   * Feed the inspector off row selection. A Time Order row is a
    * single event; Aggregated/Bottom-Up rows merge many calls, so they scope to
    * every occurrence (`instances`).
    */

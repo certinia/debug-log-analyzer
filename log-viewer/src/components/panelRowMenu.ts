@@ -12,7 +12,7 @@ import { ContextMenuBuilder } from './ContextMenuBuilder.js';
 import type { ContextMenuItem } from './ContextMenu.js';
 
 /**
- * The detail side bar's row menu — the same actions the timeline's frame menu
+ * The inspector's row menu — the same actions the timeline's frame menu
  * offers, so a frame yields identical clipboard text wherever you right-click it.
  */
 export function panelRowMenuItems(): ContextMenuItem[] {
