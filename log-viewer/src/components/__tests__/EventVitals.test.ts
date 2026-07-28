@@ -73,9 +73,14 @@ describe('EventVitals', () => {
       'SOQL Rows',
       'Selective',
       'Namespace',
-      'Caller namespace',
       'Line',
     ]);
+  });
+
+  it('omits the caller namespace when it matches the namespace', async () => {
+    // Nothing to learn from "default called default" — see the differing case below.
+    const el = await mount({ eventIndex: soqlIndex, type: 'soql' });
+    expect(labels(el)).not.toContain('Caller namespace');
   });
 
   it('reports total and self time inline, to 3 decimal places', async () => {
@@ -132,5 +137,30 @@ describe('EventVitals', () => {
   it('reports nothing when the event is unknown', async () => {
     const el = await mount({ eventIndex: -1 });
     expect(el.shadowRoot?.querySelector('.empty')).not.toBeNull();
+  });
+});
+
+// Its own log (and so its own DatabaseAccess) because the caller's namespace has
+// to differ from the callee's, which the log above never does.
+describe('EventVitals across namespaces', () => {
+  const crossNamespaceLog =
+    '09:18:22.6 (100)|EXECUTION_STARTED\n' +
+    '09:18:22.6 (200)|CODE_UNIT_STARTED|[EXTERNAL]|01q000000000001|Trigger.Account\n' +
+    '09:18:22.6 (300)|ENTERING_MANAGED_PKG|c2g\n' +
+    '09:18:22.6 (400)|METHOD_ENTRY|[1]|01p000000000001|c2g.Handler.run()\n' +
+    '09:18:22.6 (500)|METHOD_EXIT|[1]|01p000000000001|c2g.Handler.run()\n' +
+    '09:18:22.6 (700)|CODE_UNIT_FINISHED|Trigger.Account\n' +
+    '09:18:22.6 (800)|EXECUTION_FINISHED\n';
+
+  it('shows the caller namespace when it differs', async () => {
+    const apexLog = parse(crossNamespaceLog);
+    await DatabaseAccess.create(apexLog);
+    // Packaged code entered from a trigger: whose code ran and who invoked it are
+    // different answers, so both are reported.
+    const pkg = apexLog.eventsById.find((e) => e.type === 'ENTERING_MANAGED_PKG')!;
+    const el = await mount({ eventIndex: pkg.eventIndex });
+    expect(valueFor(el, 'Namespace')).toBe('c2g');
+    expect(labels(el)).toContain('Caller namespace');
+    expect(valueFor(el, 'Caller namespace')).not.toBe('c2g');
   });
 });

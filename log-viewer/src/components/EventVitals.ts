@@ -190,7 +190,13 @@ export class EventVitals extends LitElement {
     this._statementRows(rows, primary);
 
     this._row(rows, 'Namespace', primary.namespace || '—');
-    this._row(rows, 'Caller namespace', getCallerNamespace(primary));
+    // Only worth a row when it says something new: "who called this" differing
+    // from "whose code ran" is the interesting case (a package's code invoked
+    // from another package's trigger). Both normalize empty to 'default'.
+    const callerNamespace = getCallerNamespace(primary);
+    if (callerNamespace !== (primary.namespace || 'default')) {
+      this._row(rows, 'Caller namespace', callerNamespace);
+    }
     this._optional(rows, 'Line', primary.lineNumber);
 
     return html`
