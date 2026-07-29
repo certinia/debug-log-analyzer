@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Net** – bytes retained (allocated minus freed); the lasting footprint. Can be negative where a path frees more than it allocates.
   - **Gross** – bytes allocated, ignoring frees; allocation churn and GC pressure.
   - **Peak** – highest live heap reached on the path; the number comparable to the heap governor limit.
-  - Shown together in the **Memory** view (total + self), and used by the Governor Avg/Peak columns and the Call Tree heap column. Method tooltips show net heap retained.
+  - Shown together in the **Memory** view (total + self); peak also appears in the **Governor Limits** view and feeds the Gov Avg/Peak columns. Method tooltips show net heap retained.
   - The Timeline governor strip plots heap as it's allocated, so you can see where it spikes.
 - 🧭 **Inspector**: select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL statement and inspect it without leaving the tab you're on. ([#113])
   - **Details**: type, timing, and every governor metric the selection consumed as `used / limit`.
@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ♻️ Replace `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).
 - 🗄️ **Database table columns** (DML, SOQL, SOSL): consolidated onto the shared Call Tree column/sort styling for a consistent look across all tables.
 - 🧱 **Data grids**: a crisper header/content separator and tidied grid styling across all tables.
+- 📐 **Column widths**: every column is sized to its widest header and value, so nothing clips or truncates; the **General**, **Database** and **Governor Limits** views were retuned to match.
 
 ### Fixed
 

@@ -106,7 +106,7 @@ export const commonColumnDefaults = {
 };
 
 /**
- * The shared "Gov. Avg (%)" column — the average governor consumption across all
+ * The shared "Gov Avg %" column — the average governor consumption across all
  * governors on a call path (see {@link governorCost}), rendered as a progress
  * bar. Reused across all call-tree/analysis tables. `governorCost` is populated
  * during tree build; the tooltip breaks the average down per metric.
@@ -114,12 +114,12 @@ export const commonColumnDefaults = {
 export function createGovernorCostColumn(governorLimits: GovernorLimits): ColumnDefinition {
   const formatterParams = { precision: 0, totalValue: 100, showPercentageText: false };
   return {
-    title: 'Gov. Avg (%)',
+    title: 'Gov Avg %',
     field: 'governorCost',
     sorter: 'number',
     cssClass: 'number-cell',
-    width: 100,
-    minWidth: 80,
+    width: 71,
+    minWidth: 71,
     hozAlign: 'right',
     headerHozAlign: 'right',
     formatter: progressFormatter,
@@ -144,21 +144,21 @@ export function createGovernorCostColumn(governorLimits: GovernorLimits): Column
 }
 
 /**
- * The "Gov. Peak (%)" column — the single tightest governor consumed on a path
+ * The "Gov Peak %" column — the single tightest governor consumed on a path
  * (see {@link governorCostMax}), rendered as a bar. Complements the averaged
- * Gov. Avg column; hidden by default (surfaced by the Governor Limits view or a
+ * Gov Avg column; hidden by default (surfaced by the Governor Limits view or a
  * user toggle). The tooltip names which governor is the peak.
  */
 export function createGovernorPeakColumn(governorLimits: GovernorLimits): ColumnDefinition {
   const formatterParams = { precision: 0, totalValue: 100, showPercentageText: false };
   return {
-    title: 'Gov. Peak (%)',
+    title: 'Gov Peak %',
     field: 'governorCostMax',
     visible: false,
     sorter: 'number',
     cssClass: 'number-cell',
-    width: 100,
-    minWidth: 80,
+    width: 78,
+    minWidth: 78,
     hozAlign: 'right',
     headerHozAlign: 'right',
     formatter: progressFormatter,
@@ -184,6 +184,12 @@ export function createGovernorPeakColumn(governorLimits: GovernorLimits): Column
  * relative to its governor `limit`. Shared by all call-tree/analysis tables so
  * the Total and Self variants stay consistent. Pass `visible: false` for the
  * Self variants, which are hidden until a view or the user shows them.
+ *
+ * The default 70px is what a two-line "… Count" header needs; the values never
+ * exceed their governor limit, so they're far narrower. Row columns pass a
+ * smaller `width` because "Rows" is a shorter word than "Count". Self titles say
+ * `self`, not `(self)`, so the extra word wraps to a third header line instead of
+ * forcing the column 30-40px wider — the same convention as the heap columns.
  */
 export function createGovernorColumn(opts: {
   title: string;
@@ -260,7 +266,7 @@ export function createGovernorMetricColumns(
       limit: governorLimits.dmlStatements.limit,
     }),
     createGovernorColumn({
-      title: 'DML Count (self)',
+      title: 'DML Count self',
       field: 'dmlCount.self',
       limit: governorLimits.dmlStatements.limit,
       visible: false,
@@ -271,7 +277,7 @@ export function createGovernorMetricColumns(
       limit: governorLimits.soqlQueries.limit,
     }),
     createGovernorColumn({
-      title: 'SOQL Count (self)',
+      title: 'SOQL Count self',
       field: 'soqlCount.self',
       limit: governorLimits.soqlQueries.limit,
       visible: false,
@@ -282,7 +288,7 @@ export function createGovernorMetricColumns(
       limit: governorLimits.soslQueries.limit,
     }),
     createGovernorColumn({
-      title: 'SOSL Count (self)',
+      title: 'SOSL Count self',
       field: 'soslCount.self',
       limit: governorLimits.soslQueries.limit,
       visible: false,
@@ -292,7 +298,8 @@ export function createGovernorMetricColumns(
       field: 'thrownCount.total',
       sorter: 'number',
       cssClass: 'number-cell',
-      width: 60,
+      // 77 is the narrowest width that doesn't clip "Throws"; 60 did.
+      width: 77,
       hozAlign: 'right',
       headerHozAlign: 'right',
       bottomCalc: 'sum',
@@ -301,22 +308,26 @@ export function createGovernorMetricColumns(
       title: 'DML Rows',
       field: 'dmlRowCount.total',
       limit: governorLimits.dmlRows.limit,
+      width: 63,
     }),
     createGovernorColumn({
-      title: 'DML Rows (self)',
+      title: 'DML Rows self',
       field: 'dmlRowCount.self',
       limit: governorLimits.dmlRows.limit,
+      width: 63,
       visible: false,
     }),
     createGovernorColumn({
       title: 'SOQL Rows',
       field: 'soqlRowCount.total',
       limit: governorLimits.queryRows.limit,
+      width: 63,
     }),
     createGovernorColumn({
-      title: 'SOQL Rows (self)',
+      title: 'SOQL Rows self',
       field: 'soqlRowCount.self',
       limit: governorLimits.queryRows.limit,
+      width: 63,
       visible: false,
     }),
     // SOSL rows have no governor limit (only SOSL queries is limited, to 20),
@@ -326,19 +337,19 @@ export function createGovernorMetricColumns(
       field: 'soslRowCount.total',
       sorter: 'number',
       cssClass: 'number-cell',
-      width: 70,
+      width: 63,
       minWidth: 60,
       hozAlign: 'right',
       headerHozAlign: 'right',
       bottomCalc: 'sum',
     },
     {
-      title: 'SOSL Rows (self)',
+      title: 'SOSL Rows self',
       field: 'soslRowCount.self',
       visible: false,
       sorter: 'number',
       cssClass: 'number-cell',
-      width: 70,
+      width: 63,
       minWidth: 60,
       hozAlign: 'right',
       headerHozAlign: 'right',
@@ -349,12 +360,15 @@ export function createGovernorMetricColumns(
       'Heap Net (bytes)',
       'Net bytes retained on this path (alloc − free); may be negative',
       heapFooters.netTotal,
+      // Title "Heap Net" (2 lines) beats the widest value, "-12,000,000".
+      92,
     ),
     createHeapBytesColumn(
       'heapAllocated.self',
       'Heap Net self (bytes)',
       'Net bytes retained directly by this node (excluding sub-methods); may be negative',
       heapFooters.netSelf,
+      121,
       false,
     ),
     createHeapBytesColumn(
@@ -362,12 +376,14 @@ export function createGovernorMetricColumns(
       'Heap Peak (bytes)',
       'Peak live heap on this path (matches the "Maximum heap size" governor)',
       'max',
+      100,
     ),
     createHeapBytesColumn(
       'heapGross.total',
       'Heap Alloc (bytes)',
       'Total bytes allocated on this path (ignores frees; churn)',
       heapFooters.grossTotal,
+      107,
       false,
     ),
     createHeapBytesColumn(
@@ -375,6 +391,7 @@ export function createGovernorMetricColumns(
       'Heap Alloc self (bytes)',
       'Bytes allocated directly by this node (excluding sub-methods; ignores frees)',
       heapFooters.grossSelf,
+      121,
       false,
     ),
     createGovernorCostColumn(governorLimits),
@@ -385,7 +402,10 @@ export function createGovernorMetricColumns(
 /**
  * A shared plain-number heap column: every heap value (net, gross, peak — total & self)
  * renders identically as a thousand-separated integer in bytes (no bar, no %), so the
- * columns scan uniformly. The unit lives in the title. `bottomCalc` is supplied by the
+ * columns scan uniformly. The unit lives in the title — the header, not the value, is what
+ * sets these columns' minimum width.
+ * `width` is per-column for the same reason: it's the widest title word (wrapped to two
+ * lines) or the widest value, whichever is larger. `bottomCalc` is supplied by the
  * caller so each table's footer can match its time-column aggregation (per-table sum vs
  * call-stack-dedup for totals, sum-all-visible for self, 'max' for peak).
  */
@@ -394,6 +414,7 @@ export function createHeapBytesColumn(
   title: string,
   headerTooltip: string,
   bottomCalc: ColumnDefinition['bottomCalc'],
+  width: number,
   visible?: boolean,
 ): ColumnDefinition {
   return {
@@ -403,7 +424,7 @@ export function createHeapBytesColumn(
     visible,
     sorter: 'number',
     cssClass: 'number-cell',
-    width: 90,
+    width,
     minWidth: 70,
     hozAlign: 'right',
     headerHozAlign: 'right',
