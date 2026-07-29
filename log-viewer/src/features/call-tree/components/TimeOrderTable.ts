@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEventType } from 'apex-log-parser';
+import type { ApexLog } from 'apex-log-parser';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
@@ -32,11 +32,10 @@ export function createTimeOrderTable(
 ): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
 
-  const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
   const governorLimits = rootMethod.governorLimits;
 
   const tableData = toTimeOrderTree(rootMethod.children, governorLimits);
-  const nameFormatter = createCalltreeNameFormatter(excludedTypes);
+  const nameFormatter = createCalltreeNameFormatter();
 
   const tableRef: { current: Tabulator | undefined } = { current: undefined };
   const selfTimeBottomCalc = makeSumSelfTimeAllVisible(() => tableRef.current);
@@ -107,6 +106,15 @@ export function createTimeOrderTable(
         field: 'callerNamespace',
         sorter: 'string',
         width: 120,
+        visible: false,
+      },
+      {
+        title: 'Type',
+        field: 'type',
+        headerSortStartingDir: 'asc',
+        sorter: 'string',
+        width: 150,
+        tooltip: true,
         visible: false,
       },
       ...createGovernorMetricColumns(governorLimits, heapFooters),

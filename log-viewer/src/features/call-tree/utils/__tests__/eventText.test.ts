@@ -4,7 +4,7 @@
 import { describe, expect, it } from '@jest/globals';
 import type { GovernorLimits, LogEvent } from 'apex-log-parser';
 
-import { eventName, formatCallStack, formatEventDetails } from '../eventText.js';
+import { eventLabel, eventName, formatCallStack, formatEventDetails } from '../eventText.js';
 
 type EventOptions = {
   text: string;
@@ -65,6 +65,38 @@ describe('eventName', () => {
     expect(eventName(createEvent({ text: 'MyClass.run()' }))).toBe('MyClass.run()');
     expect(eventName(createEvent({ text: 'MyClass.run()', suffix: ' (exception)' }))).toBe(
       'MyClass.run() (exception)',
+    );
+  });
+});
+
+describe('eventLabel', () => {
+  it('leaves text that identifies itself alone', () => {
+    expect(
+      eventLabel(createEvent({ text: 'fflib_SObjectDomain.triggerHandler(System.Type)' })),
+    ).toBe('fflib_SObjectDomain.triggerHandler(System.Type)');
+    // The suffix is what disambiguates, not the raw type.
+    expect(
+      eventLabel(
+        createEvent({
+          text: 'c2g.AbstractTaxHandler',
+          type: 'CONSTRUCTOR_ENTRY',
+          suffix: ' (constructor)',
+        }),
+      ),
+    ).toBe('c2g.AbstractTaxHandler (constructor)');
+  });
+
+  it('falls back to the type when the text cannot stand alone', () => {
+    // A lone boolean, a lone number, no text at all, or a repeat of the type.
+    expect(eventLabel(createEvent({ text: 'false', type: 'SYSTEM_MODE_ENTER' }))).toBe(
+      'SYSTEM_MODE_ENTER: false',
+    );
+    expect(eventLabel(createEvent({ text: '17', type: 'STATEMENT_EXECUTE' }))).toBe(
+      'STATEMENT_EXECUTE: 17',
+    );
+    expect(eventLabel(createEvent({ text: '', type: 'VALIDATION_PASS' }))).toBe('VALIDATION_PASS');
+    expect(eventLabel(createEvent({ text: 'VALIDATION_RULE', type: 'VALIDATION_RULE' }))).toBe(
+      'VALIDATION_RULE: VALIDATION_RULE',
     );
   });
 });

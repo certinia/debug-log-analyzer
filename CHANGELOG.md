@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Governor limits strip**: tooltip rows keep a stable order and always show the `used / limit` value, so figures no longer jump around as you move the pointer. ([#827])
   - **Timeline zooming**: consistent, smooth zoom across platforms and input devices — a Windows mouse wheel no longer over-zooms in large jumps, fast scrolls stay bounded, and zooming in then back out returns to the same level.
   - **Truncation markers** now end where the log recovers, so trusted sections are no longer flag. ([#828])
+- 🏷️ **Call Tree names**: rows no longer carry a raw `EVENT_TYPE:` prefix in front of text that already identifies them, so `WF_CRITERIA_BEGIN: WF_CRITERIA : ON_ALL_CHANGES` reads as `WF_CRITERIA : ON_ALL_CHANGES`. Frames whose text can't stand alone keep the type, and the ones that needed naming now say what they are — `(code unit)`, `(constructor)`, `(managed package)`, `(flow)`. A **Type** column is available in every view from the **Columns** menu if you want the raw types back.
 - 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832]).
 - 🎛️ **Modernised dropdowns**: searchable, compact controls that carry the field and value in one place (e.g. `Group: Namespace`, `Type: All`) ([#848]).
 - ♻️ Replace `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent, LogEventType } from 'apex-log-parser';
+import type { LogEvent } from 'apex-log-parser';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
@@ -21,6 +21,7 @@ import {
   waitForNextFrame,
 } from '../features/call-tree/components/TableShared.js';
 import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCalcs.js';
+import { eventLabel } from '../features/call-tree/utils/eventText.js';
 import { getSettings, updateSetting } from '../features/settings/Settings.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
@@ -47,12 +48,9 @@ const VIEW_MODES: ViewModeOption[] = [
   { value: 'bottom-up', label: 'Bottom-Up' },
 ];
 
-// SOQL/DML frames already read as their statement text, so don't prefix the type.
-const EXCLUDED_TYPES = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
-
 /**
  * Compact dataTree name cell: tree indent + single-line (inline) SOQL/SOSL +
- * type-prefixed plain text. Unlike the Call Tree tab's formatter it renders SOQL
+ * the frame's label. Unlike the Call Tree tab's formatter it renders SOQL
  * inline (not pretty) and no `<a>` link, so cells truncate cleanly and the row
  * click alone drives navigation.
  */
@@ -77,8 +75,7 @@ function compactNameFormatter(cell: CellComponent): HTMLElement {
     return soqlInlineElement(text, isSosl ? 'sosl' : 'soql');
   }
 
-  const label = type && type !== text && !EXCLUDED_TYPES.has(type) ? `${type}: ${text}` : text;
-  return document.createTextNode(label) as unknown as HTMLElement;
+  return document.createTextNode(node ? eventLabel(node) : text) as unknown as HTMLElement;
 }
 
 /**

@@ -17,6 +17,8 @@ export interface TimeOrderRow {
   text: string;
   namespace: string;
   callerNamespace: string;
+  /** Event type (e.g. METHOD_ENTRY) — an optional column, off by default. */
+  type: string;
   duration: SelfTotal;
   dmlCount: SelfTotal;
   soqlCount: SelfTotal;
@@ -87,6 +89,7 @@ export function toTimeOrderTree(
       text: event.text,
       namespace: event.namespace,
       callerNamespace: getCallerNamespace(event),
+      type: type ?? '',
       duration: event.duration,
       dmlCount: event.dmlCount,
       soqlCount: event.soqlCount,

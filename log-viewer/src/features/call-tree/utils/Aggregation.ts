@@ -23,6 +23,8 @@ export interface AggregatedRow {
   namespace: string;
   /** Namespace of the direct caller (representative; used for grouping/filtering, not displayed) */
   callerNamespace: string;
+  /** Event type (e.g. METHOD_ENTRY) — an optional column, off by default. */
+  type: string;
   /** Number of times this function was called */
   callCount: number;
   /** Sum of self-time across all calls */
@@ -639,6 +641,7 @@ function createEmptyAggregatedRow(
     text: event.text,
     namespace: event.namespace,
     callerNamespace: getCallerNamespace(event),
+    type: event.type ?? '',
     callCount: 0,
     totalSelfTime: 0,
     totalTime: 0,

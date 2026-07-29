@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent, LogEventType } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { Tabulator, type Options } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
@@ -64,8 +64,7 @@ export function createBottomUpTable(
   registerTableModules();
   Tabulator.registerModule([GroupCalcs, GroupChildIndent, GroupSort]);
 
-  const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
-  const nameFormatter = createCalltreeNameFormatter(excludedTypes);
+  const nameFormatter = createCalltreeNameFormatter();
 
   const totalTimeBottomCalc = (
     _values: number[],

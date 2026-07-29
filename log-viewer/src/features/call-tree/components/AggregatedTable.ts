@@ -10,6 +10,7 @@ import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { toAggregatedCallTree, type AggregatedRow } from '../utils/Aggregation.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
+import { eventLabel, eventName } from '../utils/eventText.js';
 import {
   commonColumnDefaults,
   createGovernorMetricColumns,
@@ -85,13 +86,14 @@ export function createAggregatedTable(
           const rowData = cell.getData() as AggregatedRow;
           const firstInstance = rowData.instances[0];
 
+          const label = firstInstance ? eventLabel(firstInstance) : rowData.text;
           if (firstInstance?.hasValidSymbols) {
             const link = document.createElement('a');
             link.setAttribute('href', '#!');
-            link.textContent = rowData.text;
+            link.textContent = eventName(firstInstance);
             return link;
           }
-          return document.createTextNode(rowData.text) as unknown as HTMLElement;
+          return document.createTextNode(label) as unknown as HTMLElement;
         },
         variableHeight: true,
         cellClick: (e, cell) => {
@@ -124,6 +126,15 @@ export function createAggregatedTable(
         field: 'callerNamespace',
         sorter: 'string',
         width: 120,
+        visible: false,
+      },
+      {
+        title: 'Type',
+        field: 'type',
+        headerSortStartingDir: 'asc',
+        sorter: 'string',
+        width: 150,
+        tooltip: true,
         visible: false,
       },
       {
