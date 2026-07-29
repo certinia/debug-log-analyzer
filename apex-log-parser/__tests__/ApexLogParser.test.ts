@@ -214,6 +214,27 @@ describe('parseLog tests', () => {
     expect(firstChildren[0]).toBeInstanceOf(CodeUnitStartedLine);
   });
 
+  it('names the frames whose text cannot say what they are', async () => {
+    // Each of these carries a text that reads like anything else — a trigger
+    // path, a bare namespace, a flow label — so the suffix does the naming.
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n' +
+      '09:18:22.6 (200)|CODE_UNIT_STARTED|[EXTERNAL]|01q000000000001|__sfdc_trigger/c2g/CODAInvoice\n' +
+      '09:18:22.6 (300)|ENTERING_MANAGED_PKG|c2g\n' +
+      '09:18:22.6 (400)|FLOW_START_INTERVIEW_BEGIN|91080693a3c1|Account Before Save LC\n' +
+      '09:18:22.6 (500)|FLOW_START_INTERVIEW_END|91080693a3c1|Account Before Save LC\n' +
+      '09:18:22.6 (600)|CODE_UNIT_FINISHED|__sfdc_trigger/c2g/CODAInvoice\n' +
+      '09:18:22.6 (700)|EXECUTION_FINISHED\n';
+
+    const suffixes = new Map(
+      parse(log).eventsById.map((event) => [event.type, event.suffix] as const),
+    );
+    // Most code units start partway through a transaction, so not "entrypoint".
+    expect(suffixes.get('CODE_UNIT_STARTED')).toBe(' (code unit)');
+    expect(suffixes.get('ENTERING_MANAGED_PKG')).toBe(' (managed package)');
+    expect(suffixes.get('FLOW_START_INTERVIEW_BEGIN')).toBe(' (flow)');
+  });
+
   it('Should parse between EXECUTION_STARTED and EXECUTION_FINISHED for CRLF (\r\n)', async () => {
     const log =
       '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|user@example.com|Greenwich Mean Time|GMT+01:00\r\n' +
