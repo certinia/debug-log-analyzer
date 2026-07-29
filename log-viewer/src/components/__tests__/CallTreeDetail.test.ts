@@ -71,24 +71,12 @@ describe('CallTreeDetail view mode', () => {
   });
 });
 
-describe('CallTreeDetail details toggle', () => {
-  it('starts off and toggles on click', async () => {
+describe('CallTreeDetail note', () => {
+  it('says the times are relative to the selection and details are omitted', async () => {
     const el = await mount();
-    const toggle = el.shadowRoot?.querySelector<HTMLButtonElement>('.pill-toggle');
-
-    expect(toggle?.getAttribute('aria-pressed')).toBe('false');
-
-    toggle?.click();
-    await el.updateComplete;
-
-    expect(el.shadowRoot?.querySelector('.pill-toggle')?.getAttribute('aria-pressed')).toBe('true');
-  });
-
-  it('says the times are relative to the selection', async () => {
-    const el = await mount();
-    expect(el.shadowRoot?.querySelector('.note')?.textContent).toContain(
-      'relative to the selection',
-    );
+    const note = el.shadowRoot?.querySelector('.note')?.textContent;
+    expect(note).toContain('relative to the selection');
+    expect(note).toContain('Zero-duration rows are omitted');
     // Nothing was truncated (no table built), so no warning.
     expect(el.shadowRoot?.querySelector('.note .warn')).toBeNull();
   });

@@ -31,12 +31,7 @@ import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
-import {
-  buildScopedCallTree,
-  NODE_BUDGET,
-  type ScopedCallTree,
-  type ScopedRow,
-} from './scopedCallTree.js';
+import { buildScopedCallTree, NODE_BUDGET, type ScopedCallTree } from './scopedCallTree.js';
 import './ViewModeSwitch.js';
 import type { ViewModeOption } from './ViewModeSwitch.js';
 
@@ -97,12 +92,6 @@ export class CallTreeDetail extends LitElement {
 
   @state()
   private viewMode: ViewMode = 'time-order';
-
-  /** Show the zero-duration bookkeeping rows (heap, statements, assignments).
-   *  Off by default, as on the Call Tree tab — they outnumber the timed frames
-   *  several times over. */
-  @state()
-  private showDetails = false;
 
   private _tables: Record<ViewMode, Tabulator | null> = {
     'time-order': null,
@@ -315,34 +304,7 @@ export class CallTreeDetail extends LitElement {
     table.on('rowContext', (e, row) => {
       this._showRowMenu(e as MouseEvent, row, table);
     });
-    // Filters must wait for the build; a table created later than a toggle picks
-    // the current state up here.
-    table.on('tableBuilt', () => {
-      this._applyDetailsFilter(table);
-    });
     this._tables[mode] = table;
-  }
-
-  private _detailsFilter = (data: ScopedRow): boolean => data._hasDetailsDeep;
-
-  private _applyDetailsFilter(table: Tabulator) {
-    table.blockRedraw();
-    table.clearFilter(false);
-    if (!this.showDetails) {
-      table.addFilter(this._detailsFilter);
-    }
-    table.restoreRedraw();
-  }
-
-  private _toggleDetails() {
-    this.showDetails = !this.showDetails;
-    // @state field initializer shadows the accessor under @swc/jest; nudge it.
-    this.requestUpdate();
-    for (const table of Object.values(this._tables)) {
-      if (table) {
-        this._applyDetailsFilter(table);
-      }
-    }
   }
 
   /** Row right-click menu: reveal in the Call Tree tab, or copy the frame. */
@@ -436,15 +398,6 @@ export class CallTreeDetail extends LitElement {
           @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
             this._setViewMode(e.detail.value as ViewMode)}
         ></view-mode-switch>
-        <button
-          type="button"
-          class="filter-control pill-toggle"
-          aria-pressed="${this.showDetails}"
-          title="Show zero-duration rows (heap allocations, statements, variable assignments)"
-          @click=${this._toggleDetails}
-        >
-          Details
-        </button>
       </div>
       <div class="tables">
         <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
@@ -458,7 +411,7 @@ export class CallTreeDetail extends LitElement {
         </div>
       </div>
       <p class="note">
-        <span>Times are relative to the selection.</span>${
+        <span>Times are relative to the selection. Zero-duration rows are omitted.</span>${
           this._scoped?.truncated
             ? html`<span class="warn"
                 >Large subtree — stopped at ${formatInteger(NODE_BUDGET)} rows.</span
