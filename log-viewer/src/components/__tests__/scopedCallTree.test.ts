@@ -105,7 +105,7 @@ describe('buildScopedCallTree', () => {
     expect(counts).toEqual([1, 1, 1, 1]);
   });
 
-  it('marks zero-duration bookkeeping rows as details, keeping those with timed descendants', () => {
+  it('drops zero-duration bookkeeping rows, keeping those with timed descendants', () => {
     const scope = ev(200, 'METHOD_ENTRY', 'scope', { total: 50, self: 0 });
     const heap = ev(201, 'HEAP_ALLOCATE', 'Bytes:8', { total: 0, self: 0 });
     const statement = ev(202, 'STATEMENT_EXECUTE', '[12]', { total: 0, self: 0 });
@@ -120,13 +120,19 @@ describe('buildScopedCallTree', () => {
 
     const tree = buildScopedCallTree(scope.eventIndex)!;
     const selected = tree.timeOrder[0]!;
-    const [heapRow, statementRow] = selected._children!;
-    // The selection always shows; a bare heap allocation does not.
-    expect(selected._hasDetailsDeep).toBe(true);
-    expect(heapRow!._hasDetailsDeep).toBe(false);
-    // Zero duration itself, but it is the only way to reach `timed`.
-    expect(statementRow!._hasDetailsDeep).toBe(true);
-    expect(statementRow!._children![0]!._hasDetailsDeep).toBe(true);
+    // The bare heap allocation is gone; the statement stays because it is the
+    // only way to reach `timed`.
+    expect(selected._children!.map((row) => row.text)).toEqual(['[12]']);
+    expect(selected._children![0]!._children!.map((row) => row.text)).toEqual(['timed']);
+  });
+
+  it('keeps the selection itself even when it has no duration', () => {
+    const scope = ev(210, 'VARIABLE_SCOPE_BEGIN', 'scope', { total: 0, self: 0 });
+    scope.parent = root;
+    byId.set(scope.eventIndex, scope);
+
+    const tree = buildScopedCallTree(scope.eventIndex)!;
+    expect(tree.timeOrder.map((row) => row.text)).toEqual(['scope']);
   });
 
   it('aggregated: linear path stays one node per frame', () => {
@@ -141,10 +147,6 @@ describe('buildScopedCallTree', () => {
     expect(texts).toEqual(['exec', 'm1', 'm2', 'SELECT Id FROM Account']);
   });
 
-  it('reports untruncated for a small subtree', () => {
-    expect(buildScopedCallTree(4)!.truncated).toBe(false);
-  });
-
   it('builds each view only on first read, then caches it', () => {
     const tree = buildScopedCallTree(4)!;
     // Same object back on a second read — the walk is not repeated.
@@ -153,12 +155,11 @@ describe('buildScopedCallTree', () => {
     expect(tree.timeOrder).toBe(tree.timeOrder);
   });
 
-  it('truncates a subtree that exceeds the node budget instead of materialising it', () => {
-    // A wide leaf-heavy subtree well past the 20k budget.
+  it('materialises every child rather than capping the subtree', () => {
     const big = ev(100, 'METHOD_ENTRY', 'big', { total: 100, self: 0 });
     big.parent = root;
-    big.children = Array.from({ length: 25_000 }, (_unused, i) =>
-      ev(1_000 + i, 'METHOD_ENTRY', `kid${i}`, { total: 0, self: 0 }),
+    big.children = Array.from({ length: 5 }, (_unused, i) =>
+      ev(1_000 + i, 'METHOD_ENTRY', `kid${i}`, { total: 1, self: 1 }),
     );
     for (const kid of big.children) {
       kid.parent = big;
@@ -166,9 +167,8 @@ describe('buildScopedCallTree', () => {
     byId.set(big.eventIndex, big);
 
     const tree = buildScopedCallTree(big.eventIndex)!;
-    expect(tree.truncated).toBe(true);
-    // The node itself is kept (its totals are intact) but descent stopped early.
     expect(tree.timeOrder[0]!.text).toBe('big');
-    expect(tree.timeOrder[0]!._children!.length).toBeLessThan(25_000);
+    // Every child is present — expansion is the renderer's job, not a build-time cap.
+    expect(tree.timeOrder[0]!._children!.length).toBe(5);
   });
 });

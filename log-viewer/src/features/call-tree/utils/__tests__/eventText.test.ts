@@ -87,7 +87,7 @@ describe('eventLabel', () => {
   });
 
   it('falls back to the type when the text cannot stand alone', () => {
-    // A lone boolean, a lone number, no text at all, or a repeat of the type.
+    // A lone boolean, a lone number, or no text at all.
     expect(eventLabel(createEvent({ text: 'false', type: 'SYSTEM_MODE_ENTER' }))).toBe(
       'SYSTEM_MODE_ENTER: false',
     );
@@ -95,8 +95,11 @@ describe('eventLabel', () => {
       'STATEMENT_EXECUTE: 17',
     );
     expect(eventLabel(createEvent({ text: '', type: 'VALIDATION_PASS' }))).toBe('VALIDATION_PASS');
-    expect(eventLabel(createEvent({ text: 'VALIDATION_RULE', type: 'VALIDATION_RULE' }))).toBe(
-      'VALIDATION_RULE: VALIDATION_RULE',
+  });
+
+  it('does not repeat the type when the text already is the type', () => {
+    expect(eventLabel(createEvent({ text: 'EXECUTION_STARTED', type: 'EXECUTION_STARTED' }))).toBe(
+      'EXECUTION_STARTED',
     );
   });
 });

@@ -18,11 +18,11 @@ import {
   headerSortElement,
   clipboardCopyOptions,
   registerTableModules,
+  virtualScrollOptions,
   waitForNextFrame,
 } from '../features/call-tree/components/TableShared.js';
 import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCalcs.js';
 import { eventLabel } from '../features/call-tree/utils/eventText.js';
-import { getSettings, updateSetting } from '../features/settings/Settings.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
@@ -31,22 +31,31 @@ import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
-import {
-  buildScopedCallTree,
-  NODE_BUDGET,
-  type ScopedCallTree,
-  type ScopedRow,
-} from './scopedCallTree.js';
+import { buildScopedCallTree, type ScopedCallTree } from './scopedCallTree.js';
 import './ViewModeSwitch.js';
 import type { ViewModeOption } from './ViewModeSwitch.js';
 
-type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
-
-const VIEW_MODES: ViewModeOption[] = [
+// The switch options are the source of the union, so the guard below can't drift.
+const VIEW_MODES = [
   { value: 'time-order', label: 'Time Order' },
   { value: 'aggregated', label: 'Aggregated' },
   { value: 'bottom-up', label: 'Bottom-Up' },
-];
+] as const satisfies readonly ViewModeOption[];
+
+type ViewMode = (typeof VIEW_MODES)[number]['value'];
+
+function isViewMode(value: unknown): value is ViewMode {
+  return VIEW_MODES.some((option) => option.value === value);
+}
+
+/**
+ * The picked view mode, shared by every instance: the pane is torn down and
+ * rebuilt on each collapse, tab hop and panel toggle, so without this the mode
+ * would reset on every selection. Deliberately not persisted — a log opens on
+ * Time Order, the mode that matches the Call Tree tab and the timeline, so an
+ * aggregated view is always something you chose in this log, not last week.
+ */
+let sharedViewMode: ViewMode | undefined;
 
 /**
  * Compact dataTree name cell: tree indent + single-line (inline) SOQL/SOSL +
@@ -98,12 +107,6 @@ export class CallTreeDetail extends LitElement {
   @state()
   private viewMode: ViewMode = 'time-order';
 
-  /** Show the zero-duration bookkeeping rows (heap, statements, assignments).
-   *  Off by default, as on the Call Tree tab — they outnumber the timed frames
-   *  several times over. */
-  @state()
-  private showDetails = false;
-
   private _tables: Record<ViewMode, Tabulator | null> = {
     'time-order': null,
     aggregated: null,
@@ -120,24 +123,14 @@ export class CallTreeDetail extends LitElement {
   private _contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private _menuEventIndex = -1;
-  // Set once the user picks a mode, so a late settings load can't overrule them.
-  private _modeIsUserChoice = false;
 
   constructor() {
     super();
-    // The mode is remembered UI state, so it's read here rather than threaded
-    // through the section builders.
-    getSettings()
-      .then((settings) => {
-        const mode = settings?.inspector?.callTreeMode;
-        if (!this._modeIsUserChoice && VIEW_MODES.some((option) => option.value === mode)) {
-          this.viewMode = mode as ViewMode;
-          this.requestUpdate();
-        }
-      })
-      .catch(() => {
-        /* settings unavailable (e.g. outside the extension host) — keep the default */
-      });
+    // Session UI state, so it's read here rather than threaded through the
+    // section builders.
+    if (sharedViewMode) {
+      this.viewMode = sharedViewMode;
+    }
   }
 
   firstUpdated(): void {
@@ -162,16 +155,6 @@ export class CallTreeDetail extends LitElement {
         gap: 8px;
         padding-bottom: 4px;
         flex: 0 0 auto;
-      }
-      .note {
-        flex: 0 0 auto;
-        margin: 4px 0 0;
-        color: var(--vscode-descriptionForeground);
-        font-size: var(--filter-control-font-size);
-      }
-      .note .warn {
-        color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
-        margin-left: 0.5ch;
       }
       .tables {
         position: relative;
@@ -271,13 +254,16 @@ export class CallTreeDetail extends LitElement {
       height: '100%',
       maxHeight: '100%',
       placeholder: 'No call tree available',
+      // A scoped subtree is unbounded, so only the visible rows are rendered —
+      // the same deal the Call Tree tab's tables get. The build in
+      // `scopedCallTree` is still eager; this bounds the paint, not the walk.
+      ...virtualScrollOptions,
       dataTree: true,
       dataTreeChildField: '_children',
       dataTreeChildColumnCalcs: false,
       dataTreeBranchElement: '<span/>',
       columnCalcs: 'table',
       // Arrow-key row navigation, matching the Call Tree tab.
-      // @ts-expect-error custom option registered by the RowKeyboardNavigation module
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
       ...clipboardCopyOptions,
@@ -315,34 +301,7 @@ export class CallTreeDetail extends LitElement {
     table.on('rowContext', (e, row) => {
       this._showRowMenu(e as MouseEvent, row, table);
     });
-    // Filters must wait for the build; a table created later than a toggle picks
-    // the current state up here.
-    table.on('tableBuilt', () => {
-      this._applyDetailsFilter(table);
-    });
     this._tables[mode] = table;
-  }
-
-  private _detailsFilter = (data: ScopedRow): boolean => data._hasDetailsDeep;
-
-  private _applyDetailsFilter(table: Tabulator) {
-    table.blockRedraw();
-    table.clearFilter(false);
-    if (!this.showDetails) {
-      table.addFilter(this._detailsFilter);
-    }
-    table.restoreRedraw();
-  }
-
-  private _toggleDetails() {
-    this.showDetails = !this.showDetails;
-    // @state field initializer shadows the accessor under @swc/jest; nudge it.
-    this.requestUpdate();
-    for (const table of Object.values(this._tables)) {
-      if (table) {
-        this._applyDetailsFilter(table);
-      }
-    }
   }
 
   /** Row right-click menu: reveal in the Call Tree tab, or copy the frame. */
@@ -434,17 +393,8 @@ export class CallTreeDetail extends LitElement {
           .options=${VIEW_MODES}
           value=${this.viewMode}
           @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
-            this._setViewMode(e.detail.value as ViewMode)}
+            this._setViewMode(e.detail.value)}
         ></view-mode-switch>
-        <button
-          type="button"
-          class="filter-control pill-toggle"
-          aria-pressed="${this.showDetails}"
-          title="Show zero-duration rows (heap allocations, statements, variable assignments)"
-          @click=${this._toggleDetails}
-        >
-          Details
-        </button>
       </div>
       <div class="tables">
         <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
@@ -457,15 +407,6 @@ export class CallTreeDetail extends LitElement {
           <div id="bottom-up-tree" class="grid"></div>
         </div>
       </div>
-      <p class="note">
-        <span>Times are relative to the selection.</span>${
-          this._scoped?.truncated
-            ? html`<span class="warn"
-                >Large subtree — stopped at ${formatInteger(NODE_BUDGET)} rows.</span
-              >`
-            : ''
-        }
-      </p>
       <context-menu
         @menu-select=${(e: CustomEvent<{ itemId: string }>) =>
           runPanelRowAction(e.detail.itemId, this._menuEventIndex)}
@@ -473,11 +414,11 @@ export class CallTreeDetail extends LitElement {
     `;
   }
 
-  private _setViewMode(mode: ViewMode) {
-    this._modeIsUserChoice = true;
+  private _setViewMode(mode: string) {
+    if (!isViewMode(mode)) {
+      return;
+    }
+    sharedViewMode = mode;
     this.viewMode = mode;
-    updateSetting('inspector.callTreeMode', mode);
-    // @state field initializer shadows the accessor under @swc/jest; nudge it.
-    this.requestUpdate();
   }
 }

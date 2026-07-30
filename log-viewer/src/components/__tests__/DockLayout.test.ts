@@ -112,7 +112,6 @@ describe('DockLayout resize', () => {
   it('reports nothing while the panel is hidden, since there is no handle', async () => {
     const el = await mount('right');
     el.visible = false;
-    el.requestUpdate('visible', true);
     await el.updateComplete;
 
     expect(el.shadowRoot?.querySelector('.gutter')).toBeNull();

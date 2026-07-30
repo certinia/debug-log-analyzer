@@ -8,7 +8,6 @@ import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenge
 import { formatDuration } from '../../../core/utility/Util.js';
 import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../utils/TimeOrderTree.js';
 import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
@@ -18,6 +17,7 @@ import {
   createSelfSumHeapFooters,
   headerSortElement,
   registerTableModules,
+  virtualScrollOptions,
   type TableCallbacks,
 } from './TableShared.js';
 
@@ -51,9 +51,7 @@ export function createTimeOrderTable(
     maxHeight: '100%',
     //  custom property for datagrid/module/RowKeyboardNavigation
     rowKeyboardNavigation: true,
-    //  custom property for module/AnchoringPolicy
-    anchoringPolicy: true,
-    renderVertical: VirtualVerticalRenderer,
+    ...virtualScrollOptions,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',

@@ -3,7 +3,7 @@
  */
 import type { LogEvent } from 'apex-log-parser';
 
-import { computeHasDetailsDeep } from '../features/call-tree/utils/DetailsFilter.js';
+import { EXCLUDED_DETAIL_TYPES } from '../features/call-tree/utils/DetailsFilter.js';
 import { DatabaseAccess } from '../features/database/services/Database.js';
 
 /** Frame grouping key — same shape as the call-tree aggregation. */
@@ -23,10 +23,6 @@ export interface ScopedRow {
   type: string;
   duration: { total: number; self: number };
   callCount: number;
-  /** Show-Details roll-up: this row, or a descendant, is worth showing. Zero-
-   *  duration bookkeeping rows (heap allocations, statements, assignments) are
-   *  false and hidden unless the user asks for them. */
-  _hasDetailsDeep: boolean;
   _children: ScopedRow[] | null;
 }
 
@@ -37,24 +33,16 @@ export interface ScopedCallTree {
   readonly timeOrder: ScopedRow[];
   readonly aggregated: ScopedRow[];
   readonly bottomUp: ScopedRow[];
-  /** True when a subtree hit {@link NODE_BUDGET} and was cut short. */
-  truncated: boolean;
 }
 
 /**
- * Cap on materialised nodes per selection. A broad frame selected as an
- * aggregate would otherwise expand `occurrences × whole subtree` — millions of
- * nodes on a large log — blocking the UI thread well past the 50ms budget.
+ * The selected node + its real subtree, with real durations. Zero-duration
+ * bookkeeping rows (heap allocations, statements, assignments) are dropped —
+ * the Inspector is a summary, and the Call Tree tab is where those details are
+ * read. Returns null when the row is one of them; `keep` forces the selection
+ * itself through, whatever its duration.
  */
-export const NODE_BUDGET = 20_000;
-
-interface Budget {
-  left: number;
-  truncated: boolean;
-}
-
-/** The selected node + its real subtree, with real durations, within `budget`. */
-function realSubtree(event: LogEvent, budget: Budget): ScopedRow {
+function realSubtree(event: LogEvent, keep = false): ScopedRow | null {
   const row: ScopedRow = {
     id: event.eventIndex,
     originalData: event,
@@ -62,26 +50,22 @@ function realSubtree(event: LogEvent, budget: Budget): ScopedRow {
     type: event.type ?? '',
     duration: { total: event.duration.total, self: event.duration.self },
     callCount: 1,
-    _hasDetailsDeep: false,
     _children: null,
   };
-  budget.left -= 1;
 
-  // Check the budget per child, not just before descending: a single node can
-  // have more direct children than the whole budget allows.
   const children: ScopedRow[] = [];
   for (const kid of event.children) {
-    if (budget.left <= 0) {
-      // Keep the nodes built so far (their totals are intact) and stop.
-      budget.truncated = true;
-      break;
+    const child = realSubtree(kid);
+    if (child) {
+      children.push(child);
     }
-    children.push(realSubtree(kid, budget));
   }
   row._children = children.length ? children : null;
-  // Post-order: children carry their own roll-up by the time we ask.
-  row._hasDetailsDeep = computeHasDetailsDeep(row, row.duration.total, row.type);
-  return row;
+  // Post-order: a zero-duration frame stays only as the path to a kept
+  // descendant, or because its type reports limits rather than time.
+  const significant =
+    keep || row.duration.total > 0 || children.length > 0 || EXCLUDED_DETAIL_TYPES.has(row.type);
+  return significant ? row : null;
 }
 
 /**
@@ -118,12 +102,11 @@ export function buildScopedCallTree(
   // Wrap each occurrence in its ancestor chain, innermost first, attributing that
   // occurrence's total up its path with no self time. Aggregation then merges
   // paths that share frames.
-  const budget: Budget = { left: NODE_BUDGET, truncated: false };
   const roots = selectedEvents.map((selected) => {
-    let node = realSubtree(selected, budget);
     // The selection and the path to it are the point of the view, so they show
-    // even when the selection itself has no duration (e.g. a variable scope).
-    node._hasDetailsDeep = true;
+    // even when the selection itself has no duration (e.g. a variable scope) —
+    // `keep` is what makes this non-null.
+    let node = realSubtree(selected, true)!;
     let parent = selected.parent;
     while (parent && parent !== apexLog) {
       node = {
@@ -133,7 +116,6 @@ export function buildScopedCallTree(
         type: parent.type ?? '',
         duration: { total: selected.duration.total, self: 0 },
         callCount: 1,
-        _hasDetailsDeep: true,
         _children: [node],
       };
       parent = parent.parent;
@@ -148,7 +130,6 @@ export function buildScopedCallTree(
   let bottomUp: ScopedRow[] | null = null;
   return {
     rootTotal,
-    truncated: budget.truncated,
     get timeOrder(): ScopedRow[] {
       // Many occurrences usually share ancestors, so merge the paths for a
       // readable tree; a single occurrence keeps its exact chain.
@@ -185,7 +166,6 @@ function aggregate(rows: ScopedRow[]): ScopedRow[] {
           type: row.type,
           duration: { total: 0, self: 0 },
           callCount: 0,
-          _hasDetailsDeep: false,
           _children: [],
         };
         groups.set(key, group);
@@ -194,8 +174,6 @@ function aggregate(rows: ScopedRow[]): ScopedRow[] {
       group.duration.total += row.duration.total;
       group.duration.self += row.duration.self;
       group.callCount += row.callCount;
-      // A group shows if any occurrence did.
-      group._hasDetailsDeep ||= row._hasDetailsDeep;
       if (row._children) {
         (group._children as ScopedRow[]).push(...row._children);
       }
@@ -237,8 +215,6 @@ function buildBottomUp(rows: ScopedRow[]): ScopedRow[] {
         type: src.type,
         duration: { total: 0, self: 0 },
         callCount: 0,
-        // Every bottom-up row carries attributed self time, so all of them show.
-        _hasDetailsDeep: true,
         _children: null,
         _map: new Map(),
       };
@@ -285,7 +261,6 @@ function buildBottomUp(rows: ScopedRow[]): ScopedRow[] {
       type: node.type,
       duration: node.duration,
       callCount: node.callCount,
-      _hasDetailsDeep: true,
       _children: children.length ? children : null,
     };
   };

@@ -21,7 +21,7 @@ export interface ViewModeOption {
 @customElement('view-mode-switch')
 export class ViewModeSwitch extends LitElement {
   @property({ attribute: false })
-  options: ViewModeOption[] = [];
+  options: readonly ViewModeOption[] = [];
 
   @property()
   value = '';
@@ -36,14 +36,18 @@ export class ViewModeSwitch extends LitElement {
         display: flex;
         gap: 0;
       }
+      /* Same dense sizing as the filter bar's Expand/Collapse/Columns controls
+         (--filter-control-* in global.styles), so the switch reads as one
+         visual family with them. Only the outer edges of the row are rounded. */
       vscode-button {
-        height: 26px;
+        height: var(--filter-control-height);
       }
       vscode-button::part(base) {
-        padding: 0 8px;
+        padding: var(--filter-control-padding);
+        font-size: var(--filter-control-font-size);
       }
       vscode-button:first-child {
-        --vsc-border-left-radius: 2px;
+        --vsc-border-left-radius: var(--filter-control-radius);
         --vsc-border-right-radius: 0;
       }
       vscode-button:not(:first-child):not(:last-child) {
@@ -52,7 +56,7 @@ export class ViewModeSwitch extends LitElement {
       }
       vscode-button:last-child {
         --vsc-border-left-radius: 0;
-        --vsc-border-right-radius: 2px;
+        --vsc-border-right-radius: var(--filter-control-radius);
       }
     `,
   ];

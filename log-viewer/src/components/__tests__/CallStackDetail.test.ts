@@ -25,6 +25,7 @@ jest.mock('tabulator-tables', () => ({
     }
   },
   Module: class {},
+  Renderer: class {},
 }));
 
 // No DatabaseAccess in the test, so the stack is empty.
@@ -39,11 +40,6 @@ async function mount(eventIndex: number): Promise<CallStackDetail> {
   const el = document.createElement('call-stack-detail') as CallStackDetail;
   el.eventIndex = eventIndex;
   document.body.appendChild(el);
-  await el.updateComplete;
-  // Under @swc/jest the `@property` field initializer shadows Lit's reactive
-  // accessor, so the assignment above never reaches `changedProperties` and the
-  // table is never built. Nudge the update the way the browser would.
-  el.requestUpdate('eventIndex', undefined);
   await el.updateComplete;
   return el;
 }

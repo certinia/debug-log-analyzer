@@ -18,8 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🧭 **Inspector**: select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL statement and inspect it without leaving the tab you're on. ([#113])
   - **Details**: type, timing, and every governor metric the selection consumed as `used / limit`.
   - **Call stack**: the frames that led to the selection, with total and self time.
-  - **Call tree**: the selected frame's own subtree, switchable between **Time Order**, **Aggregated** and **Bottom-Up**. Times are relative to the selection, and zero-duration rows (heap allocations, statements, variable assignments) stay hidden until you press **Details**.
-  - Dock it left, right or bottom, drag to resize, and collapse the sections you don't need — the layout is remembered, along with the call tree view mode and whether the Inspector is open.
+  - **Call tree**: the selected frame's own subtree, switchable between **Time Order**, **Aggregated** and **Bottom-Up**. Times are relative to the selection, and zero-duration rows (heap allocations, statements, variable assignments) are left out — read those on the Call Tree tab.
+  - Dock it left, right or bottom, drag to resize, and collapse the sections you don't need — the layout is remembered.
   - Right-click a row for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
 - 🗄️ **Database Analysis**: governor-limit visibility and SOSL usage. ([#162])
   - 📏 **Governor-limit overview**: SOQL, SOSL, DML and query/DML rows shown as `used / limit`, colored as they approach the limit.

@@ -11,7 +11,7 @@ import { LitElement, css, html, type TemplateResult } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 
-import { getCallerNamespace } from '../core/utility/CallerNamespace.js';
+import { DEFAULT_NAMESPACE, getCallerNamespace } from '../core/utility/CallerNamespace.js';
 import { formatMs } from '../core/utility/Duration.js';
 import { formatInteger } from '../core/utility/Util.js';
 import { SOSL_ROWS_PER_QUERY_LIMIT } from '../features/database/limits.js';
@@ -192,9 +192,9 @@ export class EventVitals extends LitElement {
     this._row(rows, 'Namespace', primary.namespace || '—');
     // Only worth a row when it says something new: "who called this" differing
     // from "whose code ran" is the interesting case (a package's code invoked
-    // from another package's trigger). Both normalize empty to 'default'.
+    // from another package's trigger). Both normalize empty the same way.
     const callerNamespace = getCallerNamespace(primary);
-    if (callerNamespace !== (primary.namespace || 'default')) {
+    if (callerNamespace !== (primary.namespace || DEFAULT_NAMESPACE)) {
       this._row(rows, 'Caller namespace', callerNamespace);
     }
     this._optional(rows, 'Line', primary.lineNumber);

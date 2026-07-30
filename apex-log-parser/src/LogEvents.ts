@@ -760,7 +760,7 @@ export class MethodExitLine extends LogEvent {
 export class SystemConstructorEntryLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.System;
   debugLevel = LOG_LEVEL.Fine;
-  suffix = '(system constructor)';
+  suffix = ' (system constructor)';
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['SYSTEM_CONSTRUCTOR_EXIT'], LOG_CATEGORY.System, 'method');

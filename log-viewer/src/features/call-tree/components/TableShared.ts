@@ -17,6 +17,7 @@ import * as CommonModules from '../../../tabulator/module/CommonModules.js';
 import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
+import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { makeSumFieldAllVisible } from '../utils/BottomCalcs.js';
 import { governorCostBreakdown, type GovernorCostRow } from '../utils/GovernorCost.js';
 
@@ -41,6 +42,16 @@ export const clipboardCopyOptions = {
   clipboardCopyRowRange: 'all',
   keybindings: { copyToClipboard: ['ctrl + 67', 'meta + 67'] },
 } as unknown as Partial<Options>;
+
+/**
+ * Virtual row rendering plus the scroll anchoring that goes with it — one
+ * matched pair (see ScrollAnchor), so any table with an unbounded row count
+ * spreads this rather than remembering both halves.
+ */
+export const virtualScrollOptions = {
+  renderVertical: VirtualVerticalRenderer,
+  anchoringPolicy: true,
+} satisfies Partial<Options>;
 
 /** Resolve after the next animation frame — lets a just-shown host lay out
  *  before Tabulator measures column widths. */
