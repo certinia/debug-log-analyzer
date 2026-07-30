@@ -109,6 +109,16 @@ export class LogView {
             break;
           }
 
+          case 'openUrl': {
+            // https only: a webview message must not be able to hand VS Code a
+            // `command:` or `file:` URI to execute.
+            const url = typeof payload === 'string' ? payload : '';
+            if (url && Uri.parse(url).scheme === 'https') {
+              commands.executeCommand('vscode.open', Uri.parse(url));
+            }
+            break;
+          }
+
           case 'getConfig': {
             const config = getConfig();
             const overrides = getColumnOverrides(context.context.globalState);

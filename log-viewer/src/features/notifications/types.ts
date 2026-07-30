@@ -3,8 +3,25 @@
  */
 import type { TemplateResult } from 'lit';
 
+import type { MarkerType } from '../timeline/types/flamechart.types.js';
+
 /** Severity of a single issue. Ordered most→least severe by `SEVERITY_ORDER`. */
 export type IssueSeverity = 'error' | 'warning' | 'info';
+
+/**
+ * What activating an issue card does, supplied by whoever produced the issue.
+ *
+ * Deliberately opaque: the cards render one accessible activation affordance and call
+ * `run`, so the same list serves call-tree navigation, an external report link or
+ * anything a future consumer needs — without the list knowing about any of them.
+ */
+export interface IssueAction {
+  /** Tooltip and accessible name, e.g. `Go to call tree`. */
+  readonly label: string;
+  /** Trailing codicon name. Defaults to `arrow-right`. */
+  readonly icon?: string;
+  readonly run: () => void;
+}
 
 /**
  * One entry in either header surface: a problem found in the log (governor limit
@@ -17,8 +34,13 @@ export interface LogIssue {
   readonly summary: string;
   readonly message: string | TemplateResult<1>;
   readonly severity: IssueSeverity;
-  /** Call-tree event to navigate to, or `null` when the issue isn't tied to one. */
-  readonly eventIndex: number | null;
+  /** What clicking the card does, or `null` for a card that isn't actionable. */
+  readonly action: IssueAction | null;
+  /**
+   * Which timeline marker draws this issue, so a card's rail and its band read as the
+   * same thing. `null` for issues the timeline doesn't draw (parser notifications).
+   */
+  readonly category: MarkerType | null;
   readonly timestamp: number | null;
 }
 

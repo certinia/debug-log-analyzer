@@ -16,7 +16,9 @@ import {
   vscodeMessenger,
 } from '../../core/messaging/VSCodeExtensionMessenger.js';
 import { DatabaseAccess } from '../database/services/Database.js';
-import type { IssueSeverity, LogIssue } from '../notifications/types.js';
+import type { LogIssue } from '../notifications/types.js';
+import { toLogIssue } from './logIssues.js';
+import { parserIssuesToNotifications } from './parserNotifications.js';
 
 // styles
 import { globalStyles } from '../../styles/global.styles.js';
@@ -247,18 +249,9 @@ export class LogViewer extends LitElement {
 
     // Rebuilt per load, never appended to: both surfaces describe *this* log, so a
     // previous log's problems must not carry over.
-    this.logProblems = [
-      ...(read.error ? [read.error] : []),
-      ...apexLog.logIssues.map((issue): LogIssue => ({
-        summary: issue.summary,
-        message: issue.description,
-        severity: toSeverity(issue.type),
-        eventIndex: issue.eventIndex ?? null,
-        timestamp: issue.startTime || null,
-      })),
-    ];
+    this.logProblems = [...(read.error ? [read.error] : []), ...apexLog.logIssues.map(toLogIssue)];
 
-    this.notifications = parserIssuesToNotifications(apexLog);
+    this.notifications = parserIssuesToNotifications(apexLog.parsingErrors);
 
     // Navigate to event location if requested (passed as prop to timeline-view)
     if (data.navigateToEventIndex !== undefined || data.navigateToTimestamp !== undefined) {
@@ -304,48 +297,12 @@ export class LogViewer extends LitElement {
         summary: 'Could not read log',
         message: msg,
         severity: 'error',
-        eventIndex: null,
+        action: null,
+        category: null,
         timestamp: null,
       },
     };
   }
-}
-
-const SEVERITY_BY_ISSUE_TYPE: ReadonlyMap<string, IssueSeverity> = new Map([
-  ['error', 'error'],
-  ['unexpected', 'warning'],
-  ['skip', 'info'],
-]);
-
-function toSeverity(issueType: 'unexpected' | 'error' | 'skip'): IssueSeverity {
-  return SEVERITY_BY_ISSUE_TYPE.get(issueType) || 'info';
-}
-
-function parserIssuesToNotifications(apexLog: ApexLog): LogIssue[] {
-  return apexLog.parsingErrors.map((message): LogIssue => {
-    const unknownType = isUnknownType(message);
-
-    return {
-      summary: unknownType ? message : message.slice(0, message.indexOf(':')),
-      message: unknownType
-        ? html`<a
-            href=${`command:vscode.open?${encodeURIComponent(
-              JSON.stringify('https://github.com/certinia/debug-log-analyzer/issues'),
-            )}`}
-            >report unsupported type</a
-          >`
-        : message.slice(message.indexOf(':') + 1),
-      // A parse gap means some of the log wasn't understood, which can silently skew
-      // every view built from it — a warning, not the untinted 'None' it used to be.
-      severity: 'warning',
-      eventIndex: null,
-      timestamp: null,
-    };
-  });
-}
-
-function isUnknownType(message: string): boolean {
-  return message.startsWith('Unsupported log event name:');
 }
 
 interface LogDataEvent {

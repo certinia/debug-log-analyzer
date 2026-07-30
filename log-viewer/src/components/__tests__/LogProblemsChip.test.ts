@@ -15,7 +15,14 @@ import type { LogProblemsChip } from '../LogProblemsChip.js';
 import '../LogProblemsChip.js';
 
 function issue(severity: IssueSeverity): LogIssue {
-  return { summary: severity, message: '', severity, eventIndex: null, timestamp: null };
+  return {
+    summary: severity,
+    message: '',
+    severity,
+    action: null,
+    category: null,
+    timestamp: null,
+  };
 }
 
 async function mount(issues: readonly LogIssue[] | null): Promise<LogProblemsChip> {

@@ -26,6 +26,12 @@ class StubResizeObserver {
   }
 
   observe(target: Element): void {
+    // Only the nav bar's own observer drives the ladder — its descendants observe themselves
+    // too (issue-list re-measures its clamps), and capturing theirs would hijack `notify`.
+    if (target.tagName !== 'NAV-BAR') {
+      return;
+    }
+
     notify = (width) =>
       this.cb(
         [{ target, contentRect: { width } } as unknown as ResizeObserverEntry],
@@ -80,7 +86,14 @@ afterAll(() => {
 });
 
 function issue(severity: IssueSeverity): LogIssue {
-  return { summary: severity, message: '', severity, eventIndex: null, timestamp: null };
+  return {
+    summary: severity,
+    message: '',
+    severity,
+    action: null,
+    category: null,
+    timestamp: null,
+  };
 }
 
 async function mount(

@@ -29,8 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🗂️ **Configurable table columns** (Call Tree, Analysis, Database). ([#298])
   - 🗂️ **Column views**: switch preset column sets, show/hide columns from the **Columns** button or the header right-click menu, inline **reset** to restore defaults; choices persist per view.
   - 🏷️ **New columns**: **Object** (queried/target SObject, with group-by) on SOQL/DML; **SOSL Count/Rows**, **Avg Self Time** and optional **Self** variants for every governor metric; and a SOQL **Query Plan** view (Relative Cost, Leading Operation, SObject Type, Cardinality).
+- 🧰 **Filter bar** (Call Tree, Database): filters now live in one toolbar above each table.
+  - Filter by **Namespace**, **Object** or **Caller Namespace**, or by a **Row Count** / **Time Taken** min–max range; active filters are highlighted.
+  - Collapse behind a **Filter** button on narrow window. ([#873])
 - 🔴 **Timeline exception markers**: exceptions show as red lines, with a **Throws** count in method tooltips. ([#828])
-- 🧰 **Filter bar** (Call Tree, Database): filters now live in one toolbar above each table instead of in the column headers. Keep only the rows you care about — by **Namespace**, **Object** or **Caller Namespace** (multi-select, showing how many are picked), or by a **Row Count** / **Time Taken** min–max range; active filters are highlighted. On a narrow window the filters collapse behind a **Filter** button that opens them in a panel. ([#873])
 
 ### Changed
 
@@ -40,13 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Truncation markers** now end where the log recovers, so trusted sections are no longer flag. ([#828])
 - 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832]).
 - 🎛️ **Modernised dropdowns**: searchable, compact controls that carry the field and value in one place (e.g. `Group: Namespace`, `Type: All`) ([#848]).
-- ♻️ Replace `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).
 - 🗄️ **Database table columns** (DML, SOQL, SOSL): consolidated onto the shared Call Tree column/sort styling for a consistent look across all tables.
-- 🧱 **Data grids**: a crisper header/content separator and tidied grid styling across all tables.
 - 🎨 **Header bar**
   - **Log problems** icon now shows the most severe problem found, with a count.
+  - **Log problems** and **Notifications** redesigned cards, show two lines of summary and message (click the message for the rest), and go to the Call Tree when clicked. An **Unsupported log event** card opens a prefilled bug report.
   - **Help & documentation** and **Report an issue** move into a `•••` menu, which also holds the controls the header drops as the window narrows.
-  - **Log problems** and **Notifications** panels redesigned.
+- ♻️ Replace `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).
 
 ### Fixed
 
