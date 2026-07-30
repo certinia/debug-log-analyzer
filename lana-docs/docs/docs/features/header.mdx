@@ -1,0 +1,34 @@
+---
+id: header
+title: Header
+description: The Apex Log Analyzer header summarises log problems and tool notifications, shows the log's captured debug levels, and collapses into a "•••" menu as the panel narrows.
+keywords:
+  [
+    salesforce debug log analyzer,
+    apex log analyzer header,
+    salesforce debug log levels,
+    apex log notifications,
+    salesforce developer tools,
+  ]
+image: https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline.png
+hide_title: true
+---
+
+## 🚦 Header
+
+The bar above the tabs summarises the log at a glance.
+
+- **Log problems** – a chip for problems found in the log itself (governor limit exceptions, fatal errors, skipped lines): the worst severity's icon, with a count badge. Shows a tick when the log is clean. Click it for the full breakdown.
+- **Notifications** – a separate bell for messages about the tool rather than the log — today, parser diagnostics for log lines it couldn't understand. Kept apart from log problems so the two don't read as one severity count.
+- **Inspector toggle** – shows or hides the [Inspector](./inspector.md) panel.
+- **`•••` menu** – always holds **Help & documentation** and **Report an issue**. On a narrow window the header sheds log problems, the Inspector toggle, notifications and the log size/duration meta into this menu too, in that order, so nothing is lost — a dot on the toggle marks that something collapsed in.
+
+Each problem or notification opens as a list of cards: a severity icon, a summary that expands on click if it runs past two lines, and — for problems that point at a spot in the log — an arrow action that jumps to it in the Call Tree.
+
+If the parser meets a log event it doesn't recognize, the Notifications bell carries a card for it with a **Report unsupported log event** action, opening a pre-filled GitHub issue.
+
+### Debug levels
+
+Below the header, a row of chips shows the debug levels the log was captured with, one per category (`CATEGORY LEVEL`, e.g. `APEX_CODE FINE`). This is a read-only display of what was captured — it doesn't filter the log.
+
+Chips that don't fit the width collapse into a `+N` popover, same behaviour as the header's own `•••` menu.

@@ -89,7 +89,7 @@ Right-click on empty space shows **Reset Zoom** (`0`).
 
 ### Markers
 
-Log issue markers (truncation, errors, etc.) can be selected and navigated:
+Log issue markers (truncation, errors, exceptions, etc.) can be selected and navigated. **Exceptions** draw as a thin red hairline at the moment each was thrown; a dense cluster collapses into a single "N exceptions" marker. Method tooltips also show a **Throws** count for exceptions thrown anywhere in that method's subtree.
 
 | Action            | Mouse              | Keyboard                                            |
 | ----------------- | ------------------ | --------------------------------------------------- |
@@ -162,6 +162,7 @@ The tooltip provides the following information:
 - **Time** - Wall-clock time of day for the event (e.g., `14:30:05.122 → 14:30:06.625`). Only shown when wall-clock data is available in the log.
 - **Duration** - Made up of **Total Time** (time spent in that event and its children) and **Self Time** (time directly spent in that event)
 - **Rows** - Shows **Total Rows** (rows from that event and its children) and **Self Rows** (rows directly from that event)
+- **Throws** - Number of exceptions thrown within that event's subtree, when any occurred
 
 ## Minimap
 
