@@ -26,6 +26,11 @@ import {
   SOSL_VIEWS,
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
+import {
+  DB_ROW_COUNT_WIDTH,
+  DB_TIME_WIDTH,
+  NAMESPACE_WIDTH,
+} from '../../../tabulator/ColumnWidths.js';
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
@@ -577,13 +582,13 @@ export class SOSLView extends LitElement {
           title: 'Namespace',
           field: 'namespace',
           sorter: 'string',
-          width: 117,
+          width: NAMESPACE_WIDTH,
         },
         {
           title: 'Caller Namespace',
           field: 'callerNamespace',
           sorter: 'string',
-          width: 117,
+          width: NAMESPACE_WIDTH,
           visible: false,
         },
         {
@@ -591,7 +596,7 @@ export class SOSLView extends LitElement {
           field: 'rowCount',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 70,
+          width: DB_ROW_COUNT_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatter,
@@ -615,7 +620,7 @@ export class SOSLView extends LitElement {
           field: 'timeTaken',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 107,
+          width: DB_TIME_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatterMS,

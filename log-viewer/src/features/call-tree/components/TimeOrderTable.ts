@@ -6,6 +6,7 @@ import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
+import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
@@ -98,14 +99,14 @@ export function createTimeOrderTable(
         title: 'Namespace',
         field: 'namespace',
         sorter: 'string',
-        width: 117,
+        width: NAMESPACE_WIDTH,
         minWidth: 80,
       },
       {
         title: 'Caller Namespace',
         field: 'callerNamespace',
         sorter: 'string',
-        width: 117,
+        width: NAMESPACE_WIDTH,
         visible: false,
       },
       {
@@ -124,7 +125,7 @@ export function createTimeOrderTable(
         field: 'duration.total',
         sorter: 'number',
         headerSortTristate: true,
-        width: 140,
+        width: TIME_WIDTH,
         hozAlign: 'right',
         headerHozAlign: 'right',
         formatter: progressFormatterMS,
@@ -144,7 +145,7 @@ export function createTimeOrderTable(
         field: 'duration.self',
         sorter: 'number',
         headerSortTristate: true,
-        width: 140,
+        width: TIME_WIDTH,
         hozAlign: 'right',
         headerHozAlign: 'right',
         bottomCalc: selfTimeBottomCalc,

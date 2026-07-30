@@ -6,6 +6,7 @@ import { Tabulator } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
+import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { toAggregatedCallTree, type AggregatedRow } from '../utils/Aggregation.js';
@@ -118,14 +119,14 @@ export function createAggregatedTable(
         title: 'Namespace',
         field: 'namespace',
         sorter: 'string',
-        width: 117,
+        width: NAMESPACE_WIDTH,
         minWidth: 80,
       },
       {
         title: 'Caller Namespace',
         field: 'callerNamespace',
         sorter: 'string',
-        width: 117,
+        width: NAMESPACE_WIDTH,
         visible: false,
       },
       {
@@ -155,7 +156,7 @@ export function createAggregatedTable(
         field: 'totalTime',
         sorter: 'number',
         headerSortTristate: true,
-        width: 140,
+        width: TIME_WIDTH,
         minWidth: 120,
         hozAlign: 'right',
         headerHozAlign: 'right',
@@ -174,7 +175,7 @@ export function createAggregatedTable(
         field: 'totalSelfTime',
         sorter: 'number',
         headerSortTristate: true,
-        width: 140,
+        width: TIME_WIDTH,
         minWidth: 120,
         hozAlign: 'right',
         headerHozAlign: 'right',
@@ -193,7 +194,7 @@ export function createAggregatedTable(
         field: 'avgSelfTime',
         sorter: 'number',
         headerSortTristate: true,
-        width: 140,
+        width: TIME_WIDTH,
         minWidth: 120,
         hozAlign: 'right',
         headerHozAlign: 'right',

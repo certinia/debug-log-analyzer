@@ -355,45 +355,46 @@ export function createGovernorMetricColumns(
       headerHozAlign: 'right',
       bottomCalc: 'sum',
     },
-    createHeapBytesColumn(
-      'heapAllocated.total',
-      'Heap Net (bytes)',
-      'Net bytes retained on this path (alloc − free); may be negative',
-      heapFooters.netTotal,
-      // Title "Heap Net" (2 lines) beats the widest value, "-12,000,000".
-      92,
-    ),
-    createHeapBytesColumn(
-      'heapAllocated.self',
-      'Heap Net self (bytes)',
-      'Net bytes retained directly by this node (excluding sub-methods); may be negative',
-      heapFooters.netSelf,
-      121,
-      false,
-    ),
-    createHeapBytesColumn(
-      'heapPeak',
-      'Heap Peak (bytes)',
-      'Peak live heap on this path (matches the "Maximum heap size" governor)',
-      'max',
-      100,
-    ),
-    createHeapBytesColumn(
-      'heapGross.total',
-      'Heap Alloc (bytes)',
-      'Total bytes allocated on this path (ignores frees; churn)',
-      heapFooters.grossTotal,
-      107,
-      false,
-    ),
-    createHeapBytesColumn(
-      'heapGross.self',
-      'Heap Alloc self (bytes)',
-      'Bytes allocated directly by this node (excluding sub-methods; ignores frees)',
-      heapFooters.grossSelf,
-      121,
-      false,
-    ),
+    createHeapBytesColumn({
+      field: 'heapAllocated.total',
+      title: 'Heap Net (bytes)',
+      headerTooltip: 'Net bytes retained on this path (alloc − free); may be negative',
+      bottomCalc: heapFooters.netTotal,
+      // The title wrapped to two lines is wider than "-12,000,000", the widest value.
+      width: 92,
+    }),
+    createHeapBytesColumn({
+      field: 'heapAllocated.self',
+      title: 'Heap Net self (bytes)',
+      headerTooltip:
+        'Net bytes retained directly by this node (excluding sub-methods); may be negative',
+      bottomCalc: heapFooters.netSelf,
+      width: 121,
+      visible: false,
+    }),
+    createHeapBytesColumn({
+      field: 'heapPeak',
+      title: 'Heap Peak (bytes)',
+      headerTooltip: 'Peak live heap on this path (matches the "Maximum heap size" governor)',
+      bottomCalc: 'max',
+      width: 100,
+    }),
+    createHeapBytesColumn({
+      field: 'heapGross.total',
+      title: 'Heap Alloc (bytes)',
+      headerTooltip: 'Total bytes allocated on this path (ignores frees; churn)',
+      bottomCalc: heapFooters.grossTotal,
+      width: 107,
+      visible: false,
+    }),
+    createHeapBytesColumn({
+      field: 'heapGross.self',
+      title: 'Heap Alloc self (bytes)',
+      headerTooltip: 'Bytes allocated directly by this node (excluding sub-methods; ignores frees)',
+      bottomCalc: heapFooters.grossSelf,
+      width: 121,
+      visible: false,
+    }),
     createGovernorCostColumn(governorLimits),
     createGovernorPeakColumn(governorLimits),
   ];
@@ -404,19 +405,29 @@ export function createGovernorMetricColumns(
  * renders identically as a thousand-separated integer in bytes (no bar, no %), so the
  * columns scan uniformly. The unit lives in the title — the header, not the value, is what
  * sets these columns' minimum width.
- * `width` is per-column for the same reason: it's the widest title word (wrapped to two
- * lines) or the widest value, whichever is larger. `bottomCalc` is supplied by the
- * caller so each table's footer can match its time-column aggregation (per-table sum vs
- * call-stack-dedup for totals, sum-all-visible for self, 'max' for peak).
  */
-export function createHeapBytesColumn(
-  field: string,
-  title: string,
-  headerTooltip: string,
-  bottomCalc: ColumnDefinition['bottomCalc'],
-  width: number,
-  visible?: boolean,
-): ColumnDefinition {
+export interface HeapBytesColumnOptions {
+  field: string;
+  title: string;
+  headerTooltip: string;
+  /**
+   * Supplied per column so each table's footer matches its time-column aggregation
+   * (per-table sum vs call-stack-dedup for totals, sum-all-visible for self, 'max' for peak).
+   */
+  bottomCalc: ColumnDefinition['bottomCalc'];
+  /** The widest title word wrapped to two lines, or the widest value — whichever is larger. */
+  width: number;
+  visible?: boolean;
+}
+
+export function createHeapBytesColumn({
+  field,
+  title,
+  headerTooltip,
+  bottomCalc,
+  width,
+  visible,
+}: HeapBytesColumnOptions): ColumnDefinition {
   return {
     title,
     field,

@@ -6,6 +6,7 @@ import { Tabulator, type Options } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
+import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
@@ -181,14 +182,14 @@ export function createBottomUpTable(
         title: 'Namespace',
         field: 'namespace',
         sorter: 'string',
-        width: 117,
+        width: NAMESPACE_WIDTH,
         minWidth: 80,
       },
       {
         title: 'Caller Namespace',
         field: 'callerNamespace',
         sorter: 'string',
-        width: 117,
+        width: NAMESPACE_WIDTH,
         visible: false,
       },
       {
@@ -217,7 +218,7 @@ export function createBottomUpTable(
         field: 'totalTime',
         sorter: 'number',
         headerSortTristate: true,
-        width: 140,
+        width: TIME_WIDTH,
         minWidth: 120,
         hozAlign: 'right',
         headerHozAlign: 'right',
@@ -236,7 +237,7 @@ export function createBottomUpTable(
         field: 'totalSelfTime',
         sorter: 'number',
         headerSortTristate: true,
-        width: 140,
+        width: TIME_WIDTH,
         minWidth: 120,
         hozAlign: 'right',
         headerHozAlign: 'right',
@@ -255,7 +256,7 @@ export function createBottomUpTable(
         field: 'avgSelfTime',
         sorter: 'number',
         headerSortTristate: true,
-        width: 140,
+        width: TIME_WIDTH,
         minWidth: 120,
         hozAlign: 'right',
         headerHozAlign: 'right',

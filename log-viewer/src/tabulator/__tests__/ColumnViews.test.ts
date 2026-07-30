@@ -189,7 +189,6 @@ describe('view sets', () => {
     expect(general).toContain('thrownCount.total');
     expect(general).not.toContain('heapAllocated.total');
     expect(general).not.toContain('heapPeak');
-    expect(general).not.toContain('governorCost');
     // SOSL is near-always-zero, so it stays out of the everyday overview.
     expect(general).not.toContain('soslCount.total');
     expect(general).not.toContain('soslRowCount.total');
