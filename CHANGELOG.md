@@ -52,8 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Help & documentation** and **Report an issue** move into a `•••` menu, which also holds the controls the header drops as the window narrows.
 - ♻️ Replace `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).
 
-> > > > > > > main
-
 ### Fixed
 
 - 📊 **Database usage bars** (Row Count, Time Taken): the usage bar was hidden whenever the rounded percentage was 0% (the common case for small row counts against large governor limits), so it rarely appeared; it now fills relative to the grid's own column total rather than a governor limit, shows on grouped summary rows, and Time Taken (ms) now shows a bar too.
