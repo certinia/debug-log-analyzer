@@ -28,7 +28,7 @@ export class DetailDock extends LitElement {
   @property({ type: String })
   emptyText = 'Nothing selected.';
 
-  /** Collapsed sections and pane sizes, owned and persisted by the consumer. */
+  /** Passed through to `<pane-view>`; the consumer owns them. */
   @property({ attribute: false })
   collapsed: Record<string, boolean> = {};
 
