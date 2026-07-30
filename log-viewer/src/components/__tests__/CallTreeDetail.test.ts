@@ -18,10 +18,12 @@ jest.mock('tabulator-tables', () => ({
 }));
 // vscode-button needs ElementInternals.setFormValue (absent in jsdom).
 jest.mock('#vscode-elements/vscode-button.js', () => ({}));
-// The view mode persists through the extension host, which isn't there.
+
+const settings = { inspector: { callTreeMode: 'bottom-up' } };
+const written: Array<{ section: string; value: unknown }> = [];
 jest.mock('../../features/settings/Settings.js', () => ({
-  getSettings: () => Promise.resolve({}),
-  updateSetting: () => {},
+  getSettings: () => Promise.resolve(settings),
+  updateSetting: (section: string, value: unknown) => written.push({ section, value }),
 }));
 
 import type { CallTreeDetail } from '../CallTreeDetail.js';
@@ -36,25 +38,41 @@ function hidden(el: CallTreeDetail, id: string): boolean {
     ?.classList.contains('is-hidden');
 }
 
+function switchEl(el: CallTreeDetail): Element {
+  const found = el.shadowRoot?.querySelector('view-mode-switch');
+  if (!found) {
+    throw new Error('view-mode-switch not rendered');
+  }
+  return found;
+}
+
 async function mount(): Promise<CallTreeDetail> {
   const el = document.createElement('call-tree-detail') as CallTreeDetail;
   el.eventIndex = -1; // no DatabaseAccess in the test — no table is built
   document.body.appendChild(el);
+  // The remembered mode arrives from a promise, so settle it then re-render.
+  await el.updateComplete;
+  await Promise.resolve();
   await el.updateComplete;
   return el;
 }
 
+// The remembered mode is module state loaded once, so the restore test must run
+// before anything picks a mode of its own.
 describe('CallTreeDetail view mode', () => {
-  it('defaults to Time Order and switches on view-mode-change', async () => {
+  it('restores the remembered mode', async () => {
     expect(customElements.get('call-tree-detail')).toBeDefined();
     const el = await mount();
-    const view = el.shadowRoot?.querySelector('view-mode-switch');
 
-    expect(view?.getAttribute('value')).toBe('time-order');
-    expect(hidden(el, 'time-order-tree')).toBe(false);
-    expect(hidden(el, 'aggregated-tree')).toBe(true);
+    expect(switchEl(el).getAttribute('value')).toBe('bottom-up');
+    expect(hidden(el, 'bottom-up-tree')).toBe(false);
+    expect(hidden(el, 'time-order-tree')).toBe(true);
+  });
 
-    view?.dispatchEvent(
+  it('switches on view-mode-change and persists the pick', async () => {
+    const el = await mount();
+
+    switchEl(el).dispatchEvent(
       new CustomEvent('view-mode-change', {
         detail: { value: 'aggregated' },
         bubbles: true,
@@ -63,10 +81,18 @@ describe('CallTreeDetail view mode', () => {
     );
     await el.updateComplete;
 
-    expect(el.shadowRoot?.querySelector('view-mode-switch')?.getAttribute('value')).toBe(
-      'aggregated',
-    );
+    expect(switchEl(el).getAttribute('value')).toBe('aggregated');
     expect(hidden(el, 'aggregated-tree')).toBe(false);
-    expect(hidden(el, 'time-order-tree')).toBe(true);
+    expect(hidden(el, 'bottom-up-tree')).toBe(true);
+    expect(written).toEqual([{ section: 'inspector.callTreeMode', value: 'aggregated' }]);
+  });
+
+  it('shares the picked mode with a pane mounted later', async () => {
+    // The pane is torn down and rebuilt on every collapse and tab hop, so the
+    // mode has to survive without another settings round-trip.
+    const el = await mount();
+
+    expect(switchEl(el).getAttribute('value')).toBe('aggregated');
+    expect(hidden(el, 'aggregated-tree')).toBe(false);
   });
 });
