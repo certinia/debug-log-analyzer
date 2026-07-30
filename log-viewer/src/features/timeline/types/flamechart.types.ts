@@ -11,7 +11,7 @@
 
 //TODO: Remove deps outside timeline
 
-import type { LogCategory, LogEvent } from 'apex-log-parser';
+import type { LogCategory, LogEvent, LogIssue } from 'apex-log-parser';
 import { formatDuration } from '../../../core/utility/Util.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 
@@ -623,6 +623,24 @@ export const MARKER_COLORS: Record<MarkerType, number> = {
   skip: 0x1e80ff, // light blue
   unexpected: 0x8080ff, // light purple
 } as const;
+
+/**
+ * The same marker colour as a CSS hex string, for DOM renderers (the issue cards' rail).
+ * Derived rather than restated so the canvas and the DOM can't drift apart.
+ */
+export function markerColorCss(type: MarkerType): string {
+  return `#${MARKER_COLORS[type].toString(16).padStart(6, '0')}`;
+}
+
+/**
+ * The marker a parsed log issue is drawn as, so a DOM renderer can match its band.
+ *
+ * `'error'` maps to `'exception'`: `extractMarkers` drops `'error'` logIssues and the same
+ * failure is drawn from `log.exceptions`, so the exception hue is what's actually on screen.
+ */
+export function markerTypeForIssue(issueType: LogIssue['type']): MarkerType {
+  return issueType === 'error' ? 'exception' : issueType;
+}
 
 /**
  * Default transparency for full-height background bands.
