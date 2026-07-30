@@ -10,6 +10,10 @@ const defaultConfig = {
         jsc: {
           target: 'esnext',
           parser: { decorators: true, syntax: 'typescript' },
+          // Match the bundles (and log-viewer/tsconfig.json): with `define`
+          // semantics a class field initializer shadows Lit's reactive
+          // accessor, so property assignments never trigger a re-render.
+          transform: { useDefineForClassFields: false },
         },
       },
     ],
