@@ -39,6 +39,13 @@ export class DockLayout extends LitElement {
   @property({ type: String })
   emptyText = 'Nothing selected.';
 
+  /** Passed through to `<pane-view>`; the consumer owns them. */
+  @property({ attribute: false })
+  collapsed: Record<string, boolean> = {};
+
+  @property({ attribute: false })
+  paneSizes: Record<string, number> = {};
+
   // Live drag state (transient); when set, overrides `size` while dragging.
   @state()
   private _liveSize: number | null = null;
@@ -125,6 +132,8 @@ export class DockLayout extends LitElement {
                   style=${this._dockSizeStyle()}
                   .sections=${this.sections}
                   .emptyText=${this.emptyText}
+                  .collapsed=${this.collapsed}
+                  .paneSizes=${this.paneSizes}
                   dock=${this.dock}
                 ></detail-dock>
               `
@@ -180,7 +189,6 @@ export class DockLayout extends LitElement {
       this._pendingCollapse = false;
       this._liveSize = Math.max(MIN_SIZE, Math.min(raw, Math.max(MIN_SIZE, max)));
     }
-    this.requestUpdate();
   };
 
   private _endResize = (e: PointerEvent) => {

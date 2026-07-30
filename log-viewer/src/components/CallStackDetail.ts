@@ -105,7 +105,6 @@ export class CallStackDetail extends LitElement {
       placeholder: 'No call stack available',
       columnCalcs: 'table',
       // Arrow-key row navigation, matching the Call Tree tab.
-      // @ts-expect-error custom option registered by the RowKeyboardNavigation module
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
       ...clipboardCopyOptions,
