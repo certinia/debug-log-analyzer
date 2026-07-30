@@ -2,6 +2,8 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
+import type { IssueAction } from '../notifications/types.js';
+
 /** Document event asking the Call Tree tab to reveal a log event. */
 export const CALLTREE_GO_TO_ROW = 'calltree-go-to-row';
 
@@ -16,4 +18,17 @@ export async function goToRow(target: { eventIndex: number }) {
       detail: target,
     }),
   );
+}
+
+/**
+ * {@link goToRow} as an issue-card action. Lives here rather than in the notifications
+ * feature so the issue cards stay ignorant of the call tree.
+ */
+export function goToCallTreeAction(eventIndex: number): IssueAction {
+  return {
+    label: 'Go to call tree',
+    run: () => {
+      void goToRow({ eventIndex });
+    },
+  };
 }

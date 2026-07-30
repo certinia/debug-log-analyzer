@@ -16,10 +16,9 @@ import {
   vscodeMessenger,
 } from '../../core/messaging/VSCodeExtensionMessenger.js';
 import { DatabaseAccess } from '../database/services/Database.js';
-import {
-  Notification,
-  type NotificationSeverity,
-} from '../notifications/components/NotificationPanel.js';
+import type { LogIssue } from '../notifications/types.js';
+import { toLogIssue } from './logIssues.js';
+import { parserIssuesToNotifications } from './parserNotifications.js';
 
 // styles
 import { globalStyles } from '../../styles/global.styles.js';
@@ -46,10 +45,12 @@ export class LogViewer extends LitElement {
   logSize: number | null = null;
   @property()
   logDuration: number | null = null;
-  @property()
-  notifications: Notification[] | null = null;
-  @property()
-  parserIssues: Notification[] = [];
+  /** Problems found in the log itself. `null` until the first log is parsed. */
+  @property({ attribute: false })
+  logProblems: readonly LogIssue[] | null = null;
+  /** Notifications about the tool — today, parser diagnostics. */
+  @property({ attribute: false })
+  notifications: readonly LogIssue[] = [];
   @property()
   timelineRoot: ApexLog | null = null;
 
@@ -144,8 +145,8 @@ export class LogViewer extends LitElement {
         .logPath=${this.logPath}
         .logSize=${this.logSize}
         .logDuration=${this.logDuration}
+        .logProblems=${this.logProblems}
         .notifications=${this.notifications}
-        .parserIssues=${this.parserIssues}
         .timelineRoot=${this.timelineRoot}
       ></app-header>
 
@@ -225,7 +226,16 @@ export class LogViewer extends LitElement {
     this.logPath = data.logPath?.trim() || '';
 
     const logUri = data.logUri;
-    const logData = data.logData || (await this._readLog(logUri || ''));
+    const read = data.logData
+      ? { logData: data.logData, error: null }
+      : await this._readLog(logUri || '');
+    const logData = read.logData;
+
+    // Published before parsing, so a throw further down can't discard the only
+    // explanation the user would get. `logProblems` stays null while parsing otherwise.
+    if (read.error) {
+      this.logProblems = [read.error];
+    }
 
     const apexLog = parse(logData);
 
@@ -237,21 +247,11 @@ export class LogViewer extends LitElement {
     this.timelineRoot = apexLog;
     this.logDuration = apexLog.duration.total;
 
-    const localNotifications = Array.from(this.notifications ?? []);
-    apexLog.logIssues.forEach((element) => {
-      const severity = this.toSeverity(element.type);
+    // Rebuilt per load, never appended to: both surfaces describe *this* log, so a
+    // previous log's problems must not carry over.
+    this.logProblems = [...(read.error ? [read.error] : []), ...apexLog.logIssues.map(toLogIssue)];
 
-      const logMessage = new Notification();
-      logMessage.summary = element.summary;
-      logMessage.message = element.description;
-      logMessage.severity = severity;
-      logMessage.eventIndex = element.eventIndex ?? null;
-      logMessage.timestamp = element.startTime || null;
-      localNotifications.push(logMessage);
-    });
-    this.notifications = localNotifications;
-
-    this.parserIssues = this.parserIssuesToMessages(apexLog);
+    this.notifications = parserIssuesToNotifications(apexLog.parsingErrors);
 
     // Navigate to event location if requested (passed as prop to timeline-view)
     if (data.navigateToEventIndex !== undefined || data.navigateToTimestamp !== undefined) {
@@ -261,7 +261,11 @@ export class LogViewer extends LitElement {
     }
   }
 
-  async _readLog(logUri: string): Promise<string> {
+  /**
+   * Reads the log, returning the failure as a {@link LogIssue} rather than publishing it —
+   * the caller owns `logProblems` so it can rebuild the list for each load.
+   */
+  async _readLog(logUri: string): Promise<{ logData: string; error: LogIssue | null }> {
     let msg;
     if (logUri) {
       try {
@@ -279,7 +283,7 @@ export class LogViewer extends LitElement {
           }
           chunks.push(value);
         }
-        return chunks.join('');
+        return { logData: chunks.join(''), error: null };
       } catch (err: unknown) {
         msg = (err instanceof Error ? err.message : String(err)) ?? '';
       }
@@ -287,46 +291,17 @@ export class LogViewer extends LitElement {
       msg = 'Invalid Log Path';
     }
 
-    const logMessage = new Notification();
-    logMessage.summary = 'Could not read log';
-    logMessage.message = msg;
-    logMessage.severity = 'Error';
-    this.notifications = [logMessage];
-    return '';
-  }
-
-  severity = new Map<string, NotificationSeverity>([
-    ['error', 'Error'],
-    ['unexpected', 'Warning'],
-    ['skip', 'Info'],
-  ]);
-  private toSeverity(errorType: 'unexpected' | 'error' | 'skip') {
-    return this.severity.get(errorType) || 'Info';
-  }
-
-  private parserIssuesToMessages(apexLog: ApexLog) {
-    const issues: Notification[] = [];
-    apexLog.parsingErrors.forEach((message) => {
-      const isUnknownType = this.isUnknownType(message);
-
-      const logMessage = new Notification();
-      logMessage.summary = isUnknownType ? message : message.slice(0, message.indexOf(':'));
-      logMessage.message = isUnknownType
-        ? html`<a
-            href=${`command:vscode.open?${encodeURIComponent(
-              JSON.stringify('https://github.com/certinia/debug-log-analyzer/issues'),
-            )}`}
-            >report unsupported type</a
-          >`
-        : message.slice(message.indexOf(':') + 1);
-
-      issues.push(logMessage);
-    });
-    return issues;
-  }
-
-  private isUnknownType(message: string) {
-    return message.startsWith('Unsupported log event name:');
+    return {
+      logData: '',
+      error: {
+        summary: 'Could not read log',
+        message: msg,
+        severity: 'error',
+        action: null,
+        category: null,
+        timestamp: null,
+      },
+    };
   }
 }
 

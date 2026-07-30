@@ -35,6 +35,7 @@ export default {
       ...defaultConfig,
       displayName: 'log-viewer',
       rootDir: '<rootDir>/log-viewer',
+      setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
       moduleNameMapper: {
         ...defaultConfig.moduleNameMapper,
         '^apex-log-parser$': '<rootDir>/../apex-log-parser/src/index.ts',
