@@ -1,11 +1,12 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import type { LogEvent, LogEventType } from 'apex-log-parser';
+import type { LogEvent } from 'apex-log-parser';
 import type { CellComponent, EmptyCallback } from 'tabulator-tables';
 import { formatSOQL } from '../../soql/format/formatter.js';
+import { eventLabel, eventName } from '../utils/eventText.js';
 
-export function createCalltreeNameFormatter(excludedTypes: Set<LogEventType>) {
+export function createCalltreeNameFormatter() {
   let childIndent: number;
 
   return function calltreeNameFormatter(
@@ -47,15 +48,12 @@ export function createCalltreeNameFormatter(excludedTypes: Set<LogEventType>) {
     if (node.hasValidSymbols) {
       const link = document.createElement('a');
       link.setAttribute('href', '#!');
-      link.textContent = node.text;
+      // With the suffix: a constructor's text is a bare class name, so without
+      // it the row reads as a type reference rather than a call.
+      link.textContent = eventName(node);
       return link;
     }
 
-    let text = node.text;
-    if (node.type && node.type !== text && !excludedTypes.has(node.type)) {
-      text = node.type + ': ' + text;
-    }
-
-    return document.createTextNode(text) as unknown as HTMLElement;
+    return document.createTextNode(eventLabel(node)) as unknown as HTMLElement;
   };
 }

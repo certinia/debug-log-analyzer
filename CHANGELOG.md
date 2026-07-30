@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🧭 **Inspector**: select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL statement and inspect it without leaving the tab you're on. ([#113])
   - **Details**: type, timing, and every governor metric the selection consumed as `used / limit`.
   - **Call stack**: the frames that led to the selection, with total and self time.
-  - **Call tree**: the selected frames own subtree, switchable between **Time Order**, **Aggregated** and **Bottom-Up**.
+  - **Call tree**: the selected frame's own subtree, switchable between **Time Order**, **Aggregated** and **Bottom-Up**. Times are relative to the selection, and zero-duration rows (heap allocations, statements, variable assignments) are left out — read those on the Call Tree tab.
   - Dock it left, right or bottom, drag to resize, and collapse the sections you don't need — the layout is remembered.
   - Right-click a row for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
 - 🗄️ **Database Analysis**: governor-limit visibility and SOSL usage. ([#162])
@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Governor limits strip**: tooltip rows keep a stable order and always show the `used / limit` value, so figures no longer jump around as you move the pointer. ([#827])
   - **Timeline zooming**: consistent, smooth zoom across platforms and input devices — a Windows mouse wheel no longer over-zooms in large jumps, fast scrolls stay bounded, and zooming in then back out returns to the same level.
   - **Truncation markers** now end where the log recovers, so trusted sections are no longer flag. ([#828])
+- 🏷️ **Call Tree names**: rows no longer carry a raw `EVENT_TYPE:` prefix in front of text that already identifies them, so `WF_CRITERIA_BEGIN: WF_CRITERIA : ON_ALL_CHANGES` reads as `WF_CRITERIA : ON_ALL_CHANGES`. Frames whose text can't stand alone keep the type, and the ones that needed naming now say what they are — `(code unit)`, `(constructor)`, `(managed package)`, `(flow)`. A **Type** column is available in every view from the **Columns** menu if you want the raw types back.
 - 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832]).
 - 🎛️ **Modernised dropdowns**: searchable, compact controls that carry the field and value in one place (e.g. `Group: Namespace`, `Type: All`) ([#848]).
 - ♻️ Replace `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).

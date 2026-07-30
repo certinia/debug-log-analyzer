@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEvent, LogEventType } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { Tabulator, type Options } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
@@ -10,7 +10,6 @@ import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
-import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import {
   sumDurationTotalForRootEvents,
   sumTotalForRootEvents,
@@ -22,6 +21,7 @@ import {
   createGovernorMetricColumns,
   headerSortElement,
   registerTableModules,
+  virtualScrollOptions,
   type TableCallbacks,
 } from './TableShared.js';
 
@@ -64,8 +64,7 @@ export function createBottomUpTable(
   registerTableModules();
   Tabulator.registerModule([GroupCalcs, GroupChildIndent, GroupSort]);
 
-  const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
-  const nameFormatter = createCalltreeNameFormatter(excludedTypes);
+  const nameFormatter = createCalltreeNameFormatter();
 
   const totalTimeBottomCalc = (
     _values: number[],
@@ -122,9 +121,8 @@ export function createBottomUpTable(
     height: '100%',
     maxHeight: '100%',
     rowKeyboardNavigation: true,
-    anchoringPolicy: true,
+    ...virtualScrollOptions,
     initialFilter: callbacks.showDetailsFilter,
-    renderVertical: VirtualVerticalRenderer,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',

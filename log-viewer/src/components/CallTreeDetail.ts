@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { LogEvent, LogEventType } from 'apex-log-parser';
+import type { LogEvent } from 'apex-log-parser';
 import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
@@ -18,9 +18,11 @@ import {
   headerSortElement,
   clipboardCopyOptions,
   registerTableModules,
+  virtualScrollOptions,
   waitForNextFrame,
 } from '../features/call-tree/components/TableShared.js';
 import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCalcs.js';
+import { eventLabel } from '../features/call-tree/utils/eventText.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
@@ -55,12 +57,9 @@ function isViewMode(value: unknown): value is ViewMode {
  */
 let sharedViewMode: ViewMode | undefined;
 
-// SOQL/DML frames already read as their statement text, so don't prefix the type.
-const EXCLUDED_TYPES = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
-
 /**
  * Compact dataTree name cell: tree indent + single-line (inline) SOQL/SOSL +
- * type-prefixed plain text. Unlike the Call Tree tab's formatter it renders SOQL
+ * the frame's label. Unlike the Call Tree tab's formatter it renders SOQL
  * inline (not pretty) and no `<a>` link, so cells truncate cleanly and the row
  * click alone drives navigation.
  */
@@ -85,8 +84,7 @@ function compactNameFormatter(cell: CellComponent): HTMLElement {
     return soqlInlineElement(text, isSosl ? 'sosl' : 'soql');
   }
 
-  const label = type && type !== text && !EXCLUDED_TYPES.has(type) ? `${type}: ${text}` : text;
-  return document.createTextNode(label) as unknown as HTMLElement;
+  return document.createTextNode(node ? eventLabel(node) : text) as unknown as HTMLElement;
 }
 
 /**
@@ -150,7 +148,11 @@ export class CallTreeDetail extends LitElement {
         height: 100%;
         min-height: 0;
       }
-      view-mode-switch {
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
         padding-bottom: 4px;
         flex: 0 0 auto;
       }
@@ -252,19 +254,35 @@ export class CallTreeDetail extends LitElement {
       height: '100%',
       maxHeight: '100%',
       placeholder: 'No call tree available',
+      // A scoped subtree is unbounded, so only the visible rows are rendered —
+      // the same deal the Call Tree tab's tables get. The build in
+      // `scopedCallTree` is still eager; this bounds the paint, not the walk.
+      ...virtualScrollOptions,
       dataTree: true,
       dataTreeChildField: '_children',
       dataTreeChildColumnCalcs: false,
       dataTreeBranchElement: '<span/>',
       columnCalcs: 'table',
       // Arrow-key row navigation, matching the Call Tree tab.
-      // @ts-expect-error custom option registered by the RowKeyboardNavigation module
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
       ...clipboardCopyOptions,
       headerSortElement,
       columnDefaults: commonColumnDefaults,
       columns: this._columns(mode, scoped.rootTotal),
+      // Time Order stays chronological — that's what the mode is for. The
+      // grouped modes lead with their ranking metric, as the Call Tree tab's
+      // Bottom-Up does; either way the headers stay sortable.
+      ...(mode === 'time-order'
+        ? {}
+        : {
+            initialSort: [
+              {
+                column: mode === 'bottom-up' ? 'duration.self' : 'duration.total',
+                dir: 'desc' as const,
+              },
+            ],
+          }),
     });
     // Clicking a row toggles its subtree — jumping to the main Call Tree tab is
     // an explicit right-click action. The tree-control arrow handles its own
@@ -369,13 +387,15 @@ export class CallTreeDetail extends LitElement {
 
   render() {
     return html`
-      <view-mode-switch
-        aria-label="Call tree view mode"
-        .options=${VIEW_MODES}
-        value=${this.viewMode}
-        @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
-          this._setViewMode(e.detail.value)}
-      ></view-mode-switch>
+      <div class="toolbar">
+        <view-mode-switch
+          aria-label="Call tree view mode"
+          .options=${VIEW_MODES}
+          value=${this.viewMode}
+          @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
+            this._setViewMode(e.detail.value)}
+        ></view-mode-switch>
+      </div>
       <div class="tables">
         <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
           <div id="time-order-tree" class="grid"></div>

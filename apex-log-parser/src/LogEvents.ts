@@ -760,7 +760,7 @@ export class MethodExitLine extends LogEvent {
 export class SystemConstructorEntryLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.System;
   debugLevel = LOG_LEVEL.Fine;
-  suffix = '(system constructor)';
+  suffix = ' (system constructor)';
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['SYSTEM_CONSTRUCTOR_EXIT'], LOG_CATEGORY.System, 'method');
@@ -803,7 +803,10 @@ export class SystemMethodExitLine extends LogEvent {
 export class CodeUnitStartedLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.ApexCode;
   debugLevel = LOG_LEVEL.Error;
-  suffix = ' (entrypoint)';
+  // Not "entrypoint": most code units (triggers, validation rules, VF pages)
+  // start partway through a transaction, and the text can read exactly like a
+  // method (`ffrr.ffrr.ContractPopulateBatch`).
+  suffix = ' (code unit)';
   codeUnitType = '';
 
   constructor(parser: ApexLogParser, parts: string[]) {
@@ -1536,6 +1539,9 @@ export class ExecutionStartedLine extends DurationLogEvent {
 export class EnteringManagedPackageLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.ApexCode;
   debugLevel = LOG_LEVEL.Fine;
+  // The text is a bare namespace token (`c2g`, `dlrs`, `java__util`), so say
+  // what it is.
+  suffix = ' (managed package)';
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, [], LOG_CATEGORY.Apex, 'pkg');
     const rawNs = parts[2] || '',
@@ -1664,6 +1670,10 @@ export class FlowStartInterviewsErrorLine extends LogEvent {
 export class FlowStartInterviewBeginLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Info;
+  // The text is just the flow's label ("Account Before Save LC"), which reads
+  // like anything else. The plural FLOW_START_INTERVIEWS_BEGIN resolves its own
+  // more specific suffix (record-triggered, autolaunched, …) once it ends.
+  suffix = ' (flow)';
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['FLOW_START_INTERVIEW_END'], LOG_CATEGORY.Automation, 'custom');
     this.text = parts[3] || '';

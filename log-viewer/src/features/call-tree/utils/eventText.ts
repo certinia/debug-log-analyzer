@@ -12,6 +12,29 @@ export function eventName(event: LogEvent): string {
 }
 
 /**
+ * True when the text says nothing on its own: absent, or a lone boolean or
+ * number. Those are the only frames whose raw event type earns a place in the
+ * label — for everything else the text (plus the parser's suffix) already
+ * identifies the frame, and prefixing it just adds a word to read.
+ */
+function isBareText(text: string): boolean {
+  return !text || text === 'true' || text === 'false' || /^-?\d+$/.test(text);
+}
+
+/**
+ * The frame's label for a tree cell: {@link eventName}, falling back to the raw
+ * event type where the text can't stand alone. Text that already repeats the
+ * type stands alone — prefixing it would read `EXECUTION_STARTED: EXECUTION_STARTED`.
+ */
+export function eventLabel(event: LogEvent): string {
+  const name = eventName(event);
+  if (!isBareText(event.text) || event.text === event.type) {
+    return name;
+  }
+  return name ? `${event.type}: ${name}` : (event.type ?? '');
+}
+
+/**
  * Plain-text details for a frame — name, type, duration and any non-zero
  * governor metrics. Shared by the timeline's and the inspector's
  * "Copy Details" actions so both put identical text on the clipboard.
