@@ -187,10 +187,12 @@ export class CallTreeDetail extends LitElement {
   updated(changed: PropertyValues) {
     const scopeChanged = changed.has('eventIndex') || changed.has('instances');
     if (scopeChanged) {
-      // The scoped root changed — drop every table so each rebuilds on demand,
-      // and recompute the scoped tree once (all three modes share it).
+      // The scoped root changed — drop every table so each rebuilds on demand.
+      // The walk itself (`buildScopedCallTree`) is deferred to `_showActive`,
+      // past its paint yield: for a wide aggregate it's occurrences × subtree,
+      // and running it here would block the selection highlight from painting.
       this._destroyTables();
-      this._scoped = buildScopedCallTree(this.eventIndex, this.instances);
+      this._scoped = null;
     }
     if (scopeChanged || changed.has('viewMode')) {
       void this._showActive();
@@ -230,6 +232,9 @@ export class CallTreeDetail extends LitElement {
       return;
     }
 
+    // Built lazily here, after the yield above, so the selection highlight and
+    // the rest of the panel paint before this potentially expensive walk runs.
+    this._scoped ??= buildScopedCallTree(this.eventIndex, this.instances);
     const scoped = this._scoped;
     if (!scoped) {
       return;

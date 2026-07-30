@@ -30,16 +30,32 @@ jest.mock('../../features/settings/Settings.js', () => ({
 }));
 
 // The real builders mount Tabulator tables; only the section ids matter here.
+// `deferSections` lets a test hold a build's resolution open so it can
+// interleave a second, faster selection ahead of it (see the epoch test below);
+// every other test leaves it false and gets an immediately-resolved build.
+let deferSections = false;
+const pendingSections: Array<() => void> = [];
 jest.mock('../detailSections.js', () => ({
-  buildDetailSections: (_source: string, selection: unknown) =>
-    Promise.resolve(
-      selection
-        ? [
-            { id: 'vitals', title: 'Details', content: html`<div>v</div>` },
-            { id: 'callstack', title: 'Call stack', content: html`<div>c</div>` },
-          ]
-        : [],
-    ),
+  buildDetailSections: (_source: string, selection: { eventIndex?: number } | null) => {
+    // The marker carries the selection through to the rendered content, so a
+    // stale build resolving late is distinguishable from the one that supersedes it.
+    const sections = selection
+      ? [
+          {
+            id: 'vitals',
+            title: 'Details',
+            content: html`<div class="marker">${selection.eventIndex}</div>`,
+          },
+          { id: 'callstack', title: 'Call stack', content: html`<div>c</div>` },
+        ]
+      : [];
+    if (!deferSections) {
+      return Promise.resolve(sections);
+    }
+    return new Promise<typeof sections>((resolve) => {
+      pendingSections.push(() => resolve(sections));
+    });
+  },
 }));
 
 import { eventBus } from '../../core/events/EventBus.js';
@@ -54,6 +70,15 @@ import '../LogInspector.js';
  */
 async function flush(el: LogInspector): Promise<void> {
   await new Promise((resolve) => requestAnimationFrame(resolve));
+  for (let i = 0; i < 5; i++) {
+    await el.updateComplete;
+  }
+}
+
+/** Settles the render chain through the nested shadow DOMs, without the rAF
+ *  wait `flush` adds — a test that drives `_rebuild()` directly doesn't want
+ *  another debounced rebuild sneaking in. */
+async function settle(el: LogInspector): Promise<void> {
   for (let i = 0; i < 5; i++) {
     await el.updateComplete;
   }
@@ -86,12 +111,18 @@ function select(source: 'timeline' | 'database', eventIndex: number): void {
   eventBus.emit('detail:select', { source, selection: { kind: 'event', eventIndex } });
 }
 
+function marker(el: LogInspector): string | null {
+  return paneView(el).shadowRoot?.querySelector('.marker')?.textContent ?? null;
+}
+
 describe('LogInspector', () => {
   beforeEach(() => {
     written.length = 0;
     delete settings.inspector;
     deferSettings = false;
     releaseSettings = null;
+    deferSections = false;
+    pendingSections.length = 0;
     document.body.replaceChildren();
   });
 
@@ -192,5 +223,33 @@ describe('LogInspector', () => {
     // The stored `visible: false` and `collapsed` don't undo either action.
     expect(visible(el)).toBe(true);
     expect(paneView(el).collapsed).toEqual({ vitals: true });
+  });
+
+  it('drops a superseded rebuild: a stale build resolving late does not overwrite a newer one', async () => {
+    deferSections = true;
+    const el = await mount('timeline-tab');
+    // Mounting with an activeTab already triggers its own (empty-selection)
+    // rebuild; drain it before driving the two we care about.
+    pendingSections.pop()?.();
+    await settle(el);
+    pendingSections.length = 0;
+
+    select('timeline', 1);
+    await new Promise((resolve) => requestAnimationFrame(resolve)); // debounce fires -> _rebuild() epoch 1 starts, awaiting buildDetailSections
+    select('timeline', 2);
+    await new Promise((resolve) => requestAnimationFrame(resolve)); // debounce fires -> _rebuild() epoch 2 starts, awaiting buildDetailSections
+    expect(pendingSections).toHaveLength(2);
+
+    // The newer selection's build resolves first (it's the one the user is
+    // waiting on); the stale epoch-1 build resolves afterwards, as it would if
+    // its underlying walk was simply slower.
+    pendingSections[1]!();
+    await settle(el);
+    expect(marker(el)).toBe('2');
+
+    pendingSections[0]!();
+    await settle(el);
+    // The epoch guard drops the stale result — it must not clobber the newer one.
+    expect(marker(el)).toBe('2');
   });
 });

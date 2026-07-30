@@ -155,6 +155,43 @@ describe('buildScopedCallTree', () => {
     expect(tree.timeOrder).toBe(tree.timeOrder);
   });
 
+  it('a wide aggregate merges every occurrence, uncapped', () => {
+    // A statement called from a loop: many occurrences of the same frame, each
+    // with its own small subtree — the "occurrences × subtree" shape a NODE_BUDGET
+    // cap used to bound (see PR #877's removal note). No cap exists any more, so
+    // every occurrence must still be represented.
+    const OCCURRENCES = 500;
+    const loop = ev(300, 'METHOD_ENTRY', 'loop', { total: OCCURRENCES, self: 0 });
+    loop.parent = root;
+    byId.set(loop.eventIndex, loop);
+
+    const instances: number[] = [];
+    let nextId = 301;
+    for (let i = 0; i < OCCURRENCES; i++) {
+      const call = ev(nextId++, 'SOQL_EXECUTE_BEGIN', 'SELECT Id FROM Account', {
+        total: 1,
+        self: 1,
+      });
+      call.parent = loop;
+      loop.children.push(call);
+      byId.set(call.eventIndex, call);
+      instances.push(call.eventIndex);
+    }
+
+    const tree = buildScopedCallTree(instances[0]!, instances)!;
+    expect(tree.rootTotal).toBe(OCCURRENCES);
+
+    // Every occurrence merges into a single aggregated row, counting every call.
+    const [aggregated] = tree.aggregated;
+    expect(aggregated?.callCount).toBe(OCCURRENCES);
+    expect(aggregated?.duration.total).toBe(OCCURRENCES);
+
+    // Same for bottom-up: the seed frame's self time sums across every occurrence.
+    const [bottomUp] = tree.bottomUp;
+    expect(bottomUp?.callCount).toBe(OCCURRENCES);
+    expect(bottomUp?.duration.self).toBe(OCCURRENCES);
+  });
+
   it('materialises every child rather than capping the subtree', () => {
     const big = ev(100, 'METHOD_ENTRY', 'big', { total: 100, self: 0 });
     big.parent = root;
