@@ -6,6 +6,7 @@ import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
+import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../utils/TimeOrderTree.js';
@@ -13,7 +14,9 @@ import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
 import {
   commonColumnDefaults,
   createGovernorMetricColumns,
+  createNamespaceColumns,
   createSelfSumHeapFooters,
+  createTypeColumn,
   headerSortElement,
   registerTableModules,
   virtualScrollOptions,
@@ -92,29 +95,8 @@ export function createTimeOrderTable(
         widthGrow: 5,
         widthShrink: 1,
       },
-      {
-        title: 'Namespace',
-        field: 'namespace',
-        sorter: 'string',
-        width: 100,
-        minWidth: 80,
-      },
-      {
-        title: 'Caller Namespace',
-        field: 'callerNamespace',
-        sorter: 'string',
-        width: 120,
-        visible: false,
-      },
-      {
-        title: 'Type',
-        field: 'type',
-        headerSortStartingDir: 'asc',
-        sorter: 'string',
-        width: 150,
-        tooltip: true,
-        visible: false,
-      },
+      ...createNamespaceColumns(),
+      createTypeColumn(),
       ...createGovernorMetricColumns(governorLimits, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {
@@ -122,7 +104,7 @@ export function createTimeOrderTable(
         field: 'duration.total',
         sorter: 'number',
         headerSortTristate: true,
-        width: 150,
+        width: TIME_WIDTH,
         hozAlign: 'right',
         headerHozAlign: 'right',
         formatter: progressFormatterMS,
@@ -142,7 +124,7 @@ export function createTimeOrderTable(
         field: 'duration.self',
         sorter: 'number',
         headerSortTristate: true,
-        width: 150,
+        width: TIME_WIDTH,
         hozAlign: 'right',
         headerHozAlign: 'right',
         bottomCalc: selfTimeBottomCalc,

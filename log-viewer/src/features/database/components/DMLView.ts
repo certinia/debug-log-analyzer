@@ -24,6 +24,11 @@ import {
   resolveColumnView,
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
+import {
+  DB_ROW_COUNT_WIDTH,
+  DB_TIME_WIDTH,
+  NAMESPACE_WIDTH,
+} from '../../../tabulator/ColumnWidths.js';
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
@@ -601,13 +606,14 @@ export class DMLView extends LitElement {
           title: 'Caller Namespace',
           field: 'callerNamespace',
           sorter: 'string',
-          width: 100,
+          width: NAMESPACE_WIDTH,
         },
         {
           title: 'Object',
           field: 'objectType',
           sorter: 'string',
           width: 110,
+          tooltip: true,
           visible: false,
           formatter: (cell) => (cell.getValue() as string | null) ?? '—',
         },
@@ -615,7 +621,7 @@ export class DMLView extends LitElement {
           title: 'Namespace',
           field: 'namespace',
           sorter: 'string',
-          width: 100,
+          width: NAMESPACE_WIDTH,
           visible: false,
         },
         {
@@ -623,7 +629,7 @@ export class DMLView extends LitElement {
           field: 'rowCount',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 90,
+          width: DB_ROW_COUNT_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatter,
@@ -647,7 +653,7 @@ export class DMLView extends LitElement {
           field: 'timeTaken',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 110,
+          width: DB_TIME_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatterMS,

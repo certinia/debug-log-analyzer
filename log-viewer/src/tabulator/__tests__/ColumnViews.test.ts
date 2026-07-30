@@ -15,6 +15,7 @@ import {
   resolveColumnView,
   SOQL_VIEWS,
   SOSL_VIEWS,
+  TIME_TOTALS,
   toggleField,
 } from '../ColumnViews.js';
 
@@ -184,11 +185,19 @@ describe('view sets', () => {
     expect(general.some((f) => f.endsWith('.self') && f !== 'duration.self')).toBe(false);
   });
 
-  it('General shows Heap (net) but omits the near-always-zero SOSL columns', () => {
+  it('General keeps throws but defers heap and governor usage to their own views', () => {
     const general = getColumnView(CALL_TREE_VIEWS, 'General')!.fields!;
-    expect(general).toContain('heapAllocated.total');
+    expect(general).toContain('thrownCount.total');
+    expect(general).not.toContain('heapAllocated.total');
+    expect(general).not.toContain('heapPeak');
+    // SOSL is near-always-zero, so it stays out of the everyday overview.
     expect(general).not.toContain('soslCount.total');
     expect(general).not.toContain('soslRowCount.total');
+  });
+
+  it('governorCost belongs to the Governor Limits view alone', () => {
+    const owning = CALL_TREE_VIEWS.filter((v) => v.fields?.includes('governorCost'));
+    expect(owning.map((v) => v.id)).toEqual(['Governor Limits']);
   });
 
   it('Database and Governor Limits merge DML, SOQL and SOSL count + row totals', () => {
@@ -204,6 +213,15 @@ describe('view sets', () => {
       ]) {
         expect(view).toContain(f);
       }
+    }
+  });
+
+  it('Database carries timing so Governor Limits stays the pure-limits view', () => {
+    const database = getColumnView(CALL_TREE_VIEWS, 'Database')!.fields!;
+    const governor = getColumnView(CALL_TREE_VIEWS, 'Governor Limits')!.fields!;
+    for (const f of TIME_TOTALS) {
+      expect(database).toContain(f);
+      expect(governor).not.toContain(f);
     }
   });
 

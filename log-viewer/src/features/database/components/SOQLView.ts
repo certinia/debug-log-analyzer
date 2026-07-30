@@ -33,6 +33,11 @@ import {
   SOQL_VIEWS,
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
+import {
+  DB_ROW_COUNT_WIDTH,
+  DB_TIME_WIDTH,
+  NAMESPACE_WIDTH,
+} from '../../../tabulator/ColumnWidths.js';
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
@@ -65,6 +70,9 @@ import './DatabaseSection.js';
 
 /** The SOQL column is always shown in the SOQL table. */
 const ALWAYS_VISIBLE = ['soql'];
+
+/** Both cardinality columns: the title wrapped to two lines is the constraint. */
+const CARDINALITY_WIDTH = 113;
 
 // Group-by dropdown label → row field. Labels that don't map 1:1 to a field
 // name (Object, Caller Namespace) need this indirection.
@@ -628,7 +636,7 @@ export class SOQLView extends LitElement {
           formatterParams: {
             allowEmpty: true,
           },
-          width: 40,
+          width: 99,
           hozAlign: 'center',
           vertAlign: 'top',
           sorter: function (a, b, aRow, bRow, _column, dir, _sorterParams) {
@@ -686,6 +694,7 @@ export class SOQLView extends LitElement {
           field: 'objectType',
           sorter: 'string',
           width: 110,
+          tooltip: true,
           visible: false,
           formatter: (cell) => (cell.getValue() as string | null) ?? '—',
         },
@@ -693,13 +702,13 @@ export class SOQLView extends LitElement {
           title: 'Namespace',
           field: 'namespace',
           sorter: 'string',
-          width: 100,
+          width: NAMESPACE_WIDTH,
         },
         {
           title: 'Caller Namespace',
           field: 'callerNamespace',
           sorter: 'string',
-          width: 100,
+          width: NAMESPACE_WIDTH,
           visible: false,
         },
         {
@@ -707,7 +716,7 @@ export class SOQLView extends LitElement {
           field: 'rowCount',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 100,
+          width: DB_ROW_COUNT_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatter,
@@ -731,7 +740,7 @@ export class SOQLView extends LitElement {
           field: 'aggregations',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 100,
+          width: 121,
           hozAlign: 'right',
           headerHozAlign: 'right',
           bottomCalc: 'sum',
@@ -741,7 +750,7 @@ export class SOQLView extends LitElement {
           field: 'relativeCost',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 110,
+          width: 92,
           hozAlign: 'right',
           headerHozAlign: 'right',
           visible: false,
@@ -751,6 +760,7 @@ export class SOQLView extends LitElement {
           field: 'leadingOperationType',
           sorter: 'string',
           width: 140,
+          tooltip: true,
           visible: false,
         },
         {
@@ -758,6 +768,7 @@ export class SOQLView extends LitElement {
           field: 'sObjectType',
           sorter: 'string',
           width: 130,
+          tooltip: true,
           visible: false,
         },
         {
@@ -765,7 +776,7 @@ export class SOQLView extends LitElement {
           field: 'cardinality',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 110,
+          width: CARDINALITY_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           visible: false,
@@ -775,7 +786,7 @@ export class SOQLView extends LitElement {
           field: 'sObjectCardinality',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 140,
+          width: CARDINALITY_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           visible: false,
@@ -785,6 +796,7 @@ export class SOQLView extends LitElement {
           field: 'fields',
           sorter: 'string',
           width: 140,
+          tooltip: true,
           visible: false,
         },
         // Time column sits at the far right.
@@ -793,7 +805,7 @@ export class SOQLView extends LitElement {
           field: 'timeTaken',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 120,
+          width: DB_TIME_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatterMS,

@@ -56,7 +56,7 @@ They appear in the Call Tree and Analysis **Memory** column view, in the inspect
 
 Because a path can consume several limits at once, the Call Tree and Analysis tables offer two summary columns:
 
-- **Gov. Avg (%)** – average utilisation across every governor with a limit, for that path.
-- **Gov. Peak (%)** – the single tightest governor on that path. Hidden by default; the tooltip names which limit is the peak.
+- **Gov Avg %** – average utilisation across every governor with a limit, for that path.
+- **Gov Peak %** – the single tightest governor on that path. Hidden by default; the tooltip names which limit is the peak.
 
-Sorting by **Gov. Peak** is the fastest way to find the call path that is closest to breaching something, regardless of _which_ limit it is.
+Sorting by **Gov Peak** is the fastest way to find the call path that is closest to breaching something, regardless of _which_ limit it is.

@@ -54,10 +54,10 @@ Each column can be sorted by clicking the column header, this will sort the rows
 
 Switch column sets from the **Columns** button in the toolbar (or the header right-click menu):
 
-1. **General** – everyday overview.
+1. **General** – everyday overview: DML/SOQL counts + rows, throws, and total/self time.
 1. **Time** – call count and self/total/average time.
-1. **Governor Limits** – DML/SOQL/SOSL counts + rows, throws, heap, and governor limit usage (avg + peak).
-1. **Database** – DML/SOQL/SOSL counts + rows.
+1. **Governor Limits** – DML/SOQL/SOSL counts + rows, throws, heap peak, and governor limit usage (avg + peak).
+1. **Database** – DML/SOQL/SOSL counts + rows, with total/self time to show which query-heavy path is slow.
 1. **Memory** – heap net (retained), gross (churn) and peak live heap, each total + self.
 
 Show or hide individual columns from the same menu; an edited view shows a **reset** icon. Choices persist per view. **Type** (the raw log event type) is hidden by default in every view and can be turned on here — names read better without it, but it sorts, groups and exports like any other column.

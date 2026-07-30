@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Net** – bytes retained (allocated minus freed); the lasting footprint. Can be negative where a path frees more than it allocates.
   - **Gross** – bytes allocated, ignoring frees; allocation churn and GC pressure.
   - **Peak** – highest live heap reached on the path; the number comparable to the heap governor limit.
-  - Shown together in the **Memory** view (total + self), and used by the Governor Avg/Peak columns and the Call Tree heap column. Method tooltips show net heap retained.
+  - Shown together in the **Memory** view (total + self); peak also appears in the **Governor Limits** view and feeds the Gov Avg/Peak columns. Method tooltips show net heap retained.
   - The Timeline governor strip plots heap as it's allocated, so you can see where it spikes.
 - 🧭 **Inspector**: select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL statement and inspect it without leaving the tab you're on. ([#113])
   - **Details**: type, timing, and every governor metric the selection consumed as `used / limit`.
@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832]).
 - 🎛️ **Modernised dropdowns**: searchable, compact controls that carry the field and value in one place (e.g. `Group: Namespace`, `Type: All`) ([#848]).
 - 🗄️ **Database table columns** (DML, SOQL, SOSL): consolidated onto the shared Call Tree column/sort styling for a consistent look across all tables.
+- 🧱 **Data grids**: a crisper header/content separator and tidied grid styling across all tables.
+- 📐 **Column widths**: sized to fit their header and values, so nothing clips.
 - 🎨 **Header bar**
   - **Log problems** icon now shows the most severe problem found, with a count.
   - **Log problems** and **Notifications** redesigned cards, show two lines of summary and message (click the message for the rest), and go to the Call Tree when clicked. An **Unsupported log event** card opens a prefilled bug report.
