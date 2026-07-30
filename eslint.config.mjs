@@ -30,6 +30,10 @@ export default defineConfig(
     languageOptions: {
       parserOptions: {
         tsconfigRootDir: import.meta.dirname,
+        // AGENTS.md keeps `typescript` aliased to @typescript/typescript6 because
+        // typescript-eslint needs the TS <=6.0 API. Fail the lint run if a bump
+        // breaks that, rather than emitting a warning nobody reads.
+        onUnsupportedTypeScriptVersion: 'error',
       },
     },
 
