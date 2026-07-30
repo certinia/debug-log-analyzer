@@ -10,7 +10,6 @@ import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
-import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import {
   sumDurationTotalForRootEvents,
   sumTotalForRootEvents,
@@ -22,6 +21,7 @@ import {
   createGovernorMetricColumns,
   headerSortElement,
   registerTableModules,
+  virtualScrollOptions,
   type TableCallbacks,
 } from './TableShared.js';
 
@@ -121,9 +121,8 @@ export function createBottomUpTable(
     height: '100%',
     maxHeight: '100%',
     rowKeyboardNavigation: true,
-    anchoringPolicy: true,
+    ...virtualScrollOptions,
     initialFilter: callbacks.showDetailsFilter,
-    renderVertical: VirtualVerticalRenderer,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',

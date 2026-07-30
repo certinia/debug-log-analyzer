@@ -18,6 +18,7 @@ import {
   headerSortElement,
   clipboardCopyOptions,
   registerTableModules,
+  virtualScrollOptions,
   waitForNextFrame,
 } from '../features/call-tree/components/TableShared.js';
 import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCalcs.js';
@@ -27,7 +28,6 @@ import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
-import { VirtualVerticalRenderer } from '../tabulator/renderer/VirtualVerticalRenderer.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
@@ -251,13 +251,10 @@ export class CallTreeDetail extends LitElement {
       height: '100%',
       maxHeight: '100%',
       placeholder: 'No call tree available',
-      // A scoped subtree is unbounded — the same virtual renderer the Call Tree
-      // tab uses is what keeps deep expansion affordable.
-      renderVertical: VirtualVerticalRenderer,
-      // Custom options (this and `rowKeyboardNavigation` below) aren't in
-      // Tabulator's Options type; TS flags only the first excess property.
-      // @ts-expect-error custom option read by VirtualVerticalRenderer
-      anchoringPolicy: true,
+      // A scoped subtree is unbounded, so only the visible rows are rendered —
+      // the same deal the Call Tree tab's tables get. The build in
+      // `scopedCallTree` is still eager; this bounds the paint, not the walk.
+      ...virtualScrollOptions,
       dataTree: true,
       dataTreeChildField: '_children',
       dataTreeChildColumnCalcs: false,

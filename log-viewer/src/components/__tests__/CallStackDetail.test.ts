@@ -25,6 +25,7 @@ jest.mock('tabulator-tables', () => ({
     }
   },
   Module: class {},
+  Renderer: class {},
 }));
 
 // No DatabaseAccess in the test, so the stack is empty.

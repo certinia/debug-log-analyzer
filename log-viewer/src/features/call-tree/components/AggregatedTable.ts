@@ -7,7 +7,6 @@ import { Tabulator } from 'tabulator-tables';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { toAggregatedCallTree, type AggregatedRow } from '../utils/Aggregation.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import { eventLabel, eventName } from '../utils/eventText.js';
@@ -17,6 +16,7 @@ import {
   createSelfSumHeapFooters,
   headerSortElement,
   registerTableModules,
+  virtualScrollOptions,
   type TableCallbacks,
 } from './TableShared.js';
 
@@ -47,10 +47,9 @@ export function createAggregatedTable(
     height: '100%',
     maxHeight: '100%',
     rowKeyboardNavigation: true,
-    anchoringPolicy: true,
+    ...virtualScrollOptions,
     // @ts-expect-error tabulator allows a function predicate but the types only declare Filter[]
     initialFilter: callbacks.showDetailsFilter,
-    renderVertical: VirtualVerticalRenderer,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',
