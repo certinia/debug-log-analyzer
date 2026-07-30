@@ -5,7 +5,7 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
-import type { Notification } from '../notifications/components/NotificationPanel.js';
+import type { LogIssue } from '../notifications/types.js';
 
 // web components
 import '../../components/LogLevels.js';
@@ -29,10 +29,10 @@ export class AppHeader extends LitElement {
   logSize = null;
   @property()
   logDuration = null;
-  @property()
-  notifications: Notification[] | null = null;
-  @property()
-  parserIssues: Notification[] = [];
+  @property({ attribute: false })
+  logProblems: readonly LogIssue[] | null = null;
+  @property({ attribute: false })
+  notifications: readonly LogIssue[] = [];
   @property()
   timelineRoot: ApexLog | null = null;
 
@@ -59,8 +59,8 @@ export class AppHeader extends LitElement {
         .logPath=${this.logPath}
         .logSize=${this.logSize}
         .logDuration=${this.logDuration}
+        .logProblems=${this.logProblems}
         .notifications=${this.notifications}
-        .parserIssues=${this.parserIssues}
       ></nav-bar>
       <log-levels .logSettings=${this.timelineRoot?.debugLevels}></log-levels>
       <find-widget></find-widget>

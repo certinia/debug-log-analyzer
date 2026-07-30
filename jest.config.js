@@ -10,6 +10,10 @@ const defaultConfig = {
         jsc: {
           target: 'esnext',
           parser: { decorators: true, syntax: 'typescript' },
+          // Mirrors tsconfig. swc defaults this on, which would `defineProperty` every
+          // initialised field over the accessor lit's decorators put on the prototype —
+          // silently killing reactivity in tests only.
+          transform: { useDefineForClassFields: false },
         },
       },
     ],
