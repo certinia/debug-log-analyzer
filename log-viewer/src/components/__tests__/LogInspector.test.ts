@@ -30,6 +30,14 @@ jest.mock('../../features/settings/Settings.js', () => ({
 }));
 
 // The real builders mount Tabulator tables; only the section ids matter here.
+// Mirrors detailSections.ts's real per-source copy so the emptyText assertions
+// below exercise the same strings LogInspector actually renders.
+const EMPTY_TEXT: Record<string, string> = {
+  timeline: 'Select a frame on the timeline to inspect it.',
+  calltree: 'Select a frame in the call tree to inspect it.',
+  analysis: 'Select a row in the analysis grid to inspect it.',
+  database: 'Select a SOQL, DML or SOSL row to inspect it.',
+};
 jest.mock('../detailSections.js', () => ({
   buildDetailSections: (_source: string, selection: unknown) =>
     Promise.resolve(
@@ -40,6 +48,8 @@ jest.mock('../detailSections.js', () => ({
           ]
         : [],
     ),
+  emptyTextFor: (source: string | undefined) =>
+    source ? (EMPTY_TEXT[source] ?? 'Select a row to inspect it.') : 'Select a row to inspect it.',
 }));
 
 import { eventBus } from '../../core/events/EventBus.js';
@@ -80,6 +90,14 @@ function paneView(el: LogInspector): PaneView {
 
 function visible(el: LogInspector): boolean {
   return !!el.shadowRoot?.querySelector('dock-layout')?.hasAttribute('visible');
+}
+
+function emptyText(el: LogInspector): string | null {
+  const dock = el.shadowRoot
+    ?.querySelector('dock-layout')
+    ?.shadowRoot?.querySelector('detail-dock')
+    ?.shadowRoot?.querySelector('.empty');
+  return dock?.textContent?.trim() ?? null;
 }
 
 function select(source: 'timeline' | 'database', eventIndex: number): void {
@@ -192,5 +210,29 @@ describe('LogInspector', () => {
     // The stored `visible: false` and `collapsed` don't undo either action.
     expect(visible(el)).toBe(true);
     expect(paneView(el).collapsed).toEqual({ vitals: true });
+  });
+
+  it('shows a source-specific empty state, and updates it as the active tab changes', async () => {
+    settings.inspector = {
+      position: 'right',
+      size: 400,
+      collapsed: {},
+      paneSizes: {},
+      visible: true,
+    };
+    const el = await mount('timeline-tab');
+    expect(emptyText(el)).toBe('Select a frame on the timeline to inspect it.');
+
+    el.activeTab = 'tree-tab';
+    await flush(el);
+    expect(emptyText(el)).toBe('Select a frame in the call tree to inspect it.');
+
+    el.activeTab = 'analysis-tab';
+    await flush(el);
+    expect(emptyText(el)).toBe('Select a row in the analysis grid to inspect it.');
+
+    el.activeTab = 'database-tab';
+    await flush(el);
+    expect(emptyText(el)).toBe('Select a SOQL, DML or SOSL row to inspect it.');
   });
 });
