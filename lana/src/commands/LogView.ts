@@ -16,7 +16,7 @@ import {
   getColumnOverrides,
   getColumnViews,
   getConfig,
-  getInspectorCollapsed,
+  getInspectorState,
   updateConfig,
   updatePrivateSection,
 } from '../workspace/AppConfig.js';
@@ -120,7 +120,7 @@ export class LogView {
             config.database.soql.columnView = columnViews['database.soql.columnView'] ?? 'General';
             config.database.dml.columnView = columnViews['database.dml.columnView'] ?? 'General';
             config.database.sosl.columnView = columnViews['database.sosl.columnView'] ?? 'General';
-            config.inspector.collapsed = getInspectorCollapsed(context.context.globalState);
+            Object.assign(config.inspector, getInspectorState(context.context.globalState));
             panel.webview.postMessage({
               requestId,
               cmd: 'getConfig',
