@@ -15,6 +15,7 @@ jest.mock('tabulator-tables', () => ({
     static registerModule() {}
   },
   Module: class {},
+  Renderer: class {},
 }));
 // vscode-button needs ElementInternals.setFormValue (absent in jsdom).
 jest.mock('#vscode-elements/vscode-button.js', () => ({}));
@@ -68,16 +69,5 @@ describe('CallTreeDetail view mode', () => {
     );
     expect(hidden(el, 'aggregated-tree')).toBe(false);
     expect(hidden(el, 'time-order-tree')).toBe(true);
-  });
-});
-
-describe('CallTreeDetail note', () => {
-  it('says the times are relative to the selection and details are omitted', async () => {
-    const el = await mount();
-    const note = el.shadowRoot?.querySelector('.note')?.textContent;
-    expect(note).toContain('relative to the selection');
-    expect(note).toContain('Zero-duration rows are omitted');
-    // Nothing was truncated (no table built), so no warning.
-    expect(el.shadowRoot?.querySelector('.note .warn')).toBeNull();
   });
 });

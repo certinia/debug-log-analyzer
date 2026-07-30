@@ -33,30 +33,16 @@ export interface ScopedCallTree {
   readonly timeOrder: ScopedRow[];
   readonly aggregated: ScopedRow[];
   readonly bottomUp: ScopedRow[];
-  /** True when a subtree hit {@link NODE_BUDGET} and was cut short. */
-  truncated: boolean;
 }
 
 /**
- * Cap on materialised nodes per selection. A broad frame selected as an
- * aggregate would otherwise expand `occurrences × whole subtree` — millions of
- * nodes on a large log — blocking the UI thread well past the 50ms budget.
+ * The selected node + its real subtree, with real durations. Zero-duration
+ * bookkeeping rows (heap allocations, statements, assignments) are dropped —
+ * the Inspector is a summary, and the Call Tree tab is where those details are
+ * read. Returns null when the row is one of them; `keep` forces the selection
+ * itself through, whatever its duration.
  */
-export const NODE_BUDGET = 20_000;
-
-interface Budget {
-  left: number;
-  truncated: boolean;
-}
-
-/**
- * The selected node + its real subtree, with real durations, within `budget`.
- * Zero-duration bookkeeping rows (heap allocations, statements, assignments)
- * are dropped — the Inspector is a summary, and the Call Tree tab is where
- * those details are read. Returns null when the row is one of them; `keep`
- * forces the selection itself through, whatever its duration.
- */
-function realSubtree(event: LogEvent, budget: Budget, keep = false): ScopedRow | null {
+function realSubtree(event: LogEvent, keep = false): ScopedRow | null {
   const row: ScopedRow = {
     id: event.eventIndex,
     originalData: event,
@@ -66,18 +52,10 @@ function realSubtree(event: LogEvent, budget: Budget, keep = false): ScopedRow |
     callCount: 1,
     _children: null,
   };
-  budget.left -= 1;
 
-  // Check the budget per child, not just before descending: a single node can
-  // have more direct children than the whole budget allows.
   const children: ScopedRow[] = [];
   for (const kid of event.children) {
-    if (budget.left <= 0) {
-      // Keep the nodes built so far (their totals are intact) and stop.
-      budget.truncated = true;
-      break;
-    }
-    const child = realSubtree(kid, budget);
+    const child = realSubtree(kid);
     if (child) {
       children.push(child);
     }
@@ -124,12 +102,11 @@ export function buildScopedCallTree(
   // Wrap each occurrence in its ancestor chain, innermost first, attributing that
   // occurrence's total up its path with no self time. Aggregation then merges
   // paths that share frames.
-  const budget: Budget = { left: NODE_BUDGET, truncated: false };
   const roots = selectedEvents.map((selected) => {
     // The selection and the path to it are the point of the view, so they show
     // even when the selection itself has no duration (e.g. a variable scope) —
     // `keep` is what makes this non-null.
-    let node = realSubtree(selected, budget, true)!;
+    let node = realSubtree(selected, true)!;
     let parent = selected.parent;
     while (parent && parent !== apexLog) {
       node = {
@@ -153,7 +130,6 @@ export function buildScopedCallTree(
   let bottomUp: ScopedRow[] | null = null;
   return {
     rootTotal,
-    truncated: budget.truncated,
     get timeOrder(): ScopedRow[] {
       // Many occurrences usually share ancestors, so merge the paths for a
       // readable tree; a single occurrence keeps its exact chain.

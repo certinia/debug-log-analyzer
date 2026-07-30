@@ -27,11 +27,12 @@ import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
+import { VirtualVerticalRenderer } from '../tabulator/renderer/VirtualVerticalRenderer.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
-import { buildScopedCallTree, NODE_BUDGET, type ScopedCallTree } from './scopedCallTree.js';
+import { buildScopedCallTree, type ScopedCallTree } from './scopedCallTree.js';
 import './ViewModeSwitch.js';
 import type { ViewModeOption } from './ViewModeSwitch.js';
 
@@ -152,16 +153,6 @@ export class CallTreeDetail extends LitElement {
         padding-bottom: 4px;
         flex: 0 0 auto;
       }
-      .note {
-        flex: 0 0 auto;
-        margin: 4px 0 0;
-        color: var(--vscode-descriptionForeground);
-        font-size: var(--filter-control-font-size);
-      }
-      .note .warn {
-        color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
-        margin-left: 0.5ch;
-      }
       .tables {
         position: relative;
         flex: 1 1 auto;
@@ -260,13 +251,19 @@ export class CallTreeDetail extends LitElement {
       height: '100%',
       maxHeight: '100%',
       placeholder: 'No call tree available',
+      // A scoped subtree is unbounded — the same virtual renderer the Call Tree
+      // tab uses is what keeps deep expansion affordable.
+      renderVertical: VirtualVerticalRenderer,
+      // Custom options (this and `rowKeyboardNavigation` below) aren't in
+      // Tabulator's Options type; TS flags only the first excess property.
+      // @ts-expect-error custom option read by VirtualVerticalRenderer
+      anchoringPolicy: true,
       dataTree: true,
       dataTreeChildField: '_children',
       dataTreeChildColumnCalcs: false,
       dataTreeBranchElement: '<span/>',
       columnCalcs: 'table',
       // Arrow-key row navigation, matching the Call Tree tab.
-      // @ts-expect-error custom option registered by the RowKeyboardNavigation module
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
       ...clipboardCopyOptions,
@@ -410,15 +407,6 @@ export class CallTreeDetail extends LitElement {
           <div id="bottom-up-tree" class="grid"></div>
         </div>
       </div>
-      <p class="note">
-        <span>Times are relative to the selection. Zero-duration rows are omitted.</span>${
-          this._scoped?.truncated
-            ? html`<span class="warn"
-                >Large subtree — stopped at ${formatInteger(NODE_BUDGET)} rows.</span
-              >`
-            : ''
-        }
-      </p>
       <context-menu
         @menu-select=${(e: CustomEvent<{ itemId: string }>) =>
           runPanelRowAction(e.detail.itemId, this._menuEventIndex)}
