@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ♻️ Replace `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).
 - 🗄️ **Database table columns** (DML, SOQL, SOSL): consolidated onto the shared Call Tree column/sort styling for a consistent look across all tables.
 - 🧱 **Data grids**: a crisper header/content separator and tidied grid styling across all tables.
-- 📐 **Column widths**: every column is sized to its widest header and value, so nothing clips or truncates; the **General**, **Database** and **Governor Limits** views were retuned to match.
+- 📐 **Column widths**: sized to fit their header and values, so nothing clips.
 
 ### Fixed
 
