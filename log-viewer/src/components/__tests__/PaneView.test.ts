@@ -175,8 +175,9 @@ describe('PaneView', () => {
     handle.dispatchEvent(pointer('pointerup', 120));
     await el.updateComplete;
 
-    expect(sizes?.a).toBe(120);
-    expect(sizes?.b).toBe(80);
+    // Keyed by axis: a height dragged here is not a width in the bottom dock.
+    expect(sizes?.['vertical:a']).toBe(120);
+    expect(sizes?.['vertical:b']).toBe(80);
   });
 
   it('does not emit pane-resize for a sash click that never moved', async () => {
@@ -222,7 +223,7 @@ describe('PaneView', () => {
       { id: 'a', title: 'A', content: html`<div>A</div>` },
       { id: 'b', title: 'B', content: html`<div>B</div>` },
     ];
-    el.paneSizes = { a: 300, b: 100 };
+    el.paneSizes = { 'vertical:a': 300, 'vertical:b': 100 };
     document.body.appendChild(el);
     await el.updateComplete;
 
@@ -240,12 +241,36 @@ describe('PaneView', () => {
       { id: 'b', title: 'B', content: html`<div>B</div>` },
     ];
     // Only a was on screen when the drag happened; b must not become a sliver.
-    el.paneSizes = { a: 120 };
+    el.paneSizes = { 'vertical:a': 120 };
     document.body.appendChild(el);
     await el.updateComplete;
 
     const pane = (id: string) => el.shadowRoot?.querySelector(`.pane[data-id="${id}"]`);
     expect(pane('a')?.getAttribute('style')).toContain('flex: 3 1 0');
     expect(pane('b')?.getAttribute('style')).toContain('flex: 1 1 0');
+  });
+
+  it('ignores sizes dragged on the other axis, and re-seeds when re-docked', async () => {
+    const el = document.createElement('pane-view') as PaneView;
+    el.orientation = 'vertical';
+    el.sections = [
+      { id: 'a', title: 'A', content: html`<div>A</div>` },
+      { id: 'b', title: 'B', content: html`<div>B</div>` },
+    ];
+    // Widths from the bottom dock; replaying them as heights is a layout the
+    // user never chose, so the vertical dock falls back to even weights.
+    el.paneSizes = { 'horizontal:a': 300, 'horizontal:b': 100 };
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const pane = (id: string) => el.shadowRoot?.querySelector(`.pane[data-id="${id}"]`);
+    expect(pane('a')?.getAttribute('style')).toContain('flex: 1 1 0');
+    expect(pane('b')?.getAttribute('style')).toContain('flex: 1 1 0');
+
+    // Re-docking flips orientation on the same element: its own sizes apply now.
+    el.orientation = 'horizontal';
+    await el.updateComplete;
+    expect(pane('a')?.getAttribute('style')).toContain('flex: 1.5 1 0');
+    expect(pane('b')?.getAttribute('style')).toContain('flex: 0.5 1 0');
   });
 });

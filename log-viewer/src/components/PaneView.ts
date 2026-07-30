@@ -42,12 +42,18 @@ export class PaneView extends LitElement {
   @property({ attribute: false })
   collapsed: Record<string, boolean> = {};
 
-  /** Pane sizes from the last drag (px), keyed by section id. Relative only. */
+  /**
+   * Pane sizes from the last drag (px), keyed `<orientation>:<section id>`.
+   * Relative only, and per axis — a width dragged in the horizontal dock says
+   * nothing about heights in the vertical one, so each orientation keeps its own
+   * sizes and the other's are left untouched.
+   */
   @property({ attribute: false })
   paneSizes: Record<string, number> = {};
 
-  // The rendered weights: seeded from `paneSizes`, then edited in place by a
-  // live drag until `pane-resize` hands the result back to the consumer.
+  // The current axis' weights, keyed by section id: seeded from `paneSizes`,
+  // then edited in place by a live drag until `pane-resize` hands the result
+  // back to the consumer.
   @state()
   private _weights: Record<string, number> = {};
 
@@ -176,9 +182,16 @@ export class PaneView extends LitElement {
   ];
 
   willUpdate(changed: PropertyValues): void {
-    // Adopt whatever the consumer stored; a drag then edits this copy.
-    if (changed.has('paneSizes')) {
-      this._weights = { ...this.paneSizes };
+    // Adopt whatever the consumer stored for this axis; a drag then edits this
+    // copy. Re-docking flips the orientation on the same element, so that has to
+    // re-seed too or the previous axis' sizes would carry over.
+    if (changed.has('paneSizes') || changed.has('orientation')) {
+      const prefix = `${this.orientation}:`;
+      this._weights = Object.fromEntries(
+        Object.entries(this.paneSizes)
+          .filter(([key]) => key.startsWith(prefix))
+          .map(([key, size]) => [key.slice(prefix.length), size]),
+      );
     }
   }
 
@@ -385,12 +398,12 @@ export class PaneView extends LitElement {
 
   /** Fires on interaction-end only, so the consumer's write isn't per-frame. */
   private _emitResize() {
+    // Only this axis' keys, so merging keeps the other orientation's sizes.
+    const sizes = Object.fromEntries(
+      Object.entries(this._weights).map(([id, size]) => [`${this.orientation}:${id}`, size]),
+    );
     this.dispatchEvent(
-      new CustomEvent('pane-resize', {
-        detail: { sizes: { ...this._weights } },
-        bubbles: true,
-        composed: true,
-      }),
+      new CustomEvent('pane-resize', { detail: { sizes }, bubbles: true, composed: true }),
     );
   }
 }
