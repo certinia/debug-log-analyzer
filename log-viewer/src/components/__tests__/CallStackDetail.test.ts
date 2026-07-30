@@ -41,11 +41,6 @@ async function mount(eventIndex: number): Promise<CallStackDetail> {
   el.eventIndex = eventIndex;
   document.body.appendChild(el);
   await el.updateComplete;
-  // Under @swc/jest the `@property` field initializer shadows Lit's reactive
-  // accessor, so the assignment above never reaches `changedProperties` and the
-  // table is never built. Nudge the update the way the browser would.
-  el.requestUpdate('eventIndex', undefined);
-  await el.updateComplete;
   return el;
 }
 

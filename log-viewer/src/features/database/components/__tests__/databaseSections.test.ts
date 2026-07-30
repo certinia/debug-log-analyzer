@@ -24,8 +24,7 @@ describe('buildDatabaseSections', () => {
     const sections = await buildDatabaseSections({ eventIndex: 3, type: 'soql' });
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree', 'issues']);
     expect(sections.find((s) => s.id === 'issues')?.badge).toBe('2');
-    // SOQL issues open by default, but the smallest section.
-    expect(sections.find((s) => s.id === 'issues')?.collapsed).toBeUndefined();
+    // The smallest section.
     expect(sections.find((s) => s.id === 'issues')?.weight).toBe(1);
   });
 

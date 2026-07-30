@@ -21,7 +21,7 @@ export interface ViewModeOption {
 @customElement('view-mode-switch')
 export class ViewModeSwitch extends LitElement {
   @property({ attribute: false })
-  options: ViewModeOption[] = [];
+  options: readonly ViewModeOption[] = [];
 
   @property()
   value = '';
