@@ -21,7 +21,6 @@ import {
   waitForNextFrame,
 } from '../features/call-tree/components/TableShared.js';
 import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCalcs.js';
-import { getSettings, updateSetting } from '../features/settings/Settings.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
@@ -48,30 +47,13 @@ function isViewMode(value: unknown): value is ViewMode {
 }
 
 /**
- * The remembered view mode, shared by every instance: the pane is torn down and
- * rebuilt on each collapse, tab hop and panel toggle, so reading it per instance
- * would be one config round-trip per rebuild — and would render the default mode
- * first, building a Tabulator the user never sees. Loaded once, lazily; a user's
- * own pick supersedes a load still in flight (hence `??=`).
+ * The picked view mode, shared by every instance: the pane is torn down and
+ * rebuilt on each collapse, tab hop and panel toggle, so without this the mode
+ * would reset on every selection. Deliberately not persisted — a log opens on
+ * Time Order, the mode that matches the Call Tree tab and the timeline, so an
+ * aggregated view is always something you chose in this log, not last week.
  */
 let sharedViewMode: ViewMode | undefined;
-let viewModeLoad: Promise<void> | undefined;
-
-function loadSharedViewMode(): Promise<void> {
-  viewModeLoad ??= getSettings()
-    .then((settings) => {
-      const mode = settings?.inspector?.callTreeMode;
-      if (isViewMode(mode)) {
-        sharedViewMode ??= mode;
-      }
-    })
-    .catch(() => {
-      // Settings unavailable (e.g. outside the extension host): keep the default
-      // and drop the memo, so the next pane retries instead of never restoring.
-      viewModeLoad = undefined;
-    });
-  return viewModeLoad;
-}
 
 // SOQL/DML frames already read as their statement text, so don't prefix the type.
 const EXCLUDED_TYPES = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
@@ -127,11 +109,6 @@ export class CallTreeDetail extends LitElement {
   @state()
   private viewMode: ViewMode = 'time-order';
 
-  // False only while the remembered mode is still loading; building before it
-  // lands would make a Tabulator for the default mode the user never sees.
-  @state()
-  private _modeReady = true;
-
   private _tables: Record<ViewMode, Tabulator | null> = {
     'time-order': null,
     aggregated: null,
@@ -151,18 +128,10 @@ export class CallTreeDetail extends LitElement {
 
   constructor() {
     super();
-    // The mode is remembered UI state, so it's read here rather than threaded
-    // through the section builders.
+    // Session UI state, so it's read here rather than threaded through the
+    // section builders.
     if (sharedViewMode) {
       this.viewMode = sharedViewMode;
-    } else {
-      this._modeReady = false;
-      void loadSharedViewMode().then(() => {
-        if (sharedViewMode) {
-          this.viewMode = sharedViewMode;
-        }
-        this._modeReady = true;
-      });
     }
   }
 
@@ -221,7 +190,7 @@ export class CallTreeDetail extends LitElement {
       this._destroyTables();
       this._scoped = buildScopedCallTree(this.eventIndex, this.instances);
     }
-    if (this._modeReady && (scopeChanged || changed.has('viewMode') || changed.has('_modeReady'))) {
+    if (scopeChanged || changed.has('viewMode')) {
       void this._showActive();
     }
   }
@@ -405,7 +374,7 @@ export class CallTreeDetail extends LitElement {
         .options=${VIEW_MODES}
         value=${this.viewMode}
         @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
-          this._setViewMode(e.detail.value as ViewMode)}
+          this._setViewMode(e.detail.value)}
       ></view-mode-switch>
       <div class="tables">
         <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
@@ -425,9 +394,11 @@ export class CallTreeDetail extends LitElement {
     `;
   }
 
-  private _setViewMode(mode: ViewMode) {
+  private _setViewMode(mode: string) {
+    if (!isViewMode(mode)) {
+      return;
+    }
     sharedViewMode = mode;
     this.viewMode = mode;
-    updateSetting('inspector.callTreeMode', mode);
   }
 }

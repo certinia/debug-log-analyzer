@@ -19,13 +19,6 @@ jest.mock('tabulator-tables', () => ({
 // vscode-button needs ElementInternals.setFormValue (absent in jsdom).
 jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 
-const settings = { inspector: { callTreeMode: 'bottom-up' } };
-const written: Array<{ section: string; value: unknown }> = [];
-jest.mock('../../features/settings/Settings.js', () => ({
-  getSettings: () => Promise.resolve(settings),
-  updateSetting: (section: string, value: unknown) => written.push({ section, value }),
-}));
-
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
 
@@ -50,26 +43,22 @@ async function mount(): Promise<CallTreeDetail> {
   const el = document.createElement('call-tree-detail') as CallTreeDetail;
   el.eventIndex = -1; // no DatabaseAccess in the test — no table is built
   document.body.appendChild(el);
-  // The remembered mode arrives from a promise, so settle it then re-render.
-  await el.updateComplete;
-  await Promise.resolve();
   await el.updateComplete;
   return el;
 }
 
-// The remembered mode is module state loaded once, so the restore test must run
-// before anything picks a mode of its own.
+// The picked mode is module state, so these run in order: default, pick, share.
 describe('CallTreeDetail view mode', () => {
-  it('restores the remembered mode', async () => {
+  it('starts on time order', async () => {
     expect(customElements.get('call-tree-detail')).toBeDefined();
     const el = await mount();
 
-    expect(switchEl(el).getAttribute('value')).toBe('bottom-up');
-    expect(hidden(el, 'bottom-up-tree')).toBe(false);
-    expect(hidden(el, 'time-order-tree')).toBe(true);
+    expect(switchEl(el).getAttribute('value')).toBe('time-order');
+    expect(hidden(el, 'time-order-tree')).toBe(false);
+    expect(hidden(el, 'bottom-up-tree')).toBe(true);
   });
 
-  it('switches on view-mode-change and persists the pick', async () => {
+  it('switches on view-mode-change', async () => {
     const el = await mount();
 
     switchEl(el).dispatchEvent(
@@ -83,13 +72,12 @@ describe('CallTreeDetail view mode', () => {
 
     expect(switchEl(el).getAttribute('value')).toBe('aggregated');
     expect(hidden(el, 'aggregated-tree')).toBe(false);
-    expect(hidden(el, 'bottom-up-tree')).toBe(true);
-    expect(written).toEqual([{ section: 'inspector.callTreeMode', value: 'aggregated' }]);
+    expect(hidden(el, 'time-order-tree')).toBe(true);
   });
 
   it('shares the picked mode with a pane mounted later', async () => {
-    // The pane is torn down and rebuilt on every collapse and tab hop, so the
-    // mode has to survive without another settings round-trip.
+    // The pane is torn down and rebuilt on every collapse and tab hop, so a
+    // pick has to outlive the element — but only for this log, not the next.
     const el = await mount();
 
     expect(switchEl(el).getAttribute('value')).toBe('aggregated');

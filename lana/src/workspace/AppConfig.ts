@@ -51,7 +51,6 @@ interface Config {
     collapsed: Record<string, boolean>;
     paneSizes: Record<string, number>;
     visible: boolean | null;
-    callTreeMode: string;
   };
 }
 
@@ -110,7 +109,6 @@ export const INSPECTOR_STATE_SECTIONS = [
   'inspector.collapsed',
   'inspector.paneSizes',
   'inspector.visible',
-  'inspector.callTreeMode',
 ] as const;
 
 /** All sections routed to globalState instead of editable `lana.*` settings. */
@@ -121,17 +119,13 @@ export const PRIVATE_SECTIONS = [
 ] as const;
 
 type ColumnOverrides = Record<string, string[]>;
-type InspectorState = Pick<
-  Config['inspector'],
-  'collapsed' | 'paneSizes' | 'visible' | 'callTreeMode'
->;
+type InspectorState = Pick<Config['inspector'], 'collapsed' | 'paneSizes' | 'visible'>;
 
 export function getInspectorState(globalState: Memento): InspectorState {
   return {
     collapsed: globalState.get<Record<string, boolean>>('inspector.collapsed', {}),
     paneSizes: globalState.get<Record<string, number>>('inspector.paneSizes', {}),
     visible: globalState.get<boolean | null>('inspector.visible', null),
-    callTreeMode: globalState.get<string>('inspector.callTreeMode', 'time-order'),
   };
 }
 

@@ -102,7 +102,6 @@ describe('LogInspector', () => {
       collapsed: { callstack: true },
       paneSizes: {},
       visible: true,
-      callTreeMode: 'time-order',
     };
     const el = await mount('database-tab');
     select('database', 3);
@@ -148,7 +147,6 @@ describe('LogInspector', () => {
       collapsed: {},
       paneSizes: {},
       visible: false,
-      callTreeMode: 'time-order',
     };
     const el = await mount('timeline-tab');
     select('timeline', 1);
@@ -168,7 +166,6 @@ describe('LogInspector', () => {
       collapsed: { callstack: true },
       paneSizes: {},
       visible: false,
-      callTreeMode: 'time-order',
     };
     deferSettings = true;
     const el = document.createElement('log-inspector') as LogInspector;
