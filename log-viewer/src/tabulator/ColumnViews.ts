@@ -34,8 +34,9 @@ export const TIME_TOTALS = ['totalTime', 'totalSelfTime', 'duration.total', 'dur
  * Column views for the Call Tree and Analysis tables. General is an explicit
  * curated set (not `null`) so the Self columns stay hidden by default. Each view
  * answers one question, so a metric belongs to one view rather than every view:
- * heap lives in Memory, governor utilisation (`governorCost`/`governorCostMax`)
- * in Governor Limits. Both stay toggleable anywhere via the column menu.
+ * heap detail lives in Memory (peak also in Governor Limits, since heap size is
+ * one), governor utilisation (`governorCost`/`governorCostMax`) in Governor
+ * Limits. All stay toggleable anywhere via the column menu.
  */
 export const CALL_TREE_VIEWS: ColumnView[] = [
   {

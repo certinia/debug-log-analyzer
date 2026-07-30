@@ -271,8 +271,8 @@ export function createGovernorPeakColumn(governorLimits: GovernorLimits): Column
  * The default 70px is what a two-line "… Count" header needs; the values never
  * exceed their governor limit, so they're far narrower. Row columns pass a
  * smaller `width` because "Rows" is a shorter word than "Count". Self titles say
- * `self`, not `(self)`, so the extra word wraps to a third header line instead of
- * forcing the column 30-40px wider — the same convention as the heap columns.
+ * `self`, not `(self)`, so the extra word wraps rather than costing 30-40px of
+ * width.
  */
 export function createGovernorColumn(opts: {
   title: string;
