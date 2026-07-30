@@ -33,13 +33,27 @@ import { buildScopedCallTree, type ScopedCallTree } from './scopedCallTree.js';
 import './ViewModeSwitch.js';
 import type { ViewModeOption } from './ViewModeSwitch.js';
 
-type ViewMode = 'time-order' | 'aggregated' | 'bottom-up';
-
-const VIEW_MODES: ViewModeOption[] = [
+// The switch options are the source of the union, so the guard below can't drift.
+const VIEW_MODES = [
   { value: 'time-order', label: 'Time Order' },
   { value: 'aggregated', label: 'Aggregated' },
   { value: 'bottom-up', label: 'Bottom-Up' },
-];
+] as const satisfies readonly ViewModeOption[];
+
+type ViewMode = (typeof VIEW_MODES)[number]['value'];
+
+function isViewMode(value: unknown): value is ViewMode {
+  return VIEW_MODES.some((option) => option.value === value);
+}
+
+/**
+ * The picked view mode, shared by every instance: the pane is torn down and
+ * rebuilt on each collapse, tab hop and panel toggle, so without this the mode
+ * would reset on every selection. Deliberately not persisted — a log opens on
+ * Time Order, the mode that matches the Call Tree tab and the timeline, so an
+ * aggregated view is always something you chose in this log, not last week.
+ */
+let sharedViewMode: ViewMode | undefined;
 
 // SOQL/DML frames already read as their statement text, so don't prefix the type.
 const EXCLUDED_TYPES = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
@@ -111,6 +125,15 @@ export class CallTreeDetail extends LitElement {
   private _contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private _menuEventIndex = -1;
+
+  constructor() {
+    super();
+    // Session UI state, so it's read here rather than threaded through the
+    // section builders.
+    if (sharedViewMode) {
+      this.viewMode = sharedViewMode;
+    }
+  }
 
   firstUpdated(): void {
     this._contextMenu = this.renderRoot.querySelector('context-menu');
@@ -351,7 +374,7 @@ export class CallTreeDetail extends LitElement {
         .options=${VIEW_MODES}
         value=${this.viewMode}
         @view-mode-change=${(e: CustomEvent<{ value: string }>) =>
-          this._setViewMode(e.detail.value as ViewMode)}
+          this._setViewMode(e.detail.value)}
       ></view-mode-switch>
       <div class="tables">
         <div class="table-host ${this.viewMode === 'time-order' ? '' : 'is-hidden'}">
@@ -371,9 +394,11 @@ export class CallTreeDetail extends LitElement {
     `;
   }
 
-  private _setViewMode(mode: ViewMode) {
+  private _setViewMode(mode: string) {
+    if (!isViewMode(mode)) {
+      return;
+    }
+    sharedViewMode = mode;
     this.viewMode = mode;
-    // @state field initializer shadows the accessor under @swc/jest; nudge it.
-    this.requestUpdate();
   }
 }

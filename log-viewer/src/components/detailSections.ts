@@ -20,19 +20,18 @@ import './EventVitals.js';
  */
 export async function buildDetailSections(
   source: DetailSource,
-  selection: DetailSelection,
-  collapsed: Record<string, boolean> = {},
+  selection: DetailSelection | null,
 ): Promise<PaneSection[]> {
-  // The Database grids resolve statement-specific vitals and SOQL lint issues.
-  if (source === 'database' && selection.kind === 'event' && selection.type) {
-    return buildDatabaseSections(
-      { eventIndex: selection.eventIndex, type: selection.type },
-      collapsed,
-    );
+  // Nothing selected: no sections yet, so the inspector shows its empty text.
+  if (!selection) {
+    return [];
   }
 
-  // Persisted collapsed state wins over the per-section default.
-  const isCollapsed = (id: string, fallback = false) => collapsed[id] ?? fallback;
+  // The Database grids resolve statement-specific vitals and SOQL lint issues.
+  if (source === 'database' && selection.kind === 'event' && selection.type) {
+    return buildDatabaseSections({ eventIndex: selection.eventIndex, type: selection.type });
+  }
+
   const isAggregate = selection.kind === 'aggregate';
   // An aggregate scopes to all its occurrences; a single frame to itself.
   const eventIndex = isAggregate ? (selection.instances[0] ?? -1) : selection.eventIndex;
@@ -44,7 +43,6 @@ export async function buildDetailSections(
       id: 'vitals',
       title: 'Details',
       weight: 3,
-      collapsed: isCollapsed('vitals'),
       content: html`<event-vitals
         eventIndex=${eventIndex}
         .instances=${instances}
@@ -55,14 +53,12 @@ export async function buildDetailSections(
       id: 'callstack',
       title: 'Call stack',
       weight: 3,
-      collapsed: isCollapsed('callstack'),
       content: html`<call-stack-detail eventIndex=${eventIndex}></call-stack-detail>`,
     },
     {
       id: 'calltree',
       title: 'Call tree',
       weight: 4,
-      collapsed: isCollapsed('calltree'),
       content: html`<call-tree-detail
         eventIndex=${eventIndex}
         .instances=${instances}

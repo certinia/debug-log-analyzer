@@ -25,8 +25,8 @@ const TAB_TO_SOURCE: Record<string, DetailSource> = {
  * The app-wide inspector. Lives at the app root (sibling of the tab strip,
  * via a forwarded `main` slot) so it crosscuts every tab. It follows the active
  * tab: each source's latest selection is remembered, and it shows the active
- * tab's selection. Persists dock position/size (public settings) and per-section
- * collapse (private globalState); visibility is transient (opens on first select).
+ * tab's selection. Persists dock position/size (public settings) plus its
+ * open/closed state, section collapse and pane sizes (private globalState).
  */
 @customElement('log-inspector')
 export class LogInspector extends LitElement {
@@ -39,18 +39,28 @@ export class LogInspector extends LitElement {
   @state()
   private dock: DockPosition = 'right';
   @state()
-  private panelVisible = false;
-  @state()
   private panelSize = 500;
+
+  // Keyed by section id and shared by every tab — one panel, one layout.
+  @state()
+  private collapsedSections: Record<string, boolean> = {};
+  @state()
+  private paneSizes: Record<string, number> = {};
 
   // Latest selection per source; the bar renders the active tab's entry.
   private _selections = new Map<DetailSource, DetailSelection>();
-  // Auto-open only on the first selection; afterwards the user's toggle wins.
-  private _hasAutoOpened = false;
+  // The user's last open/closed choice, or null if they've never made one —
+  // which is the only state that lets a selection auto-open the panel.
+  @state()
+  private _visiblePref: boolean | null = null;
+  // Set once a selection has opened the panel on the user's behalf.
+  @state()
+  private _autoOpened = false;
+  // Set as soon as the user docks, resizes or collapses anything, so a settings
+  // load still in flight can't overwrite what they just did.
+  private _userAdjusted = false;
   // Guards against a slow rebuild resolving after a newer selection.
   private _rebuildEpoch = 0;
-  // Persisted per-section collapse (globalState), keyed by section id.
-  private _collapsedSections: Record<string, boolean> = {};
   private _unsubscribe: Array<() => void> = [];
 
   constructor() {
@@ -62,15 +72,27 @@ export class LogInspector extends LitElement {
     getSettings()
       .then((settings) => {
         const panel = settings?.inspector;
-        if (panel) {
+        if (!panel) {
+          return;
+        }
+        // The load can land after the user has already opened or laid out the
+        // panel, so their own choice always wins over the stored one.
+        this._visiblePref ??= panel.visible ?? null;
+        if (!this._userAdjusted) {
           this.dock = panel.position;
           this.panelSize = panel.size;
-          this._collapsedSections = panel.collapsed ?? {};
+          this.collapsedSections = panel.collapsed ?? {};
+          this.paneSizes = panel.paneSizes ?? {};
         }
       })
       .catch(() => {
         /* settings unavailable (e.g. outside the extension host) — keep defaults */
       });
+  }
+
+  // Open when the user says so, else only if a selection auto-opened it.
+  private get _visible(): boolean {
+    return this._visiblePref ?? this._autoOpened;
   }
 
   disconnectedCallback(): void {
@@ -109,38 +131,50 @@ export class LogInspector extends LitElement {
       <dock-layout
         dock=${this.dock}
         .size=${this.panelSize}
-        ?visible=${this.panelVisible}
+        ?visible=${this._visible}
         .sections=${this.sections}
+        .collapsed=${this.collapsedSections}
+        .paneSizes=${this.paneSizes}
         emptyText="Select a row to inspect it."
         @dock-position-change=${this._onDockPositionChange}
         @dock-resize=${this._onDockResize}
         @dock-hide=${this._hidePanel}
         @dock-collapse=${this._hidePanel}
         @pane-toggle=${this._onPaneToggle}
+        @pane-resize=${this._onPaneResize}
       >
         <slot slot="main" name="main"></slot>
       </dock-layout>
     `;
   }
 
+  private get _activeSource(): DetailSource | undefined {
+    return TAB_TO_SOURCE[this.activeTab];
+  }
+
   private _onSelect(detail: { source: DetailSource; selection: DetailSelection | null }): void {
     if (detail.selection) {
       this._selections.set(detail.source, detail.selection);
-      if (!this._hasAutoOpened) {
-        this._hasAutoOpened = true;
-        this.panelVisible = true;
-      }
+      // Only shows the panel while the user has never chosen for themselves,
+      // which `_visible` decides.
+      this._autoOpened = true;
     } else {
       this._selections.delete(detail.source);
     }
     // Only rebuild if the change is for the tab currently on screen.
-    if (TAB_TO_SOURCE[this.activeTab] === detail.source) {
+    if (this._activeSource === detail.source) {
       this._scheduleRebuild();
     }
   }
 
   private _onToggle(detail: { visible?: boolean }): void {
-    this.panelVisible = detail.visible ?? !this.panelVisible;
+    this._setVisible(detail.visible ?? !this._visible);
+  }
+
+  /** Every open/close is the user's, so each one is remembered. */
+  private _setVisible(visible: boolean): void {
+    this._visiblePref = visible;
+    updateSetting('inspector.visible', visible);
   }
 
   /**
@@ -154,10 +188,9 @@ export class LogInspector extends LitElement {
 
   private async _rebuild(): Promise<void> {
     const epoch = ++this._rebuildEpoch;
-    const source = TAB_TO_SOURCE[this.activeTab];
-    const selection = source ? (this._selections.get(source) ?? null) : null;
-    const sections = selection
-      ? await buildDetailSections(source!, selection, this._collapsedSections)
+    const source = this._activeSource;
+    const sections = source
+      ? await buildDetailSections(source, this._selections.get(source) ?? null)
       : [];
     // Drop a slow build that a newer selection already superseded.
     if (epoch === this._rebuildEpoch) {
@@ -166,6 +199,7 @@ export class LogInspector extends LitElement {
   }
 
   private _onDockPositionChange = (e: CustomEvent<{ position: DockPosition }>) => {
+    this._userAdjusted = true;
     this.dock = e.detail.position;
     updateSetting('inspector.position', this.dock);
   };
@@ -173,17 +207,26 @@ export class LogInspector extends LitElement {
   // `dock-resize` fires once on pointer-up, so this write already lands on
   // interaction-end — no debounce needed.
   private _onDockResize = (e: CustomEvent<{ size: number }>) => {
+    this._userAdjusted = true;
     this.panelSize = e.detail.size;
     updateSetting('inspector.size', this.panelSize);
   };
 
   private _onPaneToggle = (e: CustomEvent<{ collapsed: Record<string, boolean> }>) => {
-    this._collapsedSections = { ...this._collapsedSections, ...e.detail.collapsed };
-    updateSetting('inspector.collapsed', this._collapsedSections);
+    this._userAdjusted = true;
+    this.collapsedSections = { ...this.collapsedSections, ...e.detail.collapsed };
+    updateSetting('inspector.collapsed', this.collapsedSections);
+  };
+
+  // `pane-resize` fires on pointer-up, so this write lands on interaction-end.
+  private _onPaneResize = (e: CustomEvent<{ sizes: Record<string, number> }>) => {
+    this._userAdjusted = true;
+    this.paneSizes = { ...this.paneSizes, ...e.detail.sizes };
+    updateSetting('inspector.paneSizes', this.paneSizes);
   };
 
   private _hidePanel = () => {
-    this.panelVisible = false;
+    this._setVisible(false);
   };
 }
 

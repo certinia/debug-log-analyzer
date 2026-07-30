@@ -58,13 +58,7 @@ describe('buildDetailSections', () => {
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
   });
 
-  it('honours persisted collapsed state over the per-section default', async () => {
-    const sections = await buildDetailSections(
-      'calltree',
-      { kind: 'event', eventIndex: 4 },
-      { callstack: true },
-    );
-    expect(sections.find((s) => s.id === 'callstack')?.collapsed).toBe(true);
-    expect(sections.find((s) => s.id === 'calltree')?.collapsed).toBe(false);
+  it('builds no sections when nothing is selected', async () => {
+    expect(await buildDetailSections('calltree', null)).toEqual([]);
   });
 });
