@@ -28,7 +28,7 @@ const LIMIT_ROW_TOTALS = ['dmlRowCount.total', 'soqlRowCount.total', 'soslRowCou
 // Both naming variants of the total/self time columns: `totalTime`/`totalSelfTime`
 // (aggregated & bottom-up) and `duration.*` (time-order). Listing both lets one
 // preset drive all three tables.
-const TIME_TOTALS = ['totalTime', 'totalSelfTime', 'duration.total', 'duration.self'];
+export const TIME_TOTALS = ['totalTime', 'totalSelfTime', 'duration.total', 'duration.self'];
 
 /**
  * Column views for the Call Tree and Analysis tables. General is an explicit

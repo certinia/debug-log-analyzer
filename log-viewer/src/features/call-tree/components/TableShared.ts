@@ -10,6 +10,7 @@ import {
 } from 'tabulator-tables';
 
 import { formatInteger } from '../../../core/utility/Util.js';
+import { NAMESPACE_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
 import { type ProgressParams, progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { AnchoringPolicy } from '../../../tabulator/module/AnchoringPolicy.js';
@@ -116,6 +117,77 @@ export const commonColumnDefaults = {
   widthShrink: 0,
 };
 
+/** Row-metric columns: "Rows" is a shorter title than "Count", so they sit narrower. */
+const ROWS_WIDTH = 63;
+
+/** Numeric count columns: the narrowest a right-aligned count stays readable at. */
+const COUNT_MIN_WIDTH = 60;
+
+/**
+ * The `Namespace` / `Caller Namespace` pair every call-tree table leads with, so
+ * the two can't drift apart between tables. Caller is hidden until a view or the
+ * user shows it.
+ */
+export function createNamespaceColumns(): ColumnDefinition[] {
+  return [
+    {
+      title: 'Namespace',
+      field: 'namespace',
+      sorter: 'string',
+      width: NAMESPACE_WIDTH,
+      minWidth: 80,
+    },
+    {
+      title: 'Caller Namespace',
+      field: 'callerNamespace',
+      sorter: 'string',
+      width: NAMESPACE_WIDTH,
+      visible: false,
+    },
+  ];
+}
+
+/**
+ * The log event `Type` column. Hidden by default in the top-down tables, where
+ * the name already carries the type prefix; Bottom-Up shows it, as its buckets
+ * merge frames of differing types.
+ */
+export function createTypeColumn(opts: { visible?: boolean } = {}): ColumnDefinition {
+  return {
+    title: 'Type',
+    field: 'type',
+    headerSortStartingDir: 'asc',
+    sorter: 'string',
+    width: 150,
+    tooltip: true,
+    visible: opts.visible ?? false,
+  };
+}
+
+/**
+ * A plain right-aligned integer column with a summing footer — for counts with no
+ * governor limit to draw a bar against (see {@link createGovernorColumn} for those).
+ */
+export function createCountColumn(opts: {
+  title: string;
+  field: string;
+  width: number;
+  visible?: boolean;
+}): ColumnDefinition {
+  return {
+    title: opts.title,
+    field: opts.field,
+    visible: opts.visible,
+    sorter: 'number',
+    cssClass: 'number-cell',
+    width: opts.width,
+    minWidth: COUNT_MIN_WIDTH,
+    hozAlign: 'right',
+    headerHozAlign: 'right',
+    bottomCalc: 'sum',
+  };
+}
+
 /**
  * The shared "Gov Avg %" column — the average governor consumption across all
  * governors on a call path (see {@link governorCost}), rendered as a progress
@@ -210,7 +282,7 @@ export function createGovernorColumn(opts: {
   minWidth?: number;
   visible?: boolean;
 }): ColumnDefinition {
-  const { title, field, limit, width = 70, minWidth = 60, visible } = opts;
+  const { title, field, limit, width = 70, minWidth = COUNT_MIN_WIDTH, visible } = opts;
   const formatterParams = { precision: 0, totalValue: limit, showPercentageText: false };
   return {
     title,
@@ -304,68 +376,43 @@ export function createGovernorMetricColumns(
       limit: governorLimits.soslQueries.limit,
       visible: false,
     }),
-    {
-      title: 'Throws Count',
-      field: 'thrownCount.total',
-      sorter: 'number',
-      cssClass: 'number-cell',
-      // 77 is the narrowest width that doesn't clip "Throws"; 60 did.
-      width: 77,
-      hozAlign: 'right',
-      headerHozAlign: 'right',
-      bottomCalc: 'sum',
-    },
+    // 77 is the narrowest width that doesn't clip "Throws"; 60 did.
+    createCountColumn({ title: 'Throws Count', field: 'thrownCount.total', width: 77 }),
     createGovernorColumn({
       title: 'DML Rows',
       field: 'dmlRowCount.total',
       limit: governorLimits.dmlRows.limit,
-      width: 63,
+      width: ROWS_WIDTH,
     }),
     createGovernorColumn({
       title: 'DML Rows self',
       field: 'dmlRowCount.self',
       limit: governorLimits.dmlRows.limit,
-      width: 63,
+      width: ROWS_WIDTH,
       visible: false,
     }),
     createGovernorColumn({
       title: 'SOQL Rows',
       field: 'soqlRowCount.total',
       limit: governorLimits.queryRows.limit,
-      width: 63,
+      width: ROWS_WIDTH,
     }),
     createGovernorColumn({
       title: 'SOQL Rows self',
       field: 'soqlRowCount.self',
       limit: governorLimits.queryRows.limit,
-      width: 63,
+      width: ROWS_WIDTH,
       visible: false,
     }),
     // SOSL rows have no governor limit (only SOSL queries is limited, to 20),
     // so these are plain counts rather than progress bars against a limit.
-    {
-      title: 'SOSL Rows',
-      field: 'soslRowCount.total',
-      sorter: 'number',
-      cssClass: 'number-cell',
-      width: 63,
-      minWidth: 60,
-      hozAlign: 'right',
-      headerHozAlign: 'right',
-      bottomCalc: 'sum',
-    },
-    {
+    createCountColumn({ title: 'SOSL Rows', field: 'soslRowCount.total', width: ROWS_WIDTH }),
+    createCountColumn({
       title: 'SOSL Rows self',
       field: 'soslRowCount.self',
+      width: ROWS_WIDTH,
       visible: false,
-      sorter: 'number',
-      cssClass: 'number-cell',
-      width: 63,
-      minWidth: 60,
-      hozAlign: 'right',
-      headerHozAlign: 'right',
-      bottomCalc: 'sum',
-    },
+    }),
     createHeapBytesColumn({
       field: 'heapAllocated.total',
       title: 'Heap Net (bytes)',

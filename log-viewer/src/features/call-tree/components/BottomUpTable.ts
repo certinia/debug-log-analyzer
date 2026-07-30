@@ -6,7 +6,7 @@ import { Tabulator, type Options } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
-import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
+import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
@@ -19,7 +19,10 @@ import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { toBottomUpTree, type BottomUpRow } from '../utils/Aggregation.js';
 import {
   commonColumnDefaults,
+  createCountColumn,
   createGovernorMetricColumns,
+  createNamespaceColumns,
+  createTypeColumn,
   headerSortElement,
   registerTableModules,
   virtualScrollOptions,
@@ -177,39 +180,9 @@ export function createBottomUpTable(
         widthGrow: 5,
         widthShrink: 1,
       },
-      {
-        title: 'Namespace',
-        field: 'namespace',
-        sorter: 'string',
-        width: NAMESPACE_WIDTH,
-        minWidth: 80,
-      },
-      {
-        title: 'Caller Namespace',
-        field: 'callerNamespace',
-        sorter: 'string',
-        width: NAMESPACE_WIDTH,
-        visible: false,
-      },
-      {
-        title: 'Type',
-        field: 'type',
-        headerSortStartingDir: 'asc',
-        width: 150,
-        sorter: 'string',
-        tooltip: true,
-      },
-      {
-        title: 'Calls',
-        field: 'callCount',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 70,
-        minWidth: 60,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
+      ...createNamespaceColumns(),
+      createTypeColumn({ visible: true }),
+      createCountColumn({ title: 'Calls', field: 'callCount', width: 70 }),
       ...createGovernorMetricColumns(rootMethod.governorLimits, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {

@@ -15,6 +15,7 @@ import {
   resolveColumnView,
   SOQL_VIEWS,
   SOSL_VIEWS,
+  TIME_TOTALS,
   toggleField,
 } from '../ColumnViews.js';
 
@@ -218,7 +219,7 @@ describe('view sets', () => {
   it('Database carries timing so Governor Limits stays the pure-limits view', () => {
     const database = getColumnView(CALL_TREE_VIEWS, 'Database')!.fields!;
     const governor = getColumnView(CALL_TREE_VIEWS, 'Governor Limits')!.fields!;
-    for (const f of ['totalTime', 'totalSelfTime', 'duration.total', 'duration.self']) {
+    for (const f of TIME_TOTALS) {
       expect(database).toContain(f);
       expect(governor).not.toContain(f);
     }

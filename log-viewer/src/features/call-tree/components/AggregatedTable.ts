@@ -6,15 +6,18 @@ import { Tabulator } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
-import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
+import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { toAggregatedCallTree, type AggregatedRow } from '../utils/Aggregation.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import { eventLabel, eventName } from '../utils/eventText.js';
 import {
   commonColumnDefaults,
+  createCountColumn,
   createGovernorMetricColumns,
+  createNamespaceColumns,
   createSelfSumHeapFooters,
+  createTypeColumn,
   headerSortElement,
   registerTableModules,
   virtualScrollOptions,
@@ -114,40 +117,9 @@ export function createAggregatedTable(
         widthGrow: 5,
         widthShrink: 1,
       },
-      {
-        title: 'Namespace',
-        field: 'namespace',
-        sorter: 'string',
-        width: NAMESPACE_WIDTH,
-        minWidth: 80,
-      },
-      {
-        title: 'Caller Namespace',
-        field: 'callerNamespace',
-        sorter: 'string',
-        width: NAMESPACE_WIDTH,
-        visible: false,
-      },
-      {
-        title: 'Type',
-        field: 'type',
-        headerSortStartingDir: 'asc',
-        sorter: 'string',
-        width: 150,
-        tooltip: true,
-        visible: false,
-      },
-      {
-        title: 'Calls',
-        field: 'callCount',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 70,
-        minWidth: 60,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
+      ...createNamespaceColumns(),
+      createTypeColumn(),
+      createCountColumn({ title: 'Calls', field: 'callCount', width: 70 }),
       ...createGovernorMetricColumns(rootMethod.governorLimits, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {

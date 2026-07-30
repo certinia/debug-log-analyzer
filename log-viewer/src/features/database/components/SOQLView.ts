@@ -71,6 +71,9 @@ import './DatabaseSection.js';
 /** The SOQL column is always shown in the SOQL table. */
 const ALWAYS_VISIBLE = ['soql'];
 
+/** Both cardinality columns: the title wrapped to two lines is the constraint. */
+const CARDINALITY_WIDTH = 113;
+
 // Group-by dropdown label → row field. Labels that don't map 1:1 to a field
 // name (Object, Caller Namespace) need this indirection.
 const groupLabelsToFields = new Map<string, string>([
@@ -773,7 +776,7 @@ export class SOQLView extends LitElement {
           field: 'cardinality',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 113,
+          width: CARDINALITY_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           visible: false,
@@ -783,7 +786,7 @@ export class SOQLView extends LitElement {
           field: 'sObjectCardinality',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 113,
+          width: CARDINALITY_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           visible: false,

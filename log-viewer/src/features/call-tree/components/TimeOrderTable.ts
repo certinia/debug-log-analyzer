@@ -6,7 +6,7 @@ import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
-import { NAMESPACE_WIDTH, TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
+import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../utils/TimeOrderTree.js';
@@ -14,7 +14,9 @@ import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
 import {
   commonColumnDefaults,
   createGovernorMetricColumns,
+  createNamespaceColumns,
   createSelfSumHeapFooters,
+  createTypeColumn,
   headerSortElement,
   registerTableModules,
   virtualScrollOptions,
@@ -93,29 +95,8 @@ export function createTimeOrderTable(
         widthGrow: 5,
         widthShrink: 1,
       },
-      {
-        title: 'Namespace',
-        field: 'namespace',
-        sorter: 'string',
-        width: NAMESPACE_WIDTH,
-        minWidth: 80,
-      },
-      {
-        title: 'Caller Namespace',
-        field: 'callerNamespace',
-        sorter: 'string',
-        width: NAMESPACE_WIDTH,
-        visible: false,
-      },
-      {
-        title: 'Type',
-        field: 'type',
-        headerSortStartingDir: 'asc',
-        sorter: 'string',
-        width: 150,
-        tooltip: true,
-        visible: false,
-      },
+      ...createNamespaceColumns(),
+      createTypeColumn(),
       ...createGovernorMetricColumns(governorLimits, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {
