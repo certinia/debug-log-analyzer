@@ -28,6 +28,13 @@ export class DetailDock extends LitElement {
   @property({ type: String })
   emptyText = 'Nothing selected.';
 
+  /** Passed through to `<pane-view>`; the consumer owns them. */
+  @property({ attribute: false })
+  collapsed: Record<string, boolean> = {};
+
+  @property({ attribute: false })
+  paneSizes: Record<string, number> = {};
+
   static styles = [
     globalStyles,
     panelTokens,
@@ -121,6 +128,8 @@ export class DetailDock extends LitElement {
           ? html`<pane-view
               orientation=${this.dock === 'bottom' ? 'horizontal' : 'vertical'}
               .sections=${this.sections}
+              .collapsed=${this.collapsed}
+              .paneSizes=${this.paneSizes}
             ></pane-view>`
           : html`<div class="empty">${this.emptyText}</div>`
       }

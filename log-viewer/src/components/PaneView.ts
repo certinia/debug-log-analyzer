@@ -3,7 +3,7 @@
  */
 import '#vscode-elements/vscode-icon.js';
 import '#vscode-elements/vscode-badge.js';
-import { LitElement, css, html, nothing, type TemplateResult } from 'lit';
+import { LitElement, css, html, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 // styles
@@ -16,8 +16,6 @@ export interface PaneSection {
   content: TemplateResult;
   /** Optional count/label shown as a badge in the section header. */
   badge?: string;
-  /** Default collapsed state (vertical only), seeded on first render. */
-  collapsed?: boolean;
   /** Default flex-grow weight when open, seeded on first render (default 1). */
   weight?: number;
 }
@@ -40,9 +38,22 @@ export class PaneView extends LitElement {
   @property({ type: String })
   orientation: PaneOrientation = 'vertical';
 
-  // Transient per-session state.
-  @state()
-  private _collapsed: Record<string, boolean> = {};
+  /** Collapsed sections, keyed by section id. Controlled by the consumer. */
+  @property({ attribute: false })
+  collapsed: Record<string, boolean> = {};
+
+  /**
+   * Pane sizes from the last drag (px), keyed `<orientation>:<section id>`.
+   * Relative only, and per axis — a width dragged in the horizontal dock says
+   * nothing about heights in the vertical one, so each orientation keeps its own
+   * sizes and the other's are left untouched.
+   */
+  @property({ attribute: false })
+  paneSizes: Record<string, number> = {};
+
+  // The current axis' weights, keyed by section id: seeded from `paneSizes`,
+  // then edited in place by a live drag until `pane-resize` hands the result
+  // back to the consumer.
   @state()
   private _weights: Record<string, number> = {};
 
@@ -52,6 +63,7 @@ export class PaneView extends LitElement {
     start: number;
     startA: number;
     startB: number;
+    moved: boolean;
   } | null = null;
 
   static styles = [
@@ -169,10 +181,25 @@ export class PaneView extends LitElement {
     `,
   ];
 
+  willUpdate(changed: PropertyValues): void {
+    // Adopt whatever the consumer stored for this axis; a drag then edits this
+    // copy. Re-docking flips the orientation on the same element, so that has to
+    // re-seed too or the previous axis' sizes would carry over.
+    if (changed.has('paneSizes') || changed.has('orientation')) {
+      const prefix = `${this.orientation}:`;
+      this._weights = Object.fromEntries(
+        Object.entries(this.paneSizes)
+          .filter(([key]) => key.startsWith(prefix))
+          .map(([key, size]) => [key.slice(prefix.length), size]),
+      );
+    }
+  }
+
   render() {
+    const weights = this._flexWeights();
     const items: TemplateResult[] = [];
     this.sections.forEach((section, index) => {
-      items.push(this._renderPane(section));
+      items.push(this._renderPane(section, weights.get(section.id) ?? 1));
       const next = this.sections[index + 1];
       if (next && this._isOpen(section.id) && this._isOpen(next.id)) {
         items.push(this._renderSash(section.id, next.id));
@@ -182,10 +209,38 @@ export class PaneView extends LitElement {
     return html`<div class="pane-view" data-orientation=${this.orientation}>${items}</div>`;
   }
 
-  private _renderPane(section: PaneSection) {
+  /**
+   * Flex weights for the open panes, all on one scale. Stored sizes are pixel
+   * snapshots taken during a drag while `section.weight` is a small unit share,
+   * so the stored set is rescaled onto the unit scale: mixing the two would
+   * render a section with no stored size — one added after the drag, or
+   * collapsed during it — as a sliver beside its pixel-sized siblings.
+   */
+  private _flexWeights(): Map<string, number> {
+    const open = this.sections.filter((section) => this._isOpen(section.id));
+    let storedPx = 0;
+    let storedUnits = 0;
+    for (const section of open) {
+      const stored = this._weights[section.id];
+      if (stored !== undefined) {
+        storedPx += stored;
+        storedUnits += section.weight ?? 1;
+      }
+    }
+    // px → units, and 0 when nothing is stored so every pane falls back to units.
+    const scale = storedPx > 0 ? storedUnits / storedPx : 0;
+    return new Map(
+      open.map((section) => {
+        const stored = this._weights[section.id];
+        const weight = stored !== undefined && scale > 0 ? stored * scale : (section.weight ?? 1);
+        return [section.id, weight];
+      }),
+    );
+  }
+
+  private _renderPane(section: PaneSection, weight: number) {
     const open = this._isOpen(section.id);
     const collapsible = this._collapsible;
-    const weight = this._weights[section.id] ?? section.weight ?? 1;
     const style = open ? `flex: ${weight} 1 0` : 'flex: 0 0 auto';
 
     return html`<div class="pane" data-id=${section.id} ?data-open=${open} style=${style}>
@@ -221,27 +276,20 @@ export class PaneView extends LitElement {
     return this.orientation === 'vertical';
   }
 
-  /** Section's `collapsed` default (when the user hasn't toggled it yet). */
-  private _defaultCollapsed(id: string): boolean {
-    return this.sections.find((s) => s.id === id)?.collapsed ?? false;
-  }
-
   private _isOpen(id: string) {
-    return this._collapsible ? !(this._collapsed[id] ?? this._defaultCollapsed(id)) : true;
+    return this._collapsible ? !this.collapsed[id] : true;
   }
 
   private _toggle(id: string) {
     // New collapsed state = the current open state (open → collapse, and vice
-    // versa), starting from the effective (possibly default) state.
-    this._collapsed = { ...this._collapsed, [id]: this._isOpen(id) };
+    // versa). The consumer owns the record, so it re-renders us with the new one.
     this.dispatchEvent(
       new CustomEvent('pane-toggle', {
-        detail: { collapsed: this._collapsed },
+        detail: { collapsed: { ...this.collapsed, [id]: this._isOpen(id) } },
         bubbles: true,
         composed: true,
       }),
     );
-    this.requestUpdate();
   }
 
   private _onHeaderKey(e: KeyboardEvent, id: string) {
@@ -279,9 +327,12 @@ export class PaneView extends LitElement {
       start: this.orientation === 'vertical' ? e.clientY : e.clientX,
       startA: this._weights[aId] ?? 0,
       startB: this._weights[bId] ?? 0,
+      moved: false,
     };
     sash.addEventListener('pointermove', this._onSashMove);
     sash.addEventListener('pointerup', this._endSash);
+    sash.addEventListener('pointercancel', this._cancelSash);
+    sash.addEventListener('lostpointercapture', this._onLostCapture);
   }
 
   private _onSashMove = (e: PointerEvent) => {
@@ -293,23 +344,66 @@ export class PaneView extends LitElement {
     const total = sash.startA + sash.startB;
     const delta = pos - sash.start;
     const newA = Math.max(MIN_PANE_PX, Math.min(sash.startA + delta, total - MIN_PANE_PX));
+    sash.moved = true;
     this._weights = { ...this._weights, [sash.aId]: newA, [sash.bId]: total - newA };
-    this.requestUpdate();
   };
 
   private _endSash = (e: PointerEvent) => {
-    const sashEl = e.currentTarget as HTMLElement;
-    sashEl.releasePointerCapture(e.pointerId);
+    const moved = this._sash?.moved ?? false;
+    // A click that never moved changed no size, so it isn't worth persisting —
+    // and a double-click reset would otherwise emit three times.
+    if (this._teardownSash(e.currentTarget as HTMLElement, e.pointerId) && moved) {
+      this._emitResize();
+    }
+  };
+
+  /** An interrupted gesture (OS gesture, touch cancel) undoes the drag. */
+  private _cancelSash = (e: PointerEvent) => {
+    const sash = this._sash;
+    if (sash) {
+      this._weights = { ...this._weights, [sash.aId]: sash.startA, [sash.bId]: sash.startB };
+    }
+    this._teardownSash(e.currentTarget as HTMLElement, e.pointerId);
+  };
+
+  // Capture lost without a pointerup (window blur, another element capturing):
+  // stop tracking, or a later move would resize with no button held.
+  private _onLostCapture = (e: PointerEvent) => {
+    this._teardownSash(e.currentTarget as HTMLElement, e.pointerId);
+  };
+
+  /** Detaches the drag; false if it had already ended. */
+  private _teardownSash(sashEl: HTMLElement, pointerId: number): boolean {
+    if (!this._sash) {
+      return false;
+    }
+    this._sash = null;
+    if (sashEl.hasPointerCapture(pointerId)) {
+      sashEl.releasePointerCapture(pointerId);
+    }
     sashEl.classList.remove('pane-sash--active');
     sashEl.removeEventListener('pointermove', this._onSashMove);
     sashEl.removeEventListener('pointerup', this._endSash);
-    this._sash = null;
-  };
+    sashEl.removeEventListener('pointercancel', this._cancelSash);
+    sashEl.removeEventListener('lostpointercapture', this._onLostCapture);
+    return true;
+  }
 
   private _resetSash(aId: string, bId: string) {
     const total =
       (this._weights[aId] ?? this._paneSize(aId)) + (this._weights[bId] ?? this._paneSize(bId));
     this._weights = { ...this._weights, [aId]: total / 2, [bId]: total / 2 };
-    this.requestUpdate();
+    this._emitResize();
+  }
+
+  /** Fires on interaction-end only, so the consumer's write isn't per-frame. */
+  private _emitResize() {
+    // Only this axis' keys, so merging keeps the other orientation's sizes.
+    const sizes = Object.fromEntries(
+      Object.entries(this._weights).map(([id, size]) => [`${this.orientation}:${id}`, size]),
+    );
+    this.dispatchEvent(
+      new CustomEvent('pane-resize', { detail: { sizes }, bubbles: true, composed: true }),
+    );
   }
 }
