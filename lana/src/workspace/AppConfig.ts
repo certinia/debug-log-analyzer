@@ -111,6 +111,16 @@ export function getConfig(): Config {
   const plainConfig = JSON.parse(JSON.stringify(config));
   // Override the customThemes with the merged themes, to exclude defaults
   plainConfig.timeline.customThemes = userThemes;
+  // `lana.database.*` is private globalState, not a registered setting, so the merged
+  // tree has no `database` branch at all on a profile that never wrote one (every
+  // fresh install). Seed the shape `Config` promises before callers fill it in.
+  const database = plainConfig.database ?? {};
+  plainConfig.database = Object.fromEntries(
+    (['soql', 'dml', 'sosl'] as const).map((view) => [
+      view,
+      { columnView: 'General', columnOverrides: {}, ...database[view] },
+    ]),
+  );
   // The webview cannot see the workbench's chrome mode, so resolve `auto` here and
   // send it a concrete value.
   plainConfig.appearance = { chrome: resolveChrome(plainConfig.appearance?.chrome) };
