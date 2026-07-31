@@ -27,6 +27,7 @@ import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
+import type { ProgressParams } from '../tabulator/format/ProgressMS.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
@@ -113,6 +114,23 @@ export class CallTreeDetail extends LitElement {
     'bottom-up': null,
   };
 
+  /** Modes whose table holds a previous selection's rows, so it needs re-filling
+   *  before it is shown again. */
+  private _stale = new Set<ViewMode>();
+
+  /**
+   * The bar/percentage params, shared by every column of every mode table and
+   * mutated in place per selection. Tabulator reads `formatterParams` by
+   * reference at render time, so this keeps the column definitions
+   * selection-independent — which is what lets a new selection re-fill a table
+   * with `setData` instead of rebuilding it.
+   */
+  private readonly _barParams: ProgressParams = {
+    precision: 2,
+    totalValue: 0,
+    showPercentageText: true,
+  };
+
   // The scoped tree (all three representations) for the current eventIndex,
   // computed once per selection and shared across the mode tables.
   private _scoped: ScopedCallTree | null = null;
@@ -187,11 +205,16 @@ export class CallTreeDetail extends LitElement {
   updated(changed: PropertyValues) {
     const scopeChanged = changed.has('eventIndex') || changed.has('instances');
     if (scopeChanged) {
-      // The scoped root changed — drop every table so each rebuilds on demand.
+      // The scoped root changed — mark every built table stale so each is
+      // re-filled on demand, rather than destroyed and rebuilt.
       // `_scoped` is only invalidated here and only rebuilt in `_showActive`,
       // past its paint yield — never before it.
-      this._destroyTables();
       this._scoped = null;
+      for (const mode of Object.keys(this._tables) as ViewMode[]) {
+        if (this._tables[mode]) {
+          this._stale.add(mode);
+        }
+      }
     }
     if (scopeChanged || changed.has('viewMode')) {
       void this._showActive();
@@ -208,6 +231,7 @@ export class CallTreeDetail extends LitElement {
       this._tables[mode]?.destroy();
       this._tables[mode] = null;
     }
+    this._stale.clear();
   }
 
   private async _showActive(): Promise<void> {
@@ -226,7 +250,7 @@ export class CallTreeDetail extends LitElement {
 
     const mode = this.viewMode;
     const existing = this._tables[mode];
-    if (existing) {
+    if (existing && !this._stale.has(mode)) {
       existing.redraw(); // re-fit the layout for the now-visible host
       return;
     }
@@ -235,6 +259,22 @@ export class CallTreeDetail extends LitElement {
     // the rest of the panel paint before this potentially expensive walk runs.
     this._scoped ??= buildScopedCallTree(this.eventIndex, this.instances);
     const scoped = this._scoped;
+    // Percentages are relative to the selection, so retarget the shared params
+    // the formatters read rather than rebuilding the columns around a new total.
+    this._barParams.totalValue = scoped?.rootTotal ?? 0;
+    const data = !scoped
+      ? []
+      : mode === 'time-order'
+        ? scoped.timeOrder
+        : mode === 'aggregated'
+          ? scoped.aggregated
+          : scoped.bottomUp;
+
+    if (existing) {
+      this._stale.delete(mode);
+      void existing.setData(data);
+      return;
+    }
     if (!scoped) {
       return;
     }
@@ -242,13 +282,6 @@ export class CallTreeDetail extends LitElement {
     if (!container) {
       return;
     }
-
-    const data =
-      mode === 'time-order'
-        ? scoped.timeOrder
-        : mode === 'aggregated'
-          ? scoped.aggregated
-          : scoped.bottomUp;
 
     registerTableModules();
     const table = new Tabulator(container, {
@@ -273,7 +306,7 @@ export class CallTreeDetail extends LitElement {
       ...clipboardCopyOptions,
       headerSortElement,
       columnDefaults: commonColumnDefaults,
-      columns: this._columns(mode, scoped.rootTotal),
+      columns: this._columns(mode, progressColumnWidth(scoped.logTotal)),
       // Time Order stays chronological — that's what the mode is for. The
       // grouped modes lead with their ranking metric, as the Call Tree tab's
       // Bottom-Up does; either way the headers stay sortable.
@@ -330,10 +363,14 @@ export class CallTreeDetail extends LitElement {
     this._contextMenu.show(PANEL_ROW_MENU_ITEMS, event.clientX, event.clientY);
   }
 
-  private _columns(mode: ViewMode, rootTotal: number): ColumnDefinition[] {
+  /**
+   * `barWidth` is sized from the whole log rather than the selection, so the bar
+   * columns keep one width as the selection changes — and never have to grow for
+   * a wider total.
+   */
+  private _columns(mode: ViewMode, barWidth: number): ColumnDefinition[] {
     const isTimeOrder = mode === 'time-order';
-    const barParams = { precision: 2, totalValue: rootTotal, showPercentageText: true };
-    const barWidth = progressColumnWidth(rootTotal);
+    const barParams = this._barParams;
 
     const columns: ColumnDefinition[] = [
       {

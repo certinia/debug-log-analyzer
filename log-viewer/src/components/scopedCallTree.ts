@@ -29,6 +29,10 @@ export interface ScopedRow {
 export interface ScopedCallTree {
   /** The selected node's total time (ns) — the % denominator for the bars. */
   rootTotal: number;
+  /** The whole log's total time (ns). Every selection's `rootTotal` fits inside
+   *  it, so it sizes the bar columns once for the log instead of per selection —
+   *  the widths then stay put as the selection changes. */
+  logTotal: number;
   /** The three views are built on first read and cached (only one is visible). */
   readonly timeOrder: ScopedRow[];
   readonly aggregated: ScopedRow[];
@@ -130,6 +134,7 @@ export function buildScopedCallTree(
   let bottomUp: ScopedRow[] | null = null;
   return {
     rootTotal,
+    logTotal: apexLog.duration.total,
     get timeOrder(): ScopedRow[] {
       // Many occurrences usually share ancestors, so merge the paths for a
       // readable tree; a single occurrence keeps its exact chain.

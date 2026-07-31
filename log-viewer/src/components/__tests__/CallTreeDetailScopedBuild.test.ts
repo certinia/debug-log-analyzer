@@ -9,26 +9,61 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 jest.mock('../../tabulator/style/DataGrid.scss', () => ({ default: '' }));
 jest.mock('../../tabulator/format/Progress.css', () => ({}));
 // The tabulator ESM build (+ its module registrations) doesn't load under jest;
-// the mocked walk returns null so no table is ever built here.
-jest.mock('tabulator-tables', () => ({
-  Tabulator: class {
+// this stub records what the component does to a table instead.
+jest.mock('tabulator-tables', () => {
+  class Tabulator {
     static registerModule() {}
-  },
-  Module: class {},
-  Renderer: class {},
-}));
+    static instances: Tabulator[] = [];
+    setData = jest.fn(() => Promise.resolve());
+    redraw = jest.fn();
+    destroy = jest.fn();
+    on = jest.fn();
+    options: Record<string, unknown>;
+    constructor(_element: HTMLElement, options: Record<string, unknown>) {
+      this.options = options;
+      Tabulator.instances.push(this);
+    }
+  }
+  return { Tabulator, Module: class {}, Renderer: class {} };
+});
 // vscode-button needs ElementInternals.setFormValue (absent in jsdom).
 jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 
-// The walk is what this suite times, so it's stubbed; null keeps the build from
-// reaching Tabulator.
+// The walk is what this suite is about, so it's stubbed; each test says whether
+// it yields a tree or nothing.
 jest.mock('../scopedCallTree.js', () => ({ buildScopedCallTree: jest.fn(() => null) }));
+
+import { Tabulator } from 'tabulator-tables';
 
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
-import { buildScopedCallTree } from '../scopedCallTree.js';
+import { buildScopedCallTree, type ScopedCallTree } from '../scopedCallTree.js';
+import type { ProgressParams } from '../../tabulator/format/ProgressMS.js';
 
 const build = jest.mocked(buildScopedCallTree);
+
+interface StubTable {
+  options: { columns: Array<{ field: string; formatterParams: ProgressParams; width: number }> };
+  setData: jest.Mock;
+  redraw: jest.Mock;
+  destroy: jest.Mock;
+}
+
+/** The stub tables built so far, oldest first. */
+const tables = Tabulator as unknown as { instances: StubTable[] };
+
+/** A scoped tree with no rows — only its totals matter to these tests. */
+function tree(rootTotal: number): ScopedCallTree {
+  return { rootTotal, logTotal: 5_000_000, timeOrder: [], aggregated: [], bottomUp: [] };
+}
+
+function totalColumn(table: StubTable) {
+  const column = table.options.columns.find((c) => c.field === 'duration.total');
+  if (!column) {
+    throw new Error('Total column not built');
+  }
+  return column;
+}
 
 /** Lets the rAF the build waits behind fire, then settles the render. */
 async function frame(el: CallTreeDetail): Promise<void> {
@@ -46,8 +81,10 @@ async function mount(eventIndex: number): Promise<CallTreeDetail> {
 
 describe('CallTreeDetail scoped build', () => {
   beforeEach(() => {
-    build.mockClear();
     document.body.replaceChildren();
+    build.mockReset();
+    build.mockReturnValue(null);
+    tables.instances.length = 0;
   });
 
   it('defers the walk past the paint yield', async () => {
@@ -69,5 +106,41 @@ describe('CallTreeDetail scoped build', () => {
     // superseded one before it can pay for a walk nobody is waiting on.
     await frame(el);
     expect(build.mock.calls).toEqual([[6, null]]);
+  });
+
+  it('re-fills the built table for a new selection instead of rebuilding it', async () => {
+    build.mockImplementation((eventIndex) => tree(eventIndex * 1000));
+    const el = await mount(5);
+    await frame(el);
+    expect(tables.instances).toHaveLength(1);
+    const table = tables.instances[0]!;
+
+    el.eventIndex = 6;
+    await el.updateComplete;
+    await frame(el);
+
+    // Same table, re-filled — a Tabulator is expensive to construct, and its
+    // construction is what used to land on the selection's critical path.
+    expect(tables.instances).toHaveLength(1);
+    expect(table.destroy).not.toHaveBeenCalled();
+    expect(table.setData).toHaveBeenCalledTimes(1);
+  });
+
+  it('retargets the percentage denominator without touching the bar width', async () => {
+    build.mockImplementation((eventIndex) => tree(eventIndex * 1000));
+    const el = await mount(5);
+    await frame(el);
+    const column = totalColumn(tables.instances[0]!);
+    const widthAtBuild = column.width;
+    expect(column.formatterParams.totalValue).toBe(5000);
+
+    el.eventIndex = 6;
+    await el.updateComplete;
+    await frame(el);
+
+    // The formatters read these params by reference at render time, so the new
+    // selection's total reaches the bars with the columns left as they were.
+    expect(column.formatterParams.totalValue).toBe(6000);
+    expect(column.width).toBe(widthAtBuild);
   });
 });
