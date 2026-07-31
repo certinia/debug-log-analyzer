@@ -108,15 +108,13 @@ export class CallTreeDetail extends LitElement {
   @state()
   private viewMode: ViewMode = 'time-order';
 
-  private _tables: Record<ViewMode, Tabulator | null> = {
+  /** A built table. `stale` means it holds a previous selection's rows, so it
+   *  needs re-filling before it is shown again. */
+  private _tables: Record<ViewMode, { table: Tabulator; stale: boolean } | null> = {
     'time-order': null,
     aggregated: null,
     'bottom-up': null,
   };
-
-  /** Modes whose table holds a previous selection's rows, so it needs re-filling
-   *  before it is shown again. */
-  private _stale = new Set<ViewMode>();
 
   /**
    * The bar/percentage params, shared by every column of every mode table and
@@ -210,9 +208,9 @@ export class CallTreeDetail extends LitElement {
       // `_scoped` is only invalidated here and only rebuilt in `_showActive`,
       // past its paint yield — never before it.
       this._scoped = null;
-      for (const mode of Object.keys(this._tables) as ViewMode[]) {
-        if (this._tables[mode]) {
-          this._stale.add(mode);
+      for (const slot of Object.values(this._tables)) {
+        if (slot) {
+          slot.stale = true;
         }
       }
     }
@@ -228,10 +226,9 @@ export class CallTreeDetail extends LitElement {
 
   private _destroyTables() {
     for (const mode of Object.keys(this._tables) as ViewMode[]) {
-      this._tables[mode]?.destroy();
+      this._tables[mode]?.table.destroy();
       this._tables[mode] = null;
     }
-    this._stale.clear();
   }
 
   private async _showActive(): Promise<void> {
@@ -249,9 +246,9 @@ export class CallTreeDetail extends LitElement {
     }
 
     const mode = this.viewMode;
-    const existing = this._tables[mode];
-    if (existing && !this._stale.has(mode)) {
-      existing.redraw(); // re-fit the layout for the now-visible host
+    const slot = this._tables[mode];
+    if (slot && !slot.stale) {
+      slot.table.redraw(); // re-fit the layout for the now-visible host
       return;
     }
 
@@ -262,22 +259,28 @@ export class CallTreeDetail extends LitElement {
     // Percentages are relative to the selection, so retarget the shared params
     // the formatters read rather than rebuilding the columns around a new total.
     this._barParams.totalValue = scoped?.rootTotal ?? 0;
-    const data = !scoped
-      ? []
-      : mode === 'time-order'
+    if (!scoped) {
+      // Nothing in scope: empty a built table, and there is nothing to size a
+      // new one against.
+      if (slot) {
+        slot.stale = false;
+        void slot.table.setData([]);
+      }
+      return;
+    }
+
+    const data =
+      mode === 'time-order'
         ? scoped.timeOrder
         : mode === 'aggregated'
           ? scoped.aggregated
           : scoped.bottomUp;
+    if (slot) {
+      slot.stale = false;
+      void slot.table.setData(data);
+      return;
+    }
 
-    if (existing) {
-      this._stale.delete(mode);
-      void existing.setData(data);
-      return;
-    }
-    if (!scoped) {
-      return;
-    }
     const container = this.renderRoot?.querySelector<HTMLDivElement>(`#${mode}-tree`);
     if (!container) {
       return;
@@ -338,7 +341,7 @@ export class CallTreeDetail extends LitElement {
     table.on('rowContext', (e, row) => {
       this._showRowMenu(e as MouseEvent, row, table);
     });
-    this._tables[mode] = table;
+    this._tables[mode] = { table, stale: false };
   }
 
   /** Row right-click menu: reveal in the Call Tree tab, or copy the frame. */
@@ -400,7 +403,7 @@ export class CallTreeDetail extends LitElement {
         field: 'duration.self',
         barWidth,
         barParams,
-        bottomCalc: makeSumSelfTimeAllVisible(() => this._tables[mode] ?? undefined),
+        bottomCalc: makeSumSelfTimeAllVisible(() => this._tables[mode]?.table),
       }),
     ];
 
