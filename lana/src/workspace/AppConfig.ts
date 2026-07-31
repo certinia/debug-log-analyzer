@@ -4,7 +4,7 @@
 
 import { ConfigurationTarget, workspace, type Memento } from 'vscode';
 
-interface Config {
+export interface Config {
   timeline: {
     activeTheme: string;
     colors: {
@@ -43,6 +43,10 @@ interface Config {
     dml: { columnView: string; columnOverrides: Record<string, string[]> };
     sosl: { columnView: string; columnOverrides: Record<string, string[]> };
   };
+  appearance: {
+    /** Resolved panel chrome for the webview — never the raw `auto` setting. */
+    chrome: 'cards' | 'flat';
+  };
   // The app-wide inspector, fed by a selection on any tab.
   inspector: {
     position: 'left' | 'right' | 'bottom';
@@ -52,6 +56,44 @@ interface Config {
     paneSizes: Record<string, number>;
     visible: boolean | null;
   };
+}
+
+const MODERN_KEY = /modern.?ui|floating.?panels?/i;
+const MODERN_VALUE = /^(modern|floating|cards?)$/i;
+
+/**
+ * Detects VS Code's modern/floating-panels chrome without hardcoding the
+ * experiment's setting id — it has been renamed once already (the shipped
+ * migration table maps `workbench.experimental.floatingPanels` to
+ * `workbench.experimental.modernUI`) and will be renamed again on graduation.
+ *
+ * Matches a name pattern over the `workbench` config value tree, requiring an
+ * on-looking value (`true`, or an enum such as `modern`/`cards`) so an unrelated
+ * future `workbench.*modern*` setting cannot turn cards on by accident.
+ * `lana.appearance.chrome` is the user-facing backstop if one ever does.
+ */
+function detectModernChrome(): boolean {
+  const walk = (value: unknown, depth: number): boolean =>
+    depth <= 2 &&
+    !!value &&
+    typeof value === 'object' &&
+    Object.entries(value).some(
+      ([key, child]) =>
+        (MODERN_KEY.test(key) &&
+          (child === true || (typeof child === 'string' && MODERN_VALUE.test(child)))) ||
+        walk(child, depth + 1),
+    );
+  // The value tree, not the `getConfiguration('workbench')` wrapper: it is a plain
+  // merged object, so it carries no `has`/`get`/`update`/`inspect` keys to skip.
+  return walk(workspace.getConfiguration().get('workbench'), 0);
+}
+
+/** `auto` (the default) follows the host; `cards`/`flat` pin the chrome. */
+function resolveChrome(setting: unknown): 'cards' | 'flat' {
+  if (setting === 'cards' || setting === 'flat') {
+    return setting;
+  }
+  return detectModernChrome() ? 'cards' : 'flat';
 }
 
 export function getConfig(): Config {
@@ -69,6 +111,9 @@ export function getConfig(): Config {
   const plainConfig = JSON.parse(JSON.stringify(config));
   // Override the customThemes with the merged themes, to exclude defaults
   plainConfig.timeline.customThemes = userThemes;
+  // The webview cannot see the workbench's chrome mode, so resolve `auto` here and
+  // send it a concrete value.
+  plainConfig.appearance = { chrome: resolveChrome(plainConfig.appearance?.chrome) };
   return plainConfig;
 }
 

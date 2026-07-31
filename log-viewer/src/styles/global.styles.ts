@@ -8,19 +8,19 @@ export const globalStyles = css`
        copies. */
     --filter-control-height: 22px;
     --filter-control-font-size: 11px;
-    --filter-control-padding: 0 8px;
-    --filter-control-radius: 4px;
+    --filter-control-padding: 0 var(--lana-space-8);
+    --filter-control-radius: var(--lana-radius-sm);
     --filter-control-border-color: var(--vscode-settings-dropdownBorder, #3c3c3c);
     --filter-control-bg: var(--vscode-settings-dropdownBackground, #313131);
 
     /* Popover design tokens — facet/range/select/context-menu popovers all
        consume these so they render as one family. */
     --filter-popover-bg: var(--vscode-menu-background, var(--vscode-editor-background));
-    --filter-popover-border-color: var(--vscode-menu-border, var(--divider-background));
-    --filter-popover-radius: 6px;
-    --filter-popover-shadow: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+    --filter-popover-border-color: var(--vscode-menu-border, var(--lana-surface-border));
+    --filter-popover-radius: var(--lana-radius-md);
+    --filter-popover-shadow: var(--lana-shadow-popover);
     --filter-popover-row-font-size: 12px;
-    --filter-popover-row-padding: 4px 8px;
+    --filter-popover-row-padding: var(--lana-space-4) var(--lana-space-8);
 
     /* Label column width shared by every filter's overflow-panel row (facet,
        range, select) so their labels + controls line up as one form. */
@@ -85,7 +85,8 @@ export const globalStyles = css`
   /* Native checkbox: box background/border never change on check (matching
      vscode-checkbox) — only a currentColor tick appears on top, drawn with
      the same tick path vscode-checkbox uses via mask-image so it scales
-     cleanly instead of being clipped out of a filled square. */
+     cleanly instead of being clipped out of a filled square. The 16px box and
+     3px radius are vscode-checkbox's own metrics, not the --lana-* scale. */
   .vs-checkbox {
     box-sizing: border-box;
     appearance: none;
@@ -93,7 +94,8 @@ export const globalStyles = css`
     width: 16px;
     height: 16px;
     flex-shrink: 0;
-    border: 1px solid var(--vscode-checkbox-border, var(--vscode-settings-dropdownBorder, #6b6b6b));
+    border: var(--lana-stroke) solid
+      var(--vscode-checkbox-border, var(--vscode-settings-dropdownBorder, #6b6b6b));
     border-radius: 3px;
     background-color: var(--vscode-checkbox-background, #313131);
     cursor: pointer;
@@ -123,7 +125,7 @@ export const globalStyles = css`
   .vs-checkbox-label {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--lana-space-6);
     font-size: 11px;
     cursor: pointer;
   }
@@ -138,9 +140,9 @@ export const globalStyles = css`
     height: var(--filter-control-height);
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--lana-space-4);
     padding: var(--filter-control-padding);
-    border: 1px solid var(--filter-control-border-color);
+    border: var(--lana-stroke) solid var(--filter-control-border-color);
     border-radius: var(--filter-control-radius);
     background-color: var(--filter-control-bg);
     color: var(--vscode-foreground);
@@ -187,7 +189,7 @@ export const globalStyles = css`
      class for the look. */
   .filter-popover {
     background-color: var(--filter-popover-bg);
-    border: 1px solid var(--filter-popover-border-color);
+    border: var(--lana-stroke) solid var(--filter-popover-border-color);
     border-radius: var(--filter-popover-radius);
     box-shadow: var(--filter-popover-shadow);
     color: var(--vscode-menu-foreground, var(--vscode-foreground));
@@ -196,7 +198,7 @@ export const globalStyles = css`
 
   .filter-popover-row {
     padding: var(--filter-popover-row-padding);
-    border-radius: 4px;
+    border-radius: var(--lana-radius-sm);
     font-size: var(--filter-popover-row-font-size);
     cursor: pointer;
   }

@@ -26,6 +26,12 @@ export class VSCodeExtensionMessenger {
 
   public getVsCodeAPI<T>(): VSCodeAPI<T> | null {
     if (!VSCodeExtensionMessenger.vscode) {
+      // Only the extension host injects this. Outside a webview (standalone browser
+      // host) every caller already handles a null API, so degrade to no-op
+      // messaging instead of throwing.
+      if (typeof acquireVsCodeApi !== 'function') {
+        return null;
+      }
       VSCodeExtensionMessenger.vscode = acquireVsCodeApi();
     }
     return VSCodeExtensionMessenger.vscode;

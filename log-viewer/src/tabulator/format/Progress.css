@@ -7,7 +7,7 @@
   height: 100%;
   opacity: 0.3;
   right: 0;
-  background: #a97d0f;
+  background: var(--vscode-progressBar-background);
 }
 .progress-bar__text {
   position: relative;

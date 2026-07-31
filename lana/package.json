@@ -367,6 +367,31 @@
             "order": 1
           }
         }
+      },
+      {
+        "type": "object",
+        "id": "lana",
+        "title": "Appearance",
+        "order": 4,
+        "properties": {
+          "lana.appearance.chrome": {
+            "title": "Chrome",
+            "type": "string",
+            "default": "auto",
+            "enum": [
+              "auto",
+              "cards",
+              "flat"
+            ],
+            "enumDescriptions": [
+              "Match the workbench: cards when VS Code's modern (floating panels) chrome is on, otherwise flat.",
+              "Always draw panels as floating cards with rounded corners and gaps.",
+              "Always draw panels flat, separated by hairline dividers."
+            ],
+            "markdownDescription": "How the log view draws its panels. Default: `auto`",
+            "order": 0
+          }
+        }
       }
     ]
   },

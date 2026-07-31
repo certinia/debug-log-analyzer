@@ -266,17 +266,3 @@ export const METRIC_STRIP_TIME_GRID_OPACITY = 0.3;
  * Width of the expand/collapse toggle area on the left side.
  */
 export const METRIC_STRIP_TOGGLE_WIDTH = 20;
-
-/**
- * Toggle button colors.
- */
-export const METRIC_STRIP_TOGGLE_COLORS = {
-  /** Background when not hovered. */
-  background: 0x333333,
-  /** Background when hovered. */
-  backgroundHover: 0x444444,
-  /** Chevron icon color. */
-  icon: 0xcccccc,
-  /** Chevron icon color when hovered. */
-  iconHover: 0xffffff,
-} as const;

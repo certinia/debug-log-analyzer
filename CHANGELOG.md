@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Filter by **Namespace**, **Object** or **Caller Namespace**, or by a **Row Count** / **Time Taken** min–max range; active filters are highlighted.
   - Collapse behind a **Filter** button on narrow window. ([#873])
 - 🔴 **Timeline exception markers**: exceptions show as red lines, with a **Throws** count in method tooltips. ([#828])
+- 🎨 **Live theming**: switching color theme or turning on high contrast now recolors the whole UI instantly — including the Timeline's canvas-drawn cursor line, find matches, selection, axis, tooltips, minimap and governor strip. No reopening the panel, and large logs are never re-rendered from scratch.
+- 🪟 **Modern VS Code chrome**: when VS Code draws side bars and panels as floating cards, the log view matches it — rounded panes, gaps instead of hairline dividers, and the host's own radius, spacing and surface colors. Detected automatically; `lana.appearance.chrome` (`auto` / `cards` / `flat`) overrides it.
 
 ### Changed
 

@@ -17,6 +17,7 @@ import {
 } from '../../core/messaging/VSCodeExtensionMessenger.js';
 import { DatabaseAccess } from '../database/services/Database.js';
 import type { LogIssue } from '../notifications/types.js';
+import { getSettings, onSettingsChanged, type LanaSettings } from '../settings/Settings.js';
 import { toLogIssue } from './logIssues.js';
 import { parserIssuesToNotifications } from './parserNotifications.js';
 
@@ -78,7 +79,8 @@ export class LogViewer extends LitElement {
            log-levels row) can detect overflow rather than widening the page.
            clip (not hidden) avoids forcing overflow-y to auto. */
         overflow-x: clip;
-        padding: 0px 8px 0px 8px;
+        /* Half of the x=16 guide the header and tabs share (see AppHeader). */
+        padding: 0 var(--lana-space-8);
       }
 
       vscode-tabs {
@@ -102,6 +104,13 @@ export class LogViewer extends LitElement {
            panel can sit flush to the window edge. */
         box-shadow: inset 0 calc(max(1px, 0.0625rem) * 1)
           var(--vscode-panelSectionHeader-background);
+        /* Cards: the panel is a card hanging off the tab strip, so it keeps the
+           strip's seam at the top and rounds the two free corners. Flat leaves
+           --lana-panel-border transparent and the gap at 0, so nothing shows. */
+        border: var(--lana-stroke) solid var(--lana-panel-border);
+        border-top: none;
+        border-radius: 0 0 var(--lana-panel-radius) var(--lana-panel-radius);
+        margin-bottom: var(--lana-panel-gap);
       }
 
       /* icon + label as one flex row, like the toolkit's tabs; also restores
@@ -122,6 +131,15 @@ export class LogViewer extends LitElement {
     super();
     vscodeMessenger.request<LogDataEvent>('fetchLog').then((msg) => {
       this._handleLogFetch(msg);
+    });
+
+    // Panel chrome lives on documentElement, not this host: the `--lana-panel-*`
+    // tokens are defined at document level so they inherit into every shadow root.
+    getSettings().then((settings) => {
+      this._applyChrome(settings);
+    });
+    onSettingsChanged((settings) => {
+      this._applyChrome(settings);
     });
 
     document.addEventListener('show-tab', (e: Event) => {
@@ -187,6 +205,15 @@ export class LogViewer extends LitElement {
             <database-view .timelineRoot="${this.timelineRoot}"></database-view>
           </vscode-tab-panel> </vscode-tabs
       ></log-inspector>`;
+  }
+
+  /**
+   * A webview cannot see the workbench's chrome mode, so the extension resolves it
+   * (`lana.appearance.chrome`, or VS Code's modern/floating-panels experiment) and
+   * sends it here. No message ⇒ `flat`, today's look.
+   */
+  private _applyChrome(settings: LanaSettings) {
+    document.documentElement.dataset.chrome = settings.appearance?.chrome ?? 'flat';
   }
 
   _onTabSelect(e: VscTabsSelectEvent) {

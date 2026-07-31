@@ -40,14 +40,14 @@ export class AppHeader extends LitElement {
     globalStyles,
     css`
       :host {
-        background-color: var(--vscode-tab-activeBackground);
+        background-color: var(--lana-header-bg);
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: var(--lana-space-2);
         min-width: 0;
         /* Match the tabs' box inset (LogViewer 8px + this 8px == tabs' 8px + their internal
            8px) so the log-title, first level chip, and first tab share one left/right guide. */
-        padding: 0 8px;
+        padding: 0 var(--lana-space-8);
       }
     `,
   ];

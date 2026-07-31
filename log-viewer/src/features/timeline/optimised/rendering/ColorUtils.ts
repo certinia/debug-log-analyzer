@@ -120,6 +120,17 @@ export function rgbToABGR(color: number, alpha: number = 1.0): number {
   return (a << 24) | (b << 16) | (g << 8) | r;
 }
 
+/**
+ * Convert a 0xRRGGBB color back to a CSS hex string.
+ * Needed by the Pixi APIs that take text colors as strings.
+ *
+ * @param color - Color in 0xRRGGBB format
+ * @returns CSS hex string, e.g. `#808080`
+ */
+export function pixiToCssHex(color: number): string {
+  return `#${color.toString(16).padStart(6, '0')}`;
+}
+
 // ============================================================================
 // COLOR BLENDING UTILITIES
 // ============================================================================

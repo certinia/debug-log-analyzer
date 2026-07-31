@@ -8,7 +8,6 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { formatSOQLToTemplate } from '../features/soql/format/formatter.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { panelTokens } from './panelTokens.js';
 
 export type CodeLanguage = 'soql' | 'sosl' | 'plain';
 
@@ -31,7 +30,6 @@ export class CodeBlock extends LitElement {
 
   static styles = [
     globalStyles,
-    panelTokens,
     unsafeCSS(soqlSyntaxStyles),
     css`
       :host {
@@ -41,9 +39,9 @@ export class CodeBlock extends LitElement {
       .code-block {
         position: relative;
         overflow: auto;
-        padding: var(--space-2);
+        padding: var(--lana-space-8);
         border: 1px solid var(--vscode-widget-border, transparent);
-        border-radius: var(--panel-radius);
+        border-radius: var(--lana-radius-sm);
         background-color: var(--vscode-textCodeBlock-background, var(--vscode-editor-background));
       }
 
@@ -57,8 +55,8 @@ export class CodeBlock extends LitElement {
 
       .copy {
         position: absolute;
-        top: var(--space-1);
-        right: var(--space-1);
+        top: var(--lana-space-4);
+        right: var(--lana-space-4);
         opacity: 0;
         transition: opacity 0.1s ease;
         color: var(--vscode-icon-foreground);

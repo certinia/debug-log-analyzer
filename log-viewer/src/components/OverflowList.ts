@@ -159,14 +159,14 @@ export class OverflowList extends LitElement {
           flip-inline,
           flip-block flip-inline;
         inset: auto;
-        margin: 6px 0 0 0;
+        margin: var(--lana-space-6) 0 0 0;
         min-width: 200px;
         max-width: min(92vw, 340px);
-        padding: 6px;
+        padding: var(--lana-space-6);
         background-color: var(--vscode-menu-background, var(--vscode-editor-background));
-        border: 1px solid var(--vscode-menu-border, var(--divider-background));
-        border-radius: 6px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+        border: var(--lana-stroke) solid var(--vscode-menu-border, var(--lana-surface-border));
+        border-radius: var(--lana-radius-md);
+        box-shadow: var(--lana-shadow-popover);
         color: var(--vscode-menu-foreground, var(--vscode-foreground));
         font-family: var(--vscode-font-family);
       }

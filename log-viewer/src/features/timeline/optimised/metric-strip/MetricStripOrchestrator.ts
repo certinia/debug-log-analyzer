@@ -319,6 +319,17 @@ export class MetricStripOrchestrator {
   }
 
   /**
+   * Set the toggle chevron colors after a host theme change.
+   *
+   * @param color - Resting icon color (0xRRGGBB)
+   * @param hoverColor - Icon color while the toggle is hovered (0xRRGGBB)
+   */
+  public setToggleIconColors(color: number, hoverColor: number): void {
+    this.renderer?.setToggleIconColors(color, hoverColor);
+    this.callbacks.requestRender();
+  }
+
+  /**
    * Check if there's data to render.
    */
   public hasData(): boolean {

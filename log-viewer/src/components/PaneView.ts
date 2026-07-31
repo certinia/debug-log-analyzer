@@ -8,7 +8,6 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 // styles
 import { globalStyles } from '../styles/global.styles.js';
-import { panelTokens } from './panelTokens.js';
 
 export interface PaneSection {
   id: string;
@@ -68,7 +67,6 @@ export class PaneView extends LitElement {
 
   static styles = [
     globalStyles,
-    panelTokens,
     css`
       :host {
         display: block;
@@ -98,7 +96,7 @@ export class PaneView extends LitElement {
         overflow: hidden;
       }
       .pane-view[data-orientation='horizontal'] .pane {
-        border-right: 1px solid var(--vscode-sideBar-border, transparent);
+        border-right: var(--lana-stroke) solid var(--lana-panel-divider);
       }
       .pane-view[data-orientation='horizontal'] .pane:last-of-type {
         border-right: none;
@@ -107,10 +105,10 @@ export class PaneView extends LitElement {
       .pane-header {
         display: flex;
         align-items: center;
-        gap: var(--space-1);
-        flex: 0 0 var(--panel-header-height);
-        height: var(--panel-header-height);
-        padding: 0 var(--space-3) 0 var(--space-1);
+        gap: var(--lana-space-4);
+        flex: 0 0 var(--lana-panel-header-height);
+        height: var(--lana-panel-header-height);
+        padding: 0 var(--lana-space-12) 0 var(--lana-space-4);
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
@@ -151,22 +149,22 @@ export class PaneView extends LitElement {
         min-height: 0;
         min-width: 0;
         overflow: auto;
-        padding: var(--space-1) var(--space-3) var(--space-2);
+        padding: var(--lana-space-4) var(--lana-space-12) var(--lana-space-8);
       }
 
       .pane-sash {
-        flex: 0 0 4px;
+        flex: 0 0 var(--lana-sash-size);
         z-index: 1;
         background-color: transparent;
         transition: background-color 0.1s ease;
       }
       .pane-view[data-orientation='vertical'] .pane-sash {
         cursor: row-resize;
-        margin: -2px 0;
+        margin: var(--lana-sash-inset) 0;
       }
       .pane-view[data-orientation='horizontal'] .pane-sash {
         cursor: col-resize;
-        margin: 0 -2px;
+        margin: 0 var(--lana-sash-inset);
       }
       .pane-sash:hover,
       .pane-sash.pane-sash--active {

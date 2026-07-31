@@ -7,7 +7,7 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { getSettings } from '../../settings/Settings.js';
+import { getSettings, onSettingsChanged, type LanaSettings } from '../../settings/Settings.js';
 import { type TimelineGroup, keyMap, setColors } from '../services/Timeline.js';
 
 import { DEFAULT_THEME_NAME, type TimelineColors } from '../themes/Themes.js';
@@ -150,17 +150,26 @@ export class TimelineView extends LitElement {
     });
 
     getSettings().then((settings) => {
-      const { timeline } = settings;
-      this.useLegacyTimeline = timeline.legacy;
-
-      if (!this.useLegacyTimeline) {
-        addCustomThemes(this.toTheme(timeline.customThemes));
-        this.setTheme(timeline.activeTheme ?? DEFAULT_THEME_NAME);
-      } else {
-        setColors(timeline.colors);
-        this.timelineKeys = Array.from(keyMap.values());
-      }
+      this.applyTimelineSettings(settings);
     });
+    // The panel is never re-created, so live `lana.timeline.*` edits only reach the
+    // chart through this push.
+    onSettingsChanged((settings) => {
+      this.applyTimelineSettings(settings);
+    });
+  }
+
+  private applyTimelineSettings(settings: LanaSettings) {
+    const { timeline } = settings;
+    this.useLegacyTimeline = timeline.legacy;
+
+    if (!this.useLegacyTimeline) {
+      addCustomThemes(this.toTheme(timeline.customThemes));
+      this.setTheme(timeline.activeTheme ?? DEFAULT_THEME_NAME);
+    } else {
+      setColors(timeline.colors);
+      this.timelineKeys = Array.from(keyMap.values());
+    }
   }
 
   render() {

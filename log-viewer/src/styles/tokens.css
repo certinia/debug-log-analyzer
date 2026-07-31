@@ -1,0 +1,98 @@
+/*
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ */
+
+/*
+ * Semantic appearance tokens. Every radius, space, stroke, surface and shadow in
+ * the app resolves through this set, so re-theming is a host concern rather than
+ * a per-component one.
+ *
+ * Each token is `var(--vscode-…, <literal>)`: inside a webview VS Code injects
+ * the `--vscode-*` block on `documentElement` and re-pushes it on every theme
+ * change, so these follow along for free. The literals are what a standalone
+ * host (or a VS Code older than the size-token registry) falls back to — a
+ * non-webview host only has to override this one set to re-skin the app.
+ *
+ * Declared on `:root` rather than per-`:host`: the build's CSS plugin injects
+ * this into `document.head`, and custom properties inherit through every shadow
+ * boundary, so one definition reaches every component.
+ */
+:root {
+  /* Radius — VS Code's cornerRadius registry. */
+  --lana-radius-xs: var(--vscode-cornerRadius-xSmall, 2px);
+  --lana-radius-sm: var(--vscode-cornerRadius-small, 4px);
+  --lana-radius-md: var(--vscode-cornerRadius-medium, 6px);
+  --lana-radius-lg: var(--vscode-cornerRadius-large, 8px);
+  --lana-radius-xl: var(--vscode-cornerRadius-xLarge, 12px);
+  --lana-radius-circle: var(--vscode-cornerRadius-circle, 9999px);
+
+  /* Space — named by px so a literal maps to a token without a lookup. */
+  --lana-space-2: var(--vscode-spacing-size20, 2px);
+  --lana-space-4: var(--vscode-spacing-size40, 4px);
+  --lana-space-6: var(--vscode-spacing-size60, 6px);
+  --lana-space-8: var(--vscode-spacing-size80, 8px);
+  --lana-space-12: var(--vscode-spacing-size120, 12px);
+  --lana-space-16: var(--vscode-spacing-size160, 16px);
+  --lana-space-20: var(--vscode-spacing-size200, 20px);
+  --lana-space-24: var(--vscode-spacing-size240, 24px);
+
+  --lana-stroke: var(--vscode-strokeThickness, 1px);
+
+  /* Surfaces — the same registered colors VS Code's own chrome is built from.
+     `surface-foreground` is absent in some themes (e.g. Dark High Contrast
+     defines background + border only), so its fallback is load-bearing. */
+  --lana-surface-bg: var(
+    --vscode-surface-background,
+    var(--vscode-sideBar-background, var(--vscode-editor-background))
+  );
+  --lana-surface-fg: var(--vscode-surface-foreground, var(--vscode-foreground));
+  --lana-surface-border: var(
+    --vscode-surface-border,
+    var(--vscode-widget-border, var(--vscode-sideBar-border, transparent))
+  );
+  --lana-header-bg: var(--vscode-tab-activeBackground);
+
+  --lana-shadow-popover: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+  --lana-shadow-overlay: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.5));
+
+  /* Panel chrome — the flat defaults. Components reference these unconditionally
+     and the `[data-chrome='cards']` block below is the only thing that changes
+     mode, so no component carries two copies of its rules. Gaps and borders
+     collapse to nothing here, leaving today's hairline-separator look. */
+  --lana-panel-gap: 0px;
+  --lana-panel-radius: 0px;
+  --lana-panel-border: transparent;
+
+  /* Two seams, because they behave differently by mode:
+     `divider` separates adjacent regions when there is no gap to do it, so cards
+     drop it; `edge` is a region's outer hairline and is drawn in both modes. */
+  --lana-panel-divider: var(--vscode-sideBar-border, transparent);
+  --lana-panel-edge: var(--vscode-sideBar-border, transparent);
+
+  /* Resize handles. `inset` pulls the handle over its neighbours so flat chrome
+     shows no gap, leaving the divider hairline as the only seam; cards drop the
+     overlap so the handle's own width becomes the gap between the two cards. */
+  --lana-sash-size: var(--lana-space-4);
+  --lana-sash-inset: calc(var(--lana-sash-size) / -2);
+
+  /* Shared height for the inspector dock's action bar and pane section headers. */
+  --lana-panel-header-height: var(--lana-space-24);
+}
+
+/*
+ * Cards chrome — mirrors what VS Code's modern/floating-panels workbench applies
+ * to its own parts (`margin: 0 spacing-size20`, `border: 1px solid surface-border`,
+ * `border-radius: cornerRadius-large`), so our panes read as the same material.
+ * Set from `data-chrome` on `documentElement`, pushed by the extension: a webview
+ * cannot see the workbench flag itself.
+ */
+:root[data-chrome='cards'] {
+  --lana-panel-gap: var(--lana-space-4);
+  --lana-panel-radius: var(--lana-radius-lg);
+  --lana-panel-border: var(--lana-surface-border);
+  /* Cards are already separated by their gap and border, so both seams for the
+     flat look — the hairline and the handle's overlap — are dropped. */
+  --lana-panel-divider: transparent;
+  --lana-panel-edge: var(--lana-surface-border);
+  --lana-sash-inset: 0px;
+}

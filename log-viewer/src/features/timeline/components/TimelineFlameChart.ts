@@ -13,6 +13,7 @@ import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
+import { themeObserver } from '../../../core/theme/ThemeObserver.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
 import type { EditorColors, TimelineOptions } from '../types/flamechart.types.js';
@@ -43,11 +44,11 @@ export class TimelineFlameChart extends LitElement {
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        padding: 20px;
-        background: #ffebee;
-        border: 1px solid #ef5350;
-        border-radius: 4px;
-        color: #c62828;
+        padding: var(--lana-space-20);
+        background: var(--vscode-inputValidation-errorBackground);
+        border: var(--lana-stroke) solid var(--vscode-inputValidation-errorBorder);
+        border-radius: var(--lana-radius-sm);
+        color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground));
         font-family: monospace;
         max-width: 80%;
         text-align: center;
@@ -58,8 +59,8 @@ export class TimelineFlameChart extends LitElement {
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        padding: 20px;
-        color: #666;
+        padding: var(--lana-space-20);
+        color: var(--vscode-descriptionForeground);
         font-family: monospace;
       }
     `,
@@ -114,6 +115,22 @@ export class TimelineFlameChart extends LitElement {
   @query('.timeline-container')
   private containerRef!: HTMLElement;
 
+  /** Unsubscribe for the appearance subscription; set while connected. */
+  private themeUnsubscribe: (() => void) | null = null;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.themeUnsubscribe ??= themeObserver.on(() => {
+      this.refreshTheme();
+    });
+  }
+
+  override disconnectedCallback(): void {
+    this.themeUnsubscribe?.();
+    this.themeUnsubscribe = null;
+    super.disconnectedCallback();
+  }
+
   override updated(changedProperties: PropertyValues): void {
     super.updated(changedProperties);
 
@@ -125,9 +142,26 @@ export class TimelineFlameChart extends LitElement {
       this.initializeTimeline();
     }
 
-    if (changedProperties.has('themeName') || changedProperties.has('themeName')) {
-      this.apexLogTimeline?.setTheme(this.themeName ?? '');
+    if (changedProperties.has('themeName')) {
+      this.refreshTheme();
     }
+  }
+
+  /**
+   * Push the current appearance into the renderers.
+   *
+   * Both halves move together: the category palette named by `themeName`, and the
+   * editor colors read out of CSS. Deliberately never re-runs
+   * {@link initializeTimeline} — tearing down the Pixi app on a theme switch would
+   * blow the perf budget on large logs.
+   */
+  private refreshTheme(): void {
+    if (!this.apexLogTimeline) {
+      return;
+    }
+
+    this.apexLogTimeline.setEditorColors(this.extractEditorColors());
+    this.apexLogTimeline.setTheme(this.themeName ?? '');
   }
 
   /**
@@ -206,6 +240,10 @@ export class TimelineFlameChart extends LitElement {
       lineNumberForeground: parseColorToHex(
         style.getPropertyValue('--tl-line-number-foreground').trim() || '#808080',
         0x808080,
+      ),
+      editorForeground: parseColorToHex(
+        style.getPropertyValue('--tl-editor-foreground').trim() || '#cccccc',
+        0xcccccc,
       ),
       selectionBackground: parseColorToHex(
         style.getPropertyValue('--tl-selection-background').trim() || 'rgba(38, 79, 120, 0.5)',

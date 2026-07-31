@@ -1,7 +1,10 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { vscodeMessenger } from '../../core/messaging/VSCodeExtensionMessenger.js';
+import {
+  VSCodeExtensionMessenger,
+  vscodeMessenger,
+} from '../../core/messaging/VSCodeExtensionMessenger.js';
 
 /* eslint-disable @typescript-eslint/naming-convention */
 export type LanaSettings = {
@@ -39,6 +42,15 @@ export type LanaSettings = {
     dml: { columnView: string; columnOverrides: Record<string, string[]> };
     sosl: { columnView: string; columnOverrides: Record<string, string[]> };
   };
+  appearance: {
+    /**
+     * Panel chrome resolved by the extension — `cards` mirrors VS Code's modern
+     * (floating panels) workbench, `flat` is the classic hairline-divider look. A
+     * webview cannot see the workbench flag itself, so this only ever arrives over
+     * a message; absent means `flat`.
+     */
+    chrome: 'cards' | 'flat';
+  };
   // The app-wide inspector, fed by a selection on any tab.
   inspector: {
     position: 'left' | 'right' | 'bottom';
@@ -55,6 +67,19 @@ export type LanaSettings = {
 export function getSettings(): Promise<LanaSettings> {
   return vscodeMessenger.request<LanaSettings>('getConfig').then((msg) => {
     return msg;
+  });
+}
+
+/**
+ * Subscribes to settings the user edits while the view is open. The panel keeps
+ * its context when hidden and is never re-created, so this push is the only way
+ * live edits (theme colors, panel chrome) reach the UI.
+ */
+export function onSettingsChanged(callback: (settings: LanaSettings) => void): void {
+  VSCodeExtensionMessenger.listen<LanaSettings>((event) => {
+    if (event.data?.cmd === 'configChanged' && event.data.payload) {
+      callback(event.data.payload);
+    }
   });
 }
 
