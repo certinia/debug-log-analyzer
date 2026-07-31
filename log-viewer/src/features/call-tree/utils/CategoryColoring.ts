@@ -5,7 +5,7 @@ import { css } from 'lit';
 import type { RowComponent } from 'tabulator-tables';
 
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { getSettings, onSettingsChanged, type LanaSettings } from '../../settings/Settings.js';
+import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
 import { DEFAULT_THEME_NAME, type TimelineColors } from '../../timeline/themes/Themes.js';
 import { addCustomThemes, getTheme } from '../../timeline/themes/ThemeSelector.js';
 
@@ -82,7 +82,6 @@ export function wireCategoryColoring(host: HTMLElement): void {
     host.classList.toggle('category-colorize', callTree?.categoryColorize ?? false);
   };
 
-  getSettings().then(apply);
-  // The panel is never re-created, so live setting edits only arrive as a push.
-  onSettingsChanged(apply);
+  // Hosts live as long as the panel, so the subscription is never torn down.
+  subscribeSettings(apply);
 }

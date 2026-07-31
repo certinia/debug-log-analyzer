@@ -17,7 +17,7 @@ import {
 } from '../../core/messaging/VSCodeExtensionMessenger.js';
 import { DatabaseAccess } from '../database/services/Database.js';
 import type { LogIssue } from '../notifications/types.js';
-import { getSettings, onSettingsChanged, type LanaSettings } from '../settings/Settings.js';
+import { subscribeSettings, type LanaSettings } from '../settings/Settings.js';
 import { toLogIssue } from './logIssues.js';
 import { parserIssuesToNotifications } from './parserNotifications.js';
 
@@ -135,10 +135,9 @@ export class LogViewer extends LitElement {
 
     // Panel chrome lives on documentElement, not this host: the `--lana-panel-*`
     // tokens are defined at document level so they inherit into every shadow root.
-    getSettings().then((settings) => {
-      this._applyChrome(settings);
-    });
-    onSettingsChanged((settings) => {
+    // The root component lives as long as the panel, so the subscription is never
+    // torn down.
+    subscribeSettings((settings) => {
       this._applyChrome(settings);
     });
 
