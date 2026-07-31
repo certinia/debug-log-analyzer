@@ -188,9 +188,8 @@ export class CallTreeDetail extends LitElement {
     const scopeChanged = changed.has('eventIndex') || changed.has('instances');
     if (scopeChanged) {
       // The scoped root changed — drop every table so each rebuilds on demand.
-      // The walk itself (`buildScopedCallTree`) is deferred to `_showActive`,
-      // past its paint yield: for a wide aggregate it's occurrences × subtree,
-      // and running it here would block the selection highlight from painting.
+      // `_scoped` is only invalidated here and only rebuilt in `_showActive`,
+      // past its paint yield — never before it.
       this._destroyTables();
       this._scoped = null;
     }

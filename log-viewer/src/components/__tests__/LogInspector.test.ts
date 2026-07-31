@@ -64,24 +64,20 @@ import type { PaneView } from '../PaneView.js';
 import '../LogInspector.js';
 
 /**
- * Settles the rAF-debounced rebuild, the async section build and the render.
- * The build chain awaits more than once, so keep re-awaiting the render rather
- * than counting microtasks.
+ * Settles the async section build and the render chain through the nested
+ * shadow DOMs. The build chain awaits more than once, so keep re-awaiting the
+ * render rather than counting microtasks.
  */
-async function flush(el: LogInspector): Promise<void> {
-  await new Promise((resolve) => requestAnimationFrame(resolve));
+async function settle(el: LogInspector): Promise<void> {
   for (let i = 0; i < 5; i++) {
     await el.updateComplete;
   }
 }
 
-/** Settles the render chain through the nested shadow DOMs, without the rAF
- *  wait `flush` adds — a test that drives `_rebuild()` directly doesn't want
- *  another debounced rebuild sneaking in. */
-async function settle(el: LogInspector): Promise<void> {
-  for (let i = 0; i < 5; i++) {
-    await el.updateComplete;
-  }
+/** `settle`, plus the rAF wait that lets the debounced rebuild fire first. */
+async function flush(el: LogInspector): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await settle(el);
 }
 
 async function mount(activeTab: string): Promise<LogInspector> {
@@ -226,13 +222,10 @@ describe('LogInspector', () => {
   });
 
   it('drops a superseded rebuild: a stale build resolving late does not overwrite a newer one', async () => {
-    deferSections = true;
+    // Mount undeferred so its own (empty-selection) rebuild resolves, then defer
+    // only the two builds this test drives.
     const el = await mount('timeline-tab');
-    // Mounting with an activeTab already triggers its own (empty-selection)
-    // rebuild; drain it before driving the two we care about.
-    pendingSections.pop()?.();
-    await settle(el);
-    pendingSections.length = 0;
+    deferSections = true;
 
     select('timeline', 1);
     await new Promise((resolve) => requestAnimationFrame(resolve)); // debounce fires -> _rebuild() epoch 1 starts, awaiting buildDetailSections
