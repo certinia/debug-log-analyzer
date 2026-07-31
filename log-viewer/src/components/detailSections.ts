@@ -13,42 +13,21 @@ import './CallTreeDetail.js';
 import './EventVitals.js';
 
 /**
- * Per-source copy for the inspector's empty state (`LogInspector`'s
- * `emptyText`, rendered by `DetailDock` whenever {@link buildDetailSections}
- * returns `[]`). This is the single source of truth for that copy — keep it
- * here rather than duplicating strings at the call site.
- */
-const EMPTY_TEXT: Record<DetailSource, string> = {
-  timeline: 'Select a frame on the timeline to inspect it.',
-  calltree: 'Select a frame in the call tree to inspect it.',
-  analysis: 'Select a row in the analysis grid to inspect it.',
-  database: 'Select a SOQL, DML or SOSL row to inspect it.',
-};
-
-/** Empty-state copy for the given source, or a generic fallback if the active tab has none. */
-export function emptyTextFor(source: DetailSource | undefined): string {
-  return source ? EMPTY_TEXT[source] : 'Select a row to inspect it.';
-}
-
-/**
  * Build the inspector's sections for a selection from any tab. Every source gets
  * the same shared trio — Details, Call stack, Call tree — scoped to the
  * selection; the Database view keeps its richer set (Vitals + SOQL issues) via
  * {@link buildDatabaseSections}.
  *
- * Precedence rule (binding on future scoping inputs, e.g. a timeline
- * time-range selection): an explicit row/frame `selection` always wins. A
- * range or other ambient scope only applies when `selection` is `null` — it
- * must be layered into the `!selection` branch below, not made to override an
- * explicit selection.
+ * Precedence rule, binding on future scoping inputs such as a timeline time
+ * range: an explicit row/frame `selection` always wins. A range or other
+ * ambient scope only applies when `selection` is `null`, so it belongs inside
+ * the `!selection` branch — never above it.
  */
 export async function buildDetailSections(
   source: DetailSource,
   selection: DetailSelection | null,
 ): Promise<PaneSection[]> {
-  // Nothing explicitly selected: no sections yet, so the inspector shows its
-  // source-specific empty text (see `emptyTextFor`). A future range-scoped
-  // fallback belongs in this branch, after checking for one — never above it.
+  // Nothing selected: no sections, so the inspector shows `emptyTextFor(source)`.
   if (!selection) {
     return [];
   }

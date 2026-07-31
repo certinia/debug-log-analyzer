@@ -30,14 +30,8 @@ jest.mock('../../features/settings/Settings.js', () => ({
 }));
 
 // The real builders mount Tabulator tables; only the section ids matter here.
-// Mirrors detailSections.ts's real per-source copy so the emptyText assertions
-// below exercise the same strings LogInspector actually renders.
-const EMPTY_TEXT: Record<string, string> = {
-  timeline: 'Select a frame on the timeline to inspect it.',
-  calltree: 'Select a frame in the call tree to inspect it.',
-  analysis: 'Select a row in the analysis grid to inspect it.',
-  database: 'Select a SOQL, DML or SOSL row to inspect it.',
-};
+// `detailEmptyText.js` is deliberately left unmocked so the assertions below
+// exercise the real copy LogInspector renders.
 jest.mock('../detailSections.js', () => ({
   buildDetailSections: (_source: string, selection: unknown) =>
     Promise.resolve(
@@ -48,8 +42,6 @@ jest.mock('../detailSections.js', () => ({
           ]
         : [],
     ),
-  emptyTextFor: (source: string | undefined) =>
-    source ? (EMPTY_TEXT[source] ?? 'Select a row to inspect it.') : 'Select a row to inspect it.',
 }));
 
 import { eventBus } from '../../core/events/EventBus.js';
