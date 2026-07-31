@@ -128,6 +128,9 @@ export class TimelineFlameChart extends LitElement {
   override disconnectedCallback(): void {
     this.themeUnsubscribe?.();
     this.themeUnsubscribe = null;
+    // A `lana.timeline.legacy` toggle swaps this element out while the panel is
+    // open, so the Pixi app has to go with it or its WebGL context leaks.
+    this.cleanup();
     super.disconnectedCallback();
   }
 
