@@ -143,9 +143,9 @@ export class TimelineFlameChart extends LitElement {
       this.containerRef
     ) {
       this.initializeTimeline();
-    }
-
-    if (changedProperties.has('themeName')) {
+    } else if (changedProperties.has('themeName')) {
+      // `else`: opening a log lands both properties in one update, and
+      // `initializeTimeline` already reads the current appearance.
       this.refreshTheme();
     }
   }
