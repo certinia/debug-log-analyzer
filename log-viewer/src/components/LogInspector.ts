@@ -8,6 +8,7 @@ import { type DetailSelection, type DetailSource, eventBus } from '../core/event
 import type { InspectorRevealEvent } from './inspectorReveal.js';
 import { debounce } from '../core/utility/Util.js';
 import { getSettings, updateSetting } from '../features/settings/Settings.js';
+import { emptyTextFor } from './detailEmptyText.js';
 import { buildDetailSections } from './detailSections.js';
 import { globalStyles } from '../styles/global.styles.js';
 import type { DockPosition } from './DetailDock.js';
@@ -136,7 +137,7 @@ export class LogInspector extends LitElement {
         .sections=${this.sections}
         .collapsed=${this.collapsedSections}
         .paneSizes=${this.paneSizes}
-        emptyText="Select a row to inspect it."
+        emptyText=${emptyTextFor(this._activeSource)}
         @dock-position-change=${this._onDockPositionChange}
         @dock-resize=${this._onDockResize}
         @dock-hide=${this._hidePanel}
