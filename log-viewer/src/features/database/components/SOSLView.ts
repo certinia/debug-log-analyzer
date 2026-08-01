@@ -9,13 +9,13 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, SOSLExecuteBeginLine } from 'apex-log-parser';
-import { eventBus } from '../../../core/events/EventBus.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { emitGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
@@ -655,17 +655,9 @@ export class SOSLView extends LitElement {
     // Drive the detail panel off selection (not click) so keyboard row
     // navigation updates it too, matching the SOQL/DML grids.
     this.soslTable.on('rowSelectionChanged', (_data, rows) => {
-      if (this._echoGuard.suppressed) {
-        return;
-      }
-      const data = rows[0]?.getData() as SOSLRow | undefined;
-      if (!data || data.eventIndex === undefined || !data.sosl) {
-        return;
-      }
-      eventBus.emit('detail:select', {
-        source: 'database',
-        selection: { kind: 'event', eventIndex: data.eventIndex, type: 'sosl' },
-      });
+      emitGridSelection(this._echoGuard, 'sosl', rows, (data: SOSLRow) =>
+        data.sosl ? data.eventIndex : undefined,
+      );
     });
 
     this.soslTable.on('rowContext', (e, row) => {
@@ -746,8 +738,9 @@ export class SOSLView extends LitElement {
     return this.holder;
   }
 
+  /** Clears this grid because another one was picked, so it emits nothing. */
   deselectRows() {
-    this.soslTable?.deselectRow();
+    this._echoGuard.run(() => this.soslTable?.deselectRow());
   }
 
   /**

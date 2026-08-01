@@ -14,7 +14,6 @@ import {
 } from 'tabulator-tables';
 
 import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
-import { eventBus } from '../../../core/events/EventBus.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
@@ -25,6 +24,7 @@ import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { emitGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import {
   applyColumnView,
@@ -453,8 +453,9 @@ export class SOQLView extends LitElement {
     this.soqlTable?.copyToClipboard('all');
   }
 
+  /** Clears this grid because another one was picked, so it emits nothing. */
   deselectRows() {
-    this.soqlTable?.deselectRow();
+    this._echoGuard.run(() => this.soqlTable?.deselectRow());
   }
 
   /**
@@ -850,18 +851,9 @@ export class SOQLView extends LitElement {
     // navigation updates it too. RowKeyboardNavigation keeps a single row
     // selected across mouse and arrow-key navigation.
     this.soqlTable.on('rowSelectionChanged', (_data, rows) => {
-      if (this._echoGuard.suppressed) {
-        return;
-      }
-      const data = rows[0]?.getData() as GridSOQLData | undefined;
-      if (!data || data.eventIndex === undefined || !data.soql) {
-        return;
-      }
-
-      eventBus.emit('detail:select', {
-        source: 'database',
-        selection: { kind: 'event', eventIndex: data.eventIndex, type: 'soql' },
-      });
+      emitGridSelection(this._echoGuard, 'soql', rows, (data: GridSOQLData) =>
+        data.soql ? data.eventIndex : undefined,
+      );
     });
 
     this.soqlTable.on('rowContext', (e, row) => {
