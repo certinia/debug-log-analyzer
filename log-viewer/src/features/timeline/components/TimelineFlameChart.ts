@@ -145,8 +145,10 @@ export class TimelineFlameChart extends LitElement {
       this.initializeTimeline();
     } else if (changedProperties.has('themeName')) {
       // `else`: opening a log lands both properties in one update, and
-      // `initializeTimeline` already reads the current appearance.
-      this.refreshTheme();
+      // `initializeTimeline` already reads the current appearance. Only the
+      // category palette moved, so the CSS reads stay untouched — a quick-pick
+      // preview sends one of these per keystroke.
+      this.apexLogTimeline?.setTheme(this.themeName ?? '');
     }
   }
 
