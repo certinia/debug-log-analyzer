@@ -42,4 +42,4 @@ Right-click a row in the **Call stack** or **Call tree** for:
 | **Copy Details**      | Name, type, duration and governor metrics                       |
 | **Copy Call Stack**   | The whole parent chain, one frame per line                      |
 
-Clicking a row on its own never navigates away — in the Call stack it selects the frame, and in the Call tree it expands or collapses its subtree. Arrow keys move between rows, and `CMD / CTRL + c` copies the table.
+Clicking a row highlights the matching frame or row in the tab you're on, and never switches tab: the Timeline selects the frame and centers it when it's off screen, the Call Tree scrolls to it in **Time Order**, and the Database tab selects the statement. Rows in the Call tree's **Aggregated** and **Bottom-Up** views merge several occurrences, so there is no single frame to highlight. Arrow keys move between rows, and `CMD / CTRL + c` copies the table.
