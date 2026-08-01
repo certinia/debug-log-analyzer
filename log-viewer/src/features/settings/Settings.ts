@@ -63,20 +63,25 @@ export function getSettings(): Promise<LanaSettings> {
 
 const subscribers = new Set<(settings: LanaSettings) => void>();
 let listening = false;
+/** Newest settings seen, from either the reply or a push; seeds later subscribers. */
+let latest: LanaSettings | null = null;
+let seedRequest: Promise<LanaSettings | null> | null = null;
+
+function publish(settings: LanaSettings): void {
+  latest = settings;
+  subscribers.forEach((notify) => {
+    notify(settings);
+  });
+}
 
 /**
  * Delivers the current settings, then every later edit, and returns the
  * unsubscribe function. The panel keeps its context when hidden and is never
- * re-created, so the push is the only way live edits (theme colors) reach the UI — seeding and following are one call so a consumer cannot take
- * half the contract.
+ * re-created, so the push is the only way live edits (theme colors) reach the UI —
+ * seeding and following are one call so a consumer cannot take half the contract.
  */
 export function subscribeSettings(callback: (settings: LanaSettings) => void): () => void {
-  let pushed = false;
-  const subscriber = (settings: LanaSettings) => {
-    pushed = true;
-    callback(settings);
-  };
-  subscribers.add(subscriber);
+  subscribers.add(callback);
 
   if (!listening) {
     // One window listener for every subscriber; `listen` has no removal path.
@@ -84,27 +89,28 @@ export function subscribeSettings(callback: (settings: LanaSettings) => void): (
     VSCodeExtensionMessenger.listen<LanaSettings>((event) => {
       const settings = event.data?.cmd === 'configChanged' ? event.data.payload : null;
       if (settings) {
-        subscribers.forEach((notify) => {
-          notify(settings);
-        });
+        publish(settings);
       }
     });
   }
 
-  // A push can land before the reply to this request; the reply is then the older
-  // value, so drop it rather than applying it over the newer one.
-  getSettings()
-    .then((settings) => {
-      if (!pushed) {
-        subscriber(settings);
+  if (latest) {
+    callback(latest);
+  } else {
+    // One request however many subscribers; later ones reuse the same reply.
+    // No extension host to ask (standalone browser): the UI keeps its defaults.
+    seedRequest ??= getSettings().catch(() => null);
+    seedRequest.then((settings) => {
+      // A push can land before the reply; it is then the newer value, so the
+      // reply is dropped rather than applied over it.
+      if (settings && !latest) {
+        publish(settings);
       }
-    })
-    .catch(() => {
-      // No extension host to ask (standalone browser): the UI keeps its defaults.
     });
+  }
 
   return () => {
-    subscribers.delete(subscriber);
+    subscribers.delete(callback);
   };
 }
 

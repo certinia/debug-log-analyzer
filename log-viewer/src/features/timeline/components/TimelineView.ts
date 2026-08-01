@@ -177,10 +177,10 @@ export class TimelineView extends LitElement {
     this.useLegacyTimeline = timeline.legacy;
 
     if (!this.useLegacyTimeline) {
-      addCustomThemes(this.toTheme(timeline.customThemes));
       const palette = JSON.stringify([timeline.activeTheme, timeline.customThemes]);
       if (palette !== this.persistedPalette) {
         this.persistedPalette = palette;
+        addCustomThemes(this.toTheme(timeline.customThemes));
         this.setTheme(timeline.activeTheme ?? DEFAULT_THEME_NAME);
       }
     } else {

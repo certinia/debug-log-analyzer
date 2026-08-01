@@ -136,6 +136,9 @@ export class AnalysisView extends LitElement {
   // single boolean read with no walk and no cache.
   _showDetailsFilter = (data: BottomUpRow): boolean => data._hasDetailsDeep;
 
+  /** Releases the category-colouring settings subscription; set while connected. */
+  private _categoryColoringOff: (() => void) | null = null;
+
   constructor() {
     super();
 
@@ -146,11 +149,13 @@ export class AnalysisView extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    wireCategoryColoring(this);
+    this._categoryColoringOff = wireCategoryColoring(this);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._categoryColoringOff?.();
+    this._categoryColoringOff = null;
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);

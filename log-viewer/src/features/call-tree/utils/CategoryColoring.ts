@@ -63,9 +63,10 @@ function applyCategoryTheme(host: HTMLElement, themeName: string): void {
 
 /**
  * Wire category colouring onto a host element: seed the theme vars, follow live theme
- * switches, and toggle the colorize tint from settings. Call from `connectedCallback`.
+ * switches, and toggle the colorize tint from settings. Call from `connectedCallback`
+ * and call the returned function from `disconnectedCallback`.
  */
-export function wireCategoryColoring(host: HTMLElement): void {
+export function wireCategoryColoring(host: HTMLElement): () => void {
   applyCategoryTheme(host, DEFAULT_THEME_NAME);
 
   VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
@@ -82,6 +83,5 @@ export function wireCategoryColoring(host: HTMLElement): void {
     host.classList.toggle('category-colorize', callTree?.categoryColorize ?? false);
   };
 
-  // Hosts live as long as the panel, so the subscription is never torn down.
-  subscribeSettings(apply);
+  return subscribeSettings(apply);
 }
