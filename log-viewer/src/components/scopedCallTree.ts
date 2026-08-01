@@ -26,6 +26,16 @@ export interface ScopedRow {
   _children: ScopedRow[] | null;
 }
 
+/**
+ * The event a scoped row reveals, or null when it merges occurrences. Aggregated
+ * and bottom-up rows carry a synthetic negative id and keep only the first
+ * occurrence, so revealing one would misname which occurrence was clicked.
+ */
+export function revealableEventIndex(row: Partial<ScopedRow> | undefined): number | null {
+  const { id, originalData } = row ?? {};
+  return id !== undefined && id >= 0 && originalData ? originalData.eventIndex : null;
+}
+
 export interface ScopedCallTree {
   /** The selected node's total time (ns) — the % denominator for the bars. */
   rootTotal: number;

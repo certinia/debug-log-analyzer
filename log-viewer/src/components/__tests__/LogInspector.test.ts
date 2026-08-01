@@ -46,6 +46,7 @@ import { eventBus } from '../../core/events/EventBus.js';
 import type { LogInspector } from '../LogInspector.js';
 import type { PaneView } from '../PaneView.js';
 import '../LogInspector.js';
+import { dispatchInspectorReveal } from '../inspectorReveal.js';
 
 /**
  * Settles the rAF-debounced rebuild, the async section build and the render.
@@ -74,6 +75,15 @@ function paneView(el: LogInspector): PaneView {
     ?.shadowRoot?.querySelector<PaneView>('pane-view');
   if (!found) {
     throw new Error('pane-view not rendered');
+  }
+  return found;
+}
+
+/** The reveal listener sits on `dock-layout`, which renders whether or not a row is selected. */
+function dockLayout(el: LogInspector): HTMLElement {
+  const found = el.shadowRoot?.querySelector<HTMLElement>('dock-layout');
+  if (!found) {
+    throw new Error('dock-layout not rendered');
   }
   return found;
 }
@@ -192,5 +202,27 @@ describe('LogInspector', () => {
     // The stored `visible: false` and `collapsed` don't undo either action.
     expect(visible(el)).toBe(true);
     expect(paneView(el).collapsed).toEqual({ vitals: true });
+  });
+
+  it('stamps the active tab on a reveal, so only that tab acts on it', async () => {
+    const el = await mount('tree-tab');
+
+    const seen: Array<{ source: string; eventIndex: number }> = [];
+    const off = eventBus.on('inspector:reveal', (d) => seen.push(d));
+    dispatchInspectorReveal(dockLayout(el), 5);
+    off();
+
+    expect(seen).toEqual([{ source: 'calltree', eventIndex: 5 }]);
+  });
+
+  it('drops a reveal from a tab with no inspectable view', async () => {
+    const el = await mount('unknown-tab');
+
+    const seen: unknown[] = [];
+    const off = eventBus.on('inspector:reveal', (d) => seen.push(d));
+    dispatchInspectorReveal(dockLayout(el), 5);
+    off();
+
+    expect(seen).toEqual([]);
   });
 });

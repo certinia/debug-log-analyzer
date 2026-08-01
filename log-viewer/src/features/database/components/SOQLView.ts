@@ -15,6 +15,7 @@ import {
 
 import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
 import { eventBus } from '../../../core/events/EventBus.js';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
@@ -101,6 +102,8 @@ export class SOQLView extends LitElement {
 
   soqlTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
+  /** Guards the programmatic select made on the inspector's behalf. */
+  private _echoGuard = new SelectionEchoGuard();
   table: HTMLElement | null = null;
 
   @state()
@@ -451,6 +454,26 @@ export class SOQLView extends LitElement {
 
   deselectRows() {
     this.soqlTable?.deselectRow();
+  }
+
+  /**
+   * Select the row for `eventIndex`, without echoing `detail:select` back at the
+   * inspector that asked for it. Returns false when this grid has no such row.
+   */
+  selectByEventIndex(eventIndex: number): boolean {
+    // The tabulator index is a synthetic row id, so the eventIndex is scanned for.
+    const match = this.soqlTable
+      ?.getRows()
+      .find((candidate) => (candidate.getData() as GridSOQLData).eventIndex === eventIndex);
+    if (!match) {
+      return false;
+    }
+
+    this._echoGuard.run(() => {
+      this.soqlTable?.deselectRow();
+      match.select();
+    });
+    return true;
   }
 
   _exportToCSV() {
@@ -838,6 +861,9 @@ export class SOQLView extends LitElement {
     // navigation updates it too. RowKeyboardNavigation keeps a single row
     // selected across mouse and arrow-key navigation.
     this.soqlTable.on('rowSelectionChanged', (_data, rows) => {
+      if (this._echoGuard.suppressed) {
+        return;
+      }
       const data = rows[0]?.getData() as GridSOQLData | undefined;
       if (!data || data.eventIndex === undefined || !data.soql) {
         return;

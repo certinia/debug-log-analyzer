@@ -10,6 +10,7 @@ import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tab
 
 import type { ApexLog, DMLBeginLine } from 'apex-log-parser';
 import { eventBus } from '../../../core/events/EventBus.js';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { goToRow } from '../../call-tree/navigation.js';
@@ -86,6 +87,8 @@ export class DMLView extends LitElement {
 
   dmlTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
+  /** Guards the programmatic select made on the inspector's behalf. */
+  private _echoGuard = new SelectionEchoGuard();
   table: HTMLElement | null = null;
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
@@ -435,6 +438,26 @@ export class DMLView extends LitElement {
     this.dmlTable?.deselectRow();
   }
 
+  /**
+   * Select the row for `eventIndex`, without echoing `detail:select` back at the
+   * inspector that asked for it. Returns false when this grid has no such row.
+   */
+  selectByEventIndex(eventIndex: number): boolean {
+    // The tabulator index is a synthetic row id, so the eventIndex is scanned for.
+    const match = this.dmlTable
+      ?.getRows()
+      .find((candidate) => (candidate.getData() as DMLRow).eventIndex === eventIndex);
+    if (!match) {
+      return false;
+    }
+
+    this._echoGuard.run(() => {
+      this.dmlTable?.deselectRow();
+      match.select();
+    });
+    return true;
+  }
+
   _exportToCSV() {
     this.dmlTable?.download('csv', 'dml.csv', { bom: true, delimiter: ',' });
   }
@@ -687,6 +710,9 @@ export class DMLView extends LitElement {
     // navigation updates it too. RowKeyboardNavigation keeps a single row
     // selected across mouse and arrow-key navigation.
     this.dmlTable.on('rowSelectionChanged', (_data, rows) => {
+      if (this._echoGuard.suppressed) {
+        return;
+      }
       const data = rows[0]?.getData() as DMLRow | undefined;
       if (!data || data.eventIndex === undefined || !data.dml) {
         return;

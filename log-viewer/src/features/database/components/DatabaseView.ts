@@ -75,6 +75,7 @@ export class DatabaseView extends LitElement {
   findMap = {};
 
   private _offDetailSelect: (() => void) | null = null;
+  private _offInspectorReveal: (() => void) | null = null;
 
   constructor() {
     super();
@@ -101,6 +102,24 @@ export class DatabaseView extends LitElement {
         }
       }
     });
+
+    // Reveal an inspector row here, but only while the Database tab is the tab
+    // the inspector is showing. The eventIndex belongs to exactly one grid, so
+    // each is offered it in turn until one owns it.
+    this._offInspectorReveal = eventBus.on('inspector:reveal', (d) => {
+      if (d.source !== 'database') {
+        return;
+      }
+      const views = [this._dmlView, this._soqlView, this._soslView];
+      const owner = views.find((view) => view?.selectByEventIndex(d.eventIndex));
+      if (owner) {
+        for (const view of views) {
+          if (view !== owner) {
+            view?.deselectRows();
+          }
+        }
+      }
+    });
   }
 
   disconnectedCallback(): void {
@@ -110,6 +129,8 @@ export class DatabaseView extends LitElement {
     document.removeEventListener('lv-find', this._findHandler as EventListener);
     this._offDetailSelect?.();
     this._offDetailSelect = null;
+    this._offInspectorReveal?.();
+    this._offInspectorReveal = null;
   }
 
   updated(changed: PropertyValues): void {
