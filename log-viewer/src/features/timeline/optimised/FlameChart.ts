@@ -820,7 +820,6 @@ export class FlameChart<E extends EventNode = EventNode> {
       colors.editorForeground,
     );
 
-    this.minimapOrchestrator?.invalidateCache();
     this.requestRender();
   }
 
