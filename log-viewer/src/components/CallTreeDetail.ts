@@ -32,7 +32,12 @@ import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
-import { buildScopedCallTree, type ScopedCallTree } from './scopedCallTree.js';
+import {
+  buildScopedCallTree,
+  type ScopedBuildOptions,
+  type ScopedCallTree,
+  type ScopedRow,
+} from './scopedCallTree.js';
 import './ViewModeSwitch.js';
 import type { ViewModeOption } from './ViewModeSwitch.js';
 
@@ -136,6 +141,10 @@ export class CallTreeDetail extends LitElement {
   // Guards against a slow view-switch resolving after a newer one.
   private _switchEpoch = 0;
 
+  /** True while a scoped build is in flight. Read by the tables' placeholder,
+   *  which Tabulator re-evaluates every time it shows one. */
+  private _pending = false;
+
   private _contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private _menuEventIndex = -1;
@@ -231,6 +240,35 @@ export class CallTreeDetail extends LitElement {
     }
   }
 
+  /**
+   * The rows for `mode`, building (and caching) the scoped tree first if this is
+   * the selection's first view. Returns an empty array when nothing is in scope,
+   * and null when the build was abandoned because a newer selection arrived.
+   */
+  private async _rows(mode: ViewMode, options: ScopedBuildOptions): Promise<ScopedRow[] | null> {
+    if (!this._scoped) {
+      const scoped = await buildScopedCallTree(this.eventIndex, this.instances, options);
+      if (options.cancelled?.()) {
+        // Abandoned rather than empty — don't cache the null over a scope that
+        // was never walked.
+        return null;
+      }
+      this._scoped = scoped;
+    }
+    const scoped = this._scoped;
+    if (!scoped) {
+      return [];
+    }
+    switch (mode) {
+      case 'time-order':
+        return scoped.timeOrder(options);
+      case 'aggregated':
+        return scoped.aggregated(options);
+      case 'bottom-up':
+        return scoped.bottomUp(options);
+    }
+  }
+
   private async _showActive(): Promise<void> {
     const epoch = ++this._switchEpoch;
     // Wait for the now-visible host to lay out before Tabulator measures column
@@ -246,38 +284,43 @@ export class CallTreeDetail extends LitElement {
     }
 
     const mode = this.viewMode;
-    const slot = this._tables[mode];
-    if (slot && !slot.stale) {
-      slot.table.redraw(); // re-fit the layout for the now-visible host
+    const built = this._tables[mode];
+    if (built && !built.stale) {
+      built.table.redraw(); // re-fit the layout for the now-visible host
       return;
     }
 
-    // Built lazily here, after the yield above, so the selection highlight and
-    // the rest of the panel paint before this potentially expensive walk runs.
-    this._scoped ??= buildScopedCallTree(this.eventIndex, this.instances);
-    const scoped = this._scoped;
+    // Started here, after the yield above, so the selection highlight and the
+    // rest of the panel paint before the walk does anything; the walk then
+    // slices itself, so it never blocks a frame either.
+    this._pending = true;
+    if (built) {
+      // Those rows belong to the previous selection and the build below spans
+      // several frames — clear them rather than leave them standing under a
+      // selection they don't describe.
+      void built.table.setData([]);
+    }
+    const data = await this._rows(mode, {
+      yieldFrame: waitForNextFrame,
+      cancelled: () => epoch !== this._switchEpoch || !this.isConnected,
+    });
+    if (!data || epoch !== this._switchEpoch || !this.isConnected) {
+      return; // superseded, or the pane went away mid-build
+    }
+    this._pending = false;
     // Percentages are relative to the selection, so retarget the shared params
     // the formatters read rather than rebuilding the columns around a new total.
+    const scoped = this._scoped;
     this._barParams.totalValue = scoped?.rootTotal ?? 0;
-    if (!scoped) {
-      // Nothing in scope: empty a built table, and there is nothing to size a
-      // new one against.
-      if (slot) {
-        slot.stale = false;
-        void slot.table.setData([]);
-      }
-      return;
-    }
 
-    const data =
-      mode === 'time-order'
-        ? scoped.timeOrder
-        : mode === 'aggregated'
-          ? scoped.aggregated
-          : scoped.bottomUp;
+    const slot = this._tables[mode];
     if (slot) {
       slot.stale = false;
       void slot.table.setData(data);
+      return;
+    }
+    if (!scoped) {
+      // Nothing in scope, so there is nothing to size a new table against.
       return;
     }
 
@@ -293,7 +336,9 @@ export class CallTreeDetail extends LitElement {
       layout: 'fitColumns',
       height: '100%',
       maxHeight: '100%',
-      placeholder: 'No call tree available',
+      // Re-evaluated every time Tabulator shows the placeholder, so the pending
+      // text tracks the build without a second empty-state element.
+      placeholder: () => (this._pending ? 'Building the call tree…' : 'No call tree available'),
       // A scoped subtree is unbounded, so only the visible rows are rendered —
       // the same deal the Call Tree tab's tables get. The build in
       // `scopedCallTree` is still eager; this bounds the paint, not the walk.

@@ -30,8 +30,10 @@ jest.mock('tabulator-tables', () => {
 jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 
 // The walk is what this suite is about, so it's stubbed; each test says whether
-// it yields a tree or nothing.
-jest.mock('../scopedCallTree.js', () => ({ buildScopedCallTree: jest.fn(() => null) }));
+// it yields a tree or nothing, and when.
+jest.mock('../scopedCallTree.js', () => ({
+  buildScopedCallTree: jest.fn(() => Promise.resolve(null)),
+}));
 
 import { Tabulator } from 'tabulator-tables';
 
@@ -43,7 +45,10 @@ import type { ProgressParams } from '../../tabulator/format/ProgressMS.js';
 const build = jest.mocked(buildScopedCallTree);
 
 interface StubTable {
-  options: { columns: Array<{ field: string; formatterParams: ProgressParams; width: number }> };
+  options: {
+    columns: Array<{ field: string; formatterParams: ProgressParams; width: number }>;
+    placeholder: () => string;
+  };
   setData: jest.Mock;
   redraw: jest.Mock;
   destroy: jest.Mock;
@@ -54,7 +59,21 @@ const tables = Tabulator as unknown as { instances: StubTable[] };
 
 /** A scoped tree with no rows — only its totals matter to these tests. */
 function tree(rootTotal: number): ScopedCallTree {
-  return { rootTotal, logTotal: 5_000_000, timeOrder: [], aggregated: [], bottomUp: [] };
+  return {
+    rootTotal,
+    logTotal: 5_000_000,
+    timeOrder: () => Promise.resolve([]),
+    aggregated: () => Promise.resolve([]),
+    bottomUp: () => Promise.resolve([]),
+  };
+}
+
+/** Holds every build open, so a test decides when — and in which order — the
+ *  walks finish. Returns the resolvers, one per build, in start order. */
+function deferBuilds(): Array<(scoped: ScopedCallTree | null) => void> {
+  const resolvers: Array<(scoped: ScopedCallTree | null) => void> = [];
+  build.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)));
+  return resolvers;
 }
 
 function totalColumn(table: StubTable) {
@@ -65,10 +84,18 @@ function totalColumn(table: StubTable) {
   return column;
 }
 
+/** The build chain awaits more than once, so keep re-awaiting the render rather
+ *  than counting microtasks. */
+async function settle(el: CallTreeDetail): Promise<void> {
+  for (let i = 0; i < 5; i++) {
+    await el.updateComplete;
+  }
+}
+
 /** Lets the rAF the build waits behind fire, then settles the render. */
 async function frame(el: CallTreeDetail): Promise<void> {
   await new Promise((resolve) => requestAnimationFrame(resolve));
-  await el.updateComplete;
+  await settle(el);
 }
 
 async function mount(eventIndex: number): Promise<CallTreeDetail> {
@@ -83,7 +110,7 @@ describe('CallTreeDetail scoped build', () => {
   beforeEach(() => {
     document.body.replaceChildren();
     build.mockReset();
-    build.mockReturnValue(null);
+    build.mockResolvedValue(null);
     tables.instances.length = 0;
   });
 
@@ -94,7 +121,7 @@ describe('CallTreeDetail scoped build', () => {
     expect(build).not.toHaveBeenCalled();
 
     await frame(el);
-    expect(build.mock.calls).toEqual([[5, null]]);
+    expect(build.mock.calls).toEqual([[5, null, expect.anything()]]);
   });
 
   it('walks only the latest scope when selections arrive back to back', async () => {
@@ -105,11 +132,11 @@ describe('CallTreeDetail scoped build', () => {
     // Both switches are still behind the same yield; the epoch guard drops the
     // superseded one before it can pay for a walk nobody is waiting on.
     await frame(el);
-    expect(build.mock.calls).toEqual([[6, null]]);
+    expect(build.mock.calls).toEqual([[6, null, expect.anything()]]);
   });
 
   it('re-fills the built table for a new selection instead of rebuilding it', async () => {
-    build.mockImplementation((eventIndex) => tree(eventIndex * 1000));
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
     const el = await mount(5);
     await frame(el);
     expect(tables.instances).toHaveLength(1);
@@ -120,14 +147,16 @@ describe('CallTreeDetail scoped build', () => {
     await frame(el);
 
     // Same table, re-filled — a Tabulator is expensive to construct, and its
-    // construction is what used to land on the selection's critical path.
+    // construction is what used to land on the selection's critical path. Two
+    // fills: the previous selection's rows are cleared before the walk, then
+    // the new ones land.
     expect(tables.instances).toHaveLength(1);
     expect(table.destroy).not.toHaveBeenCalled();
-    expect(table.setData).toHaveBeenCalledTimes(1);
+    expect(table.setData).toHaveBeenCalledTimes(2);
   });
 
   it('retargets the percentage denominator without touching the bar width', async () => {
-    build.mockImplementation((eventIndex) => tree(eventIndex * 1000));
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
     const el = await mount(5);
     await frame(el);
     const column = totalColumn(tables.instances[0]!);
@@ -142,5 +171,50 @@ describe('CallTreeDetail scoped build', () => {
     // selection's total reaches the bars with the columns left as they were.
     expect(column.formatterParams.totalValue).toBe(6000);
     expect(column.width).toBe(widthAtBuild);
+  });
+
+  it('clears the stale rows and says the walk is running', async () => {
+    const resolvers = deferBuilds();
+    const el = await mount(5);
+    await frame(el);
+    resolvers[0]!(tree(5000));
+    await settle(el);
+    const table = tables.instances[0]!;
+    expect(table.options.placeholder()).toBe('No call tree available');
+
+    el.eventIndex = 6;
+    await el.updateComplete;
+    await frame(el);
+
+    // The rows on screen describe the previous selection, so they go before the
+    // walk starts; Tabulator re-reads the placeholder each time it shows one.
+    expect(table.setData).toHaveBeenLastCalledWith([]);
+    expect(table.options.placeholder()).toBe('Building the call tree…');
+
+    resolvers[1]!(tree(6000));
+    await settle(el);
+    expect(table.options.placeholder()).toBe('No call tree available');
+  });
+
+  it('drops a superseded walk that finishes after the newer one', async () => {
+    const resolvers = deferBuilds();
+    const el = await mount(5);
+    await frame(el);
+    el.eventIndex = 6;
+    await el.updateComplete;
+    await frame(el);
+    expect(resolvers).toHaveLength(2);
+
+    // The newer walk finishes first; the stale one lands afterwards, as it would
+    // if its own scope were simply wider.
+    resolvers[1]!(tree(6000));
+    await settle(el);
+    expect(totalColumn(tables.instances[0]!).formatterParams.totalValue).toBe(6000);
+
+    resolvers[0]!(tree(5000));
+    await settle(el);
+    // The epoch guard drops it — the denominator still describes what's shown.
+    expect(tables.instances).toHaveLength(1);
+    expect(totalColumn(tables.instances[0]!).formatterParams.totalValue).toBe(6000);
   });
 });
