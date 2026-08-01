@@ -59,9 +59,10 @@ export interface ScopedRow {
 export interface ScopedCallTree {
   /** The selected node's total time (ns) — the % denominator for the bars. */
   rootTotal: number;
-  /** The whole log's total time (ns). Every selection's `rootTotal` fits inside
-   *  it, so it sizes the bar columns once for the log instead of per selection —
-   *  the widths then stay put as the selection changes. */
+  /** The whole log's total time (ns). It sizes the bar columns once for the log
+   *  instead of per selection, so the widths stay put as the selection changes.
+   *  An aggregate `rootTotal` sums nested occurrences, so it can read wider than
+   *  this; the column carries enough padding to absorb that. */
   logTotal: number;
   /** The three views, built on first call and cached (only one is on screen).
    *  Each hands the frame back as it works, and returns null when abandoned. */
