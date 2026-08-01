@@ -21,7 +21,6 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       link: { type: 'doc', id: 'docs/features/features' },
       items: [
-        'docs/features/header',
         'docs/features/timeline',
         'docs/features/governor-limits-heap',
         'docs/features/calltree',
