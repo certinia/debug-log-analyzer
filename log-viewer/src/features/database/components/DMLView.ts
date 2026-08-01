@@ -9,13 +9,13 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, DMLBeginLine } from 'apex-log-parser';
-import { eventBus } from '../../../core/events/EventBus.js';
 import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { emitGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import {
   applyColumnView,
@@ -435,8 +435,9 @@ export class DMLView extends LitElement {
     this.dmlTable?.copyToClipboard('all');
   }
 
+  /** Clears this grid because another one was picked, so it emits nothing. */
   deselectRows() {
-    this.dmlTable?.deselectRow();
+    this._echoGuard.run(() => this.dmlTable?.deselectRow());
   }
 
   /**
@@ -699,18 +700,9 @@ export class DMLView extends LitElement {
     // navigation updates it too. RowKeyboardNavigation keeps a single row
     // selected across mouse and arrow-key navigation.
     this.dmlTable.on('rowSelectionChanged', (_data, rows) => {
-      if (this._echoGuard.suppressed) {
-        return;
-      }
-      const data = rows[0]?.getData() as DMLRow | undefined;
-      if (!data || data.eventIndex === undefined || !data.dml) {
-        return;
-      }
-
-      eventBus.emit('detail:select', {
-        source: 'database',
-        selection: { kind: 'event', eventIndex: data.eventIndex, type: 'dml' },
-      });
+      emitGridSelection(this._echoGuard, 'dml', rows, (data: DMLRow) =>
+        data.dml ? data.eventIndex : undefined,
+      );
     });
 
     this.dmlTable.on('rowContext', (e, row) => {

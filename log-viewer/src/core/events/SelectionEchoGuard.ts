@@ -3,9 +3,11 @@
  */
 
 /**
- * Marks the window in which a view selects a row on the inspector's behalf, so
- * the view can skip the `detail:select` it would otherwise emit and send the
- * inspector back the very selection it asked for.
+ * Marks the window in which a view changes its selection for a reason the
+ * inspector must not hear about, so the view can skip the `detail:select` it
+ * would otherwise emit: a row selected on the inspector's own behalf, which
+ * would send back the very selection it asked for, or a grid cleared because a
+ * sibling grid was picked, whose null would arrive after the pick and undo it.
  *
  * Needed because neither consumer offers a silent select: tabulator fires
  * `rowSelectionChanged` for a programmatic `row.select()`, and the flame chart

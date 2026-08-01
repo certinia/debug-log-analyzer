@@ -11,13 +11,16 @@
  *  active tab, keyed by source. */
 export type DetailSource = 'timeline' | 'calltree' | 'analysis' | 'database';
 
+/** Which of the database grids a selection came from. */
+export type StatementType = 'dml' | 'soql' | 'sosl';
+
 /**
  * A selection to inspect in the inspector. A single frame maps to one `eventIndex`;
  * an aggregate row (Call Tree Aggregated/Bottom-Up, Analysis) scopes to all its
  * occurrences (`instances` = their eventIndexes), aggregated.
  */
 export type DetailSelection =
-  | { kind: 'event'; eventIndex: number; type?: 'dml' | 'soql' | 'sosl' }
+  | { kind: 'event'; eventIndex: number; type?: StatementType }
   | { kind: 'aggregate'; instances: number[]; label: string };
 
 interface EventMap {
