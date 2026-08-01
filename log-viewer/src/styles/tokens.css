@@ -1,0 +1,61 @@
+/*
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ */
+
+/*
+ * Semantic appearance tokens. Every radius, space, stroke, surface and shadow in
+ * the app resolves through this set, so re-theming is a host concern rather than
+ * a per-component one.
+ *
+ * Each token is `var(--vscode-…, <literal>)`: inside a webview VS Code injects
+ * the `--vscode-*` block on `documentElement` and re-pushes it on every theme
+ * change, so these follow along for free. The literals are what a standalone
+ * host (or a VS Code older than the size-token registry) falls back to — a
+ * non-webview host only has to override this one set to re-skin the app.
+ *
+ * Declared on `:root` rather than per-`:host`: the build's CSS plugin injects
+ * this into `document.head`, and custom properties inherit through every shadow
+ * boundary, so one definition reaches every component.
+ */
+:root {
+  /* Radius — VS Code's cornerRadius registry. */
+  --lana-radius-sm: var(--vscode-cornerRadius-small, 4px);
+  --lana-radius-md: var(--vscode-cornerRadius-medium, 6px);
+  --lana-radius-lg: var(--vscode-cornerRadius-large, 8px);
+
+  /* Space — named by px so a literal maps to a token without a lookup. */
+  --lana-space-2: var(--vscode-spacing-size20, 2px);
+  --lana-space-4: var(--vscode-spacing-size40, 4px);
+  --lana-space-6: var(--vscode-spacing-size60, 6px);
+  --lana-space-8: var(--vscode-spacing-size80, 8px);
+  --lana-space-12: var(--vscode-spacing-size120, 12px);
+  --lana-space-20: var(--vscode-spacing-size200, 20px);
+  --lana-space-24: var(--vscode-spacing-size240, 24px);
+
+  --lana-stroke: var(--vscode-strokeThickness, 1px);
+
+  /* Surfaces — the same registered colors VS Code's own chrome is built from.
+     `surface-border` is absent before the size-token registry (stable 1.128 ships
+     none of the `--vscode-surface-*` set), so its fallback chain is load-bearing. */
+  --lana-surface-border: var(
+    --vscode-surface-border,
+    var(--vscode-widget-border, var(--vscode-sideBar-border, transparent))
+  );
+  --lana-header-bg: var(--vscode-tab-activeBackground, var(--vscode-editor-background));
+
+  --lana-shadow-popover: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+  --lana-shadow-overlay: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.5));
+
+  /* Two panel seams, because they behave differently: `divider` separates two
+     adjacent regions, `edge` is a single region's outer hairline. */
+  --lana-panel-divider: var(--vscode-sideBar-border, transparent);
+  --lana-panel-edge: var(--vscode-sideBar-border, transparent);
+
+  /* Resize handles. `inset` pulls the handle over its neighbours so no gap shows,
+     leaving the divider hairline as the only seam. */
+  --lana-sash-size: var(--lana-space-4);
+  --lana-sash-inset: calc(var(--lana-sash-size) / -2);
+
+  /* Shared height for the inspector dock's action bar and pane section headers. */
+  --lana-panel-header-height: var(--lana-space-24);
+}
