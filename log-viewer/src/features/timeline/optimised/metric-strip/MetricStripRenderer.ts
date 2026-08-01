@@ -123,6 +123,13 @@ export class MetricStripRenderer {
   /** Whether mouse is hovering over the toggle area. */
   private isToggleHovered = false;
 
+  /**
+   * Toggle chevron colors. Replaced by {@link setToggleIconColors} once the host
+   * theme is known; the literals only apply outside a themed host.
+   */
+  private toggleIconColor = 0xcccccc;
+  private toggleIconHoverColor = 0xffffff;
+
   constructor() {
     this.markerGraphics = new Graphics();
     this.dangerZoneGraphics = new Graphics();
@@ -184,6 +191,17 @@ export class MetricStripRenderer {
   }
 
   /**
+   * Set the toggle chevron colors after a host theme change.
+   *
+   * @param color - Resting icon color (0xRRGGBB)
+   * @param hoverColor - Icon color while the toggle is hovered (0xRRGGBB)
+   */
+  public setToggleIconColors(color: number, hoverColor: number): void {
+    this.toggleIconColor = color;
+    this.toggleIconHoverColor = hoverColor;
+  }
+
+  /**
    * Check if the toggle is currently hovered.
    */
   public getIsToggleHovered(): boolean {
@@ -240,7 +258,7 @@ export class MetricStripRenderer {
    */
   private renderToggleButton(): void {
     const g = this.toggleGraphics;
-    const iconColor = this.isToggleHovered ? 0xffffff : 0xcccccc;
+    const iconColor = this.isToggleHovered ? this.toggleIconHoverColor : this.toggleIconColor;
 
     if (this.isCollapsed) {
       // ▶ (right-pointing triangle)

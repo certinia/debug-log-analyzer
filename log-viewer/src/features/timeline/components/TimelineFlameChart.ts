@@ -13,6 +13,7 @@ import { css, html, LitElement, type PropertyValues, unsafeCSS } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
+import { themeObserver } from '../../../core/theme/ThemeObserver.js';
 import { ApexLogTimeline } from '../optimised/ApexLogTimeline.js';
 import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
 import type { EditorColors, TimelineOptions } from '../types/flamechart.types.js';
@@ -114,6 +115,25 @@ export class TimelineFlameChart extends LitElement {
   @query('.timeline-container')
   private containerRef!: HTMLElement;
 
+  /** Unsubscribe for the appearance subscription; set while connected. */
+  private themeUnsubscribe: (() => void) | null = null;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.themeUnsubscribe ??= themeObserver.on(() => {
+      this.refreshTheme();
+    });
+  }
+
+  override disconnectedCallback(): void {
+    this.themeUnsubscribe?.();
+    this.themeUnsubscribe = null;
+    // A `lana.timeline.legacy` toggle swaps this element out while the panel is
+    // open, so the Pixi app has to go with it or its WebGL context leaks.
+    this.cleanup();
+    super.disconnectedCallback();
+  }
+
   override updated(changedProperties: PropertyValues): void {
     super.updated(changedProperties);
 
@@ -123,11 +143,28 @@ export class TimelineFlameChart extends LitElement {
       this.containerRef
     ) {
       this.initializeTimeline();
+    } else if (changedProperties.has('themeName')) {
+      // `else`: opening a log lands both properties in one update, and
+      // `initializeTimeline` already reads the current appearance.
+      this.refreshTheme();
+    }
+  }
+
+  /**
+   * Push the current appearance into the renderers.
+   *
+   * Both halves move together: the category palette named by `themeName`, and the
+   * editor colors read out of CSS. Deliberately never re-runs
+   * {@link initializeTimeline} — tearing down the Pixi app on a theme switch would
+   * blow the perf budget on large logs.
+   */
+  private refreshTheme(): void {
+    if (!this.apexLogTimeline) {
+      return;
     }
 
-    if (changedProperties.has('themeName') || changedProperties.has('themeName')) {
-      this.apexLogTimeline?.setTheme(this.themeName ?? '');
-    }
+    this.apexLogTimeline.setEditorColors(this.extractEditorColors());
+    this.apexLogTimeline.setTheme(this.themeName ?? '');
   }
 
   /**
@@ -206,6 +243,10 @@ export class TimelineFlameChart extends LitElement {
       lineNumberForeground: parseColorToHex(
         style.getPropertyValue('--tl-line-number-foreground').trim() || '#808080',
         0x808080,
+      ),
+      editorForeground: parseColorToHex(
+        style.getPropertyValue('--tl-editor-foreground').trim() || '#cccccc',
+        0xcccccc,
       ),
       selectionBackground: parseColorToHex(
         style.getPropertyValue('--tl-selection-background').trim() || 'rgba(38, 79, 120, 0.5)',

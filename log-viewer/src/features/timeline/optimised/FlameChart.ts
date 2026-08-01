@@ -13,6 +13,7 @@
 import type { LogEvent } from 'apex-log-parser';
 import * as PIXI from 'pixi.js';
 import type {
+  EditorColors,
   EventNode,
   HeatStripTimeSeries,
   ModifierKeys,
@@ -44,6 +45,7 @@ import { TimelineResizeHandler } from './interaction/TimelineResizeHandler.js';
 import type { MeasurementSnapshot } from './measurement/MeasurementState.js';
 import { RectangleCache, type PrecomputedRect } from './RectangleCache.js';
 import { cssColorToPixi } from './rendering/ColorUtils.js';
+import { hexToCSS } from './rendering/tooltip-utils.js';
 import { CursorLineRenderer } from './rendering/CursorLineRenderer.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineViewport } from './TimelineViewport.js';
@@ -296,24 +298,16 @@ export class FlameChart<E extends EventNode = EventNode> {
     // Create axis renderer SECOND
     if (this.axisContainer && this.uiContainer) {
       const editorColors = this.options.editorColors;
-      const axisConfig = {
+      const lineColor = editorColors?.lineNumberForeground ?? 0x808080;
+      this.axisRenderer = new MeshAxisRenderer(this.axisContainer, {
         height: 30,
-        lineColor: editorColors?.lineNumberForeground ?? 0x808080,
-        textColor: editorColors
-          ? `#${editorColors.lineNumberForeground.toString(16).padStart(6, '0')}`
-          : '#808080',
+        lineColor,
+        textColor: hexToCSS(lineColor),
         fontSize: 11,
         minLabelSpacing: 120,
-      };
-      this.axisRenderer = new MeshAxisRenderer(this.axisContainer, axisConfig);
+        backgroundColor: editorColors?.widgetBackground,
+      });
       this.axisRenderer.setScreenSpaceContainer(this.uiContainer);
-      if (editorColors) {
-        this.axisRenderer.setColors(
-          editorColors.lineNumberForeground,
-          `#${editorColors.lineNumberForeground.toString(16).padStart(6, '0')}`,
-          editorColors.widgetBackground,
-        );
-      }
       // No minimap offset needed - main timeline has its own canvas
     }
 
@@ -788,6 +782,44 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.minimapOrchestrator?.invalidateCache();
 
     // Request re-render
+    this.requestRender();
+  }
+
+  /**
+   * Push editor colors read from the host theme into every renderer that holds one.
+   *
+   * Fans out to the same consumers wired in {@link init}, so a theme switch never has
+   * to tear the Pixi app down — doing so would blow the perf budget on large logs.
+   *
+   * @param colors - Editor colors resolved from CSS custom properties
+   */
+  public setEditorColors(colors: EditorColors): void {
+    this.options.editorColors = colors;
+
+    this.axisRenderer?.setColors(
+      colors.lineNumberForeground,
+      hexToCSS(colors.lineNumberForeground),
+      colors.widgetBackground,
+    );
+    this.cursorLineRenderer?.setColor(colors.cursorForeground);
+    this.searchOrchestrator?.setHighlightColor(colors.findMatchBackground);
+    this.selectionOrchestrator?.setHighlightColor(colors.findMatchBackground);
+    this.measurementOrchestrator?.setColors(
+      colors.selectionBackground,
+      // Same fallback the orchestrator applies at init: many themes leave
+      // `selectionHighlightBorder` transparent, so the border falls back to the focus ring.
+      colors.selectionHighlightBorder || colors.focusBorder,
+    );
+    this.minimapOrchestrator?.setColors(
+      colors.widgetBackground,
+      colors.focusBorder,
+      colors.lineNumberForeground,
+    );
+    this.metricStripOrchestrator?.setToggleIconColors(
+      colors.lineNumberForeground,
+      colors.editorForeground,
+    );
+
     this.requestRender();
   }
 
@@ -1370,6 +1402,14 @@ export class FlameChart<E extends EventNode = EventNode> {
       displayWidth,
       this.index.totalDuration,
     );
+
+    const editorColors = this.options.editorColors;
+    if (editorColors) {
+      this.metricStripOrchestrator.setToggleIconColors(
+        editorColors.lineNumberForeground,
+        editorColors.editorForeground,
+      );
+    }
 
     // Focus container on metric strip mousedown for keyboard support
     const metricStripApp = this.metricStripOrchestrator.getApp();
