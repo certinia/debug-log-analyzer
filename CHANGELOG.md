@@ -39,12 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 📊 **Timeline**
   - **Governor limits strip**: tooltip rows keep a stable order and always show the `used / limit` value, so figures no longer jump around as you move the pointer. ([#827])
   - **Timeline zooming**: consistent, smooth zoom across platforms and input devices — a Windows mouse wheel no longer over-zooms in large jumps, fast scrolls stay bounded, and zooming in then back out returns to the same level.
-  - **Truncation markers** now end where the log recovers, so trusted sections are no longer flag. ([#828])
+  - **Truncation markers** now end where the log recovers, so trusted sections are no longer flagged. ([#828])
 - 🏷️ **Call Tree names**: rows no longer carry a raw `EVENT_TYPE:` prefix in front of text that already identifies them, so `WF_CRITERIA_BEGIN: WF_CRITERIA : ON_ALL_CHANGES` reads as `WF_CRITERIA : ON_ALL_CHANGES`. Frames whose text can't stand alone keep the type, and the ones that needed naming now say what they are — `(code unit)`, `(constructor)`, `(managed package)`, `(flow)`. A **Type** column is available in every view from the **Columns** menu if you want the raw types back.
 - 🗂️ **Call Tree + Database styling**: VS Code style tree icons, and rows indent under their group headings. ([#832]).
 - 🎛️ **Modernised dropdowns**: searchable, compact controls that carry the field and value in one place (e.g. `Group: Namespace`, `Type: All`) ([#848]).
-- 🗄️ **Database table columns** (DML, SOQL, SOSL): consolidated onto the shared Call Tree column/sort styling for a consistent look across all tables.
-- 🧱 **Data grids**: a crisper header/content separator and tidied grid styling across all tables.
+- 🗄️ **Database table columns** (DML, SOQL, SOSL): consolidated onto the shared Call Tree column/sort styling for a consistent look across all tables. ([#873])
+- 🧱 **Data grids**: a crisper header/content separator and tidied grid styling across all tables. ([#873])
 - 📐 **Column widths**: sized to fit their header and values, so nothing clips.
 - 🎨 **Header bar**
   - **Log problems** icon now shows the most severe problem found, with a count.
@@ -54,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- 📊 **Database usage bars** (Row Count, Time Taken): the usage bar was hidden whenever the rounded percentage was 0% (the common case for small row counts against large governor limits), so it rarely appeared; it now fills relative to the grid's own column total rather than a governor limit, shows on grouped summary rows, and Time Taken (ms) now shows a bar too.
+- 📊 **Database usage bars** (Row Count, Time Taken): the usage bar was hidden whenever the rounded percentage was 0% (the common case for small row counts against large governor limits), so it rarely appeared; it now fills relative to the grid's own column total rather than a governor limit, shows on grouped summary rows, and Time Taken (ms) now shows a bar too. ([#873])
 
 ## [1.20.1] 2026-07-23
 
@@ -548,6 +548,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#576]: https://github.com/certinia/debug-log-analyzer/issues/576
 [#832]: https://github.com/certinia/debug-log-analyzer/issues/832
 [#848]: https://github.com/certinia/debug-log-analyzer/issues/848
+[#828]: https://github.com/certinia/debug-log-analyzer/issues/828
 [#827]: https://github.com/certinia/debug-log-analyzer/issues/827
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
 [#162]: https://github.com/certinia/debug-log-analyzer/issues/162
