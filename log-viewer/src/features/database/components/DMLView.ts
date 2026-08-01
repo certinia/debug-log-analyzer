@@ -16,6 +16,7 @@ import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { selectRowByEventIndex } from './revealRow.js';
 import {
   applyColumnView,
   buildColumnMenuItems,
@@ -443,19 +444,7 @@ export class DMLView extends LitElement {
    * inspector that asked for it. Returns false when this grid has no such row.
    */
   selectByEventIndex(eventIndex: number): boolean {
-    // The tabulator index is a synthetic row id, so the eventIndex is scanned for.
-    const match = this.dmlTable
-      ?.getRows()
-      .find((candidate) => (candidate.getData() as DMLRow).eventIndex === eventIndex);
-    if (!match) {
-      return false;
-    }
-
-    this._echoGuard.run(() => {
-      this.dmlTable?.deselectRow();
-      match.select();
-    });
-    return true;
+    return selectRowByEventIndex(this.dmlTable, this._echoGuard, eventIndex);
   }
 
   _exportToCSV() {

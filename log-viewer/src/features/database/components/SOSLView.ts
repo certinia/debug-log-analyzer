@@ -16,6 +16,7 @@ import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { selectRowByEventIndex } from './revealRow.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import {
@@ -754,19 +755,7 @@ export class SOSLView extends LitElement {
    * inspector that asked for it. Returns false when this grid has no such row.
    */
   selectByEventIndex(eventIndex: number): boolean {
-    // The tabulator index is a synthetic row id, so the eventIndex is scanned for.
-    const match = this.soslTable
-      ?.getRows()
-      .find((candidate) => (candidate.getData() as SOSLRow).eventIndex === eventIndex);
-    if (!match) {
-      return false;
-    }
-
-    this._echoGuard.run(() => {
-      this.soslTable?.deselectRow();
-      match.select();
-    });
-    return true;
+    return selectRowByEventIndex(this.soslTable, this._echoGuard, eventIndex);
   }
 
   downlodEncoder(defaultFileName: string) {

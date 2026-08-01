@@ -25,6 +25,7 @@ import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { selectRowByEventIndex } from './revealRow.js';
 import {
   applyColumnView,
   buildColumnMenuItems,
@@ -461,19 +462,7 @@ export class SOQLView extends LitElement {
    * inspector that asked for it. Returns false when this grid has no such row.
    */
   selectByEventIndex(eventIndex: number): boolean {
-    // The tabulator index is a synthetic row id, so the eventIndex is scanned for.
-    const match = this.soqlTable
-      ?.getRows()
-      .find((candidate) => (candidate.getData() as GridSOQLData).eventIndex === eventIndex);
-    if (!match) {
-      return false;
-    }
-
-    this._echoGuard.run(() => {
-      this.soqlTable?.deselectRow();
-      match.select();
-    });
-    return true;
+    return selectRowByEventIndex(this.soqlTable, this._echoGuard, eventIndex);
   }
 
   _exportToCSV() {
