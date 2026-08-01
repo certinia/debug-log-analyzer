@@ -65,20 +65,34 @@ export class LogView {
     const codiconUri = panel.webview.asWebviewUri(Uri.file(join(logViewerRoot, 'codicon.css')));
     const indexSrc = await this.getFile(index);
     panel.iconPath = Uri.file(join(logViewerRoot, 'certinia-icon-color.png'));
+    const initialConfig = LogView.resolveConfig(context);
     panel.webview.html = indexSrc
       .replace(/bundle\.js/gi, bundleUri.toString(true))
-      .replace(/codicon\.css/gi, codiconUri.toString(true));
+      .replace(/codicon\.css/gi, codiconUri.toString(true))
+      // Stamp the chrome on the markup so the first paint is already in the right
+      // mode; asking for it over a message would show flat chrome until the reply.
+      .replace(
+        '<html lang="en">',
+        `<html lang="en" data-chrome="${initialConfig.appearance.chrome}">`,
+      );
 
     // The panel keeps its context when hidden, so it is never re-created: settings
     // edits have to be pushed to it. `workbench` is watched as a whole section
     // rather than one key because the modern-chrome experiment's setting id changes
     // between releases (see `AppConfig.detectModernChrome()`).
+    // Any of the ~250 `workbench.*` settings triggers this, so only push when the
+    // resolved payload actually changed — every webview subscriber re-applies it.
+    let lastConfig = JSON.stringify(initialConfig);
     const configListener = workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration('lana') || event.affectsConfiguration('workbench')) {
-        panel.webview.postMessage({
-          cmd: 'configChanged',
-          payload: LogView.resolveConfig(context),
-        });
+      if (!event.affectsConfiguration('lana') && !event.affectsConfiguration('workbench')) {
+        return;
+      }
+
+      const config = LogView.resolveConfig(context);
+      const serialized = JSON.stringify(config);
+      if (serialized !== lastConfig) {
+        lastConfig = serialized;
+        panel.webview.postMessage({ cmd: 'configChanged', payload: config });
       }
     });
 
