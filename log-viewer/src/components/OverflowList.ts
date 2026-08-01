@@ -163,10 +163,10 @@ export class OverflowList extends LitElement {
         min-width: 200px;
         max-width: min(92vw, 340px);
         padding: var(--lana-space-6);
-        background-color: var(--vscode-menu-background, var(--vscode-editor-background));
-        border: var(--lana-stroke) solid var(--vscode-menu-border, var(--lana-surface-border));
-        border-radius: var(--lana-radius-md);
-        box-shadow: var(--lana-shadow-popover);
+        background-color: var(--filter-popover-bg);
+        border: var(--lana-stroke) solid var(--filter-popover-border-color);
+        border-radius: var(--filter-popover-radius);
+        box-shadow: var(--filter-popover-shadow);
         color: var(--vscode-menu-foreground, var(--vscode-foreground));
         font-family: var(--vscode-font-family);
       }
