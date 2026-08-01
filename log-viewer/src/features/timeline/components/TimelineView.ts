@@ -7,7 +7,7 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { getSettings } from '../../settings/Settings.js';
+import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
 import { type TimelineGroup, keyMap, setColors } from '../services/Timeline.js';
 
 import { DEFAULT_THEME_NAME, type TimelineColors } from '../themes/Themes.js';
@@ -57,6 +57,16 @@ export class TimelineView extends LitElement {
 
   @state()
   private useLegacyTimeline: boolean | null = null;
+
+  /** Unsubscribe for the settings subscription; set while connected. */
+  private settingsUnsubscribe: (() => void) | null = null;
+
+  /**
+   * Last applied persisted palette (`activeTheme` + `customThemes`). A quick-pick
+   * preview is not persisted, so an unrelated `configChanged` push must not
+   * re-apply the stored theme over it.
+   */
+  private persistedPalette: string | null = null;
 
   @state()
   private timeDisplayMode: TimeDisplayMode = 'elapsed';
@@ -149,18 +159,34 @@ export class TimelineView extends LitElement {
       }
     });
 
-    getSettings().then((settings) => {
-      const { timeline } = settings;
-      this.useLegacyTimeline = timeline.legacy;
-
-      if (!this.useLegacyTimeline) {
-        addCustomThemes(this.toTheme(timeline.customThemes));
-        this.setTheme(timeline.activeTheme ?? DEFAULT_THEME_NAME);
-      } else {
-        setColors(timeline.colors);
-        this.timelineKeys = Array.from(keyMap.values());
-      }
+    // The panel is never re-created, so live `lana.timeline.*` edits only reach the
+    // chart through this subscription.
+    this.settingsUnsubscribe ??= subscribeSettings((settings) => {
+      this.applyTimelineSettings(settings);
     });
+  }
+
+  override disconnectedCallback() {
+    this.settingsUnsubscribe?.();
+    this.settingsUnsubscribe = null;
+    super.disconnectedCallback();
+  }
+
+  private applyTimelineSettings(settings: LanaSettings) {
+    const { timeline } = settings;
+    this.useLegacyTimeline = timeline.legacy;
+
+    if (!this.useLegacyTimeline) {
+      addCustomThemes(this.toTheme(timeline.customThemes));
+      const palette = JSON.stringify([timeline.activeTheme, timeline.customThemes]);
+      if (palette !== this.persistedPalette) {
+        this.persistedPalette = palette;
+        this.setTheme(timeline.activeTheme ?? DEFAULT_THEME_NAME);
+      }
+    } else {
+      setColors(timeline.colors);
+      this.timelineKeys = Array.from(keyMap.values());
+    }
   }
 
   render() {

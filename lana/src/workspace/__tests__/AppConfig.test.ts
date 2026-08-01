@@ -1,12 +1,14 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import { describe, expect, it, jest } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import type { Memento } from 'vscode';
+import { workspace } from 'vscode';
 
 import {
   COLUMN_OVERRIDE_SECTIONS,
   getColumnOverrides,
+  getConfig,
   updateColumnOverride,
 } from '../AppConfig.js';
 
@@ -19,6 +21,53 @@ function mockMemento(store: Record<string, unknown> = {}): Memento {
     update: jest.fn(() => Promise.resolve()),
   } as unknown as Memento;
 }
+
+function mockLanaConfig(values: Record<string, unknown>): void {
+  const config = {
+    ...values,
+    get: jest.fn(),
+    has: jest.fn(() => false),
+    inspect: jest.fn(() => undefined),
+    update: jest.fn(),
+  };
+  jest
+    .mocked(workspace.getConfiguration)
+    .mockReturnValue(config as unknown as ReturnType<typeof workspace.getConfiguration>);
+}
+
+describe('getConfig', () => {
+  afterEach(() => {
+    jest.mocked(workspace.getConfiguration).mockReset();
+  });
+
+  it('seeds the database branch the merged settings tree never carries', () => {
+    // `lana.database.*` is private globalState, so a fresh profile has no branch.
+    mockLanaConfig({ timeline: {}, callTree: {}, inspector: {} });
+
+    const config = getConfig();
+
+    for (const view of ['soql', 'dml', 'sosl'] as const) {
+      expect(config.database[view]).toEqual({ columnView: 'General', columnOverrides: {} });
+    }
+  });
+
+  it('keeps values a legacy settings.json still carries', () => {
+    mockLanaConfig({
+      timeline: {},
+      callTree: {},
+      inspector: {},
+      database: { soql: { columnView: 'Governor Limits' } },
+    });
+
+    const config = getConfig();
+
+    expect(config.database.soql).toEqual({
+      columnView: 'Governor Limits',
+      columnOverrides: {},
+    });
+    expect(config.database.dml.columnView).toBe('General');
+  });
+});
 
 describe('AppConfig column overrides', () => {
   describe('getColumnOverrides', () => {
