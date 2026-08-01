@@ -15,39 +15,15 @@
  * OS colour-scheme preference, fires a notification.
  */
 
-export type ThemeKind = 'light' | 'dark' | 'high-contrast' | 'high-contrast-light';
-
-/** Body classes the webview preload sets, most specific first. */
-const KIND_BY_CLASS: ReadonlyArray<readonly [string, ThemeKind]> = [
-  ['vscode-high-contrast-light', 'high-contrast-light'],
-  ['vscode-high-contrast', 'high-contrast'],
-  ['vscode-light', 'light'],
-  ['vscode-dark', 'dark'],
-];
-
-/**
- * The current theme kind. Falls back to the OS preference so a standalone host
- * (no webview preload, so no body class) still reports something usable.
- */
-export function getThemeKind(): ThemeKind {
-  const kind = KIND_BY_CLASS.find(([className]) => document.body?.classList.contains(className));
-  if (kind) {
-    return kind[1];
-  }
-
-  return globalThis.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-}
-
 class ThemeObserverImpl {
-  private listeners = new Set<(kind: ThemeKind) => void>();
+  private listeners = new Set<() => void>();
   private mutationObserver: MutationObserver | null = null;
   private colorScheme: MediaQueryList | null = null;
   private pendingFrame: number | null = null;
   private readonly notify = () => {
     this.pendingFrame = null;
-    const kind = getThemeKind();
     this.listeners.forEach((listener) => {
-      listener(kind);
+      listener();
     });
   };
 
@@ -55,7 +31,7 @@ class ThemeObserverImpl {
    * Subscribe to appearance changes. Returns the unsubscribe function; the
    * underlying observers exist only while there is at least one subscriber.
    */
-  on(listener: (kind: ThemeKind) => void): () => void {
+  on(listener: () => void): () => void {
     this.listeners.add(listener);
     this.connect();
 

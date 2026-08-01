@@ -44,7 +44,8 @@ import { TimelineInteractionHandler } from './interaction/TimelineInteractionHan
 import { TimelineResizeHandler } from './interaction/TimelineResizeHandler.js';
 import type { MeasurementSnapshot } from './measurement/MeasurementState.js';
 import { RectangleCache, type PrecomputedRect } from './RectangleCache.js';
-import { cssColorToPixi, pixiToCssHex } from './rendering/ColorUtils.js';
+import { cssColorToPixi } from './rendering/ColorUtils.js';
+import { hexToCSS } from './rendering/tooltip-utils.js';
 import { CursorLineRenderer } from './rendering/CursorLineRenderer.js';
 import { TimelineEventIndex } from './TimelineEventIndex.js';
 import { TimelineViewport } from './TimelineViewport.js';
@@ -301,7 +302,7 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.axisRenderer = new MeshAxisRenderer(this.axisContainer, {
         height: 30,
         lineColor,
-        textColor: pixiToCssHex(lineColor),
+        textColor: hexToCSS(lineColor),
         fontSize: 11,
         minLabelSpacing: 120,
         backgroundColor: editorColors?.widgetBackground,
@@ -797,7 +798,7 @@ export class FlameChart<E extends EventNode = EventNode> {
 
     this.axisRenderer?.setColors(
       colors.lineNumberForeground,
-      pixiToCssHex(colors.lineNumberForeground),
+      hexToCSS(colors.lineNumberForeground),
       colors.widgetBackground,
     );
     this.cursorLineRenderer?.setColor(colors.cursorForeground);
@@ -805,7 +806,9 @@ export class FlameChart<E extends EventNode = EventNode> {
     this.selectionOrchestrator?.setHighlightColor(colors.findMatchBackground);
     this.measurementOrchestrator?.setColors(
       colors.selectionBackground,
-      colors.selectionHighlightBorder,
+      // Same fallback the orchestrator applies at init: many themes leave
+      // `selectionHighlightBorder` transparent, so the border falls back to the focus ring.
+      colors.selectionHighlightBorder || colors.focusBorder,
     );
     this.minimapOrchestrator?.setColors(
       colors.widgetBackground,

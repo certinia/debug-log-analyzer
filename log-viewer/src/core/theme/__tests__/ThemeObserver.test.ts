@@ -5,7 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { getThemeKind, themeObserver } from '../ThemeObserver.js';
+import { themeObserver } from '../ThemeObserver.js';
 
 /**
  * Lets jsdom deliver the queued MutationObserver records (a microtask), then runs
@@ -15,34 +15,6 @@ async function flushFrame(): Promise<void> {
   await Promise.resolve();
   jest.advanceTimersByTime(32);
 }
-
-describe('getThemeKind', () => {
-  afterEach(() => {
-    document.body.className = '';
-  });
-
-  it('reads the kind from the webview body class', () => {
-    document.body.className = 'vscode-light';
-    expect(getThemeKind()).toBe('light');
-
-    document.body.className = 'vscode-dark';
-    expect(getThemeKind()).toBe('dark');
-  });
-
-  it('prefers the high contrast variants over the plain kind', () => {
-    // The preload sets both, so the more specific class has to win.
-    document.body.className = 'vscode-high-contrast vscode-dark';
-    expect(getThemeKind()).toBe('high-contrast');
-
-    document.body.className = 'vscode-high-contrast-light vscode-high-contrast vscode-light';
-    expect(getThemeKind()).toBe('high-contrast-light');
-  });
-
-  it('falls back to the OS preference with no body class', () => {
-    // jsdom's matchMedia always reports no match, so light is never preferred.
-    expect(getThemeKind()).toBe('dark');
-  });
-});
 
 describe('themeObserver', () => {
   let unsubscribe: (() => void) | null = null;
@@ -66,7 +38,7 @@ describe('themeObserver', () => {
     jest.useRealTimers();
   });
 
-  it('notifies with the new kind when the body class changes', async () => {
+  it('notifies when the body theme class changes', async () => {
     const listener = jest.fn();
     unsubscribe = themeObserver.on(listener);
 
@@ -74,7 +46,6 @@ describe('themeObserver', () => {
     await flushFrame();
 
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(listener).toHaveBeenCalledWith('light');
   });
 
   it('notifies when the injected --vscode-* block is re-applied', async () => {
