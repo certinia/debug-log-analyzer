@@ -30,6 +30,9 @@ modern/floating-panels chrome — without reopening the panel.
 - **Every change must work in both `flat` and `cards` chrome.** Mode-specific chrome goes through
   `--lana-panel-{gap,radius,border,divider,edge}` under `:root[data-chrome='cards']` — never a second
   copy of a component's rules, and never assume one mode.
+- **Data palettes are the one exception.** The timeline category palettes (`timeline/themes/Themes.ts`)
+  and the metric-strip tier colors (`metric-strip/metric-strip-colors.ts`) encode meaning, not chrome,
+  so they stay literal and do not follow the host theme.
 - **Anything that reads a color in JS** (canvas/Pixi/`getComputedStyle`) MUST subscribe to
   `core/theme/ThemeObserver.ts` and refresh in place. Never re-initialise the renderer — tearing down
   the Pixi app on a theme switch blows the perf budget on large logs.
