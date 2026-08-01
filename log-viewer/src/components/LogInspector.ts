@@ -5,6 +5,7 @@ import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { type DetailSelection, type DetailSource, eventBus } from '../core/events/EventBus.js';
+import type { InspectorRevealEvent } from './inspectorReveal.js';
 import { debounce } from '../core/utility/Util.js';
 import { getSettings, updateSetting } from '../features/settings/Settings.js';
 import { emptyTextFor } from './detailEmptyText.js';
@@ -143,6 +144,7 @@ export class LogInspector extends LitElement {
         @dock-collapse=${this._hidePanel}
         @pane-toggle=${this._onPaneToggle}
         @pane-resize=${this._onPaneResize}
+        @inspector-reveal=${this._onReveal}
       >
         <slot slot="main" name="main"></slot>
       </dock-layout>
@@ -167,6 +169,18 @@ export class LogInspector extends LitElement {
       this._scheduleRebuild();
     }
   }
+
+  /**
+   * An inspector row asks to be revealed. Only the active tab's own view acts on
+   * it, so the source is stamped here - a call-tree selection must never move
+   * the timeline.
+   */
+  private _onReveal = (e: InspectorRevealEvent): void => {
+    const source = this._activeSource;
+    if (source) {
+      eventBus.emit('inspector:reveal', { source, eventIndex: e.detail.eventIndex });
+    }
+  };
 
   private _onToggle(detail: { visible?: boolean }): void {
     this._setVisible(detail.visible ?? !this._visible);

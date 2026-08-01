@@ -10,11 +10,13 @@ import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tab
 
 import type { ApexLog, SOSLExecuteBeginLine } from 'apex-log-parser';
 import { eventBus } from '../../../core/events/EventBus.js';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { selectRowByEventIndex } from './revealRow.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import {
@@ -87,6 +89,8 @@ export class SOSLView extends LitElement {
 
   soslTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
+  /** Guards the programmatic select made on the inspector's behalf. */
+  private _echoGuard = new SelectionEchoGuard();
   table: HTMLElement | null = null;
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
@@ -651,6 +655,9 @@ export class SOSLView extends LitElement {
     // Drive the detail panel off selection (not click) so keyboard row
     // navigation updates it too, matching the SOQL/DML grids.
     this.soslTable.on('rowSelectionChanged', (_data, rows) => {
+      if (this._echoGuard.suppressed) {
+        return;
+      }
       const data = rows[0]?.getData() as SOSLRow | undefined;
       if (!data || data.eventIndex === undefined || !data.sosl) {
         return;
@@ -741,6 +748,14 @@ export class SOSLView extends LitElement {
 
   deselectRows() {
     this.soslTable?.deselectRow();
+  }
+
+  /**
+   * Select the row for `eventIndex`, without echoing `detail:select` back at the
+   * inspector that asked for it. Returns false when this grid has no such row.
+   */
+  selectByEventIndex(eventIndex: number): boolean {
+    return selectRowByEventIndex(this.soslTable, this._echoGuard, eventIndex);
   }
 
   downlodEncoder(defaultFileName: string) {

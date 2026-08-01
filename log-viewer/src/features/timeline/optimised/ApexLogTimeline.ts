@@ -21,6 +21,7 @@ import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { ContextMenu } from '../../../components/ContextMenu.js';
 import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
 import { eventBus } from '../../../core/events/EventBus.js';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { copyToClipboard } from '../../../core/utility/Clipboard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { findEventByEventIndex, findEventByTimestamp } from '../../../core/utility/EventSearch.js';
@@ -38,6 +39,7 @@ import {
   type ViewportState,
 } from '../types/flamechart.types.js';
 import type { SearchCursor } from '../types/search.types.js';
+import { isFrameOffscreen, toDetailSelection } from '../utils/detail-selection-sync.js';
 import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
@@ -60,6 +62,9 @@ export class ApexLogTimeline {
   private selectedEventForContextMenu: EventNode | null = null;
   private selectedMarkerForContextMenu: TimelineMarker | null = null;
   private eventBusUnsubscribe: (() => void) | null = null;
+  private inspectorRevealUnsubscribe: (() => void) | null = null;
+  /** Guards the programmatic select made on the inspector's behalf. */
+  private echoGuard = new SelectionEchoGuard();
 
   constructor() {
     this.flamechart = new FlameChart();
@@ -197,6 +202,44 @@ export class ApexLogTimeline {
         this.navigateToTimestamp(detail.timestamp);
       }
     });
+
+    // Reveal an inspector row in the flame chart, but only while the timeline is
+    // the tab the inspector is showing.
+    this.inspectorRevealUnsubscribe = eventBus.on('inspector:reveal', (detail) => {
+      if (detail.source === 'timeline') {
+        this.selectFrameByEventIndex(detail.eventIndex);
+      }
+    });
+  }
+
+  /**
+   * Select the frame for `eventIndex` and pan to it when it is off-screen.
+   * Passive sync, so it never zooms - a full focus would be too disruptive.
+   */
+  private selectFrameByEventIndex(eventIndex: number): void {
+    if (!this.apexLog) {
+      return;
+    }
+
+    const result = findEventByEventIndex(this.apexLog, eventIndex);
+    if (!result) {
+      return;
+    }
+
+    const selected = this.echoGuard.run(() =>
+      this.flamechart.selectByEventNode(this.toEventNode(result)),
+    );
+    if (!selected) {
+      return;
+    }
+
+    const bounds = this.flamechart.getViewportManager()?.getBounds();
+    if (
+      bounds &&
+      isFrameOffscreen(bounds, result.event.timestamp, result.event.duration.total, result.depth)
+    ) {
+      this.flamechart.centerOnSelectedFrame();
+    }
   }
 
   /**
@@ -231,7 +274,14 @@ export class ApexLogTimeline {
       return;
     }
 
-    const eventNode: EventNode = {
+    this.flamechart.selectByEventNode(this.toEventNode(result));
+    const viewport = this.flamechart.getViewportManager();
+    viewport?.focusOnEvent(result.event.timestamp, result.event.duration.total, result.depth);
+    this.flamechart.requestRender();
+  }
+
+  private toEventNode(result: { event: LogEvent; depth: number }): EventNode {
+    return {
       id: `${result.event.eventIndex}-${result.depth}`,
       timestamp: result.event.timestamp,
       duration: result.event.duration.total,
@@ -239,11 +289,6 @@ export class ApexLogTimeline {
       text: result.event.text,
       original: result.event,
     };
-
-    this.flamechart.selectByEventNode(eventNode);
-    const viewport = this.flamechart.getViewportManager();
-    viewport?.focusOnEvent(result.event.timestamp, result.event.duration.total, result.depth);
-    this.flamechart.requestRender();
   }
 
   /**
@@ -273,6 +318,10 @@ export class ApexLogTimeline {
     if (this.eventBusUnsubscribe) {
       this.eventBusUnsubscribe();
       this.eventBusUnsubscribe = null;
+    }
+    if (this.inspectorRevealUnsubscribe) {
+      this.inspectorRevealUnsubscribe();
+      this.inspectorRevealUnsubscribe = null;
     }
 
     this.flamechart.destroy();
@@ -426,6 +475,10 @@ export class ApexLogTimeline {
    * Use J key for explicit "jump to call tree" action.
    */
   private handleSelect(eventNode: EventNode | null): void {
+    if (this.echoGuard.suppressed) {
+      return;
+    }
+
     if (!eventNode) {
       // Selection cleared - hide tooltip
       if (this.tooltipRenderer) {
@@ -439,11 +492,9 @@ export class ApexLogTimeline {
     // User can press J to explicitly jump to call tree
     // The inspector shows the selected frame's detail.
     const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
-    if (originalEvent?.eventIndex !== undefined) {
-      eventBus.emit('detail:select', {
-        source: 'timeline',
-        selection: { kind: 'event', eventIndex: originalEvent.eventIndex },
-      });
+    const selection = toDetailSelection(originalEvent?.eventIndex);
+    if (selection) {
+      eventBus.emit('detail:select', { source: 'timeline', selection });
     }
   }
 
@@ -484,11 +535,9 @@ export class ApexLogTimeline {
     // Marker selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
     // Markers only carry an eventIndex when they map to a log event.
-    if (marker.eventIndex !== undefined) {
-      eventBus.emit('detail:select', {
-        source: 'timeline',
-        selection: { kind: 'event', eventIndex: marker.eventIndex },
-      });
+    const selection = toDetailSelection(marker.eventIndex);
+    if (selection) {
+      eventBus.emit('detail:select', { source: 'timeline', selection });
     }
   }
 

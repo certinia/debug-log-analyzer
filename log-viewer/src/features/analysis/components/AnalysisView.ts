@@ -560,6 +560,9 @@ export class AnalysisView extends LitElement {
 
     // Feed the inspector. Analysis rows merge many calls, so they
     // scope to every occurrence of the method.
+    // No `inspector:reveal` subscription here on purpose: analysis rows are
+    // aggregates keyed by type|namespace|text, so an eventIndex only resolves
+    // back to the whole bucket - which is already the selected row.
     this.analysisTable.on('rowSelectionChanged', (_data, rows) => {
       const data = rows[0]?.getData() as BottomUpRow | undefined;
       const event = data?.originalData;

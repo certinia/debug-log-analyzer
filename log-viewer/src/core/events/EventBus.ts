@@ -32,6 +32,12 @@ interface EventMap {
 
   // App-level request to show/hide (or force a state on) the inspector.
   'detail:toggle': { visible?: boolean };
+
+  // A row was picked inside the inspector — reveal that event in the tab the
+  // inspector is currently showing, never in another tab: `source` is the active
+  // tab and only that view acts. Strictly outbound from the inspector, as
+  // `detail:select` is strictly inbound to it; separate events stop an echo loop.
+  'inspector:reveal': { source: DetailSource; eventIndex: number };
 }
 
 type EventCallback<K extends keyof EventMap> = (detail: EventMap[K]) => void;

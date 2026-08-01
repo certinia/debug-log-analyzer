@@ -31,9 +31,11 @@ import type { ProgressParams } from '../tabulator/format/ProgressMS.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
+import { dispatchInspectorReveal } from './inspectorReveal.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import {
   buildScopedCallTree,
+  revealableEventIndex,
   type ScopedBuildOptions,
   type ScopedCallTree,
   type ScopedRow,
@@ -391,6 +393,15 @@ export class CallTreeDetail extends LitElement {
     });
     table.on('rowContext', (e, row) => {
       this._showRowMenu(e as MouseEvent, row, table);
+    });
+    // Selecting a real frame reveals it in the tab on screen. Aggregated and
+    // bottom-up rows merge occurrences behind a synthetic negative id, so
+    // revealing one would misname which occurrence was clicked.
+    table.on('rowSelectionChanged', (_data, rows) => {
+      const eventIndex = revealableEventIndex(rows[0]?.getData() as Partial<ScopedRow> | undefined);
+      if (eventIndex !== null) {
+        dispatchInspectorReveal(this, eventIndex);
+      }
     });
     this._tables[mode] = { table, stale: false };
   }
