@@ -290,6 +290,13 @@ interface BottomUpNode extends ScopedRow {
   _map: Map<string, BottomUpNode>;
 }
 
+/** A row's ancestors, innermost first. Siblings share the whole tail, so the
+ *  walk carries a link per node instead of a copy of the path. */
+interface CallerChain {
+  row: ScopedRow;
+  caller: CallerChain | null;
+}
+
 /**
  * Bottom-up: each frame with self time seeds a top-level row (ranked by self),
  * and its callers nest beneath it up to the root — the reverse of the call
@@ -329,39 +336,40 @@ async function buildBottomUp(
 
   // Iterative pre-order over every occurrence's subtree: both the occurrence
   // count and the subtree size grow, so one flat sliceable loop covers both.
-  const stack: Array<{ row: ScopedRow; path: ScopedRow[] }> = [];
+  const stack: Array<{ row: ScopedRow; callers: CallerChain | null }> = [];
   for (let i = rows.length - 1; i >= 0; i--) {
-    stack.push({ row: rows[i]!, path: [] });
+    stack.push({ row: rows[i]!, callers: null });
   }
   let steps = 0;
   while (stack.length) {
     if (steps++ % CHECK_EVERY === 0 && !(await tick())) {
       return null;
     }
-    const { row, path } = stack.pop()!;
+    const { row, callers } = stack.pop()!;
     if (row.duration.self > 0) {
-      // Callee first, then its callers up to the root.
-      const chain = [row, ...path.slice().reverse()];
-      let map = topMap;
-      let order: BottomUpNode[] | null = topOrder;
-      for (let i = 0; i < chain.length; i++) {
-        const node = ensure(map, order, chain[i]!);
+      // The seed row, then its callers up to the root. The chain is already in
+      // that order, so it is walked in place rather than copied and reversed.
+      const seed = ensure(topMap, topOrder, row);
+      seed.duration.total += row.duration.self;
+      seed.duration.self += row.duration.self;
+      seed.callCount += 1;
+      let map = seed._map;
+      for (let link = callers; link; link = link.caller) {
+        const node = ensure(map, null, link.row);
         node.duration.total += row.duration.self;
         // Callers count the call they contributed too, matching the Call Tree
         // tab's bottom-up (every bucket in the chain accumulates); counting
         // only the seed left every caller row reading "Calls 0".
         node.callCount += 1;
-        if (i === 0) {
-          node.duration.self += row.duration.self;
-        }
         map = node._map;
-        order = null;
       }
     }
     if (row._children) {
-      const childPath = [...path, row];
+      // Shared by every child, so the ancestor path costs one link per node
+      // rather than a copy of the whole path.
+      const childCallers: CallerChain = { row, caller: callers };
       for (let i = row._children.length - 1; i >= 0; i--) {
-        stack.push({ row: row._children[i]!, path: childPath });
+        stack.push({ row: row._children[i]!, callers: childCallers });
       }
     }
   }
@@ -374,6 +382,7 @@ async function buildBottomUp(
     }
     const node = everyNode[i]!;
     node._children = node._map.size ? [...node._map.values()] : null;
+    node._map.clear(); // its entries live in `_children` now
   }
   return topOrder.sort((a, b) => b.duration.self - a.duration.self);
 }

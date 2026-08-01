@@ -269,17 +269,23 @@ export class CallTreeDetail extends LitElement {
     }
   }
 
+  /**
+   * True once `epoch`'s work should be thrown away: a newer switch replaced it,
+   * or the component was disconnected mid-wait (e.g. the pane collapsed) —
+   * building into detached DOM that disconnectedCallback already ran past would
+   * leak the Tabulator.
+   */
+  private _superseded(epoch: number): boolean {
+    return epoch !== this._switchEpoch || !this.isConnected;
+  }
+
   private async _showActive(): Promise<void> {
     const epoch = ++this._switchEpoch;
     // Wait for the now-visible host to lay out before Tabulator measures column
     // widths — building against a hidden/zero-width host makes columns overlap.
     await this.updateComplete;
     await waitForNextFrame();
-    // Bail if a newer switch superseded this one, or the component was
-    // disconnected mid-wait (e.g. the pane collapsed) — otherwise we'd build a
-    // Tabulator into detached DOM that disconnectedCallback already ran past,
-    // leaking it.
-    if (epoch !== this._switchEpoch || !this.isConnected) {
+    if (this._superseded(epoch)) {
       return;
     }
 
@@ -302,10 +308,10 @@ export class CallTreeDetail extends LitElement {
     }
     const data = await this._rows(mode, {
       yieldFrame: waitForNextFrame,
-      cancelled: () => epoch !== this._switchEpoch || !this.isConnected,
+      cancelled: () => this._superseded(epoch),
     });
-    if (!data || epoch !== this._switchEpoch || !this.isConnected) {
-      return; // superseded, or the pane went away mid-build
+    if (!data || this._superseded(epoch)) {
+      return;
     }
     this._pending = false;
     // Percentages are relative to the selection, so retarget the shared params
