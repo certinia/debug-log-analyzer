@@ -21,7 +21,6 @@
   /* Radius — VS Code's cornerRadius registry. */
   --lana-radius-sm: var(--vscode-cornerRadius-small, 4px);
   --lana-radius-md: var(--vscode-cornerRadius-medium, 6px);
-  --lana-radius-lg: var(--vscode-cornerRadius-large, 8px);
 
   /* Space — named by px so a literal maps to a token without a lookup. */
   --lana-space-2: var(--vscode-spacing-size20, 2px);

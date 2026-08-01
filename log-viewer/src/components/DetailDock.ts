@@ -60,7 +60,7 @@ export class DetailDock extends LitElement {
         flex: 0 0 var(--lana-panel-header-height);
         height: var(--lana-panel-header-height);
         padding: 0 var(--lana-space-4);
-        border-bottom: var(--lana-stroke) solid var(--vscode-sideBar-border, transparent);
+        border-bottom: var(--lana-stroke) solid var(--lana-panel-divider);
       }
       vscode-icon {
         color: var(--vscode-icon-foreground);

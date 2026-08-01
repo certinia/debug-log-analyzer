@@ -21,7 +21,8 @@ Webview UI. Applies when working under `log-viewer/`.
 
 ## UI appearance
 
-- **No hardcoded colors, radii, spacing, shadows or border widths.** Consume `--lana-*`. New tokens
+- **No new hardcoded colors, radii, spacing, shadows or border widths**, and tokenise the ones you
+  touch — older literals are still being converted file by file. Consume `--lana-*`. New tokens
   go in `styles/tokens.css` as `var(--vscode-…, <literal fallback>)`. The fallback is what makes a
   standalone (non-webview) host themable — one stylesheet overriding `--lana-*` is the whole seam.
 - **Data palettes are the one exception.** The timeline category palettes (`timeline/themes/Themes.ts`)
