@@ -52,10 +52,8 @@
   --lana-shadow-popover: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
   --lana-shadow-overlay: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.5));
 
-  /* Two panel seams, because they behave differently: `divider` separates two
-     adjacent regions, `edge` is a single region's outer hairline. */
+  /* The hairline between panes, and around a docked one. */
   --lana-panel-divider: var(--vscode-sideBar-border, transparent);
-  --lana-panel-edge: var(--vscode-sideBar-border, transparent);
 
   /* Resize handles. `inset` pulls the handle over its neighbours so no gap shows,
      leaving the divider hairline as the only seam. */

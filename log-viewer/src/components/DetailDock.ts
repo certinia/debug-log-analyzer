@@ -49,7 +49,7 @@ export class DetailDock extends LitElement {
         font-size: var(--vscode-font-size);
         /* Match the docked edge (the DockLayout gutter) so the panel reads as a
            deliberate region rather than blending into the tab header above. */
-        border-top: var(--lana-stroke) solid var(--lana-panel-edge);
+        border-top: var(--lana-stroke) solid var(--lana-panel-divider);
       }
 
       .actions {
