@@ -45,6 +45,10 @@
     var(--vscode-editor-background, transparent)
   );
 
+  /* Skeleton fill — a tint of the foreground, so it stays visible on the themes
+     that set `editorWidget.background` to the editor background. */
+  --lana-skeleton-bg: color-mix(in srgb, var(--vscode-foreground, #cccccc) 12%, transparent);
+
   --lana-shadow-popover: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
   --lana-shadow-overlay: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.5));
 
