@@ -40,7 +40,10 @@
     --vscode-surface-border,
     var(--vscode-widget-border, var(--vscode-sideBar-border, transparent))
   );
-  --lana-header-bg: var(--vscode-tab-activeBackground, var(--vscode-editor-background));
+  --lana-header-bg: var(
+    --vscode-tab-activeBackground,
+    var(--vscode-editor-background, transparent)
+  );
 
   --lana-shadow-popover: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
   --lana-shadow-overlay: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.5));

@@ -44,9 +44,9 @@ $codicon-chevron-down: '\eab4';
         headerMargin: 4px,
         // column header sort arrows — upstream only ever uses these as plain colours
         // (no color.adjust()), so CSS vars are safe here.
-        sortArrowHover: var(--vscode-icon-foreground),
-        sortArrowActive: var(--vscode-icon-foreground),
-        sortArrowInactive: var(--vscode-descriptionForeground),
+        sortArrowHover: var(--vscode-icon-foreground, currentColor),
+        sortArrowActive: var(--vscode-icon-foreground, currentColor),
+        sortArrowInactive: var(--vscode-descriptionForeground, #999),
         // rows
         rowBackgroundColor: var(--vscode-editor-background),
         // Must stay a Sass colour literal — tabulator.scss runs color.adjust() on it
@@ -58,13 +58,13 @@ $codicon-chevron-down: '\eab4';
         rowSelectedBackground: var(--vscode-list-activeSelectionBackground),
         rowSelectedBackgroundHover: var(--vscode-list-activeSelectionBackground),
         editBoxColor: var(--vscode-focusBorder, #1d68cd),
-        errorColor: var(--vscode-errorForeground),
+        errorColor: var(--vscode-errorForeground, #f14c4c),
         // footer
         footerBackgroundColor: transparent,
         footerTextColor: var(--vscode-editor-foreground),
         footerBorderColor: transparent,
         footerSeparatorColor: transparent,
-        footerActiveColor: var(--vscode-textLink-activeForeground)
+        footerActiveColor: var(--vscode-textLink-activeForeground, #3794ff)
       )
   );
   @include meta.load-css('../format/Progress.css');
@@ -256,15 +256,15 @@ $codicon-chevron-down: '\eab4';
     }
 
     .sort-by--bottom {
-      color: var(--vscode-icon-foreground);
+      color: var(--vscode-icon-foreground, currentColor);
       border-bottom: none;
-      border-top: 6px solid var(--vscode-icon-foreground);
+      border-top: 6px solid var(--vscode-icon-foreground, currentColor);
       border-left: 6px solid transparent;
       border-right: 6px solid transparent;
     }
     .sort-by--top {
-      color: var(--vscode-icon-foreground);
-      border-bottom: 6px solid var(--vscode-icon-foreground);
+      color: var(--vscode-icon-foreground, currentColor);
+      border-bottom: 6px solid var(--vscode-icon-foreground, currentColor);
       border-top: none;
       border-left: 6px solid transparent;
       border-right: 6px solid transparent;
