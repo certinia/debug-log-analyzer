@@ -56,10 +56,10 @@ export class DetailDock extends LitElement {
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        gap: var(--lana-space-4);
+        gap: var(--lana-space-2xs);
         flex: 0 0 var(--lana-panel-header-height);
         height: var(--lana-panel-header-height);
-        padding: 0 var(--lana-space-4);
+        padding: 0 var(--lana-space-2xs);
         border-bottom: var(--lana-stroke) solid var(--lana-panel-divider);
       }
       vscode-icon {
@@ -83,7 +83,7 @@ export class DetailDock extends LitElement {
 
       .empty {
         flex: 1 1 auto;
-        padding: var(--lana-space-12) var(--lana-space-20);
+        padding: var(--lana-space-md) var(--lana-space-lg);
         color: var(--vscode-descriptionForeground);
       }
     `,

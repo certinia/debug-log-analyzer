@@ -105,10 +105,10 @@ export class PaneView extends LitElement {
       .pane-header {
         display: flex;
         align-items: center;
-        gap: var(--lana-space-4);
+        gap: var(--lana-space-2xs);
         flex: 0 0 var(--lana-panel-header-height);
         height: var(--lana-panel-header-height);
-        padding: 0 var(--lana-space-12) 0 var(--lana-space-4);
+        padding: 0 var(--lana-space-md) 0 var(--lana-space-2xs);
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
@@ -149,7 +149,7 @@ export class PaneView extends LitElement {
         min-height: 0;
         min-width: 0;
         overflow: auto;
-        padding: var(--lana-space-4) var(--lana-space-12) var(--lana-space-8);
+        padding: var(--lana-space-2xs) var(--lana-space-md) var(--lana-space-sm);
       }
 
       .pane-sash {

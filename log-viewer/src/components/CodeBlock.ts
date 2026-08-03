@@ -39,7 +39,7 @@ export class CodeBlock extends LitElement {
       .code-block {
         position: relative;
         overflow: auto;
-        padding: var(--lana-space-8);
+        padding: var(--lana-space-sm);
         border: 1px solid var(--vscode-widget-border, transparent);
         border-radius: var(--lana-radius-sm);
         background-color: var(--vscode-textCodeBlock-background, var(--vscode-editor-background));
@@ -55,8 +55,8 @@ export class CodeBlock extends LitElement {
 
       .copy {
         position: absolute;
-        top: var(--lana-space-4);
-        right: var(--lana-space-4);
+        top: var(--lana-space-2xs);
+        right: var(--lana-space-2xs);
         opacity: 0;
         transition: opacity 0.1s ease;
         color: var(--vscode-icon-foreground);

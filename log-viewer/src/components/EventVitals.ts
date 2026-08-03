@@ -95,14 +95,14 @@ export class EventVitals extends LitElement {
         container-type: inline-size;
       }
       code-block {
-        margin-bottom: var(--lana-space-8);
+        margin-bottom: var(--lana-space-sm);
       }
       /* Label/value pairs stack when narrow and become two aligned columns when
          there's room; the grid owns the columns so subgrid rows line up. */
       .grid {
         display: grid;
         grid-template-columns: minmax(0, 1fr);
-        gap: var(--lana-space-8) var(--lana-space-12);
+        gap: var(--lana-space-sm) var(--lana-space-md);
       }
       .row {
         display: grid;
@@ -136,7 +136,7 @@ export class EventVitals extends LitElement {
       }
       .pill {
         display: inline-block;
-        padding: 0 var(--lana-space-8);
+        padding: 0 var(--lana-space-sm);
         border-radius: var(--lana-radius-sm);
         font-size: 0.85em;
         line-height: 1.4;

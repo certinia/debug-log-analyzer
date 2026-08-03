@@ -79,7 +79,7 @@ export class LogViewer extends LitElement {
            clip (not hidden) avoids forcing overflow-y to auto. */
         overflow-x: clip;
         /* Half of the x=16 guide the header and tabs share (see AppHeader). */
-        padding: 0 var(--lana-space-8);
+        padding: 0 var(--lana-space-sm);
       }
 
       vscode-tabs {

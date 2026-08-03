@@ -16,7 +16,7 @@ export const globalStyles = [
        copies. */
       --filter-control-height: 22px;
       --filter-control-font-size: 11px;
-      --filter-control-padding: 0 var(--lana-space-8);
+      --filter-control-padding: 0 var(--lana-space-sm);
       --filter-control-radius: var(--lana-radius-sm);
       --filter-control-border-color: var(--vscode-settings-dropdownBorder, #3c3c3c);
       --filter-control-bg: var(--vscode-settings-dropdownBackground, #313131);
@@ -28,7 +28,7 @@ export const globalStyles = [
       --filter-popover-radius: var(--lana-radius-md);
       --filter-popover-shadow: var(--lana-shadow-popover);
       --filter-popover-row-font-size: 12px;
-      --filter-popover-row-padding: var(--lana-space-4) var(--lana-space-8);
+      --filter-popover-row-padding: var(--lana-space-2xs) var(--lana-space-sm);
 
       /* Label column width shared by every filter's overflow-panel row (facet,
        range, select) so their labels + controls line up as one form. */
@@ -133,7 +133,7 @@ export const globalStyles = [
     .vs-checkbox-label {
       display: inline-flex;
       align-items: center;
-      gap: var(--lana-space-6);
+      gap: var(--lana-space-xs);
       font-size: 11px;
       cursor: pointer;
     }
@@ -148,7 +148,7 @@ export const globalStyles = [
       height: var(--filter-control-height);
       display: inline-flex;
       align-items: center;
-      gap: var(--lana-space-4);
+      gap: var(--lana-space-2xs);
       padding: var(--filter-control-padding);
       border: var(--lana-stroke) solid var(--filter-control-border-color);
       border-radius: var(--filter-control-radius);

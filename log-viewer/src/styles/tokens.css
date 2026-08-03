@@ -29,14 +29,14 @@
   --lana-radius-sm: var(--vscode-cornerRadius-small, 4px);
   --lana-radius-md: var(--vscode-cornerRadius-medium, 6px);
 
-  /* Space — named by px so a literal maps to a token without a lookup. */
-  --lana-space-2: var(--vscode-spacing-size20, 2px);
-  --lana-space-4: var(--vscode-spacing-size40, 4px);
-  --lana-space-6: var(--vscode-spacing-size60, 6px);
-  --lana-space-8: var(--vscode-spacing-size80, 8px);
-  --lana-space-12: var(--vscode-spacing-size120, 12px);
-  --lana-space-20: var(--vscode-spacing-size200, 20px);
-  --lana-space-24: var(--vscode-spacing-size240, 24px);
+  /* Space — a t-shirt scale, so a step can be re-sized without renaming it. */
+  --lana-space-3xs: var(--vscode-spacing-size20, 2px);
+  --lana-space-2xs: var(--vscode-spacing-size40, 4px);
+  --lana-space-xs: var(--vscode-spacing-size60, 6px);
+  --lana-space-sm: var(--vscode-spacing-size80, 8px);
+  --lana-space-md: var(--vscode-spacing-size120, 12px);
+  --lana-space-lg: var(--vscode-spacing-size200, 20px);
+  --lana-space-xl: var(--vscode-spacing-size240, 24px);
 
   --lana-stroke: var(--vscode-strokeThickness, 1px);
 
@@ -64,9 +64,9 @@
 
   /* Resize handles. `inset` pulls the handle over its neighbours so no gap shows,
      leaving the divider hairline as the only seam. */
-  --lana-sash-size: var(--lana-space-4);
+  --lana-sash-size: var(--lana-space-2xs);
   --lana-sash-inset: calc(var(--lana-sash-size) / -2);
 
   /* Shared height for the inspector dock's action bar and pane section headers. */
-  --lana-panel-header-height: var(--lana-space-24);
+  --lana-panel-header-height: var(--lana-space-xl);
 }

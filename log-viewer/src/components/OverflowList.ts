@@ -159,10 +159,10 @@ export class OverflowList extends LitElement {
           flip-inline,
           flip-block flip-inline;
         inset: auto;
-        margin: var(--lana-space-6) 0 0 0;
+        margin: var(--lana-space-xs) 0 0 0;
         min-width: 200px;
         max-width: min(92vw, 340px);
-        padding: var(--lana-space-6);
+        padding: var(--lana-space-xs);
         background-color: var(--filter-popover-bg);
         border: var(--lana-stroke) solid var(--filter-popover-border-color);
         border-radius: var(--filter-popover-radius);

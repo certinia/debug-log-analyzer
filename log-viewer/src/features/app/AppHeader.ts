@@ -43,11 +43,11 @@ export class AppHeader extends LitElement {
         background-color: var(--lana-header-bg);
         display: flex;
         flex-direction: column;
-        gap: var(--lana-space-2);
+        gap: var(--lana-space-3xs);
         min-width: 0;
         /* Match the tabs' box inset (LogViewer 8px + this 8px == tabs' 8px + their internal
            8px) so the log-title, first level chip, and first tab share one left/right guide. */
-        padding: 0 var(--lana-space-8);
+        padding: 0 var(--lana-space-sm);
       }
     `,
   ];
