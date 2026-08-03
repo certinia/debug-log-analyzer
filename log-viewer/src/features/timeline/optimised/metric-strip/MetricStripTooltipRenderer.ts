@@ -79,6 +79,13 @@ export class MetricStripTooltipRenderer extends BaseTooltipRenderer {
   }
 
   /**
+   * No-op: theme is not used (universal colors).
+   */
+  public setTheme(_isDark: boolean): void {
+    // No-op: metric strip uses universal colors
+  }
+
+  /**
    * Show the tooltip with metric data at the specified position.
    *
    * @param screenX - X position in container coordinates

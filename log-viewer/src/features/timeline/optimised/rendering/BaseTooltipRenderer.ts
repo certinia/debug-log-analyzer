@@ -10,9 +10,9 @@
  * - Element creation with VS Code theme styling
  * - Positioning with boundary clamping
  * - Show/hide lifecycle
+ * - Theme updates
  *
- * Colors come from `--vscode-*` custom properties, so tooltips re-theme without any
- * JS involvement.
+ * Subclasses implement content generation via setTheme() for theme-specific colors.
  */
 
 import { TOOLTIP_CSS } from './tooltip-utils.js';
@@ -50,6 +50,9 @@ export abstract class BaseTooltipRenderer {
   /** HTML tooltip element. */
   protected tooltipElement: HTMLDivElement;
 
+  /** Whether dark theme is active. */
+  protected isDarkTheme = true;
+
   /** Default positioning options. */
   protected positionOptions: TooltipPositionOptions;
 
@@ -72,6 +75,14 @@ export abstract class BaseTooltipRenderer {
     this.tooltipElement = this.createTooltipElement();
     container.appendChild(this.tooltipElement);
   }
+
+  /**
+   * Set the theme for color selection.
+   * Subclasses should override to update theme-specific state.
+   *
+   * @param isDark - Whether dark theme is active
+   */
+  public abstract setTheme(isDark: boolean): void;
 
   /**
    * Hide the tooltip.
