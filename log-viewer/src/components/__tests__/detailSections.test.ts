@@ -58,7 +58,9 @@ describe('buildDetailSections', () => {
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
   });
 
-  it('builds no sections when nothing is selected', async () => {
-    expect(await buildDetailSections('calltree', null)).toEqual([]);
+  it('builds no sections when nothing is selected, for every source', async () => {
+    for (const source of ['timeline', 'calltree', 'analysis', 'database'] as const) {
+      expect(await buildDetailSections(source, null)).toEqual([]);
+    }
   });
 });

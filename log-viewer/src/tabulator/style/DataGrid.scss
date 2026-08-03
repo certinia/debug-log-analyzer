@@ -42,10 +42,11 @@ $codicon-chevron-down: '\eab4';
         headerBorderColor: transparent,
         headerSeparatorColor: transparent,
         headerMargin: 4px,
-        // column header sort arrows
-        sortArrowHover: #555,
-        sortArrowActive: #666,
-        sortArrowInactive: #bbb,
+        // column header sort arrows — upstream only ever uses these as plain colours
+        // (no color.adjust()), so CSS vars are safe here.
+        sortArrowHover: var(--vscode-icon-foreground, currentColor),
+        sortArrowActive: var(--vscode-icon-foreground, currentColor),
+        sortArrowInactive: var(--vscode-descriptionForeground, #999),
         // rows
         rowBackgroundColor: var(--vscode-editor-background),
         // Must stay a Sass colour literal — tabulator.scss runs color.adjust() on it
@@ -57,13 +58,13 @@ $codicon-chevron-down: '\eab4';
         rowSelectedBackground: var(--vscode-list-activeSelectionBackground),
         rowSelectedBackgroundHover: var(--vscode-list-activeSelectionBackground),
         editBoxColor: var(--vscode-focusBorder, #1d68cd),
-        errorColor: #dd0000,
+        errorColor: var(--vscode-errorForeground, #f14c4c),
         // footer
         footerBackgroundColor: transparent,
         footerTextColor: var(--vscode-editor-foreground),
         footerBorderColor: transparent,
         footerSeparatorColor: transparent,
-        footerActiveColor: #d00
+        footerActiveColor: var(--vscode-textLink-activeForeground, #3794ff)
       )
   );
   @include meta.load-css('../format/Progress.css');
@@ -251,19 +252,19 @@ $codicon-chevron-down: '\eab4';
     .sort-by {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: var(--lana-space-3xs);
     }
 
     .sort-by--bottom {
-      color: rgb(102, 102, 102);
+      color: var(--vscode-icon-foreground, currentColor);
       border-bottom: none;
-      border-top: 6px solid rgb(102, 102, 102);
+      border-top: 6px solid var(--vscode-icon-foreground, currentColor);
       border-left: 6px solid transparent;
       border-right: 6px solid transparent;
     }
     .sort-by--top {
-      color: rgb(102, 102, 102);
-      border-bottom: 6px solid rgb(102, 102, 102);
+      color: var(--vscode-icon-foreground, currentColor);
+      border-bottom: 6px solid var(--vscode-icon-foreground, currentColor);
       border-top: none;
       border-left: 6px solid transparent;
       border-right: 6px solid transparent;
@@ -283,8 +284,8 @@ $codicon-chevron-down: '\eab4';
     font-size: 0.92rem;
     font-variant-numeric: tabular-nums;
     padding: 5px;
-    border-radius: 4px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    border-radius: var(--lana-radius-sm);
+    box-shadow: var(--lana-shadow-overlay);
   }
 
   .tabulator-edit-list {

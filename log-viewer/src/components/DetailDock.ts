@@ -6,7 +6,6 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import { globalStyles } from '../styles/global.styles.js';
-import { panelTokens } from './panelTokens.js';
 import './PaneView.js';
 import type { PaneSection } from './PaneView.js';
 
@@ -37,7 +36,6 @@ export class DetailDock extends LitElement {
 
   static styles = [
     globalStyles,
-    panelTokens,
     css`
       :host {
         display: flex;
@@ -51,22 +49,22 @@ export class DetailDock extends LitElement {
         font-size: var(--vscode-font-size);
         /* Match the docked edge (the DockLayout gutter) so the panel reads as a
            deliberate region rather than blending into the tab header above. */
-        border-top: 1px solid var(--vscode-sideBar-border, transparent);
+        border-top: var(--lana-stroke) solid var(--lana-panel-divider);
       }
 
       .actions {
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        gap: var(--space-1);
-        flex: 0 0 var(--panel-header-height);
-        height: var(--panel-header-height);
-        padding: 0 var(--space-1);
-        border-bottom: 1px solid var(--vscode-sideBar-border, transparent);
+        gap: var(--lana-space-2xs);
+        flex: 0 0 var(--lana-panel-header-height);
+        height: var(--lana-panel-header-height);
+        padding: 0 var(--lana-space-2xs);
+        border-bottom: var(--lana-stroke) solid var(--lana-panel-divider);
       }
       vscode-icon {
         color: var(--vscode-icon-foreground);
-        border-radius: var(--panel-radius);
+        border-radius: var(--lana-radius-sm);
       }
       vscode-icon:hover {
         background-color: var(--vscode-toolbar-hoverBackground);
@@ -85,7 +83,7 @@ export class DetailDock extends LitElement {
 
       .empty {
         flex: 1 1 auto;
-        padding: var(--space-3) var(--space-5);
+        padding: var(--lana-space-md) var(--lana-space-lg);
         color: var(--vscode-descriptionForeground);
       }
     `,

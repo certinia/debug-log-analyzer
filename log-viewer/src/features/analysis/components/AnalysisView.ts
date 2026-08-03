@@ -136,6 +136,9 @@ export class AnalysisView extends LitElement {
   // single boolean read with no walk and no cache.
   _showDetailsFilter = (data: BottomUpRow): boolean => data._hasDetailsDeep;
 
+  /** Releases the category-colouring settings subscription; set while connected. */
+  private _categoryColoringOff: (() => void) | null = null;
+
   constructor() {
     super();
 
@@ -146,11 +149,13 @@ export class AnalysisView extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    wireCategoryColoring(this);
+    this._categoryColoringOff = wireCategoryColoring(this);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._categoryColoringOff?.();
+    this._categoryColoringOff = null;
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
@@ -560,6 +565,9 @@ export class AnalysisView extends LitElement {
 
     // Feed the inspector. Analysis rows merge many calls, so they
     // scope to every occurrence of the method.
+    // No `inspector:reveal` subscription here on purpose: analysis rows are
+    // aggregates keyed by type|namespace|text, so an eventIndex only resolves
+    // back to the whole bucket - which is already the selected row.
     this.analysisTable.on('rowSelectionChanged', (_data, rows) => {
       const data = rows[0]?.getData() as BottomUpRow | undefined;
       const event = data?.originalData;

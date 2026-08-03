@@ -17,6 +17,7 @@ Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers.
 
 - **🔥 [See where the time went](#-timeline)** – An interactive flame chart of the whole transaction, with a minimap for navigating massive logs.
 - **🌲 [Follow the execution](#-call-tree)** – The full call tree in time order, aggregated, or bottom-up, with timing, row counts and DML/SOQL metrics.
+- **🚦 [At a glance header](#-header)** – A "Log problems" chip and Notifications bell summarize issues, and chips show the debug levels the log was captured with.
 - **🧭 [Inspect anything](#-inspector-) 🧪** – Select any frame or statement and the dockable inspector shows its vitals, call stack and its own call tree.
 - **🗄️ [Find the slow SOQL, DML and SOSL](#%EF%B8%8F-database-analysis)** – Every statement with its timing, row counts and selectivity, so the expensive ones stand out.
 - **📊 [Stay inside governor limits](#-governor-limits--heap)** – Usage against the limit for every governor, and where in the transaction you consumed it.
@@ -83,6 +84,15 @@ Use `Log: Retrieve Apex Log And Show Analysis` from the Command Palette.
 - Avoid truncated logs — they can result in incomplete or misleading analysis.
 - Recommended settings for a good balance of detail and performance: `APEX_CODE,FINE; APEX_PROFILING,FINE; CALLOUT,INFO; DB,FINEST; NBA,INFO; SYSTEM,DEBUG; VALIDATION,INFO; VISUALFORCE,FINE; WAVE,INFO; WORKFLOW,FINE`
 
+## 🚦 Header
+
+The bar above the tabs summarizes the log at a glance:
+
+- **Log problems** – A chip for problems found in the log itself (governor limit exceptions, fatal errors, skipped lines), with a count badge; click it for the full breakdown.
+- **Notifications** – A separate bell for messages about the tool rather than the log, kept apart from log problems so the two don't read as one severity count.
+- **Debug levels** – Chips showing the debug levels the log was captured with, one per category. Read-only display, not a filter.
+- **`•••` menu** – Help, report an issue, and whatever the header sheds as the window narrows.
+
 ## 🔥 Timeline
 
 The Timeline view shows a live visualization of your Salesforce Apex log execution — including methods, SOQL queries, DML operations, workflows, flows, and more.
@@ -107,6 +117,7 @@ Explore nested method calls with performance metrics:
 - **Metrics**: Self Time, Total Time, SOQL/DML/SOSL Counts + Rows, Heap (net/gross/peak), Governor Limit Avg + Peak, Thrown
 - **Call Tree Views**: Use Time Order for sequence, Aggregated for repeated hot paths, Bottom-Up for caller attribution
 - **Column Views** – Switch preset column sets (General, Time, Governor Limits, Database, Memory), show/hide columns from the header menu, reset to defaults
+- **Column widths** – Sized to fit their header and values, across every table in the extension
 - **Group Bottom-Up by Namespace or Type**
 - **Filter bar** – Namespace, event Type, and a Total/Self Time range, plus **Details** and **Debug Only** toggles
 - **Keyboard Navigation**
