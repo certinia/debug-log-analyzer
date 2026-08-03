@@ -1913,16 +1913,30 @@ export class FlameChart<E extends EventNode = EventNode> {
 
   /**
    * Select a frame by its EventNode reference.
-   * Used when navigating from external sources (e.g., calltree "Show in Timeline").
+   * Used when navigating from external sources (e.g., calltree "Show in Timeline"),
+   * or on a passive selection sync from the inspector.
    *
    * @param eventNode - The EventNode containing an original reference to find and select
+   * @returns true when the frame was found and selected
    */
-  public selectByEventNode(eventNode: EventNode): void {
+  public selectByEventNode(eventNode: EventNode): boolean {
     const treeNode = this.selectionOrchestrator?.findByOriginal(eventNode);
-    if (treeNode) {
-      this.selectionOrchestrator?.selectFrame(treeNode);
-      this.requestRender();
+    if (!treeNode) {
+      return false;
     }
+
+    this.selectionOrchestrator?.selectFrame(treeNode);
+    this.requestRender();
+    return true;
+  }
+
+  /**
+   * Pan (without changing zoom) so the currently selected frame is visible.
+   * Animated, and a no-op if the frame is already in view - use this for the
+   * passive selection sync, where a full zoom-to-fit would be too disruptive.
+   */
+  public centerOnSelectedFrame(): void {
+    this.selectionOrchestrator?.centerOnSelectedFrame();
   }
 
   /**

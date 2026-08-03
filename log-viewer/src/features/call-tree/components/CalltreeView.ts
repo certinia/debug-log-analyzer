@@ -12,6 +12,7 @@ import type { RowComponent, Tabulator } from 'tabulator-tables';
 
 import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { eventBus, type DetailSource } from '../../../core/events/EventBus.js';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { findEventByEventIndex } from '../../../core/utility/EventSearch.js';
 import { isVisible } from '../../../core/utility/Util.js';
@@ -149,9 +150,20 @@ export class CalltreeView extends LitElement {
     this._goToRow(e.detail.eventIndex);
   }) as EventListener;
 
+  /** Guards the programmatic select made on the inspector's behalf. */
+  private _echoGuard = new SelectionEchoGuard();
+  private _inspectorRevealUnsubscribe: (() => void) | null = null;
+
   constructor() {
     super();
 
+    // Reveal an inspector row here, but only while the Call Tree is the tab the
+    // inspector is showing.
+    this._inspectorRevealUnsubscribe = eventBus.on('inspector:reveal', (detail) => {
+      if (detail.source === 'calltree') {
+        void this._revealEventIndex(detail.eventIndex);
+      }
+    });
     document.addEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
@@ -169,6 +181,8 @@ export class CalltreeView extends LitElement {
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
+    this._inspectorRevealUnsubscribe?.();
+    this._inspectorRevealUnsubscribe = null;
     this._destroyCurrentTable();
   }
 
@@ -829,6 +843,27 @@ export class CalltreeView extends LitElement {
     await this.calltreeTable.goToRow(treeRow, { scrollIfVisible: true, focusRow: true });
   }
 
+  /**
+   * Select the row for `eventIndex` in place: no tab switch, no view-mode change
+   * and no focus steal, unlike {@link _goToRow}. Only Time Order has a row per
+   * event, so the grouped modes are left alone.
+   */
+  private async _revealEventIndex(eventIndex: number): Promise<void> {
+    if (this.viewMode !== 'time-order' || !this.calltreeTable) {
+      return;
+    }
+
+    const treeRow = await this._findByEventIndex(this.calltreeTable.getRows(), eventIndex);
+    if (!treeRow) {
+      return;
+    }
+
+    await this._echoGuard.runAsync(() =>
+      //@ts-expect-error This is a custom function added in by RowNavigation custom module
+      this.calltreeTable.goToRow(treeRow, { scrollIfVisible: false, focusRow: false }),
+    );
+  }
+
   async _find(e: CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>) {
     const activeTable = this._getActiveTable();
     const isTableVisible = !!activeTable?.element?.clientHeight;
@@ -1037,6 +1072,9 @@ export class CalltreeView extends LitElement {
    */
   private _emitDetailSelection(table: Tabulator, source: DetailSource = 'calltree'): void {
     table.on('rowSelectionChanged', (_data, rows) => {
+      if (this._echoGuard.suppressed) {
+        return;
+      }
       const data = rows[0]?.getData() as
         { originalData?: LogEvent; instances?: LogEvent[]; text?: string } | undefined;
       const event = data?.originalData;

@@ -27,11 +27,19 @@ import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
+import type { ProgressParams } from '../tabulator/format/ProgressMS.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
+import { dispatchInspectorReveal } from './inspectorReveal.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
-import { buildScopedCallTree, type ScopedCallTree } from './scopedCallTree.js';
+import {
+  buildScopedCallTree,
+  revealableEventIndex,
+  type ScopedBuildOptions,
+  type ScopedCallTree,
+  type ScopedRow,
+} from './scopedCallTree.js';
 import './ViewModeSwitch.js';
 import type { ViewModeOption } from './ViewModeSwitch.js';
 
@@ -107,10 +115,25 @@ export class CallTreeDetail extends LitElement {
   @state()
   private viewMode: ViewMode = 'time-order';
 
-  private _tables: Record<ViewMode, Tabulator | null> = {
+  /** A built table. `stale` means it holds a previous selection's rows, so it
+   *  needs re-filling before it is shown again. */
+  private _tables: Record<ViewMode, { table: Tabulator; stale: boolean } | null> = {
     'time-order': null,
     aggregated: null,
     'bottom-up': null,
+  };
+
+  /**
+   * The bar/percentage params, shared by every column of every mode table and
+   * mutated in place per selection. Tabulator reads `formatterParams` by
+   * reference at render time, so this keeps the column definitions
+   * selection-independent — which is what lets a new selection re-fill a table
+   * with `setData` instead of rebuilding it.
+   */
+  private readonly _barParams: ProgressParams = {
+    precision: 2,
+    totalValue: 0,
+    showPercentageText: true,
   };
 
   // The scoped tree (all three representations) for the current eventIndex,
@@ -119,6 +142,10 @@ export class CallTreeDetail extends LitElement {
 
   // Guards against a slow view-switch resolving after a newer one.
   private _switchEpoch = 0;
+
+  /** True while a scoped build is in flight. Read by the tables' placeholder,
+   *  which Tabulator re-evaluates every time it shows one. */
+  private _pending = false;
 
   private _contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
@@ -187,10 +214,16 @@ export class CallTreeDetail extends LitElement {
   updated(changed: PropertyValues) {
     const scopeChanged = changed.has('eventIndex') || changed.has('instances');
     if (scopeChanged) {
-      // The scoped root changed — drop every table so each rebuilds on demand,
-      // and recompute the scoped tree once (all three modes share it).
-      this._destroyTables();
-      this._scoped = buildScopedCallTree(this.eventIndex, this.instances);
+      // The scoped root changed — mark every built table stale so each is
+      // re-filled on demand, rather than destroyed and rebuilt.
+      // `_scoped` is only invalidated here and only rebuilt in `_showActive`,
+      // past its paint yield — never before it.
+      this._scoped = null;
+      for (const slot of Object.values(this._tables)) {
+        if (slot) {
+          slot.stale = true;
+        }
+      }
     }
     if (scopeChanged || changed.has('viewMode')) {
       void this._showActive();
@@ -204,9 +237,48 @@ export class CallTreeDetail extends LitElement {
 
   private _destroyTables() {
     for (const mode of Object.keys(this._tables) as ViewMode[]) {
-      this._tables[mode]?.destroy();
+      this._tables[mode]?.table.destroy();
       this._tables[mode] = null;
     }
+  }
+
+  /**
+   * The rows for `mode`, building (and caching) the scoped tree first if this is
+   * the selection's first view. Returns an empty array when nothing is in scope,
+   * and null when the build was abandoned because a newer selection arrived.
+   */
+  private async _rows(mode: ViewMode, options: ScopedBuildOptions): Promise<ScopedRow[] | null> {
+    if (!this._scoped) {
+      const scoped = await buildScopedCallTree(this.eventIndex, this.instances, options);
+      if (options.cancelled?.()) {
+        // Abandoned rather than empty — don't cache the null over a scope that
+        // was never walked.
+        return null;
+      }
+      this._scoped = scoped;
+    }
+    const scoped = this._scoped;
+    if (!scoped) {
+      return [];
+    }
+    switch (mode) {
+      case 'time-order':
+        return scoped.timeOrder(options);
+      case 'aggregated':
+        return scoped.aggregated(options);
+      case 'bottom-up':
+        return scoped.bottomUp(options);
+    }
+  }
+
+  /**
+   * True once `epoch`'s work should be thrown away: a newer switch replaced it,
+   * or the component was disconnected mid-wait (e.g. the pane collapsed) —
+   * building into detached DOM that disconnectedCallback already ran past would
+   * leak the Tabulator.
+   */
+  private _superseded(epoch: number): boolean {
+    return epoch !== this._switchEpoch || !this.isConnected;
   }
 
   private async _showActive(): Promise<void> {
@@ -215,36 +287,55 @@ export class CallTreeDetail extends LitElement {
     // widths — building against a hidden/zero-width host makes columns overlap.
     await this.updateComplete;
     await waitForNextFrame();
-    // Bail if a newer switch superseded this one, or the component was
-    // disconnected mid-wait (e.g. the pane collapsed) — otherwise we'd build a
-    // Tabulator into detached DOM that disconnectedCallback already ran past,
-    // leaking it.
-    if (epoch !== this._switchEpoch || !this.isConnected) {
+    if (this._superseded(epoch)) {
       return;
     }
 
     const mode = this.viewMode;
-    const existing = this._tables[mode];
-    if (existing) {
-      existing.redraw(); // re-fit the layout for the now-visible host
+    const built = this._tables[mode];
+    if (built && !built.stale) {
+      built.table.redraw(); // re-fit the layout for the now-visible host
       return;
     }
 
-    const scoped = this._scoped;
-    if (!scoped) {
+    // Started here, after the yield above, so the selection highlight and the
+    // rest of the panel paint before the walk does anything; the walk then
+    // slices itself, so it never blocks a frame either.
+    this._pending = true;
+    if (built) {
+      // Those rows belong to the previous selection and the build below spans
+      // several frames — clear them rather than leave them standing under a
+      // selection they don't describe.
+      void built.table.setData([]);
+    }
+    const data = await this._rows(mode, {
+      yieldFrame: waitForNextFrame,
+      cancelled: () => this._superseded(epoch),
+    });
+    if (!data || this._superseded(epoch)) {
       return;
     }
+    this._pending = false;
+    // Percentages are relative to the selection, so retarget the shared params
+    // the formatters read rather than rebuilding the columns around a new total.
+    const scoped = this._scoped;
+    this._barParams.totalValue = scoped?.rootTotal ?? 0;
+
+    const slot = this._tables[mode];
+    if (slot) {
+      slot.stale = false;
+      void slot.table.setData(data);
+      return;
+    }
+    if (!scoped) {
+      // Nothing in scope, so there is nothing to size a new table against.
+      return;
+    }
+
     const container = this.renderRoot?.querySelector<HTMLDivElement>(`#${mode}-tree`);
     if (!container) {
       return;
     }
-
-    const data =
-      mode === 'time-order'
-        ? scoped.timeOrder
-        : mode === 'aggregated'
-          ? scoped.aggregated
-          : scoped.bottomUp;
 
     registerTableModules();
     const table = new Tabulator(container, {
@@ -253,7 +344,9 @@ export class CallTreeDetail extends LitElement {
       layout: 'fitColumns',
       height: '100%',
       maxHeight: '100%',
-      placeholder: 'No call tree available',
+      // Re-evaluated every time Tabulator shows the placeholder, so the pending
+      // text tracks the build without a second empty-state element.
+      placeholder: () => (this._pending ? 'Building the call tree…' : 'No call tree available'),
       // A scoped subtree is unbounded, so only the visible rows are rendered —
       // the same deal the Call Tree tab's tables get. The build in
       // `scopedCallTree` is still eager; this bounds the paint, not the walk.
@@ -269,7 +362,7 @@ export class CallTreeDetail extends LitElement {
       ...clipboardCopyOptions,
       headerSortElement,
       columnDefaults: commonColumnDefaults,
-      columns: this._columns(mode, scoped.rootTotal),
+      columns: this._columns(mode, progressColumnWidth(scoped.logTotal)),
       // Time Order stays chronological — that's what the mode is for. The
       // grouped modes lead with their ranking metric, as the Call Tree tab's
       // Bottom-Up does; either way the headers stay sortable.
@@ -301,7 +394,16 @@ export class CallTreeDetail extends LitElement {
     table.on('rowContext', (e, row) => {
       this._showRowMenu(e as MouseEvent, row, table);
     });
-    this._tables[mode] = table;
+    // Selecting a real frame reveals it in the tab on screen. Aggregated and
+    // bottom-up rows merge occurrences behind a synthetic negative id, so
+    // revealing one would misname which occurrence was clicked.
+    table.on('rowSelectionChanged', (_data, rows) => {
+      const eventIndex = revealableEventIndex(rows[0]?.getData() as Partial<ScopedRow> | undefined);
+      if (eventIndex !== null) {
+        dispatchInspectorReveal(this, eventIndex);
+      }
+    });
+    this._tables[mode] = { table, stale: false };
   }
 
   /** Row right-click menu: reveal in the Call Tree tab, or copy the frame. */
@@ -326,10 +428,14 @@ export class CallTreeDetail extends LitElement {
     this._contextMenu.show(PANEL_ROW_MENU_ITEMS, event.clientX, event.clientY);
   }
 
-  private _columns(mode: ViewMode, rootTotal: number): ColumnDefinition[] {
+  /**
+   * `barWidth` is sized from the whole log rather than the selection, so the bar
+   * columns keep one width as the selection changes — and never have to grow for
+   * a wider total.
+   */
+  private _columns(mode: ViewMode, barWidth: number): ColumnDefinition[] {
     const isTimeOrder = mode === 'time-order';
-    const barParams = { precision: 2, totalValue: rootTotal, showPercentageText: true };
-    const barWidth = progressColumnWidth(rootTotal);
+    const barParams = this._barParams;
 
     const columns: ColumnDefinition[] = [
       {
@@ -359,7 +465,7 @@ export class CallTreeDetail extends LitElement {
         field: 'duration.self',
         barWidth,
         barParams,
-        bottomCalc: makeSumSelfTimeAllVisible(() => this._tables[mode] ?? undefined),
+        bottomCalc: makeSumSelfTimeAllVisible(() => this._tables[mode]?.table),
       }),
     ];
 
