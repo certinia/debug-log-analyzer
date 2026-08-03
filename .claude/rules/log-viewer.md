@@ -28,6 +28,10 @@ Webview UI. Applies when working under `log-viewer/`.
 - **Data palettes are the one exception.** The timeline category palettes (`timeline/themes/Themes.ts`)
   and the metric-strip tier colors (`metric-strip/metric-strip-colors.ts`) encode meaning, not chrome,
   so they stay literal and do not follow the host theme.
+- **A component whose CSS names a `--lana-*` token carries the tokens.** `globalStyles` already
+  does, so `static styles = [globalStyles, …]` is enough; a component that skips `globalStyles`
+  adds `tokenStyles` (`styles/tokens.styles.ts`) itself. The document-level copy, injected by the
+  build's CSS plugin, is only for light DOM — the popups tabulator appends to `document.body`.
 - Verify in a light and a dark theme before calling a UI change done.
 
 ## Key paths

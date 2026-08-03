@@ -3,7 +3,9 @@
  */
 import { html, render } from 'lit';
 
-// styles — document-level so the --lana-* tokens inherit into every shadow root
+// Components adopt the --lana-* tokens themselves (styles/tokens.styles.ts); this
+// import guarantees the document-level copy, which styles the popups tabulator
+// appends to document.body.
 import './styles/tokens.css';
 
 // web components

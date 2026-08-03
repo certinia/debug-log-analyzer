@@ -13,10 +13,17 @@
  * host (or a VS Code older than the size-token registry) falls back to — a
  * non-webview host only has to override this one set to re-skin the app.
  *
- * Declared on `:root` rather than per-`:host`: the build's CSS plugin injects
- * this into `document.head`, and custom properties inherit through every shadow
- * boundary, so one definition reaches every component.
+ * One source, two delivery paths — `:host` for a shadow root, `:root` for the
+ * document. Components adopt the `:host` copy through `tokenStyles`
+ * (`styles/tokens.styles.ts`), so a component that reads a token also carries its
+ * definition instead of relying on the app shell to have provided one. The
+ * document copy, injected into `document.head` by the build's CSS plugin, is what
+ * styles the popups tabulator appends to `document.body` — they are outside every
+ * shadow root, so nothing adopts a sheet for them. Each selector is inert on the
+ * other side: `:host` matches nothing in a document, `:root` matches nothing in a
+ * shadow root.
  */
+:host,
 :root {
   /* Radius — VS Code's cornerRadius registry. */
   --lana-radius-sm: var(--vscode-cornerRadius-small, 4px);

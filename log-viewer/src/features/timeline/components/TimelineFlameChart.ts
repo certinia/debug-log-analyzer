@@ -18,11 +18,13 @@ import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
 import type { EditorColors, TimelineOptions } from '../types/flamechart.types.js';
 import { TimelineError } from '../types/flamechart.types.js';
 
+import { tokenStyles } from '../../../styles/tokens.styles.js';
 import { tooltipStyles } from '../styles/timeline.css.js';
 
 @customElement('timeline-flame-chart')
 export class TimelineFlameChart extends LitElement {
   static styles = [
+    tokenStyles,
     unsafeCSS(tooltipStyles),
     css`
       :host {
