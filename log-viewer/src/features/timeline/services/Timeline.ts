@@ -539,24 +539,14 @@ export function refreshThemeColors(): void {
   }
 
   const computedStyle = getComputedStyle(canvas);
-  const previousFindMatchColor = findMatchColor;
-  // getPropertyValue returns '' for an unset property, never null.
   findMatchColor =
-    computedStyle.getPropertyValue('--vscode-editor-findMatchHighlightBackground') || '#ea5c0054';
+    computedStyle.getPropertyValue('--vscode-editor-findMatchHighlightBackground') ?? '#ea5c0054';
   currentFindMatchColor =
-    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground') || '#9e6a03';
+    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground') ?? '#9e6a03';
   borderSettings = new Map<string, number>([
     [strokeColor, 1],
     [findMatchColor, 2],
   ]);
-
-  // borderRenderQueue is keyed by color and only rebuilt on find, so re-key any live
-  // matches — otherwise they keep drawing in the outgoing theme's color.
-  const liveMatches = borderRenderQueue.get(previousFindMatchColor);
-  if (liveMatches && previousFindMatchColor !== findMatchColor) {
-    borderRenderQueue.delete(previousFindMatchColor);
-    borderRenderQueue.set(findMatchColor, liveMatches);
-  }
 
   state.requestRedraw();
 }

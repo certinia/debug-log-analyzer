@@ -103,6 +103,7 @@ export class MeshAxisRenderer {
   private labelsContainer: Container;
   private screenSpaceContainer: Container | null = null;
   private config: AxisConfig;
+  private labelCache: Map<string, Text> = new Map();
   /** Pool of reusable Text labels (index-based to support duplicate text) */
   private labelPool: Text[] = [];
   /** Number of active labels in current frame */
@@ -231,7 +232,7 @@ export class MeshAxisRenderer {
     }
 
     // Update existing labels with new color
-    for (const label of this.labelPool) {
+    for (const label of this.labelCache.values()) {
       label.style.fill = textColor;
     }
 
