@@ -11,13 +11,16 @@
  *  active tab, keyed by source. */
 export type DetailSource = 'timeline' | 'calltree' | 'analysis' | 'database';
 
+/** Which of the database grids a selection came from. */
+export type StatementType = 'dml' | 'soql' | 'sosl';
+
 /**
  * A selection to inspect in the inspector. A single frame maps to one `eventIndex`;
  * an aggregate row (Call Tree Aggregated/Bottom-Up, Analysis) scopes to all its
  * occurrences (`instances` = their eventIndexes), aggregated.
  */
 export type DetailSelection =
-  | { kind: 'event'; eventIndex: number; type?: 'dml' | 'soql' | 'sosl' }
+  | { kind: 'event'; eventIndex: number; type?: StatementType }
   | { kind: 'aggregate'; instances: number[]; label: string };
 
 interface EventMap {
@@ -32,6 +35,12 @@ interface EventMap {
 
   // App-level request to show/hide (or force a state on) the inspector.
   'detail:toggle': { visible?: boolean };
+
+  // A row was picked inside the inspector — reveal that event in the tab the
+  // inspector is currently showing, never in another tab: `source` is the active
+  // tab and only that view acts. Strictly outbound from the inspector, as
+  // `detail:select` is strictly inbound to it; separate events stop an echo loop.
+  'inspector:reveal': { source: DetailSource; eventIndex: number };
 }
 
 type EventCallback<K extends keyof EventMap> = (detail: EventMap[K]) => void;

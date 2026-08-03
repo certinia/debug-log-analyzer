@@ -30,33 +30,58 @@ jest.mock('../../features/settings/Settings.js', () => ({
 }));
 
 // The real builders mount Tabulator tables; only the section ids matter here.
+// `detailEmptyText.js` is deliberately left unmocked so the assertions below
+// exercise the real copy LogInspector renders.
+//
+// `deferSections` lets a test hold a build's resolution open so it can
+// interleave a second, faster selection ahead of it (see the epoch test below);
+// every other test leaves it false and gets an immediately-resolved build.
+let deferSections = false;
+const pendingSections: Array<() => void> = [];
 jest.mock('../detailSections.js', () => ({
-  buildDetailSections: (_source: string, selection: unknown) =>
-    Promise.resolve(
-      selection
-        ? [
-            { id: 'vitals', title: 'Details', content: html`<div>v</div>` },
-            { id: 'callstack', title: 'Call stack', content: html`<div>c</div>` },
-          ]
-        : [],
-    ),
+  buildDetailSections: (_source: string, selection: { eventIndex?: number } | null) => {
+    // The marker carries the selection through to the rendered content, so a
+    // stale build resolving late is distinguishable from the one that supersedes it.
+    const sections = selection
+      ? [
+          {
+            id: 'vitals',
+            title: 'Details',
+            content: html`<div class="marker">${selection.eventIndex}</div>`,
+          },
+          { id: 'callstack', title: 'Call stack', content: html`<div>c</div>` },
+        ]
+      : [];
+    if (!deferSections) {
+      return Promise.resolve(sections);
+    }
+    return new Promise<typeof sections>((resolve) => {
+      pendingSections.push(() => resolve(sections));
+    });
+  },
 }));
 
 import { eventBus } from '../../core/events/EventBus.js';
 import type { LogInspector } from '../LogInspector.js';
 import type { PaneView } from '../PaneView.js';
 import '../LogInspector.js';
+import { dispatchInspectorReveal } from '../inspectorReveal.js';
 
 /**
- * Settles the rAF-debounced rebuild, the async section build and the render.
- * The build chain awaits more than once, so keep re-awaiting the render rather
- * than counting microtasks.
+ * Settles the async section build and the render chain through the nested
+ * shadow DOMs. The build chain awaits more than once, so keep re-awaiting the
+ * render rather than counting microtasks.
  */
-async function flush(el: LogInspector): Promise<void> {
-  await new Promise((resolve) => requestAnimationFrame(resolve));
+async function settle(el: LogInspector): Promise<void> {
   for (let i = 0; i < 5; i++) {
     await el.updateComplete;
   }
+}
+
+/** `settle`, plus the rAF wait that lets the debounced rebuild fire first. */
+async function flush(el: LogInspector): Promise<void> {
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await settle(el);
 }
 
 async function mount(activeTab: string): Promise<LogInspector> {
@@ -78,12 +103,33 @@ function paneView(el: LogInspector): PaneView {
   return found;
 }
 
+/** The reveal listener sits on `dock-layout`, which renders whether or not a row is selected. */
+function dockLayout(el: LogInspector): HTMLElement {
+  const found = el.shadowRoot?.querySelector<HTMLElement>('dock-layout');
+  if (!found) {
+    throw new Error('dock-layout not rendered');
+  }
+  return found;
+}
+
 function visible(el: LogInspector): boolean {
   return !!el.shadowRoot?.querySelector('dock-layout')?.hasAttribute('visible');
 }
 
+function emptyText(el: LogInspector): string | null {
+  const dock = el.shadowRoot
+    ?.querySelector('dock-layout')
+    ?.shadowRoot?.querySelector('detail-dock')
+    ?.shadowRoot?.querySelector('.empty');
+  return dock?.textContent?.trim() ?? null;
+}
+
 function select(source: 'timeline' | 'database', eventIndex: number): void {
   eventBus.emit('detail:select', { source, selection: { kind: 'event', eventIndex } });
+}
+
+function marker(el: LogInspector): string | null {
+  return paneView(el).shadowRoot?.querySelector('.marker')?.textContent ?? null;
 }
 
 describe('LogInspector', () => {
@@ -92,6 +138,8 @@ describe('LogInspector', () => {
     delete settings.inspector;
     deferSettings = false;
     releaseSettings = null;
+    deferSections = false;
+    pendingSections.length = 0;
     document.body.replaceChildren();
   });
 
@@ -192,5 +240,76 @@ describe('LogInspector', () => {
     // The stored `visible: false` and `collapsed` don't undo either action.
     expect(visible(el)).toBe(true);
     expect(paneView(el).collapsed).toEqual({ vitals: true });
+  });
+
+  it('stamps the active tab on a reveal, so only that tab acts on it', async () => {
+    const el = await mount('tree-tab');
+
+    const seen: Array<{ source: string; eventIndex: number }> = [];
+    const off = eventBus.on('inspector:reveal', (d) => seen.push(d));
+    dispatchInspectorReveal(dockLayout(el), 5);
+    off();
+
+    expect(seen).toEqual([{ source: 'calltree', eventIndex: 5 }]);
+  });
+
+  it('drops a reveal from a tab with no inspectable view', async () => {
+    const el = await mount('unknown-tab');
+
+    const seen: unknown[] = [];
+    const off = eventBus.on('inspector:reveal', (d) => seen.push(d));
+    dispatchInspectorReveal(dockLayout(el), 5);
+    off();
+
+    expect(seen).toEqual([]);
+  });
+
+  it('shows a source-specific empty state, and updates it as the active tab changes', async () => {
+    settings.inspector = {
+      position: 'right',
+      size: 400,
+      collapsed: {},
+      paneSizes: {},
+      visible: true,
+    };
+    const el = await mount('timeline-tab');
+    expect(emptyText(el)).toBe('Select a frame on the timeline to inspect it.');
+
+    el.activeTab = 'tree-tab';
+    await flush(el);
+    expect(emptyText(el)).toBe('Select a frame in the call tree to inspect it.');
+
+    el.activeTab = 'analysis-tab';
+    await flush(el);
+    expect(emptyText(el)).toBe('Select a row in the analysis grid to inspect it.');
+
+    el.activeTab = 'database-tab';
+    await flush(el);
+    expect(emptyText(el)).toBe('Select a SOQL, DML or SOSL row to inspect it.');
+  });
+
+  it('drops a superseded rebuild: a stale build resolving late does not overwrite a newer one', async () => {
+    // Mount undeferred so its own (empty-selection) rebuild resolves, then defer
+    // only the two builds this test drives.
+    const el = await mount('timeline-tab');
+    deferSections = true;
+
+    select('timeline', 1);
+    await new Promise((resolve) => requestAnimationFrame(resolve)); // debounce fires -> _rebuild() epoch 1 starts, awaiting buildDetailSections
+    select('timeline', 2);
+    await new Promise((resolve) => requestAnimationFrame(resolve)); // debounce fires -> _rebuild() epoch 2 starts, awaiting buildDetailSections
+    expect(pendingSections).toHaveLength(2);
+
+    // The newer selection's build resolves first (it's the one the user is
+    // waiting on); the stale epoch-1 build resolves afterwards, as it would if
+    // its underlying walk was simply slower.
+    pendingSections[1]!();
+    await settle(el);
+    expect(marker(el)).toBe('2');
+
+    pendingSections[0]!();
+    await settle(el);
+    // The epoch guard drops the stale result — it must not clobber the newer one.
+    expect(marker(el)).toBe('2');
   });
 });

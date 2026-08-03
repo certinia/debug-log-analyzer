@@ -20,6 +20,7 @@ import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import { buildCallStackData, type CallStackRow } from './callStackData.js';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
+import { dispatchInspectorReveal } from './inspectorReveal.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 
 /**
@@ -149,6 +150,14 @@ export class CallStackDetail extends LitElement {
     // right-click action. The call stack is flat, so there is nothing to toggle.
     this._table.on('rowContext', (e, row) => {
       this._showRowMenu(e as MouseEvent, row);
+    });
+    // Selecting a frame reveals it in the tab on screen; the inspector adds the
+    // source, since only it knows which tab that is.
+    this._table.on('rowSelectionChanged', (_data, rows) => {
+      const eventIndex = (rows[0]?.getData() as CallStackRow | undefined)?.eventIndex;
+      if (eventIndex !== undefined) {
+        dispatchInspectorReveal(this, eventIndex);
+      }
     });
   }
 
