@@ -5,7 +5,7 @@ import { css } from 'lit';
 import type { RowComponent } from 'tabulator-tables';
 
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { getSettings } from '../../settings/Settings.js';
+import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
 import { DEFAULT_THEME_NAME, type TimelineColors } from '../../timeline/themes/Themes.js';
 import { addCustomThemes, getTheme } from '../../timeline/themes/ThemeSelector.js';
 
@@ -63,22 +63,30 @@ function applyCategoryTheme(host: HTMLElement, themeName: string): void {
 
 /**
  * Wire category colouring onto a host element: seed the theme vars, follow live theme
- * switches, and toggle the colorize tint from settings. Call from `connectedCallback`.
+ * switches, and toggle the colorize tint from settings. Call from `connectedCallback`
+ * and call the returned function from `disconnectedCallback`.
  */
-export function wireCategoryColoring(host: HTMLElement): void {
+export function wireCategoryColoring(host: HTMLElement): () => void {
   applyCategoryTheme(host, DEFAULT_THEME_NAME);
 
-  VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
+  const stopThemePreview = VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
     const { cmd, payload } = event.data;
     if (cmd === 'switchTimelineTheme') {
       applyCategoryTheme(host, payload.activeTheme ?? DEFAULT_THEME_NAME);
     }
   });
 
-  getSettings().then((settings) => {
+  const apply = (settings: LanaSettings) => {
     const { timeline, callTree } = settings;
     addCustomThemes(timeline.customThemes);
     applyCategoryTheme(host, timeline.activeTheme ?? DEFAULT_THEME_NAME);
     host.classList.toggle('category-colorize', callTree?.categoryColorize ?? false);
-  });
+  };
+
+  const stopSettings = subscribeSettings(apply);
+
+  return () => {
+    stopThemePreview();
+    stopSettings();
+  };
 }

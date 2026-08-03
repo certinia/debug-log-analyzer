@@ -7,10 +7,10 @@ import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { getSettings } from '../../settings/Settings.js';
+import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
 import { type TimelineGroup, keyMap, setColors } from '../services/Timeline.js';
 
-import { DEFAULT_THEME_NAME, type TimelineColors } from '../themes/Themes.js';
+import { DEFAULT_THEME_NAME, sameColors, type TimelineColors } from '../themes/Themes.js';
 import { addCustomThemes, getTheme } from '../themes/ThemeSelector.js';
 
 import type { TimeDisplayMode } from '../types/flamechart.types.js';
@@ -57,6 +57,19 @@ export class TimelineView extends LitElement {
 
   @state()
   private useLegacyTimeline: boolean | null = null;
+
+  /** Unsubscribe for the settings subscription; set while connected. */
+  private settingsUnsubscribe: (() => void) | null = null;
+
+  /** Removes the theme-preview message listener; set while connected. */
+  private themePreviewUnsubscribe: (() => void) | null = null;
+
+  /**
+   * The persisted palette last applied. A quick-pick preview is not persisted, so an
+   * unrelated `configChanged` push must not re-apply the stored theme over it.
+   */
+  private appliedThemeName: string | null = null;
+  private appliedCustomThemes: { [key: string]: TimelineColors } = {};
 
   @state()
   private timeDisplayMode: TimeDisplayMode = 'elapsed';
@@ -142,24 +155,59 @@ export class TimelineView extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
 
-    VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
-      const { cmd, payload } = event.data;
-      if (cmd === 'switchTimelineTheme' && this.activeTheme !== payload.activeTheme) {
-        this.setTheme(payload.activeTheme ?? DEFAULT_THEME_NAME);
-      }
+    this.themePreviewUnsubscribe ??= VSCodeExtensionMessenger.listen<{ activeTheme: string }>(
+      (event) => {
+        const { cmd, payload } = event.data;
+        if (cmd === 'switchTimelineTheme' && this.activeTheme !== payload.activeTheme) {
+          this.setTheme(payload.activeTheme ?? DEFAULT_THEME_NAME);
+        }
+      },
+    );
+
+    // The panel is never re-created, so live `lana.timeline.*` edits only reach the
+    // chart through this subscription.
+    this.settingsUnsubscribe ??= subscribeSettings((settings) => {
+      this.applyTimelineSettings(settings);
     });
+  }
 
-    getSettings().then((settings) => {
-      const { timeline } = settings;
-      this.useLegacyTimeline = timeline.legacy;
+  override disconnectedCallback() {
+    this.settingsUnsubscribe?.();
+    this.settingsUnsubscribe = null;
+    this.themePreviewUnsubscribe?.();
+    this.themePreviewUnsubscribe = null;
+    super.disconnectedCallback();
+  }
 
-      if (!this.useLegacyTimeline) {
-        addCustomThemes(this.toTheme(timeline.customThemes));
-        this.setTheme(timeline.activeTheme ?? DEFAULT_THEME_NAME);
-      } else {
-        setColors(timeline.colors);
-        this.timelineKeys = Array.from(keyMap.values());
+  private applyTimelineSettings(settings: LanaSettings) {
+    const { timeline } = settings;
+    this.useLegacyTimeline = timeline.legacy;
+
+    if (!this.useLegacyTimeline) {
+      const themeName = timeline.activeTheme ?? DEFAULT_THEME_NAME;
+      const customThemes = this.toTheme(timeline.customThemes);
+      if (themeName !== this.appliedThemeName || !this.sameCustomThemes(customThemes)) {
+        this.appliedThemeName = themeName;
+        this.appliedCustomThemes = customThemes;
+        addCustomThemes(customThemes);
+        this.setTheme(themeName);
       }
+    } else {
+      setColors(timeline.colors);
+      this.timelineKeys = Array.from(keyMap.values());
+    }
+  }
+
+  /** True when the pushed custom themes match those already applied. */
+  private sameCustomThemes(customThemes: { [key: string]: TimelineColors }): boolean {
+    const names = Object.keys(customThemes);
+    if (names.length !== Object.keys(this.appliedCustomThemes).length) {
+      return false;
+    }
+    return names.every((name) => {
+      const applied = this.appliedCustomThemes[name];
+      const pushed = customThemes[name];
+      return !!applied && !!pushed && sameColors(applied, pushed);
     });
   }
 

@@ -141,6 +141,8 @@ export class CalltreeView extends LitElement {
   /** The table whose header was right-clicked (for column-toggle actions). */
   private contextMenuTable: Tabulator | null = null;
   private viewSwitchEpoch = 0;
+  /** Releases the category-colouring settings subscription; set while connected. */
+  private _categoryColoringOff: (() => void) | null = null;
 
   get _callTreeTableWrapper(): HTMLDivElement | null {
     return (this.tableContainer = this.renderRoot?.querySelector('#call-tree-table') ?? null);
@@ -172,11 +174,13 @@ export class CalltreeView extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    wireCategoryColoring(this);
+    this._categoryColoringOff = wireCategoryColoring(this);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._categoryColoringOff?.();
+    this._categoryColoringOff = null;
     document.removeEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);

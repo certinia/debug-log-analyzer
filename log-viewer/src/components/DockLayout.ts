@@ -88,19 +88,19 @@ export class DockLayout extends LitElement {
       }
 
       .gutter {
-        flex: 0 0 4px;
+        flex: 0 0 var(--lana-sash-size);
         z-index: 1;
-        background-color: var(--vscode-sideBar-border, transparent);
+        background-color: var(--lana-panel-divider);
         transition: background-color 0.1s ease;
       }
       .layout[data-dock='right'] .gutter,
       .layout[data-dock='left'] .gutter {
         cursor: col-resize;
-        margin: 0 -2px;
+        margin: 0 var(--lana-sash-inset);
       }
       .layout[data-dock='bottom'] .gutter {
         cursor: row-resize;
-        margin: -2px 0;
+        margin: var(--lana-sash-inset) 0;
       }
       .gutter:hover,
       .gutter.gutter--active {
