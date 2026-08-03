@@ -59,6 +59,13 @@
   --lana-shadow-popover: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
   --lana-shadow-overlay: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.5));
 
+  /* Badges — small count/kind pills, matching VS Code's own badge chrome. */
+  --lana-badge-bg: var(--vscode-badge-background, #616161);
+  --lana-badge-fg: var(--vscode-badge-foreground, #f8f8f8);
+
+  /* Secondary text — metadata that must not compete with the content it annotates. */
+  --lana-fg-muted: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+
   /* The hairline between panes, and around a docked one. */
   --lana-panel-divider: var(--vscode-sideBar-border, transparent);
 

@@ -27,7 +27,7 @@ Explore the Apex Log Analyzer for Salesforce debug logs features including inter
 
 **Log problems** are problems found in the log itself — governor limit exceptions, fatal errors, skipped lines. A chip shows the worst severity's icon with a count badge, and a tick when the log is clean. **Notifications** are messages about the tool rather than the log — today, parser diagnostics for log lines it couldn't understand. The two are kept apart so they don't read as one severity count.
 
-Each opens as a list of cards: a severity icon, a summary that expands on click if it runs past two lines, and — for problems that point at a spot in the log — an arrow action that jumps to it in the Call Tree.
+Each opens as a list of cards: a severity icon, a summary, a dimmed line with the kind and the time in the log (e.g. `Fatal error · 24.6 s`), a message that expands on click if it runs past two lines, and — for problems that point at a spot in the log — an arrow action that jumps to it in the Call Tree.
 
 If the parser meets a log event it doesn't recognize, a notification card carries a **Report unsupported log event** action, opening a pre-filled GitHub issue.
 

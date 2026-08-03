@@ -37,6 +37,12 @@ export class NotificationCentre extends LitElement {
         display: inline-flex;
         flex: 0 0 auto;
       }
+
+      /* Issue cards carry whole exception messages: widen past the menu default so the
+         two-line clamp holds a readable measure (~60 chars/line). */
+      anchored-popover {
+        --anchored-popover-width: 400px;
+      }
     `,
   ];
 

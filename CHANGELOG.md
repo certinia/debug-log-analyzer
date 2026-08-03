@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🎨 **Header bar**
   - **Log problems** icon now shows the most severe problem found, with a count.
   - **Log problems** and **Notifications** redesigned cards, show two lines of summary and message (click the message for the rest), and go to the Call Tree when clicked. An **Unsupported log event** card opens a prefilled bug report.
+  - **Log problems** cards say what kind of problem they are: a `Fatal error` / `Exception` pill and the time in the log sit on a line under the summary. Fatal errors drop the `FATAL ERROR! cause=` prefix, exception summaries are no longer cut at 99 characters, and both popovers are wider.
   - **Help & documentation** and **Report an issue** move into a `•••` menu, which also holds the controls the header drops as the window narrows.
 - ♻️ Replace `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).
 

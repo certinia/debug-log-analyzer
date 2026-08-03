@@ -42,7 +42,8 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
     }
 
     // Exceptions are drawn from the exception events (see extractExceptionMarkers),
-    // so skip 'error' issues here to avoid a duplicated red channel.
+    // so skip 'error' issues here to avoid a duplicated red channel. 'fatal' issues
+    // are excluded for the same reason, by the isMarkerType guard above.
     if (issue.type === 'error') {
       continue;
     }

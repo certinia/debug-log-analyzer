@@ -80,8 +80,9 @@ export class AnchoredPopover extends LitElement {
         inset: auto;
         margin: 6px 0 0 0;
         box-sizing: border-box;
-        width: 320px;
-        max-width: min(92vw, 320px);
+        /* Consumers widen via --anchored-popover-width; menus keep the compact default. */
+        width: var(--anchored-popover-width, 320px);
+        max-width: min(92vw, var(--anchored-popover-width, 320px));
         max-height: 540px;
         overflow-y: auto;
         padding: 6px;

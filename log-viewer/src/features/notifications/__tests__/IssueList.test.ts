@@ -98,6 +98,33 @@ describe('IssueList', () => {
     expect(issues.map((i) => i.summary)).toEqual(['skipped', 'limit exception']);
   });
 
+  it('renders a meta line with the kind pill and the moment in the log', async () => {
+    const el = await mount([
+      { ...issue('error', 'cpu limit'), label: 'Fatal error', timestamp: 100_000_000 },
+      issue('info', 'skipped'),
+    ]);
+
+    const meta = cards(el)[0]?.querySelector('.issue__meta');
+    expect(meta?.querySelector('.issue__label')?.textContent).toBe('Fatal error');
+    expect(meta?.textContent?.replace(/\s+/g, ' ')).toContain('· 100 ms');
+    // The meta line lives under the head, so the summary's clamp keeps the full width.
+    expect(cards(el)[0]?.querySelector('.issue__head .issue__label')).toBeNull();
+    // Meta is part of the card's accessible name, since the row is presentation.
+    expect(cards(el)[0]?.getAttribute('aria-label')).toBe('cpu limit (Fatal error, 100 ms)');
+    // No label and no timestamp — no meta row at all.
+    expect(cards(el)[1]?.querySelector('.issue__meta')).toBeNull();
+  });
+
+  it('shows a time-only meta line, including for a timestamp of 0', async () => {
+    const el = await mount([{ ...issue('warning', 'truncated'), timestamp: 0 }]);
+
+    const meta = cards(el)[0]?.querySelector('.issue__meta');
+    expect(meta?.querySelector('.issue__label')).toBeNull();
+    expect(meta?.textContent).not.toContain('·');
+    expect(meta?.textContent?.replace(/\s+/g, ' ')).toContain('0 ms');
+    expect(cards(el)[0]?.getAttribute('aria-label')).toBe('truncated (0 ms)');
+  });
+
   it('activates by clicking the card and by the keyboard-reachable action button', async () => {
     const run = jest.fn();
     const el = await mount([issue('error', 'has action', { label: 'Go somewhere', run })]);
