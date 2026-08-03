@@ -7,6 +7,8 @@ const THEME_MAP = new Map<string, TimelineColors>(
   THEMES.map((theme) => [theme.name, theme.colors]),
 );
 
+const BUILT_IN_THEME_NAMES = new Set(THEMES.map((theme) => theme.name));
+
 const DEFAULT_THEME = THEME_MAP.get(DEFAULT_THEME_NAME)!;
 
 export function getTheme(themeName: string): TimelineColors {
@@ -24,8 +26,9 @@ export function getDefault(): TimelineColors {
 
 export function addCustomThemes(customThemes: { [key: string]: TimelineColors }): void {
   for (const [name, colors] of Object.entries(customThemes)) {
-    // Skip if theme with this name already exists, avoid overriding built-in themes
-    if (THEME_MAP.has(name)) {
+    // Built-in themes are never overridden. A custom theme, though, is re-registered
+    // on every settings push, so an edited one must replace its earlier entry.
+    if (BUILT_IN_THEME_NAMES.has(name)) {
       continue;
     }
     THEME_MAP.set(name, colors);

@@ -4,7 +4,7 @@
 
 import { ConfigurationTarget, workspace, type Memento } from 'vscode';
 
-interface Config {
+export interface Config {
   timeline: {
     activeTheme: string;
     colors: {
@@ -69,7 +69,40 @@ export function getConfig(): Config {
   const plainConfig = JSON.parse(JSON.stringify(config));
   // Override the customThemes with the merged themes, to exclude defaults
   plainConfig.timeline.customThemes = userThemes;
+  // `lana.database.*` is private globalState, not a registered setting, so the merged
+  // tree has no `database` branch at all on a profile that never wrote one (every
+  // fresh install). Seed the shape `Config` promises before callers fill it in.
+  const database = plainConfig.database ?? {};
+  plainConfig.database = Object.fromEntries(
+    (['soql', 'dml', 'sosl'] as const).map((view) => [
+      view,
+      { columnView: 'General', columnOverrides: {}, ...database[view] },
+    ]),
+  );
   return plainConfig;
+}
+
+/** True when two resolved configs hold the same values, so nothing needs pushing. */
+export function sameConfig(a: Config, b: Config): boolean {
+  return sameValue(a, b);
+}
+
+// A structural walk, because the payload is a plain JSON tree with open-ended
+// records (column overrides, custom themes) that no per-field check can cover.
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) {
+    return false;
+  }
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) =>
+      sameValue((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+    )
+  );
 }
 
 export function updateConfig(section: string, value: unknown): Thenable<void> {
