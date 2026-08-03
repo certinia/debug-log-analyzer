@@ -20,15 +20,14 @@ export interface Config {
     };
     customThemes: {
       [key: string]: {
-        /* eslint-disable @typescript-eslint/naming-convention */
-        'Code Unit': string;
-        Workflow: string;
-        Method: string;
-        Flow: string;
-        DML: string;
-        SOQL: string;
-        'System Method': string;
-        /* eslint-enable @typescript-eslint/naming-convention */
+        apex: string;
+        codeUnit: string;
+        system: string;
+        automation: string;
+        dml: string;
+        soql: string;
+        callout: string;
+        validation: string;
       };
     };
     legacy: boolean;

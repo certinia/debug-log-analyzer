@@ -30,6 +30,7 @@ import { formatCallStack, formatEventDetails } from '../../call-tree/utils/event
 import { getTheme } from '../themes/ThemeSelector.js';
 import {
   BUCKET_CONSTANTS,
+  type EditorColors,
   type EventNode,
   type FindEventDetail,
   type FindResultsEventDetail,
@@ -370,6 +371,14 @@ export class ApexLogTimeline {
     if (this.tooltipRenderer) {
       this.tooltipRenderer.updateCategoryColors(colorMap);
     }
+  }
+
+  /**
+   * Apply editor colors read from CSS after a host theme change.
+   * The category palette is separate — see {@link setTheme}.
+   */
+  public setEditorColors(colors: EditorColors): void {
+    this.flamechart.setEditorColors(colors);
   }
 
   private themeToColors(themeName: string) {

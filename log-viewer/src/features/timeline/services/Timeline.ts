@@ -527,6 +527,30 @@ export function init(timelineContainer: HTMLElement, rootMethod: ApexLog) {
   }
 }
 
+/**
+ * Re-read the find-match colors from CSS and redraw.
+ *
+ * Called on init and again on every host theme change — the canvas caches these as
+ * strings, so nothing here re-themes on its own.
+ */
+export function refreshThemeColors(): void {
+  if (!canvas) {
+    return;
+  }
+
+  const computedStyle = getComputedStyle(canvas);
+  findMatchColor =
+    computedStyle.getPropertyValue('--vscode-editor-findMatchHighlightBackground') ?? '#ea5c0054';
+  currentFindMatchColor =
+    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground') ?? '#9e6a03';
+  borderSettings = new Map<string, number>([
+    [strokeColor, 1],
+    [findMatchColor, 2],
+  ]);
+
+  state.requestRedraw();
+}
+
 export function setColors(timelineColors: TimelineColors) {
   for (const keyMeta of keyMap.values()) {
     const key = keyMeta.label as keyof TimelineColors;
@@ -1022,15 +1046,7 @@ function onInitTimeline(): void {
   tooltip.id = 'timeline-tooltip';
   container.appendChild(tooltip);
 
-  const computedStyle = getComputedStyle(canvas);
-  findMatchColor =
-    computedStyle.getPropertyValue('--vscode-editor-findMatchHighlightBackground') ?? '#ea5c0054';
-  currentFindMatchColor =
-    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground') ?? '#9e6a03';
-  borderSettings = new Map<string, number>([
-    [strokeColor, 1],
-    [findMatchColor, 2],
-  ]);
+  refreshThemeColors();
 
   if (canvas) {
     canvas.addEventListener('mouseout', onLeaveCanvas);

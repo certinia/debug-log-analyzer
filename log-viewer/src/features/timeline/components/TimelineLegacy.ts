@@ -5,7 +5,8 @@ import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
-import { init as timelineInit } from '../services/Timeline.js';
+import { themeObserver } from '../../../core/theme/ThemeObserver.js';
+import { init as timelineInit, refreshThemeColors } from '../services/Timeline.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -23,8 +24,20 @@ export class TimelineLegacy extends LitElement {
   @query('#timeline-container')
   private _container!: HTMLDivElement;
 
-  constructor() {
-    super();
+  /** Unsubscribe for the appearance subscription; set while connected. */
+  private themeUnsubscribe: (() => void) | null = null;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.themeUnsubscribe ??= themeObserver.on(() => {
+      refreshThemeColors();
+    });
+  }
+
+  override disconnectedCallback(): void {
+    this.themeUnsubscribe?.();
+    this.themeUnsubscribe = null;
+    super.disconnectedCallback();
   }
 
   static styles = [

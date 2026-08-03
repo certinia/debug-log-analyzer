@@ -261,6 +261,8 @@ export interface EditorColors {
   widgetBackground: number;
   /** Line number / axis color (--tl-line-number-foreground) */
   lineNumberForeground: number;
+  /** Editor text color, for chrome that brightens on hover (--tl-editor-foreground) */
+  editorForeground: number;
   /** Selection overlay color (--tl-selection-background) */
   selectionBackground: number;
   /** Selection highlight border color (--tl-selection-highlight-border) */
