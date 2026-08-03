@@ -9,7 +9,9 @@ import {
   COLUMN_OVERRIDE_SECTIONS,
   getColumnOverrides,
   getConfig,
+  sameConfig,
   updateColumnOverride,
+  type Config,
 } from '../AppConfig.js';
 
 function mockMemento(store: Record<string, unknown> = {}): Memento {
@@ -66,6 +68,32 @@ describe('getConfig', () => {
       columnOverrides: {},
     });
     expect(config.database.dml.columnView).toBe('General');
+  });
+});
+
+describe('sameConfig', () => {
+  const base = (): Config =>
+    ({
+      timeline: { activeTheme: 'Dark', legacy: false, customThemes: { Custom: {} } },
+      callTree: { columnView: 'General', columnOverrides: { Time: ['a', 'b'] } },
+    }) as unknown as Config;
+
+  it('holds when every value matches', () => {
+    expect(sameConfig(base(), base())).toBe(true);
+  });
+
+  it('sees a changed value inside an open-ended record', () => {
+    const changed = base();
+    changed.callTree.columnOverrides.Time = ['a', 'c'];
+
+    expect(sameConfig(base(), changed)).toBe(false);
+  });
+
+  it('sees an added key', () => {
+    const changed = base();
+    changed.callTree.columnOverrides.Governor = ['x'];
+
+    expect(sameConfig(base(), changed)).toBe(false);
   });
 });
 

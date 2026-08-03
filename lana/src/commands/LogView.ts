@@ -17,6 +17,7 @@ import {
   getColumnViews,
   getConfig,
   getInspectorState,
+  sameConfig,
   updateConfig,
   updatePrivateSection,
   type Config,
@@ -72,16 +73,15 @@ export class LogView {
     // The panel keeps its context when hidden, so it is never re-created: settings
     // edits have to be pushed to it. Only push when the resolved payload actually
     // changed — every webview subscriber re-applies it.
-    let lastConfig = JSON.stringify(LogView.resolveConfig(context));
+    let lastConfig = LogView.resolveConfig(context);
     const configListener = workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration('lana')) {
         return;
       }
 
       const config = LogView.resolveConfig(context);
-      const serialized = JSON.stringify(config);
-      if (serialized !== lastConfig) {
-        lastConfig = serialized;
+      if (!sameConfig(config, lastConfig)) {
+        lastConfig = config;
         panel.webview.postMessage({ cmd: 'configChanged', payload: config });
       }
     });

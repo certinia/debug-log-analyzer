@@ -18,6 +18,22 @@ export interface TimelineColors {
   validation: string;
 }
 
+const TIMELINE_COLOR_KEYS = [
+  'apex',
+  'codeUnit',
+  'system',
+  'automation',
+  'dml',
+  'soql',
+  'callout',
+  'validation',
+] as const satisfies readonly (keyof TimelineColors)[];
+
+/** True when two palettes hold the same colour for every category. */
+export function sameColors(a: TimelineColors, b: TimelineColors): boolean {
+  return TIMELINE_COLOR_KEYS.every((key) => a[key] === b[key]);
+}
+
 export const DEFAULT_THEME_NAME = '50 Shades of Green';
 export const THEMES: TimelineTheme[] = [
   {

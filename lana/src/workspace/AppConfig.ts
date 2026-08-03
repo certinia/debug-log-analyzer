@@ -82,6 +82,29 @@ export function getConfig(): Config {
   return plainConfig;
 }
 
+/** True when two resolved configs hold the same values, so nothing needs pushing. */
+export function sameConfig(a: Config, b: Config): boolean {
+  return sameValue(a, b);
+}
+
+// A structural walk, because the payload is a plain JSON tree with open-ended
+// records (column overrides, custom themes) that no per-field check can cover.
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) {
+    return false;
+  }
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) =>
+      sameValue((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+    )
+  );
+}
+
 export function updateConfig(section: string, value: unknown): Thenable<void> {
   const config = workspace.getConfiguration('lana');
   return config.update(section, value, ConfigurationTarget.Global);
