@@ -402,6 +402,12 @@ export class FlameChart<E extends EventNode = EventNode> {
       this.setupSearch();
     }
 
+    // Every renderer that holds a host colour now exists, so the one fan-out point
+    // seeds them all — no init-time copy of the same pushes.
+    if (this.options.editorColors) {
+      this.setEditorColors(this.options.editorColors);
+    }
+
     // Initial render
     this.requestRender();
   }
@@ -788,8 +794,9 @@ export class FlameChart<E extends EventNode = EventNode> {
   /**
    * Push editor colors read from the host theme into every renderer that holds one.
    *
-   * Fans out to the same consumers wired in {@link init}, so a theme switch never has
-   * to tear the Pixi app down — doing so would blow the perf budget on large logs.
+   * The single fan-out point: {@link init} calls it once the renderers exist, and a
+   * theme switch calls it again, so switching never has to tear the Pixi app down —
+   * doing so would blow the perf budget on large logs.
    *
    * @param colors - Editor colors resolved from CSS custom properties
    */
@@ -1402,14 +1409,6 @@ export class FlameChart<E extends EventNode = EventNode> {
       displayWidth,
       this.index.totalDuration,
     );
-
-    const editorColors = this.options.editorColors;
-    if (editorColors) {
-      this.metricStripOrchestrator.setToggleIconColors(
-        editorColors.lineNumberForeground,
-        editorColors.editorForeground,
-      );
-    }
 
     // Focus container on metric strip mousedown for keyboard support
     const metricStripApp = this.metricStripOrchestrator.getApp();
