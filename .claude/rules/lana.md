@@ -15,9 +15,9 @@ VS Code extension. Applies when working under `lana/`.
 
 ## Settings
 
-- User-visible preferences are discoverable `lana.*` settings, not hidden `globalState`.
-- Setting changes reach an open panel by pushing `configChanged` — the panel sets
-  `retainContextWhenHidden`, so it is never re-created and never re-reads config on its own.
+- **Give every user preference a `lana.*` setting.** Do not hide it in `globalState`.
+- **Push `configChanged` to an open panel when a setting changes.** The panel sets
+  `retainContextWhenHidden`, so it is never re-created and never re-reads the config itself.
 
 ## Key paths
 
