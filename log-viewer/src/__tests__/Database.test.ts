@@ -26,6 +26,24 @@ describe('Analyse database tests', () => {
 
     const firstDML = result.getDMLLines()[0];
     expect(firstDML?.text).toEqual('DML Op:Insert Type:codaCompany__c');
+    expect(firstDML?.sObjectType).toEqual('codaCompany__c');
+  });
+
+  it('collects SOSL statements', async () => {
+    const log =
+      '09:18:22.6 (6574780)|EXECUTION_STARTED\n' +
+      '09:18:22.6 (6586704)|CODE_UNIT_STARTED|[EXTERNAL]|066d0000002m8ij|apex://pkg.Entry\n' +
+      '17:33:36.2 (1672655920)|SOSL_EXECUTE_BEGIN|[12]|FIND :searchQuery RETURNING Account(Id, Name)\n' +
+      '17:33:36.2 (1678684460)|SOSL_EXECUTE_END|[12]|Rows:5\n' +
+      '09:18:22.6 (7300000)|CODE_UNIT_FINISHED|apex://pkg.Entry\n' +
+      '09:18:22.6 (7400000)|EXECUTION_FINISHED\n';
+
+    const apexLog = parse(log);
+    const result = await DatabaseAccess.create(apexLog);
+
+    const soslLines = result.getSOSLLines();
+    expect(soslLines.length).toEqual(1);
+    expect(soslLines[0]?.soslRowCount.self).toEqual(5);
   });
 
   it('resolves stack by eventIndex when timestamps are duplicated', async () => {

@@ -18,6 +18,32 @@ export const EXCLUDED_DETAIL_TYPES: ReadonlySet<string> = new Set<string>([
 ]);
 
 /**
+ * Show-Details predicate, rolled up across children. Called post-order after
+ * `_children` is set and each child's own `_hasDetailsDeep` is populated. The
+ * type is passed in because it lives in a different place per row shape (on
+ * `originalData` for aggregated rows, on the row itself for bottom-up ones).
+ */
+export function computeHasDetailsDeep<
+  T extends { _children?: T[] | null; _hasDetailsDeep: boolean },
+>(row: T, totalTime: number, type: string | null | undefined): boolean {
+  if (totalTime > 0) {
+    return true;
+  }
+  if (type && EXCLUDED_DETAIL_TYPES.has(type)) {
+    return true;
+  }
+  const children = row._children;
+  if (children) {
+    for (let i = 0, len = children.length; i < len; i++) {
+      if (children[i]!._hasDetailsDeep) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * Recursive id-cached deep filter for any tree row that exposes `id` + `_children`.
  * Returns true when `predicate(row)` is true OR any descendant matches; the
  * memoised result is stored on the shared `filterCache` so repeated lookups

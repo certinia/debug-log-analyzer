@@ -11,7 +11,7 @@
 
 //TODO: Remove deps outside timeline
 
-import type { LogCategory, LogEvent } from 'apex-log-parser';
+import type { LogCategory, LogEvent, LogIssue } from 'apex-log-parser';
 import { formatDuration } from '../../../core/utility/Util.js';
 import type { PrecomputedRect } from '../optimised/RectangleCache.js';
 
@@ -261,6 +261,8 @@ export interface EditorColors {
   widgetBackground: number;
   /** Line number / axis color (--tl-line-number-foreground) */
   lineNumberForeground: number;
+  /** Editor text color, for chrome that brightens on hover (--tl-editor-foreground) */
+  editorForeground: number;
   /** Selection overlay color (--tl-selection-background) */
   selectionBackground: number;
   /** Selection highlight border color (--tl-selection-highlight-border) */
@@ -543,10 +545,10 @@ export class TimelineError extends Error {
 
 /**
  * Marker type enumeration.
- * Represents the three states of log Marker in Salesforce debug logs.
- * Order represents severity for stacking: error > unexpected > skip
+ * Represents the states of log Marker in Salesforce debug logs.
+ * Order represents severity for stacking: exception > error > unexpected > skip
  */
-export type MarkerType = 'error' | 'skip' | 'unexpected';
+export type MarkerType = 'error' | 'skip' | 'unexpected' | 'exception';
 
 /**
  * Controls whether the timeline axis shows elapsed time or wall-clock time.
@@ -583,6 +585,13 @@ export interface TimelineMarker {
    */
   startTime: number;
 
+  /**
+   * Time position (in nanoseconds) where the marker ends, when it can be bounded
+   * (e.g. a truncation that recovers). Undefined for point-in-time markers, which
+   * render as a single min-width line.
+   */
+  endTime?: number;
+
   /** Parser-assigned event identity when the marker corresponds to a concrete event. */
   eventIndex?: number;
 
@@ -597,26 +606,84 @@ export interface TimelineMarker {
  * Type guard to check if a string is a valid markerType.
  */
 export function isMarkerType(value: string): value is MarkerType {
-  return value === 'error' || value === 'skip' || value === 'unexpected';
+  return value === 'error' || value === 'skip' || value === 'unexpected' || value === 'exception';
 }
 
 /**
  * Color mapping for marker types.
  * Values are PixiJS numeric color codes (0xRRGGBB format).
- * Alpha channel (0.2) applied separately during rendering via MARKER_ALPHA.
+ * Alpha is applied during rendering via MARKER_ALPHA_BY_TYPE, so a single flat
+ * fill reads correctly over both light and dark editor backgrounds.
+ *
+ * Visual grammar: translucent bands (skip/unexpected/error) mark regions of
+ * uncertainty; the saturated exception hairline marks a discrete failure.
  */
 
 export const MARKER_COLORS: Record<MarkerType, number> = {
-  error: 0xff8080, // rgba(255, 128, 128, 0.2) - light red
-  skip: 0x1e80ff, // rgba(30, 128, 255, 0.2) - light blue
-  unexpected: 0x8080ff, // rgba(128, 128, 255, 0.2) - light purple
+  exception: 0xe5484d, // saturated red - reads on light and dark themes as a 1px line
+  error: 0xff8080, // light red
+  skip: 0x1e80ff, // light blue
+  unexpected: 0x8080ff, // light purple
 } as const;
 
 /**
- * Transparency level for all truncation indicators.
- * Applied uniformly to ensure indicators remain in background.
+ * The same marker colour as a CSS hex string, for DOM renderers (the issue cards' rail).
+ * Derived rather than restated so the canvas and the DOM can't drift apart.
+ */
+export function markerColorCss(type: MarkerType): string {
+  return `#${MARKER_COLORS[type].toString(16).padStart(6, '0')}`;
+}
+
+/**
+ * The marker a parsed log issue is drawn as, so a DOM renderer can match its band.
+ *
+ * `'error'` maps to `'exception'`: `extractMarkers` drops `'error'` logIssues and the same
+ * failure is drawn from `log.exceptions`, so the exception hue is what's actually on screen.
+ */
+export function markerTypeForIssue(issueType: LogIssue['type']): MarkerType {
+  return issueType === 'error' ? 'exception' : issueType;
+}
+
+/**
+ * Default transparency for full-height background bands.
+ * Low enough to stay in the background over any editor theme.
  */
 export const MARKER_ALPHA = 0.2;
+
+/**
+ * Higher opacity for exception hairlines so a 1px line stays crisp on both themes.
+ */
+export const EXCEPTION_ALPHA = 0.9;
+
+/**
+ * Minimum rendered width (px) for a marker. Keeps a marker visible when zoomed out;
+ * a bounded marker widens to its exact range as you zoom in, and never disappears.
+ */
+export const MARKER_MIN_WIDTH_PX = 2;
+
+/**
+ * Minimum gap (px) enforced between adjacent drawn markers so distinct markers read as
+ * separate. Bands shift to preserve this gap.
+ */
+export const MARKER_GAP_PX = 1;
+
+/**
+ * Merge distance (px) for point markers (exceptions). Points closer than this to the
+ * previous drawn marker collapse into one line for a cleaner look (still counted in the
+ * tooltip via hit testing). Being pixel-based, it merges more aggressively when zoomed out
+ * and separates markers again as you zoom in. Tunable.
+ */
+export const MARKER_BUCKET_PX = 4;
+
+/**
+ * Per-type alpha. Bands stay faint; exception hairlines are near-opaque.
+ */
+export const MARKER_ALPHA_BY_TYPE: Record<MarkerType, number> = {
+  exception: EXCEPTION_ALPHA,
+  error: MARKER_ALPHA,
+  skip: MARKER_ALPHA,
+  unexpected: MARKER_ALPHA,
+} as const;
 
 // ============================================================================
 // TEXT LABEL CONSTANTS
@@ -668,12 +735,17 @@ export const TEXT_LABEL_CONSTANTS = {
 /**
  * Severity levels in ascending order (lowest to highest).
  * Used for z-index stacking when indicators overlap.
- * Render order: unexpected first (bottom layer) → unexpected → error (top layer).
+ * Render order: unexpected first (bottom layer) → skip → error → exception (top layer).
  */
-export const SEVERITY_ORDER: readonly MarkerType[] = ['unexpected', 'skip', 'error'] as const;
+export const SEVERITY_ORDER: readonly MarkerType[] = [
+  'unexpected',
+  'skip',
+  'error',
+  'exception',
+] as const;
 
 /**
- * Maps truncation type to severity rank (higher = more severe).
+ * Maps marker type to severity rank (higher = more severe).
  * Used for sorting and prioritization logic during hit testing.
  */
 
@@ -681,6 +753,7 @@ export const SEVERITY_RANK: Record<MarkerType, number> = {
   skip: 1,
   unexpected: 2,
   error: 3,
+  exception: 4,
 } as const;
 
 // ============================================================================
@@ -766,10 +839,16 @@ export interface HeatStripMetric {
  * Represents current usage and limit for a single metric.
  */
 export interface HeatStripMetricValue {
-  /** Current usage value */
+  /** Current usage value (corrected: last cumulative baseline + granular deltas since). */
   used: number;
   /** Maximum allowed value (limit) */
   limit: number;
+  /**
+   * Increment-only total from detailed events, set only for delta-tracked metrics and only
+   * when it diverges below `used` (i.e. the log dropped events the cumulative snapshot counted).
+   * Undefined means no divergence / metric has no granular source.
+   */
+  tracked?: number;
 }
 
 /**
@@ -832,6 +911,8 @@ export interface MetricStripClassifiedMetric {
   tier: 1 | 2 | 3;
   /** Maximum percentage reached across all timestamps (0-1+) */
   globalMaxPercent: number;
+  /** Authoritative limit for this metric ("out of" total), fixed across the series. 0 if unknown. */
+  limit: number;
   /** Line color for this metric (hex number 0xRRGGBB) */
   color: number;
   /** Priority for ordering (lower = higher priority, shown first) */
@@ -844,10 +925,12 @@ export interface MetricStripClassifiedMetric {
  * Raw metric value with used and limit.
  */
 export interface MetricStripRawValue {
-  /** Current usage value */
+  /** Current usage value (corrected line value). */
   used: number;
   /** Maximum allowed value (limit) */
   limit: number;
+  /** Increment-only tracked total, present only when it diverges below `used`. See HeatStripMetricValue.tracked. */
+  tracked?: number;
 }
 
 /**

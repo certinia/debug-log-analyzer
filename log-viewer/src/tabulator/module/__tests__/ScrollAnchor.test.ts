@@ -59,7 +59,9 @@ describe('ScrollAnchor', () => {
       on: jest.fn(),
       element: { querySelector: jest.fn() },
       getRows: jest.fn((type?: string) => {
-        if (type === 'visible') return [r1, r2, r3];
+        if (type === 'visible') {
+          return [r1, r2, r3];
+        }
         return [];
       }),
     };

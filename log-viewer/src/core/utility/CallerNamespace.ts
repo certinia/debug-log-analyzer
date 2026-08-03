@@ -3,7 +3,8 @@
  */
 import type { LogEvent } from 'apex-log-parser';
 
-const DEFAULT_NAMESPACE = 'default';
+/** What an empty/unset namespace normalizes to, here and in every comparison against a namespace. */
+export const DEFAULT_NAMESPACE = 'default';
 
 const cache = new WeakMap<LogEvent, string>();
 

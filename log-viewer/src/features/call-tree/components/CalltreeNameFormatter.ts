@@ -1,11 +1,12 @@
 /*
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
-import type { LogEvent, LogEventType } from 'apex-log-parser';
+import type { LogEvent } from 'apex-log-parser';
 import type { CellComponent, EmptyCallback } from 'tabulator-tables';
 import { formatSOQL } from '../../soql/format/formatter.js';
+import { eventLabel, eventName } from '../utils/eventText.js';
 
-export function createCalltreeNameFormatter(excludedTypes: Set<LogEventType>) {
+export function createCalltreeNameFormatter() {
   let childIndent: number;
 
   return function calltreeNameFormatter(
@@ -18,11 +19,13 @@ export function createCalltreeNameFormatter(excludedTypes: Set<LogEventType>) {
     const row = cell.getRow();
     // @ts-expect-error _row is private to tabulator but is the only way to get the tree level in a formatter
     const treeLevel: number = row._row.modules.dataTree?.index ?? 0;
-    const levelIndent = treeLevel * childIndent;
-    if (levelIndent) {
+    // Group indent comes from `--lana-group-indent` (DataGrid.scss) so it stays live as
+    // grouping toggles; level-0 cells get theirs purely from CSS, with no inline style.
+    const treeIndent = treeLevel * childIndent;
+    if (treeIndent) {
       const cellElem = cell.getElement();
-      cellElem.style.paddingLeft = `${levelIndent + 4}px`;
-      cellElem.style.textIndent = `-${levelIndent}px`;
+      cellElem.style.paddingLeft = `calc(${treeIndent + 4}px + var(--lana-group-indent, 0px))`;
+      cellElem.style.textIndent = `-${treeIndent}px`;
     }
 
     const { originalData: node } = cell.getData() as { originalData: LogEvent };
@@ -45,15 +48,12 @@ export function createCalltreeNameFormatter(excludedTypes: Set<LogEventType>) {
     if (node.hasValidSymbols) {
       const link = document.createElement('a');
       link.setAttribute('href', '#!');
-      link.textContent = node.text;
+      // With the suffix: a constructor's text is a bare class name, so without
+      // it the row reads as a type reference rather than a call.
+      link.textContent = eventName(node);
       return link;
     }
 
-    let text = node.text;
-    if (node.type && node.type !== text && !excludedTypes.has(node.type)) {
-      text = node.type + ': ' + text;
-    }
-
-    return document.createTextNode(text) as unknown as HTMLElement;
+    return document.createTextNode(eventLabel(node)) as unknown as HTMLElement;
   };
 }

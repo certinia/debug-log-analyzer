@@ -10,6 +10,10 @@ const defaultConfig = {
         jsc: {
           target: 'esnext',
           parser: { decorators: true, syntax: 'typescript' },
+          // Match the bundles (and log-viewer/tsconfig.json): with `define`
+          // semantics a class field initializer shadows Lit's reactive
+          // accessor, so property assignments never trigger a re-render.
+          transform: { useDefineForClassFields: false },
         },
       },
     ],
@@ -31,9 +35,13 @@ export default {
       ...defaultConfig,
       displayName: 'log-viewer',
       rootDir: '<rootDir>/log-viewer',
+      setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
       moduleNameMapper: {
         ...defaultConfig.moduleNameMapper,
         '^apex-log-parser$': '<rootDir>/../apex-log-parser/src/index.ts',
+        // Stylesheet imports have no transform here; the `.js` rule above runs first, so the
+        // `*.css.ts` style modules are unaffected.
+        '\\.s?css$': '<rootDir>/src/__tests__/mocks/styleStub.ts',
       },
       transformIgnorePatterns: [
         // allow transformation of pixi.js and its dependencies

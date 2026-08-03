@@ -17,65 +17,35 @@
  * LogEvent should only be referenced here in ApexLogTimeline to convert to generic EventNode for FlameChart and not in FlameChart or its dependencies.
  */
 
-import type { ApexLog, GovernorSnapshot, Limits, LogEvent } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { ContextMenu } from '../../../components/ContextMenu.js';
 import { ContextMenuBuilder } from '../../../components/ContextMenuBuilder.js';
 import { eventBus } from '../../../core/events/EventBus.js';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
+import { copyToClipboard } from '../../../core/utility/Clipboard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { findEventByEventIndex, findEventByTimestamp } from '../../../core/utility/EventSearch.js';
-import { formatDuration } from '../../../core/utility/Util.js';
-import { goToRow } from '../../call-tree/components/CalltreeView.js';
+import { goToRow } from '../../call-tree/navigation.js';
+import { formatCallStack, formatEventDetails } from '../../call-tree/utils/eventText.js';
 import { getTheme } from '../themes/ThemeSelector.js';
 import {
   BUCKET_CONSTANTS,
+  type EditorColors,
   type EventNode,
   type FindEventDetail,
   type FindResultsEventDetail,
-  type HeatStripMetric,
-  type HeatStripTimeSeries,
   type ModifierKeys,
   type TimelineMarker,
   type TimelineOptions,
   type ViewportState,
 } from '../types/flamechart.types.js';
 import type { SearchCursor } from '../types/search.types.js';
-import { extractMarkers } from '../utils/marker-utils.js';
+import { isFrameOffscreen, toDetailSelection } from '../utils/detail-selection-sync.js';
+import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer } from './FrameTooltipRenderer.js';
-
-/**
- * Apex-specific metric definitions for heat strip visualization.
- * "Big 4" limits (CPU, SOQL, DML, Heap) have priority < 4 and are always shown.
- * Other limits have priority >= 4 and are only shown when > 0%.
- */
-const APEX_METRICS: Map<keyof Limits, HeatStripMetric> = new Map([
-  ['cpuTime', { id: 'cpuTime', displayName: 'CPU Time', unit: 'ms', priority: 0 }],
-  ['soqlQueries', { id: 'soqlQueries', displayName: 'SOQL Queries', unit: '', priority: 1 }],
-  ['dmlStatements', { id: 'dmlStatements', displayName: 'DML Statements', unit: '', priority: 2 }],
-  ['heapSize', { id: 'heapSize', displayName: 'Heap Size', unit: 'bytes', priority: 3 }],
-  ['queryRows', { id: 'queryRows', displayName: 'Query Rows', unit: '', priority: 4 }],
-  ['soslQueries', { id: 'soslQueries', displayName: 'SOSL Queries', unit: '', priority: 5 }],
-  ['dmlRows', { id: 'dmlRows', displayName: 'DML Rows', unit: '', priority: 6 }],
-  [
-    'publishImmediateDml',
-    { id: 'publishImmediateDml', displayName: 'Publish Immediate DML', unit: '', priority: 7 },
-  ],
-  ['callouts', { id: 'callouts', displayName: 'Callouts', unit: '', priority: 8 }],
-  [
-    'emailInvocations',
-    { id: 'emailInvocations', displayName: 'Email Invocations', unit: '', priority: 9 },
-  ],
-  ['futureCalls', { id: 'futureCalls', displayName: 'Future Calls', unit: '', priority: 10 }],
-  [
-    'queueableJobsAddedToQueue',
-    { id: 'queueableJobsAddedToQueue', displayName: 'Queueable Jobs', unit: '', priority: 11 },
-  ],
-  [
-    'mobileApexPushCalls',
-    { id: 'mobileApexPushCalls', displayName: 'Mobile Push Calls', unit: '', priority: 12 },
-  ],
-]);
+import { buildApexLimitTimeSeries } from './apex-limit-series.js';
 
 interface ApexTimelineOptions extends TimelineOptions {
   themeName?: string | null;
@@ -93,6 +63,9 @@ export class ApexLogTimeline {
   private selectedEventForContextMenu: EventNode | null = null;
   private selectedMarkerForContextMenu: TimelineMarker | null = null;
   private eventBusUnsubscribe: (() => void) | null = null;
+  private inspectorRevealUnsubscribe: (() => void) | null = null;
+  /** Guards the programmatic select made on the inspector's behalf. */
+  private echoGuard = new SelectionEchoGuard();
 
   constructor() {
     this.flamechart = new FlameChart();
@@ -121,7 +94,7 @@ export class ApexLogTimeline {
       apexLog: apexLog,
     });
 
-    const markers = extractMarkers(this.apexLog);
+    const markers = extractMarkers(this.apexLog).concat(extractExceptionMarkers(this.apexLog));
     this.events = this.extractEvents();
 
     // Derive categories from shared constant (ensures compile-time sync with color map)
@@ -190,10 +163,10 @@ export class ApexLogTimeline {
           this.handleContextMenu(target, screenX, screenY, clientX, clientY);
         },
         onCopy: (eventNode) => {
-          this.copyToClipboard(eventNode.text);
+          copyToClipboard(eventNode.text);
         },
         onCopyMarker: (marker) => {
-          this.copyToClipboard(marker.summary);
+          copyToClipboard(marker.summary);
         },
       },
       // Pass precomputed data to skip redundant O(n) traversals
@@ -216,13 +189,11 @@ export class ApexLogTimeline {
     // Wire up search event listeners
     this.enableSearch();
 
-    // Transform and set heat strip time series data for visualization
-    if (apexLog.governorLimits.snapshots.length > 0) {
-      const heatStripSeries = this.transformGovernorToHeatStrip(apexLog.governorLimits.snapshots);
-      this.flamechart.setHeatStripTimeSeries(heatStripSeries);
-    } else {
-      this.flamechart.setHeatStripTimeSeries(null);
-    }
+    // Build the dense governor-limit series (cumulative snapshots + granular events).
+    const heatStripSeries = buildApexLimitTimeSeries(this.apexLog, this.events);
+    this.flamechart.setHeatStripTimeSeries(
+      heatStripSeries.events.length > 0 ? heatStripSeries : null,
+    );
 
     // Subscribe to EventBus for timeline navigation requests (from CalltreeView and raw-log entry).
     this.eventBusUnsubscribe = eventBus.on('timeline:navigate-to', (detail) => {
@@ -232,6 +203,44 @@ export class ApexLogTimeline {
         this.navigateToTimestamp(detail.timestamp);
       }
     });
+
+    // Reveal an inspector row in the flame chart, but only while the timeline is
+    // the tab the inspector is showing.
+    this.inspectorRevealUnsubscribe = eventBus.on('inspector:reveal', (detail) => {
+      if (detail.source === 'timeline') {
+        this.selectFrameByEventIndex(detail.eventIndex);
+      }
+    });
+  }
+
+  /**
+   * Select the frame for `eventIndex` and pan to it when it is off-screen.
+   * Passive sync, so it never zooms - a full focus would be too disruptive.
+   */
+  private selectFrameByEventIndex(eventIndex: number): void {
+    if (!this.apexLog) {
+      return;
+    }
+
+    const result = findEventByEventIndex(this.apexLog, eventIndex);
+    if (!result) {
+      return;
+    }
+
+    const selected = this.echoGuard.run(() =>
+      this.flamechart.selectByEventNode(this.toEventNode(result)),
+    );
+    if (!selected) {
+      return;
+    }
+
+    const bounds = this.flamechart.getViewportManager()?.getBounds();
+    if (
+      bounds &&
+      isFrameOffscreen(bounds, result.event.timestamp, result.event.duration.total, result.depth)
+    ) {
+      this.flamechart.centerOnSelectedFrame();
+    }
   }
 
   /**
@@ -266,7 +275,14 @@ export class ApexLogTimeline {
       return;
     }
 
-    const eventNode: EventNode = {
+    this.flamechart.selectByEventNode(this.toEventNode(result));
+    const viewport = this.flamechart.getViewportManager();
+    viewport?.focusOnEvent(result.event.timestamp, result.event.duration.total, result.depth);
+    this.flamechart.requestRender();
+  }
+
+  private toEventNode(result: { event: LogEvent; depth: number }): EventNode {
+    return {
       id: `${result.event.eventIndex}-${result.depth}`,
       timestamp: result.event.timestamp,
       duration: result.event.duration.total,
@@ -274,11 +290,6 @@ export class ApexLogTimeline {
       text: result.event.text,
       original: result.event,
     };
-
-    this.flamechart.selectByEventNode(eventNode);
-    const viewport = this.flamechart.getViewportManager();
-    viewport?.focusOnEvent(result.event.timestamp, result.event.duration.total, result.depth);
-    this.flamechart.requestRender();
   }
 
   /**
@@ -308,6 +319,10 @@ export class ApexLogTimeline {
     if (this.eventBusUnsubscribe) {
       this.eventBusUnsubscribe();
       this.eventBusUnsubscribe = null;
+    }
+    if (this.inspectorRevealUnsubscribe) {
+      this.inspectorRevealUnsubscribe();
+      this.inspectorRevealUnsubscribe = null;
     }
 
     this.flamechart.destroy();
@@ -356,6 +371,14 @@ export class ApexLogTimeline {
     if (this.tooltipRenderer) {
       this.tooltipRenderer.updateCategoryColors(colorMap);
     }
+  }
+
+  /**
+   * Apply editor colors read from CSS after a host theme change.
+   * The category palette is separate — see {@link setTheme}.
+   */
+  public setEditorColors(colors: EditorColors): void {
+    this.flamechart.setEditorColors(colors);
   }
 
   private themeToColors(themeName: string) {
@@ -461,16 +484,27 @@ export class ApexLogTimeline {
    * Use J key for explicit "jump to call tree" action.
    */
   private handleSelect(eventNode: EventNode | null): void {
+    if (this.echoGuard.suppressed) {
+      return;
+    }
+
     if (!eventNode) {
       // Selection cleared - hide tooltip
       if (this.tooltipRenderer) {
         this.tooltipRenderer.hide();
       }
+      eventBus.emit('detail:select', { source: 'timeline', selection: null });
       return;
     }
 
     // Selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
+    // The inspector shows the selected frame's detail.
+    const originalEvent = (eventNode as EventNode & { original?: LogEvent }).original;
+    const selection = toDetailSelection(originalEvent?.eventIndex);
+    if (selection) {
+      eventBus.emit('detail:select', { source: 'timeline', selection });
+    }
   }
 
   /**
@@ -503,11 +537,17 @@ export class ApexLogTimeline {
       if (this.tooltipRenderer) {
         this.tooltipRenderer.hide();
       }
+      eventBus.emit('detail:select', { source: 'timeline', selection: null });
       return;
     }
 
     // Marker selection only - no auto-navigation to call tree
     // User can press J to explicitly jump to call tree
+    // Markers only carry an eventIndex when they map to a log event.
+    const selection = toDetailSelection(marker.eventIndex);
+    if (selection) {
+      eventBus.emit('detail:select', { source: 'timeline', selection });
+    }
   }
 
   /**
@@ -728,10 +768,10 @@ export class ApexLogTimeline {
           this.flamechart.focusOnSelectedMarker();
           break;
         case 'copy-summary':
-          this.copyToClipboard(marker.summary);
+          copyToClipboard(marker.summary);
           break;
         case 'copy-marker-details':
-          this.copyToClipboard(this.formatMarkerDetails(marker));
+          copyToClipboard(this.formatMarkerDetails(marker));
           break;
       }
       return;
@@ -754,13 +794,13 @@ export class ApexLogTimeline {
         this.flamechart.focusOnSelectedFrame();
         break;
       case 'copy-name':
-        this.copyToClipboard(event.text);
+        copyToClipboard(event.text);
         break;
       case 'copy-details':
-        this.copyToClipboard(this.formatEventDetails(event));
+        copyToClipboard(this.formatEventDetails(event));
         break;
       case 'copy-call-stack':
-        this.copyToClipboard(this.formatCallStack(event));
+        copyToClipboard(this.formatCallStack(event));
         break;
       case 'show-in-log':
         this.handleShowInLog(event);
@@ -793,15 +833,6 @@ export class ApexLogTimeline {
   }
 
   /**
-   * Copy text to clipboard.
-   */
-  private copyToClipboard(text: string): void {
-    navigator.clipboard.writeText(text).catch(() => {
-      // Silently fail - clipboard API may not be available in all contexts
-    });
-  }
-
-  /**
    * Format event details for clipboard (similar to tooltip content).
    */
   private formatEventDetails(eventNode: EventNode): string {
@@ -811,59 +842,7 @@ export class ApexLogTimeline {
       // Fallback for nodes without original
       return `Name: ${eventNode.text}\nType: ${eventNode.type}`;
     }
-
-    const lines: string[] = [];
-    lines.push(`Name: ${logEvent.text}${logEvent.suffix ?? ''}`);
-
-    if (logEvent.type) {
-      lines.push(`Type: ${logEvent.type}`);
-    }
-
-    if (logEvent.exitStamp && logEvent.duration.total) {
-      let durationStr = formatDuration(logEvent.duration.total);
-      if (logEvent.cpuType === 'free') {
-        durationStr += ' (free)';
-      } else if (logEvent.duration.self) {
-        durationStr += ` (self ${formatDuration(logEvent.duration.self)})`;
-      }
-      lines.push(`Duration: ${durationStr}`);
-    }
-
-    // Add metrics (only if non-zero)
-    const govLimits = this.apexLog?.governorLimits;
-
-    if (logEvent.dmlCount.total) {
-      lines.push(`DML: ${this.formatLimit(logEvent.dmlCount, govLimits?.dmlStatements.limit)}`);
-    }
-    if (logEvent.dmlRowCount.total) {
-      lines.push(`DML Rows: ${this.formatLimit(logEvent.dmlRowCount, govLimits?.dmlRows.limit)}`);
-    }
-    if (logEvent.soqlCount.total) {
-      lines.push(`SOQL: ${this.formatLimit(logEvent.soqlCount, govLimits?.soqlQueries.limit)}`);
-    }
-    if (logEvent.soqlRowCount.total) {
-      lines.push(
-        `SOQL Rows: ${this.formatLimit(logEvent.soqlRowCount, govLimits?.queryRows.limit)}`,
-      );
-    }
-    if (logEvent.soslCount.total) {
-      lines.push(`SOSL: ${this.formatLimit(logEvent.soslCount, govLimits?.soslQueries.limit)}`);
-    }
-    if (logEvent.soslRowCount.total) {
-      lines.push(
-        `SOSL Rows: ${this.formatLimit(logEvent.soslRowCount, govLimits?.soslQueries.limit)}`,
-      );
-    }
-
-    return lines.join('\n');
-  }
-
-  /**
-   * Format a metric with limit for clipboard.
-   */
-  private formatLimit(metric: { total: number; self: number }, limit?: number): string {
-    const outOf = limit ? `/${limit}` : '';
-    return `${metric.total}${outOf} (self ${metric.self})`;
+    return formatEventDetails(logEvent, this.apexLog?.governorLimits);
   }
 
   /**
@@ -872,20 +851,7 @@ export class ApexLogTimeline {
    */
   private formatCallStack(eventNode: EventNode): string {
     const logEvent = (eventNode as EventNode & { original?: LogEvent }).original;
-    if (!logEvent) {
-      return eventNode.text;
-    }
-
-    // Build call stack by traversing up parent chain
-    const stack: LogEvent[] = [];
-    let current: LogEvent | null = logEvent;
-    while (current?.type) {
-      stack.unshift(current); // Prepend to get root-first order
-      current = current.parent;
-    }
-
-    // Format as call stack (one entry per line)
-    return stack.map((event) => event.text + (event.suffix ?? '')).join('\n');
+    return logEvent ? formatCallStack(logEvent) : eventNode.text;
   }
 
   /**
@@ -1048,43 +1014,5 @@ export class ApexLogTimeline {
     });
 
     document.dispatchEvent(event);
-  }
-
-  // ============================================================================
-  // APEX-SPECIFIC DATA TRANSFORMATION
-  // ============================================================================
-
-  /**
-   * Transform Apex-specific governor snapshots to generic HeatStripTimeSeries.
-   * This converts Apex governor limits data to the generic format expected by
-   * the heat strip visualization components.
-   *
-   * @param snapshots - Apex governor limit snapshots
-   * @returns Generic heat strip time series
-   */
-  private transformGovernorToHeatStrip(snapshots: GovernorSnapshot[]): HeatStripTimeSeries {
-    // Convert APEX_METRICS to string-keyed Map for the generic interface
-    const metrics = new Map<string, HeatStripMetric>();
-    for (const [key, metric] of APEX_METRICS) {
-      metrics.set(key, metric);
-    }
-
-    // Transform snapshots to events
-    const events = snapshots.map((snapshot) => {
-      const values = new Map<string, { used: number; limit: number }>();
-      for (const [key, value] of Object.entries(snapshot.limits) as [
-        keyof Limits,
-        { used: number; limit: number },
-      ][]) {
-        values.set(key, { used: value.used, limit: value.limit });
-      }
-      return {
-        timestamp: snapshot.timestamp,
-        namespace: snapshot.namespace,
-        values,
-      };
-    });
-
-    return { metrics, events };
   }
 }

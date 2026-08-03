@@ -101,6 +101,11 @@ export interface GovernorLimits extends Limits {
 
 export interface LogIssue {
   startTime?: number;
+  /**
+   * The time the issue ends, when it can be bounded (e.g. a truncation that recovers).
+   * Left undefined for point-in-time issues, which render as a single marker line.
+   */
+  endTime?: number;
   eventIndex?: number;
   summary: string;
   description: string;

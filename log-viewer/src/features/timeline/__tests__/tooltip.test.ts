@@ -53,6 +53,8 @@ describe('FrameTooltipRenderer', () => {
       soqlRowCount: { total: 0, self: 0 },
       soslCount: { total: 0, self: 0 },
       soslRowCount: { total: 0, self: 0 },
+      thrownCount: { total: 0, self: 0 },
+      heapAllocated: { total: 0, self: 0 },
     } as unknown as LogEvent;
   }
 
@@ -273,6 +275,59 @@ describe('FrameTooltipRenderer', () => {
       expect(tooltip.textContent).toContain('total');
       // Check for some duration value (format may vary)
       expect(tooltip.textContent).toContain('ms');
+
+      frameTooltipRenderer.hide();
+    });
+
+    it('should display a Throws row with the total (no self) when exceptions were thrown', () => {
+      const event = createEvent(0, 1_500_000);
+      event.thrownCount = { total: 3, self: 1 };
+
+      frameTooltipRenderer.show(event, 100, 100);
+
+      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
+      expect(tooltip.textContent).toContain('Throws:');
+      expect(tooltip.textContent).toContain('3');
+      // self is intentionally omitted for throws (always 0 on a method).
+      expect(tooltip.textContent).not.toContain('self 1');
+
+      frameTooltipRenderer.hide();
+    });
+
+    it('should not display a Throws row when no exceptions were thrown', () => {
+      const event = createEvent(0, 1_500_000);
+      event.thrownCount = { total: 0, self: 0 };
+
+      frameTooltipRenderer.show(event, 100, 100);
+
+      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
+      expect(tooltip.textContent).not.toContain('Throws:');
+
+      frameTooltipRenderer.hide();
+    });
+
+    it('should display a lowercase net heap row as total (self N), thousand-separated', () => {
+      const event = createEvent(0, 1_500_000);
+      event.heapAllocated = { self: 1_572_864, total: 4_000_000 };
+
+      frameTooltipRenderer.show(event, 100, 100);
+
+      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
+      expect(tooltip.textContent).toContain('heap:');
+      // Net subtree total (with the byte unit) and the method's own net in parens.
+      expect(tooltip.textContent).toContain('4,000,000 bytes (self 1,572,864)');
+
+      frameTooltipRenderer.hide();
+    });
+
+    it('should not display a heap row when net heap is 0 (allocated then freed)', () => {
+      const event = createEvent(0, 1_500_000);
+      event.heapAllocated = { self: 0, total: 0 };
+
+      frameTooltipRenderer.show(event, 100, 100);
+
+      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
+      expect(tooltip.textContent).not.toContain('heap:');
 
       frameTooltipRenderer.hide();
     });
@@ -641,6 +696,8 @@ describe('FrameTooltipRenderer', () => {
         soqlRowCount: { total: 0, self: 0 },
         soslCount: { total: 0, self: 0 },
         soslRowCount: { total: 0, self: 0 },
+        thrownCount: { total: 0, self: 0 },
+        heapAllocated: { total: 0, self: 0 },
       } as unknown as LogEvent;
 
       frameTooltipRenderer.show(event, 100, 100);

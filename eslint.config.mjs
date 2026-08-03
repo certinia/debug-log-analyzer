@@ -5,6 +5,9 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig(
   globalIgnores([
+    // agent worktrees/scratch: nested repo copies that would otherwise be
+    // picked up as ambiguous tsconfigRootDir candidates by typescript-eslint
+    '**/.claude/',
     '**/.sf/',
     '**/.sfdx/',
     '**/dist/',
@@ -21,6 +24,18 @@ export default defineConfig(
   {
     files: ['**/*.ts'],
     extends: [eslint.configs.recommended, tseslint.configs.recommended, prettierConfig],
+
+    // pin the root so typescript-eslint does not auto-detect ambiguous
+    // candidates from nested repo copies (e.g. .claude agent worktrees)
+    languageOptions: {
+      parserOptions: {
+        tsconfigRootDir: import.meta.dirname,
+        // AGENTS.md keeps `typescript` aliased to @typescript/typescript6 because
+        // typescript-eslint needs the TS <=6.0 API. Fail the lint run if a bump
+        // breaks that, rather than emitting a warning nobody reads.
+        onUnsupportedTypeScriptVersion: 'error',
+      },
+    },
 
     rules: {
       'no-console': 'warn',

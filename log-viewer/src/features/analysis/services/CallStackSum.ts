@@ -13,7 +13,10 @@ import type { Metric } from '../../analysis/services/RowGrouper.js';
  * Used by both AnalysisView (rows = `Metric` with `nodes`) and BottomUpTable (rows
  * = `BottomUpRow` with `instances`).
  */
-export function sumDurationTotalForRootEvents(eventGroups: Iterable<LogEvent[]>): number {
+export function sumTotalForRootEvents(
+  eventGroups: Iterable<LogEvent[]>,
+  valueOf: (node: LogEvent) => number,
+): number {
   const allNodes = new Set<LogEvent>();
   for (const group of eventGroups) {
     for (const node of group) {
@@ -35,11 +38,16 @@ export function sumDurationTotalForRootEvents(eventGroups: Iterable<LogEvent[]>)
     }
 
     if (!hasAncestor) {
-      total += node.duration.total;
+      total += valueOf(node);
     }
   }
 
   return total;
+}
+
+/** {@link sumTotalForRootEvents} specialised to `duration.total` (the original behaviour). */
+export function sumDurationTotalForRootEvents(eventGroups: Iterable<LogEvent[]>): number {
+  return sumTotalForRootEvents(eventGroups, (node) => node.duration.total);
 }
 
 /**

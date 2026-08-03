@@ -33,9 +33,13 @@ export class ApexLogParser {
   reasons: Set<string> = new Set<string>();
   lastTimestamp = 0;
   discontinuity = false;
+  /** Running live heap (signed HEAP_ALLOCATE deltas) maintained in log order. */
+  runningHeap = 0;
   namespaces = new Set<string>();
   /** Every event created during this parse, indexed by `LogEvent.eventIndex`. */
   eventsById: LogEvent[] = [];
+  /** Every exception event (EXCEPTION_THROWN, FATAL_ERROR) in log order. */
+  exceptions: LogEvent[] = [];
   governorLimits: GovernorLimits = {
     soqlQueries: { used: 0, limit: 0 },
     soslQueries: { used: 0, limit: 0 },
@@ -69,10 +73,67 @@ export class ApexLogParser {
     apexLog.namespaces = Array.from(this.namespaces);
     apexLog.governorLimits = this.governorLimits;
     apexLog.eventsById = this.eventsById;
+    apexLog.exceptions = this.exceptions;
 
     this.addGovernorLimits(apexLog);
+    this.resolveIssueEndTimes(apexLog);
 
     return apexLog;
+  }
+
+  /**
+   * Assigns an `endTime` to truncation issues that can be bounded, so the timeline only
+   * shades the untrusted region instead of everything up to the next marker.
+   *
+   * - `Skipped-Lines` (mid-log): ends at the first following *entry* event (one with
+   *   `exitTypes`), because that opens a fresh, fully-present subtree where trust resumes.
+   *   A detail line such as `HEAP_ALLOCATE` is ignored — it may be nested under a parent
+   *   whose entry was deleted.
+   * - `Max-Size-reached`: ends at the first event past the truncated region, because the
+   *   next surviving line is a preserved event and is trusted (e.g. a trailing
+   *   `FATAL_ERROR`). The truncated node's own remnants are collapsed onto the truncation
+   *   timestamp, so we take the first later event (`timestamp > startTime`).
+   * - Other issues stay point-in-time (`endTime` undefined).
+   */
+  private resolveIssueEndTimes(apexLog: ApexLog) {
+    const events = this.eventsById;
+    const logEndTime = apexLog.exitStamp || 0;
+    for (const issue of this.logIssues) {
+      const startIndex = (issue.eventIndex ?? -1) + 1;
+      if (issue.summary === 'Skipped-Lines') {
+        let endTime = logEndTime;
+        for (let i = startIndex; i < events.length; i++) {
+          const event = events[i];
+          if (event && event.exitTypes.length > 0) {
+            endTime = event.timestamp;
+            break;
+          }
+        }
+        issue.endTime = endTime;
+      } else if (issue.summary === 'Max-Size-reached') {
+        const startTime = issue.startTime ?? 0;
+        let endTime = logEndTime;
+        for (let i = startIndex; i < events.length; i++) {
+          const event = events[i];
+          if (event && event.timestamp > startTime) {
+            endTime = event.timestamp;
+            break;
+          }
+        }
+        issue.endTime = endTime;
+      }
+    }
+  }
+
+  /**
+   * Applies a signed heap allocation to the running live-heap total (a negative `bytes` is a
+   * deallocation) and returns the resulting live-heap level, clamped at 0. Called by the heap
+   * allocation leaf events in log order; the returned value seeds their `heapPeak`, which is
+   * then rolled up (by max) to the enclosing methods in {@link aggregateTotals}.
+   */
+  trackHeapAllocation(bytes: number): number {
+    this.runningHeap += bytes;
+    return Math.max(0, this.runningHeap);
   }
 
   private addGovernorLimits(apexLog: ApexLog) {
@@ -91,6 +152,20 @@ export class ApexLogParser {
           currentLimit.used += value.used;
         }
       }
+
+      // Heap is a transaction-wide PEAK, never a per-namespace sum and never the last block
+      // (heap falls as memory is freed, so last-block/sum both misreport it — see #862 for
+      // why global limits aren't summed). Take the highest heap any snapshot reported, and the
+      // computed peak live heap (from HEAP_ALLOCATE events — more precise, and the only source
+      // when a log has no "Maximum heap size" line). The limit (denominator) is left as the
+      // per-namespace value the loop set; correcting it needs certified-pool detection (#862).
+      let reportedHeapPeak = 0;
+      for (const snapshot of apexLog.governorLimits.snapshots) {
+        if (snapshot.limits.heapSize.used > reportedHeapPeak) {
+          reportedHeapPeak = snapshot.limits.heapSize.used;
+        }
+      }
+      totalLimits.heapSize.used = Math.max(reportedHeapPeak, apexLog.heapPeak);
     }
   }
 
@@ -403,7 +478,21 @@ export class ApexLogParser {
           parent.soqlRowCount.total += child.soqlRowCount.total;
           parent.soslRowCount.total += child.soslRowCount.total;
           parent.duration.self -= child.duration.total;
-          parent.totalThrownCount += child.totalThrownCount;
+          parent.thrownCount.total += child.thrownCount.total;
+          parent.heapAllocated.total += child.heapAllocated.total;
+          parent.heapGross.total += child.heapGross.total;
+          // Direct/self heap: attribute only leaf allocation children (HEAP_ALLOCATE /
+          // BULK_HEAP_ALLOCATE, which are not `isParent`) to the enclosing method, so
+          // `.self` = bytes allocated by this method's own body, excluding sub-methods.
+          if (!child.isParent) {
+            parent.heapAllocated.self += child.heapAllocated.self;
+            parent.heapGross.self += child.heapGross.self;
+          }
+          // Peak live heap composes by max (not sum): a parent's peak is the highest
+          // reached anywhere in its subtree, so root.heapPeak = the transaction peak.
+          if (child.heapPeak > parent.heapPeak) {
+            parent.heapPeak = child.heapPeak;
+          }
         }
       }
     }

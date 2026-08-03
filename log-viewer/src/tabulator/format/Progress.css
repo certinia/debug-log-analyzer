@@ -4,10 +4,12 @@
 }
 .progress-bar {
   position: absolute;
-  background: #a97d0f;
-  opacity: 0.3;
   height: 100%;
+  opacity: 0.3;
   right: 0;
+  /* charts.orange keeps the bar distinct from the blue selected row; the literal is
+     the pre-token colour, for hosts that inject no `--vscode-*`. */
+  background: var(--vscode-charts-orange, #a97d0f);
 }
 .progress-bar__text {
   position: relative;

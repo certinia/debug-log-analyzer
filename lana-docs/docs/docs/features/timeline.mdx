@@ -63,6 +63,8 @@ Click on any event to **select** and highlight it. Selection enables keyboard na
 When no frame is selected, arrow keys pan the viewport. When a frame is selected, arrow keys navigate the call stack. Hold `Shift` to always pan.
 :::
 
+Selecting a frame also fills the [inspector](./inspector.md), so you can read its governor metrics, call stack and scoped call tree beside the chart.
+
 ### Go to Call Tree
 
 | Action            | Mouse              | Keyboard |
@@ -87,7 +89,7 @@ Right-click on empty space shows **Reset Zoom** (`0`).
 
 ### Markers
 
-Log issue markers (truncation, errors, etc.) can be selected and navigated:
+Log issue markers (truncation, errors, exceptions, etc.) can be selected and navigated. **Exceptions** draw as a thin red hairline at the moment each was thrown; a dense cluster collapses into a single "N exceptions" marker. Method tooltips also show a **Throws** count for exceptions thrown anywhere in that method's subtree.
 
 | Action            | Mouse              | Keyboard                                            |
 | ----------------- | ------------------ | --------------------------------------------------- |
@@ -140,12 +142,15 @@ Release the mouse button to zoom the viewport to fit the selected area exactly.
 ## Tooltip
 
 <img
-src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline-tooltip.png"
-alt="Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts"
-style={{
-  width: '50%', height:'auto', maxWidth:'400px'
-}}
-loading="lazy"/>
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline-tooltip.png"
+  alt="Tooltip showing detailed event information including event name, description, timestamps, duration, and row counts"
+  style={{
+    width: '50%',
+    height: 'auto',
+    maxWidth: '400px',
+  }}
+  loading="lazy"
+/>
 
 Hovering over an element displays detailed information about that event. Use `J` or `Cmd/Ctrl+Click` to navigate to the frame in the Call Tree.
 
@@ -157,18 +162,22 @@ The tooltip provides the following information:
 - **Time** - Wall-clock time of day for the event (e.g., `14:30:05.122 → 14:30:06.625`). Only shown when wall-clock data is available in the log.
 - **Duration** - Made up of **Total Time** (time spent in that event and its children) and **Self Time** (time directly spent in that event)
 - **Rows** - Shows **Total Rows** (rows from that event and its children) and **Self Rows** (rows directly from that event)
+- **Throws** - Number of exceptions thrown within that event's subtree, when any occurred
 
 ## Minimap
 
 The minimap gives you instant context of your entire log. Spot hotspots at a glance, jump anywhere with a click, and always know exactly where you are—all without scrolling.
 
 <img
-src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline-minimap.gif"
-alt="The Timeline minimap: a density skyline of the whole log with a viewport lens that pans and zooms the main timeline."
-style={{
-  width: '50%', height:'auto', maxWidth:'400px'
-}}
-loading="lazy"/>
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline-minimap.gif"
+  alt="The Timeline minimap: a density skyline of the whole log with a viewport lens that pans and zooms the main timeline."
+  style={{
+    width: '50%',
+    height: 'auto',
+    maxWidth: '400px',
+  }}
+  loading="lazy"
+/>
 
 ### What the Minimap Shows
 
@@ -226,12 +235,15 @@ When hovering over the viewport lens or dragging, a label appears showing:
 The Governor Limits strip displays Salesforce governor limit usage over time, positioned below the main timeline. It provides instant visual feedback on limit consumption to help identify potential limit breaches.
 
 <img
-src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline-gov-strip.gif"
-alt="The Governor Limits strip below the Timeline, showing limit usage over time with traffic-light coloring."
-style={{
-  width: '50%', height:'auto', maxWidth:'400px'
-}}
-loading="lazy"/>
+  src="https://raw.githubusercontent.com/certinia/debug-log-analyzer/main/lana/assets/1_20/timeline-gov-strip.gif"
+  alt="The Governor Limits strip below the Timeline, showing limit usage over time with traffic-light coloring."
+  style={{
+    width: '50%',
+    height: 'auto',
+    maxWidth: '400px',
+  }}
+  loading="lazy"
+/>
 
 ### Display Modes
 

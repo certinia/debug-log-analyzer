@@ -1,24 +1,31 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEventType } from 'apex-log-parser';
+import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { Tabulator, type Options } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
-import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
-import MinMaxFilter from '../../../tabulator/filters/MinMax.js';
+import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
+import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
-import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
-import { sumDurationTotalForRootEvents } from '../../analysis/services/CallStackSum.js';
+import {
+  sumDurationTotalForRootEvents,
+  sumTotalForRootEvents,
+} from '../../analysis/services/CallStackSum.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { toBottomUpTree, type BottomUpRow } from '../utils/Aggregation.js';
 import {
   commonColumnDefaults,
+  createCountColumn,
+  createGovernorMetricColumns,
+  createNamespaceColumns,
+  createTypeColumn,
   headerSortElement,
   registerTableModules,
+  virtualScrollOptions,
   type TableCallbacks,
 } from './TableShared.js';
 
@@ -59,16 +66,31 @@ export function createBottomUpTable(
   options: BottomUpTableOptions = {},
 ): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
-  Tabulator.registerModule([GroupCalcs, GroupSort]);
+  Tabulator.registerModule([GroupCalcs, GroupChildIndent, GroupSort]);
 
-  const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
-  const nameFormatter = createCalltreeNameFormatter(excludedTypes);
+  const nameFormatter = createCalltreeNameFormatter();
 
   const totalTimeBottomCalc = (
     _values: number[],
     data: BottomUpRow[],
     _calcParams: unknown,
   ): number => sumDurationTotalForRootEvents(data.map((row) => row.instances));
+
+  // Heap totals need the same call-stack dedup as totalTime: bottom-up buckets overlap, so a
+  // naive sum double-counts nested allocations. Self sums plainly (self never overlaps).
+  const heapTotalBottomCalc =
+    (valueOf: (node: LogEvent) => number) =>
+    (_values: number[], data: BottomUpRow[], _calcParams: unknown): number =>
+      sumTotalForRootEvents(
+        data.map((row) => row.instances),
+        valueOf,
+      );
+  const heapFooters = {
+    netTotal: heapTotalBottomCalc((node) => node.heapAllocated.total),
+    grossTotal: heapTotalBottomCalc((node) => node.heapGross.total),
+    netSelf: 'sum' as const,
+    grossSelf: 'sum' as const,
+  };
 
   const { enableClipboardAndDownload, exportFileName, ...tabulatorOptionOverrides } = options;
 
@@ -93,17 +115,18 @@ export function createBottomUpTable(
       }
     : {};
 
+  const tableData = toBottomUpTree(rootMethod.children, rootMethod.governorLimits);
+
   const tabulatorOptions = {
-    data: toBottomUpTree(rootMethod.children),
+    data: tableData,
     index: 'id',
     layout: 'fitColumns',
     placeholder: options.placeholder ?? 'No Call Tree Available',
     height: '100%',
     maxHeight: '100%',
     rowKeyboardNavigation: true,
-    anchoringPolicy: true,
+    ...virtualScrollOptions,
     initialFilter: callbacks.showDetailsFilter,
-    renderVertical: VirtualVerticalRenderer,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',
@@ -129,6 +152,10 @@ export function createBottomUpTable(
       {
         title: 'Name',
         field: 'text',
+        // Sticky column parked: frozen layout fights the vertical virtual renderer.
+        // Re-add with _syncTableWidth in VirtualVerticalRenderer.
+        // frozen: true,
+        minWidth: 200,
         headerSortTristate: true,
         bottomCalc: () => 'Total',
         cssClass: 'datagrid-textarea datagrid-code-text',
@@ -151,47 +178,19 @@ export function createBottomUpTable(
           }
         },
         widthGrow: 5,
+        widthShrink: 1,
       },
-      {
-        title: 'Namespace',
-        field: 'namespace',
-        sorter: 'string',
-        width: 100,
-        minWidth: 80,
-        headerFilter: 'list',
-        headerFilterFunc: 'in',
-        headerFilterParams: {
-          values: rootMethod.namespaces,
-          clearable: true,
-          multiselect: true,
-        },
-        headerFilterLiveFilter: false,
-      },
-      {
-        title: 'Type',
-        field: 'type',
-        headerSortStartingDir: 'asc',
-        width: 150,
-        sorter: 'string',
-        tooltip: true,
-      },
-      {
-        title: 'Count',
-        field: 'callCount',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 65,
-        minWidth: 60,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
+      ...createNamespaceColumns(),
+      createTypeColumn({ visible: true }),
+      createCountColumn({ title: 'Calls', field: 'callCount', width: 70 }),
+      ...createGovernorMetricColumns(rootMethod.governorLimits, heapFooters),
+      // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',
         field: 'totalTime',
         sorter: 'number',
         headerSortTristate: true,
-        width: 165,
+        width: TIME_WIDTH,
         minWidth: 120,
         hozAlign: 'right',
         headerHozAlign: 'right',
@@ -203,9 +202,6 @@ export function createBottomUpTable(
         bottomCalcFormatter: progressFormatterMS,
         bottomCalc: totalTimeBottomCalc,
         bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        headerFilter: MinMaxEditor,
-        headerFilterFunc: MinMaxFilter,
-        headerFilterLiveFilter: false,
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
       {
@@ -213,7 +209,7 @@ export function createBottomUpTable(
         field: 'totalSelfTime',
         sorter: 'number',
         headerSortTristate: true,
-        width: 165,
+        width: TIME_WIDTH,
         minWidth: 120,
         hozAlign: 'right',
         headerHozAlign: 'right',
@@ -225,9 +221,20 @@ export function createBottomUpTable(
         bottomCalcFormatter: progressFormatterMS,
         bottomCalc: 'sum',
         bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        headerFilter: MinMaxEditor,
-        headerFilterFunc: MinMaxFilter,
-        headerFilterLiveFilter: false,
+        tooltip: (_event, cell) => formatDuration(cell.getValue()),
+      },
+      {
+        title: 'Avg Self Time (ms)',
+        field: 'avgSelfTime',
+        sorter: 'number',
+        headerSortTristate: true,
+        width: TIME_WIDTH,
+        minWidth: 120,
+        hozAlign: 'right',
+        headerHozAlign: 'right',
+        visible: false,
+        formatter: progressFormatterMS,
+        formatterParams: { precision: 2, totalValue: rootMethod.duration.total },
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
     ],

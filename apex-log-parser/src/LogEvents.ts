@@ -16,6 +16,8 @@ import type {
   SelfTotal,
 } from './types.js';
 import { DEBUG_CATEGORY, LOG_CATEGORY, LOG_LEVEL } from './types.js';
+import type { LimitObservation } from './limits.js';
+import { parseCodedLimit, parseLabelledLimit, parseTotalLimit } from './limits.js';
 
 /**
  * All log lines extend this base class.
@@ -225,9 +227,68 @@ export abstract class LogEvent {
   };
 
   /**
-   * The total number of exceptions thrown (EXCEPTION_THROWN) in this node and child nodes
+   * Total + self counts for exceptions thrown (EXCEPTION_THROWN).
+   *
+   * `self` is seeded on the EXCEPTION_THROWN leaf node (like DML/SOQL), so a method's
+   * `thrownCount.self` is always 0 (the throw is a child, not the method itself). Because
+   * only methods are hoverable on the timeline, `self` is deliberately omitted from the
+   * Throws tooltip row — it would only ever read "(self 0)". The field keeps the SelfTotal
+   * shape for consistency with the other metrics and so the leaf carries `self: 1`.
    */
-  totalThrownCount = 0;
+  thrownCount: SelfTotal = {
+    /**
+     * The net number of exceptions thrown directly by this node.
+     */
+    self: 0,
+    /**
+     * The total number of exceptions thrown in this node and child nodes
+     */
+    total: 0,
+  };
+
+  /**
+   * Signed NET heap bytes (alloc − free) for HEAP_ALLOCATE / BULK_HEAP_ALLOCATE. A negative
+   * `HEAP_ALLOCATE` is a deallocation, so this is signed: `+` grows the heap, `−` is net
+   * cleanup, `~0` is neutral ("allocated then freed — no lasting footprint"). This is the
+   * primary "does this path retain heap" metric. It is NOT the churn volume (see
+   * {@link heapGross}) nor the governor-comparable peak (see {@link heapPeak}).
+   *
+   * `self` is the net directly in this node's own body: seeded as `bytes` on each allocation
+   * leaf, and (in `aggregateTotals`) summed onto the enclosing method from its direct leaf
+   * children only — so a method's `self` excludes allocations in sub-methods. `total` is the
+   * net across this node and all descendants.
+   */
+  heapAllocated: SelfTotal = {
+    /**
+     * The net bytes retained directly by this node (excluding sub-methods).
+     */
+    self: 0,
+    /**
+     * The total net bytes retained in this node and child nodes
+     */
+    total: 0,
+  };
+
+  /**
+   * GROSS heap bytes allocated (positive HEAP_ALLOCATE only; frees ignored) — the churn / GC
+   * pressure a path creates regardless of whether it frees. Distinct from {@link heapAllocated}
+   * (net) and {@link heapPeak} (max live): an allocate-then-free loop has net ≈ 0 and a small
+   * peak but a large gross. Same self/total aggregation as {@link heapAllocated}.
+   */
+  heapGross: SelfTotal = {
+    /** Gross bytes allocated directly by this node (excluding sub-methods). */
+    self: 0,
+    /** Total gross bytes allocated in this node and child nodes. */
+    total: 0,
+  };
+
+  /**
+   * Peak live heap (bytes) reached while this node's subtree was executing — the max of the
+   * running live-heap total (signed HEAP_ALLOCATE deltas) over the node's window, clamped at
+   * 0. Always ≥ 0 and composes (child ≤ parent ≤ root), so the root equals the transaction
+   * peak. This is the heap number comparable to the heap governor limit.
+   */
+  heapPeak = 0;
 
   /**
    * The line types which would legitimately end this method
@@ -257,6 +318,17 @@ export abstract class LogEvent {
     if (this.exitStamp) {
       this.duration.total = this.duration.self = this.exitStamp - this.timestamp;
     }
+  }
+
+  /**
+   * Seeds this heap-allocation leaf's net/gross/peak metrics from a signed byte delta
+   * (negative = deallocation) and advances the parser's running live-heap total. Shared
+   * by {@link HeapAllocateLine} and {@link BulkHeapAllocateLine}.
+   */
+  protected seedHeapLeaf(parser: ApexLogParser, bytes: number): void {
+    this.heapAllocated.self = this.heapAllocated.total = bytes;
+    this.heapGross.self = this.heapGross.total = bytes > 0 ? bytes : 0;
+    this.heapPeak = parser.trackHeapAllocation(bytes);
   }
 
   private parseTimestamp(text: string): number {
@@ -377,6 +449,12 @@ export class ApexLog extends LogEvent {
   eventsById: LogEvent[] = [];
 
   /**
+   * Every exception event (EXCEPTION_THROWN, FATAL_ERROR) in log order.
+   * Used by the timeline to mark where exceptions were thrown.
+   */
+  exceptions: LogEvent[] = [];
+
+  /**
    * The endtime with nodes of 0 duration excluded
    */
   executionEndTime = 0;
@@ -475,15 +553,24 @@ export function parseRows(text: string | null | undefined): number {
   throw new Error(`Unable to parse row count: '${text}'`);
 }
 
+/** Parse a byte count from a "Bytes:N" fragment (e.g. "Bytes:152" → 152, "Bytes:-4" → -4). */
+function parseBytes(fragment: string | undefined): number {
+  return fragment?.startsWith('Bytes:') ? Number(fragment.slice(6)) || 0 : 0;
+}
+
 /* Log line entry Parsers */
 
 export class BulkHeapAllocateLine extends LogEvent {
   debugLevel = LOG_LEVEL.Finest;
   debugCategory = DEBUG_CATEGORY.ApexCode;
   logCategory = 'Apex Code';
+  /** Bytes allocated by this bulk allocation (from the "Bytes:N" fragment). */
+  bytes = 0;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = parts[2] || '';
+    this.bytes = parseBytes(parts[2]);
+    this.seedHeapLeaf(parser, this.bytes);
   }
 }
 
@@ -673,7 +760,7 @@ export class MethodExitLine extends LogEvent {
 export class SystemConstructorEntryLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.System;
   debugLevel = LOG_LEVEL.Fine;
-  suffix = '(system constructor)';
+  suffix = ' (system constructor)';
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['SYSTEM_CONSTRUCTOR_EXIT'], LOG_CATEGORY.System, 'method');
@@ -716,7 +803,10 @@ export class SystemMethodExitLine extends LogEvent {
 export class CodeUnitStartedLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.ApexCode;
   debugLevel = LOG_LEVEL.Error;
-  suffix = ' (entrypoint)';
+  // Not "entrypoint": most code units (triggers, validation rules, VF pages)
+  // start partway through a transaction, and the text can read exactly like a
+  // method (`ffrr.ffrr.ContractPopulateBatch`).
+  suffix = ' (code unit)';
   codeUnitType = '';
 
   constructor(parser: ApexLogParser, parts: string[]) {
@@ -912,11 +1002,17 @@ export class DMLBeginLine extends DurationLogEvent {
     total: 1,
   };
   namespace = 'default';
+  /** The SObject the DML targets (e.g. `Account`), from the `Type:` field. Null if absent. */
+  sObjectType: string | null = null;
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['DML_END'], LOG_CATEGORY.DML, 'free');
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = 'DML ' + parts[3] + ' ' + parts[4];
+    const typePart = parts[4];
+    if (typePart?.startsWith('Type:')) {
+      this.sObjectType = typePart.slice('Type:'.length);
+    }
     const rowCountString = parts[5];
     this.dmlRowCount.total = this.dmlRowCount.self = rowCountString ? parseRows(rowCountString) : 0;
   }
@@ -1065,19 +1161,26 @@ export class SOSLExecuteEndLine extends LogEvent {
 export class HeapAllocateLine extends LogEvent {
   debugLevel = LOG_LEVEL.Finer;
   debugCategory = DEBUG_CATEGORY.ApexCode;
+  /** Bytes allocated by this line. Example: "|HEAP_ALLOCATE|[84]|Bytes:152" → 152. */
+  bytes = 0;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
+    this.bytes = parseBytes(parts[3]);
+    this.seedHeapLeaf(parser, this.bytes);
   }
 }
 
 export class HeapDeallocateLine extends LogEvent {
   debugLevel = LOG_LEVEL.Finer;
   debugCategory = DEBUG_CATEGORY.ApexCode;
+  /** Bytes deallocated by this line (from the "Bytes:N" fragment, when present). */
+  bytes = 0;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
+    this.bytes = parseBytes(parts[3]);
   }
 }
 
@@ -1164,31 +1267,22 @@ export class LimitUsageLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.ApexProfiling;
   debugLevel = LOG_LEVEL.Finest;
   namespace = 'default';
+  /**
+   * Governor-limit observation parsed from this line, or null for non-governor codes.
+   * Example: "|LIMIT_USAGE|[89]|SOQL|1|100" → { metric: 'soqlQueries', used: 1, limit: 100 }.
+   */
+  limitUsage: LimitObservation | null = null;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] + ' ' + parts[4] + ' out of ' + parts[5];
+    this.limitUsage = parseCodedLimit(parts[3], parts[4], parts[5]);
   }
 }
 
 export class LimitUsageForNSLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.ApexProfiling;
   debugLevel = LOG_LEVEL.Finest;
-  static limitsKeys = new Map<string, string>([
-    ['Number of SOQL queries', 'soqlQueries'],
-    ['Number of query rows', 'queryRows'],
-    ['Number of SOSL queries', 'soslQueries'],
-    ['Number of DML statements', 'dmlStatements'],
-    ['Number of Publish Immediate DML', 'publishImmediateDml'],
-    ['Number of DML rows', 'dmlRows'],
-    ['Maximum CPU time', 'cpuTime'],
-    ['Maximum heap size', 'heapSize'],
-    ['Number of callouts', 'callouts'],
-    ['Number of Email Invocations', 'emailInvocations'],
-    ['Number of future calls', 'futureCalls'],
-    ['Number of queueable jobs added to the queue', 'queueableJobsAddedToQueue'],
-    ['Number of Mobile Apex push calls', 'mobileApexPushCalls'],
-  ]);
 
   namespace = 'default';
 
@@ -1202,15 +1296,14 @@ export class LimitUsageForNSLine extends LogEvent {
     // Parse the namespace from the first line (before any newline)
     this.namespace = this.text.slice(0, this.text.indexOf('\n')).replace(/\(|\)/g, '');
 
-    // Clean up the text for easier parsing
+    // Clean up the text for display
     const cleanedText = this.text
       .replace(/^\s+/gm, '')
       .replaceAll('******* CLOSE TO LIMIT', '')
       .replaceAll(' out of ', '/');
     this.text = cleanedText;
 
-    // Split into lines and parse each line for limits
-    const lines = cleanedText.split('\n');
+    // Parse each "Label: used/limit" line via the shared limit parser.
     const limits: Limits = {
       soqlQueries: { used: 0, limit: 0 },
       soslQueries: { used: 0, limit: 0 },
@@ -1227,20 +1320,10 @@ export class LimitUsageForNSLine extends LogEvent {
       mobileApexPushCalls: { used: 0, limit: 0 },
     };
 
-    for (const line of lines) {
-      // Match lines like: "Maximum CPU time: 15008/10000"
-      const match = line.match(/^(.+?):\s*([\d,]+)\/([\d,]+)/);
-      if (match) {
-        const key: keyof Limits = LimitUsageForNSLine.limitsKeys.get(
-          match[1]!.trim(),
-        ) as keyof Limits;
-        if (key) {
-          const used = parseInt(match[2]!.replace(/,/g, ''), 10);
-          const limit = parseInt(match[3]!.replace(/,/g, ''), 10);
-          if (key) {
-            limits[key] = { used, limit };
-          }
-        }
+    for (const line of cleanedText.split('\n')) {
+      const observation = parseLabelledLimit(line);
+      if (observation) {
+        limits[observation.metric] = { used: observation.used, limit: observation.limit };
       }
     }
 
@@ -1456,6 +1539,9 @@ export class ExecutionStartedLine extends DurationLogEvent {
 export class EnteringManagedPackageLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.ApexCode;
   debugLevel = LOG_LEVEL.Fine;
+  // The text is a bare namespace token (`c2g`, `dlrs`, `java__util`), so say
+  // what it is.
+  suffix = ' (managed package)';
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, [], LOG_CATEGORY.Apex, 'pkg');
     const rawNs = parts[2] || '',
@@ -1584,6 +1670,10 @@ export class FlowStartInterviewsErrorLine extends LogEvent {
 export class FlowStartInterviewBeginLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Info;
+  // The text is just the flow's label ("Account Before Save LC"), which reads
+  // like anything else. The plural FLOW_START_INTERVIEWS_BEGIN resolves its own
+  // more specific suffix (record-triggered, autolaunched, …) once it ends.
+  suffix = ' (flow)';
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['FLOW_START_INTERVIEW_END'], LOG_CATEGORY.Automation, 'custom');
     this.text = parts[3] || '';
@@ -1593,9 +1683,12 @@ export class FlowStartInterviewBeginLine extends DurationLogEvent {
 export class FlowStartInterviewLimitUsageLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Finer;
+  /** Governor-limit observation. Example: "SOQL queries: 0 out of 100". */
+  limitUsage: LimitObservation | null = null;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = parts[2] || '';
+    this.limitUsage = parseLabelledLimit(this.text);
   }
 }
 
@@ -1731,18 +1824,24 @@ export class FlowElementFaultLine extends LogEvent {
 export class FlowElementLimitUsageLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Finer;
+  /** Governor-limit observation. Example: "2 ms CPU time, total 10 out of 15000". */
+  limitUsage: LimitObservation | null = null;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = `${parts[2]}`;
+    this.limitUsage = parseTotalLimit(this.text);
   }
 }
 
 export class FlowInterviewFinishedLimitUsageLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Finer;
+  /** Governor-limit observation. Example: "SOQL queries: 0 out of 100". */
+  limitUsage: LimitObservation | null = null;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = `${parts[2]}`;
+    this.limitUsage = parseLabelledLimit(this.text);
   }
 }
 
@@ -1821,9 +1920,12 @@ export class FlowBulkElementNotSupportedLine extends LogEvent {
 export class FlowBulkElementLimitUsageLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Finer;
+  /** Governor-limit observation. Example: "1 SOQL queries, total 1 out of 100". */
+  limitUsage: LimitObservation | null = null;
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = parts[2] || '';
+    this.limitUsage = parseTotalLimit(this.text);
   }
 }
 
@@ -2285,12 +2387,13 @@ export class ExceptionThrownLine extends LogEvent {
   debugCategory = DEBUG_CATEGORY.ApexCode;
   discontinuity = true;
   acceptsText = true;
-  totalThrownCount = 1;
+  thrownCount = { self: 1, total: 1 };
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
+    parser.exceptions.push(this);
   }
 
   onAfter(parser: ApexLogParser, _next?: LogEvent): void {
@@ -2314,6 +2417,7 @@ export class FatalErrorLine extends LogEvent {
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts);
     this.text = parts[2] || '';
+    parser.exceptions.push(this);
   }
 
   onAfter(parser: ApexLogParser, _next?: LogEvent): void {

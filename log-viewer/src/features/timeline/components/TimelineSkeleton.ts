@@ -33,7 +33,6 @@ export class TimelineSkeleton extends LitElement {
         width: 100%;
         height: 1.5rem;
         margin-bottom: 0.5rem;
-        border-radius: 0.25rem;
       }
 
       .skeleton-inline {

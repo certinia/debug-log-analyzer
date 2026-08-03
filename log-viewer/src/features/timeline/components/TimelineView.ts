@@ -1,22 +1,22 @@
 /*
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
-import { LitElement, css, html, unsafeCSS } from 'lit';
+import '#vscode-elements/vscode-toolbar-button.js';
+import { LitElement, css, html } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
 import type { ApexLog } from 'apex-log-parser';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
-import { getSettings } from '../../settings/Settings.js';
+import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
 import { type TimelineGroup, keyMap, setColors } from '../services/Timeline.js';
 
-import { DEFAULT_THEME_NAME, type TimelineColors } from '../themes/Themes.js';
+import { DEFAULT_THEME_NAME, sameColors, type TimelineColors } from '../themes/Themes.js';
 import { addCustomThemes, getTheme } from '../themes/ThemeSelector.js';
 
 import type { TimeDisplayMode } from '../types/flamechart.types.js';
 import type { TimelineFlameChart } from './TimelineFlameChart.js';
 
 // styles
-import codiconStyles from '@vscode/codicons/dist/codicon.css';
 import { globalStyles } from '../../../styles/global.styles.js';
 
 // web components
@@ -58,6 +58,19 @@ export class TimelineView extends LitElement {
   @state()
   private useLegacyTimeline: boolean | null = null;
 
+  /** Unsubscribe for the settings subscription; set while connected. */
+  private settingsUnsubscribe: (() => void) | null = null;
+
+  /** Removes the theme-preview message listener; set while connected. */
+  private themePreviewUnsubscribe: (() => void) | null = null;
+
+  /**
+   * The persisted palette last applied. A quick-pick preview is not persisted, so an
+   * unrelated `configChanged` push must not re-apply the stored theme over it.
+   */
+  private appliedThemeName: string | null = null;
+  private appliedCustomThemes: { [key: string]: TimelineColors } = {};
+
   @state()
   private timeDisplayMode: TimeDisplayMode = 'elapsed';
 
@@ -70,7 +83,6 @@ export class TimelineView extends LitElement {
 
   static styles = [
     globalStyles,
-    unsafeCSS(codiconStyles),
     css`
       :host {
         /* Editor */
@@ -119,14 +131,15 @@ export class TimelineView extends LitElement {
         /* Toolbar */
         --tl-toolbar-hover-background: var(--vscode-toolbar-hoverBackground);
 
-        --button-icon-hover-background: var(--tl-toolbar-hover-background);
-
         display: flex;
         flex-direction: column;
         flex: 1;
         position: relative;
         width: 100%;
         height: 90%;
+        /* inset previously provided by the tab panel's padding */
+        padding: 10px 6px;
+        box-sizing: border-box;
       }
 
       .timeline-toolbar {
@@ -136,35 +149,65 @@ export class TimelineView extends LitElement {
         gap: 4px;
         flex: 0 0 auto;
       }
-
-      vscode-button {
-        height: 22px;
-        width: 22px;
-      }
     `,
   ];
 
   async connectedCallback() {
     super.connectedCallback();
 
-    VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
-      const { cmd, payload } = event.data;
-      if (cmd === 'switchTimelineTheme' && this.activeTheme !== payload.activeTheme) {
-        this.setTheme(payload.activeTheme ?? DEFAULT_THEME_NAME);
-      }
+    this.themePreviewUnsubscribe ??= VSCodeExtensionMessenger.listen<{ activeTheme: string }>(
+      (event) => {
+        const { cmd, payload } = event.data;
+        if (cmd === 'switchTimelineTheme' && this.activeTheme !== payload.activeTheme) {
+          this.setTheme(payload.activeTheme ?? DEFAULT_THEME_NAME);
+        }
+      },
+    );
+
+    // The panel is never re-created, so live `lana.timeline.*` edits only reach the
+    // chart through this subscription.
+    this.settingsUnsubscribe ??= subscribeSettings((settings) => {
+      this.applyTimelineSettings(settings);
     });
+  }
 
-    getSettings().then((settings) => {
-      const { timeline } = settings;
-      this.useLegacyTimeline = timeline.legacy;
+  override disconnectedCallback() {
+    this.settingsUnsubscribe?.();
+    this.settingsUnsubscribe = null;
+    this.themePreviewUnsubscribe?.();
+    this.themePreviewUnsubscribe = null;
+    super.disconnectedCallback();
+  }
 
-      if (!this.useLegacyTimeline) {
-        addCustomThemes(this.toTheme(timeline.customThemes));
-        this.setTheme(timeline.activeTheme ?? DEFAULT_THEME_NAME);
-      } else {
-        setColors(timeline.colors);
-        this.timelineKeys = Array.from(keyMap.values());
+  private applyTimelineSettings(settings: LanaSettings) {
+    const { timeline } = settings;
+    this.useLegacyTimeline = timeline.legacy;
+
+    if (!this.useLegacyTimeline) {
+      const themeName = timeline.activeTheme ?? DEFAULT_THEME_NAME;
+      const customThemes = this.toTheme(timeline.customThemes);
+      if (themeName !== this.appliedThemeName || !this.sameCustomThemes(customThemes)) {
+        this.appliedThemeName = themeName;
+        this.appliedCustomThemes = customThemes;
+        addCustomThemes(customThemes);
+        this.setTheme(themeName);
       }
+    } else {
+      setColors(timeline.colors);
+      this.timelineKeys = Array.from(keyMap.values());
+    }
+  }
+
+  /** True when the pushed custom themes match those already applied. */
+  private sameCustomThemes(customThemes: { [key: string]: TimelineColors }): boolean {
+    const names = Object.keys(customThemes);
+    if (names.length !== Object.keys(this.appliedCustomThemes).length) {
+      return false;
+    }
+    return names.every((name) => {
+      const applied = this.appliedCustomThemes[name];
+      const pushed = customThemes[name];
+      return !!applied && !!pushed && sameColors(applied, pushed);
     });
   }
 
@@ -178,20 +221,18 @@ export class TimelineView extends LitElement {
       const hasWallClock = this.timelineRoot?.startTime !== null;
       const isWallClock = this.timeDisplayMode === 'wallClock';
 
-      return html`${hasWallClock
-          ? html`<div class="timeline-toolbar">
-              <vscode-button
-                appearance="icon"
-                aria-label="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
-                @click=${() => this.toggleTimeDisplay()}
-              >
-                <span
-                  class="codicon ${isWallClock ? 'codicon-history' : 'codicon-clockface'}"
+      return html`${
+          hasWallClock
+            ? html`<div class="timeline-toolbar">
+                <vscode-toolbar-button
+                  icon="${isWallClock ? 'history' : 'clockface'}"
+                  label="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
                   title="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
-                ></span>
-              </vscode-button>
-            </div>`
-          : ''}
+                  @click=${() => this.toggleTimeDisplay()}
+                ></vscode-toolbar-button>
+              </div>`
+            : ''
+        }
         <timeline-flame-chart
           .apexLog=${this.timelineRoot}
           .themeName=${this.activeTheme}

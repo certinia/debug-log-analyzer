@@ -164,6 +164,14 @@ export class MinimapDensityQuery {
    * @returns MinimapDensityData for rendering
    */
   public query(bucketCount: number): MinimapDensityData {
+    // bucketCount is the display width from getBoundingClientRect(), which is
+    // fractional under non-integer OS display scaling (Windows 125%/150% DPI).
+    // A fractional/NaN count crashes the Array/typed-array constructors below
+    // with "Invalid array length" (the `<= 0` guards do not catch it), which
+    // aborts timeline init and leaves interaction handlers unwired. Normalise
+    // here, the single entry point feeding both compute paths and the cache.
+    bucketCount = Number.isFinite(bucketCount) ? Math.floor(bucketCount) : 0;
+
     // Fast path: exact match in cache
     const cached = this.densityCache.get(bucketCount);
     if (cached) {

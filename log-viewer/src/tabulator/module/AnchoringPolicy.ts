@@ -5,6 +5,13 @@ import { Module, type RowComponent, type Tabulator } from 'tabulator-tables';
 
 const anchoringPolicyOption = 'anchoringPolicy' as const;
 
+declare module 'tabulator-tables' {
+  interface Options {
+    /** Enable this module's anchoring on the table (registered below). */
+    anchoringPolicy?: boolean;
+  }
+}
+
 interface AnchorableRenderer {
   setAnchor?: (row: unknown, offsetFromHolderTop: number) => void;
   // Echo-suppressed scrollTop write (VirtualVerticalRenderer). Absent on the

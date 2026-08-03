@@ -16,7 +16,7 @@ function makeMockTable(): unknown {
       getDisplayRows: () => [],
       scrollHorizontal: () => {},
     },
-    columnManager: { element: {} },
+    columnManager: { element: {}, getWidth: () => 200 },
     options: {},
     eventBus: { _events: {}, dispatch: () => {} },
   };
@@ -356,7 +356,7 @@ function makeRendererWithRows(rows: RowStub[]): RendererForSetAnchor {
       getDisplayRows: () => rows,
       scrollHorizontal: () => {},
     },
-    columnManager: { element: {} },
+    columnManager: { element: {}, getWidth: () => 200 },
     options: {},
     eventBus: { _events: {}, dispatch: () => {} },
   };
@@ -550,7 +550,7 @@ function makeRerenderRenderer(initialRows: RowStub[]): {
       scrollHorizontal: () => {},
       tableEmpty,
     },
-    columnManager: { element: {} },
+    columnManager: { element: {}, getWidth: () => 200 },
     options: {},
     eventBus: { _events: {}, dispatch: () => {} },
   };
@@ -678,7 +678,9 @@ describe('VirtualVerticalRenderer.scrollToRowPosition', () => {
       makeRowStub(200),
     ];
     const r = makeRendererWithRows(rows);
-    for (let i = 0; i < rows.length; i++) r._setHeight(i, 50);
+    for (let i = 0; i < rows.length; i++) {
+      r._setHeight(i, 50);
+    }
     r._flushEstimateUpdate();
     r.elementVertical.scrollTop = scrollTop;
     r.elementVertical.scrollHeight = r._totalHeight();
@@ -757,7 +759,7 @@ describe('VirtualVerticalRenderer.initialize stock-bug workaround', () => {
     };
     const table = {
       rowManager,
-      columnManager: { element: {} },
+      columnManager: { element: {}, getWidth: () => 200 },
       options: {},
       eventBus: { _events: {}, dispatch: () => {} },
     };

@@ -16,11 +16,17 @@ type EventOptions = {
   dmlTotal?: number;
   soqlSelf?: number;
   soqlTotal?: number;
+  soslSelf?: number;
+  soslTotal?: number;
   dmlRowSelf?: number;
   dmlRowTotal?: number;
   soqlRowSelf?: number;
   soqlRowTotal?: number;
+  soslRowSelf?: number;
+  soslRowTotal?: number;
   thrown?: number;
+  heapSelf?: number;
+  heapTotal?: number;
 };
 
 let nextTimestamp = 1;
@@ -52,11 +58,14 @@ function createEvent(options: EventOptions): LogEvent {
     duration: { self: options.self, total: options.total },
     dmlRowCount: { self: options.dmlRowSelf ?? 0, total: options.dmlRowTotal ?? 0 },
     soqlRowCount: { self: options.soqlRowSelf ?? 0, total: options.soqlRowTotal ?? 0 },
-    soslRowCount: { self: 0, total: 0 },
+    soslRowCount: { self: options.soslRowSelf ?? 0, total: options.soslRowTotal ?? 0 },
     dmlCount: { self: options.dmlSelf ?? 0, total: options.dmlTotal ?? 0 },
     soqlCount: { self: options.soqlSelf ?? 0, total: options.soqlTotal ?? 0 },
-    soslCount: { self: 0, total: 0 },
-    totalThrownCount: options.thrown ?? 0,
+    soslCount: { self: options.soslSelf ?? 0, total: options.soslTotal ?? 0 },
+    thrownCount: { self: options.thrown ?? 0, total: options.thrown ?? 0 },
+    heapAllocated: { self: options.heapSelf ?? 0, total: options.heapTotal ?? 0 },
+    heapGross: { self: 0, total: 0 },
+    heapPeak: 0,
     exitTypes: [],
   } as unknown as LogEvent;
 
@@ -240,7 +249,7 @@ describe('toBottomUpTree', () => {
       soqlCount: { self: 9, total: 15 },
       dmlRowCount: { self: 21, total: 24 },
       soqlRowCount: { self: 33, total: 39 },
-      totalThrownCount: 3,
+      thrownCount: { total: 3 },
     });
 
     const callers = childRow._children ?? [];
@@ -256,7 +265,7 @@ describe('toBottomUpTree', () => {
       soqlCount: { self: 3, total: 5 },
       dmlRowCount: { self: 7, total: 8 },
       soqlRowCount: { self: 11, total: 13 },
-      totalThrownCount: 1,
+      thrownCount: { total: 1 },
     });
 
     expect(callerB.originalData.text).toBe('ParentB');
@@ -268,7 +277,7 @@ describe('toBottomUpTree', () => {
       soqlCount: { self: 6, total: 10 },
       dmlRowCount: { self: 14, total: 16 },
       soqlRowCount: { self: 22, total: 26 },
-      totalThrownCount: 2,
+      thrownCount: { total: 2 },
     });
   });
 
@@ -376,7 +385,7 @@ describe('toBottomUpTree', () => {
     expect(hotMethod.soqlCount).toEqual({ self: 6, total: 11 });
     expect(hotMethod.dmlRowCount).toEqual({ self: 35, total: 55 });
     expect(hotMethod.soqlRowCount).toEqual({ self: 22, total: 34 });
-    expect(hotMethod.totalThrownCount).toBe(7);
+    expect(hotMethod.thrownCount.total).toBe(7);
 
     const callers = hotMethod._children ?? [];
     const callerA = findRowByText(callers, 'ParentA');
@@ -612,7 +621,7 @@ describe('toBottomUpTree', () => {
     expect(searchRow.dmlRowCount.total).toBe(100); // outermost only
     expect(searchRow.soqlRowCount.self).toBe(15);
     expect(searchRow.soqlRowCount.total).toBe(50); // outermost only
-    expect(searchRow.totalThrownCount).toBe(3); // outermost only
+    expect(searchRow.thrownCount.total).toBe(3); // outermost only
   });
 
   it('keeps totalTime greater than or equal to totalSelfTime for all bottom-up rows', () => {
@@ -910,7 +919,7 @@ describe('toBottomUpTree', () => {
     const limitOnly = findRowByText(rows, 'LimitOnly');
     expect(limitOnly.callCount).toBe(1);
     expect(limitOnly.dmlCount.self).toBe(1);
-    expect(limitOnly.totalThrownCount).toBe(1);
+    expect(limitOnly.thrownCount.total).toBe(1);
   });
 
   it('orders roots deterministically by totalSelfTime desc, then name asc for ties', () => {
@@ -1104,5 +1113,57 @@ describe('_hasDetailsDeep precomputation', () => {
     const rows = toBottomUpTree(root.children);
     const limit = findRowByText(rows, 'LimitUsage');
     expect(limit._hasDetailsDeep).toBe(true);
+  });
+});
+
+describe('SOSL rollup', () => {
+  it('aggregated: sums SOSL count and rows across instances', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    // Two calls to the same signature; their SOSL metrics are summed on the row.
+    createEvent({
+      text: 'Search',
+      self: 1,
+      total: 1,
+      parent: root,
+      soslSelf: 1,
+      soslTotal: 1,
+      soslRowSelf: 10,
+      soslRowTotal: 10,
+    });
+    createEvent({
+      text: 'Search',
+      self: 1,
+      total: 1,
+      parent: root,
+      soslSelf: 1,
+      soslTotal: 1,
+      soslRowSelf: 5,
+      soslRowTotal: 5,
+    });
+
+    const rows = toAggregatedCallTree(root.children);
+    const searchRow = findRowByText(rows, 'Search');
+    expect(searchRow.soslCount.total).toBe(2);
+    expect(searchRow.soslRowCount.total).toBe(15);
+  });
+
+  it('bottom-up: attributes SOSL self/total to the callee bucket', () => {
+    const root = createEvent({ text: 'LOG_ROOT', self: 0, total: 0, type: 'EXECUTION_STARTED' });
+    const caller = createEvent({ text: 'Caller', self: 0, total: 2, parent: root });
+    createEvent({
+      text: 'Callee',
+      self: 2,
+      total: 2,
+      parent: caller,
+      soslSelf: 1,
+      soslTotal: 1,
+      soslRowSelf: 7,
+      soslRowTotal: 7,
+    });
+
+    const rows = toBottomUpTree(root.children);
+    const callee = findRowByText(rows, 'Callee');
+    expect(callee.soslCount.self).toBe(1);
+    expect(callee.soslRowCount.total).toBe(7);
   });
 });

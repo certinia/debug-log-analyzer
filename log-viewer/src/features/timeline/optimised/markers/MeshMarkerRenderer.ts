@@ -18,12 +18,18 @@
 import type { Container, Geometry, Shader } from 'pixi.js';
 import { Mesh } from 'pixi.js';
 import type { TimelineMarker } from '../../types/flamechart.types.js';
-import { MARKER_ALPHA, MARKER_COLORS } from '../../types/flamechart.types.js';
+import {
+  MARKER_ALPHA_BY_TYPE,
+  MARKER_BUCKET_PX,
+  MARKER_COLORS,
+  MARKER_GAP_PX,
+  MARKER_MIN_WIDTH_PX,
+} from '../../types/flamechart.types.js';
 import { RectangleGeometry, type ViewportTransform } from '../RectangleGeometry.js';
 import { createRectangleShader } from '../RectangleShader.js';
 import type { TimelineViewport } from '../TimelineViewport.js';
 import { hitTestMarkers, type MarkerIndicator } from './MarkerHitTest.js';
-import { sortMarkersByTimeAndSeverity } from './MarkerProcessor.js';
+import { layoutMarkerRects, sortMarkersByTimeAndSeverity } from './MarkerProcessor.js';
 
 /**
  * Renders marker indicators as semi-transparent vertical bands using Mesh.
@@ -106,10 +112,9 @@ export class MeshMarkerRenderer {
 
     // Get viewport bounds for culling
     const bounds = this.viewport.getBounds();
-    const timelineEndTime = bounds.timeEnd; // Use viewport end as timeline end
     const viewportState = this.viewport.getState();
 
-    // Process all markers (typically <10 for typical logs)
+    // Process all markers (typically <10 truncation markers; exceptions can be many)
     this.visibleIndicators = [];
 
     for (let i = 0; i < this.markers.length; i++) {
@@ -118,8 +123,10 @@ export class MeshMarkerRenderer {
         continue;
       }
 
-      const nextMarker = this.markers[i + 1];
-      const resolvedEndTime = nextMarker?.startTime ?? timelineEndTime;
+      // A bounded marker (endTime set) shades its exact range; an unbounded marker is a
+      // point at startTime. We no longer extend to the next marker's start — that would
+      // grey out sections that recovered after a truncation.
+      const resolvedEndTime = marker.endTime ?? marker.startTime;
 
       // T009: Viewport culling - skip markers outside visible time range
       // Marker is visible if it overlaps [bounds.timeStart, bounds.timeEnd]
@@ -130,21 +137,21 @@ export class MeshMarkerRenderer {
       // T010: Transform to world coordinates for rendering
       // World coordinates = time * zoom (no offset - we handle that in clip-space conversion)
       const worldStartX = marker.startTime * viewportState.zoom;
-      const worldEndX = resolvedEndTime * viewportState.zoom;
-      const worldWidth = worldEndX - worldStartX;
+      const exactWidth = resolvedEndTime * viewportState.zoom - worldStartX;
 
-      // Skip if width is too small (less than 1 pixel)
-      if (worldWidth < 1) {
-        continue;
-      }
+      // Clamp to a minimum width so markers stay visible when zoomed out; a bounded
+      // marker tightens to its exact width as you zoom in and never disappears.
+      const worldWidth = Math.max(exactWidth, MARKER_MIN_WIDTH_PX);
 
       const indicator: MarkerIndicator = {
         marker,
         resolvedEndTime,
         screenStartX: worldStartX,
-        screenEndX: worldEndX,
+        screenEndX: worldStartX + worldWidth,
         screenWidth: worldWidth,
+        exactWidth: Math.max(exactWidth, 0),
         color: MARKER_COLORS[marker.type],
+        alpha: MARKER_ALPHA_BY_TYPE[marker.type],
         isVisible: true,
       };
 
@@ -173,31 +180,30 @@ export class MeshMarkerRenderer {
       canvasYOffset: 0,
     };
 
-    // Apply 1px gap for negative space separation between adjacent markers
-    const gap = 1;
-    const halfGap = gap / 2;
+    // Resolve overlapping markers into gapped, min-width rectangles. Dense point clusters
+    // collapse to one line; every drawn rect is >= MARKER_GAP_PX from its neighbour. Hit
+    // testing still uses every indicator, so bucketed markers keep their tooltip count.
+    const rects = layoutMarkerRects(
+      this.visibleIndicators,
+      MARKER_MIN_WIDTH_PX,
+      MARKER_GAP_PX,
+      MARKER_BUCKET_PX,
+    );
 
-    // Draw all indicators as rectangles
     let rectIndex = 0;
-    for (const indicator of this.visibleIndicators) {
-      // Apply gap to create separation between adjacent markers
-      const gappedX = indicator.screenStartX + halfGap;
-      const gappedWidth = Math.max(0, indicator.screenWidth - gap);
-
-      if (gappedWidth > 0) {
-        // Full height markers (from y=0 to displayHeight)
-        this.geometry.writeRectangle(
-          rectIndex,
-          gappedX,
-          0,
-          gappedWidth,
-          viewportState.displayHeight,
-          indicator.color,
-          viewportTransform,
-          MARKER_ALPHA,
-        );
-        rectIndex++;
-      }
+    for (const rect of rects) {
+      // Full height markers (from y=0 to displayHeight)
+      this.geometry.writeRectangle(
+        rectIndex,
+        rect.x,
+        0,
+        rect.width,
+        viewportState.displayHeight,
+        rect.color,
+        viewportTransform,
+        rect.alpha,
+      );
+      rectIndex++;
     }
 
     // Set draw count and make visible

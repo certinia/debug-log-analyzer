@@ -1,10 +1,5 @@
-@import '../../../tabulator/style/DataGrid.scss';
+@use '../../../tabulator/style/DataGrid';
 
-.row__details-container {
-  height: 100%;
-  padding: 4px 4px 6px 4px;
-  background-color: var(--vscode-editorHoverWidget-background);
-}
 .db-group-row {
   display: flex;
   min-width: 0;

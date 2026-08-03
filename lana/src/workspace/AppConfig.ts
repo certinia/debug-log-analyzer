@@ -2,9 +2,9 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 
-import { ConfigurationTarget, workspace } from 'vscode';
+import { ConfigurationTarget, workspace, type Memento } from 'vscode';
 
-interface Config {
+export interface Config {
   timeline: {
     activeTheme: string;
     colors: {
@@ -20,21 +20,36 @@ interface Config {
     };
     customThemes: {
       [key: string]: {
-        /* eslint-disable @typescript-eslint/naming-convention */
-        'Code Unit': string;
-        Workflow: string;
-        Method: string;
-        Flow: string;
-        DML: string;
-        SOQL: string;
-        'System Method': string;
-        /* eslint-enable @typescript-eslint/naming-convention */
+        apex: string;
+        codeUnit: string;
+        system: string;
+        automation: string;
+        dml: string;
+        soql: string;
+        callout: string;
+        validation: string;
       };
     };
     legacy: boolean;
   };
   callTree: {
     categoryColorize: boolean;
+    columnView: string;
+    columnOverrides: Record<string, string[]>;
+  };
+  database: {
+    soql: { columnView: string; columnOverrides: Record<string, string[]> };
+    dml: { columnView: string; columnOverrides: Record<string, string[]> };
+    sosl: { columnView: string; columnOverrides: Record<string, string[]> };
+  };
+  // The app-wide inspector, fed by a selection on any tab.
+  inspector: {
+    position: 'left' | 'right' | 'bottom';
+    size: number;
+    // The rest is private globalState (see INSPECTOR_STATE_SECTIONS), not settings.
+    collapsed: Record<string, boolean>;
+    paneSizes: Record<string, number>;
+    visible: boolean | null;
   };
 }
 
@@ -53,10 +68,122 @@ export function getConfig(): Config {
   const plainConfig = JSON.parse(JSON.stringify(config));
   // Override the customThemes with the merged themes, to exclude defaults
   plainConfig.timeline.customThemes = userThemes;
+  // `lana.database.*` is private globalState, not a registered setting, so the merged
+  // tree has no `database` branch at all on a profile that never wrote one (every
+  // fresh install). Seed the shape `Config` promises before callers fill it in.
+  const database = plainConfig.database ?? {};
+  plainConfig.database = Object.fromEntries(
+    (['soql', 'dml', 'sosl'] as const).map((view) => [
+      view,
+      { columnView: 'General', columnOverrides: {}, ...database[view] },
+    ]),
+  );
   return plainConfig;
+}
+
+/** True when two resolved configs hold the same values, so nothing needs pushing. */
+export function sameConfig(a: Config, b: Config): boolean {
+  return sameValue(a, b);
+}
+
+// A structural walk, because the payload is a plain JSON tree with open-ended
+// records (column overrides, custom themes) that no per-field check can cover.
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) {
+    return false;
+  }
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) =>
+      sameValue((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+    )
+  );
 }
 
 export function updateConfig(section: string, value: unknown): Thenable<void> {
   const config = workspace.getConfiguration('lana');
   return config.update(section, value, ConfigurationTarget.Global);
 }
+
+/**
+ * Column overrides are opaque per-view field maps — private UI state, not user
+ * preferences — so they persist in globalState rather than editable settings.
+ */
+export const COLUMN_OVERRIDE_SECTIONS = [
+  'callTree.columnOverrides',
+  'database.soql.columnOverrides',
+  'database.dml.columnOverrides',
+  'database.sosl.columnOverrides',
+] as const;
+
+/**
+ * The Database column-view presets persist privately in globalState (they are
+ * not registered `lana.*` settings). `callTree.columnView` stays a public
+ * setting.
+ */
+export const COLUMN_VIEW_SECTIONS = [
+  'database.soql.columnView',
+  'database.dml.columnView',
+  'database.sosl.columnView',
+] as const;
+
+/**
+ * The inspector's layout state (which sections are collapsed, their sizes, the
+ * call tree's view mode, whether the panel is open) is remembered UI state
+ * rather than a preference, so it persists in globalState. Dock position and
+ * size stay public `lana.inspector.*` settings.
+ */
+export const INSPECTOR_STATE_SECTIONS = [
+  'inspector.collapsed',
+  'inspector.paneSizes',
+  'inspector.visible',
+] as const;
+
+/** All sections routed to globalState instead of editable `lana.*` settings. */
+export const PRIVATE_SECTIONS = [
+  ...COLUMN_OVERRIDE_SECTIONS,
+  ...COLUMN_VIEW_SECTIONS,
+  ...INSPECTOR_STATE_SECTIONS,
+] as const;
+
+type ColumnOverrides = Record<string, string[]>;
+type InspectorState = Pick<Config['inspector'], 'collapsed' | 'paneSizes' | 'visible'>;
+
+export function getInspectorState(globalState: Memento): InspectorState {
+  return {
+    collapsed: globalState.get<Record<string, boolean>>('inspector.collapsed', {}),
+    paneSizes: globalState.get<Record<string, number>>('inspector.paneSizes', {}),
+    visible: globalState.get<boolean | null>('inspector.visible', null),
+  };
+}
+
+export function getColumnOverrides(globalState: Memento): Record<string, ColumnOverrides> {
+  const overrides: Record<string, ColumnOverrides> = {};
+  for (const section of COLUMN_OVERRIDE_SECTIONS) {
+    overrides[section] = globalState.get<ColumnOverrides>(section, {});
+  }
+  return overrides;
+}
+
+export function getColumnViews(globalState: Memento): Record<string, string> {
+  const views: Record<string, string> = {};
+  for (const section of COLUMN_VIEW_SECTIONS) {
+    views[section] = globalState.get<string>(section, 'General');
+  }
+  return views;
+}
+
+export function updatePrivateSection(
+  globalState: Memento,
+  section: string,
+  value: unknown,
+): Thenable<void> {
+  return globalState.update(section, value);
+}
+
+/** Alias retained for callers that persist column overrides specifically. */
+export const updateColumnOverride = updatePrivateSection;

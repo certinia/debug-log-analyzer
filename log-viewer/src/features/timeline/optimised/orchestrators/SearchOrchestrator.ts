@@ -34,6 +34,7 @@ import type {
   ViewportState,
 } from '../../types/flamechart.types.js';
 import type { SearchCursor, SearchOptions } from '../../types/search.types.js';
+import { createHighlightColors } from '../rendering/HighlightRenderer.js';
 import type { PrecomputedRect, RectangleCache } from '../RectangleCache.js';
 import { EventMatcher } from '../search/EventMatcher.js';
 import { FlameChartCursor } from '../search/FlameChartCursor.js';
@@ -226,6 +227,22 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    */
   public setMainTimelineYOffset(offset: number): void {
     this.mainTimelineYOffset = offset;
+  }
+
+  /**
+   * Re-colour the match highlights after a theme change.
+   *
+   * Writes to whichever half of the lazy init is live: the deferred data when the
+   * renderers have not been built yet, the renderer itself once they have.
+   *
+   * @param findMatchColor - New find-match color (0xRRGGBB)
+   */
+  public setHighlightColor(findMatchColor: number): void {
+    if (this.deferredInitData) {
+      this.deferredInitData.findMatchColor = findMatchColor;
+    }
+
+    this.searchHighlightRenderer?.setColors(createHighlightColors(findMatchColor));
   }
 
   /**

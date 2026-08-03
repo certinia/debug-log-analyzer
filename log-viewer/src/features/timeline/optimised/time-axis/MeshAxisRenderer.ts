@@ -47,6 +47,8 @@ interface AxisConfig {
   fontSize: number;
   /** Minimum spacing between labels in pixels */
   minLabelSpacing: number;
+  /** Background color behind sticky labels (default: dark editor widget) */
+  backgroundColor?: number;
   /** Whether to show labels (default: true) */
   showLabels?: boolean;
   /** Grid line alpha/opacity (default: 1.0) */
@@ -108,8 +110,8 @@ export class MeshAxisRenderer {
   private activeLabelCount = 0;
   /** Grid line color */
   private gridLineColor: number;
-  /** Background color for sticky labels */
-  private backgroundColor: number = 0x252526;
+  /** Background color for sticky labels; the literal only applies outside a themed host. */
+  private backgroundColor: number;
 
   /** Active label strategy */
   private strategy: TimeAxisLabelStrategy;
@@ -139,6 +141,7 @@ export class MeshAxisRenderer {
     };
 
     this.gridLineColor = this.config.lineColor;
+    this.backgroundColor = this.config.backgroundColor ?? 0x252526;
 
     // Create geometry and shader for grid lines
     this.geometry = new RectangleGeometry();

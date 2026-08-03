@@ -90,6 +90,11 @@ export function formatTimeRange(startTimeNs: number, endTimeNs: number): string 
   return `${formatDuration(startTimeNs)} → ${formatDuration(endTimeNs)}`;
 }
 
+/** Integer → thousand-separated string (e.g. 1572864 → "1,572,864"), for heap/byte values. */
+export function formatInteger(value: number): string {
+  return Math.round(value).toLocaleString();
+}
+
 /**
  * Formats milliseconds-since-midnight to `HH:MM:SS.mmm` wall-clock time string.
  *

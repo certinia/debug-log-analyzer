@@ -58,8 +58,8 @@ export function buildMetricParts(event: LogEvent): string[] {
   }
 
   // Exceptions
-  if (event.totalThrownCount > 0) {
-    parts.push(`\u26a0\ufe0f ${event.totalThrownCount} thrown`);
+  if (event.thrownCount.total > 0) {
+    parts.push(`\u26a0\ufe0f ${event.thrownCount.total} thrown`);
   }
 
   return parts;

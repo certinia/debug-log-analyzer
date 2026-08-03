@@ -8,6 +8,7 @@ export {
   ExportModule,
   FilterModule,
   FormatModule,
+  FrozenColumnsModule,
   GroupRowsModule,
   InteractionModule,
   KeybindingsModule,

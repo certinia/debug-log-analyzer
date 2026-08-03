@@ -13,6 +13,10 @@ export class GroupSort extends Module {
     // @ts-expect-error groupSort is a custom propoerty see registerTableOption above
     if (this.table.options.groupSort) {
       this.subscribe('sort-changed', this._sortGroups.bind(this));
+      // Recompute group values once filtering has refreshed the active row set —
+      // otherwise setGroupValues stays pinned to the pre-filter rows and filtered-
+      // out groups keep showing an empty header.
+      this.subscribe('data-refreshed', this._sortGroups.bind(this));
     }
   }
 
@@ -48,7 +52,9 @@ export class GroupSort extends Module {
 
       const groupsByKey: { [key: string]: unknown[] } = {};
       if (groupFunc) {
-        const rows = this.table.rowManager.rows;
+        // activeRows (post-filter), not rows (all rows) — otherwise group
+        // values stay pinned to the unfiltered set and empty groups remain.
+        const rows = this.table.rowManager.activeRows;
         rows.forEach((row: InternalColumnTotal) => {
           const grpVal = groupFunc(row.data);
           let groupRows = groupsByKey[grpVal];

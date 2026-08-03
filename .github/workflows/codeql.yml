@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Initializes the CodeQL tools for scanning.
       # JavaScript/TypeScript is analyzed straight from source, so no build is needed

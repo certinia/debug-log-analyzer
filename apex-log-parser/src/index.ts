@@ -32,14 +32,20 @@ export {
   CodeUnitStartedLine,
   DMLBeginLine,
   ExecutionStartedLine,
+  HeapAllocateLine,
+  LimitUsageLine,
   LogEvent,
   MethodEntryLine,
   SOQLExecuteBeginLine,
   SOQLExecuteExplainLine,
+  SOSLExecuteBeginLine,
   parseObjectNamespace,
   parseRows,
   parseVfNamespace,
 } from './LogEvents.js';
+
+// Governor-limit observation types (the .limitUsage field type crosses into the log-viewer).
+export type { LimitMetricKey, LimitObservation } from './limits.js';
 
 // Mapping
 export { getLogEventClass, lineTypeMap } from './LogLineMapping.js';

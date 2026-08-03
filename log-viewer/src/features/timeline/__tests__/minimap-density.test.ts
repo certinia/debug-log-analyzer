@@ -196,4 +196,39 @@ describe('MinimapDensityQuery', () => {
       expect(result.buckets).toHaveLength(0);
     });
   });
+
+  describe('fractional bucket count (Windows fractional DPI scaling)', () => {
+    // Regression: getBoundingClientRect().width is non-integer under Windows
+    // 125%/150% display scaling; a fractional/NaN count previously threw
+    // "Invalid array length" and aborted timeline init.
+    const rects = [createRect('Method', 0, 1000, 0)];
+
+    it('floors a fractional bucket count instead of throwing (segment tree path)', () => {
+      const rectsByCategory = buildRectsByCategory(rects);
+      const segmentTree = new TemporalSegmentTree(rectsByCategory);
+      const query = new MinimapDensityQuery(rectsByCategory, 1000, 0, segmentTree);
+
+      const fractional = query.query(10.6);
+      const floored = query.query(10);
+
+      expect(fractional.buckets).toHaveLength(10);
+      expect(fractional.buckets).toEqual(floored.buckets);
+    });
+
+    it('floors a fractional bucket count instead of throwing (fallback path)', () => {
+      const rectsByCategory = buildRectsByCategory(rects);
+      const query = new MinimapDensityQuery(rectsByCategory, 1000, 0);
+
+      expect(() => query.query(1536.6667)).not.toThrow();
+      expect(query.query(1536.6667).buckets).toHaveLength(1536);
+    });
+
+    it('treats a non-finite bucket count as empty instead of throwing', () => {
+      const rectsByCategory = buildRectsByCategory(rects);
+      const query = new MinimapDensityQuery(rectsByCategory, 1000, 0);
+
+      expect(() => query.query(Number.NaN)).not.toThrow();
+      expect(query.query(Number.NaN).buckets).toHaveLength(0);
+    });
+  });
 });

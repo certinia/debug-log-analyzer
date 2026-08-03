@@ -17,6 +17,7 @@ import {
 } from '../../../core/utility/Util.js';
 import { formatSOQL } from '../../soql/format/formatter.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
+import { formatNumber } from './rendering/tooltip-utils.js';
 
 /**
  * Configuration options for tooltip behavior.
@@ -249,8 +250,10 @@ export class FrameTooltipRenderer {
    * Converts PixiJS numeric colors (0xRRGGBB) to CSS hex strings (#RRGGBB).
    */
   private getTruncationColor(type: string): string {
-    // Map truncation types to CSS colors matching TRUNCATION_COLORS
+    // Map marker types to CSS colors matching MARKER_COLORS
     switch (type) {
+      case 'exception':
+        return '#e5484d'; // saturated red - discrete failure
       case 'error':
         return '#ff808033'; // rgba(255, 128, 128, 0.2)
       case 'skip':
@@ -365,6 +368,23 @@ export class FrameTooltipRenderer {
               event.soslRowCount.self,
               govLimits?.soslQueries.limit,
             ),
+          });
+        }
+
+        if (event.thrownCount.total) {
+          // No `self`: on a method (the only hoverable frame) self is always 0 because the
+          // throw is a child leaf, so it would only ever read "(self 0)".
+          rows.push({ label: 'Throws:', value: `${event.thrownCount.total}` });
+        }
+
+        if (event.heapAllocated.total || event.heapAllocated.self) {
+          // Net heap retained (alloc − free): total for the subtree, self for this method's
+          // own body. ~0 net (allocated then freed) shows no row. Gross/peak live in the grid.
+          rows.push({
+            label: 'heap:',
+            value: `${formatNumber(event.heapAllocated.total)} bytes (self ${formatNumber(
+              event.heapAllocated.self,
+            )})`,
           });
         }
       }

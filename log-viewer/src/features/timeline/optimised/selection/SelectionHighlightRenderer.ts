@@ -31,6 +31,7 @@ import {
   renderHighlight,
   type HighlightColors,
 } from '../rendering/HighlightRenderer.js';
+import { markerDuration } from '../markers/MarkerProcessor.js';
 
 /**
  * Culling bounds derived from viewport.
@@ -62,12 +63,6 @@ export class SelectionHighlightRenderer {
   /** Graphics for marker selection highlight (renders behind frames) */
   private markerGraphics: PIXI.Graphics;
 
-  /** All markers for duration calculation */
-  private markers: TimelineMarker[] = [];
-
-  /** Timeline end time for last marker duration calculation */
-  private timelineEnd = 0;
-
   /** Highlight colors extracted from CSS variables (same as search) */
   private colors: HighlightColors;
 
@@ -87,18 +82,6 @@ export class SelectionHighlightRenderer {
     container.addChild(this.markerGraphics);
 
     this.colors = createHighlightColors(findMatchColor ?? DEFAULT_FIND_MATCH_COLOR);
-  }
-
-  /**
-   * Set markers array and timeline parameters for marker selection.
-   * Required for calculating marker duration.
-   *
-   * @param markers - Array of timeline markers (sorted by startTime)
-   * @param timelineEnd - End time of timeline in nanoseconds
-   */
-  public setMarkerContext(markers: TimelineMarker[], timelineEnd: number): void {
-    this.markers = markers;
-    this.timelineEnd = timelineEnd;
   }
 
   /**
@@ -157,11 +140,10 @@ export class SelectionHighlightRenderer {
    * @param selectedMarker - The marker to highlight
    */
   private renderMarkerHighlight(viewport: ViewportState, selectedMarker: TimelineMarker): void {
-    // Calculate marker duration (extends to next marker or timeline end)
-    const markerIndex = this.markers.findIndex((m) => m.id === selectedMarker.id);
-    const nextMarker = this.markers[markerIndex + 1];
-    const markerEnd = nextMarker?.startTime ?? this.timelineEnd;
-    const duration = markerEnd - selectedMarker.startTime;
+    // Highlight the marker's own range. A bounded marker (truncation) uses its endTime; a
+    // point marker (exception) has duration 0, so the MIN_HIGHLIGHT_WIDTH branch below draws
+    // a centered min-width highlight.
+    const duration = markerDuration(selectedMarker);
 
     // Calculate screen position
     const screenX = selectedMarker.startTime * viewport.zoom;

@@ -2,10 +2,11 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 
-import type { LogEvent, SelfTotal } from 'apex-log-parser';
+import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { Multiset } from '../../../core/utility/Multiset.js';
-import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
+import { computeHasDetailsDeep } from './DetailsFilter.js';
+import { setGovernorCost } from './GovernorCost.js';
 
 /**
  * Represents a row in the aggregated call tree view.
@@ -22,6 +23,8 @@ export interface AggregatedRow {
   namespace: string;
   /** Namespace of the direct caller (representative; used for grouping/filtering, not displayed) */
   callerNamespace: string;
+  /** Event type (e.g. METHOD_ENTRY) — an optional column, off by default. */
+  type: string;
   /** Number of times this function was called */
   callCount: number;
   /** Sum of self-time across all calls */
@@ -34,12 +37,26 @@ export interface AggregatedRow {
   dmlCount: SelfTotal;
   /** Total SOQL count */
   soqlCount: SelfTotal;
+  /** Total SOSL count */
+  soslCount: SelfTotal;
   /** Total DML rows */
   dmlRowCount: SelfTotal;
   /** Total SOQL rows */
   soqlRowCount: SelfTotal;
-  /** Total exceptions thrown */
-  totalThrownCount: number;
+  /** Total SOSL rows */
+  soslRowCount: SelfTotal;
+  /** Total + self exceptions thrown */
+  thrownCount: SelfTotal;
+  /** Total + self signed NET heap bytes (alloc − free; may be negative) — retention */
+  heapAllocated: SelfTotal;
+  /** Total + self GROSS heap bytes allocated (frees ignored) — churn */
+  heapGross: SelfTotal;
+  /** Peak live heap (bytes) reached across this row's calls — the limit-comparable value */
+  heapPeak: number;
+  /** Average governor consumption across all reported governors (0–100%). */
+  governorCost: number;
+  /** The single tightest governor consumed on this path (0–100+%). */
+  governorCostMax: number;
   /** Aggregated children (callees grouped by signature) */
   _children?: AggregatedRow[] | null;
   /** References to original events for drill-down */
@@ -82,12 +99,26 @@ export interface BottomUpRow {
   dmlCount: SelfTotal;
   /** Total SOQL count */
   soqlCount: SelfTotal;
+  /** Total SOSL count */
+  soslCount: SelfTotal;
   /** Total DML rows */
   dmlRowCount: SelfTotal;
   /** Total SOQL rows */
   soqlRowCount: SelfTotal;
-  /** Total exceptions thrown */
-  totalThrownCount: number;
+  /** Total SOSL rows */
+  soslRowCount: SelfTotal;
+  /** Total + self exceptions thrown */
+  thrownCount: SelfTotal;
+  /** Total + self signed NET heap bytes (alloc − free; may be negative) — retention */
+  heapAllocated: SelfTotal;
+  /** Total + self GROSS heap bytes allocated (frees ignored) — churn */
+  heapGross: SelfTotal;
+  /** Peak live heap (bytes) reached across this row's calls — the limit-comparable value */
+  heapPeak: number;
+  /** Average governor consumption across all reported governors (0–100%). */
+  governorCost: number;
+  /** The single tightest governor consumed on this path (0–100+%). */
+  governorCostMax: number;
   /** Callers (parent functions) as children - lazy loaded */
   _children?: BottomUpRow[] | null;
   /**
@@ -127,7 +158,10 @@ function getStackKey(event: LogEvent): string {
  * are merged together, with aggregated metrics.
  * Uses Multiset call-stack tracking to prevent double-counting of recursive calls.
  */
-export function toAggregatedCallTree(rootChildren: LogEvent[]): AggregatedRow[] {
+export function toAggregatedCallTree(
+  rootChildren: LogEvent[],
+  governorLimits?: GovernorLimits,
+): AggregatedRow[] {
   if (rootChildren.length === 0) {
     return [];
   }
@@ -160,8 +194,11 @@ export function toAggregatedCallTree(rootChildren: LogEvent[]): AggregatedRow[] 
   for (const row of rootMap.values()) {
     const firstInstance = row.instances[0];
     const stackKey = firstInstance ? getStackKey(firstInstance) : row.key;
-    row._children = aggregateChildrenRecursive(row.instances, stackKey, idFor);
+    row._children = aggregateChildrenRecursive(row.instances, stackKey, idFor, governorLimits);
     calculateAverages(row);
+    if (governorLimits) {
+      setGovernorCost(row, governorLimits);
+    }
     row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.originalData.type);
   }
 
@@ -177,6 +214,7 @@ function aggregateChildrenRecursive(
   instances: LogEvent[],
   parentStackKey: string,
   idFor: () => number,
+  governorLimits?: GovernorLimits,
 ): AggregatedRow[] | null {
   const childMap = new Map<string, AggregatedRow>();
   // Create a new stack for each aggregation level, starting with the parent stack key
@@ -206,8 +244,11 @@ function aggregateChildrenRecursive(
   for (const row of childMap.values()) {
     const firstInstance = row.instances[0];
     const stackKey = firstInstance ? getStackKey(firstInstance) : row.key;
-    row._children = aggregateChildrenRecursive(row.instances, stackKey, idFor);
+    row._children = aggregateChildrenRecursive(row.instances, stackKey, idFor, governorLimits);
     calculateAverages(row);
+    if (governorLimits) {
+      setGovernorCost(row, governorLimits);
+    }
     row._hasDetailsDeep = computeHasDetailsDeep(row, row.totalTime, row.originalData.type);
   }
 
@@ -239,11 +280,22 @@ function addEventToAggregatedRowWithStack(
   row.dmlCount.total += event.dmlCount.total;
   row.soqlCount.self += event.soqlCount.self;
   row.soqlCount.total += event.soqlCount.total;
+  row.soslCount.self += event.soslCount.self;
+  row.soslCount.total += event.soslCount.total;
   row.dmlRowCount.self += event.dmlRowCount.self;
   row.dmlRowCount.total += event.dmlRowCount.total;
   row.soqlRowCount.self += event.soqlRowCount.self;
   row.soqlRowCount.total += event.soqlRowCount.total;
-  row.totalThrownCount += event.totalThrownCount;
+  row.soslRowCount.self += event.soslRowCount.self;
+  row.soslRowCount.total += event.soslRowCount.total;
+  row.thrownCount.self += event.thrownCount.self;
+  row.thrownCount.total += event.thrownCount.total;
+  row.heapAllocated.self += event.heapAllocated.self;
+  row.heapAllocated.total += event.heapAllocated.total;
+  row.heapGross.self += event.heapGross.self;
+  row.heapGross.total += event.heapGross.total;
+  // Peak live heap aggregates by max (the worst single call), not sum.
+  row.heapPeak = Math.max(row.heapPeak, event.heapPeak);
   row.instances.push(event);
 }
 
@@ -275,9 +327,11 @@ function addEventToAggregatedRowWithStack(
  *   - duration.self / duration.total
  *   - dmlCount.self / dmlCount.total
  *   - soqlCount.self / soqlCount.total
+ *   - soslCount.self / soslCount.total
  *   - dmlRowCount.self / dmlRowCount.total
  *   - soqlRowCount.self / soqlRowCount.total
- *   - totalThrownCount (treated like a total metric for attribution)
+ *   - soslRowCount.self / soslRowCount.total
+ *   - thrownCount.self / thrownCount.total
  */
 type FrameContext = {
   frame: LogEvent;
@@ -289,9 +343,13 @@ type FrameContext = {
   totalTime: number;
   dmlTotal: number;
   soqlTotal: number;
+  soslTotal: number;
   dmlRowTotal: number;
   soqlRowTotal: number;
+  soslRowTotal: number;
   thrownTotal: number;
+  heapTotal: number;
+  heapGrossTotal: number;
 };
 
 type DfsEntry = {
@@ -319,7 +377,10 @@ type DfsEntry = {
  * Zero-delta guards on the DML/SOQL/row/thrown accumulators avoid the no-op
  * `bucket.x += 0` writes that dominate logs without heavy DB work.
  */
-export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
+export function toBottomUpTree(
+  rootChildren: LogEvent[],
+  governorLimits?: GovernorLimits,
+): BottomUpRow[] {
   if (rootChildren.length === 0) {
     return [];
   }
@@ -355,18 +416,26 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
       totalTime: node.duration.total,
       dmlTotal: node.dmlCount.total,
       soqlTotal: node.soqlCount.total,
+      soslTotal: node.soslCount.total,
       dmlRowTotal: node.dmlRowCount.total,
       soqlRowTotal: node.soqlRowCount.total,
-      thrownTotal: node.totalThrownCount,
+      soslRowTotal: node.soslRowCount.total,
+      thrownTotal: node.thrownCount.total,
+      heapTotal: node.heapAllocated.total,
+      heapGrossTotal: node.heapGross.total,
     };
 
     if (prior) {
       prior.totalTime -= node.duration.total;
       prior.dmlTotal -= node.dmlCount.total;
       prior.soqlTotal -= node.soqlCount.total;
+      prior.soslTotal -= node.soslCount.total;
       prior.dmlRowTotal -= node.dmlRowCount.total;
       prior.soqlRowTotal -= node.soqlRowCount.total;
-      prior.thrownTotal -= node.totalThrownCount;
+      prior.soslRowTotal -= node.soslRowCount.total;
+      prior.thrownTotal -= node.thrownCount.total;
+      prior.heapTotal -= node.heapAllocated.total;
+      prior.heapGrossTotal -= node.heapGross.total;
     }
     activeByName.set(stackKey, ctx);
     dfs.push({ node, childIdx: 0, ctx });
@@ -380,14 +449,26 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
     const selfTime = node.duration.self;
     const dmlSelf = node.dmlCount.self;
     const soqlSelf = node.soqlCount.self;
+    const soslSelf = node.soslCount.self;
     const dmlRowSelf = node.dmlRowCount.self;
     const soqlRowSelf = node.soqlRowCount.self;
+    const soslRowSelf = node.soslRowCount.self;
+    const thrownSelf = node.thrownCount.self;
+    const heapSelf = node.heapAllocated.self;
+    const heapGrossSelf = node.heapGross.self;
+    // Peak live heap composes by max, so (unlike the additive totals) it needs no
+    // deepest-frame subtraction — just max this node's peak into every chain row.
+    const heapPeak = node.heapPeak;
     const totalTime = ctx.totalTime;
     const dmlTotal = ctx.dmlTotal;
     const soqlTotal = ctx.soqlTotal;
+    const soslTotal = ctx.soslTotal;
     const dmlRowTotal = ctx.dmlRowTotal;
     const soqlRowTotal = ctx.soqlRowTotal;
+    const soslRowTotal = ctx.soslRowTotal;
     const thrownTotal = ctx.thrownTotal;
+    const heapTotal = ctx.heapTotal;
+    const heapGrossTotal = ctx.heapGrossTotal;
 
     // Closure captures the hoisted locals; zero-delta guards skip no-op writes
     // for logs without heavy DB work.
@@ -407,6 +488,12 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
       if (soqlTotal) {
         b.soqlCount.total += soqlTotal;
       }
+      if (soslSelf) {
+        b.soslCount.self += soslSelf;
+      }
+      if (soslTotal) {
+        b.soslCount.total += soslTotal;
+      }
       if (dmlRowSelf) {
         b.dmlRowCount.self += dmlRowSelf;
       }
@@ -419,8 +506,32 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
       if (soqlRowTotal) {
         b.soqlRowCount.total += soqlRowTotal;
       }
+      if (soslRowSelf) {
+        b.soslRowCount.self += soslRowSelf;
+      }
+      if (soslRowTotal) {
+        b.soslRowCount.total += soslRowTotal;
+      }
+      if (thrownSelf) {
+        b.thrownCount.self += thrownSelf;
+      }
       if (thrownTotal) {
-        b.totalThrownCount += thrownTotal;
+        b.thrownCount.total += thrownTotal;
+      }
+      if (heapSelf) {
+        b.heapAllocated.self += heapSelf;
+      }
+      if (heapTotal) {
+        b.heapAllocated.total += heapTotal;
+      }
+      if (heapGrossSelf) {
+        b.heapGross.self += heapGrossSelf;
+      }
+      if (heapGrossTotal) {
+        b.heapGross.total += heapGrossTotal;
+      }
+      if (heapPeak > b.heapPeak) {
+        b.heapPeak = heapPeak;
       }
     };
 
@@ -475,7 +586,7 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
     }
   }
 
-  return finalizeBuckets(rootBuckets);
+  return finalizeBuckets(rootBuckets, governorLimits);
 }
 
 /**
@@ -483,20 +594,26 @@ export function toBottomUpTree(rootChildren: LogEvent[]): BottomUpRow[] {
  * (primary metric total-self desc, then name asc) at every level. Empty child
  * arrays are collapsed to null so Tabulator's dataTree renders a leaf indicator.
  */
-function finalizeBuckets(rootBuckets: Map<number, BottomUpRow>): BottomUpRow[] {
+function finalizeBuckets(
+  rootBuckets: Map<number, BottomUpRow>,
+  governorLimits?: GovernorLimits,
+): BottomUpRow[] {
   const roots = Array.from(rootBuckets.values());
   for (const row of roots) {
-    finalizeBucketRecursive(row);
+    finalizeBucketRecursive(row, governorLimits);
   }
   sortBuckets(roots);
   return roots;
 }
 
-function finalizeBucketRecursive(row: BottomUpRow): void {
+function finalizeBucketRecursive(row: BottomUpRow, governorLimits?: GovernorLimits): void {
   calculateBottomUpAverages(row);
+  if (governorLimits) {
+    setGovernorCost(row, governorLimits);
+  }
   if (row._children && row._children.length > 0) {
     for (const child of row._children) {
-      finalizeBucketRecursive(child);
+      finalizeBucketRecursive(child, governorLimits);
     }
     sortBuckets(row._children);
   }
@@ -524,15 +641,23 @@ function createEmptyAggregatedRow(
     text: event.text,
     namespace: event.namespace,
     callerNamespace: getCallerNamespace(event),
+    type: event.type ?? '',
     callCount: 0,
     totalSelfTime: 0,
     totalTime: 0,
     avgSelfTime: 0,
     dmlCount: { self: 0, total: 0 },
     soqlCount: { self: 0, total: 0 },
+    soslCount: { self: 0, total: 0 },
     dmlRowCount: { self: 0, total: 0 },
     soqlRowCount: { self: 0, total: 0 },
-    totalThrownCount: 0,
+    soslRowCount: { self: 0, total: 0 },
+    thrownCount: { self: 0, total: 0 },
+    heapAllocated: { self: 0, total: 0 },
+    heapGross: { self: 0, total: 0 },
+    heapPeak: 0,
+    governorCost: 0,
+    governorCostMax: 0,
     _children: null,
     instances: [],
     originalData: event,
@@ -560,9 +685,16 @@ function createEmptyBottomUpRow(
     avgSelfTime: 0,
     dmlCount: { self: 0, total: 0 },
     soqlCount: { self: 0, total: 0 },
+    soslCount: { self: 0, total: 0 },
     dmlRowCount: { self: 0, total: 0 },
     soqlRowCount: { self: 0, total: 0 },
-    totalThrownCount: 0,
+    soslRowCount: { self: 0, total: 0 },
+    thrownCount: { self: 0, total: 0 },
+    heapAllocated: { self: 0, total: 0 },
+    heapGross: { self: 0, total: 0 },
+    heapPeak: 0,
+    governorCost: 0,
+    governorCostMax: 0,
     _children: null,
     instances: [],
     originalData: event,
@@ -580,32 +712,4 @@ function calculateBottomUpAverages(row: BottomUpRow): void {
   if (row.callCount > 0) {
     row.avgSelfTime = row.totalSelfTime / row.callCount;
   }
-}
-
-/**
- * Show-Details predicate, rolled up across children. Called post-order after
- * `_children` is set and each child's own `_hasDetailsDeep` is populated.
- * Generic over `AggregatedRow` (type lives on `originalData`) and `BottomUpRow`
- * (type lives on the row directly) — caller passes whichever applies.
- */
-function computeHasDetailsDeep<T extends { _children?: T[] | null; _hasDetailsDeep: boolean }>(
-  row: T,
-  totalTime: number,
-  type: string | null | undefined,
-): boolean {
-  if (totalTime > 0) {
-    return true;
-  }
-  if (type && EXCLUDED_DETAIL_TYPES.has(type)) {
-    return true;
-  }
-  const children = row._children;
-  if (children) {
-    for (let i = 0, len = children.length; i < len; i++) {
-      if (children[i]!._hasDetailsDeep) {
-        return true;
-      }
-    }
-  }
-  return false;
 }

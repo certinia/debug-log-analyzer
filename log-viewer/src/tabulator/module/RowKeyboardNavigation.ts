@@ -13,6 +13,14 @@ import {
 // todo: remove the '@ts-expect-error' + fix the types file
 
 const rowNavOptionName = 'rowKeyboardNavigation' as const;
+
+declare module 'tabulator-tables' {
+  interface Options {
+    /** Enable this module's key bindings on the table (registered below). */
+    rowKeyboardNavigation?: boolean;
+  }
+}
+
 /**
  * Enable RowNavigation by importing the class and calling
  * Tabulator.registerModule(RowNavigation); before the first instantiation of the table.

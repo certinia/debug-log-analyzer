@@ -1,43 +1,20 @@
+@use 'sass:meta';
+
 // I prefer the table with no borders but if we want to add one I think this works best
 // var(--vscode-sideBar-border)
 
-//Main Theme Variables
-$backgroundColor: var(--vscode-editor-background); //background color of tabulator
-$borderColor: transparent; //border to tabulator
-$textSize: var(--vscode-editor-font-size); //table text size
+// Row-hover colour is the only theme value also referenced by our own rules below, so it
+// stays a variable; every other tabulator theme value is inlined into the config map below.
+$rowHoverBackground: var(--vscode-list-hoverBackground);
 
-//header theming
-$headerBackgroundColor: transparent; //border to tabulator
-$headerTextColor: var(--vscode-editor-foreground); //header text color
-$headerBorderColor: transparent; //header border color
-$headerSeparatorColor: transparent; //header bottom separator color
-$headerMargin: 4px !default; //padding round header
+$codicon-chevron-right: '\eab6';
+$codicon-chevron-down: '\eab4';
 
-//column header arrows
-$sortArrowHover: #555 !default;
-$sortArrowActive: #666 !default;
-$sortArrowInactive: #bbb !default;
-
-//row theming
-$rowBackgroundColor: $backgroundColor; //table row background color
-$rowAltBackgroundColor: transparent; //table row background color
-$rowBorderColor: transparent; //table border color
-$rowTextColor: var(--vscode-editor-foreground); //table text color
-$rowHoverBackground: var(--vscode-list-hoverBackground); //row background color on hover
-//row background color when selected
-$rowSelectedBackground: var(--vscode-list-activeSelectionBackground);
-//row background color when selected and hovered
-$rowSelectedBackgroundHover: var(--vscode-list-activeSelectionBackground);
-
-$editBoxColor: var(--vscode-focusBorder, #1d68cd); //border color for edit boxes
-$errorColor: #dd0000 !default; //error indication
-
-//footer theming
-$footerBackgroundColor: transparent; //border to tabulator
-$footerTextColor: var(--vscode-editor-foreground); //footer text color
-$footerBorderColor: transparent; //footer border color
-$footerSeparatorColor: transparent; //footer bottom separator color
-$footerActiveColor: #d00 !default; //footer bottom active text color
+@mixin codicon-chevron {
+  font-family: 'codicon';
+  font-size: 14px;
+  line-height: 16px;
+}
 
 // Demote upstream tabulator styles (and our scss-mixin partials that build
 // on them) into a cascade layer so any unlayered rule — at any specificity —
@@ -45,44 +22,81 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
 // inside the SAME layer so they beat upstream within the layer, but lose to
 // any unlayered child-span colour (e.g. classed token spans) automatically.
 @layer tabulator {
-  @import '~tabulator-tables/src/scss/tabulator.scss';
-  @import '../editors/MinMax';
-  @import '../format/Progress';
+  // Load upstream tabulator's SCSS, configuring its !default theme variables with our
+  // vscode-themed values. meta.load-css (unlike @use) is legal inside @layer, so the
+  // upstream styles stay demoted. These styles are adopted into each view's shadow root
+  // (via `unsafeCSS(dataGridStyles)`), so the editor/formatter CSS must be loaded here
+  // too — the `.ts` `import './*.css'` side-effects only reach the light DOM.
+  // Order matches the original @import order — within one @layer, source order breaks
+  // equal-specificity ties, so tabulator must load before the editor/formatter overrides.
+  @include meta.load-css(
+    'tabulator-tables/src/scss/tabulator',
+    // resolved via sass loadPaths (node_modules)
+    $with: (
+        backgroundColor: var(--vscode-editor-background),
+        borderColor: transparent,
+        textSize: var(--vscode-editor-font-size),
+        // header
+        headerBackgroundColor: transparent,
+        headerTextColor: var(--vscode-editor-foreground),
+        headerBorderColor: transparent,
+        headerSeparatorColor: transparent,
+        headerMargin: 4px,
+        // column header sort arrows — upstream only ever uses these as plain colours
+        // (no color.adjust()), so CSS vars are safe here.
+        sortArrowHover: var(--vscode-icon-foreground, currentColor),
+        sortArrowActive: var(--vscode-icon-foreground, currentColor),
+        sortArrowInactive: var(--vscode-descriptionForeground, #999),
+        // rows
+        rowBackgroundColor: var(--vscode-editor-background),
+        // Must stay a Sass colour literal — tabulator.scss runs color.adjust() on it
+        // for calc rows (so it can't be a CSS var).
+        rowAltBackgroundColor: transparent,
+        rowBorderColor: transparent,
+        rowTextColor: var(--vscode-editor-foreground),
+        rowHoverBackground: $rowHoverBackground,
+        rowSelectedBackground: var(--vscode-list-activeSelectionBackground),
+        rowSelectedBackgroundHover: var(--vscode-list-activeSelectionBackground),
+        editBoxColor: var(--vscode-focusBorder, #1d68cd),
+        errorColor: var(--vscode-errorForeground, #f14c4c),
+        // footer
+        footerBackgroundColor: transparent,
+        footerTextColor: var(--vscode-editor-foreground),
+        footerBorderColor: transparent,
+        footerSeparatorColor: transparent,
+        footerActiveColor: var(--vscode-textLink-activeForeground, #3794ff)
+      )
+  );
+  @include meta.load-css('../format/Progress.css');
 
   .tabulator {
+    .tabulator-header {
+      border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-editorGroup-border));
+    }
+
     .tabulator-tableholder {
-      overflow-x: hidden;
+      overflow-x: auto;
       overflow-anchor: none;
       .tabulator-table {
         display: block;
-        background-color: default;
       }
     }
 
-    .tabulator-header-filter {
-      input[type='search'] {
-        color: var(--vscode-editor-foreground);
-        background-color: var(--vscode-dropdown-background, default);
-        border: 1px solid var(--vscode-dropdown-border, transparent);
-        width: 50%;
-        box-sizing: border-box;
-        position: relative;
-        padding: 2px 4px;
-        box-sizing: border-box;
-        border-radius: 2px;
-        appearance: textfield !important;
-      }
-      input[type='search']:focus {
-        outline: var(--vscode-focusBorder, default) solid 1px;
-      }
-    }
+    // Parked with the sticky Name column (see the commented `frozen: true` in the
+    // call-tree tables). Frozen cells use `background-color: inherit`, so they are only
+    // opaque where the row/section is opaque; even rows, calc/total rows and the header
+    // are transparent and would let scrolling columns show through. Re-add with the
+    // frozen column. (Selected/hovered rows are excluded so the Name cell keeps its
+    // inherited state colour; the last selector covers the sortable-header :hover state.)
+    // .tabulator-row.tabulator-row-even:not(.tabulator-selected):not(:hover)
+    //   .tabulator-cell.tabulator-frozen,
+    // .tabulator-row.tabulator-calcs .tabulator-cell.tabulator-frozen,
+    // .tabulator-header .tabulator-col.tabulator-frozen,
+    // .tabulator-header .tabulator-col.tabulator-frozen.tabulator-col-sorter-element:hover {
+    //   background-color: var(--vscode-editor-background);
+    // }
 
     .tabulator-row {
-      background-color: default;
-      .tabulator-row-even {
-        background-color: default;
-      }
-
       &.tabulator-group {
         font-family: monospace;
         background: unset;
@@ -97,6 +111,27 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
           background-color: $rowHoverBackground;
         }
 
+        .tabulator-arrow {
+          width: 16px;
+          height: 16px;
+          margin-right: 4px;
+          border: none;
+          text-align: center;
+
+          &::before {
+            @include codicon-chevron;
+            content: $codicon-chevron-right;
+          }
+        }
+
+        &.tabulator-group-visible .tabulator-arrow {
+          border: none; // override upstream's more-specific expanded-state border
+
+          &::before {
+            content: $codicon-chevron-down;
+          }
+        }
+
         // Neutralise upstream `.tabulator-row.tabulator-group span { color: #d00 }`
         // so plain text in group headers inherits the theme foreground. Lives in
         // the same layer as the rule it's overriding — that keeps it out of the
@@ -105,6 +140,90 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
           margin-left: unset;
           color: inherit;
         }
+
+        // SOQL group headers (SOQLView only): truncate the query but keep the
+        // (count) pinned/visible. Scoped via :has so other group headers are
+        // untouched.
+        // inline-flex (not flex): the cell must stay in the row's inline-block
+        // flow so the sibling calc cells keep lining up under their columns.
+        .tabulator-cell:has(.soql-group-header) {
+          display: inline-flex;
+          align-items: center;
+        }
+        .soql-group-header {
+          display: flex;
+          flex: 1 1 auto;
+          min-width: 0;
+          align-items: center;
+        }
+        .soql-group-header__q {
+          // 0 grow: the query takes only the width it needs (shrinking with
+          // ellipsis when long) so the count sits right after it, not pushed
+          // to the far edge of the wide first column.
+          flex: 0 1 auto;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .soql-group-header__count {
+          flex: 0 0 auto;
+          margin-left: 6px;
+        }
+      }
+    }
+
+    // Group member indent. `.lana-grouped` (toggled by `GroupChildIndent`) only defines
+    // the var; consumers fall back to 0px, so a regroup is a targeted var invalidation.
+    &.lana-grouped {
+      --lana-group-indent: var(--lana-indent-unit, 9px);
+    }
+
+    .tabulator-calcs {
+      --lana-group-indent: 0px; // calc rows stay flush
+    }
+
+    // Indented call-tree cells carry an inline calc() that wins over this rule.
+    .tabulator-cell:first-child {
+      padding-left: calc(4px + var(--lana-group-indent, 0px)); // = stock 4px when ungrouped
+    }
+
+    .tabulator-row .tabulator-cell .tabulator-data-tree-control {
+      height: 16px;
+      width: 16px;
+      margin-right: 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      text-indent: 0; // cancel the name cell's hanging indent so the glyph stays in the control box
+
+      @media (hover: hover) and (pointer: fine) {
+        &:hover {
+          background: transparent;
+        }
+      }
+
+      .tabulator-data-tree-control-expand,
+      .tabulator-data-tree-control-collapse {
+        height: auto;
+        width: auto;
+        background: transparent;
+
+        &::after {
+          content: none;
+        }
+
+        &::before {
+          @include codicon-chevron;
+        }
+      }
+
+      .tabulator-data-tree-control-expand::before {
+        content: $codicon-chevron-right;
+      }
+
+      .tabulator-data-tree-control-collapse::before {
+        content: $codicon-chevron-down;
       }
     }
 
@@ -133,19 +252,19 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
     .sort-by {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: var(--lana-space-3xs);
     }
 
     .sort-by--bottom {
-      color: rgb(102, 102, 102);
+      color: var(--vscode-icon-foreground, currentColor);
       border-bottom: none;
-      border-top: 6px solid rgb(102, 102, 102);
+      border-top: 6px solid var(--vscode-icon-foreground, currentColor);
       border-left: 6px solid transparent;
       border-right: 6px solid transparent;
     }
     .sort-by--top {
-      color: rgb(102, 102, 102);
-      border-bottom: 6px solid rgb(102, 102, 102);
+      color: var(--vscode-icon-foreground, currentColor);
+      border-bottom: 6px solid var(--vscode-icon-foreground, currentColor);
       border-top: none;
       border-left: 6px solid transparent;
       border-right: 6px solid transparent;
@@ -165,8 +284,8 @@ $footerActiveColor: #d00 !default; //footer bottom active text color
     font-size: 0.92rem;
     font-variant-numeric: tabular-nums;
     padding: 5px;
-    border-radius: 4px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    border-radius: var(--lana-radius-sm);
+    box-shadow: var(--lana-shadow-overlay);
   }
 
   .tabulator-edit-list {

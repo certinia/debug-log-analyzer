@@ -1,7 +1,7 @@
 {
   "name": "lana",
   "displayName": "Apex Log Analyzer",
-  "version": "1.20.0",
+  "version": "1.20.1",
   "description": "Salesforce Apex Debug Log Analyzer: Blazing-fast VS Code extension for Salesforce. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.",
   "keywords": [
     "analysis",
@@ -138,6 +138,20 @@
             "default": false,
             "markdownDescription": "Tint the Call Tree Name column by event category, matching the Timeline colors, instead of showing a small color chip. Default: `false`",
             "order": 0
+          },
+          "lana.callTree.columnView": {
+            "title": "Column view",
+            "type": "string",
+            "default": "General",
+            "enum": [
+              "General",
+              "Time",
+              "Governor Limits",
+              "Database",
+              "Memory"
+            ],
+            "markdownDescription": "The column view applied to the Call Tree and Analysis tables. Default: `General`",
+            "order": 1
           }
         }
       },
@@ -326,6 +340,33 @@
             }
           }
         }
+      },
+      {
+        "type": "object",
+        "id": "lana",
+        "title": "Inspector",
+        "order": 3,
+        "properties": {
+          "lana.inspector.position": {
+            "title": "Position",
+            "type": "string",
+            "default": "right",
+            "enum": [
+              "left",
+              "right",
+              "bottom"
+            ],
+            "markdownDescription": "Where the inspector docks. Default: `right`",
+            "order": 0
+          },
+          "lana.inspector.size": {
+            "title": "Size",
+            "type": "number",
+            "default": 500,
+            "markdownDescription": "The docked inspector's width (or height when docked to the bottom), in pixels. Default: `500`",
+            "order": 1
+          }
+        }
       }
     ]
   },
@@ -333,14 +374,14 @@
     "vscode:prepublish": "pnpm -w run build && pnpm -w run copy:package-docs"
   },
   "dependencies": {
-    "@apexdevtools/apex-parser": "5.1.0-beta.1",
-    "@salesforce/apex-node": "^8.4.28",
-    "@salesforce/core": "^8.31.2"
+    "@apexdevtools/apex-parser": "5.1.0",
+    "@salesforce/apex-node": "^8.4.39",
+    "@salesforce/core": "^8.32.6"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "~22.16.5",
     "@types/vscode": "~1.100.0",
-    "typescript": "npm:@typescript/typescript6@^6.0.1"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }

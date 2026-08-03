@@ -4,7 +4,7 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import type { ApexLog, LogEvent, LogIssue } from 'apex-log-parser';
 import { debounce, formatDuration } from '../../../core/utility/Util.js';
-import { goToRow } from '../../call-tree/components/CalltreeView.js';
+import { goToRow } from '../../call-tree/navigation.js';
 
 export interface TimelineGroup {
   label: string;
@@ -23,6 +23,7 @@ interface TimelineColors {
 /* eslint-enable @typescript-eslint/naming-convention */
 
 const truncationColors: Map<string, string> = new Map([
+  ['exception', 'rgba(229, 72, 77, 0.9)'],
   ['error', 'rgba(255, 128, 128, 0.2)'],
   ['skip', 'rgb(30, 128, 255, 0.2)'],
   ['unexpected', 'rgba(128, 128, 255, 0.2)'],
@@ -435,7 +436,7 @@ function drawTruncation(ctx: CanvasRenderingContext2D) {
 
     if (thisEntry?.startTime) {
       const startTime = thisEntry.startTime,
-        endTime = nextEntry?.startTime ?? timelineRoot.exitStamp;
+        endTime = thisEntry.endTime ?? nextEntry?.startTime ?? timelineRoot.exitStamp;
 
       let x = startTime * state.zoom - state.offsetX;
       let w = (endTime - startTime) * state.zoom;
@@ -524,6 +525,30 @@ export function init(timelineContainer: HTMLElement, rootMethod: ApexLog) {
   if (ctx) {
     requestAnimationFrame(drawTimeLine);
   }
+}
+
+/**
+ * Re-read the find-match colors from CSS and redraw.
+ *
+ * Called on init and again on every host theme change — the canvas caches these as
+ * strings, so nothing here re-themes on its own.
+ */
+export function refreshThemeColors(): void {
+  if (!canvas) {
+    return;
+  }
+
+  const computedStyle = getComputedStyle(canvas);
+  findMatchColor =
+    computedStyle.getPropertyValue('--vscode-editor-findMatchHighlightBackground') ?? '#ea5c0054';
+  currentFindMatchColor =
+    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground') ?? '#9e6a03';
+  borderSettings = new Map<string, number>([
+    [strokeColor, 1],
+    [findMatchColor, 2],
+  ]);
+
+  state.requestRedraw();
 }
 
 export function setColors(timelineColors: TimelineColors) {
@@ -702,6 +727,11 @@ function findTimelineTooltip(
             govLimits.soslQueries.limit,
           ),
         });
+      }
+
+      if (target.thrownCount.total) {
+        // No `self`: always 0 on a method (the throw is a child leaf).
+        rows.push({ label: 'Throws:', value: `${target.thrownCount.total}` });
       }
     }
 
@@ -1016,15 +1046,7 @@ function onInitTimeline(): void {
   tooltip.id = 'timeline-tooltip';
   container.appendChild(tooltip);
 
-  const computedStyle = getComputedStyle(canvas);
-  findMatchColor =
-    computedStyle.getPropertyValue('--vscode-editor-findMatchHighlightBackground') ?? '#ea5c0054';
-  currentFindMatchColor =
-    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground') ?? '#9e6a03';
-  borderSettings = new Map<string, number>([
-    [strokeColor, 1],
-    [findMatchColor, 2],
-  ]);
+  refreshThemeColors();
 
   if (canvas) {
     canvas.addEventListener('mouseout', onLeaveCanvas);
