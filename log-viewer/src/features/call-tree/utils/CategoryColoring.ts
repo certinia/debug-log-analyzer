@@ -69,7 +69,7 @@ function applyCategoryTheme(host: HTMLElement, themeName: string): void {
 export function wireCategoryColoring(host: HTMLElement): () => void {
   applyCategoryTheme(host, DEFAULT_THEME_NAME);
 
-  VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
+  const stopThemePreview = VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
     const { cmd, payload } = event.data;
     if (cmd === 'switchTimelineTheme') {
       applyCategoryTheme(host, payload.activeTheme ?? DEFAULT_THEME_NAME);
@@ -83,5 +83,10 @@ export function wireCategoryColoring(host: HTMLElement): () => void {
     host.classList.toggle('category-colorize', callTree?.categoryColorize ?? false);
   };
 
-  return subscribeSettings(apply);
+  const stopSettings = subscribeSettings(apply);
+
+  return () => {
+    stopThemePreview();
+    stopSettings();
+  };
 }

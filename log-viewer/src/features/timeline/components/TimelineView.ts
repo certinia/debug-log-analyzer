@@ -61,6 +61,9 @@ export class TimelineView extends LitElement {
   /** Unsubscribe for the settings subscription; set while connected. */
   private settingsUnsubscribe: (() => void) | null = null;
 
+  /** Removes the theme-preview message listener; set while connected. */
+  private themePreviewUnsubscribe: (() => void) | null = null;
+
   /**
    * The persisted palette last applied. A quick-pick preview is not persisted, so an
    * unrelated `configChanged` push must not re-apply the stored theme over it.
@@ -152,12 +155,14 @@ export class TimelineView extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
 
-    VSCodeExtensionMessenger.listen<{ activeTheme: string }>((event) => {
-      const { cmd, payload } = event.data;
-      if (cmd === 'switchTimelineTheme' && this.activeTheme !== payload.activeTheme) {
-        this.setTheme(payload.activeTheme ?? DEFAULT_THEME_NAME);
-      }
-    });
+    this.themePreviewUnsubscribe ??= VSCodeExtensionMessenger.listen<{ activeTheme: string }>(
+      (event) => {
+        const { cmd, payload } = event.data;
+        if (cmd === 'switchTimelineTheme' && this.activeTheme !== payload.activeTheme) {
+          this.setTheme(payload.activeTheme ?? DEFAULT_THEME_NAME);
+        }
+      },
+    );
 
     // The panel is never re-created, so live `lana.timeline.*` edits only reach the
     // chart through this subscription.
@@ -169,6 +174,8 @@ export class TimelineView extends LitElement {
   override disconnectedCallback() {
     this.settingsUnsubscribe?.();
     this.settingsUnsubscribe = null;
+    this.themePreviewUnsubscribe?.();
+    this.themePreviewUnsubscribe = null;
     super.disconnectedCallback();
   }
 
