@@ -234,7 +234,7 @@ export const selectSizingStyles = css`
 /** vscode-single-select where the control fits the selected value and the popup its widest option. */
 @customElement('vs-select')
 export class VsSelect extends VscodeSingleSelect {
-  static styles = [...VscodeSingleSelect.styles, globalStyles, selectSizingStyles];
+  static styles = [...VscodeSingleSelect.styles, ...globalStyles, selectSizingStyles];
 
   /** Shrinks padding/font-size to match the filter bar's facet/range trigger pills. */
   @property({ type: Boolean, reflect: true })
