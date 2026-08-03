@@ -376,7 +376,7 @@
   "dependencies": {
     "@apexdevtools/apex-ls": "^6.0.2",
     "@apexdevtools/apex-parser": "5.1.0",
-    "@salesforce/apex-node": "^8.4.39",
+    "@salesforce/apex-node": "^9.0.0",
     "@salesforce/core": "^8.32.6"
   },
   "devDependencies": {

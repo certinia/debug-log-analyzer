@@ -119,8 +119,8 @@ importers:
         specifier: 5.1.0
         version: 5.1.0
       '@salesforce/apex-node':
-        specifier: ^8.4.39
-        version: 8.4.39
+        specifier: ^9.0.0
+        version: 9.0.0
       '@salesforce/core':
         specifier: ^8.32.6
         version: 8.32.6
@@ -2710,20 +2710,32 @@ packages:
   '@rspack/lite-tapable@1.1.0':
     resolution: {integrity: sha512-E2B0JhYFmVAwdDiG14+DW0Di4Ze4Jg10Pc4/lILUrd5DRCaklduz2OvJ5HYQ6G+hd+WTzqQb3QnDNfK4yvAFYw==}
 
-  '@salesforce/apex-node@8.4.39':
-    resolution: {integrity: sha512-zmE6FyBJsskUpVeZxJwFmyCxwDv6Ab3ApJ2FRyWBwX8QBlMnvyV4KqCxPoOxCW6zgl5Af9fw/3aVKNhnrMC+mA==}
-    engines: {node: '>=18.18.2'}
+  '@salesforce/apex-node@9.0.0':
+    resolution: {integrity: sha512-OwOnUxaec9tBcWG2lqg8e7qmazpgzd4oUZuyaw/xbnz21pQAztfn2gAlZNGGnunAKtceyarO9iLygt/ebXJC/g==}
+    engines: {node: '>=22.0.0'}
 
   '@salesforce/core@8.32.6':
     resolution: {integrity: sha512-ZR973WoqCgi6cR58WhgokbHVZOaADNKHiuM1FAwS5pTLQnC91xYi04i2e/gpAX2AUf7Ya6zjbusYtZNpSyKKAQ==}
     engines: {node: '>=18.0.0'}
 
+  '@salesforce/core@9.1.0':
+    resolution: {integrity: sha512-ID9g4YH0yZBeWI0eKJv2IJRRN6ZuNjwpIOjEZm9a79Gzxa3IITsV4PCvD8q7JA3PKqiln57p8yJE458Kn5KW1g==}
+    engines: {node: '>=22.0.0'}
+
   '@salesforce/kit@3.2.6':
     resolution: {integrity: sha512-O8S4LWerHa9Zosqh+IoQjgLtpxMOfObRxaRnUdRV4MLtFUi+bQxQiyFvve6eEaBaMP1b1xVDQpvSvQ+PXEDGFQ==}
+
+  '@salesforce/kit@4.0.0':
+    resolution: {integrity: sha512-VwxhSH/8PQ5YmPAdhmLaJGCgR0n/pOm8T2y+/odMFthd5SA0xsO/kTdaRLFnFQAxxNj1nYtNHRb+BoMuAatzew==}
+    engines: {node: '>=22.0.0'}
 
   '@salesforce/ts-types@2.0.12':
     resolution: {integrity: sha512-BIJyduJC18Kc8z+arUm5AZ9VkPRyw1KKAm+Tk+9LT99eOzhNilyfKzhZ4t+tG2lIGgnJpmytZfVDZ0e2kFul8g==}
     engines: {node: '>=18.0.0'}
+
+  '@salesforce/ts-types@3.0.1':
+    resolution: {integrity: sha512-NWkveMYT2I3O7EAYwWHi6/ba2YUwp9MFi/zJzA+czK5MVqJfdD6FZbiQrTbALZNvFzgFSdq9BvHm6ygRmtROzw==}
+    engines: {node: '>=22.0.0'}
 
   '@sideway/address@4.1.5':
     resolution: {integrity: sha512-IqO/DUQHUkPeixNQ8n0JA6102hT9CmaljNTPmQ1u8MEhBo/R4Q8eKLN/vGZxuebwOroDB4cbpjheD4+/sKFK4Q==}
@@ -3655,9 +3667,6 @@ packages:
 
   ajv@6.15.0:
     resolution: {integrity: sha512-fgFx7Hfoq60ytK2c7DhnF8jIvzYgOMxfugjLOSMHjLIPgenqa7S7oaagATUq99mV6IYvN2tRmC0wnTYX6iPbMw==}
-
-  ajv@8.18.0:
-    resolution: {integrity: sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A==}
 
   ajv@8.20.0:
     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
@@ -4800,9 +4809,6 @@ packages:
 
   fast-safe-stringify@2.1.1:
     resolution: {integrity: sha512-W+KJc2dmILlPplD/H4K9l9LcAHAfPtP6BY84uVLXQ6Evcz9Lcg33Y2z1IVblT6xdY54PXYVHEv+0Wpq8Io6zkA==}
-
-  fast-uri@3.1.2:
-    resolution: {integrity: sha512-rVjf7ArG3LTk+FS6Yw81V1DLuZl1bRbNrev6Tmd/9RaroeeRRJhAt7jg/6YFxbvAQXUCavSoZhPPj6oOx+5KjQ==}
 
   fast-uri@4.0.0:
     resolution: {integrity: sha512-l90y339r2DkZs/ldcWQXcwTjkbp/NbuJDGYoQ3awBgaT3GXOFkm3OkVpz6Z86TywYcya0eVP2r1kTV90f3krGQ==}
@@ -7404,11 +7410,6 @@ packages:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
     hasBin: true
 
-  semver@7.8.1:
-    resolution: {integrity: sha512-rkVq3IXh+4FDGch+KwzX3aV9W3kO54GyEgpvBzSyctDA6Xtd7RJQV1xmXbeQp5v7+VzLOfVqiutSE6GICgPFvg==}
-    engines: {node: '>=10'}
-    hasBin: true
-
   semver@7.8.4:
     resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
     engines: {node: '>=10'}
@@ -7805,15 +7806,15 @@ packages:
   tldts-core@6.1.86:
     resolution: {integrity: sha512-Je6p7pkk+KMzMv2XXKmAE3McmolOQFdxkKw0R8EYNr7sELW46JqnNeTX8ybPiQgvg1ymCoF8LXs5fzFaZvJPTA==}
 
-  tldts-core@7.4.3:
-    resolution: {integrity: sha512-27ep5H9PzdBrNd5OFM/j3WCU8F3kPwM9D0BOaOf7uYfxMJfyr0K5Tjj69Gri+sZlh2WXd5buIm47NuPF29CDiw==}
+  tldts-core@7.4.10:
+    resolution: {integrity: sha512-KnQjp53ZekKgm/r3l+u8kJGGzYgrWdP8+Mql7a4vijh2WE0IrZWspQj/TpTxDho/YxO+AnOZnIjQcCD+q6iJsw==}
 
   tldts@6.1.86:
     resolution: {integrity: sha512-WMi/OQ2axVTf/ykqCQgXiIct+mSQDFdH2fkwhPwgEwvJ1kSzZRiinb0zF2Xb8u4+OqPChmyI6MEu4EezNJz+FQ==}
     hasBin: true
 
-  tldts@7.4.3:
-    resolution: {integrity: sha512-A3BDQBeeukYPzB4QdQ1DtdlUmp4x2OCH8n5UVhEWbyANxNep8GavottKzd1xYKFJKjUgMyPT7EzOfnBO55s8Sg==}
+  tldts@7.4.10:
+    resolution: {integrity: sha512-GgouD1B+sWwvkaEq8vXC15DjQitxbvs12oIXELpconwm+Tg3zfcEv4jgzq3vtKverDXsg3VI8aRgNL2Nra0Iog==}
     hasBin: true
 
   tmpl@1.0.5:
@@ -7835,8 +7836,8 @@ packages:
     resolution: {integrity: sha512-FVDYdxtnj0G6Qm/DhNPSb8Ju59ULcup3tuJxkFb5K8Bv2pUXILbf0xZWU8PX8Ov19OXljbUyveOFwRMwkXzO+A==}
     engines: {node: '>=16'}
 
-  tough-cookie@6.0.1:
-    resolution: {integrity: sha512-LktZQb3IeoUWB9lqR5EWTHgW/VTITCXg4D21M+lvybRVdylLrRMnqaIONLVb5mav8vM19m44HIcGq4qASeu2Qw==}
+  tough-cookie@6.0.2:
+    resolution: {integrity: sha512-exgYmnmL/sJpR3upZfXG5PoatXQii55xAiXGXzY+sROLZ/Y+SLcp9PgJNI9Vz37HpQ74WvDcLT8eqm+kV3FzrA==}
     engines: {node: '>=16'}
 
   tr46@5.1.1:
@@ -11925,10 +11926,10 @@ snapshots:
 
   '@rspack/lite-tapable@1.1.0': {}
 
-  '@salesforce/apex-node@8.4.39':
+  '@salesforce/apex-node@9.0.0':
     dependencies:
-      '@salesforce/core': 8.32.6
-      '@salesforce/kit': 3.2.6
+      '@salesforce/core': 9.1.0
+      '@salesforce/kit': 4.0.0
       '@types/istanbul-reports': 3.0.4
       fast-glob: 3.3.3
       faye: 1.4.1
@@ -11959,11 +11960,39 @@ snapshots:
       ts-retry-promise: 0.8.1
       zod: 4.4.3
 
+  '@salesforce/core@9.1.0':
+    dependencies:
+      '@jsforce/jsforce-node': 3.10.19
+      '@salesforce/kit': 4.0.0
+      '@salesforce/ts-types': 3.0.1
+      ajv: 8.20.0
+      change-case: 4.1.2
+      fast-levenshtein: 3.0.0
+      faye: 1.4.1
+      form-data: 4.0.6
+      js2xmlparser: 4.0.2
+      jsonwebtoken: 9.0.3
+      jszip: 3.10.1
+      memfs: 4.38.1
+      pino: 9.14.0
+      pino-abstract-transport: 1.2.0
+      pino-pretty: 11.3.0
+      proper-lockfile: 4.1.2
+      semver: 7.8.5
+      ts-retry-promise: 0.8.1
+      zod: 4.4.3
+
   '@salesforce/kit@3.2.6':
     dependencies:
       '@salesforce/ts-types': 2.0.12
 
+  '@salesforce/kit@4.0.0':
+    dependencies:
+      '@salesforce/ts-types': 3.0.1
+
   '@salesforce/ts-types@2.0.12': {}
+
+  '@salesforce/ts-types@3.0.1': {}
 
   '@sideway/address@4.1.5':
     dependencies:
@@ -12808,17 +12837,17 @@ snapshots:
       clean-stack: 2.2.0
       indent-string: 4.0.0
 
-  ajv-formats@2.1.1(ajv@8.18.0):
+  ajv-formats@2.1.1(ajv@8.20.0):
     optionalDependencies:
-      ajv: 8.18.0
+      ajv: 8.20.0
 
   ajv-keywords@3.5.2(ajv@6.15.0):
     dependencies:
       ajv: 6.15.0
 
-  ajv-keywords@5.1.0(ajv@8.18.0):
+  ajv-keywords@5.1.0(ajv@8.20.0):
     dependencies:
-      ajv: 8.18.0
+      ajv: 8.20.0
       fast-deep-equal: 3.1.3
 
   ajv@6.15.0:
@@ -12827,13 +12856,6 @@ snapshots:
       fast-json-stable-stringify: 2.1.0
       json-schema-traverse: 0.4.1
       uri-js: 4.4.1
-
-  ajv@8.18.0:
-    dependencies:
-      fast-deep-equal: 3.1.3
-      fast-uri: 3.1.2
-      json-schema-traverse: 1.0.0
-      require-from-string: 2.0.2
 
   ajv@8.20.0:
     dependencies:
@@ -14083,8 +14105,6 @@ snapshots:
 
   fast-safe-stringify@2.1.1: {}
 
-  fast-uri@3.1.2: {}
-
   fast-uri@4.0.0: {}
 
   fastest-levenshtein@1.0.16: {}
@@ -14107,7 +14127,7 @@ snapshots:
       csprng: 0.1.2
       faye-websocket: 0.11.4
       safe-buffer: 5.2.1
-      tough-cookie: 6.0.1
+      tough-cookie: 6.0.2
       tunnel-agent: 0.6.0
 
   fb-watchman@2.0.2:
@@ -15083,7 +15103,7 @@ snapshots:
       jest-message-util: 30.4.1
       jest-util: 30.4.1
       pretty-format: 30.4.1
-      semver: 7.8.1
+      semver: 7.8.5
       synckit: 0.11.13
     transitivePeerDependencies:
       - supports-color
@@ -15990,7 +16010,7 @@ snapshots:
   micromatch@4.0.8:
     dependencies:
       braces: 3.0.3
-      picomatch: 4.0.4
+      picomatch: 4.0.5
 
   mime-db@1.33.0: {}
 
@@ -17425,9 +17445,9 @@ snapshots:
   schema-utils@4.3.3:
     dependencies:
       '@types/json-schema': 7.0.15
-      ajv: 8.18.0
-      ajv-formats: 2.1.1(ajv@8.18.0)
-      ajv-keywords: 5.1.0(ajv@8.18.0)
+      ajv: 8.20.0
+      ajv-formats: 2.1.1(ajv@8.20.0)
+      ajv-keywords: 5.1.0(ajv@8.20.0)
 
   search-insights@2.17.3: {}
 
@@ -17448,8 +17468,6 @@ snapshots:
       semver: 7.8.5
 
   semver@6.3.1: {}
-
-  semver@7.8.1: {}
 
   semver@7.8.4: {}
 
@@ -17826,15 +17844,15 @@ snapshots:
 
   tldts-core@6.1.86: {}
 
-  tldts-core@7.4.3: {}
+  tldts-core@7.4.10: {}
 
   tldts@6.1.86:
     dependencies:
       tldts-core: 6.1.86
 
-  tldts@7.4.3:
+  tldts@7.4.10:
     dependencies:
-      tldts-core: 7.4.3
+      tldts-core: 7.4.10
 
   tmpl@1.0.5: {}
 
@@ -17850,9 +17868,9 @@ snapshots:
     dependencies:
       tldts: 6.1.86
 
-  tough-cookie@6.0.1:
+  tough-cookie@6.0.2:
     dependencies:
-      tldts: 7.4.3
+      tldts: 7.4.10
 
   tr46@5.1.1:
     dependencies:
