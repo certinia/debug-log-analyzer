@@ -81,8 +81,12 @@ export class VSCodeExtensionMessenger {
     });
   }
 
-  public static listen<T>(callback: (event: MessageEvent<VSCodeMessage<T>>) => void): void {
+  /** Listens for extension messages; returns the function that removes the listener. */
+  public static listen<T>(callback: (event: MessageEvent<VSCodeMessage<T>>) => void): () => void {
     window.addEventListener('message', callback);
+    return () => {
+      window.removeEventListener('message', callback);
+    };
   }
 }
 

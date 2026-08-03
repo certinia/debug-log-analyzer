@@ -62,7 +62,7 @@ export function getSettings(): Promise<LanaSettings> {
 }
 
 const subscribers = new Set<(settings: LanaSettings) => void>();
-let listening = false;
+let stopListening: (() => void) | null = null;
 /** Newest settings seen, from either the reply or a push; seeds later subscribers. */
 let latest: LanaSettings | null = null;
 let seedRequest: Promise<LanaSettings | null> | null = null;
@@ -83,16 +83,13 @@ function publish(settings: LanaSettings): void {
 export function subscribeSettings(callback: (settings: LanaSettings) => void): () => void {
   subscribers.add(callback);
 
-  if (!listening) {
-    // One window listener for every subscriber; `listen` has no removal path.
-    listening = true;
-    VSCodeExtensionMessenger.listen<LanaSettings>((event) => {
-      const settings = event.data?.cmd === 'configChanged' ? event.data.payload : null;
-      if (settings) {
-        publish(settings);
-      }
-    });
-  }
+  // One window listener for every subscriber, removed with the last of them.
+  stopListening ??= VSCodeExtensionMessenger.listen<LanaSettings>((event) => {
+    const settings = event.data?.cmd === 'configChanged' ? event.data.payload : null;
+    if (settings) {
+      publish(settings);
+    }
+  });
 
   if (latest) {
     callback(latest);
@@ -103,7 +100,7 @@ export function subscribeSettings(callback: (settings: LanaSettings) => void): (
     seedRequest.then((settings) => {
       // A push can land before the reply; it is then the newer value, so the
       // reply is dropped rather than applied over it.
-      if (settings && !latest) {
+      if (settings && !latest && subscribers.size) {
         publish(settings);
       }
     });
@@ -111,6 +108,15 @@ export function subscribeSettings(callback: (settings: LanaSettings) => void): (
 
   return () => {
     subscribers.delete(callback);
+    if (subscribers.size) {
+      return;
+    }
+    // Nobody is following, so stop listening. The cache goes too: pushes arriving
+    // while detached are missed, so the next subscriber must seed from a fresh read.
+    stopListening?.();
+    stopListening = null;
+    latest = null;
+    seedRequest = null;
   };
 }
 
