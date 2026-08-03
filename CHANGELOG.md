@@ -57,7 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - 📊 **Database usage bars** (Row Count, Time Taken): the usage bar was hidden whenever the rounded percentage was 0% (the common case for small row counts against large governor limits), so it rarely appeared; it now fills relative to the grid's own column total rather than a governor limit, shows on grouped summary rows, and Time Taken (ms) now shows a bar too. ([#873])
 - 🎨 **Theme colours**: some colours did not update on theme switch; they now do.
-- ⚙️ **Settings**: settings did not reach the log view on a fresh install, and `lana.timeline.*` edits did not apply to an open log view; they now do.
 
 ## [1.20.1] 2026-07-23
 
