@@ -68,7 +68,6 @@ the TS ≤6.0 API (lands in TS 7.1). Don't remove until typescript-eslint suppor
 - Never hand-edit the vendored `tabulator_esm.mjs` beyond the sanctioned documented patches.
 - Root `README.md` / `CHANGELOG.md` / `LICENSE.txt` are the sources of truth; the `lana/` copies are
   build output.
-- One concern per commit. Show the message and file list, then wait for approval.
 
 ### Goal-Driven Execution
 
