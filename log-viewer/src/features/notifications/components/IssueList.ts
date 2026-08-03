@@ -102,7 +102,8 @@ export class IssueList extends LitElement {
       /* The meta line under the summary: kind pill, then the moment in the log. Its own
          row rather than a trailing decoration so the summary's clamp keeps the full width,
          and so fatal/thrown pairs with identical summaries stay distinguishable at a
-         glance. line-height matches the pill's box, so a pill-less row is the same height. */
+         glance. The 16px line-height sizes the pill's box too, so a pill-less row is the
+         same height. */
       .issue__meta {
         display: flex;
         align-items: center;
@@ -119,7 +120,6 @@ export class IssueList extends LitElement {
         flex: 0 0 auto;
         font-size: 10px;
         font-weight: 600;
-        line-height: 1.6;
         padding: 0 var(--lana-space-xs);
         border-radius: var(--lana-radius-sm);
         color: var(--lana-badge-fg);

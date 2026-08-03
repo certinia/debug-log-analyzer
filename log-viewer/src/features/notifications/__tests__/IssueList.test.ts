@@ -19,7 +19,15 @@ function issue(
   action: IssueAction | null = null,
   category: LogIssue['category'] = null,
 ): LogIssue {
-  return { summary, message: `${summary} detail`, severity, action, category, timestamp: null };
+  return {
+    summary,
+    message: `${summary} detail`,
+    severity,
+    label: null,
+    action,
+    category,
+    timestamp: null,
+  };
 }
 
 async function mount(issues: readonly LogIssue[]): Promise<IssueList> {

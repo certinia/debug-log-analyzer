@@ -60,12 +60,6 @@ export class LogProblemsChip extends LitElement {
         width: 16px;
         height: 16px;
       }
-
-      /* Issue cards carry whole exception messages: widen past the menu default so the
-         two-line clamp holds a readable measure (~60 chars/line). */
-      anchored-popover {
-        --anchored-popover-width: 400px;
-      }
     `,
   ];
 
@@ -82,6 +76,7 @@ export class LogProblemsChip extends LitElement {
       align="start"
       heading="Log problems"
       show-heading
+      wide
       empty-message="No problems found in this log"
     >
       <span

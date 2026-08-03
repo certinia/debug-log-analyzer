@@ -90,6 +90,7 @@ function issue(severity: IssueSeverity): LogIssue {
     summary: severity,
     message: '',
     severity,
+    label: null,
     action: null,
     category: null,
     timestamp: null,
