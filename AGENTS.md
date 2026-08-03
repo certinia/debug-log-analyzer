@@ -52,5 +52,6 @@ communicate via message passing only.
 
 Area-specific rules load on demand (Claude Code, scoped by path):
 
-- `.claude/rules/log-viewer.md` — webview/UI: boundary, performance budgets, key paths.
+- `.claude/rules/log-viewer.md` — webview/UI: boundary, performance budgets, `--lana-*` appearance
+  tokens, key paths.
 - `.claude/rules/lana.md` — VS Code extension: UX, command paths.

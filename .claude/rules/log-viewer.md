@@ -19,10 +19,27 @@ Webview UI. Applies when working under `log-viewer/`.
 - Operations >100ms show a progress indicator.
 - Benchmark against large logs from `sample-app/`.
 
+## UI appearance
+
+- **Use a `--lana-*` token for every color, radius, space, shadow and border width.** Write no new
+  literals, and replace the literals in the code you touch. Older files still hold literals; we
+  convert them file by file.
+- **Put a new token in `styles/tokens.css` as `var(--vscode-…, <literal>)`.** The literal is the
+  value a host outside VS Code gets, so one stylesheet can re-skin the app.
+- **Data palettes stay literal.** The timeline categories (`timeline/themes/Themes.ts`) and the
+  metric-strip tiers (`metric-strip/metric-strip-colors.ts`) show meaning, not chrome, so they do
+  not follow the host theme.
+- **A component that names a token must also carry the tokens.** `globalStyles` carries them, so
+  `static styles = [globalStyles, …]` is enough. Without `globalStyles`, add `tokenStyles`
+  (`styles/tokens.styles.ts`). The document copy, which the build injects, styles only the popups
+  that tabulator puts in `document.body`.
+- **Check each UI change in a light theme and in a dark theme.**
+
 ## Key paths
 
 - Timeline: `log-viewer/src/features/timeline/`
 - Parser: `log-viewer/src/core/log-parser/`
+- Tokens: `log-viewer/src/styles/tokens.css`
 
 ## Testing
 

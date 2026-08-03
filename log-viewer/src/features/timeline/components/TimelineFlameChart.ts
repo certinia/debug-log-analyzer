@@ -18,11 +18,13 @@ import { parseColorToHex } from '../optimised/rendering/ColorUtils.js';
 import type { EditorColors, TimelineOptions } from '../types/flamechart.types.js';
 import { TimelineError } from '../types/flamechart.types.js';
 
+import { tokenStyles } from '../../../styles/tokens.styles.js';
 import { tooltipStyles } from '../styles/timeline.css.js';
 
 @customElement('timeline-flame-chart')
 export class TimelineFlameChart extends LitElement {
   static styles = [
+    tokenStyles,
     unsafeCSS(tooltipStyles),
     css`
       :host {
@@ -43,11 +45,14 @@ export class TimelineFlameChart extends LitElement {
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        padding: 20px;
-        background: #ffebee;
-        border: 1px solid #ef5350;
-        border-radius: 4px;
-        color: #c62828;
+        padding: var(--lana-space-lg);
+        background: var(--vscode-inputValidation-errorBackground, #ffebee);
+        border: var(--lana-stroke) solid var(--vscode-inputValidation-errorBorder, #ef5350);
+        border-radius: var(--lana-radius-sm);
+        color: var(
+          --vscode-inputValidation-errorForeground,
+          var(--vscode-errorForeground, #c62828)
+        );
         font-family: monospace;
         max-width: 80%;
         text-align: center;
@@ -58,8 +63,8 @@ export class TimelineFlameChart extends LitElement {
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        padding: 20px;
-        color: #666;
+        padding: var(--lana-space-lg);
+        color: var(--vscode-descriptionForeground, #999);
         font-family: monospace;
       }
     `,

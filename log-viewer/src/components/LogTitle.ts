@@ -43,7 +43,7 @@ export class LogTitle extends LitElement {
         padding-block: 2px;
         padding-inline: 6px;
         background: transparent;
-        border-radius: 5px;
+        border-radius: var(--lana-radius-sm);
         font-weight: var(--text-weight-semibold, 600);
         font-size: 1.1rem;
         overflow: hidden;

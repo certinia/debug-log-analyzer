@@ -78,7 +78,8 @@ export class LogViewer extends LitElement {
            log-levels row) can detect overflow rather than widening the page.
            clip (not hidden) avoids forcing overflow-y to auto. */
         overflow-x: clip;
-        padding: 0px 8px 0px 8px;
+        /* Half of the x=16 guide the header and tabs share (see AppHeader). */
+        padding: 0 var(--lana-space-sm);
       }
 
       vscode-tabs {
