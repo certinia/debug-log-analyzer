@@ -21,18 +21,19 @@ Webview UI. Applies when working under `log-viewer/`.
 
 ## UI appearance
 
-- **No new hardcoded colors, radii, spacing, shadows or border widths**, and tokenise the ones you
-  touch — older literals are still being converted file by file. Consume `--lana-*`. New tokens
-  go in `styles/tokens.css` as `var(--vscode-…, <literal fallback>)`. The fallback is what makes a
-  standalone (non-webview) host themable — one stylesheet overriding `--lana-*` is the whole seam.
-- **Data palettes are the one exception.** The timeline category palettes (`timeline/themes/Themes.ts`)
-  and the metric-strip tier colors (`metric-strip/metric-strip-colors.ts`) encode meaning, not chrome,
-  so they stay literal and do not follow the host theme.
-- **A component whose CSS names a `--lana-*` token carries the tokens.** `globalStyles` already
-  does, so `static styles = [globalStyles, …]` is enough; a component that skips `globalStyles`
-  adds `tokenStyles` (`styles/tokens.styles.ts`) itself. The document-level copy, injected by the
-  build's CSS plugin, is only for light DOM — the popups tabulator appends to `document.body`.
-- Verify in a light and a dark theme before calling a UI change done.
+- **Use a `--lana-*` token for every color, radius, space, shadow and border width.** Write no new
+  literals, and replace the literals in the code you touch. Older files still hold literals; we
+  convert them file by file.
+- **Put a new token in `styles/tokens.css` as `var(--vscode-…, <literal>)`.** The literal is the
+  value a host outside VS Code gets, so one stylesheet can re-skin the app.
+- **Data palettes stay literal.** The timeline categories (`timeline/themes/Themes.ts`) and the
+  metric-strip tiers (`metric-strip/metric-strip-colors.ts`) show meaning, not chrome, so they do
+  not follow the host theme.
+- **A component that names a token must also carry the tokens.** `globalStyles` carries them, so
+  `static styles = [globalStyles, …]` is enough. Without `globalStyles`, add `tokenStyles`
+  (`styles/tokens.styles.ts`). The document copy, which the build injects, styles only the popups
+  that tabulator puts in `document.body`.
+- **Check each UI change in a light theme and in a dark theme.**
 
 ## Key paths
 
