@@ -17,12 +17,17 @@ import './EventVitals.js';
  * the same shared trio — Details, Call stack, Call tree — scoped to the
  * selection; the Database view keeps its richer set (Vitals + SOQL issues) via
  * {@link buildDatabaseSections}.
+ *
+ * Precedence rule, binding on future scoping inputs such as a timeline time
+ * range: an explicit row/frame `selection` always wins. A range or other
+ * ambient scope only applies when `selection` is `null`, so it belongs inside
+ * the `!selection` branch — never above it.
  */
 export async function buildDetailSections(
   source: DetailSource,
   selection: DetailSelection | null,
 ): Promise<PaneSection[]> {
-  // Nothing selected: no sections yet, so the inspector shows its empty text.
+  // Nothing selected: no sections, so the inspector shows `emptyTextFor(source)`.
   if (!selection) {
     return [];
   }
