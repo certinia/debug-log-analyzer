@@ -17,7 +17,6 @@ import { formatInteger } from '../core/utility/Util.js';
 import { SOSL_ROWS_PER_QUERY_LIMIT } from '../features/database/limits.js';
 import { DatabaseAccess } from '../features/database/services/Database.js';
 import { globalStyles } from '../styles/global.styles.js';
-import { panelTokens } from './panelTokens.js';
 
 // web components
 import './CodeBlock.js';
@@ -90,21 +89,20 @@ export class EventVitals extends LitElement {
 
   static styles = [
     globalStyles,
-    panelTokens,
     css`
       :host {
         display: block;
         container-type: inline-size;
       }
       code-block {
-        margin-bottom: var(--space-2);
+        margin-bottom: var(--lana-space-sm);
       }
       /* Label/value pairs stack when narrow and become two aligned columns when
          there's room; the grid owns the columns so subgrid rows line up. */
       .grid {
         display: grid;
         grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-2) var(--space-3);
+        gap: var(--lana-space-sm) var(--lana-space-md);
       }
       .row {
         display: grid;
@@ -138,8 +136,8 @@ export class EventVitals extends LitElement {
       }
       .pill {
         display: inline-block;
-        padding: 0 var(--space-2);
-        border-radius: var(--panel-radius);
+        padding: 0 var(--lana-space-sm);
+        border-radius: var(--lana-radius-sm);
         font-size: 0.85em;
         line-height: 1.4;
         color: var(--vscode-editor-background);

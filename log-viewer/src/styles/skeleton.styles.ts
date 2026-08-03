@@ -3,8 +3,8 @@ import { css } from 'lit';
 export const skeletonStyles = css`
   .skeleton {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    background-color: rgb(229 231 235);
-    border-radius: 0.25rem;
+    background-color: var(--lana-skeleton-bg);
+    border-radius: var(--lana-radius-sm);
     min-width: 1ch;
     width: 100%;
   }

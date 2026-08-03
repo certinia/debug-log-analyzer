@@ -39,6 +39,9 @@ export default {
       moduleNameMapper: {
         ...defaultConfig.moduleNameMapper,
         '^apex-log-parser$': '<rootDir>/../apex-log-parser/src/index.ts',
+        // Stylesheet imports have no transform here; the `.js` rule above runs first, so the
+        // `*.css.ts` style modules are unaffected.
+        '\\.s?css$': '<rootDir>/src/__tests__/mocks/styleStub.ts',
       },
       transformIgnorePatterns: [
         // allow transformation of pixi.js and its dependencies
