@@ -54,7 +54,7 @@ describe('buildCallStackData', () => {
     expect(rootTotal).toBe(0);
   });
 
-  it('drops detail frames, as the Call Tree tab does', () => {
+  it('drops detail frames, keeping call frames only', () => {
     currentStack = [
       {
         eventIndex: 7,

@@ -17,9 +17,10 @@ export interface CallStackRow {
  * returns them). `rootTotal` (the outermost frame's total, in ns) is the
  * denominator for the Total/Self percentage bars.
  *
- * Detail frames are dropped, so the inspector never shows what the Call Tree tab
- * hides: a `CUMULATIVE_LIMIT_USAGE` or `CUMULATIVE_PROFILING_BEGIN` block is a
- * parent, so it can be an ancestor of a selected detail row.
+ * Detail frames are dropped: the inspector's stack holds call frames only. A
+ * `CUMULATIVE_LIMIT_USAGE` or `CUMULATIVE_PROFILING_BEGIN` block is a parent, so
+ * it can be an ancestor of a selected row. `EXCLUDED_DETAIL_TYPES` names them
+ * for the Call Tree tab, which keeps them visible; here they are the exclusion.
  */
 export function buildCallStackData(eventIndex: number): {
   rows: CallStackRow[];

@@ -46,7 +46,7 @@
 
   /* Type — one step down from the host's body size, for text that annotates
      rather than states. */
-  --lana-text-sm: 0.85rem;
+  --lana-text-sm: calc(var(--vscode-font-size, 13px) * 0.85);
 
   /* Surfaces — the same registered colors VS Code's own chrome is built from.
      `surface-border` is absent before the size-token registry (stable 1.128 ships
