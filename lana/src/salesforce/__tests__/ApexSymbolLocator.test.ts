@@ -342,6 +342,17 @@ describe('ApexSymbolLocator', () => {
       expect(result.line).toBe(2);
       expect(result.isExactMatch).toBe(true);
     });
+
+    it('should match a source param qualified with the bare outer class name', () => {
+      // Source (line 5) declares `MyClass.InnerClass, ...`; with a namespace the outer
+      // class arrives as 'myns.myclass', so the bare 'myclass.' qualifier must also strip.
+      const result = getMethodLine(
+        root,
+        'myns.MyClass.bar(myns.MyClass.InnerClass, InnerClass, Integer, Integer)',
+      );
+      expect(result.line).toBe(5);
+      expect(result.isExactMatch).toBe(true);
+    });
   });
 
   describe('getMethodLine - inner class methods', () => {

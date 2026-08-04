@@ -161,8 +161,15 @@ function findConstructorNode(
 // qualifies types external to it. Strip the outer class, namespace, and System.
 // qualifiers from both sides so qualified and unqualified names compare equal.
 // (MyClass.ObjectArg)/(myns.ObjectArg)/(System.List) vs (ObjectArg)/(List).
+// When a namespace is present `outerClassName` arrives as 'ns.outer', so the bare
+// 'outer.' qualifier the source file uses must be stripped separately.
 function stripParamQualifiers(params: string, outerClassName: string, namespace: string): string {
-  let stripped = params.replaceAll(outerClassName + '.', '');
+  const bareOuterClassName = namespace
+    ? outerClassName.slice(namespace.length + 1)
+    : outerClassName;
+  let stripped = params
+    .replaceAll(outerClassName + '.', '')
+    .replaceAll(bareOuterClassName + '.', '');
   if (namespace) {
     stripped = stripped.replaceAll(namespace + '.', '');
   }
