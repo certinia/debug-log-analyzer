@@ -31,22 +31,26 @@ export class SfdxProject {
   }
 
   async buildClassIndex(): Promise<void> {
-    this.classCache = new Map();
-
     const allUris = (
       await Promise.all(
         this.packageDirectories.map((packageDir) => this.findClassesInPackage(packageDir.uri)),
       )
     ).flat();
 
+    // Build into a local map and only replace the cache once every search has
+    // resolved, so a rejected findFiles never leaves an empty-but-valid cache.
+    const classIndex = new Map<string, Uri[]>();
     for (const uri of allUris) {
       // uri.path is always '/'-separated (unlike fsPath), so posix basename is safe everywhere
       const className = path.posix.basename(uri.path, '.cls');
-      if (!this.classCache.has(className)) {
-        this.classCache.set(className, []);
+      const uris = classIndex.get(className);
+      if (uris) {
+        uris.push(uri);
+      } else {
+        classIndex.set(className, [uri]);
       }
-      this.classCache.get(className)!.push(uri);
     }
+    this.classCache = classIndex;
   }
 
   private async findClassesInPackage(packageUri: Uri): Promise<Uri[]> {

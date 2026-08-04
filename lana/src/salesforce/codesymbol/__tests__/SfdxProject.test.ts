@@ -172,6 +172,33 @@ describe('SfdxProject', () => {
       expect(project.findClass('NewClass')).toHaveLength(1);
     });
 
+    it('should keep the previous index when a findFiles call rejects', async () => {
+      project = new SfdxProject('test-project', 'ns', [{ uri: forceAppUri, default: true }]);
+
+      (workspace.findFiles as jest.Mock)
+        .mockResolvedValueOnce([clsUri('/workspace/force-app/classes/MyClass.cls')])
+        .mockRejectedValueOnce(new Error('glob failed'));
+
+      await project.buildClassIndex();
+      await expect(project.buildClassIndex()).rejects.toThrow('glob failed');
+
+      expect(project.findClass('MyClass')).toHaveLength(1);
+    });
+
+    it('should index successfully on retry after a rejected build', async () => {
+      project = new SfdxProject('test-project', 'ns', [{ uri: forceAppUri, default: true }]);
+
+      (workspace.findFiles as jest.Mock)
+        .mockRejectedValueOnce(new Error('glob failed'))
+        .mockResolvedValueOnce([clsUri('/workspace/force-app/classes/MyClass.cls')]);
+
+      await expect(project.buildClassIndex()).rejects.toThrow('glob failed');
+      expect(project.findClass('MyClass')).toEqual([]);
+
+      await project.buildClassIndex();
+      expect(project.findClass('MyClass')).toHaveLength(1);
+    });
+
     it('should use correct glob pattern for finding classes', async () => {
       project = new SfdxProject('test-project', 'ns', [{ uri: forceAppUri, default: true }]);
 
