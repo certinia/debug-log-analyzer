@@ -136,7 +136,7 @@ export class TimelineView extends LitElement {
         flex: 1;
         position: relative;
         width: 100%;
-        height: 90%;
+        height: 100%;
         /* inset previously provided by the tab panel's padding */
         padding: 10px 6px;
         box-sizing: border-box;
@@ -147,6 +147,21 @@ export class TimelineView extends LitElement {
         align-items: center;
         justify-content: flex-end;
         gap: 4px;
+        flex: 0 0 auto;
+      }
+
+      /* The chart takes every row the container gives it, and the renderer scrolls
+         when the call depth needs more; the key and the toolbar keep their own
+         height. The zero min-height lets the chart shrink below its content, which
+         a flex item does not do by default. */
+      timeline-flame-chart,
+      timeline-legacy,
+      timeline-skeleton {
+        flex: 1 1 0;
+        min-height: 0;
+      }
+
+      timeline-key {
         flex: 0 0 auto;
       }
     `,
