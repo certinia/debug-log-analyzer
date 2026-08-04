@@ -4,33 +4,18 @@
 import { workspace } from 'vscode';
 import type { Context } from '../../Context';
 import { getMethodLine, parseApex } from '../../salesforce/ApexParser/ApexSymbolLocator';
-import type { ApexSymbol } from '../../salesforce/codesymbol/ApexSymbolParser';
-import { parseSymbolCandidates } from '../../salesforce/codesymbol/ApexSymbolParser';
 import { OpenFileInPackage } from '../OpenFileInPackage';
 
 // Note: no `jest.mock('vscode')` — the moduleNameMapper already supplies the mock, and
 // automocking would neuter the Position/Selection classes this test asserts against.
-jest.mock('../../salesforce/codesymbol/ApexSymbolParser');
 jest.mock('../../salesforce/ApexParser/ApexSymbolLocator');
 
-const mockParseSymbolCandidates = parseSymbolCandidates as jest.Mock;
 const mockParseApex = parseApex as jest.Mock;
 const mockGetMethodLine = getMethodLine as jest.Mock;
 const mockOpenTextDocument = workspace.openTextDocument as jest.Mock;
 
-function createSymbol(overrides: Partial<ApexSymbol> = {}): ApexSymbol {
-  return {
-    fullSymbol: 'MyClass.foo()',
-    namespace: null,
-    outerClass: 'MyClass',
-    ...overrides,
-  };
-}
-
 function createContext() {
   const workspaceManager = {
-    initialiseWorkspaceProjectInfo: jest.fn().mockResolvedValue(undefined),
-    getAllProjects: jest.fn().mockReturnValue([{ namespace: 'ns' }]),
     findSymbol: jest.fn(),
   };
   const display = {
@@ -55,26 +40,22 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
 
       await OpenFileInPackage.openFileForSymbol(context, symbol);
 
-      expect(workspaceManager.initialiseWorkspaceProjectInfo).not.toHaveBeenCalled();
-      expect(mockParseSymbolCandidates).not.toHaveBeenCalled();
+      expect(workspaceManager.findSymbol).not.toHaveBeenCalled();
     },
   );
 
-  it('initialises project info and parses the symbol against all projects', async () => {
+  it('resolves the symbol through the workspace manager', async () => {
     const { context, workspaceManager } = createContext();
-    mockParseSymbolCandidates.mockReturnValue([createSymbol()]);
-    workspaceManager.findSymbol.mockResolvedValue(null);
+    workspaceManager.findSymbol.mockResolvedValue({ status: 'not-found' });
 
     await OpenFileInPackage.openFileForSymbol(context, 'MyClass.foo()');
 
-    expect(workspaceManager.initialiseWorkspaceProjectInfo).toHaveBeenCalledTimes(1);
-    expect(mockParseSymbolCandidates).toHaveBeenCalledWith('MyClass.foo()', [{ namespace: 'ns' }]);
+    expect(workspaceManager.findSymbol).toHaveBeenCalledWith('MyClass.foo()');
   });
 
   it('shows a not-found error and opens nothing when the class is not found', async () => {
     const { context, workspaceManager, display } = createContext();
-    mockParseSymbolCandidates.mockReturnValue([createSymbol()]);
-    workspaceManager.findSymbol.mockResolvedValue(null);
+    workspaceManager.findSymbol.mockResolvedValue({ status: 'not-found' });
 
     await OpenFileInPackage.openFileForSymbol(context, 'MyClass.foo()');
 
@@ -85,39 +66,23 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
     expect(display.showFile).not.toHaveBeenCalled();
   });
 
-  it('shows a not-found error when the symbol yields no candidates', async () => {
+  it('stays silent and opens nothing when the user cancels the class picker', async () => {
     const { context, workspaceManager, display } = createContext();
-    mockParseSymbolCandidates.mockReturnValue([]);
-
-    await OpenFileInPackage.openFileForSymbol(context, '()');
-
-    expect(workspaceManager.findSymbol).not.toHaveBeenCalled();
-    expect(display.showErrorMessage).toHaveBeenCalledWith("Type '()' was not found in workspace");
-    expect(display.showFile).not.toHaveBeenCalled();
-  });
-
-  it('falls back to the next candidate when the first is not found', async () => {
-    const { context, workspaceManager, display } = createContext();
-    const first = createSymbol({ namespace: 'ns', outerClass: 'MyClass' });
-    const second = createSymbol({ namespace: null, outerClass: 'MyClass' });
-    mockParseSymbolCandidates.mockReturnValue([first, second]);
-    workspaceManager.findSymbol
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ fsPath: '/ws/MyClass.cls' });
-    mockGetMethodLine.mockReturnValue({ line: 1, character: 0, isExactMatch: true });
+    workspaceManager.findSymbol.mockResolvedValue({ status: 'cancelled' });
 
     await OpenFileInPackage.openFileForSymbol(context, 'MyClass.foo()');
 
-    expect(workspaceManager.findSymbol).toHaveBeenNthCalledWith(1, first);
-    expect(workspaceManager.findSymbol).toHaveBeenNthCalledWith(2, second);
     expect(display.showErrorMessage).not.toHaveBeenCalled();
-    expect(display.showFile).toHaveBeenCalledTimes(1);
+    expect(mockOpenTextDocument).not.toHaveBeenCalled();
+    expect(display.showFile).not.toHaveBeenCalled();
   });
 
   it('opens the file at the resolved line and character on an exact match', async () => {
     const { context, workspaceManager, display } = createContext();
-    mockParseSymbolCandidates.mockReturnValue([createSymbol()]);
-    workspaceManager.findSymbol.mockResolvedValue({ fsPath: '/ws/force-app/MyClass.cls' });
+    workspaceManager.findSymbol.mockResolvedValue({
+      status: 'found',
+      uri: { fsPath: '/ws/force-app/MyClass.cls' },
+    });
     mockGetMethodLine.mockReturnValue({ line: 12, character: 4, isExactMatch: true });
 
     await OpenFileInPackage.openFileForSymbol(context, 'MyClass.foo()');
@@ -137,8 +102,10 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
 
   it('defaults the character to 0 when the location has none', async () => {
     const { context, workspaceManager, display } = createContext();
-    mockParseSymbolCandidates.mockReturnValue([createSymbol()]);
-    workspaceManager.findSymbol.mockResolvedValue({ fsPath: '/ws/MyClass.cls' });
+    workspaceManager.findSymbol.mockResolvedValue({
+      status: 'found',
+      uri: { fsPath: '/ws/MyClass.cls' },
+    });
     mockGetMethodLine.mockReturnValue({ line: 3, isExactMatch: true });
 
     await OpenFileInPackage.openFileForSymbol(context, 'MyClass.foo()');
@@ -149,8 +116,10 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
 
   it('warns but still opens the file when the symbol location is not an exact match', async () => {
     const { context, workspaceManager, display } = createContext();
-    mockParseSymbolCandidates.mockReturnValue([createSymbol()]);
-    workspaceManager.findSymbol.mockResolvedValue({ fsPath: '/ws/force-app/MyClass.cls' });
+    workspaceManager.findSymbol.mockResolvedValue({
+      status: 'found',
+      uri: { fsPath: '/ws/force-app/MyClass.cls' },
+    });
     mockGetMethodLine.mockReturnValue({
       line: 1,
       character: 0,

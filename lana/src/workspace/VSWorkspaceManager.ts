@@ -1,11 +1,10 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type { Uri } from 'vscode';
 import { workspace } from 'vscode';
-import type { ApexSymbol } from '../salesforce/codesymbol/ApexSymbolParser';
+import { parseSymbolCandidates } from '../salesforce/codesymbol/ApexSymbolParser';
 import type { SfdxProject } from '../salesforce/codesymbol/SfdxProject';
-import { findSymbol } from '../salesforce/codesymbol/SymbolFinder';
+import { findSymbol, type SymbolFindResult } from '../salesforce/codesymbol/SymbolFinder';
 import { VSWorkspace } from './VSWorkspace';
 
 export class VSWorkspaceManager {
@@ -21,8 +20,26 @@ export class VSWorkspaceManager {
     }
   }
 
-  async findSymbol(apexSymbol: ApexSymbol): Promise<Uri | null> {
-    return await findSymbol(this, apexSymbol);
+  /**
+   * Resolve a log frame symbol to a class file. When every candidate misses an
+   * index built before this call, the index is rebuilt once and the search
+   * retried, so classes created since the last parse are found without a reload.
+   */
+  async findSymbol(symbolName: string): Promise<SymbolFindResult> {
+    const hasExistingIndex = this.initPromise !== null;
+    await this.initialiseWorkspaceProjectInfo();
+
+    const candidates = parseSymbolCandidates(symbolName, this.getAllProjects());
+    if (!candidates.length) {
+      return { status: 'not-found' };
+    }
+
+    let result = await findSymbol(this, candidates);
+    if (result.status === 'not-found' && hasExistingIndex) {
+      await this.refresh();
+      result = await findSymbol(this, candidates);
+    }
+    return result;
   }
 
   getAllProjects(): SfdxProject[] {

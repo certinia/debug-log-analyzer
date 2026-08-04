@@ -5,9 +5,11 @@
 import type { Uri } from 'vscode';
 import { workspace } from 'vscode';
 import { Item, Options, QuickPick } from '../../display/QuickPick.js';
-import type { VSWorkspace } from '../../workspace/VSWorkspace.js';
 import type { VSWorkspaceManager } from '../../workspace/VSWorkspaceManager.js';
 import type { ApexSymbol } from './ApexSymbolParser.js';
+
+export type SymbolFindResult =
+  { status: 'found'; uri: Uri } | { status: 'not-found' } | { status: 'cancelled' };
 
 class ClassItem extends Item {
   uri: Uri;
@@ -18,32 +20,49 @@ class ClassItem extends Item {
   }
 }
 
+/**
+ * Search the workspace index for each candidate in rank order; the first
+ * candidate with a match wins. Multiple matches ask the user to pick, and
+ * dismissing the picker is reported as cancelled, not as a miss.
+ */
 export async function findSymbol(
   workspaceManager: VSWorkspaceManager,
-  apexSymbol: ApexSymbol,
-): Promise<Uri | null> {
-  const matchingFolders = apexSymbol.namespace
-    ? workspaceManager.getWorkspaceForNamespacedProjects(apexSymbol.namespace)
-    : workspaceManager.workspaceFolders;
+  candidates: ApexSymbol[],
+): Promise<SymbolFindResult> {
+  for (const apexSymbol of candidates) {
+    const matchingFolders = apexSymbol.namespace
+      ? workspaceManager.getWorkspaceForNamespacedProjects(apexSymbol.namespace)
+      : workspaceManager.workspaceFolders;
 
-  const paths = getClassFilepaths(matchingFolders, apexSymbol);
+    const uris = dedupeUris(matchingFolders.flatMap((folder) => folder.findClass(apexSymbol)));
 
-  if (!paths.length) {
-    return null;
+    if (!uris.length) {
+      continue;
+    }
+
+    if (uris.length === 1) {
+      return { status: 'found', uri: uris[0]! };
+    }
+
+    const selected = await QuickPick.pick(
+      uris.map((uri) => new ClassItem(uri, apexSymbol.outerClass)),
+      new Options('Select a class:'),
+    );
+
+    return selected.length ? { status: 'found', uri: selected[0]!.uri } : { status: 'cancelled' };
   }
 
-  if (paths.length === 1) {
-    return paths[0]!;
-  }
-
-  const selected = await QuickPick.pick(
-    paths.map((uri) => new ClassItem(uri, apexSymbol.outerClass)),
-    new Options('Select a class:'),
-  );
-
-  return selected.length ? selected[0]!.uri : null;
+  return { status: 'not-found' };
 }
 
-function getClassFilepaths(folders: VSWorkspace[], apexSymbol: ApexSymbol): Uri[] {
-  return folders.map((folder) => folder.findClass(apexSymbol)).flat();
+/** Overlapping package directories can index the same file twice. */
+function dedupeUris(uris: Uri[]): Uri[] {
+  const urisByKey = new Map<string, Uri>();
+  for (const uri of uris) {
+    const key = uri.toString();
+    if (!urisByKey.has(key)) {
+      urisByKey.set(key, uri);
+    }
+  }
+  return [...urisByKey.values()];
 }

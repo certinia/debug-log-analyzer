@@ -143,21 +143,75 @@ describe('VSWorkspaceManager', () => {
   });
 
   describe('findSymbol', () => {
-    it('should delegate to symbolFinder', async () => {
-      const mockUri = { fsPath: '/test/MyClass.cls' };
-      const mockSymbol = {
-        fullSymbol: 'MyClass.method()',
-        namespace: null,
-        outerClass: 'MyClass',
+    const mockUri = { fsPath: '/test/MyClass.cls' };
+
+    function createManager() {
+      const mockWorkspace = {
+        parseSfdxProjects: jest.fn().mockResolvedValue(undefined),
+        getAllProjects: jest.fn().mockReturnValue([]),
       };
-      (findSymbol as jest.Mock).mockResolvedValueOnce(mockUri);
-
       const manager = new VSWorkspaceManager();
+      manager.workspaceFolders = [mockWorkspace] as unknown as VSWorkspace[];
+      return { manager, mockWorkspace };
+    }
 
-      const result = await manager.findSymbol(mockSymbol);
+    it('should parse the symbol into candidates and delegate to the finder', async () => {
+      const { manager } = createManager();
+      (findSymbol as jest.Mock).mockResolvedValue({ status: 'found', uri: mockUri });
 
-      expect(findSymbol).toHaveBeenCalledWith(manager, mockSymbol);
-      expect(result).toEqual(mockUri);
+      const result = await manager.findSymbol('MyClass.method()');
+
+      expect(findSymbol).toHaveBeenCalledWith(manager, [
+        { fullSymbol: 'MyClass.method()', namespace: null, outerClass: 'MyClass' },
+        { fullSymbol: 'MyClass.method()', namespace: null, outerClass: 'method' },
+      ]);
+      expect(result).toEqual({ status: 'found', uri: mockUri });
+    });
+
+    it('should report not-found without searching when the symbol yields no candidates', async () => {
+      const { manager } = createManager();
+
+      const result = await manager.findSymbol('()');
+
+      expect(result).toEqual({ status: 'not-found' });
+      expect(findSymbol).not.toHaveBeenCalled();
+    });
+
+    it('should rebuild a pre-existing index once and retry when all candidates miss', async () => {
+      const { manager, mockWorkspace } = createManager();
+      await manager.initialiseWorkspaceProjectInfo();
+      (findSymbol as jest.Mock)
+        .mockResolvedValueOnce({ status: 'not-found' })
+        .mockResolvedValueOnce({ status: 'found', uri: mockUri });
+
+      const result = await manager.findSymbol('MyClass.method()');
+
+      expect(result).toEqual({ status: 'found', uri: mockUri });
+      expect(mockWorkspace.parseSfdxProjects).toHaveBeenCalledTimes(2);
+      expect(findSymbol).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not retry when the index was built by this call', async () => {
+      const { manager, mockWorkspace } = createManager();
+      (findSymbol as jest.Mock).mockResolvedValue({ status: 'not-found' });
+
+      const result = await manager.findSymbol('MyClass.method()');
+
+      expect(result).toEqual({ status: 'not-found' });
+      expect(mockWorkspace.parseSfdxProjects).toHaveBeenCalledTimes(1);
+      expect(findSymbol).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not retry when the user cancelled the picker', async () => {
+      const { manager, mockWorkspace } = createManager();
+      await manager.initialiseWorkspaceProjectInfo();
+      (findSymbol as jest.Mock).mockResolvedValue({ status: 'cancelled' });
+
+      const result = await manager.findSymbol('MyClass.method()');
+
+      expect(result).toEqual({ status: 'cancelled' });
+      expect(mockWorkspace.parseSfdxProjects).toHaveBeenCalledTimes(1);
+      expect(findSymbol).toHaveBeenCalledTimes(1);
     });
   });
 });
