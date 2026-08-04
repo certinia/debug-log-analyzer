@@ -54,6 +54,22 @@ describe('buildCallStackData', () => {
     expect(rootTotal).toBe(0);
   });
 
+  it('drops detail frames, as the Call Tree tab does', () => {
+    currentStack = [
+      {
+        eventIndex: 7,
+        type: 'CUMULATIVE_LIMIT_USAGE',
+        text: 'LIMIT_USAGE_FOR_NS',
+        duration: { total: 900_000, self: 0 },
+      },
+      ...stack,
+    ];
+    const { rows, rootTotal } = buildCallStackData(3);
+    expect(rows.map((r) => r.eventIndex)).toEqual([1, 2, 3]);
+    // The denominator follows the outermost frame still shown.
+    expect(rootTotal).toBe(41_200_000);
+  });
+
   it('handles an empty stack', () => {
     currentStack = [];
     const { rows, rootTotal } = buildCallStackData(3);
