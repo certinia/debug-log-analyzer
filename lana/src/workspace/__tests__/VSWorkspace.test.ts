@@ -1,8 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type { Uri } from 'vscode';
-import type { WorkspaceFolder } from 'vscode';
+import type { Uri, WorkspaceFolder } from 'vscode';
 import { SfdxProject } from '../../salesforce/codesymbol/SfdxProject';
 import { getProjects } from '../../salesforce/codesymbol/SfdxProjectReader';
 import { VSWorkspace } from '../VSWorkspace';

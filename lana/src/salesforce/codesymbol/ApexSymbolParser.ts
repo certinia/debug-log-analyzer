@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type { SfdxProject } from './SfdxProject';
+import type { SfdxProject } from './SfdxProject.js';
 
 export type ApexSymbol = {
   fullSymbol: string;
@@ -29,8 +29,8 @@ export function parseSymbolCandidates(
 ): ApexSymbol[] {
   // Cut the parameter list before splitting on dots so parenthesised,
   // dot-qualified params (e.g. `(System.String)`) never leak into class parts.
-  const openingParentheses = symbol.indexOf('(');
-  const path = openingParentheses === -1 ? symbol : symbol.slice(0, openingParentheses);
+  const paramsStart = symbol.indexOf('(');
+  const path = paramsStart === -1 ? symbol : symbol.slice(0, paramsStart);
   const parts = path
     .split('.')
     .map((part) => part.trim())

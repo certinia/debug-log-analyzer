@@ -34,7 +34,9 @@ export class SfdxProject {
   async buildClassIndex(): Promise<void> {
     const allUris = (
       await Promise.all(
-        this.packageDirectories.map((packageDir) => this.findClassesInPackage(packageDir.uri)),
+        this.packageDirectories.map((packageDir) =>
+          workspace.findFiles(new RelativePattern(packageDir.uri, '**/*.cls')),
+        ),
       )
     ).flat();
 
@@ -52,10 +54,5 @@ export class SfdxProject {
       }
     }
     this.classCache = classIndex;
-  }
-
-  private async findClassesInPackage(packageUri: Uri): Promise<Uri[]> {
-    const pattern = new RelativePattern(packageUri, '**/*.cls');
-    return await workspace.findFiles(pattern);
   }
 }

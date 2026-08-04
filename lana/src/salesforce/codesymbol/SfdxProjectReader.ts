@@ -2,7 +2,7 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { RelativePattern, Uri, workspace, type WorkspaceFolder } from 'vscode';
-import { SfdxProject } from './SfdxProject';
+import { SfdxProject } from './SfdxProject.js';
 
 interface RawPackageDirectory {
   readonly path: string;
@@ -24,24 +24,23 @@ export async function getProjects(workspaceFolder: WorkspaceFolder): Promise<Sfd
   for (const uri of sfdxProjectUris) {
     try {
       const document = await workspace.openTextDocument(uri);
-      const content = document.getText();
-      const rawProject = JSON.parse(content) as RawSfdxProject;
+      const rawProject = JSON.parse(document.getText()) as RawSfdxProject;
 
       if (!Array.isArray(rawProject.packageDirectories)) {
         throw new Error('packageDirectories is missing or not an array');
       }
 
       const projectDir = Uri.joinPath(uri, '..');
-      const project: SfdxProject = new SfdxProject(
-        rawProject.name ?? null,
-        rawProject.namespace ?? '',
-        rawProject.packageDirectories.map((pkg) => ({
-          uri: Uri.joinPath(projectDir, pkg.path),
-          default: pkg.default ?? false,
-        })),
+      projects.push(
+        new SfdxProject(
+          rawProject.name ?? null,
+          rawProject.namespace ?? '',
+          rawProject.packageDirectories.map((pkg) => ({
+            uri: Uri.joinPath(projectDir, pkg.path),
+            default: pkg.default ?? false,
+          })),
+        ),
       );
-
-      projects.push(project);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.warn(`Failed to parse sfdx-project.json at ${uri.fsPath}:`, error);

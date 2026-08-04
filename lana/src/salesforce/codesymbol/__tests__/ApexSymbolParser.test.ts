@@ -3,10 +3,6 @@
  */
 import { parseSymbolCandidates } from '../ApexSymbolParser';
 
-function projectWithNamespace(namespace: string): { namespace: string } {
-  return { namespace };
-}
-
 describe('parseSymbolCandidates', () => {
   describe('symbols without a namespace', () => {
     it('should resolve a simple method symbol to its outer class', () => {
@@ -50,7 +46,7 @@ describe('parseSymbolCandidates', () => {
   });
 
   describe('symbols with a known project namespace', () => {
-    const projects = [projectWithNamespace('ns')];
+    const projects = [{ namespace: 'ns' }];
 
     it('should rank the namespaced candidate first', () => {
       const candidates = parseSymbolCandidates('ns.MyClass.myMethod()', projects);

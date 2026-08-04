@@ -35,9 +35,7 @@ export class OpenFileInPackage {
         );
       }
       const zeroIndexedLineNumber = symbolLocation.line - 1;
-      const character = symbolLocation.character ?? 0;
-
-      const pos = new Position(zeroIndexedLineNumber, character);
+      const pos = new Position(zeroIndexedLineNumber, symbolLocation.character ?? 0);
 
       const options: TextDocumentShowOptions = {
         preserveFocus: false,

@@ -1,11 +1,10 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import type { Uri } from 'vscode';
-import type { WorkspaceFolder } from 'vscode';
-import type { ApexSymbol } from '../salesforce/codesymbol/ApexSymbolParser';
-import type { SfdxProject } from '../salesforce/codesymbol/SfdxProject';
-import { getProjects } from '../salesforce/codesymbol/SfdxProjectReader';
+import type { Uri, WorkspaceFolder } from 'vscode';
+import type { ApexSymbol } from '../salesforce/codesymbol/ApexSymbolParser.js';
+import type { SfdxProject } from '../salesforce/codesymbol/SfdxProject.js';
+import { getProjects } from '../salesforce/codesymbol/SfdxProjectReader.js';
 
 export class VSWorkspace {
   workspaceFolder: WorkspaceFolder;
@@ -22,23 +21,18 @@ export class VSWorkspace {
     return this.workspaceFolder.name;
   }
 
-  async parseSfdxProjects() {
+  async parseSfdxProjects(): Promise<void> {
     const sfdxProjects = await getProjects(this.workspaceFolder);
 
     await Promise.all(sfdxProjects.map((sfdxProject) => sfdxProject.buildClassIndex()));
 
-    this.sfdxProjectsByNamespace = sfdxProjects.reduce(
+    this.sfdxProjectsByNamespace = sfdxProjects.reduce<Record<string, SfdxProject[]>>(
       (projectsByNamespace, project) => {
         const namespace = project.namespace ?? '';
-
-        if (!projectsByNamespace[namespace]) {
-          projectsByNamespace[namespace] = [];
-        }
-
-        projectsByNamespace[namespace].push(project);
+        (projectsByNamespace[namespace] ??= []).push(project);
         return projectsByNamespace;
       },
-      {} as Record<string, SfdxProject[]>,
+      {},
     );
   }
 

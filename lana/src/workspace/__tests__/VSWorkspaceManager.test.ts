@@ -12,6 +12,19 @@ jest.mock('../VSWorkspace');
 jest.mock('../../salesforce/codesymbol/SfdxProject');
 jest.mock('../../salesforce/codesymbol/SymbolFinder');
 
+function createMockWorkspace() {
+  return {
+    parseSfdxProjects: jest.fn().mockResolvedValue(undefined),
+    getAllProjects: jest.fn().mockReturnValue([]),
+  };
+}
+
+function createManager(...folders: object[]): VSWorkspaceManager {
+  const manager = new VSWorkspaceManager();
+  manager.workspaceFolders = folders as unknown as VSWorkspace[];
+  return manager;
+}
+
 describe('VSWorkspaceManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -43,11 +56,12 @@ describe('VSWorkspaceManager', () => {
       const mockProjects1 = [new SfdxProject('p1', 'ns1', [])];
       const mockProjects2 = [new SfdxProject('p2', 'ns2', [])];
 
-      const mockWorkspace1 = { getAllProjects: jest.fn().mockReturnValue(mockProjects1) };
-      const mockWorkspace2 = { getAllProjects: jest.fn().mockReturnValue(mockProjects2) };
+      const mockWorkspace1 = createMockWorkspace();
+      const mockWorkspace2 = createMockWorkspace();
+      mockWorkspace1.getAllProjects.mockReturnValue(mockProjects1);
+      mockWorkspace2.getAllProjects.mockReturnValue(mockProjects2);
 
-      const manager = new VSWorkspaceManager();
-      manager.workspaceFolders = [mockWorkspace1, mockWorkspace2] as unknown as VSWorkspace[];
+      const manager = createManager(mockWorkspace1, mockWorkspace2);
 
       const result = manager.getAllProjects();
 
@@ -57,17 +71,10 @@ describe('VSWorkspaceManager', () => {
 
   describe('initialiseWorkspaceProjectInfo', () => {
     it('should call parseSfdxProjects on all workspaces', async () => {
-      const mockWorkspace1 = {
-        getAllProjects: jest.fn().mockReturnValue([]),
-        parseSfdxProjects: jest.fn().mockResolvedValue(undefined),
-      };
-      const mockWorkspace2 = {
-        getAllProjects: jest.fn().mockReturnValue([]),
-        parseSfdxProjects: jest.fn().mockResolvedValue(undefined),
-      };
+      const mockWorkspace1 = createMockWorkspace();
+      const mockWorkspace2 = createMockWorkspace();
 
-      const manager = new VSWorkspaceManager();
-      manager.workspaceFolders = [mockWorkspace1, mockWorkspace2] as unknown as VSWorkspace[];
+      const manager = createManager(mockWorkspace1, mockWorkspace2);
 
       await manager.initialiseWorkspaceProjectInfo();
 
@@ -76,10 +83,8 @@ describe('VSWorkspaceManager', () => {
     });
 
     it('should share one parse across concurrent and repeat calls', async () => {
-      const mockWorkspace = { parseSfdxProjects: jest.fn().mockResolvedValue(undefined) };
-
-      const manager = new VSWorkspaceManager();
-      manager.workspaceFolders = [mockWorkspace] as unknown as VSWorkspace[];
+      const mockWorkspace = createMockWorkspace();
+      const manager = createManager(mockWorkspace);
 
       await Promise.all([
         manager.initialiseWorkspaceProjectInfo(),
@@ -91,15 +96,10 @@ describe('VSWorkspaceManager', () => {
     });
 
     it('should retry after a rejected parse', async () => {
-      const mockWorkspace = {
-        parseSfdxProjects: jest
-          .fn()
-          .mockRejectedValueOnce(new Error('parse failed'))
-          .mockResolvedValueOnce(undefined),
-      };
+      const mockWorkspace = createMockWorkspace();
+      mockWorkspace.parseSfdxProjects.mockRejectedValueOnce(new Error('parse failed'));
 
-      const manager = new VSWorkspaceManager();
-      manager.workspaceFolders = [mockWorkspace] as unknown as VSWorkspace[];
+      const manager = createManager(mockWorkspace);
 
       await expect(manager.initialiseWorkspaceProjectInfo()).rejects.toThrow('parse failed');
       await manager.initialiseWorkspaceProjectInfo();
@@ -110,10 +110,8 @@ describe('VSWorkspaceManager', () => {
 
   describe('refresh', () => {
     it('should re-parse even when already initialised', async () => {
-      const mockWorkspace = { parseSfdxProjects: jest.fn().mockResolvedValue(undefined) };
-
-      const manager = new VSWorkspaceManager();
-      manager.workspaceFolders = [mockWorkspace] as unknown as VSWorkspace[];
+      const mockWorkspace = createMockWorkspace();
+      const manager = createManager(mockWorkspace);
 
       await manager.initialiseWorkspaceProjectInfo();
       await manager.refresh();
@@ -126,18 +124,13 @@ describe('VSWorkspaceManager', () => {
   describe('findSymbol', () => {
     const mockUri = { fsPath: '/test/MyClass.cls' };
 
-    function createManager() {
-      const mockWorkspace = {
-        parseSfdxProjects: jest.fn().mockResolvedValue(undefined),
-        getAllProjects: jest.fn().mockReturnValue([]),
-      };
-      const manager = new VSWorkspaceManager();
-      manager.workspaceFolders = [mockWorkspace] as unknown as VSWorkspace[];
-      return { manager, mockWorkspace };
+    function createManagerWithWorkspace() {
+      const mockWorkspace = createMockWorkspace();
+      return { manager: createManager(mockWorkspace), mockWorkspace };
     }
 
     it('should parse the symbol into candidates and delegate to the finder', async () => {
-      const { manager } = createManager();
+      const { manager } = createManagerWithWorkspace();
       (findSymbol as jest.Mock).mockResolvedValue({ status: 'found', uri: mockUri });
 
       const result = await manager.findSymbol('MyClass.method()');
@@ -150,7 +143,7 @@ describe('VSWorkspaceManager', () => {
     });
 
     it('should report not-found without searching when the symbol yields no candidates', async () => {
-      const { manager } = createManager();
+      const { manager } = createManagerWithWorkspace();
 
       const result = await manager.findSymbol('()');
 
@@ -159,7 +152,7 @@ describe('VSWorkspaceManager', () => {
     });
 
     it('should rebuild a pre-existing index once and retry when all candidates miss', async () => {
-      const { manager, mockWorkspace } = createManager();
+      const { manager, mockWorkspace } = createManagerWithWorkspace();
       await manager.initialiseWorkspaceProjectInfo();
       (findSymbol as jest.Mock)
         .mockResolvedValueOnce({ status: 'not-found' })
@@ -173,7 +166,7 @@ describe('VSWorkspaceManager', () => {
     });
 
     it('should not retry when the index was built by this call', async () => {
-      const { manager, mockWorkspace } = createManager();
+      const { manager, mockWorkspace } = createManagerWithWorkspace();
       (findSymbol as jest.Mock).mockResolvedValue({ status: 'not-found' });
 
       const result = await manager.findSymbol('MyClass.method()');
@@ -184,7 +177,7 @@ describe('VSWorkspaceManager', () => {
     });
 
     it('should not retry when the user cancelled the picker', async () => {
-      const { manager, mockWorkspace } = createManager();
+      const { manager, mockWorkspace } = createManagerWithWorkspace();
       await manager.initialiseWorkspaceProjectInfo();
       (findSymbol as jest.Mock).mockResolvedValue({ status: 'cancelled' });
 

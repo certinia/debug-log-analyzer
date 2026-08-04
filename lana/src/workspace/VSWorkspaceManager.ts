@@ -2,23 +2,17 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { workspace } from 'vscode';
-import { parseSymbolCandidates } from '../salesforce/codesymbol/ApexSymbolParser';
-import type { SfdxProject } from '../salesforce/codesymbol/SfdxProject';
-import { findSymbol, type SymbolFindResult } from '../salesforce/codesymbol/SymbolFinder';
-import { VSWorkspace } from './VSWorkspace';
+import { parseSymbolCandidates } from '../salesforce/codesymbol/ApexSymbolParser.js';
+import type { SfdxProject } from '../salesforce/codesymbol/SfdxProject.js';
+import { findSymbol, type SymbolFindResult } from '../salesforce/codesymbol/SymbolFinder.js';
+import { VSWorkspace } from './VSWorkspace.js';
 
 export class VSWorkspaceManager {
-  workspaceFolders: VSWorkspace[] = [];
+  workspaceFolders: VSWorkspace[] = (workspace.workspaceFolders ?? []).map(
+    (folder) => new VSWorkspace(folder),
+  );
 
   private initPromise: Promise<void> | null = null;
-
-  constructor() {
-    if (workspace.workspaceFolders) {
-      this.workspaceFolders = workspace.workspaceFolders.map((folder) => {
-        return new VSWorkspace(folder);
-      });
-    }
-  }
 
   /**
    * Resolve a log frame symbol to a class file. When every candidate misses an

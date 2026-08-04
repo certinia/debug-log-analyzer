@@ -6,24 +6,28 @@ import { SfdxProject } from '../SfdxProject';
 
 jest.mock('vscode');
 
-const dirUri = (path: string): Uri => ({ path, fsPath: path }) as Uri;
-const clsUri = (path: string): Uri => ({ path, fsPath: path }) as Uri;
+const fileUri = (path: string): Uri => ({ path, fsPath: path }) as Uri;
+
+function createProject(packageDirUris: Uri[]): SfdxProject {
+  return new SfdxProject(
+    'test-project',
+    'ns',
+    packageDirUris.map((uri, index) => ({ uri, default: index === 0 })),
+  );
+}
 
 describe('SfdxProject', () => {
   let project: SfdxProject;
 
-  const forceAppUri = dirUri('/workspace/force-app');
-  const anotherAppUri = dirUri('/workspace/another-app');
+  const forceAppUri = fileUri('/workspace/force-app');
+  const anotherAppUri = fileUri('/workspace/another-app');
 
   beforeEach(() => {
     jest.clearAllMocks();
+    project = createProject([forceAppUri]);
   });
 
   describe('findClass', () => {
-    beforeEach(() => {
-      project = new SfdxProject('test-project', 'ns', [{ uri: forceAppUri, default: true }]);
-    });
-
     it('should return empty array when class not in cache', () => {
       const result = project.findClass('NonExistentClass');
 
@@ -37,7 +41,7 @@ describe('SfdxProject', () => {
     });
 
     it('should return single Uri when class has one match', async () => {
-      const mockUri = clsUri('/workspace/force-app/classes/MyClass.cls');
+      const mockUri = fileUri('/workspace/force-app/classes/MyClass.cls');
       (workspace.findFiles as jest.Mock).mockResolvedValue([mockUri]);
 
       await project.buildClassIndex();
@@ -48,8 +52,8 @@ describe('SfdxProject', () => {
 
     it('should return multiple Uris when class has multiple matches', async () => {
       const mockUris = [
-        clsUri('/workspace/force-app/classes/MyClass.cls'),
-        clsUri('/workspace/another-app/classes/MyClass.cls'),
+        fileUri('/workspace/force-app/classes/MyClass.cls'),
+        fileUri('/workspace/another-app/classes/MyClass.cls'),
       ];
       (workspace.findFiles as jest.Mock).mockResolvedValue(mockUris);
 
@@ -60,7 +64,7 @@ describe('SfdxProject', () => {
     });
 
     it('should match class names case-insensitively', async () => {
-      const mockUri = clsUri('/workspace/force-app/classes/MyClass.cls');
+      const mockUri = fileUri('/workspace/force-app/classes/MyClass.cls');
       (workspace.findFiles as jest.Mock).mockResolvedValue([mockUri]);
 
       await project.buildClassIndex();
@@ -70,7 +74,7 @@ describe('SfdxProject', () => {
     });
 
     it('should return the indexed Uri objects unchanged', async () => {
-      const mockUri = clsUri('/workspace/force-app/classes/TestClass.cls');
+      const mockUri = fileUri('/workspace/force-app/classes/TestClass.cls');
       (workspace.findFiles as jest.Mock).mockResolvedValue([mockUri]);
 
       await project.buildClassIndex();
@@ -82,11 +86,9 @@ describe('SfdxProject', () => {
 
   describe('buildClassIndex', () => {
     it('should build index from single package directory', async () => {
-      project = new SfdxProject('test-project', 'ns', [{ uri: forceAppUri, default: true }]);
-
       const mockUris = [
-        clsUri('/workspace/force-app/classes/Class1.cls'),
-        clsUri('/workspace/force-app/classes/Class2.cls'),
+        fileUri('/workspace/force-app/classes/Class1.cls'),
+        fileUri('/workspace/force-app/classes/Class2.cls'),
       ];
       (workspace.findFiles as jest.Mock).mockResolvedValue(mockUris);
 
@@ -100,14 +102,11 @@ describe('SfdxProject', () => {
     });
 
     it('should build index from multiple package directories', async () => {
-      project = new SfdxProject('test-project', 'ns', [
-        { uri: forceAppUri, default: true },
-        { uri: anotherAppUri, default: false },
-      ]);
+      project = createProject([forceAppUri, anotherAppUri]);
 
       (workspace.findFiles as jest.Mock)
-        .mockResolvedValueOnce([clsUri('/workspace/force-app/classes/Class1.cls')])
-        .mockResolvedValueOnce([clsUri('/workspace/another-app/classes/Class2.cls')]);
+        .mockResolvedValueOnce([fileUri('/workspace/force-app/classes/Class1.cls')])
+        .mockResolvedValueOnce([fileUri('/workspace/another-app/classes/Class2.cls')]);
 
       await project.buildClassIndex();
 
@@ -120,14 +119,11 @@ describe('SfdxProject', () => {
     });
 
     it('should handle multiple classes with the same name', async () => {
-      project = new SfdxProject('test-project', 'ns', [
-        { uri: forceAppUri, default: true },
-        { uri: anotherAppUri, default: false },
-      ]);
+      project = createProject([forceAppUri, anotherAppUri]);
 
       (workspace.findFiles as jest.Mock)
-        .mockResolvedValueOnce([clsUri('/workspace/force-app/classes/DuplicateClass.cls')])
-        .mockResolvedValueOnce([clsUri('/workspace/another-app/classes/DuplicateClass.cls')]);
+        .mockResolvedValueOnce([fileUri('/workspace/force-app/classes/DuplicateClass.cls')])
+        .mockResolvedValueOnce([fileUri('/workspace/another-app/classes/DuplicateClass.cls')]);
 
       await project.buildClassIndex();
 
@@ -137,9 +133,7 @@ describe('SfdxProject', () => {
     });
 
     it('should handle empty package directories', async () => {
-      project = new SfdxProject('test-project', 'ns', [
-        { uri: dirUri('/workspace/empty-app'), default: true },
-      ]);
+      project = createProject([fileUri('/workspace/empty-app')]);
 
       (workspace.findFiles as jest.Mock).mockResolvedValue([]);
 
@@ -151,11 +145,9 @@ describe('SfdxProject', () => {
     });
 
     it('should properly extract class name from .cls file paths', async () => {
-      project = new SfdxProject('test-project', 'ns', [{ uri: forceAppUri, default: true }]);
-
       const mockUris = [
-        clsUri('/workspace/force-app/classes/MyController.cls'),
-        clsUri('/workspace/force-app/classes/utils/StringUtil.cls'),
+        fileUri('/workspace/force-app/classes/MyController.cls'),
+        fileUri('/workspace/force-app/classes/utils/StringUtil.cls'),
       ];
       (workspace.findFiles as jest.Mock).mockResolvedValue(mockUris);
 
@@ -167,11 +159,9 @@ describe('SfdxProject', () => {
     });
 
     it('should clear previous cache when re-indexing', async () => {
-      project = new SfdxProject('test-project', 'ns', [{ uri: forceAppUri, default: true }]);
-
       (workspace.findFiles as jest.Mock)
-        .mockResolvedValueOnce([clsUri('/workspace/force-app/classes/OldClass.cls')])
-        .mockResolvedValueOnce([clsUri('/workspace/force-app/classes/NewClass.cls')]);
+        .mockResolvedValueOnce([fileUri('/workspace/force-app/classes/OldClass.cls')])
+        .mockResolvedValueOnce([fileUri('/workspace/force-app/classes/NewClass.cls')]);
 
       await project.buildClassIndex();
       expect(project.findClass('OldClass')).toHaveLength(1);
@@ -183,10 +173,8 @@ describe('SfdxProject', () => {
     });
 
     it('should keep the previous index when a findFiles call rejects', async () => {
-      project = new SfdxProject('test-project', 'ns', [{ uri: forceAppUri, default: true }]);
-
       (workspace.findFiles as jest.Mock)
-        .mockResolvedValueOnce([clsUri('/workspace/force-app/classes/MyClass.cls')])
+        .mockResolvedValueOnce([fileUri('/workspace/force-app/classes/MyClass.cls')])
         .mockRejectedValueOnce(new Error('glob failed'));
 
       await project.buildClassIndex();
@@ -196,11 +184,9 @@ describe('SfdxProject', () => {
     });
 
     it('should index successfully on retry after a rejected build', async () => {
-      project = new SfdxProject('test-project', 'ns', [{ uri: forceAppUri, default: true }]);
-
       (workspace.findFiles as jest.Mock)
         .mockRejectedValueOnce(new Error('glob failed'))
-        .mockResolvedValueOnce([clsUri('/workspace/force-app/classes/MyClass.cls')]);
+        .mockResolvedValueOnce([fileUri('/workspace/force-app/classes/MyClass.cls')]);
 
       await expect(project.buildClassIndex()).rejects.toThrow('glob failed');
       expect(project.findClass('MyClass')).toEqual([]);
@@ -210,8 +196,6 @@ describe('SfdxProject', () => {
     });
 
     it('should use correct glob pattern for finding classes', async () => {
-      project = new SfdxProject('test-project', 'ns', [{ uri: forceAppUri, default: true }]);
-
       (workspace.findFiles as jest.Mock).mockResolvedValue([]);
 
       await project.buildClassIndex();
@@ -220,11 +204,9 @@ describe('SfdxProject', () => {
     });
 
     it('should handle classes in nested directories', async () => {
-      project = new SfdxProject('test-project', 'ns', [{ uri: forceAppUri, default: true }]);
-
       const mockUris = [
-        clsUri('/workspace/force-app/classes/controllers/MyController.cls'),
-        clsUri('/workspace/force-app/classes/utils/helpers/StringHelper.cls'),
+        fileUri('/workspace/force-app/classes/controllers/MyController.cls'),
+        fileUri('/workspace/force-app/classes/utils/helpers/StringHelper.cls'),
       ];
       (workspace.findFiles as jest.Mock).mockResolvedValue(mockUris);
 
