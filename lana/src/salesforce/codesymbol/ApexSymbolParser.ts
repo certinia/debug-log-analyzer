@@ -15,8 +15,10 @@ export type ApexSymbol = {
  *
  * 1. Known namespace — the first part matches a project namespace.
  * 2. No namespace — the first part is the outer class. Skipped for 4-part
- *    symbols: Apex nests one level, so `outer.inner.method` is the maximum
- *    without a namespace.
+ *    symbols (Apex nests one level, so `outer.inner.method` is the maximum
+ *    without a namespace) and ranked last when the first part is a known
+ *    namespace, so a class sharing a namespace's name cannot outrank the
+ *    namespaced match.
  * 3. Undeclared namespace — the first part is a namespace not declared by any
  *    local project (e.g. a managed package); search all projects for the
  *    second part.
@@ -51,17 +53,22 @@ export function parseSymbolCandidates(
   };
 
   const namespaces = new Set(projects.map((project) => project.namespace).filter(Boolean));
+  const startsWithKnownNamespace = parts.length >= 2 && namespaces.has(parts[0]!);
 
-  if (parts.length >= 2 && namespaces.has(parts[0]!)) {
+  if (startsWithKnownNamespace) {
     addCandidate(parts[0]!, parts[1]);
   }
 
-  if (parts.length <= 3) {
+  if (parts.length <= 3 && !startsWithKnownNamespace) {
     addCandidate(null, parts[0]);
   }
 
   if (parts.length >= 2) {
     addCandidate(null, parts[1]);
+  }
+
+  if (parts.length <= 3 && startsWithKnownNamespace) {
+    addCandidate(null, parts[0]);
   }
 
   return candidates;

@@ -62,6 +62,16 @@ describe('parseSymbolCandidates', () => {
       );
     });
 
+    it('should rank a class sharing the namespace name below the class candidates', () => {
+      const candidates = parseSymbolCandidates('ns.MyClass.myMethod()', projects);
+
+      expect(candidates.map((c) => `${c.namespace}|${c.outerClass}`)).toEqual([
+        'ns|MyClass',
+        'null|MyClass',
+        'null|ns',
+      ]);
+    });
+
     it('should strip constructor parameters from a namespaced constructor symbol', () => {
       const candidates = parseSymbolCandidates('ns.MyClass(String)', projects);
 
