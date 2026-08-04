@@ -130,25 +130,40 @@ export class LogDiagnosticsView extends LitElement {
         color: var(--lana-fg-muted);
       }
 
-      /* What is behind the finding: the code the log named, then its figures, on
-         one line. The name and the figures carry the meaning, so the lead reads as
-         a quiet label beside them. */
+      /* What is behind the finding, as a figure row: a quiet label, the code the
+         log named, then its figures held to the right edge so the eye reads the
+         names down the pane and the numbers up the right of it. The label is the
+         one part that never wraps away from the name. */
       .cause {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: var(--lana-space-2xs) var(--lana-space-sm);
         margin: var(--lana-space-xs) 0 0;
       }
 
       .cause__label {
+        flex: 0 0 auto;
         color: var(--lana-fg-muted);
+        font-size: var(--lana-text-sm);
       }
 
       .cause__name {
+        flex: 1 1 auto;
+        min-width: 0;
         font-family: var(--lana-font-mono);
+        font-size: var(--lana-text-sm);
         overflow-wrap: anywhere;
       }
 
       .cause__value {
+        flex: 0 0 auto;
+        margin-left: auto;
+        color: var(--vscode-foreground);
         font-family: var(--lana-font-mono);
+        font-size: var(--lana-text-sm);
         font-variant-numeric: tabular-nums;
+        font-weight: 600;
       }
 
       /* The line the finding points at: the statement it read, or the frame the
@@ -254,11 +269,11 @@ export class LogDiagnosticsView extends LitElement {
     if (!cause) {
       return '';
     }
-    return html`<p class="cause">
+    return html`<div class="cause">
       <span class="cause__label">${cause.label}</span>
       <span class="cause__name">${cause.name}</span>
       <span class="cause__value">${cause.value}</span>
-    </p>`;
+    </div>`;
   }
 
   /**

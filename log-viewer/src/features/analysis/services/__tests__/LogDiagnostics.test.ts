@@ -309,6 +309,26 @@ describe('computeLogDiagnostics', () => {
     });
   });
 
+  it('points a breach at the method it stopped in, not at the exception row', async () => {
+    const method = event({ type: 'METHOD_ENTRY', eventIndex: 2, text: 'A.run()' });
+    // `isParent` marks a method; the log root is a parent too, so it is skipped.
+    const root = event({ eventIndex: 0, isParent: true });
+    Object.assign(method, { isParent: true, parent: root });
+    log = apexLog({
+      exceptions: [
+        event({
+          type: 'EXCEPTION_THROWN',
+          eventIndex: 4,
+          text: 'System.LimitException: Apex CPU time limit exceeded',
+          parent: method,
+        }),
+      ],
+    });
+
+    const { diagnostics } = await computeLogDiagnostics();
+    expect(diagnostics[0]?.eventIndex).toBe(2);
+  });
+
   it('counts debug statements once they are worth reporting', async () => {
     const debugLine = (index: number) =>
       event({ type: 'USER_DEBUG', eventIndex: index, text: 'DEBUG|hello' });

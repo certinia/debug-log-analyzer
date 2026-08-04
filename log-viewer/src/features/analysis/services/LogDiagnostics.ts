@@ -188,6 +188,24 @@ function hotSpot(selfTime: Map<string, number>, totalSelf: number): HotSpot | nu
   return { label: label.slice(label.lastIndexOf('|') + 1), selfNs, share };
 }
 
+/**
+ * The method the log was running when the event happened.
+ *
+ * An exception and a breach are both raised inside code, and that code is the
+ * cause the reader wants: the exception row itself takes no time and says only
+ * that the transaction ended. The log root is skipped, since it is not code.
+ */
+function enclosingMethodIndex(event: LogEvent): number {
+  let node = event.parent;
+  while (node) {
+    if (node.isParent && node.parent) {
+      return node.eventIndex;
+    }
+    node = node.parent;
+  }
+  return event.eventIndex;
+}
+
 /** A governor breach the log reported as an exception, with where it stopped. */
 interface Breach {
   eventIndex: number;
@@ -226,7 +244,7 @@ function limitDiagnostics(
     // carries a stack, so keep whichever frame the log gave us.
     const seen = breaches.get(named.key);
     breaches.set(named.key, {
-      eventIndex: seen?.eventIndex ?? event.eventIndex,
+      eventIndex: seen?.eventIndex ?? enclosingMethodIndex(event),
       frame: seen?.frame || frame || undefined,
     });
   }
@@ -310,6 +328,7 @@ function exceptionDiagnostics(exceptions: LogEvent[]): Diagnostic[] {
     const frame = group.events
       .map((event) => splitException(event.text).frame)
       .find((first) => first.length > 0);
+    const thrownIn = group.events[0];
     return {
       id: `exception|${head}`,
       severity: 'Error' as Severity,
@@ -319,7 +338,7 @@ function exceptionDiagnostics(exceptions: LogEvent[]): Diagnostic[] {
         ? 'Nothing caught this exception, so the transaction rolled back.'
         : 'Even a caught exception costs CPU time, and a thrown-and-caught exception used as flow control is expensive.',
       count: Math.max(thrown, 1),
-      eventIndex: group.eventIndex,
+      eventIndex: thrownIn ? enclosingMethodIndex(thrownIn) : group.eventIndex,
       evidence: frame,
     };
   });
