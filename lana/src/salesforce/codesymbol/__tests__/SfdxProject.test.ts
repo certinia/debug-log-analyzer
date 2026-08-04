@@ -59,6 +59,16 @@ describe('SfdxProject', () => {
       expect(result).toEqual(mockUris);
     });
 
+    it('should match class names case-insensitively', async () => {
+      const mockUri = clsUri('/workspace/force-app/classes/MyClass.cls');
+      (workspace.findFiles as jest.Mock).mockResolvedValue([mockUri]);
+
+      await project.buildClassIndex();
+
+      expect(project.findClass('myclass')).toEqual([mockUri]);
+      expect(project.findClass('MYCLASS')).toEqual([mockUri]);
+    });
+
     it('should return the indexed Uri objects unchanged', async () => {
       const mockUri = clsUri('/workspace/force-app/classes/TestClass.cls');
       (workspace.findFiles as jest.Mock).mockResolvedValue([mockUri]);

@@ -27,7 +27,8 @@ export class SfdxProject {
   }
 
   findClass(className: string): Uri[] {
-    return this.classCache?.get(className) ?? [];
+    // Apex names are case-insensitive, so the index is keyed lowercase.
+    return this.classCache?.get(className.toLowerCase()) ?? [];
   }
 
   async buildClassIndex(): Promise<void> {
@@ -42,7 +43,7 @@ export class SfdxProject {
     const classIndex = new Map<string, Uri[]>();
     for (const uri of allUris) {
       // uri.path is always '/'-separated (unlike fsPath), so posix basename is safe everywhere
-      const className = path.posix.basename(uri.path, '.cls');
+      const className = path.posix.basename(uri.path, '.cls').toLowerCase();
       const uris = classIndex.get(className);
       if (uris) {
         uris.push(uri);
