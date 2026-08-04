@@ -40,6 +40,14 @@ export class AnchoredPopover extends LitElement {
   @property({ attribute: 'empty-message' })
   emptyMessage = '';
 
+  /**
+   * Widen the panel for content-bearing popovers — issue cards carry whole exception
+   * messages, and 400px lets the two-line clamp hold a readable measure (~60 chars/line).
+   * Off for menus, which keep the compact default.
+   */
+  @property({ type: Boolean })
+  wide = false;
+
   /** Queried live rather than cached: the slot's content changes without a re-render. */
   private get _panelContent(): readonly Element[] {
     const slot = this.shadowRoot?.querySelector<HTMLSlotElement>('slot[name="panel"]');
@@ -80,8 +88,8 @@ export class AnchoredPopover extends LitElement {
         inset: auto;
         margin: 6px 0 0 0;
         box-sizing: border-box;
-        width: 320px;
-        max-width: min(92vw, 320px);
+        width: var(--anchored-popover-width, 320px);
+        max-width: min(92vw, var(--anchored-popover-width, 320px));
         max-height: 540px;
         overflow-y: auto;
         padding: 6px;
@@ -95,6 +103,10 @@ export class AnchoredPopover extends LitElement {
 
       :host([align='start']) .panel {
         position-area: bottom span-right;
+      }
+
+      :host([wide]) {
+        --anchored-popover-width: 400px;
       }
 
       .panel__head {

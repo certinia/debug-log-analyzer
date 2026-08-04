@@ -309,6 +309,7 @@ describe('parseLog tests', () => {
     expect(apexLog.logIssues[0]?.summary).toBe(
       'System.LimitException: c2g:Too many SOQL queries: 101',
     );
+    expect(apexLog.logIssues[0]?.type).toBe('error');
   });
   it('Should detect fatal errors', async () => {
     const log =
@@ -321,8 +322,57 @@ describe('parseLog tests', () => {
 
     expect(apexLog.children.length).toBe(1);
     expect(apexLog.logIssues[0]?.summary).toBe(
-      'FATAL ERROR! cause=System.LimitException: c2g:Too many SOQL queries: 101',
+      'System.LimitException: c2g:Too many SOQL queries: 101',
     );
+    expect(apexLog.logIssues[0]?.type).toBe('fatal');
+    expect(apexLog.logIssues[0]?.description).toBe('');
+  });
+
+  it('Fatal error summary is the first line; description is the stack trace only', async () => {
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '16:16:04.97 (1000)|FATAL_ERROR|System.LimitException: Apex CPU time limit exceeded\n\n' +
+      'Class.pse.JSONUtils.removeNamespaceFromKeys: line 32, column 1\n' +
+      'Class.pse.ExtendedSObject.marshall: line 186, column 1\n' +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const apexLog = parse(log);
+
+    const fatal = apexLog.logIssues.find((issue) => issue.type === 'fatal');
+    expect(fatal?.summary).toBe('System.LimitException: Apex CPU time limit exceeded');
+    expect(fatal?.description).toBe(
+      'Class.pse.JSONUtils.removeNamespaceFromKeys: line 32, column 1\n' +
+        'Class.pse.ExtendedSObject.marshall: line 186, column 1',
+    );
+  });
+
+  it('Keeps a fatal error and a thrown exception with the same message as separate issues', async () => {
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '16:16:04.97 (500)|EXCEPTION_THROWN|[60]|System.LimitException: Apex CPU time limit exceeded\n' +
+      '16:16:04.97 (1000)|FATAL_ERROR|System.LimitException: Apex CPU time limit exceeded\n' +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const apexLog = parse(log);
+
+    const types = apexLog.logIssues.map((issue) => issue.type);
+    expect(types).toEqual(['error', 'fatal']);
+    expect(apexLog.logIssues[0]?.summary).toBe(apexLog.logIssues[1]?.summary);
+  });
+
+  it('Exception summary keeps the full first line without truncation', async () => {
+    const message =
+      'System.LimitException: Update failed. First exception on row 0 with id aCC3Y000000TNpbWAG; ' +
+      'first error: CANNOT_EXECUTE_FLOW_TRIGGER, this message runs well past the old 99 character cap';
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      `16:16:04.97 (1000)|EXCEPTION_THROWN|[60]|${message}\n` +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const apexLog = parse(log);
+
+    expect(apexLog.logIssues[0]?.summary).toBe(message);
+    expect(apexLog.logIssues[0]?.description).toBe('');
   });
   it('Skipped-Lines endTime resolves to the next entry event, ignoring detail lines', async () => {
     const log =

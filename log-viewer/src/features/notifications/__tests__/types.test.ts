@@ -13,7 +13,15 @@ import {
 } from '../types.js';
 
 function issue(severity: IssueSeverity, summary: string = severity): LogIssue {
-  return { summary, message: '', severity, action: null, category: null, timestamp: null };
+  return {
+    summary,
+    message: '',
+    severity,
+    label: null,
+    action: null,
+    category: null,
+    timestamp: null,
+  };
 }
 
 describe('worstSeverity', () => {
