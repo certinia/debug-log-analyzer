@@ -24,6 +24,7 @@ export function parserIssuesToNotifications(parsingErrors: readonly string[]): L
       // A parse gap means some of the log wasn't understood, which can silently skew
       // every view built from it — a warning, not the untinted 'None' it used to be.
       severity: 'warning',
+      label: null,
       // Only an unsupported event name is safe to report: `Invalid log line: …` echoes log
       // text that can carry customer data, so that card stays static.
       action: eventName ? reportUnsupportedTypeAction(eventName) : null,

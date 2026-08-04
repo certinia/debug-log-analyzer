@@ -637,11 +637,11 @@ export function markerColorCss(type: MarkerType): string {
 /**
  * The marker a parsed log issue is drawn as, so a DOM renderer can match its band.
  *
- * `'error'` maps to `'exception'`: `extractMarkers` drops `'error'` logIssues and the same
+ * `'error'` and `'fatal'` map to `'exception'`: `extractMarkers` drops both and the same
  * failure is drawn from `log.exceptions`, so the exception hue is what's actually on screen.
  */
 export function markerTypeForIssue(issueType: LogIssue['type']): MarkerType {
-  return issueType === 'error' ? 'exception' : issueType;
+  return issueType === 'error' || issueType === 'fatal' ? 'exception' : issueType;
 }
 
 /**

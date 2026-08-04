@@ -49,6 +49,7 @@ export class NotificationCentre extends LitElement {
       align="end"
       heading="Notifications"
       show-heading
+      wide
       empty-message="Log parsed with no issues"
     >
       <span slot="trigger" class="header-control" title=${label} aria-label=${label}>

@@ -16,7 +16,7 @@ export const LOG_LEVEL = {
 
 export type LogLevel = (typeof LOG_LEVEL)[keyof typeof LOG_LEVEL] | '';
 
-export type IssueType = 'unexpected' | 'error' | 'skip';
+export type IssueType = 'unexpected' | 'error' | 'skip' | 'fatal';
 
 export type LineNumber = number | 'EXTERNAL' | null; // an actual line-number or 'EXTERNAL'
 

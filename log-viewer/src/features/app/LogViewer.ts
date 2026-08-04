@@ -298,6 +298,7 @@ export class LogViewer extends LitElement {
         summary: 'Could not read log',
         message: msg,
         severity: 'error',
+        label: null,
         action: null,
         category: null,
         timestamp: null,

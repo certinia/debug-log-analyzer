@@ -45,9 +45,10 @@ describe('extractMarkers', () => {
     expect(markers[0]!.endTime).toBeUndefined();
   });
 
-  it('drops error issues (exceptions cover them)', () => {
+  it('drops error and fatal issues (exceptions cover them)', () => {
     const issues: LogIssue[] = [
-      { startTime: 100, summary: 'FATAL ERROR! cause=boom', description: '', type: 'error' },
+      { startTime: 100, summary: 'System.LimitException: cpu', description: '', type: 'fatal' },
+      { startTime: 150, summary: 'System.LimitException: soql', description: '', type: 'error' },
       { startTime: 200, summary: 'Skipped-Lines', description: '', type: 'skip' },
     ];
 

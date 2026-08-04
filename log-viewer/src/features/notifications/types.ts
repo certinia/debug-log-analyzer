@@ -34,6 +34,8 @@ export interface LogIssue {
   readonly summary: string;
   readonly message: string | TemplateResult<1>;
   readonly severity: IssueSeverity;
+  /** Short kind badge on the meta line (e.g. `Fatal error`), or `null` for none. */
+  readonly label: string | null;
   /** What clicking the card does, or `null` for a card that isn't actionable. */
   readonly action: IssueAction | null;
   /**
