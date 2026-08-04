@@ -47,7 +47,7 @@
     "url": "https://github.com/certinia/debug-log-analyzer.git"
   },
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.102.0"
   },
   "categories": [
     "Other"
@@ -376,13 +376,13 @@
   "dependencies": {
     "@apexdevtools/apex-ls": "^6.0.2",
     "@apexdevtools/apex-parser": "5.1.0",
-    "@salesforce/apex-node": "^8.4.39",
-    "@salesforce/core": "^8.32.6"
+    "@salesforce/apex-node": "^9.0.0",
+    "@salesforce/core": "^9.1.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "~22.16.5",
-    "@types/vscode": "~1.100.0",
+    "@types/vscode": "~1.102.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }
