@@ -23,8 +23,10 @@ export async function getProjects(workspaceFolder: WorkspaceFolder): Promise<Sfd
 
   for (const uri of sfdxProjectUris) {
     try {
-      const document = await workspace.openTextDocument(uri);
-      const rawProject = JSON.parse(document.getText()) as RawSfdxProject;
+      // fs.readFile avoids openTextDocument's editor side effects (document
+      // registry entries, open/close events) for files the user never sees.
+      const bytes = await workspace.fs.readFile(uri);
+      const rawProject = JSON.parse(new TextDecoder().decode(bytes)) as RawSfdxProject;
 
       if (!Array.isArray(rawProject.packageDirectories)) {
         throw new Error('packageDirectories is missing or not an array');

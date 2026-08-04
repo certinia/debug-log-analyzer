@@ -13,9 +13,9 @@ const fileUri = (path: string): Uri => ({ path, fsPath: path }) as Uri;
 function mockProjectFiles(files: { uri: Uri; contents: string }[]): void {
   (workspace.findFiles as jest.Mock).mockResolvedValue(files.map((file) => file.uri));
 
-  const openTextDocument = workspace.openTextDocument as jest.Mock;
+  const readFile = workspace.fs.readFile as jest.Mock;
   for (const file of files) {
-    openTextDocument.mockResolvedValueOnce({ getText: () => file.contents });
+    readFile.mockResolvedValueOnce(new TextEncoder().encode(file.contents));
   }
 }
 
