@@ -5,7 +5,7 @@
 import type { Uri } from 'vscode';
 import { workspace } from 'vscode';
 import { Item, Options, QuickPick } from '../../display/QuickPick.js';
-import type { VSWorkspaceManager } from '../../workspace/VSWorkspaceManager.js';
+import type { VSWorkspace } from '../../workspace/VSWorkspace.js';
 import type { ApexSymbol } from './ApexSymbolParser.js';
 
 export type SymbolFindResult =
@@ -24,17 +24,16 @@ class ClassItem extends Item {
  * Search the workspace index for each candidate in rank order; the first
  * candidate with a match wins. Multiple matches ask the user to pick, and
  * dismissing the picker is reported as cancelled, not as a miss.
+ *
+ * Namespace filtering belongs to `VSWorkspace.findClass`: every folder is
+ * searched, and folders without the candidate's namespace contribute nothing.
  */
 export async function findSymbol(
-  workspaceManager: VSWorkspaceManager,
+  workspaceFolders: VSWorkspace[],
   candidates: ApexSymbol[],
 ): Promise<SymbolFindResult> {
   for (const apexSymbol of candidates) {
-    const matchingFolders = apexSymbol.namespace
-      ? workspaceManager.getWorkspaceForNamespacedProjects(apexSymbol.namespace)
-      : workspaceManager.workspaceFolders;
-
-    const uris = dedupeUris(matchingFolders.flatMap((folder) => folder.findClass(apexSymbol)));
+    const uris = dedupeUris(workspaceFolders.flatMap((folder) => folder.findClass(apexSymbol)));
 
     if (!uris.length) {
       continue;

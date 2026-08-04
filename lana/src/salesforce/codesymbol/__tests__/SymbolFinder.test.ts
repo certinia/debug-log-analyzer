@@ -4,14 +4,12 @@
 import type { Uri, WorkspaceFolder } from 'vscode';
 import { QuickPick } from '../../../display/QuickPick';
 import { VSWorkspace } from '../../../workspace/VSWorkspace';
-import { VSWorkspaceManager } from '../../../workspace/VSWorkspaceManager';
 import type { ApexSymbol } from '../ApexSymbolParser';
 import { findSymbol } from '../SymbolFinder';
 
 jest.mock('vscode');
 jest.mock('../../../display/QuickPick');
 jest.mock('../../../workspace/VSWorkspace');
-jest.mock('../../../workspace/VSWorkspaceManager');
 
 function createSymbol(opts: { namespace?: string | null; outerClass: string }): ApexSymbol {
   return {
@@ -32,16 +30,6 @@ function createMockWorkspace(findClassResult: Uri[]): VSWorkspace {
   return workspace;
 }
 
-function createMockManager(
-  workspaceFolders: VSWorkspace[],
-  namespacedWorkspaces: VSWorkspace[] = [],
-): VSWorkspaceManager {
-  const manager = new VSWorkspaceManager();
-  manager.workspaceFolders = workspaceFolders;
-  (manager.getWorkspaceForNamespacedProjects as jest.Mock).mockReturnValue(namespacedWorkspaces);
-  return manager;
-}
-
 describe('SymbolFinder', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -50,18 +38,15 @@ describe('SymbolFinder', () => {
   describe('findSymbol', () => {
     it('should report not-found when no classes match', async () => {
       const mockWorkspace = createMockWorkspace([]);
-      const manager = createMockManager([mockWorkspace]);
       const symbol = createSymbol({ outerClass: 'MyClass' });
 
-      const result = await findSymbol(manager, [symbol]);
+      const result = await findSymbol([mockWorkspace], [symbol]);
 
       expect(result).toEqual({ status: 'not-found' });
     });
 
     it('should report not-found for an empty candidate list', async () => {
-      const manager = createMockManager([createMockWorkspace([])]);
-
-      const result = await findSymbol(manager, []);
+      const result = await findSymbol([createMockWorkspace([])], []);
 
       expect(result).toEqual({ status: 'not-found' });
     });
@@ -69,10 +54,9 @@ describe('SymbolFinder', () => {
     it('should return a single result without showing QuickPick', async () => {
       const mockUri = createMockUri('/workspace/MyClass.cls');
       const mockWorkspace = createMockWorkspace([mockUri]);
-      const manager = createMockManager([mockWorkspace]);
       const symbol = createSymbol({ outerClass: 'MyClass' });
 
-      const result = await findSymbol(manager, [symbol]);
+      const result = await findSymbol([mockWorkspace], [symbol]);
 
       expect(result).toEqual({ status: 'found', uri: mockUri });
       expect(QuickPick.pick).not.toHaveBeenCalled();
@@ -82,12 +66,11 @@ describe('SymbolFinder', () => {
       const mockUri1 = createMockUri('/workspace1/MyClass.cls');
       const mockUri2 = createMockUri('/workspace2/MyClass.cls');
       const mockWorkspace = createMockWorkspace([mockUri1, mockUri2]);
-      const manager = createMockManager([mockWorkspace]);
       const symbol = createSymbol({ outerClass: 'MyClass' });
 
       (QuickPick.pick as jest.Mock).mockResolvedValue([{ uri: mockUri1 }]);
 
-      const result = await findSymbol(manager, [symbol]);
+      const result = await findSymbol([mockWorkspace], [symbol]);
 
       expect(result).toEqual({ status: 'found', uri: mockUri1 });
       expect(QuickPick.pick).toHaveBeenCalledWith(
@@ -103,10 +86,9 @@ describe('SymbolFinder', () => {
       const mockUri1 = createMockUri('/workspace/MyClass.cls');
       const mockUri2 = createMockUri('/workspace/MyClass.cls');
       const mockWorkspace = createMockWorkspace([mockUri1, mockUri2]);
-      const manager = createMockManager([mockWorkspace]);
       const symbol = createSymbol({ outerClass: 'MyClass' });
 
-      const result = await findSymbol(manager, [symbol]);
+      const result = await findSymbol([mockWorkspace], [symbol]);
 
       expect(result).toEqual({ status: 'found', uri: mockUri1 });
       expect(QuickPick.pick).not.toHaveBeenCalled();
@@ -116,12 +98,11 @@ describe('SymbolFinder', () => {
       const mockUri1 = createMockUri('/workspace1/MyClass.cls');
       const mockUri2 = createMockUri('/workspace2/MyClass.cls');
       const mockWorkspace = createMockWorkspace([mockUri1, mockUri2]);
-      const manager = createMockManager([mockWorkspace]);
       const symbol = createSymbol({ outerClass: 'MyClass' });
 
       (QuickPick.pick as jest.Mock).mockResolvedValue([]);
 
-      const result = await findSymbol(manager, [symbol]);
+      const result = await findSymbol([mockWorkspace], [symbol]);
 
       expect(result).toEqual({ status: 'cancelled' });
     });
@@ -129,16 +110,12 @@ describe('SymbolFinder', () => {
     it('should fall back to the next candidate when the first has no matches', async () => {
       const mockUri = createMockUri('/workspace/MyClass.cls');
       const mockWorkspace = createMockWorkspace([]);
-      const manager = createMockManager([mockWorkspace]);
       const first = createSymbol({ namespace: 'ns', outerClass: 'MyClass' });
       const second = createSymbol({ outerClass: 'MyClass' });
 
-      (mockWorkspace.findClass as jest.Mock)
-        .mockReturnValueOnce([]) // second candidate searches all workspaces
-        .mockReturnValue([mockUri]);
-      (manager.getWorkspaceForNamespacedProjects as jest.Mock).mockReturnValue([mockWorkspace]);
+      (mockWorkspace.findClass as jest.Mock).mockReturnValueOnce([]).mockReturnValue([mockUri]);
 
-      const result = await findSymbol(manager, [first, second]);
+      const result = await findSymbol([mockWorkspace], [first, second]);
 
       expect(result).toEqual({ status: 'found', uri: mockUri });
       expect(mockWorkspace.findClass).toHaveBeenNthCalledWith(1, first);
@@ -148,43 +125,38 @@ describe('SymbolFinder', () => {
     it('should not consult later candidates once one matches', async () => {
       const mockUri = createMockUri('/workspace/MyClass.cls');
       const mockWorkspace = createMockWorkspace([mockUri]);
-      const manager = createMockManager([mockWorkspace]);
       const first = createSymbol({ outerClass: 'MyClass' });
       const second = createSymbol({ outerClass: 'Other' });
 
-      const result = await findSymbol(manager, [first, second]);
+      const result = await findSymbol([mockWorkspace], [first, second]);
 
       expect(result).toEqual({ status: 'found', uri: mockUri });
       expect(mockWorkspace.findClass).toHaveBeenCalledTimes(1);
       expect(mockWorkspace.findClass).toHaveBeenCalledWith(first);
     });
 
-    it('should use namespaced workspaces when the candidate has a namespace', async () => {
+    it('should search every folder and let findClass apply the namespace filter', async () => {
       const mockUri = createMockUri('/namespaced/MyClass.cls');
-      const regularWorkspace = createMockWorkspace([]);
-      const namespacedWorkspace = createMockWorkspace([mockUri]);
-      const manager = createMockManager([regularWorkspace], [namespacedWorkspace]);
+      const folderWithoutNamespace = createMockWorkspace([]);
+      const folderWithNamespace = createMockWorkspace([mockUri]);
       const symbol = createSymbol({ namespace: 'ns', outerClass: 'MyClass' });
 
-      const result = await findSymbol(manager, [symbol]);
+      const result = await findSymbol([folderWithoutNamespace, folderWithNamespace], [symbol]);
 
       expect(result).toEqual({ status: 'found', uri: mockUri });
-      expect(manager.getWorkspaceForNamespacedProjects).toHaveBeenCalledWith('ns');
-      expect(namespacedWorkspace.findClass).toHaveBeenCalledWith(symbol);
-      expect(regularWorkspace.findClass).not.toHaveBeenCalled();
+      expect(folderWithoutNamespace.findClass).toHaveBeenCalledWith(symbol);
+      expect(folderWithNamespace.findClass).toHaveBeenCalledWith(symbol);
     });
 
-    it('should use all workspaces when the candidate has no namespace', async () => {
+    it('should collect matches from every folder for a candidate without a namespace', async () => {
       const mockUri = createMockUri('/workspace1/MyClass.cls');
       const mockWorkspace1 = createMockWorkspace([mockUri]);
       const mockWorkspace2 = createMockWorkspace([]);
-      const manager = createMockManager([mockWorkspace1, mockWorkspace2]);
       const symbol = createSymbol({ outerClass: 'MyClass' });
 
-      const result = await findSymbol(manager, [symbol]);
+      const result = await findSymbol([mockWorkspace1, mockWorkspace2], [symbol]);
 
       expect(result).toEqual({ status: 'found', uri: mockUri });
-      expect(manager.getWorkspaceForNamespacedProjects).not.toHaveBeenCalled();
       expect(mockWorkspace1.findClass).toHaveBeenCalledWith(symbol);
       expect(mockWorkspace2.findClass).toHaveBeenCalledWith(symbol);
     });

@@ -8,7 +8,6 @@ export class VSWorkspaceManager {
 
   findSymbol = jest.fn();
   getAllProjects = jest.fn();
-  getWorkspaceForNamespacedProjects = jest.fn();
   initialiseWorkspaceProjectInfo = jest.fn();
   refresh = jest.fn();
 }

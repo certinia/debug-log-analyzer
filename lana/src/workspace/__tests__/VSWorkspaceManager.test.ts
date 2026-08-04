@@ -55,25 +55,6 @@ describe('VSWorkspaceManager', () => {
     });
   });
 
-  describe('getWorkspaceForNamespacedProjects', () => {
-    it('should return workspaces that have projects with matching namespace', () => {
-      const mockWorkspace1 = {
-        getProjectsForNamespace: jest.fn().mockReturnValue([{ name: 'p1' }]),
-      };
-      const mockWorkspace2 = {
-        getProjectsForNamespace: jest.fn().mockReturnValue([]),
-      };
-
-      const manager = new VSWorkspaceManager();
-      manager.workspaceFolders = [mockWorkspace1, mockWorkspace2] as unknown as VSWorkspace[];
-
-      const result = manager.getWorkspaceForNamespacedProjects('ns1');
-
-      expect(result).toHaveLength(1);
-      expect(result[0]).toBe(mockWorkspace1);
-    });
-  });
-
   describe('initialiseWorkspaceProjectInfo', () => {
     it('should call parseSfdxProjects on all workspaces', async () => {
       const mockWorkspace1 = {
@@ -161,7 +142,7 @@ describe('VSWorkspaceManager', () => {
 
       const result = await manager.findSymbol('MyClass.method()');
 
-      expect(findSymbol).toHaveBeenCalledWith(manager, [
+      expect(findSymbol).toHaveBeenCalledWith(manager.workspaceFolders, [
         { fullSymbol: 'MyClass.method()', namespace: null, outerClass: 'MyClass' },
         { fullSymbol: 'MyClass.method()', namespace: null, outerClass: 'method' },
       ]);

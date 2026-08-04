@@ -34,22 +34,16 @@ export class VSWorkspaceManager {
       return { status: 'not-found' };
     }
 
-    let result = await findSymbol(this, candidates);
+    let result = await findSymbol(this.workspaceFolders, candidates);
     if (result.status === 'not-found' && hasExistingIndex) {
       await this.refresh();
-      result = await findSymbol(this, candidates);
+      result = await findSymbol(this.workspaceFolders, candidates);
     }
     return result;
   }
 
   getAllProjects(): SfdxProject[] {
     return this.workspaceFolders.flatMap((folder) => folder.getAllProjects());
-  }
-
-  getWorkspaceForNamespacedProjects(namespace: string): VSWorkspace[] {
-    return this.workspaceFolders.filter(
-      (folder) => folder.getProjectsForNamespace(namespace).length,
-    );
   }
 
   /**
