@@ -112,9 +112,6 @@ importers:
 
   lana:
     dependencies:
-      '@apexdevtools/apex-ls':
-        specifier: ^6.0.2
-        version: 6.0.2
       '@apexdevtools/apex-parser':
         specifier: 5.1.0
         version: 5.1.0
@@ -314,23 +311,11 @@ packages:
     resolution: {integrity: sha512-PIOUXlSnrqM0S+WOgDRb4RzotydJH7ZoT6tOyL7tAO7qJOfvX5wsEW8Pe+PMKMwvuI4/gIyK9cg2H7lJXqnc4Q==}
     engines: {node: '>= 14.0.0'}
 
-  '@apexdevtools/apex-ls@6.0.2':
-    resolution: {integrity: sha512-1RHLBom+fsbe7XayL9BZVfxWwonYILj/3WD59/FiLiSg3WIT1ey8VT6TNv8UHkscfypeCy1v3eJ5NdQlCELhmQ==}
-    engines: {node: '>=14.0.0'}
-
-  '@apexdevtools/apex-parser@4.3.1':
-    resolution: {integrity: sha512-RlaWpAFudE0GvUcim/xLBNw5ipNgT0Yd1eM7jeZJS0R9qn5DxeUGY3636zfgKgWkK04075y1fgNbPsIi/EjKiw==}
-    engines: {node: '>=8.0.0'}
-
   '@apexdevtools/apex-parser@5.1.0':
     resolution: {integrity: sha512-DPThB5oMnJ9b62weMpufGQfJjtZ+5UHP5Ne8nOqsDDCAVP3P2yRL80p1qX5BpPxyOowhTJ9RF/3qhat0vCrv4g==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
     bundledDependencies:
       - antlr4
-
-  '@apexdevtools/vf-parser@1.1.0':
-    resolution: {integrity: sha512-dP45Y3b4F0b8HosvGEMo6ugRx8yKhaz7h6eJh1cD/YvFxajk6x9Hfrtw63U2EKAstug6waBsT6QC7h+4USjBnA==}
-    engines: {node: '>=8.0.0'}
 
   '@asamuzakjp/css-color@3.2.0':
     resolution: {integrity: sha512-K1A6z8tS3XsmCMM86xoWdn7Fkdn9m6RSVtocUrJYIwZnFVkng/PvkEoWtOWmP+Scc6saYWHWZYbndEEXxl24jw==}
@@ -3705,9 +3690,6 @@ packages:
     resolution: {integrity: sha512-QiVbZhyy4xAZ17UPEuG3YTOt8ZaoeOR1CvEAqrEsDBsOqINslaB147i9xqljZqoyf5S+EUlGStaj+t22LT9MOg==}
     engines: {node: '>=16'}
 
-  antlr4ts@0.5.0-alpha.4:
-    resolution: {integrity: sha512-WPQDt1B74OfPv/IMS2ekXAKkTZIHl88uMetg6q3OTqgFxZ/dxDXI0EWLyZid/1Pe6hTftyg5N7gel5wNAGxXyQ==}
-
   anymatch@3.1.3:
     resolution: {integrity: sha512-KMReFUr0B4t+D+OBkjR3KYqvocp2XaSzO55UcB6mgQMd3KbcE+mWTyvVV7D/zsdEbNnV6acZUutkiHQXvTr1Rw==}
     engines: {node: '>= 8'}
@@ -6281,10 +6263,6 @@ packages:
   node-addon-api@7.1.1:
     resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
 
-  node-dir@0.1.17:
-    resolution: {integrity: sha512-tmPX422rYgofd4epzrNoOXiE8XFZYOcCq1vD7MAXCDO+O+zndlA2ztdKKMa+EeuBG5tHETpr4ml4RGgpqDCCAg==}
-    engines: {node: '>= 0.10.5'}
-
   node-emoji@2.2.0:
     resolution: {integrity: sha512-Z3lTE9pLaJF47NyMhd4ww1yFTAP8YhYI8SleJiHzM46Fgpm5cnNzSl9XfzFNqbaz+VlJrIj3fXQ4DeN1Rjm6cw==}
     engines: {node: '>=18'}
@@ -8435,24 +8413,7 @@ snapshots:
     dependencies:
       '@algolia/client-common': 5.56.0
 
-  '@apexdevtools/apex-ls@6.0.2':
-    dependencies:
-      '@apexdevtools/apex-parser': 4.3.1
-      '@apexdevtools/vf-parser': 1.1.0
-      '@xmldom/xmldom': 0.8.13
-      antlr4ts: 0.5.0-alpha.4
-
-  '@apexdevtools/apex-parser@4.3.1':
-    dependencies:
-      antlr4ts: 0.5.0-alpha.4
-      node-dir: 0.1.17
-
   '@apexdevtools/apex-parser@5.1.0': {}
-
-  '@apexdevtools/vf-parser@1.1.0':
-    dependencies:
-      antlr4ts: 0.5.0-alpha.4
-      node-dir: 0.1.17
 
   '@asamuzakjp/css-color@3.2.0':
     dependencies:
@@ -12870,8 +12831,6 @@ snapshots:
 
   antlr4@4.13.2: {}
 
-  antlr4ts@0.5.0-alpha.4: {}
-
   anymatch@3.1.3:
     dependencies:
       normalize-path: 3.0.0
@@ -16093,10 +16052,6 @@ snapshots:
 
   node-addon-api@7.1.1:
     optional: true
-
-  node-dir@0.1.17:
-    dependencies:
-      minimatch: 3.1.5
 
   node-emoji@2.2.0:
     dependencies:

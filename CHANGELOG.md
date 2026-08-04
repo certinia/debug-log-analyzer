@@ -53,12 +53,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Log problems** card say what kind of problem they are: a `Fatal error` / `Exception` pill and the time in the log sit under the summary.
   - **Help & documentation** and **Report an issue** move into a `•••` menu, which also holds the controls the header drops as the window narrows.
 - ♻️ Replace `webview-ui-toolkit` with [vscode-elements](https://github.com/vscode-elements/elements) for all UI controls. ([#576]).
+- ⚡ **Go to Code**: Faster in large projects — ~6× to ~10× faster ([#834]).
 
 ### Fixed
 
 - 🎨 **Timeline theme switch**: parts of the Timeline did not update on theme switch until the log view was reopened; they now do.
 - 📊 **Database usage bars** (Row Count, Time Taken): the usage bar was hidden whenever the rounded percentage was 0% (the common case for small row counts against large governor limits), so it rarely appeared; it now fills relative to the grid's own column total rather than a governor limit, shows on grouped summary rows, and Time Taken (ms) now shows a bar too. ([#873])
 - 🎨 **Theme colours**: some colours did not update on theme switch; they now do.
+- 🐛 **Go to Code**: Match methods with namespace/`System`-qualified parameter types. ([#834])
 - 📐 **Timeline height**: the Flame Chart stopped short of the bottom of its panel, leaving a strip of empty space; it now fills the panel and follows the Inspector as you resize or re-dock it.
 
 ## [1.20.1] 2026-07-23
@@ -550,6 +552,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- Unreleased -->
 
 [#873]: https://github.com/certinia/debug-log-analyzer/issues/873
+[#834]: https://github.com/certinia/debug-log-analyzer/issues/834
 [#576]: https://github.com/certinia/debug-log-analyzer/issues/576
 [#832]: https://github.com/certinia/debug-log-analyzer/issues/832
 [#848]: https://github.com/certinia/debug-log-analyzer/issues/848

@@ -1,56 +1,67 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import type { Workspace } from '@apexdevtools/apex-ls';
 
+import type { Uri } from 'vscode';
+import { workspace } from 'vscode';
+import { Item, Options, QuickPick } from '../../display/QuickPick.js';
 import type { VSWorkspace } from '../../workspace/VSWorkspace.js';
+import type { ApexSymbol } from './ApexSymbolParser.js';
+
+export type SymbolFindResult =
+  { status: 'found'; uri: Uri } | { status: 'not-found' } | { status: 'cancelled' };
+
+class ClassItem extends Item {
+  uri: Uri;
+
+  constructor(uri: Uri, className: string) {
+    super(className, workspace.asRelativePath(uri), '');
+    this.uri = uri;
+  }
+}
 
 /**
- * Finds Apex symbol definitions (classes) within Salesforce workspaces.
- * Searches across multiple workspaces and supports nested symbol resolution.
+ * Search the workspace index for each candidate in rank order; the first
+ * candidate with a match wins. Multiple matches ask the user to pick, and
+ * dismissing the picker is reported as cancelled, not as a miss.
+ *
+ * Namespace filtering belongs to `VSWorkspace.findClass`: every folder is
+ * searched, and folders without the candidate's namespace contribute nothing.
  */
-export class SymbolFinder {
-  /**
-   * Searches for a symbol across multiple workspaces.
-   * @param workspaces - Array of VS Code workspaces to search in
-   * @param symbol - The fully qualified or partial symbol name to find
-   * @returns Array of file paths to .cls files containing the symbol
-   */
-  async findSymbol(workspaces: VSWorkspace[], symbol: string): Promise<string[]> {
-    // Dynamic import for code splitting. Improves performance by reducing the amount of JS that is loaded and parsed at the start.
+export async function findSymbol(
+  workspaceFolders: VSWorkspace[],
+  candidates: ApexSymbol[],
+): Promise<SymbolFindResult> {
+  for (const apexSymbol of candidates) {
+    const uris = dedupeUris(workspaceFolders.flatMap((folder) => folder.findClass(apexSymbol)));
 
-    const { Workspaces } = await import('@apexdevtools/apex-ls');
-    const paths = [];
-    for (const ws of workspaces) {
-      const apexWs = Workspaces.get(ws.path());
-      const filePath = this.findInWorkspace(apexWs, symbol);
-      if (filePath) {
-        paths.push(filePath);
-      }
+    if (!uris.length) {
+      continue;
     }
 
-    return paths;
-  }
-
-  /**
-   * Searches for a symbol within a single workspace, recursively resolving nested symbols.
-   * If a symbol is not found, attempts to find its parent namespace by removing the last segment.
-   * @param ws - The Apex workspace to search in
-   * @param symbol - The symbol name to find (can be fully qualified like 'namespace.ClassName')
-   * @returns Path to the .cls file containing the symbol, or null if not found
-   */
-  private findInWorkspace(ws: Workspace, symbol: string): string | null {
-    const paths = ws.findType(symbol);
-
-    if (paths.length === 0) {
-      const parts = symbol.split('.');
-      if (parts.length > 1) {
-        parts.pop();
-        return this.findInWorkspace(ws, parts.join('.'));
-      }
-      return null;
+    if (uris.length === 1) {
+      return { status: 'found', uri: uris[0]! };
     }
 
-    return paths.find((path) => path.endsWith('.cls')) || null;
+    const selected = await QuickPick.pick(
+      uris.map((uri) => new ClassItem(uri, apexSymbol.outerClass)),
+      new Options('Select a class:'),
+    );
+
+    return selected.length ? { status: 'found', uri: selected[0]!.uri } : { status: 'cancelled' };
   }
+
+  return { status: 'not-found' };
+}
+
+/** Overlapping package directories can index the same file twice. */
+function dedupeUris(uris: Uri[]): Uri[] {
+  const urisByKey = new Map<string, Uri>();
+  for (const uri of uris) {
+    const key = uri.toString();
+    if (!urisByKey.has(key)) {
+      urisByKey.set(key, uri);
+    }
+  }
+  return [...urisByKey.values()];
 }
