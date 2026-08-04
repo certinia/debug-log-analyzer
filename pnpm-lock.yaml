@@ -75,7 +75,7 @@ importers:
         version: 9.1.7
       jest:
         specifier: ^30.4.2
-        version: 30.4.2(@types/node@25.9.1)
+        version: 30.4.2(@types/node@22.20.1)
       jest-environment-jsdom:
         specifier: ^30.4.1
         version: 30.4.1
@@ -112,28 +112,25 @@ importers:
 
   lana:
     dependencies:
-      '@apexdevtools/apex-ls':
-        specifier: ^6.0.2
-        version: 6.0.2
       '@apexdevtools/apex-parser':
         specifier: 5.1.0
         version: 5.1.0
       '@salesforce/apex-node':
-        specifier: ^8.4.39
-        version: 8.4.39
+        specifier: ^9.0.0
+        version: 9.0.2
       '@salesforce/core':
-        specifier: ^8.32.6
-        version: 8.32.6
+        specifier: ^9.1.0
+        version: 9.1.0
     devDependencies:
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
       '@types/node':
-        specifier: ~22.16.5
-        version: 22.16.5
+        specifier: ~22.20.1
+        version: 22.20.1
       '@types/vscode':
-        specifier: ~1.100.0
-        version: 1.100.0
+        specifier: ~1.102.0
+        version: 1.102.0
       typescript:
         specifier: npm:@typescript/typescript6@^6.0.2
         version: '@typescript/typescript6@6.0.2'
@@ -314,23 +311,11 @@ packages:
     resolution: {integrity: sha512-PIOUXlSnrqM0S+WOgDRb4RzotydJH7ZoT6tOyL7tAO7qJOfvX5wsEW8Pe+PMKMwvuI4/gIyK9cg2H7lJXqnc4Q==}
     engines: {node: '>= 14.0.0'}
 
-  '@apexdevtools/apex-ls@6.0.2':
-    resolution: {integrity: sha512-1RHLBom+fsbe7XayL9BZVfxWwonYILj/3WD59/FiLiSg3WIT1ey8VT6TNv8UHkscfypeCy1v3eJ5NdQlCELhmQ==}
-    engines: {node: '>=14.0.0'}
-
-  '@apexdevtools/apex-parser@4.3.1':
-    resolution: {integrity: sha512-RlaWpAFudE0GvUcim/xLBNw5ipNgT0Yd1eM7jeZJS0R9qn5DxeUGY3636zfgKgWkK04075y1fgNbPsIi/EjKiw==}
-    engines: {node: '>=8.0.0'}
-
   '@apexdevtools/apex-parser@5.1.0':
     resolution: {integrity: sha512-DPThB5oMnJ9b62weMpufGQfJjtZ+5UHP5Ne8nOqsDDCAVP3P2yRL80p1qX5BpPxyOowhTJ9RF/3qhat0vCrv4g==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
     bundledDependencies:
       - antlr4
-
-  '@apexdevtools/vf-parser@1.1.0':
-    resolution: {integrity: sha512-dP45Y3b4F0b8HosvGEMo6ugRx8yKhaz7h6eJh1cD/YvFxajk6x9Hfrtw63U2EKAstug6waBsT6QC7h+4USjBnA==}
-    engines: {node: '>=8.0.0'}
 
   '@asamuzakjp/css-color@3.2.0':
     resolution: {integrity: sha512-K1A6z8tS3XsmCMM86xoWdn7Fkdn9m6RSVtocUrJYIwZnFVkng/PvkEoWtOWmP+Scc6saYWHWZYbndEEXxl24jw==}
@@ -2710,20 +2695,21 @@ packages:
   '@rspack/lite-tapable@1.1.0':
     resolution: {integrity: sha512-E2B0JhYFmVAwdDiG14+DW0Di4Ze4Jg10Pc4/lILUrd5DRCaklduz2OvJ5HYQ6G+hd+WTzqQb3QnDNfK4yvAFYw==}
 
-  '@salesforce/apex-node@8.4.39':
-    resolution: {integrity: sha512-zmE6FyBJsskUpVeZxJwFmyCxwDv6Ab3ApJ2FRyWBwX8QBlMnvyV4KqCxPoOxCW6zgl5Af9fw/3aVKNhnrMC+mA==}
-    engines: {node: '>=18.18.2'}
+  '@salesforce/apex-node@9.0.2':
+    resolution: {integrity: sha512-TD7REX5rTf60pH2DzY5DgbFOsonmwqAQLmfw6mTHTGTbx8jCEcPgaa1F2mvQn7Vg2i7r+ifbJ9YPkwn7aqXF5w==}
+    engines: {node: '>=22.0.0'}
 
-  '@salesforce/core@8.32.6':
-    resolution: {integrity: sha512-ZR973WoqCgi6cR58WhgokbHVZOaADNKHiuM1FAwS5pTLQnC91xYi04i2e/gpAX2AUf7Ya6zjbusYtZNpSyKKAQ==}
-    engines: {node: '>=18.0.0'}
+  '@salesforce/core@9.1.0':
+    resolution: {integrity: sha512-ID9g4YH0yZBeWI0eKJv2IJRRN6ZuNjwpIOjEZm9a79Gzxa3IITsV4PCvD8q7JA3PKqiln57p8yJE458Kn5KW1g==}
+    engines: {node: '>=22.0.0'}
 
-  '@salesforce/kit@3.2.6':
-    resolution: {integrity: sha512-O8S4LWerHa9Zosqh+IoQjgLtpxMOfObRxaRnUdRV4MLtFUi+bQxQiyFvve6eEaBaMP1b1xVDQpvSvQ+PXEDGFQ==}
+  '@salesforce/kit@4.0.0':
+    resolution: {integrity: sha512-VwxhSH/8PQ5YmPAdhmLaJGCgR0n/pOm8T2y+/odMFthd5SA0xsO/kTdaRLFnFQAxxNj1nYtNHRb+BoMuAatzew==}
+    engines: {node: '>=22.0.0'}
 
-  '@salesforce/ts-types@2.0.12':
-    resolution: {integrity: sha512-BIJyduJC18Kc8z+arUm5AZ9VkPRyw1KKAm+Tk+9LT99eOzhNilyfKzhZ4t+tG2lIGgnJpmytZfVDZ0e2kFul8g==}
-    engines: {node: '>=18.0.0'}
+  '@salesforce/ts-types@3.0.1':
+    resolution: {integrity: sha512-NWkveMYT2I3O7EAYwWHi6/ba2YUwp9MFi/zJzA+czK5MVqJfdD6FZbiQrTbALZNvFzgFSdq9BvHm6ygRmtROzw==}
+    engines: {node: '>=22.0.0'}
 
   '@sideway/address@4.1.5':
     resolution: {integrity: sha512-IqO/DUQHUkPeixNQ8n0JA6102hT9CmaljNTPmQ1u8MEhBo/R4Q8eKLN/vGZxuebwOroDB4cbpjheD4+/sKFK4Q==}
@@ -3135,14 +3121,8 @@ packages:
   '@types/node@17.0.45':
     resolution: {integrity: sha512-w+tIMs3rq2afQdsPJlODhoUEKzFP1ayaoyl1CcnwtIlsVe7K7bA1NGm4s3PraqTLlXnbIN84zuBlxBWo1u9BLw==}
 
-  '@types/node@22.16.5':
-    resolution: {integrity: sha512-bJFoMATwIGaxxx8VJPeM8TonI8t579oRvgAuT8zFugJsJZgzqv0Fu8Mhp68iecjzG7cnN3mO2dJQ5uUM2EFrgQ==}
-
-  '@types/node@25.9.1':
-    resolution: {integrity: sha512-xfrlY7UD5rMJk3ZVJP8BNzS28J36YJg+xp+LPXV1TdWxr8uMH5A860QNxYDGQe/ylDSgjxE52Q9VnO7p75tJxg==}
-
-  '@types/node@26.1.2':
-    resolution: {integrity: sha512-Vu4a5UFA9rIIFJ7rB/Vaafh9lrCQszopTCx6KjFboXTGQbPNasehVR5TEiithSDGyd1DEiUByggTZsg8jukeIg==}
+  '@types/node@22.20.1':
+    resolution: {integrity: sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q==}
 
   '@types/prismjs@1.26.6':
     resolution: {integrity: sha512-vqlvI7qlMvcCBbVe0AKAb4f97//Hy0EBTaiW8AalRnG/xAN5zOiWWyrNqNXeq8+KAuvRewjCVY1+IPxk4RdNYw==}
@@ -3201,8 +3181,8 @@ packages:
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
-  '@types/vscode@1.100.0':
-    resolution: {integrity: sha512-4uNyvzHoraXEeCamR3+fzcBlh7Afs4Ifjs4epINyUX/jvdk0uzLnwiDY35UKDKnkCHP5Nu3dljl2H8lR6s+rQw==}
+  '@types/vscode@1.102.0':
+    resolution: {integrity: sha512-V9sFXmcXz03FtYTSUsYsu5K0Q9wH9w9V25slddcxrh5JgORD14LpnOA7ov0L9ALi+6HrTjskLJ/tY5zeRF3TFA==}
 
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
@@ -3710,9 +3690,6 @@ packages:
   antlr4@4.13.2:
     resolution: {integrity: sha512-QiVbZhyy4xAZ17UPEuG3YTOt8ZaoeOR1CvEAqrEsDBsOqINslaB147i9xqljZqoyf5S+EUlGStaj+t22LT9MOg==}
     engines: {node: '>=16'}
-
-  antlr4ts@0.5.0-alpha.4:
-    resolution: {integrity: sha512-WPQDt1B74OfPv/IMS2ekXAKkTZIHl88uMetg6q3OTqgFxZ/dxDXI0EWLyZid/1Pe6hTftyg5N7gel5wNAGxXyQ==}
 
   anymatch@3.1.3:
     resolution: {integrity: sha512-KMReFUr0B4t+D+OBkjR3KYqvocp2XaSzO55UcB6mgQMd3KbcE+mWTyvVV7D/zsdEbNnV6acZUutkiHQXvTr1Rw==}
@@ -6287,10 +6264,6 @@ packages:
   node-addon-api@7.1.1:
     resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
 
-  node-dir@0.1.17:
-    resolution: {integrity: sha512-tmPX422rYgofd4epzrNoOXiE8XFZYOcCq1vD7MAXCDO+O+zndlA2ztdKKMa+EeuBG5tHETpr4ml4RGgpqDCCAg==}
-    engines: {node: '>= 0.10.5'}
-
   node-emoji@2.2.0:
     resolution: {integrity: sha512-Z3lTE9pLaJF47NyMhd4ww1yFTAP8YhYI8SleJiHzM46Fgpm5cnNzSl9XfzFNqbaz+VlJrIj3fXQ4DeN1Rjm6cw==}
     engines: {node: '>=18'}
@@ -7356,10 +7329,6 @@ packages:
     engines: {node: '>=20.19.0'}
     hasBin: true
 
-  sax@1.6.0:
-    resolution: {integrity: sha512-6R3J5M4AcbtLUdZmRv2SygeVaM7IhrLXu9BmnOGmmACak8fiUtOsYNWUS4uK7upbmHIBbLBeFeI//477BKLBzA==}
-    engines: {node: '>=11.0.0'}
-
   sax@1.6.1:
     resolution: {integrity: sha512-42tBVwLWnaQvW5zc4HbZrTuWccECCZfBi92FDuwtqxasH+JbPB3/FOKb1m222K42R4WxuxzzMsTswfzgtSu64Q==}
     engines: {node: '>=11.0.0'}
@@ -7406,11 +7375,6 @@ packages:
 
   semver@7.8.1:
     resolution: {integrity: sha512-rkVq3IXh+4FDGch+KwzX3aV9W3kO54GyEgpvBzSyctDA6Xtd7RJQV1xmXbeQp5v7+VzLOfVqiutSE6GICgPFvg==}
-    engines: {node: '>=10'}
-    hasBin: true
-
-  semver@7.8.4:
-    resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -7762,12 +7726,6 @@ packages:
     peerDependencies:
       tslib: ^2
 
-  thingies@2.6.0:
-    resolution: {integrity: sha512-rMHRjmlFLM1R96UYPvpmnc3LYtdFrT33JIB7L9hetGue1qAPfn1N2LJeEjxUSidu1Iku+haLZXDuEXUHNGO/lg==}
-    engines: {node: '>=10.18'}
-    peerDependencies:
-      tslib: ^2
-
   thingies@2.6.1:
     resolution: {integrity: sha512-cV/CMGTK3M4MlnJ/0At6ismOw/A0EEniDNScajjz/Br3c1sqE72YD01rGpPTKwd27wAxI5Pr+6+0w8yofzFRYw==}
     engines: {node: '>=10.18'}
@@ -7928,16 +7886,6 @@ packages:
 
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
-
-  undici-types@7.24.6:
-    resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
-
-  undici-types@8.3.0:
-    resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
-
-  undici@8.5.0:
-    resolution: {integrity: sha512-xamtWoB1EshgjpmlXd7GGm2VfdDtw1+rD8uhry8pSNW3If6S8E0m2T2+orSKeZXEn/aPJMviCpDBA65WJt8zhg==}
-    engines: {node: '>=22.19.0'}
 
   undici@8.9.0:
     resolution: {integrity: sha512-aWZpUj7XoGonMClx4gdDRfgBjqeA+F473aDmROQQbM9n6PRfK/u1q/a0X4wMTgcHfT8H6fpbt98PFuDUwFg2YA==}
@@ -8447,24 +8395,7 @@ snapshots:
     dependencies:
       '@algolia/client-common': 5.56.0
 
-  '@apexdevtools/apex-ls@6.0.2':
-    dependencies:
-      '@apexdevtools/apex-parser': 4.3.1
-      '@apexdevtools/vf-parser': 1.1.0
-      '@xmldom/xmldom': 0.8.13
-      antlr4ts: 0.5.0-alpha.4
-
-  '@apexdevtools/apex-parser@4.3.1':
-    dependencies:
-      antlr4ts: 0.5.0-alpha.4
-      node-dir: 0.1.17
-
   '@apexdevtools/apex-parser@5.1.0': {}
-
-  '@apexdevtools/vf-parser@1.1.0':
-    dependencies:
-      antlr4ts: 0.5.0-alpha.4
-      node-dir: 0.1.17
 
   '@asamuzakjp/css-color@3.2.0':
     dependencies:
@@ -10894,7 +10825,7 @@ snapshots:
   '@jest/console@30.4.1':
     dependencies:
       '@jest/types': 30.4.1
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       chalk: 4.1.2
       jest-message-util: 30.4.1
       jest-util: 30.4.1
@@ -10908,7 +10839,7 @@ snapshots:
       '@jest/test-result': 30.4.1
       '@jest/transform': 30.4.1
       '@jest/types': 30.4.1
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       ansi-escapes: 4.3.2
       chalk: 4.1.2
       ci-info: 4.4.0
@@ -10916,7 +10847,7 @@ snapshots:
       fast-json-stable-stringify: 2.1.0
       graceful-fs: 4.2.11
       jest-changed-files: 30.4.1
-      jest-config: 30.4.2(@types/node@25.9.1)
+      jest-config: 30.4.2(@types/node@22.20.1)
       jest-haste-map: 30.4.1
       jest-message-util: 30.4.1
       jest-regex-util: 30.4.0
@@ -10948,7 +10879,7 @@ snapshots:
       '@jest/fake-timers': 30.4.1
       '@jest/types': 30.4.1
       '@types/jsdom': 21.1.7
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       jest-mock: 30.4.1
       jest-util: 30.4.1
       jsdom: 26.1.0
@@ -10957,7 +10888,7 @@ snapshots:
     dependencies:
       '@jest/fake-timers': 30.4.1
       '@jest/types': 30.4.1
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       jest-mock: 30.4.1
 
   '@jest/expect-utils@30.4.1':
@@ -10975,7 +10906,7 @@ snapshots:
     dependencies:
       '@jest/types': 30.4.1
       '@sinonjs/fake-timers': 15.4.0
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       jest-message-util: 30.4.1
       jest-mock: 30.4.1
       jest-util: 30.4.1
@@ -10993,7 +10924,7 @@ snapshots:
 
   '@jest/pattern@30.4.0':
     dependencies:
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       jest-regex-util: 30.4.0
 
   '@jest/reporters@30.4.1':
@@ -11004,7 +10935,7 @@ snapshots:
       '@jest/transform': 30.4.1
       '@jest/types': 30.4.1
       '@jridgewell/trace-mapping': 0.3.31
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       chalk: 4.1.2
       collect-v8-coverage: 1.0.3
       exit-x: 0.2.2
@@ -11083,7 +11014,7 @@ snapshots:
       '@jest/schemas': 29.6.3
       '@types/istanbul-lib-coverage': 2.0.6
       '@types/istanbul-reports': 3.0.4
-      '@types/node': 26.1.2
+      '@types/node': 22.20.1
       '@types/yargs': 17.0.35
       chalk: 4.1.2
 
@@ -11093,7 +11024,7 @@ snapshots:
       '@jest/schemas': 30.4.1
       '@types/istanbul-lib-coverage': 2.0.6
       '@types/istanbul-reports': 3.0.4
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       '@types/yargs': 17.0.35
       chalk: 4.1.2
 
@@ -11130,7 +11061,7 @@ snapshots:
       faye: 1.4.1
       form-data: 4.0.6
       multistream: 3.1.0
-      undici: 8.5.0
+      undici: 8.9.0
       xml2js: 0.6.2
 
   '@jsonjoy.com/base64@1.1.2(tslib@2.8.1)':
@@ -11925,10 +11856,10 @@ snapshots:
 
   '@rspack/lite-tapable@1.1.0': {}
 
-  '@salesforce/apex-node@8.4.39':
+  '@salesforce/apex-node@9.0.2':
     dependencies:
-      '@salesforce/core': 8.32.6
-      '@salesforce/kit': 3.2.6
+      '@salesforce/core': 9.1.0
+      '@salesforce/kit': 4.0.0
       '@types/istanbul-reports': 3.0.4
       fast-glob: 3.3.3
       faye: 1.4.1
@@ -11937,11 +11868,11 @@ snapshots:
       istanbul-reports: 3.2.0
       json-stream-stringify: 3.1.7
 
-  '@salesforce/core@8.32.6':
+  '@salesforce/core@9.1.0':
     dependencies:
       '@jsforce/jsforce-node': 3.10.19
-      '@salesforce/kit': 3.2.6
-      '@salesforce/ts-types': 2.0.12
+      '@salesforce/kit': 4.0.0
+      '@salesforce/ts-types': 3.0.1
       ajv: 8.20.0
       change-case: 4.1.2
       fast-levenshtein: 3.0.0
@@ -11955,15 +11886,15 @@ snapshots:
       pino-abstract-transport: 1.2.0
       pino-pretty: 11.3.0
       proper-lockfile: 4.1.2
-      semver: 7.8.4
+      semver: 7.8.5
       ts-retry-promise: 0.8.1
       zod: 4.4.3
 
-  '@salesforce/kit@3.2.6':
+  '@salesforce/kit@4.0.0':
     dependencies:
-      '@salesforce/ts-types': 2.0.12
+      '@salesforce/ts-types': 3.0.1
 
-  '@salesforce/ts-types@2.0.12': {}
+  '@salesforce/ts-types@3.0.1': {}
 
   '@sideway/address@4.1.5':
     dependencies:
@@ -12256,20 +12187,20 @@ snapshots:
   '@types/body-parser@1.19.6':
     dependencies:
       '@types/connect': 3.4.38
-      '@types/node': 26.1.2
+      '@types/node': 22.20.1
 
   '@types/bonjour@3.5.13':
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 22.20.1
 
   '@types/connect-history-api-fallback@1.5.4':
     dependencies:
       '@types/express-serve-static-core': 5.1.2
-      '@types/node': 26.1.2
+      '@types/node': 22.20.1
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 22.20.1
 
   '@types/debug@4.1.12':
     dependencies:
@@ -12287,7 +12218,7 @@ snapshots:
 
   '@types/express-serve-static-core@5.1.2':
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 22.20.1
       '@types/qs': 6.15.1
       '@types/range-parser': 1.2.7
       '@types/send': 1.2.1
@@ -12300,12 +12231,12 @@ snapshots:
 
   '@types/fs-extra@8.1.5':
     dependencies:
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
 
   '@types/glob@7.2.0':
     dependencies:
       '@types/minimatch': 6.0.0
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
 
   '@types/hast@3.0.4':
     dependencies:
@@ -12340,7 +12271,7 @@ snapshots:
 
   '@types/jsdom@21.1.7':
     dependencies:
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       '@types/tough-cookie': 4.0.5
       parse5: 7.3.0
 
@@ -12360,17 +12291,9 @@ snapshots:
 
   '@types/node@17.0.45': {}
 
-  '@types/node@22.16.5':
+  '@types/node@22.20.1':
     dependencies:
       undici-types: 6.21.0
-
-  '@types/node@25.9.1':
-    dependencies:
-      undici-types: 7.24.6
-
-  '@types/node@26.1.2':
-    dependencies:
-      undici-types: 8.3.0
 
   '@types/prismjs@1.26.6': {}
 
@@ -12407,11 +12330,11 @@ snapshots:
 
   '@types/sax@1.2.7':
     dependencies:
-      '@types/node': 17.0.45
+      '@types/node': 22.20.1
 
   '@types/send@1.2.1':
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 22.20.1
 
   '@types/serve-index@1.9.4':
     dependencies:
@@ -12420,7 +12343,7 @@ snapshots:
   '@types/serve-static@2.2.0':
     dependencies:
       '@types/http-errors': 2.0.5
-      '@types/node': 26.1.2
+      '@types/node': 22.20.1
 
   '@types/stack-utils@2.0.3': {}
 
@@ -12434,11 +12357,11 @@ snapshots:
 
   '@types/unist@3.0.3': {}
 
-  '@types/vscode@1.100.0': {}
+  '@types/vscode@1.102.0': {}
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 22.20.1
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -12889,8 +12812,6 @@ snapshots:
   ansis@3.17.0: {}
 
   antlr4@4.13.2: {}
-
-  antlr4ts@0.5.0-alpha.4: {}
 
   anymatch@3.1.3:
     dependencies:
@@ -13988,7 +13909,7 @@ snapshots:
 
   eval@0.1.8:
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 22.20.1
       require-like: 0.1.2
 
   event-target-shim@5.0.1: {}
@@ -14829,7 +14750,7 @@ snapshots:
       '@jest/expect': 30.4.1
       '@jest/test-result': 30.4.1
       '@jest/types': 30.4.1
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       chalk: 4.1.2
       co: 4.6.0
       dedent: 1.7.2
@@ -14849,7 +14770,7 @@ snapshots:
       - babel-plugin-macros
       - supports-color
 
-  jest-cli@30.4.2(@types/node@25.9.1):
+  jest-cli@30.4.2(@types/node@22.20.1):
     dependencies:
       '@jest/core': 30.4.2
       '@jest/test-result': 30.4.1
@@ -14857,7 +14778,7 @@ snapshots:
       chalk: 4.1.2
       exit-x: 0.2.2
       import-local: 3.2.0
-      jest-config: 30.4.2(@types/node@25.9.1)
+      jest-config: 30.4.2(@types/node@22.20.1)
       jest-util: 30.4.1
       jest-validate: 30.4.1
       yargs: 17.7.2
@@ -14868,7 +14789,7 @@ snapshots:
       - supports-color
       - ts-node
 
-  jest-config@30.4.2(@types/node@25.9.1):
+  jest-config@30.4.2(@types/node@22.20.1):
     dependencies:
       '@babel/core': 7.29.7
       '@jest/get-type': 30.1.0
@@ -14894,7 +14815,7 @@ snapshots:
       slash: 3.0.0
       strip-json-comments: 3.1.1
     optionalDependencies:
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
     transitivePeerDependencies:
       - babel-plugin-macros
       - supports-color
@@ -14933,7 +14854,7 @@ snapshots:
       '@jest/environment': 30.4.1
       '@jest/fake-timers': 30.4.1
       '@jest/types': 30.4.1
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       jest-mock: 30.4.1
       jest-util: 30.4.1
       jest-validate: 30.4.1
@@ -14941,7 +14862,7 @@ snapshots:
   jest-haste-map@30.4.1:
     dependencies:
       '@jest/types': 30.4.1
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       anymatch: 3.1.3
       fb-watchman: 2.0.2
       graceful-fs: 4.2.11
@@ -14981,7 +14902,7 @@ snapshots:
   jest-mock@30.4.1:
     dependencies:
       '@jest/types': 30.4.1
-      '@types/node': 22.16.5
+      '@types/node': 22.20.1
       jest-util: 30.4.1
 
   jest-pnp-resolver@1.2.3(jest-resolve@30.4.1):
@@ -15015,7 +14936,7 @@ snapshots:
       '@jest/test-result': 30.4.1
       '@jest/transform': 30.4.1
       '@jest/types': 30.4.1
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       chalk: 4.1.2
       emittery: 0.13.1
       exit-x: 0.2.2
@@ -15044,7 +14965,7 @@ snapshots:
       '@jest/test-result': 30.4.1
       '@jest/transform': 30.4.1
       '@jest/types': 30.4.1
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       chalk: 4.1.2
       cjs-module-lexer: 2.2.0
       collect-v8-coverage: 1.0.3
@@ -15091,7 +15012,7 @@ snapshots:
   jest-util@29.7.0:
     dependencies:
       '@jest/types': 29.6.3
-      '@types/node': 26.1.2
+      '@types/node': 22.20.1
       chalk: 4.1.2
       ci-info: 3.9.0
       graceful-fs: 4.2.11
@@ -15100,7 +15021,7 @@ snapshots:
   jest-util@30.4.1:
     dependencies:
       '@jest/types': 30.4.1
-      '@types/node': 22.16.5
+      '@types/node': 22.20.1
       chalk: 4.1.2
       ci-info: 4.4.0
       graceful-fs: 4.2.11
@@ -15119,7 +15040,7 @@ snapshots:
     dependencies:
       '@jest/test-result': 30.4.1
       '@jest/types': 30.4.1
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       ansi-escapes: 4.3.2
       chalk: 4.1.2
       emittery: 0.13.1
@@ -15128,31 +15049,31 @@ snapshots:
 
   jest-worker@27.5.1:
     dependencies:
-      '@types/node': 22.16.5
+      '@types/node': 22.20.1
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
   jest-worker@29.7.0:
     dependencies:
-      '@types/node': 26.1.2
+      '@types/node': 22.20.1
       jest-util: 29.7.0
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
   jest-worker@30.4.1:
     dependencies:
-      '@types/node': 25.9.1
+      '@types/node': 22.20.1
       '@ungap/structured-clone': 1.3.1
       jest-util: 30.4.1
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
-  jest@30.4.2(@types/node@25.9.1):
+  jest@30.4.2(@types/node@22.20.1):
     dependencies:
       '@jest/core': 30.4.2
       '@jest/types': 30.4.1
       import-local: 3.2.0
-      jest-cli: 30.4.2(@types/node@25.9.1)
+      jest-cli: 30.4.2(@types/node@22.20.1)
     transitivePeerDependencies:
       - '@types/node'
       - babel-plugin-macros
@@ -15255,7 +15176,7 @@ snapshots:
       lodash.isstring: 4.0.1
       lodash.once: 4.1.1
       ms: 2.1.3
-      semver: 7.8.4
+      semver: 7.8.5
 
   jszip@3.10.1:
     dependencies:
@@ -15665,7 +15586,7 @@ snapshots:
       '@jsonjoy.com/json-pack': 1.21.0(tslib@2.8.1)
       '@jsonjoy.com/util': 1.9.0(tslib@2.8.1)
       glob-to-regex.js: 1.2.0(tslib@2.8.1)
-      thingies: 2.6.0(tslib@2.8.1)
+      thingies: 2.6.1(tslib@2.8.1)
       tree-dump: 1.1.0(tslib@2.8.1)
       tslib: 2.8.1
 
@@ -16113,10 +16034,6 @@ snapshots:
 
   node-addon-api@7.1.1:
     optional: true
-
-  node-dir@0.1.17:
-    dependencies:
-      minimatch: 3.1.5
 
   node-emoji@2.2.0:
     dependencies:
@@ -17404,8 +17321,6 @@ snapshots:
     optionalDependencies:
       '@parcel/watcher': 2.5.6
 
-  sax@1.6.0: {}
-
   sax@1.6.1: {}
 
   saxes@6.0.0:
@@ -17450,8 +17365,6 @@ snapshots:
   semver@6.3.1: {}
 
   semver@7.8.1: {}
-
-  semver@7.8.4: {}
 
   semver@7.8.5: {}
 
@@ -17795,10 +17708,6 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  thingies@2.6.0(tslib@2.8.1):
-    dependencies:
-      tslib: 2.8.1
-
   thingies@2.6.1(tslib@2.8.1):
     dependencies:
       tslib: 2.8.1
@@ -17945,12 +17854,6 @@ snapshots:
       '@typescript/typescript-win32-x64': 7.0.2
 
   undici-types@6.21.0: {}
-
-  undici-types@7.24.6: {}
-
-  undici-types@8.3.0: {}
-
-  undici@8.5.0: {}
 
   undici@8.9.0: {}
 
@@ -18418,7 +18321,7 @@ snapshots:
 
   xml2js@0.6.2:
     dependencies:
-      sax: 1.6.0
+      sax: 1.6.1
       xmlbuilder: 11.0.1
 
   xmlbuilder@11.0.1: {}

@@ -118,7 +118,7 @@ export class LogView {
           case 'openType': {
             const symbol = payload as string;
             if (symbol) {
-              OpenFileInPackage.openFileForSymbol(context, symbol);
+              await OpenFileInPackage.openFileForSymbol(context, symbol);
             }
             break;
           }
