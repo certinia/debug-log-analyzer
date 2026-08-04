@@ -243,6 +243,9 @@ export class LogViewer extends LitElement {
     // The event-lookup service backs the inspector on every tab, so it is
     // created with the parsed log rather than by whichever tab loads first.
     await DatabaseAccess.create(apexLog);
+    // After the service holds the log, never before: whole-log content reads it
+    // straight from there.
+    eventBus.emit('log:loaded', {});
 
     this.logSize = apexLog.size;
     this.timelineRoot = apexLog;
