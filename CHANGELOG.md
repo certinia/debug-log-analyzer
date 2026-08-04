@@ -59,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🎨 **Timeline theme switch**: parts of the Timeline did not update on theme switch until the log view was reopened; they now do.
 - 📊 **Database usage bars** (Row Count, Time Taken): the usage bar was hidden whenever the rounded percentage was 0% (the common case for small row counts against large governor limits), so it rarely appeared; it now fills relative to the grid's own column total rather than a governor limit, shows on grouped summary rows, and Time Taken (ms) now shows a bar too. ([#873])
 - 🎨 **Theme colours**: some colours did not update on theme switch; they now do.
+- 📐 **Timeline height**: the Flame Chart stopped short of the bottom of its panel, leaving a strip of empty space; it now fills the panel and follows the Inspector as you resize or re-dock it.
 
 ## [1.20.1] 2026-07-23
 
