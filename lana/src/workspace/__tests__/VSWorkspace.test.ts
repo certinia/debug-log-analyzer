@@ -125,9 +125,6 @@ describe('VSWorkspace', () => {
         fullSymbol: 'ns1.MyClass.method()',
         namespace: 'ns1',
         outerClass: 'MyClass',
-        innerClass: null,
-        method: 'method',
-        parameters: '',
       });
 
       expect(result).toEqual([mockUri]);
@@ -145,9 +142,6 @@ describe('VSWorkspace', () => {
         fullSymbol: 'MyClass.method()',
         namespace: null,
         outerClass: 'MyClass',
-        innerClass: null,
-        method: 'method',
-        parameters: '',
       });
 
       expect(result).toEqual([mockUri1, mockUri2]);

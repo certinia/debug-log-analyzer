@@ -149,9 +149,6 @@ describe('VSWorkspaceManager', () => {
         fullSymbol: 'MyClass.method()',
         namespace: null,
         outerClass: 'MyClass',
-        innerClass: null,
-        method: 'method',
-        parameters: '',
       };
       (findSymbol as jest.Mock).mockResolvedValueOnce(mockUri);
 

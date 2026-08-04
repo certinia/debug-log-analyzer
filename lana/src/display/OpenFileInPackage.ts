@@ -2,11 +2,18 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 import { basename } from 'path';
-import { Position, Selection, ViewColumn, workspace, type TextDocumentShowOptions } from 'vscode';
+import {
+  Position,
+  Selection,
+  ViewColumn,
+  workspace,
+  type TextDocumentShowOptions,
+  type Uri,
+} from 'vscode';
 
 import type { Context } from '../Context.js';
 import { getMethodLine, parseApex } from '../salesforce/ApexParser/ApexSymbolLocator.js';
-import { parseSymbol } from '../salesforce/codesymbol/ApexSymbolParser.js';
+import { parseSymbolCandidates } from '../salesforce/codesymbol/ApexSymbolParser.js';
 
 export class OpenFileInPackage {
   static async openFileForSymbol(context: Context, symbolName: string): Promise<void> {
@@ -15,13 +22,17 @@ export class OpenFileInPackage {
     }
 
     await context.workspaceManager.initialiseWorkspaceProjectInfo();
-    const apexSymbol = parseSymbol(symbolName, context.workspaceManager.getAllProjects());
+    const candidates = parseSymbolCandidates(symbolName, context.workspaceManager.getAllProjects());
 
-    const uri = await context.workspaceManager.findSymbol(apexSymbol);
+    let uri: Uri | null = null;
+    for (const apexSymbol of candidates) {
+      uri = await context.workspaceManager.findSymbol(apexSymbol);
+      if (uri) {
+        break;
+      }
+    }
     if (!uri) {
-      context.display.showErrorMessage(
-        `Type '${apexSymbol.fullSymbol}' was not found in workspace`,
-      );
+      context.display.showErrorMessage(`Type '${symbolName}' was not found in workspace`);
       return;
     }
 

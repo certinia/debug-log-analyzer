@@ -18,9 +18,6 @@ function createSymbol(opts: { namespace?: string | null; outerClass: string }): 
     fullSymbol: 'testSymbol',
     namespace: opts.namespace ?? null,
     outerClass: opts.outerClass,
-    innerClass: null,
-    method: 'method',
-    parameters: '',
   };
 }
 

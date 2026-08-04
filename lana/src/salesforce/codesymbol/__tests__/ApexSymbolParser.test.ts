@@ -1,162 +1,143 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type { Uri } from 'vscode';
-import { parseSymbol, type ApexSymbol } from '../ApexSymbolParser';
-import { SfdxProject } from '../SfdxProject';
+import type { SfdxProject } from '../SfdxProject';
+import { parseSymbolCandidates } from '../ApexSymbolParser';
 
-jest.mock('../SfdxProject');
-
-function createProject(namespace: string): SfdxProject {
-  return new SfdxProject('test-project', namespace, [
-    { uri: { path: '/workspace/force-app' } as Uri, default: true },
-  ]);
+function projectWithNamespace(namespace: string): SfdxProject {
+  return { namespace } as SfdxProject;
 }
 
-describe('parseSymbol', () => {
-  describe('without namespace', () => {
-    const projects: SfdxProject[] = [];
+describe('parseSymbolCandidates', () => {
+  describe('symbols without a namespace', () => {
+    it('should resolve a simple method symbol to its outer class', () => {
+      const candidates = parseSymbolCandidates('MyClass.myMethod()', []);
 
-    it('should parse simple class and method', () => {
-      const result = parseSymbol('MyClass.myMethod()', projects);
-
-      expect(result).toEqual<ApexSymbol>({
+      expect(candidates[0]).toEqual({
         fullSymbol: 'MyClass.myMethod()',
         namespace: null,
         outerClass: 'MyClass',
-        innerClass: null,
-        method: 'myMethod',
-        parameters: '',
       });
     });
 
-    it('should parse method with parameters', () => {
-      const result = parseSymbol('MyClass.myMethod(String, Integer)', projects);
+    it('should resolve an inner class method to the outer class first', () => {
+      const candidates = parseSymbolCandidates('MyClass.Inner.myMethod()', []);
 
-      expect(result).toEqual<ApexSymbol>({
-        fullSymbol: 'MyClass.myMethod(String, Integer)',
-        namespace: null,
-        outerClass: 'MyClass',
-        innerClass: null,
-        method: 'myMethod',
-        parameters: 'String, Integer',
-      });
+      expect(candidates).toEqual([
+        { fullSymbol: 'MyClass.Inner.myMethod()', namespace: null, outerClass: 'MyClass' },
+        { fullSymbol: 'MyClass.Inner.myMethod()', namespace: null, outerClass: 'Inner' },
+      ]);
     });
 
-    it('should parse inner class method', () => {
-      const result = parseSymbol('MyClass.Inner.myMethod()', projects);
+    it('should resolve a constructor symbol', () => {
+      const candidates = parseSymbolCandidates('MyClass(String)', []);
 
-      expect(result).toEqual<ApexSymbol>({
-        fullSymbol: 'MyClass.Inner.myMethod()',
-        namespace: null,
-        outerClass: 'MyClass',
-        innerClass: 'Inner',
-        method: 'myMethod',
-        parameters: '',
-      });
+      expect(candidates).toEqual([
+        { fullSymbol: 'MyClass(String)', namespace: null, outerClass: 'MyClass' },
+      ]);
     });
 
-    it('should parse inner class method with parameters', () => {
-      const result = parseSymbol('MyClass.Inner.myMethod(String)', projects);
+    it('should return a candidate for a single-part symbol instead of throwing', () => {
+      const candidates = parseSymbolCandidates('execute_anonymous_apex', []);
 
-      expect(result).toEqual<ApexSymbol>({
-        fullSymbol: 'MyClass.Inner.myMethod(String)',
-        namespace: null,
-        outerClass: 'MyClass',
-        innerClass: 'Inner',
-        method: 'myMethod',
-        parameters: 'String',
-      });
+      expect(candidates).toEqual([
+        {
+          fullSymbol: 'execute_anonymous_apex',
+          namespace: null,
+          outerClass: 'execute_anonymous_apex',
+        },
+      ]);
     });
   });
 
-  describe('with namespace', () => {
-    const projects = [createProject('ns')];
+  describe('symbols with a known project namespace', () => {
+    const projects = [projectWithNamespace('ns')];
 
-    it('should parse namespaced class and method', () => {
-      const result = parseSymbol('ns.MyClass.myMethod()', projects);
+    it('should rank the namespaced candidate first', () => {
+      const candidates = parseSymbolCandidates('ns.MyClass.myMethod()', projects);
 
-      expect(result).toEqual<ApexSymbol>({
+      expect(candidates[0]).toEqual({
         fullSymbol: 'ns.MyClass.myMethod()',
         namespace: 'ns',
         outerClass: 'MyClass',
-        innerClass: null,
-        method: 'myMethod',
-        parameters: '',
+      });
+      // the symbol could also be outer.inner.method with no namespace
+      expect(candidates).toContainEqual(
+        expect.objectContaining({ namespace: null, outerClass: 'ns' }),
+      );
+    });
+
+    it('should strip constructor parameters from a namespaced constructor symbol', () => {
+      const candidates = parseSymbolCandidates('ns.MyClass(String)', projects);
+
+      expect(candidates[0]).toEqual({
+        fullSymbol: 'ns.MyClass(String)',
+        namespace: 'ns',
+        outerClass: 'MyClass',
       });
     });
 
-    it('should parse namespaced method with parameters', () => {
-      const result = parseSymbol('ns.MyClass.myMethod(String, Integer)', projects);
+    it('should handle a fully qualified inner class method', () => {
+      const candidates = parseSymbolCandidates('ns.Outer.Inner.myMethod()', projects);
 
-      expect(result).toEqual<ApexSymbol>({
-        fullSymbol: 'ns.MyClass.myMethod(String, Integer)',
-        namespace: 'ns',
-        outerClass: 'MyClass',
-        innerClass: null,
-        method: 'myMethod',
-        parameters: 'String, Integer',
-      });
-    });
-
-    it('should parse namespaced inner class method', () => {
-      const result = parseSymbol('ns.MyClass.Inner.myMethod()', projects);
-
-      expect(result).toEqual<ApexSymbol>({
-        fullSymbol: 'ns.MyClass.Inner.myMethod()',
-        namespace: 'ns',
-        outerClass: 'MyClass',
-        innerClass: 'Inner',
-        method: 'myMethod',
-        parameters: '',
-      });
-    });
-
-    it('should parse namespaced inner class method with parameters', () => {
-      const result = parseSymbol('ns.MyClass.Inner.myMethod(String)', projects);
-
-      expect(result).toEqual<ApexSymbol>({
-        fullSymbol: 'ns.MyClass.Inner.myMethod(String)',
-        namespace: 'ns',
-        outerClass: 'MyClass',
-        innerClass: 'Inner',
-        method: 'myMethod',
-        parameters: 'String',
-      });
+      expect(candidates).toEqual([
+        { fullSymbol: 'ns.Outer.Inner.myMethod()', namespace: 'ns', outerClass: 'Outer' },
+        { fullSymbol: 'ns.Outer.Inner.myMethod()', namespace: null, outerClass: 'Outer' },
+      ]);
     });
   });
 
-  describe('namespace detection', () => {
-    it('should detect namespace from projects when symbol has 3 parts', () => {
-      const projects = [createProject('myns')];
-      const result = parseSymbol('myns.MyClass.myMethod()', projects);
+  describe('symbols with an undeclared namespace', () => {
+    it('should fall back to treating the first part as a namespace', () => {
+      const candidates = parseSymbolCandidates('pkg.MyClass.myMethod()', []);
 
-      expect(result.namespace).toBe('myns');
-      expect(result.outerClass).toBe('MyClass');
+      expect(candidates).toEqual([
+        { fullSymbol: 'pkg.MyClass.myMethod()', namespace: null, outerClass: 'pkg' },
+        { fullSymbol: 'pkg.MyClass.myMethod()', namespace: null, outerClass: 'MyClass' },
+      ]);
     });
 
-    it('should not detect namespace when first part does not match any project', () => {
-      const projects = [createProject('otherns')];
-      const result = parseSymbol('MyClass.Inner.myMethod()', projects);
+    it('should skip the no-namespace candidate for four-part symbols', () => {
+      // Apex nests one level, so 4 parts must start with a namespace
+      const candidates = parseSymbolCandidates('pkg.Outer.Inner.myMethod()', []);
 
-      expect(result.namespace).toBeNull();
-      expect(result.outerClass).toBe('MyClass');
-      expect(result.innerClass).toBe('Inner');
-    });
-
-    it('should always detect namespace when symbol has 4 parts', () => {
-      const projects: SfdxProject[] = [];
-      const result = parseSymbol('ns.MyClass.Inner.myMethod()', projects);
-
-      expect(result.namespace).toBe('ns');
-      expect(result.outerClass).toBe('MyClass');
-      expect(result.innerClass).toBe('Inner');
+      expect(candidates).toEqual([
+        { fullSymbol: 'pkg.Outer.Inner.myMethod()', namespace: null, outerClass: 'Outer' },
+      ]);
     });
   });
 
-  describe('error handling', () => {
-    it('should throw error for empty symbol', () => {
-      expect(() => parseSymbol('', [])).toThrow('Invalid symbol: ');
+  describe('parameter handling', () => {
+    it('should ignore dot-qualified parameters when splitting the class path', () => {
+      const candidates = parseSymbolCandidates(
+        'MyClass.myMethod(System.String, ns.Outer.Inner)',
+        [],
+      );
+
+      expect(candidates[0]).toEqual(
+        expect.objectContaining({ namespace: null, outerClass: 'MyClass' }),
+      );
+      expect(
+        candidates.every((c) => !c.outerClass.includes('(') && !c.outerClass.includes(')')),
+      ).toBe(true);
+    });
+  });
+
+  describe('malformed input', () => {
+    it.each(['', '   ', '...', '()', '.method()'])('should not throw for %p', (symbol) => {
+      expect(() => parseSymbolCandidates(symbol, [])).not.toThrow();
+    });
+
+    it('should return no candidates for an empty symbol', () => {
+      expect(parseSymbolCandidates('', [])).toEqual([]);
+      expect(parseSymbolCandidates('()', [])).toEqual([]);
+    });
+
+    it('should not emit duplicate candidates', () => {
+      const candidates = parseSymbolCandidates('MyClass.MyClass()', []);
+
+      const keys = candidates.map((c) => `${c.namespace}|${c.outerClass}`);
+      expect(new Set(keys).size).toBe(keys.length);
     });
   });
 });
