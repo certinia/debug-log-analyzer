@@ -13,38 +13,43 @@ export class OpenFileInPackage {
       return;
     }
 
-    const result = await context.workspaceManager.findSymbol(symbolName);
-    if (result.status === 'cancelled') {
-      return;
+    try {
+      const result = await context.workspaceManager.findSymbol(symbolName);
+      if (result.status === 'cancelled') {
+        return;
+      }
+      if (result.status === 'not-found') {
+        context.display.showErrorMessage(`Type '${symbolName}' was not found in workspace`);
+        return;
+      }
+      const uri = result.uri;
+
+      const document = await workspace.openTextDocument(uri);
+      const parsedRoot = parseApex(document.getText());
+
+      const symbolLocation = getMethodLine(parsedRoot, symbolName);
+
+      if (!symbolLocation.isExactMatch) {
+        context.display.showErrorMessage(
+          `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${basename(uri.fsPath)}'`,
+        );
+      }
+      const zeroIndexedLineNumber = symbolLocation.line - 1;
+      const character = symbolLocation.character ?? 0;
+
+      const pos = new Position(zeroIndexedLineNumber, character);
+
+      const options: TextDocumentShowOptions = {
+        preserveFocus: false,
+        preview: false,
+        viewColumn: ViewColumn.Active,
+        selection: new Selection(pos, pos),
+      };
+
+      context.display.showFile(uri.fsPath, options);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      context.display.showErrorMessage(`Unable to open '${symbolName}': ${message}`);
     }
-    if (result.status === 'not-found') {
-      context.display.showErrorMessage(`Type '${symbolName}' was not found in workspace`);
-      return;
-    }
-    const uri = result.uri;
-
-    const document = await workspace.openTextDocument(uri);
-    const parsedRoot = parseApex(document.getText());
-
-    const symbolLocation = getMethodLine(parsedRoot, symbolName);
-
-    if (!symbolLocation.isExactMatch) {
-      context.display.showErrorMessage(
-        `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${basename(uri.fsPath)}'`,
-      );
-    }
-    const zeroIndexedLineNumber = symbolLocation.line - 1;
-    const character = symbolLocation.character ?? 0;
-
-    const pos = new Position(zeroIndexedLineNumber, character);
-
-    const options: TextDocumentShowOptions = {
-      preserveFocus: false,
-      preview: false,
-      viewColumn: ViewColumn.Active,
-      selection: new Selection(pos, pos),
-    };
-
-    context.display.showFile(uri.fsPath, options);
   }
 }

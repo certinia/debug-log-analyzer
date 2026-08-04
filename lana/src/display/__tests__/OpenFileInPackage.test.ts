@@ -135,4 +135,36 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
     // best-effort: still navigates to the class (line 1)
     expect(display.showFile).toHaveBeenCalledTimes(1);
   });
+
+  it('surfaces a symbol-resolution failure as an error message', async () => {
+    const { context, workspaceManager, display } = createContext();
+    workspaceManager.findSymbol.mockRejectedValue(new Error('glob failed'));
+
+    await expect(
+      OpenFileInPackage.openFileForSymbol(context, 'MyClass.foo()'),
+    ).resolves.toBeUndefined();
+
+    expect(display.showErrorMessage).toHaveBeenCalledWith(
+      "Unable to open 'MyClass.foo()': glob failed",
+    );
+    expect(display.showFile).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a document-open failure as an error message', async () => {
+    const { context, workspaceManager, display } = createContext();
+    workspaceManager.findSymbol.mockResolvedValue({
+      status: 'found',
+      uri: { fsPath: '/ws/MyClass.cls' },
+    });
+    mockOpenTextDocument.mockRejectedValue(new Error('file is binary'));
+
+    await expect(
+      OpenFileInPackage.openFileForSymbol(context, 'MyClass.foo()'),
+    ).resolves.toBeUndefined();
+
+    expect(display.showErrorMessage).toHaveBeenCalledWith(
+      "Unable to open 'MyClass.foo()': file is binary",
+    );
+    expect(display.showFile).not.toHaveBeenCalled();
+  });
 });
