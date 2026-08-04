@@ -8,6 +8,7 @@ import { buildDatabaseSections } from '../features/database/components/databaseS
 import type { PaneSection } from './PaneView.js';
 
 // web components
+import '../features/analysis/components/LogDiagnosticsView.js';
 import './CallStackDetail.js';
 import './CallTreeDetail.js';
 import './EventVitals.js';
@@ -20,8 +21,8 @@ import './LogOverview.js';
  * {@link buildDatabaseSections}.
  *
  * With nothing selected every source gets the whole-log analogue of what its tab
- * does. Only the shared **Log overview** is built so far, so each source returns
- * the same single section.
+ * does: the shared **Log overview**, plus the sections that tab can answer at log
+ * scope. Analysis adds **Findings**; the other tabs have theirs still to come.
  *
  * Precedence rule, binding on future scoping inputs such as a timeline time
  * range: an explicit row/frame `selection` always wins. A range or other
@@ -36,7 +37,7 @@ export async function buildDetailSections(
   // per-source selection hint itself, since `DetailDock`'s empty state now only
   // shows before a tab id resolves.
   if (!selection) {
-    return [
+    const sections: PaneSection[] = [
       {
         id: 'overview',
         title: 'Log overview',
@@ -44,6 +45,15 @@ export async function buildDetailSections(
         content: html`<log-overview source=${source}></log-overview>`,
       },
     ];
+    if (source === 'analysis') {
+      sections.push({
+        id: 'findings',
+        title: 'Findings',
+        weight: 3,
+        content: html`<log-diagnostics></log-diagnostics>`,
+      });
+    }
+    return sections;
   }
 
   // The Database grids resolve statement-specific vitals and SOQL lint issues.
