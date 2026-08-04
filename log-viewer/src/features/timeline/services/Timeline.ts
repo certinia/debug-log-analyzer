@@ -25,6 +25,7 @@ interface TimelineColors {
 const truncationColors: Map<string, string> = new Map([
   ['exception', 'rgba(229, 72, 77, 0.9)'],
   ['error', 'rgba(255, 128, 128, 0.2)'],
+  ['fatal', 'rgba(255, 128, 128, 0.2)'],
   ['skip', 'rgb(30, 128, 255, 0.2)'],
   ['unexpected', 'rgba(128, 128, 255, 0.2)'],
 ]);
@@ -539,14 +540,24 @@ export function refreshThemeColors(): void {
   }
 
   const computedStyle = getComputedStyle(canvas);
+  const previousFindMatchColor = findMatchColor;
+  // getPropertyValue returns '' for an unset property, never null.
   findMatchColor =
-    computedStyle.getPropertyValue('--vscode-editor-findMatchHighlightBackground') ?? '#ea5c0054';
+    computedStyle.getPropertyValue('--vscode-editor-findMatchHighlightBackground') || '#ea5c0054';
   currentFindMatchColor =
-    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground') ?? '#9e6a03';
+    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground') || '#9e6a03';
   borderSettings = new Map<string, number>([
     [strokeColor, 1],
     [findMatchColor, 2],
   ]);
+
+  // borderRenderQueue is keyed by color and only rebuilt on find, so re-key any live
+  // matches — otherwise they keep drawing in the outgoing theme's color.
+  const liveMatches = borderRenderQueue.get(previousFindMatchColor);
+  if (liveMatches && previousFindMatchColor !== findMatchColor) {
+    borderRenderQueue.delete(previousFindMatchColor);
+    borderRenderQueue.set(findMatchColor, liveMatches);
+  }
 
   state.requestRedraw();
 }

@@ -76,6 +76,7 @@ export class LogProblemsChip extends LitElement {
       align="start"
       heading="Log problems"
       show-heading
+      wide
       empty-message="No problems found in this log"
     >
       <span

@@ -10,7 +10,7 @@
 
 import type { ApexLog } from 'apex-log-parser';
 import type { TimelineMarker } from '../types/flamechart.types.js';
-import { isMarkerType } from '../types/flamechart.types.js';
+import { isMarkerType, markerTypeForIssue } from '../types/flamechart.types.js';
 
 /**
  * Extracts markers from ApexLog.logIssues array.
@@ -21,7 +21,7 @@ import { isMarkerType } from '../types/flamechart.types.js';
  * Mapping rules:
  * - 'skip' → skip (skipped lines)
  * - 'unexpected' → unexpected (incomplete entries)
- * - 'error' issues are dropped here: exceptions are surfaced instead via
+ * - 'error' and 'fatal' issues are dropped here: exceptions are surfaced instead via
  *   {@link extractExceptionMarkers}, which covers LimitException/FATAL_ERROR.
  *
  * @param log - Parsed Apex log containing logIssues array
@@ -36,14 +36,14 @@ export function extractMarkers(log: ApexLog): TimelineMarker[] {
 
   let markerIndex = 0;
   for (const issue of log.logIssues) {
-    // Validate type using type guard
-    if (!isMarkerType(issue.type)) {
+    // Exceptions are drawn from the exception events (see extractExceptionMarkers), so
+    // skip any issue on the exception channel here to avoid a duplicated red channel.
+    if (markerTypeForIssue(issue.type) === 'exception') {
       continue;
     }
 
-    // Exceptions are drawn from the exception events (see extractExceptionMarkers),
-    // so skip 'error' issues here to avoid a duplicated red channel.
-    if (issue.type === 'error') {
+    // Validate type using type guard
+    if (!isMarkerType(issue.type)) {
       continue;
     }
 

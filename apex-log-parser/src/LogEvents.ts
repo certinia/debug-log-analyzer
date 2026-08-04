@@ -2382,6 +2382,21 @@ export class WFSpoolActionBeginLine extends LogEvent {
   }
 }
 
+/**
+ * Splits issue text into a summary (the full first line — presentation truncation
+ * is the consumer's job) and a description (the remainder, e.g. a stack trace).
+ */
+function splitIssueText(text: string): { summary: string; description: string } {
+  const newLineIndex = text.indexOf('\n');
+  if (newLineIndex === -1) {
+    return { summary: text.trim(), description: '' };
+  }
+  return {
+    summary: text.slice(0, newLineIndex).trim(),
+    description: text.slice(newLineIndex + 1).trim(),
+  };
+}
+
 export class ExceptionThrownLine extends LogEvent {
   debugLevel = LOG_LEVEL.Info;
   debugCategory = DEBUG_CATEGORY.ApexCode;
@@ -2398,12 +2413,8 @@ export class ExceptionThrownLine extends LogEvent {
 
   onAfter(parser: ApexLogParser, _next?: LogEvent): void {
     if (this.text.indexOf('System.LimitException') >= 0) {
-      const isMultiLine = this.text.indexOf('\n');
-      const len = isMultiLine < 0 ? 99 : isMultiLine;
-      const truncateText = this.text.length > len;
-      const summary = this.text.slice(0, len + 1) + (truncateText ? '…' : '');
-      const message = truncateText ? this.text : '';
-      parser.addLogIssue(this.timestamp, this.eventIndex, summary, message, 'error');
+      const { summary, description } = splitIssueText(this.text);
+      parser.addLogIssue(this.timestamp, this.eventIndex, summary, description, 'error');
     }
   }
 }
@@ -2421,16 +2432,8 @@ export class FatalErrorLine extends LogEvent {
   }
 
   onAfter(parser: ApexLogParser, _next?: LogEvent): void {
-    const newLineIndex = this.text.indexOf('\n');
-    const summary = newLineIndex > -1 ? this.text.slice(0, newLineIndex + 1) : this.text;
-    const detailText = summary.length !== this.text.length ? this.text : '';
-    parser.addLogIssue(
-      this.timestamp,
-      this.eventIndex,
-      'FATAL ERROR! cause=' + summary,
-      detailText,
-      'error',
-    );
+    const { summary, description } = splitIssueText(this.text);
+    parser.addLogIssue(this.timestamp, this.eventIndex, summary, description, 'fatal');
   }
 }
 
