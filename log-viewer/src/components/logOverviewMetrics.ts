@@ -37,6 +37,11 @@ interface RankedGauge {
   ratio: number;
 }
 
+const rank = (gauge: GaugeMetric & { used: number }): RankedGauge => ({
+  gauge,
+  ratio: gauge.used / gauge.limit,
+});
+
 /**
  * The whole-log gauges closest to a limit, tightest first, capped at
  * {@link MAX_GAUGES}. A metric with no limit or no usage is left out.
@@ -56,16 +61,13 @@ export function tightestGauges(limits: GovernorLimits): GaugeMetric[] {
       const heap = limits.heapSize;
       return heap.limit > 0 && heap.used > 0
         ? [
-            {
-              gauge: {
-                label,
-                found: heap.used,
-                used: heap.used,
-                limit: heap.limit,
-                format: formatByteSize,
-              },
-              ratio: heap.used / heap.limit,
-            },
+            rank({
+              label,
+              found: heap.used,
+              used: heap.used,
+              limit: heap.limit,
+              format: formatByteSize,
+            }),
           ]
         : [];
     }
@@ -76,17 +78,14 @@ export function tightestGauges(limits: GovernorLimits): GaugeMetric[] {
       if (metric.limit <= 0 || metric.used <= 0) {
         continue;
       }
-      const ratio = metric.used / metric.limit;
-      if (!tightest || ratio > tightest.ratio) {
-        tightest = {
-          gauge: {
-            label: namespace === DEFAULT_NAMESPACE ? label : `${label} (${namespace})`,
-            found: metric.used,
-            used: metric.used,
-            limit: metric.limit,
-          },
-          ratio,
-        };
+      const candidate = rank({
+        label: namespace === DEFAULT_NAMESPACE ? label : `${label} (${namespace})`,
+        found: metric.used,
+        used: metric.used,
+        limit: metric.limit,
+      });
+      if (!tightest || candidate.ratio > tightest.ratio) {
+        tightest = candidate;
       }
     }
     return tightest ? [tightest] : [];

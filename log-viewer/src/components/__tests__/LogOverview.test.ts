@@ -3,24 +3,10 @@
  *
  * @jest-environment jsdom
  */
-import type { GovernorLimits, Limits } from 'apex-log-parser';
+import type { GovernorLimits } from 'apex-log-parser';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-const emptyLimits = (): Limits => ({
-  soqlQueries: { used: 0, limit: 0 },
-  soslQueries: { used: 0, limit: 0 },
-  queryRows: { used: 0, limit: 0 },
-  dmlStatements: { used: 0, limit: 0 },
-  publishImmediateDml: { used: 0, limit: 0 },
-  dmlRows: { used: 0, limit: 0 },
-  cpuTime: { used: 0, limit: 0 },
-  heapSize: { used: 0, limit: 0 },
-  callouts: { used: 0, limit: 0 },
-  emailInvocations: { used: 0, limit: 0 },
-  futureCalls: { used: 0, limit: 0 },
-  queueableJobsAddedToQueue: { used: 0, limit: 0 },
-  mobileApexPushCalls: { used: 0, limit: 0 },
-});
+import { emptyLimits } from './limitsTestUtils.js';
 
 // The log arrives after the first paint, which is the case this covers.
 let governorLimits: GovernorLimits | null = null;

@@ -138,7 +138,7 @@ export class GovernorSummary extends LitElement {
 
   private _renderGauge(metric: GaugeMetric) {
     const muted = metric.found === 0 && (metric.used ?? 0) === 0;
-    const format = metric.format ?? ((value: number) => integer.format(value));
+    const format = metric.format ?? integer.format;
 
     if (metric.used === null || metric.limit <= 0) {
       return html`<div class="gauge ${muted ? 'muted' : ''}">

@@ -6,22 +6,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { formatByteSize } from '../../core/utility/Util.js';
 import { tightestGauges } from '../logOverviewMetrics.js';
-
-const emptyLimits = (): Limits => ({
-  soqlQueries: { used: 0, limit: 0 },
-  soslQueries: { used: 0, limit: 0 },
-  queryRows: { used: 0, limit: 0 },
-  dmlStatements: { used: 0, limit: 0 },
-  publishImmediateDml: { used: 0, limit: 0 },
-  dmlRows: { used: 0, limit: 0 },
-  cpuTime: { used: 0, limit: 0 },
-  heapSize: { used: 0, limit: 0 },
-  callouts: { used: 0, limit: 0 },
-  emailInvocations: { used: 0, limit: 0 },
-  futureCalls: { used: 0, limit: 0 },
-  queueableJobsAddedToQueue: { used: 0, limit: 0 },
-  mobileApexPushCalls: { used: 0, limit: 0 },
-});
+import { emptyLimits } from './limitsTestUtils.js';
 
 const governorLimits = (byNamespace: Map<string, Limits>, rollUp?: Partial<Limits>) =>
   ({ ...emptyLimits(), ...rollUp, byNamespace, snapshots: [] }) as GovernorLimits;
