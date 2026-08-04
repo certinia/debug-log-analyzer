@@ -93,6 +93,53 @@ describe('VSWorkspaceManager', () => {
       expect(mockWorkspace1.parseSfdxProjects).toHaveBeenCalled();
       expect(mockWorkspace2.parseSfdxProjects).toHaveBeenCalled();
     });
+
+    it('should share one parse across concurrent and repeat calls', async () => {
+      const mockWorkspace = { parseSfdxProjects: jest.fn().mockResolvedValue(undefined) };
+
+      const manager = new VSWorkspaceManager();
+      manager.workspaceFolders = [mockWorkspace] as unknown as VSWorkspace[];
+
+      await Promise.all([
+        manager.initialiseWorkspaceProjectInfo(),
+        manager.initialiseWorkspaceProjectInfo(),
+      ]);
+      await manager.initialiseWorkspaceProjectInfo();
+
+      expect(mockWorkspace.parseSfdxProjects).toHaveBeenCalledTimes(1);
+    });
+
+    it('should retry after a rejected parse', async () => {
+      const mockWorkspace = {
+        parseSfdxProjects: jest
+          .fn()
+          .mockRejectedValueOnce(new Error('parse failed'))
+          .mockResolvedValueOnce(undefined),
+      };
+
+      const manager = new VSWorkspaceManager();
+      manager.workspaceFolders = [mockWorkspace] as unknown as VSWorkspace[];
+
+      await expect(manager.initialiseWorkspaceProjectInfo()).rejects.toThrow('parse failed');
+      await manager.initialiseWorkspaceProjectInfo();
+
+      expect(mockWorkspace.parseSfdxProjects).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('refresh', () => {
+    it('should re-parse even when already initialised', async () => {
+      const mockWorkspace = { parseSfdxProjects: jest.fn().mockResolvedValue(undefined) };
+
+      const manager = new VSWorkspaceManager();
+      manager.workspaceFolders = [mockWorkspace] as unknown as VSWorkspace[];
+
+      await manager.initialiseWorkspaceProjectInfo();
+      await manager.refresh();
+      await manager.initialiseWorkspaceProjectInfo();
+
+      expect(mockWorkspace.parseSfdxProjects).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('findSymbol', () => {

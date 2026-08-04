@@ -11,6 +11,8 @@ import { VSWorkspace } from './VSWorkspace';
 export class VSWorkspaceManager {
   workspaceFolders: VSWorkspace[] = [];
 
+  private initPromise: Promise<void> | null = null;
+
   constructor() {
     if (workspace.workspaceFolders) {
       this.workspaceFolders = workspace.workspaceFolders.map((folder) => {
@@ -33,11 +35,31 @@ export class VSWorkspaceManager {
     );
   }
 
-  async initialiseWorkspaceProjectInfo(forceRefresh = false) {
-    await Promise.all(
-      this.workspaceFolders
-        .filter((folder) => forceRefresh || !folder.getAllProjects().length)
-        .map((folder) => folder.parseSfdxProjects()),
-    );
+  /**
+   * Parse and index the sfdx projects once, sharing the in-flight promise with
+   * concurrent callers. A rejected parse is forgotten so the next call retries.
+   */
+  initialiseWorkspaceProjectInfo(): Promise<void> {
+    return this.initPromise ?? this.startParse();
+  }
+
+  /** Rebuild the project index, replacing any previous result. */
+  refresh(): Promise<void> {
+    return this.startParse();
+  }
+
+  private startParse(): Promise<void> {
+    const parsePromise = Promise.all(
+      this.workspaceFolders.map((folder) => folder.parseSfdxProjects()),
+    ).then(() => undefined);
+
+    parsePromise.catch(() => {
+      if (this.initPromise === parsePromise) {
+        this.initPromise = null;
+      }
+    });
+
+    this.initPromise = parsePromise;
+    return parsePromise;
   }
 }

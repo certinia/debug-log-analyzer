@@ -10,4 +10,5 @@ export class VSWorkspaceManager {
   getAllProjects = jest.fn();
   getWorkspaceForNamespacedProjects = jest.fn();
   initialiseWorkspaceProjectInfo = jest.fn();
+  refresh = jest.fn();
 }
