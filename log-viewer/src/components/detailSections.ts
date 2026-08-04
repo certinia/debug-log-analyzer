@@ -11,12 +11,17 @@ import type { PaneSection } from './PaneView.js';
 import './CallStackDetail.js';
 import './CallTreeDetail.js';
 import './EventVitals.js';
+import './LogOverview.js';
 
 /**
  * Build the inspector's sections for a selection from any tab. Every source gets
  * the same shared trio — Details, Call stack, Call tree — scoped to the
  * selection; the Database view keeps its richer set (Vitals + SOQL issues) via
  * {@link buildDatabaseSections}.
+ *
+ * With nothing selected every source gets the whole-log analogue of what its tab
+ * does. Only the shared **Log overview** is built so far, so each source returns
+ * the same single section.
  *
  * Precedence rule, binding on future scoping inputs such as a timeline time
  * range: an explicit row/frame `selection` always wins. A range or other
@@ -27,9 +32,18 @@ export async function buildDetailSections(
   source: DetailSource,
   selection: DetailSelection | null,
 ): Promise<PaneSection[]> {
-  // Nothing selected: no sections, so the inspector shows `emptyTextFor(source)`.
+  // Nothing selected: the whole log is the scope. The overview carries the
+  // per-source selection hint itself, since `DetailDock`'s empty state now only
+  // shows before a tab id resolves.
   if (!selection) {
-    return [];
+    return [
+      {
+        id: 'overview',
+        title: 'Log overview',
+        weight: 1,
+        content: html`<log-overview source=${source}></log-overview>`,
+      },
+    ];
   }
 
   // The Database grids resolve statement-specific vitals and SOQL lint issues.
