@@ -23,7 +23,10 @@ export type ApexSymbol = {
  *
  * Never throws; unparseable input yields no candidates.
  */
-export function parseSymbolCandidates(symbol: string, projects: SfdxProject[]): ApexSymbol[] {
+export function parseSymbolCandidates(
+  symbol: string,
+  projects: ReadonlyArray<Pick<SfdxProject, 'namespace'>>,
+): ApexSymbol[] {
   // Cut the parameter list before splitting on dots so parenthesised,
   // dot-qualified params (e.g. `(System.String)`) never leak into class parts.
   const openingParentheses = symbol.indexOf('(');

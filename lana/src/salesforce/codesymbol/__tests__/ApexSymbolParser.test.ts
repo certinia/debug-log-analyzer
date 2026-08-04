@@ -1,11 +1,10 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import type { SfdxProject } from '../SfdxProject';
 import { parseSymbolCandidates } from '../ApexSymbolParser';
 
-function projectWithNamespace(namespace: string): SfdxProject {
-  return { namespace } as SfdxProject;
+function projectWithNamespace(namespace: string): { namespace: string } {
+  return { namespace };
 }
 
 describe('parseSymbolCandidates', () => {
