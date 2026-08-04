@@ -1,10 +1,13 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import { posix } from 'path';
 import { RelativePattern, Uri, workspace, type WorkspaceFolder } from 'vscode';
 import { getProjects } from '../SfdxProjectReader';
 
 jest.mock('vscode');
+
+const fileUri = (path: string): Uri => ({ path, fsPath: path }) as Uri;
 
 describe('getProjects', () => {
   const mockWorkspaceFolder = {
@@ -15,6 +18,10 @@ describe('getProjects', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Mirror the real Uri.joinPath: join segments and normalize '..'
+    (Uri.joinPath as jest.Mock).mockImplementation((base: Uri, ...segments: string[]) =>
+      fileUri(posix.join(base.path, ...segments)),
+    );
   });
 
   it('should return empty array when no sfdx-project.json files found', async () => {
@@ -27,7 +34,7 @@ describe('getProjects', () => {
   });
 
   it('should parse valid sfdx-project.json files', async () => {
-    const mockUri = { fsPath: '/workspace/sfdx-project.json' };
+    const mockUri = fileUri('/workspace/sfdx-project.json');
     const mockProjectContent = {
       name: 'my-project',
       namespace: 'myns',
@@ -38,9 +45,6 @@ describe('getProjects', () => {
     (workspace.openTextDocument as jest.Mock).mockResolvedValue({
       getText: () => JSON.stringify(mockProjectContent),
     });
-    (Uri.joinPath as jest.Mock).mockReturnValue({
-      path: '/workspace/force-app/sfdx-project.json',
-    });
 
     const result = await getProjects(mockWorkspaceFolder);
 
@@ -48,14 +52,56 @@ describe('getProjects', () => {
     expect(result[0]).toMatchObject({
       name: 'my-project',
       namespace: 'myns',
-      packageDirectories: [{ path: '/workspace/force-app', default: true }],
+      packageDirectories: [{ uri: fileUri('/workspace/force-app'), default: true }],
+    });
+  });
+
+  it('should resolve package directories relative to a nested project file', async () => {
+    const mockUri = fileUri('/workspace/packages/pkg-a/sfdx-project.json');
+    const mockProjectContent = {
+      name: 'pkg-a',
+      namespace: '',
+      packageDirectories: [{ path: 'src/main', default: true }],
+    };
+
+    (workspace.findFiles as jest.Mock).mockResolvedValue([mockUri]);
+    (workspace.openTextDocument as jest.Mock).mockResolvedValue({
+      getText: () => JSON.stringify(mockProjectContent),
+    });
+
+    const result = await getProjects(mockWorkspaceFolder);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.packageDirectories).toEqual([
+      { uri: fileUri('/workspace/packages/pkg-a/src/main'), default: true },
+    ]);
+  });
+
+  it('should default missing name, namespace and package default flags', async () => {
+    const mockUri = fileUri('/workspace/sfdx-project.json');
+    const mockProjectContent = {
+      packageDirectories: [{ path: 'force-app' }],
+    };
+
+    (workspace.findFiles as jest.Mock).mockResolvedValue([mockUri]);
+    (workspace.openTextDocument as jest.Mock).mockResolvedValue({
+      getText: () => JSON.stringify(mockProjectContent),
+    });
+
+    const result = await getProjects(mockWorkspaceFolder);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      name: null,
+      namespace: '',
+      packageDirectories: [{ uri: fileUri('/workspace/force-app'), default: false }],
     });
   });
 
   it('should parse multiple sfdx-project.json files', async () => {
     const mockUris = [
-      { fsPath: '/workspace/project1/sfdx-project.json' },
-      { fsPath: '/workspace/project2/sfdx-project.json' },
+      fileUri('/workspace/project1/sfdx-project.json'),
+      fileUri('/workspace/project2/sfdx-project.json'),
     ];
     const mockProjects = [
       { name: 'project1', namespace: 'ns1', packageDirectories: [] },
@@ -66,7 +112,6 @@ describe('getProjects', () => {
     (workspace.openTextDocument as jest.Mock)
       .mockResolvedValueOnce({ getText: () => JSON.stringify(mockProjects[0]) })
       .mockResolvedValueOnce({ getText: () => JSON.stringify(mockProjects[1]) });
-    (Uri.joinPath as jest.Mock).mockReturnValue({ path: '/workspace/sfdx-project.json' });
 
     const result = await getProjects(mockWorkspaceFolder);
 
@@ -76,7 +121,7 @@ describe('getProjects', () => {
   });
 
   it('should skip invalid JSON files and log warning', async () => {
-    const mockUri = { fsPath: '/workspace/invalid/sfdx-project.json' };
+    const mockUri = fileUri('/workspace/invalid/sfdx-project.json');
     const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
 
     (workspace.findFiles as jest.Mock).mockResolvedValue([mockUri]);
@@ -95,10 +140,30 @@ describe('getProjects', () => {
     consoleSpy.mockRestore();
   });
 
+  it('should skip project files without a packageDirectories array', async () => {
+    const mockUri = fileUri('/workspace/sfdx-project.json');
+    const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+    (workspace.findFiles as jest.Mock).mockResolvedValue([mockUri]);
+    (workspace.openTextDocument as jest.Mock).mockResolvedValue({
+      getText: () => JSON.stringify({ name: 'no-dirs', packageDirectories: 'force-app' }),
+    });
+
+    const result = await getProjects(mockWorkspaceFolder);
+
+    expect(result).toEqual([]);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to parse sfdx-project.json'),
+      expect.any(Error),
+    );
+
+    consoleSpy.mockRestore();
+  });
+
   it('should continue processing other files when one fails', async () => {
     const mockUris = [
-      { fsPath: '/workspace/invalid/sfdx-project.json' },
-      { fsPath: '/workspace/valid/sfdx-project.json' },
+      fileUri('/workspace/invalid/sfdx-project.json'),
+      fileUri('/workspace/valid/sfdx-project.json'),
     ];
     const validProject = { name: 'valid', namespace: '', packageDirectories: [] };
     const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
@@ -107,7 +172,6 @@ describe('getProjects', () => {
     (workspace.openTextDocument as jest.Mock)
       .mockResolvedValueOnce({ getText: () => 'invalid json' })
       .mockResolvedValueOnce({ getText: () => JSON.stringify(validProject) });
-    (Uri.joinPath as jest.Mock).mockReturnValue({ path: '/workspace/sfdx-project.json' });
 
     const result = await getProjects(mockWorkspaceFolder);
 

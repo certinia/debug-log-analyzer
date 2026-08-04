@@ -107,9 +107,11 @@ describe('VSWorkspace', () => {
 
     beforeEach(async () => {
       mockProject1 = new SfdxProject('project1', 'ns1', [
-        { path: '/workspace/force-app', default: true },
+        { uri: { path: '/workspace/force-app' } as Uri, default: true },
       ]);
-      mockProject2 = new SfdxProject('project2', '', [{ path: '/workspace/src', default: true }]);
+      mockProject2 = new SfdxProject('project2', '', [
+        { uri: { path: '/workspace/src' } as Uri, default: true },
+      ]);
 
       (getProjects as jest.Mock).mockResolvedValue([mockProject1, mockProject2]);
       await vsWorkspace.parseSfdxProjects();

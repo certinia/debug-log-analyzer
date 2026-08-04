@@ -2,10 +2,10 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import path from 'path';
-import { RelativePattern, Uri, workspace } from 'vscode';
+import { RelativePattern, type Uri, workspace } from 'vscode';
 
 export interface PackageDirectory {
-  readonly path: string;
+  readonly uri: Uri;
   readonly default: boolean;
 }
 
@@ -14,7 +14,7 @@ export class SfdxProject {
   readonly namespace: string;
   readonly packageDirectories: readonly PackageDirectory[];
 
-  private classCache?: Map<string, string[]>;
+  private classCache?: Map<string, Uri[]>;
 
   constructor(
     name: string | null,
@@ -27,8 +27,7 @@ export class SfdxProject {
   }
 
   findClass(className: string): Uri[] {
-    const paths = this.classCache?.get(className) ?? [];
-    return paths.map((p) => Uri.file(p));
+    return this.classCache?.get(className) ?? [];
   }
 
   async buildClassIndex(): Promise<void> {
@@ -36,21 +35,22 @@ export class SfdxProject {
 
     const allUris = (
       await Promise.all(
-        this.packageDirectories.map((packageDir) => this.findClassesInProject(packageDir.path)),
+        this.packageDirectories.map((packageDir) => this.findClassesInPackage(packageDir.uri)),
       )
     ).flat();
 
     for (const uri of allUris) {
-      const className = path.basename(uri.fsPath, '.cls');
+      // uri.path is always '/'-separated (unlike fsPath), so posix basename is safe everywhere
+      const className = path.posix.basename(uri.path, '.cls');
       if (!this.classCache.has(className)) {
         this.classCache.set(className, []);
       }
-      this.classCache.get(className)!.push(uri.fsPath);
+      this.classCache.get(className)!.push(uri);
     }
   }
 
-  private async findClassesInProject(basePath: string): Promise<Uri[]> {
-    const pattern = new RelativePattern(basePath, '**/*.cls');
+  private async findClassesInPackage(packageUri: Uri): Promise<Uri[]> {
+    const pattern = new RelativePattern(packageUri, '**/*.cls');
     return await workspace.findFiles(pattern);
   }
 }

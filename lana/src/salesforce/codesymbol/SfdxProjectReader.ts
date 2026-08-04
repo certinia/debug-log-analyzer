@@ -2,12 +2,17 @@
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
 import { RelativePattern, Uri, workspace, type WorkspaceFolder } from 'vscode';
-import { type PackageDirectory, SfdxProject } from './SfdxProject';
+import { SfdxProject } from './SfdxProject';
+
+interface RawPackageDirectory {
+  readonly path: string;
+  readonly default?: boolean;
+}
 
 export interface RawSfdxProject {
-  readonly name: string | null;
-  readonly namespace: string;
-  readonly packageDirectories: readonly PackageDirectory[];
+  readonly name?: string | null;
+  readonly namespace?: string;
+  readonly packageDirectories?: readonly RawPackageDirectory[];
 }
 
 export async function getProjects(workspaceFolder: WorkspaceFolder): Promise<SfdxProject[]> {
@@ -22,12 +27,17 @@ export async function getProjects(workspaceFolder: WorkspaceFolder): Promise<Sfd
       const content = document.getText();
       const rawProject = JSON.parse(content) as RawSfdxProject;
 
+      if (!Array.isArray(rawProject.packageDirectories)) {
+        throw new Error('packageDirectories is missing or not an array');
+      }
+
+      const projectDir = Uri.joinPath(uri, '..');
       const project: SfdxProject = new SfdxProject(
-        rawProject.name,
-        rawProject.namespace,
+        rawProject.name ?? null,
+        rawProject.namespace ?? '',
         rawProject.packageDirectories.map((pkg) => ({
-          ...pkg,
-          path: Uri.joinPath(uri, pkg.path).path.replace(/\/sfdx-project.json/i, ''),
+          uri: Uri.joinPath(projectDir, pkg.path),
+          default: pkg.default ?? false,
         })),
       );
 

@@ -1,13 +1,16 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
+import type { Uri } from 'vscode';
 import { parseSymbol, type ApexSymbol } from '../ApexSymbolParser';
 import { SfdxProject } from '../SfdxProject';
 
 jest.mock('../SfdxProject');
 
 function createProject(namespace: string): SfdxProject {
-  return new SfdxProject('test-project', namespace, [{ path: 'force-app', default: true }]);
+  return new SfdxProject('test-project', namespace, [
+    { uri: { path: '/workspace/force-app' } as Uri, default: true },
+  ]);
 }
 
 describe('parseSymbol', () => {
