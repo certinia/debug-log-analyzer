@@ -71,6 +71,11 @@ describe('VSWorkspace', () => {
       expect(vsWorkspace.getProjectsForNamespace('unknown')).toEqual([]);
     });
 
+    it('should not match Object.prototype members as namespaces', () => {
+      expect(vsWorkspace.getProjectsForNamespace('constructor')).toEqual([]);
+      expect(vsWorkspace.getProjectsForNamespace('toString')).toEqual([]);
+    });
+
     it('should return projects matching the namespace', async () => {
       const ns1Projects = [
         new SfdxProject('project1', 'ns1', []),

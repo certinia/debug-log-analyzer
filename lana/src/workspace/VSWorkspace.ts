@@ -8,7 +8,7 @@ import { getProjects } from '../salesforce/codesymbol/SfdxProjectReader.js';
 
 export class VSWorkspace {
   workspaceFolder: WorkspaceFolder;
-  sfdxProjectsByNamespace: Record<string, SfdxProject[]> = {};
+  sfdxProjectsByNamespace = new Map<string, SfdxProject[]>();
 
   constructor(workspaceFolder: WorkspaceFolder) {
     this.workspaceFolder = workspaceFolder;
@@ -26,22 +26,20 @@ export class VSWorkspace {
 
     await Promise.all(sfdxProjects.map((sfdxProject) => sfdxProject.buildClassIndex()));
 
-    this.sfdxProjectsByNamespace = sfdxProjects.reduce<Record<string, SfdxProject[]>>(
-      (projectsByNamespace, project) => {
-        const namespace = project.namespace ?? '';
-        (projectsByNamespace[namespace] ??= []).push(project);
-        return projectsByNamespace;
-      },
-      {},
-    );
+    this.sfdxProjectsByNamespace = sfdxProjects.reduce((projectsByNamespace, project) => {
+      const namespace = project.namespace ?? '';
+      const projects = projectsByNamespace.get(namespace) ?? [];
+      projects.push(project);
+      return projectsByNamespace.set(namespace, projects);
+    }, new Map<string, SfdxProject[]>());
   }
 
   getProjectsForNamespace(namespace: string): SfdxProject[] {
-    return this.sfdxProjectsByNamespace[namespace] ?? [];
+    return this.sfdxProjectsByNamespace.get(namespace) ?? [];
   }
 
   getAllProjects(): SfdxProject[] {
-    return Object.values(this.sfdxProjectsByNamespace).flat();
+    return [...this.sfdxProjectsByNamespace.values()].flat();
   }
 
   findClass(apexSymbol: ApexSymbol): Uri[] {
