@@ -13,8 +13,9 @@ import './CallStackDetail.js';
 import './CallTreeDetail.js';
 import './CategoryTimeBar.js';
 import './EventVitals.js';
-import './ExecutionShape.js';
 import './GovernorTrends.js';
+import './HotPath.js';
+import './HotSpots.js';
 import './LogOverview.js';
 
 /**
@@ -26,8 +27,8 @@ import './LogOverview.js';
  * With nothing selected every source gets the whole-log analogue of what its tab
  * does: the shared **Log overview**, plus the sections that tab can answer at log
  * scope. Analysis adds **Findings**; the Timeline adds its charts and the
- * whole-log call tree; the Call Tree adds the **Execution shape** — the
- * structure of the run, which only that tab answers.
+ * whole-log call tree; the Call Tree adds the **Hot path** and **Hot spots** —
+ * clickable routes into the tree it sits beside.
  *
  * Precedence rule, binding on future scoping inputs such as a timeline time
  * range: an explicit row/frame `selection` always wins. A range or other
@@ -45,23 +46,30 @@ export async function buildDetailSections(
       {
         id: 'overview',
         title: 'Log overview',
-        weight: 1,
+        fit: 'content',
         content: html`<log-overview></log-overview>`,
       },
     ];
     if (source === 'calltree') {
-      sections.push({
-        id: 'shape',
-        title: 'Execution shape',
-        weight: 1,
-        content: html`<execution-shape></execution-shape>`,
-      });
+      sections.push(
+        {
+          id: 'hot-path',
+          title: 'Hot path',
+          fit: 'content',
+          content: html`<hot-path></hot-path>`,
+        },
+        {
+          id: 'hot-spots',
+          title: 'Hot spots',
+          fit: 'content',
+          content: html`<hot-spots></hot-spots>`,
+        },
+      );
     }
     if (source === 'analysis') {
       sections.push({
         id: 'findings',
         title: 'Findings',
-        weight: 3,
         content: html`<log-diagnostics></log-diagnostics>`,
       });
     }
@@ -72,13 +80,13 @@ export async function buildDetailSections(
         {
           id: 'category-time',
           title: 'Time by category',
-          weight: 1,
+          fit: 'content',
           content: html`<category-time-bar></category-time-bar>`,
         },
         {
           id: 'governor-trends',
           title: 'Governor usage over time',
-          weight: 2,
+          fit: 'content',
           content: html`<governor-trends></governor-trends>`,
         },
         {
@@ -109,7 +117,7 @@ export async function buildDetailSections(
     {
       id: 'vitals',
       title: 'Details',
-      weight: 3,
+      fit: 'content',
       content: html`<event-vitals
         eventIndex=${eventIndex}
         .instances=${instances}

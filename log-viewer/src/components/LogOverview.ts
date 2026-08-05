@@ -37,9 +37,13 @@ export class LogOverview extends LitElement {
         display: block;
       }
 
+      /* The pane body owns the left edge; the strip keeps its own row rhythm. */
+      governor-summary {
+        padding: var(--lana-space-2xs) 0;
+      }
+
       .note {
-        /* Left inset lines the text up with the gauge strip's labels. */
-        padding: var(--lana-space-sm) var(--lana-space-md) 0 var(--lana-section-inset);
+        padding: var(--lana-space-sm) 0 0;
         color: var(--lana-fg-muted);
         font-size: var(--lana-text-sm);
       }

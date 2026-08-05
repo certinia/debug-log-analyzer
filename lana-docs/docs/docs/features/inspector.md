@@ -45,7 +45,10 @@ The **Analysis** tab adds:
 
 The **Call Tree** tab adds:
 
-- **Execution shape** – event and node counts, max and mean depth, truncated calls, and the deepest and widest points of the run. Structure only, no times: those belong to the [Analysis](./analysis.mdx) tab and the [Timeline](./timeline.mdx).
+- **Hot path** – the chain of calls the log spent most of its time in, entry point first. At each step, calls with the same signature count as one, so a method called 200 times shows once with a `200×` count. The path follows the biggest of these and stops where the time spreads out or a call's own work outweighs its children; every frame shows its time and share of the log. A truncated log heads the path with a warning, because timings below a cut-off call under-report.
+- **Hot spots** – the five signatures with the most self time across the whole log, with call counts.
+
+Every row in both sections is a link: click it to reveal that call in the tree (Time Order view).
 
 Select a row and the sections re-scope to it; deselect and the whole-log view returns.
 

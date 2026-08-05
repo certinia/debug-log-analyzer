@@ -54,12 +54,11 @@ export class GovernorSummary extends LitElement {
         display: block;
       }
 
+      /* No padding of its own: each host sets its content edge on the element. */
       .gauges {
         display: flex;
         flex-wrap: wrap;
         gap: 8px 22px;
-        /* Left inset matches the sections' content edge (3px accent + 12px). */
-        padding: 10px 12px 12px 15px;
       }
 
       .gauge {
