@@ -4,26 +4,23 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import { headerItemStyles } from '../styles/headerItem.styles.js';
 import { skeletonStyles } from '../styles/skeleton.styles.js';
+import { tokenStyles } from '../styles/tokens.styles.js';
 
 import './DotSeparator.js';
 
 @customElement('log-meta')
 export class LogMeta extends LitElement {
   static styles = [
+    tokenStyles,
     skeletonStyles,
+    headerItemStyles,
     css`
-      :host {
-        display: inline-flex;
-        flex: 0 0 auto;
-      }
-
       .log__metadata {
         display: inline-flex;
         gap: 8px;
         align-items: center;
-        font-size: 0.9rem;
-        color: var(--vscode-descriptionForeground, #999);
       }
 
       .metadata__item {

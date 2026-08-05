@@ -7,6 +7,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 
 import { eventBus } from '../core/events/EventBus.js';
 import { formatDuration } from '../core/utility/Util.js';
+import type { LogIdentityData } from '../features/app/logIdentity.js';
 import type { LogIssue } from '../features/notifications/types.js';
 import { computeVisibleCount } from './overflowFit.js';
 
@@ -20,18 +21,45 @@ import '../features/notifications/components/NotificationCentre.js';
 import './Divider.js';
 import './DotSeparator.js';
 import './HeaderMenu.js';
+import './LogIdentity.js';
 import './LogMeta.js';
 import './LogProblemsChip.js';
 import './LogTitle.js';
 
 /**
- * What the header sheds as it narrows, in the order it *keeps* them: log meta goes
- * first (passive info, and its values survive in the title's tooltip), then the bell
- * (tool-level, usually empty), then the Inspector toggle (also on the command palette,
- * and the docked panel is visible either way), and log problems last — the only signal
- * that can invalidate the whole analysis. Everything shed reappears inside `•••`.
+ * The identity chunks in keep order (the last row sheds first), tying each chunk to
+ * its `LogIdentityData` field and its compact-label widths. `CHUNKS`, the render
+ * loop, `_chunkActive`, and the title tooltip all derive from this, so adding an
+ * item is one row here.
  */
-const CHUNKS = ['problems', 'inspector', 'bell', 'meta'] as const;
+const IDENTITY_CHUNKS = [
+  { chunk: 'entry', field: 'entryPoint', cap: '24ch', skeletonWidth: '12ch' },
+  { chunk: 'user', field: 'user', cap: '16ch', skeletonWidth: '8ch' },
+  { chunk: 'time', field: 'startTime', cap: '', skeletonWidth: '8ch' },
+] as const satisfies readonly {
+  chunk: string;
+  field: keyof LogIdentityData;
+  cap: string;
+  skeletonWidth: string;
+}[];
+
+/**
+ * What the header sheds as it narrows, in the order it *keeps* them: the transaction
+ * identity goes first, one item at a time from the right — time, then user, then entry
+ * point (losing "when" before "who" before "what") — then log meta (all passive info
+ * whose values survive in the title's tooltip), then the bell (tool-level, usually
+ * empty), then the Inspector toggle (also on the command palette, and the docked panel
+ * is visible either way), and log problems last — the only signal that can invalidate
+ * the whole analysis. Shed controls reappear inside `•••`; shed values survive in the
+ * title's tooltip.
+ */
+const CHUNKS = [
+  'problems',
+  'inspector',
+  'bell',
+  'meta',
+  ...IDENTITY_CHUNKS.map(({ chunk }) => chunk),
+] as const;
 type Chunk = (typeof CHUNKS)[number];
 
 /**
@@ -68,6 +96,10 @@ export class NavBar extends LitElement {
   /** Notifications about the tool — today, parser diagnostics. */
   @property({ attribute: false })
   notifications: readonly LogIssue[] = [];
+
+  /** Transaction identity (entry point · user · start time). `null` while parsing. */
+  @property({ attribute: false })
+  logIdentity: LogIdentityData | null = null;
 
   /** How many leading `CHUNKS` stay in the header; the rest are in the `•••` menu. */
   @state()
@@ -189,7 +221,8 @@ export class NavBar extends LitElement {
       changed.has('logSize') ||
       changed.has('logDuration') ||
       changed.has('logProblems') ||
-      changed.has('notifications')
+      changed.has('notifications') ||
+      changed.has('logIdentity')
     ) {
       this._widths.clear();
       this._visible = CHUNKS.length;
@@ -217,7 +250,13 @@ export class NavBar extends LitElement {
           <log-title
             logName="${this.logName}"
             logPath="${this.logPath}"
-            details="${[sizeText, elapsedText].filter(Boolean).join(' • ')}"
+            details="${[
+              sizeText,
+              elapsedText,
+              ...IDENTITY_CHUNKS.map(({ field }) => this.logIdentity?.[field]?.detail),
+            ]
+              .filter(Boolean)
+              .join(' • ')}"
           ></log-title>
           ${
             show.meta
@@ -227,6 +266,18 @@ export class NavBar extends LitElement {
                 </div>`
               : ''
           }
+          ${IDENTITY_CHUNKS.map(({ chunk, field, cap, skeletonWidth }) =>
+            show[chunk] && this._chunkActive(chunk)
+              ? html`<div class="chunk chunk--${chunk}">
+                  <dot-separator></dot-separator>
+                  <log-identity
+                    .item=${this.logIdentity?.[field] ?? null}
+                    cap=${cap}
+                    skeletonWidth=${skeletonWidth}
+                  ></log-identity>
+                </div>`
+              : '',
+          )}
           ${
             show.problems
               ? html`<div class="chunk chunk--problems">
@@ -285,9 +336,12 @@ export class NavBar extends LitElement {
     }
 
     this._measure();
-    const widths = CHUNKS.map((chunk) => this._widths.get(chunk) ?? 0);
+    // An inactive chunk renders nothing: it costs the ladder no width, and its zero
+    // width is legitimate rather than "not measured yet".
+    const active = CHUNKS.map((chunk) => this._chunkActive(chunk));
+    const widths = CHUNKS.map((chunk, i) => (active[i] ? (this._widths.get(chunk) ?? 0) : 0));
     // Nothing measured yet (first paint, or the webview is hidden) — leave the layout be.
-    if (widths.some((width) => width === 0)) {
+    if (widths.some((width, i) => width === 0 && active[i])) {
       return;
     }
 
@@ -295,6 +349,16 @@ export class NavBar extends LitElement {
     // `_fit` also runs from `updated`, so this must settle: an unchanged stage is not a
     // change, so lit schedules nothing and the loop stops.
     this._visible = computeVisibleCount(widths, avail, 0, 0);
+  }
+
+  /**
+   * Whether a chunk currently has anything to show. The identity chunks are the only
+   * optional ones: each stays active while the log parses (skeleton) and goes inactive
+   * when the parsed log carries no value for it (e.g. a cropped log with no USER_INFO).
+   */
+  private _chunkActive(chunk: Chunk): boolean {
+    const field = IDENTITY_CHUNKS.find((identity) => identity.chunk === chunk)?.field;
+    return !field || this.logIdentity === null || Boolean(this.logIdentity[field]);
   }
 
   private _measure(): void {

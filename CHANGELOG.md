@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Filter by **Namespace**, **Object** or **Caller Namespace**, or by a **Row Count** / **Time Taken** min–max range; active filters are highlighted.
   - Collapse behind a **Filter** button on narrow window. ([#873])
 - 🔴 **Timeline exception markers**: exceptions show as red lines, with a **Throws** count in method tooltips. ([#828])
+- 🪪 **Header**: the header now includes entry point, user, and start time with hover for more details.
 
 ### Changed
 
