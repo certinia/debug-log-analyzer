@@ -3,9 +3,8 @@
  */
 import type { GovernorLimits } from 'apex-log-parser';
 
-import { DEFAULT_NAMESPACE } from '../core/utility/CallerNamespace.js';
-import { formatByteSize } from '../core/utility/Util.js';
-import { GOVERNOR_METRICS } from './logOverviewMetrics.js';
+import { formatByteSize, formatInteger } from '../core/utility/Util.js';
+import { GOVERNOR_METRICS, metricLabel, tightestNamespaceMetric } from './logOverviewMetrics.js';
 
 /** How many trend charts to draw before the section stops being at-a-glance. */
 const MAX_TRENDS = 4;
@@ -34,7 +33,10 @@ export interface TrendSeries {
   format: (value: number) => string;
 }
 
-const integer = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+/** Memo of {@link governorTrendSeries}: the charts re-render on every hover,
+ *  but a log's snapshots never change, and the stable series identity also
+ *  feeds the component's per-series geometry memo. */
+const seriesCache = new WeakMap<GovernorLimits, TrendSeries[]>();
 
 /**
  * Usage-over-time series for the governor metrics closest to their limits,
@@ -42,7 +44,9 @@ const integer = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
  *
  * For each metric the tightest namespace is chosen by its final used/limit
  * ratio — per namespace, never a sum over namespaces (#862) — and that
- * namespace's snapshots become the points. Each point's percentage uses the
+ * namespace's snapshots become the points. Heap therefore diverges from the
+ * gauges, which read heap's transaction-wide peak from the roll-up: a trend
+ * needs one namespace's ordered snapshots. Each point's percentage uses the
  * limit recorded in its own snapshot, never a hardcoded one: limits differ
  * between synchronous and asynchronous transactions. A leading zero point
  * anchors every series at the start of the log.
@@ -51,69 +55,53 @@ const integer = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
  * left out (the gauges above already show its final value).
  */
 export function governorTrendSeries(limits: GovernorLimits): TrendSeries[] {
+  const cached = seriesCache.get(limits);
+  if (cached) {
+    return cached;
+  }
+
   const series = GOVERNOR_METRICS.flatMap<TrendSeries>(({ key, label }) => {
-    let tightestNamespace: string | null = null;
-    let tightestRatio = 0;
-    for (const [namespace, forNamespace] of limits.byNamespace) {
-      const metric = forNamespace[key];
-      if (metric.limit <= 0 || metric.used <= 0) {
-        continue;
-      }
-      const ratio = metric.used / metric.limit;
-      if (tightestNamespace === null || ratio > tightestRatio) {
-        tightestNamespace = namespace;
-        tightestRatio = ratio;
-      }
-    }
-    if (tightestNamespace === null) {
+    const tightest = tightestNamespaceMetric(limits, key);
+    if (!tightest) {
       return [];
     }
 
-    const sampled: TrendPoint[] = [];
-    for (const snapshot of limits.snapshots) {
-      if (snapshot.namespace !== tightestNamespace) {
-        continue;
-      }
+    const sampled = limits.snapshots.flatMap<TrendPoint>((snapshot) => {
       const metric = snapshot.limits[key];
-      if (metric.limit <= 0) {
-        continue;
-      }
-      sampled.push({
-        t: snapshot.timestamp,
-        ratio: (metric.used / metric.limit) * 100,
-        used: metric.used,
-        limit: metric.limit,
-      });
-    }
+      return snapshot.namespace !== tightest.namespace || metric.limit <= 0
+        ? []
+        : [
+            {
+              t: snapshot.timestamp,
+              ratio: (metric.used / metric.limit) * 100,
+              used: metric.used,
+              limit: metric.limit,
+            },
+          ];
+    });
     const firstSample = sampled[0];
     if (!firstSample || sampled.length < 2) {
       // Fewer than two real snapshots — a single sample is a gauge, not a trend.
       return [];
     }
-    // A zero point anchors the series at the start of the log; nothing was
-    // consumed yet, so it borrows the first sample's limit.
-    const points: TrendPoint[] = [
-      { t: 0, ratio: 0, used: 0, limit: firstSample.limit },
-      ...sampled,
-    ];
 
-    const final = limits.byNamespace.get(tightestNamespace)?.[key];
-    if (!final) {
-      return [];
-    }
     return [
       {
-        label: tightestNamespace === DEFAULT_NAMESPACE ? label : `${label} (${tightestNamespace})`,
-        points,
-        used: final.used,
-        limit: final.limit,
-        finalRatio: tightestRatio * 100,
-        format: key === 'heapSize' ? formatByteSize : integer.format,
+        label: metricLabel(label, tightest.namespace),
+        // A zero point anchors the series at the start of the log; nothing was
+        // consumed yet, so it borrows the first sample's limit.
+        points: [{ t: 0, ratio: 0, used: 0, limit: firstSample.limit }, ...sampled],
+        used: tightest.used,
+        limit: tightest.limit,
+        finalRatio: tightest.ratio * 100,
+        format: key === 'heapSize' ? formatByteSize : formatInteger,
       },
     ];
   });
 
-  return series.sort((a, b) => b.finalRatio - a.finalRatio).slice(0, MAX_TRENDS);
+  const ranked = series.sort((a, b) => b.finalRatio - a.finalRatio).slice(0, MAX_TRENDS);
+  seriesCache.set(limits, ranked);
+  return ranked;
 }
 
 /**
@@ -137,19 +125,15 @@ export function pointAt(points: TrendPoint[], t: number): TrendPoint | null {
   if (t >= last.t) {
     return { ...last, t };
   }
-  let prev = first;
-  for (const point of points) {
-    if (t <= point.t) {
-      const span = point.t - prev.t;
-      const fraction = span > 0 ? (t - prev.t) / span : 1;
-      return {
-        t,
-        ratio: prev.ratio + fraction * (point.ratio - prev.ratio),
-        used: prev.used + fraction * (point.used - prev.used),
-        limit: point.limit,
-      };
-    }
-    prev = point;
-  }
-  return last;
+  const i = points.findIndex((point) => t <= point.t);
+  const next = points[i]!; // findIndex hit: first.t < t <= last.t
+  const prev = points[i - 1]!; // i >= 1: t > first.t
+  const span = next.t - prev.t;
+  const fraction = span > 0 ? (t - prev.t) / span : 1;
+  return {
+    t,
+    ratio: prev.ratio + fraction * (next.ratio - prev.ratio),
+    used: prev.used + fraction * (next.used - prev.used),
+    limit: next.limit,
+  };
 }

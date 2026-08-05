@@ -146,6 +146,15 @@ describe('governorTrendSeries', () => {
     expect(heap?.format).toBe(formatByteSize);
     expect(cpu?.format(4_000)).toBe('4,000');
   });
+
+  it('memoises per limits object, returning the same array for the same log', () => {
+    const limits = governorLimits({ default: { cpuTime: { used: 9_000, limit: 10_000 } } }, [
+      snapshot(1_000, 'default', { cpuTime: { used: 2_000, limit: 10_000 } }),
+      snapshot(2_000, 'default', { cpuTime: { used: 9_000, limit: 10_000 } }),
+    ]);
+
+    expect(governorTrendSeries(limits)).toBe(governorTrendSeries(limits));
+  });
 });
 
 describe('pointAt', () => {

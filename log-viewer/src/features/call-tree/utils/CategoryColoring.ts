@@ -6,7 +6,7 @@ import type { RowComponent } from 'tabulator-tables';
 
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
-import { DEFAULT_THEME_NAME, type TimelineColors } from '../../timeline/themes/Themes.js';
+import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../../timeline/themes/Themes.js';
 import { addCustomThemes, getTheme } from '../../timeline/themes/ThemeSelector.js';
 
 /**
@@ -17,19 +17,6 @@ import { addCustomThemes, getTheme } from '../../timeline/themes/ThemeSelector.j
  * property, so a theme switch only updates the host vars and rows re-resolve in place —
  * no Tabulator reformat, no scroll shift.
  */
-
-// Maps a LogEvent.category string to its TimelineColors key, so a row can point at the
-// matching `--ct-color-<key>` host variable. Single source of truth for the set.
-const CATEGORY_THEME_VAR: Readonly<Record<string, keyof TimelineColors>> = {
-  Apex: 'apex',
-  System: 'system',
-  'Code Unit': 'codeUnit',
-  Automation: 'automation',
-  DML: 'dml',
-  SOQL: 'soql',
-  Validation: 'validation',
-  Callout: 'callout',
-};
 
 export const categoryColoringStyles = css`
   .tabulator-row .datagrid-code-text {
@@ -48,7 +35,7 @@ export const categoryColoringStyles = css`
 export const categoryRowFormatter = (row: RowComponent): void => {
   const data = row.getData() as { originalData?: { category?: string } };
   const category = data.originalData?.category;
-  const themeKey = category ? CATEGORY_THEME_VAR[category] : undefined;
+  const themeKey = category ? CATEGORY_THEME_KEY[category] : undefined;
   if (themeKey) {
     row.getElement().style.setProperty('--row-cat-color', `var(--ct-color-${themeKey})`);
   }

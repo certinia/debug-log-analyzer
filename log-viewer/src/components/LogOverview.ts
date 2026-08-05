@@ -4,7 +4,7 @@
 import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 
-import { eventBus } from '../core/events/EventBus.js';
+import { LogLoadedController } from '../core/events/LogLoadedController.js';
 import type { GaugeMetric } from '../features/database/components/GovernorSummary.js';
 import { DatabaseAccess } from '../features/database/services/Database.js';
 import { globalStyles } from '../styles/global.styles.js';
@@ -22,21 +22,8 @@ import '../features/database/components/GovernorSummary.js';
  */
 @customElement('log-overview')
 export class LogOverview extends LitElement {
-  private _offLogLoaded: (() => void) | null = null;
-
-  override connectedCallback() {
-    super.connectedCallback();
-    // The inspector paints before the first log is parsed, and it rebuilds only
-    // on a tab change or a selection — so the gauges have to follow the log
-    // themselves.
-    this._offLogLoaded = eventBus.on('log:loaded', () => this.requestUpdate());
-  }
-
-  override disconnectedCallback() {
-    this._offLogLoaded?.();
-    this._offLogLoaded = null;
-    super.disconnectedCallback();
-  }
+  /** The gauges have to follow the log itself. */
+  private readonly _logLoaded = new LogLoadedController(this);
 
   static styles = [
     globalStyles,

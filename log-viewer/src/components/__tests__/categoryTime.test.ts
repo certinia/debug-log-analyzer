@@ -64,6 +64,12 @@ describe('categorySelfTimes', () => {
       { category: 'System', selfTime: 10 },
     ]);
   });
+
+  it('memoises per log, returning the same array for the same tree', () => {
+    const root = log([ev('Apex', 100)]);
+
+    expect(categorySelfTimes(root)).toBe(categorySelfTimes(root));
+  });
 });
 
 describe('categoryPalette', () => {

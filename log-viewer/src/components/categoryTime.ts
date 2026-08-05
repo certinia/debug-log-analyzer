@@ -6,7 +6,7 @@ import type { ApexLog } from 'apex-log-parser';
 import type { LanaSettings } from '../features/settings/Settings.js';
 import { LEGACY_CATEGORY_MAP } from '../features/timeline/services/Timeline.js';
 import { addCustomThemes, getTheme } from '../features/timeline/themes/ThemeSelector.js';
-import { DEFAULT_THEME_NAME, type TimelineColors } from '../features/timeline/themes/Themes.js';
+import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../features/timeline/themes/Themes.js';
 
 /** The bucket for events the parser leaves uncategorised. */
 export const OTHER_CATEGORY = 'Other';
@@ -15,17 +15,9 @@ export const OTHER_CATEGORY = 'Other';
  *  palette is data, so it does not follow the host theme. */
 const OTHER_COLOR = '#808080';
 
-/** Parser category → the palette key a theme stores its colour under. */
-const THEME_KEY_BY_CATEGORY: Record<string, keyof TimelineColors> = {
-  Apex: 'apex',
-  'Code Unit': 'codeUnit',
-  System: 'system',
-  Automation: 'automation',
-  DML: 'dml',
-  SOQL: 'soql',
-  Callout: 'callout',
-  Validation: 'validation',
-};
+/** Memo of {@link categorySelfTimes}: the chart re-renders on every hover, but
+ *  the tree never changes after parse, so the walk runs once per log. */
+const selfTimesCache = new WeakMap<ApexLog, CategoryTime[]>();
 
 export interface CategoryTime {
   category: string;
@@ -40,6 +32,10 @@ export interface CategoryTime {
  * Iterative: the tree's size is unbounded.
  */
 export function categorySelfTimes(root: ApexLog): CategoryTime[] {
+  const cached = selfTimesCache.get(root);
+  if (cached) {
+    return cached;
+  }
   const totals = new Map<string, number>();
   const stack = [...root.children];
   while (stack.length) {
@@ -51,10 +47,12 @@ export function categorySelfTimes(root: ApexLog): CategoryTime[] {
       stack.push(child);
     }
   }
-  return [...totals]
+  const slices = [...totals]
     .filter(([, selfTime]) => selfTime > 0)
     .map(([category, selfTime]) => ({ category, selfTime }))
     .sort((a, b) => b.selfTime - a.selfTime);
+  selfTimesCache.set(root, slices);
+  return slices;
 }
 
 /**
@@ -78,7 +76,7 @@ export function categoryPalette(
   }
   const colors = getTheme(timeline?.activeTheme ?? DEFAULT_THEME_NAME);
   return (category) => {
-    const key = THEME_KEY_BY_CATEGORY[category];
+    const key = CATEGORY_THEME_KEY[category];
     return key ? colors[key] : OTHER_COLOR;
   };
 }

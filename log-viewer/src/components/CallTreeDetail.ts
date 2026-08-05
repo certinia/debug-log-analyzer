@@ -11,7 +11,7 @@ import {
   Tabulator,
 } from 'tabulator-tables';
 
-import { eventBus } from '../core/events/EventBus.js';
+import { LogLoadedController } from '../core/events/LogLoadedController.js';
 import { formatDuration, formatInteger } from '../core/utility/Util.js';
 import {
   commonColumnDefaults,
@@ -158,26 +158,16 @@ export class CallTreeDetail extends LitElement {
   /** eventIndex of the row whose context menu is open. */
   private _menuEventIndex = -1;
 
-  private _offLogLoaded: (() => void) | null = null;
-
-  override connectedCallback(): void {
-    super.connectedCallback();
-    // A whole-log tree can mount before the first parse finishes (the scoped
-    // tree cannot — a selection implies a parsed log), so rebuild when the log
-    // lands.
-    this._offLogLoaded = eventBus.on('log:loaded', () => {
-      if (!this.wholeLog) {
-        return;
-      }
-      this._scoped = null;
-      for (const slot of Object.values(this._tables)) {
-        if (slot) {
-          slot.stale = true;
-        }
-      }
-      void this._showActive();
-    });
-  }
+  // A whole-log tree can mount before the first parse finishes (the scoped
+  // tree cannot — a selection implies a parsed log), so rebuild when the log
+  // lands.
+  private readonly _logLoaded = new LogLoadedController(this, () => {
+    if (!this.wholeLog) {
+      return;
+    }
+    this._invalidateScope();
+    void this._showActive();
+  });
 
   constructor() {
     super();
@@ -242,26 +232,30 @@ export class CallTreeDetail extends LitElement {
   updated(changed: PropertyValues) {
     const scopeChanged = changed.has('eventIndex') || changed.has('instances');
     if (scopeChanged) {
-      // The scoped root changed — mark every built table stale so each is
-      // re-filled on demand, rather than destroyed and rebuilt.
-      // `_scoped` is only invalidated here and only rebuilt in `_showActive`,
-      // past its paint yield — never before it.
-      this._scoped = null;
-      for (const slot of Object.values(this._tables)) {
-        if (slot) {
-          slot.stale = true;
-        }
-      }
+      this._invalidateScope();
     }
     if (scopeChanged || changed.has('viewMode')) {
       void this._showActive();
     }
   }
 
+  /**
+   * The scoped root changed — mark every built table stale so each is re-filled
+   * on demand, rather than destroyed and rebuilt. `_scoped` is only invalidated
+   * here and only rebuilt in `_showActive`, past its paint yield — never
+   * before it.
+   */
+  private _invalidateScope(): void {
+    this._scoped = null;
+    for (const slot of Object.values(this._tables)) {
+      if (slot) {
+        slot.stale = true;
+      }
+    }
+  }
+
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    this._offLogLoaded?.();
-    this._offLogLoaded = null;
     this._destroyTables();
   }
 

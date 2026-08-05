@@ -4,10 +4,15 @@
 import { LitElement, css, html, svg } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 
-import { eventBus } from '../core/events/EventBus.js';
+import { LogLoadedController } from '../core/events/LogLoadedController.js';
 import { formatDuration } from '../core/utility/Util.js';
+import {
+  GOVERNOR_WARN_PERCENT,
+  governorTier,
+} from '../features/database/components/GovernorSummary.js';
 import { DatabaseAccess } from '../features/database/services/Database.js';
 import { globalStyles } from '../styles/global.styles.js';
+import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import {
   governorTrendSeries,
   pointAt,
@@ -19,14 +24,46 @@ import {
 const VIEW_W = 100;
 const VIEW_H = 30;
 
-/** The warn threshold the guide line marks, as used/limit percent. */
-const WARN_PERCENT = 80;
+/** The pieces of a chart that depend only on the data, never the hover. */
+interface TrendGeometry {
+  line: string;
+  area: string;
+  guideY: string;
+  x: (t: number) => number;
+}
 
-function tier(percent: number): 'safe' | 'warn' | 'danger' {
-  if (percent >= 100) {
-    return 'danger';
+/** Memo of {@link trendGeometry}: a hover re-renders every chart on every
+ *  pointer move, but a series' shape never changes, and the series identity
+ *  is stable per log. */
+const geometryCache = new WeakMap<TrendSeries, TrendGeometry>();
+
+function trendGeometry(series: TrendSeries, logTotal: number): TrendGeometry {
+  const cached = geometryCache.get(series);
+  if (cached) {
+    return cached;
   }
-  return percent >= WARN_PERCENT ? 'warn' : 'safe';
+
+  const maxRatio = Math.max(100, ...series.points.map((p) => p.ratio));
+  const x = (t: number) => (logTotal > 0 ? (t / logTotal) * VIEW_W : 0);
+  const y = (ratio: number) => VIEW_H - (ratio / maxRatio) * VIEW_H;
+
+  const path = series.points
+    .map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.t).toFixed(2)} ${y(p.ratio).toFixed(2)}`)
+    .join(' ');
+  // Consumption never resets inside a transaction, so hold the last sample's
+  // level out to the end of the log before closing down to the baseline.
+  // A series always holds an anchor plus at least two samples.
+  const lastY = y(series.points[series.points.length - 1]!.ratio).toFixed(2);
+  const line = `${path} L${VIEW_W} ${lastY}`;
+
+  const geometry = {
+    line,
+    area: `${line} L${VIEW_W} ${VIEW_H} L0 ${VIEW_H} Z`,
+    guideY: y(GOVERNOR_WARN_PERCENT).toFixed(2),
+    x,
+  };
+  geometryCache.set(series, geometry);
+  return geometry;
 }
 
 /**
@@ -41,36 +78,13 @@ export class GovernorTrends extends LitElement {
   @state()
   private _hover: { label: string; point: TrendPoint } | null = null;
 
-  private _offLogLoaded: (() => void) | null = null;
-
-  override connectedCallback() {
-    super.connectedCallback();
-    // The inspector paints before the first parse and rebuilds only on a tab
-    // change or a selection, so the charts have to follow the log itself.
-    this._offLogLoaded = eventBus.on('log:loaded', () => this.requestUpdate());
-  }
-
-  override disconnectedCallback() {
-    this._offLogLoaded?.();
-    this._offLogLoaded = null;
-    super.disconnectedCallback();
-  }
+  /** The charts have to follow the log itself. */
+  private readonly _logLoaded = new LogLoadedController(this);
 
   static styles = [
     globalStyles,
+    inspectorSectionStyles,
     css`
-      :host {
-        display: block;
-        /* Left inset lines the content up with the other sections' text. */
-        padding: var(--lana-space-sm) var(--lana-space-md) var(--lana-space-md)
-          var(--lana-section-inset);
-      }
-
-      .note {
-        color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
-      }
-
       .trends {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
@@ -84,7 +98,7 @@ export class GovernorTrends extends LitElement {
       }
 
       .trend__head {
-        padding-bottom: 4px;
+        padding-bottom: var(--lana-space-2xs);
       }
 
       .trend__label {
@@ -92,7 +106,7 @@ export class GovernorTrends extends LitElement {
         font-size: 0.7rem;
         letter-spacing: 0.06em;
         text-transform: uppercase;
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -112,7 +126,7 @@ export class GovernorTrends extends LitElement {
       }
 
       .trend__limit {
-        color: var(--vscode-descriptionForeground);
+        color: var(--lana-fg-muted);
       }
 
       .trend__chart {
@@ -180,24 +194,11 @@ export class GovernorTrends extends LitElement {
   }
 
   private _renderTrend(series: TrendSeries, logTotal: number) {
-    const maxRatio = Math.max(100, ...series.points.map((p) => p.ratio));
-    const x = (t: number) => (logTotal > 0 ? (t / logTotal) * VIEW_W : 0);
-    const y = (ratio: number) => VIEW_H - (ratio / maxRatio) * VIEW_H;
-
-    const line = series.points
-      .map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.t).toFixed(2)} ${y(p.ratio).toFixed(2)}`)
-      .join(' ');
-    // Consumption never resets inside a transaction, so hold the last sample's
-    // level out to the end of the log before closing down to the baseline.
-    const lastPoint = series.points[series.points.length - 1];
-    const lastY = lastPoint ? y(lastPoint.ratio).toFixed(2) : `${VIEW_H}`;
-    const area = `${line} L${VIEW_W} ${lastY} L${VIEW_W} ${VIEW_H} L0 ${VIEW_H} Z`;
-    const guideY = y(WARN_PERCENT).toFixed(2);
-
+    const { line, area, guideY, x } = trendGeometry(series, logTotal);
     const hovered = this._hover?.label === series.label ? this._hover.point : null;
     const hoverX = hovered ? x(hovered.t).toFixed(2) : null;
 
-    return html`<div class="trend trend--${tier(series.finalRatio)}">
+    return html`<div class="trend trend--${governorTier(series.finalRatio)}">
       <div class="trend__head">
         <span class="trend__label">${series.label}</span>
         <span class="trend__value"
@@ -220,7 +221,7 @@ export class GovernorTrends extends LitElement {
       >
         ${svg`
           <path class="trend__area" d=${area}></path>
-          <path class="trend__line" d=${`${line} L${VIEW_W} ${lastY}`}></path>
+          <path class="trend__line" d=${line}></path>
           <line class="trend__guide" x1="0" y1=${guideY} x2=${VIEW_W} y2=${guideY}></line>
           ${hoverX === null ? '' : svg`<line class="trend__hover" x1=${hoverX} y1="0" x2=${hoverX} y2=${VIEW_H}></line>`}
         `}

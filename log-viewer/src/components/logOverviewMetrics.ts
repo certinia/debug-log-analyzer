@@ -43,6 +43,42 @@ const rank = (gauge: GaugeMetric & { used: number }): RankedGauge => ({
   ratio: gauge.used / gauge.limit,
 });
 
+/** One namespace's final figures for a metric, with the ratio that ranked it. */
+export interface TightestMetric {
+  namespace: string;
+  used: number;
+  limit: number;
+  /** used/limit as a fraction. */
+  ratio: number;
+}
+
+/**
+ * The namespace whose final used/limit ratio is highest for `key`, or null when
+ * no namespace shows both a limit and usage. Per namespace, never the rolled-up
+ * totals (#862) — see {@link tightestGauges}.
+ */
+export function tightestNamespaceMetric(
+  limits: GovernorLimits,
+  key: keyof Limits,
+): TightestMetric | null {
+  return [...limits.byNamespace].reduce<TightestMetric | null>(
+    (tightest, [namespace, forNamespace]) => {
+      const { used, limit } = forNamespace[key];
+      if (limit <= 0 || used <= 0) {
+        return tightest;
+      }
+      const ratio = used / limit;
+      return !tightest || ratio > tightest.ratio ? { namespace, used, limit, ratio } : tightest;
+    },
+    null,
+  );
+}
+
+/** A metric's display label, naming the namespace unless it is the default one. */
+export function metricLabel(label: string, namespace: string): string {
+  return namespace === DEFAULT_NAMESPACE ? label : `${label} (${namespace})`;
+}
+
 /**
  * The whole-log gauges closest to a limit, tightest first, capped at
  * {@link MAX_GAUGES}. A metric with no limit or no usage is left out.
@@ -73,23 +109,17 @@ export function tightestGauges(limits: GovernorLimits): GaugeMetric[] {
         : [];
     }
 
-    let tightest: RankedGauge | null = null;
-    for (const [namespace, forNamespace] of limits.byNamespace) {
-      const metric = forNamespace[key];
-      if (metric.limit <= 0 || metric.used <= 0) {
-        continue;
-      }
-      const candidate = rank({
-        label: namespace === DEFAULT_NAMESPACE ? label : `${label} (${namespace})`,
-        found: metric.used,
-        used: metric.used,
-        limit: metric.limit,
-      });
-      if (!tightest || candidate.ratio > tightest.ratio) {
-        tightest = candidate;
-      }
-    }
-    return tightest ? [tightest] : [];
+    const tightest = tightestNamespaceMetric(limits, key);
+    return tightest
+      ? [
+          rank({
+            label: metricLabel(label, tightest.namespace),
+            found: tightest.used,
+            used: tightest.used,
+            limit: tightest.limit,
+          }),
+        ]
+      : [];
   });
 
   return ranked

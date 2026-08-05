@@ -6,11 +6,12 @@ import { customElement, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
-import { eventBus } from '../core/events/EventBus.js';
+import { LogLoadedController } from '../core/events/LogLoadedController.js';
 import { formatDuration } from '../core/utility/Util.js';
 import { DatabaseAccess } from '../features/database/services/Database.js';
-import { subscribeSettings, type LanaSettings } from '../features/settings/Settings.js';
+import { subscribeSettings } from '../features/settings/Settings.js';
 import { globalStyles } from '../styles/global.styles.js';
+import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { categoryPalette, categorySelfTimes } from './categoryTime.js';
 
 /**
@@ -21,34 +22,28 @@ import { categoryPalette, categorySelfTimes } from './categoryTime.js';
  */
 @customElement('category-time-bar')
 export class CategoryTimeBar extends LitElement {
-  /** The category under the pointer — over its slice or its legend item. */
+  /** The category under the pointer — over its slice or its legend item.
+   *  `onSlice` gates the bar's readout tip: only a slice hover shows it. */
   @state()
-  private _hovered: string | null = null;
+  private _hover: { category: string; onSlice: boolean } | null = null;
 
-  /** The slice whose readout shows — only slice hover, never legend hover. */
-  @state()
-  private _tip: string | null = null;
-
-  private _timeline: LanaSettings['timeline'] | null = null;
-  private _offLogLoaded: (() => void) | null = null;
+  private _color: (category: string) => string = categoryPalette(null);
   private _offSettings: (() => void) | null = null;
+
+  /** The bar has to follow the log itself. */
+  private readonly _logLoaded = new LogLoadedController(this);
 
   override connectedCallback() {
     super.connectedCallback();
-    // The inspector paints before the first parse and rebuilds only on a tab
-    // change or a selection, so the bar has to follow the log itself.
-    this._offLogLoaded = eventBus.on('log:loaded', () => this.requestUpdate());
     // The palette follows the timeline's theme settings live, so a theme change
     // recolours the bar the way it recolours the flame chart.
     this._offSettings = subscribeSettings((settings) => {
-      this._timeline = settings.timeline;
+      this._color = categoryPalette(settings.timeline);
       this.requestUpdate();
     });
   }
 
   override disconnectedCallback() {
-    this._offLogLoaded?.();
-    this._offLogLoaded = null;
     this._offSettings?.();
     this._offSettings = null;
     super.disconnectedCallback();
@@ -56,19 +51,8 @@ export class CategoryTimeBar extends LitElement {
 
   static styles = [
     globalStyles,
+    inspectorSectionStyles,
     css`
-      :host {
-        display: block;
-        /* Left inset lines the content up with the other sections' text. */
-        padding: var(--lana-space-sm) var(--lana-space-md) var(--lana-space-md)
-          var(--lana-section-inset);
-      }
-
-      .note {
-        color: var(--lana-fg-muted);
-        font-size: var(--lana-text-sm);
-      }
-
       .chart {
         position: relative;
       }
@@ -152,32 +136,17 @@ export class CategoryTimeBar extends LitElement {
       return html`<p class="note">No categorised time was recorded in this log.</p>`;
     }
 
-    const color = categoryPalette(this._timeline);
+    // Lay the slices out once; the tip and the rects share the geometry.
     let x = 0;
-    let tipCenter = 0;
-    const rects = slices.map((slice) => {
+    const laid = slices.map((slice) => {
+      const start = x;
       const width = (slice.selfTime / total) * 100;
-      const dim = this._hovered !== null && this._hovered !== slice.category;
-      const rect = svg`<rect
-        class=${dim ? 'bar__slice bar__slice--dim' : 'bar__slice'}
-        x=${x.toFixed(3)} y="0" width=${width.toFixed(3)} height="4"
-        fill=${color(slice.category)}
-        @pointerenter=${() => {
-          this._hovered = slice.category;
-          this._tip = slice.category;
-        }}
-        @pointerleave=${() => {
-          this._hovered = null;
-          this._tip = null;
-        }}
-      ></rect>`;
-      if (slice.category === this._tip) {
-        tipCenter = x + width / 2;
-      }
       x += width;
-      return rect;
+      return { ...slice, start, width };
     });
-    const tipSlice = this._tip ? slices.find((s) => s.category === this._tip) : undefined;
+    const hover = this._hover;
+    const tipSlice = hover?.onSlice ? laid.find((s) => s.category === hover.category) : undefined;
+    const tipCenter = tipSlice ? tipSlice.start + tipSlice.width / 2 : 0;
 
     return html`
       <div class="chart">
@@ -188,7 +157,19 @@ export class CategoryTimeBar extends LitElement {
           role="img"
           aria-label="Time by category"
         >
-          ${rects}
+          ${laid.map(
+            (slice) => svg`<rect
+              class=${
+                hover !== null && hover.category !== slice.category
+                  ? 'bar__slice bar__slice--dim'
+                  : 'bar__slice'
+              }
+              x=${slice.start.toFixed(3)} y="0" width=${slice.width.toFixed(3)} height="4"
+              fill=${this._color(slice.category)}
+              @pointerenter=${() => (this._hover = { category: slice.category, onSlice: true })}
+              @pointerleave=${() => (this._hover = null)}
+            ></rect>`,
+          )}
         </svg>
         ${
           tipSlice
@@ -200,36 +181,38 @@ export class CategoryTimeBar extends LitElement {
                     : { right: `${(100 - tipCenter).toFixed(1)}%` },
                 )}
               >
-                ${tipSlice.category} · ${formatDuration(tipSlice.selfTime)} ·
-                ${((tipSlice.selfTime / total) * 100).toFixed(1)}%
+                ${tipSlice.category} · ${this._readout(tipSlice.selfTime, total)}
               </div>`
             : ''
         }
       </div>
       <div class="legend">
-        ${slices.map(
+        ${laid.map(
           (slice) => html`
             <span
               class=${classMap({
                 legend__item: true,
-                'legend__item--active': this._hovered === slice.category,
+                'legend__item--active': hover?.category === slice.category,
               })}
-              @pointerenter=${() => (this._hovered = slice.category)}
-              @pointerleave=${() => (this._hovered = null)}
+              @pointerenter=${() => (this._hover = { category: slice.category, onSlice: false })}
+              @pointerleave=${() => (this._hover = null)}
             >
               <span
                 class="legend__swatch"
-                style=${styleMap({ background: color(slice.category) })}
+                style=${styleMap({ background: this._color(slice.category) })}
               ></span>
               <span>${slice.category}</span>
-              <span class="legend__value">
-                ${formatDuration(slice.selfTime)} · ${((slice.selfTime / total) * 100).toFixed(1)}%
-              </span>
+              <span class="legend__value"> ${this._readout(slice.selfTime, total)} </span>
             </span>
           `,
         )}
       </div>
     `;
+  }
+
+  /** `duration · percent` — the tip and the legend show the same figures. */
+  private _readout(selfTime: number, total: number): string {
+    return `${formatDuration(selfTime)} · ${((selfTime / total) * 100).toFixed(1)}%`;
   }
 }
 
