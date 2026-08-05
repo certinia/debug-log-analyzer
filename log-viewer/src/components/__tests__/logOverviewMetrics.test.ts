@@ -41,6 +41,17 @@ describe('seriesGauges', () => {
     expect(gauges.map((g) => g.label)).not.toContain('DML');
   });
 
+  it('reads heap from its peak, not the last event: deallocations pull the line down', () => {
+    const gauges = seriesGauges(
+      timeSeries([
+        seriesEvent(1_000, { heapSize: { used: 5_000_000, limit: 6_000_000 } }),
+        seriesEvent(2_000, { heapSize: { used: 1_000_000, limit: 6_000_000 } }),
+      ]),
+    );
+
+    expect(gauges[0]).toMatchObject({ label: 'Heap Size', used: 5_000_000, limit: 6_000_000 });
+  });
+
   it('formats heap as bytes', () => {
     const gauges = seriesGauges(
       timeSeries([seriesEvent(1_000, { heapSize: { used: 5_400_000, limit: 6_000_000 } })]),

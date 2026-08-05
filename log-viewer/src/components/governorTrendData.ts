@@ -24,10 +24,10 @@ export interface TrendPoint {
 export interface TrendSeries {
   label: string;
   points: TrendPoint[];
-  /** Final consumption, for the value column and the tier colour. */
+  /** Final consumption (the peak for heap), for the value column and the tier colour. */
   used: number;
   limit: number;
-  /** Final used/limit as a percentage — the series' rank. */
+  /** used/limit as a percentage — the series' rank. */
   finalRatio: number;
   format: (value: number) => string;
 }

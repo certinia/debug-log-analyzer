@@ -48,13 +48,25 @@ const GOVERNOR_METRICS: ReadonlyArray<{ key: keyof Limits; label: string }> = [
   { key: 'mobileApexPushCalls', label: 'Mobile Push Calls' },
 ];
 
-/** A governor metric's final level, ranked by how close it sits to its limit. */
+/** A metric's highest level across the series, for the non-monotonic metrics. */
+function peakUsed(series: HeatStripTimeSeries, key: keyof Limits): number {
+  let peak = 0;
+  for (const event of series.events) {
+    const used = event.values.get(key)?.used ?? 0;
+    if (used > peak) {
+      peak = used;
+    }
+  }
+  return peak;
+}
+
+/** A governor metric's level (final, or the peak for heap), ranked against its limit. */
 export interface RankedLimitMetric {
   key: keyof Limits;
   label: string;
   used: number;
   limit: number;
-  /** Final used/limit as a percentage — the metric's rank. */
+  /** used/limit as a percentage — the metric's rank. */
   ratio: number;
 }
 
@@ -63,8 +75,10 @@ export interface RankedLimitMetric {
  * read from the metric strip's time series — the same source the timeline and
  * the trend charts draw, so every surface shows one figure per metric. The
  * series is dense (every event carries every known metric forward), so the
- * last event holds each metric's final level. A metric with no consumption is
- * left out.
+ * last event holds each metric's final level. Heap is the one non-monotonic
+ * metric — deallocations pull the line back down — so it reads its peak across
+ * the series, matching the "Maximum heap size" governor. A metric with no
+ * consumption is left out.
  *
  * These are whole-transaction totals: the series sums usage across
  * namespaces, so in a namespaced org a metric can pass 100% of a single
@@ -79,16 +93,12 @@ export function rankedLimitMetrics(series: HeatStripTimeSeries, max: number): Ra
 
   return GOVERNOR_METRICS.flatMap<RankedLimitMetric>(({ key, label }) => {
     const value = final.get(key);
-    return value && value.limit > 0 && value.used > 0
-      ? [
-          {
-            key,
-            label,
-            used: value.used,
-            limit: value.limit,
-            ratio: (value.used / value.limit) * 100,
-          },
-        ]
+    if (!value || value.limit <= 0) {
+      return [];
+    }
+    const used = key === 'heapSize' ? peakUsed(series, key) : value.used;
+    return used > 0
+      ? [{ key, label, used, limit: value.limit, ratio: (used / value.limit) * 100 }]
       : [];
   })
     .sort((a, b) => b.ratio - a.ratio)
