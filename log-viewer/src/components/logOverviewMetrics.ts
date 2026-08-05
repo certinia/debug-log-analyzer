@@ -11,11 +11,11 @@ import type { GaugeMetric } from '../features/database/components/GovernorSummar
 const MAX_GAUGES = 6;
 
 /**
- * Every governor-tracked metric, with the label its gauge shows. A local list
- * rather than the timeline adapter's `APEX_METRICS`, which is internal to that
- * feature.
+ * Every governor-tracked metric, with the label the inspector shows for it. Kept
+ * here rather than taken from the timeline adapter's `APEX_METRICS`, which is
+ * internal to that feature.
  */
-const METRICS: ReadonlyArray<{ key: keyof Limits; label: string }> = [
+export const METRICS: ReadonlyArray<{ key: keyof Limits; label: string }> = [
   { key: 'cpuTime', label: 'CPU Time' },
   { key: 'heapSize', label: 'Heap Size' },
   { key: 'soqlQueries', label: 'SOQL' },

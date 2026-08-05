@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dock it left, right or bottom, drag to resize, and collapse the sections you don't need — the layout is remembered.
   - Right-click a row for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
   - **Log overview**: with nothing selected, the Inspector shows the whole log instead of sitting empty — the six governor metrics closest to their limit, each as `used / limit`. A metric is read from the namespace nearest its own limit, never from a sum across namespaces.
+  - With nothing selected the **Analysis** tab lists **Findings** — log-wide diagnostics built from what the log already holds: truncation, governor breaches, exceptions, query-plan verdicts, SOQL optimization tips grouped with a count, statements repeated from one line (the usual sign of a query or DML in a loop), debug-statement cost and the methods with the most self time. Click a finding to reveal the row behind it in the Analysis grid.
 - 🗄️ **Database Analysis**: governor-limit visibility and SOSL usage. ([#162])
   - 📏 **Governor-limit overview**: SOQL, SOSL, DML and query/DML rows shown as `used / limit`, colored as they approach the limit.
   - 🧮 **Found vs Counted**: each section reconciles statements found in the log against the governor-counted total, flagging queries that didn't consume the limit (e.g. custom metadata, which is free unless it selects a long text area field or runs in a Flow).

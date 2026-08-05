@@ -60,10 +60,16 @@ describe('buildDetailSections', () => {
   });
 
   it('builds the whole-log overview when nothing is selected, for every source', async () => {
-    for (const source of ['timeline', 'calltree', 'analysis', 'database'] as const) {
+    for (const source of ['timeline', 'calltree', 'database'] as const) {
       const sections = await buildDetailSections(source, null);
       expect(sections.map((s) => s.id)).toEqual(['overview']);
       expect(sections[0]?.title).toBe('Log overview');
     }
+  });
+
+  it('adds the findings section on Analysis, which is that tab at log scope', async () => {
+    const sections = await buildDetailSections('analysis', null);
+    expect(sections.map((s) => s.id)).toEqual(['overview', 'findings']);
+    expect(sections[1]?.title).toBe('Findings');
   });
 });
