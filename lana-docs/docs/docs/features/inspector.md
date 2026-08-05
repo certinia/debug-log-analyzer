@@ -31,6 +31,16 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 
 Collapse any section by clicking its header, or drag the divider between two to resize them. It's one panel, so your layout follows you from tab to tab, and is restored next time.
 
+### Nothing selected
+
+With no selection the inspector shows the whole log. Every tab starts with a **Log overview** — the six governor metrics closest to their limit, each as `used / limit`, read from the namespace nearest its own limit. The **Timeline** tab adds:
+
+- **Time by category** – the log's self time as one stacked bar, in the flame chart's own colours, with a legend. Self time, so the bar always totals the log.
+- **Governor usage over time** – small area charts of the metrics nearest their limits, drawn from the log's `CUMULATIVE_LIMIT_USAGE` snapshots. Hover a chart to read the value at any point in the log.
+- **Call tree** – every root event in the log, in the same three views as the scoped tree.
+
+Select a row and the sections re-scope to it; deselect and the whole-log view returns.
+
 ### Row actions
 
 Right-click a row in the **Call stack** or **Call tree** for:
