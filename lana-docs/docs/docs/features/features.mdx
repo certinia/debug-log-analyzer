@@ -23,10 +23,6 @@ import DocCardList from '@theme/DocCardList';
 
 Explore the Apex Log Analyzer for Salesforce debug logs features including interactive timelines, detailed Time Order, Aggregated, and Bottom-Up call trees, in-depth analysis, database insights, and powerful search capabilities to streamline your debugging and performance tuning.
 
-## 🪪 Transaction identity
-
-The header says what ran, who ran it, and when — the entry point (e.g. `Anonymous Apex`, `Trigger MyTrigger`, a VF page), the user, and the wall-clock start time, shown after the log size and duration. Hover an item for its full value: the raw entry point, the user's email, or the start time with its timezone. As the window narrows the items shed one at a time, and their values stay in the log-name tooltip. A log that lacks the data (for example a cropped log with no `USER_INFO` line) omits that item.
-
 ## 🚦 Log problems and notifications
 
 **Log problems** are problems found in the log itself — governor limit exceptions, fatal errors, skipped lines. A chip shows the worst severity's icon with a count badge, and a tick when the log is clean. **Notifications** are messages about the tool rather than the log — today, parser diagnostics for log lines it couldn't understand. The two are kept apart so they don't read as one severity count.

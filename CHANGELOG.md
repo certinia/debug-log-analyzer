@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Filter by **Namespace**, **Object** or **Caller Namespace**, or by a **Row Count** / **Time Taken** min–max range; active filters are highlighted.
   - Collapse behind a **Filter** button on narrow window. ([#873])
 - 🔴 **Timeline exception markers**: exceptions show as red lines, with a **Throws** count in method tooltips. ([#828])
-- 🪪 **Header identity**: the header now says what ran, who ran it, and when — entry point, user, and start time after the log size and duration. Hover for the full values (raw entry point, email, start time with timezone). Items shed one at a time as the window narrows; their values stay in the log-name tooltip.
+- 🪪 **Header**: the header now includes entry point, user, and start time with hover for more details.
 
 ### Changed
 
