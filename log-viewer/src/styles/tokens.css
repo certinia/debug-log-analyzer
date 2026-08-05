@@ -52,6 +52,12 @@
      (11px suits only uppercase micro-labels, whose caps height carries the size.) */
   --lana-text-md: calc(var(--vscode-font-size, 13px) * 0.92);
 
+  /* Header metadata (size · duration · identity) — just under the title size. */
+  --lana-text-meta: 0.9rem;
+
+  /* Monospace, for text whose alignment carries meaning: stacks, code. */
+  --lana-font-mono: var(--vscode-editor-font-family, monospace);
+
   /* Surfaces — the same registered colors VS Code's own chrome is built from.
      `surface-border` is absent before the size-token registry (stable 1.128 ships
      none of the `--vscode-surface-*` set), so its fallback chain is load-bearing. */
@@ -64,9 +70,15 @@
     var(--vscode-editor-background, transparent)
   );
 
+  /* Code surface — the fill VS Code gives inline code blocks in its own markdown. */
+  --lana-code-bg: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.12));
+
   /* Skeleton fill — a tint of the foreground, so it stays visible on the themes
      that set `editorWidget.background` to the editor background. */
   --lana-skeleton-bg: color-mix(in srgb, var(--vscode-foreground, #cccccc) 12%, transparent);
+
+  /* Floating surfaces — tooltips and popovers, matching VS Code's widget chrome. */
+  --lana-popover-bg: var(--vscode-editorWidget-background, #252526);
 
   --lana-shadow-popover: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
   --lana-shadow-overlay: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.5));
@@ -75,11 +87,28 @@
   --lana-badge-bg: var(--vscode-badge-background, #616161);
   --lana-badge-fg: var(--vscode-badge-foreground, #f8f8f8);
 
-  /* Primary text. */
-  --lana-fg: var(--vscode-foreground, #cccccc);
+  /* Severity — the same colours VS Code's Problems panel marks its rows with. */
+  --lana-severity-error: var(
+    --vscode-problemsErrorIcon-foreground,
+    var(--vscode-errorForeground, #f14c4c)
+  );
+  --lana-severity-warning: var(
+    --vscode-problemsWarningIcon-foreground,
+    var(--vscode-editorWarning-foreground, #cca700)
+  );
+  --lana-severity-info: var(
+    --vscode-problemsInfoIcon-foreground,
+    var(--vscode-editorInfo-foreground, #3794ff)
+  );
+
+  /* Row hover, for lists whose rows can be opened or picked. */
+  --lana-row-hover-bg: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
 
   /* Secondary text — metadata that must not compete with the content it annotates. */
   --lana-fg-muted: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+
+  /* Primary text, for promoting muted text back to full strength. */
+  --lana-fg: var(--vscode-foreground, #cccccc);
 
   /* The hairline between panes, and around a docked one. */
   --lana-panel-divider: var(--vscode-sideBar-border, transparent);
