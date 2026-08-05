@@ -1,22 +1,38 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits, Limits } from 'apex-log-parser';
+import type { Limits } from 'apex-log-parser';
 
-import { DEFAULT_NAMESPACE } from '../core/utility/CallerNamespace.js';
 import { formatByteSize } from '../core/utility/Util.js';
 import type { GaugeMetric } from '../features/database/components/GovernorSummary.js';
+import type { HeatStripTimeSeries } from '../features/timeline/types/flamechart.types.js';
 
 /** How many gauges the strip shows before it stops being at-a-glance. */
 const MAX_GAUGES = 6;
 
 /**
+ * Why governor figures are missing, and the likely fix. Shared by every
+ * surface that needs the cumulative snapshots (`LogOverview`,
+ * `GovernorTrends`) so they all give the same reason. The parser samples the
+ * snapshots from CUMULATIVE_LIMIT_USAGE events, which the Apex Profiling
+ * debug category emits at INFO and above — though some INFO logs still lack
+ * them, so the copy hedges.
+ */
+export const NO_CUMULATIVE_LIMITS_TEXT =
+  'This log has no CUMULATIVE_LIMIT_USAGE events, so governor totals are unknown. This can happen when the Apex Profiling debug level is below INFO.';
+
+/** Short caveat under figures that were estimated without cumulative snapshots. */
+export const ESTIMATED_LIMITS_TEXT =
+  'No CUMULATIVE_LIMIT_USAGE events in the log; figures are estimated from logged events. An Apex Profiling debug level of INFO or higher usually includes them.';
+
+/**
  * Every governor-tracked metric, with the label its gauge shows. A local list
  * rather than the timeline adapter's `APEX_METRICS`, which is internal to that
- * feature. Shared with the governor trend charts, so both surfaces name the
- * same metrics the same way.
+ * feature. The gauges and the governor trend charts both read it through
+ * {@link rankedLimitMetrics}, so both surfaces name the same metrics the same
+ * way.
  */
-export const GOVERNOR_METRICS: ReadonlyArray<{ key: keyof Limits; label: string }> = [
+const GOVERNOR_METRICS: ReadonlyArray<{ key: keyof Limits; label: string }> = [
   { key: 'cpuTime', label: 'CPU Time' },
   { key: 'heapSize', label: 'Heap Size' },
   { key: 'soqlQueries', label: 'SOQL' },
@@ -32,98 +48,64 @@ export const GOVERNOR_METRICS: ReadonlyArray<{ key: keyof Limits; label: string 
   { key: 'mobileApexPushCalls', label: 'Mobile Push Calls' },
 ];
 
-interface RankedGauge {
-  gauge: GaugeMetric;
-  /** Fraction of the limit consumed; ranks the strip and is then dropped. */
-  ratio: number;
-}
-
-const rank = (gauge: GaugeMetric & { used: number }): RankedGauge => ({
-  gauge,
-  ratio: gauge.used / gauge.limit,
-});
-
-/** One namespace's final figures for a metric, with the ratio that ranked it. */
-export interface TightestMetric {
-  namespace: string;
+/** A governor metric's final level, ranked by how close it sits to its limit. */
+export interface RankedLimitMetric {
+  key: keyof Limits;
+  label: string;
   used: number;
   limit: number;
-  /** used/limit as a fraction. */
+  /** Final used/limit as a percentage — the metric's rank. */
   ratio: number;
 }
 
 /**
- * The namespace whose final used/limit ratio is highest for `key`, or null when
- * no namespace shows both a limit and usage. Per namespace, never the rolled-up
- * totals (#862) — see {@link tightestGauges}.
+ * The governor metrics closest to a limit, tightest first, capped at `max`,
+ * read from the metric strip's time series — the same source the timeline and
+ * the trend charts draw, so every surface shows one figure per metric. The
+ * series is dense (every event carries every known metric forward), so the
+ * last event holds each metric's final level. A metric with no consumption is
+ * left out.
+ *
+ * These are whole-transaction totals: the series sums usage across
+ * namespaces, so in a namespaced org a metric can pass 100% of a single
+ * namespace's limit without a breach (#862) — accepted so every surface
+ * matches the charts and the strip.
  */
-export function tightestNamespaceMetric(
-  limits: GovernorLimits,
-  key: keyof Limits,
-): TightestMetric | null {
-  return [...limits.byNamespace].reduce<TightestMetric | null>(
-    (tightest, [namespace, forNamespace]) => {
-      const { used, limit } = forNamespace[key];
-      if (limit <= 0 || used <= 0) {
-        return tightest;
-      }
-      const ratio = used / limit;
-      return !tightest || ratio > tightest.ratio ? { namespace, used, limit, ratio } : tightest;
-    },
-    null,
-  );
-}
+export function rankedLimitMetrics(series: HeatStripTimeSeries, max: number): RankedLimitMetric[] {
+  const final = series.events[series.events.length - 1]?.values;
+  if (!final) {
+    return [];
+  }
 
-/** A metric's display label, naming the namespace unless it is the default one. */
-export function metricLabel(label: string, namespace: string): string {
-  return namespace === DEFAULT_NAMESPACE ? label : `${label} (${namespace})`;
+  return GOVERNOR_METRICS.flatMap<RankedLimitMetric>(({ key, label }) => {
+    const value = final.get(key);
+    return value && value.limit > 0 && value.used > 0
+      ? [
+          {
+            key,
+            label,
+            used: value.used,
+            limit: value.limit,
+            ratio: (value.used / value.limit) * 100,
+          },
+        ]
+      : [];
+  })
+    .sort((a, b) => b.ratio - a.ratio)
+    .slice(0, max);
 }
 
 /**
- * The whole-log gauges closest to a limit, tightest first, capped at
- * {@link MAX_GAUGES}. A metric with no limit or no usage is left out.
- *
- * Read per namespace, never from the rolled-up totals: the roll-up sums `used`
- * across namespaces and so overstates every metric (#862). Each namespace has
- * its own budget, so the transaction's real risk is the tightest single
- * percentage — not a sum over a sum. The namespace is named in the label unless
- * it is the default one.
- *
- * Heap is the one exception: the parser stores a transaction-wide peak in the
- * roll-up, and each namespace on its own undercounts it.
+ * The whole-log gauges closest to a limit, capped at {@link MAX_GAUGES}.
+ * Without cumulative snapshots the totals are estimates, and the caller shows
+ * {@link ESTIMATED_LIMITS_TEXT} alongside them.
  */
-export function tightestGauges(limits: GovernorLimits): GaugeMetric[] {
-  const ranked = GOVERNOR_METRICS.flatMap<RankedGauge>(({ key, label }) => {
-    if (key === 'heapSize') {
-      const heap = limits.heapSize;
-      return heap.limit > 0 && heap.used > 0
-        ? [
-            rank({
-              label,
-              found: heap.used,
-              used: heap.used,
-              limit: heap.limit,
-              format: formatByteSize,
-            }),
-          ]
-        : [];
-    }
-
-    const tightest = tightestNamespaceMetric(limits, key);
-    return tightest
-      ? [
-          rank({
-            label: metricLabel(label, tightest.namespace),
-            found: tightest.used,
-            used: tightest.used,
-            limit: tightest.limit,
-          }),
-        ]
-      : [];
-  });
-
-  return ranked
-    .sort((a, b) => b.ratio - a.ratio)
-    .slice(0, MAX_GAUGES)
-    .map((entry) => entry.gauge);
+export function seriesGauges(series: HeatStripTimeSeries): GaugeMetric[] {
+  return rankedLimitMetrics(series, MAX_GAUGES).map(({ key, label, used, limit }) => ({
+    label,
+    found: used,
+    used,
+    limit,
+    ...(key === 'heapSize' ? { format: formatByteSize } : {}),
+  }));
 }

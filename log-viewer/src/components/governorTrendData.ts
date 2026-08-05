@@ -1,15 +1,16 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { GovernorLimits } from 'apex-log-parser';
-
 import { formatByteSize, formatInteger } from '../core/utility/Util.js';
-import { GOVERNOR_METRICS, metricLabel, tightestNamespaceMetric } from './logOverviewMetrics.js';
+import type { HeatStripTimeSeries } from '../features/timeline/types/flamechart.types.js';
+import { rankedLimitMetrics } from './logOverviewMetrics.js';
 
 /** How many trend charts to draw before the section stops being at-a-glance. */
 const MAX_TRENDS = 4;
 
-/** One sampled point of a metric's consumption. */
+/** One sampled point of a metric's consumption. The metric's limit is fixed
+ *  for the whole series by the series builder, so it lives on
+ *  {@link TrendSeries}, not here. */
 export interface TrendPoint {
   /** Nanoseconds since the start of the log. */
   t: number;
@@ -17,8 +18,6 @@ export interface TrendPoint {
   ratio: number;
   /** Raw consumption at this instant, for the hover readout. */
   used: number;
-  /** The limit recorded in this point's own snapshot. */
-  limit: number;
 }
 
 /** One metric's usage-over-time series, ready to chart. */
@@ -34,73 +33,50 @@ export interface TrendSeries {
 }
 
 /** Memo of {@link governorTrendSeries}: the charts re-render on every hover,
- *  but a log's snapshots never change, and the stable series identity also
- *  feeds the component's per-series geometry memo. */
-const seriesCache = new WeakMap<GovernorLimits, TrendSeries[]>();
+ *  but the input series is built once per log, and the stable output identity
+ *  also feeds the component's per-series geometry memo. */
+const seriesCache = new WeakMap<HeatStripTimeSeries, TrendSeries[]>();
 
 /**
  * Usage-over-time series for the governor metrics closest to their limits,
- * tightest first, capped at {@link MAX_TRENDS}.
+ * tightest first, capped at {@link MAX_TRENDS} — the same ranking the Log
+ * overview's gauges use (see `rankedLimitMetrics`), so the charts and the
+ * gauges always pick and order metrics identically. Points are then sampled
+ * only for the metrics that made the cut.
  *
- * For each metric the tightest namespace is chosen by its final used/limit
- * ratio — per namespace, never a sum over namespaces (#862) — and that
- * namespace's snapshots become the points. Heap therefore diverges from the
- * gauges, which read heap's transaction-wide peak from the roll-up: a trend
- * needs one namespace's ordered snapshots. Each point's percentage uses the
- * limit recorded in its own snapshot, never a hardcoded one: limits differ
- * between synchronous and asynchronous transactions. A leading zero point
- * anchors every series at the start of the log.
- *
- * A metric needs at least two snapshots to show a trend; with fewer, it is
- * left out (the gauges above already show its final value).
+ * The input is the metric strip's own time series (see `apexLimitTimeSeries`),
+ * so the charts and the strip always show the same figures. The series is
+ * dense — every emitted timestamp carries every known metric — so a single
+ * observation is enough to draw. A leading zero point anchors every series at
+ * the start of the log. A metric whose final consumption is zero is left out:
+ * a flat line at zero says nothing the gauges do not.
  */
-export function governorTrendSeries(limits: GovernorLimits): TrendSeries[] {
-  const cached = seriesCache.get(limits);
+export function governorTrendSeries(series: HeatStripTimeSeries): TrendSeries[] {
+  const cached = seriesCache.get(series);
   if (cached) {
     return cached;
   }
 
-  const series = GOVERNOR_METRICS.flatMap<TrendSeries>(({ key, label }) => {
-    const tightest = tightestNamespaceMetric(limits, key);
-    if (!tightest) {
-      return [];
-    }
-
-    const sampled = limits.snapshots.flatMap<TrendPoint>((snapshot) => {
-      const metric = snapshot.limits[key];
-      return snapshot.namespace !== tightest.namespace || metric.limit <= 0
-        ? []
-        : [
-            {
-              t: snapshot.timestamp,
-              ratio: (metric.used / metric.limit) * 100,
-              used: metric.used,
-              limit: metric.limit,
-            },
-          ];
-    });
-    const firstSample = sampled[0];
-    if (!firstSample || sampled.length < 2) {
-      // Fewer than two real snapshots — a single sample is a gauge, not a trend.
-      return [];
-    }
-
-    return [
-      {
-        label: metricLabel(label, tightest.namespace),
-        // A zero point anchors the series at the start of the log; nothing was
-        // consumed yet, so it borrows the first sample's limit.
-        points: [{ t: 0, ratio: 0, used: 0, limit: firstSample.limit }, ...sampled],
-        used: tightest.used,
-        limit: tightest.limit,
-        finalRatio: tightest.ratio * 100,
-        format: key === 'heapSize' ? formatByteSize : formatInteger,
-      },
-    ];
-  });
-
-  const ranked = series.sort((a, b) => b.finalRatio - a.finalRatio).slice(0, MAX_TRENDS);
-  seriesCache.set(limits, ranked);
+  const ranked = rankedLimitMetrics(series, MAX_TRENDS).map<TrendSeries>(
+    ({ key, label, used, limit, ratio }) => ({
+      label,
+      // A zero point anchors the series at the start of the log.
+      points: [
+        { t: 0, ratio: 0, used: 0 },
+        ...series.events.flatMap<TrendPoint>((event) => {
+          const value = event.values.get(key);
+          return value
+            ? [{ t: event.timestamp, ratio: (value.used / value.limit) * 100, used: value.used }]
+            : [];
+        }),
+      ],
+      used,
+      limit,
+      finalRatio: ratio,
+      format: key === 'heapSize' ? formatByteSize : formatInteger,
+    }),
+  );
+  seriesCache.set(series, ranked);
   return ranked;
 }
 
@@ -108,9 +84,8 @@ export function governorTrendSeries(limits: GovernorLimits): TrendSeries[] {
  * The series' value at time `t`, linearly interpolated between the samples
  * around it — a moving readout that follows the drawn line exactly. Past the
  * last sample the level holds and only the timestamp moves, matching the
- * chart's area (consumption never resets inside a transaction). Each
- * interpolated point reports its segment's ending limit. Points must be
- * ascending by `t`, which {@link governorTrendSeries} guarantees. Returns
+ * chart's area (consumption never resets inside a transaction). Points must
+ * be ascending by `t`, which {@link governorTrendSeries} guarantees. Returns
  * `null` only for an empty series.
  */
 export function pointAt(points: TrendPoint[], t: number): TrendPoint | null {
@@ -125,15 +100,25 @@ export function pointAt(points: TrendPoint[], t: number): TrendPoint | null {
   if (t >= last.t) {
     return { ...last, t };
   }
-  const i = points.findIndex((point) => t <= point.t);
-  const next = points[i]!; // findIndex hit: first.t < t <= last.t
-  const prev = points[i - 1]!; // i >= 1: t > first.t
+  // Binary search for the first sample at or after t: this runs on every
+  // pointer move, and a dense series holds thousands of points.
+  let lo = 1;
+  let hi = points.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (points[mid]!.t < t) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  const next = points[lo]!; // search hit: first.t < t <= last.t
+  const prev = points[lo - 1]!; // lo >= 1: t > first.t
   const span = next.t - prev.t;
   const fraction = span > 0 ? (t - prev.t) / span : 1;
   return {
     t,
     ratio: prev.ratio + fraction * (next.ratio - prev.ratio),
     used: prev.used + fraction * (next.used - prev.used),
-    limit: next.limit,
   };
 }

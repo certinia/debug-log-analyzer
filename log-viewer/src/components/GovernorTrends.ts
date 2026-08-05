@@ -11,6 +11,7 @@ import {
   governorTier,
 } from '../features/database/components/GovernorSummary.js';
 import { DatabaseAccess } from '../features/database/services/Database.js';
+import { apexLimitTimeSeries } from '../features/timeline/optimised/apex-limit-series.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import {
@@ -19,6 +20,7 @@ import {
   type TrendPoint,
   type TrendSeries,
 } from './governorTrendData.js';
+import { NO_CUMULATIVE_LIMITS_TEXT } from './logOverviewMetrics.js';
 
 /** Chart-space size; the SVG stretches to fill its row. */
 const VIEW_W = 100;
@@ -52,7 +54,7 @@ function trendGeometry(series: TrendSeries, logTotal: number): TrendGeometry {
     .join(' ');
   // Consumption never resets inside a transaction, so hold the last sample's
   // level out to the end of the log before closing down to the baseline.
-  // A series always holds an anchor plus at least two samples.
+  // A series always holds an anchor plus at least one sample.
   const lastY = y(series.points[series.points.length - 1]!.ratio).toFixed(2);
   const line = `${path} L${VIEW_W} ${lastY}`;
 
@@ -181,16 +183,15 @@ export class GovernorTrends extends LitElement {
     if (!apexLog) {
       return html`<p class="note">No log is loaded.</p>`;
     }
-    const series = governorTrendSeries(apexLog.governorLimits);
+    const series = governorTrendSeries(apexLimitTimeSeries(apexLog));
     if (!series.length) {
-      return html`<p class="note">
-        This log holds too few limit snapshots to draw a trend. The parser samples them from
-        CUMULATIVE_LIMIT_USAGE events.
-      </p>`;
+      return html`<p class="note">${NO_CUMULATIVE_LIMITS_TEXT}</p>`;
     }
 
+    // With no cumulative snapshots the series draws from granular events and
+    // the default limits — the Log overview above carries the estimated note.
     const logTotal = apexLog.duration.total;
-    return html`<div class="trends"> ${series.map((s) => this._renderTrend(s, logTotal))} </div>`;
+    return html`<div class="trends">${series.map((s) => this._renderTrend(s, logTotal))}</div>`;
   }
 
   private _renderTrend(series: TrendSeries, logTotal: number) {
@@ -204,10 +205,7 @@ export class GovernorTrends extends LitElement {
         <span class="trend__value"
           >${hovered ? html`${formatDuration(hovered.t)} · ` : ''}${series.format(
             hovered ? hovered.used : series.used,
-          )}
-          <span class="trend__limit"
-            >/ ${series.format(hovered ? hovered.limit : series.limit)}</span
-          ></span
+          )} <span class="trend__limit">/ ${series.format(series.limit)}</span></span
         >
       </div>
       <svg

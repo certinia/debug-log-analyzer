@@ -45,7 +45,7 @@ import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.j
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
 import { FrameTooltipRenderer } from './FrameTooltipRenderer.js';
-import { buildApexLimitTimeSeries } from './apex-limit-series.js';
+import { apexLimitTimeSeries } from './apex-limit-series.js';
 
 interface ApexTimelineOptions extends TimelineOptions {
   themeName?: string | null;
@@ -189,8 +189,9 @@ export class ApexLogTimeline {
     // Wire up search event listeners
     this.enableSearch();
 
-    // Build the dense governor-limit series (cumulative snapshots + granular events).
-    const heatStripSeries = buildApexLimitTimeSeries(this.apexLog, this.events);
+    // The dense governor-limit series (cumulative snapshots + granular events),
+    // memoised per log and shared with the inspector's governor trend charts.
+    const heatStripSeries = apexLimitTimeSeries(this.apexLog);
     this.flamechart.setHeatStripTimeSeries(
       heatStripSeries.events.length > 0 ? heatStripSeries : null,
     );

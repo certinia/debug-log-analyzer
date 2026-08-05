@@ -33,10 +33,10 @@ Collapse any section by clicking its header, or drag the divider between two to 
 
 ### Nothing selected
 
-With no selection the inspector shows the whole log. Every tab starts with a **Log overview** — the six governor metrics closest to their limit, each as `used / limit`, read from the namespace nearest its own limit. The **Timeline** tab adds:
+With no selection the inspector shows the whole log. Every tab starts with a **Log overview** — the six governor metrics closest to their limit, each as `used / limit`, the same whole-transaction totals the timeline's metric strip shows. When the log has no `CUMULATIVE_LIMIT_USAGE` events the figures are estimated from the logged events instead, and a note says so. The **Timeline** tab adds:
 
 - **Time by category** – the log's self time as one stacked bar, in the flame chart's own colours, with a legend. Self time, so the bar always totals the log.
-- **Governor usage over time** – small area charts of the metrics nearest their limits, drawn from the log's `CUMULATIVE_LIMIT_USAGE` snapshots. Hover a chart to read the value at any point in the log.
+- **Governor usage over time** – small area charts of the metrics nearest their limits, drawn from the same data as the timeline's metric strip: `CUMULATIVE_LIMIT_USAGE` snapshots plus the log's own SOQL, DML and heap events. Without snapshots the figures are estimated. Hover a chart to read the value at any point in the log.
 - **Call tree** – every root event in the log, in the same three views as the scoped tree.
 
 Select a row and the sections re-scope to it; deselect and the whole-log view returns.
