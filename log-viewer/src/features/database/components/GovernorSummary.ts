@@ -62,7 +62,9 @@ export class GovernorSummary extends LitElement {
         display: flex;
         flex-direction: column;
         gap: 4px;
-        min-width: 6.5rem;
+        /* Floor at the gauge's own nowrap value so a narrowing panel wraps the
+           row instead of letting the text paint over the next gauge. */
+        min-width: fit-content;
         flex: 1 1 6.5rem;
         max-width: 12rem;
       }
