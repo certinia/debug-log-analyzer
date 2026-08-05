@@ -62,7 +62,7 @@ describe('buildDetailSections', () => {
   });
 
   it('builds the whole-log overview when nothing is selected, for every source', async () => {
-    for (const source of ['calltree', 'analysis', 'database'] as const) {
+    for (const source of ['calltree', 'database'] as const) {
       const sections = await buildDetailSections(source, null);
       expect(sections.map((s) => s.id)).toEqual(['overview']);
       expect(sections[0]?.title).toBe('Log overview');
@@ -79,5 +79,11 @@ describe('buildDetailSections', () => {
     ]);
     // The whole-log tree gets the most room, matching the selection layout.
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
+  });
+
+  it('adds the findings section on Analysis, which is that tab at log scope', async () => {
+    const sections = await buildDetailSections('analysis', null);
+    expect(sections.map((s) => s.id)).toEqual(['overview', 'findings']);
+    expect(sections[1]?.title).toBe('Findings');
   });
 });

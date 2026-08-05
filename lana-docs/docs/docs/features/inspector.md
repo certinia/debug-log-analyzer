@@ -39,6 +39,10 @@ With no selection the inspector shows the whole log. Every tab starts with a **L
 - **Governor usage over time** – small area charts of the metrics nearest their limits, drawn from the same data as the timeline's metric strip: `CUMULATIVE_LIMIT_USAGE` snapshots plus the log's own SOQL, DML and heap events. Without snapshots the figures are estimated. Hover a chart to read the value at any point in the log.
 - **Call tree** – every root event in the log, in the same three views as the scoped tree.
 
+The **Analysis** tab adds:
+
+- **Findings** – what is slow or wrong in the log, and what to do about it. One pass over the log reports truncation (which makes every figure below it an undercount), governor breaches, exceptions, query-plan verdicts, SOQL optimization tips, statements repeated from one line — the usual sign of a query or DML in a loop — debug-statement cost, and the methods with the most self time. Query-plan verdicts need a `FINEST` log; without one the pane says the verdicts are unknown rather than reading clean. Each finding shows the code the log named with its figures; click it to reveal the row behind it in the Analysis grid.
+
 Select a row and the sections re-scope to it; deselect and the whole-log view returns.
 
 ### Row actions

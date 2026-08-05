@@ -26,13 +26,13 @@ export const ESTIMATED_LIMITS_TEXT =
   'No CUMULATIVE_LIMIT_USAGE events in the log; figures are estimated from logged events. An Apex Profiling debug level of INFO or higher usually includes them.';
 
 /**
- * Every governor-tracked metric, with the label its gauge shows. A local list
- * rather than the timeline adapter's `APEX_METRICS`, which is internal to that
- * feature. The gauges and the governor trend charts both read it through
- * {@link rankedLimitMetrics}, so both surfaces name the same metrics the same
- * way.
+ * Every governor-tracked metric, with the label the inspector shows for it. A
+ * local list rather than the timeline adapter's `APEX_METRICS`, which is
+ * internal to that feature. The gauges and the governor trend charts read it
+ * through {@link rankedLimitMetrics}, and the log diagnostics read it
+ * directly, so every surface names the same metrics the same way.
  */
-const GOVERNOR_METRICS: ReadonlyArray<{ key: keyof Limits; label: string }> = [
+export const GOVERNOR_METRICS: ReadonlyArray<{ key: keyof Limits; label: string }> = [
   { key: 'cpuTime', label: 'CPU Time' },
   { key: 'heapSize', label: 'Heap Size' },
   { key: 'soqlQueries', label: 'SOQL' },

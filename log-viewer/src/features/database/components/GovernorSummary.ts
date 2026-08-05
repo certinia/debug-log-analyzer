@@ -66,9 +66,10 @@ export class GovernorSummary extends LitElement {
         display: flex;
         flex-direction: column;
         gap: 4px;
-        /* Floor at the gauge's own nowrap value so a narrowing panel wraps the
-           row instead of letting the text paint over the next gauge. */
-        min-width: fit-content;
+        /* The label and the value never wrap, so a gauge must not shrink below
+           the wider of the two: at a 6.5rem floor a long value overflowed its
+           box and ran over the next gauge. min-content wraps the row instead. */
+        min-width: min-content;
         flex: 1 1 6.5rem;
         max-width: 12rem;
       }

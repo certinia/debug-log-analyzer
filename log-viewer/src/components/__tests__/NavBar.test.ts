@@ -10,6 +10,7 @@ jest.mock('#vscode-elements/vscode-icon.js', () => ({}));
 jest.mock('#vscode-elements/vscode-toolbar-button.js', () => ({}));
 jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 
+import type { LogIdentityData } from '../../features/app/logIdentity.js';
 import type { IssueSeverity, LogIssue } from '../../features/notifications/types.js';
 
 import type { NavBar } from '../NavBar.js';
@@ -47,9 +48,12 @@ class StubResizeObserver {
  * jsdom lays nothing out, so every `offsetWidth` is 0 and the ladder would never engage.
  * With these widths each chunk costs its width + the 6px gap, `•••` costs 36 and the title
  * floor falls back to 140 (jsdom resolves no `min-width`), putting the stage boundaries at
- * 390 / 284 / 248 / 212 px.
+ * 598 / 542 / 476 / 390 / 284 / 248 / 212 px.
  */
 const DEFAULT_CHUNK_WIDTHS: Readonly<Record<string, number>> = {
+  'chunk--time': 50,
+  'chunk--user': 60,
+  'chunk--entry': 80,
   'chunk--meta': 100,
   'chunk--problems': 30,
   'chunk--inspector': 30,
@@ -119,7 +123,7 @@ async function resize(el: NavBar, width: number): Promise<NavBar> {
 }
 
 function inlineChunks(el: NavBar): string[] {
-  return ['meta', 'problems', 'inspector', 'bell'].filter((chunk) =>
+  return ['meta', 'entry', 'user', 'time', 'problems', 'inspector', 'bell'].filter((chunk) =>
     el.shadowRoot?.querySelector(`.chunk--${chunk}`),
   );
 }
@@ -142,11 +146,41 @@ describe('NavBar collapse ladder', () => {
   it('keeps everything inline when there is room', async () => {
     const el = await resize(await mount(), 800);
 
-    expect(inlineChunks(el)).toEqual(['meta', 'problems', 'inspector', 'bell']);
+    expect(inlineChunks(el)).toEqual([
+      'meta',
+      'entry',
+      'user',
+      'time',
+      'problems',
+      'inspector',
+      'bell',
+    ]);
     expect(el.shadowRoot?.querySelector('[slot="collapsed"]')).toBeNull();
   });
 
-  it('sheds log meta first, keeping its values in the title tooltip', async () => {
+  it('sheds the identity one item at a time — time, then user, then entry', async () => {
+    const el = await mount();
+
+    expect(inlineChunks(await resize(el, 560))).toEqual([
+      'meta',
+      'entry',
+      'user',
+      'problems',
+      'inspector',
+      'bell',
+    ]);
+    expect(inlineChunks(await resize(el, 500))).toEqual([
+      'meta',
+      'entry',
+      'problems',
+      'inspector',
+      'bell',
+    ]);
+    expect(inlineChunks(await resize(el, 420))).toEqual(['meta', 'problems', 'inspector', 'bell']);
+    expect(el.shadowRoot?.querySelector('[slot="collapsed"]')).toBeNull();
+  });
+
+  it('then log meta, keeping its values in the title tooltip', async () => {
     const el = await resize(await mount(), 350);
 
     expect(inlineChunks(el)).toEqual(['problems', 'inspector', 'bell']);
@@ -173,6 +207,49 @@ describe('NavBar collapse ladder', () => {
     expect(inlineChunks(el)).toEqual([]);
     expect(menuSections(el)).toEqual(['Notifications', 'Toggle Inspector', 'Log problems (2)']);
     expect(el.shadowRoot?.querySelector('header-menu')).not.toBeNull();
+  });
+
+  it('skips an identity item the log does not have, without freezing the ladder', async () => {
+    const el = await mount();
+    el.logIdentity = {
+      entryPoint: { label: 'Anonymous Apex', detail: 'execute_anonymous_apex' },
+      user: null,
+      startTime: { label: '16:35:06', detail: 'Started 16:35:06.123' },
+    } satisfies LogIdentityData;
+    await el.updateComplete;
+    await el.updateComplete;
+
+    expect(inlineChunks(await resize(el, 800))).toEqual([
+      'meta',
+      'entry',
+      'time',
+      'problems',
+      'inspector',
+      'bell',
+    ]);
+    // The absent item costs nothing, so time survives narrower than it would with a user.
+    expect(inlineChunks(await resize(el, 480))).toEqual([
+      'meta',
+      'entry',
+      'problems',
+      'inspector',
+      'bell',
+    ]);
+  });
+
+  it('folds the identity details into the title tooltip', async () => {
+    const el = await mount();
+    el.logIdentity = {
+      entryPoint: { label: 'Anonymous Apex', detail: 'execute_anonymous_apex' },
+      user: { label: 'tina.owen', detail: 'tina.owen@example.com' },
+      startTime: { label: '16:35:06', detail: 'Started 16:35:06.123 (GMT+01:00)' },
+    } satisfies LogIdentityData;
+    await el.updateComplete;
+
+    const details = el.shadowRoot?.querySelector('log-title')?.getAttribute('details') ?? '';
+    expect(details).toContain('execute_anonymous_apex');
+    expect(details).toContain('tina.owen@example.com');
+    expect(details).toContain('Started 16:35:06.123 (GMT+01:00)');
   });
 
   it('re-measures a collapsed chunk after its content changes', async () => {
