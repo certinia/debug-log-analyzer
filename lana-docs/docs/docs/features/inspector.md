@@ -31,6 +31,14 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 
 Collapse any section by clicking its header, or drag the divider between two to resize them. It's one panel, so your layout follows you from tab to tab, and is restored next time.
 
+### Nothing selected
+
+With no selection the inspector shows the whole log. Every tab starts with a **Log overview** — the six governor metrics closest to their limit, each as `used / limit`, read from the namespace nearest its own limit. The **Analysis** tab adds:
+
+- **Findings** – what is slow or wrong in the log, and what to do about it. One pass over the log reports truncation (which makes every figure below it an undercount), governor breaches, exceptions, query-plan verdicts, SOQL optimization tips, statements repeated from one line — the usual sign of a query or DML in a loop — debug-statement cost, and the methods with the most self time. Query-plan verdicts need a `FINEST` log; without one the pane says the verdicts are unknown rather than reading clean. Each finding shows the code the log named with its figures; click it to reveal the row behind it in the Analysis grid.
+
+Select a row and the sections re-scope to it; deselect and the whole-log view returns.
+
 ### Row actions
 
 Right-click a row in the **Call stack** or **Call tree** for:

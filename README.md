@@ -134,6 +134,7 @@ Select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SO
 - **Call stack** – The frames that led to the selection, with total and self time.
 - **Call tree** – The selection's own subtree, in Time Order, Aggregated or Bottom-Up. Scoped to what you picked, which is what makes it different from the Call Tree tab.
 - **SOQL issues** – Optimization tips for the selected query.
+- **Nothing selected?** – It shows the whole log: the governor metrics closest to their limits, and on the Analysis tab a **Findings** list — what is slow or wrong in the log, each finding linking to the row behind it.
 - **Dock it where you want** – Left, right or bottom; drag to resize, collapse the sections you don't need. Your layout is remembered.
 - **Right-click a row** for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
 
