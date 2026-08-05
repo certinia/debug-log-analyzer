@@ -234,6 +234,55 @@ export async function buildScopedCallTree(
   };
 }
 
+/**
+ * The whole log's call tree — every root event with its real subtree and real
+ * durations, nothing clamped or attributed. The scoped builder cannot answer
+ * this: it exists to model a selection, so it rewrites ancestor durations. Here
+ * there is no selection and no ancestors, so every figure is the event's own.
+ *
+ * Same three views, same slicing, same zero-duration-detail pruning as the
+ * scoped tree; `rootTotal` and `logTotal` are both the log's total, so bars are
+ * percentages of the whole log.
+ */
+export async function buildWholeLogCallTree(
+  options: ScopedBuildOptions,
+): Promise<ScopedCallTree | null> {
+  const apexLog = DatabaseAccess.instance()?.getApexLog();
+  if (!apexLog) {
+    return null;
+  }
+
+  const tick = frameBudget(options);
+  const roots: ScopedRow[] = [];
+  for (const event of apexLog.children) {
+    const subtree = await realSubtree(event, tick);
+    if (!subtree) {
+      return null;
+    }
+    roots.push(subtree);
+  }
+
+  // Only one view is on screen, so build each on first read and cache it.
+  let aggregatedRows: ScopedRow[] | null = null;
+  let bottomUpRows: ScopedRow[] | null = null;
+  return {
+    rootTotal: apexLog.duration.total,
+    logTotal: apexLog.duration.total,
+    timeOrder() {
+      // Already the log's own event order, with real durations — no merging.
+      return Promise.resolve(roots);
+    },
+    async aggregated(viewOptions) {
+      aggregatedRows ??= await aggregate(roots, viewOptions);
+      return aggregatedRows;
+    },
+    async bottomUp(viewOptions) {
+      bottomUpRows ??= await buildBottomUp(roots, viewOptions);
+      return bottomUpRows;
+    },
+  };
+}
+
 /** Top-down aggregation: merge sibling frames sharing a key, summing metrics. */
 async function aggregate(
   rows: ScopedRow[],

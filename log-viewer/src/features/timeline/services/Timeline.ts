@@ -48,7 +48,12 @@ export const keyMap: Map<string, TimelineGroup> = new Map([
   ['SOQL', { label: 'SOQL', fillColor: '#6D4C7D' }],
 ]);
 
-const LEGACY_CATEGORY_MAP: Record<string, string> = {
+/** The legacy timeline group labels — the keys of {@link keyMap} and of the
+ *  legacy `timeline.colors` setting. */
+export type LegacyTimelineGroup =
+  'Method' | 'Code Unit' | 'System Method' | 'Workflow' | 'DML' | 'SOQL';
+
+export const LEGACY_CATEGORY_MAP: Record<string, LegacyTimelineGroup> = {
   Apex: 'Method',
   'Code Unit': 'Code Unit',
   System: 'System Method',

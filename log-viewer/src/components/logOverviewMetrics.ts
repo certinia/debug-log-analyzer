@@ -13,9 +13,10 @@ const MAX_GAUGES = 6;
 /**
  * Every governor-tracked metric, with the label its gauge shows. A local list
  * rather than the timeline adapter's `APEX_METRICS`, which is internal to that
- * feature.
+ * feature. Shared with the governor trend charts, so both surfaces name the
+ * same metrics the same way.
  */
-const METRICS: ReadonlyArray<{ key: keyof Limits; label: string }> = [
+export const GOVERNOR_METRICS: ReadonlyArray<{ key: keyof Limits; label: string }> = [
   { key: 'cpuTime', label: 'CPU Time' },
   { key: 'heapSize', label: 'Heap Size' },
   { key: 'soqlQueries', label: 'SOQL' },
@@ -56,7 +57,7 @@ const rank = (gauge: GaugeMetric & { used: number }): RankedGauge => ({
  * roll-up, and each namespace on its own undercounts it.
  */
 export function tightestGauges(limits: GovernorLimits): GaugeMetric[] {
-  const ranked = METRICS.flatMap<RankedGauge>(({ key, label }) => {
+  const ranked = GOVERNOR_METRICS.flatMap<RankedGauge>(({ key, label }) => {
     if (key === 'heapSize') {
       const heap = limits.heapSize;
       return heap.limit > 0 && heap.used > 0

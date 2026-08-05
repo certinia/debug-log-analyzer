@@ -21,7 +21,6 @@ import '../LogOverview.js';
 
 const overview = async () => {
   const element = document.createElement('log-overview');
-  element.source = 'timeline';
   document.body.append(element);
   await element.updateComplete;
   return element;
@@ -56,10 +55,5 @@ describe('log-overview', () => {
 
     expect(element.shadowRoot?.querySelector('governor-summary')).not.toBeNull();
     expect(element.shadowRoot?.querySelector('.note')).toBeNull();
-  });
-
-  it('names what to select for the source it follows', async () => {
-    const element = await overview();
-    expect(element.shadowRoot?.querySelector('.hint')?.textContent).toContain('timeline');
   });
 });

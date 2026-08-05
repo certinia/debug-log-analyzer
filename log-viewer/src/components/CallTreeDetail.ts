@@ -11,6 +11,7 @@ import {
   Tabulator,
 } from 'tabulator-tables';
 
+import { eventBus } from '../core/events/EventBus.js';
 import { formatDuration, formatInteger } from '../core/utility/Util.js';
 import {
   commonColumnDefaults,
@@ -35,6 +36,7 @@ import { dispatchInspectorReveal } from './inspectorReveal.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import {
   buildScopedCallTree,
+  buildWholeLogCallTree,
   revealableEventIndex,
   type ScopedBuildOptions,
   type ScopedCallTree,
@@ -112,6 +114,11 @@ export class CallTreeDetail extends LitElement {
   @property({ attribute: false })
   instances: number[] | null = null;
 
+  /** True shows the whole log rooted at the log itself — real durations,
+   *  nothing scoped or attributed. `eventIndex`/`instances` are then ignored. */
+  @property({ type: Boolean })
+  wholeLog = false;
+
   @state()
   private viewMode: ViewMode = 'time-order';
 
@@ -150,6 +157,27 @@ export class CallTreeDetail extends LitElement {
   private _contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private _menuEventIndex = -1;
+
+  private _offLogLoaded: (() => void) | null = null;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    // A whole-log tree can mount before the first parse finishes (the scoped
+    // tree cannot — a selection implies a parsed log), so rebuild when the log
+    // lands.
+    this._offLogLoaded = eventBus.on('log:loaded', () => {
+      if (!this.wholeLog) {
+        return;
+      }
+      this._scoped = null;
+      for (const slot of Object.values(this._tables)) {
+        if (slot) {
+          slot.stale = true;
+        }
+      }
+      void this._showActive();
+    });
+  }
 
   constructor() {
     super();
@@ -232,6 +260,8 @@ export class CallTreeDetail extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._offLogLoaded?.();
+    this._offLogLoaded = null;
     this._destroyTables();
   }
 
@@ -249,7 +279,9 @@ export class CallTreeDetail extends LitElement {
    */
   private async _rows(mode: ViewMode, options: ScopedBuildOptions): Promise<ScopedRow[] | null> {
     if (!this._scoped) {
-      const scoped = await buildScopedCallTree(this.eventIndex, this.instances, options);
+      const scoped = this.wholeLog
+        ? await buildWholeLogCallTree(options)
+        : await buildScopedCallTree(this.eventIndex, this.instances, options);
       if (options.cancelled?.()) {
         // Abandoned rather than empty — don't cache the null over a scope that
         // was never walked.
