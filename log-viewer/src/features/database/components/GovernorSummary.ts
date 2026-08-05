@@ -25,11 +25,15 @@ export interface GaugeMetric {
   format?: (value: number) => string;
 }
 
-function tier(percent: number): 'safe' | 'warn' | 'danger' {
+/** Consumption percentage where a gauge or trend turns from safe to warn. */
+export const GOVERNOR_WARN_PERCENT = 80;
+
+/** The severity colour band for a governor consumption percentage. */
+export function governorTier(percent: number): 'safe' | 'warn' | 'danger' {
   if (percent >= 100) {
     return 'danger';
   }
-  return percent >= 80 ? 'warn' : 'safe';
+  return percent >= GOVERNOR_WARN_PERCENT ? 'warn' : 'safe';
 }
 
 /**
@@ -62,7 +66,10 @@ export class GovernorSummary extends LitElement {
         display: flex;
         flex-direction: column;
         gap: 4px;
-        min-width: 6.5rem;
+        /* The label and the value never wrap, so a gauge must not shrink below
+           the wider of the two: at a 6.5rem floor a long value overflowed its
+           box and ran over the next gauge. min-content wraps the row instead. */
+        min-width: min-content;
         flex: 1 1 6.5rem;
         max-width: 12rem;
       }
@@ -163,7 +170,7 @@ export class GovernorSummary extends LitElement {
       >
       <div class="gauge__track">
         <div
-          class="gauge__fill gauge__fill--${tier(percent)}"
+          class="gauge__fill gauge__fill--${governorTier(percent)}"
           style="width: ${Math.min(percent, 100)}%"
         ></div>
       </div>

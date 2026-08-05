@@ -8,34 +8,21 @@ import { customElement, property, state } from 'lit/decorators.js';
 import type { SOQLExecuteBeginLine } from 'apex-log-parser';
 import { DatabaseAccess } from '../../database/services/Database.js';
 import {
+  QueryPlanCostRule,
   SEVERITY_TYPES,
   SOQLLinter,
   type SOQLLinterRule,
-  type Severity,
 } from '../services/SOQLLinter.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
-
-const severityToIcon = new Map<string, string>(
-  Object.entries({ error: 'error', warning: 'warning', info: 'info' }),
-);
-
-/** Selectivity issue derived directly from the query-plan explain line. */
-class ExplainLineSelectivityRule implements SOQLLinterRule {
-  message = '';
-  severity: Severity = 'Error';
-  summary = 'Query is not selective.';
-  constructor(relativeCost: number) {
-    this.message = `The relative cost of the query is ${relativeCost}.`;
-  }
-}
+import { severityIcon, severityStyles } from '../../../styles/severity.styles.js';
 
 function getIssuesFromSOQLLine(soqlLine: SOQLExecuteBeginLine | null): SOQLLinterRule[] {
   const soqlIssues: SOQLLinterRule[] = [];
   const explain = soqlLine?.children[0];
   if (explain?.relativeCost && explain.relativeCost > 1) {
-    soqlIssues.push(new ExplainLineSelectivityRule(explain.relativeCost));
+    soqlIssues.push(new QueryPlanCostRule(explain.relativeCost));
   }
   return soqlIssues;
 }
@@ -79,6 +66,7 @@ export class SOQLLinterIssues extends LitElement {
 
   static styles = [
     globalStyles,
+    severityStyles,
     css`
       :host {
         flex: 1;
@@ -103,15 +91,6 @@ export class SOQLLinterIssues extends LitElement {
       }
       summary vscode-icon {
         flex: 0 0 auto;
-      }
-      .sev-error {
-        color: var(--vscode-problemsErrorIcon-foreground, var(--vscode-errorForeground));
-      }
-      .sev-warning {
-        color: var(--vscode-problemsWarningIcon-foreground, var(--vscode-editorWarning-foreground));
-      }
-      .sev-info {
-        color: var(--vscode-problemsInfoIcon-foreground, var(--vscode-editorInfo-foreground));
       }
       p {
         margin: 2px 0 4px 20px;
@@ -143,7 +122,7 @@ export class SOQLLinterIssues extends LitElement {
       const sev = issue.severity.toLowerCase();
       return html`<details>
         <summary title=${issue.summary}>
-          <vscode-icon class="sev-${sev}" name=${severityToIcon.get(sev) ?? 'info'}></vscode-icon>
+          <vscode-icon class="sev-${sev}" name=${severityIcon(issue.severity)}></vscode-icon>
           <span>${issue.summary}</span>
         </summary>
         <p>${issue.message}</p>

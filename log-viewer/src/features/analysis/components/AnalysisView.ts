@@ -14,6 +14,7 @@ import type { ApexLog } from 'apex-log-parser';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
 import { eventBus } from '../../../core/events/EventBus.js';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
@@ -139,9 +140,20 @@ export class AnalysisView extends LitElement {
   /** Releases the category-colouring settings subscription; set while connected. */
   private _categoryColoringOff: (() => void) | null = null;
 
+  /** Guards the programmatic select made on the inspector's behalf. */
+  private _echoGuard = new SelectionEchoGuard();
+  private _inspectorRevealUnsubscribe: (() => void) | null = null;
+
   constructor() {
     super();
 
+    // An inspector finding names one event; the grid holds it in the bucket for
+    // its method, so that bucket is what gets revealed.
+    this._inspectorRevealUnsubscribe = eventBus.on('inspector:reveal', (detail) => {
+      if (detail.source === 'analysis') {
+        void this._revealEventIndex(detail.eventIndex);
+      }
+    });
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
@@ -159,6 +171,43 @@ export class AnalysisView extends LitElement {
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
+    this._inspectorRevealUnsubscribe?.();
+    this._inspectorRevealUnsubscribe = null;
+  }
+
+  /**
+   * Select the bucket holding `eventIndex` and scroll it into view. Guarded, so the
+   * inspector keeps the findings it was clicked in rather than being rebuilt around
+   * the row it just asked for.
+   */
+  private async _revealEventIndex(eventIndex: number): Promise<void> {
+    const table = this.analysisTable;
+    // `instances` is populated on root buckets only, which is what the grid lists.
+    const match = table
+      ?.getRows()
+      .find((row) =>
+        (row.getData() as BottomUpRow).instances?.some((event) => event.eventIndex === eventIndex),
+      );
+    if (!table || !match) {
+      return;
+    }
+
+    // Show Details keeps only rows with a duration, so the buckets for debug
+    // lines, thrown exceptions and query plans are filtered out — exactly the
+    // events a finding points at. Turn the filter off rather than reveal nothing.
+    const data = match.getData();
+    if (
+      !this.filterState.showDetails &&
+      !table.getRows('active').some((row) => row.getData() === data)
+    ) {
+      this._handleShowDetailsChange();
+      await this.updateComplete;
+    }
+
+    await this._echoGuard.runAsync(() =>
+      //@ts-expect-error This is a custom function added in by RowNavigation custom module
+      table.goToRow(match, { scrollIfVisible: false, focusRow: false }),
+    );
   }
 
   firstUpdated(): void {
@@ -565,10 +614,10 @@ export class AnalysisView extends LitElement {
 
     // Feed the inspector. Analysis rows merge many calls, so they
     // scope to every occurrence of the method.
-    // No `inspector:reveal` subscription here on purpose: analysis rows are
-    // aggregates keyed by type|namespace|text, so an eventIndex only resolves
-    // back to the whole bucket - which is already the selected row.
     this.analysisTable.on('rowSelectionChanged', (_data, rows) => {
+      if (this._echoGuard.suppressed) {
+        return;
+      }
       const data = rows[0]?.getData() as BottomUpRow | undefined;
       const event = data?.originalData;
       if (!event) {
