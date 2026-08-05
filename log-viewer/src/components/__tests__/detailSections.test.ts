@@ -9,7 +9,9 @@ import { describe, expect, it } from '@jest/globals';
 // this suite only exercises the section-assembly logic.
 jest.mock('../CallStackDetail.js', () => ({}));
 jest.mock('../CallTreeDetail.js', () => ({}));
+jest.mock('../CategoryTimeBar.js', () => ({}));
 jest.mock('../EventVitals.js', () => ({}));
+jest.mock('../GovernorTrends.js', () => ({}));
 jest.mock('../LogOverview.js', () => ({}));
 
 const databaseCalls: { eventIndex: number; type: string }[] = [];
@@ -60,11 +62,23 @@ describe('buildDetailSections', () => {
   });
 
   it('builds the whole-log overview when nothing is selected, for every source', async () => {
-    for (const source of ['timeline', 'calltree', 'database'] as const) {
+    for (const source of ['calltree', 'database'] as const) {
       const sections = await buildDetailSections(source, null);
       expect(sections.map((s) => s.id)).toEqual(['overview']);
       expect(sections[0]?.title).toBe('Log overview');
     }
+  });
+
+  it('adds the charts and the whole-log call tree for the timeline with nothing selected', async () => {
+    const sections = await buildDetailSections('timeline', null);
+    expect(sections.map((s) => s.id)).toEqual([
+      'overview',
+      'category-time',
+      'governor-trends',
+      'calltree',
+    ]);
+    // The whole-log tree gets the most room, matching the selection layout.
+    expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
   });
 
   it('adds the findings section on Analysis, which is that tab at log scope', async () => {

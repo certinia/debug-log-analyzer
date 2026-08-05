@@ -9,7 +9,7 @@ import type {
   SOQLExecuteBeginLine,
 } from 'apex-log-parser';
 
-import { METRICS } from '../../../components/logOverviewMetrics.js';
+import { GOVERNOR_METRICS } from '../../../components/logOverviewMetrics.js';
 import { DEFAULT_NAMESPACE } from '../../../core/utility/CallerNamespace.js';
 import { formatByteSize, formatDuration, formatInteger } from '../../../core/utility/Util.js';
 import { getEventKey } from '../../call-tree/utils/Aggregation.js';
@@ -251,7 +251,7 @@ function limitDiagnostics(
 
   const forNamespace = limits.byNamespace.get(DEFAULT_NAMESPACE);
   const found: Diagnostic[] = [];
-  for (const { key, label } of METRICS) {
+  for (const { key, label } of GOVERNOR_METRICS) {
     const breach = breaches.get(key);
     const metric = forNamespace?.[key];
     const known = metric && metric.limit > 0 && metric.used > 0;

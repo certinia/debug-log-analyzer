@@ -209,18 +209,32 @@ export async function buildScopedCallTree(
     roots.push(node);
   }
 
-  // Only one view is on screen, so build each on first read and cache it —
-  // aggregate()/buildBottomUp() are full walks of every retained subtree.
+  // Many occurrences usually share ancestors, so merge the paths for a
+  // readable tree; a single occurrence keeps its exact chain.
+  return lazyCallTree(roots, rootTotal, apexLog.duration.total, roots.length > 1);
+}
+
+/**
+ * The three lazy views over a built set of roots. Only one view is on screen,
+ * so each is built on first read and cached — aggregate()/buildBottomUp() are
+ * full walks of every retained subtree. `mergeTimeOrder` folds occurrences that
+ * share ancestors (a scoped aggregate); the whole-log tree and a single
+ * occurrence keep their exact order.
+ */
+function lazyCallTree(
+  roots: ScopedRow[],
+  rootTotal: number,
+  logTotal: number,
+  mergeTimeOrder: boolean,
+): ScopedCallTree {
   let timeOrderRows: ScopedRow[] | null = null;
   let aggregatedRows: ScopedRow[] | null = null;
   let bottomUpRows: ScopedRow[] | null = null;
   return {
     rootTotal,
-    logTotal: apexLog.duration.total,
+    logTotal,
     async timeOrder(viewOptions) {
-      // Many occurrences usually share ancestors, so merge the paths for a
-      // readable tree; a single occurrence keeps its exact chain.
-      timeOrderRows ??= roots.length > 1 ? await aggregate(roots, viewOptions) : roots;
+      timeOrderRows ??= mergeTimeOrder ? await aggregate(roots, viewOptions) : roots;
       return timeOrderRows;
     },
     async aggregated(viewOptions) {
@@ -232,6 +246,38 @@ export async function buildScopedCallTree(
       return bottomUpRows;
     },
   };
+}
+
+/**
+ * The whole log's call tree — every root event with its real subtree and real
+ * durations, nothing clamped or attributed. The scoped builder cannot answer
+ * this: it exists to model a selection, so it rewrites ancestor durations. Here
+ * there is no selection and no ancestors, so every figure is the event's own.
+ *
+ * Same three views, same slicing, same zero-duration-detail pruning as the
+ * scoped tree; `rootTotal` and `logTotal` are both the log's total, so bars are
+ * percentages of the whole log.
+ */
+export async function buildWholeLogCallTree(
+  options: ScopedBuildOptions,
+): Promise<ScopedCallTree | null> {
+  const apexLog = DatabaseAccess.instance()?.getApexLog();
+  if (!apexLog) {
+    return null;
+  }
+
+  const tick = frameBudget(options);
+  const roots: ScopedRow[] = [];
+  for (const event of apexLog.children) {
+    const subtree = await realSubtree(event, tick);
+    if (!subtree) {
+      return null;
+    }
+    roots.push(subtree);
+  }
+
+  // Already the log's own event order, with real durations — no merging.
+  return lazyCallTree(roots, apexLog.duration.total, apexLog.duration.total, false);
 }
 
 /** Top-down aggregation: merge sibling frames sharing a key, summing metrics. */

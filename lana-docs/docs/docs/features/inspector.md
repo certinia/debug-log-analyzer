@@ -33,7 +33,13 @@ Collapse any section by clicking its header, or drag the divider between two to 
 
 ### Nothing selected
 
-With no selection the inspector shows the whole log. Every tab starts with a **Log overview** — the six governor metrics closest to their limit, each as `used / limit`, read from the namespace nearest its own limit. The **Analysis** tab adds:
+With no selection the inspector shows the whole log. Every tab starts with a **Log overview** — the six governor metrics closest to their limit, each as `used / limit`, the same whole-transaction totals the timeline's metric strip shows. When the log has no `CUMULATIVE_LIMIT_USAGE` events the figures are estimated from the logged events instead, and a note says so. The **Timeline** tab adds:
+
+- **Time by category** – the log's self time as one stacked bar, in the flame chart's own colours, with a legend. Self time, so the bar always totals the log.
+- **Governor usage over time** – small area charts of the metrics nearest their limits, drawn from the same data as the timeline's metric strip: `CUMULATIVE_LIMIT_USAGE` snapshots plus the log's own SOQL, DML and heap events. Without snapshots the figures are estimated. Hover a chart to read the value at any point in the log.
+- **Call tree** – every root event in the log, in the same three views as the scoped tree.
+
+The **Analysis** tab adds:
 
 - **Findings** – what is slow or wrong in the log, and what to do about it. One pass over the log reports truncation (which makes every figure below it an undercount), governor breaches, exceptions, query-plan verdicts, SOQL optimization tips, statements repeated from one line — the usual sign of a query or DML in a loop — debug-statement cost, and the methods with the most self time. Query-plan verdicts need a `FINEST` log; without one the pane says the verdicts are unknown rather than reading clean. Each finding shows the code the log named with its figures; click it to reveal the row behind it in the Analysis grid.
 
