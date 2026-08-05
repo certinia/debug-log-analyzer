@@ -31,6 +31,8 @@ It docks to the **right**, **left** or **bottom**, resizes by dragging its edge,
 
 Collapse any section by clicking its header, or drag the divider between two to resize them. It's one panel, so your layout follows you from tab to tab, and is restored next time.
 
+With nothing selected the inspector shows the whole log instead of sitting empty. On the Call Tree tab it adds an **Execution shape** section — event and node counts, max and mean depth, truncated calls, and the deepest and widest points of the run. It shows structure only, no times: those belong to the [Analysis](./analysis.mdx) tab and the [Timeline](./timeline.mdx).
+
 ### Row actions
 
 Right-click a row in the **Call stack** or **Call tree** for:

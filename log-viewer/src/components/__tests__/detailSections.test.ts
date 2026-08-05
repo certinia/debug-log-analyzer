@@ -10,6 +10,7 @@ import { describe, expect, it } from '@jest/globals';
 jest.mock('../CallStackDetail.js', () => ({}));
 jest.mock('../CallTreeDetail.js', () => ({}));
 jest.mock('../EventVitals.js', () => ({}));
+jest.mock('../ExecutionShape.js', () => ({}));
 jest.mock('../LogOverview.js', () => ({}));
 
 const databaseCalls: { eventIndex: number; type: string }[] = [];
@@ -60,10 +61,16 @@ describe('buildDetailSections', () => {
   });
 
   it('builds the whole-log overview when nothing is selected, for every source', async () => {
-    for (const source of ['timeline', 'calltree', 'analysis', 'database'] as const) {
+    for (const source of ['timeline', 'analysis', 'database'] as const) {
       const sections = await buildDetailSections(source, null);
       expect(sections.map((s) => s.id)).toEqual(['overview']);
       expect(sections[0]?.title).toBe('Log overview');
     }
+  });
+
+  it('adds the execution shape to the call tree when nothing is selected', async () => {
+    const sections = await buildDetailSections('calltree', null);
+    expect(sections.map((s) => s.id)).toEqual(['overview', 'shape']);
+    expect(sections[1]?.title).toBe('Execution shape');
   });
 });
