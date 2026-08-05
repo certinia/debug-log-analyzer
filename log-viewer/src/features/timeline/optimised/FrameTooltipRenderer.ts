@@ -402,6 +402,7 @@ export class FrameTooltipRenderer {
         rows,
         this.options.categoryColors[event.category] || '',
         descriptionHtml,
+        event.category,
       );
     }
 
@@ -419,6 +420,8 @@ export class FrameTooltipRenderer {
     rows: { label: string; value: string }[],
     color: string,
     descriptionHtml?: string,
+    /** Category label for the swatch row; `color` fills the swatch. */
+    categoryName?: string,
   ) {
     const tooltipBody = document.createElement('div');
     tooltipBody.className = 'timeline-tooltip';
@@ -443,6 +446,22 @@ export class FrameTooltipRenderer {
       descriptionDiv.textContent = description;
     }
     tooltipBody.appendChild(descriptionDiv);
+
+    if (categoryName && color) {
+      const categoryRow = document.createElement('div');
+      categoryRow.className = 'tooltip-category';
+
+      const swatch = document.createElement('span');
+      swatch.className = 'tooltip-swatch';
+      swatch.style.backgroundColor = color;
+
+      const name = document.createElement('span');
+      name.textContent = categoryName;
+
+      categoryRow.appendChild(swatch);
+      categoryRow.appendChild(name);
+      tooltipBody.appendChild(categoryRow);
+    }
 
     rows.forEach(({ label, value }) => {
       const row = document.createElement('div');

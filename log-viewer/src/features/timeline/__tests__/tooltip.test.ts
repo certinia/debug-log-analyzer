@@ -373,6 +373,35 @@ describe('FrameTooltipRenderer', () => {
       frameTooltipRenderer.hide();
     });
 
+    it('should display a category row with a swatch in the category color', () => {
+      frameTooltipRenderer.destroy();
+      frameTooltipRenderer = new FrameTooltipRenderer(container, {
+        categoryColors: { Apex: '#88ae58' },
+        cursorOffset: 10,
+        enableFlip: true,
+      });
+      const event = createEvent(0, 100, 'Event', 'Apex');
+
+      frameTooltipRenderer.show(event, 100, 100);
+
+      const swatch = container.querySelector('.tooltip-swatch') as HTMLElement;
+      expect(swatch).not.toBeNull();
+      expect(swatch.style.backgroundColor).toBe('rgb(136, 174, 88)');
+      expect(swatch.parentElement?.textContent).toContain('Apex');
+
+      frameTooltipRenderer.hide();
+    });
+
+    it('should not display a category row for an uncategorised event', () => {
+      const event = createEvent(0, 100, 'Event', '');
+
+      frameTooltipRenderer.show(event, 100, 100);
+
+      expect(container.querySelector('.tooltip-swatch')).toBeNull();
+
+      frameTooltipRenderer.hide();
+    });
+
     it('should display wall-clock time row when apexLog has startTime', () => {
       frameTooltipRenderer.destroy();
       const mockApexLog = {

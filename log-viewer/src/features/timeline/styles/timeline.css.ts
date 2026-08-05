@@ -35,6 +35,21 @@ export const tooltipStyles = `${soqlSyntaxStyles}
         word-break: break-all;
       }
 
+      .tooltip-category {
+        display: flex;
+        align-items: center;
+        gap: var(--lana-space-2xs);
+        padding: var(--lana-space-3xs) 0;
+        color: var(--tl-description-foreground, #999);
+      }
+
+      .tooltip-swatch {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--lana-radius-sm);
+        flex: 0 0 auto;
+      }
+
       .tooltip-row {
         display: flex;
         justify-content: space-between;

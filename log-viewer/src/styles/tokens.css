@@ -48,6 +48,10 @@
      rather than states. */
   --lana-text-sm: calc(var(--vscode-font-size, 13px) * 0.85);
 
+  /* Half a step down — mixed-case secondary text; 12px at the host's default 13px.
+     (11px suits only uppercase micro-labels, whose caps height carries the size.) */
+  --lana-text-md: calc(var(--vscode-font-size, 13px) * 0.92);
+
   /* Header metadata (size · duration · identity) — just under the title size. */
   --lana-text-meta: 0.9rem;
 
