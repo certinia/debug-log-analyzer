@@ -48,6 +48,9 @@
      rather than states. */
   --lana-text-sm: calc(var(--vscode-font-size, 13px) * 0.85);
 
+  /* Header metadata (size · duration · identity) — just under the title size. */
+  --lana-text-meta: 0.9rem;
+
   /* Monospace, for text whose alignment carries meaning: stacks, code. */
   --lana-font-mono: var(--vscode-editor-font-family, monospace);
 

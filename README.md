@@ -90,6 +90,7 @@ The bar above the tabs summarizes the log at a glance:
 
 - **Log problems** – A chip for problems found in the log itself (governor limit exceptions, fatal errors, skipped lines), with a count badge; click it for the full breakdown.
 - **Notifications** – A separate bell for messages about the tool rather than the log, kept apart from log problems so the two don't read as one severity count.
+- **Log info** – Entry point, user, and start time; hover for full details.
 - **Debug levels** – Chips showing the debug levels the log was captured with, one per category. Read-only display, not a filter.
 - **`•••` menu** – Help, report an issue, and whatever the header sheds as the window narrows.
 
