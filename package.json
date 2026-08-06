@@ -51,5 +51,14 @@
   },
   "lint-staged": {
     "*.{ts,css,md,scss}": "prettier --cache --write --experimental-cli"
+  },
+  "pnpm": {
+    "overrides": {
+      "brace-expansion": "^5.0.9",
+      "fast-uri": "^4.1.2",
+      "js-yaml": "^4.3.1",
+      "serialize-javascript": "^7.0.5",
+      "uuid": "^11.1.1"
+    }
   }
 }
