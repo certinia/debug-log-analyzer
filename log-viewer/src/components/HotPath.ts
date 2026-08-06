@@ -17,7 +17,7 @@ import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { revealRowStyles } from '../styles/revealRow.styles.js';
 import { dispatchInspectorReveal } from './inspectorReveal.js';
 
-/** Frames shown before the tail collapses into a "more" line. */
+/** Frames shown, the terminus among them; the tail between them collapses into a "more" line. */
 const FRAME_CAP = 10;
 
 /**
@@ -71,14 +71,18 @@ export class HotPath extends LitElement {
       return html`<p class="note">The log has no timed calls.</p>`;
     }
 
-    const frames = highlights.hotPath.slice(0, FRAME_CAP);
-    const hidden = highlights.hotPath.length - frames.length;
+    // The terminus is the frame the path exists to name, so a long path keeps it
+    // and drops the middle instead.
+    const path = highlights.hotPath;
+    const terminus = path[path.length - 1]!;
+    const overflows = path.length > FRAME_CAP;
+    const head = overflows ? path.slice(0, FRAME_CAP - 1) : path;
+    const hidden = overflows ? path.length - FRAME_CAP : 0;
     return html`
       ${this._truncationCaveat(highlights)}
-      ${frames.map((frame, index) =>
-        this._frameRow(frame, highlights.totalTime, index === highlights.hotPath.length - 1),
-      )}
+      ${head.map((frame) => this._frameRow(frame, highlights.totalTime, frame === terminus))}
       ${hidden > 0 ? html`<div class="more">+ ${hidden} more frames</div>` : ''}
+      ${overflows ? this._frameRow(terminus, highlights.totalTime, true) : ''}
     `;
   }
 
