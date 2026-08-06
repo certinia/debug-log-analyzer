@@ -139,6 +139,7 @@ export class AnalysisView extends LitElement {
 
   /** Releases the category-colouring settings subscription; set while connected. */
   private _categoryColoringOff: (() => void) | null = null;
+  private _selectionClearUnsubscribe: (() => void) | null = null;
 
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
@@ -157,6 +158,13 @@ export class AnalysisView extends LitElement {
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
+
+    // Escape (app-wide) deselects here; the table reports the clear itself.
+    this._selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
+      if (detail.source === 'analysis') {
+        this.analysisTable?.deselectRow();
+      }
+    });
   }
 
   override connectedCallback(): void {
@@ -171,6 +179,8 @@ export class AnalysisView extends LitElement {
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
+    this._selectionClearUnsubscribe?.();
+    this._selectionClearUnsubscribe = null;
     this._inspectorRevealUnsubscribe?.();
     this._inspectorRevealUnsubscribe = null;
   }

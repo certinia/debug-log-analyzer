@@ -22,10 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Click a row and the matching frame or row is highlighted in the tab you're on, without switching tab: the Timeline selects the frame and centers it when it's off screen, the Call Tree scrolls to it in **Time Order**, and the Database tab selects the statement.
   - Dock it left, right or bottom, drag to resize, and collapse the sections you don't need — the layout is remembered.
   - Right-click a row for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
+  - Press `Escape` to clear the selection on the tab you're on; the Inspector returns to its whole-log view. ([#63])
   - **Log overview**: with nothing selected, the Inspector shows the whole log instead of sitting empty — the six governor metrics closest to their limit, each as `used / limit`, the same whole-transaction totals as the Timeline's metric strip. Without `CUMULATIVE_LIMIT_USAGE` events the figures are estimated from logged events, and a note says so.
   - With nothing selected the **Timeline** tab also charts the whole log: **Time by category** (self time as one stacked bar in the flame chart's own colours, with a legend), **Governor usage over time** (small area charts of the metrics nearest their limits — hover for the value at any point), and the full **Call tree** in the same three views.
   - With nothing selected the **Analysis** tab lists **Findings** — log-wide diagnostics built from what the log already holds: truncation, governor breaches, exceptions, query-plan verdicts, SOQL optimization tips grouped with a count, statements repeated from one line (the usual sign of a query or DML in a loop), debug-statement cost and the methods with the most self time. Click a finding to reveal the row behind it in the Analysis grid.
   - With nothing selected the **Call Tree** tab shows the **Hot path** — the chain of calls the log spent most of its time in, with repeated calls counted as one frame (`200×`) — and the **Hot spots** — the five signatures with the most self time. Each row carries a meter showing its share of the log, and every row is a link: click it to reveal that call in the tree. A truncated log adds a warning that timings below the cut under-report.
+
 - 🗄️ **Database Analysis**: governor-limit visibility and SOSL usage. ([#162])
   - 📏 **Governor-limit overview**: SOQL, SOSL, DML and query/DML rows shown as `used / limit`, colored as they approach the limit.
   - 🧮 **Found vs Counted**: each section reconciles statements found in the log against the governor-counted total, flagging queries that didn't consume the limit (e.g. custom metadata, which is free unless it selects a long text area field or runs in a Flow).
@@ -569,6 +571,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
 [#162]: https://github.com/certinia/debug-log-analyzer/issues/162
 [#113]: https://github.com/certinia/debug-log-analyzer/issues/113
+[#63]: https://github.com/certinia/debug-log-analyzer/issues/63
 [#32]: https://github.com/certinia/debug-log-analyzer/issues/32
 
 <!-- v1.20.1 -->

@@ -4,7 +4,12 @@
 import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
-import { type DetailSelection, type DetailSource, eventBus } from '../core/events/EventBus.js';
+import {
+  TAB_TO_SOURCE,
+  type DetailSelection,
+  type DetailSource,
+  eventBus,
+} from '../core/events/EventBus.js';
 import type { InspectorRevealEvent } from './inspectorReveal.js';
 import { debounce } from '../core/utility/Util.js';
 import { getSettings, updateSetting } from '../features/settings/Settings.js';
@@ -14,14 +19,6 @@ import { globalStyles } from '../styles/global.styles.js';
 import type { DockPosition } from './DetailDock.js';
 import './DockLayout.js';
 import type { PaneSection } from './PaneView.js';
-
-/** Maps the LogViewer tab id to the detail source that feeds the inspector. */
-const TAB_TO_SOURCE: Record<string, DetailSource> = {
-  'timeline-tab': 'timeline',
-  'tree-tab': 'calltree',
-  'analysis-tab': 'analysis',
-  'database-tab': 'database',
-};
 
 /**
  * The app-wide inspector. Lives at the app root (sibling of the tab strip,

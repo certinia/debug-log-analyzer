@@ -1931,6 +1931,14 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
+   * Clear the current frame or marker selection (a no-op when nothing is
+   * selected). The selection-change callbacks fire with null.
+   */
+  public clearSelection(): void {
+    this.selectionOrchestrator?.clearSelection();
+  }
+
+  /**
    * Pan (without changing zoom) so the currently selected frame is visible.
    * Animated, and a no-op if the frame is already in view - use this for the
    * passive selection sync, where a full zoom-to-fit would be too disruptive.
