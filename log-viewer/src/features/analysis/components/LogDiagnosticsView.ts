@@ -8,6 +8,7 @@ import { customElement, state } from 'lit/decorators.js';
 import { dispatchInspectorReveal } from '../../../components/inspectorReveal.js';
 import { eventBus } from '../../../core/events/EventBus.js';
 import { globalStyles } from '../../../styles/global.styles.js';
+import { bleedRowStyles } from '../../../styles/revealRow.styles.js';
 import { severityIcon, severityStyles } from '../../../styles/severity.styles.js';
 import {
   computeLogDiagnostics,
@@ -49,26 +50,22 @@ export class LogDiagnosticsView extends LitElement {
   static styles = [
     globalStyles,
     severityStyles,
+    bleedRowStyles,
     css`
       :host {
         display: block;
-        padding: 0 var(--lana-space-md) var(--lana-space-md) var(--lana-section-inset);
-        overflow-y: auto;
       }
 
       /* One finding is one row: a fixed-height line that never reflows the list,
-         with the detail behind a disclosure. */
+         with the detail behind a disclosure. The severity glyph leads, the title
+         takes the slack, and the meta, count and chevron flow into their own
+         columns — absent ones leave no empty track. */
       summary {
-        display: flex;
+        display: grid;
+        grid-auto-flow: column;
+        grid-template-columns: auto minmax(0, 1fr);
         align-items: center;
-        gap: var(--lana-space-2xs);
-        border-radius: var(--lana-radius-sm);
-        padding: var(--lana-space-3xs) var(--lana-space-2xs);
-        cursor: pointer;
-      }
-
-      summary:hover {
-        background-color: var(--lana-row-hover-bg);
+        column-gap: var(--lana-space-2xs);
       }
 
       /* The chevron replaces the native marker, so every row shows it can open. */
@@ -76,10 +73,6 @@ export class LogDiagnosticsView extends LitElement {
       summary::-webkit-details-marker {
         content: '';
         display: none;
-      }
-
-      summary vscode-icon {
-        flex: 0 0 auto;
       }
 
       .chevron {
@@ -94,14 +87,12 @@ export class LogDiagnosticsView extends LitElement {
       /* The summary states the problem; the figure behind it and the count are
          metadata, so they sit right and do not push the title around. */
       .title {
-        flex: 1 1 auto;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
 
       .meta {
-        flex: 0 0 auto;
         color: var(--lana-fg-muted);
         font-family: var(--lana-font-mono);
         font-size: var(--lana-text-sm);
@@ -110,7 +101,6 @@ export class LogDiagnosticsView extends LitElement {
 
       /* How many events raised the finding, as a count badge. */
       .count {
-        flex: 0 0 auto;
         min-width: 1.4em;
         border-radius: var(--lana-radius-md);
         padding: 0 var(--lana-space-2xs);
@@ -121,8 +111,11 @@ export class LogDiagnosticsView extends LitElement {
         text-align: center;
       }
 
+      /* A rail threads the detail back to its row's severity glyph. */
       .body {
-        margin: 0 0 var(--lana-space-sm) calc(var(--lana-space-lg) + var(--lana-space-2xs));
+        margin: 0 0 var(--lana-space-sm) var(--lana-space-2xs);
+        border-left: var(--lana-stroke) solid var(--lana-surface-border);
+        padding-left: calc(var(--lana-space-lg) + var(--lana-space-2xs));
       }
 
       .detail {
@@ -240,8 +233,7 @@ export class LogDiagnosticsView extends LitElement {
           ? result.diagnostics.map((diagnostic) => {
               const severity = diagnostic.severity.toLowerCase();
               return html`<details>
-                <summary>
-                  <vscode-icon class="chevron" name="chevron-right"></vscode-icon>
+                <summary class="bleed-row">
                   <vscode-icon
                     class="sev-${severity}"
                     name=${severityIcon(diagnostic.severity)}
@@ -251,6 +243,7 @@ export class LogDiagnosticsView extends LitElement {
                   ${
                     diagnostic.count > 1 ? html`<span class="count">${diagnostic.count}</span>` : ''
                   }
+                  <vscode-icon class="chevron" name="chevron-right"></vscode-icon>
                 </summary>
                 <div class="body">
                   ${diagnostic.message ? html`<p class="detail">${diagnostic.message}</p>` : ''}

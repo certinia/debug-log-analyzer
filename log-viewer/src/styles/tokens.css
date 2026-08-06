@@ -104,6 +104,20 @@
   /* Row hover, for lists whose rows can be opened or picked. */
   --lana-row-hover-bg: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
 
+  /* Row meters — thin magnitude strips under list rows. Monochrome foreground
+     tints, so length is the only encoding and colour stays reserved for
+     governor tiers and severity. */
+  --lana-meter-track: color-mix(in srgb, var(--vscode-foreground, #cccccc) 10%, transparent);
+  --lana-meter-fill: color-mix(in srgb, var(--vscode-foreground, #cccccc) 55%, transparent);
+
+  /* Warning callout — a tinted fill behind an actionable data-quality caveat. */
+  --lana-callout-warning-bg: color-mix(in srgb, var(--lana-severity-warning) 12%, transparent);
+  --lana-callout-warning-bg-hover: color-mix(
+    in srgb,
+    var(--lana-severity-warning) 20%,
+    transparent
+  );
+
   /* Secondary text — metadata that must not compete with the content it annotates. */
   --lana-fg-muted: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
 

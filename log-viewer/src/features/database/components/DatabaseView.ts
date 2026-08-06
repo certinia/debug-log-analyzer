@@ -179,7 +179,10 @@ export class DatabaseView extends LitElement {
       }
 
       governor-summary {
-        border-bottom: 1px solid var(--vscode-panel-border);
+        border-bottom: var(--lana-stroke) solid var(--vscode-panel-border);
+        /* Left inset matches the sections' content edge. */
+        padding: var(--lana-space-sm) var(--lana-space-md) var(--lana-space-md)
+          var(--lana-section-inset);
       }
 
       .db-panel {

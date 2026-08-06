@@ -12,6 +12,8 @@ jest.mock('../CallTreeDetail.js', () => ({}));
 jest.mock('../CategoryTimeBar.js', () => ({}));
 jest.mock('../EventVitals.js', () => ({}));
 jest.mock('../GovernorTrends.js', () => ({}));
+jest.mock('../HotPath.js', () => ({}));
+jest.mock('../HotSpots.js', () => ({}));
 jest.mock('../LogOverview.js', () => ({}));
 
 const databaseCalls: { eventIndex: number; type: string }[] = [];
@@ -30,6 +32,8 @@ describe('buildDetailSections', () => {
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
     // The call tree gets the most room, so it is the section worth reading.
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
+    // The vitals are a fixed set of figures: they take their own height only.
+    expect(sections.find((s) => s.id === 'vitals')?.fit).toBe('content');
   });
 
   it('delegates a database statement to the richer database sections', async () => {
@@ -61,12 +65,19 @@ describe('buildDetailSections', () => {
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
   });
 
-  it('builds the whole-log overview when nothing is selected, for every source', async () => {
-    for (const source of ['calltree', 'database'] as const) {
-      const sections = await buildDetailSections(source, null);
-      expect(sections.map((s) => s.id)).toEqual(['overview']);
-      expect(sections[0]?.title).toBe('Log overview');
-    }
+  it('builds only the whole-log overview for the database with nothing selected', async () => {
+    const sections = await buildDetailSections('database', null);
+    expect(sections.map((s) => s.id)).toEqual(['overview']);
+    expect(sections[0]?.title).toBe('Log overview');
+  });
+
+  it('adds the hot path and hot spots to the call tree when nothing is selected', async () => {
+    const sections = await buildDetailSections('calltree', null);
+    expect(sections.map((s) => s.id)).toEqual(['overview', 'hot-path', 'hot-spots']);
+    expect(sections[1]?.title).toBe('Hot path');
+    expect(sections[2]?.title).toBe('Hot spots');
+    // Every section here is a short list: each takes its own height only.
+    expect(sections.every((s) => s.fit === 'content')).toBe(true);
   });
 
   it('adds the charts and the whole-log call tree for the timeline with nothing selected', async () => {
@@ -77,8 +88,10 @@ describe('buildDetailSections', () => {
       'governor-trends',
       'calltree',
     ]);
-    // The whole-log tree gets the most room, matching the selection layout.
+    // The whole-log tree soaks up the leftover space; the charts keep their own.
     expect(sections.find((s) => s.id === 'calltree')?.weight).toBe(4);
+    expect(sections.find((s) => s.id === 'calltree')?.fit ?? 'fill').toBe('fill');
+    expect(sections.find((s) => s.id === 'governor-trends')?.fit).toBe('content');
   });
 
   it('adds the findings section on Analysis, which is that tab at log scope', async () => {

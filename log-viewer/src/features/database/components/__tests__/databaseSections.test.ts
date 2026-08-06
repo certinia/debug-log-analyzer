@@ -26,6 +26,8 @@ describe('buildDatabaseSections', () => {
     expect(sections.find((s) => s.id === 'issues')?.badge).toBe('2');
     // The smallest section.
     expect(sections.find((s) => s.id === 'issues')?.weight).toBe(1);
+    // The vitals are a fixed set of figures: they take their own height only.
+    expect(sections.find((s) => s.id === 'vitals')?.fit).toBe('content');
   });
 
   it('omits the SOQL issues section for a DML selection', async () => {

@@ -25,13 +25,14 @@ export interface DetailSelection {
 export async function buildDatabaseSections(selection: DetailSelection): Promise<PaneSection[]> {
   const { eventIndex, type } = selection;
 
-  // Each section opens at its own default height (leftover-space share); the
-  // call tree gets the most, SOQL issues the least (but still open).
+  // The vitals are a fixed set of figures, so they take their own height; the
+  // fill sections share the leftover space, the call tree getting the most,
+  // SOQL issues the least (but still open).
   const sections: PaneSection[] = [
     {
       id: 'vitals',
       title: 'Details',
-      weight: 3,
+      fit: 'content',
       content: html`<event-vitals eventIndex=${eventIndex} type=${type}></event-vitals>`,
     },
     {
