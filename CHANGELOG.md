@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Click a row and the matching frame or row is highlighted in the tab you're on, without switching tab: the Timeline selects the frame and centers it when it's off screen, the Call Tree scrolls to it in **Time Order**, and the Database tab selects the statement.
   - Dock it left, right or bottom, drag to resize, and collapse the sections you don't need — the layout is remembered.
   - Right-click a row for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
+  - Press `Escape` to clear the selection on the tab you're on; the Inspector returns to its whole-log view. ([#63])
   - **Log overview**: with nothing selected, the Inspector shows the whole log instead of sitting empty — the six governor metrics closest to their limit, each as `used / limit`. A metric is read from the namespace nearest its own limit, never from a sum across namespaces.
 - 🗄️ **Database Analysis**: governor-limit visibility and SOSL usage. ([#162])
   - 📏 **Governor-limit overview**: SOQL, SOSL, DML and query/DML rows shown as `used / limit`, colored as they approach the limit.
@@ -564,6 +565,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 [#298]: https://github.com/certinia/debug-log-analyzer/issues/298
 [#162]: https://github.com/certinia/debug-log-analyzer/issues/162
 [#113]: https://github.com/certinia/debug-log-analyzer/issues/113
+[#63]: https://github.com/certinia/debug-log-analyzer/issues/63
 [#32]: https://github.com/certinia/debug-log-analyzer/issues/32
 
 <!-- v1.20.1 -->

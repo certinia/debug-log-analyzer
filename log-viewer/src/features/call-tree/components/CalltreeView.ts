@@ -155,6 +155,7 @@ export class CalltreeView extends LitElement {
   /** Guards the programmatic select made on the inspector's behalf. */
   private _echoGuard = new SelectionEchoGuard();
   private _inspectorRevealUnsubscribe: (() => void) | null = null;
+  private _selectionClearUnsubscribe: (() => void) | null = null;
 
   constructor() {
     super();
@@ -164,6 +165,15 @@ export class CalltreeView extends LitElement {
     this._inspectorRevealUnsubscribe = eventBus.on('inspector:reveal', (detail) => {
       if (detail.source === 'calltree') {
         void this._revealEventIndex(detail.eventIndex);
+      }
+    });
+
+    // Escape (app-wide) deselects here; the table reports the clear itself.
+    this._selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
+      if (detail.source === 'calltree') {
+        for (const table of this._tables) {
+          table.deselectRow();
+        }
       }
     });
     document.addEventListener(CALLTREE_GO_TO_ROW, this._goToRowEvt);
@@ -187,6 +197,8 @@ export class CalltreeView extends LitElement {
     document.removeEventListener('lv-find-close', this._findEvt);
     this._inspectorRevealUnsubscribe?.();
     this._inspectorRevealUnsubscribe = null;
+    this._selectionClearUnsubscribe?.();
+    this._selectionClearUnsubscribe = null;
     this._destroyCurrentTable();
   }
 

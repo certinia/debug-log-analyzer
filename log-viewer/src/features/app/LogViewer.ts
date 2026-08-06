@@ -10,13 +10,14 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { parse, type ApexLog } from 'apex-log-parser';
-import { eventBus } from '../../core/events/EventBus.js';
+import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
 import {
   VSCodeExtensionMessenger,
   vscodeMessenger,
 } from '../../core/messaging/VSCodeExtensionMessenger.js';
 import { DatabaseAccess } from '../database/services/Database.js';
 import type { LogIssue } from '../notifications/types.js';
+import { installEscapeDeselect } from './escapeDeselect.js';
 import { toLogIssue } from './logIssues.js';
 import { parserIssuesToNotifications } from './parserNotifications.js';
 
@@ -128,6 +129,9 @@ export class LogViewer extends LitElement {
     document.addEventListener('show-tab', (e: Event) => {
       this._showTabEvent(e);
     });
+
+    // Escape, when nothing else claims it, deselects on the active tab.
+    installEscapeDeselect(() => TAB_TO_SOURCE[this._selectedTab]);
 
     // Listen for navigation messages from the extension
     VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {

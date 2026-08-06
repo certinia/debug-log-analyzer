@@ -76,6 +76,7 @@ export class DatabaseView extends LitElement {
 
   private _offDetailSelect: (() => void) | null = null;
   private _offInspectorReveal: (() => void) | null = null;
+  private _offSelectionClear: (() => void) | null = null;
 
   constructor() {
     super();
@@ -116,6 +117,16 @@ export class DatabaseView extends LitElement {
         views.filter((view) => view !== owner).forEach((view) => view?.deselectRows());
       }
     });
+
+    // Escape (app-wide) deselects here. Only one grid holds the selection, and
+    // it reports the clear itself — hence `notify`.
+    this._offSelectionClear = eventBus.on('selection:clear', (d) => {
+      if (d.source === 'database') {
+        [this._dmlView, this._soqlView, this._soslView].forEach((view) =>
+          view?.deselectRows({ notify: true }),
+        );
+      }
+    });
   }
 
   disconnectedCallback(): void {
@@ -127,6 +138,8 @@ export class DatabaseView extends LitElement {
     this._offDetailSelect = null;
     this._offInspectorReveal?.();
     this._offInspectorReveal = null;
+    this._offSelectionClear?.();
+    this._offSelectionClear = null;
   }
 
   updated(changed: PropertyValues): void {

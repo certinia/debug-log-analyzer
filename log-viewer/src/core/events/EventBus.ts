@@ -11,6 +11,14 @@
  *  active tab, keyed by source. */
 export type DetailSource = 'timeline' | 'calltree' | 'analysis' | 'database';
 
+/** Maps the LogViewer tab id to the detail source that feeds the inspector. */
+export const TAB_TO_SOURCE: Record<string, DetailSource> = {
+  'timeline-tab': 'timeline',
+  'tree-tab': 'calltree',
+  'analysis-tab': 'analysis',
+  'database-tab': 'database',
+};
+
 /** Which of the database grids a selection came from. */
 export type StatementType = 'dml' | 'soql' | 'sosl';
 
@@ -41,6 +49,12 @@ interface EventMap {
 
   // App-level request to show/hide (or force a state on) the inspector.
   'detail:toggle': { visible?: boolean };
+
+  // App-level request (Escape) for the active tab's view to drop its own
+  // selection. The view clears its grid row/frame highlight; its normal
+  // selection-change path then emits `detail:select` with a null selection,
+  // which clears the inspector. Only the view for `source` acts.
+  'selection:clear': { source: DetailSource };
 
   // A row was picked inside the inspector — reveal that event in the tab the
   // inspector is currently showing, never in another tab: `source` is the active

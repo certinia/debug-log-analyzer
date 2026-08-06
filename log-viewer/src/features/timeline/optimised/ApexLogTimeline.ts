@@ -64,6 +64,7 @@ export class ApexLogTimeline {
   private selectedMarkerForContextMenu: TimelineMarker | null = null;
   private eventBusUnsubscribe: (() => void) | null = null;
   private inspectorRevealUnsubscribe: (() => void) | null = null;
+  private selectionClearUnsubscribe: (() => void) | null = null;
   /** Guards the programmatic select made on the inspector's behalf. */
   private echoGuard = new SelectionEchoGuard();
 
@@ -211,6 +212,14 @@ export class ApexLogTimeline {
         this.selectFrameByEventIndex(detail.eventIndex);
       }
     });
+
+    // Escape (app-wide) deselects here; the chart reports the clear itself.
+    // The flame chart's own Escape (container focused) consumes the key first.
+    this.selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
+      if (detail.source === 'timeline') {
+        this.flamechart.clearSelection();
+      }
+    });
   }
 
   /**
@@ -323,6 +332,10 @@ export class ApexLogTimeline {
     if (this.inspectorRevealUnsubscribe) {
       this.inspectorRevealUnsubscribe();
       this.inspectorRevealUnsubscribe = null;
+    }
+    if (this.selectionClearUnsubscribe) {
+      this.selectionClearUnsubscribe();
+      this.selectionClearUnsubscribe = null;
     }
 
     this.flamechart.destroy();

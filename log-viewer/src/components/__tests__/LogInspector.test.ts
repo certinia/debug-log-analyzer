@@ -288,6 +288,26 @@ describe('LogInspector', () => {
     expect(emptyText(el)).toBe('Select a SOQL, DML or SOSL row to inspect it.');
   });
 
+  it('returns to the whole-log empty state when a null selection clears the source', async () => {
+    settings.inspector = {
+      position: 'right',
+      size: 400,
+      collapsed: {},
+      paneSizes: {},
+      visible: true,
+    };
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    expect(marker(el)).toBe('1');
+
+    eventBus.emit('detail:select', { source: 'timeline', selection: null });
+    await flush(el);
+
+    // marker() would throw here: the pane view unmounts with the selection.
+    expect(emptyText(el)).toBe('Select a frame on the timeline to inspect it.');
+  });
+
   it('drops a superseded rebuild: a stale build resolving late does not overwrite a newer one', async () => {
     // Mount undeferred so its own (empty-selection) rebuild resolves, then defer
     // only the two builds this test drives.

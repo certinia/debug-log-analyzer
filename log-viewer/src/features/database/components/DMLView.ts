@@ -435,8 +435,16 @@ export class DMLView extends LitElement {
     this.dmlTable?.copyToClipboard('all');
   }
 
-  /** Clears this grid because another one was picked, so it emits nothing. */
-  deselectRows() {
+  /**
+   * Drops this grid's row highlight. Silent by default, for the clear that
+   * follows another grid being picked; `notify` leaves the grid's own
+   * selection-change path to report it, which is the user-driven (Escape) case.
+   */
+  deselectRows({ notify = false }: { notify?: boolean } = {}) {
+    if (notify) {
+      this.dmlTable?.deselectRow();
+      return;
+    }
     this._echoGuard.run(() => this.dmlTable?.deselectRow());
   }
 

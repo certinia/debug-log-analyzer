@@ -738,8 +738,16 @@ export class SOSLView extends LitElement {
     return this.holder;
   }
 
-  /** Clears this grid because another one was picked, so it emits nothing. */
-  deselectRows() {
+  /**
+   * Drops this grid's row highlight. Silent by default, for the clear that
+   * follows another grid being picked; `notify` leaves the grid's own
+   * selection-change path to report it, which is the user-driven (Escape) case.
+   */
+  deselectRows({ notify = false }: { notify?: boolean } = {}) {
+    if (notify) {
+      this.soslTable?.deselectRow();
+      return;
+    }
     this._echoGuard.run(() => this.soslTable?.deselectRow());
   }
 
