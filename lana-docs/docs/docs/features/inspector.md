@@ -43,6 +43,13 @@ The **Analysis** tab adds:
 
 - **Findings** – what is slow or wrong in the log, and what to do about it. One pass over the log reports truncation (which makes every figure below it an undercount), governor breaches, exceptions, query-plan verdicts, SOQL optimization tips, statements repeated from one line — the usual sign of a query or DML in a loop — debug-statement cost, and the methods with the most self time. Query-plan verdicts need a `FINEST` log; without one the pane says the verdicts are unknown rather than reading clean. Each finding shows the code the log named with its figures; click it to reveal the row behind it in the Analysis grid.
 
+The **Call Tree** tab adds:
+
+- **Hot path** – the chain of calls the log spent most of its time in, entry point first. At each step, calls with the same signature count as one, so a method called 200 times shows once with a `200×` count. The path follows the biggest of these and stops where the time spreads out or a call's own work outweighs its children; every frame shows its time and share of the log. A truncated log heads the path with a warning, because timings below a cut-off call under-report.
+- **Hot spots** – the five signatures with the most self time across the whole log, with call counts.
+
+Every row in both sections is a link: click it to reveal that call in the tree (Time Order view).
+
 Select a row and the sections re-scope to it; deselect and the whole-log view returns.
 
 ### Row actions

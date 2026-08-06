@@ -17,6 +17,13 @@ export interface PaneSection {
   badge?: string;
   /** Default flex-grow weight when open, seeded on first render (default 1). */
   weight?: number;
+  /**
+   * How the open pane takes space (default `'fill'`). A `'content'` pane sizes
+   * to its content and shrinks — scrolling inside — when space runs out; it
+   * never stretches to soak up leftovers, so it has no sash and no stored size.
+   * A `'fill'` pane shares the remaining space by weight.
+   */
+  fit?: 'content' | 'fill';
 }
 
 export type PaneOrientation = 'vertical' | 'horizontal';
@@ -199,7 +206,16 @@ export class PaneView extends LitElement {
     this.sections.forEach((section, index) => {
       items.push(this._renderPane(section, weights.get(section.id) ?? 1));
       const next = this.sections[index + 1];
-      if (next && this._isOpen(section.id) && this._isOpen(next.id)) {
+      // A sash trades space between the two panes beside it, so it only exists
+      // where both neighbours are open fill panes — a content pane's size is
+      // its content's, not the user's, and dragging it would be a lie.
+      if (
+        next &&
+        this._isOpen(section.id) &&
+        this._isOpen(next.id) &&
+        this._isFill(section) &&
+        this._isFill(next)
+      ) {
         items.push(this._renderSash(section.id, next.id));
       }
     });
@@ -215,7 +231,9 @@ export class PaneView extends LitElement {
    * collapsed during it — as a sliver beside its pixel-sized siblings.
    */
   private _flexWeights(): Map<string, number> {
-    const open = this.sections.filter((section) => this._isOpen(section.id));
+    const open = this.sections.filter(
+      (section) => this._isOpen(section.id) && this._isFill(section),
+    );
     let storedPx = 0;
     let storedUnits = 0;
     for (const section of open) {
@@ -239,7 +257,13 @@ export class PaneView extends LitElement {
   private _renderPane(section: PaneSection, weight: number) {
     const open = this._isOpen(section.id);
     const collapsible = this._collapsible;
-    const style = open ? `flex: ${weight} 1 0` : 'flex: 0 0 auto';
+    // An open content pane sizes to its content but stays shrinkable, so when
+    // space runs out it scrolls instead of pushing the fill panes off screen.
+    const style = !open
+      ? 'flex: 0 0 auto'
+      : this._isFill(section)
+        ? `flex: ${weight} 1 0`
+        : 'flex: 0 1 auto';
 
     return html`<div class="pane" data-id=${section.id} ?data-open=${open} style=${style}>
       <div
@@ -278,6 +302,10 @@ export class PaneView extends LitElement {
     return this._collapsible ? !this.collapsed[id] : true;
   }
 
+  private _isFill(section: PaneSection) {
+    return (section.fit ?? 'fill') === 'fill';
+  }
+
   private _toggle(id: string) {
     // New collapsed state = the current open state (open → collapse, and vice
     // versa). The consumer owns the record, so it re-renders us with the new one.
@@ -311,10 +339,11 @@ export class PaneView extends LitElement {
     sash.setPointerCapture(e.pointerId);
     sash.classList.add('pane-sash--active');
 
-    // Snapshot every open pane's rendered size as its weight, so weights are in
-    // pixels and only the two dragged panes change (their sum stays constant).
+    // Snapshot every open fill pane's rendered size as its weight, so weights
+    // are in pixels and only the two dragged panes change (their sum stays
+    // constant). Content panes keep no size — their content decides it.
     for (const section of this.sections) {
-      if (this._isOpen(section.id)) {
+      if (this._isOpen(section.id) && this._isFill(section)) {
         this._weights[section.id] = this._paneSize(section.id);
       }
     }

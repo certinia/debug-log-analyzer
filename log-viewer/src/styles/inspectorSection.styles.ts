@@ -6,11 +6,10 @@ import { css } from 'lit';
 /** Shared chrome for an inspector chart section: the host box and the muted
  *  "nothing to draw" note. */
 export const inspectorSectionStyles = css`
+  /* No padding of its own: the pane body owns it, so every section shares one
+     content edge. */
   :host {
     display: block;
-    /* Left inset lines the content up with the other sections' text. */
-    padding: var(--lana-space-sm) var(--lana-space-md) var(--lana-space-md)
-      var(--lana-section-inset);
   }
 
   .note {

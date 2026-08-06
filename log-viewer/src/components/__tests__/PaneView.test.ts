@@ -273,4 +273,54 @@ describe('PaneView', () => {
     expect(pane('a')?.getAttribute('style')).toContain('flex: 1.5 1 0');
     expect(pane('b')?.getAttribute('style')).toContain('flex: 0.5 1 0');
   });
+
+  it('sizes a content pane to its content, shrinkable, and never stretches it', async () => {
+    const el = document.createElement('pane-view') as PaneView;
+    el.orientation = 'vertical';
+    el.sections = [
+      { id: 'a', title: 'A', content: html`<div>A</div>`, fit: 'content' },
+      { id: 'b', title: 'B', content: html`<div>B</div>` },
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const pane = (id: string) => el.shadowRoot?.querySelector(`.pane[data-id="${id}"]`);
+    expect(pane('a')?.getAttribute('style')).toContain('flex: 0 1 auto');
+    expect(pane('b')?.getAttribute('style')).toContain('flex: 1 1 0');
+  });
+
+  it('renders no sash beside a content pane', async () => {
+    const el = document.createElement('pane-view') as PaneView;
+    el.orientation = 'vertical';
+    el.sections = [
+      { id: 'a', title: 'A', content: html`<div>A</div>`, fit: 'content' },
+      { id: 'b', title: 'B', content: html`<div>B</div>` },
+      { id: 'c', title: 'C', content: html`<div>C</div>` },
+    ];
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    // Only b↔c are both fill; a content pane's size is not the user's to drag.
+    expect(el.shadowRoot?.querySelectorAll('.pane-sash').length).toBe(1);
+  });
+
+  it('ignores a stored size for a content pane when scaling the fill weights', async () => {
+    const el = document.createElement('pane-view') as PaneView;
+    el.orientation = 'vertical';
+    el.sections = [
+      { id: 'a', title: 'A', content: html`<div>A</div>`, fit: 'content' },
+      { id: 'b', title: 'B', content: html`<div>B</div>` },
+      { id: 'c', title: 'C', content: html`<div>C</div>` },
+    ];
+    // A stale size for the content pane (stored before it became content) must
+    // not skew the fill panes' shares.
+    el.paneSizes = { 'vertical:a': 500, 'vertical:b': 300, 'vertical:c': 100 };
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const pane = (id: string) => el.shadowRoot?.querySelector(`.pane[data-id="${id}"]`);
+    expect(pane('a')?.getAttribute('style')).toContain('flex: 0 1 auto');
+    expect(pane('b')?.getAttribute('style')).toContain('flex: 1.5 1 0');
+    expect(pane('c')?.getAttribute('style')).toContain('flex: 0.5 1 0');
+  });
 });
