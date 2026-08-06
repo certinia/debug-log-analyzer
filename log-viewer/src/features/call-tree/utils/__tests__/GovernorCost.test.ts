@@ -32,7 +32,11 @@ function row(overrides: Partial<Record<string, number>> = {}): GovernorCostRow {
     soqlRowCount: st(overrides.soqlRows ?? 0),
     dmlRowCount: st(overrides.dmlRows ?? 0),
     soslRowCount: st(overrides.soslRows ?? 0),
-    heapAllocated: st(overrides.heap ?? 0),
+    // `heap` drives the Heap cost metric (which reads heapPeak); heapAllocated (net) and
+    // heapGross (churn) are not read by the cost and are here only to satisfy the shape.
+    heapAllocated: st(overrides.heapNet ?? 0),
+    heapGross: st(overrides.heapGross ?? 0),
+    heapPeak: overrides.heap ?? 0,
     governorCost: 0,
     governorCostMax: 0,
   };
@@ -117,6 +121,21 @@ describe('governorCostBreakdown', () => {
     const breakdown = governorCostBreakdown(row({ soql: 5, dml: 2 }), limits({ dmlStatements: 0 }));
     // dml has usage but no limit; sosl/rows/heap have no usage.
     expect(breakdown.map((m) => m.label)).toEqual(['SOQL']);
+  });
+});
+
+describe('heap uses peak-live heap, not signed net allocation', () => {
+  it('never produces a negative cost from a net-negative subtree', () => {
+    // A subtree that frees more than it allocates has a negative heapAllocated.total
+    // but a real (≥0) peak live heap. Cost must reflect the peak, never go negative.
+    const r = row({ heap: 3000000, heapNet: -5000000 });
+    expect(governorCost(r, limits())).toBeCloseTo(50 / REPORTED_GOVERNORS, 5); // heap 50% / 6
+    expect(governorCostMax(r, limits())).toBeCloseTo(50, 5);
+  });
+
+  it('scores 0 when peak heap is 0 regardless of net allocation', () => {
+    expect(governorCost(row({ heapNet: -5000000 }), limits())).toBe(0);
+    expect(governorCostMax(row({ heapNet: -5000000 }), limits())).toBe(0);
   });
 });
 

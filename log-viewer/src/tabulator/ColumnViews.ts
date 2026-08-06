@@ -25,17 +25,23 @@ export interface ColumnView {
 const LIMIT_COUNT_TOTALS = ['dmlCount.total', 'soqlCount.total', 'soslCount.total'];
 const LIMIT_ROW_TOTALS = ['dmlRowCount.total', 'soqlRowCount.total', 'soslRowCount.total'];
 
+// Both naming variants of the total/self time columns: `totalTime`/`totalSelfTime`
+// (aggregated & bottom-up) and `duration.*` (time-order). Listing both lets one
+// preset drive all three tables.
+export const TIME_TOTALS = ['totalTime', 'totalSelfTime', 'duration.total', 'duration.self'];
+
 /**
  * Column views for the Call Tree and Analysis tables. General is an explicit
- * curated set (not `null`) so the Self columns stay hidden by default. Time
- * fields are listed under both name variants (`totalTime`/`totalSelfTime` for
- * aggregated & bottom-up, `duration.total`/`duration.self` for time-order) so
- * one list works across all three tables.
+ * curated set (not `null`) so the Self columns stay hidden by default. Each view
+ * answers one question, so a metric belongs to one view rather than every view:
+ * heap detail lives in Memory (peak also in Governor Limits, since heap size is
+ * one), governor utilisation (`governorCost`/`governorCostMax`) in Governor
+ * Limits. All stay toggleable anywhere via the column menu.
  */
 export const CALL_TREE_VIEWS: ColumnView[] = [
   {
     // SOSL is omitted here (near-always-zero for most orgs); it stays in the
-    // Governor Limits and Database views and remains toggleable anywhere.
+    // Governor Limits and Database views.
     id: 'General',
     fields: [
       'namespace',
@@ -45,26 +51,12 @@ export const CALL_TREE_VIEWS: ColumnView[] = [
       'thrownCount.total',
       'dmlRowCount.total',
       'soqlRowCount.total',
-      'heapAllocated.total',
-      'totalTime',
-      'totalSelfTime',
-      'duration.total',
-      'duration.self',
-      'governorCost',
+      ...TIME_TOTALS,
     ],
   },
   {
     id: 'Time',
-    fields: [
-      'namespace',
-      'callCount',
-      'totalTime',
-      'totalSelfTime',
-      'avgSelfTime',
-      'duration.total',
-      'duration.self',
-      'governorCost',
-    ],
+    fields: ['namespace', 'callCount', 'avgSelfTime', ...TIME_TOTALS],
   },
   {
     id: 'Governor Limits',
@@ -73,18 +65,27 @@ export const CALL_TREE_VIEWS: ColumnView[] = [
       ...LIMIT_COUNT_TOTALS,
       ...LIMIT_ROW_TOTALS,
       'thrownCount.total',
-      'heapAllocated.total',
+      'heapPeak',
       'governorCost',
       'governorCostMax',
     ],
   },
   {
+    // Timing sits alongside the counts so this view answers "which query-heavy
+    // path is slow" — the thing Governor Limits (no timing) can't.
     id: 'Database',
-    fields: ['namespace', ...LIMIT_COUNT_TOTALS, ...LIMIT_ROW_TOTALS, 'governorCost'],
+    fields: ['namespace', ...LIMIT_COUNT_TOTALS, ...LIMIT_ROW_TOTALS, ...TIME_TOTALS],
   },
   {
     id: 'Memory',
-    fields: ['namespace', 'heapAllocated.self', 'heapAllocated.total', 'governorCost'],
+    fields: [
+      'namespace',
+      'heapAllocated.total',
+      'heapAllocated.self',
+      'heapGross.total',
+      'heapGross.self',
+      'heapPeak',
+    ],
   },
 ];
 
@@ -92,10 +93,10 @@ export const CALL_TREE_VIEWS: ColumnView[] = [
 export const SOQL_VIEWS: ColumnView[] = [
   {
     // Object is visible by default (its __mdt suffix flags the "does this count
-    // toward the SOQL limit?" case of #162). The derived Counts column lives in
-    // the focused Limits view to avoid duplicating that signal.
+    // toward the SOQL limit?" case of #162). isSelective/aggregations still
+    // available via the Performance view and the column menu.
     id: 'General',
-    fields: ['isSelective', 'objectType', 'namespace', 'rowCount', 'timeTaken', 'aggregations'],
+    fields: ['objectType', 'namespace', 'rowCount', 'timeTaken'],
   },
   { id: 'Performance', fields: ['isSelective', 'relativeCost', 'rowCount', 'timeTaken'] },
   {
@@ -237,7 +238,8 @@ export function buildColumnMenuItems(
     const title = String(column.getDefinition().title ?? field);
     items.push({
       id: `col:${field}`,
-      label: `${column.isVisible() ? CHECKED : UNCHECKED}${title}`,
+      label: title,
+      checked: column.isVisible(),
       keepOpen: true,
     });
   }

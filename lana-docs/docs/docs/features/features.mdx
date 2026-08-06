@@ -1,7 +1,7 @@
 ---
 id: features
 title: ✨ Features
-description: Explore the key features of Apex Debug Log Analyzer for Salesforce, including Timeline/Flame Chart, Call Tree, Analysis, Database, and Find functionality.
+description: Explore the key features of Apex Debug Log Analyzer for Salesforce, including log problems, debug levels, Timeline/Flame Chart, Call Tree, Analysis, Database, and Find functionality.
 keywords:
   [
     salesforce debug log analyzer,
@@ -10,6 +10,8 @@ keywords:
     debug log timeline,
     salesforce call tree,
     salesforce database analysis,
+    salesforce debug log levels,
+    apex log notifications,
     apex log analyzer features,
     apex debug log analzyer for salesforce feature overview,
   ]
@@ -20,5 +22,17 @@ hide_title: true
 import DocCardList from '@theme/DocCardList';
 
 Explore the Apex Log Analyzer for Salesforce debug logs features including interactive timelines, detailed Time Order, Aggregated, and Bottom-Up call trees, in-depth analysis, database insights, and powerful search capabilities to streamline your debugging and performance tuning.
+
+## 🚦 Log problems and notifications
+
+**Log problems** are problems found in the log itself — governor limit exceptions, fatal errors, skipped lines. A chip shows the worst severity's icon with a count badge, and a tick when the log is clean. **Notifications** are messages about the tool rather than the log — today, parser diagnostics for log lines it couldn't understand. The two are kept apart so they don't read as one severity count.
+
+Each opens as a list of cards: a severity icon, a summary, a dimmed line with the kind and the time in the log (e.g. `Fatal error · 24.6 s`), a message that expands on click if it runs past two lines, and — for problems that point at a spot in the log — an arrow action that jumps to it in the Call Tree.
+
+If the parser meets a log event it doesn't recognize, a notification card carries a **Report unsupported log event** action, opening a pre-filled GitHub issue.
+
+## 🎚️ Debug levels
+
+A row of chips shows the debug levels the log was captured with, one per category (`CATEGORY LEVEL`, e.g. `APEX_CODE FINE`). This is a read-only display of what was captured — it doesn't filter the log.
 
 <DocCardList />

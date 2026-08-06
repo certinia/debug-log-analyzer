@@ -131,10 +131,9 @@ describe('Negative Filter Operator Rule tests', () => {
 
 describe('Order By Without Limit Rule tests', () => {
   const orderByWithoutLimit = {
-    summary:
-      'Avoid ORDER BY unless the result set needs to be ordered, it can increase query time.',
+    summary: 'ORDER BY without a LIMIT.',
     message:
-      "An ORDER BY clause doesn't have anything to do with selectivity. Selectivity is determined by available indexes that align with filter conditions (WHERE clause) and record visibility (sharing rules, etc.). Once the optimizer determines which rows to return, it applies the ORDER BY logic to sort the records in the return set. However an ORDER BY and LIMIT can sometimes be optimizable.",
+      'Sorting costs time and does nothing for selectivity, which comes from indexes on the WHERE clause. Drop the ORDER BY unless the caller needs the order, or add a LIMIT, since ORDER BY with a LIMIT can be optimised.',
     severity: 'Info',
   };
 

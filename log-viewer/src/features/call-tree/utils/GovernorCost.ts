@@ -4,17 +4,30 @@
 import type { GovernorLimits, SelfTotal } from 'apex-log-parser';
 
 /**
- * Minimal per-node metric shape needed to derive the governor cost. Every
- * call-tree row model (time-order, aggregated, bottom-up) satisfies this.
+ * The governor usage a node reports — all that's needed to *derive* cost. Both
+ * the call-tree row models and the parser's `LogEvent` satisfy this, so the
+ * derivations below work off either without a conversion step.
  */
-export interface GovernorCostRow {
+export interface GovernorUsage {
   dmlCount: SelfTotal;
   soqlCount: SelfTotal;
   soslCount: SelfTotal;
   dmlRowCount: SelfTotal;
   soqlRowCount: SelfTotal;
   soslRowCount: SelfTotal;
+  /** Signed net heap (alloc − free) — retention. */
   heapAllocated: SelfTotal;
+  /** Gross heap allocated (positive allocations only) — churn. */
+  heapGross: SelfTotal;
+  /** Peak live heap (bytes) reached in this path's subtree — the limit-comparable heap value. */
+  heapPeak: number;
+}
+
+/**
+ * Minimal per-node metric shape needed to derive the governor cost. Every
+ * call-tree row model (time-order, aggregated, bottom-up) satisfies this.
+ */
+export interface GovernorCostRow extends GovernorUsage {
   /**
    * Average governor consumption on this path (0–100%): the mean of every
    * governor's own `used/limit × 100`, across all governors that have a reported
@@ -34,7 +47,7 @@ export interface GovernorCostRow {
 interface CostMetric {
   label: string;
   /** Reads the node's cumulative usage for this metric. */
-  used: (row: GovernorCostRow) => number;
+  used: (row: GovernorUsage) => number;
   /** Reads the log's maximum for this metric. */
   limit: (limits: GovernorLimits) => number;
 }
@@ -46,6 +59,11 @@ interface CostMetric {
  * they have no per-transaction limit to accumulate against (the 2,000-row cap
  * is per query) and don't count against the SOQL query-rows limit; only SOSL
  * *queries* is a transaction total (limited to 20).
+ *
+ * Heap uses `heapPeak` (peak live heap in the subtree), NOT `heapAllocated.total`:
+ * heap is the only non-monotonic governor, so its signed net allocation can be
+ * negative and does not compose against the limit. `heapPeak` is ≥ 0 and composes,
+ * so it is the value comparable to the heap limit per path.
  */
 const COST_METRICS: CostMetric[] = [
   { label: 'SOQL', used: (r) => r.soqlCount.total, limit: (l) => l.soqlQueries.limit },
@@ -53,7 +71,7 @@ const COST_METRICS: CostMetric[] = [
   { label: 'SOSL', used: (r) => r.soslCount.total, limit: (l) => l.soslQueries.limit },
   { label: 'SOQL Rows', used: (r) => r.soqlRowCount.total, limit: (l) => l.queryRows.limit },
   { label: 'DML Rows', used: (r) => r.dmlRowCount.total, limit: (l) => l.dmlRows.limit },
-  { label: 'Heap', used: (r) => r.heapAllocated.total, limit: (l) => l.heapSize.limit },
+  { label: 'Heap', used: (r) => r.heapPeak, limit: (l) => l.heapSize.limit },
 ];
 
 /**
@@ -64,7 +82,7 @@ const COST_METRICS: CostMetric[] = [
  * the single tightest one. Governors never reported in the log (limit 0) are
  * excluded from both the sum and the divisor.
  */
-export function governorCost(row: GovernorCostRow, limits: GovernorLimits): number {
+export function governorCost(row: GovernorUsage, limits: GovernorLimits): number {
   let total = 0;
   let count = 0;
   for (const metric of COST_METRICS) {
@@ -83,7 +101,7 @@ export function governorCost(row: GovernorCostRow, limits: GovernorLimits): numb
  * "am I about to breach one specific limit" signal, complementing the averaged
  * {@link governorCost}.
  */
-export function governorCostMax(row: GovernorCostRow, limits: GovernorLimits): number {
+export function governorCostMax(row: GovernorUsage, limits: GovernorLimits): number {
   let max = 0;
   for (const metric of COST_METRICS) {
     const limit = metric.limit(limits);
@@ -111,7 +129,7 @@ export interface GovernorCostMetric {
  * breakdown behind the summed Gov. Cost figure in the column tooltip.
  */
 export function governorCostBreakdown(
-  row: GovernorCostRow,
+  row: GovernorUsage,
   limits: GovernorLimits,
 ): GovernorCostMetric[] {
   const metrics: GovernorCostMetric[] = [];

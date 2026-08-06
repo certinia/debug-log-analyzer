@@ -1,7 +1,7 @@
 {
   "name": "lana",
   "displayName": "Apex Log Analyzer",
-  "version": "1.20.0",
+  "version": "1.20.1",
   "description": "Salesforce Apex Debug Log Analyzer: Blazing-fast VS Code extension for Salesforce. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.",
   "keywords": [
     "analysis",
@@ -48,7 +48,7 @@
     "url": "https://github.com/certinia/debug-log-analyzer.git"
   },
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.102.0"
   },
   "categories": [
     "Other"
@@ -355,44 +355,27 @@
       {
         "type": "object",
         "id": "lana",
-        "title": "Database",
-        "order": 2,
+        "title": "Inspector",
+        "order": 3,
         "properties": {
-          "lana.database.soql.columnView": {
-            "title": "SOQL column view",
+          "lana.inspector.position": {
+            "title": "Position",
             "type": "string",
-            "default": "General",
+            "default": "right",
             "enum": [
-              "General",
-              "Performance",
-              "Query Plan",
-              "Limits"
+              "left",
+              "right",
+              "bottom"
             ],
-            "markdownDescription": "The column view applied to the Database SOQL table. Default: `General`",
+            "markdownDescription": "Where the inspector docks. Default: `right`",
             "order": 0
           },
-          "lana.database.dml.columnView": {
-            "title": "DML column view",
-            "type": "string",
-            "default": "General",
-            "enum": [
-              "General",
-              "Timing",
-              "Limits"
-            ],
-            "markdownDescription": "The column view applied to the Database DML table. Default: `General`",
-            "order": 2
-          },
-          "lana.database.sosl.columnView": {
-            "title": "SOSL column view",
-            "type": "string",
-            "default": "General",
-            "enum": [
-              "General",
-              "Timing"
-            ],
-            "markdownDescription": "The column view applied to the Database SOSL table. Default: `General`",
-            "order": 4
+          "lana.inspector.size": {
+            "title": "Size",
+            "type": "number",
+            "default": 500,
+            "markdownDescription": "The docked inspector's width (or height when docked to the bottom), in pixels. Default: `500`",
+            "order": 1
           }
         }
       }
@@ -410,8 +393,8 @@
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/node": "~22.16.5",
-    "@types/vscode": "~1.100.0",
+    "@types/node": "~22.20.1",
+    "@types/vscode": "~1.102.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }

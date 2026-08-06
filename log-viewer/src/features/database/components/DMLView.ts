@@ -4,15 +4,19 @@
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
-import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, DMLBeginLine } from 'apex-log-parser';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { emitGridSelection } from './gridSelection.js';
+import { selectRowByEventIndex } from './revealRow.js';
 import {
   applyColumnView,
   buildColumnMenuItems,
@@ -22,11 +26,17 @@ import {
   resolveColumnView,
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
+import {
+  DB_ROW_COUNT_WIDTH,
+  DB_TIME_WIDTH,
+  NAMESPACE_WIDTH,
+} from '../../../tabulator/ColumnWidths.js';
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
-import Number from '../../../tabulator/format/Number.js';
+import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
+import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
@@ -35,16 +45,20 @@ import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
+import { commonColumnDefaults, headerSortElement } from '../../call-tree/components/TableShared.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
 import databaseViewStyles from './DatabaseView.scss';
 
 // web components
-import '../../../components/CallStack.js';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
+import { showStatementRowMenu } from './rowContextMenu.js';
+import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
+import '../../../components/datagrid-range-filter.js';
+import '../../../components/OverflowList.js';
 
 /** The DML column is always shown in the DML table. */
 const ALWAYS_VISIBLE = ['dml'];
@@ -74,6 +88,8 @@ export class DMLView extends LitElement {
 
   dmlTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
+  /** Guards the programmatic select made on the inspector's behalf. */
+  private _echoGuard = new SelectionEchoGuard();
   table: HTMLElement | null = null;
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
@@ -91,6 +107,17 @@ export class DMLView extends LitElement {
   @state()
   private columnOverrides: Record<string, string[]> = {};
   private contextMenu: ContextMenu | null = null;
+  /** eventIndex of the row whose context menu is open. */
+  private contextMenuEventIndex: number | null = null;
+
+  @state()
+  private callerNamespaces: string[] = [];
+  @state()
+  private objects: string[] = [];
+  private callerNamespaceSelected: string[] = [];
+  private objectSelected: string[] = [];
+  private rowCountRange: FilterRange = { start: null, end: null };
+  private timeTakenRange: FilterRange = { start: null, end: null };
 
   constructor() {
     super();
@@ -158,7 +185,30 @@ export class DMLView extends LitElement {
 
     return html`
       <datagrid-filter-bar>
+        <overflow-list slot="filters" menu-heading="Filters" icon="filter">
+          <datagrid-facet-filter
+            label="Caller Namespace"
+            .values="${this.callerNamespaces}"
+            @datagrid-facet-change="${this._handleCallerNamespaceFacet}"
+          ></datagrid-facet-filter>
+          <datagrid-facet-filter
+            label="Object"
+            .values="${this.objects}"
+            @datagrid-facet-change="${this._handleObjectFacet}"
+          ></datagrid-facet-filter>
+          <datagrid-range-filter
+            label="Row Count"
+            @datagrid-range-change="${this._handleRowCountRange}"
+          ></datagrid-range-filter>
+          <datagrid-range-filter
+            label="Time Taken"
+            unit="ms"
+            @datagrid-range-change="${this._handleTimeTakenRange}"
+          ></datagrid-range-filter>
+        </overflow-list>
+
         <vs-select
+          dense
           slot="table-actions"
           id="dml-column-view"
           prefix="Columns"
@@ -177,6 +227,7 @@ export class DMLView extends LitElement {
         </vs-select>
 
         <vs-select
+          dense
           slot="group"
           id="dml-groupby-dropdown"
           prefix="Group"
@@ -216,7 +267,7 @@ export class DMLView extends LitElement {
         ${dmlSkeleton}
         <div id="db-dml-table"></div>
       </div>
-      <context-menu @menu-select="${this._handleColumnMenuSelect}"></context-menu>
+      <context-menu @menu-select="${this._handleContextMenuSelect}"></context-menu>
     `;
   }
 
@@ -286,10 +337,21 @@ export class DMLView extends LitElement {
     );
   }
 
-  private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
+  private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
+    this.contextMenuEventIndex = showStatementRowMenu(event, row, this.dmlTable, this.contextMenu);
+  }
+
+  private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>) {
     const { itemId } = e.detail;
     const table = this.dmlTable;
     if (!table) {
+      return;
+    }
+    if (itemId === 'show-in-call-tree') {
+      const eventIndex = this.contextMenuEventIndex;
+      if (eventIndex !== null) {
+        void goToRow({ eventIndex });
+      }
       return;
     }
     if (itemId.startsWith('view:')) {
@@ -336,8 +398,62 @@ export class DMLView extends LitElement {
     updateSetting('database.dml.columnOverrides', this.columnOverrides);
   }
 
+  private _handleCallerNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
+    this.callerNamespaceSelected = event.detail.selected;
+    this.dmlTable?.refreshFilter();
+  }
+
+  private _handleObjectFacet(event: CustomEvent<{ selected: string[] }>) {
+    this.objectSelected = event.detail.selected;
+    this.dmlTable?.refreshFilter();
+  }
+
+  private _handleRowCountRange(event: CustomEvent<{ range: FilterRange }>) {
+    this.rowCountRange = event.detail.range;
+    this.dmlTable?.refreshFilter();
+  }
+
+  private _handleTimeTakenRange(event: CustomEvent<{ range: FilterRange }>) {
+    this.timeTakenRange = event.detail.range;
+    this.dmlTable?.refreshFilter();
+  }
+
+  private _callerNamespaceFilter = (data: DMLRow): boolean =>
+    this.callerNamespaceSelected.length === 0 ||
+    this.callerNamespaceSelected.includes(data.callerNamespace ?? '');
+
+  private _objectFilter = (data: DMLRow): boolean =>
+    this.objectSelected.length === 0 || this.objectSelected.includes(data.objectType ?? '');
+
+  private _rowCountFilter = (data: DMLRow): boolean =>
+    inCountRange(this.rowCountRange, data.rowCount ?? 0);
+
+  private _timeTakenFilter = (data: DMLRow): boolean =>
+    inMsRange(this.timeTakenRange, data.timeTaken ?? 0);
+
   _copyToClipboard() {
     this.dmlTable?.copyToClipboard('all');
+  }
+
+  /**
+   * Drops this grid's row highlight. Silent by default, for the clear that
+   * follows another grid being picked; `notify` leaves the grid's own
+   * selection-change path to report it, which is the user-driven (Escape) case.
+   */
+  deselectRows({ notify = false }: { notify?: boolean } = {}) {
+    if (notify) {
+      this.dmlTable?.deselectRow();
+      return;
+    }
+    this._echoGuard.run(() => this.dmlTable?.deselectRow());
+  }
+
+  /**
+   * Select the row for `eventIndex`, without echoing `detail:select` back at the
+   * inspector that asked for it. Returns false when this grid has no such row.
+   */
+  selectByEventIndex(eventIndex: number): boolean {
+    return selectRowByEventIndex(this.dmlTable, this._echoGuard, eventIndex);
   }
 
   _exportToCSV() {
@@ -438,7 +554,6 @@ export class DMLView extends LitElement {
 
   _renderDMLTable(dmlTableContainer: HTMLElement, dmlLines: DMLBeginLine[]) {
     const dmlData: DMLRow[] = [];
-    const dmlRowLimit = this.timelineRoot?.governorLimits.dmlRows.limit ?? 0;
     let nextRowId = 0;
     if (dmlLines) {
       for (const dml of dmlLines) {
@@ -451,16 +566,20 @@ export class DMLView extends LitElement {
           rowCount: dml.dmlRowCount.self,
           timeTaken: dml.duration.total,
           eventIndex: dml.eventIndex,
-          _children: [
-            {
-              id: ++nextRowId,
-              eventIndex: dml.eventIndex,
-              isDetail: true,
-            },
-          ],
         });
       }
     }
+
+    // Bars fill relative to this grid's own totals (the Total row's sum), not a governor limit.
+    const dmlRowCountTotal = dmlData.reduce((sum, row) => sum + (row.rowCount ?? 0), 0);
+    const dmlTimeTakenTotal = dmlData.reduce((sum, row) => sum + (row.timeTaken ?? 0), 0);
+
+    this.callerNamespaces = [
+      ...new Set(dmlData.map((row) => row.callerNamespace).filter((v): v is string => !!v)),
+    ].sort();
+    this.objects = [
+      ...new Set(dmlData.map((row) => row.objectType).filter((v): v is string => !!v)),
+    ].sort();
 
     this.dmlTable = new Tabulator(dmlTableContainer, {
       index: 'id',
@@ -488,85 +607,42 @@ export class DMLView extends LitElement {
       groupClosedShowCalcs: true,
       groupStartOpen: false,
       groupToggleElement: false,
-      selectableRowsCheck: function (row: RowComponent) {
-        return !row.getData().isDetail;
-      },
       selectableRows: 'highlight',
-      dataTree: true,
-      dataTreeBranchElement: false,
-      dataTreeStartExpanded: false,
-      columnDefaults: {
-        title: 'default',
-        resizable: true,
-        headerSortStartingDir: 'desc',
-        headerTooltip: true,
-        headerWordWrap: true,
-      },
-      headerSortElement: function (_column, dir) {
-        switch (dir) {
-          case 'asc':
-            return "<div class='sort-by--top'></div>";
-          case 'desc':
-            return "<div class='sort-by--bottom'></div>";
-          default:
-            return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
-        }
-      },
+      columnDefaults: commonColumnDefaults,
+      headerSortElement,
       columns: [
         {
           title: 'DML',
           field: 'dml',
           sorter: 'string',
+          tooltip: true,
+          widthGrow: 5,
           bottomCalc: () => {
             return 'Total';
           },
           headerSortTristate: true,
-          cssClass: 'datagrid-textarea datagrid-code-text',
-          variableHeight: true,
-          formatter: (cell, _formatterParams, _onRendered) => {
-            const data = cell.getData() as DMLRow;
-            return `<call-stack
-            eventIndex="${data.eventIndex}"
-            startDepth="0"
-            endDepth="1"
-          ></call-stack>`;
-          },
+          cssClass: 'datagrid-code-text',
         },
         {
           title: 'Caller Namespace',
           field: 'callerNamespace',
           sorter: 'string',
-          width: 120,
-          headerFilter: 'list',
-          headerFilterFunc: 'in',
-          headerFilterParams: {
-            valuesLookup: 'all',
-            clearable: true,
-            multiselect: true,
-          },
-          headerFilterLiveFilter: false,
+          width: NAMESPACE_WIDTH,
         },
         {
           title: 'Object',
           field: 'objectType',
           sorter: 'string',
-          width: 150,
+          width: 110,
+          tooltip: true,
           visible: false,
-          headerFilter: 'list',
-          headerFilterFunc: 'in',
-          headerFilterParams: {
-            valuesLookup: 'all',
-            clearable: true,
-            multiselect: true,
-          },
-          headerFilterLiveFilter: false,
           formatter: (cell) => (cell.getValue() as string | null) ?? '—',
         },
         {
           title: 'Namespace',
           field: 'namespace',
           sorter: 'string',
-          width: 120,
+          width: NAMESPACE_WIDTH,
           visible: false,
         },
         {
@@ -574,46 +650,49 @@ export class DMLView extends LitElement {
           field: 'rowCount',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 90,
+          width: DB_ROW_COUNT_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatter,
-          formatterParams: { precision: 0, totalValue: dmlRowLimit, showPercentageText: false },
+          formatterParams: {
+            precision: 0,
+            totalValue: dmlRowCountTotal,
+            showPercentageText: false,
+          },
           bottomCalc: 'sum',
           bottomCalcFormatter: progressFormatter,
           bottomCalcFormatterParams: {
             precision: 0,
-            totalValue: dmlRowLimit,
+            totalValue: dmlRowCountTotal,
             showPercentageText: false,
           },
-          tooltip: (_e, cell) => cell.getValue() + (dmlRowLimit > 0 ? '/' + dmlRowLimit : ''),
+          tooltip: (_e, cell) =>
+            cell.getValue() + (dmlRowCountTotal > 0 ? '/' + dmlRowCountTotal : ''),
         },
         {
           title: 'Time Taken (ms)',
           field: 'timeTaken',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 110,
+          width: DB_TIME_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          formatter: Number,
+          formatter: progressFormatterMS,
           formatterParams: {
-            thousand: false,
             precision: 2,
+            totalValue: dmlTimeTakenTotal,
+            showPercentageText: false,
           },
           accessorDownload: NumberAccessor,
-          bottomCalcFormatter: Number,
           bottomCalc: 'sum',
-          bottomCalcFormatterParams: { precision: 2 },
+          bottomCalcFormatter: progressFormatterMS,
+          bottomCalcFormatterParams: {
+            precision: 2,
+            totalValue: dmlTimeTakenTotal,
+            showPercentageText: false,
+          },
         },
       ],
-      rowFormatter: (row) => {
-        const data = row.getData();
-        if (data.isDetail && data.eventIndex !== undefined) {
-          const detailContainer = this.createDetailPanel(data.eventIndex);
-          row.getElement().replaceChildren(detailContainer);
-        }
-      },
     });
 
     this.dmlTable.on('groupClick', (_e: UIEvent, group: GroupComponent) => {
@@ -623,31 +702,19 @@ export class DMLView extends LitElement {
       }
 
       group.toggle();
-      if (this.dmlTable && group.isVisible()) {
-        this.dmlTable.blockRedraw();
-        for (const row of group.getRows()) {
-          if (row.getTreeChildren() && !row.isTreeExpanded()) {
-            row.treeExpand();
-          }
-        }
-        this.dmlTable.restoreRedraw();
-      }
     });
 
-    this.dmlTable.on('rowClick', function (_e, row) {
-      const { type } = window.getSelection() ?? {};
-      if (type === 'Range') {
-        return;
-      }
+    // Drive the detail panel off selection (not click) so keyboard row
+    // navigation updates it too. RowKeyboardNavigation keeps a single row
+    // selected across mouse and arrow-key navigation.
+    this.dmlTable.on('rowSelectionChanged', (_data, rows) => {
+      emitGridSelection(this._echoGuard, 'dml', rows, (data: DMLRow) =>
+        data.dml ? data.eventIndex : undefined,
+      );
+    });
 
-      const data = row.getData();
-      if (!(data.eventIndex !== undefined && data.dml)) {
-        return;
-      }
-
-      const origRowHeight = row.getElement().offsetHeight;
-      row.treeToggle();
-      row.getCell('dml').getElement().style.height = origRowHeight + 'px';
+    this.dmlTable.on('rowContext', (e, row) => {
+      this._showRowContextMenu(e as MouseEvent, row);
     });
 
     this.dmlTable.on('tableBuilt', () => {
@@ -657,6 +724,10 @@ export class DMLView extends LitElement {
       this.dmlTable?.setSortedGroupBy('dml');
       if (this.dmlTable) {
         this._initTableColumns(this.dmlTable);
+        this.dmlTable.addFilter(this._callerNamespaceFilter);
+        this.dmlTable.addFilter(this._objectFilter);
+        this.dmlTable.addFilter(this._rowCountFilter);
+        this.dmlTable.addFilter(this._timeTakenFilter);
       }
     });
 
@@ -721,14 +792,6 @@ export class DMLView extends LitElement {
     return this.holder;
   }
 
-  createDetailPanel(eventIndex: number) {
-    const detailContainer = document.createElement('div');
-    detailContainer.className = 'row__details-container';
-    render(html`<call-stack eventIndex=${eventIndex}></call-stack>`, detailContainer);
-
-    return detailContainer;
-  }
-
   downlodEncoder(defaultFileName: string) {
     return function (fileContents: string, mimeType: string) {
       const vscode = vscodeMessenger.getVsCodeAPI();
@@ -763,8 +826,6 @@ interface DMLRow {
   rowCount?: number;
   timeTaken?: number;
   eventIndex?: number;
-  isDetail?: boolean;
-  _children?: DMLRow[];
 }
 
 type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

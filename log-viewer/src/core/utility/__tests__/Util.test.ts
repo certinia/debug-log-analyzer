@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { computeWallClockMs, formatWallClockTime } from '../Util.js';
+import { computeWallClockMs, formatByteSize, formatWallClockTime } from '../Util.js';
 
 describe('formatWallClockTime', () => {
   it('should format midnight as 00:00:00.000', () => {
@@ -58,5 +58,25 @@ describe('computeWallClockMs', () => {
     // 500,000 ns = 0.5 ms
     const result = computeWallClockMs(0, 0, 500000);
     expect(result).toBe(0.5);
+  });
+});
+
+describe('formatByteSize', () => {
+  it('writes megabytes with one decimal at most', () => {
+    expect(formatByteSize(5_400_000)).toBe('5.4 MB');
+    expect(formatByteSize(6_000_000)).toBe('6 MB');
+    expect(formatByteSize(12_345_678)).toBe('12.3 MB');
+  });
+
+  it('writes kilobytes below a megabyte', () => {
+    expect(formatByteSize(2_048)).toBe('2 KB');
+    expect(formatByteSize(999_900)).toBe('999.9 KB');
+  });
+
+  it('writes small and negative counts as bytes', () => {
+    expect(formatByteSize(0)).toBe('0 bytes');
+    expect(formatByteSize(940)).toBe('940 bytes');
+    // A net heap figure can be negative; the sign survives.
+    expect(formatByteSize(-1_500_000)).toBe('-1.5 MB');
   });
 });

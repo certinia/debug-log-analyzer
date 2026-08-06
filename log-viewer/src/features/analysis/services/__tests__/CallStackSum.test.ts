@@ -4,12 +4,17 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import type { LogEvent } from 'apex-log-parser';
 
-import { sumDurationTotalForRootEvents, sumRootNodesOnly } from '../CallStackSum.js';
+import {
+  sumDurationTotalForRootEvents,
+  sumRootNodesOnly,
+  sumTotalForRootEvents,
+} from '../CallStackSum.js';
 import type { Metric } from '../RowGrouper.js';
 
 type EventOptions = {
   text: string;
   total: number;
+  heapTotal?: number;
   parent?: LogEvent | null;
 };
 
@@ -24,6 +29,7 @@ function createEvent(options: EventOptions): LogEvent {
     namespace: 'default',
     timestamp: nextTimestamp++,
     duration: { self: 0, total: options.total },
+    heapAllocated: { self: 0, total: options.heapTotal ?? 0 },
     dmlRowCount: { self: 0, total: 0 },
     soqlRowCount: { self: 0, total: 0 },
     soslRowCount: { self: 0, total: 0 },
@@ -66,6 +72,26 @@ describe('sumDurationTotalForRootEvents', () => {
 
   it('returns 0 for an empty input', () => {
     expect(sumDurationTotalForRootEvents([])).toBe(0);
+  });
+});
+
+describe('sumTotalForRootEvents (generic accessor)', () => {
+  beforeEach(() => {
+    nextTimestamp = 1;
+  });
+
+  it('dedups by call stack for an arbitrary field (heap total)', () => {
+    // Parent heap 100 (subtree total), its leaf 100; another parent 30, its leaf 30.
+    // Naive sum = 260; root-only dedup = 130. Proves the BottomUp heap-total footer
+    // won't double-count overlapping buckets.
+    const parentA = createEvent({ text: 'ParentA', total: 0, heapTotal: 100 });
+    const leafA = createEvent({ text: 'Leaf', total: 0, heapTotal: 100, parent: parentA });
+    const parentB = createEvent({ text: 'ParentB', total: 0, heapTotal: 30 });
+    const leafB = createEvent({ text: 'Leaf', total: 0, heapTotal: 30, parent: parentB });
+
+    expect(
+      sumTotalForRootEvents([[parentA], [parentB], [leafA, leafB]], (n) => n.heapAllocated.total),
+    ).toBe(130);
   });
 });
 

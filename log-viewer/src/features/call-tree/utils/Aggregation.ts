@@ -5,7 +5,7 @@
 import type { GovernorLimits, LogEvent, SelfTotal } from 'apex-log-parser';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { Multiset } from '../../../core/utility/Multiset.js';
-import { EXCLUDED_DETAIL_TYPES } from './DetailsFilter.js';
+import { computeHasDetailsDeep } from './DetailsFilter.js';
 import { setGovernorCost } from './GovernorCost.js';
 
 /**
@@ -23,6 +23,8 @@ export interface AggregatedRow {
   namespace: string;
   /** Namespace of the direct caller (representative; used for grouping/filtering, not displayed) */
   callerNamespace: string;
+  /** Event type (e.g. METHOD_ENTRY) — an optional column, off by default. */
+  type: string;
   /** Number of times this function was called */
   callCount: number;
   /** Sum of self-time across all calls */
@@ -45,8 +47,12 @@ export interface AggregatedRow {
   soslRowCount: SelfTotal;
   /** Total + self exceptions thrown */
   thrownCount: SelfTotal;
-  /** Total + self heap bytes allocated */
+  /** Total + self signed NET heap bytes (alloc − free; may be negative) — retention */
   heapAllocated: SelfTotal;
+  /** Total + self GROSS heap bytes allocated (frees ignored) — churn */
+  heapGross: SelfTotal;
+  /** Peak live heap (bytes) reached across this row's calls — the limit-comparable value */
+  heapPeak: number;
   /** Average governor consumption across all reported governors (0–100%). */
   governorCost: number;
   /** The single tightest governor consumed on this path (0–100+%). */
@@ -103,8 +109,12 @@ export interface BottomUpRow {
   soslRowCount: SelfTotal;
   /** Total + self exceptions thrown */
   thrownCount: SelfTotal;
-  /** Total + self heap bytes allocated */
+  /** Total + self signed NET heap bytes (alloc − free; may be negative) — retention */
   heapAllocated: SelfTotal;
+  /** Total + self GROSS heap bytes allocated (frees ignored) — churn */
+  heapGross: SelfTotal;
+  /** Peak live heap (bytes) reached across this row's calls — the limit-comparable value */
+  heapPeak: number;
   /** Average governor consumption across all reported governors (0–100%). */
   governorCost: number;
   /** The single tightest governor consumed on this path (0–100+%). */
@@ -282,6 +292,10 @@ function addEventToAggregatedRowWithStack(
   row.thrownCount.total += event.thrownCount.total;
   row.heapAllocated.self += event.heapAllocated.self;
   row.heapAllocated.total += event.heapAllocated.total;
+  row.heapGross.self += event.heapGross.self;
+  row.heapGross.total += event.heapGross.total;
+  // Peak live heap aggregates by max (the worst single call), not sum.
+  row.heapPeak = Math.max(row.heapPeak, event.heapPeak);
   row.instances.push(event);
 }
 
@@ -335,6 +349,7 @@ type FrameContext = {
   soslRowTotal: number;
   thrownTotal: number;
   heapTotal: number;
+  heapGrossTotal: number;
 };
 
 type DfsEntry = {
@@ -407,6 +422,7 @@ export function toBottomUpTree(
       soslRowTotal: node.soslRowCount.total,
       thrownTotal: node.thrownCount.total,
       heapTotal: node.heapAllocated.total,
+      heapGrossTotal: node.heapGross.total,
     };
 
     if (prior) {
@@ -419,6 +435,7 @@ export function toBottomUpTree(
       prior.soslRowTotal -= node.soslRowCount.total;
       prior.thrownTotal -= node.thrownCount.total;
       prior.heapTotal -= node.heapAllocated.total;
+      prior.heapGrossTotal -= node.heapGross.total;
     }
     activeByName.set(stackKey, ctx);
     dfs.push({ node, childIdx: 0, ctx });
@@ -438,6 +455,10 @@ export function toBottomUpTree(
     const soslRowSelf = node.soslRowCount.self;
     const thrownSelf = node.thrownCount.self;
     const heapSelf = node.heapAllocated.self;
+    const heapGrossSelf = node.heapGross.self;
+    // Peak live heap composes by max, so (unlike the additive totals) it needs no
+    // deepest-frame subtraction — just max this node's peak into every chain row.
+    const heapPeak = node.heapPeak;
     const totalTime = ctx.totalTime;
     const dmlTotal = ctx.dmlTotal;
     const soqlTotal = ctx.soqlTotal;
@@ -447,6 +468,7 @@ export function toBottomUpTree(
     const soslRowTotal = ctx.soslRowTotal;
     const thrownTotal = ctx.thrownTotal;
     const heapTotal = ctx.heapTotal;
+    const heapGrossTotal = ctx.heapGrossTotal;
 
     // Closure captures the hoisted locals; zero-delta guards skip no-op writes
     // for logs without heavy DB work.
@@ -501,6 +523,15 @@ export function toBottomUpTree(
       }
       if (heapTotal) {
         b.heapAllocated.total += heapTotal;
+      }
+      if (heapGrossSelf) {
+        b.heapGross.self += heapGrossSelf;
+      }
+      if (heapGrossTotal) {
+        b.heapGross.total += heapGrossTotal;
+      }
+      if (heapPeak > b.heapPeak) {
+        b.heapPeak = heapPeak;
       }
     };
 
@@ -610,6 +641,7 @@ function createEmptyAggregatedRow(
     text: event.text,
     namespace: event.namespace,
     callerNamespace: getCallerNamespace(event),
+    type: event.type ?? '',
     callCount: 0,
     totalSelfTime: 0,
     totalTime: 0,
@@ -622,6 +654,8 @@ function createEmptyAggregatedRow(
     soslRowCount: { self: 0, total: 0 },
     thrownCount: { self: 0, total: 0 },
     heapAllocated: { self: 0, total: 0 },
+    heapGross: { self: 0, total: 0 },
+    heapPeak: 0,
     governorCost: 0,
     governorCostMax: 0,
     _children: null,
@@ -657,6 +691,8 @@ function createEmptyBottomUpRow(
     soslRowCount: { self: 0, total: 0 },
     thrownCount: { self: 0, total: 0 },
     heapAllocated: { self: 0, total: 0 },
+    heapGross: { self: 0, total: 0 },
+    heapPeak: 0,
     governorCost: 0,
     governorCostMax: 0,
     _children: null,
@@ -676,32 +712,4 @@ function calculateBottomUpAverages(row: BottomUpRow): void {
   if (row.callCount > 0) {
     row.avgSelfTime = row.totalSelfTime / row.callCount;
   }
-}
-
-/**
- * Show-Details predicate, rolled up across children. Called post-order after
- * `_children` is set and each child's own `_hasDetailsDeep` is populated.
- * Generic over `AggregatedRow` (type lives on `originalData`) and `BottomUpRow`
- * (type lives on the row directly) — caller passes whichever applies.
- */
-function computeHasDetailsDeep<T extends { _children?: T[] | null; _hasDetailsDeep: boolean }>(
-  row: T,
-  totalTime: number,
-  type: string | null | undefined,
-): boolean {
-  if (totalTime > 0) {
-    return true;
-  }
-  if (type && EXCLUDED_DETAIL_TYPES.has(type)) {
-    return true;
-  }
-  const children = row._children;
-  if (children) {
-    for (let i = 0, len = children.length; i < len; i++) {
-      if (children[i]!._hasDetailsDeep) {
-        return true;
-      }
-    }
-  }
-  return false;
 }

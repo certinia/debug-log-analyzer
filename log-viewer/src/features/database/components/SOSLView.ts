@@ -4,15 +4,21 @@
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
-import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, SOSLExecuteBeginLine } from 'apex-log-parser';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { emitGridSelection } from './gridSelection.js';
+import { selectRowByEventIndex } from './revealRow.js';
+import { soqlInlineElement } from '../../soql/format/inlineCell.js';
+import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import {
   applyColumnView,
   buildColumnMenuItems,
@@ -22,12 +28,17 @@ import {
   SOSL_VIEWS,
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
+import {
+  DB_ROW_COUNT_WIDTH,
+  DB_TIME_WIDTH,
+  NAMESPACE_WIDTH,
+} from '../../../tabulator/ColumnWidths.js';
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
-import Number from '../../../tabulator/format/Number.js';
+import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
-import { SOSL_ROWS_PER_QUERY_LIMIT } from '../limits.js';
+import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
@@ -36,16 +47,20 @@ import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
+import { commonColumnDefaults, headerSortElement } from '../../call-tree/components/TableShared.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
 import databaseViewStyles from './DatabaseView.scss';
 
 // web components
-import '../../../components/CallStack.js';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
+import { showStatementRowMenu } from './rowContextMenu.js';
+import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
+import '../../../components/datagrid-range-filter.js';
+import '../../../components/OverflowList.js';
 
 /** The SOSL column is always shown in the SOSL table. */
 const ALWAYS_VISIBLE = ['sosl'];
@@ -56,8 +71,6 @@ const groupLabelsToFields = new Map<string, string>([
   ['Caller Namespace', 'callerNamespace'],
   ['None', ''],
 ]);
-
-const countFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 
 @customElement('sosl-view')
 export class SOSLView extends LitElement {
@@ -76,6 +89,8 @@ export class SOSLView extends LitElement {
 
   soslTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
+  /** Guards the programmatic select made on the inspector's behalf. */
+  private _echoGuard = new SelectionEchoGuard();
   table: HTMLElement | null = null;
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
@@ -93,6 +108,14 @@ export class SOSLView extends LitElement {
   @state()
   private columnOverrides: Record<string, string[]> = {};
   private contextMenu: ContextMenu | null = null;
+  /** eventIndex of the row whose context menu is open. */
+  private contextMenuEventIndex: number | null = null;
+
+  @state()
+  private namespaces: string[] = [];
+  private namespaceSelected: string[] = [];
+  private rowCountRange: FilterRange = { start: null, end: null };
+  private timeTakenRange: FilterRange = { start: null, end: null };
 
   constructor() {
     super();
@@ -134,6 +157,7 @@ export class SOSLView extends LitElement {
   static styles = [
     unsafeCSS(dataGridStyles),
     unsafeCSS(databaseViewStyles),
+    unsafeCSS(soqlSyntaxStyles),
     globalStyles,
     css`
       :host {
@@ -160,7 +184,25 @@ export class SOSLView extends LitElement {
 
     return html`
       <datagrid-filter-bar>
+        <overflow-list slot="filters" menu-heading="Filters" icon="filter">
+          <datagrid-facet-filter
+            label="Namespace"
+            .values="${this.namespaces}"
+            @datagrid-facet-change="${this._handleNamespaceFacet}"
+          ></datagrid-facet-filter>
+          <datagrid-range-filter
+            label="Row Count"
+            @datagrid-range-change="${this._handleRowCountRange}"
+          ></datagrid-range-filter>
+          <datagrid-range-filter
+            label="Time Taken"
+            unit="ms"
+            @datagrid-range-change="${this._handleTimeTakenRange}"
+          ></datagrid-range-filter>
+        </overflow-list>
+
         <vs-select
+          dense
           slot="table-actions"
           id="sosl-column-view"
           prefix="Columns"
@@ -179,6 +221,7 @@ export class SOSLView extends LitElement {
         </vs-select>
 
         <vs-select
+          dense
           slot="group"
           id="sosl-groupby-dropdown"
           prefix="Group"
@@ -217,7 +260,7 @@ export class SOSLView extends LitElement {
         ${soslSkeleton}
         <div id="db-sosl-table"></div>
       </div>
-      <context-menu @menu-select="${this._handleColumnMenuSelect}"></context-menu>
+      <context-menu @menu-select="${this._handleContextMenuSelect}"></context-menu>
     `;
   }
 
@@ -287,10 +330,21 @@ export class SOSLView extends LitElement {
     );
   }
 
-  private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
+  private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
+    this.contextMenuEventIndex = showStatementRowMenu(event, row, this.soslTable, this.contextMenu);
+  }
+
+  private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>) {
     const { itemId } = e.detail;
     const table = this.soslTable;
     if (!table) {
+      return;
+    }
+    if (itemId === 'show-in-call-tree') {
+      const eventIndex = this.contextMenuEventIndex;
+      if (eventIndex !== null) {
+        void goToRow({ eventIndex });
+      }
       return;
     }
     if (itemId.startsWith('view:')) {
@@ -336,6 +390,30 @@ export class SOSLView extends LitElement {
     }
     updateSetting('database.sosl.columnOverrides', this.columnOverrides);
   }
+
+  private _handleNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
+    this.namespaceSelected = event.detail.selected;
+    this.soslTable?.refreshFilter();
+  }
+
+  private _handleRowCountRange(event: CustomEvent<{ range: FilterRange }>) {
+    this.rowCountRange = event.detail.range;
+    this.soslTable?.refreshFilter();
+  }
+
+  private _handleTimeTakenRange(event: CustomEvent<{ range: FilterRange }>) {
+    this.timeTakenRange = event.detail.range;
+    this.soslTable?.refreshFilter();
+  }
+
+  private _namespaceFilter = (data: SOSLRow): boolean =>
+    this.namespaceSelected.length === 0 || this.namespaceSelected.includes(data.namespace ?? '');
+
+  private _rowCountFilter = (data: SOSLRow): boolean =>
+    inCountRange(this.rowCountRange, data.rowCount ?? 0);
+
+  private _timeTakenFilter = (data: SOSLRow): boolean =>
+    inMsRange(this.timeTakenRange, data.timeTaken ?? 0);
 
   _copyToClipboard() {
     this.soslTable?.copyToClipboard('all');
@@ -449,16 +527,17 @@ export class SOSLView extends LitElement {
           rowCount: sosl.soslRowCount.self,
           timeTaken: sosl.duration.total,
           eventIndex: sosl.eventIndex,
-          _children: [
-            {
-              id: ++nextRowId,
-              eventIndex: sosl.eventIndex,
-              isDetail: true,
-            },
-          ],
         });
       }
     }
+
+    this.namespaces = [
+      ...new Set(soslData.map((row) => row.namespace).filter((v): v is string => !!v)),
+    ].sort();
+
+    // Bars fill relative to this grid's own totals (the Total row's sum), not a governor limit.
+    const soslRowCountTotal = soslData.reduce((sum, row) => sum + (row.rowCount ?? 0), 0);
+    const soslTimeTakenTotal = soslData.reduce((sum, row) => sum + (row.timeTaken ?? 0), 0);
 
     this.soslTable = new Tabulator(soslTableContainer, {
       index: 'id',
@@ -486,153 +565,103 @@ export class SOSLView extends LitElement {
       groupClosedShowCalcs: true,
       groupStartOpen: false,
       groupToggleElement: false,
-      selectableRowsCheck: function (row: RowComponent) {
-        return !row.getData().isDetail;
-      },
       selectableRows: 'highlight',
-      dataTree: true,
-      dataTreeBranchElement: false,
-      dataTreeStartExpanded: false,
-      columnDefaults: {
-        title: 'default',
-        resizable: true,
-        headerSortStartingDir: 'desc',
-        headerTooltip: true,
-        headerWordWrap: true,
-      },
-      headerSortElement: function (_column, dir) {
-        switch (dir) {
-          case 'asc':
-            return "<div class='sort-by--top'></div>";
-          case 'desc':
-            return "<div class='sort-by--bottom'></div>";
-          default:
-            return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
-        }
-      },
+      columnDefaults: commonColumnDefaults,
+      headerSortElement,
       columns: [
         {
           title: 'SOSL',
           field: 'sosl',
           sorter: 'string',
+          tooltip: true,
+          widthGrow: 5,
           bottomCalc: () => {
             return 'Total';
           },
           headerSortTristate: true,
-          cssClass: 'datagrid-textarea datagrid-code-text',
-          variableHeight: true,
-          formatter: (cell, _formatterParams, _onRendered) => {
-            const data = cell.getData() as SOSLRow;
-            return `<call-stack
-            eventIndex="${data.eventIndex}"
-            startDepth="0"
-            endDepth="1"
-          ></call-stack>`;
-          },
+          cssClass: 'datagrid-code-text',
+          formatter: (cell) => soqlInlineElement(cell.getValue() as string, 'sosl'),
         },
         {
           title: 'Namespace',
           field: 'namespace',
           sorter: 'string',
-          width: 120,
-          headerFilter: 'list',
-          headerFilterFunc: 'in',
-          headerFilterParams: {
-            valuesLookup: 'all',
-            clearable: true,
-            multiselect: true,
-          },
-          headerFilterLiveFilter: false,
+          width: NAMESPACE_WIDTH,
         },
         {
           title: 'Caller Namespace',
           field: 'callerNamespace',
           sorter: 'string',
-          width: 120,
+          width: NAMESPACE_WIDTH,
           visible: false,
         },
         {
-          // SOSL's row limit is per query (2,000), not a transaction total — so
-          // each row meters against that per-query cap; the footer is a plain sum.
           title: 'Row Count',
           field: 'rowCount',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 100,
+          width: DB_ROW_COUNT_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatter,
           formatterParams: {
             precision: 0,
-            totalValue: SOSL_ROWS_PER_QUERY_LIMIT,
+            totalValue: soslRowCountTotal,
             showPercentageText: false,
           },
-          // The group/total is a plain sum (a per-query bar there would be
-          // meaningless); use an integer formatter, NOT the ns→ms `Number` one.
           bottomCalc: 'sum',
-          bottomCalcFormatter: (cell) => countFormat.format((cell.getValue() as number) ?? 0),
-          tooltip: (_e, cell) => `${cell.getValue()} / ${SOSL_ROWS_PER_QUERY_LIMIT} per query`,
+          bottomCalcFormatter: progressFormatter,
+          bottomCalcFormatterParams: {
+            precision: 0,
+            totalValue: soslRowCountTotal,
+            showPercentageText: false,
+          },
+          tooltip: (_e, cell) =>
+            cell.getValue() + (soslRowCountTotal > 0 ? '/' + soslRowCountTotal : ''),
         },
         {
           title: 'Time Taken (ms)',
           field: 'timeTaken',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 110,
+          width: DB_TIME_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          formatter: Number,
+          formatter: progressFormatterMS,
           formatterParams: {
-            thousand: false,
             precision: 2,
+            totalValue: soslTimeTakenTotal,
+            showPercentageText: false,
           },
           accessorDownload: NumberAccessor,
-          bottomCalcFormatter: Number,
           bottomCalc: 'sum',
-          bottomCalcFormatterParams: { precision: 2 },
+          bottomCalcFormatter: progressFormatterMS,
+          bottomCalcFormatterParams: {
+            precision: 2,
+            totalValue: soslTimeTakenTotal,
+            showPercentageText: false,
+          },
         },
       ],
-      rowFormatter: (row) => {
-        const data = row.getData();
-        if (data.isDetail && data.eventIndex !== undefined) {
-          const detailContainer = this.createDetailPanel(data.eventIndex);
-          row.getElement().replaceChildren(detailContainer);
-        }
-      },
     });
 
     this.soslTable.on('groupClick', (_e: UIEvent, group: GroupComponent) => {
-      const { type } = window.getSelection() ?? {};
-      if (type === 'Range') {
+      if (window.getSelection()?.type === 'Range') {
         return;
       }
-
       group.toggle();
-      if (this.soslTable && group.isVisible()) {
-        this.soslTable.blockRedraw();
-        for (const row of group.getRows()) {
-          if (row.getTreeChildren() && !row.isTreeExpanded()) {
-            row.treeExpand();
-          }
-        }
-        this.soslTable.restoreRedraw();
-      }
     });
 
-    this.soslTable.on('rowClick', function (_e, row) {
-      const { type } = window.getSelection() ?? {};
-      if (type === 'Range') {
-        return;
-      }
+    // Drive the detail panel off selection (not click) so keyboard row
+    // navigation updates it too, matching the SOQL/DML grids.
+    this.soslTable.on('rowSelectionChanged', (_data, rows) => {
+      emitGridSelection(this._echoGuard, 'sosl', rows, (data: SOSLRow) =>
+        data.sosl ? data.eventIndex : undefined,
+      );
+    });
 
-      const data = row.getData();
-      if (!(data.eventIndex !== undefined && data.sosl)) {
-        return;
-      }
-
-      const origRowHeight = row.getElement().offsetHeight;
-      row.treeToggle();
-      row.getCell('sosl').getElement().style.height = origRowHeight + 'px';
+    this.soslTable.on('rowContext', (e, row) => {
+      this._showRowContextMenu(e as MouseEvent, row);
     });
 
     this.soslTable.on('tableBuilt', () => {
@@ -642,6 +671,9 @@ export class SOSLView extends LitElement {
       this.soslTable?.setSortedGroupBy('sosl');
       if (this.soslTable) {
         this._initTableColumns(this.soslTable);
+        this.soslTable.addFilter(this._namespaceFilter);
+        this.soslTable.addFilter(this._rowCountFilter);
+        this.soslTable.addFilter(this._timeTakenFilter);
       }
     });
 
@@ -706,12 +738,25 @@ export class SOSLView extends LitElement {
     return this.holder;
   }
 
-  createDetailPanel(eventIndex: number) {
-    const detailContainer = document.createElement('div');
-    detailContainer.className = 'row__details-container';
-    render(html`<call-stack eventIndex=${eventIndex}></call-stack>`, detailContainer);
+  /**
+   * Drops this grid's row highlight. Silent by default, for the clear that
+   * follows another grid being picked; `notify` leaves the grid's own
+   * selection-change path to report it, which is the user-driven (Escape) case.
+   */
+  deselectRows({ notify = false }: { notify?: boolean } = {}) {
+    if (notify) {
+      this.soslTable?.deselectRow();
+      return;
+    }
+    this._echoGuard.run(() => this.soslTable?.deselectRow());
+  }
 
-    return detailContainer;
+  /**
+   * Select the row for `eventIndex`, without echoing `detail:select` back at the
+   * inspector that asked for it. Returns false when this grid has no such row.
+   */
+  selectByEventIndex(eventIndex: number): boolean {
+    return selectRowByEventIndex(this.soslTable, this._echoGuard, eventIndex);
   }
 
   downlodEncoder(defaultFileName: string) {
@@ -747,8 +792,6 @@ interface SOSLRow {
   rowCount?: number;
   timeTaken?: number;
   eventIndex?: number;
-  isDetail?: boolean;
-  _children?: SOSLRow[];
 }
 
 type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

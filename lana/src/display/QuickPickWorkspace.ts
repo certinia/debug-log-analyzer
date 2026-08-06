@@ -10,14 +10,16 @@ import { Item, Options, QuickPick } from './QuickPick.js';
 
 export class QuickPickWorkspace {
   static async pickOrReturn(context: Context): Promise<VSWorkspace> {
-    if (context.workspaces.length > 1) {
+    const workspaceFolders = context.workspaceManager.workspaceFolders;
+
+    if (workspaceFolders.length > 1) {
       const [workspace] = await QuickPick.pick(
-        context.workspaces.map((ws) => new Item(ws.name(), ws.uri, '')),
+        workspaceFolders.map((ws) => new Item(ws.name(), ws.path(), '')),
         new Options('Select a workspace:'),
       );
 
       if (workspace) {
-        const selectedWs = context.workspaces.find((ws) => ws.uri === workspace.description);
+        const selectedWs = workspaceFolders.find((ws) => ws.path() === workspace.description);
         if (!selectedWs) {
           throw new Error('Selected workspace not found');
         }
@@ -25,8 +27,8 @@ export class QuickPickWorkspace {
       } else {
         throw new Error('No workspace selected');
       }
-    } else if (context.workspaces.length === 1) {
-      const ws = context.workspaces[0];
+    } else if (workspaceFolders.length === 1) {
+      const ws = workspaceFolders[0];
       if (!ws) {
         throw new Error('No workspace available');
       }

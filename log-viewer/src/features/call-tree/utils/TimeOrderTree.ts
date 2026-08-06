@@ -17,6 +17,8 @@ export interface TimeOrderRow {
   text: string;
   namespace: string;
   callerNamespace: string;
+  /** Event type (e.g. METHOD_ENTRY) — an optional column, off by default. */
+  type: string;
   duration: SelfTotal;
   dmlCount: SelfTotal;
   soqlCount: SelfTotal;
@@ -26,6 +28,10 @@ export interface TimeOrderRow {
   soslRowCount: SelfTotal;
   thrownCount: SelfTotal;
   heapAllocated: SelfTotal;
+  /** Total + self gross heap bytes allocated (frees ignored) — churn */
+  heapGross: SelfTotal;
+  /** Peak live heap (bytes) reached in this node's subtree — the limit-comparable value */
+  heapPeak: number;
   /** Average governor consumption across all reported governors (0–100%). */
   governorCost: number;
   /** The single tightest governor consumed on this path (0–100+%). */
@@ -83,6 +89,7 @@ export function toTimeOrderTree(
       text: event.text,
       namespace: event.namespace,
       callerNamespace: getCallerNamespace(event),
+      type: type ?? '',
       duration: event.duration,
       dmlCount: event.dmlCount,
       soqlCount: event.soqlCount,
@@ -92,6 +99,8 @@ export function toTimeOrderTree(
       soslRowCount: event.soslRowCount,
       thrownCount: event.thrownCount,
       heapAllocated: event.heapAllocated,
+      heapGross: event.heapGross,
+      heapPeak: event.heapPeak,
       governorCost: 0,
       governorCostMax: 0,
       _hasDetailsDeep: selfIsDetail || childHasDetailsDeep,

@@ -10,11 +10,15 @@ import { WebView } from '../display/WebView.js';
 import { RawLogNavigation } from '../log-features/RawLogNavigation.js';
 import { fileOrFolderExists, readFile, writeFile } from '../services/salesforceServices.js';
 import {
-  COLUMN_OVERRIDE_SECTIONS,
+  PRIVATE_SECTIONS,
   getColumnOverrides,
+  getColumnViews,
   getConfig,
-  updateColumnOverride,
+  getInspectorState,
+  sameConfig,
   updateConfig,
+  updatePrivateSection,
+  type Config,
 } from '../workspace/AppConfig.js';
 
 interface WebViewLogFileRequest<T = unknown> {
@@ -73,8 +77,25 @@ export class LogView {
       .replace(/bundle\.js/gi, bundleUri.toString(true))
       .replace(/codicon\.css/gi, codiconUri.toString(true));
 
+    // The panel keeps its context when hidden, so it is never re-created: settings
+    // edits have to be pushed to it. Only push when the resolved payload actually
+    // changed — every webview subscriber re-applies it.
+    let lastConfig = LogView.resolveConfig(context);
+    const configListener = workspace.onDidChangeConfiguration((event) => {
+      if (!event.affectsConfiguration('lana')) {
+        return;
+      }
+
+      const config = LogView.resolveConfig(context);
+      if (!sameConfig(config, lastConfig)) {
+        lastConfig = config;
+        panel.webview.postMessage({ cmd: 'configChanged', payload: config });
+      }
+    });
+
     panel.onDidDispose(
       () => {
+        configListener.dispose();
         this.currentPanel = undefined;
         this.currentLogUri = undefined;
       },
@@ -104,7 +125,7 @@ export class LogView {
           case 'openType': {
             const symbol = payload as string;
             if (symbol) {
-              OpenFileInPackage.openFileForSymbol(context, symbol);
+              await OpenFileInPackage.openFileForSymbol(context, symbol);
             }
             break;
           }
@@ -114,17 +135,21 @@ export class LogView {
             break;
           }
 
+          case 'openUrl': {
+            // https only: a webview message must not be able to hand VS Code a
+            // `command:` or `file:` URI to execute.
+            const url = typeof payload === 'string' ? payload : '';
+            if (url && Uri.parse(url).scheme === 'https') {
+              commands.executeCommand('vscode.open', Uri.parse(url));
+            }
+            break;
+          }
+
           case 'getConfig': {
-            const config = getConfig();
-            const overrides = getColumnOverrides(context.context.globalState);
-            config.callTree.columnOverrides = overrides['callTree.columnOverrides'] ?? {};
-            config.database.soql.columnOverrides = overrides['database.soql.columnOverrides'] ?? {};
-            config.database.dml.columnOverrides = overrides['database.dml.columnOverrides'] ?? {};
-            config.database.sosl.columnOverrides = overrides['database.sosl.columnOverrides'] ?? {};
             panel.webview.postMessage({
               requestId,
               cmd: 'getConfig',
-              payload: config,
+              payload: LogView.resolveConfig(context),
             });
             break;
           }
@@ -132,8 +157,8 @@ export class LogView {
           case 'updateConfig': {
             const { section, value } = payload as { section: string; value: unknown };
             if (section) {
-              if ((COLUMN_OVERRIDE_SECTIONS as readonly string[]).includes(section)) {
-                updateColumnOverride(context.context.globalState, section, value);
+              if ((PRIVATE_SECTIONS as readonly string[]).includes(section)) {
+                updatePrivateSection(context.context.globalState, section, value);
               } else {
                 updateConfig(section, value);
               }
@@ -188,6 +213,26 @@ export class LogView {
     );
 
     return panel;
+  }
+
+  /**
+   * The `lana` settings plus the private globalState sections the webview needs.
+   * Shared by the initial `getConfig` reply and every `configChanged` push so the
+   * two can never drift.
+   */
+  private static resolveConfig(context: Context): Config {
+    const config = getConfig();
+    const overrides = getColumnOverrides(context.context.globalState);
+    config.callTree.columnOverrides = overrides['callTree.columnOverrides'] ?? {};
+    config.database.soql.columnOverrides = overrides['database.soql.columnOverrides'] ?? {};
+    config.database.dml.columnOverrides = overrides['database.dml.columnOverrides'] ?? {};
+    config.database.sosl.columnOverrides = overrides['database.sosl.columnOverrides'] ?? {};
+    const columnViews = getColumnViews(context.context.globalState);
+    config.database.soql.columnView = columnViews['database.soql.columnView'] ?? 'General';
+    config.database.dml.columnView = columnViews['database.dml.columnView'] ?? 'General';
+    config.database.sosl.columnView = columnViews['database.sosl.columnView'] ?? 'General';
+    Object.assign(config.inspector, getInspectorState(context.context.globalState));
+    return config;
   }
 
   private static async getFile(fileUri: Uri): Promise<string> {

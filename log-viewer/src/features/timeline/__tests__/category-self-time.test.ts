@@ -1,0 +1,112 @@
+/*
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ */
+import { describe, expect, it } from '@jest/globals';
+import type { ApexLog, LogCategory, LogEvent } from 'apex-log-parser';
+
+import type { TimelineColors } from '../themes/Themes.js';
+import { categorySelfTimes, toTimelineKeys } from '../utils/category-self-time.js';
+
+function node(category: LogCategory, self: number, children: LogEvent[] = []): LogEvent {
+  return {
+    category,
+    duration: { self, total: self },
+    children,
+  } as unknown as LogEvent;
+}
+
+function log(children: LogEvent[]): ApexLog {
+  return node('', 0, children) as ApexLog;
+}
+
+describe('categorySelfTimes', () => {
+  it('sums self time per category across siblings and nesting', () => {
+    const root = log([
+      node('Apex', 10, [node('SOQL', 5), node('Apex', 3)]),
+      node('DML', 7),
+      node('Apex', 2),
+    ]);
+
+    const totals = categorySelfTimes(root);
+
+    expect(totals.get('Apex')).toBe(15);
+    expect(totals.get('SOQL')).toBe(5);
+    expect(totals.get('DML')).toBe(7);
+  });
+
+  it('counts only self time, so a parent excludes its children', () => {
+    const root = log([node('Apex', 10, [node('Apex', 4)])]);
+
+    expect(categorySelfTimes(root).get('Apex')).toBe(14);
+  });
+
+  it('skips uncategorised events but still walks their children', () => {
+    const root = log([node('', 100, [node('SOQL', 5)])]);
+
+    const totals = categorySelfTimes(root);
+
+    expect(totals.get('SOQL')).toBe(5);
+    expect(totals.has('')).toBe(false);
+  });
+
+  it('returns an empty map for an empty log', () => {
+    expect(categorySelfTimes(log([])).size).toBe(0);
+  });
+
+  it('handles a 5000-deep chain without a stack overflow', () => {
+    let chain = node('Apex', 1);
+    for (let i = 0; i < 4999; i++) {
+      chain = node('Apex', 1, [chain]);
+    }
+
+    expect(categorySelfTimes(log([chain])).get('Apex')).toBe(5000);
+  });
+});
+
+describe('toTimelineKeys', () => {
+  const colors: TimelineColors = {
+    apex: '#a1',
+    codeUnit: '#a2',
+    system: '#a3',
+    automation: '#a4',
+    dml: '#a5',
+    soql: '#a6',
+    callout: '#a7',
+    validation: '#a8',
+  };
+
+  it('builds the legend in category order with the palette colors', () => {
+    const keys = toTimelineKeys(colors);
+
+    expect(keys.map((k) => k.label)).toEqual([
+      'Apex',
+      'Code Unit',
+      'System',
+      'Automation',
+      'DML',
+      'SOQL',
+      'Callout',
+    ]);
+    expect(keys.map((k) => k.fillColor)).toEqual(['#a1', '#a2', '#a3', '#a4', '#a5', '#a6', '#a7']);
+    expect(keys.every((k) => k.selfTimeNs === undefined)).toBe(true);
+  });
+
+  it('attaches self time per category when provided', () => {
+    const selfTimes = new Map<LogCategory, number>([
+      ['Apex', 15],
+      ['SOQL', 5],
+    ]);
+
+    const keys = toTimelineKeys(colors, selfTimes);
+
+    expect(keys.find((k) => k.label === 'Apex')?.selfTimeNs).toBe(15);
+    expect(keys.find((k) => k.label === 'SOQL')?.selfTimeNs).toBe(5);
+  });
+
+  it('reads 0 for a category the log never used', () => {
+    const keys = toTimelineKeys(colors, new Map<LogCategory, number>([['Apex', 15]]));
+
+    expect(keys.find((k) => k.label === 'DML')?.selfTimeNs).toBe(0);
+    expect(keys.find((k) => k.label === 'Callout')?.selfTimeNs).toBe(0);
+  });
+});

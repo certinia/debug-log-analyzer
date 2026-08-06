@@ -10,21 +10,24 @@ import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 import { parse, type ApexLog } from 'apex-log-parser';
-import { eventBus } from '../../core/events/EventBus.js';
+import { TAB_TO_SOURCE, eventBus } from '../../core/events/EventBus.js';
 import {
   VSCodeExtensionMessenger,
   vscodeMessenger,
 } from '../../core/messaging/VSCodeExtensionMessenger.js';
-import {
-  Notification,
-  type NotificationSeverity,
-} from '../notifications/components/NotificationPanel.js';
+import { DatabaseAccess } from '../database/services/Database.js';
+import type { LogIssue } from '../notifications/types.js';
+import { installEscapeDeselect } from './escapeDeselect.js';
+import { deriveLogIdentity, type LogIdentityData } from './logIdentity.js';
+import { toLogIssue } from './logIssues.js';
+import { parserIssuesToNotifications } from './parserNotifications.js';
 
 // styles
 import { globalStyles } from '../../styles/global.styles.js';
 
 // web components
 import './AppHeader.js';
+import '../../components/LogInspector.js';
 
 interface NavigateToTimelinePayload {
   timestamp: number;
@@ -44,10 +47,15 @@ export class LogViewer extends LitElement {
   logSize: number | null = null;
   @property()
   logDuration: number | null = null;
-  @property()
-  notifications: Notification[] | null = null;
-  @property()
-  parserIssues: Notification[] = [];
+  /** Problems found in the log itself. `null` until the first log is parsed. */
+  @property({ attribute: false })
+  logProblems: readonly LogIssue[] | null = null;
+  /** Notifications about the tool — today, parser diagnostics. */
+  @property({ attribute: false })
+  notifications: readonly LogIssue[] = [];
+  /** Transaction identity for the header. `null` until the first log is parsed. */
+  @property({ attribute: false })
+  logIdentity: LogIdentityData | null = null;
   @property()
   timelineRoot: ApexLog | null = null;
 
@@ -70,7 +78,13 @@ export class LogViewer extends LitElement {
         display: flex;
         flex-direction: column;
         height: 100%;
-        padding: 0px 8px 0px 8px;
+        min-width: 0;
+        /* keep the layout bounded to the viewport so header children (e.g. the
+           log-levels row) can detect overflow rather than widening the page.
+           clip (not hidden) avoids forcing overflow-y to auto. */
+        overflow-x: clip;
+        /* Half of the x=16 guide the header and tabs share (see AppHeader). */
+        padding: 0 var(--lana-space-sm);
       }
 
       vscode-tabs {
@@ -78,7 +92,10 @@ export class LogViewer extends LitElement {
 
         display: flex;
         flex-direction: column;
-        height: 100%;
+        /* Slotted into the inspector's main area, so fill it as a flex
+           item rather than relying on height:100%. */
+        flex: 1 1 auto;
+        min-width: 0;
         min-height: 0;
       }
 
@@ -87,8 +104,8 @@ export class LogViewer extends LitElement {
         min-height: 0;
         overflow: auto;
         box-sizing: border-box;
-        /* the toolkit's vscode-panel-view padding */
-        padding: 10px 6px;
+        /* No padding here: each view owns its own inset so a docked details
+           panel can sit flush to the window edge. */
         box-shadow: inset 0 calc(max(1px, 0.0625rem) * 1)
           var(--vscode-panelSectionHeader-background);
       }
@@ -117,6 +134,9 @@ export class LogViewer extends LitElement {
       this._showTabEvent(e);
     });
 
+    // Escape, when nothing else claims it, deselects on the active tab.
+    installEscapeDeselect(() => TAB_TO_SOURCE[this._selectedTab]);
+
     // Listen for navigation messages from the extension
     VSCodeExtensionMessenger.listen<NavigateToTimelinePayload>((event) => {
       const { cmd, payload } = event.data;
@@ -134,46 +154,49 @@ export class LogViewer extends LitElement {
         .logPath=${this.logPath}
         .logSize=${this.logSize}
         .logDuration=${this.logDuration}
+        .logProblems=${this.logProblems}
         .notifications=${this.notifications}
-        .parserIssues=${this.parserIssues}
+        .logIdentity=${this.logIdentity}
         .timelineRoot=${this.timelineRoot}
       ></app-header>
 
-      <vscode-tabs
-        panel
-        .selectedIndex="${this._selectedIndex}"
-        @vsc-tabs-select="${this._onTabSelect}"
-      >
-        <vscode-tab-header slot="header">
-          <span class="tab-header"><vscode-icon name="graph"></vscode-icon>Timeline</span>
-        </vscode-tab-header>
-        <vscode-tab-header slot="header">
-          <span class="tab-header"><vscode-icon name="list-tree"></vscode-icon>Call Tree</span>
-        </vscode-tab-header>
-        <vscode-tab-header slot="header">
-          <span class="tab-header"><vscode-icon name="code"></vscode-icon>Analysis</span>
-        </vscode-tab-header>
-        <vscode-tab-header slot="header">
-          <span class="tab-header"><vscode-icon name="database"></vscode-icon>Database</span>
-        </vscode-tab-header>
+      <log-inspector .activeTab=${this._selectedTab}>
+        <vscode-tabs
+          slot="main"
+          panel
+          .selectedIndex="${this._selectedIndex}"
+          @vsc-tabs-select="${this._onTabSelect}"
+        >
+          <vscode-tab-header slot="header">
+            <span class="tab-header"><vscode-icon name="graph"></vscode-icon>Timeline</span>
+          </vscode-tab-header>
+          <vscode-tab-header slot="header">
+            <span class="tab-header"><vscode-icon name="list-tree"></vscode-icon>Call Tree</span>
+          </vscode-tab-header>
+          <vscode-tab-header slot="header">
+            <span class="tab-header"><vscode-icon name="code"></vscode-icon>Analysis</span>
+          </vscode-tab-header>
+          <vscode-tab-header slot="header">
+            <span class="tab-header"><vscode-icon name="database"></vscode-icon>Database</span>
+          </vscode-tab-header>
 
-        <vscode-tab-panel>
-          <timeline-view
-            .timelineRoot="${this.timelineRoot}"
-            .navigateToEventIndex="${this._navigateToEventIndex}"
-            .navigateToTimestamp="${this._navigateToTimestamp}"
-          ></timeline-view>
-        </vscode-tab-panel>
-        <vscode-tab-panel>
-          <call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view>
-        </vscode-tab-panel>
-        <vscode-tab-panel>
-          <analysis-view .timelineRoot="${this.timelineRoot}"> </analysis-view>
-        </vscode-tab-panel>
-        <vscode-tab-panel>
-          <database-view .timelineRoot="${this.timelineRoot}"></database-view>
-        </vscode-tab-panel>
-      </vscode-tabs>`;
+          <vscode-tab-panel>
+            <timeline-view
+              .timelineRoot="${this.timelineRoot}"
+              .navigateToEventIndex="${this._navigateToEventIndex}"
+              .navigateToTimestamp="${this._navigateToTimestamp}"
+            ></timeline-view>
+          </vscode-tab-panel>
+          <vscode-tab-panel>
+            <call-tree-view .timelineRoot="${this.timelineRoot}"></call-tree-view>
+          </vscode-tab-panel>
+          <vscode-tab-panel>
+            <analysis-view .timelineRoot="${this.timelineRoot}"> </analysis-view>
+          </vscode-tab-panel>
+          <vscode-tab-panel>
+            <database-view .timelineRoot="${this.timelineRoot}"></database-view>
+          </vscode-tab-panel> </vscode-tabs
+      ></log-inspector>`;
   }
 
   _onTabSelect(e: VscTabsSelectEvent) {
@@ -213,29 +236,46 @@ export class LogViewer extends LitElement {
     this.logPath = data.logPath?.trim() || '';
 
     const logUri = data.logUri;
-    const logData = data.logData || (await this._readLog(logUri || ''));
+    const read = data.logData
+      ? { logData: data.logData, error: null }
+      : await this._readLog(logUri || '');
+    const logData = read.logData;
 
-    const apexLog = parse(logData);
+    // Published before parsing, so a throw further down can't discard the only
+    // explanation the user would get. `logProblems` stays null while parsing otherwise.
+    if (read.error) {
+      this.logProblems = [read.error];
+    }
+
+    let apexLog: ApexLog;
+    try {
+      apexLog = parse(logData);
+    } catch (err) {
+      // Resolve the identity even when parsing throws, or the header's identity
+      // skeletons would pulse forever with nothing left to fill them.
+      this.logIdentity = { entryPoint: null, user: null, startTime: null };
+      throw err;
+    }
+
+    // The event-lookup service backs the inspector on every tab, so it is
+    // created with the parsed log rather than by whichever tab loads first.
+    await DatabaseAccess.create(apexLog);
+    // After the service holds the log, never before: whole-log content reads it
+    // straight from there.
+    eventBus.emit('log:loaded', {});
 
     this.logSize = apexLog.size;
     this.timelineRoot = apexLog;
     this.logDuration = apexLog.duration.total;
+    // Raw text is needed for the user: USER_INFO precedes EXECUTION_STARTED, so the
+    // parser never sees it. See deriveLogIdentity.
+    this.logIdentity = deriveLogIdentity(apexLog, logData);
 
-    const localNotifications = Array.from(this.notifications ?? []);
-    apexLog.logIssues.forEach((element) => {
-      const severity = this.toSeverity(element.type);
+    // Rebuilt per load, never appended to: both surfaces describe *this* log, so a
+    // previous log's problems must not carry over.
+    this.logProblems = [...(read.error ? [read.error] : []), ...apexLog.logIssues.map(toLogIssue)];
 
-      const logMessage = new Notification();
-      logMessage.summary = element.summary;
-      logMessage.message = element.description;
-      logMessage.severity = severity;
-      logMessage.eventIndex = element.eventIndex ?? null;
-      logMessage.timestamp = element.startTime || null;
-      localNotifications.push(logMessage);
-    });
-    this.notifications = localNotifications;
-
-    this.parserIssues = this.parserIssuesToMessages(apexLog);
+    this.notifications = parserIssuesToNotifications(apexLog.parsingErrors);
 
     // Navigate to event location if requested (passed as prop to timeline-view)
     if (data.navigateToEventIndex !== undefined || data.navigateToTimestamp !== undefined) {
@@ -245,7 +285,11 @@ export class LogViewer extends LitElement {
     }
   }
 
-  async _readLog(logUri: string): Promise<string> {
+  /**
+   * Reads the log, returning the failure as a {@link LogIssue} rather than publishing it —
+   * the caller owns `logProblems` so it can rebuild the list for each load.
+   */
+  async _readLog(logUri: string): Promise<{ logData: string; error: LogIssue | null }> {
     let msg;
     if (logUri) {
       try {
@@ -263,7 +307,7 @@ export class LogViewer extends LitElement {
           }
           chunks.push(value);
         }
-        return chunks.join('');
+        return { logData: chunks.join(''), error: null };
       } catch (err: unknown) {
         msg = (err instanceof Error ? err.message : String(err)) ?? '';
       }
@@ -271,46 +315,18 @@ export class LogViewer extends LitElement {
       msg = 'Invalid Log Path';
     }
 
-    const logMessage = new Notification();
-    logMessage.summary = 'Could not read log';
-    logMessage.message = msg;
-    logMessage.severity = 'Error';
-    this.notifications = [logMessage];
-    return '';
-  }
-
-  severity = new Map<string, NotificationSeverity>([
-    ['error', 'Error'],
-    ['unexpected', 'Warning'],
-    ['skip', 'Info'],
-  ]);
-  private toSeverity(errorType: 'unexpected' | 'error' | 'skip') {
-    return this.severity.get(errorType) || 'Info';
-  }
-
-  private parserIssuesToMessages(apexLog: ApexLog) {
-    const issues: Notification[] = [];
-    apexLog.parsingErrors.forEach((message) => {
-      const isUnknownType = this.isUnknownType(message);
-
-      const logMessage = new Notification();
-      logMessage.summary = isUnknownType ? message : message.slice(0, message.indexOf(':'));
-      logMessage.message = isUnknownType
-        ? html`<a
-            href=${`command:vscode.open?${encodeURIComponent(
-              JSON.stringify('https://github.com/certinia/debug-log-analyzer/issues'),
-            )}`}
-            >report unsupported type</a
-          >`
-        : message.slice(message.indexOf(':') + 1);
-
-      issues.push(logMessage);
-    });
-    return issues;
-  }
-
-  private isUnknownType(message: string) {
-    return message.startsWith('Unsupported log event name:');
+    return {
+      logData: '',
+      error: {
+        summary: 'Could not read log',
+        message: msg,
+        severity: 'error',
+        label: null,
+        action: null,
+        category: null,
+        timestamp: null,
+      },
+    };
   }
 }
 

@@ -6,17 +6,21 @@ import { Tabulator } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
-import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
-import { minMaxTreeFilter } from '../../../tabulator/filters/MinMax.js';
+import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { toAggregatedCallTree, type AggregatedRow } from '../utils/Aggregation.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
+import { eventLabel, eventName } from '../utils/eventText.js';
 import {
   commonColumnDefaults,
+  createCountColumn,
   createGovernorMetricColumns,
+  createNamespaceColumns,
+  createSelfSumHeapFooters,
+  createTypeColumn,
   headerSortElement,
   registerTableModules,
+  virtualScrollOptions,
   type TableCallbacks,
 } from './TableShared.js';
 
@@ -31,14 +35,11 @@ export function createAggregatedTable(
 ): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
 
-  const namespaceFilterCache = new Map<number, boolean>();
-  const totalTimeFilterCache = new Map<number, boolean>();
-  const selfTimeFilterCache = new Map<number, boolean>();
-
   let childIndent: number | undefined;
 
   const tableRef: { current: Tabulator | undefined } = { current: undefined };
   const selfTimeBottomCalc = makeSumSelfTimeAllVisible(() => tableRef.current);
+  const heapFooters = createSelfSumHeapFooters(() => tableRef.current);
 
   const tableData = toAggregatedCallTree(rootMethod.children, rootMethod.governorLimits);
 
@@ -50,10 +51,9 @@ export function createAggregatedTable(
     height: '100%',
     maxHeight: '100%',
     rowKeyboardNavigation: true,
-    anchoringPolicy: true,
+    ...virtualScrollOptions,
     // @ts-expect-error tabulator allows a function predicate but the types only declare Filter[]
     initialFilter: callbacks.showDetailsFilter,
-    renderVertical: VirtualVerticalRenderer,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',
@@ -89,13 +89,14 @@ export function createAggregatedTable(
           const rowData = cell.getData() as AggregatedRow;
           const firstInstance = rowData.instances[0];
 
+          const label = firstInstance ? eventLabel(firstInstance) : rowData.text;
           if (firstInstance?.hasValidSymbols) {
             const link = document.createElement('a');
             link.setAttribute('href', '#!');
-            link.textContent = rowData.text;
+            link.textContent = eventName(firstInstance);
             return link;
           }
-          return document.createTextNode(rowData.text) as unknown as HTMLElement;
+          return document.createTextNode(label) as unknown as HTMLElement;
         },
         variableHeight: true,
         cellClick: (e, cell) => {
@@ -116,48 +117,17 @@ export function createAggregatedTable(
         widthGrow: 5,
         widthShrink: 1,
       },
-      {
-        title: 'Namespace',
-        field: 'namespace',
-        sorter: 'string',
-        width: 100,
-        minWidth: 80,
-        headerFilter: 'list',
-        headerFilterFunc: callbacks.namespaceFilter,
-        headerFilterFuncParams: { filterCache: namespaceFilterCache },
-        headerFilterParams: {
-          values: rootMethod.namespaces,
-          clearable: true,
-          multiselect: true,
-        },
-        headerFilterLiveFilter: false,
-      },
-      {
-        title: 'Caller Namespace',
-        field: 'callerNamespace',
-        sorter: 'string',
-        width: 120,
-        visible: false,
-      },
-      {
-        title: 'Calls',
-        field: 'callCount',
-        sorter: 'number',
-        cssClass: 'number-cell',
-        width: 70,
-        minWidth: 60,
-        hozAlign: 'right',
-        headerHozAlign: 'right',
-        bottomCalc: 'sum',
-      },
-      ...createGovernorMetricColumns(rootMethod.governorLimits),
+      ...createNamespaceColumns(),
+      createTypeColumn(),
+      createCountColumn({ title: 'Calls', field: 'callCount', width: 70 }),
+      ...createGovernorMetricColumns(rootMethod.governorLimits, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',
         field: 'totalTime',
         sorter: 'number',
         headerSortTristate: true,
-        width: 150,
+        width: TIME_WIDTH,
         minWidth: 120,
         hozAlign: 'right',
         headerHozAlign: 'right',
@@ -169,10 +139,6 @@ export function createAggregatedTable(
         bottomCalcFormatter: progressFormatterMS,
         bottomCalc: 'sum',
         bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        headerFilter: MinMaxEditor,
-        headerFilterFunc: minMaxTreeFilter,
-        headerFilterFuncParams: { columnName: 'totalTime', filterCache: totalTimeFilterCache },
-        headerFilterLiveFilter: false,
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
       {
@@ -180,7 +146,7 @@ export function createAggregatedTable(
         field: 'totalSelfTime',
         sorter: 'number',
         headerSortTristate: true,
-        width: 150,
+        width: TIME_WIDTH,
         minWidth: 120,
         hozAlign: 'right',
         headerHozAlign: 'right',
@@ -192,10 +158,6 @@ export function createAggregatedTable(
         bottomCalcFormatter: progressFormatterMS,
         bottomCalc: selfTimeBottomCalc,
         bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        headerFilter: MinMaxEditor,
-        headerFilterFunc: minMaxTreeFilter,
-        headerFilterFuncParams: { columnName: 'totalSelfTime', filterCache: selfTimeFilterCache },
-        headerFilterLiveFilter: false,
         tooltip: (_event, cell) => formatDuration(cell.getValue()),
       },
       {
@@ -203,7 +165,7 @@ export function createAggregatedTable(
         field: 'avgSelfTime',
         sorter: 'number',
         headerSortTristate: true,
-        width: 150,
+        width: TIME_WIDTH,
         minWidth: 120,
         hozAlign: 'right',
         headerHozAlign: 'right',
@@ -215,18 +177,15 @@ export function createAggregatedTable(
   });
   tableRef.current = table;
 
-  // Filter caches are cleared once per render via `renderStarted`. Row ids
-  // produced by `toAggregatedCallTree` are globally unique within a build
-  // (per-build monotonic counter), so cached `deepFilter` results stay valid
-  // across the cascaded `filter.filter()` passes Tabulator runs for each
-  // expanded subtree — `getChildren` → `filter.filter(config.children)`
-  // would otherwise fire `dataFiltered` multiple times per user action,
-  // defeating the cache. If row ids ever lose their uniqueness guarantee
-  // this must move back to `dataFiltered`.
+  // The host's filter caches (search/type/debug/namespace/duration) are cleared once per
+  // render via `renderStarted` — see CalltreeView's `onFilterCacheClear`. Row ids produced
+  // by `toAggregatedCallTree` are globally unique within a build (per-build monotonic
+  // counter), so cached `deepFilter` results stay valid across the cascaded
+  // `filter.filter()` passes Tabulator runs for each expanded subtree —
+  // `getChildren` → `filter.filter(config.children)` would otherwise fire `dataFiltered`
+  // multiple times per user action, defeating the cache. If row ids ever lose their
+  // uniqueness guarantee this must move back to `dataFiltered`.
   table.on('renderStarted', () => {
-    namespaceFilterCache.clear();
-    totalTimeFilterCache.clear();
-    selfTimeFilterCache.clear();
     callbacks.onFilterCacheClear?.();
     callbacks.onRenderStarted();
   });

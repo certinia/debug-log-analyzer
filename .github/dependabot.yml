@@ -5,7 +5,37 @@ updates:
     schedule:
       interval: 'daily'
     versioning-strategy: auto
+    # let freshly published versions age before proposing them (supply-chain hygiene)
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    # majors are deliberately left out of the minor/patch groups so each one still
+    # arrives as its own PR - they need reading and are reverted individually
+    groups:
+      # exception: @salesforce/apex-node majors require the matching
+      # @salesforce/core major, so these move in lockstep incl. majors
+      salesforce:
+        patterns: ['@salesforce/*']
+      production-dependencies:
+        dependency-type: 'production'
+        update-types: ['minor', 'patch']
+      development-dependencies:
+        dependency-type: 'development'
+        update-types: ['minor', 'patch']
+    ignore:
+      # engines.vscode sets the API floor; types must not exceed it (vsce rejects
+      # the package otherwise). Bump by hand when engines.vscode is raised.
+      - dependency-name: '@types/vscode'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      # types track the extension-host Node runtime of the minimum supported
+      # VS Code version, not the latest Node release
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
       interval: 'weekly'
+    groups:
+      github-actions:
+        patterns: ['*']
+        update-types: ['minor', 'patch']

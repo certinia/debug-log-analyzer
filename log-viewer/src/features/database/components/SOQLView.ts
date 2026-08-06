@@ -4,7 +4,7 @@
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
-import { LitElement, css, html, render, unsafeCSS, type PropertyValues } from 'lit';
+import { LitElement, css, html, unsafeCSS, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
   Tabulator,
@@ -14,13 +14,18 @@ import {
 } from 'tabulator-tables';
 
 import type { ApexLog, SOQLExecuteBeginLine } from 'apex-log-parser';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
+import { goToRow } from '../../call-tree/navigation.js';
 import { deriveSoqlObject } from '../services/sobjectClassification.js';
 import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
+import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { emitGridSelection } from './gridSelection.js';
+import { selectRowByEventIndex } from './revealRow.js';
 import {
   applyColumnView,
   buildColumnMenuItems,
@@ -30,11 +35,17 @@ import {
   SOQL_VIEWS,
   toggleField,
 } from '../../../tabulator/ColumnViews.js';
+import {
+  DB_ROW_COUNT_WIDTH,
+  DB_TIME_WIDTH,
+  NAMESPACE_WIDTH,
+} from '../../../tabulator/ColumnWidths.js';
 
 // Tabulator custom modules, imports + styles
 import NumberAccessor from '../../../tabulator/dataaccessor/Number.js';
-import Number from '../../../tabulator/format/Number.js';
+import { inCountRange, inMsRange, type FilterRange } from '../../../tabulator/filters/MinMax.js';
 import { progressFormatter } from '../../../tabulator/format/Progress.js';
+import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
 import { GroupCalcs } from '../../../tabulator/groups/GroupCalcs.js';
 import { GroupChildIndent } from '../../../tabulator/groups/GroupChildIndent.js';
 import { GroupSort } from '../../../tabulator/groups/GroupSort.js';
@@ -43,20 +54,27 @@ import { Find } from '../../../tabulator/module/Find.js';
 import { RowKeyboardNavigation } from '../../../tabulator/module/RowKeyboardNavigation.js';
 import { RowNavigation } from '../../../tabulator/module/RowNavigation.js';
 import dataGridStyles from '../../../tabulator/style/DataGrid.scss';
+import { commonColumnDefaults, headerSortElement } from '../../call-tree/components/TableShared.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
 import databaseViewStyles from './DatabaseView.scss';
 
 // web components
-import '../../../components/CallStack.js';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
+import { showStatementRowMenu } from './rowContextMenu.js';
+import '../../../components/datagrid-facet-filter.js';
 import '../../../components/datagrid-filter-bar.js';
-import './DatabaseSOQLDetailPanel.js';
+import '../../../components/datagrid-range-filter.js';
+import '../../../components/OverflowList.js';
+import './DatabaseSection.js';
 
 /** The SOQL column is always shown in the SOQL table. */
 const ALWAYS_VISIBLE = ['soql'];
+
+/** Both cardinality columns: the title wrapped to two lines is the constraint. */
+const CARDINALITY_WIDTH = 113;
 
 // Group-by dropdown label → row field. Labels that don't map 1:1 to a field
 // name (Object, Caller Namespace) need this indirection.
@@ -85,6 +103,8 @@ export class SOQLView extends LitElement {
 
   soqlTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
+  /** Guards the programmatic select made on the inspector's behalf. */
+  private _echoGuard = new SelectionEchoGuard();
   table: HTMLElement | null = null;
 
   @state()
@@ -94,6 +114,18 @@ export class SOQLView extends LitElement {
   @state()
   private columnOverrides: Record<string, string[]> = {};
   private contextMenu: ContextMenu | null = null;
+  /** eventIndex of the row whose context menu is open. */
+  private contextMenuEventIndex: number | null = null;
+
+  @state()
+  private objects: string[] = [];
+  @state()
+  private namespaces: string[] = [];
+  private objectSelected: string[] = [];
+  private namespaceSelected: string[] = [];
+  private rowCountRange: FilterRange = { start: null, end: null };
+  private timeTakenRange: FilterRange = { start: null, end: null };
+
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
     count: 0,
@@ -172,7 +204,30 @@ export class SOQLView extends LitElement {
     const soqlSkeleton = !this.timelineRoot ? html`<grid-skeleton></grid-skeleton>` : ``;
     return html`
       <datagrid-filter-bar>
+        <overflow-list slot="filters" menu-heading="Filters" icon="filter">
+          <datagrid-facet-filter
+            label="Object"
+            .values="${this.objects}"
+            @datagrid-facet-change="${this._handleObjectFacet}"
+          ></datagrid-facet-filter>
+          <datagrid-facet-filter
+            label="Namespace"
+            .values="${this.namespaces}"
+            @datagrid-facet-change="${this._handleNamespaceFacet}"
+          ></datagrid-facet-filter>
+          <datagrid-range-filter
+            label="Row Count"
+            @datagrid-range-change="${this._handleRowCountRange}"
+          ></datagrid-range-filter>
+          <datagrid-range-filter
+            label="Time Taken"
+            unit="ms"
+            @datagrid-range-change="${this._handleTimeTakenRange}"
+          ></datagrid-range-filter>
+        </overflow-list>
+
         <vs-select
+          dense
           slot="table-actions"
           id="soql-column-view"
           prefix="Columns"
@@ -191,6 +246,7 @@ export class SOQLView extends LitElement {
         </vs-select>
 
         <vs-select
+          dense
           slot="group"
           id="soql-groupby-dropdown"
           prefix="Group"
@@ -230,7 +286,7 @@ export class SOQLView extends LitElement {
         ${soqlSkeleton}
         <div id="db-soql-table"></div>
       </div>
-      <context-menu @menu-select="${this._handleColumnMenuSelect}"></context-menu>
+      <context-menu @menu-select="${this._handleContextMenuSelect}"></context-menu>
     `;
   }
 
@@ -300,10 +356,21 @@ export class SOQLView extends LitElement {
     );
   }
 
-  private _handleColumnMenuSelect(e: CustomEvent<{ itemId: string }>) {
+  private _showRowContextMenu(event: MouseEvent, row: RowComponent) {
+    this.contextMenuEventIndex = showStatementRowMenu(event, row, this.soqlTable, this.contextMenu);
+  }
+
+  private _handleContextMenuSelect(e: CustomEvent<{ itemId: string }>) {
     const { itemId } = e.detail;
     const table = this.soqlTable;
     if (!table) {
+      return;
+    }
+    if (itemId === 'show-in-call-tree') {
+      const eventIndex = this.contextMenuEventIndex;
+      if (eventIndex !== null) {
+        void goToRow({ eventIndex });
+      }
       return;
     }
     if (itemId.startsWith('view:')) {
@@ -350,8 +417,61 @@ export class SOQLView extends LitElement {
     updateSetting('database.soql.columnOverrides', this.columnOverrides);
   }
 
+  private _handleObjectFacet(event: CustomEvent<{ selected: string[] }>) {
+    this.objectSelected = event.detail.selected;
+    this.soqlTable?.refreshFilter();
+  }
+
+  private _handleNamespaceFacet(event: CustomEvent<{ selected: string[] }>) {
+    this.namespaceSelected = event.detail.selected;
+    this.soqlTable?.refreshFilter();
+  }
+
+  private _handleRowCountRange(event: CustomEvent<{ range: FilterRange }>) {
+    this.rowCountRange = event.detail.range;
+    this.soqlTable?.refreshFilter();
+  }
+
+  private _handleTimeTakenRange(event: CustomEvent<{ range: FilterRange }>) {
+    this.timeTakenRange = event.detail.range;
+    this.soqlTable?.refreshFilter();
+  }
+
+  private _objectFilter = (data: GridSOQLData): boolean =>
+    this.objectSelected.length === 0 || this.objectSelected.includes(data.objectType ?? '');
+
+  private _namespaceFilter = (data: GridSOQLData): boolean =>
+    this.namespaceSelected.length === 0 || this.namespaceSelected.includes(data.namespace ?? '');
+
+  private _rowCountFilter = (data: GridSOQLData): boolean =>
+    inCountRange(this.rowCountRange, data.rowCount ?? 0);
+
+  private _timeTakenFilter = (data: GridSOQLData): boolean =>
+    inMsRange(this.timeTakenRange, data.timeTaken ?? 0);
+
   _copyToClipboard() {
     this.soqlTable?.copyToClipboard('all');
+  }
+
+  /**
+   * Drops this grid's row highlight. Silent by default, for the clear that
+   * follows another grid being picked; `notify` leaves the grid's own
+   * selection-change path to report it, which is the user-driven (Escape) case.
+   */
+  deselectRows({ notify = false }: { notify?: boolean } = {}) {
+    if (notify) {
+      this.soqlTable?.deselectRow();
+      return;
+    }
+    this._echoGuard.run(() => this.soqlTable?.deselectRow());
+  }
+
+  /**
+   * Select the row for `eventIndex`, without echoing `detail:select` back at the
+   * inspector that asked for it. Returns false when this grid has no such row.
+   */
+  selectByEventIndex(eventIndex: number): boolean {
+    return selectRowByEventIndex(this.soqlTable, this._echoGuard, eventIndex);
   }
 
   _exportToCSV() {
@@ -447,13 +567,7 @@ export class SOQLView extends LitElement {
   }
 
   _renderSOQLTable(soqlTableContainer: HTMLElement, soqlLines: SOQLExecuteBeginLine[]) {
-    const eventIndexToSOQL = new Map<number, SOQLExecuteBeginLine>();
-    const queryRowLimit = this.timelineRoot?.governorLimits.queryRows.limit ?? 0;
     let nextRowId = 0;
-
-    soqlLines?.forEach((line) => {
-      eventIndexToSOQL.set(line.eventIndex, line);
-    });
 
     const soqlData: GridSOQLData[] = [];
     if (soqlLines) {
@@ -476,16 +590,20 @@ export class SOQLView extends LitElement {
           sObjectCardinality: explainLine?.sObjectCardinality ?? null,
           fields: explainLine?.fields?.join(', ') ?? null,
           eventIndex: soql.eventIndex,
-          _children: [
-            {
-              id: ++nextRowId,
-              eventIndex: soql.eventIndex,
-              isDetail: true,
-            },
-          ],
         });
       }
     }
+
+    this.objects = [
+      ...new Set(soqlData.map((row) => row.objectType).filter((v): v is string => !!v)),
+    ].sort();
+    this.namespaces = [
+      ...new Set(soqlData.map((row) => row.namespace).filter((v): v is string => !!v)),
+    ].sort();
+
+    // Bars fill relative to this grid's own totals (the Total row's sum), not a governor limit.
+    const soqlRowCountTotal = soqlData.reduce((sum, row) => sum + (row.rowCount ?? 0), 0);
+    const soqlTimeTakenTotal = soqlData.reduce((sum, row) => sum + (row.timeTaken ?? 0), 0);
 
     this.soqlTable = new Tabulator(soqlTableContainer, {
       index: 'id',
@@ -515,29 +633,8 @@ export class SOQLView extends LitElement {
       groupStartOpen: false,
       groupToggleElement: false,
       selectableRows: 'highlight',
-      selectableRowsCheck: function (row: RowComponent) {
-        return !row.getData().isDetail;
-      },
-      dataTree: true,
-      dataTreeBranchElement: false,
-      dataTreeStartExpanded: false,
-      columnDefaults: {
-        title: 'default',
-        resizable: true,
-        headerSortStartingDir: 'desc',
-        headerTooltip: true,
-        headerWordWrap: true,
-      },
-      headerSortElement: function (_column, dir) {
-        switch (dir) {
-          case 'asc':
-            return "<div class='sort-by--top'></div>";
-          case 'desc':
-            return "<div class='sort-by--bottom'></div>";
-          default:
-            return "<div class='sort-by'><div class='sort-by--top'></div><div class='sort-by--bottom'></div></div>";
-        }
-      },
+      columnDefaults: commonColumnDefaults,
+      headerSortElement,
       columns: [
         {
           title: 'SOQL',
@@ -545,20 +642,13 @@ export class SOQLView extends LitElement {
           headerSortStartingDir: 'asc',
           sorter: 'string',
           tooltip: true,
+          widthGrow: 5,
           bottomCalc: () => {
             return 'Total';
           },
           headerSortTristate: true,
-          cssClass: 'datagrid-textarea datagrid-code-text',
-          variableHeight: true,
-          formatter: (cell, _formatterParams, _onRendered) => {
-            const data = cell.getData() as GridSOQLData;
-            return `<call-stack
-            eventIndex=${data.eventIndex}
-            startDepth="0"
-            endDepth="1"
-          ></call-stack>`;
-          },
+          cssClass: 'datagrid-code-text',
+          formatter: (cell) => soqlInlineElement(cell.getValue() as string, 'soql'),
         },
         {
           title: 'Selective',
@@ -567,7 +657,7 @@ export class SOQLView extends LitElement {
           formatterParams: {
             allowEmpty: true,
           },
-          width: 40,
+          width: 99,
           hozAlign: 'center',
           vertAlign: 'top',
           sorter: function (a, b, aRow, bRow, _column, dir, _sorterParams) {
@@ -624,37 +714,22 @@ export class SOQLView extends LitElement {
           title: 'Object',
           field: 'objectType',
           sorter: 'string',
-          width: 150,
+          width: 110,
+          tooltip: true,
           visible: false,
-          headerFilter: 'list',
-          headerFilterFunc: 'in',
-          headerFilterParams: {
-            valuesLookup: 'all',
-            clearable: true,
-            multiselect: true,
-          },
-          headerFilterLiveFilter: false,
           formatter: (cell) => (cell.getValue() as string | null) ?? '—',
         },
         {
           title: 'Namespace',
           field: 'namespace',
           sorter: 'string',
-          width: 120,
-          headerFilter: 'list',
-          headerFilterFunc: 'in',
-          headerFilterParams: {
-            valuesLookup: 'all',
-            clearable: true,
-            multiselect: true,
-          },
-          headerFilterLiveFilter: false,
+          width: NAMESPACE_WIDTH,
         },
         {
           title: 'Caller Namespace',
           field: 'callerNamespace',
           sorter: 'string',
-          width: 120,
+          width: NAMESPACE_WIDTH,
           visible: false,
         },
         {
@@ -662,26 +737,31 @@ export class SOQLView extends LitElement {
           field: 'rowCount',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 100,
+          width: DB_ROW_COUNT_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           formatter: progressFormatter,
-          formatterParams: { precision: 0, totalValue: queryRowLimit, showPercentageText: false },
+          formatterParams: {
+            precision: 0,
+            totalValue: soqlRowCountTotal,
+            showPercentageText: false,
+          },
           bottomCalc: 'sum',
           bottomCalcFormatter: progressFormatter,
           bottomCalcFormatterParams: {
             precision: 0,
-            totalValue: queryRowLimit,
+            totalValue: soqlRowCountTotal,
             showPercentageText: false,
           },
-          tooltip: (_e, cell) => cell.getValue() + (queryRowLimit > 0 ? '/' + queryRowLimit : ''),
+          tooltip: (_e, cell) =>
+            cell.getValue() + (soqlRowCountTotal > 0 ? '/' + soqlRowCountTotal : ''),
         },
         {
           title: 'Aggregations',
           field: 'aggregations',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 100,
+          width: 121,
           hozAlign: 'right',
           headerHozAlign: 'right',
           bottomCalc: 'sum',
@@ -691,7 +771,7 @@ export class SOQLView extends LitElement {
           field: 'relativeCost',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 110,
+          width: 92,
           hozAlign: 'right',
           headerHozAlign: 'right',
           visible: false,
@@ -701,6 +781,7 @@ export class SOQLView extends LitElement {
           field: 'leadingOperationType',
           sorter: 'string',
           width: 140,
+          tooltip: true,
           visible: false,
         },
         {
@@ -708,6 +789,7 @@ export class SOQLView extends LitElement {
           field: 'sObjectType',
           sorter: 'string',
           width: 130,
+          tooltip: true,
           visible: false,
         },
         {
@@ -715,7 +797,7 @@ export class SOQLView extends LitElement {
           field: 'cardinality',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 110,
+          width: CARDINALITY_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           visible: false,
@@ -725,7 +807,7 @@ export class SOQLView extends LitElement {
           field: 'sObjectCardinality',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 140,
+          width: CARDINALITY_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
           visible: false,
@@ -735,6 +817,7 @@ export class SOQLView extends LitElement {
           field: 'fields',
           sorter: 'string',
           width: 140,
+          tooltip: true,
           visible: false,
         },
         // Time column sits at the far right.
@@ -743,27 +826,25 @@ export class SOQLView extends LitElement {
           field: 'timeTaken',
           sorter: 'number',
           cssClass: 'number-cell',
-          width: 120,
+          width: DB_TIME_WIDTH,
           hozAlign: 'right',
           headerHozAlign: 'right',
-          formatter: Number,
+          formatter: progressFormatterMS,
           formatterParams: {
-            thousand: false,
             precision: 2,
+            totalValue: soqlTimeTakenTotal,
+            showPercentageText: false,
           },
           accessorDownload: NumberAccessor,
-          bottomCalcFormatter: Number,
           bottomCalc: 'sum',
-          bottomCalcFormatterParams: { precision: 2 },
+          bottomCalcFormatter: progressFormatterMS,
+          bottomCalcFormatterParams: {
+            precision: 2,
+            totalValue: soqlTimeTakenTotal,
+            showPercentageText: false,
+          },
         },
       ],
-      rowFormatter: (row) => {
-        const data = row.getData();
-        if (data.isDetail && data.eventIndex !== undefined) {
-          const detailContainer = this.createSOQLDetailPanel(data.eventIndex, eventIndexToSOQL);
-          row.getElement().replaceChildren(detailContainer);
-        }
-      },
     });
 
     this.soqlTable.on('groupClick', (_e: UIEvent, group: GroupComponent) => {
@@ -772,32 +853,19 @@ export class SOQLView extends LitElement {
         return;
       }
       group.toggle();
-
-      if (this.soqlTable && group.isVisible()) {
-        this.soqlTable.blockRedraw();
-        for (const row of group.getRows()) {
-          if (row.getTreeChildren() && !row.isTreeExpanded()) {
-            row.treeExpand();
-          }
-        }
-        this.soqlTable.restoreRedraw();
-      }
     });
 
-    this.soqlTable.on('rowClick', function (_e, row) {
-      const { type } = window.getSelection() ?? {};
-      if (type === 'Range') {
-        return;
-      }
+    // Drive the detail panel off selection (not click) so keyboard row
+    // navigation updates it too. RowKeyboardNavigation keeps a single row
+    // selected across mouse and arrow-key navigation.
+    this.soqlTable.on('rowSelectionChanged', (_data, rows) => {
+      emitGridSelection(this._echoGuard, 'soql', rows, (data: GridSOQLData) =>
+        data.soql ? data.eventIndex : undefined,
+      );
+    });
 
-      const data = row.getData();
-      if (!(data.eventIndex !== undefined && data.soql)) {
-        return;
-      }
-
-      const origRowHeight = row.getElement().offsetHeight;
-      row.treeToggle();
-      row.getCell('soql').getElement().style.height = origRowHeight + 'px';
+    this.soqlTable.on('rowContext', (e, row) => {
+      this._showRowContextMenu(e as MouseEvent, row);
     });
 
     this.soqlTable.on('tableBuilt', () => {
@@ -807,6 +875,10 @@ export class SOQLView extends LitElement {
       this.soqlTable?.setSortedGroupBy('soql');
       if (this.soqlTable) {
         this._initTableColumns(this.soqlTable);
+        this.soqlTable.addFilter(this._objectFilter);
+        this.soqlTable.addFilter(this._namespaceFilter);
+        this.soqlTable.addFilter(this._rowCountFilter);
+        this.soqlTable.addFilter(this._timeTakenFilter);
       }
     });
 
@@ -871,22 +943,6 @@ export class SOQLView extends LitElement {
     return this.holder;
   }
 
-  createSOQLDetailPanel(eventIndex: number, eventIndexToSOQL: Map<number, SOQLExecuteBeginLine>) {
-    const detailContainer = document.createElement('div');
-    detailContainer.className = 'row__details-container';
-
-    const soqlLine = eventIndexToSOQL.get(eventIndex);
-    render(
-      html`<db-soql-detail-panel
-        eventIndex=${eventIndex}
-        soql=${soqlLine?.text}
-      ></db-soql-detail-panel>`,
-      detailContainer,
-    );
-
-    return detailContainer;
-  }
-
   downlodEncoder(defaultFileName: string) {
     return function (fileContents: string, mimeType: string) {
       const vscode = vscodeMessenger.getVsCodeAPI();
@@ -929,8 +985,6 @@ interface GridSOQLData {
   sObjectCardinality?: number | null;
   fields?: string | null;
   eventIndex?: number;
-  isDetail?: boolean;
-  _children?: GridSOQLData[];
 }
 
 type FindEvt = CustomEvent<{ text: string; count: number; options: { matchCase: boolean } }>;

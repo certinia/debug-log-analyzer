@@ -45,3 +45,36 @@ export function calculateViewportBounds(viewport: ViewportState): ViewportBounds
     depthEnd,
   };
 }
+
+/**
+ * Upper bound on the per-event normalized wheel delta (~one WHEEL_DELTA mouse
+ * notch). Windows mouse notches report a far larger deltaY than a macOS
+ * trackpad, so clamping keeps a single notch/gesture to a consistent, bounded
+ * zoom step across platforms and prevents fast scrolls from jumping.
+ */
+const MAX_WHEEL_DELTA = 120;
+
+/**
+ * Map a wheel event to a zoom multiplier, shared by every timeline wheel
+ * handler (main flame chart, minimap, metric strip) so zoom feel is identical.
+ *
+ * Exponential so zoom-in and zoom-out of equal magnitude are reciprocal (no
+ * drift when scrolling in then out) and the factor is always > 0; the delta is
+ * clamped so one large event can't produce a jarring jump or a sign flip.
+ *
+ * @param deltaY - Raw WheelEvent.deltaY (positive = scroll down = zoom out).
+ * @param deltaMode - WheelEvent.deltaMode (0 pixel, 1 line, 2 page).
+ * @param sensitivity - Multiplier on the zoom step. Default 1.
+ * @returns Zoom multiplier to apply to the current zoom (>0; 1 = no change).
+ */
+export function wheelZoomFactor(deltaY: number, deltaMode: number, sensitivity = 1): number {
+  // Scroll up (negative deltaY) zooms in (factor > 1).
+  let delta = -deltaY;
+  if (deltaMode === 1) {
+    delta *= 15; // lines → approx pixels
+  } else if (deltaMode === 2) {
+    delta *= 800; // pages → approx pixels
+  }
+  delta = Math.max(-MAX_WHEEL_DELTA, Math.min(MAX_WHEEL_DELTA, delta));
+  return Math.exp(delta * 0.001 * sensitivity);
+}

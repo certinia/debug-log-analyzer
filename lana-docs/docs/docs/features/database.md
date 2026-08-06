@@ -48,7 +48,8 @@ If the grouping is removed the sorting applies the same but across all rows inst
 
 ### Filtering
 
-1. In the SOQL view show Log events for specific namespaces using the namespace column filter
+1. **Namespace**, **Object** or **Caller Namespace** — pick one or more values to keep.
+1. **Row Count** and **Time Taken** — set a _min–max_ range.
 
 ### Column Views
 
@@ -62,13 +63,13 @@ SOQL and DML can be grouped by **Object** (the queried/target SObject), **Namesp
 
 **Caller Namespace** is the namespace of the direct caller that issued the statement — handy for seeing which package's code is responsible, even when the time is attributed to the default namespace.
 
-### DML / SOQL Call Stack
+### Inspect a statement
 
-Clicking a row will show the SOQL/DML call stack, clicking on a link will take you to where that SOQL/DML occurred in the call tree.
+Selecting a SOQL, DML or SOSL row opens the [inspector](./inspector.md), which shows that statement's vitals and governor metrics, the call stack that led to it, a call tree scoped to it, and — for SOQL — its optimization tips.
 
-### SOQL Analysis
+### Show in Call Tree
 
-For SOQL rows, to the right of the Call Stack is SOQL Analysis which shows information about SOQL performance for the given query and how to improve it.
+Right-click any statement and choose **Show in Call Tree** to jump to it in the full [Call Tree](./calltree.mdx), with the row expanded, scrolled to and focused. Useful when you want the surrounding execution rather than the statement alone.
 
 ### Export to CSV + copy to clipboard
 

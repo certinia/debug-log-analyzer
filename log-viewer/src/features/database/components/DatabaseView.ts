@@ -13,6 +13,7 @@ import type {
   SOSLExecuteBeginLine,
 } from 'apex-log-parser';
 
+import { eventBus } from '../../../core/events/EventBus.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
 import { DatabaseAccess } from '../services/Database.js';
@@ -20,10 +21,12 @@ import { DatabaseAccess } from '../services/Database.js';
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
 
+import type { DMLView } from './DMLView.js';
+import type { SOQLView } from './SOQLView.js';
+import type { SOSLView } from './SOSLView.js';
+
 // web components
-import '../../../components/CallStack.js';
 import './DMLView.js';
-import './DatabaseSOQLDetailPanel.js';
 import './DatabaseSection.js';
 import type { DatabaseMetric } from './DatabaseMetricCard.js';
 import './GovernorSummary.js';
@@ -64,12 +67,66 @@ export class DatabaseView extends LitElement {
   @state()
   soslHighlightIndex = 0;
 
+  findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
+    text: '',
+    count: 0,
+    options: { matchCase: false },
+  };
+  findMap = {};
+
+  private _offDetailSelect: (() => void) | null = null;
+  private _offInspectorReveal: (() => void) | null = null;
+  private _offSelectionClear: (() => void) | null = null;
+
   constructor() {
     super();
 
     document.addEventListener('db-find-results', this._findResults as EventListener);
     document.addEventListener('lv-find-match', this._findHandler as EventListener);
     document.addEventListener('lv-find', this._findHandler as EventListener);
+
+    // Only one statement is "selected" across the three grids at a time — when
+    // one grid reports a selection, clear the other two. (The inspector
+    // owns rendering the detail; this just keeps the grids mutually exclusive.)
+    this._offDetailSelect = eventBus.on('detail:select', (d) => {
+      if (d.source !== 'database' || d.selection?.kind !== 'event') {
+        return;
+      }
+      const grids = [
+        ['dml', this._dmlView],
+        ['soql', this._soqlView],
+        ['sosl', this._soslView],
+      ] as const;
+      for (const [type, view] of grids) {
+        if (d.selection.type !== type) {
+          view?.deselectRows();
+        }
+      }
+    });
+
+    // Reveal an inspector row here, but only while the Database tab is the tab
+    // the inspector is showing. The eventIndex belongs to exactly one grid, so
+    // each is offered it in turn until one owns it.
+    this._offInspectorReveal = eventBus.on('inspector:reveal', (d) => {
+      if (d.source !== 'database') {
+        return;
+      }
+      const views = [this._dmlView, this._soqlView, this._soslView];
+      const owner = views.find((view) => view?.selectByEventIndex(d.eventIndex));
+      if (owner) {
+        views.filter((view) => view !== owner).forEach((view) => view?.deselectRows());
+      }
+    });
+
+    // Escape (app-wide) deselects here. Only one grid holds the selection, and
+    // it reports the clear itself — hence `notify`.
+    this._offSelectionClear = eventBus.on('selection:clear', (d) => {
+      if (d.source === 'database') {
+        [this._dmlView, this._soqlView, this._soslView].forEach((view) =>
+          view?.deselectRows({ notify: true }),
+        );
+      }
+    });
   }
 
   disconnectedCallback(): void {
@@ -77,6 +134,12 @@ export class DatabaseView extends LitElement {
     document.removeEventListener('db-find-results', this._findResults as EventListener);
     document.removeEventListener('lv-find-match', this._findHandler as EventListener);
     document.removeEventListener('lv-find', this._findHandler as EventListener);
+    this._offDetailSelect?.();
+    this._offDetailSelect = null;
+    this._offInspectorReveal?.();
+    this._offInspectorReveal = null;
+    this._offSelectionClear?.();
+    this._offSelectionClear = null;
   }
 
   updated(changed: PropertyValues): void {
@@ -112,13 +175,27 @@ export class DatabaseView extends LitElement {
     css`
       :host {
         display: flex;
+        height: 100%;
+        width: 100%;
+        background-color: var(--vscode-editor-background);
+      }
+
+      .db-grids {
+        display: flex;
         flex-direction: column;
         height: 100%;
         width: 100%;
+        overflow: auto;
+        /* the inset the tab panel used to provide — kept off the docked panel */
+        padding: 10px 6px;
+        box-sizing: border-box;
       }
 
       governor-summary {
-        border-bottom: 1px solid var(--vscode-panel-border);
+        border-bottom: var(--lana-stroke) solid var(--vscode-panel-border);
+        /* Left inset matches the sections' content edge. */
+        padding: var(--lana-space-sm) var(--lana-space-md) var(--lana-space-md)
+          var(--lana-section-inset);
       }
 
       .db-panel {
@@ -156,9 +233,23 @@ export class DatabaseView extends LitElement {
 
   render() {
     return html`
-      <governor-summary .metrics="${this._stripMetrics()}"></governor-summary>
-      ${this._renderSection('dml')} ${this._renderSection('soql')} ${this._renderSection('sosl')}
+      <div class="db-grids">
+        <governor-summary .metrics="${this._stripMetrics()}"></governor-summary>
+        ${this._renderSection('dml')} ${this._renderSection('soql')} ${this._renderSection('sosl')}
+      </div>
     `;
+  }
+
+  private get _dmlView(): DMLView | null {
+    return this.renderRoot?.querySelector('dml-view') ?? null;
+  }
+
+  private get _soqlView(): SOQLView | null {
+    return this.renderRoot?.querySelector('soql-view') ?? null;
+  }
+
+  private get _soslView(): SOSLView | null {
+    return this.renderRoot?.querySelector('sosl-view') ?? null;
   }
 
   private _renderSection(kind: SectionKind) {

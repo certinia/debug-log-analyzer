@@ -17,6 +17,10 @@ export class LogTitle extends LitElement {
   @property()
   logPath = '';
 
+  /** Appended to the tooltip — carries the log meta once the header collapses it. */
+  @property()
+  details = '';
+
   static styles = [
     globalStyles,
     skeletonStyles,
@@ -25,7 +29,10 @@ export class LogTitle extends LitElement {
         --text-weight-semibold: 600;
         display: inline-flex;
         align-items: center;
-        min-width: 4ch;
+        /* Floor, not a nicety: without it the title shreds itself to nothing while the
+           header's controls keep their space, so nav-bar's collapse ladder never
+           engages. nav-bar reads this value back to budget the ladder. */
+        min-width: 16ch;
         min-height: 1rem;
         max-width: 60ch;
         flex: 0 1 auto;
@@ -36,7 +43,7 @@ export class LogTitle extends LitElement {
         padding-block: 2px;
         padding-inline: 6px;
         background: transparent;
-        border-radius: 5px;
+        border-radius: var(--lana-radius-sm);
         font-weight: var(--text-weight-semibold, 600);
         font-size: 1.1rem;
         overflow: hidden;
@@ -65,7 +72,9 @@ export class LogTitle extends LitElement {
       return html`<div class="skeleton">&nbsp;</div>`;
     }
 
-    return html`<a class="title-item" href="#" @click="${this._goToLog}" title="${this.logPath}"
+    const tooltip = this.details ? `${this.logPath}\n${this.details}` : this.logPath;
+
+    return html`<a class="title-item" href="#" @click="${this._goToLog}" title="${tooltip}"
       >${this.logName}</a
     >`;
   }

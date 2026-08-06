@@ -17,6 +17,7 @@ import {
 } from '../../../core/utility/Util.js';
 import { formatSOQL } from '../../soql/format/formatter.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
+import { formatNumber } from './rendering/tooltip-utils.js';
 
 /**
  * Configuration options for tooltip behavior.
@@ -375,6 +376,17 @@ export class FrameTooltipRenderer {
           // throw is a child leaf, so it would only ever read "(self 0)".
           rows.push({ label: 'Throws:', value: `${event.thrownCount.total}` });
         }
+
+        if (event.heapAllocated.total || event.heapAllocated.self) {
+          // Net heap retained (alloc − free): total for the subtree, self for this method's
+          // own body. ~0 net (allocated then freed) shows no row. Gross/peak live in the grid.
+          rows.push({
+            label: 'heap:',
+            value: `${formatNumber(event.heapAllocated.total)} bytes (self ${formatNumber(
+              event.heapAllocated.self,
+            )})`,
+          });
+        }
       }
 
       const descriptionText = event.text + (event.suffix ?? '');
@@ -390,6 +402,7 @@ export class FrameTooltipRenderer {
         rows,
         this.options.categoryColors[event.category] || '',
         descriptionHtml,
+        event.category,
       );
     }
 
@@ -407,6 +420,8 @@ export class FrameTooltipRenderer {
     rows: { label: string; value: string }[],
     color: string,
     descriptionHtml?: string,
+    /** Category label for the swatch row; `color` fills the swatch. */
+    categoryName?: string,
   ) {
     const tooltipBody = document.createElement('div');
     tooltipBody.className = 'timeline-tooltip';
@@ -431,6 +446,22 @@ export class FrameTooltipRenderer {
       descriptionDiv.textContent = description;
     }
     tooltipBody.appendChild(descriptionDiv);
+
+    if (categoryName && color) {
+      const categoryRow = document.createElement('div');
+      categoryRow.className = 'tooltip-category';
+
+      const swatch = document.createElement('span');
+      swatch.className = 'tooltip-swatch';
+      swatch.style.backgroundColor = color;
+
+      const name = document.createElement('span');
+      name.textContent = categoryName;
+
+      categoryRow.appendChild(swatch);
+      categoryRow.appendChild(name);
+      tooltipBody.appendChild(categoryRow);
+    }
 
     rows.forEach(({ label, value }) => {
       const row = document.createElement('div');

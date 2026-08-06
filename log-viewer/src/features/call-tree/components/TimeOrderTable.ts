@@ -1,23 +1,25 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
-import type { ApexLog, LogEventType } from 'apex-log-parser';
+import type { ApexLog } from 'apex-log-parser';
 import { Tabulator, type RowComponent } from 'tabulator-tables';
 
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { formatDuration } from '../../../core/utility/Util.js';
-import MinMaxEditor from '../../../tabulator/editors/MinMax.js';
-import { minMaxTreeFilter } from '../../../tabulator/filters/MinMax.js';
+import { TIME_WIDTH } from '../../../tabulator/ColumnWidths.js';
 import { progressFormatterMS } from '../../../tabulator/format/ProgressMS.js';
-import { VirtualVerticalRenderer } from '../../../tabulator/renderer/VirtualVerticalRenderer.js';
 import { makeSumSelfTimeAllVisible } from '../utils/BottomCalcs.js';
 import { toTimeOrderTree, type TimeOrderRow } from '../utils/TimeOrderTree.js';
 import { createCalltreeNameFormatter } from './CalltreeNameFormatter.js';
 import {
   commonColumnDefaults,
   createGovernorMetricColumns,
+  createNamespaceColumns,
+  createSelfSumHeapFooters,
+  createTypeColumn,
   headerSortElement,
   registerTableModules,
+  virtualScrollOptions,
   type TableCallbacks,
 } from './TableShared.js';
 
@@ -33,18 +35,14 @@ export function createTimeOrderTable(
 ): { table: Tabulator; tableBuilt: Promise<void> } {
   registerTableModules();
 
-  const selfTimeFilterCache = new Map<number, boolean>();
-  const totalTimeFilterCache = new Map<number, boolean>();
-  const namespaceFilterCache = new Map<number, boolean>();
-
-  const excludedTypes = new Set<LogEventType>(['SOQL_EXECUTE_BEGIN', 'DML_BEGIN']);
   const governorLimits = rootMethod.governorLimits;
 
   const tableData = toTimeOrderTree(rootMethod.children, governorLimits);
-  const nameFormatter = createCalltreeNameFormatter(excludedTypes);
+  const nameFormatter = createCalltreeNameFormatter();
 
   const tableRef: { current: Tabulator | undefined } = { current: undefined };
   const selfTimeBottomCalc = makeSumSelfTimeAllVisible(() => tableRef.current);
+  const heapFooters = createSelfSumHeapFooters(() => tableRef.current);
 
   const table = new Tabulator(container, {
     data: tableData,
@@ -55,9 +53,7 @@ export function createTimeOrderTable(
     maxHeight: '100%',
     //  custom property for datagrid/module/RowKeyboardNavigation
     rowKeyboardNavigation: true,
-    //  custom property for module/AnchoringPolicy
-    anchoringPolicy: true,
-    renderVertical: VirtualVerticalRenderer,
+    ...virtualScrollOptions,
     dataTree: true,
     dataTreeChildColumnCalcs: false,
     dataTreeBranchElement: '<span/>',
@@ -99,37 +95,16 @@ export function createTimeOrderTable(
         widthGrow: 5,
         widthShrink: 1,
       },
-      {
-        title: 'Namespace',
-        field: 'namespace',
-        sorter: 'string',
-        width: 100,
-        minWidth: 80,
-        headerFilter: 'list',
-        headerFilterFunc: callbacks.namespaceFilter,
-        headerFilterFuncParams: { filterCache: namespaceFilterCache },
-        headerFilterParams: {
-          values: rootMethod.namespaces,
-          clearable: true,
-          multiselect: true,
-        },
-        headerFilterLiveFilter: false,
-      },
-      {
-        title: 'Caller Namespace',
-        field: 'callerNamespace',
-        sorter: 'string',
-        width: 120,
-        visible: false,
-      },
-      ...createGovernorMetricColumns(governorLimits),
+      ...createNamespaceColumns(),
+      createTypeColumn(),
+      ...createGovernorMetricColumns(governorLimits, heapFooters),
       // Time columns sit at the far right of every call-tree table.
       {
         title: 'Total Time (ms)',
         field: 'duration.total',
         sorter: 'number',
         headerSortTristate: true,
-        width: 150,
+        width: TIME_WIDTH,
         hozAlign: 'right',
         headerHozAlign: 'right',
         formatter: progressFormatterMS,
@@ -140,10 +115,6 @@ export function createTimeOrderTable(
         bottomCalcFormatter: progressFormatterMS,
         bottomCalc: 'sum',
         bottomCalcFormatterParams: { precision: 2, totalValue: rootMethod.duration.total },
-        headerFilter: MinMaxEditor,
-        headerFilterFunc: minMaxTreeFilter,
-        headerFilterFuncParams: { columnName: 'duration.total', filterCache: totalTimeFilterCache },
-        headerFilterLiveFilter: false,
         tooltip(_event, cell, _onRender) {
           return formatDuration(cell.getValue());
         },
@@ -153,7 +124,7 @@ export function createTimeOrderTable(
         field: 'duration.self',
         sorter: 'number',
         headerSortTristate: true,
-        width: 150,
+        width: TIME_WIDTH,
         hozAlign: 'right',
         headerHozAlign: 'right',
         bottomCalc: selfTimeBottomCalc,
@@ -164,13 +135,6 @@ export function createTimeOrderTable(
           precision: 2,
           totalValue: rootMethod.duration.total,
         },
-        headerFilter: MinMaxEditor,
-        headerFilterFunc: minMaxTreeFilter,
-        headerFilterFuncParams: {
-          columnName: 'duration.self',
-          filterCache: selfTimeFilterCache,
-        },
-        headerFilterLiveFilter: false,
         tooltip(_event, cell, _onRender) {
           return formatDuration(cell.getValue());
         },
@@ -179,18 +143,14 @@ export function createTimeOrderTable(
   });
   tableRef.current = table;
 
-  // Filter caches are cleared once per render via `renderStarted`. Row ids
-  // produced by `toTimeOrderTree` are globally unique within a build
-  // (per-build monotonic counter), so cached `deepFilter` results stay valid
-  // across the cascaded `filter.filter()` passes Tabulator runs for each
-  // expanded subtree — `getChildren` → `filter.filter(config.children)`
-  // would otherwise fire `dataFiltered` multiple times per user action,
-  // defeating the cache. If row ids ever lose their uniqueness guarantee
-  // this must move back to `dataFiltered`.
+  // The host's filter caches (search/type/debug/namespace/duration) are cleared once per
+  // render via `renderStarted` — see CalltreeView's `onFilterCacheClear`. Row ids produced
+  // by `toTimeOrderTree` are globally unique within a build (per-build monotonic counter),
+  // so cached `deepFilter` results stay valid across the cascaded `filter.filter()` passes
+  // Tabulator runs for each expanded subtree — `getChildren` → `filter.filter(config.children)`
+  // would otherwise fire `dataFiltered` multiple times per user action, defeating the cache.
+  // If row ids ever lose their uniqueness guarantee this must move back to `dataFiltered`.
   table.on('renderStarted', () => {
-    totalTimeFilterCache.clear();
-    selfTimeFilterCache.clear();
-    namespaceFilterCache.clear();
     callbacks.onFilterCacheClear?.();
     callbacks.onRenderStarted();
   });

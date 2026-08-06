@@ -17,13 +17,23 @@ export interface GaugeMetric {
   used: number | null;
   /** Governor limit (0 when none applies). */
   limit: number;
+  /**
+   * How to write the numbers. Defaults to a thousand-separated integer; a byte
+   * metric passes a compact one, since `5,400,000 / 6,000,000` is wider than a
+   * gauge.
+   */
+  format?: (value: number) => string;
 }
 
-function tier(percent: number): 'safe' | 'warn' | 'danger' {
+/** Consumption percentage where a gauge or trend turns from safe to warn. */
+export const GOVERNOR_WARN_PERCENT = 80;
+
+/** The severity colour band for a governor consumption percentage. */
+export function governorTier(percent: number): 'safe' | 'warn' | 'danger' {
   if (percent >= 100) {
     return 'danger';
   }
-  return percent >= 80 ? 'warn' : 'safe';
+  return percent >= GOVERNOR_WARN_PERCENT ? 'warn' : 'safe';
 }
 
 /**
@@ -44,19 +54,21 @@ export class GovernorSummary extends LitElement {
         display: block;
       }
 
+      /* No padding of its own: each host sets its content edge on the element. */
       .gauges {
         display: flex;
         flex-wrap: wrap;
         gap: 8px 22px;
-        /* Left inset matches the sections' content edge (3px accent + 12px). */
-        padding: 10px 12px 12px 15px;
       }
 
       .gauge {
         display: flex;
         flex-direction: column;
         gap: 4px;
-        min-width: 6.5rem;
+        /* The label and the value never wrap, so a gauge must not shrink below
+           the wider of the two: at a 6.5rem floor a long value overflowed its
+           box and ran over the next gauge. min-content wraps the row instead. */
+        min-width: min-content;
         flex: 1 1 6.5rem;
         max-width: 12rem;
       }
@@ -132,12 +144,13 @@ export class GovernorSummary extends LitElement {
 
   private _renderGauge(metric: GaugeMetric) {
     const muted = metric.found === 0 && (metric.used ?? 0) === 0;
+    const format = metric.format ?? integer.format;
 
     if (metric.used === null || metric.limit <= 0) {
       return html`<div class="gauge ${muted ? 'muted' : ''}">
         <span class="gauge__label">${metric.label}</span>
         <span class="gauge__value"
-          >${integer.format(metric.found)} <span class="gauge__na">seen</span></span
+          >${format(metric.found)} <span class="gauge__na">seen</span></span
         >
       </div>`;
     }
@@ -152,12 +165,11 @@ export class GovernorSummary extends LitElement {
     >
       <span class="gauge__label">${metric.label}</span>
       <span class="gauge__value"
-        >${integer.format(metric.used)}
-        <span class="gauge__limit">/ ${integer.format(metric.limit)}</span></span
+        >${format(metric.used)} <span class="gauge__limit">/ ${format(metric.limit)}</span></span
       >
       <div class="gauge__track">
         <div
-          class="gauge__fill gauge__fill--${tier(percent)}"
+          class="gauge__fill gauge__fill--${governorTier(percent)}"
           style="width: ${Math.min(percent, 100)}%"
         ></div>
       </div>

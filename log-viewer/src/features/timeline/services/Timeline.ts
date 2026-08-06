@@ -4,7 +4,7 @@
 //TODO:Refactor - usage should look more like `new TimeLine(timelineContainer, {tooltip:true}:Config)`;
 import type { ApexLog, LogEvent, LogIssue } from 'apex-log-parser';
 import { debounce, formatDuration } from '../../../core/utility/Util.js';
-import { goToRow } from '../../call-tree/components/CalltreeView.js';
+import { goToRow } from '../../call-tree/navigation.js';
 
 export interface TimelineGroup {
   label: string;
@@ -25,6 +25,7 @@ interface TimelineColors {
 const truncationColors: Map<string, string> = new Map([
   ['exception', 'rgba(229, 72, 77, 0.9)'],
   ['error', 'rgba(255, 128, 128, 0.2)'],
+  ['fatal', 'rgba(255, 128, 128, 0.2)'],
   ['skip', 'rgb(30, 128, 255, 0.2)'],
   ['unexpected', 'rgba(128, 128, 255, 0.2)'],
 ]);
@@ -47,7 +48,12 @@ export const keyMap: Map<string, TimelineGroup> = new Map([
   ['SOQL', { label: 'SOQL', fillColor: '#6D4C7D' }],
 ]);
 
-const LEGACY_CATEGORY_MAP: Record<string, string> = {
+/** The legacy timeline group labels — the keys of {@link keyMap} and of the
+ *  legacy `timeline.colors` setting. */
+export type LegacyTimelineGroup =
+  'Method' | 'Code Unit' | 'System Method' | 'Workflow' | 'DML' | 'SOQL';
+
+export const LEGACY_CATEGORY_MAP: Record<string, LegacyTimelineGroup> = {
   Apex: 'Method',
   'Code Unit': 'Code Unit',
   System: 'System Method',
@@ -525,6 +531,40 @@ export function init(timelineContainer: HTMLElement, rootMethod: ApexLog) {
   if (ctx) {
     requestAnimationFrame(drawTimeLine);
   }
+}
+
+/**
+ * Re-read the find-match colors from CSS and redraw.
+ *
+ * Called on init and again on every host theme change — the canvas caches these as
+ * strings, so nothing here re-themes on its own.
+ */
+export function refreshThemeColors(): void {
+  if (!canvas) {
+    return;
+  }
+
+  const computedStyle = getComputedStyle(canvas);
+  const previousFindMatchColor = findMatchColor;
+  // getPropertyValue returns '' for an unset property, never null.
+  findMatchColor =
+    computedStyle.getPropertyValue('--vscode-editor-findMatchHighlightBackground') || '#ea5c0054';
+  currentFindMatchColor =
+    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground') || '#9e6a03';
+  borderSettings = new Map<string, number>([
+    [strokeColor, 1],
+    [findMatchColor, 2],
+  ]);
+
+  // borderRenderQueue is keyed by color and only rebuilt on find, so re-key any live
+  // matches — otherwise they keep drawing in the outgoing theme's color.
+  const liveMatches = borderRenderQueue.get(previousFindMatchColor);
+  if (liveMatches && previousFindMatchColor !== findMatchColor) {
+    borderRenderQueue.delete(previousFindMatchColor);
+    borderRenderQueue.set(findMatchColor, liveMatches);
+  }
+
+  state.requestRedraw();
 }
 
 export function setColors(timelineColors: TimelineColors) {
@@ -1022,15 +1062,7 @@ function onInitTimeline(): void {
   tooltip.id = 'timeline-tooltip';
   container.appendChild(tooltip);
 
-  const computedStyle = getComputedStyle(canvas);
-  findMatchColor =
-    computedStyle.getPropertyValue('--vscode-editor-findMatchHighlightBackground') ?? '#ea5c0054';
-  currentFindMatchColor =
-    computedStyle.getPropertyValue('--vscode-editor-findMatchBackground') ?? '#9e6a03';
-  borderSettings = new Map<string, number>([
-    [strokeColor, 1],
-    [findMatchColor, 2],
-  ]);
+  refreshThemeColors();
 
   if (canvas) {
     canvas.addEventListener('mouseout', onLeaveCanvas);

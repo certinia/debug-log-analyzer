@@ -64,6 +64,8 @@ function createEvent(options: EventOptions): LogEvent {
     soslCount: { self: options.soslSelf ?? 0, total: options.soslTotal ?? 0 },
     thrownCount: { self: options.thrown ?? 0, total: options.thrown ?? 0 },
     heapAllocated: { self: options.heapSelf ?? 0, total: options.heapTotal ?? 0 },
+    heapGross: { self: 0, total: 0 },
+    heapPeak: 0,
     exitTypes: [],
   } as unknown as LogEvent;
 

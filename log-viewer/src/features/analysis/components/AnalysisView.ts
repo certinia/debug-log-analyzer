@@ -2,7 +2,6 @@
  * Copyright (c) 2022 Certinia Inc. All rights reserved.
  */
 import '#vscode-elements/vscode-button.js';
-import '#vscode-elements/vscode-checkbox.js';
 import '#vscode-elements/vscode-option.js';
 import '../../../components/VsSelect.js';
 import '#vscode-elements/vscode-toolbar-button.js';
@@ -14,6 +13,8 @@ import type { RowComponent, Tabulator } from 'tabulator-tables';
 import type { ApexLog } from 'apex-log-parser';
 import '../../../components/ContextMenu.js';
 import type { ContextMenu } from '../../../components/ContextMenu.js';
+import { eventBus } from '../../../core/events/EventBus.js';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
 import { createBottomUpTable } from '../../call-tree/components/BottomUpTable.js';
@@ -41,8 +42,8 @@ import { globalStyles } from '../../../styles/global.styles.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 
 // Components
-import '../../../components/GridSkeleton.js';
 import '../../../components/datagrid-filter-bar.js';
+import '../../../components/GridSkeleton.js';
 
 /** The Name column is always shown in the analysis table. */
 const ALWAYS_VISIBLE = ['text'];
@@ -59,6 +60,9 @@ export class AnalysisView extends LitElement {
         width: 100%;
         display: flex;
         gap: 1rem;
+        /* inset previously provided by the tab panel's padding */
+        padding: 10px 6px;
+        box-sizing: border-box;
       }
 
       .analysis-view {
@@ -92,6 +96,15 @@ export class AnalysisView extends LitElement {
         gap: 4px;
         align-items: flex-end;
       }
+
+      .filter-container vscode-button {
+        height: var(--filter-control-height);
+      }
+
+      .filter-container vscode-button::part(base) {
+        padding: var(--filter-control-padding);
+        font-size: var(--filter-control-font-size);
+      }
     `,
     categoryColoringStyles,
   ];
@@ -124,24 +137,87 @@ export class AnalysisView extends LitElement {
   // single boolean read with no walk and no cache.
   _showDetailsFilter = (data: BottomUpRow): boolean => data._hasDetailsDeep;
 
+  /** Releases the category-colouring settings subscription; set while connected. */
+  private _categoryColoringOff: (() => void) | null = null;
+  private _selectionClearUnsubscribe: (() => void) | null = null;
+
+  /** Guards the programmatic select made on the inspector's behalf. */
+  private _echoGuard = new SelectionEchoGuard();
+  private _inspectorRevealUnsubscribe: (() => void) | null = null;
+
   constructor() {
     super();
 
+    // An inspector finding names one event; the grid holds it in the bucket for
+    // its method, so that bucket is what gets revealed.
+    this._inspectorRevealUnsubscribe = eventBus.on('inspector:reveal', (detail) => {
+      if (detail.source === 'analysis') {
+        void this._revealEventIndex(detail.eventIndex);
+      }
+    });
     document.addEventListener('lv-find', this._findEvt);
     document.addEventListener('lv-find-match', this._findEvt);
     document.addEventListener('lv-find-close', this._findEvt);
+
+    // Escape (app-wide) deselects here; the table reports the clear itself.
+    this._selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
+      if (detail.source === 'analysis') {
+        this.analysisTable?.deselectRow();
+      }
+    });
   }
 
   override connectedCallback(): void {
     super.connectedCallback();
-    wireCategoryColoring(this);
+    this._categoryColoringOff = wireCategoryColoring(this);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._categoryColoringOff?.();
+    this._categoryColoringOff = null;
     document.removeEventListener('lv-find', this._findEvt);
     document.removeEventListener('lv-find-match', this._findEvt);
     document.removeEventListener('lv-find-close', this._findEvt);
+    this._selectionClearUnsubscribe?.();
+    this._selectionClearUnsubscribe = null;
+    this._inspectorRevealUnsubscribe?.();
+    this._inspectorRevealUnsubscribe = null;
+  }
+
+  /**
+   * Select the bucket holding `eventIndex` and scroll it into view. Guarded, so the
+   * inspector keeps the findings it was clicked in rather than being rebuilt around
+   * the row it just asked for.
+   */
+  private async _revealEventIndex(eventIndex: number): Promise<void> {
+    const table = this.analysisTable;
+    // `instances` is populated on root buckets only, which is what the grid lists.
+    const match = table
+      ?.getRows()
+      .find((row) =>
+        (row.getData() as BottomUpRow).instances?.some((event) => event.eventIndex === eventIndex),
+      );
+    if (!table || !match) {
+      return;
+    }
+
+    // Show Details keeps only rows with a duration, so the buckets for debug
+    // lines, thrown exceptions and query plans are filtered out — exactly the
+    // events a finding points at. Turn the filter off rather than reveal nothing.
+    const data = match.getData();
+    if (
+      !this.filterState.showDetails &&
+      !table.getRows('active').some((row) => row.getData() === data)
+    ) {
+      this._handleShowDetailsChange();
+      await this.updateComplete;
+    }
+
+    await this._echoGuard.runAsync(() =>
+      //@ts-expect-error This is a custom function added in by RowNavigation custom module
+      table.goToRow(match, { scrollIfVisible: false, focusRow: false }),
+    );
   }
 
   firstUpdated(): void {
@@ -188,6 +264,7 @@ export class AnalysisView extends LitElement {
             >
 
             <vs-select
+              dense
               id="column-view"
               prefix="Columns"
               label="Column view"
@@ -208,10 +285,18 @@ export class AnalysisView extends LitElement {
           </div>
 
           <div slot="filters" class="filter-container">
-            <vscode-checkbox @change="${this._handleShowDetailsChange}">Details</vscode-checkbox>
+            <button
+              type="button"
+              class="filter-control pill-toggle"
+              aria-pressed="${this.filterState.showDetails}"
+              @click="${this._handleShowDetailsChange}"
+            >
+              Details
+            </button>
           </div>
 
           <vs-select
+            dense
             slot="group"
             id="groupby-dropdown"
             prefix="Group"
@@ -396,9 +481,9 @@ export class AnalysisView extends LitElement {
     }
   }
 
-  _handleShowDetailsChange(event: Event) {
-    const target = event.target as HTMLInputElement;
-    this.filterState.showDetails = target.checked;
+  _handleShowDetailsChange() {
+    this.filterState.showDetails = !this.filterState.showDetails;
+    this.requestUpdate();
     this._updateFiltering();
   }
 
@@ -499,7 +584,6 @@ export class AnalysisView extends LitElement {
       this._tableWrapper,
       rootMethod,
       {
-        namespaceFilter: () => true,
         showDetailsFilter: this._showDetailsFilter,
         onFilterCacheClear: () => {
           if (!this.blockClearHighlights && this.totalMatches > 0) {
@@ -536,6 +620,31 @@ export class AnalysisView extends LitElement {
         this._resetFindWidget();
         this._clearSearchHighlights();
       }
+    });
+
+    // Feed the inspector. Analysis rows merge many calls, so they
+    // scope to every occurrence of the method.
+    this.analysisTable.on('rowSelectionChanged', (_data, rows) => {
+      if (this._echoGuard.suppressed) {
+        return;
+      }
+      const data = rows[0]?.getData() as BottomUpRow | undefined;
+      const event = data?.originalData;
+      if (!event) {
+        eventBus.emit('detail:select', { source: 'analysis', selection: null });
+        return;
+      }
+      const occurrences = data.instances?.length ? data.instances : null;
+      eventBus.emit('detail:select', {
+        source: 'analysis',
+        selection: occurrences
+          ? {
+              kind: 'aggregate',
+              instances: occurrences.map((e) => e.eventIndex),
+              label: data.text ?? event.text,
+            }
+          : { kind: 'event', eventIndex: event.eventIndex },
+      });
     });
 
     await tableBuilt;

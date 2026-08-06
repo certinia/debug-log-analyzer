@@ -247,22 +247,48 @@ export abstract class LogEvent {
   };
 
   /**
-   * Total + self heap bytes allocated (HEAP_ALLOCATE / BULK_HEAP_ALLOCATE).
+   * Signed NET heap bytes (alloc − free) for HEAP_ALLOCATE / BULK_HEAP_ALLOCATE. A negative
+   * `HEAP_ALLOCATE` is a deallocation, so this is signed: `+` grows the heap, `−` is net
+   * cleanup, `~0` is neutral ("allocated then freed — no lasting footprint"). This is the
+   * primary "does this path retain heap" metric. It is NOT the churn volume (see
+   * {@link heapGross}) nor the governor-comparable peak (see {@link heapPeak}).
    *
-   * `self` is seeded on the allocation leaf node (like DML/SOQL counts), so a method's
-   * `heapAllocated.self` is typically 0 and `heapAllocated.total` is the sum of allocations
-   * in this node and its children.
+   * `self` is the net directly in this node's own body: seeded as `bytes` on each allocation
+   * leaf, and (in `aggregateTotals`) summed onto the enclosing method from its direct leaf
+   * children only — so a method's `self` excludes allocations in sub-methods. `total` is the
+   * net across this node and all descendants.
    */
   heapAllocated: SelfTotal = {
     /**
-     * The net bytes allocated directly by this node.
+     * The net bytes retained directly by this node (excluding sub-methods).
      */
     self: 0,
     /**
-     * The total bytes allocated in this node and child nodes
+     * The total net bytes retained in this node and child nodes
      */
     total: 0,
   };
+
+  /**
+   * GROSS heap bytes allocated (positive HEAP_ALLOCATE only; frees ignored) — the churn / GC
+   * pressure a path creates regardless of whether it frees. Distinct from {@link heapAllocated}
+   * (net) and {@link heapPeak} (max live): an allocate-then-free loop has net ≈ 0 and a small
+   * peak but a large gross. Same self/total aggregation as {@link heapAllocated}.
+   */
+  heapGross: SelfTotal = {
+    /** Gross bytes allocated directly by this node (excluding sub-methods). */
+    self: 0,
+    /** Total gross bytes allocated in this node and child nodes. */
+    total: 0,
+  };
+
+  /**
+   * Peak live heap (bytes) reached while this node's subtree was executing — the max of the
+   * running live-heap total (signed HEAP_ALLOCATE deltas) over the node's window, clamped at
+   * 0. Always ≥ 0 and composes (child ≤ parent ≤ root), so the root equals the transaction
+   * peak. This is the heap number comparable to the heap governor limit.
+   */
+  heapPeak = 0;
 
   /**
    * The line types which would legitimately end this method
@@ -292,6 +318,17 @@ export abstract class LogEvent {
     if (this.exitStamp) {
       this.duration.total = this.duration.self = this.exitStamp - this.timestamp;
     }
+  }
+
+  /**
+   * Seeds this heap-allocation leaf's net/gross/peak metrics from a signed byte delta
+   * (negative = deallocation) and advances the parser's running live-heap total. Shared
+   * by {@link HeapAllocateLine} and {@link BulkHeapAllocateLine}.
+   */
+  protected seedHeapLeaf(parser: ApexLogParser, bytes: number): void {
+    this.heapAllocated.self = this.heapAllocated.total = bytes;
+    this.heapGross.self = this.heapGross.total = bytes > 0 ? bytes : 0;
+    this.heapPeak = parser.trackHeapAllocation(bytes);
   }
 
   private parseTimestamp(text: string): number {
@@ -533,7 +570,7 @@ export class BulkHeapAllocateLine extends LogEvent {
     super(parser, parts);
     this.text = parts[2] || '';
     this.bytes = parseBytes(parts[2]);
-    this.heapAllocated.self = this.heapAllocated.total = this.bytes;
+    this.seedHeapLeaf(parser, this.bytes);
   }
 }
 
@@ -723,7 +760,7 @@ export class MethodExitLine extends LogEvent {
 export class SystemConstructorEntryLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.System;
   debugLevel = LOG_LEVEL.Fine;
-  suffix = '(system constructor)';
+  suffix = ' (system constructor)';
 
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['SYSTEM_CONSTRUCTOR_EXIT'], LOG_CATEGORY.System, 'method');
@@ -766,7 +803,10 @@ export class SystemMethodExitLine extends LogEvent {
 export class CodeUnitStartedLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.ApexCode;
   debugLevel = LOG_LEVEL.Error;
-  suffix = ' (entrypoint)';
+  // Not "entrypoint": most code units (triggers, validation rules, VF pages)
+  // start partway through a transaction, and the text can read exactly like a
+  // method (`ffrr.ffrr.ContractPopulateBatch`).
+  suffix = ' (code unit)';
   codeUnitType = '';
 
   constructor(parser: ApexLogParser, parts: string[]) {
@@ -1128,7 +1168,7 @@ export class HeapAllocateLine extends LogEvent {
     this.lineNumber = this.parseLineNumber(parts[2]);
     this.text = parts[3] || '';
     this.bytes = parseBytes(parts[3]);
-    this.heapAllocated.self = this.heapAllocated.total = this.bytes;
+    this.seedHeapLeaf(parser, this.bytes);
   }
 }
 
@@ -1499,6 +1539,9 @@ export class ExecutionStartedLine extends DurationLogEvent {
 export class EnteringManagedPackageLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.ApexCode;
   debugLevel = LOG_LEVEL.Fine;
+  // The text is a bare namespace token (`c2g`, `dlrs`, `java__util`), so say
+  // what it is.
+  suffix = ' (managed package)';
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, [], LOG_CATEGORY.Apex, 'pkg');
     const rawNs = parts[2] || '',
@@ -1627,6 +1670,10 @@ export class FlowStartInterviewsErrorLine extends LogEvent {
 export class FlowStartInterviewBeginLine extends DurationLogEvent {
   debugCategory = DEBUG_CATEGORY.Workflow;
   debugLevel = LOG_LEVEL.Info;
+  // The text is just the flow's label ("Account Before Save LC"), which reads
+  // like anything else. The plural FLOW_START_INTERVIEWS_BEGIN resolves its own
+  // more specific suffix (record-triggered, autolaunched, …) once it ends.
+  suffix = ' (flow)';
   constructor(parser: ApexLogParser, parts: string[]) {
     super(parser, parts, ['FLOW_START_INTERVIEW_END'], LOG_CATEGORY.Automation, 'custom');
     this.text = parts[3] || '';
@@ -2335,6 +2382,21 @@ export class WFSpoolActionBeginLine extends LogEvent {
   }
 }
 
+/**
+ * Splits issue text into a summary (the full first line — presentation truncation
+ * is the consumer's job) and a description (the remainder, e.g. a stack trace).
+ */
+function splitIssueText(text: string): { summary: string; description: string } {
+  const newLineIndex = text.indexOf('\n');
+  if (newLineIndex === -1) {
+    return { summary: text.trim(), description: '' };
+  }
+  return {
+    summary: text.slice(0, newLineIndex).trim(),
+    description: text.slice(newLineIndex + 1).trim(),
+  };
+}
+
 export class ExceptionThrownLine extends LogEvent {
   debugLevel = LOG_LEVEL.Info;
   debugCategory = DEBUG_CATEGORY.ApexCode;
@@ -2351,12 +2413,8 @@ export class ExceptionThrownLine extends LogEvent {
 
   onAfter(parser: ApexLogParser, _next?: LogEvent): void {
     if (this.text.indexOf('System.LimitException') >= 0) {
-      const isMultiLine = this.text.indexOf('\n');
-      const len = isMultiLine < 0 ? 99 : isMultiLine;
-      const truncateText = this.text.length > len;
-      const summary = this.text.slice(0, len + 1) + (truncateText ? '…' : '');
-      const message = truncateText ? this.text : '';
-      parser.addLogIssue(this.timestamp, this.eventIndex, summary, message, 'error');
+      const { summary, description } = splitIssueText(this.text);
+      parser.addLogIssue(this.timestamp, this.eventIndex, summary, description, 'error');
     }
   }
 }
@@ -2374,16 +2432,8 @@ export class FatalErrorLine extends LogEvent {
   }
 
   onAfter(parser: ApexLogParser, _next?: LogEvent): void {
-    const newLineIndex = this.text.indexOf('\n');
-    const summary = newLineIndex > -1 ? this.text.slice(0, newLineIndex + 1) : this.text;
-    const detailText = summary.length !== this.text.length ? this.text : '';
-    parser.addLogIssue(
-      this.timestamp,
-      this.eventIndex,
-      'FATAL ERROR! cause=' + summary,
-      detailText,
-      'error',
-    );
+    const { summary, description } = splitIssueText(this.text);
+    parser.addLogIssue(this.timestamp, this.eventIndex, summary, description, 'fatal');
   }
 }
 

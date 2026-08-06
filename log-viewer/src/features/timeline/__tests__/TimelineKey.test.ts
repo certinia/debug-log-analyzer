@@ -1,0 +1,62 @@
+/*
+ * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ *
+ * @jest-environment jsdom
+ */
+import { describe, expect, it } from '@jest/globals';
+
+// jsdom can't run the real element (vscode-icon reads document.baseURI).
+jest.mock('../../../components/OverflowList.js', () => ({}));
+
+import type { TimelineKeyEntry, Timelinekey } from '../components/TimelineKey.js';
+import '../components/TimelineKey.js';
+
+async function mount(entries: TimelineKeyEntry[]): Promise<Timelinekey> {
+  const el = document.createElement('timeline-key') as Timelinekey;
+  el.timelineKeys = entries;
+  document.body.appendChild(el);
+  await el.updateComplete;
+  return el;
+}
+
+function chips(el: Timelinekey): HTMLElement[] {
+  return [...(el.shadowRoot?.querySelectorAll<HTMLElement>('.chip') ?? [])];
+}
+
+describe('TimelineKey', () => {
+  it('renders one chip per entry, with dot color, label and data-category', async () => {
+    const el = await mount([
+      { label: 'Apex', fillColor: 'rgb(43, 143, 129)', selfTimeNs: 12_100_000_000 },
+      { label: 'SOQL', fillColor: 'rgb(109, 76, 125)', selfTimeNs: 500_000 },
+    ]);
+
+    const rendered = chips(el);
+    expect(rendered).toHaveLength(2);
+
+    const [apex] = rendered;
+    expect(apex?.dataset['category']).toBe('Apex');
+    expect(apex?.textContent).toContain('Apex');
+    const dot = apex?.querySelector<HTMLElement>('.chip__dot');
+    expect(dot?.style.backgroundColor).toBe('rgb(43, 143, 129)');
+  });
+
+  it('shows the compact self time when present', async () => {
+    const el = await mount([
+      { label: 'Apex', fillColor: 'rgb(0, 0, 0)', selfTimeNs: 12_100_000_000 },
+    ]);
+
+    expect(chips(el)[0]?.querySelector('.chip__time')?.textContent).toBe('12.1s');
+  });
+
+  it('omits the time when self time is unknown', async () => {
+    const el = await mount([{ label: 'Method', fillColor: 'rgb(0, 0, 0)' }]);
+
+    expect(chips(el)[0]?.querySelector('.chip__time')).toBeNull();
+  });
+
+  it('keeps the chip itself unfilled — only the dot carries the category color', async () => {
+    const el = await mount([{ label: 'DML', fillColor: 'rgb(176, 104, 104)' }]);
+
+    expect(chips(el)[0]?.getAttribute('style')).toBeNull();
+  });
+});

@@ -214,6 +214,27 @@ describe('parseLog tests', () => {
     expect(firstChildren[0]).toBeInstanceOf(CodeUnitStartedLine);
   });
 
+  it('names the frames whose text cannot say what they are', async () => {
+    // Each of these carries a text that reads like anything else — a trigger
+    // path, a bare namespace, a flow label — so the suffix does the naming.
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n' +
+      '09:18:22.6 (200)|CODE_UNIT_STARTED|[EXTERNAL]|01q000000000001|__sfdc_trigger/c2g/CODAInvoice\n' +
+      '09:18:22.6 (300)|ENTERING_MANAGED_PKG|c2g\n' +
+      '09:18:22.6 (400)|FLOW_START_INTERVIEW_BEGIN|91080693a3c1|Account Before Save LC\n' +
+      '09:18:22.6 (500)|FLOW_START_INTERVIEW_END|91080693a3c1|Account Before Save LC\n' +
+      '09:18:22.6 (600)|CODE_UNIT_FINISHED|__sfdc_trigger/c2g/CODAInvoice\n' +
+      '09:18:22.6 (700)|EXECUTION_FINISHED\n';
+
+    const suffixes = new Map(
+      parse(log).eventsById.map((event) => [event.type, event.suffix] as const),
+    );
+    // Most code units start partway through a transaction, so not "entrypoint".
+    expect(suffixes.get('CODE_UNIT_STARTED')).toBe(' (code unit)');
+    expect(suffixes.get('ENTERING_MANAGED_PKG')).toBe(' (managed package)');
+    expect(suffixes.get('FLOW_START_INTERVIEW_BEGIN')).toBe(' (flow)');
+  });
+
   it('Should parse between EXECUTION_STARTED and EXECUTION_FINISHED for CRLF (\r\n)', async () => {
     const log =
       '09:18:22.6 (6508409)|USER_INFO|[EXTERNAL]|0050W000006W3LM|user@example.com|Greenwich Mean Time|GMT+01:00\r\n' +
@@ -288,6 +309,7 @@ describe('parseLog tests', () => {
     expect(apexLog.logIssues[0]?.summary).toBe(
       'System.LimitException: c2g:Too many SOQL queries: 101',
     );
+    expect(apexLog.logIssues[0]?.type).toBe('error');
   });
   it('Should detect fatal errors', async () => {
     const log =
@@ -300,8 +322,57 @@ describe('parseLog tests', () => {
 
     expect(apexLog.children.length).toBe(1);
     expect(apexLog.logIssues[0]?.summary).toBe(
-      'FATAL ERROR! cause=System.LimitException: c2g:Too many SOQL queries: 101',
+      'System.LimitException: c2g:Too many SOQL queries: 101',
     );
+    expect(apexLog.logIssues[0]?.type).toBe('fatal');
+    expect(apexLog.logIssues[0]?.description).toBe('');
+  });
+
+  it('Fatal error summary is the first line; description is the stack trace only', async () => {
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '16:16:04.97 (1000)|FATAL_ERROR|System.LimitException: Apex CPU time limit exceeded\n\n' +
+      'Class.pse.JSONUtils.removeNamespaceFromKeys: line 32, column 1\n' +
+      'Class.pse.ExtendedSObject.marshall: line 186, column 1\n' +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const apexLog = parse(log);
+
+    const fatal = apexLog.logIssues.find((issue) => issue.type === 'fatal');
+    expect(fatal?.summary).toBe('System.LimitException: Apex CPU time limit exceeded');
+    expect(fatal?.description).toBe(
+      'Class.pse.JSONUtils.removeNamespaceFromKeys: line 32, column 1\n' +
+        'Class.pse.ExtendedSObject.marshall: line 186, column 1',
+    );
+  });
+
+  it('Keeps a fatal error and a thrown exception with the same message as separate issues', async () => {
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '16:16:04.97 (500)|EXCEPTION_THROWN|[60]|System.LimitException: Apex CPU time limit exceeded\n' +
+      '16:16:04.97 (1000)|FATAL_ERROR|System.LimitException: Apex CPU time limit exceeded\n' +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const apexLog = parse(log);
+
+    const types = apexLog.logIssues.map((issue) => issue.type);
+    expect(types).toEqual(['error', 'fatal']);
+    expect(apexLog.logIssues[0]?.summary).toBe(apexLog.logIssues[1]?.summary);
+  });
+
+  it('Exception summary keeps the full first line without truncation', async () => {
+    const message =
+      'System.LimitException: Update failed. First exception on row 0 with id aCC3Y000000TNpbWAG; ' +
+      'first error: CANNOT_EXECUTE_FLOW_TRIGGER, this message runs well past the old 99 character cap';
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      `16:16:04.97 (1000)|EXCEPTION_THROWN|[60]|${message}\n` +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const apexLog = parse(log);
+
+    expect(apexLog.logIssues[0]?.summary).toBe(message);
+    expect(apexLog.logIssues[0]?.description).toBe('');
   });
   it('Skipped-Lines endTime resolves to the next entry event, ignoring detail lines', async () => {
     const log =
@@ -381,7 +452,7 @@ describe('parseLog tests', () => {
     expect(thrown?.thrownCount).toEqual({ self: 1, total: 1 });
   });
 
-  it('heapAllocated is seeded on the allocation leaf and rolled up as total on ancestors', async () => {
+  it('heapAllocated: leaf seeds self=total=bytes; methods get direct self + rolled-up total', async () => {
     const log =
       '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
       '15:20:52.222 (200)|METHOD_ENTRY|[185]|01p4J00000FpS6t|Outer.run()\n' +
@@ -402,9 +473,135 @@ describe('parseLog tests', () => {
     const outerAlloc = outer.children.find((child) => child.type === 'HEAP_ALLOCATE');
     expect(outerAlloc?.heapAllocated).toEqual({ self: 10, total: 10 });
 
-    // Inner rolls up its own 32 bytes; Outer rolls up both (10 + 32).
-    expect(inner.heapAllocated).toEqual({ self: 0, total: 32 });
-    expect(outer.heapAllocated).toEqual({ self: 0, total: 42 });
+    // self = bytes allocated directly by the method's own body (its direct leaf allocations,
+    // excluding sub-methods); total = self + descendants. Inner directly allocates 32; Outer
+    // directly allocates 10 (Inner's 32 is not Outer's self) and totals 42.
+    expect(inner.heapAllocated).toEqual({ self: 32, total: 32 });
+    expect(outer.heapAllocated).toEqual({ self: 10, total: 42 });
+
+    // All allocations are positive here, so gross mirrors net.
+    expect(inner.heapGross).toEqual({ self: 32, total: 32 });
+    expect(outer.heapGross).toEqual({ self: 10, total: 42 });
+  });
+
+  it('heapPeak tracks peak live heap (signed net preserved; frees do not lower the peak)', async () => {
+    // Stats allocates then frees 500k (net 0); Data allocates 5MB and keeps it; View
+    // frees the 5MB (a negative HEAP_ALLOCATE is the deallocation). Running live heap:
+    // 500k → 0 → 5MB → 0, so the transaction peak is 5MB, reached under Data.
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '15:20:52.222 (200)|METHOD_ENTRY|[185]|01pRoot|Root.run()\n' +
+      '15:20:52.222 (300)|METHOD_ENTRY|[186]|01pCS|Stats.compute()\n' +
+      '15:20:52.222 (310)|HEAP_ALLOCATE|[52]|Bytes:500000\n' +
+      '15:20:52.222 (320)|HEAP_ALLOCATE|[52]|Bytes:-500000\n' +
+      '15:20:52.222 (330)|METHOD_EXIT|[186]|01pCS|Stats.compute()\n' +
+      '15:20:52.222 (400)|METHOD_ENTRY|[190]|01pLD|Data.load()\n' +
+      '15:20:52.222 (410)|HEAP_ALLOCATE|[60]|Bytes:5000000\n' +
+      '15:20:52.222 (420)|METHOD_EXIT|[190]|01pLD|Data.load()\n' +
+      '15:20:52.222 (500)|METHOD_ENTRY|[200]|01pRD|View.render()\n' +
+      '15:20:52.222 (510)|HEAP_ALLOCATE|[70]|Bytes:-5000000\n' +
+      '15:20:52.222 (520)|METHOD_EXIT|[200]|01pRD|View.render()\n' +
+      '15:20:52.222 (700)|METHOD_EXIT|[185]|01pRoot|Root.run()\n' +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const apexLog = parse(log);
+    const root = apexLog.children[0]!.children[0]!;
+    const byText = (text: string) => root.children.find((child) => child.text === text)!;
+    const stats = byText('Stats.compute()');
+    const load = byText('Data.load()');
+    const render = byText('View.render()');
+
+    // Signed net allocation is unchanged: Data keeps +5MB, View frees -5MB, the rest net 0.
+    expect(load.heapAllocated.total).toBe(5000000);
+    expect(render.heapAllocated.total).toBe(-5000000);
+    expect(stats.heapAllocated.total).toBe(0);
+    expect(root.heapAllocated.total).toBe(0);
+
+    // Direct/self = the method's own leaf allocations. Data directly allocates +5MB, View
+    // directly frees -5MB; Root only calls sub-methods (no direct heap leaves), so self = 0.
+    expect(load.heapAllocated.self).toBe(5000000);
+    expect(render.heapAllocated.self).toBe(-5000000);
+    expect(root.heapAllocated.self).toBe(0);
+
+    // Gross = positive allocations only (frees ignored): Stats churned 500k (net 0), Data 5MB,
+    // View 0 (it only frees). Root's gross totals the churn (500k + 5MB), unlike its net (0).
+    expect(stats.heapGross.total).toBe(500000);
+    expect(load.heapGross.total).toBe(5000000);
+    expect(render.heapGross.total).toBe(0);
+    expect(root.heapGross.total).toBe(5500000);
+
+    // Peak live heap: attributed to the allocating subtree, composes to the root, never negative.
+    expect(stats.heapPeak).toBe(500000);
+    expect(load.heapPeak).toBe(5000000);
+    expect(render.heapPeak).toBe(0);
+    expect(root.heapPeak).toBe(5000000);
+
+    // No "Maximum heap size" line in this log, so used falls back to the computed peak.
+    expect(apexLog.governorLimits.heapSize.used).toBe(5000000);
+  });
+
+  it('net, gross and peak are distinct for an allocate-then-free method', async () => {
+    // One method allocates 5MB then frees it: net nets to 0 ("no big deal"), but gross shows
+    // the 5MB churn and peak shows the 5MB transiently held.
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '15:20:52.222 (200)|METHOD_ENTRY|[1]|01pM|M.a()\n' +
+      '15:20:52.222 (210)|HEAP_ALLOCATE|[1]|Bytes:5000000\n' +
+      '15:20:52.222 (220)|HEAP_ALLOCATE|[1]|Bytes:-5000000\n' +
+      '15:20:52.222 (230)|METHOD_EXIT|[1]|01pM|M.a()\n' +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const method = parse(log).children[0]!.children[0]!;
+    expect(method.heapAllocated.total).toBe(0); // net: allocated then freed
+    expect(method.heapGross.total).toBe(5000000); // churn
+    expect(method.heapPeak).toBe(5000000); // transiently held
+  });
+
+  it('BULK_HEAP_ALLOCATE feeds net/gross/peak the same as HEAP_ALLOCATE', async () => {
+    const log =
+      '09:18:22.6 (100)|EXECUTION_STARTED\n\n' +
+      '15:20:52.222 (200)|METHOD_ENTRY|[1]|01pM|M.a()\n' +
+      '15:20:52.222 (210)|BULK_HEAP_ALLOCATE|Bytes:1000\n' +
+      '15:20:52.222 (220)|METHOD_EXIT|[1]|01pM|M.a()\n' +
+      '09:19:13.82 (2000)|EXECUTION_FINISHED\n';
+
+    const method = parse(log).children[0]!.children[0]!;
+    expect(method.heapAllocated).toEqual({ self: 1000, total: 1000 });
+    expect(method.heapGross).toEqual({ self: 1000, total: 1000 });
+    expect(method.heapPeak).toBe(1000);
+  });
+
+  it('governorLimits.heapSize.used is the max of the reported peak and the computed peak', () => {
+    const withReported = (reportedPeak: number, allocBytes: number) =>
+      [
+        '09:18:22.6 (100)|EXECUTION_STARTED',
+        '15:20:52.222 (200)|METHOD_ENTRY|[1]|01pM|M.a()',
+        `15:20:52.222 (210)|HEAP_ALLOCATE|[1]|Bytes:${allocBytes}`,
+        '15:20:52.222 (220)|METHOD_EXIT|[1]|01pM|M.a()',
+        '12:43:02.105 (300)|LIMIT_USAGE_FOR_NS|(default)|',
+        `  Maximum heap size: ${reportedPeak} out of 6000000`,
+        '09:19:13.82 (2000)|EXECUTION_FINISHED',
+      ].join('\n');
+
+    // Reported (100) below the computed peak (5,000,000) → computed wins.
+    expect(parse(withReported(100, 5000000)).governorLimits.heapSize.used).toBe(5000000);
+    // Reported (5000) above the computed peak (100) → reported wins.
+    expect(parse(withReported(5000, 100)).governorLimits.heapSize.used).toBe(5000);
+  });
+
+  it('governorLimits.heapSize.used is the peak across snapshots, not the last block', () => {
+    // Heap falls as memory is freed, so a later LIMIT_USAGE_FOR_NS block can report a lower
+    // (even 0) heap than an earlier one. `used` must be the peak (500000), not the last (0).
+    const log = [
+      '09:18:22.6 (100)|EXECUTION_STARTED',
+      '12:43:02.105 (200)|LIMIT_USAGE_FOR_NS|(default)|',
+      '  Maximum heap size: 500000 out of 6000000',
+      '12:43:02.105 (300)|LIMIT_USAGE_FOR_NS|(default)|',
+      '  Maximum heap size: 0 out of 6000000',
+      '09:19:13.82 (2000)|EXECUTION_FINISHED',
+    ].join('\n');
+
+    expect(parse(log).governorLimits.heapSize.used).toBe(500000);
   });
 
   it('Methods should have line-numbers', async () => {
@@ -1314,7 +1511,9 @@ describe('Governor Limits Parsing', () => {
       publishImmediateDml: { used: 5, limit: 150 },
       dmlRows: { used: 118, limit: 10000 },
       cpuTime: { used: 17008, limit: 10000 },
-      heapSize: { used: 400, limit: 6000000 },
+      // Heap is the transaction PEAK (max across namespace snapshots: max(300, 100)), not the
+      // sum (400) — global limits aren't summed (#862).
+      heapSize: { used: 300, limit: 6000000 },
       callouts: { used: 3, limit: 100 },
       emailInvocations: { used: 6, limit: 10 },
       futureCalls: { used: 4, limit: 50 },

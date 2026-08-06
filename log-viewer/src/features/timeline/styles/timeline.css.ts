@@ -13,11 +13,11 @@ export const tooltipStyles = `${soqlSyntaxStyles}
 
       .timeline-tooltip {
         position: relative;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        box-shadow: var(--lana-shadow-overlay);
         backdrop-filter: blur(6px);
         z-index: 1000;
         padding: 5px;
-        border-radius: 4px;
+        border-radius: var(--lana-radius-sm);
         border-left: 4px solid;
         background-color: var(--tl-hover-background);
         color: var(--tl-hover-foreground);
@@ -33,6 +33,21 @@ export const tooltipStyles = `${soqlSyntaxStyles}
         line-height: 1.3em;
         white-space: pre-wrap;
         word-break: break-all;
+      }
+
+      .tooltip-category {
+        display: flex;
+        align-items: center;
+        gap: var(--lana-space-2xs);
+        padding: var(--lana-space-3xs) 0;
+        color: var(--tl-description-foreground, #999);
+      }
+
+      .tooltip-swatch {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--lana-radius-sm);
+        flex: 0 0 auto;
       }
 
       .tooltip-row {
