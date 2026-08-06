@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { posix } from 'path';
 import { RelativePattern, Uri, workspace, type WorkspaceFolder } from 'vscode';
+import { Utils } from 'vscode-uri';
 import { getProjects } from '../SfdxProjectReader';
 
 jest.mock('vscode');
@@ -29,9 +29,17 @@ describe('getProjects', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Mirror the real Uri.joinPath: join segments and normalize '..'
-    (Uri.joinPath as jest.Mock).mockImplementation((base: Uri, ...segments: string[]) =>
-      fileUri(posix.join(base.path, ...segments)),
-    );
+    (Uri.joinPath as jest.Mock).mockImplementation((base: Uri, ...segments: string[]) => {
+      const parts = base.path.split('/').filter((p) => p);
+      for (const seg of segments) {
+        if (seg === '..') {
+          parts.pop();
+        } else if (seg !== '.') {
+          parts.push(seg);
+        }
+      }
+      return fileUri('/' + parts.join('/'));
+    });
   });
 
   it('should return empty array when no sfdx-project.json files found', async () => {

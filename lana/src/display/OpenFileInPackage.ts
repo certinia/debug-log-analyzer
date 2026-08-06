@@ -51,7 +51,7 @@ export class OpenFileInPackage {
         selection: new Selection(pos, pos),
       };
 
-      context.display.showFile(uri, options);
+      context.display.showFile(uri.fsPath, options);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       context.display.showErrorMessage(`Unable to open '${symbolName}': ${message}`);

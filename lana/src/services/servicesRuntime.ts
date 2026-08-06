@@ -35,6 +35,7 @@ let runtime: ServicesRuntime | undefined;
  * be awaited during extension activation before any service wrapper is used.
  */
 export async function initServices(): Promise<void> {
+  console.log('[LANA] initServices: Looking for services extension...');
   const ext = extensions.getExtension<SalesforceVSCodeServicesApi>(SERVICES_EXT_ID);
   if (!ext) {
     throw new Error(
@@ -42,10 +43,13 @@ export async function initServices(): Promise<void> {
     );
   }
 
+  console.log(`[LANA] initServices: Services extension found, isActive=${ext.isActive}`);
   servicesApi = ext.isActive ? ext.exports : await ext.activate();
+  console.log('[LANA] initServices: Services API obtained, building runtime...');
   runtime = ManagedRuntime.make(
     Layer.succeedContext(servicesApi.services.prebuiltServicesDependencies),
   );
+  console.log('[LANA] initServices: Runtime built');
 }
 
 /** The resolved services API. Throws if `initServices()` has not completed. */

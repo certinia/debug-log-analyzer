@@ -38,7 +38,7 @@ export default defineConfig([
   {
     input: { Main: './lana/src/Main.web.ts' },
     output: {
-      format: 'esm',
+      format: 'cjs',
       dir: './lana/dist/web',
       // cleanDir omitted — desktop bundle already cleaned lana/dist parent
       chunkFileNames: 'lana-[name].js',

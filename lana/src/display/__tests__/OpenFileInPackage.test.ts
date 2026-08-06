@@ -81,7 +81,7 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
     const { context, workspaceManager, display } = createContext();
     workspaceManager.findSymbol.mockResolvedValue({
       status: 'found',
-      uri: { fsPath: '/ws/force-app/MyClass.cls' },
+      uri: { fsPath: '/ws/force-app/MyClass.cls', path: '/ws/force-app/MyClass.cls' },
     });
     mockGetMethodLine.mockReturnValue({ line: 12, character: 4, isExactMatch: true });
 
@@ -104,7 +104,7 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
     const { context, workspaceManager, display } = createContext();
     workspaceManager.findSymbol.mockResolvedValue({
       status: 'found',
-      uri: { fsPath: '/ws/MyClass.cls' },
+      uri: { fsPath: '/ws/MyClass.cls', path: '/ws/MyClass.cls' },
     });
     mockGetMethodLine.mockReturnValue({ line: 3, isExactMatch: true });
 
@@ -118,7 +118,7 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
     const { context, workspaceManager, display } = createContext();
     workspaceManager.findSymbol.mockResolvedValue({
       status: 'found',
-      uri: { fsPath: '/ws/force-app/MyClass.cls' },
+      uri: { fsPath: '/ws/force-app/MyClass.cls', path: '/ws/force-app/MyClass.cls' },
     });
     mockGetMethodLine.mockReturnValue({
       line: 1,
@@ -154,7 +154,7 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
     const { context, workspaceManager, display } = createContext();
     workspaceManager.findSymbol.mockResolvedValue({
       status: 'found',
-      uri: { fsPath: '/ws/MyClass.cls' },
+      uri: { fsPath: '/ws/MyClass.cls', path: '/ws/MyClass.cls' },
     });
     mockOpenTextDocument.mockRejectedValue(new Error('file is binary'));
 

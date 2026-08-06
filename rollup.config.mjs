@@ -63,10 +63,10 @@ export default [
   {
     input: './lana/src/Main.web.ts',
     output: {
-      format: 'es',
+      format: 'cjs',
       dir: './lana/dist/web',
       chunkFileNames: 'lana-[name].js',
-      sourcemap: false,
+      sourcemap: false
     },
 
     external: ['vscode'],

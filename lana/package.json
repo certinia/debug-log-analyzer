@@ -29,7 +29,6 @@
     "profiling",
     "soql"
   ],
-  "type": "module",
   "main": "dist/Main.js",
   "browser": "dist/web/Main.web.js",
   "icon": "./certinia-icon-color.png",
