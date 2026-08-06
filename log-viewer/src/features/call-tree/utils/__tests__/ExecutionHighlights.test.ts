@@ -169,6 +169,20 @@ describe('computeExecutionHighlights hot spots', () => {
     expect(hotSpots.map((s) => s.text)).toEqual(['M7', 'M6', 'M5', 'M4', 'M3']);
   });
 
+  it('counts untimed instances of a timed signature, so the average holds', () => {
+    const log = createLog(1000);
+    const timed = createEvent({ text: 'MyClass.run()', self: 60 });
+    const untimed = createEvent({ text: 'MyClass.run()', self: 0 });
+    index(log, timed, untimed);
+
+    const { hotSpots } = computeExecutionHighlights(log);
+
+    expect(hotSpots).toEqual([
+      { text: 'MyClass.run()', eventIndex: timed.eventIndex, selfTime: 60, count: 2 },
+    ]);
+    expect(untimed.eventIndex).not.toBe(hotSpots[0]?.eventIndex);
+  });
+
   it('ignores events with no self time', () => {
     const log = createLog(1000);
     index(log, createEvent({ text: 'Wrapper', self: 0, total: 500 }));

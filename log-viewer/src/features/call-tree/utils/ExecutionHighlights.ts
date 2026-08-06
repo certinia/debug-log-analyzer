@@ -24,7 +24,7 @@ export interface HotSpotRow {
   eventIndex: number;
   /** Self time summed across every instance of the signature. */
   selfTime: number;
-  /** How many instances the signature has. */
+  /** How many instances the signature has, timed or not, so `selfTime / count` is the honest average. */
   count: number;
 }
 
@@ -145,7 +145,9 @@ function largestInstance(instances: LogEvent[]): LogEvent {
 
 /**
  * Aggregate self time by signature and count truncated regions in one flat
- * pass. Truncation flags every unclosed frame in a cut-off chain, so only
+ * pass. Every instance counts, including the untimed ones, so the count divides
+ * the self time honestly; signatures with no self time at all drop out at the
+ * end. Truncation flags every unclosed frame in a cut-off chain, so only
  * top-most flagged events count as regions; `eventsById` is in time order, so
  * the first one seen is the first in the log.
  */
@@ -162,21 +164,18 @@ function scanEvents(events: LogEvent[]): Pick<ExecutionHighlights, 'hotSpots' | 
       }
     }
     const self = event.duration.self;
-    if (self <= 0) {
-      continue;
-    }
     const key = getEventKey(event);
     const spot = spots.get(key);
     if (!spot) {
       spots.set(key, {
         text: event.text,
         eventIndex: event.eventIndex,
-        selfTime: self,
+        selfTime: Math.max(self, 0),
         count: 1,
         maxSelf: self,
       });
     } else {
-      spot.selfTime += self;
+      spot.selfTime += Math.max(self, 0);
       spot.count++;
       if (self > spot.maxSelf) {
         spot.maxSelf = self;
@@ -186,6 +185,7 @@ function scanEvents(events: LogEvent[]): Pick<ExecutionHighlights, 'hotSpots' | 
   }
 
   const hotSpots = [...spots.values()]
+    .filter((spot) => spot.selfTime > 0)
     .sort((a, b) => b.selfTime - a.selfTime)
     .slice(0, HOT_SPOT_COUNT)
     .map(({ text, eventIndex, selfTime, count }) => ({ text, eventIndex, selfTime, count }));
