@@ -72,18 +72,19 @@ export class HotPath extends LitElement {
     }
 
     // The terminus is the frame the path exists to name, so a long path keeps it
-    // and drops the middle instead.
+    // and drops the middle instead: the last row shown is always the terminus.
     const path = highlights.hotPath;
-    const terminus = path[path.length - 1]!;
-    const overflows = path.length > FRAME_CAP;
-    const head = overflows ? path.slice(0, FRAME_CAP - 1) : path;
-    const hidden = overflows ? path.length - FRAME_CAP : 0;
-    return html`
-      ${this._truncationCaveat(highlights)}
-      ${head.map((frame) => this._frameRow(frame, highlights.totalTime, frame === terminus))}
-      ${hidden > 0 ? html`<div class="more">+ ${hidden} more frames</div>` : ''}
-      ${overflows ? this._frameRow(terminus, highlights.totalTime, true) : ''}
-    `;
+    const shown =
+      path.length > FRAME_CAP ? [...path.slice(0, FRAME_CAP - 1), path[path.length - 1]!] : path;
+    const hidden = path.length - shown.length;
+    const rows = shown.map((frame, index) =>
+      this._frameRow(frame, highlights.totalTime, index === shown.length - 1),
+    );
+    if (hidden > 0) {
+      // The dropped frames are counted where they were: above the terminus.
+      rows.splice(rows.length - 1, 0, html`<div class="more">+ ${hidden} more frames</div>`);
+    }
+    return html`${this._truncationCaveat(highlights)}${rows}`;
   }
 
   /**

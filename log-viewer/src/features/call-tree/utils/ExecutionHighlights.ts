@@ -164,18 +164,19 @@ function scanEvents(events: LogEvent[]): Pick<ExecutionHighlights, 'hotSpots' | 
       }
     }
     const self = event.duration.self;
+    const timed = Math.max(self, 0);
     const key = getEventKey(event);
     const spot = spots.get(key);
     if (!spot) {
       spots.set(key, {
         text: event.text,
         eventIndex: event.eventIndex,
-        selfTime: Math.max(self, 0),
+        selfTime: timed,
         count: 1,
         maxSelf: self,
       });
     } else {
-      spot.selfTime += Math.max(self, 0);
+      spot.selfTime += timed;
       spot.count++;
       if (self > spot.maxSelf) {
         spot.maxSelf = self;
