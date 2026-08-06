@@ -7,28 +7,38 @@ import type { ApexLog, LogEvent } from 'apex-log-parser';
 import { computeExecutionHighlights, getExecutionHighlights } from '../ExecutionHighlights.js';
 
 let nextEventIndex = 0;
+let nextStamp = 0;
 
 /**
  * The slice of `LogEvent` the highlights pass reads: the tree links, the
- * timings, the identity fields behind `getEventKey`, and the truncation flag.
+ * timings, the stamps that tell a nested instance from a later one, the identity
+ * fields behind `getEventKey`, and the truncation flag. Stamps default to a
+ * fresh non-overlapping span, so an event nests only where a test says so.
  */
 function createEvent(
   options: {
     text?: string;
     type?: string;
+    category?: string;
     namespace?: string;
     self?: number;
     total?: number;
+    timestamp?: number;
+    exitStamp?: number;
     parent?: LogEvent;
     isTruncated?: boolean;
   } = {},
 ): LogEvent {
+  const timestamp = options.timestamp ?? nextStamp++;
   const event = {
     text: options.text ?? 'event',
     type: options.type ?? 'METHOD_ENTRY',
+    category: options.category ?? '',
     namespace: options.namespace ?? 'default',
     eventIndex: nextEventIndex++,
     duration: { self: options.self ?? 0, total: options.total ?? 0 },
+    timestamp,
+    exitStamp: options.exitStamp ?? timestamp,
     parent: options.parent ?? null,
     children: [],
     isTruncated: options.isTruncated ?? false,
@@ -68,7 +78,9 @@ describe('computeExecutionHighlights hot path', () => {
       text: 'Root',
       eventIndex: root.eventIndex,
       totalTime: 900,
+      selfTime: 0,
       count: 1,
+      category: '',
     });
   });
 
@@ -85,8 +97,22 @@ describe('computeExecutionHighlights hot path', () => {
     const { hotPath } = computeExecutionHighlights(log);
 
     expect(hotPath).toEqual([
-      { text: 'Root', eventIndex: root.eventIndex, totalTime: 1000, count: 1 },
-      { text: 'Repeat', eventIndex: worst.eventIndex, totalTime: 600, count: 2 },
+      {
+        text: 'Root',
+        eventIndex: root.eventIndex,
+        totalTime: 1000,
+        selfTime: 0,
+        count: 1,
+        category: '',
+      },
+      {
+        text: 'Repeat',
+        eventIndex: worst.eventIndex,
+        totalTime: 600,
+        selfTime: 0,
+        count: 2,
+        category: '',
+      },
     ]);
   });
 
@@ -116,6 +142,33 @@ describe('computeExecutionHighlights hot path', () => {
     expect(hotPath.map((f) => f.text)).toEqual(['Root']);
   });
 
+  it('carries the group self time and the worst instance category', () => {
+    const log = createLog(1000);
+    const root = createEvent({ text: 'Root', category: 'Code Unit', total: 1000, self: 100 });
+    log.children.push(root);
+    createEvent({ text: 'Repeat', category: 'Apex', total: 300, self: 200, parent: root });
+    createEvent({ text: 'Repeat', category: 'Apex', total: 500, self: 400, parent: root });
+
+    const { hotPath } = computeExecutionHighlights(log);
+
+    expect(hotPath[0]?.selfTime).toBe(100);
+    expect(hotPath[0]?.category).toBe('Code Unit');
+    expect(hotPath[1]?.selfTime).toBe(600);
+    expect(hotPath[1]?.category).toBe('Apex');
+  });
+
+  it('holds a frame self time inside its total', () => {
+    const log = createLog(1000);
+    // A negative self on one instance drags the group's sum below zero; the
+    // frame's own share of itself cannot sit outside its total.
+    const root = createEvent({ text: 'Root', total: 500, self: -100 });
+    log.children.push(root);
+
+    const { hotPath } = computeExecutionHighlights(log);
+
+    expect(hotPath[0]?.selfTime).toBe(0);
+  });
+
   it('is empty when the log has no timed calls', () => {
     const log = createLog(0);
     const root = createEvent({ text: 'Root', total: 0 });
@@ -140,9 +193,25 @@ describe('computeExecutionHighlights hot spots', () => {
 
     const { hotSpots } = computeExecutionHighlights(log);
 
+    // Nothing timed either signature's calls as a whole, so the total answers
+    // with the self time — never below it, or the meter would overflow its bar.
     expect(hotSpots).toEqual([
-      { text: 'MyClass.run()', eventIndex: worst.eventIndex, selfTime: 400, count: 2 },
-      { text: 'Other.go()', eventIndex: other.eventIndex, selfTime: 50, count: 1 },
+      {
+        text: 'MyClass.run()',
+        eventIndex: worst.eventIndex,
+        selfTime: 400,
+        totalTime: 400,
+        count: 2,
+        category: '',
+      },
+      {
+        text: 'Other.go()',
+        eventIndex: other.eventIndex,
+        selfTime: 50,
+        totalTime: 50,
+        count: 1,
+        category: '',
+      },
     ]);
   });
 
@@ -178,9 +247,76 @@ describe('computeExecutionHighlights hot spots', () => {
     const { hotSpots } = computeExecutionHighlights(log);
 
     expect(hotSpots).toEqual([
-      { text: 'MyClass.run()', eventIndex: timed.eventIndex, selfTime: 60, count: 2 },
+      {
+        text: 'MyClass.run()',
+        eventIndex: timed.eventIndex,
+        selfTime: 60,
+        totalTime: 60,
+        count: 2,
+        category: '',
+      },
     ]);
     expect(untimed.eventIndex).not.toBe(hotSpots[0]?.eventIndex);
+  });
+
+  it('sums total time and takes the category from the worst instance', () => {
+    const log = createLog(1000);
+    const cheap = createEvent({ text: 'MyClass.run()', category: 'Apex', self: 20, total: 100 });
+    const worst = createEvent({ text: 'MyClass.run()', category: 'SOQL', self: 80, total: 300 });
+    index(log, cheap, worst);
+
+    const { hotSpots } = computeExecutionHighlights(log);
+
+    expect(hotSpots[0]?.totalTime).toBe(400);
+    expect(hotSpots[0]?.category).toBe('SOQL');
+  });
+
+  it('counts recursion total time once, over the outermost instance', () => {
+    const log = createLog(1000);
+    const outer = createEvent({
+      text: 'Recurse.go()',
+      self: 40,
+      total: 300,
+      timestamp: 100,
+      exitStamp: 400,
+    });
+    const inner = createEvent({
+      text: 'Recurse.go()',
+      self: 60,
+      total: 260,
+      timestamp: 140,
+      exitStamp: 400,
+      parent: outer,
+    });
+    const later = createEvent({
+      text: 'Recurse.go()',
+      self: 20,
+      total: 100,
+      timestamp: 500,
+      exitStamp: 600,
+    });
+    index(log, outer, inner, later);
+
+    const { hotSpots } = computeExecutionHighlights(log);
+
+    // Self time counts every level; total counts the outer call and the later
+    // one, so the wall time is not charged twice.
+    expect(hotSpots[0]?.selfTime).toBe(120);
+    expect(hotSpots[0]?.totalTime).toBe(400);
+    expect(hotSpots[0]?.count).toBe(3);
+  });
+
+  it('lifts a total left below the self time by untimed outer calls', () => {
+    const log = createLog(1000);
+    // The outer calls were never timed; only the nested one was, so the summed
+    // self time (80) runs past the summed total (30).
+    const outer = createEvent({ text: 'Wrap.run()', self: 0, total: 30, timestamp: 0 });
+    const nested = createEvent({ text: 'Wrap.run()', self: 80, total: 0, parent: outer });
+    index(log, outer, nested);
+
+    const { hotSpots } = computeExecutionHighlights(log);
+
+    expect(hotSpots[0]?.totalTime).toBe(80);
   });
 
   it('ignores events with no self time', () => {

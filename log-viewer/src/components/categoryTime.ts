@@ -2,14 +2,36 @@
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
  */
 import type { ApexLog } from 'apex-log-parser';
+import {
+  html,
+  type ReactiveController,
+  type ReactiveControllerHost,
+  type TemplateResult,
+} from 'lit';
 
-import type { LanaSettings } from '../features/settings/Settings.js';
+import { subscribeSettings, type LanaSettings } from '../features/settings/Settings.js';
 import { LEGACY_CATEGORY_MAP } from '../features/timeline/services/Timeline.js';
 import { addCustomThemes, getTheme } from '../features/timeline/themes/ThemeSelector.js';
 import { CATEGORY_THEME_KEY, DEFAULT_THEME_NAME } from '../features/timeline/themes/Themes.js';
 
 /** The bucket for events the parser leaves uncategorised. */
 export const OTHER_CATEGORY = 'Other';
+
+/** The category's name to show, naming the bucket an empty one falls in. */
+export function categoryName(category: string): string {
+  return category || OTHER_CATEGORY;
+}
+
+/**
+ * The category as a reveal row shows it: the colour chip `--row-hue` paints,
+ * plus the same name in text a screen reader can hear, because the hue alone
+ * carries no meaning. For a host that adopts `revealRowStyles`.
+ */
+export function categorySwatch(category: string): TemplateResult {
+  const name = categoryName(category);
+  return html`<span class="reveal-row__swatch" title=${name} aria-hidden="true"></span>
+    <span class="reveal-row__sr">${name}</span>`;
+}
 
 /** Neutral literal for {@link OTHER_CATEGORY} — no theme names it, and the
  *  palette is data, so it does not follow the host theme. */
@@ -41,7 +63,7 @@ export function categorySelfTimes(root: ApexLog): CategoryTime[] {
   while (stack.length) {
     const event = stack.pop()!; // non-empty: the loop condition just checked
 
-    const category = event.category || OTHER_CATEGORY;
+    const category = categoryName(event.category);
     totals.set(category, (totals.get(category) ?? 0) + event.duration.self);
     for (const child of event.children) {
       stack.push(child);
@@ -79,4 +101,37 @@ export function categoryPalette(
     const key = CATEGORY_THEME_KEY[category];
     return key ? colors[key] : OTHER_COLOR;
   };
+}
+
+/**
+ * {@link categoryPalette} for a component, kept live: the host re-renders
+ * whenever the timeline theme or the legacy colours change, so its swatches and
+ * meters follow the flame chart without a reload.
+ */
+export class CategoryPaletteController implements ReactiveController {
+  private _color = categoryPalette(null);
+  private _unsubscribe: (() => void) | null = null;
+  private readonly _host: ReactiveControllerHost;
+
+  constructor(host: ReactiveControllerHost) {
+    this._host = host;
+    host.addController(this);
+  }
+
+  hostConnected(): void {
+    this._unsubscribe = subscribeSettings((settings) => {
+      this._color = categoryPalette(settings.timeline);
+      this._host.requestUpdate();
+    });
+  }
+
+  hostDisconnected(): void {
+    this._unsubscribe?.();
+    this._unsubscribe = null;
+  }
+
+  /** The category's colour; uncategorised events read as {@link OTHER_CATEGORY}. */
+  colorFor(category: string): string {
+    return this._color(category);
+  }
 }
