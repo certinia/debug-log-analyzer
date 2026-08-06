@@ -9,10 +9,9 @@ import { styleMap } from 'lit/directives/style-map.js';
 import { LogLoadedController } from '../core/events/LogLoadedController.js';
 import { formatDuration } from '../core/utility/Util.js';
 import { DatabaseAccess } from '../features/database/services/Database.js';
-import { subscribeSettings } from '../features/settings/Settings.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
-import { categoryPalette, categorySelfTimes } from './categoryTime.js';
+import { CategoryPaletteController, categorySelfTimes } from './categoryTime.js';
 
 /**
  * The whole log's self time split by category, as one stacked bar in the flame
@@ -27,27 +26,10 @@ export class CategoryTimeBar extends LitElement {
   @state()
   private _hover: { category: string; onSlice: boolean } | null = null;
 
-  private _color: (category: string) => string = categoryPalette(null);
-  private _offSettings: (() => void) | null = null;
+  private readonly _palette = new CategoryPaletteController(this);
 
   /** The bar has to follow the log itself. */
   private readonly _logLoaded = new LogLoadedController(this);
-
-  override connectedCallback() {
-    super.connectedCallback();
-    // The palette follows the timeline's theme settings live, so a theme change
-    // recolours the bar the way it recolours the flame chart.
-    this._offSettings = subscribeSettings((settings) => {
-      this._color = categoryPalette(settings.timeline);
-      this.requestUpdate();
-    });
-  }
-
-  override disconnectedCallback() {
-    this._offSettings?.();
-    this._offSettings = null;
-    super.disconnectedCallback();
-  }
 
   static styles = [
     globalStyles,
@@ -165,7 +147,7 @@ export class CategoryTimeBar extends LitElement {
                   : 'bar__slice'
               }
               x=${slice.start.toFixed(3)} y="0" width=${slice.width.toFixed(3)} height="4"
-              fill=${this._color(slice.category)}
+              fill=${this._palette.colorFor(slice.category)}
               @pointerenter=${() => (this._hover = { category: slice.category, onSlice: true })}
               @pointerleave=${() => (this._hover = null)}
             ></rect>`,
@@ -199,7 +181,7 @@ export class CategoryTimeBar extends LitElement {
             >
               <span
                 class="legend__swatch"
-                style=${styleMap({ background: this._color(slice.category) })}
+                style=${styleMap({ background: this._palette.colorFor(slice.category) })}
               ></span>
               <span>${slice.category}</span>
               <span class="legend__value"> ${this._readout(slice.selfTime, total)} </span>

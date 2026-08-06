@@ -15,6 +15,8 @@ export interface PaneSection {
   content: TemplateResult;
   /** Optional count/label shown as a badge in the section header. */
   badge?: string;
+  /** Optional codicon name shown before the title, naming what the section answers. */
+  icon?: string;
   /** Default flex-grow weight when open, seeded on first render (default 1). */
   weight?: number;
   /**
@@ -279,6 +281,7 @@ export class PaneView extends LitElement {
             ? html`<vscode-icon name=${open ? 'chevron-down' : 'chevron-right'}></vscode-icon>`
             : nothing
         }
+        ${section.icon ? html`<vscode-icon name=${section.icon}></vscode-icon>` : nothing}
         <span class="pane-header__title">${section.title}</span>
         ${section.badge ? html`<vscode-badge>${section.badge}</vscode-badge>` : nothing}
       </div>

@@ -3,6 +3,7 @@
  */
 import { LitElement, css, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
+import { styleMap } from 'lit/directives/style-map.js';
 
 import '#vscode-elements/vscode-icon.js';
 import { LogLoadedController } from '../core/events/LogLoadedController.js';
@@ -15,6 +16,7 @@ import {
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { revealRowStyles } from '../styles/revealRow.styles.js';
+import { CategoryPaletteController, categorySwatch } from './categoryTime.js';
 import { dispatchInspectorReveal } from './inspectorReveal.js';
 
 /** Frames shown, the terminus among them; the tail between them collapses into a "more" line. */
@@ -31,6 +33,7 @@ const FRAME_CAP = 10;
 export class HotPath extends LitElement {
   /** The path has to follow the log itself. */
   private readonly _logLoaded = new LogLoadedController(this);
+  private readonly _palette = new CategoryPaletteController(this);
 
   static styles = [
     globalStyles,
@@ -88,19 +91,26 @@ export class HotPath extends LitElement {
   }
 
   /**
-   * One frame: name and figures on the first line, its share of the log as a
-   * meter beneath — the staircase of shrinking meters is what shows the
-   * descent. The path's terminus is the hot spot, so it alone gets emphasis.
+   * One frame: a swatch, name and figures, its share of the log as a meter
+   * beneath — the staircase of shrinking meters shows the descent, and the
+   * meter's solid head is the frame's own self time. The path's terminus is the
+   * hot spot, so it alone gets emphasis.
    */
   private _frameRow(frame: HotPathFrame, logTotal: number, isTerminus: boolean) {
     const share = logTotal > 0 ? (frame.totalTime / logTotal) * 100 : 0;
+    const selfShare = frame.totalTime > 0 ? (frame.selfTime / frame.totalTime) * 100 : 0;
     return html`
       <button
         class="bleed-row reveal-row ${isTerminus ? 'reveal-row--focus' : ''}"
         type="button"
         title="Show this call in the tree"
+        style=${styleMap({
+          '--row-hue': this._palette.colorFor(frame.category),
+          '--self-pct': `${selfShare}%`,
+        })}
         @click=${() => dispatchInspectorReveal(this, frame.eventIndex)}
       >
+        ${categorySwatch(frame.category)}
         <span class="reveal-row__name" title=${frame.text}>${frame.text}</span>
         <span class="reveal-row__value"
           >${frame.count > 1 ? `${frame.count}× · ` : ''}${formatDuration(frame.totalTime)} ·

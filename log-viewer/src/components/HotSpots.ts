@@ -3,6 +3,7 @@
  */
 import { LitElement, html } from 'lit';
 import { customElement } from 'lit/decorators.js';
+import { styleMap } from 'lit/directives/style-map.js';
 
 import { LogLoadedController } from '../core/events/LogLoadedController.js';
 import { formatDuration } from '../core/utility/Util.js';
@@ -13,6 +14,7 @@ import {
 import { globalStyles } from '../styles/global.styles.js';
 import { inspectorSectionStyles } from '../styles/inspectorSection.styles.js';
 import { revealRowStyles } from '../styles/revealRow.styles.js';
+import { CategoryPaletteController, categorySwatch } from './categoryTime.js';
 import { dispatchInspectorReveal } from './inspectorReveal.js';
 
 /**
@@ -25,6 +27,7 @@ import { dispatchInspectorReveal } from './inspectorReveal.js';
 export class HotSpots extends LitElement {
   /** The list has to follow the log itself. */
   private readonly _logLoaded = new LogLoadedController(this);
+  private readonly _palette = new CategoryPaletteController(this);
 
   static styles = [globalStyles, inspectorSectionStyles, revealRowStyles];
 
@@ -38,27 +41,38 @@ export class HotSpots extends LitElement {
   }
 
   /**
-   * One signature: name and self time on the first line, the call count and
-   * share of the log beneath, and the share again as a meter. One denominator —
-   * the log — across every row, so the meters compare across sections too.
+   * One signature: a swatch, the name and its self time, then the churn read
+   * beneath — calls, self time each, share of the log. The meter runs to the
+   * total share and its solid head is the self share the sub line names; one
+   * denominator, the log, across every row.
    */
   private _spotRow(spot: HotSpotRow, logTotal: number) {
     const share = logTotal > 0 ? (spot.selfTime / logTotal) * 100 : 0;
-    const count = spot.count > 1 ? `${spot.count}× · ` : '';
+    const meterShare = logTotal > 0 ? (spot.totalTime / logTotal) * 100 : 0;
+    const selfPct = spot.totalTime > 0 ? (spot.selfTime / spot.totalTime) * 100 : 0;
+    const churn =
+      spot.count > 1
+        ? `${spot.count}× · ${formatDuration(spot.selfTime / spot.count)} self avg · `
+        : '';
     return html`
       <button
         class="bleed-row reveal-row"
         type="button"
         title="Show the most expensive call in the tree"
+        style=${styleMap({
+          '--row-hue': this._palette.colorFor(spot.category),
+          '--self-pct': `${selfPct}%`,
+        })}
         @click=${() => dispatchInspectorReveal(this, spot.eventIndex)}
       >
+        ${categorySwatch(spot.category)}
         <span class="reveal-row__name" title=${spot.text}>${spot.text}</span>
         <span class="reveal-row__value reveal-row__value--primary"
           >${formatDuration(spot.selfTime)}</span
         >
-        <span class="reveal-row__sub">${count}${share.toFixed(1)}% of log</span>
+        <span class="reveal-row__sub">${churn}${share.toFixed(1)}% of log</span>
         <span class="reveal-row__meter"
-          ><span class="reveal-row__meter-fill" style="width: ${share}%"></span
+          ><span class="reveal-row__meter-fill" style="width: ${meterShare}%"></span
         ></span>
       </button>
     `;

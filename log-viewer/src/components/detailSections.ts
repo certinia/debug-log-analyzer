@@ -46,6 +46,7 @@ export async function buildDetailSections(
       {
         id: 'overview',
         title: 'Log overview',
+        icon: 'pie-chart',
         fit: 'content',
         content: html`<log-overview></log-overview>`,
       },
@@ -55,12 +56,14 @@ export async function buildDetailSections(
         {
           id: 'hot-path',
           title: 'Hot path',
+          icon: 'flame',
           fit: 'content',
           content: html`<hot-path></hot-path>`,
         },
         {
           id: 'hot-spots',
           title: 'Hot spots',
+          icon: 'dashboard',
           fit: 'content',
           content: html`<hot-spots></hot-spots>`,
         },
@@ -70,6 +73,7 @@ export async function buildDetailSections(
       sections.push({
         id: 'findings',
         title: 'Findings',
+        icon: 'checklist',
         content: html`<log-diagnostics></log-diagnostics>`,
       });
     }
@@ -80,12 +84,14 @@ export async function buildDetailSections(
         {
           id: 'category-time',
           title: 'Time by category',
+          icon: 'pie-chart',
           fit: 'content',
           content: html`<category-time-bar></category-time-bar>`,
         },
         {
           id: 'governor-trends',
           title: 'Governor usage over time',
+          icon: 'graph',
           fit: 'content',
           content: html`<governor-trends></governor-trends>`,
         },
