@@ -49,7 +49,12 @@ jest.mock('../../features/database/services/Database.js', () => ({
   },
 }));
 
-import { buildScopedCallTree, type ScopedBuildOptions, type ScopedRow } from '../scopedCallTree.js';
+import {
+  buildScopedCallTree,
+  buildWholeLogCallTree,
+  type ScopedBuildOptions,
+  type ScopedRow,
+} from '../scopedCallTree.js';
 
 /** These fixtures are small enough to never hit a slice deadline, so `yieldFrame`
  *  is only there to satisfy the contract. */
@@ -268,5 +273,47 @@ describe('buildScopedCallTree', () => {
     expect(rows[0]!.text).toBe('big');
     // Every child is present — expansion is the renderer's job, not a build-time cap.
     expect(rows[0]!._children!.length).toBe(5);
+  });
+});
+
+describe('buildWholeLogCallTree', () => {
+  it('roots the tree at the log with real durations — nothing scoped or attributed', async () => {
+    const tree = (await buildWholeLogCallTree(options))!;
+    // The whole log is both the scope and the bar denominator.
+    expect(tree.rootTotal).toBe(500);
+    expect(tree.logTotal).toBe(500);
+
+    const chain: ScopedRow[] = [];
+    let node: ScopedRow | undefined = (await tree.timeOrder(options))![0];
+    while (node) {
+      chain.push(node);
+      node = node._children?.[0];
+    }
+    expect(chain.map((r) => r.text)).toEqual(['exec', 'm1', 'm2', 'SELECT Id FROM Account']);
+    // Real durations throughout — the scoped builder would have rewritten these.
+    expect(chain[0]?.duration).toEqual({ total: 500, self: 0 });
+    expect(chain[3]?.duration).toEqual({ total: 200, self: 200 });
+  });
+
+  it('builds each view only on first read, then caches it', async () => {
+    const tree = (await buildWholeLogCallTree(options))!;
+    expect(await tree.timeOrder(options)).toBe(await tree.timeOrder(options));
+    expect(await tree.aggregated(options)).toBe(await tree.aggregated(options));
+    expect(await tree.bottomUp(options)).toBe(await tree.bottomUp(options));
+  });
+
+  it('abandons a cancelled build instead of finishing it', async () => {
+    const clock = jest.spyOn(performance, 'now');
+    let time = 0;
+    clock.mockImplementation(() => (time += 100));
+    try {
+      const tree = await buildWholeLogCallTree({
+        yieldFrame: () => Promise.resolve(),
+        cancelled: () => true,
+      });
+      expect(tree).toBeNull();
+    } finally {
+      clock.mockRestore();
+    }
   });
 });

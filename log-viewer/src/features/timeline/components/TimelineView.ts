@@ -2,19 +2,21 @@
  * Copyright (c) 2023 Certinia Inc. All rights reserved.
  */
 import '#vscode-elements/vscode-toolbar-button.js';
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, type PropertyValues } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
-import type { ApexLog } from 'apex-log-parser';
+import type { ApexLog, LogCategory } from 'apex-log-parser';
 import { VSCodeExtensionMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { subscribeSettings, type LanaSettings } from '../../settings/Settings.js';
-import { type TimelineGroup, keyMap, setColors } from '../services/Timeline.js';
+import { keyMap, setColors } from '../services/Timeline.js';
 
 import { DEFAULT_THEME_NAME, sameColors, type TimelineColors } from '../themes/Themes.js';
 import { addCustomThemes, getTheme } from '../themes/ThemeSelector.js';
 
+import { categorySelfTimes, toTimelineKeys } from '../utils/category-self-time.js';
 import type { TimeDisplayMode } from '../types/flamechart.types.js';
 import type { TimelineFlameChart } from './TimelineFlameChart.js';
+import type { TimelineKeyEntry } from './TimelineKey.js';
 
 // styles
 import { globalStyles } from '../../../styles/global.styles.js';
@@ -53,7 +55,10 @@ export class TimelineView extends LitElement {
   activeTheme: string | null = null;
 
   @state()
-  private timelineKeys: TimelineGroup[] = [];
+  private timelineKeys: TimelineKeyEntry[] = [];
+
+  /** Per-category self time for the loaded log; drives the legend durations. */
+  private selfTimes?: Map<LogCategory, number>;
 
   @state()
   private useLegacyTimeline: boolean | null = null;
@@ -138,31 +143,38 @@ export class TimelineView extends LitElement {
         width: 100%;
         height: 100%;
         /* inset previously provided by the tab panel's padding */
-        padding: 10px 6px;
+        padding: var(--lana-space-md) var(--lana-space-xs);
         box-sizing: border-box;
       }
 
       .timeline-toolbar {
         display: flex;
         align-items: center;
-        justify-content: flex-end;
-        gap: 4px;
+        justify-content: space-between;
+        gap: var(--lana-space-sm);
+        min-width: 0;
+        flex: 0 0 auto;
+        margin-bottom: var(--lana-space-sm);
+      }
+
+      .timeline-toolbar timeline-key {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+
+      .timeline-toolbar vscode-toolbar-button {
         flex: 0 0 auto;
       }
 
       /* The chart takes every row the container gives it, and the renderer scrolls
-         when the call depth needs more; the key and the toolbar keep their own
-         height. The zero min-height lets the chart shrink below its content, which
-         a flex item does not do by default. */
+         when the call depth needs more; the toolbar keeps its own height. The zero
+         min-height lets the chart shrink below its content, which a flex item does
+         not do by default. */
       timeline-flame-chart,
       timeline-legacy,
       timeline-skeleton {
         flex: 1 1 0;
         min-height: 0;
-      }
-
-      timeline-key {
-        flex: 0 0 auto;
       }
     `,
   ];
@@ -206,6 +218,10 @@ export class TimelineView extends LitElement {
         this.appliedCustomThemes = customThemes;
         addCustomThemes(customThemes);
         this.setTheme(themeName);
+      } else {
+        // A legacy → modern toggle re-enters here with the theme unchanged, so the
+        // legend may still hold the legacy keyMap entries.
+        this.rebuildTimelineKeys();
       }
     } else {
       setColors(timeline.colors);
@@ -226,41 +242,53 @@ export class TimelineView extends LitElement {
     });
   }
 
+  protected willUpdate(changed: PropertyValues): void {
+    if (changed.has('timelineRoot')) {
+      this.selfTimes = this.timelineRoot ? categorySelfTimes(this.timelineRoot) : undefined;
+      this.rebuildTimelineKeys();
+    }
+  }
+
   render() {
     if (!this.timelineRoot || this.useLegacyTimeline === null) {
-      return html`<timeline-skeleton></timeline-skeleton>
-        <timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>`;
+      return html`<timeline-skeleton></timeline-skeleton>`;
     }
 
-    if (!this.useLegacyTimeline) {
-      const hasWallClock = this.timelineRoot?.startTime !== null;
-      const isWallClock = this.timeDisplayMode === 'wallClock';
+    const toolbar = html`<div class="timeline-toolbar">
+      <timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>
+      ${this.renderTimeDisplayToggle()}
+    </div>`;
 
-      return html`${
-          hasWallClock
-            ? html`<div class="timeline-toolbar">
-                <vscode-toolbar-button
-                  icon="${isWallClock ? 'history' : 'clockface'}"
-                  label="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
-                  title="${isWallClock ? 'Show elapsed time' : 'Show wall-clock time'}"
-                  @click=${() => this.toggleTimeDisplay()}
-                ></vscode-toolbar-button>
-              </div>`
-            : ''
-        }
-        <timeline-flame-chart
+    if (this.useLegacyTimeline) {
+      return html`${toolbar}
+        <timeline-legacy
           .apexLog=${this.timelineRoot}
           .themeName=${this.activeTheme}
-          .navigateToEventIndex=${this.navigateToEventIndex}
-          .navigateToTimestamp=${this.navigateToTimestamp}
-        ></timeline-flame-chart>
-        <timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>`;
+        ></timeline-legacy>`;
     }
-    return html`<timeline-legacy
+    return html`${toolbar}
+      <timeline-flame-chart
         .apexLog=${this.timelineRoot}
         .themeName=${this.activeTheme}
-      ></timeline-legacy
-      ><timeline-key .timelineKeys="${this.timelineKeys}"></timeline-key>`;
+        .navigateToEventIndex=${this.navigateToEventIndex}
+        .navigateToTimestamp=${this.navigateToTimestamp}
+      ></timeline-flame-chart>`;
+  }
+
+  /** The elapsed/wall-clock switch. Legacy has no such mode, nor do logs without a start time. */
+  private renderTimeDisplayToggle() {
+    if (this.useLegacyTimeline || this.timelineRoot?.startTime === null) {
+      return '';
+    }
+
+    const isWallClock = this.timeDisplayMode === 'wallClock';
+    const label = isWallClock ? 'Show elapsed time' : 'Show wall-clock time';
+    return html`<vscode-toolbar-button
+      icon="${isWallClock ? 'history' : 'clockface'}"
+      label="${label}"
+      title="${label}"
+      @click=${() => this.toggleTimeDisplay()}
+    ></vscode-toolbar-button>`;
   }
 
   private toggleTimeDisplay(): void {
@@ -270,7 +298,18 @@ export class TimelineView extends LitElement {
 
   private setTheme(themeName: string) {
     this.activeTheme = themeName ?? DEFAULT_THEME_NAME;
-    this.timelineKeys = this.toTimelineKeys(getTheme(themeName));
+    this.rebuildTimelineKeys();
+  }
+
+  /** Rebuilds the legend from the active palette + the log's per-category self times. */
+  private rebuildTimelineKeys(): void {
+    if (this.useLegacyTimeline) {
+      return; // legacy keys come from keyMap in applyTimelineSettings
+    }
+    this.timelineKeys = toTimelineKeys(
+      getTheme(this.activeTheme ?? DEFAULT_THEME_NAME),
+      this.selfTimes,
+    );
   }
 
   private toTheme(themeSettings: ThemeSettings): { [key: string]: TimelineColors } {
@@ -288,43 +327,5 @@ export class TimelineView extends LitElement {
       };
     }
     return themes;
-  }
-
-  private toTimelineKeys(colors: TimelineColors): TimelineGroup[] {
-    return [
-      {
-        label: 'Apex',
-        fillColor: colors.apex,
-      },
-      {
-        label: 'Code Unit',
-        fillColor: colors.codeUnit,
-      },
-      {
-        label: 'System',
-        fillColor: colors.system,
-      },
-      {
-        label: 'Automation',
-        fillColor: colors.automation,
-      },
-      {
-        label: 'DML',
-        fillColor: colors.dml,
-      },
-      {
-        label: 'SOQL',
-        fillColor: colors.soql,
-      },
-      {
-        label: 'Callout',
-        fillColor: colors.callout,
-      },
-      //NOTE: add back once the parser is updated to include validation events
-      // {
-      //   label: 'Validation',
-      //   fillColor: colors.validation,
-      // },
-    ];
   }
 }

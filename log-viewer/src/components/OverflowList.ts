@@ -15,8 +15,6 @@ import { computeVisibleCount } from './overflowFit.js';
 
 /** Space reserved for the overflow toggle once the row can't fit every item (px). */
 const OVERFLOW_RESERVE = 56;
-/** Gap between items, in px — the source of truth for both the `.items` CSS gap and the fit math. */
-const ITEMS_GAP = 6;
 /** Shared by the toggle's `popovertarget`/`aria-controls` and the panel's `id` — must match. */
 const PANEL_ID = 'overflow-list-panel';
 
@@ -53,6 +51,10 @@ export class OverflowList extends LitElement {
   @property({ attribute: 'icon' })
   icon = 'chevron-down';
 
+  /** Gap between inline items (px) — drives both the row layout and the fit math. */
+  @property({ type: Number })
+  gap = 6;
+
   /** How many items fit inline; the rest are moved into the popover menu. */
   @state()
   private visibleCount = Number.POSITIVE_INFINITY;
@@ -85,7 +87,6 @@ export class OverflowList extends LitElement {
         display: flex;
         flex-wrap: nowrap;
         align-items: center;
-        gap: ${ITEMS_GAP}px;
         min-width: 0;
         overflow: hidden;
         flex: 1 1 auto;
@@ -279,7 +280,7 @@ export class OverflowList extends LitElement {
     }
     if (!this.itemWidths) {
       this._measure();
-    } else if (changed.has('collapseFrom') || changed.has('minVisible')) {
+    } else if (changed.has('collapseFrom') || changed.has('minVisible') || changed.has('gap')) {
       this._recompute(this.lastWidth);
     }
   }
@@ -315,7 +316,7 @@ export class OverflowList extends LitElement {
     }
     // Fit the visible run from the appropriate end (reverse for start-collapse).
     const ordered = this.collapseFrom === 'start' ? [...widths].reverse() : widths;
-    const fit = computeVisibleCount(ordered, avail, ITEMS_GAP, OVERFLOW_RESERVE);
+    const fit = computeVisibleCount(ordered, avail, this.gap, OVERFLOW_RESERVE);
     this.visibleCount = Math.max(fit, Math.min(this.minVisible, widths.length));
     this._applyOverflow();
   }
@@ -363,7 +364,7 @@ export class OverflowList extends LitElement {
     return html`<div class="container ${this.collapseFrom}">
       <div class="bar">
         ${fromStart ? toggle : ''}
-        <div class="items"><slot></slot></div>
+        <div class="items" style="gap: ${this.gap}px"><slot></slot></div>
         ${fromStart ? '' : toggle}
       </div>
       ${

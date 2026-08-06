@@ -90,6 +90,7 @@ The bar above the tabs summarizes the log at a glance:
 
 - **Log problems** – A chip for problems found in the log itself (governor limit exceptions, fatal errors, skipped lines), with a count badge; click it for the full breakdown.
 - **Notifications** – A separate bell for messages about the tool rather than the log, kept apart from log problems so the two don't read as one severity count.
+- **Log info** – Entry point, user, and start time; hover for full details.
 - **Debug levels** – Chips showing the debug levels the log was captured with, one per category. Read-only display, not a filter.
 - **`•••` menu** – Help, report an issue, and whatever the header sheds as the window narrows.
 
@@ -134,6 +135,7 @@ Select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SO
 - **Call stack** – The frames that led to the selection, with total and self time.
 - **Call tree** – The selection's own subtree, in Time Order, Aggregated or Bottom-Up. Scoped to what you picked, which is what makes it different from the Call Tree tab.
 - **SOQL issues** – Optimization tips for the selected query.
+- **Nothing selected?** – It shows the whole log: the governor metrics closest to their limits; on the Timeline tab, time by category, governor usage over time and the full call tree; and on the Analysis tab a **Findings** list — what is slow or wrong in the log, each finding linking to the row behind it.
 - **Dock it where you want** – Left, right or bottom; drag to resize, collapse the sections you don't need. Your layout is remembered.
 - **Right-click a row** for **Show in Call Tree**, **Copy Name**, **Copy Details** or **Copy Call Stack**; `Cmd/Ctrl+C` copies the table.
 

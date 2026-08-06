@@ -18,6 +18,7 @@ import {
 import { DatabaseAccess } from '../database/services/Database.js';
 import type { LogIssue } from '../notifications/types.js';
 import { installEscapeDeselect } from './escapeDeselect.js';
+import { deriveLogIdentity, type LogIdentityData } from './logIdentity.js';
 import { toLogIssue } from './logIssues.js';
 import { parserIssuesToNotifications } from './parserNotifications.js';
 
@@ -52,6 +53,9 @@ export class LogViewer extends LitElement {
   /** Notifications about the tool — today, parser diagnostics. */
   @property({ attribute: false })
   notifications: readonly LogIssue[] = [];
+  /** Transaction identity for the header. `null` until the first log is parsed. */
+  @property({ attribute: false })
+  logIdentity: LogIdentityData | null = null;
   @property()
   timelineRoot: ApexLog | null = null;
 
@@ -152,6 +156,7 @@ export class LogViewer extends LitElement {
         .logDuration=${this.logDuration}
         .logProblems=${this.logProblems}
         .notifications=${this.notifications}
+        .logIdentity=${this.logIdentity}
         .timelineRoot=${this.timelineRoot}
       ></app-header>
 
@@ -242,7 +247,15 @@ export class LogViewer extends LitElement {
       this.logProblems = [read.error];
     }
 
-    const apexLog = parse(logData);
+    let apexLog: ApexLog;
+    try {
+      apexLog = parse(logData);
+    } catch (err) {
+      // Resolve the identity even when parsing throws, or the header's identity
+      // skeletons would pulse forever with nothing left to fill them.
+      this.logIdentity = { entryPoint: null, user: null, startTime: null };
+      throw err;
+    }
 
     // The event-lookup service backs the inspector on every tab, so it is
     // created with the parsed log rather than by whichever tab loads first.
@@ -254,6 +267,9 @@ export class LogViewer extends LitElement {
     this.logSize = apexLog.size;
     this.timelineRoot = apexLog;
     this.logDuration = apexLog.duration.total;
+    // Raw text is needed for the user: USER_INFO precedes EXECUTION_STARTED, so the
+    // parser never sees it. See deriveLogIdentity.
+    this.logIdentity = deriveLogIdentity(apexLog, logData);
 
     // Rebuilt per load, never appended to: both surfaces describe *this* log, so a
     // previous log's problems must not carry over.
