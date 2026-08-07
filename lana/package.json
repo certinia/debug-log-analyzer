@@ -1,6 +1,6 @@
 {
   "name": "lana",
-  "displayName": "Apex Log Analyzer",
+  "displayName": "Salesforce Apex Log Analyzer",
   "version": "1.20.1",
   "description": "Salesforce Apex Debug Log Analyzer: Blazing-fast VS Code extension for Salesforce. Visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep transaction insights and optimize slow Apex.",
   "keywords": [
@@ -31,20 +31,16 @@
   ],
   "main": "dist/Main.js",
   "browser": "dist/web/Main.web.js",
-  "icon": "./certinia-icon-color.png",
+  "icon": "./salesforce-icon.png",
   "galleryBanner": {
     "color": "#000000",
     "theme": "dark"
   },
-  "publisher": "FinancialForce",
-  "author": {
-    "name": "Certinia",
-    "url": "https://github.com/certinia"
-  },
+  "publisher": "salesforce",
   "license": "SEE LICENSE IN LICENSE.txt",
   "repository": {
     "type": "git",
-    "url": "https://github.com/certinia/debug-log-analyzer.git"
+    "url": "https://github.com/forcedotcom/debug-log-analyzer.git"
   },
   "engines": {
     "vscode": "^1.102.0"
@@ -71,17 +67,17 @@
       {
         "command": "lana.retrieveLogFile",
         "title": "Log: Retrieve Apex Log And Show Analysis",
-        "icon": "./certinia-icon-color.png"
+        "icon": "./salesforce-icon.png"
       },
       {
         "command": "lana.showLogAnalysis",
         "title": "Log: Show Apex Log Analysis",
-        "icon": "./certinia-icon-color.png"
+        "icon": "./salesforce-icon.png"
       },
       {
         "command": "lana.switchTimelineTheme",
         "title": "Log: Timeline Theme",
-        "icon": "./certinia-icon-color.png"
+        "icon": "./salesforce-icon.png"
       }
     ],
     "grammars": [

@@ -78,7 +78,7 @@ export default defineConfig([
         hook: 'closeBundle',
         targets: [
           {
-            src: ['log-viewer/out/*', 'log-viewer/index.html', 'lana/certinia-icon-color.png'],
+            src: ['log-viewer/out/*', 'log-viewer/index.html', 'lana/salesforce-icon.png'],
             dest: 'lana/dist',
           },
           {

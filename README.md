@@ -1,5 +1,10 @@
 # 🚀 Apex Log Analyzer – Visualize Salesforce Debug Logs in VS Code
 
+[![Version](https://img.shields.io/visual-studio-marketplace/v/salesforce.lana)](https://marketplace.visualstudio.com/items?itemName=salesforce.lana)
+[![Download](https://img.shields.io/visual-studio-marketplace/d/salesforce.lana)](https://marketplace.visualstudio.com/items?itemName=salesforce.lana)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/salesforce.lana)](https://marketplace.visualstudio.com/items?itemName=salesforce.lana)
+[![Ratings](https://img.shields.io/visual-studio-marketplace/r/salesforce.lana)](https://marketplace.visualstudio.com/items?itemName=salesforce.lana)
+
 **Analyze Salesforce Apex Debug logs with blazing speed.**  
 Apex Log Analyzer is a blazing-fast VS Code extension for Salesforce developers. Instantly visualize and debug Apex logs with interactive flame charts, dynamic call trees, and detailed SOQL/DML breakdowns. Identify performance bottlenecks, gain deep insight into complex transactions and optimize slow Apex methods faster than ever.
 
@@ -46,12 +51,12 @@ You can install Apex Log Analyzer directly from Visual Studio Code, the command 
 
 #### 🌐 Option 2: Install from Marketplace
 
-[➡️ Install Apex Log Analyzer on Visual Studio Code Marketplace](https://marketplace.visualstudio.com/items?itemName=financialforce.lana)
+[➡️ Install Salesforce Apex Log Analyzer on Visual Studio Code Marketplace](https://marketplace.visualstudio.com/items?itemName=salesforce.lana)
 
 #### >\_ Option 3: Install via Command Line
 
 ```bash
-code install financialforce.lana
+code install salesforce.lana
 ```
 
 #### ✨ Try the Pre-Release Version
