@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Certinia Inc. All rights reserved.
  */
-import { workspace } from 'vscode';
+import { Uri, workspace } from 'vscode';
 import type { Context } from '../../Context';
 import { getMethodLine, parseApex } from '../../salesforce/ApexParser/ApexSymbolLocator';
 import { OpenFileInPackage } from '../OpenFileInPackage';
@@ -79,9 +79,10 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
 
   it('opens the file at the resolved line and character on an exact match', async () => {
     const { context, workspaceManager, display } = createContext();
+    const uri = Uri.parse('vscode-vfs://github/workspace/force-app/MyClass.cls');
     workspaceManager.findSymbol.mockResolvedValue({
       status: 'found',
-      uri: { fsPath: '/ws/force-app/MyClass.cls', path: '/ws/force-app/MyClass.cls' },
+      uri,
     });
     mockGetMethodLine.mockReturnValue({ line: 12, character: 4, isExactMatch: true });
 
@@ -93,8 +94,11 @@ describe('OpenFileInPackage.openFileForSymbol', () => {
     );
     expect(display.showErrorMessage).not.toHaveBeenCalled();
     expect(display.showFile).toHaveBeenCalledTimes(1);
-    const [path, options] = display.showFile.mock.calls[0];
-    expect(path).toBe('/ws/force-app/MyClass.cls');
+    const [openedUri, options] = display.showFile.mock.calls[0];
+    expect(openedUri).toBe(uri);
+    expect(openedUri).toEqual(
+      expect.objectContaining({ scheme: 'vscode-vfs', authority: 'github' }),
+    );
     // line is converted to zero-indexed; character used as-is
     expect(options.selection.start).toEqual(expect.objectContaining({ line: 11, character: 4 }));
     expect(options.viewColumn).toBe(-1);

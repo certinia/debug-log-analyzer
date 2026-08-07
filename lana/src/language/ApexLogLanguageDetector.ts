@@ -20,6 +20,7 @@ const EXECUTION_STARTED = /^\d{2}:\d{2}:\d{2}\.\d{1,} \(\d+\)\|EXECUTION_STARTED
 const USER_INFO = /^\d{2}:\d{2}:\d{2}\.\d{1,} \(\d+\)\|USER_INFO\|/;
 const DETECT_EXTENSIONS = new Set(['.log', '.txt']);
 const MAX_LINES_TO_CHECK = 100;
+export const APEX_LOG_URI_SCHEMES: readonly string[] = ['file', 'vscode-vfs', 'memfs'];
 
 export function isApexLogContent(doc: TextDocument): boolean {
   if (doc.lineCount === 0) {
@@ -71,9 +72,8 @@ function getActiveTabUri(): Uri | undefined {
 
 function updateContextKey(): void {
   const editor = window.activeTextEditor;
-  const supportedSchemes = ['file', 'vscode-vfs', 'memfs'];
 
-  if (editor && supportedSchemes.includes(editor.document.uri.scheme)) {
+  if (editor && APEX_LOG_URI_SCHEMES.includes(editor.document.uri.scheme)) {
     const doc = editor.document;
     if (hasDetectExtension(doc.uri)) {
       const detected = isApexLogContent(doc);
@@ -86,7 +86,7 @@ function updateContextKey(): void {
 
   // Fallback to tab API for large files where activeTextEditor is undefined
   const tabUri = getActiveTabUri();
-  if (tabUri && supportedSchemes.includes(tabUri.scheme) && hasDetectExtension(tabUri)) {
+  if (tabUri && APEX_LOG_URI_SCHEMES.includes(tabUri.scheme) && hasDetectExtension(tabUri)) {
     // isApexLogFile is async; fire-and-forget is acceptable here for context key update
     void isApexLogFile(tabUri).then((detected) => {
       commands.executeCommand('setContext', 'lana.isApexLog', detected);
@@ -128,8 +128,7 @@ export class ApexLogLanguageDetector {
 }
 
 function detectAndSetLanguage(doc: TextDocument): void {
-  const supportedSchemes = ['file', 'vscode-vfs', 'memfs'];
-  if (doc.languageId === 'apexlog' || !supportedSchemes.includes(doc.uri.scheme)) {
+  if (doc.languageId === 'apexlog' || !APEX_LOG_URI_SCHEMES.includes(doc.uri.scheme)) {
     return;
   }
 

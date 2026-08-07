@@ -14,12 +14,12 @@ export class QuickPickWorkspace {
 
     if (workspaceFolders.length > 1) {
       const [workspace] = await QuickPick.pick(
-        workspaceFolders.map((ws) => new Item(ws.name(), ws.path(), '')),
+        workspaceFolders.map((ws) => new Item(ws.name(), ws.uri, '')),
         new Options('Select a workspace:'),
       );
 
       if (workspace) {
-        const selectedWs = workspaceFolders.find((ws) => ws.path() === workspace.description);
+        const selectedWs = workspaceFolders.find((ws) => ws.uri === workspace.description);
         if (!selectedWs) {
           throw new Error('Selected workspace not found');
         }
