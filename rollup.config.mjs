@@ -23,7 +23,7 @@ export default [
     input: './lana/src/Main.ts',
     output: {
       format: 'es',
-      dir: './lana/out',
+      dir: './lana/dist',
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
     },
@@ -58,33 +58,37 @@ export default [
           },
         }),
       ),
-      // Copy runtime dependency files for salesforce bundle compatibility
-      copy({
-        targets: [
-          // Pino worker files (thread-stream requires these at runtime)
-          {
-            src: 'node_modules/.pnpm/thread-stream@*/node_modules/thread-stream/lib/worker.js',
-            dest: 'lana/out',
-            rename: 'thread-stream-worker.js',
+    ],
+  },
+  {
+    input: './lana/src/Main.web.ts',
+    output: {
+      format: 'cjs',
+      dir: './lana/dist/web',
+      chunkFileNames: 'lana-[name].js',
+      sourcemap: false
+    },
+
+    external: ['vscode'],
+    plugins: [
+      // Browser bundle: no Node builtins (they don't exist on web)
+      nodeResolve({ browser: true, preferBuiltins: false }),
+      commonjs(),
+      json(),
+      nodePolyfills(), // Polyfill any stray Node references
+      swc(
+        defineRollupSwcOption({
+          include: /\.[mc]?[jt]sx?$/,
+          exclude: /node_modules/,
+          tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
+          jsc: {
+            minify: {
+              compress: production ? { keep_classnames: true, keep_fnames: true } : false,
+              mangle: production ? { keep_classnames: true } : false,
+            },
           },
-          {
-            src: 'node_modules/.pnpm/pino@*/node_modules/pino/lib/worker.js',
-            dest: 'lana/out',
-            rename: 'pino-worker.js',
-          },
-          {
-            src: 'node_modules/.pnpm/pino@*/node_modules/pino/file.js',
-            dest: 'lana/out',
-            rename: 'pino-file.js',
-          },
-          // @salesforce/core logger transform stream (pino transport pipeline)
-          {
-            src: 'node_modules/.pnpm/@salesforce+core@*/node_modules/@salesforce/core/lib/logger/transformStream.js',
-            dest: 'lana/out',
-            rename: 'salesforce-transform-stream.js',
-          },
-        ],
-      }),
+        }),
+      ),
     ],
   },
   {
@@ -134,11 +138,11 @@ export default [
         targets: [
           {
             src: ['log-viewer/out/*', 'log-viewer/index.html', 'lana/certinia-icon-color.png'],
-            dest: 'lana/out',
+            dest: 'lana/dist',
           },
           {
             src: path.join(codiconsDist, 'codicon.{css,ttf}'),
-            dest: 'lana/out',
+            dest: 'lana/dist',
           },
         ],
       }),

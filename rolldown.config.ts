@@ -23,7 +23,7 @@ export default defineConfig([
     input: './lana/src/Main.ts',
     output: {
       format: 'esm',
-      dir: './lana/out',
+      dir: './lana/dist',
       cleanDir: true,
       chunkFileNames: 'lana-[name].js',
       sourcemap: false,
@@ -34,6 +34,23 @@ export default defineConfig([
     platform: 'node',
 
     external: ['vscode'],
+  },
+  {
+    input: { Main: './lana/src/Main.web.ts' },
+    output: {
+      format: 'cjs',
+      dir: './lana/dist/web',
+      // cleanDir omitted — desktop bundle already cleaned lana/dist parent
+      chunkFileNames: 'lana-[name].js',
+      sourcemap: false,
+      keepNames: true,
+      minify: production,
+    },
+    tsconfig: production ? './lana/tsconfig.json' : './lana/tsconfig-dev.json',
+    platform: 'browser',
+
+    external: ['vscode'],
+    plugins: [nodePolyfills()],
   },
   {
     input: { bundle: './log-viewer/src/Main.ts' },
@@ -62,11 +79,11 @@ export default defineConfig([
         targets: [
           {
             src: ['log-viewer/out/*', 'log-viewer/index.html', 'lana/certinia-icon-color.png'],
-            dest: 'lana/out',
+            dest: 'lana/dist',
           },
           {
             src: path.join(codiconsDist, 'codicon.{css,ttf}'),
-            dest: 'lana/out',
+            dest: 'lana/dist',
           },
         ],
       }),

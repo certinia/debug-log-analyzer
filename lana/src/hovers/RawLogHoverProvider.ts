@@ -25,14 +25,15 @@ class RawLogHoverProvider implements HoverProvider {
     }
 
     const timestamp = parseInt(match[1], 10);
-    return this.buildHover(document.uri.fsPath, timestamp);
+    return this.buildHover(document.uri.toString(), timestamp);
   }
 
-  private async buildHover(filePath: string, timestamp: number): Promise<Hover> {
-    const args = encodeURIComponent(JSON.stringify({ timestamp, filePath }));
+  private async buildHover(uriString: string, timestamp: number): Promise<Hover> {
+    // Pass uriString as filePath for ShowInLogAnalysis command (web-safe URI string)
+    const args = encodeURIComponent(JSON.stringify({ timestamp, filePath: uriString }));
     const commandUri = `command:lana.showInLogAnalysis?${args}`;
 
-    const apexLog = await LogEventCache.getApexLog(filePath);
+    const apexLog = await LogEventCache.getApexLog(uriString);
     const result = apexLog ? LogEventCache.findEventByTimestamp(apexLog, timestamp) : null;
 
     const metricParts = result ? buildMetricParts(result.event) : [];
@@ -51,7 +52,12 @@ class RawLogHoverProvider implements HoverProvider {
   }
 
   static apply(context: Context): void {
-    const docSelector = [{ scheme: 'file', language: 'apexlog' }];
+    // Support both desktop (file) and web (vscode-vfs, memfs) schemes
+    const docSelector = [
+      { scheme: 'file', language: 'apexlog' },
+      { scheme: 'vscode-vfs', language: 'apexlog' },
+      { scheme: 'memfs', language: 'apexlog' },
+    ];
 
     const hoverProviderDisposable = languages.registerHoverProvider(
       docSelector,

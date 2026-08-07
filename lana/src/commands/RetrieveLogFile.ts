@@ -1,9 +1,8 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import type { LogRecord } from '@salesforce/apex-node';
-import { existsSync } from 'fs';
-import { join, parse } from 'path';
+import { Uri } from 'vscode';
+import { Utils } from 'vscode-uri';
 import {
   window,
   type QuickPick as VSCodeQuickPick,
@@ -15,8 +14,13 @@ import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
 import { Item, Options, QuickPick } from '../display/QuickPick.js';
 import { QuickPickWorkspace } from '../display/QuickPickWorkspace.js';
-import { GetLogFile } from '../salesforce/logs/GetLogFile.js';
-import { GetLogFiles } from '../salesforce/logs/GetLogFiles.js';
+import {
+  fileOrFolderExists,
+  getLogBody,
+  listLogs,
+  writeFile,
+  type ApexLogListItem,
+} from '../services/salesforceServices.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 
@@ -54,15 +58,15 @@ export class RetrieveLogFile {
   }
 
   private static async command(context: Context): Promise<WebviewPanel | void> {
-    const ws = await QuickPickWorkspace.pickOrReturn(context);
+    const wsFolder = await QuickPickWorkspace.pickOrReturn(context);
     const loadingPicker = RetrieveLogFile.showLoadingPicker();
     try {
-      const logFiles = await GetLogFiles.apply(ws);
+      const logFiles = await listLogs();
       const logFileId = await RetrieveLogFile.getLogFile(logFiles);
       if (logFileId) {
-        const logFilePath = this.getLogFilePath(ws, logFileId);
-        const writeLogFile = this.writeLogFile(ws, logFilePath);
-        return LogView.createView(context, writeLogFile, logFilePath);
+        const logUri = this.getLogFileUri(Uri.parse(wsFolder.uri), logFileId);
+        const writeLogFile = this.writeLogFile(logUri, logFileId);
+        return LogView.createView(context, writeLogFile, logUri);
       }
     } finally {
       loadingPicker.dispose();
@@ -78,7 +82,7 @@ export class RetrieveLogFile {
     return qp;
   }
 
-  private static async getLogFile(files: LogRecord[]): Promise<string | null> {
+  private static async getLogFile(files: ApexLogListItem[]): Promise<string | null> {
     const items = files
       .sort((a, b) => {
         const aDate = Date.parse(a.StartTime);
@@ -145,17 +149,17 @@ export class RetrieveLogFile {
     return Math.round(value * precision) / precision;
   }
 
-  private static getLogFilePath(ws: string, fileId: string): string {
-    const logDirectory = join(ws, '.sfdx', 'tools', 'debug', 'logs');
-    const logFilePath = join(logDirectory, `${fileId}.log`);
-    return logFilePath;
+  private static getLogFileUri(wsUri: Uri, fileId: string): Uri {
+    // Build .sfdx/tools/debug/logs/{fileId}.log relative to the workspace root.
+    // Utils.joinPath works on both desktop (file://) and web (vscode-vfs://, memfs://).
+    return Utils.joinPath(wsUri, '.sfdx', 'tools', 'debug', 'logs', `${fileId}.log`);
   }
 
-  private static async writeLogFile(ws: string, logPath: string) {
-    const logExists = existsSync(logPath);
+  private static async writeLogFile(logUri: Uri, logId: string): Promise<void> {
+    const logExists = await fileOrFolderExists(logUri);
     if (!logExists) {
-      const logfilePath = parse(logPath);
-      await GetLogFile.apply(ws, logfilePath.dir, logfilePath.name);
+      const logBody = await getLogBody(logId);
+      await writeFile(logUri, logBody);
     }
   }
 }

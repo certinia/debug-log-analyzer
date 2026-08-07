@@ -1,8 +1,15 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { basename } from 'path';
-import { Position, Selection, ViewColumn, workspace, type TextDocumentShowOptions } from 'vscode';
+import {
+  Position,
+  Selection,
+  ViewColumn,
+  workspace,
+  type TextDocumentShowOptions,
+  type Uri,
+} from 'vscode';
+import { Utils } from 'vscode-uri';
 
 import type { Context } from '../Context.js';
 import { getMethodLine, parseApex } from '../salesforce/ApexParser/ApexSymbolLocator.js';
@@ -31,7 +38,7 @@ export class OpenFileInPackage {
 
       if (!symbolLocation.isExactMatch) {
         context.display.showErrorMessage(
-          `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${basename(uri.fsPath)}'`,
+          `Symbol '${symbolLocation.missingSymbol}' could not be found in file '${Utils.basename(uri)}'`,
         );
       }
       const zeroIndexedLineNumber = symbolLocation.line - 1;

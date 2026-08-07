@@ -1,14 +1,15 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { parse } from 'path';
+import { Utils } from 'vscode-uri';
 import { window } from 'vscode';
 
 import type { Context } from '../Context.js';
+import type { VSWorkspace } from '../workspace/VSWorkspace.js';
 import { Item, Options, QuickPick } from './QuickPick.js';
 
 export class QuickPickWorkspace {
-  static async pickOrReturn(context: Context): Promise<string> {
+  static async pickOrReturn(context: Context): Promise<VSWorkspace> {
     const workspaceFolders = context.workspaceManager.workspaceFolders;
 
     if (workspaceFolders.length > 1) {
@@ -18,15 +19,34 @@ export class QuickPickWorkspace {
       );
 
       if (workspace) {
-        return workspace.description;
+        const selectedWs = workspaceFolders.find((ws) => ws.path() === workspace.description);
+        if (!selectedWs) {
+          throw new Error('Selected workspace not found');
+        }
+        return selectedWs;
       } else {
         throw new Error('No workspace selected');
       }
     } else if (workspaceFolders.length === 1) {
-      return workspaceFolders[0]?.path() || '';
+      const ws = workspaceFolders[0];
+      if (!ws) {
+        throw new Error('No workspace available');
+      }
+      return ws;
     } else {
+      // No workspace folders — fall back to active editor's containing folder
+      // (web: memfs:// or vscode-vfs://; desktop: file://)
       if (window.activeTextEditor) {
-        return parse(window.activeTextEditor.document.fileName).dir;
+        const docUri = window.activeTextEditor.document.uri;
+        const folderUri = Utils.dirname(docUri);
+        // Construct a minimal VSWorkspace-like object. Since VSWorkspace expects
+        // a WorkspaceFolder, we create a synthetic one for the active editor's parent dir.
+        const syntheticFolder = {
+          uri: folderUri,
+          name: Utils.basename(folderUri),
+          index: 0,
+        };
+        return new (await import('../workspace/VSWorkspace.js')).VSWorkspace(syntheticFolder);
       } else {
         throw new Error('No workspace selected');
       }

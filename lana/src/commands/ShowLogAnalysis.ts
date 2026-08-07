@@ -1,12 +1,11 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { existsSync } from 'fs';
-import type { Uri } from 'vscode';
-import { window } from 'vscode';
+import { type Uri, window } from 'vscode';
 
 import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
+import { fileOrFolderExists } from '../services/salesforceServices.js';
 import { Command } from './Command.js';
 import { LogView } from './LogView.js';
 
@@ -33,12 +32,8 @@ export class ShowLogAnalysis {
   }
 
   private static async command(context: Context, uri: Uri): Promise<void> {
-    const filePath = uri?.fsPath || window?.activeTextEditor?.document.fileName || '';
-    const fileContent = !existsSync(filePath) ? window?.activeTextEditor?.document.getText() : '';
-
-    if (filePath || fileContent) {
-      LogView.createView(context, Promise.resolve(), filePath, fileContent);
-    } else {
+    const logUri = uri || window?.activeTextEditor?.document.uri;
+    if (!logUri) {
       context.display.showErrorMessage(
         'No file selected or the file is too large. Try again using the file explorer or text editor command.',
       );
@@ -46,5 +41,15 @@ export class ShowLogAnalysis {
         'No file selected or the file is too large. Try again using the file explorer or text editor command.',
       );
     }
+
+    // Check if file exists on disk (web-safe via FsService).
+    // If it doesn't, pass the active editor's inline text (for unsaved/virtual docs).
+    let fileContent: string | undefined;
+    const exists = await fileOrFolderExists(logUri);
+    if (!exists) {
+      fileContent = window?.activeTextEditor?.document.getText();
+    }
+
+    LogView.createView(context, Promise.resolve(), logUri, fileContent);
   }
 }

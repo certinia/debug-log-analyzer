@@ -36,9 +36,9 @@
     "bump-prerelease": "node ./scripts/pre-release.mjs",
     "build": "node --run typecheck && NODE_ENV=production node --run build:dev",
     "build:fast": "node --run typecheck && NODE_ENV=production node --run build:dev:fast",
-    "build:dev": "rm -rf lana/out && rollup -c rollup.config.mjs",
+    "build:dev": "rm -rf lana/dist && rollup -c rollup.config.mjs",
     "build:dev:fast": "rolldown -c rolldown.config.ts",
-    "watch": "rm -rf lana/out && rollup -w -c rollup.config.mjs",
+    "watch": "rm -rf lana/dist && rollup -w -c rollup.config.mjs",
     "watch:fast": "rolldown -w -c rolldown.config.ts",
     "copy:package-docs": "node ./scripts/copy-package-docs.mjs",
     "typecheck": "tsc -b",
@@ -51,5 +51,14 @@
   },
   "lint-staged": {
     "*.{ts,css,md,scss}": "prettier --cache --write --experimental-cli"
+  },
+  "pnpm": {
+    "overrides": {
+      "brace-expansion": "^5.0.9",
+      "fast-uri": "^4.1.2",
+      "js-yaml": "^4.3.1",
+      "serialize-javascript": "^7.0.5",
+      "uuid": "^11.1.1"
+    }
   }
 }
