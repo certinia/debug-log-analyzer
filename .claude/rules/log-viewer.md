@@ -44,9 +44,14 @@ Webview UI. Applies when working under `log-viewer/`.
 
 ## Key paths
 
-- Timeline: `log-viewer/src/features/timeline/`
-- Parser: `log-viewer/src/core/log-parser/`
+- Parser: `apex-log-parser/src/` — shared package, so changes affect `lana/` too.
+- Extension boundary: `log-viewer/src/core/messaging/VSCodeExtensionMessenger.ts`
+- Timeline: `log-viewer/src/features/timeline/`. The pixi.js flame chart lives in `optimised/` —
+  read its `AGENTS.md` first.
 - Theme observer: `log-viewer/src/core/theme/ThemeObserver.ts`
+- Grid layer: `log-viewer/src/tabulator/` — wraps a patched vendored tabulator; don't edit the
+  vendor file.
+- Shared lit components: `log-viewer/src/components/`
 - Tokens: `log-viewer/src/styles/tokens.css`
 
 ## Testing
