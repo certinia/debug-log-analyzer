@@ -3,25 +3,20 @@
  */
 import type { Tabulator } from 'tabulator-tables';
 
-import type { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-
 /** The part of a database grid row that traces back to the log event it was built from. */
 interface EventRow {
   eventIndex?: number;
 }
 
 /**
- * Select the row for `eventIndex`, without echoing `detail:select` back at the
- * inspector that asked for it. Returns false when the grid has no such row.
+ * Select the row for `eventIndex`. Returns false when the grid has no such row.
  *
  * Shared by the DML, SOQL and SOSL grids: the inspector offers an eventIndex to
- * each in turn, and only the grid that owns it selects.
+ * each in turn, and only the grid that owns it selects. `DatabaseView` runs the
+ * call under its echo guard, so the selection is not reported back at the
+ * inspector that asked for it.
  */
-export function selectRowByEventIndex(
-  table: Tabulator | null,
-  guard: SelectionEchoGuard,
-  eventIndex: number,
-): boolean {
+export function selectRowByEventIndex(table: Tabulator | null, eventIndex: number): boolean {
   // The tabulator index is a synthetic row id, so the eventIndex is scanned for.
   const match = table
     ?.getRows()
@@ -30,9 +25,7 @@ export function selectRowByEventIndex(
     return false;
   }
 
-  guard.run(() => {
-    table.deselectRow();
-    match.select();
-  });
+  table.deselectRow();
+  match.select();
   return true;
 }

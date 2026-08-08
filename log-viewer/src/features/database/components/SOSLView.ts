@@ -9,13 +9,12 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { Tabulator, type GroupComponent, type RowComponent } from 'tabulator-tables';
 
 import type { ApexLog, SOSLExecuteBeginLine } from 'apex-log-parser';
-import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { vscodeMessenger } from '../../../core/messaging/VSCodeExtensionMessenger.js';
 import { getCallerNamespace } from '../../../core/utility/CallerNamespace.js';
 import { goToRow } from '../../call-tree/navigation.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
-import { emitGridSelection } from './gridSelection.js';
+import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
@@ -89,8 +88,6 @@ export class SOSLView extends LitElement {
 
   soslTable: Tabulator | null = null;
   holder: HTMLElement | null = null;
-  /** Guards the programmatic select made on the inspector's behalf. */
-  private _echoGuard = new SelectionEchoGuard();
   table: HTMLElement | null = null;
   findArgs: { text: string; count: number; options: { matchCase: boolean } } = {
     text: '',
@@ -655,7 +652,7 @@ export class SOSLView extends LitElement {
     // Drive the detail panel off selection (not click) so keyboard row
     // navigation updates it too, matching the SOQL/DML grids.
     this.soslTable.on('rowSelectionChanged', (_data, rows) => {
-      emitGridSelection(this._echoGuard, 'sosl', rows, (data: SOSLRow) =>
+      reportGridSelection(this, 'sosl', rows, (data: SOSLRow) =>
         data.sosl ? data.eventIndex : undefined,
       );
     });
@@ -738,25 +735,16 @@ export class SOSLView extends LitElement {
     return this.holder;
   }
 
-  /**
-   * Drops this grid's row highlight. Silent by default, for the clear that
-   * follows another grid being picked; `notify` leaves the grid's own
-   * selection-change path to report it, which is the user-driven (Escape) case.
-   */
-  deselectRows({ notify = false }: { notify?: boolean } = {}) {
-    if (notify) {
-      this.soslTable?.deselectRow();
-      return;
-    }
-    this._echoGuard.run(() => this.soslTable?.deselectRow());
+  /** Drops this grid's row highlight, reported upward like any other change. */
+  deselectRows() {
+    this.soslTable?.deselectRow();
   }
 
   /**
-   * Select the row for `eventIndex`, without echoing `detail:select` back at the
-   * inspector that asked for it. Returns false when this grid has no such row.
+   * Select the row for `eventIndex`. Returns false when this grid has no such row.
    */
   selectByEventIndex(eventIndex: number): boolean {
-    return selectRowByEventIndex(this.soslTable, this._echoGuard, eventIndex);
+    return selectRowByEventIndex(this.soslTable, eventIndex);
   }
 
   downlodEncoder(defaultFileName: string) {
