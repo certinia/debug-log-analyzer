@@ -12,6 +12,7 @@ jest.mock('../../tabulator/format/Progress.css', () => ({}));
 // Capture the options the component hands to Tabulator. The real ESM build (and
 // its module registrations) doesn't load under jest.
 const built: Record<string, unknown>[] = [];
+const selected: number[][] = [];
 type TableHandler = (...args: unknown[]) => void;
 const handlers: Record<string, TableHandler> = {};
 jest.mock('tabulator-tables', () => ({
@@ -26,6 +27,9 @@ jest.mock('tabulator-tables', () => ({
     destroy() {}
     getSelectedRows() {
       return [];
+    }
+    selectRow(indexes: number[]) {
+      selected.push(indexes);
     }
   },
   Module: class {},
@@ -86,6 +90,39 @@ describe('CallStackDetail', () => {
     handlers.rowSelectionChanged?.([], [{ getData: () => ({ eventIndex: 11 }) }]);
 
     expect(seen).toEqual([11]);
+    el.remove();
+  });
+
+  it('marks the active frame once the table is built, without calling it a pick', async () => {
+    const el = await mount(4);
+    el.activeEventIndex = 4;
+    await el.updateComplete;
+    // The rows arrive with `tableBuilt`, so the mark made before it is the one
+    // under test here.
+    selected.length = 0;
+
+    const seen: number[] = [];
+    const listener = (e: Event) => seen.push((e as InspectorRevealEvent).detail.eventIndex);
+    document.addEventListener(INSPECTOR_REVEAL_EVENT, listener);
+    handlers.tableBuilt?.();
+    document.removeEventListener(INSPECTOR_REVEAL_EVENT, listener);
+
+    expect(selected).toEqual([[4]]);
+    expect(seen).toEqual([]);
+    el.remove();
+  });
+
+  it('moves the mark without rebuilding, since the anchor holds the rows', async () => {
+    const el = await mount(4);
+    handlers.tableBuilt?.();
+    built.length = 0;
+    selected.length = 0;
+
+    el.activeEventIndex = 12;
+    await el.updateComplete;
+
+    expect(selected).toEqual([[12]]);
+    expect(built).toEqual([]);
     el.remove();
   });
 });

@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Shown together in the **Memory** view (total + self); peak also appears in the **Governor Limits** view and feeds the Gov Avg/Peak columns. Method tooltips show net heap retained.
   - The Timeline governor strip plots heap as it's allocated, so you can see where it spikes.
 - 🧭 **Inspector**: select anything — a timeline frame, a call tree or analysis row, a SOQL/DML/SOSL statement — and inspect it without leaving the tab you're on. ([#113])
-  - **A selection** shows its details and governor metrics as `used / limit`, the call stack that led to it, and its own subtree in **Time Order**, **Aggregated** or **Bottom-Up**.
+  - **A selection** shows its details and governor metrics as `used / limit`, the call stack that led to it, and its own subtree in **Time Order**, **Aggregated** or **Bottom-Up**. Click a frame in the call stack to walk up it — the details and subtree follow, and the stack stays anchored to what you selected.
   - **Nothing selected** shows the whole log instead of an empty panel: a governor overview on every tab, time by category and governor trends on the Timeline, log-wide findings on Analysis, and the hot path and hot spots on the Call Tree.
   - Every row is a link: click it to reveal the frame, row or statement behind it in the tab you're on. Right-click for copy actions.
   - Dock it left, right or bottom, drag to resize, and collapse the sections you don't need — the layout is remembered. `Escape` clears the selection and returns the whole-log view. ([#63])

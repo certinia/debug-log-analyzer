@@ -39,15 +39,21 @@ jest.mock('../../features/settings/Settings.js', () => ({
 let deferSections = false;
 const pendingSections: Array<() => void> = [];
 jest.mock('../detailSections.js', () => ({
-  buildDetailSections: (_source: string, selection: { eventIndex?: number } | null) => {
-    // The marker carries the selection through to the rendered content, so a
-    // stale build resolving late is distinguishable from the one that supersedes it.
+  buildDetailSections: (
+    _source: string,
+    selection: { eventIndex?: number } | null,
+    activeEventIndex: number | null,
+  ) => {
+    // The markers carry the anchor and the active frame through to the rendered
+    // content, so a stale build resolving late is distinguishable from the one
+    // that supersedes it, and a walk is distinguishable from a new pick.
     const sections = selection
       ? [
           {
             id: 'vitals',
             title: 'Details',
-            content: html`<div class="marker">${selection.eventIndex}</div>`,
+            content: html`<div class="marker">${selection.eventIndex}</div>
+              <div class="active">${activeEventIndex ?? '-'}</div>`,
           },
           { id: 'callstack', title: 'Call stack', content: html`<div>c</div>` },
         ]
@@ -130,6 +136,11 @@ function select(source: 'timeline' | 'database', eventIndex: number): void {
 
 function marker(el: LogInspector): string | null {
   return paneView(el).shadowRoot?.querySelector('.marker')?.textContent ?? null;
+}
+
+/** The frame the sections follow, `-` while the anchor is what is shown. */
+function activeMarker(el: LogInspector): string | null {
+  return paneView(el).shadowRoot?.querySelector('.active')?.textContent ?? null;
 }
 
 describe('LogInspector', () => {
@@ -251,6 +262,49 @@ describe('LogInspector', () => {
     off();
 
     expect(seen).toEqual([{ source: 'calltree', eventIndex: 5 }]);
+  });
+
+  it('follows a revealed frame while the selection that anchors the stack holds', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    expect([marker(el), activeMarker(el)]).toEqual(['1', '-']);
+
+    dispatchInspectorReveal(dockLayout(el), 5);
+    await flush(el);
+
+    // The anchor is what the call stack is built from, so it must not move.
+    expect([marker(el), activeMarker(el)]).toEqual(['1', '5']);
+  });
+
+  it('ends the walk when the tab reports a new pick of its own', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+    dispatchInspectorReveal(dockLayout(el), 5);
+    await flush(el);
+
+    select('timeline', 7);
+    await flush(el);
+
+    expect([marker(el), activeMarker(el)]).toEqual(['7', '-']);
+  });
+
+  it('keeps each tab walking its own stack', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    select('database', 2);
+    await flush(el);
+    dispatchInspectorReveal(dockLayout(el), 5);
+    await flush(el);
+
+    el.activeTab = 'database-tab';
+    await flush(el);
+    expect([marker(el), activeMarker(el)]).toEqual(['2', '-']);
+
+    el.activeTab = 'timeline-tab';
+    await flush(el);
+    expect([marker(el), activeMarker(el)]).toEqual(['1', '5']);
   });
 
   it('drops a reveal from a tab with no inspectable view', async () => {
