@@ -3,44 +3,35 @@
  */
 import type { RowComponent } from 'tabulator-tables';
 
-import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
-import type { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
+import type { StatementType } from '../../../core/events/EventBus.js';
+
+/** What a grid tells its parent: the picked statement, or null once cleared. */
+export type GridSelectionEvent = CustomEvent<{
+  type: StatementType;
+  eventIndex: number | null;
+}>;
 
 /**
- * Reports a database grid's selection to the inspector: the picked row, or
- * null once the grid is cleared, so the inspector stops showing the row the
- * user just deselected.
- *
- * Emits nothing while `guard` suppresses - that clear came from the inspector,
- * or from `DatabaseView` clearing the two grids the pick did not land in, and
- * its null would arrive after the pick and undo it.
+ * Reports a database grid's selection to `DatabaseView`, which owns the tab's
+ * mutual exclusion and is the only thing that emits `detail:select`. The event
+ * bubbles to that view's shadow root and no further.
  *
  * `eventIndexOf` returns undefined for a row that holds no statement, which is
  * reported as no change rather than as a clear.
  */
-export function emitGridSelection<T>(
-  guard: SelectionEchoGuard,
+export function reportGridSelection<T>(
+  host: HTMLElement,
   type: StatementType,
   rows: RowComponent[],
   eventIndexOf: (data: T) => number | undefined,
 ): void {
-  if (guard.suppressed) {
-    return;
-  }
-
   const data = rows[0]?.getData() as T | undefined;
-  if (!data) {
-    eventBus.emit('detail:select', { source: 'database', selection: null });
-    return;
-  }
-
-  const eventIndex = eventIndexOf(data);
+  const eventIndex = data ? eventIndexOf(data) : null;
   if (eventIndex === undefined) {
     return;
   }
 
-  eventBus.emit('detail:select', {
-    source: 'database',
-    selection: { kind: 'event', eventIndex, type },
-  });
+  host.dispatchEvent(
+    new CustomEvent('grid-selection', { detail: { type, eventIndex }, bubbles: true }),
+  );
 }

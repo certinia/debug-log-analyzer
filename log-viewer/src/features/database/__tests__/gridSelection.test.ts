@@ -1,17 +1,13 @@
 /*
  * Copyright (c) 2026 Certinia Inc. All rights reserved.
+ *
+ * @jest-environment jsdom
  */
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import type { RowComponent } from 'tabulator-tables';
 
-import {
-  eventBus,
-  type DetailSelection,
-  type DetailSource,
-} from '../../../core/events/EventBus.js';
-import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
-import { emitGridSelection } from '../components/gridSelection.js';
+import { reportGridSelection, type GridSelectionEvent } from '../components/gridSelection.js';
 
 interface StatementRow {
   eventIndex?: number;
@@ -25,47 +21,45 @@ function row(data: StatementRow): RowComponent {
 
 const soqlEventIndex = (data: StatementRow) => (data.soql ? data.eventIndex : undefined);
 
-describe('emitGridSelection', () => {
-  let seen: Array<{ source: DetailSource; selection: DetailSelection | null }>;
-  let off: () => void;
+describe('reportGridSelection', () => {
+  let host: HTMLElement;
+  let seen: GridSelectionEvent['detail'][];
 
   beforeEach(() => {
+    host = document.createElement('div');
     seen = [];
-    off = eventBus.on('detail:select', (d) => seen.push(d));
+    host.addEventListener('grid-selection', (event) =>
+      seen.push((event as GridSelectionEvent).detail),
+    );
   });
 
-  afterEach(() => off());
+  it('reports the picked row with the grid it came from', () => {
+    reportGridSelection(host, 'soql', [row({ eventIndex: 7, soql: 'SELECT' })], soqlEventIndex);
 
-  it('reports the picked row', () => {
-    emitGridSelection(
-      new SelectionEchoGuard(),
-      'soql',
-      [row({ eventIndex: 7, soql: 'SELECT' })],
-      soqlEventIndex,
+    expect(seen).toEqual([{ type: 'soql', eventIndex: 7 }]);
+  });
+
+  it('reports a cleared grid', () => {
+    reportGridSelection(host, 'soql', [], soqlEventIndex);
+
+    expect(seen).toEqual([{ type: 'soql', eventIndex: null }]);
+  });
+
+  it('says nothing for a row that holds no statement', () => {
+    reportGridSelection(host, 'soql', [row({ eventIndex: 7 })], soqlEventIndex);
+
+    expect(seen).toEqual([]);
+  });
+
+  it('reaches an ancestor, since only the parent view acts on it', () => {
+    const parent = document.createElement('div');
+    parent.append(host);
+    parent.addEventListener('grid-selection', (event) =>
+      seen.push((event as GridSelectionEvent).detail),
     );
 
-    expect(seen).toEqual([
-      { source: 'database', selection: { kind: 'event', eventIndex: 7, type: 'soql' } },
-    ]);
-  });
+    reportGridSelection(host, 'dml', [row({ eventIndex: 3, soql: 'SELECT' })], soqlEventIndex);
 
-  it('clears the inspector when the grid is cleared', () => {
-    emitGridSelection(new SelectionEchoGuard(), 'soql', [], soqlEventIndex);
-
-    expect(seen).toEqual([{ source: 'database', selection: null }]);
-  });
-
-  it('says nothing while a select on the inspector behalf is in flight', () => {
-    const guard = new SelectionEchoGuard();
-
-    guard.run(() => emitGridSelection(guard, 'soql', [], soqlEventIndex));
-
-    expect(seen).toEqual([]);
-  });
-
-  it('leaves the inspector alone for a row that holds no statement', () => {
-    emitGridSelection(new SelectionEchoGuard(), 'soql', [row({ eventIndex: 7 })], soqlEventIndex);
-
-    expect(seen).toEqual([]);
+    expect(seen).toHaveLength(2);
   });
 });

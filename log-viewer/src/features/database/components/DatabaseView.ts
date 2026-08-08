@@ -13,7 +13,8 @@ import type {
   SOSLExecuteBeginLine,
 } from 'apex-log-parser';
 
-import { eventBus } from '../../../core/events/EventBus.js';
+import { eventBus, type StatementType } from '../../../core/events/EventBus.js';
+import { SelectionEchoGuard } from '../../../core/events/SelectionEchoGuard.js';
 import { isVisible } from '../../../core/utility/Util.js';
 import { soslRowsMetric } from '../limits.js';
 import { DatabaseAccess } from '../services/Database.js';
@@ -29,12 +30,17 @@ import type { SOSLView } from './SOSLView.js';
 import './DMLView.js';
 import './DatabaseSection.js';
 import type { DatabaseMetric } from './DatabaseMetricCard.js';
+import type { GridSelectionEvent } from './gridSelection.js';
 import './GovernorSummary.js';
 import type { GaugeMetric } from './GovernorSummary.js';
 import './SOQLView.js';
 import './SOSLView.js';
 
-type SectionKind = 'dml' | 'soql' | 'sosl';
+/** A section is one statement type, so the two names are the same set. */
+type SectionKind = StatementType;
+
+/** The three grids this view drives share a selection contract. */
+type DatabaseGrid = DMLView | SOQLView | SOSLView;
 
 @customElement('database-view')
 export class DatabaseView extends LitElement {
@@ -74,9 +80,11 @@ export class DatabaseView extends LitElement {
   };
   findMap = {};
 
-  private _offDetailSelect: (() => void) | null = null;
   private _offInspectorReveal: (() => void) | null = null;
   private _offSelectionClear: (() => void) | null = null;
+
+  /** Guards the selects this view makes on the inspector's behalf. */
+  private _echoGuard = new SelectionEchoGuard();
 
   constructor() {
     super();
@@ -85,25 +93,6 @@ export class DatabaseView extends LitElement {
     document.addEventListener('lv-find-match', this._findHandler as EventListener);
     document.addEventListener('lv-find', this._findHandler as EventListener);
 
-    // Only one statement is "selected" across the three grids at a time — when
-    // one grid reports a selection, clear the other two. (The inspector
-    // owns rendering the detail; this just keeps the grids mutually exclusive.)
-    this._offDetailSelect = eventBus.on('detail:select', (d) => {
-      if (d.source !== 'database' || d.selection?.kind !== 'event') {
-        return;
-      }
-      const grids = [
-        ['dml', this._dmlView],
-        ['soql', this._soqlView],
-        ['sosl', this._soslView],
-      ] as const;
-      for (const [type, view] of grids) {
-        if (d.selection.type !== type) {
-          view?.deselectRows();
-        }
-      }
-    });
-
     // Reveal an inspector row here, but only while the Database tab is the tab
     // the inspector is showing. The eventIndex belongs to exactly one grid, so
     // each is offered it in turn until one owns it.
@@ -111,21 +100,49 @@ export class DatabaseView extends LitElement {
       if (d.source !== 'database') {
         return;
       }
-      const views = [this._dmlView, this._soqlView, this._soslView];
-      const owner = views.find((view) => view?.selectByEventIndex(d.eventIndex));
-      if (owner) {
-        views.filter((view) => view !== owner).forEach((view) => view?.deselectRows());
-      }
+      const views = this._views;
+      this._echoGuard.run(() => {
+        const owner = views.find((view) => view?.selectByEventIndex(d.eventIndex));
+        if (owner) {
+          views.filter((view) => view !== owner).forEach((view) => view?.deselectRows());
+        }
+      });
     });
 
     // Escape (app-wide) deselects here. Only one grid holds the selection, and
-    // it reports the clear itself — hence `notify`.
+    // its report of the clear reaches the inspector the same way a click does.
     this._offSelectionClear = eventBus.on('selection:clear', (d) => {
       if (d.source === 'database') {
-        [this._dmlView, this._soqlView, this._soslView].forEach((view) =>
-          view?.deselectRows({ notify: true }),
-        );
+        this._views.forEach((view) => view?.deselectRows());
       }
+    });
+  }
+
+  /**
+   * The database tab's only `detail:select` emitter. The three grids report
+   * their selection here; only one of them holds it at a time, so the two the
+   * pick did not land in are cleared under the guard — otherwise their nulls
+   * would arrive after the pick and undo it.
+   */
+  private _onGridSelection(event: GridSelectionEvent): void {
+    if (this._echoGuard.suppressed) {
+      return;
+    }
+    const { type, eventIndex } = event.detail;
+    if (eventIndex === null) {
+      eventBus.emit('detail:select', { source: 'database', selection: null });
+      return;
+    }
+    this._echoGuard.run(() => {
+      for (const [kind, view] of this._gridsByKind) {
+        if (kind !== type) {
+          view?.deselectRows();
+        }
+      }
+    });
+    eventBus.emit('detail:select', {
+      source: 'database',
+      selection: { kind: 'event', eventIndex, type },
     });
   }
 
@@ -134,12 +151,18 @@ export class DatabaseView extends LitElement {
     document.removeEventListener('db-find-results', this._findResults as EventListener);
     document.removeEventListener('lv-find-match', this._findHandler as EventListener);
     document.removeEventListener('lv-find', this._findHandler as EventListener);
-    this._offDetailSelect?.();
-    this._offDetailSelect = null;
     this._offInspectorReveal?.();
     this._offInspectorReveal = null;
     this._offSelectionClear?.();
     this._offSelectionClear = null;
+  }
+
+  firstUpdated(): void {
+    // One listener for all three grids: their reports bubble to this shadow
+    // root and stop there, so grids added later are heard without rebinding.
+    this.renderRoot.addEventListener('grid-selection', (event) =>
+      this._onGridSelection(event as GridSelectionEvent),
+    );
   }
 
   updated(changed: PropertyValues): void {
@@ -250,6 +273,19 @@ export class DatabaseView extends LitElement {
 
   private get _soslView(): SOSLView | null {
     return this.renderRoot?.querySelector('sosl-view') ?? null;
+  }
+
+  /** The three grids in view order, each with the statement type it holds. */
+  private get _gridsByKind(): ReadonlyArray<readonly [SectionKind, DatabaseGrid | null]> {
+    return [
+      ['dml', this._dmlView],
+      ['soql', this._soqlView],
+      ['sosl', this._soslView],
+    ];
+  }
+
+  private get _views(): ReadonlyArray<DatabaseGrid | null> {
+    return this._gridsByKind.map(([, view]) => view);
   }
 
   private _renderSection(kind: SectionKind) {
