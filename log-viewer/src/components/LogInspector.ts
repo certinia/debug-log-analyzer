@@ -48,6 +48,10 @@ export class LogInspector extends LitElement {
 
   // Latest selection per source; the bar renders the active tab's entry.
   private _selections = new Map<DetailSource, DetailSelection>();
+  // The frame walked to inside that selection's call stack, per source. Held
+  // apart from the selection so the call stack keeps its anchor while Details
+  // and the call tree follow the walk.
+  private _activeFrames = new Map<DetailSource, number>();
   // The user's last open/closed choice, or null if they've never made one —
   // which is the only state that lets a selection auto-open the panel.
   @state()
@@ -153,6 +157,8 @@ export class LogInspector extends LitElement {
   }
 
   private _onSelect(detail: { source: DetailSource; selection: DetailSelection | null }): void {
+    // A pick in the tab itself is a new anchor, so any walk down the old stack ends.
+    this._activeFrames.delete(detail.source);
     if (detail.selection) {
       this._selections.set(detail.source, detail.selection);
       // Only shows the panel while the user has never chosen for themselves,
@@ -171,11 +177,22 @@ export class LogInspector extends LitElement {
    * An inspector row asks to be revealed. Only the active tab's own view acts on
    * it, so the source is stamped here - a call-tree selection must never move
    * the timeline.
+   *
+   * The revealed row also becomes the active frame: the tab's own selection
+   * moves, and Details and the call tree follow, while the selection that
+   * anchors the call stack stays where the user left it.
    */
   private _onReveal = (e: InspectorRevealEvent): void => {
     const source = this._activeSource;
-    if (source) {
-      eventBus.emit('inspector:reveal', { source, eventIndex: e.detail.eventIndex });
+    if (!source) {
+      return;
+    }
+    eventBus.emit('inspector:reveal', { source, eventIndex: e.detail.eventIndex });
+    // Without a selection the sections are the whole-log ones, which have no
+    // frame to follow; the whole-log rows only reveal.
+    if (this._selections.has(source)) {
+      this._activeFrames.set(source, e.detail.eventIndex);
+      this._scheduleRebuild();
     }
   };
 
@@ -202,7 +219,11 @@ export class LogInspector extends LitElement {
     const epoch = ++this._rebuildEpoch;
     const source = this._activeSource;
     const sections = source
-      ? await buildDetailSections(source, this._selections.get(source) ?? null)
+      ? await buildDetailSections(
+          source,
+          this._selections.get(source) ?? null,
+          this._activeFrames.get(source) ?? null,
+        )
       : [];
     // Drop a slow build that a newer selection already superseded.
     if (epoch === this._rebuildEpoch) {

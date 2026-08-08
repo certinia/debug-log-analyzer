@@ -14,6 +14,7 @@ import {
 } from '../features/call-tree/components/TableShared.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
+import { SelectionEchoGuard } from '../core/events/SelectionEchoGuard.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
@@ -27,14 +28,26 @@ import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
  * The lineage of parent frames that led to an event, outermost first, as a
  * small resizable table (Frame | Total | Self) that mirrors the Call Tree —
  * same `progressFormatterMS` bars (percent of the stack's root frame), column
- * headers, resizable columns. Clicking a frame jumps to it.
+ * headers, resizable columns.
+ *
+ * The list is anchored: `eventIndex` is the frame the stack was built for and
+ * never moves while the user walks it. Clicking a frame makes it the active one
+ * — the row the rest of the inspector follows — which the inspector feeds back
+ * as `activeEventIndex`, so no frame is lost on the way down.
  */
 @customElement('call-stack-detail')
 export class CallStackDetail extends LitElement {
+  /** The frame the stack was built for; the list stays anchored to it. */
   @property({ type: Number })
   eventIndex = -1;
 
+  /** The frame in the stack the inspector is following. */
+  @property({ type: Number })
+  activeEventIndex = -1;
+
   private _table: Tabulator | null = null;
+  /** Guards the select made to mark the active frame. */
+  private _echoGuard = new SelectionEchoGuard();
   private _contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private _menuEventIndex = -1;
@@ -76,6 +89,9 @@ export class CallStackDetail extends LitElement {
   updated(changed: PropertyValues) {
     if (changed.has('eventIndex')) {
       this._rebuild();
+    } else if (changed.has('activeEventIndex')) {
+      // The anchor holds, so the rows are unchanged — only the mark moves.
+      this._markActive();
     }
   }
 
@@ -151,12 +167,35 @@ export class CallStackDetail extends LitElement {
     this._table.on('rowContext', (e, row) => {
       this._showRowMenu(e as MouseEvent, row);
     });
-    // Selecting a frame reveals it in the tab on screen; the inspector adds the
-    // source, since only it knows which tab that is.
+    // Selecting a frame makes it the active one and reveals it in the tab on
+    // screen; the inspector adds the source, since only it knows which tab that
+    // is. The mark this table sets itself is not a pick, so it is guarded.
     this._table.on('rowSelectionChanged', (_data, rows) => {
+      if (this._echoGuard.suppressed) {
+        return;
+      }
       const eventIndex = (rows[0]?.getData() as CallStackRow | undefined)?.eventIndex;
       if (eventIndex !== undefined) {
         dispatchInspectorReveal(this, eventIndex);
+      }
+    });
+    this._table.on('tableBuilt', () => {
+      this._markActive();
+    });
+  }
+
+  /** Marks the active frame in the list, without reporting it as a new pick. */
+  private _markActive(): void {
+    const table = this._table;
+    if (!table) {
+      return;
+    }
+    this._echoGuard.run(() => {
+      for (const selected of table.getSelectedRows()) {
+        selected.deselect();
+      }
+      if (this.activeEventIndex >= 0) {
+        table.selectRow([this.activeEventIndex]);
       }
     });
   }
