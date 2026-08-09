@@ -34,10 +34,15 @@ import './LogOverview.js';
  * range: an explicit row/frame `selection` always wins. A range or other
  * ambient scope only applies when `selection` is `null`, so it belongs inside
  * the `!selection` branch — never above it.
+ *
+ * `activeEventIndex` is the frame the user walked to inside the selection's own
+ * call stack. Details and the call tree follow it; the call stack stays anchored
+ * to `selection`, so walking down a stack never puts a frame out of reach.
  */
 export async function buildDetailSections(
   source: DetailSource,
   selection: DetailSelection | null,
+  activeEventIndex: number | null = null,
 ): Promise<PaneSection[]> {
   // Nothing selected: the whole log is the scope. `DetailDock`'s own empty
   // state still covers the moment before a tab id resolves.
@@ -110,14 +115,22 @@ export async function buildDetailSections(
 
   // The Database grids resolve statement-specific vitals and SOQL lint issues.
   if (source === 'database' && selection.kind === 'event' && selection.type) {
-    return buildDatabaseSections({ eventIndex: selection.eventIndex, type: selection.type });
+    return buildDatabaseSections({
+      eventIndex: selection.eventIndex,
+      type: selection.type,
+      activeEventIndex,
+    });
   }
 
   const isAggregate = selection.kind === 'aggregate';
   // An aggregate scopes to all its occurrences; a single frame to itself.
-  const eventIndex = isAggregate ? (selection.instances[0] ?? -1) : selection.eventIndex;
-  const instances = isAggregate ? selection.instances : null;
-  const label = isAggregate ? selection.label : '';
+  const anchorIndex = isAggregate ? (selection.instances[0] ?? -1) : selection.eventIndex;
+  const active = activeEventIndex ?? anchorIndex;
+  // One frame in the stack is being followed, so the aggregate no longer
+  // describes what Details and the call tree are showing.
+  const following = active !== anchorIndex;
+  const instances = isAggregate && !following ? selection.instances : null;
+  const label = isAggregate && !following ? selection.label : '';
 
   return [
     {
@@ -125,7 +138,7 @@ export async function buildDetailSections(
       title: 'Details',
       fit: 'content',
       content: html`<event-vitals
-        eventIndex=${eventIndex}
+        eventIndex=${active}
         .instances=${instances}
         label=${label}
       ></event-vitals>`,
@@ -134,14 +147,17 @@ export async function buildDetailSections(
       id: 'callstack',
       title: 'Call stack',
       weight: 3,
-      content: html`<call-stack-detail eventIndex=${eventIndex}></call-stack-detail>`,
+      content: html`<call-stack-detail
+        eventIndex=${anchorIndex}
+        activeEventIndex=${active}
+      ></call-stack-detail>`,
     },
     {
       id: 'calltree',
       title: 'Call tree',
       weight: 4,
       content: html`<call-tree-detail
-        eventIndex=${eventIndex}
+        eventIndex=${active}
         .instances=${instances}
       ></call-tree-detail>`,
     },

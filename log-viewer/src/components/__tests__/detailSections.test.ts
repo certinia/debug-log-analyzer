@@ -16,15 +16,37 @@ jest.mock('../HotPath.js', () => ({}));
 jest.mock('../HotSpots.js', () => ({}));
 jest.mock('../LogOverview.js', () => ({}));
 
-const databaseCalls: { eventIndex: number; type: string }[] = [];
+const databaseCalls: { eventIndex: number; type: string; activeEventIndex?: number | null }[] = [];
 jest.mock('../../features/database/components/databaseSections.js', () => ({
-  buildDatabaseSections: async (selection: { eventIndex: number; type: string }) => {
+  buildDatabaseSections: async (selection: {
+    eventIndex: number;
+    type: string;
+    activeEventIndex?: number | null;
+  }) => {
     databaseCalls.push(selection);
     return [{ id: 'vitals', title: 'Details', content: undefined }];
   },
 }));
 
+import { render, type TemplateResult } from 'lit';
+
 import { buildDetailSections } from '../detailSections.js';
+import type { PaneSection } from '../PaneView.js';
+
+/**
+ * The section content is a template, so it is rendered to read what each
+ * component was handed. The components are stubbed above, so nothing upgrades —
+ * only the attributes and properties are set.
+ */
+function rendered(sections: PaneSection[], id: string, tag: string): Element {
+  const host = document.createElement('div');
+  render(sections.find((s) => s.id === id)?.content as TemplateResult, host);
+  const el = host.querySelector(tag);
+  if (!el) {
+    throw new Error(`${tag} not rendered for section ${id}`);
+  }
+  return el;
+}
 
 describe('buildDetailSections', () => {
   it('builds the shared trio for a timeline frame', async () => {
@@ -44,8 +66,36 @@ describe('buildDetailSections', () => {
       type: 'soql',
     });
 
-    expect(databaseCalls).toEqual([{ eventIndex: 9, type: 'soql' }]);
+    expect(databaseCalls).toEqual([{ eventIndex: 9, type: 'soql', activeEventIndex: null }]);
     expect(sections.map((s) => s.id)).toEqual(['vitals']);
+  });
+
+  it('passes the frame walked to on to the database sections', async () => {
+    databaseCalls.length = 0;
+    await buildDetailSections('database', { kind: 'event', eventIndex: 9, type: 'soql' }, 4);
+
+    expect(databaseCalls).toEqual([{ eventIndex: 9, type: 'soql', activeEventIndex: 4 }]);
+  });
+
+  it('anchors the call stack to the selection while the rest follows the active frame', async () => {
+    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 }, 2);
+
+    expect(rendered(sections, 'callstack', 'call-stack-detail').getAttribute('eventIndex')).toBe(
+      '4',
+    );
+    expect(
+      rendered(sections, 'callstack', 'call-stack-detail').getAttribute('activeEventIndex'),
+    ).toBe('2');
+    expect(rendered(sections, 'vitals', 'event-vitals').getAttribute('eventIndex')).toBe('2');
+    expect(rendered(sections, 'calltree', 'call-tree-detail').getAttribute('eventIndex')).toBe('2');
+  });
+
+  it('marks the selection itself active while the user has not walked the stack', async () => {
+    const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 });
+
+    expect(
+      rendered(sections, 'callstack', 'call-stack-detail').getAttribute('activeEventIndex'),
+    ).toBe('4');
   });
 
   it('keeps the shared trio for a database selection that has no statement type', async () => {
@@ -63,6 +113,25 @@ describe('buildDetailSections', () => {
       label: 'MyClass.run()',
     });
     expect(sections.map((s) => s.id)).toEqual(['vitals', 'callstack', 'calltree']);
+    expect(
+      (rendered(sections, 'vitals', 'event-vitals') as HTMLElement & { instances: number[] | null })
+        .instances,
+    ).toEqual([11, 12, 13]);
+  });
+
+  it('drops the aggregate once a single frame in its stack is the one being followed', async () => {
+    const sections = await buildDetailSections(
+      'analysis',
+      { kind: 'aggregate', instances: [11, 12, 13], label: 'MyClass.run()' },
+      8,
+    );
+
+    const vitals = rendered(sections, 'vitals', 'event-vitals') as HTMLElement & {
+      instances: number[] | null;
+    };
+    expect(vitals.getAttribute('eventIndex')).toBe('8');
+    expect(vitals.instances).toBeNull();
+    expect(vitals.getAttribute('label')).toBe('');
   });
 
   it('builds only the whole-log overview for the database with nothing selected', async () => {
