@@ -18,6 +18,8 @@ jest.mock('tabulator-tables', () => {
     redraw = jest.fn();
     destroy = jest.fn();
     on = jest.fn();
+    getSelectedRows = jest.fn(() => []);
+    selectRow = jest.fn();
     options: Record<string, unknown>;
     constructor(_element: HTMLElement, options: Record<string, unknown>) {
       this.options = options;
@@ -52,6 +54,7 @@ interface StubTable {
   setData: jest.Mock;
   redraw: jest.Mock;
   destroy: jest.Mock;
+  selectRow: jest.Mock;
 }
 
 /** The stub tables built so far, oldest first. */
@@ -153,6 +156,22 @@ describe('CallTreeDetail scoped build', () => {
     expect(tables.instances).toHaveLength(1);
     expect(table.destroy).not.toHaveBeenCalled();
     expect(table.setData).toHaveBeenCalledTimes(2);
+  });
+
+  it('moves the mark without re-walking, since the anchor holds the scope', async () => {
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
+    const el = await mount(5);
+    await frame(el);
+    const table = tables.instances[0]!;
+    build.mockClear();
+    table.setData.mockClear();
+
+    el.activeEventIndex = 9;
+    await frame(el);
+
+    expect(table.selectRow).toHaveBeenCalledWith([9]);
+    expect(build).not.toHaveBeenCalled();
+    expect(table.setData).not.toHaveBeenCalled();
   });
 
   it('retargets the percentage denominator without touching the bar width', async () => {

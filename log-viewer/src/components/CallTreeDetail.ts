@@ -25,6 +25,7 @@ import {
 import { makeSumSelfTimeAllVisible } from '../features/call-tree/utils/BottomCalcs.js';
 import { eventLabel } from '../features/call-tree/utils/eventText.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
+import { SelectionEchoGuard } from '../core/events/SelectionEchoGuard.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
@@ -114,6 +115,11 @@ export class CallTreeDetail extends LitElement {
   @property({ attribute: false })
   instances: number[] | null = null;
 
+  /** The frame the user walked to inside the scope. It only moves the mark: the
+   *  scope is anchored on `eventIndex`, so the trees are never rebuilt for it. */
+  @property({ type: Number })
+  activeEventIndex = -1;
+
   /** True shows the whole log rooted at the log itself — real durations,
    *  nothing scoped or attributed. `eventIndex`/`instances` are then ignored. */
   @property({ type: Boolean })
@@ -157,6 +163,9 @@ export class CallTreeDetail extends LitElement {
   private _contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private _menuEventIndex = -1;
+
+  /** Guards the mark this component sets itself, so it is never read as a pick. */
+  private _echoGuard = new SelectionEchoGuard();
 
   // A whole-log tree can mount before the first parse finishes (the scoped
   // tree cannot — a selection implies a parsed log), so rebuild when the log
@@ -236,7 +245,29 @@ export class CallTreeDetail extends LitElement {
     }
     if (scopeChanged || changed.has('viewMode')) {
       void this._showActive();
+    } else if (changed.has('activeEventIndex')) {
+      // The anchor holds, so the rows are unchanged — only the mark moves.
+      this._markActive();
     }
+  }
+
+  /**
+   * Marks the active frame, without reporting it as a new pick. Only Time Order
+   * keys its rows by event, so the grouped modes have nothing to mark.
+   */
+  private _markActive(): void {
+    const table = this._tables[this.viewMode]?.table;
+    if (!table) {
+      return;
+    }
+    this._echoGuard.run(() => {
+      for (const selected of table.getSelectedRows()) {
+        selected.deselect();
+      }
+      if (this.viewMode === 'time-order' && this.activeEventIndex >= 0) {
+        table.selectRow([this.activeEventIndex]);
+      }
+    });
   }
 
   /**
@@ -350,7 +381,7 @@ export class CallTreeDetail extends LitElement {
     const slot = this._tables[mode];
     if (slot) {
       slot.stale = false;
-      void slot.table.setData(data);
+      void slot.table.setData(data).then(() => this._markActive());
       return;
     }
     if (!scoped) {
@@ -424,10 +455,16 @@ export class CallTreeDetail extends LitElement {
     // bottom-up rows merge occurrences behind a synthetic negative id, so
     // revealing one would misname which occurrence was clicked.
     table.on('rowSelectionChanged', (_data, rows) => {
+      if (this._echoGuard.suppressed) {
+        return;
+      }
       const eventIndex = revealableEventIndex(rows[0]?.getData() as Partial<ScopedRow> | undefined);
       if (eventIndex !== null) {
         dispatchInspectorReveal(this, eventIndex);
       }
+    });
+    table.on('tableBuilt', () => {
+      this._markActive();
     });
     this._tables[mode] = { table, stale: false };
   }

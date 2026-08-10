@@ -77,7 +77,7 @@ describe('buildDetailSections', () => {
     expect(databaseCalls).toEqual([{ eventIndex: 9, type: 'soql', activeEventIndex: 4 }]);
   });
 
-  it('anchors the call stack to the selection while the rest follows the active frame', async () => {
+  it('anchors the stack and the tree to the selection, while Details follows the active frame', async () => {
     const sections = await buildDetailSections('timeline', { kind: 'event', eventIndex: 4 }, 2);
 
     expect(rendered(sections, 'callstack', 'call-stack-detail').getAttribute('eventIndex')).toBe(
@@ -87,7 +87,10 @@ describe('buildDetailSections', () => {
       rendered(sections, 'callstack', 'call-stack-detail').getAttribute('activeEventIndex'),
     ).toBe('2');
     expect(rendered(sections, 'vitals', 'event-vitals').getAttribute('eventIndex')).toBe('2');
-    expect(rendered(sections, 'calltree', 'call-tree-detail').getAttribute('eventIndex')).toBe('2');
+    expect(rendered(sections, 'calltree', 'call-tree-detail').getAttribute('eventIndex')).toBe('4');
+    expect(
+      rendered(sections, 'calltree', 'call-tree-detail').getAttribute('activeEventIndex'),
+    ).toBe('2');
   });
 
   it('marks the selection itself active while the user has not walked the stack', async () => {
