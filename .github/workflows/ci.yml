@@ -76,3 +76,8 @@ jobs:
         run: |
           cd lana
           vsce package --no-dependencies
+
+  e2e:
+    name: E2E
+    needs: [verify_files, tests, build]
+    uses: ./.github/workflows/e2e.yml
