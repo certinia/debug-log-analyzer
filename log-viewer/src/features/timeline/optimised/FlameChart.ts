@@ -1931,6 +1931,17 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
+   * Mark a frame as located - an outline ring only, drawn where the frame already
+   * is. Nothing is selected and the viewport never moves, so an off-screen frame
+   * shows nothing. Pass null to drop the mark.
+   *
+   * @param eventNode - The EventNode containing an original reference to find, or null
+   */
+  public locateByEventNode(eventNode: EventNode | null): void {
+    this.selectionOrchestrator?.setLocatedNode(eventNode);
+  }
+
+  /**
    * Clear the current frame or marker selection (a no-op when nothing is
    * selected). The selection-change callbacks fire with null.
    */
@@ -2221,6 +2232,9 @@ export class FlameChart<E extends EventNode = EventNode> {
    */
   private renderHighlights(viewportState: ViewportState): void {
     const highlightMode = this.getHighlightMode();
+
+    // Independent of the mode: a located frame is neither a selection nor a match.
+    this.selectionOrchestrator?.renderLocate({ viewportState });
 
     if (highlightMode === 'selection') {
       this.selectionOrchestrator?.render({ viewportState });

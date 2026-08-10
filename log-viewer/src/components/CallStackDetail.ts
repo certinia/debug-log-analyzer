@@ -21,7 +21,7 @@ import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import { buildCallStackData, type CallStackRow } from './callStackData.js';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
-import { dispatchInspectorReveal } from './inspectorReveal.js';
+import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 
 /**
@@ -106,6 +106,11 @@ export class CallStackDetail extends LitElement {
     if (!container) {
       return;
     }
+    // The table about to be destroyed can't report the pointer leaving its rows,
+    // so any mark it asked for is dropped here.
+    if (this._table) {
+      dispatchInspectorLocate(this, null);
+    }
     // Percentages are relative to this stack's root frame, so totalValue changes
     // per selection — rebuild rather than setData to refresh the column params.
     this._table?.destroy();
@@ -178,6 +183,17 @@ export class CallStackDetail extends LitElement {
       if (eventIndex !== undefined) {
         dispatchInspectorReveal(this, eventIndex);
       }
+    });
+    // Hovering a frame marks it in the tab on screen, so the user can see where
+    // it sits before deciding to pick it.
+    this._table.on('rowMouseEnter', (_e, row) => {
+      const eventIndex = (row.getData() as CallStackRow).eventIndex;
+      if (eventIndex !== undefined) {
+        dispatchInspectorLocate(this, eventIndex);
+      }
+    });
+    this._table.on('rowMouseLeave', () => {
+      dispatchInspectorLocate(this, null);
     });
     this._table.on('tableBuilt', () => {
       this._markActive();

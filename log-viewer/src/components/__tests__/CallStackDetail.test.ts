@@ -43,7 +43,12 @@ jest.mock('../callStackData.js', () => ({
 
 import type { CallStackDetail } from '../CallStackDetail.js';
 import '../CallStackDetail.js';
-import { INSPECTOR_REVEAL_EVENT, type InspectorRevealEvent } from '../inspectorReveal.js';
+import {
+  INSPECTOR_LOCATE_EVENT,
+  INSPECTOR_REVEAL_EVENT,
+  type InspectorLocateEvent,
+  type InspectorRevealEvent,
+} from '../inspectorReveal.js';
 
 async function mount(eventIndex: number): Promise<CallStackDetail> {
   const el = document.createElement('call-stack-detail') as CallStackDetail;
@@ -109,6 +114,30 @@ describe('CallStackDetail', () => {
 
     expect(selected).toEqual([[4]]);
     expect(seen).toEqual([]);
+    el.remove();
+  });
+
+  it('locates the hovered frame, and drops the mark when the pointer leaves', async () => {
+    const el = await mount(4);
+    selected.length = 0;
+
+    const seen: (number | null)[] = [];
+    const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail.eventIndex);
+    const picked: number[] = [];
+    const revealed = (e: Event) => picked.push((e as InspectorRevealEvent).detail.eventIndex);
+    document.addEventListener(INSPECTOR_LOCATE_EVENT, located);
+    document.addEventListener(INSPECTOR_REVEAL_EVENT, revealed);
+
+    handlers.rowMouseEnter?.({}, { getData: () => ({ eventIndex: 9 }) });
+    handlers.rowMouseLeave?.({}, { getData: () => ({ eventIndex: 9 }) });
+
+    document.removeEventListener(INSPECTOR_LOCATE_EVENT, located);
+    document.removeEventListener(INSPECTOR_REVEAL_EVENT, revealed);
+
+    expect(seen).toEqual([9, null]);
+    // Hovering never picks a frame.
+    expect(picked).toEqual([]);
+    expect(selected).toEqual([]);
     el.remove();
   });
 

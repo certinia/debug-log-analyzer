@@ -71,7 +71,7 @@ import { eventBus } from '../../core/events/EventBus.js';
 import type { LogInspector } from '../LogInspector.js';
 import type { PaneView } from '../PaneView.js';
 import '../LogInspector.js';
-import { dispatchInspectorReveal } from '../inspectorReveal.js';
+import { dispatchInspectorLocate, dispatchInspectorReveal } from '../inspectorReveal.js';
 
 /**
  * Settles the async section build and the render chain through the nested
@@ -305,6 +305,42 @@ describe('LogInspector', () => {
     el.activeTab = 'timeline-tab';
     await flush(el);
     expect([marker(el), activeMarker(el)]).toEqual(['1', '5']);
+  });
+
+  it('stamps the active tab on a locate, and does not disturb the panel', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    await flush(el);
+
+    const seen: Array<{ source: string; eventIndex: number | null }> = [];
+    const off = eventBus.on('inspector:locate', (d) => seen.push(d));
+    dispatchInspectorLocate(dockLayout(el), 5);
+    dispatchInspectorLocate(dockLayout(el), null);
+    off();
+
+    expect(seen).toEqual([
+      { source: 'timeline', eventIndex: 5 },
+      { source: 'timeline', eventIndex: null },
+    ]);
+    // A locate picks nothing, so neither the anchor nor the walk moves.
+    await flush(el);
+    expect([marker(el), activeMarker(el)]).toEqual(['1', '-']);
+  });
+
+  it('drops a mark the pointer never left when the tab changes', async () => {
+    const el = await mount('timeline-tab');
+    select('timeline', 1);
+    select('database', 2);
+    await flush(el);
+    dispatchInspectorLocate(dockLayout(el), 5);
+
+    const seen: Array<{ source: string; eventIndex: number | null }> = [];
+    const off = eventBus.on('inspector:locate', (d) => seen.push(d));
+    el.activeTab = 'database-tab';
+    await flush(el);
+    off();
+
+    expect(seen).toEqual([{ source: 'timeline', eventIndex: null }]);
   });
 
   it('drops a reveal from a tab with no inspectable view', async () => {

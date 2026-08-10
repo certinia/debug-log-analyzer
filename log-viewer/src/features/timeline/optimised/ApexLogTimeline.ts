@@ -64,6 +64,7 @@ export class ApexLogTimeline {
   private selectedMarkerForContextMenu: TimelineMarker | null = null;
   private eventBusUnsubscribe: (() => void) | null = null;
   private inspectorRevealUnsubscribe: (() => void) | null = null;
+  private inspectorLocateUnsubscribe: (() => void) | null = null;
   private selectionClearUnsubscribe: (() => void) | null = null;
   /** Guards the programmatic select made on the inspector's behalf. */
   private echoGuard = new SelectionEchoGuard();
@@ -214,6 +215,14 @@ export class ApexLogTimeline {
       }
     });
 
+    // Ring the frame under the inspector's pointer, while the timeline is the tab
+    // the inspector is showing.
+    this.inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
+      if (detail.source === 'timeline') {
+        this.locateFrameByEventIndex(detail.eventIndex);
+      }
+    });
+
     // Escape (app-wide) deselects here; the chart reports the clear itself.
     // The flame chart's own Escape (container focused) consumes the key first.
     this.selectionClearUnsubscribe = eventBus.on('selection:clear', (detail) => {
@@ -251,6 +260,20 @@ export class ApexLogTimeline {
     ) {
       this.flamechart.centerOnSelectedFrame();
     }
+  }
+
+  /**
+   * Ring the frame for `eventIndex`, or drop the ring with null. Never selects and
+   * never pans: a frame outside the viewport just shows nothing.
+   */
+  private locateFrameByEventIndex(eventIndex: number | null): void {
+    if (eventIndex === null || !this.apexLog) {
+      this.flamechart.locateByEventNode(null);
+      return;
+    }
+
+    const result = findEventByEventIndex(this.apexLog, eventIndex);
+    this.flamechart.locateByEventNode(result ? this.toEventNode(result) : null);
   }
 
   /**
@@ -333,6 +356,10 @@ export class ApexLogTimeline {
     if (this.inspectorRevealUnsubscribe) {
       this.inspectorRevealUnsubscribe();
       this.inspectorRevealUnsubscribe = null;
+    }
+    if (this.inspectorLocateUnsubscribe) {
+      this.inspectorLocateUnsubscribe();
+      this.inspectorLocateUnsubscribe = null;
     }
     if (this.selectionClearUnsubscribe) {
       this.selectionClearUnsubscribe();

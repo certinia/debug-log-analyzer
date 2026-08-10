@@ -21,3 +21,23 @@ export function dispatchInspectorReveal(source: HTMLElement, eventIndex: number)
     }),
   );
 }
+
+/** Name of the DOM event an inspector section raises for the row under the pointer. */
+export const INSPECTOR_LOCATE_EVENT = 'inspector-locate';
+
+export type InspectorLocateEvent = CustomEvent<{ eventIndex: number | null }>;
+
+/**
+ * Mark `eventIndex` in the tab on screen while the pointer is over the row that
+ * names it, and nothing more - no selection, no scroll. `null` on the way out.
+ * Routed like {@link dispatchInspectorReveal}, and for the same reason.
+ */
+export function dispatchInspectorLocate(source: HTMLElement, eventIndex: number | null): void {
+  source.dispatchEvent(
+    new CustomEvent(INSPECTOR_LOCATE_EVENT, {
+      detail: { eventIndex },
+      bubbles: true,
+      composed: true,
+    }),
+  );
+}
