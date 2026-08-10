@@ -51,10 +51,10 @@ jobs:
       package-manager-version: '10'
       cache-dependency-path: pnpm-lock.yaml
       install-command: pnpm run ci:install
-      package-command: (cd lana && pnpm dlx @vscode/vsce package --no-dependencies --out lana.vsix)
-      prerelease-package-command: (cd lana && pnpm dlx @vscode/vsce package --pre-release --no-dependencies --out lana.vsix)
-      web-package-command: (cd lana && pnpm dlx @vscode/vsce package --target web --no-dependencies --out lana-web.vsix)
-      web-prerelease-package-command: (cd lana && pnpm dlx @vscode/vsce package --target web --pre-release --no-dependencies --out lana-web.vsix)
+      package-command: (cd lana && pnpm dlx @vscode/vsce package --no-dependencies --out "lana-$(node -p \"require('./package.json').version\").vsix")
+      prerelease-package-command: (cd lana && pnpm dlx @vscode/vsce package --pre-release --no-dependencies --out "lana-$(node -p \"require('./package.json').version\").vsix")
+      web-package-command: (cd lana && pnpm dlx @vscode/vsce package --target web --no-dependencies --out "lana-web-$(node -p \"require('./package.json').version\").vsix")
+      web-prerelease-package-command: (cd lana && pnpm dlx @vscode/vsce package --target web --pre-release --no-dependencies --out "lana-web-$(node -p \"require('./package.json').version\").vsix")
       artifact-glob: lana/*.vsix
       publish-web-vsix: true
     secrets: inherit
