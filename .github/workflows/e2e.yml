@@ -1,0 +1,72 @@
+name: E2E
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+# E2E tests only need repository contents. Publishing credentials are never exposed.
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Node and install dependencies
+        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@ph/W-23773464-enable-pnpm-workflows
+        with:
+          node-version: '24'
+          package-manager: pnpm
+          package-manager-version: '10'
+          cache-dependency-path: pnpm-lock.yaml
+          install-command: pnpm run ci:install
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run web E2E tests
+        run: pnpm run test:e2e:web
+      - name: Upload web test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-web-results
+          path: |
+            lana/playwright-report/web/
+            lana/test-results/web/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  desktop:
+    name: Desktop E2E (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Set up Node and install dependencies
+        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@ph/W-23773464-enable-pnpm-workflows
+        with:
+          node-version: '24'
+          package-manager: pnpm
+          package-manager-version: '10'
+          cache-dependency-path: pnpm-lock.yaml
+          install-command: pnpm run ci:install
+      - name: Run desktop E2E tests
+        run: pnpm run test:e2e:desktop
+      - name: Upload desktop test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-desktop-results-${{ matrix.os }}
+          path: |
+            lana/playwright-report/desktop/
+            lana/test-results/desktop/
+          if-no-files-found: ignore
+          retention-days: 14
