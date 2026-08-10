@@ -37,7 +37,7 @@ jobs:
   publish:
     uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@ph/W-23773464-enable-pnpm-workflows
     with:
-      branch: main
+      branch: ${{ github.ref_name }}
       extensions: lana
       registries: ${{ inputs.registries }}
       pre-release: ${{ inputs.release-type == 'prerelease' }}
