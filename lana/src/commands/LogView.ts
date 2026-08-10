@@ -72,7 +72,7 @@ export class LogView {
     const bundleUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'bundle.js'));
     const codiconUri = panel.webview.asWebviewUri(Utils.joinPath(logViewerRoot, 'codicon.css'));
     const indexSrc = await this.getFile(indexUri);
-    panel.iconPath = Utils.joinPath(logViewerRoot, 'certinia-icon-color.png');
+    panel.iconPath = Utils.joinPath(logViewerRoot, 'salesforce-icon.png');
     panel.webview.html = indexSrc
       .replace(/bundle\.js/gi, bundleUri.toString(true))
       .replace(/codicon\.css/gi, codiconUri.toString(true));

@@ -8,4 +8,8 @@ dist/
 build/
 out/
 coverage/
+playwright-report/
+test-results/
+.vscode-test/
+.vscode-test-web/
 *.tsbuildinfo

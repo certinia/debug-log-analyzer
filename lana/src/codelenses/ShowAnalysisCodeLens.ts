@@ -2,7 +2,7 @@ import { CodeLens, Range, languages, type CodeLensProvider, type TextDocument } 
 
 import type { Context } from '../Context.js';
 import { ShowLogAnalysis } from '../commands/ShowLogAnalysis.js';
-import { isApexLogContent } from '../language/ApexLogLanguageDetector.js';
+import { APEX_LOG_URI_SCHEMES, isApexLogContent } from '../language/ApexLogLanguageDetector.js';
 
 class ShowAnalysisCodeLens implements CodeLensProvider {
   context: Context;
@@ -28,11 +28,11 @@ class ShowAnalysisCodeLens implements CodeLensProvider {
   }
 
   static apply(context: Context): void {
-    const docSelector = [
-      { scheme: 'file', language: 'apexlog' },
-      { scheme: 'file', pattern: '**/*.log' },
-      { scheme: 'file', pattern: '**/*.txt' },
-    ];
+    const docSelector = APEX_LOG_URI_SCHEMES.flatMap((scheme) => [
+      { scheme, language: 'apexlog' },
+      { scheme, pattern: '**/*.log' },
+      { scheme, pattern: '**/*.txt' },
+    ]);
 
     const codeLensProviderDisposable = languages.registerCodeLensProvider(
       docSelector,

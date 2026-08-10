@@ -1,14 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import {
-  Position,
-  Selection,
-  ViewColumn,
-  workspace,
-  type TextDocumentShowOptions,
-  type Uri,
-} from 'vscode';
+import { Position, Selection, ViewColumn, workspace, type TextDocumentShowOptions } from 'vscode';
 import { Utils } from 'vscode-uri';
 
 import type { Context } from '../Context.js';
@@ -51,7 +44,7 @@ export class OpenFileInPackage {
         selection: new Selection(pos, pos),
       };
 
-      context.display.showFile(uri.fsPath, options);
+      context.display.showFile(uri, options);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       context.display.showErrorMessage(`Unable to open '${symbolName}': ${message}`);

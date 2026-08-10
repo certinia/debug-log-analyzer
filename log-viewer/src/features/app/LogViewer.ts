@@ -126,9 +126,12 @@ export class LogViewer extends LitElement {
 
   constructor() {
     super();
-    vscodeMessenger.request<LogDataEvent>('fetchLog').then((msg) => {
-      this._handleLogFetch(msg);
-    });
+    vscodeMessenger
+      .request<LogDataEvent>('fetchLog')
+      .then((msg) => this._handleLogFetch(msg))
+      .catch((error: unknown) => {
+        this.logProblems = [this._logRequestError(error)];
+      });
 
     document.addEventListener('show-tab', (e: Event) => {
       this._showTabEvent(e);
@@ -283,6 +286,18 @@ export class LogViewer extends LitElement {
       this._navigateToEventIndex = data.navigateToEventIndex;
       this._navigateToTimestamp = data.navigateToTimestamp;
     }
+  }
+
+  private _logRequestError(error: unknown): LogIssue {
+    return {
+      summary: 'Could not load log',
+      message: error instanceof Error ? error.message : String(error),
+      severity: 'error',
+      label: null,
+      action: null,
+      category: null,
+      timestamp: null,
+    };
   }
 
   /**
