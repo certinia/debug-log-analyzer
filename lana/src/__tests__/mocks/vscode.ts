@@ -123,6 +123,14 @@ export const Uri = {
   },
 };
 
+export class TabInputText {
+  uri: URI;
+
+  constructor(uri: URI) {
+    this.uri = uri;
+  }
+}
+
 // Mock RelativePattern (constructor used for glob searches)
 export const RelativePattern = jest.fn();
 
@@ -326,6 +334,11 @@ export const window = {
   })),
   createWebviewPanel: jest.fn(),
   activeTextEditor: undefined as unknown,
+  tabGroups: {
+    activeTabGroup: {
+      activeTab: undefined as unknown,
+    },
+  },
   visibleTextEditors: [],
   onDidChangeActiveTextEditor: jest.fn(() => ({ dispose: jest.fn() })),
   onDidChangeVisibleTextEditors: jest.fn(() => ({ dispose: jest.fn() })),

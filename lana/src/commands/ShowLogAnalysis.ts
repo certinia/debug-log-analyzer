@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { type Uri, window } from 'vscode';
+import { TabInputText, type Uri, window } from 'vscode';
 
 import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
@@ -32,7 +32,11 @@ export class ShowLogAnalysis {
   }
 
   private static async command(context: Context, uri: Uri): Promise<void> {
-    const logUri = uri || window?.activeTextEditor?.document.uri;
+    const activeTab = window.tabGroups.activeTabGroup.activeTab;
+    const logUri =
+      uri ||
+      window?.activeTextEditor?.document.uri ||
+      (activeTab?.input instanceof TabInputText ? activeTab.input.uri : undefined);
     if (!logUri) {
       context.display.showErrorMessage(
         'No file selected or the file is too large. Try again using the file explorer or text editor command.',

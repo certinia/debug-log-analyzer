@@ -106,27 +106,27 @@
       "editor/context": [
         {
           "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog || lana.isApexLog"
+          "when": "resourceLangId == apexlog || lana.isApexLog || resourceExtname == .log"
         }
       ],
       "editor/title/context": [
         {
           "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog || lana.isApexLog",
+          "when": "resourceLangId == apexlog || lana.isApexLog || resourceExtname == .log",
           "group": "lana"
         }
       ],
       "editor/title/run": [
         {
           "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog || lana.isApexLog",
+          "when": "resourceLangId == apexlog || lana.isApexLog || resourceExtname == .log",
           "group": "lana"
         }
       ],
       "explorer/context": [
         {
           "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog || lana.isApexLog"
+          "when": "resourceLangId == apexlog || lana.isApexLog || resourceExtname == .log"
         }
       ]
     },

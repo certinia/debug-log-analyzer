@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { Uri, window } from 'vscode';
+import { TabInputText, Uri, window } from 'vscode';
 
 import { createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { fileOrFolderExists } from '../../services/salesforceServices.js';
@@ -57,6 +57,32 @@ describe('ShowLogAnalysis', () => {
     Object.defineProperty(window, 'activeTextEditor', {
       configurable: true,
       value: activeTextEditor,
+    });
+  });
+
+  it('uses the active text tab when no editor is available', async () => {
+    const context = createMockContext();
+    const logUri = Uri.parse('file:///sample-log.log');
+    const activeTextEditor = window.activeTextEditor;
+    const activeTab = window.tabGroups.activeTabGroup.activeTab;
+    Object.defineProperty(window, 'activeTextEditor', { configurable: true, value: undefined });
+    Object.defineProperty(window.tabGroups.activeTabGroup, 'activeTab', {
+      configurable: true,
+      value: { input: new TabInputText(logUri) },
+    });
+
+    await ShowLogAnalysis.getCommand(
+      context as unknown as import('../../Context.js').Context,
+    ).run();
+
+    expect(mockCreateView).toHaveBeenCalledWith(context, expect.any(Promise), logUri, undefined);
+    Object.defineProperty(window, 'activeTextEditor', {
+      configurable: true,
+      value: activeTextEditor,
+    });
+    Object.defineProperty(window.tabGroups.activeTabGroup, 'activeTab', {
+      configurable: true,
+      value: activeTab,
     });
   });
 });
