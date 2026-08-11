@@ -89,7 +89,6 @@ export class ApexLogTimeline {
 
     // Create tooltip manager for Apex-specific tooltips
     this.tooltipRenderer = new FrameTooltipRenderer(container, {
-      enableFlip: true,
       cursorOffset: 10,
       categoryColors: colorMap,
       apexLog: apexLog,

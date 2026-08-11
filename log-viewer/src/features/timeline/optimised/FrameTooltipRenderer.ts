@@ -15,9 +15,7 @@ import {
   formatDuration,
   formatWallClockTime,
 } from '../../../core/utility/Util.js';
-import { budgetedChunks, type SoqlBudget } from '../../soql/format/budget.js';
-import { CLASS_BY_KIND } from '../../soql/format/renderInline.js';
-import { tokenize, type Dialect } from '../../soql/format/tokenize.js';
+import { formatSOQL, type Dialect, type SoqlBudget } from '../../soql/format/formatter.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 import { formatNumber } from './rendering/tooltip-utils.js';
 
@@ -55,9 +53,6 @@ export interface TooltipAnchor {
  * Configuration options for tooltip behavior.
  */
 export interface TooltipOptions {
-  /** Whether to flip tooltip position if it goes off-screen. Default: true */
-  enableFlip: boolean;
-
   /** Offset from cursor in pixels. Default: 10px */
   cursorOffset: number;
 
@@ -84,7 +79,6 @@ export class FrameTooltipRenderer {
   private currentEvent: LogEvent | null = null;
   private currentTruncationMarker: TimelineMarker | null = null;
   private currentAnchor: TooltipAnchor | null = null;
-  private visible = false;
   private enabled = true;
   /** Which side of the frame band the panel is on. Sticky, so it does not flip as X moves. */
   private anchorBelow = false;
@@ -97,23 +91,20 @@ export class FrameTooltipRenderer {
   private queryBudget: SoqlBudget | null = null;
   private resizeObserver: ResizeObserver | null = null;
 
+  /** The panel's own state: `data-visible` is what the stylesheet fades on. */
+  private get visible(): boolean {
+    return this.tooltipElement?.dataset.visible === 'true';
+  }
+
   constructor(
     container: HTMLElement,
     options: TooltipOptions = {
       categoryColors: {},
       cursorOffset: 10,
-      enableFlip: true,
     },
   ) {
     this.container = container;
-
-    // Apply default options
-    this.options = {
-      enableFlip: options.enableFlip,
-      cursorOffset: options.cursorOffset,
-      categoryColors: options.categoryColors,
-      apexLog: options.apexLog,
-    };
+    this.options = { ...options };
 
     this.createTooltipElement();
     this.observeResize();
@@ -164,7 +155,7 @@ export class FrameTooltipRenderer {
       if (this.currentEvent !== event || this.currentTruncationMarker) {
         this.currentEvent = event;
         this.currentTruncationMarker = null;
-        this.displayTooltip(event, anchor);
+        this.displayContent(this.generateTooltipContent(event), anchor);
       } else if (!options?.keepPosition && this.anchorMoved(anchor)) {
         this.currentAnchor = anchor;
         this.anchorTooltip(anchor);
@@ -192,7 +183,7 @@ export class FrameTooltipRenderer {
       if (this.currentTruncationMarker !== marker || this.currentEvent) {
         this.currentEvent = null;
         this.currentTruncationMarker = marker;
-        this.displayTruncationTooltip(marker, anchor);
+        this.displayContent(this.generateTruncationTooltipContent(marker), anchor);
       } else if (this.anchorMoved(anchor)) {
         this.currentAnchor = anchor;
         this.anchorTooltip(anchor);
@@ -238,7 +229,6 @@ export class FrameTooltipRenderer {
       this.tooltipElement.dataset.visible = 'false';
     }
 
-    this.visible = false;
     this.currentEvent = null;
     this.currentTruncationMarker = null;
     this.currentAnchor = null;
@@ -275,9 +265,9 @@ export class FrameTooltipRenderer {
         return;
       }
       if (next.kind === 'event') {
-        this.displayTooltip(next.event, next.anchor);
+        this.displayContent(this.generateTooltipContent(next.event), next.anchor);
       } else {
-        this.displayTruncationTooltip(next.marker, next.anchor);
+        this.displayContent(this.generateTruncationTooltipContent(next.marker), next.anchor);
       }
     }, SHOW_DELAY_MS);
   }
@@ -321,20 +311,6 @@ export class FrameTooltipRenderer {
     this.options.categoryColors = colors;
   }
 
-  /**
-   * Display tooltip with event information.
-   */
-  private displayTooltip(event: LogEvent, anchor: TooltipAnchor): void {
-    this.displayContent(this.generateTooltipContent(event), anchor);
-  }
-
-  /**
-   * Display tooltip with truncation marker information.
-   */
-  private displayTruncationTooltip(marker: TimelineMarker, anchor: TooltipAnchor): void {
-    this.displayContent(this.generateTruncationTooltipContent(marker), anchor);
-  }
-
   /** Swap the panel content, make it visible, and place it. */
   private displayContent(content: HTMLDivElement | null, anchor: TooltipAnchor): void {
     if (!this.tooltipElement) {
@@ -349,7 +325,6 @@ export class FrameTooltipRenderer {
     }
 
     this.tooltipElement.dataset.visible = 'true';
-    this.visible = true;
     // A new frame picks its side afresh; only movement within one frame is sticky.
     this.anchorBelow = false;
     this.currentAnchor = anchor;
@@ -558,14 +533,12 @@ export class FrameTooltipRenderer {
       return undefined;
     }
 
-    const cached = this.descriptionCache.get(event);
-    if (cached) {
-      return { node: cached.node.cloneNode(true) as HTMLDivElement, more: cached.more };
+    let block = this.descriptionCache.get(event);
+    if (!block) {
+      block = this.buildQueryPreview(text, isSosl ? 'sosl' : 'soql');
+      this.descriptionCache.set(event, block);
     }
-
-    const built = this.buildQueryPreview(text, isSosl ? 'sosl' : 'soql');
-    this.descriptionCache.set(event, built);
-    return { node: built.node.cloneNode(true) as HTMLDivElement, more: built.more };
+    return { node: block.node.cloneNode(true) as HTMLDivElement, more: block.more };
   }
 
   /**
@@ -584,23 +557,7 @@ export class FrameTooltipRenderer {
       return { node, more: 'query too large to format' };
     }
 
-    for (const chunk of budgetedChunks(tokenize(text, dialect), this.getQueryBudget())) {
-      if (typeof chunk === 'string') {
-        node.appendChild(document.createTextNode(chunk));
-        continue;
-      }
-
-      const cls = CLASS_BY_KIND[chunk.kind];
-      if (cls) {
-        const span = document.createElement('span');
-        span.className = cls;
-        span.textContent = chunk.text;
-        node.appendChild(span);
-      } else {
-        node.appendChild(document.createTextNode(chunk.text));
-      }
-    }
-
+    node.innerHTML = formatSOQL(text, { mode: 'pretty', dialect, budget: this.getQueryBudget() });
     return { node, more: null };
   }
 
@@ -835,7 +792,6 @@ export class FrameTooltipRenderer {
     this.currentEvent = null;
     this.currentTruncationMarker = null;
     this.currentAnchor = null;
-    this.visible = false;
     this.descriptionCache = new WeakMap();
   }
 }

@@ -4,7 +4,7 @@
 import type { Token } from './tokenize.js';
 
 /** Keywords that open a clause. `GROUP` and `ORDER` take the following `BY`. */
-const CLAUSE_KEYWORDS = new Set<string>([
+export const CLAUSE_KEYWORDS = new Set<string>([
   'SELECT',
   'FROM',
   'WHERE',
@@ -18,9 +18,14 @@ const CLAUSE_KEYWORDS = new Set<string>([
   'FIND',
   'RETURNING',
   'USING',
+  'TYPEOF',
 ]);
 
-const COND_JOIN = new Set<string>(['AND', 'OR']);
+/** Keywords that join two conditions. */
+export const COND_JOIN = new Set<string>(['AND', 'OR']);
+
+/** One level of indent, shared by every layout. */
+export const INDENT = '  ';
 
 /** One clause of a query: its keyword tokens, and every token up to the next clause. */
 export interface Clause {
@@ -43,7 +48,7 @@ export interface ConditionGroup {
 
 export type ConditionNode = { kind: 'leaf'; tokens: Token[] } | ConditionGroup;
 
-function isPunct(token: Token | undefined, text: string): boolean {
+export function isPunct(token: Token | undefined, text: string): boolean {
   return !!token && token.kind === 'punct' && token.text === text;
 }
 

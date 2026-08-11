@@ -146,7 +146,6 @@ describe('FrameTooltipRenderer', () => {
       frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: { Apex: '#88ae58' },
         cursorOffset: 20,
-        enableFlip: true,
       });
 
       showSettled(createEvent(0, 100), cursorAnchor(100, 100));
@@ -395,7 +394,6 @@ describe('FrameTooltipRenderer', () => {
       frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: { Apex: '#88ae58' },
         cursorOffset: 10,
-        enableFlip: true,
       });
 
       showSettled(createEvent(0, 100, 'Event', 'Apex'), cursorAnchor(100, 100));
@@ -429,7 +427,6 @@ describe('FrameTooltipRenderer', () => {
       frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: {},
         cursorOffset: 10,
-        enableFlip: true,
         apexLog: mockApexLog as never,
       });
 
@@ -448,7 +445,6 @@ describe('FrameTooltipRenderer', () => {
       frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: {},
         cursorOffset: 10,
-        enableFlip: true,
         apexLog: { startTime: null, timestamp: 0 } as never,
       });
 
@@ -663,7 +659,6 @@ describe('FrameTooltipRenderer', () => {
       frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: {},
         cursorOffset: 20,
-        enableFlip: true,
       });
       sizeTooltip(200, 100);
 

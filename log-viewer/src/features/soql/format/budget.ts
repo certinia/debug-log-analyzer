@@ -3,6 +3,8 @@
  */
 import {
   countLeaves,
+  INDENT,
+  isPunct,
   parseConditions,
   splitClauses,
   splitList,
@@ -35,8 +37,6 @@ const DEFAULT_LINES = 1;
 /** An `IN` list of this many literals or more collapses to a count. */
 const LITERAL_LIST_MIN = 5;
 
-const INDENT = '  ';
-
 const OPEN: Token = { kind: 'punct', text: '(' };
 const CLOSE: Token = { kind: 'punct', text: ')' };
 const COMMA: Token = { kind: 'punct', text: ',' };
@@ -67,10 +67,6 @@ function toChunks(tokens: Token[]): Chunk[] {
     prev = token;
   }
   return out;
-}
-
-function isPunct(token: Token | undefined, text: string): boolean {
-  return !!token && token.kind === 'punct' && token.text === text;
 }
 
 /**
@@ -136,9 +132,8 @@ function allocate(clauses: Clause[], lines: number): Map<Clause, number> {
 function renderClause(clause: Clause, allowed: number, columns: number): Chunk[][] {
   switch (clause.keyword) {
     case 'SELECT':
-      return [renderList(clause, columns, 'fields')];
     case 'GROUP BY':
-      return [renderList(clause, columns, 'fields')];
+      return [renderList(clause, columns)];
     case 'WHERE':
     case 'HAVING':
       return renderConditions(clause, allowed, columns);
@@ -147,8 +142,8 @@ function renderClause(clause: Clause, allowed: number, columns: number): Chunk[]
   }
 }
 
-/** One line of comma-separated items, with `+N label` for the rest. */
-function renderList(clause: Clause, columns: number, label: string): Chunk[] {
+/** One line of comma-separated items, with `+N fields` for the rest. */
+function renderList(clause: Clause, columns: number): Chunk[] {
   const items = splitList(clause.body).map((item) => toChunks(collapseSubquery(item)));
   const line: Chunk[] = toChunks(clause.head);
   let shown = 0;
@@ -156,7 +151,7 @@ function renderList(clause: Clause, columns: number, label: string): Chunk[] {
   for (const item of items) {
     const separator: Chunk[] = shown ? [COMMA, ' '] : [' '];
     const rest = items.length - shown - 1;
-    const tail = rest > 0 ? ` +${rest} ${label}`.length : 0;
+    const tail = rest > 0 ? ` +${rest} fields`.length : 0;
     if (shown && width(line) + width(separator) + width(item) + tail > columns) {
       break;
     }
@@ -166,7 +161,7 @@ function renderList(clause: Clause, columns: number, label: string): Chunk[] {
 
   const hidden = items.length - shown;
   if (hidden > 0) {
-    line.push(' ', elide(`+${hidden} ${label}`));
+    line.push(' ', elide(`+${hidden} fields`));
   }
   return line;
 }

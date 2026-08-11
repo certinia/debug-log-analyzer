@@ -3,8 +3,8 @@
  */
 import { html, nothing, type TemplateResult } from 'lit';
 import { budgetedChunks, type SoqlBudget } from './budget.js';
-import { CLASS_BY_KIND, escapeHtml, renderInline } from './renderInline.js';
-import { prettyChunks, renderPretty } from './renderPretty.js';
+import { CLASS_BY_KIND, chunksToHtml, escapeHtml } from './renderInline.js';
+import { prettyChunks } from './renderPretty.js';
 import { detectDialect, tokenize, type Dialect, type Token } from './tokenize.js';
 
 export interface FormatOptions {
@@ -22,15 +22,7 @@ export function formatSOQL(text: string, opts: FormatOptions): string {
     return '';
   }
   try {
-    const dialect = resolveDialect(text, opts);
-    const tokens = tokenize(text, dialect);
-    if (opts.mode !== 'pretty') {
-      return renderInline(tokens);
-    }
-    if (!opts.budget) {
-      return renderPretty(tokens);
-    }
-    return chunksToHtml(budgetedChunks(tokens, opts.budget));
+    return chunksToHtml(chunksFor(text, opts));
   } catch {
     return escapeHtml(text);
   }
@@ -64,20 +56,6 @@ function chunksFor(text: string, opts: FormatOptions): (Token | string)[] {
 
 function resolveDialect(text: string, opts: FormatOptions): Dialect {
   return !opts.dialect || opts.dialect === 'auto' ? detectDialect(text) : opts.dialect;
-}
-
-function chunksToHtml(chunks: (Token | string)[]): string {
-  let out = '';
-  for (const chunk of chunks) {
-    if (typeof chunk === 'string') {
-      out += chunk;
-      continue;
-    }
-    const cls = CLASS_BY_KIND[chunk.kind];
-    const escaped = escapeHtml(chunk.text);
-    out += cls ? `<span class="${cls}">${escaped}</span>` : escaped;
-  }
-  return out;
 }
 
 function chunkToTemplate(c: Token | string): TemplateResult | string {
