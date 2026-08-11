@@ -15,9 +15,36 @@ import {
   formatDuration,
   formatWallClockTime,
 } from '../../../core/utility/Util.js';
-import { formatSOQL } from '../../soql/format/formatter.js';
+import { CLASS_BY_KIND } from '../../soql/format/renderInline.js';
+import { prettyChunks } from '../../soql/format/renderPretty.js';
+import { tokenize, type Dialect } from '../../soql/format/tokenize.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 import { formatNumber } from './rendering/tooltip-utils.js';
+
+/** Delay before a tooltip first appears, so sweeping across frames does not strobe. */
+const SHOW_DELAY_MS = 150;
+/** Grace period before hiding, so crossing the gap between adjacent frames does not blink. */
+const HIDE_GRACE_MS = 80;
+/** Gap between the tooltip and the frame it is anchored to. */
+const ANCHOR_GAP = 8;
+/** Above this raw length a query is shown as a single ellipsised line, never pretty-printed. */
+const SOQL_FORMAT_MAX_CHARS = 2000;
+/** Preview budget for a pretty-printed query. Whichever limit is hit first wins. */
+const SOQL_PREVIEW_MAX_LINES = 6;
+const SOQL_PREVIEW_MAX_CHARS = 300;
+/** Single-line fallback length for queries too large to pretty-print. */
+const SOQL_INLINE_MAX_CHARS = 160;
+
+/** Screen-space anchor for the tooltip, in container coordinates. */
+export interface TooltipAnchor {
+  /** The hovered frame's rectangle, or null to fall back to cursor placement. */
+  rect: { x: number; y: number; width: number; height: number } | null;
+  /** Screen Y of the top of the chart area. Above it sit the minimap and metric strip. */
+  chartTopY: number;
+  /** Cursor position. X drives the panel along the frame; Y is used when `rect` is null. */
+  cursorX: number;
+  cursorY: number;
+}
 
 /**
  * Configuration options for tooltip behavior.
@@ -34,12 +61,33 @@ export interface TooltipOptions {
   apexLog?: ApexLog | null;
 }
 
+/** A tooltip waiting for the show delay to expire. */
+type PendingTooltip =
+  | { kind: 'event'; event: LogEvent; anchor: TooltipAnchor }
+  | { kind: 'marker'; marker: TimelineMarker; anchor: TooltipAnchor };
+
+/** A built description block, plus the footer that says what was cut. */
+interface DescriptionBlock {
+  node: HTMLDivElement;
+  more: string | null;
+}
+
 export class FrameTooltipRenderer {
   private container: HTMLElement;
   private tooltipElement: HTMLElement | null = null;
   private options: TooltipOptions;
   private currentEvent: LogEvent | null = null;
   private currentTruncationMarker: TimelineMarker | null = null;
+  private currentAnchor: TooltipAnchor | null = null;
+  private visible = false;
+  private enabled = true;
+  /** Which side of the frame band the panel is on. Sticky, so it does not flip as X moves. */
+  private anchorBelow = false;
+  private pending: PendingTooltip | null = null;
+  private showTimer: number | null = null;
+  private hideTimer: number | null = null;
+  /** Built descriptions, keyed by event: re-hovering a frame costs a clone, not a re-parse. */
+  private descriptionCache = new WeakMap<LogEvent, DescriptionBlock>();
 
   constructor(
     container: HTMLElement,
@@ -72,86 +120,173 @@ export class FrameTooltipRenderer {
   }
 
   /**
-   * Show tooltip for an event at the specified mouse position.
+   * Show the tooltip for an event, anchored to the frame it belongs to.
+   *
+   * The first tooltip appears after {@link SHOW_DELAY_MS}; once one is visible, moving to another
+   * frame swaps the content with no delay.
    * @param event - Event to display tooltip for
-   * @param mouseX - Mouse X position relative to container
-   * @param mouseY - Mouse Y position relative to container
+   * @param anchor - Frame rectangle and cursor position, in container coordinates
    * @param options - Optional settings
-   * @param options.keepPosition - If true and tooltip is already visible for this event, don't reposition
+   * @param options.keepPosition - If true and the tooltip is already visible for this event, don't re-anchor
    */
-  public show(
-    event: LogEvent,
-    mouseX: number,
-    mouseY: number,
-    options?: { keepPosition?: boolean },
-  ): void {
-    // If tooltip is already visible, update immediately (no delay between events)
-    const wasVisible = this.tooltipElement?.style.display === 'block';
-
-    // If different event and tooltip is visible, update immediately
-    if (wasVisible && this.currentEvent !== event) {
-      this.currentEvent = event;
-      this.currentTruncationMarker = null; // Clear truncation state when showing event
-      this.displayTooltip(event, mouseX, mouseY);
+  public show(event: LogEvent, anchor: TooltipAnchor, options?: { keepPosition?: boolean }): void {
+    if (!this.enabled) {
       return;
     }
+    this.clearHideTimer();
 
-    // If same event and visible, optionally keep position unchanged
-    if (this.currentEvent === event && wasVisible) {
-      if (options?.keepPosition) {
-        return;
+    if (this.visible) {
+      if (this.currentEvent !== event || this.currentTruncationMarker) {
+        this.currentEvent = event;
+        this.currentTruncationMarker = null;
+        this.displayTooltip(event, anchor);
+      } else if (!options?.keepPosition && this.anchorMoved(anchor)) {
+        this.currentAnchor = anchor;
+        this.anchorTooltip(anchor);
       }
-      this.positionTooltip(mouseX, mouseY);
       return;
     }
 
-    // New tooltip - apply delay or show immediately if delay is 0
     this.currentEvent = event;
-    this.currentTruncationMarker = null; // Clear truncation state when showing event
-
-    this.displayTooltip(event, mouseX, mouseY);
+    this.currentTruncationMarker = null;
+    this.scheduleShow({ kind: 'event', event, anchor });
   }
 
   /**
-   * Show tooltip for a truncation marker at the specified mouse position.
+   * Show the tooltip for a truncation marker.
    * @param marker - Truncation marker to display tooltip for
-   * @param mouseX - Mouse X position relative to container
-   * @param mouseY - Mouse Y position relative to container
+   * @param anchor - Frame rectangle and cursor position, in container coordinates
    */
-  public showTruncation(marker: TimelineMarker, mouseX: number, mouseY: number): void {
-    // If tooltip is already visible, update immediately
-    const wasVisible = this.tooltipElement?.style.display === 'block';
+  public showTruncation(marker: TimelineMarker, anchor: TooltipAnchor): void {
+    if (!this.enabled) {
+      return;
+    }
+    this.clearHideTimer();
 
-    // If different marker and tooltip is visible, update immediately
-    if (wasVisible && this.currentTruncationMarker !== marker) {
-      this.currentEvent = null; // Clear event state
-      this.currentTruncationMarker = marker;
-      this.displayTruncationTooltip(marker, mouseX, mouseY);
+    if (this.visible) {
+      if (this.currentTruncationMarker !== marker || this.currentEvent) {
+        this.currentEvent = null;
+        this.currentTruncationMarker = marker;
+        this.displayTruncationTooltip(marker, anchor);
+      } else if (this.anchorMoved(anchor)) {
+        this.currentAnchor = anchor;
+        this.anchorTooltip(anchor);
+      }
       return;
     }
 
-    // If same marker and visible, just update position
-    if (this.currentTruncationMarker === marker && wasVisible) {
-      this.positionTooltip(mouseX, mouseY);
-      return;
-    }
-
-    // New tooltip - show immediately
     this.currentEvent = null;
     this.currentTruncationMarker = marker;
-    this.displayTruncationTooltip(marker, mouseX, mouseY);
+    this.scheduleShow({ kind: 'marker', marker, anchor });
   }
 
   /**
-   * Hide tooltip immediately.
+   * Hide the tooltip after a short grace period, so crossing the gap between two adjacent
+   * frames does not blink. A `show` inside the grace window cancels the hide.
    */
   public hide(): void {
-    if (this.tooltipElement) {
-      this.tooltipElement.style.display = 'none';
+    this.clearShowTimer();
+
+    if (!this.visible) {
+      this.currentEvent = null;
+      this.currentTruncationMarker = null;
+      return;
     }
 
+    if (this.hideTimer === null) {
+      this.hideTimer = window.setTimeout(() => {
+        this.hideTimer = null;
+        this.hideImmediate();
+      }, HIDE_GRACE_MS);
+    }
+  }
+
+  /**
+   * Hide the tooltip with no grace period. Use on teardown, log change, or when hover
+   * tooltips are turned off.
+   */
+  public hideImmediate(): void {
+    this.clearShowTimer();
+    this.clearHideTimer();
+
+    if (this.tooltipElement) {
+      this.tooltipElement.dataset.visible = 'false';
+    }
+
+    this.visible = false;
     this.currentEvent = null;
     this.currentTruncationMarker = null;
+    this.currentAnchor = null;
+  }
+
+  /**
+   * Turn hover and selection tooltips on or off. Turning them off hides any tooltip at once and
+   * makes every later `show` a no-op, so one gate covers every caller.
+   * @param enabled - Whether tooltips may appear
+   */
+  public setEnabled(enabled: boolean): void {
+    if (this.enabled === enabled) {
+      return;
+    }
+
+    this.enabled = enabled;
+    if (!enabled) {
+      this.hideImmediate();
+    }
+  }
+
+  /** Queue a first appearance. A later call replaces what is queued; the timer keeps running. */
+  private scheduleShow(pending: PendingTooltip): void {
+    this.pending = pending;
+    if (this.showTimer !== null) {
+      return;
+    }
+
+    this.showTimer = window.setTimeout(() => {
+      this.showTimer = null;
+      const next = this.pending;
+      this.pending = null;
+      if (!next) {
+        return;
+      }
+      if (next.kind === 'event') {
+        this.displayTooltip(next.event, next.anchor);
+      } else {
+        this.displayTruncationTooltip(next.marker, next.anchor);
+      }
+    }, SHOW_DELAY_MS);
+  }
+
+  private clearShowTimer(): void {
+    if (this.showTimer !== null) {
+      window.clearTimeout(this.showTimer);
+      this.showTimer = null;
+    }
+    this.pending = null;
+  }
+
+  private clearHideTimer(): void {
+    if (this.hideTimer !== null) {
+      window.clearTimeout(this.hideTimer);
+      this.hideTimer = null;
+    }
+  }
+
+  /** True when the anchor has moved enough to need a re-place (cursor, pan, zoom, or no rect). */
+  private anchorMoved(anchor: TooltipAnchor): boolean {
+    const previous = this.currentAnchor;
+    if (!previous || !previous.rect || !anchor.rect) {
+      return true;
+    }
+
+    return (
+      previous.cursorX !== anchor.cursorX ||
+      previous.rect.x !== anchor.rect.x ||
+      previous.rect.y !== anchor.rect.y ||
+      previous.rect.width !== anchor.rect.width ||
+      previous.rect.height !== anchor.rect.height ||
+      previous.chartTopY !== anchor.chartTopY
+    );
   }
 
   /**
@@ -164,40 +299,23 @@ export class FrameTooltipRenderer {
   /**
    * Display tooltip with event information.
    */
-  private displayTooltip(event: LogEvent, mouseX: number, mouseY: number): void {
-    if (!this.tooltipElement) {
-      return;
-    }
-
-    // Generate tooltip content
-    const content = this.generateTooltipContent(event);
-    // Clear existing content and append new content
-    while (this.tooltipElement.firstChild) {
-      this.tooltipElement.removeChild(this.tooltipElement.firstChild);
-    }
-    if (content) {
-      this.tooltipElement.appendChild(content);
-    }
-
-    // Show tooltip
-    this.tooltipElement.style.display = 'block';
-
-    // Position tooltip
-    this.positionTooltip(mouseX, mouseY);
+  private displayTooltip(event: LogEvent, anchor: TooltipAnchor): void {
+    this.displayContent(this.generateTooltipContent(event), anchor);
   }
 
   /**
    * Display tooltip with truncation marker information.
    */
-  private displayTruncationTooltip(marker: TimelineMarker, mouseX: number, mouseY: number): void {
+  private displayTruncationTooltip(marker: TimelineMarker, anchor: TooltipAnchor): void {
+    this.displayContent(this.generateTruncationTooltipContent(marker), anchor);
+  }
+
+  /** Swap the panel content, make it visible, and place it. */
+  private displayContent(content: HTMLDivElement | null, anchor: TooltipAnchor): void {
     if (!this.tooltipElement) {
       return;
     }
 
-    // Generate tooltip content
-    const content = this.generateTruncationTooltipContent(marker);
-
-    // Clear existing content and append new content
     while (this.tooltipElement.firstChild) {
       this.tooltipElement.removeChild(this.tooltipElement.firstChild);
     }
@@ -205,11 +323,12 @@ export class FrameTooltipRenderer {
       this.tooltipElement.appendChild(content);
     }
 
-    // Show tooltip
-    this.tooltipElement.style.display = 'block';
-
-    // Position tooltip
-    this.positionTooltip(mouseX, mouseY);
+    this.tooltipElement.dataset.visible = 'true';
+    this.visible = true;
+    // A new frame picks its side afresh; only movement within one frame is sticky.
+    this.anchorBelow = false;
+    this.currentAnchor = anchor;
+    this.anchorTooltip(anchor);
   }
 
   /**
@@ -390,23 +509,98 @@ export class FrameTooltipRenderer {
       }
 
       const descriptionText = event.text + (event.suffix ?? '');
-      const isSoql = event.type === 'SOQL_EXECUTE_BEGIN';
-      const isSosl = event.type === 'SOSL_EXECUTE_BEGIN';
-      const descriptionHtml =
-        isSoql || isSosl
-          ? formatSOQL(descriptionText, { mode: 'pretty', dialect: isSosl ? 'sosl' : 'soql' })
-          : undefined;
       return this.createTooltip(
         '',
         descriptionText,
         rows,
         this.options.categoryColors[event.category] || '',
-        descriptionHtml,
+        this.getDescription(event, descriptionText),
         event.category,
+        true,
       );
     }
 
     return null;
+  }
+
+  /**
+   * Build (or reuse) the description block for an event. Queries are pretty-printed and clamped;
+   * anything else falls back to the plain text the caller already has.
+   */
+  private getDescription(event: LogEvent, text: string): DescriptionBlock | undefined {
+    const isSosl = event.type === 'SOSL_EXECUTE_BEGIN';
+    if (event.type !== 'SOQL_EXECUTE_BEGIN' && !isSosl) {
+      return undefined;
+    }
+
+    const cached = this.descriptionCache.get(event);
+    if (cached) {
+      return { node: cached.node.cloneNode(true) as HTMLDivElement, more: cached.more };
+    }
+
+    const built = this.buildQueryPreview(text, isSosl ? 'sosl' : 'soql');
+    this.descriptionCache.set(event, built);
+    return { node: built.node.cloneNode(true) as HTMLDivElement, more: built.more };
+  }
+
+  /**
+   * Render a query as classed spans, stopping at the preview budget. Cuts land on line
+   * boundaries so the `soql-tok-*` spans stay balanced.
+   */
+  private buildQueryPreview(text: string, dialect: Dialect): DescriptionBlock {
+    const node = document.createElement('div');
+    node.className = 'tooltip-header soql-block';
+
+    // Pretty-printing a multi-kilobyte query on every hover is too slow to be worth it, and the
+    // result is clamped away anyway.
+    if (text.length > SOQL_FORMAT_MAX_CHARS) {
+      node.classList.add('is-clamped');
+      node.textContent = text.slice(0, SOQL_INLINE_MAX_CHARS);
+      return { node, more: 'query too large to format' };
+    }
+
+    const chunks = prettyChunks(tokenize(text, dialect));
+    const totalLines = chunks.reduce<number>(
+      (count, chunk) => (typeof chunk === 'string' && chunk.startsWith('\n') ? count + 1 : count),
+      1,
+    );
+
+    let lines = 1;
+    let chars = 0;
+    let cut = false;
+    for (const chunk of chunks) {
+      if (typeof chunk === 'string') {
+        if (chunk.startsWith('\n')) {
+          if (lines >= SOQL_PREVIEW_MAX_LINES || chars >= SOQL_PREVIEW_MAX_CHARS) {
+            cut = true;
+            break;
+          }
+          lines++;
+        }
+        node.appendChild(document.createTextNode(chunk));
+        chars += chunk.length;
+        continue;
+      }
+
+      const cls = CLASS_BY_KIND[chunk.kind];
+      if (cls) {
+        const span = document.createElement('span');
+        span.className = cls;
+        span.textContent = chunk.text;
+        node.appendChild(span);
+      } else {
+        node.appendChild(document.createTextNode(chunk.text));
+      }
+      chars += chunk.text.length;
+    }
+
+    if (!cut) {
+      return { node, more: null };
+    }
+
+    node.classList.add('is-clamped');
+    const hidden = totalLines - lines;
+    return { node, more: `+${hidden} ${hidden === 1 ? 'line' : 'lines'}` };
   }
 
   private formatLimit(val: number, self: number, total = 0) {
@@ -419,9 +613,11 @@ export class FrameTooltipRenderer {
     description = '',
     rows: { label: string; value: string }[],
     color: string,
-    descriptionHtml?: string,
+    descriptionBlock?: DescriptionBlock,
     /** Category label for the swatch row; `color` fills the swatch. */
     categoryName?: string,
+    /** True when a click selects the frame, which the inspector then shows in full. */
+    inspectable = false,
   ) {
     const tooltipBody = document.createElement('div');
     tooltipBody.className = 'timeline-tooltip';
@@ -437,15 +633,14 @@ export class FrameTooltipRenderer {
       tooltipBody.appendChild(header);
     }
 
-    const descriptionDiv = document.createElement('div');
-    if (descriptionHtml !== undefined) {
-      descriptionDiv.className = 'tooltip-header soql-block';
-      descriptionDiv.innerHTML = descriptionHtml;
+    if (descriptionBlock) {
+      tooltipBody.appendChild(descriptionBlock.node);
     } else {
+      const descriptionDiv = document.createElement('div');
       descriptionDiv.className = 'tooltip-header';
       descriptionDiv.textContent = description;
+      tooltipBody.appendChild(descriptionDiv);
     }
-    tooltipBody.appendChild(descriptionDiv);
 
     if (categoryName && color) {
       const categoryRow = document.createElement('div');
@@ -480,55 +675,97 @@ export class FrameTooltipRenderer {
       tooltipBody.appendChild(row);
     });
 
+    if (inspectable) {
+      // One fixed row at the foot, so what was cut and where to see it in full always read in
+      // the same place instead of interrupting the description.
+      const status = document.createElement('div');
+      status.className = 'tooltip-status';
+
+      const info = document.createElement('span');
+      info.className = 'tooltip-status-info';
+      info.textContent = descriptionBlock?.more ?? '';
+
+      const action = document.createElement('span');
+      action.className = 'tooltip-status-action';
+      action.textContent = 'Click to view in Inspector';
+
+      status.appendChild(info);
+      status.appendChild(action);
+      tooltipBody.appendChild(status);
+    }
+
     return tooltipBody;
   }
 
   /**
-   * Position tooltip relative to mouse, with boundary detection.
+   * Place the tooltip against the hovered frame, inside the container.
+   *
+   * Y is pinned to the frame band — above it, or below it when there is no room above — so the
+   * panel reads as belonging to the frame. X follows the cursor along the frame's visible span,
+   * so a wide frame keeps the panel near the pointer. With no frame rect, fall back to the cursor.
+   *
+   * Measure from the container's top-left, never from the last placement: an absolutely positioned
+   * box is capped at `containerWidth - left`, so a panel parked on the right measures narrower,
+   * wraps taller, and Y would then be pinned against that wrong height.
    */
-  private positionTooltip(mouseX: number, mouseY: number): void {
-    if (!this.tooltipElement) {
+  private anchorTooltip(anchor: TooltipAnchor): void {
+    const element = this.tooltipElement;
+    if (!element) {
       return;
     }
 
-    // Reset width to allow natural sizing based on content
-    this.tooltipElement.style.width = 'auto';
-
-    // Force reflow to recalculate dimensions after content change
-    // This ensures getBoundingClientRect() returns accurate dimensions
-    // void this.tooltipElement.offsetHeight;
+    element.style.left = '0px';
+    element.style.top = '0px';
 
     const containerRect = this.container.getBoundingClientRect();
-    const tooltipRect = this.tooltipElement.getBoundingClientRect();
+    const width = element.offsetWidth;
+    const height = element.offsetHeight;
+    const rect = anchor.rect;
 
-    const offset = this.options.cursorOffset;
+    let x: number;
+    let y: number;
+    if (rect) {
+      // Follow the cursor, but stay over the frame so the panel never floats free of it.
+      x = Math.min(
+        Math.max(anchor.cursorX - width / 2, rect.x),
+        Math.max(rect.x, rect.x + rect.width - width),
+      );
 
-    // Default position: below and to the right of cursor
-    let x = mouseX + offset;
-    let y = mouseY + offset;
-
-    // Check if tooltip goes off right edge
-    if (x + tooltipRect.width > containerRect.width) {
-      x = mouseX - tooltipRect.width - offset;
+      const above = rect.y - ANCHOR_GAP - height;
+      const below = rect.y + rect.height + ANCHOR_GAP;
+      const fitsAbove = above >= anchor.chartTopY;
+      const fitsBelow = below + height <= containerRect.height;
+      // Hysteresis: keep the side already in use while it still fits, so a frame that sits on the
+      // boundary does not flip back and forth as the pointer moves along it.
+      if (this.anchorBelow ? !fitsBelow && fitsAbove : !fitsAbove) {
+        this.anchorBelow = !this.anchorBelow;
+      }
+      y = this.anchorBelow ? below : above;
+    } else {
+      const offset = this.options.cursorOffset;
+      x = anchor.cursorX + offset;
+      y = anchor.cursorY + offset;
+      if (x + width > containerRect.width) {
+        x = anchor.cursorX - width - offset;
+      }
+      if (y + height > containerRect.height) {
+        y = anchor.cursorY - height - offset;
+      }
     }
 
-    // Check if tooltip goes off bottom edge
-    if (y + tooltipRect.height > containerRect.height) {
-      y = mouseY - tooltipRect.height - offset;
-    }
-
-    // Ensure tooltip stays within container bounds
-    x = Math.max(0, Math.min(x, containerRect.width - tooltipRect.width));
-    y = Math.max(0, Math.min(y, containerRect.height - tooltipRect.height));
-
-    this.tooltipElement.style.left = `${x}px`;
-    this.tooltipElement.style.top = `${y}px`;
+    // Keep the panel inside the chart area, never over the minimap or metric strip.
+    const topLimit = rect ? anchor.chartTopY : 0;
+    element.style.left = `${Math.max(0, Math.min(x, containerRect.width - width))}px`;
+    element.style.top = `${Math.max(0, Math.min(Math.max(y, topLimit), containerRect.height - height))}px`;
   }
 
   /**
    * Clean up tooltip element.
    */
   public destroy(): void {
+    this.clearShowTimer();
+    this.clearHideTimer();
+
     if (this.tooltipElement && this.tooltipElement.parentNode) {
       this.tooltipElement.parentNode.removeChild(this.tooltipElement);
     }
@@ -536,5 +773,8 @@ export class FrameTooltipRenderer {
     this.tooltipElement = null;
     this.currentEvent = null;
     this.currentTruncationMarker = null;
+    this.currentAnchor = null;
+    this.visible = false;
+    this.descriptionCache = new WeakMap();
   }
 }

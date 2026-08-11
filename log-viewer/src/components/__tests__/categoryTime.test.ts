@@ -39,6 +39,7 @@ const timelineSettings = (
   },
   customThemes: {},
   legacy: false,
+  showTooltip: true,
   ...overrides,
 });
 

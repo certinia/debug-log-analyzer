@@ -9,16 +9,21 @@
 /**
  * Unit tests for FrameTooltipRenderer
  *
- * Tests tooltip positioning and content generation including:
- * - Boundary detection and auto-positioning
- * - Tooltip flip logic when near edges
- * - Content generation from event data
- * - Show/hide timing and debouncing
+ * Tests tooltip timing, anchoring and content generation including:
+ * - Show delay, instant swap and hide grace
+ * - Placement against the hovered frame, and the cursor fallback
+ * - Content generation from event data, with clamped query previews
+ * - The on/off switch
  */
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { LogEvent } from 'apex-log-parser';
 
-import { FrameTooltipRenderer } from '../optimised/FrameTooltipRenderer.js';
+import { FrameTooltipRenderer, type TooltipAnchor } from '../optimised/FrameTooltipRenderer.js';
+
+/** Delay before the first tooltip appears; mirrors SHOW_DELAY_MS. */
+const SHOW_DELAY_MS = 150;
+/** Grace period before hiding; mirrors HIDE_GRACE_MS. */
+const HIDE_GRACE_MS = 80;
 
 describe('FrameTooltipRenderer', () => {
   let container: HTMLElement;
@@ -58,7 +63,40 @@ describe('FrameTooltipRenderer', () => {
     } as unknown as LogEvent;
   }
 
+  /** An anchor with no frame rect, so the tooltip falls back to cursor placement. */
+  function cursorAnchor(cursorX: number, cursorY: number): TooltipAnchor {
+    return { rect: null, chartTopY: 0, cursorX, cursorY };
+  }
+
+  /** An anchor on a frame. The cursor sits at the frame's left edge unless given. */
+  function frameAnchor(
+    rect: { x: number; y: number; width: number; height: number },
+    chartTopY = 0,
+    cursorX = rect.x,
+  ): TooltipAnchor {
+    return { rect, chartTopY, cursorX, cursorY: rect.y };
+  }
+
+  function tooltipEl(): HTMLElement {
+    return container.querySelector('#timeline-tooltip') as HTMLElement;
+  }
+
+  /** jsdom lays nothing out, so the panel's size has to be declared. */
+  function sizeTooltip(width: number, height: number): void {
+    const element = tooltipEl();
+    Object.defineProperty(element, 'offsetWidth', { value: width, configurable: true });
+    Object.defineProperty(element, 'offsetHeight', { value: height, configurable: true });
+  }
+
+  /** Show and let the delay expire, which is what a settled hover looks like. */
+  function showSettled(event: LogEvent, anchor: TooltipAnchor): void {
+    frameTooltipRenderer.show(event, anchor);
+    jest.advanceTimersByTime(SHOW_DELAY_MS);
+  }
+
   beforeEach(() => {
+    jest.useFakeTimers();
+
     // Create container element
     container = document.createElement('div');
     container.style.cssText = 'width: 1000px; height: 600px; position: relative;';
@@ -81,32 +119,25 @@ describe('FrameTooltipRenderer', () => {
   afterEach(() => {
     frameTooltipRenderer.destroy();
     document.body.removeChild(container);
+    jest.useRealTimers();
   });
 
   describe('initialization', () => {
     it('should create tooltip element in container', () => {
-      const tooltip = container.querySelector('#timeline-tooltip');
+      const tooltip = tooltipEl();
 
       expect(tooltip).not.toBeNull();
       expect(tooltip instanceof HTMLElement).toBe(true);
     });
 
     it('should initialize tooltip as hidden', () => {
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-
-      expect(tooltip.style.display).toBe('');
+      expect(tooltipEl().dataset.visible).toBeUndefined();
     });
 
     it('should apply default options', () => {
-      const event = createEvent(0, 100);
+      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
 
-      // Show immediately with new implementation
-      frameTooltipRenderer.show(event, 100, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.style.display).toBe('block'); // Shown immediately
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().dataset.visible).toBe('true');
     });
 
     it('should accept custom options', () => {
@@ -118,259 +149,245 @@ describe('FrameTooltipRenderer', () => {
         enableFlip: true,
       });
 
-      const event = createEvent(0, 100);
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
 
-      // With 0 delay, should show immediately
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.style.display).toBe('block');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().dataset.visible).toBe('true');
     });
   });
 
-  describe('show and hide', () => {
-    it('should show tooltip immediately', async () => {
-      const event = createEvent(0, 100);
+  describe('show and hide timing', () => {
+    it('should not show the tooltip before the delay expires', () => {
+      frameTooltipRenderer.show(createEvent(0, 100), cursorAnchor(100, 100));
 
-      frameTooltipRenderer.show(event, 100, 100);
+      jest.advanceTimersByTime(SHOW_DELAY_MS - 1);
+      expect(tooltipEl().dataset.visible).toBeUndefined();
 
-      // Should be visible immediately with new implementation
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.style.display).toBe('block');
-
-      frameTooltipRenderer.hide();
+      jest.advanceTimersByTime(1);
+      expect(tooltipEl().dataset.visible).toBe('true');
     });
 
-    it('should hide tooltip immediately', async () => {
-      const event = createEvent(0, 100);
+    it('should never show when the pointer leaves before the delay expires', () => {
+      frameTooltipRenderer.show(createEvent(0, 100), cursorAnchor(100, 100));
 
-      frameTooltipRenderer.show(event, 100, 100);
-
+      jest.advanceTimersByTime(SHOW_DELAY_MS - 50);
       frameTooltipRenderer.hide();
+      jest.advanceTimersByTime(SHOW_DELAY_MS);
 
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.style.display).toBe('none');
+      expect(tooltipEl().dataset.visible).toBeUndefined();
     });
 
-    it('should update immediately when switching between events', async () => {
+    it('should swap content with no delay when moving to another frame', () => {
       const event1 = createEvent(0, 100, 'Event1');
       event1.text = 'Event1';
       const event2 = createEvent(200, 100, 'Event2');
       event2.text = 'Event2';
 
-      // Show first tooltip
-      frameTooltipRenderer.show(event1, 100, 100);
+      showSettled(event1, cursorAnchor(100, 100));
+      expect(tooltipEl().textContent).toContain('Event1');
 
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).toContain('Event1');
+      frameTooltipRenderer.show(event2, cursorAnchor(200, 200));
 
-      // Switch to second event - should update immediately without delay
-      frameTooltipRenderer.show(event2, 200, 200);
-
-      // Should update immediately
-      expect(tooltip.textContent).toContain('Event2');
-      expect(tooltip.style.display).toBe('block');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).toContain('Event2');
+      expect(tooltipEl().dataset.visible).toBe('true');
     });
 
-    it('should update position when hovering same event', async () => {
-      const event = createEvent(0, 100);
-
-      frameTooltipRenderer.show(event, 100, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-
-      // Mock getBoundingClientRect to provide realistic dimensions in jsdom
-      tooltip.getBoundingClientRect = () =>
-        ({
-          width: 200,
-          height: 100,
-          top: 0,
-          left: 0,
-          right: 200,
-          bottom: 100,
-        }) as DOMRect;
-
-      const initialLeft = tooltip.style.left;
-
-      // Move mouse while on same event
-      frameTooltipRenderer.show(event, 200, 100);
-
-      const newLeft = tooltip.style.left;
-      expect(newLeft).not.toBe(initialLeft);
+    it('should hide only after the grace period', () => {
+      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
 
       frameTooltipRenderer.hide();
+      jest.advanceTimersByTime(HIDE_GRACE_MS - 1);
+      expect(tooltipEl().dataset.visible).toBe('true');
+
+      jest.advanceTimersByTime(1);
+      expect(tooltipEl().dataset.visible).toBe('false');
+    });
+
+    it('should stay visible when a show lands inside the grace period', () => {
+      const event = createEvent(0, 100);
+      showSettled(event, cursorAnchor(100, 100));
+
+      frameTooltipRenderer.hide();
+      jest.advanceTimersByTime(HIDE_GRACE_MS - 20);
+      frameTooltipRenderer.show(event, cursorAnchor(110, 100));
+      jest.advanceTimersByTime(HIDE_GRACE_MS);
+
+      expect(tooltipEl().dataset.visible).toBe('true');
+    });
+
+    it('should hide with no grace period on hideImmediate', () => {
+      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+
+      frameTooltipRenderer.hideImmediate();
+
+      expect(tooltipEl().dataset.visible).toBe('false');
+    });
+
+    it('should re-anchor when the frame moves under a held pointer', () => {
+      const event = createEvent(0, 100);
+      sizeTooltip(200, 100);
+
+      showSettled(event, frameAnchor({ x: 300, y: 400, width: 100, height: 20 }));
+      const initialLeft = tooltipEl().style.left;
+
+      // Same frame, panned left.
+      frameTooltipRenderer.show(event, frameAnchor({ x: 100, y: 400, width: 100, height: 20 }));
+
+      expect(tooltipEl().style.left).not.toBe(initialLeft);
+    });
+
+    it('should hold its place while the context menu is open', () => {
+      const event = createEvent(0, 100);
+      const anchor = frameAnchor({ x: 300, y: 400, width: 400, height: 20 });
+      sizeTooltip(200, 100);
+
+      showSettled(event, anchor);
+      const initialLeft = tooltipEl().style.left;
+
+      frameTooltipRenderer.show(event, { ...anchor, cursorX: 600 }, { keepPosition: true });
+
+      expect(tooltipEl().style.left).toBe(initialLeft);
+    });
+  });
+
+  describe('enable and disable', () => {
+    it('should not show a tooltip while disabled', () => {
+      frameTooltipRenderer.setEnabled(false);
+
+      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+
+      expect(tooltipEl().dataset.visible).not.toBe('true');
+    });
+
+    it('should hide a visible tooltip at once when disabled', () => {
+      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+
+      frameTooltipRenderer.setEnabled(false);
+
+      expect(tooltipEl().dataset.visible).toBe('false');
+    });
+
+    it('should show again once re-enabled', () => {
+      frameTooltipRenderer.setEnabled(false);
+      frameTooltipRenderer.setEnabled(true);
+
+      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+
+      expect(tooltipEl().dataset.visible).toBe('true');
     });
   });
 
   describe('content generation', () => {
-    beforeEach(() => {
-      frameTooltipRenderer.destroy();
-      // Use zero delay for content tests
-      frameTooltipRenderer = new FrameTooltipRenderer(container, {
-        categoryColors: {},
-        cursorOffset: 10,
-        enableFlip: true,
-      });
-    });
-
     it('should display event type', () => {
-      const event = createEvent(0, 100, 'MyCustomEvent');
+      showSettled(createEvent(0, 100, 'MyCustomEvent'), cursorAnchor(100, 100));
 
-      frameTooltipRenderer.show(event, 100, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).toContain('MyCustomEvent');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).toContain('MyCustomEvent');
     });
 
     it('should display event text', () => {
       const event = createEvent(0, 100, 'Event', 'SOQL');
       event.text = 'SOQL query execution';
 
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(event, cursorAnchor(100, 100));
 
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).toContain('SOQL query execution');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).toContain('SOQL query execution');
     });
 
     it('should display duration in milliseconds', () => {
       // Duration: 1,500,000 ns = 1.5ms
-      const event = createEvent(0, 1_500_000);
+      showSettled(createEvent(0, 1_500_000), cursorAnchor(100, 100));
 
-      frameTooltipRenderer.show(event, 100, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       // Duration is formatted by formatDuration helper
-      expect(tooltip.textContent).toContain('ms');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).toContain('ms');
     });
 
     it('should display self duration', () => {
       // Self duration: 50% of total = 750,000 ns = 0.75ms
-      const event = createEvent(0, 1_500_000);
+      showSettled(createEvent(0, 1_500_000), cursorAnchor(100, 100));
 
-      frameTooltipRenderer.show(event, 100, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).toContain('self');
-      expect(tooltip.textContent).toContain('0.75');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).toContain('self');
+      expect(tooltipEl().textContent).toContain('0.75');
     });
 
     it('should display total duration', () => {
       // Timestamp: 2,000,000 ns = 2.000ms, duration: 100,000 ns = 0.1ms
-      const event = createEvent(2_000_000, 100_000);
+      showSettled(createEvent(2_000_000, 100_000), cursorAnchor(100, 100));
 
-      frameTooltipRenderer.show(event, 100, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).toContain('total');
+      expect(tooltipEl().textContent).toContain('total');
       // Check for some duration value (format may vary)
-      expect(tooltip.textContent).toContain('ms');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).toContain('ms');
     });
 
     it('should display a Throws row with the total (no self) when exceptions were thrown', () => {
       const event = createEvent(0, 1_500_000);
       event.thrownCount = { total: 3, self: 1 };
 
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(event, cursorAnchor(100, 100));
 
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).toContain('Throws:');
-      expect(tooltip.textContent).toContain('3');
+      expect(tooltipEl().textContent).toContain('Throws:');
+      expect(tooltipEl().textContent).toContain('3');
       // self is intentionally omitted for throws (always 0 on a method).
-      expect(tooltip.textContent).not.toContain('self 1');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).not.toContain('self 1');
     });
 
     it('should not display a Throws row when no exceptions were thrown', () => {
       const event = createEvent(0, 1_500_000);
       event.thrownCount = { total: 0, self: 0 };
 
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(event, cursorAnchor(100, 100));
 
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).not.toContain('Throws:');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).not.toContain('Throws:');
     });
 
     it('should display a lowercase net heap row as total (self N), thousand-separated', () => {
       const event = createEvent(0, 1_500_000);
       event.heapAllocated = { self: 1_572_864, total: 4_000_000 };
 
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(event, cursorAnchor(100, 100));
 
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).toContain('heap:');
+      expect(tooltipEl().textContent).toContain('heap:');
       // Net subtree total (with the byte unit) and the method's own net in parens.
-      expect(tooltip.textContent).toContain('4,000,000 bytes (self 1,572,864)');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).toContain('4,000,000 bytes (self 1,572,864)');
     });
 
     it('should not display a heap row when net heap is 0 (allocated then freed)', () => {
       const event = createEvent(0, 1_500_000);
       event.heapAllocated = { self: 0, total: 0 };
 
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(event, cursorAnchor(100, 100));
 
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).not.toContain('heap:');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).not.toContain('heap:');
     });
 
-    it('should display event text', () => {
+    it('should display custom event text', () => {
       const event = createEvent(0, 100);
       event.text = 'Custom event description';
 
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(event, cursorAnchor(100, 100));
 
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).toContain('Custom event description');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).toContain('Custom event description');
     });
 
     it('should handle long event text', () => {
       const event = createEvent(0, 100);
       event.text = 'A'.repeat(150); // 150 characters
 
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(event, cursorAnchor(100, 100));
 
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      // Just check that tooltip shows - text handling may or may not truncate
-      expect(tooltip.style.display).toBe('block');
-      expect(tooltip.textContent).toContain('A');
-
-      frameTooltipRenderer.hide();
+      // The text is clamped by CSS, so all of it stays in the DOM.
+      expect(tooltipEl().dataset.visible).toBe('true');
+      expect(tooltipEl().textContent).toContain('A');
     });
 
     it('should escape HTML in event data', () => {
       const event = createEvent(0, 100);
       event.text = '<script>alert("xss")</script>';
 
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(event, cursorAnchor(100, 100));
 
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       // textContent shows text without HTML tags - script tags won't execute
-      expect(tooltip.textContent).toContain('alert("xss")');
+      expect(tooltipEl().textContent).toContain('alert("xss")');
       // Check that no actual script element was created
-      expect(tooltip.querySelector('script')).toBeNull();
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().querySelector('script')).toBeNull();
     });
 
     it('should display a category row with a swatch in the category color', () => {
@@ -380,26 +397,19 @@ describe('FrameTooltipRenderer', () => {
         cursorOffset: 10,
         enableFlip: true,
       });
-      const event = createEvent(0, 100, 'Event', 'Apex');
 
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(createEvent(0, 100, 'Event', 'Apex'), cursorAnchor(100, 100));
 
       const swatch = container.querySelector('.tooltip-swatch') as HTMLElement;
       expect(swatch).not.toBeNull();
       expect(swatch.style.backgroundColor).toBe('rgb(136, 174, 88)');
       expect(swatch.parentElement?.textContent).toContain('Apex');
-
-      frameTooltipRenderer.hide();
     });
 
     it('should not display a category row for an uncategorised event', () => {
-      const event = createEvent(0, 100, 'Event', '');
-
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(createEvent(0, 100, 'Event', ''), cursorAnchor(100, 100));
 
       expect(container.querySelector('.tooltip-swatch')).toBeNull();
-
-      frameTooltipRenderer.hide();
     });
 
     it('should display wall-clock time row when apexLog has startTime', () => {
@@ -424,18 +434,13 @@ describe('FrameTooltipRenderer', () => {
       });
 
       // Event at timestamp 6329577ns with duration 1,000,000ns
-      const event = createEvent(6329577, 1_000_000);
+      showSettled(createEvent(6329577, 1_000_000), cursorAnchor(100, 100));
 
-      frameTooltipRenderer.show(event, 100, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).toContain('time:');
-      expect(tooltip.textContent).toContain('10:29:24.600');
+      expect(tooltipEl().textContent).toContain('time:');
+      expect(tooltipEl().textContent).toContain('10:29:24.600');
       // End time should be ~1ms later
-      expect(tooltip.textContent).toContain('10:29:24.601');
-      expect(tooltip.textContent).toContain('→');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).toContain('10:29:24.601');
+      expect(tooltipEl().textContent).toContain('→');
     });
 
     it('should not display wall-clock time row when apexLog has no startTime', () => {
@@ -447,269 +452,269 @@ describe('FrameTooltipRenderer', () => {
         apexLog: { startTime: null, timestamp: 0 } as never,
       });
 
-      const event = createEvent(0, 1_000_000);
+      showSettled(createEvent(0, 1_000_000), cursorAnchor(100, 100));
 
-      frameTooltipRenderer.show(event, 100, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).not.toContain('time:');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).not.toContain('time:');
     });
 
     it('should not display wall-clock time row when no apexLog', () => {
-      const event = createEvent(0, 1_000_000);
+      showSettled(createEvent(0, 1_000_000), cursorAnchor(100, 100));
 
-      frameTooltipRenderer.show(event, 100, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.textContent).not.toContain('time:');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).not.toContain('time:');
     });
   });
 
-  describe('positioning - basic', () => {
+  describe('query preview', () => {
+    /** A query with one clause per AND, so it pretty-prints to many lines. */
+    function longQuery(conditions: number): string {
+      const where = Array.from(
+        { length: conditions },
+        (_unused, index) => `Name = 'v${index}'`,
+      ).join(' AND ');
+      return `SELECT Id FROM Account WHERE ${where}`;
+    }
+
+    function soqlEvent(text: string): LogEvent {
+      const event = createEvent(0, 100, 'SOQL_EXECUTE_BEGIN', 'SOQL');
+      event.text = text;
+      return event;
+    }
+
+    it('should clamp a long query to the preview budget and say how much is hidden', () => {
+      showSettled(soqlEvent(longQuery(40)), cursorAnchor(100, 100));
+
+      const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
+      expect(preview).not.toBeNull();
+      expect(preview.classList.contains('is-clamped')).toBe(true);
+      expect(preview.textContent?.split('\n').length).toBe(6);
+
+      const info = container.querySelector('.tooltip-status-info') as HTMLElement;
+      expect(info.textContent).toMatch(/^\+\d+ lines$/);
+    });
+
+    it('should not clamp a query that fits the budget', () => {
+      showSettled(soqlEvent('SELECT Id FROM Account'), cursorAnchor(100, 100));
+
+      const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
+      expect(preview.classList.contains('is-clamped')).toBe(false);
+      expect(container.querySelector('.tooltip-status-info')?.textContent).toBe('');
+    });
+
+    it('should show a single ellipsised line for a query too large to format', () => {
+      const huge = `SELECT Id FROM Account WHERE Id IN ('${'0'.repeat(5000)}')`;
+
+      showSettled(soqlEvent(huge), cursorAnchor(100, 100));
+
+      const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
+      expect(preview.classList.contains('is-clamped')).toBe(true);
+      expect(preview.textContent).not.toContain('\n');
+      expect(preview.textContent?.length).toBe(160);
+
+      const info = container.querySelector('.tooltip-status-info') as HTMLElement;
+      expect(info.textContent).toBe('query too large to format');
+    });
+
+    it('should point at the inspector for the full detail', () => {
+      showSettled(soqlEvent(longQuery(40)), cursorAnchor(100, 100));
+
+      const action = container.querySelector('.tooltip-status-action') as HTMLElement;
+      expect(action.textContent).toBe('Click to view in Inspector');
+    });
+
+    it('should highlight the query with soql token classes', () => {
+      showSettled(soqlEvent('SELECT Id FROM Account'), cursorAnchor(100, 100));
+
+      const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
+      expect(preview.querySelector('span[class^="soql-tok"]')).not.toBeNull();
+    });
+
+    it('should build the preview once per event', () => {
+      const event = soqlEvent('SELECT Id FROM Account');
+
+      showSettled(event, cursorAnchor(100, 100));
+      frameTooltipRenderer.hideImmediate();
+
+      // A rebuild would pick this up; the memoised block does not.
+      event.text = 'SELECT Name FROM Contact';
+      showSettled(event, cursorAnchor(100, 100));
+
+      const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
+      expect(preview.textContent).toContain('Account');
+    });
+  });
+
+  describe('anchoring', () => {
     beforeEach(() => {
-      frameTooltipRenderer.destroy();
-      frameTooltipRenderer = new FrameTooltipRenderer(container, {
-        categoryColors: {},
-        cursorOffset: 10,
-        enableFlip: true,
-      });
-
-      // Mock getBoundingClientRect to provide realistic dimensions in jsdom
-      const mockGetBoundingClientRect = () =>
-        ({
-          width: 200,
-          height: 100,
-          top: 0,
-          left: 0,
-          right: 200,
-          bottom: 100,
-        }) as DOMRect;
-
-      // Apply mock to tooltip element after it's created
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      if (tooltip) {
-        tooltip.getBoundingClientRect = mockGetBoundingClientRect;
-      }
+      sizeTooltip(200, 100);
     });
 
-    it('should position tooltip below and right of cursor by default', () => {
+    it('should pin the panel above the frame band', () => {
+      showSettled(createEvent(0, 100), frameAnchor({ x: 300, y: 500, width: 100, height: 20 }));
+
+      const tooltip = tooltipEl();
+      // The frame is narrower than the panel, so the panel sits at the frame's left edge.
+      expect(tooltip.style.left).toBe('300px');
+      // Above the frame, with the 8px gap: 500 - 8 - 100.
+      expect(tooltip.style.top).toBe('392px');
+    });
+
+    it('should flip below the frame when there is no room above', () => {
+      // Only 50px between the chart top and the frame, so the panel cannot fit above.
+      showSettled(createEvent(0, 100), frameAnchor({ x: 300, y: 90, width: 100, height: 20 }, 40));
+
+      // Below the frame, with the 8px gap: 90 + 20 + 8.
+      expect(tooltipEl().style.top).toBe('118px');
+    });
+
+    it('should keep the side it flipped to while the pointer moves along the frame', () => {
       const event = createEvent(0, 100);
+      // Room above is 8px short of the panel, so the first placement flips below.
+      const rect = { x: 300, y: 100, width: 400, height: 20 };
 
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(event, frameAnchor(rect, 0));
+      expect(tooltipEl().style.top).toBe('128px');
 
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      const left = parseInt(tooltip.style.left, 10);
-      const top = parseInt(tooltip.style.top, 10);
+      // Moving right does not change the vertical fit, so the panel must not flip back.
+      frameTooltipRenderer.show(event, frameAnchor(rect, 0, 650));
 
-      // Should be offset from cursor (default 10px)
-      expect(left).toBeGreaterThanOrEqual(110); // 100 + 10
-      expect(top).toBeGreaterThanOrEqual(110); // 100 + 10
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().style.top).toBe('128px');
     });
 
-    it('should use custom cursor offset', () => {
+    it('should follow the cursor along a frame wider than the panel', () => {
+      const event = createEvent(0, 100);
+      const rect = { x: 100, y: 500, width: 600, height: 20 };
+
+      showSettled(event, frameAnchor(rect, 0, 400));
+
+      // Centred on the cursor: 400 - 100.
+      expect(tooltipEl().style.left).toBe('300px');
+
+      frameTooltipRenderer.show(event, frameAnchor(rect, 0, 500));
+
+      expect(tooltipEl().style.left).toBe('400px');
+    });
+
+    it('should keep the panel over the frame it belongs to', () => {
+      const rect = { x: 100, y: 500, width: 600, height: 20 };
+
+      // Cursor at the frame's right edge: the panel stops at the edge, not past it.
+      showSettled(createEvent(0, 100), frameAnchor(rect, 0, 700));
+
+      expect(tooltipEl().style.left).toBe('500px');
+    });
+
+    it('should place a frame the same way however far the last one was', () => {
+      const element = tooltipEl();
+      // An absolutely positioned panel is capped at `containerWidth - left`, so a stale `left`
+      // would make it measure narrower and wrap taller. Stand in for that here.
+      Object.defineProperty(element, 'offsetHeight', {
+        configurable: true,
+        get: () => (parseInt(element.style.left, 10) > 0 ? 300 : 100),
+      });
+      const rect = { x: 20, y: 500, width: 4, height: 20 };
+
+      showSettled(createEvent(0, 100), frameAnchor(rect));
+      const settledTop = element.style.top;
+
+      // Step to a frame at the far right, then back to the first one.
+      frameTooltipRenderer.show(createEvent(200, 100), frameAnchor({ ...rect, x: 900 }));
+      frameTooltipRenderer.show(createEvent(0, 100), frameAnchor(rect));
+
+      expect(element.style.top).toBe(settledTop);
+    });
+
+    it('should never place the panel over the minimap or metric strip', () => {
+      showSettled(createEvent(0, 100), frameAnchor({ x: 300, y: 60, width: 100, height: 20 }, 40));
+
+      expect(parseInt(tooltipEl().style.top, 10)).toBeGreaterThanOrEqual(40);
+    });
+
+    it('should keep the panel inside the container', () => {
+      showSettled(createEvent(0, 100), frameAnchor({ x: 960, y: 500, width: 40, height: 20 }));
+
+      const left = parseInt(tooltipEl().style.left, 10);
+      expect(left).toBeGreaterThanOrEqual(0);
+      expect(left + 200).toBeLessThanOrEqual(1000);
+    });
+
+    it('should place below and right of the cursor when there is no frame rect', () => {
+      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
+
+      expect(tooltipEl().style.left).toBe('110px');
+      expect(tooltipEl().style.top).toBe('110px');
+    });
+
+    it('should use a custom cursor offset', () => {
       frameTooltipRenderer.destroy();
       frameTooltipRenderer = new FrameTooltipRenderer(container, {
         categoryColors: {},
         cursorOffset: 20,
         enableFlip: true,
       });
+      sizeTooltip(200, 100);
 
-      const event = createEvent(0, 100);
+      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
 
-      frameTooltipRenderer.show(event, 100, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      const left = parseInt(tooltip.style.left, 10);
-      const top = parseInt(tooltip.style.top, 10);
-
-      expect(left).toBeGreaterThanOrEqual(120); // 100 + 20
-      expect(top).toBeGreaterThanOrEqual(120); // 100 + 20
-
-      frameTooltipRenderer.hide();
-    });
-  });
-
-  describe('positioning - boundary detection', () => {
-    beforeEach(() => {
-      frameTooltipRenderer.destroy();
-      frameTooltipRenderer = new FrameTooltipRenderer(container, {
-        categoryColors: {},
-        cursorOffset: 10,
-        enableFlip: true,
-      });
-
-      // Mock getBoundingClientRect to provide realistic dimensions in jsdom
-      const mockGetBoundingClientRect = () =>
-        ({
-          width: 200,
-          height: 100,
-          top: 0,
-          left: 0,
-          right: 200,
-          bottom: 100,
-        }) as DOMRect;
-
-      // Apply mock to tooltip element after it's created
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      if (tooltip) {
-        tooltip.getBoundingClientRect = mockGetBoundingClientRect;
-      }
+      expect(tooltipEl().style.left).toBe('120px');
+      expect(tooltipEl().style.top).toBe('120px');
     });
 
-    it('should flip horizontally when tooltip goes off right edge', () => {
-      const event = createEvent(0, 100);
+    it('should flip to the other side of the cursor near the right and bottom edges', () => {
+      showSettled(createEvent(0, 100), cursorAnchor(950, 550));
 
-      // Position near right edge
-      frameTooltipRenderer.show(event, 950, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      // Mock the tooltip dimensions
-      tooltip.getBoundingClientRect = () =>
-        ({
-          width: 200,
-          height: 100,
-          top: 0,
-          left: parseInt(tooltip.style.left || '0', 10),
-          right: parseInt(tooltip.style.left || '0', 10) + 200,
-          bottom: 100,
-        }) as DOMRect;
-
-      const left = parseInt(tooltip.style.left, 10);
-      // Tooltip should be positioned to stay within container
-      expect(left + 200).toBeLessThanOrEqual(1000);
-
-      frameTooltipRenderer.hide();
+      // Flipped: 950 - 200 - 10, and 550 - 100 - 10.
+      expect(tooltipEl().style.left).toBe('740px');
+      expect(tooltipEl().style.top).toBe('440px');
     });
 
-    it('should flip vertically when tooltip goes off bottom edge', () => {
-      const event = createEvent(0, 100);
+    it('should clamp negative cursor coordinates to the container', () => {
+      showSettled(createEvent(0, 100), cursorAnchor(-100, -100));
 
-      // Position near bottom edge
-      frameTooltipRenderer.show(event, 100, 550);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      tooltip.getBoundingClientRect = () =>
-        ({
-          width: 200,
-          height: 100,
-          top: parseInt(tooltip.style.top || '0', 10),
-          left: 0,
-          right: 200,
-          bottom: parseInt(tooltip.style.top || '0', 10) + 100,
-        }) as DOMRect;
-
-      const top = parseInt(tooltip.style.top, 10);
-      // Tooltip should be positioned to stay within container
-      expect(top + 100).toBeLessThanOrEqual(600);
-
-      frameTooltipRenderer.hide();
+      expect(parseInt(tooltipEl().style.left, 10)).toBeGreaterThanOrEqual(0);
+      expect(parseInt(tooltipEl().style.top, 10)).toBeGreaterThanOrEqual(0);
     });
 
-    it('should keep tooltip within left boundary', () => {
-      const event = createEvent(0, 100);
+    it('should clamp cursor coordinates beyond the container', () => {
+      showSettled(createEvent(0, 100), cursorAnchor(2000, 2000));
 
-      // Position at left edge
-      frameTooltipRenderer.show(event, 0, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      const left = parseInt(tooltip.style.left, 10);
-
-      // Should not be negative
-      expect(left).toBeGreaterThanOrEqual(0);
-
-      frameTooltipRenderer.hide();
-    });
-
-    it('should keep tooltip within top boundary', () => {
-      const event = createEvent(0, 100);
-
-      // Position at top edge
-      frameTooltipRenderer.show(event, 100, 0);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      const top = parseInt(tooltip.style.top, 10);
-
-      // Should not be negative
-      expect(top).toBeGreaterThanOrEqual(0);
-
-      frameTooltipRenderer.hide();
-    });
-
-    it('should handle corner positioning (bottom-right)', () => {
-      const event = createEvent(0, 100);
-
-      // Position at bottom-right corner
-      frameTooltipRenderer.show(event, 950, 550);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      tooltip.getBoundingClientRect = () =>
-        ({
-          width: 200,
-          height: 100,
-          top: parseInt(tooltip.style.top || '0', 10),
-          left: parseInt(tooltip.style.left || '0', 10),
-          right: parseInt(tooltip.style.left || '0', 10) + 200,
-          bottom: parseInt(tooltip.style.top || '0', 10) + 100,
-        }) as DOMRect;
-
-      const left = parseInt(tooltip.style.left, 10);
-      const top = parseInt(tooltip.style.top, 10);
-
-      // Should stay fully within container
-      expect(left + 200).toBeLessThanOrEqual(1000);
-      expect(top + 100).toBeLessThanOrEqual(600);
-
-      frameTooltipRenderer.hide();
+      expect(parseInt(tooltipEl().style.left, 10)).toBeLessThanOrEqual(800);
+      expect(parseInt(tooltipEl().style.top, 10)).toBeLessThanOrEqual(500);
     });
   });
 
   describe('cleanup', () => {
     it('should remove tooltip element on destroy', () => {
-      const tooltip = container.querySelector('#timeline-tooltip');
-      expect(tooltip).not.toBeNull();
+      expect(tooltipEl()).not.toBeNull();
 
       frameTooltipRenderer.destroy();
 
-      const tooltipAfter = container.querySelector('#timeline-tooltip');
-      expect(tooltipAfter).toBeNull();
+      expect(container.querySelector('#timeline-tooltip')).toBeNull();
     });
 
-    it('should handle destroy after show', async () => {
-      const event = createEvent(0, 100);
-
-      frameTooltipRenderer.show(event, 100, 100);
+    it('should handle destroy after show', () => {
+      showSettled(createEvent(0, 100), cursorAnchor(100, 100));
 
       frameTooltipRenderer.destroy();
 
-      // Tooltip should not exist
-      const tooltip = container.querySelector('#timeline-tooltip');
-      expect(tooltip).toBeNull();
+      expect(container.querySelector('#timeline-tooltip')).toBeNull();
+    });
+
+    it('should drop a pending show on destroy', () => {
+      frameTooltipRenderer.show(createEvent(0, 100), cursorAnchor(100, 100));
+
+      frameTooltipRenderer.destroy();
+
+      expect(() => jest.advanceTimersByTime(SHOW_DELAY_MS)).not.toThrow();
     });
 
     it('should handle multiple destroy calls safely', () => {
       frameTooltipRenderer.destroy();
-      frameTooltipRenderer.destroy(); // Should not throw
 
-      expect(true).toBe(true); // If we get here, no error was thrown
+      expect(() => frameTooltipRenderer.destroy()).not.toThrow();
     });
   });
 
   describe('edge cases', () => {
-    beforeEach(() => {
-      frameTooltipRenderer.destroy();
-      frameTooltipRenderer = new FrameTooltipRenderer(container, {
-        categoryColors: {},
-        cursorOffset: 10,
-        enableFlip: true,
-      });
-    });
-
     it('should handle event with minimal data', () => {
       const event = {
         timestamp: 0,
@@ -729,81 +734,24 @@ describe('FrameTooltipRenderer', () => {
         heapAllocated: { total: 0, self: 0 },
       } as unknown as LogEvent;
 
-      frameTooltipRenderer.show(event, 100, 100);
+      showSettled(event, cursorAnchor(100, 100));
 
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      expect(tooltip.style.display).toBe('block');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().dataset.visible).toBe('true');
     });
 
     it('should handle zero duration', () => {
-      const event = createEvent(0, 0);
+      showSettled(createEvent(0, 0), cursorAnchor(100, 100));
 
-      frameTooltipRenderer.show(event, 100, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       // Just check the tooltip displays - no duration shown for 0
-      expect(tooltip.style.display).toBe('block');
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().dataset.visible).toBe('true');
     });
 
     it('should handle very large durations', () => {
       // 1 second = 1,000,000,000 ns
-      const event = createEvent(0, 1_000_000_000);
+      showSettled(createEvent(0, 1_000_000_000), cursorAnchor(100, 100));
 
-      frameTooltipRenderer.show(event, 100, 100);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
       // Should show duration in seconds or milliseconds
-      expect(tooltip.textContent).toMatch(/\d+\s*(s|ms)/);
-
-      frameTooltipRenderer.hide();
-    });
-
-    it('should handle negative mouse coordinates', () => {
-      const event = createEvent(0, 100);
-
-      // Should not crash with negative coordinates
-      frameTooltipRenderer.show(event, -10, -10);
-
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      const left = parseInt(tooltip.style.left, 10);
-      const top = parseInt(tooltip.style.top, 10);
-
-      // Should clamp to zero
-      expect(left).toBeGreaterThanOrEqual(0);
-      expect(top).toBeGreaterThanOrEqual(0);
-
-      frameTooltipRenderer.hide();
-    });
-
-    it('should handle mouse coordinates beyond container', () => {
-      const event = createEvent(0, 100);
-
-      // Get tooltip and mock before showing
-      const tooltip = container.querySelector('#timeline-tooltip') as HTMLElement;
-      tooltip.getBoundingClientRect = () =>
-        ({
-          width: 200,
-          height: 100,
-          top: 0,
-          left: 0,
-          right: 200,
-          bottom: 100,
-        }) as DOMRect;
-
-      frameTooltipRenderer.show(event, 2000, 2000);
-
-      const left = parseInt(tooltip.style.left, 10);
-      const top = parseInt(tooltip.style.top, 10);
-
-      // Should clamp to stay within container
-      expect(left).toBeLessThanOrEqual(1000);
-      expect(top).toBeLessThanOrEqual(600);
-
-      frameTooltipRenderer.hide();
+      expect(tooltipEl().textContent).toMatch(/\d+\s*(s|ms)/);
     });
   });
 });

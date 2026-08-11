@@ -79,6 +79,11 @@
 
   /* Floating surfaces — tooltips and popovers, matching VS Code's widget chrome. */
   --lana-popover-bg: var(--vscode-editorWidget-background, #252526);
+  /* Divider inside a hover panel — the colour VS Code rules its own hover status bar with. */
+  --lana-hover-border: var(
+    --vscode-editorHoverWidget-border,
+    var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.35))
+  );
 
   --lana-shadow-popover: 0 4px 16px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
   --lana-shadow-overlay: 0 8px 24px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.5));
