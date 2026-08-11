@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
-import { TabInputText, type Uri, window } from 'vscode';
+import { TabInputText, window } from 'vscode';
+import type { URI } from 'vscode-uri';
 
 import { appName } from '../AppSettings.js';
 import type { Context } from '../Context.js';
@@ -11,7 +12,7 @@ import { LogView } from './LogView.js';
 
 export class ShowLogAnalysis {
   static getCommand(context: Context): Command {
-    return new Command('showLogAnalysis', 'Log: Show Apex Log Analysis', (uri: Uri) =>
+    return new Command('showLogAnalysis', 'Log: Show Apex Log Analysis', (uri: URI) =>
       ShowLogAnalysis.safeCommand(context, uri),
     );
   }
@@ -21,7 +22,7 @@ export class ShowLogAnalysis {
     context.display.output(`Registered command '${appName}: Show Log'`);
   }
 
-  private static async safeCommand(context: Context, uri: Uri): Promise<void> {
+  private static async safeCommand(context: Context, uri: URI): Promise<void> {
     try {
       await ShowLogAnalysis.command(context, uri);
     } catch (err: unknown) {
@@ -31,7 +32,7 @@ export class ShowLogAnalysis {
     }
   }
 
-  private static async command(context: Context, uri: Uri): Promise<void> {
+  private static async command(context: Context, uri: URI): Promise<void> {
     const activeTab = window.tabGroups.activeTabGroup.activeTab;
     const logUri =
       uri ||

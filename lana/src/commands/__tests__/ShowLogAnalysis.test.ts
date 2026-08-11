@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { TabInputText, Uri, window } from 'vscode';
+import { TabInputText, window } from 'vscode';
+import { URI } from 'vscode-uri';
 
 import { createMockContext } from '../../__tests__/helpers/test-builders.js';
 import { fileOrFolderExists } from '../../services/salesforceServices.js';
@@ -26,7 +27,7 @@ describe('ShowLogAnalysis', () => {
     mockCreateView.mockRejectedValueOnce(new Error('Unable to load log viewer'));
 
     await ShowLogAnalysis.getCommand(context as unknown as import('../../Context.js').Context).run(
-      Uri.parse('file:///test.log'),
+      URI.parse('file:///test.log'),
     );
 
     expect(context.display.showErrorMessage).toHaveBeenCalledWith(
@@ -36,7 +37,7 @@ describe('ShowLogAnalysis', () => {
 
   it('passes active editor content for virtual documents', async () => {
     const context = createMockContext();
-    const logUri = Uri.parse('untitled:sample-log.log');
+    const logUri = URI.parse('untitled:sample-log.log');
     const activeTextEditor = window.activeTextEditor;
     mockFileOrFolderExists.mockResolvedValueOnce(false);
     Object.defineProperty(window, 'activeTextEditor', {
@@ -62,7 +63,7 @@ describe('ShowLogAnalysis', () => {
 
   it('uses the active text tab when no editor is available', async () => {
     const context = createMockContext();
-    const logUri = Uri.parse('file:///sample-log.log');
+    const logUri = URI.parse('file:///sample-log.log');
     const activeTextEditor = window.activeTextEditor;
     const activeTab = window.tabGroups.activeTabGroup.activeTab;
     Object.defineProperty(window, 'activeTextEditor', { configurable: true, value: undefined });
