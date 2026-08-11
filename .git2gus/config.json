@@ -1,0 +1,14 @@
+{
+  "productTag": "a1aB000000005G3IAI",
+  "issueTypeLabels": {
+    "feature": "USER STORY",
+    "type:bug": "BUG P3",
+    "type:security": "BUG P2",
+    "type:feedback": "",
+    "status:duplicate": "",
+    "type:community-contrib": "USER STORY"
+  },
+  "defaultBuild": "offcore.tooling.66",
+  "hideWorkItemUrl": "true",
+  "statusWhenClosed": "CLOSED"
+}
