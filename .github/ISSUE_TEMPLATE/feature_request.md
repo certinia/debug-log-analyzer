@@ -9,9 +9,9 @@ assignees: ''
 
 ## 🔍 Before You Start
 
-Search [existing issues](https://github.com/certinia/debug-log-analyzer/issues) to check if this feature has already been suggested.
+Search [existing issues](https://github.com/forcedotcom/debug-log-analyzer/issues) to check if this feature has already been suggested.
 
-If this is an early idea, open question, or you want feedback before filing, please start an [Ideas discussion](https://github.com/certinia/debug-log-analyzer/discussions/categories/ideas) first.
+If this is an early idea, open question, or you want feedback before filing, please start an [Ideas discussion](https://github.com/forcedotcom/debug-log-analyzer/discussions/categories/ideas) first.
 
 > If your idea is new — awesome! Continue below 👇
 

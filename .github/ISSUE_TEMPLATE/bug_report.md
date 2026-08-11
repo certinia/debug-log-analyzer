@@ -14,8 +14,8 @@ Thanks for taking the time to help us improve! Please fill out the details below
 NOTE:
 
 - This is a community project. We will triage your bug as soon as we can.
-- Before raising a new bug, please check our [issue list](https://github.com/certinia/debug-log-analyzer/issues) to see if it has already been reported.
-- For general help or if you are not sure this is a bug, use [Q&A discussions](https://github.com/certinia/debug-log-analyzer/discussions/categories/q-a) or [all discussions](https://github.com/certinia/debug-log-analyzer/discussions).
+- Before raising a new bug, please check our [issue list](https://github.com/forcedotcom/debug-log-analyzer/issues) to see if it has already been reported.
+- For general help or if you are not sure this is a bug, use [Q&A discussions](https://github.com/forcedotcom/debug-log-analyzer/discussions/categories/q-a) or [all discussions](https://github.com/forcedotcom/debug-log-analyzer/discussions).
 
 ### 💡 Description
 
