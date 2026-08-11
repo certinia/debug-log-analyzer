@@ -12,6 +12,7 @@
 // a drift from `@types/vscode` surfaces as ONE error at the factory, not at
 // every call site.
 import type { EndOfLine, TextDocument } from 'vscode';
+import { URI, Utils } from 'vscode-uri';
 
 // Track subscriptions for cleanup
 const subscriptions: { dispose: jest.Mock }[] = [];
@@ -110,9 +111,6 @@ export const ViewColumn = {
 } as const;
 export type ViewColumn = (typeof ViewColumn)[keyof typeof ViewColumn];
 
-// Use the real vscode-uri URI class for compatibility with Utils.joinPath
-import { URI, Utils } from 'vscode-uri';
-
 // Mock Uri class - delegates to real vscode-uri URI
 export const Uri = {
   file: (path: string) => URI.file(path),
@@ -122,6 +120,14 @@ export const Uri = {
     return Utils.joinPath(base, ...pathSegments);
   },
 };
+
+export class TabInputText {
+  uri: URI;
+
+  constructor(uri: URI) {
+    this.uri = uri;
+  }
+}
 
 // Mock RelativePattern (constructor used for glob searches)
 export const RelativePattern = jest.fn();
@@ -326,6 +332,11 @@ export const window = {
   })),
   createWebviewPanel: jest.fn(),
   activeTextEditor: undefined as unknown,
+  tabGroups: {
+    activeTabGroup: {
+      activeTab: undefined as unknown,
+    },
+  },
   visibleTextEditors: [],
   onDidChangeActiveTextEditor: jest.fn(() => ({ dispose: jest.fn() })),
   onDidChangeVisibleTextEditors: jest.fn(() => ({ dispose: jest.fn() })),

@@ -1,54 +1,60 @@
-name: Publish Stable
+name: Publish Extension
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      release-type:
+        description: 'Publish a stable or pre-release extension'
+        required: true
+        default: stable
+        type: choice
+        options: [stable, prerelease]
+      registries:
+        description: 'Public registries for the universal VSIX'
+        required: true
+        default: all
+        type: choice
+        options: [all, vsce, ovsx]
+      version-bump:
+        description: 'Version bump to apply'
+        required: true
+        default: patch
+        type: choice
+        options: [patch, minor, major]
+      dry-run:
+        description: 'Build and validate artifacts without changing Git or publishing'
+        required: true
+        default: true
+        type: boolean
 
-# Publishing uses VSCE/OVSX secrets, not the git token — read-only is enough.
+# The shared workflow creates version commits and tags only for live publishing.
 permissions:
-  contents: read
+  actions: read
+  contents: write
+  packages: write
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@v6.0.9
-        with:
-          version: 10
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-          cache: 'pnpm'
-      - name: Install vsce + ovsx
-        run: |
-          pnpm add --global @vscode/vsce
-          pnpm add --global ovsx
-      - name: Dependencies
-        run: pnpm run ci:install
-      - name: Build extension
-        run: |
-          cd lana
-          vsce package --no-dependencies
-      - name: Publish to VS Code Marketplace + Open VSX Registry
-        # Secrets and the release tag are passed via env (not interpolated into the
-        # shell) to avoid leaking tokens in the process list and shell injection.
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_TOKEN }}
-          OVSX_PAT: ${{ secrets.OVSX_TOKEN }}
-          TAG: ${{ github.event.release.tag_name }}
-        run: |
-          cd lana
-          echo "Verify vsce token has not expired"
-          vsce verify-pat
-          echo "Verify ovsx token has not expired"
-          ovsx verify-pat
-
-          echo "Publish to vsce"
-          vsce publish --packagePath "lana-${TAG}.vsix" --no-dependencies
-          echo "Publish to ovsx"
-          ovsx publish "lana-${TAG}.vsix" --no-dependencies
+  publish:
+    uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@main
+    with:
+      branch: ${{ github.ref_name }}
+      extensions: lana
+      registries: ${{ inputs.registries }}
+      pre-release: ${{ inputs.release-type == 'prerelease' }}
+      nightly: false
+      version-bump: ${{ inputs.version-bump }}
+      dry-run: ${{ inputs.dry-run }}
+      extensions-root: .
+      exclude-web-vsix: 'true'
+      node-version: '24'
+      package-manager: pnpm
+      package-manager-version: '10'
+      cache-dependency-path: pnpm-lock.yaml
+      install-command: pnpm run ci:install
+      package-command: cd lana && pnpm dlx @vscode/vsce package --no-dependencies --out lana-$(node -p "require('./package.json').version").vsix
+      prerelease-package-command: cd lana && pnpm dlx @vscode/vsce package --pre-release --no-dependencies --out lana-$(node -p "require('./package.json').version").vsix
+      web-package-command: cd lana && pnpm dlx @vscode/vsce package --target web --no-dependencies --out lana-web-$(node -p "require('./package.json').version").vsix
+      web-prerelease-package-command: cd lana && pnpm dlx @vscode/vsce package --target web --pre-release --no-dependencies --out lana-web-$(node -p "require('./package.json').version").vsix
+      artifact-glob: lana/*.vsix
+      publish-web-vsix: true
+    secrets: inherit

@@ -19,42 +19,39 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6.0.9
-        with:
-          version: 10
-      - name: Set up Node
-        uses: actions/setup-node@v7
+      - name: Set up Node and install dependencies
+        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@main
         with:
           node-version: '24'
-          cache: 'pnpm'
-      - name: Install Packages
-        run: pnpm run ci:install
+          package-manager: pnpm
+          package-manager-version: '10'
+          cache-dependency-path: pnpm-lock.yaml
+          install-command: pnpm run ci:install
       - name: Lint Files
         run: pnpm run lint
 
   tests:
     # Split per jest project so they run on parallel runners and failures are isolated.
     # Kept as --runInBand: on 2-vCPU runners the worker pool is slower than serial.
-    name: Test (${{ matrix.project }})
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }}, ${{ matrix.project }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
         project: [apex-log-parser, log-viewer, lana]
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6.0.9
-        with:
-          version: 10
-      - name: Set up Node
-        uses: actions/setup-node@v7
+      - name: Set up Node and install dependencies
+        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@main
         with:
           node-version: '24'
-          cache: 'pnpm'
-      - name: Install Packages
-        run: pnpm run ci:install
+          package-manager: pnpm
+          package-manager-version: '10'
+          cache-dependency-path: pnpm-lock.yaml
+          install-command: pnpm run ci:install
       - name: Tests
         run: pnpm exec jest --selectProjects ${{ matrix.project }} --runInBand
 
@@ -65,19 +62,22 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6.0.9
-        with:
-          version: 10
-      - name: Set up Node
-        uses: actions/setup-node@v7
+      - name: Set up Node and install dependencies
+        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@main
         with:
           node-version: '24'
-          cache: 'pnpm'
+          package-manager: pnpm
+          package-manager-version: '10'
+          cache-dependency-path: pnpm-lock.yaml
+          install-command: pnpm run ci:install
       - name: Install vsce
         run: pnpm add --global @vscode/vsce
-      - name: Install Dependencies
-        run: pnpm run ci:install
       - name: Build VSCode Package
         run: |
           cd lana
           vsce package --no-dependencies
+
+  e2e:
+    name: E2E
+    needs: [verify_files, tests, build]
+    uses: ./.github/workflows/e2e.yml

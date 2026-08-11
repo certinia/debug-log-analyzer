@@ -111,6 +111,9 @@ importers:
       typescript-eslint:
         specifier: ^8.65.0
         version: 8.65.0(@typescript/typescript6@6.0.2)(eslint@10.8.0(jiti@1.21.7))
+      wireit:
+        specifier: ^0.14.13
+        version: 0.14.13
 
   lana:
     dependencies:
@@ -9169,6 +9172,11 @@ packages:
 
   wildcard@2.0.1:
     resolution: {integrity: sha512-CC1bOL87PIWSBhDcTrdeLo6eGT7mCFtrg0uIJtqJUFyK+eJnzl8A1niH56uu7KMa5XFrtiV+AQuHO3n7DsHnLQ==}
+
+  wireit@0.14.13:
+    resolution: {integrity: sha512-Fo/VlEZKY4j53DQoW7Z/fWFrNGbnrfphgVDJdFoas5rVWUA9Z14/3AixEZcEfAuywympLCq49sTXVcD+sNtIxg==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
 
   word-wrap@1.2.5:
     resolution: {integrity: sha512-BN22B5eaMMI9UMtjrGd5g5eCYPpCPDUy0FJXbYsaT5zYxjFOckS53SQDE3pWkVoWpHXVb3BrYcEN4Twa55B5cA==}
@@ -20510,6 +20518,14 @@ snapshots:
       string-width: 5.1.2
 
   wildcard@2.0.1: {}
+
+  wireit@0.14.13:
+    dependencies:
+      brace-expansion: 5.0.9
+      chokidar: 3.6.0
+      fast-glob: 3.3.3
+      jsonc-parser: 3.3.1
+      proper-lockfile: 4.1.2
 
   word-wrap@1.2.5: {}
 

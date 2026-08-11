@@ -3,13 +3,13 @@
   "private": true,
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
     "@prettier/plugin-oxc": "^0.2.2",
     "@rolldown/plugin-node-polyfills": "^1.0.3",
     "@rollup/plugin-alias": "^6.0.0",
     "@rollup/plugin-commonjs": "^29.0.3",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
-    "@playwright/test": "^1.60.0",
     "@salesforce/playwright-vscode-ext": "^1.3.10",
     "@swc/core": "^1.15.47",
     "@swc/helpers": "^0.5.23",
@@ -30,23 +30,24 @@
     "rollup-plugin-copy": "^3.5.0",
     "rollup-plugin-polyfill-node": "^0.13.0",
     "rollup-plugin-swc3": "^0.12.1",
+    "tsx": "^4.21.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-7": "npm:typescript@^7.0.2",
-    "tsx": "^4.21.0",
-    "typescript-eslint": "^8.65.0"
+    "typescript-eslint": "^8.65.0",
+    "wireit": "^0.14.13"
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "prepare": "husky",
     "bump-prerelease": "node ./scripts/pre-release.mjs",
-    "build": "node --run typecheck && NODE_ENV=production node --run build:dev",
-    "build:fast": "node --run typecheck && NODE_ENV=production node --run build:dev:fast",
-    "build:dev": "rm -rf lana/dist && rollup -c rollup.config.mjs",
-    "build:dev:fast": "rolldown -c rolldown.config.ts",
-    "watch": "rm -rf lana/dist && rollup -w -c rollup.config.mjs",
+    "build": "wireit",
+    "build:fast": "wireit",
+    "build:dev": "wireit",
+    "build:dev:fast": "wireit",
+    "watch": "wireit",
     "watch:fast": "rolldown -w -c rolldown.config.ts",
     "copy:package-docs": "node ./scripts/copy-package-docs.mjs",
-    "typecheck": "tsc -b",
+    "typecheck": "wireit",
     "typecheck:tsc6": "tsc6 -b",
     "lint": "concurrently -r -g 'eslint . --cache --cache-location node_modules/.cache/eslint/' 'prettier --cache **/*.{ts,css,md,scss} --check --experimental-cli' 'pnpm run typecheck'",
     "test": "jest",
@@ -58,6 +59,150 @@
   },
   "lint-staged": {
     "*.{ts,css,md,scss}": "prettier --cache --write --experimental-cli"
+  },
+  "wireit": {
+    "build": {
+      "command": "rollup -c rollup.config.mjs",
+      "dependencies": [
+        "typecheck"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      },
+      "files": [
+        "apex-log-parser/src/**/*.ts",
+        "lana/src/**/*",
+        "lana/salesforce-icon.png",
+        "lana/tsconfig.json",
+        "log-viewer/src/**/*",
+        "log-viewer/index.html",
+        "log-viewer/tsconfig.json",
+        "package.json",
+        "pnpm-lock.yaml",
+        "rollup.config.mjs",
+        "scripts/**/*"
+      ],
+      "output": [
+        "lana/dist/**",
+        "log-viewer/out/**"
+      ]
+    },
+    "build:fast": {
+      "command": "rolldown -c rolldown.config.ts",
+      "dependencies": [
+        "typecheck"
+      ],
+      "env": {
+        "NODE_ENV": "production"
+      },
+      "files": [
+        "apex-log-parser/src/**/*.ts",
+        "lana/src/**/*",
+        "lana/salesforce-icon.png",
+        "lana/tsconfig.json",
+        "log-viewer/src/**/*",
+        "log-viewer/index.html",
+        "log-viewer/tsconfig.json",
+        "package.json",
+        "pnpm-lock.yaml",
+        "rolldown.config.ts",
+        "scripts/**/*"
+      ],
+      "output": [
+        "lana/dist/**",
+        "log-viewer/out/**"
+      ]
+    },
+    "build:dev": {
+      "command": "rollup -c rollup.config.mjs",
+      "dependencies": [
+        "typecheck"
+      ],
+      "files": [
+        "apex-log-parser/src/**/*.ts",
+        "lana/src/**/*",
+        "lana/salesforce-icon.png",
+        "lana/tsconfig-dev.json",
+        "log-viewer/src/**/*",
+        "log-viewer/index.html",
+        "log-viewer/tsconfig-dev.json",
+        "package.json",
+        "pnpm-lock.yaml",
+        "rollup.config.mjs",
+        "scripts/**/*"
+      ],
+      "output": [
+        "lana/dist/**",
+        "log-viewer/out/**"
+      ]
+    },
+    "watch": {
+      "command": "rollup -c rollup.config.mjs",
+      "dependencies": [
+        "typecheck"
+      ],
+      "files": [
+        "apex-log-parser/src/**/*.ts",
+        "lana/src/**/*",
+        "lana/salesforce-icon.png",
+        "lana/tsconfig-dev.json",
+        "log-viewer/src/**/*",
+        "log-viewer/index.html",
+        "log-viewer/tsconfig-dev.json",
+        "package.json",
+        "pnpm-lock.yaml",
+        "rollup.config.mjs",
+        "scripts/**/*"
+      ],
+      "output": [
+        "lana/dist/**",
+        "log-viewer/out/**"
+      ]
+    },
+    "build:dev:fast": {
+      "command": "rolldown -c rolldown.config.ts",
+      "dependencies": [
+        "typecheck"
+      ],
+      "files": [
+        "apex-log-parser/src/**/*.ts",
+        "lana/src/**/*",
+        "lana/salesforce-icon.png",
+        "lana/tsconfig-dev.json",
+        "log-viewer/src/**/*",
+        "log-viewer/index.html",
+        "log-viewer/tsconfig-dev.json",
+        "package.json",
+        "pnpm-lock.yaml",
+        "rolldown.config.ts",
+        "scripts/**/*"
+      ],
+      "output": [
+        "lana/dist/**",
+        "log-viewer/out/**"
+      ]
+    },
+    "typecheck": {
+      "command": "tsc -b",
+      "files": [
+        "apex-log-parser/src/**/*.ts",
+        "apex-log-parser/tsconfig.json",
+        "lana/src/**/*.ts",
+        "lana/tsconfig.json",
+        "lana/test/playwright/**/*.ts",
+        "lana/test/playwright/tsconfig.json",
+        "log-viewer/src/**/*.ts",
+        "log-viewer/tsconfig.json",
+        "tsconfig.json"
+      ],
+      "output": [
+        "apex-log-parser/dist/**",
+        "apex-log-parser/tsconfig.tsbuildinfo",
+        "lana/tsconfig.tsbuildinfo",
+        "lana/test/playwright/tsconfig.tsbuildinfo",
+        "log-viewer/tsconfig.tsbuildinfo"
+      ]
+    }
   },
   "pnpm": {
     "overrides": {

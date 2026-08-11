@@ -56,6 +56,8 @@ You can build the extension and prepare it for local development, run the watche
 pnpm watch
 ```
 
+Wireit's watch mode is enabled with `pnpm watch -- --watch`.
+
 2. **Development Build:**
 
    To build the extension without minification (fast for local development), use:
@@ -63,6 +65,8 @@ pnpm watch
 ```bash
 pnpm build:dev
 ```
+
+Build tasks are managed by [Wireit](https://github.com/google/wireit), which tracks inputs and `lana/dist` outputs. Unchanged builds are skipped; source changes and deleted inputs trigger a clean rebuild of generated extension assets.
 
 3. **Production Build:**
 

@@ -1,0 +1,22 @@
+name: Dependabot Automerge
+
+on:
+  schedule:
+    - cron: '17 4 * * 1-5'
+  workflow_dispatch:
+
+# The Salesforce bot token performs the squash merge. No repository contents are checked out here.
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    uses: salesforcecli/github-workflows/.github/workflows/automerge.yml@main
+    with:
+      mergeMethod: squash
+      maxVersionBump: minor
+    secrets:
+      SVC_CLI_BOT_GITHUB_TOKEN: ${{ secrets.SVC_CLI_BOT_GITHUB_TOKEN }}
