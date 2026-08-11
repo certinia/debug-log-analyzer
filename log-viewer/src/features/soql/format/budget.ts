@@ -20,18 +20,7 @@ export interface SoqlBudget {
   columns: number;
 }
 
-/** Lines a clause gets before spare lines are shared out. */
-const BASE_LINES: Record<string, number> = {
-  SELECT: 1,
-  FROM: 1,
-  WHERE: 3,
-  HAVING: 1,
-  'GROUP BY': 1,
-  'ORDER BY': 1,
-  LIMIT: 1,
-  OFFSET: 1,
-};
-
+/** Every clause holds at least one line. */
 const DEFAULT_LINES = 1;
 
 /** An `IN` list of this many literals or more collapses to a count. */
@@ -88,14 +77,28 @@ export function budgetedChunks(tokens: Token[], budget: SoqlBudget): Chunk[] {
   const lines: Chunk[][] = [];
   let used = 0;
 
-  for (const clause of clauses) {
+  for (let i = 0; i < clauses.length; i++) {
     const spare = budget.lines - used;
-    if (spare <= 0) {
+    const remaining = clauses.length - i;
+    // `LIMIT` and `ORDER BY` come last and change what a query means, so a clause that does not
+    // fit is counted, never dropped in silence.
+    if (spare <= 0 || (spare === 1 && remaining > 1)) {
+      const marker = elide(`… +${remaining} clauses`);
+      if (spare > 0) {
+        lines.push([marker]);
+      } else {
+        lines[lines.length - 1]?.push(' ', marker);
+      }
       break;
     }
-    const allowed = Math.min(allowances.get(clause) ?? DEFAULT_LINES, spare);
-    const rendered = renderClause(clause, allowed, budget.columns);
-    for (const line of rendered) {
+
+    const clause = clauses[i]!;
+    // Hold a line back for each clause still to come.
+    const allowed = Math.min(
+      allowances.get(clause) ?? DEFAULT_LINES,
+      Math.max(DEFAULT_LINES, spare - remaining + 1),
+    );
+    for (const line of renderClause(clause, allowed, budget.columns)) {
       lines.push(line);
       used += lineCost(line, budget.columns);
     }
@@ -111,20 +114,14 @@ export function budgetedChunks(tokens: Token[], budget: SoqlBudget): Chunk[] {
   return out;
 }
 
-/** Give every clause its base allowance, then hand every spare line to `WHERE`. */
+/** Give every clause a line, then hand every spare line to `WHERE` — it holds the most detail. */
 function allocate(clauses: Clause[], lines: number): Map<Clause, number> {
-  const allowances = new Map<Clause, number>();
-  let base = 0;
-  for (const clause of clauses) {
-    const allowance = BASE_LINES[clause.keyword] ?? DEFAULT_LINES;
-    allowances.set(clause, allowance);
-    base += allowance;
-  }
+  const allowances = new Map<Clause, number>(clauses.map((clause) => [clause, DEFAULT_LINES]));
 
-  const spare = lines - base;
+  const spare = lines - clauses.length;
   const where = clauses.find((c) => c.keyword === 'WHERE' || c.keyword === 'HAVING');
   if (spare > 0 && where) {
-    allowances.set(where, (allowances.get(where) ?? DEFAULT_LINES) + spare);
+    allowances.set(where, DEFAULT_LINES + spare);
   }
   return allowances;
 }
@@ -146,12 +143,13 @@ function renderClause(clause: Clause, allowed: number, columns: number): Chunk[]
 function renderList(clause: Clause, columns: number): Chunk[] {
   const items = splitList(clause.body).map((item) => toChunks(collapseSubquery(item)));
   const line: Chunk[] = toChunks(clause.head);
+  const label = clause.keyword === 'SELECT' ? 'fields' : 'more';
   let shown = 0;
 
   for (const item of items) {
     const separator: Chunk[] = shown ? [COMMA, ' '] : [' '];
     const rest = items.length - shown - 1;
-    const tail = rest > 0 ? ` +${rest} fields`.length : 0;
+    const tail = rest > 0 ? ` +${rest} ${label}`.length : 0;
     if (shown && width(line) + width(separator) + width(item) + tail > columns) {
       break;
     }
@@ -161,7 +159,7 @@ function renderList(clause: Clause, columns: number): Chunk[] {
 
   const hidden = items.length - shown;
   if (hidden > 0) {
-    line.push(' ', elide(`+${hidden} fields`));
+    line.push(' ', elide(`+${hidden} ${label}`));
   }
   return line;
 }
@@ -206,7 +204,13 @@ function renderConditions(clause: Clause, allowed: number, columns: number): Chu
 
     if (i > 0 && used + cost + reserve > allowed) {
       const hidden = parts.slice(i).reduce((n, part) => n + countLeaves(part), 0);
-      lines.push([INDENT, elide(`… +${hidden} conditions`)]);
+      const marker = elide(`… +${hidden} conditions`);
+      // The count goes on the last condition when a line of its own would overrun the allowance.
+      if (used < allowed) {
+        lines.push([INDENT, marker]);
+      } else {
+        lines[lines.length - 1]!.push(' ', marker);
+      }
       break;
     }
     lines.push(line);
@@ -230,7 +234,8 @@ function renderCondition(node: ConditionNode, available: number): Chunk[] {
 
   for (let i = 0; i < node.parts.length; i++) {
     const separator: Chunk[] = i ? [' ', node.joins[i - 1]!, ' '] : [];
-    const part = renderCondition(node.parts[i]!, available);
+    // A nested group only has what its parent has not already used.
+    const part = renderCondition(node.parts[i]!, available - width(out) - width(separator));
     const rest = node.parts.slice(i + 1).reduce((n, p) => n + countLeaves(p), 0);
     const tail = rest > 0 ? ` … +${rest} conditions`.length : 0;
     if (i && width(out) + width(separator) + width(part) + tail > available) {
@@ -252,8 +257,13 @@ function renderCondition(node: ConditionNode, available: number): Chunk[] {
 
 /** A long list of literals says how many it holds instead of listing them. */
 function collapseLiterals(tokens: Token[]): Token[] {
-  const open = tokens.findIndex((t) => isPunct(t, '('));
-  if (open < 1) {
+  // A condition wrapped in its own parentheses keeps them, so start the search inside them.
+  let first = 0;
+  while (isPunct(tokens[first], '(')) {
+    first++;
+  }
+  const open = tokens.findIndex((t, i) => i >= first && isPunct(t, '('));
+  if (open <= first) {
     return tokens;
   }
 

@@ -122,8 +122,26 @@ export class FrameTooltipRenderer {
     this.resizeObserver = new ResizeObserver(() => {
       this.queryBudget = null;
       this.descriptionCache = new WeakMap();
+      this.refresh();
     });
     this.resizeObserver.observe(this.container);
+  }
+
+  /** Rebuild a panel that is on screen, so a resize does not leave a query cut to the old size. */
+  private refresh(): void {
+    const anchor = this.currentAnchor;
+    if (!this.visible || !anchor) {
+      return;
+    }
+
+    if (this.currentEvent) {
+      this.displayContent(this.generateTooltipContent(this.currentEvent), anchor);
+    } else if (this.currentTruncationMarker) {
+      this.displayContent(
+        this.generateTruncationTooltipContent(this.currentTruncationMarker),
+        anchor,
+      );
+    }
   }
 
   /**
@@ -143,10 +161,11 @@ export class FrameTooltipRenderer {
    * @param event - Event to display tooltip for
    * @param anchor - Frame rectangle and cursor position, in container coordinates
    * @param options - Optional settings
-   * @param options.keepPosition - If true and the tooltip is already visible for this event, don't re-anchor
+   * @param options.keepPosition - Leave a visible tooltip where it is, and never open a new one.
+   *   The context menu uses this: it must not move the panel, nor make one appear behind itself.
    */
   public show(event: LogEvent, anchor: TooltipAnchor, options?: { keepPosition?: boolean }): void {
-    if (!this.enabled) {
+    if (!this.enabled || (options?.keepPosition && !this.visible)) {
       return;
     }
     this.clearHideTimer();
@@ -769,10 +788,11 @@ export class FrameTooltipRenderer {
       }
     }
 
-    // Keep the panel inside the chart area, never over the minimap or metric strip.
+    // Keep the panel inside the chart area, never over the minimap or metric strip. The top limit
+    // wins over the bottom one, so a panel taller than the chart overflows down rather than up.
     const topLimit = rect ? anchor.chartTopY : 0;
     element.style.left = `${Math.max(0, Math.min(x, containerRect.width - width))}px`;
-    element.style.top = `${Math.max(0, Math.min(Math.max(y, topLimit), containerRect.height - height))}px`;
+    element.style.top = `${Math.max(topLimit, Math.min(y, containerRect.height - height))}px`;
   }
 
   /**

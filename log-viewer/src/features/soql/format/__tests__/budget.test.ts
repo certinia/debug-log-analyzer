@@ -45,6 +45,21 @@ describe('SOQL budgeted render', () => {
       );
     });
 
+    it('shows the clauses that fit, then counts the rest', () => {
+      const out = lines(
+        'SELECT Id, Name FROM Account WHERE a = 1 AND b = 2 ORDER BY Name LIMIT 10',
+        {
+          lines: 4,
+          columns: 40,
+        },
+      );
+
+      expect(out.length).toBe(4);
+      expect(out[0]).toBe('SELECT Id, Name');
+      expect(out[1]).toBe('FROM Account');
+      expect(out[out.length - 1]).toMatch(/… \+\d+ clauses$/);
+    });
+
     it('never truncates FROM, ORDER BY or LIMIT', () => {
       const query = `SELECT Id FROM AVeryLongCustomObjectName__c ORDER BY CreatedDate DESC NULLS LAST LIMIT 200 OFFSET 100`;
       const out = lines(query);
@@ -69,6 +84,14 @@ describe('SOQL budgeted render', () => {
       expect(lines('SELECT Id, Name FROM Account WHERE Name = :n', NARROW)[0]).toBe(
         'SELECT Id, Name',
       );
+    });
+
+    it('counts what a GROUP BY list left out as items, not fields', () => {
+      const fields = Array.from({ length: 20 }, (_, i) => `Field${i}__c`).join(', ');
+      const out = lines(`SELECT COUNT(Id) FROM Account GROUP BY ${fields}`);
+      const group = out.find((l) => l.startsWith('GROUP BY'))!;
+
+      expect(group).toMatch(/\+\d+ more$/);
     });
 
     it('keeps the shape of a subquery but not its fields', () => {
@@ -131,6 +154,25 @@ describe('SOQL budgeted render', () => {
       ).join(', ');
       const out = lines(`SELECT Id FROM Account WHERE Id IN (${ids})`);
       expect(out).toContain('WHERE Id IN (… 200 ids)');
+    });
+
+    it('says how many literals a parenthesised IN list holds', () => {
+      const ids = Array.from(
+        { length: 200 },
+        (_, i) => `'001xx0000000${String(i).padStart(3, '0')}'`,
+      ).join(', ');
+      const out = lines(`SELECT Id FROM Account WHERE (Id IN (${ids})) AND Name = :n`);
+
+      expect(out).toContain('WHERE (Id IN (… 200 ids))');
+      out.forEach((line) => expect(line.length).toBeLessThanOrEqual(BUDGET.columns));
+    });
+
+    it('keeps the conditions inside the lines it was given', () => {
+      const conditions = Array.from({ length: 12 }, (_, i) => `Field${i}__c = ${i}`).join(' AND ');
+      const out = lines(`SELECT Id FROM Account WHERE ${conditions}`, { lines: 5, columns: 30 });
+
+      expect(out.length).toBeLessThanOrEqual(5);
+      expect(out.join('\n')).toMatch(/… \+\d+ conditions/);
     });
 
     it('leaves a short IN list alone', () => {
