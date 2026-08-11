@@ -53,6 +53,10 @@ export interface ScopedRow {
   type: string;
   duration: { total: number; self: number };
   callCount: number;
+  /** Every occurrence the row stands for, when it merges several. Null on a row
+   *  that is one frame, whose single occurrence is `originalData` — the whole-log
+   *  tree is all such rows, so a list each would cost one array per event. */
+  eventIndexes: number[] | null;
   _children: ScopedRow[] | null;
 }
 
@@ -64,6 +68,45 @@ export interface ScopedRow {
 export function revealableEventIndex(row: Partial<ScopedRow> | undefined): number | null {
   const { id, originalData } = row ?? {};
   return id !== undefined && id >= 0 && originalData ? originalData.eventIndex : null;
+}
+
+/**
+ * Every occurrence a scoped row stands for. A merged row can be pointed at even
+ * though it cannot be revealed: there is no one frame to jump to, but all of
+ * them can be marked at once.
+ */
+export function locatableEventIndexes(row: Partial<ScopedRow> | undefined): number[] {
+  if (row?.eventIndexes) {
+    return row.eventIndexes;
+  }
+  const single = revealableEventIndex(row);
+  return single === null ? [] : [single];
+}
+
+/**
+ * The rows of one view keyed by each occurrence they stand for, so a frame named
+ * elsewhere can be found in a view whose rows merge occurrences behind a
+ * synthetic id. One frame can name several rows — in bottom-up it appears once
+ * per caller chain it sits in.
+ */
+export function rowIdsByEvent(rows: readonly ScopedRow[]): Map<number, number[]> {
+  const byEvent = new Map<number, number[]>();
+  const stack = [...rows];
+  while (stack.length) {
+    const row = stack.pop()!;
+    for (const eventIndex of locatableEventIndexes(row)) {
+      const ids = byEvent.get(eventIndex);
+      if (ids) {
+        ids.push(row.id);
+      } else {
+        byEvent.set(eventIndex, [row.id]);
+      }
+    }
+    if (row._children) {
+      stack.push(...row._children);
+    }
+  }
+  return byEvent;
 }
 
 export interface ScopedCallTree {
@@ -110,6 +153,7 @@ async function realSubtree(event: LogEvent, tick: Tick): Promise<ScopedRow | nul
       type: current.type ?? '',
       duration: { total: current.duration.total, self: current.duration.self },
       callCount: 1,
+      eventIndexes: null,
       _children: null,
     };
     rows.push(row);
@@ -202,6 +246,7 @@ export async function buildScopedCallTree(
         type: parent.type ?? '',
         duration: { total: selected.duration.total, self: 0 },
         callCount: 1,
+        eventIndexes: null,
         _children: [node],
       };
       parent = parent.parent;
@@ -294,6 +339,9 @@ async function aggregate(
   async function merge(input: ScopedRow[]): Promise<ScopedRow[] | null> {
     const groups = new Map<string, ScopedRow>();
     const order: string[] = [];
+    // The occurrences behind each group. A set, because the ancestors of the
+    // instances of one frame are the same frame, met once per instance.
+    const indexes = new Map<string, Set<number>>();
     for (let i = 0; i < input.length; i++) {
       if (i % CHECK_EVERY === 0 && !(await tick())) {
         return null;
@@ -309,14 +357,21 @@ async function aggregate(
           type: row.type,
           duration: { total: 0, self: 0 },
           callCount: 0,
+          eventIndexes: [],
           _children: [],
         };
         groups.set(key, group);
         order.push(key);
+        indexes.set(key, new Set());
       }
       group.duration.total += row.duration.total;
       group.duration.self += row.duration.self;
       group.callCount += row.callCount;
+      // Every merged occurrence, so pointing at the group points at all of them.
+      const seen = indexes.get(key)!;
+      for (const index of locatableEventIndexes(row)) {
+        seen.add(index);
+      }
       if (row._children) {
         (group._children as ScopedRow[]).push(...row._children);
       }
@@ -325,6 +380,7 @@ async function aggregate(
     const merged: ScopedRow[] = [];
     for (const key of order) {
       const group = groups.get(key)!;
+      group.eventIndexes = [...indexes.get(key)!];
       const kids = group._children as ScopedRow[];
       if (kids.length) {
         const mergedKids = await merge(kids);
@@ -345,6 +401,9 @@ async function aggregate(
 
 interface BottomUpNode extends ScopedRow {
   _map: Map<string, BottomUpNode>;
+  /** The occurrences behind the row. A set, because a caller is met once per
+   *  seed beneath it, and a hot caller has many. */
+  _indexes: Set<number>;
 }
 
 /** A row's ancestors, innermost first. Siblings share the whole tail, so the
@@ -381,8 +440,10 @@ async function buildBottomUp(
         type: src.type,
         duration: { total: 0, self: 0 },
         callCount: 0,
+        eventIndexes: [],
         _children: null,
         _map: new Map(),
+        _indexes: new Set(),
       };
       map.set(key, node);
       order?.push(node);
@@ -410,10 +471,16 @@ async function buildBottomUp(
       seed.duration.total += row.duration.self;
       seed.duration.self += row.duration.self;
       seed.callCount += 1;
+      for (const index of locatableEventIndexes(row)) {
+        seed._indexes.add(index);
+      }
       let map = seed._map;
       for (let link = callers; link; link = link.caller) {
         const node = ensure(map, null, link.row);
         node.duration.total += row.duration.self;
+        for (const index of locatableEventIndexes(link.row)) {
+          node._indexes.add(index);
+        }
         // Callers count the call they contributed too, matching the Call Tree
         // tab's bottom-up (every bucket in the chain accumulates); counting
         // only the seed left every caller row reading "Calls 0".
@@ -440,6 +507,8 @@ async function buildBottomUp(
     const node = everyNode[i]!;
     node._children = node._map.size ? [...node._map.values()] : null;
     node._map.clear(); // its entries live in `_children` now
+    node.eventIndexes = [...node._indexes];
+    node._indexes.clear(); // its entries live in `eventIndexes` now
   }
   return topOrder.sort((a, b) => b.duration.self - a.duration.self);
 }

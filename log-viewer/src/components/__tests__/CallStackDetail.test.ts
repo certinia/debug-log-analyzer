@@ -121,8 +121,8 @@ describe('CallStackDetail', () => {
     const el = await mount(4);
     selected.length = 0;
 
-    const seen: (number | null)[] = [];
-    const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail.eventIndex);
+    const seen: Array<readonly number[]> = [];
+    const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail.eventIndexes);
     const picked: number[] = [];
     const revealed = (e: Event) => picked.push((e as InspectorRevealEvent).detail.eventIndex);
     document.addEventListener(INSPECTOR_LOCATE_EVENT, located);
@@ -134,7 +134,7 @@ describe('CallStackDetail', () => {
     document.removeEventListener(INSPECTOR_LOCATE_EVENT, located);
     document.removeEventListener(INSPECTOR_REVEAL_EVENT, revealed);
 
-    expect(seen).toEqual([9, null]);
+    expect(seen).toEqual([[9], []]);
     // Hovering never picks a frame.
     expect(picked).toEqual([]);
     expect(selected).toEqual([]);

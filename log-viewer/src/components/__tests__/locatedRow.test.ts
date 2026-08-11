@@ -45,37 +45,48 @@ describe('LocatedRowMarker', () => {
     const container = host(1, 2);
     const marker = new LocatedRowMarker();
 
-    marker.mark(container, 2);
+    marker.mark(container, [2]);
 
     expect(rowFor(container, 1).classList.contains(LOCATED_ROW_CLASS)).toBe(true);
   });
 
-  it('moves the mark, so only one row carries it', () => {
+  it('marks every occurrence a merged row stands for', () => {
+    const container = host(1, 2, 3);
+    const marker = new LocatedRowMarker();
+
+    marker.mark(container, [1, 3]);
+
+    expect(rowFor(container, 0).classList.contains(LOCATED_ROW_CLASS)).toBe(true);
+    expect(rowFor(container, 1).classList.contains(LOCATED_ROW_CLASS)).toBe(false);
+    expect(rowFor(container, 2).classList.contains(LOCATED_ROW_CLASS)).toBe(true);
+  });
+
+  it('moves the mark, leaving nothing behind on the rows it left', () => {
     const container = host(1, 2);
     const marker = new LocatedRowMarker();
 
-    marker.mark(container, 1);
-    marker.mark(container, 2);
+    marker.mark(container, [1]);
+    marker.mark(container, [2]);
 
     expect(rowFor(container, 0).classList.contains(LOCATED_ROW_CLASS)).toBe(false);
     expect(rowFor(container, 1).classList.contains(LOCATED_ROW_CLASS)).toBe(true);
   });
 
-  it('drops the mark on null, on clear, and when there is no host', () => {
+  it('drops the mark on an empty list, on clear, and when there is no host', () => {
     const container = host(1);
     const row = rowFor(container, 0);
     const marker = new LocatedRowMarker();
 
-    marker.mark(container, 1);
-    marker.mark(container, null);
+    marker.mark(container, [1]);
+    marker.mark(container, []);
     expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
 
-    marker.mark(container, 1);
+    marker.mark(container, [1]);
     marker.clear();
     expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
 
-    marker.mark(container, 1);
-    marker.mark(null, 1);
+    marker.mark(container, [1]);
+    marker.mark(null, [1]);
     expect(row.classList.contains(LOCATED_ROW_CLASS)).toBe(false);
   });
 
@@ -83,7 +94,7 @@ describe('LocatedRowMarker', () => {
     const container = host(1);
     const marker = new LocatedRowMarker();
 
-    marker.mark(container, 7);
+    marker.mark(container, [7]);
 
     expect(rowFor(container, 0).classList.contains(LOCATED_ROW_CLASS)).toBe(false);
   });

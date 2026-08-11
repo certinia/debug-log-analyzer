@@ -63,8 +63,8 @@ export class CallStackDetail extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
-    this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndex }) => {
-      this._locatedRow.mark(this._tableHost(), eventIndex);
+    this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndexes }) => {
+      this._locatedRow.mark(this._tableHost(), eventIndexes);
     });
   }
 
@@ -132,7 +132,7 @@ export class CallStackDetail extends LitElement {
     // The table about to be destroyed can't report the pointer leaving its rows,
     // so any mark it asked for is dropped here.
     if (this._table) {
-      dispatchInspectorLocate(this, null);
+      dispatchInspectorLocate(this, []);
     }
     // Rows of the old table go with it, so the mark can't outlive them.
     this._locatedRow.clear();
@@ -216,11 +216,11 @@ export class CallStackDetail extends LitElement {
     this._table.on('rowMouseEnter', (_e, row) => {
       const eventIndex = (row.getData() as CallStackRow).eventIndex;
       if (eventIndex !== undefined) {
-        dispatchInspectorLocate(this, eventIndex);
+        dispatchInspectorLocate(this, [eventIndex]);
       }
     });
     this._table.on('rowMouseLeave', () => {
-      dispatchInspectorLocate(this, null);
+      dispatchInspectorLocate(this, []);
     });
     this._table.on('tableBuilt', () => {
       this._markActive();

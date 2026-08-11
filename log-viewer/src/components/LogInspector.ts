@@ -211,14 +211,23 @@ export class LogInspector extends LitElement {
     if (!source) {
       return;
     }
-    this._locatedSource = e.detail.eventIndex === null ? undefined : source;
-    eventBus.emit('inspector:locate', { source, eventIndex: e.detail.eventIndex });
+    this._locatedSource = e.detail.eventIndexes.length ? source : undefined;
+    eventBus.emit('inspector:locate', {
+      source,
+      eventIndexes: e.detail.eventIndexes,
+      sticky: e.detail.sticky,
+    });
   };
 
-  /** Drops a mark left behind by a pointer that never left the row. */
+  /** Drops a mark left behind by a pointer that never left the row. Sticky, so a
+   *  picked row's mark goes with it. */
   private _clearLocate(): void {
     if (this._locatedSource) {
-      eventBus.emit('inspector:locate', { source: this._locatedSource, eventIndex: null });
+      eventBus.emit('inspector:locate', {
+        source: this._locatedSource,
+        eventIndexes: [],
+        sticky: true,
+      });
       this._locatedSource = undefined;
     }
   }

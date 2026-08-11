@@ -31,41 +31,66 @@ export function rowIndexStamper(indexField: string): (row: RowComponent) => void
   };
 }
 
+/** A row standing for one call, or for every occurrence of a merged one. */
+interface OccurrenceRow {
+  originalData?: { eventIndex: number };
+  instances?: { eventIndex: number }[];
+}
+
 /**
- * Marks the row for the frame under the pointer in the main view, so the two
- * sides of the inspector point at the same thing.
+ * The events a row stands for: every occurrence of a merged row, the single call
+ * of a plain one, and none for a row that holds no event.
+ */
+export function rowOccurrences(data: OccurrenceRow | undefined): number[] {
+  if (data?.instances?.length) {
+    return data.instances.map((event) => event.eventIndex);
+  }
+  return data?.originalData ? [data.originalData.eventIndex] : [];
+}
+
+/**
+ * Marks the rows for the events under the pointer elsewhere, so the two sides of
+ * the inspector point at the same thing. A merged row stands for many events, so
+ * a mark can land on several rows at once.
  *
- * The mark is not a selection: it only styles the row element, so nothing
- * scrolls, expands or re-sorts. A row the table has not rendered has no element
- * to mark, so it is left alone.
+ * The mark is not a selection: it only styles the row elements, so nothing
+ * scrolls, expands or re-sorts. Rows the table has not rendered have no element
+ * to mark, so they are left alone.
  *
  * The table must use {@link rowIndexStamper} to build its `rowFormatter`.
  */
 export class LocatedRowMarker {
-  private element: HTMLElement | null = null;
+  private elements: HTMLElement[] = [];
 
   /**
-   * Move the mark to the row for `eventIndex`, or drop it when null.
+   * Move the mark to the rows for `eventIndexes`, or drop it with an empty list.
+   * Only the rendered rows are read, so the cost follows the viewport rather than
+   * the table; callers still only call this when the target changes.
    *
    * @param host - Element the table is mounted in
-   * @param eventIndex - Event to mark, or null to clear
+   * @param eventIndexes - Events to mark, empty to clear
    */
-  public mark(host: HTMLElement | null, eventIndex: number | null): void {
-    const next =
-      host && eventIndex !== null && eventIndex >= 0
-        ? host.querySelector<HTMLElement>(`.tabulator-row[${ROW_INDEX_ATTRIBUTE}="${eventIndex}"]`)
-        : null;
-    if (next === this.element) {
+  public mark(host: HTMLElement | null, eventIndexes: readonly number[]): void {
+    this.clear();
+    if (!host || !eventIndexes.length) {
       return;
     }
-    this.clear();
-    this.element = next;
-    next?.classList.add(LOCATED_ROW_CLASS);
+    const wanted = new Set(eventIndexes.map(String));
+    for (const element of host.querySelectorAll<HTMLElement>(
+      `.tabulator-row[${ROW_INDEX_ATTRIBUTE}]`,
+    )) {
+      if (wanted.has(element.getAttribute(ROW_INDEX_ATTRIBUTE)!)) {
+        element.classList.add(LOCATED_ROW_CLASS);
+        this.elements.push(element);
+      }
+    }
   }
 
   /** Drop the mark, if one is set. */
   public clear(): void {
-    this.element?.classList.remove(LOCATED_ROW_CLASS);
-    this.element = null;
+    for (const element of this.elements) {
+      element.classList.remove(LOCATED_ROW_CLASS);
+    }
+    this.elements = [];
   }
 }

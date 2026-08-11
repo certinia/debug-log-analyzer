@@ -23,6 +23,8 @@ import { soqlGroupHeader } from '../../soql/format/groupHeader.js';
 import { soqlInlineElement } from '../../soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 import { getSettings, updateSetting } from '../../settings/Settings.js';
+import { LocatedRowMarker } from '../../../components/locatedRow.js';
+import { reportGridLocate, stampGridEventIndex } from './gridLocate.js';
 import { reportGridSelection } from './gridSelection.js';
 import { selectRowByEventIndex } from './revealRow.js';
 import {
@@ -113,6 +115,8 @@ export class SOQLView extends LitElement {
   private contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private contextMenuEventIndex: number | null = null;
+  /** Marks the rows for the statements under the inspector's pointer. */
+  private _locatedRow = new LocatedRowMarker();
 
   @state()
   private objects: string[] = [];
@@ -462,6 +466,14 @@ export class SOQLView extends LitElement {
     return selectRowByEventIndex(this.soqlTable, eventIndex);
   }
 
+  /**
+   * Mark the rows for the statements under the inspector's pointer, or drop the
+   * mark with an empty list. Not a pick: nothing scrolls and nothing is selected.
+   */
+  markLocated(eventIndexes: readonly number[]): void {
+    this._locatedRow.mark(this.soqlTable?.element ?? null, eventIndexes);
+  }
+
   _exportToCSV() {
     this.soqlTable?.download('csv', 'soql.csv', { bom: true, delimiter: ',' });
   }
@@ -621,6 +633,7 @@ export class SOQLView extends LitElement {
       groupStartOpen: false,
       groupToggleElement: false,
       selectableRows: 'highlight',
+      rowFormatter: stampGridEventIndex,
       columnDefaults: commonColumnDefaults,
       headerSortElement,
       columns: [
@@ -851,6 +864,11 @@ export class SOQLView extends LitElement {
         data.soql ? data.eventIndex : undefined,
       );
     });
+
+    // Hovering a query marks it in the inspector, without picking it.
+    reportGridLocate(this, this.soqlTable, (data: GridSOQLData) =>
+      data.soql ? data.eventIndex : undefined,
+    );
 
     this.soqlTable.on('rowContext', (e, row) => {
       this._showRowContextMenu(e as MouseEvent, row);

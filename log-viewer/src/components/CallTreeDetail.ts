@@ -40,7 +40,9 @@ import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import {
   buildScopedCallTree,
   buildWholeLogCallTree,
+  locatableEventIndexes,
   revealableEventIndex,
+  rowIdsByEvent,
   type ScopedBuildOptions,
   type ScopedCallTree,
   type ScopedRow,
@@ -172,6 +174,18 @@ export class CallTreeDetail extends LitElement {
   /** Marks the row for the frame under the pointer in the tab's own view. */
   private _locatedRow = new LocatedRowMarker();
   private _locateUnsubscribe?: () => void;
+  private _selectionClearUnsubscribe?: () => void;
+
+  /**
+   * eventIndex to the ids of the rows that name it, per grouped mode. Built on
+   * the first mark of a scope, since only a pointer in the tab's own view needs
+   * it, and dropped with the rows it describes.
+   */
+  private _rowsByEvent: Record<ViewMode, Map<number, number[]> | null> = {
+    'time-order': null,
+    aggregated: null,
+    'bottom-up': null,
+  };
 
   // A whole-log tree can mount before the first parse finishes (the scoped
   // tree cannot — a selection implies a parsed log), so rebuild when the log
@@ -199,11 +213,56 @@ export class CallTreeDetail extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
-    // Only Time Order keys its rows by event, so the grouped modes have no row
-    // for a single frame; the marker finds nothing and leaves them alone.
-    this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndex }) => {
-      this._locatedRow.mark(this._tableHost(this.viewMode), eventIndex);
+    this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndexes }) => {
+      this._locatedRow.mark(
+        this._tableHost(this.viewMode),
+        this._rowIdsFor(this.viewMode, eventIndexes),
+      );
     });
+    // Escape clears the selection of the tab on screen. A picked row here is no
+    // selection of that view, so this table drops its own.
+    this._selectionClearUnsubscribe = eventBus.on('selection:clear', () => {
+      this._dropPick();
+    });
+  }
+
+  /**
+   * The ids of the rows that name `eventIndexes` in `mode`. Time Order keys its
+   * rows by event, so there the ids are the indexes themselves; a grouped row
+   * merges occurrences behind a synthetic id, so it is found by the occurrences
+   * it carries — and one frame can name several rows in Bottom-Up.
+   */
+  private _rowIdsFor(mode: ViewMode, eventIndexes: readonly number[]): number[] {
+    if (mode === 'time-order' || !eventIndexes.length) {
+      return [...eventIndexes];
+    }
+    const byEvent = (this._rowsByEvent[mode] ??= rowIdsByEvent(
+      (this._tables[mode]?.table.getData() ?? []) as ScopedRow[],
+    ));
+    const ids = new Set<number>();
+    for (const eventIndex of eventIndexes) {
+      for (const id of byEvent.get(eventIndex) ?? []) {
+        ids.add(id);
+      }
+    }
+    return [...ids];
+  }
+
+  /**
+   * Drops a picked row — its selection here, and the mark it holds in the tab on
+   * screen. A grouped row's pick moves nothing, so nothing else would drop it.
+   */
+  private _dropPick(): void {
+    const selected = this._tables[this.viewMode]?.table.getSelectedRows() ?? [];
+    if (!selected.length) {
+      return;
+    }
+    this._echoGuard.run(() => {
+      for (const row of selected) {
+        row.deselect();
+      }
+    });
+    dispatchInspectorLocate(this, [], true);
   }
 
   static styles = [
@@ -297,10 +356,12 @@ export class CallTreeDetail extends LitElement {
    */
   private _invalidateScope(): void {
     this._scoped = null;
-    for (const slot of Object.values(this._tables)) {
+    for (const mode of Object.keys(this._tables) as ViewMode[]) {
+      const slot = this._tables[mode];
       if (slot) {
         slot.stale = true;
       }
+      this._rowsByEvent[mode] = null;
     }
   }
 
@@ -308,6 +369,8 @@ export class CallTreeDetail extends LitElement {
     super.disconnectedCallback();
     this._locateUnsubscribe?.();
     this._locateUnsubscribe = undefined;
+    this._selectionClearUnsubscribe?.();
+    this._selectionClearUnsubscribe = undefined;
     this._destroyTables();
   }
 
@@ -321,6 +384,7 @@ export class CallTreeDetail extends LitElement {
     for (const mode of Object.keys(this._tables) as ViewMode[]) {
       this._tables[mode]?.table.destroy();
       this._tables[mode] = null;
+      this._rowsByEvent[mode] = null;
     }
   }
 
@@ -463,44 +527,38 @@ export class CallTreeDetail extends LitElement {
             ],
           }),
     });
-    // Clicking a row toggles its subtree — jumping to the main Call Tree tab is
-    // an explicit right-click action. The tree-control arrow handles its own
-    // toggle, so skip those clicks.
-    table.on('rowClick', (e: UIEvent, row: RowComponent) => {
-      if (window.getSelection()?.type === 'Range') {
-        return;
-      }
-      if ((e.target as HTMLElement).closest('.tabulator-data-tree-control')) {
-        return;
-      }
-      if (row.getTreeChildren().length) {
-        row.treeToggle();
-      }
-    });
+    // No rowClick handler: a click only picks the row (RowKeyboardNavigation).
+    // Expanding is the tree-control arrow's own job — doing both on one click
+    // moved the row the user was aiming at. Jumping to the main Call Tree tab is
+    // an explicit right-click action.
     table.on('rowContext', (e, row) => {
       this._showRowMenu(e as MouseEvent, row, table);
     });
     // Selecting a real frame reveals it in the tab on screen. Aggregated and
     // bottom-up rows merge occurrences behind a synthetic negative id, so
-    // revealing one would misname which occurrence was clicked.
+    // revealing one would misname which occurrence was clicked; the pick marks
+    // every occurrence instead, and holds until it is dropped — as the Chrome
+    // DevTools performance panel keeps a selected group's instances lit.
     table.on('rowSelectionChanged', (_data, rows) => {
       if (this._echoGuard.suppressed) {
         return;
       }
-      const eventIndex = revealableEventIndex(rows[0]?.getData() as Partial<ScopedRow> | undefined);
+      const data = rows[0]?.getData() as Partial<ScopedRow> | undefined;
+      const eventIndex = revealableEventIndex(data);
       if (eventIndex !== null) {
         dispatchInspectorReveal(this, eventIndex);
+      } else {
+        dispatchInspectorLocate(this, locatableEventIndexes(data), true);
       }
     });
-    // Hovering a real frame marks it in the tab on screen, so the user can see
-    // where it sits before deciding to pick it. Grouped rows merge occurrences,
-    // so there is no single frame to mark.
+    // Hovering a row marks it in the tab on screen, so the user can see where it
+    // sits before deciding to pick it. A grouped row cannot be revealed - there is
+    // no one frame to jump to - but every occurrence it merges can be marked.
     table.on('rowMouseEnter', (_e, row) => {
-      const eventIndex = revealableEventIndex(row.getData() as Partial<ScopedRow>);
-      dispatchInspectorLocate(this, eventIndex);
+      dispatchInspectorLocate(this, locatableEventIndexes(row.getData() as Partial<ScopedRow>));
     });
     table.on('rowMouseLeave', () => {
-      dispatchInspectorLocate(this, null);
+      dispatchInspectorLocate(this, []);
     });
     table.on('tableBuilt', () => {
       this._markActive();

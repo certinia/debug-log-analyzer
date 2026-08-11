@@ -35,8 +35,9 @@ jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 // it yields a tree or nothing, and when.
 jest.mock('../scopedCallTree.js', () => ({
   buildScopedCallTree: jest.fn(() => Promise.resolve(null)),
-  // Keep the real row reader: the hover test is about which rows name a frame.
+  // Keep the real row readers: the hover test is about which rows name a frame.
   revealableEventIndex: jest.requireActual('../scopedCallTree.js').revealableEventIndex,
+  locatableEventIndexes: jest.requireActual('../scopedCallTree.js').locatableEventIndexes,
 }));
 
 import { Tabulator } from 'tabulator-tables';
@@ -240,7 +241,7 @@ describe('CallTreeDetail scoped build', () => {
     expect(tables.instances).toHaveLength(1);
     expect(totalColumn(tables.instances[0]!).formatterParams.totalValue).toBe(6000);
   });
-  it('reports the frame under the pointer, and nothing for a grouped row', async () => {
+  it('reports every occurrence the row under the pointer stands for', async () => {
     build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
     const el = await mount(5);
     await frame(el);
@@ -248,16 +249,16 @@ describe('CallTreeDetail scoped build', () => {
       tables.instances[0]!.on.mock.calls.find((call) => call[0] === event)?.[1] as
         ((...args: unknown[]) => void) | undefined;
 
-    const seen: Array<number | null> = [];
-    const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail.eventIndex);
+    const seen: Array<readonly number[]> = [];
+    const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail.eventIndexes);
     document.addEventListener(INSPECTOR_LOCATE_EVENT, located);
 
     handler('rowMouseEnter')?.({}, { getData: () => ({ id: 8, originalData: { eventIndex: 8 } }) });
     handler('rowMouseLeave')?.({}, {});
-    // A grouped row merges occurrences, so it stands for no single frame.
-    handler('rowMouseEnter')?.({}, { getData: () => ({ id: -3 }) });
+    // A grouped row cannot be revealed, but every occurrence it merges is marked.
+    handler('rowMouseEnter')?.({}, { getData: () => ({ id: -3, eventIndexes: [8, 12] }) });
 
     document.removeEventListener(INSPECTOR_LOCATE_EVENT, located);
-    expect(seen).toEqual([8, null, null]);
+    expect(seen).toEqual([[8], [], [8, 12]]);
   });
 });

@@ -312,15 +312,17 @@ describe('LogInspector', () => {
     select('timeline', 1);
     await flush(el);
 
-    const seen: Array<{ source: string; eventIndex: number | null }> = [];
+    const seen: Array<{ source: string; eventIndexes: readonly number[]; sticky: boolean }> = [];
     const off = eventBus.on('inspector:locate', (d) => seen.push(d));
-    dispatchInspectorLocate(dockLayout(el), 5);
-    dispatchInspectorLocate(dockLayout(el), null);
+    dispatchInspectorLocate(dockLayout(el), [5, 9]);
+    dispatchInspectorLocate(dockLayout(el), []);
+    dispatchInspectorLocate(dockLayout(el), [5, 9], true);
     off();
 
     expect(seen).toEqual([
-      { source: 'timeline', eventIndex: 5 },
-      { source: 'timeline', eventIndex: null },
+      { source: 'timeline', eventIndexes: [5, 9], sticky: false },
+      { source: 'timeline', eventIndexes: [], sticky: false },
+      { source: 'timeline', eventIndexes: [5, 9], sticky: true },
     ]);
     // A locate picks nothing, so neither the anchor nor the walk moves.
     await flush(el);
@@ -332,15 +334,16 @@ describe('LogInspector', () => {
     select('timeline', 1);
     select('database', 2);
     await flush(el);
-    dispatchInspectorLocate(dockLayout(el), 5);
+    dispatchInspectorLocate(dockLayout(el), [5]);
 
-    const seen: Array<{ source: string; eventIndex: number | null }> = [];
+    const seen: Array<{ source: string; eventIndexes: readonly number[]; sticky: boolean }> = [];
     const off = eventBus.on('inspector:locate', (d) => seen.push(d));
     el.activeTab = 'database-tab';
     await flush(el);
     off();
 
-    expect(seen).toEqual([{ source: 'timeline', eventIndex: null }]);
+    // Sticky, so a picked row's mark goes with the pointer's.
+    expect(seen).toEqual([{ source: 'timeline', eventIndexes: [], sticky: true }]);
   });
 
   it('drops a reveal from a tab with no inspectable view', async () => {
