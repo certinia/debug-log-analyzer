@@ -15,6 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          lfs: true
           persist-credentials: false
       - name: Set up Node and install dependencies
         uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@main
@@ -49,6 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          lfs: true
           persist-credentials: false
       - name: Set up Node and install dependencies
         uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@main
