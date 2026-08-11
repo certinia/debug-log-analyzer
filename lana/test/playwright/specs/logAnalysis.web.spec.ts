@@ -6,7 +6,7 @@ import {
   waitForWorkspaceReady,
 } from '@salesforce/playwright-vscode-ext';
 
-import { assertLogAnalysisRenders } from '../support/logAnalysis';
+import { assertLogAnalysisRenders, openLogAnalysisByCommand } from '../support/logAnalysis';
 
 test('opens a sample log and renders its flame chart and call tree in VS Code Web', async ({
   page,
@@ -15,5 +15,6 @@ test('opens a sample log and renders its flame chart and call tree in VS Code We
   await waitForWorkspaceReady(page);
   await closeWelcomeTabs(page);
   await waitForExtensionsActivated(page);
+  await openLogAnalysisByCommand(page);
   await assertLogAnalysisRenders(page);
 });
