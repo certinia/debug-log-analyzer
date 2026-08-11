@@ -12,6 +12,7 @@ export const CLASS_BY_KIND: Record<TokenKind, string | null> = {
   punct: 'soql-tok-punct',
   ident: null,
   ws: null,
+  elision: 'soql-tok-elision',
 };
 
 export function escapeHtml(text: string): string {

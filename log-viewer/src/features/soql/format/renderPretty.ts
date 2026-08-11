@@ -155,7 +155,8 @@ export function renderPretty(tokens: Token[]): string {
   return out;
 }
 
-function needsSpaceBefore(prev: Token | undefined, cur: Token): boolean {
+/** True when a space belongs between two adjacent tokens on one line. */
+export function needsSpaceBefore(prev: Token | undefined, cur: Token): boolean {
   if (!prev) {
     return false;
   }
