@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 import {
-  executeCommandById,
+  executeCommandWithCommandPalette,
   hasContent,
   openFileFromExplorerTree,
   webviewActiveFrame,
@@ -31,12 +31,7 @@ export const assertLogAnalysisRenders = async (page: Page): Promise<void> => {
   await expect(callTree.locator('.tabulator-row').first()).toBeVisible({ timeout: 120_000 });
 };
 
-export const openLogAnalysisByCommand = async (page: Page): Promise<void> => {
+export const openLogAnalysis = async (page: Page): Promise<void> => {
   await openFileFromExplorerTree(page, SAMPLE_LOG_NAME);
-  await executeCommandById(page, 'lana.showLogAnalysis');
-};
-
-export const openLogAnalysisFromEditorAction = async (page: Page): Promise<void> => {
-  await openFileFromExplorerTree(page, SAMPLE_LOG_NAME);
-  await page.getByRole('button', { name: 'Log: Show Apex Log Analysis' }).click();
+  await executeCommandWithCommandPalette(page, 'Log: Show Apex Log Analysis');
 };

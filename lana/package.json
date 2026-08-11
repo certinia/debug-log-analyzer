@@ -100,8 +100,7 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "lana.showLogAnalysis",
-          "when": "resourceLangId == apexlog || lana.isApexLog"
+          "command": "lana.showLogAnalysis"
         }
       ],
       "editor/context": [
