@@ -15,8 +15,8 @@ import {
   formatDuration,
   formatWallClockTime,
 } from '../../../core/utility/Util.js';
+import { budgetedChunks, type SoqlBudget } from '../../soql/format/budget.js';
 import { CLASS_BY_KIND } from '../../soql/format/renderInline.js';
-import { prettyChunks } from '../../soql/format/renderPretty.js';
 import { tokenize, type Dialect } from '../../soql/format/tokenize.js';
 import type { TimelineMarker } from '../types/flamechart.types.js';
 import { formatNumber } from './rendering/tooltip-utils.js';
@@ -29,11 +29,16 @@ const HIDE_GRACE_MS = 80;
 const ANCHOR_GAP = 8;
 /** Above this raw length a query is shown as a single ellipsised line, never pretty-printed. */
 const SOQL_FORMAT_MAX_CHARS = 2000;
-/** Preview budget for a pretty-printed query. Whichever limit is hit first wins. */
-const SOQL_PREVIEW_MAX_LINES = 6;
-const SOQL_PREVIEW_MAX_CHARS = 300;
 /** Single-line fallback length for queries too large to pretty-print. */
 const SOQL_INLINE_MAX_CHARS = 160;
+/** Share of the panel's height a query may take. The rest holds the metric rows and the footer. */
+const QUERY_HEIGHT_SHARE = 0.45;
+const MIN_QUERY_LINES = 4;
+const MAX_QUERY_LINES = 16;
+/** Used when the panel has no layout yet, so a query still gets a sane shape. */
+const FALLBACK_BUDGET: SoqlBudget = { lines: 6, columns: 48 };
+/** The string the query line width is measured with. */
+const PROBE_TEXT = 'M'.repeat(50);
 
 /** Screen-space anchor for the tooltip, in container coordinates. */
 export interface TooltipAnchor {
@@ -88,6 +93,9 @@ export class FrameTooltipRenderer {
   private hideTimer: number | null = null;
   /** Built descriptions, keyed by event: re-hovering a frame costs a clone, not a re-parse. */
   private descriptionCache = new WeakMap<LogEvent, DescriptionBlock>();
+  /** How much query the panel holds. Measured from the panel, and only when its size changes. */
+  private queryBudget: SoqlBudget | null = null;
+  private resizeObserver: ResizeObserver | null = null;
 
   constructor(
     container: HTMLElement,
@@ -108,6 +116,23 @@ export class FrameTooltipRenderer {
     };
 
     this.createTooltipElement();
+    this.observeResize();
+  }
+
+  /**
+   * The panel's size follows the window, so re-measure the query budget when the container
+   * resizes — never per hover. Built descriptions go with it, since they were cut to the old size.
+   */
+  private observeResize(): void {
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    this.resizeObserver = new ResizeObserver(() => {
+      this.queryBudget = null;
+      this.descriptionCache = new WeakMap();
+    });
+    this.resizeObserver.observe(this.container);
   }
 
   /**
@@ -544,8 +569,8 @@ export class FrameTooltipRenderer {
   }
 
   /**
-   * Render a query as classed spans, stopping at the preview budget. Cuts land on line
-   * boundaries so the `soql-tok-*` spans stay balanced.
+   * Render a query as classed spans, fitted to the panel. Each clause keeps one line and says
+   * how much it left out, so the `WHERE` survives however long the field list is.
    */
   private buildQueryPreview(text: string, dialect: Dialect): DescriptionBlock {
     const node = document.createElement('div');
@@ -559,26 +584,9 @@ export class FrameTooltipRenderer {
       return { node, more: 'query too large to format' };
     }
 
-    const chunks = prettyChunks(tokenize(text, dialect));
-    const totalLines = chunks.reduce<number>(
-      (count, chunk) => (typeof chunk === 'string' && chunk.startsWith('\n') ? count + 1 : count),
-      1,
-    );
-
-    let lines = 1;
-    let chars = 0;
-    let cut = false;
-    for (const chunk of chunks) {
+    for (const chunk of budgetedChunks(tokenize(text, dialect), this.getQueryBudget())) {
       if (typeof chunk === 'string') {
-        if (chunk.startsWith('\n')) {
-          if (lines >= SOQL_PREVIEW_MAX_LINES || chars >= SOQL_PREVIEW_MAX_CHARS) {
-            cut = true;
-            break;
-          }
-          lines++;
-        }
         node.appendChild(document.createTextNode(chunk));
-        chars += chunk.length;
         continue;
       }
 
@@ -591,16 +599,67 @@ export class FrameTooltipRenderer {
       } else {
         node.appendChild(document.createTextNode(chunk.text));
       }
-      chars += chunk.text.length;
     }
 
-    if (!cut) {
-      return { node, more: null };
+    return { node, more: null };
+  }
+
+  /** The panel's own size, in query lines and characters. Measured once per panel size. */
+  private getQueryBudget(): SoqlBudget {
+    this.queryBudget ??= this.measureQueryBudget();
+    return this.queryBudget;
+  }
+
+  /**
+   * Measure the panel with a probe in the query's own font, so a wider window shows more of a
+   * query. Falls back to a fixed shape where the panel has no layout.
+   */
+  private measureQueryBudget(): SoqlBudget {
+    const element = this.tooltipElement;
+    if (!element) {
+      return FALLBACK_BUDGET;
     }
 
-    node.classList.add('is-clamped');
-    const hidden = totalLines - lines;
-    return { node, more: `+${hidden} ${hidden === 1 ? 'line' : 'lines'}` };
+    // Measure inside the panel's own body, so the probe carries the query's font and the width
+    // is the text's, not the panel's border box.
+    const body = document.createElement('div');
+    body.className = 'timeline-tooltip';
+    // Pinned to both edges: an absolute box with `width: auto` shrinks to its content, which
+    // would measure the probe rather than the panel.
+    body.style.position = 'absolute';
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.visibility = 'hidden';
+
+    const line = document.createElement('div');
+    line.className = 'tooltip-header soql-block';
+
+    const probe = document.createElement('span');
+    probe.style.whiteSpace = 'pre';
+    probe.textContent = PROBE_TEXT;
+
+    line.appendChild(probe);
+    body.appendChild(line);
+    element.appendChild(body);
+
+    const charWidth = probe.offsetWidth / PROBE_TEXT.length;
+    const style = window.getComputedStyle(line);
+    const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.4;
+    const panelWidth = line.clientWidth;
+    const panelHeight = parseFloat(window.getComputedStyle(element).maxHeight);
+    element.removeChild(body);
+
+    if (!charWidth || !lineHeight || !panelWidth || !panelHeight) {
+      return FALLBACK_BUDGET;
+    }
+
+    return {
+      columns: Math.max(20, Math.floor(panelWidth / charWidth)),
+      lines: Math.min(
+        MAX_QUERY_LINES,
+        Math.max(MIN_QUERY_LINES, Math.floor((panelHeight * QUERY_HEIGHT_SHARE) / lineHeight)),
+      ),
+    };
   }
 
   private formatLimit(val: number, self: number, total = 0) {
@@ -765,6 +824,8 @@ export class FrameTooltipRenderer {
   public destroy(): void {
     this.clearShowTimer();
     this.clearHideTimer();
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
 
     if (this.tooltipElement && this.tooltipElement.parentNode) {
       this.tooltipElement.parentNode.removeChild(this.tooltipElement);

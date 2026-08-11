@@ -480,24 +480,38 @@ describe('FrameTooltipRenderer', () => {
       return event;
     }
 
-    it('should clamp a long query to the preview budget and say how much is hidden', () => {
+    it('should fit a long query to the budget and count the conditions it left out', () => {
       showSettled(soqlEvent(longQuery(40)), cursorAnchor(100, 100));
 
       const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
       expect(preview).not.toBeNull();
-      expect(preview.classList.contains('is-clamped')).toBe(true);
-      expect(preview.textContent?.split('\n').length).toBe(6);
 
-      const info = container.querySelector('.tooltip-status-info') as HTMLElement;
-      expect(info.textContent).toMatch(/^\+\d+ lines$/);
+      const lines = preview.textContent?.split('\n') ?? [];
+      expect(lines.length).toBeLessThanOrEqual(6);
+      expect(lines[0]).toBe('SELECT Id');
+      expect(lines[1]).toBe('FROM Account');
+      expect(lines[lines.length - 1]).toMatch(/… \+\d+ conditions$/);
     });
 
-    it('should not clamp a query that fits the budget', () => {
+    it('should leave a query that fits on one line whole', () => {
       showSettled(soqlEvent('SELECT Id FROM Account'), cursorAnchor(100, 100));
 
       const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
-      expect(preview.classList.contains('is-clamped')).toBe(false);
+      expect(preview.textContent).toBe('SELECT Id FROM Account');
       expect(container.querySelector('.tooltip-status-info')?.textContent).toBe('');
+    });
+
+    it('should keep the WHERE clause however long the field list is', () => {
+      const fields = Array.from({ length: 60 }, (_unused, index) => `Field${index}__c`).join(', ');
+      showSettled(
+        soqlEvent(`SELECT ${fields} FROM Account WHERE Name = 'x'`),
+        cursorAnchor(100, 100),
+      );
+
+      const preview = container.querySelector('.tooltip-header.soql-block') as HTMLElement;
+      const lines = preview.textContent?.split('\n') ?? [];
+      expect(lines[0]).toMatch(/^SELECT .*\+\d+ fields$/);
+      expect(lines).toContain(`WHERE Name = 'x'`);
     });
 
     it('should show a single ellipsised line for a query too large to format', () => {

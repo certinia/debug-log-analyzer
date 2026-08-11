@@ -8,6 +8,8 @@ import { countLeaves, parseConditions, splitClauses } from '../clauses.js';
 import { tokenize } from '../tokenize.js';
 
 const BUDGET: SoqlBudget = { lines: 8, columns: 60 };
+/** Too narrow for the whole query on one line, so the clause layout is used. */
+const NARROW: SoqlBudget = { lines: 8, columns: 40 };
 
 /** Plain text of a budgeted render, as the panel shows it. */
 function render(query: string, budget: SoqlBudget = BUDGET): string {
@@ -37,6 +39,12 @@ describe('SOQL budgeted render', () => {
       ]);
     });
 
+    it('keeps a query that fits on one line whole', () => {
+      expect(render('SELECT Id FROM Account WHERE Name = :n')).toBe(
+        'SELECT Id FROM Account WHERE Name = :n',
+      );
+    });
+
     it('never truncates FROM, ORDER BY or LIMIT', () => {
       const query = `SELECT Id FROM AVeryLongCustomObjectName__c ORDER BY CreatedDate DESC NULLS LAST LIMIT 200 OFFSET 100`;
       const out = lines(query);
@@ -58,11 +66,13 @@ describe('SOQL budgeted render', () => {
     });
 
     it('leaves a short field list whole', () => {
-      expect(lines('SELECT Id, Name FROM Account')[0]).toBe('SELECT Id, Name');
+      expect(lines('SELECT Id, Name FROM Account WHERE Name = :n', NARROW)[0]).toBe(
+        'SELECT Id, Name',
+      );
     });
 
     it('keeps the shape of a subquery but not its fields', () => {
-      const out = lines('SELECT Id, (SELECT Id, Email FROM Contacts) FROM Account')[0];
+      const out = lines('SELECT Id, (SELECT Id, Email FROM Contacts) FROM Account', NARROW)[0];
       expect(out).toBe('SELECT Id, (SELECT … FROM Contacts)');
     });
   });
@@ -74,7 +84,7 @@ describe('SOQL budgeted render', () => {
     });
 
     it('puts one condition on each line, led by its join', () => {
-      expect(lines('SELECT Id FROM Account WHERE a = 1 AND b = 2 OR c = 3')).toEqual([
+      expect(lines('SELECT Id FROM Account WHERE a = 1 AND b = 2 OR c = 3', NARROW)).toEqual([
         'SELECT Id',
         'FROM Account',
         'WHERE a = 1',
@@ -92,7 +102,7 @@ describe('SOQL budgeted render', () => {
     });
 
     it('keeps a group whole when it fits', () => {
-      const out = lines('SELECT Id FROM Account WHERE (a = 1 AND b = 2) OR c = 3');
+      const out = lines('SELECT Id FROM Account WHERE (a = 1 AND b = 2) OR c = 3', NARROW);
       expect(out).toContain('WHERE (a = 1 AND b = 2)');
       expect(out).toContain('  OR c = 3');
     });
@@ -124,7 +134,7 @@ describe('SOQL budgeted render', () => {
     });
 
     it('leaves a short IN list alone', () => {
-      const out = lines(`SELECT Id FROM Account WHERE Type IN ('a', 'b')`);
+      const out = lines(`SELECT Id FROM Account WHERE Type IN ('a', 'b')`, NARROW);
       expect(out).toContain(`WHERE Type IN ('a', 'b')`);
     });
   });

@@ -81,6 +81,12 @@ function isPunct(token: Token | undefined, text: string): boolean {
  * the HTML and the Lit renderer take it unchanged.
  */
 export function budgetedChunks(tokens: Token[], budget: SoqlBudget): Chunk[] {
+  // A short query reads better whole than split over a clause per line.
+  const inline = toChunks(tokens.filter((t) => t.kind !== 'ws'));
+  if (width(inline) <= budget.columns) {
+    return inline;
+  }
+
   const clauses = splitClauses(tokens);
   const allowances = allocate(clauses, budget.lines);
   const lines: Chunk[][] = [];

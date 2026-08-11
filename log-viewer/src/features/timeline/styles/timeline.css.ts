@@ -11,8 +11,8 @@ export const tooltipStyles = `${soqlSyntaxStyles}
            line budget means the same amount of text everywhere, and the height JS measures no
            longer depends on where the panel last sat. Scales with the viewport, so a large
            monitor shows more of a query. */
-        width: clamp(280px, 32vw, 420px);
-        max-height: min(360px, 45vh);
+        width: clamp(300px, 36vw, 620px);
+        max-height: min(420px, 50vh);
         /* Never a scroll container: the content is clamped, and the panel takes no pointer. */
         overflow: hidden;
         opacity: 0;
