@@ -21,9 +21,9 @@ import type { LogEvent } from 'apex-log-parser';
 import { FrameTooltipRenderer, type TooltipAnchor } from '../optimised/FrameTooltipRenderer.js';
 
 /** Delay before the first tooltip appears; mirrors SHOW_DELAY_MS. */
-const SHOW_DELAY_MS = 150;
+const SHOW_DELAY_MS = 60;
 /** Grace period before hiding; mirrors HIDE_GRACE_MS. */
-const HIDE_GRACE_MS = 80;
+const HIDE_GRACE_MS = 30;
 
 describe('FrameTooltipRenderer', () => {
   let container: HTMLElement;
@@ -79,6 +79,12 @@ describe('FrameTooltipRenderer', () => {
 
   function tooltipEl(): HTMLElement {
     return container.querySelector('#timeline-tooltip') as HTMLElement;
+  }
+
+  /** Where the panel sits, read back from the transform that moves it. */
+  function placement(): { left: number; top: number } {
+    const match = /translate\((-?\d+)px, (-?\d+)px\)/.exec(tooltipEl().style.transform);
+    return { left: Number(match?.[1]), top: Number(match?.[2]) };
   }
 
   /** jsdom lays nothing out, so the panel's size has to be declared. */
@@ -168,7 +174,7 @@ describe('FrameTooltipRenderer', () => {
     it('should never show when the pointer leaves before the delay expires', () => {
       frameTooltipRenderer.show(createEvent(0, 100), cursorAnchor(100, 100));
 
-      jest.advanceTimersByTime(SHOW_DELAY_MS - 50);
+      jest.advanceTimersByTime(SHOW_DELAY_MS - 20);
       frameTooltipRenderer.hide();
       jest.advanceTimersByTime(SHOW_DELAY_MS);
 
@@ -206,7 +212,7 @@ describe('FrameTooltipRenderer', () => {
       showSettled(event, cursorAnchor(100, 100));
 
       frameTooltipRenderer.hide();
-      jest.advanceTimersByTime(HIDE_GRACE_MS - 20);
+      jest.advanceTimersByTime(HIDE_GRACE_MS - 10);
       frameTooltipRenderer.show(event, cursorAnchor(110, 100));
       jest.advanceTimersByTime(HIDE_GRACE_MS);
 
@@ -226,12 +232,12 @@ describe('FrameTooltipRenderer', () => {
       sizeTooltip(200, 100);
 
       showSettled(event, frameAnchor({ x: 300, y: 400, width: 100, height: 20 }));
-      const initialLeft = tooltipEl().style.left;
+      const initialLeft = placement().left;
 
       // Same frame, panned left.
       frameTooltipRenderer.show(event, frameAnchor({ x: 100, y: 400, width: 100, height: 20 }));
 
-      expect(tooltipEl().style.left).not.toBe(initialLeft);
+      expect(placement().left).not.toBe(initialLeft);
     });
 
     it('should hold its place while the context menu is open', () => {
@@ -240,11 +246,11 @@ describe('FrameTooltipRenderer', () => {
       sizeTooltip(200, 100);
 
       showSettled(event, anchor);
-      const initialLeft = tooltipEl().style.left;
+      const initialLeft = placement().left;
 
       frameTooltipRenderer.show(event, { ...anchor, cursorX: 600 }, { keepPosition: true });
 
-      expect(tooltipEl().style.left).toBe(initialLeft);
+      expect(placement().left).toBe(initialLeft);
     });
   });
 
@@ -561,97 +567,102 @@ describe('FrameTooltipRenderer', () => {
     it('should pin the panel above the frame band', () => {
       showSettled(createEvent(0, 100), frameAnchor({ x: 300, y: 500, width: 100, height: 20 }));
 
-      const tooltip = tooltipEl();
-      // The frame is narrower than the panel, so the panel sits at the frame's left edge.
-      expect(tooltip.style.left).toBe('300px');
-      // Above the frame, with the 8px gap: 500 - 8 - 100.
-      expect(tooltip.style.top).toBe('392px');
+      // Centred on the cursor, which sits at the frame's left edge here: 300 - 200 / 2.
+      expect(placement().left).toBe(200);
+      // Above the frame, with the 3px gap: 500 - 3 - 100.
+      expect(placement().top).toBe(397);
     });
 
     it('should flip below the frame when there is no room above', () => {
       // Only 50px between the chart top and the frame, so the panel cannot fit above.
       showSettled(createEvent(0, 100), frameAnchor({ x: 300, y: 90, width: 100, height: 20 }, 40));
 
-      // Below the frame, with the 8px gap: 90 + 20 + 8.
-      expect(tooltipEl().style.top).toBe('118px');
+      // Below the frame, with the 3px gap: 90 + 20 + 3.
+      expect(placement().top).toBe(113);
     });
 
-    it('should keep the side it flipped to while the pointer moves along the frame', () => {
+    it('should keep the side it flipped to while the frame moves under the pointer', () => {
       const event = createEvent(0, 100);
-      // Room above is 8px short of the panel, so the first placement flips below.
+      // Room above is 3px short of the panel, so the first placement flips below.
       const rect = { x: 300, y: 100, width: 400, height: 20 };
 
       showSettled(event, frameAnchor(rect, 0));
-      expect(tooltipEl().style.top).toBe('128px');
+      expect(placement().top).toBe(123);
 
-      // Moving right does not change the vertical fit, so the panel must not flip back.
-      frameTooltipRenderer.show(event, frameAnchor(rect, 0, 650));
+      // A pan moves the frame sideways, which does not change the vertical fit, so the panel
+      // must not flip back.
+      frameTooltipRenderer.show(event, frameAnchor({ ...rect, x: 200 }, 0));
 
-      expect(tooltipEl().style.top).toBe('128px');
+      expect(placement().top).toBe(123);
     });
 
-    it('should follow the cursor along a frame wider than the panel', () => {
+    it('should centre on the cursor rather than on the frame', () => {
+      showSettled(
+        createEvent(0, 100),
+        frameAnchor({ x: 100, y: 500, width: 600, height: 20 }, 0, 400),
+      );
+
+      // Centred on the cursor: 400 - 200 / 2.
+      expect(placement().left).toBe(300);
+    });
+
+    it('should follow the pointer as it moves within one frame', () => {
       const event = createEvent(0, 100);
       const rect = { x: 100, y: 500, width: 600, height: 20 };
 
-      showSettled(event, frameAnchor(rect, 0, 400));
+      showSettled(event, frameAnchor(rect, 0, 200));
+      expect(placement().left).toBe(100);
 
-      // Centred on the cursor: 400 - 100.
-      expect(tooltipEl().style.left).toBe('300px');
+      frameTooltipRenderer.show(event, frameAnchor(rect, 0, 650));
 
-      frameTooltipRenderer.show(event, frameAnchor(rect, 0, 500));
-
-      expect(tooltipEl().style.left).toBe('400px');
+      expect(placement().left).toBe(550);
     });
 
-    it('should keep the panel over the frame it belongs to', () => {
-      const rect = { x: 100, y: 500, width: 600, height: 20 };
-
-      // Cursor at the frame's right edge: the panel stops at the edge, not past it.
-      showSettled(createEvent(0, 100), frameAnchor(rect, 0, 700));
-
-      expect(tooltipEl().style.left).toBe('500px');
-    });
-
-    it('should place a frame the same way however far the last one was', () => {
+    it('should not measure the panel again for a pointer move within one frame', () => {
       const element = tooltipEl();
-      // An absolutely positioned panel is capped at `containerWidth - left`, so a stale `left`
-      // would make it measure narrower and wrap taller. Stand in for that here.
-      Object.defineProperty(element, 'offsetHeight', {
-        configurable: true,
-        get: () => (parseInt(element.style.left, 10) > 0 ? 300 : 100),
-      });
-      const rect = { x: 20, y: 500, width: 4, height: 20 };
+      const event = createEvent(0, 100);
+      const rect = { x: 100, y: 500, width: 600, height: 20 };
+      showSettled(event, frameAnchor(rect, 0, 200));
 
-      showSettled(createEvent(0, 100), frameAnchor(rect));
-      const settledTop = element.style.top;
+      const measured = jest.fn(() => 100);
+      Object.defineProperty(element, 'offsetHeight', { configurable: true, get: measured });
 
-      // Step to a frame at the far right, then back to the first one.
-      frameTooltipRenderer.show(createEvent(200, 100), frameAnchor({ ...rect, x: 900 }));
-      frameTooltipRenderer.show(createEvent(0, 100), frameAnchor(rect));
+      // Same content: the panel re-places to follow the cursor, but its size still holds.
+      frameTooltipRenderer.show(event, frameAnchor(rect, 0, 650));
+      expect(measured).not.toHaveBeenCalled();
 
-      expect(element.style.top).toBe(settledTop);
+      // New content is a new height, so the panel is measured again.
+      frameTooltipRenderer.show(createEvent(200, 100), frameAnchor(rect, 0, 650));
+      expect(measured).toHaveBeenCalled();
     });
 
     it('should never place the panel over the minimap or metric strip', () => {
       showSettled(createEvent(0, 100), frameAnchor({ x: 300, y: 60, width: 100, height: 20 }, 40));
 
-      expect(parseInt(tooltipEl().style.top, 10)).toBeGreaterThanOrEqual(40);
+      expect(placement().top).toBeGreaterThanOrEqual(40);
     });
 
     it('should keep the panel inside the container', () => {
       showSettled(createEvent(0, 100), frameAnchor({ x: 960, y: 500, width: 40, height: 20 }));
 
-      const left = parseInt(tooltipEl().style.left, 10);
+      const left = placement().left;
       expect(left).toBeGreaterThanOrEqual(0);
       expect(left + 200).toBeLessThanOrEqual(1000);
+    });
+
+    it('should keep the panel inside a container narrower than itself', () => {
+      container.getBoundingClientRect = () =>
+        ({ width: 150, height: 600, top: 0, left: 0, right: 150, bottom: 600 }) as DOMRect;
+
+      showSettled(createEvent(0, 100), frameAnchor({ x: 20, y: 500, width: 40, height: 20 }));
+
+      expect(placement().left).toBe(0);
     });
 
     it('should place below and right of the cursor when there is no frame rect', () => {
       showSettled(createEvent(0, 100), cursorAnchor(100, 100));
 
-      expect(tooltipEl().style.left).toBe('110px');
-      expect(tooltipEl().style.top).toBe('110px');
+      expect(placement()).toEqual({ left: 110, top: 110 });
     });
 
     it('should use a custom cursor offset', () => {
@@ -664,30 +675,28 @@ describe('FrameTooltipRenderer', () => {
 
       showSettled(createEvent(0, 100), cursorAnchor(100, 100));
 
-      expect(tooltipEl().style.left).toBe('120px');
-      expect(tooltipEl().style.top).toBe('120px');
+      expect(placement()).toEqual({ left: 120, top: 120 });
     });
 
     it('should flip to the other side of the cursor near the right and bottom edges', () => {
       showSettled(createEvent(0, 100), cursorAnchor(950, 550));
 
       // Flipped: 950 - 200 - 10, and 550 - 100 - 10.
-      expect(tooltipEl().style.left).toBe('740px');
-      expect(tooltipEl().style.top).toBe('440px');
+      expect(placement()).toEqual({ left: 740, top: 440 });
     });
 
     it('should clamp negative cursor coordinates to the container', () => {
       showSettled(createEvent(0, 100), cursorAnchor(-100, -100));
 
-      expect(parseInt(tooltipEl().style.left, 10)).toBeGreaterThanOrEqual(0);
-      expect(parseInt(tooltipEl().style.top, 10)).toBeGreaterThanOrEqual(0);
+      expect(placement().left).toBeGreaterThanOrEqual(0);
+      expect(placement().top).toBeGreaterThanOrEqual(0);
     });
 
     it('should clamp cursor coordinates beyond the container', () => {
       showSettled(createEvent(0, 100), cursorAnchor(2000, 2000));
 
-      expect(parseInt(tooltipEl().style.left, 10)).toBeLessThanOrEqual(800);
-      expect(parseInt(tooltipEl().style.top, 10)).toBeLessThanOrEqual(500);
+      expect(placement().left).toBeLessThanOrEqual(800);
+      expect(placement().top).toBeLessThanOrEqual(500);
     });
   });
 

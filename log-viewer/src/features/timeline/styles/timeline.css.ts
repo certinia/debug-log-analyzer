@@ -6,12 +6,16 @@ import { soqlSyntaxStyles } from '../../soql/styles/soql-syntax.css.js';
 export const tooltipStyles = `${soqlSyntaxStyles}
    #timeline-tooltip {
         position: absolute;
+        /* The origin the JS transform moves the panel from. */
+        top: 0;
+        left: 0;
         z-index: 1000;
         /* Fixed, not shrink-to-fit: the panel keeps one size as the pointer sweeps the chart, the
            line budget means the same amount of text everywhere, and the height JS measures no
-           longer depends on where the panel last sat. Scales with the viewport, so a large
-           monitor shows more of a query. */
-        width: clamp(300px, 36vw, 620px);
+           longer depends on where the panel last sat. The percentage is of the chart area, so a
+           wide chart shows more of a query and a narrow one never overflows. */
+        width: clamp(300px, 36%, 620px);
+        max-width: 100%;
         max-height: min(420px, 50vh);
         /* Never a scroll container: the content is clamped, and the panel takes no pointer. */
         overflow: hidden;
@@ -20,7 +24,7 @@ export const tooltipStyles = `${soqlSyntaxStyles}
         /* Hit testing must behave as if the panel were not there, so the frames it overlaps
            stay hoverable and clickable. */
         pointer-events: none;
-        transition: opacity 120ms ease;
+        transition: opacity 80ms ease;
       }
 
       #timeline-tooltip[data-visible='true'] {

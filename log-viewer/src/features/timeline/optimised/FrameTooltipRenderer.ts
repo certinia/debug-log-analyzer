@@ -20,11 +20,11 @@ import type { TimelineMarker } from '../types/flamechart.types.js';
 import { formatNumber } from './rendering/tooltip-utils.js';
 
 /** Delay before a tooltip first appears, so sweeping across frames does not strobe. */
-const SHOW_DELAY_MS = 150;
+const SHOW_DELAY_MS = 60;
 /** Grace period before hiding, so crossing the gap between adjacent frames does not blink. */
-const HIDE_GRACE_MS = 80;
+const HIDE_GRACE_MS = 30;
 /** Gap between the tooltip and the frame it is anchored to. */
-const ANCHOR_GAP = 8;
+const ANCHOR_GAP = 3;
 /** Above this raw length a query is shown as a single ellipsised line, never pretty-printed. */
 const SOQL_FORMAT_MAX_CHARS = 2000;
 /** Single-line fallback length for queries too large to pretty-print. */
@@ -89,6 +89,14 @@ export class FrameTooltipRenderer {
   private descriptionCache = new WeakMap<LogEvent, DescriptionBlock>();
   /** How much query the panel holds. Measured from the panel, and only when its size changes. */
   private queryBudget: SoqlBudget | null = null;
+  /**
+   * Sizes the placement needs, measured on the first placement after a content swap or a resize.
+   * A pointer move is then style writes alone, with no layout read to force a reflow.
+   */
+  private panelWidth: number | null = null;
+  private panelHeight: number | null = null;
+  private containerWidth: number | null = null;
+  private containerHeight: number | null = null;
   private resizeObserver: ResizeObserver | null = null;
 
   /** The panel's own state: `data-visible` is what the stylesheet fades on. */
@@ -122,6 +130,12 @@ export class FrameTooltipRenderer {
     this.resizeObserver = new ResizeObserver(() => {
       this.queryBudget = null;
       this.descriptionCache = new WeakMap();
+      // The panel's width is a share of the container, so both it and the bounds it clamps
+      // against have moved.
+      this.containerWidth = null;
+      this.containerHeight = null;
+      this.panelWidth = null;
+      this.panelHeight = null;
       this.refresh();
     });
     this.resizeObserver.observe(this.container);
@@ -344,6 +358,8 @@ export class FrameTooltipRenderer {
     }
 
     this.tooltipElement.dataset.visible = 'true';
+    // New content is a new height; the width is fixed by the stylesheet, so it still holds.
+    this.panelHeight = null;
     // A new frame picks its side afresh; only movement within one frame is sticky.
     this.anchorBelow = false;
     this.currentAnchor = anchor;
@@ -735,13 +751,11 @@ export class FrameTooltipRenderer {
   /**
    * Place the tooltip against the hovered frame, inside the container.
    *
-   * Y is pinned to the frame band — above it, or below it when there is no room above — so the
-   * panel reads as belonging to the frame. X follows the cursor along the frame's visible span,
-   * so a wide frame keeps the panel near the pointer. With no frame rect, fall back to the cursor.
-   *
-   * Measure from the container's top-left, never from the last placement: an absolutely positioned
-   * box is capped at `containerWidth - left`, so a panel parked on the right measures narrower,
-   * wraps taller, and Y would then be pinned against that wrong height.
+   * X follows the cursor and Y is pinned to the frame band — above it, or below it when there is
+   * no room above — so the panel rides along the frame it describes. The cursor is inside that
+   * frame, so a panel centred on the cursor always overlaps it, and the clamp that keeps the panel
+   * in the container is the only thing that stops it. With no frame rect — the frame is off
+   * screen, so `getFrameRect` returned null — fall back to placing both axes off the cursor.
    */
   private anchorTooltip(anchor: TooltipAnchor): void {
     const element = this.tooltipElement;
@@ -749,27 +763,33 @@ export class FrameTooltipRenderer {
       return;
     }
 
-    element.style.left = '0px';
-    element.style.top = '0px';
+    // A hidden chart measures 0, which is not a size to hold on to: cache only real values, so
+    // the next placement after the reveal measures again.
+    if (!this.containerWidth || !this.containerHeight) {
+      const containerRect = this.container.getBoundingClientRect();
+      this.containerWidth = containerRect.width || null;
+      this.containerHeight = containerRect.height || null;
+    }
+    this.panelWidth ||= element.offsetWidth || null;
+    this.panelHeight ||= element.offsetHeight || null;
 
-    const containerRect = this.container.getBoundingClientRect();
-    const width = element.offsetWidth;
-    const height = element.offsetHeight;
+    const containerWidth = this.containerWidth ?? 0;
+    const containerHeight = this.containerHeight ?? 0;
+    const width = this.panelWidth ?? 0;
+    const height = this.panelHeight ?? 0;
     const rect = anchor.rect;
 
     let x: number;
     let y: number;
     if (rect) {
-      // Follow the cursor, but stay over the frame so the panel never floats free of it.
-      x = Math.min(
-        Math.max(anchor.cursorX - width / 2, rect.x),
-        Math.max(rect.x, rect.x + rect.width - width),
-      );
+      // Centred on the cursor. The clamp below sticks the panel to the container edge, so the
+      // last half-panel-width at each end trades tracking for staying on screen.
+      x = anchor.cursorX - width / 2;
 
       const above = rect.y - ANCHOR_GAP - height;
       const below = rect.y + rect.height + ANCHOR_GAP;
       const fitsAbove = above >= anchor.chartTopY;
-      const fitsBelow = below + height <= containerRect.height;
+      const fitsBelow = below + height <= containerHeight;
       // Hysteresis: keep the side already in use while it still fits, so a frame that sits on the
       // boundary does not flip back and forth as the pointer moves along it.
       if (this.anchorBelow ? !fitsBelow && fitsAbove : !fitsAbove) {
@@ -780,10 +800,10 @@ export class FrameTooltipRenderer {
       const offset = this.options.cursorOffset;
       x = anchor.cursorX + offset;
       y = anchor.cursorY + offset;
-      if (x + width > containerRect.width) {
+      if (x + width > containerWidth) {
         x = anchor.cursorX - width - offset;
       }
-      if (y + height > containerRect.height) {
+      if (y + height > containerHeight) {
         y = anchor.cursorY - height - offset;
       }
     }
@@ -791,8 +811,12 @@ export class FrameTooltipRenderer {
     // Keep the panel inside the chart area, never over the minimap or metric strip. The top limit
     // wins over the bottom one, so a panel taller than the chart overflows down rather than up.
     const topLimit = rect ? anchor.chartTopY : 0;
-    element.style.left = `${Math.max(0, Math.min(x, containerRect.width - width))}px`;
-    element.style.top = `${Math.max(topLimit, Math.min(y, containerRect.height - height))}px`;
+    // Moved with a transform, not with `left`/`top`: following the cursor re-places on every
+    // pointer move, and only a transform keeps that off the layout path. Whole pixels, so the
+    // monospace text does not land on a subpixel boundary and blur.
+    const left = Math.round(Math.max(0, Math.min(x, containerWidth - width)));
+    const top = Math.round(Math.max(topLimit, Math.min(y, containerHeight - height)));
+    element.style.transform = `translate(${left}px, ${top}px)`;
   }
 
   /**
