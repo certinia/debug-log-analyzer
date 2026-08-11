@@ -160,12 +160,6 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
   private selectionNavigator: SelectionNavigator<E> | null = null;
   private selectionRenderer: SelectionHighlightRenderer | null = null;
 
-  /**
-   * Frame the inspector's pointer is over. Held apart from the selection: it is
-   * drawn as its own ring and never changes what is selected.
-   */
-  private locatedNode: TreeNode<E> | null = null;
-
   // ============================================================================
   // EXTERNAL REFERENCES (not owned)
   // ============================================================================
@@ -238,7 +232,6 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
       this.selectionRenderer = null;
     }
     this.selectionNavigator = null;
-    this.locatedNode = null;
     this.viewport = null;
   }
 
@@ -322,22 +315,6 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
   public selectMarker(marker: TimelineMarker): void {
     this.selectionNavigator?.selectMarker(marker);
     this.callbacks.onMarkerSelectionChange(marker);
-    this.callbacks.requestRender();
-  }
-
-  /**
-   * Mark a frame as located, or clear the mark with null. The selection is
-   * untouched and the viewport does not move - an off-screen frame simply shows
-   * nothing.
-   *
-   * @param eventNode - EventNode to locate (matched by its original reference), or null
-   */
-  public setLocatedNode(eventNode: EventNode | null): void {
-    const node = eventNode ? (this.selectionNavigator?.findByOriginal(eventNode) ?? null) : null;
-    if (node === this.locatedNode) {
-      return;
-    }
-    this.locatedNode = node;
     this.callbacks.requestRender();
   }
 
@@ -579,19 +556,6 @@ export class SelectionOrchestrator<E extends EventNode = EventNode> {
     const selectedMarker = this.selectionNavigator.getSelectedMarker();
 
     this.selectionRenderer.render(context.viewportState, selectedNode, selectedMarker);
-  }
-
-  /**
-   * Render the located frame's outline. Called on every frame, independently of
-   * the highlight mode: a locate mark is not a selection and not a search match.
-   *
-   * @param context - Render context with viewport state
-   */
-  public renderLocate(context: SelectionRenderContext): void {
-    this.selectionRenderer?.renderLocate(
-      context.viewportState,
-      this.locatedNode as TreeNode<EventNode> | null,
-    );
   }
 
   /**

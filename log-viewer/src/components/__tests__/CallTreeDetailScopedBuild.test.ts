@@ -35,6 +35,8 @@ jest.mock('#vscode-elements/vscode-button.js', () => ({}));
 // it yields a tree or nothing, and when.
 jest.mock('../scopedCallTree.js', () => ({
   buildScopedCallTree: jest.fn(() => Promise.resolve(null)),
+  // Keep the real row reader: the hover test is about which rows name a frame.
+  revealableEventIndex: jest.requireActual('../scopedCallTree.js').revealableEventIndex,
 }));
 
 import { Tabulator } from 'tabulator-tables';
@@ -42,6 +44,7 @@ import { Tabulator } from 'tabulator-tables';
 import type { CallTreeDetail } from '../CallTreeDetail.js';
 import '../CallTreeDetail.js';
 import { buildScopedCallTree, type ScopedCallTree } from '../scopedCallTree.js';
+import { INSPECTOR_LOCATE_EVENT, type InspectorLocateEvent } from '../inspectorReveal.js';
 import type { ProgressParams } from '../../tabulator/format/ProgressMS.js';
 
 const build = jest.mocked(buildScopedCallTree);
@@ -51,6 +54,7 @@ interface StubTable {
     columns: Array<{ field: string; formatterParams: ProgressParams; width: number }>;
     placeholder: () => string;
   };
+  on: jest.Mock;
   setData: jest.Mock;
   redraw: jest.Mock;
   destroy: jest.Mock;
@@ -235,5 +239,25 @@ describe('CallTreeDetail scoped build', () => {
     // The epoch guard drops it — the denominator still describes what's shown.
     expect(tables.instances).toHaveLength(1);
     expect(totalColumn(tables.instances[0]!).formatterParams.totalValue).toBe(6000);
+  });
+  it('reports the frame under the pointer, and nothing for a grouped row', async () => {
+    build.mockImplementation((eventIndex) => Promise.resolve(tree(eventIndex * 1000)));
+    const el = await mount(5);
+    await frame(el);
+    const handler = (event: string) =>
+      tables.instances[0]!.on.mock.calls.find((call) => call[0] === event)?.[1] as
+        ((...args: unknown[]) => void) | undefined;
+
+    const seen: Array<number | null> = [];
+    const located = (e: Event) => seen.push((e as InspectorLocateEvent).detail.eventIndex);
+    document.addEventListener(INSPECTOR_LOCATE_EVENT, located);
+
+    handler('rowMouseEnter')?.({}, { getData: () => ({ id: 8, originalData: { eventIndex: 8 } }) });
+    handler('rowMouseLeave')?.({}, {});
+    // A grouped row merges occurrences, so it stands for no single frame.
+    handler('rowMouseEnter')?.({}, { getData: () => ({ id: -3 }) });
+
+    document.removeEventListener(INSPECTOR_LOCATE_EVENT, located);
+    expect(seen).toEqual([8, null, null]);
   });
 });

@@ -33,7 +33,7 @@ import type {
   TreeNode,
   ViewportState,
 } from '../../types/flamechart.types.js';
-import type { SearchCursor, SearchOptions } from '../../types/search.types.js';
+import type { MatchedEventInfo, SearchCursor, SearchOptions } from '../../types/search.types.js';
 import { createHighlightColors } from '../rendering/HighlightRenderer.js';
 import type { PrecomputedRect, RectangleCache } from '../RectangleCache.js';
 import { EventMatcher } from '../search/EventMatcher.js';
@@ -350,30 +350,36 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @param context - Render context with viewport state, visible rects, and buckets
    */
   public renderStyledEvents(context: SearchRenderContext): void {
-    if (!this.eventMatcher) {
-      return;
-    }
-
-    // Ensure renderers are initialized before rendering
-    this.ensureRenderersInitialized();
-
-    if (!this.searchStyleRenderer) {
-      return;
-    }
-
-    const cursor = this.eventMatcher.getCursor();
+    const cursor = this.eventMatcher?.getCursor();
     if (!cursor) {
       return;
     }
 
-    const matchedEventIds = cursor.getMatchedEventIds();
-    const matchedEventsInfo = cursor.getMatchedEventsInfo();
-    this.searchStyleRenderer.render(
+    this.renderDimmedExcept(context, cursor.getMatchedEventIds(), cursor.getMatchedEventsInfo());
+  }
+
+  /**
+   * Draw the frames in `eventIds` at full colour and dim everything else — the
+   * two-tier styling search uses, driven by an explicit set so the inspector's
+   * hover emphasis can share it.
+   *
+   * @param context - Render context with viewport state, visible rects, and buckets
+   * @param eventIds - Rect ids to keep at full colour
+   * @param eventsInfo - The same frames' time/depth/category, so a frame merged
+   *   into a pixel bucket still lights
+   */
+  public renderDimmedExcept(
+    context: SearchRenderContext,
+    eventIds: ReadonlySet<string>,
+    eventsInfo: ReadonlyArray<MatchedEventInfo>,
+  ): void {
+    this.ensureRenderersInitialized();
+    this.searchStyleRenderer?.render(
       context.visibleRects,
-      matchedEventIds,
+      eventIds,
       context.buckets,
       context.viewportState,
-      matchedEventsInfo,
+      eventsInfo,
     );
   }
 
@@ -395,28 +401,27 @@ export class SearchOrchestrator<E extends EventNode = EventNode> {
    * @param context - Render context with viewport state and visible rects
    */
   public renderStyledLabels(context: SearchRenderContext): void {
-    if (!this.eventMatcher) {
-      return;
-    }
-
-    // Ensure renderers are initialized before rendering
-    this.ensureRenderersInitialized();
-
-    if (!this.searchTextLabelRenderer) {
-      return;
-    }
-
-    const cursor = this.eventMatcher.getCursor();
+    const cursor = this.eventMatcher?.getCursor();
     if (!cursor) {
       return;
     }
 
-    const matchedEventIds = cursor.getMatchedEventIds();
-    this.searchTextLabelRenderer.render(
-      context.visibleRects,
-      matchedEventIds,
-      context.viewportState,
-    );
+    this.renderLabelsDimmedExcept(context, cursor.getMatchedEventIds());
+  }
+
+  /**
+   * Label counterpart of {@link renderDimmedExcept}: the labels of `eventIds`
+   * stay legible and the rest are dimmed.
+   *
+   * @param context - Render context with viewport state and visible rects
+   * @param eventIds - Rect ids to keep at full strength
+   */
+  public renderLabelsDimmedExcept(
+    context: SearchRenderContext,
+    eventIds: ReadonlySet<string>,
+  ): void {
+    this.ensureRenderersInitialized();
+    this.searchTextLabelRenderer?.render(context.visibleRects, eventIds, context.viewportState);
   }
 
   /**

@@ -68,6 +68,8 @@ export class ApexLogTimeline {
   private selectionClearUnsubscribe: (() => void) | null = null;
   /** Guards the programmatic select made on the inspector's behalf. */
   private echoGuard = new SelectionEchoGuard();
+  /** Frame last reported to the inspector as under the pointer. */
+  private locatedEventIndex: number | null = null;
 
   constructor() {
     this.flamechart = new FlameChart();
@@ -215,8 +217,8 @@ export class ApexLogTimeline {
       }
     });
 
-    // Ring the frame under the inspector's pointer, while the timeline is the tab
-    // the inspector is showing.
+    // Dim the chart around the frame under the inspector's pointer, while the
+    // timeline is the tab the inspector is showing.
     this.inspectorLocateUnsubscribe = eventBus.on('inspector:locate', (detail) => {
       if (detail.source === 'timeline') {
         this.locateFrameByEventIndex(detail.eventIndex);
@@ -263,17 +265,17 @@ export class ApexLogTimeline {
   }
 
   /**
-   * Ring the frame for `eventIndex`, or drop the ring with null. Never selects and
-   * never pans: a frame outside the viewport just shows nothing.
+   * Keep the frame for `eventIndex` in colour and dim the rest of the chart, or drop
+   * the emphasis with null. Never selects and never pans.
    */
   private locateFrameByEventIndex(eventIndex: number | null): void {
     if (eventIndex === null || !this.apexLog) {
-      this.flamechart.locateByEventNode(null);
+      this.flamechart.locateByEventNodes([]);
       return;
     }
 
     const result = findEventByEventIndex(this.apexLog, eventIndex);
-    this.flamechart.locateByEventNode(result ? this.toEventNode(result) : null);
+    this.flamechart.locateByEventNodes(result ? [this.toEventNode(result)] : []);
   }
 
   /**
@@ -460,6 +462,8 @@ export class ApexLogTimeline {
       return;
     }
 
+    this.reportLocatedFrame(eventNode);
+
     // Priority: Events take precedence over truncation markers
     if (eventNode) {
       // Extract LogEvent from EventNode.original for tooltip display
@@ -482,6 +486,20 @@ export class ApexLogTimeline {
         this.options.onEventHover(null);
       }
     }
+  }
+
+  /**
+   * Tell the inspector which frame the pointer is over, so it can mark the row
+   * that stands for it. Mouse moves land per pixel, so only a change is reported.
+   */
+  private reportLocatedFrame(eventNode: EventNode | null): void {
+    const logEvent = eventNode?.original as LogEvent | undefined;
+    const eventIndex = logEvent?.eventIndex ?? null;
+    if (eventIndex === this.locatedEventIndex) {
+      return;
+    }
+    this.locatedEventIndex = eventIndex;
+    eventBus.emit('detail:locate', { source: 'timeline', eventIndex });
   }
 
   /**

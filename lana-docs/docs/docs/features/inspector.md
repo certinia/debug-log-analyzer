@@ -68,3 +68,8 @@ Right-click a row in the **Call stack** or **Call tree** for:
 Press `Escape` to clear the selection on the tab you're on; the inspector returns to its whole-log view.
 
 Clicking a row highlights the matching frame or row in the tab you're on, and never switches tab: the Timeline selects the frame and centers it when it's off screen, the Call Tree scrolls to it in **Time Order**, and the Database tab selects the statement. Rows in the Call tree's **Aggregated** and **Bottom-Up** views merge several occurrences, so there is no single frame to highlight. Arrow keys move between rows, and `CMD / CTRL + c` copies the table.
+
+Hovering works both ways and moves nothing — no selection, no scroll, no pan:
+
+- Hover a **Call stack** or **Call Tree** row to dim the Timeline around the frame it names.
+- Hover a Timeline frame to mark that frame's row in the inspector, where the row is already on screen.

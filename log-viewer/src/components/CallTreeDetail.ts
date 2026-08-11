@@ -11,6 +11,7 @@ import {
   Tabulator,
 } from 'tabulator-tables';
 
+import { eventBus } from '../core/events/EventBus.js';
 import { LogLoadedController } from '../core/events/LogLoadedController.js';
 import { formatDuration, formatInteger } from '../core/utility/Util.js';
 import {
@@ -33,7 +34,8 @@ import type { ProgressParams } from '../tabulator/format/ProgressMS.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
 import './ContextMenu.js';
 import type { ContextMenu } from './ContextMenu.js';
-import { dispatchInspectorReveal } from './inspectorReveal.js';
+import { dispatchInspectorLocate, dispatchInspectorReveal } from './inspectorReveal.js';
+import { LOCATED_ROW_CLASS, LocatedRowMarker, rowIndexStamper } from './locatedRow.js';
 import { PANEL_ROW_MENU_ITEMS, runPanelRowAction } from './panelRowMenu.js';
 import {
   buildScopedCallTree,
@@ -167,6 +169,10 @@ export class CallTreeDetail extends LitElement {
   /** Guards the mark this component sets itself, so it is never read as a pick. */
   private _echoGuard = new SelectionEchoGuard();
 
+  /** Marks the row for the frame under the pointer in the tab's own view. */
+  private _locatedRow = new LocatedRowMarker();
+  private _locateUnsubscribe?: () => void;
+
   // A whole-log tree can mount before the first parse finishes (the scoped
   // tree cannot — a selection implies a parsed log), so rebuild when the log
   // lands.
@@ -189,6 +195,15 @@ export class CallTreeDetail extends LitElement {
 
   firstUpdated(): void {
     this._contextMenu = this.renderRoot.querySelector('context-menu');
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    // Only Time Order keys its rows by event, so the grouped modes have no row
+    // for a single frame; the marker finds nothing and leaves them alone.
+    this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndex }) => {
+      this._locatedRow.mark(this._tableHost(this.viewMode), eventIndex);
+    });
   }
 
   static styles = [
@@ -234,6 +249,10 @@ export class CallTreeDetail extends LitElement {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+      /* The frame under the pointer in the tab on screen. */
+      .table-host .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
+        background-color: var(--lana-row-hover-bg);
       }
     `,
   ];
@@ -287,10 +306,18 @@ export class CallTreeDetail extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._locateUnsubscribe?.();
+    this._locateUnsubscribe = undefined;
     this._destroyTables();
   }
 
+  private _tableHost(mode: ViewMode): HTMLDivElement | null {
+    return this.renderRoot?.querySelector<HTMLDivElement>(`#${mode}-tree`) ?? null;
+  }
+
   private _destroyTables() {
+    // Rows go with their tables, so the mark can't outlive them.
+    this._locatedRow.clear();
     for (const mode of Object.keys(this._tables) as ViewMode[]) {
       this._tables[mode]?.table.destroy();
       this._tables[mode] = null;
@@ -389,7 +416,7 @@ export class CallTreeDetail extends LitElement {
       return;
     }
 
-    const container = this.renderRoot?.querySelector<HTMLDivElement>(`#${mode}-tree`);
+    const container = this._tableHost(mode);
     if (!container) {
       return;
     }
@@ -416,6 +443,8 @@ export class CallTreeDetail extends LitElement {
       // Arrow-key row navigation, matching the Call Tree tab.
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
+      // Lets the hover mark find a row by one DOM query.
+      rowFormatter: rowIndexStamper('id'),
       ...clipboardCopyOptions,
       headerSortElement,
       columnDefaults: commonColumnDefaults,
@@ -462,6 +491,16 @@ export class CallTreeDetail extends LitElement {
       if (eventIndex !== null) {
         dispatchInspectorReveal(this, eventIndex);
       }
+    });
+    // Hovering a real frame marks it in the tab on screen, so the user can see
+    // where it sits before deciding to pick it. Grouped rows merge occurrences,
+    // so there is no single frame to mark.
+    table.on('rowMouseEnter', (_e, row) => {
+      const eventIndex = revealableEventIndex(row.getData() as Partial<ScopedRow>);
+      dispatchInspectorLocate(this, eventIndex);
+    });
+    table.on('rowMouseLeave', () => {
+      dispatchInspectorLocate(this, null);
     });
     table.on('tableBuilt', () => {
       this._markActive();
@@ -588,6 +627,8 @@ export class CallTreeDetail extends LitElement {
       return;
     }
     sharedViewMode = mode;
+    // The marked row belongs to the mode being left.
+    this._locatedRow.clear();
     this.viewMode = mode;
   }
 }

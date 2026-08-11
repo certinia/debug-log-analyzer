@@ -29,7 +29,6 @@ import {
   DEFAULT_FIND_MATCH_COLOR,
   MIN_HIGHLIGHT_WIDTH,
   renderHighlight,
-  renderOutline,
   type HighlightColors,
 } from '../rendering/HighlightRenderer.js';
 import { markerDuration } from '../markers/MarkerProcessor.js';
@@ -64,9 +63,6 @@ export class SelectionHighlightRenderer {
   /** Graphics for marker selection highlight (renders behind frames) */
   private markerGraphics: PIXI.Graphics;
 
-  /** Graphics for the located frame outline (renders above the selection) */
-  private locateGraphics: PIXI.Graphics;
-
   /** Highlight colors extracted from CSS variables (same as search) */
   private colors: HighlightColors;
 
@@ -84,12 +80,6 @@ export class SelectionHighlightRenderer {
     this.markerGraphics = new PIXI.Graphics();
     this.markerGraphics.zIndex = -1;
     container.addChild(this.markerGraphics);
-
-    // Located frame outline - above the selection highlight, so a frame that is
-    // both selected and located still shows the ring.
-    this.locateGraphics = new PIXI.Graphics();
-    this.locateGraphics.zIndex = 4;
-    container.addChild(this.locateGraphics);
 
     this.colors = createHighlightColors(findMatchColor ?? DEFAULT_FIND_MATCH_COLOR);
   }
@@ -197,37 +187,7 @@ export class SelectionHighlightRenderer {
   }
 
   /**
-   * Render the located frame as an outline ring. Independent of the selection, so
-   * it survives while the selection highlight is cleared.
-   *
-   * @param viewport - Viewport state for culling and transforms
-   * @param locatedNode - Frame node under the inspector's pointer, or null
-   */
-  public renderLocate(viewport: ViewportState, locatedNode: TreeNode<EventNode> | null): void {
-    this.locateGraphics.clear();
-    if (!locatedNode) {
-      return;
-    }
-
-    const event = locatedNode.data;
-    const depth = locatedNode.depth ?? 0;
-    if (!this.isVisible(event, depth, this.calculateBounds(viewport))) {
-      return;
-    }
-
-    renderOutline(
-      this.locateGraphics,
-      event.timestamp,
-      event.duration,
-      depth,
-      viewport,
-      this.colors,
-    );
-  }
-
-  /**
-   * Clear the selection highlight from display. The located frame's ring is not
-   * a selection, so it is left alone; use {@link renderLocate} with null for that.
+   * Clear the selection highlight from display.
    */
   public clear(): void {
     this.frameGraphics.clear();
@@ -249,7 +209,6 @@ export class SelectionHighlightRenderer {
   public destroy(): void {
     this.frameGraphics.destroy();
     this.markerGraphics.destroy();
-    this.locateGraphics.destroy();
   }
 
   /**

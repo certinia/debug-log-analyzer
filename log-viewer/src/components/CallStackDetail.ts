@@ -14,7 +14,9 @@ import {
 } from '../features/call-tree/components/TableShared.js';
 import { soqlInlineElement } from '../features/soql/format/inlineCell.js';
 import { soqlSyntaxStyles } from '../features/soql/styles/soql-syntax.css.js';
+import { eventBus } from '../core/events/EventBus.js';
 import { SelectionEchoGuard } from '../core/events/SelectionEchoGuard.js';
+import { LOCATED_ROW_CLASS, LocatedRowMarker, rowIndexStamper } from './locatedRow.js';
 import { globalStyles } from '../styles/global.styles.js';
 import { progressColumnWidth } from '../tabulator/format/measureWidth.js';
 import dataGridStyles from '../tabulator/style/DataGrid.scss';
@@ -48,12 +50,22 @@ export class CallStackDetail extends LitElement {
   private _table: Tabulator | null = null;
   /** Guards the select made to mark the active frame. */
   private _echoGuard = new SelectionEchoGuard();
+  /** Marks the row for the frame under the pointer in the tab's own view. */
+  private _locatedRow = new LocatedRowMarker();
+  private _locateUnsubscribe?: () => void;
   private _contextMenu: ContextMenu | null = null;
   /** eventIndex of the row whose context menu is open. */
   private _menuEventIndex = -1;
 
   firstUpdated(): void {
     this._contextMenu = this.renderRoot.querySelector('context-menu');
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this._locateUnsubscribe = eventBus.on('detail:locate', ({ eventIndex }) => {
+      this._locatedRow.mark(this._tableHost(), eventIndex);
+    });
   }
 
   static styles = [
@@ -83,6 +95,10 @@ export class CallStackDetail extends LitElement {
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      /* The frame under the pointer in the tab on screen. */
+      #call-stack-table .tabulator-row.${unsafeCSS(LOCATED_ROW_CLASS)} {
+        background-color: var(--lana-row-hover-bg);
+      }
     `,
   ];
 
@@ -97,12 +113,19 @@ export class CallStackDetail extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._locateUnsubscribe?.();
+    this._locateUnsubscribe = undefined;
+    this._locatedRow.clear();
     this._table?.destroy();
     this._table = null;
   }
 
+  private _tableHost(): HTMLElement | null {
+    return this.renderRoot?.querySelector<HTMLElement>('#call-stack-table') ?? null;
+  }
+
   private _rebuild() {
-    const container = this.renderRoot?.querySelector('#call-stack-table') as HTMLElement | null;
+    const container = this._tableHost();
     if (!container) {
       return;
     }
@@ -111,6 +134,8 @@ export class CallStackDetail extends LitElement {
     if (this._table) {
       dispatchInspectorLocate(this, null);
     }
+    // Rows of the old table go with it, so the mark can't outlive them.
+    this._locatedRow.clear();
     // Percentages are relative to this stack's root frame, so totalValue changes
     // per selection — rebuild rather than setData to refresh the column params.
     this._table?.destroy();
@@ -129,6 +154,8 @@ export class CallStackDetail extends LitElement {
       // Arrow-key row navigation, matching the Call Tree tab.
       rowKeyboardNavigation: true,
       selectableRows: 'highlight',
+      // Lets the hover mark find a row by one DOM query.
+      rowFormatter: rowIndexStamper('eventIndex'),
       ...clipboardCopyOptions,
       headerSortElement,
       columnDefaults: commonColumnDefaults,

@@ -67,6 +67,12 @@ interface EventMap {
   // Nothing else moves: no selection change, no scroll, no pan. `eventIndex` is
   // null when the pointer leaves the row.
   'inspector:locate': { source: DetailSource; eventIndex: number | null };
+
+  // The other direction: a frame in the tab's own view is under the pointer, so
+  // the inspector marks the row that stands for it — only where that row is
+  // already on screen. Nothing moves: no selection change, no scroll, no expand.
+  // `eventIndex` is null when the pointer leaves the frame.
+  'detail:locate': { source: DetailSource; eventIndex: number | null };
 }
 
 type EventCallback<K extends keyof EventMap> = (detail: EventMap[K]) => void;

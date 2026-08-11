@@ -102,43 +102,6 @@ export function renderHighlight(
 }
 
 /**
- * Render an outline-only ring around an event: no fill, so the frame's own colour
- * is untouched and the ring reads as "this one" rather than as a selection.
- *
- * Small events (< MIN_HIGHLIGHT_WIDTH) are widened to the minimum and centred on
- * the event, as {@link renderHighlight} does, so a sub-pixel frame is still findable.
- *
- * @param graphics - PixiJS Graphics to draw to
- * @param timestamp - Event start time in nanoseconds
- * @param duration - Event duration in nanoseconds
- * @param depth - Event depth (0-indexed)
- * @param viewport - Current viewport state
- * @param colors - Highlight colors
- */
-export function renderOutline(
-  graphics: PIXI.Graphics,
-  timestamp: number,
-  duration: number,
-  depth: number,
-  viewport: ViewportState,
-  colors: HighlightColors,
-): void {
-  const screenX = timestamp * viewport.zoom;
-  const screenWidth = duration * viewport.zoom;
-  const screenY = depth * TIMELINE_CONSTANTS.EVENT_HEIGHT;
-  const screenHeight = TIMELINE_CONSTANTS.EVENT_HEIGHT;
-
-  const visibleWidth = Math.max(screenWidth, MIN_HIGHLIGHT_WIDTH);
-  // Centre the widened ring on the event, so it doesn't drift right.
-  const outlineX = screenX + screenWidth / 2 - visibleWidth / 2;
-
-  // Full bounds: the stroke is centre-aligned, so half of it falls outside the
-  // frame and stays legible against a neighbour of the same colour.
-  graphics.rect(outlineX, screenY, visibleWidth, screenHeight);
-  graphics.stroke({ width: 2, color: colors.sourceColor, alpha: 0.9 });
-}
-
-/**
  * Create highlight colors from a resolved PixiJS color value.
  *
  * @param findMatchBackground - Resolved find match color (0xRRGGBB)
