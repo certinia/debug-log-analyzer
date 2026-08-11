@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   automerge:
-    uses: salesforcecli/github-workflows/.github/workflows/automerge.yml@ph/W-23773464-enable-pnpm-workflows
+    uses: salesforcecli/github-workflows/.github/workflows/automerge.yml@main
     with:
       mergeMethod: squash
       maxVersionBump: minor

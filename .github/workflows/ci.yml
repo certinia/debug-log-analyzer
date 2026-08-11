@@ -20,7 +20,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Node and install dependencies
-        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@ph/W-23773464-enable-pnpm-workflows
+        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@main
         with:
           node-version: '24'
           package-manager: pnpm
@@ -45,7 +45,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Node and install dependencies
-        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@ph/W-23773464-enable-pnpm-workflows
+        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@main
         with:
           node-version: '24'
           package-manager: pnpm
@@ -63,7 +63,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Node and install dependencies
-        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@ph/W-23773464-enable-pnpm-workflows
+        uses: salesforcecli/github-workflows/.github/actions/setupNodeAndInstall@main
         with:
           node-version: '24'
           package-manager: pnpm
