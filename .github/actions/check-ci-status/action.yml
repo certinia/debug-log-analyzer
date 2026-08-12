@@ -1,0 +1,45 @@
+name: Check CI Status
+description: Verifies that CI checks passed for a candidate commit before promotion.
+
+inputs:
+  commit-sha:
+    description: Commit SHA to check.
+    required: true
+  token:
+    description: GitHub token with repository read access.
+    required: true
+  required-checks:
+    description: Comma-separated checks that must have succeeded.
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Verify CI checks passed
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        COMMIT_SHA: ${{ inputs.commit-sha }}
+        REQUIRED_CHECKS: ${{ inputs.required-checks }}
+        REPO: ${{ github.repository }}
+      run: |
+        CHECK_RUNS=$(gh api "repos/$REPO/commits/$COMMIT_SHA/check-runs" --paginate \
+          --jq '.check_runs[] | {name: .name, status: .status, conclusion: .conclusion}')
+        if [ -z "$CHECK_RUNS" ]; then
+          echo "No check-runs found for $COMMIT_SHA"
+          exit 1
+        fi
+
+        FAILED=0
+        IFS=',' read -ra CHECKS <<< "$REQUIRED_CHECKS"
+        for CHECK in "${CHECKS[@]}"; do
+          CHECK=$(echo "$CHECK" | xargs)
+          [ -z "$CHECK" ] && continue
+          MATCH=$(echo "$CHECK_RUNS" | jq -c --arg name "$CHECK" 'select(.name == $name)' | head -1)
+          if [ -z "$MATCH" ] || [ "$(echo "$MATCH" | jq -r '.status')" != 'completed' ] || [ "$(echo "$MATCH" | jq -r '.conclusion')" != 'success' ]; then
+            echo "Required check '$CHECK' did not succeed"
+            FAILED=1
+          fi
+        done
+
+        [ "$FAILED" -eq 0 ] || exit 1

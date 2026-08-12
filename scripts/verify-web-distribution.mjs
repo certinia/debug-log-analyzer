@@ -1,7 +1,10 @@
 import fs from 'node:fs';
 
 const ci = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
+const nightly = fs.readFileSync('.github/workflows/nightly.yml', 'utf8');
 const publish = fs.readFileSync('.github/workflows/publish.yml', 'utf8');
+const promotePrerelease = fs.readFileSync('.github/workflows/promote-prerelease.yml', 'utf8');
+const promoteStable = fs.readFileSync('.github/workflows/promote-stable.yml', 'utf8');
 const e2e = fs.readFileSync('.github/workflows/e2e.yml', 'utf8');
 const manifest = JSON.parse(fs.readFileSync('lana/package.json', 'utf8'));
 
@@ -73,6 +76,53 @@ for (const requiredText of [
   }
 }
 
+for (const requiredText of [
+  'workflow_dispatch:',
+  "#   - cron: '0 7 * * 3'",
+  'uses: salesforcecli/github-workflows/.github/workflows/vscode-promote-prerelease.yml@ph/W-23832274-pnpm-stable-promotion',
+  "min-tag-age-days: ${{ inputs.min-tag-age-days || '7' }}",
+  "vsix-name-pattern: 'lana-*.vsix'",
+  "exclude-web-vsix: 'true'",
+  'extension-name: lana',
+  "dry-run: ${{ inputs.dry-run && 'true' || 'false' }}",
+  'secrets: inherit',
+]) {
+  if (!promotePrerelease.includes(requiredText)) {
+    throw new Error(`Expected pre-release promotion workflow to include \`${requiredText}\`.`);
+  }
+}
+
+if (/^  schedule:/m.test(promotePrerelease)) {
+  throw new Error('Pre-release promotion schedule must remain disabled.');
+}
+
+for (const requiredText of [
+  'workflow_dispatch:',
+  "#     - cron: '0 6 * * 3'",
+  'uses: salesforcecli/github-workflows/.github/workflows/vscode-promote-stable.yml@ph/W-23832274-pnpm-stable-promotion',
+  'extension-name: lana',
+  "vsix-name-pattern: 'lana-*.vsix'",
+  "exclude-web-vsix: 'true'",
+  'extensions-root: .',
+  "node-version: '24'",
+  'package-manager: pnpm',
+  "package-manager-version: '10'",
+  'cache-dependency-path: pnpm-lock.yaml',
+  'lockfile-path: pnpm-lock.yaml',
+  'install-command: pnpm run ci:install',
+  'required-checks: E2E',
+  "dry-run: ${{ inputs.dry-run && 'true' || 'false' }}",
+  'secrets: inherit',
+]) {
+  if (!promoteStable.includes(requiredText)) {
+    throw new Error(`Expected stable promotion workflow to include \`${requiredText}\`.`);
+  }
+}
+
+if (/^  schedule:/m.test(promoteStable)) {
+  throw new Error('Stable promotion schedule must remain disabled.');
+}
+
 for (const prohibitedText of ['actions/checkout', 'setupNodeAndInstall', 'pnpm dlx @vscode/vsce']) {
   if (cbwebJob.includes(prohibitedText)) {
     throw new Error(`The CBWeb publish job must use the shared release artifact, not \`${prohibitedText}\`.`);
@@ -86,6 +136,29 @@ if (!/    dry-run:\n        description: .+\n        required: true\n        def
 
 if (!ci.includes('vsce package --target web --no-dependencies')) {
   throw new Error('Expected CI package validation to use the web target.');
+}
+
+for (const requiredText of [
+  "- cron: '0 4 * * *'",
+  'uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@ph/W-23832274-pnpm-stable-promotion',
+  'extensions: lana',
+  "pre-release: 'true'",
+  'branch: main',
+  'nightly: true',
+  "version-bump: 'auto'",
+  'extensions-root: .',
+  'package-manager: pnpm',
+  "exclude-web-vsix: 'true'",
+  'publish-web-vsix: false',
+  "dry-run: ${{ inputs.dry-run && 'true' || 'false' }}",
+]) {
+  if (!nightly.includes(requiredText)) {
+    throw new Error(`Expected nightly release workflow to include \`${requiredText}\`.`);
+  }
+}
+
+if (!nightly.includes('default: true')) {
+  throw new Error('Manual nightly releases must default to dry-run mode.');
 }
 
 if (manifest.main !== 'dist/Main.js' || manifest.browser !== 'dist/web/Main.web.js') {

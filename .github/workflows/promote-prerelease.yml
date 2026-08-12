@@ -1,0 +1,34 @@
+name: Promote Nightly to Pre-release
+
+on:
+  # schedule:
+  #   # Wednesdays at 07:00 UTC. Enable once nightly releases are established.
+  #   - cron: '0 7 * * 3'
+  workflow_dispatch:
+    inputs:
+      min-tag-age-days:
+        description: 'Minimum nightly age in days before eligible for promotion'
+        required: false
+        default: '7'
+        type: string
+      dry-run:
+        description: 'Run in dry-run mode (no actual publishing or tagging)'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
+
+jobs:
+  promote:
+    uses: salesforcecli/github-workflows/.github/workflows/vscode-promote-prerelease.yml@ph/W-23832274-pnpm-stable-promotion
+    with:
+      min-tag-age-days: ${{ inputs.min-tag-age-days || '7' }}
+      vsix-name-pattern: 'lana-*.vsix'
+      exclude-web-vsix: 'true'
+      extension-name: lana
+      dry-run: ${{ inputs.dry-run && 'true' || 'false' }}
+    secrets: inherit
