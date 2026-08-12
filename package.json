@@ -54,6 +54,7 @@
     "test:ci": "jest --runInBand",
     "test:e2e:web": "pnpm build && playwright test --config=lana/test/playwright/playwright.config.web.ts",
     "test:e2e:desktop": "pnpm build && playwright test --config=lana/test/playwright/playwright.config.desktop.ts",
+    "test:distribution-policy": "node ./scripts/verify-web-distribution.mjs",
     "ci:install": "pnpm install --frozen-lockfile --prefer-offline --ignore-scripts",
     "prettier-format": "prettier '**/*.ts' --cache --write --experimental-cli"
   },
