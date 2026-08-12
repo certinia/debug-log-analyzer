@@ -118,7 +118,7 @@ export class LogViewer extends LitElement {
         align-items: center;
         column-gap: 0.3em;
         font-family: var(--vscode-font-family);
-        font-size: var(--vscode-font-size, 13px);
+        font-size: var(--lana-text-lg);
         text-transform: none;
       }
     `,

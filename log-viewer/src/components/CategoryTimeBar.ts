@@ -55,7 +55,6 @@ export class CategoryTimeBar extends LitElement {
         top: calc(100% + var(--lana-space-3xs));
         pointer-events: none;
         white-space: nowrap;
-        font-size: var(--lana-text-sm);
         color: var(--lana-fg);
         padding: var(--lana-space-3xs) var(--lana-space-xs);
         background: var(--lana-popover-bg);
@@ -67,14 +66,14 @@ export class CategoryTimeBar extends LitElement {
       .legend {
         display: flex;
         flex-wrap: wrap;
-        gap: 4px 18px;
+        gap: var(--lana-space-2xs) var(--lana-space-lg);
         padding-top: var(--lana-space-sm);
       }
 
       .legend__item {
         display: flex;
         align-items: baseline;
-        gap: 6px;
+        gap: var(--lana-space-xs);
         white-space: nowrap;
       }
 
@@ -87,9 +86,8 @@ export class CategoryTimeBar extends LitElement {
       }
 
       .legend__value {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
-        font-size: var(--lana-text-sm);
         color: var(--lana-fg-muted);
       }
 

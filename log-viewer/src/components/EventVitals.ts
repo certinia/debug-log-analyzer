@@ -108,7 +108,7 @@ export class EventVitals extends LitElement {
         display: grid;
         grid-column: 1 / -1;
         grid-template-columns: subgrid;
-        row-gap: 2px;
+        row-gap: var(--lana-space-3xs);
       }
       @container (min-width: 240px) {
         .grid {
@@ -122,7 +122,7 @@ export class EventVitals extends LitElement {
         color: var(--vscode-descriptionForeground);
       }
       .value {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
         overflow-wrap: anywhere;
       }

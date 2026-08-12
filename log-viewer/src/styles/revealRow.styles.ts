@@ -86,14 +86,12 @@ export const revealRowStyles = [
       text-overflow: ellipsis;
       white-space: nowrap;
       font-family: var(--lana-font-mono);
-      font-size: var(--lana-text-sm);
     }
 
     .reveal-row__value {
       justify-self: end;
       color: var(--lana-fg-muted);
       font-family: var(--lana-font-mono);
-      font-size: var(--lana-text-sm);
       font-variant-numeric: tabular-nums;
     }
 
@@ -110,7 +108,6 @@ export const revealRowStyles = [
       white-space: nowrap;
       color: var(--lana-fg-muted);
       font-family: var(--lana-font-mono);
-      font-size: var(--lana-text-sm);
       font-variant-numeric: tabular-nums;
     }
 

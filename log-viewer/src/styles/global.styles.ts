@@ -15,7 +15,7 @@ export const globalStyles = [
        off these so the bar is one visual family instead of N hand-tuned
        copies. */
       --filter-control-height: 22px;
-      --filter-control-font-size: 11px;
+      --filter-control-font-size: var(--lana-text-base);
       --filter-control-padding: 0 var(--lana-space-sm);
       --filter-control-radius: var(--lana-radius-sm);
       --filter-control-border-color: var(--vscode-settings-dropdownBorder, #3c3c3c);
@@ -27,7 +27,7 @@ export const globalStyles = [
       --filter-popover-border-color: var(--vscode-menu-border, var(--lana-surface-border));
       --filter-popover-radius: var(--lana-radius-md);
       --filter-popover-shadow: var(--lana-shadow-popover);
-      --filter-popover-row-font-size: 12px;
+      --filter-popover-row-font-size: var(--lana-text-base);
       --filter-popover-row-padding: var(--lana-space-2xs) var(--lana-space-sm);
 
       /* Label column width shared by every filter's overflow-panel row (facet,
@@ -134,7 +134,7 @@ export const globalStyles = [
       display: inline-flex;
       align-items: center;
       gap: var(--lana-space-xs);
-      font-size: 11px;
+      font-size: var(--lana-text-base);
       cursor: pointer;
     }
 

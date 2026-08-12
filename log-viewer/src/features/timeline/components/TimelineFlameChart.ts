@@ -54,7 +54,6 @@ export class TimelineFlameChart extends LitElement {
           --vscode-inputValidation-errorForeground,
           var(--vscode-errorForeground, #c62828)
         );
-        font-family: monospace;
         max-width: 80%;
         text-align: center;
       }
@@ -66,7 +65,6 @@ export class TimelineFlameChart extends LitElement {
         transform: translate(-50%, -50%);
         padding: var(--lana-space-lg);
         color: var(--vscode-descriptionForeground, #999);
-        font-family: monospace;
       }
     `,
   ];

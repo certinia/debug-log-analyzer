@@ -72,7 +72,7 @@ export class OverflowList extends LitElement {
       :host {
         display: block;
         min-width: 0;
-        font-size: 11px;
+        font-size: var(--lana-text-base);
       }
 
       .bar {
@@ -110,7 +110,7 @@ export class OverflowList extends LitElement {
         background-color: var(--vscode-settings-dropdownBackground, #313131);
         color: var(--vscode-foreground);
         font: inherit;
-        font-size: 11px;
+        font-size: var(--lana-text-base);
         line-height: 1;
         white-space: nowrap;
         cursor: pointer;

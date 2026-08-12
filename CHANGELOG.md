@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🗄️ **Database table columns** (DML, SOQL, SOSL): consolidated onto the shared Call Tree column/sort styling for a consistent look across all tables. ([#873])
 - 🧱 **Data grids**: a crisper header/content separator and tidied grid styling across all tables. ([#873])
 - 📐 **Column widths**: sized to fit their header and values, so nothing clips.
+- 🔤 **Text sizes** now follow your VS Code font size instead of fixed pixel sizes, and code — table name columns, tooltips, group rows — always uses your editor font.
 - 🎨 **Header bar**
   - **Log problems** and **Notifications** redesigned cards, show two lines of summary and message (click the message for the rest), and go to the Call Tree when clicked. An **Unsupported log event** card opens a prefilled bug report.
   - **Log problems** icon shows the most severe problem found, with a count, the card shows the issue kind (a `Fatal error` / `Exception` pill) and the time in the log under the summary .

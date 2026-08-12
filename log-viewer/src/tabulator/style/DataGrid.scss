@@ -98,7 +98,7 @@ $codicon-chevron-down: '\eab4';
 
     .tabulator-row {
       &.tabulator-group {
-        font-family: monospace;
+        font-family: var(--lana-font-mono);
         background: unset;
         border-bottom: unset;
         border-right: unset;
@@ -228,7 +228,7 @@ $codicon-chevron-down: '\eab4';
     }
 
     .datagrid-code-text {
-      font-family: monospace;
+      font-family: var(--lana-font-mono);
       font-weight: var(--vscode-font-weight, normal);
       font-size: var(--vscode-editor-font-size, 0.9em);
     }
@@ -280,7 +280,7 @@ $codicon-chevron-down: '\eab4';
     background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
     color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editor-foreground));
     overflow-wrap: anywhere;
-    font-family: monospace;
+    font-family: var(--lana-font-mono);
     font-size: 0.92rem;
     font-variant-numeric: tabular-nums;
     padding: 5px;

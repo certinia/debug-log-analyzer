@@ -14,6 +14,5 @@ export const inspectorSectionStyles = css`
 
   .note {
     color: var(--lana-fg-muted);
-    font-size: var(--lana-text-sm);
   }
 `;

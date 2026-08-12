@@ -75,19 +75,19 @@ export class DatabaseMetricCard extends LitElement {
       }
 
       .stat__label {
-        font-size: 0.72rem;
-        letter-spacing: 0.06em;
+        font-size: var(--lana-text-caps);
+        letter-spacing: var(--lana-text-caps-tracking);
         text-transform: uppercase;
         color: var(--vscode-descriptionForeground);
       }
 
       .stat__seen {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
       }
 
       .stat__used {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
         font-size: 0.8rem;
         color: var(--vscode-descriptionForeground);

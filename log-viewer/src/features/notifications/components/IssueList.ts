@@ -142,7 +142,7 @@ export class IssueList extends LitElement {
          "at Class.method" frame reads as a frame, not one run-on paragraph. */
       .issue__message {
         font-size: var(--vscode-editor-font-size);
-        font-family: var(--vscode-editor-font-family);
+        font-family: var(--lana-font-mono);
         color: var(--vscode-descriptionForeground);
         white-space: pre-wrap;
       }

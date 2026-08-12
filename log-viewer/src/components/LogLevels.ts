@@ -43,7 +43,7 @@ export class LogLevels extends LitElement {
       :host {
         display: block;
         min-width: 0;
-        font-size: 11px;
+        font-size: var(--lana-text-sm);
       }
 
       .skeletons {

@@ -21,7 +21,7 @@ export const tooltipStyles = `${soqlSyntaxStyles}
         border-left: 4px solid;
         background-color: var(--tl-hover-background);
         color: var(--tl-hover-foreground);
-        font-family: monospace;
+        font-family: var(--lana-font-mono);
         font-size: 0.92rem;
         pointer-events: auto;
         transition: opacity 0.15s ease;
@@ -71,7 +71,7 @@ export const tooltipStyles = `${soqlSyntaxStyles}
         flex-shrink: 0;
         font-variant-numeric: tabular-nums;
         font-weight: 500;
-        font-family: monospace;
+        font-family: var(--lana-font-mono);
         text-align: right;
         white-space: pre-wrap;
       }

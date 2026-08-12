@@ -5,7 +5,7 @@
 export const soqlSyntaxStyles = `
 .soql-block {
   display: inline;
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--lana-font-mono);
   font-size: var(--vscode-editor-font-size, 0.9em);
   white-space: pre-wrap;
   word-break: break-word;

@@ -118,10 +118,10 @@ export class PaneView extends LitElement {
         flex: 0 0 var(--lana-panel-header-height);
         height: var(--lana-panel-header-height);
         padding: 0 var(--lana-space-md) 0 var(--lana-space-2xs);
-        font-size: 11px;
+        font-size: var(--lana-text-caps);
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: var(--lana-text-caps-tracking);
         color: var(--vscode-sideBarSectionHeader-foreground);
         background-color: var(--vscode-sideBarSectionHeader-background);
         border-top: 1px solid var(--vscode-sideBarSectionHeader-border, transparent);
@@ -153,12 +153,15 @@ export class PaneView extends LitElement {
         flex: 0 0 auto;
       }
 
+      /* The body owns the panel's content edge and its base text size, so every
+         section reads at one scale and only steps away from it deliberately. */
       .pane-body {
         flex: 1 1 auto;
         min-height: 0;
         min-width: 0;
         overflow: auto;
         padding: var(--lana-space-2xs) var(--lana-space-md) var(--lana-space-sm);
+        font-size: var(--lana-text-base);
       }
 
       .pane-sash {

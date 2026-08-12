@@ -80,15 +80,15 @@ export class GovernorSummary extends LitElement {
       }
 
       .gauge__label {
-        font-size: 0.7rem;
-        letter-spacing: 0.06em;
+        font-size: var(--lana-text-caps);
+        letter-spacing: var(--lana-text-caps-tracking);
         text-transform: uppercase;
         color: var(--vscode-descriptionForeground);
         white-space: nowrap;
       }
 
       .gauge__value {
-        font-family: var(--vscode-editor-font-family, monospace);
+        font-family: var(--lana-font-mono);
         font-variant-numeric: tabular-nums;
         font-size: 0.95rem;
         white-space: nowrap;

@@ -46,7 +46,7 @@ export class DetailDock extends LitElement {
         background-color: var(--vscode-sideBar-background);
         color: var(--vscode-sideBar-foreground, var(--vscode-foreground));
         font-family: var(--vscode-font-family);
-        font-size: var(--vscode-font-size);
+        font-size: var(--lana-text-base);
         /* Match the docked edge (the DockLayout gutter) so the panel reads as a
            deliberate region rather than blending into the tab header above. */
         border-top: var(--lana-stroke) solid var(--lana-panel-divider);

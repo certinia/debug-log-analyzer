@@ -135,7 +135,7 @@ export abstract class BaseTooltipRenderer {
       background: ${TOOLTIP_CSS.background};
       border: 1px solid ${TOOLTIP_CSS.border};
       color: ${TOOLTIP_CSS.foreground};
-      font-family: monospace;
+      font-family: var(--lana-font-mono);
       font-size: 11px;
       pointer-events: none;
       z-index: 200;
