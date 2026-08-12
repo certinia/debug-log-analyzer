@@ -40,6 +40,16 @@ The Database tab reconciles the statements found in the log against the governor
 Some logs contain no `CUMULATIVE_LIMIT_USAGE` block at all. Where the log never reports a total, no limit is shown rather than a guessed one.
 :::
 
+### Flow and Process Builder usage
+
+A Flow or Process Builder element runs its own SOQL and DML, but the log never reports it as a statement — there is no `SOQL_EXECUTE_BEGIN` or `DML_BEGIN` line to find. Instead the element reports how much it used, and that usage is counted against the element and rolls up through its callers like any other.
+
+The figure the element reports also covers anything its own subtree logged, such as Apex it called, so only the part no logged statement accounts for is added. Where the element is the only thing that ran, that is all of it.
+
+:::note
+This needs `WORKFLOW` at `FINER` or above. At `FINE` the log reports no Flow usage at all, so Flow elements show none.
+:::
+
 ### Heap: net, gross and peak
 
 Heap is the awkward one. Memory is freed as well as allocated, so a single number hides what actually happened — a loop that allocates and frees the same buffer a thousand times looks identical to one that leaks. Every method and call path therefore carries three heap metrics, each with a total and a self variant:

@@ -66,16 +66,18 @@ describe('granular limit parsing (via parse)', () => {
     expect(describes?.limitUsage).toBeNull();
   });
 
-  it('parses flow running-total reports (uses the total as used)', () => {
+  it('parses flow running-total reports (uses the total as used, the leading count as delta)', () => {
     expect(byType('FLOW_BULK_ELEMENT_LIMIT_USAGE')[0]?.limitUsage).toEqual({
       metric: 'soqlQueries',
       used: 5,
       limit: 100,
+      delta: 1,
     });
     expect(byType('FLOW_ELEMENT_LIMIT_USAGE')[0]?.limitUsage).toEqual({
       metric: 'cpuTime',
       used: 10,
       limit: 15000,
+      delta: 2,
     });
   });
 

@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🧭 **Inspector call stack**: cumulative limit and profiling frames appeared in the stack, so the path to a selection read wrong; the stack now excludes them, like the call tree already did.
 - 🐛 **Go to Code**: Match methods with namespace/`System`-qualified parameter types. ([#834])
 - 📐 **Timeline height**: the Flame Chart stopped short of the bottom of its panel, leaving a strip of empty space; it now fills the panel and follows the Inspector as you resize or re-dock it.
+- 🗄️ **Flow database usage**: SOQL and DML run by a Flow or Process Builder element went uncounted, because the log never reports it as a statement; the element's own usage is now counted and rolls up like any other. Needs `WORKFLOW` at `FINER` or above. ([#871])
 
 ## [1.20.1] 2026-07-23
 
@@ -555,6 +556,7 @@ Skipped due to adopting odd numbering for pre releases and even number for relea
 <!-- Unreleased -->
 
 [#873]: https://github.com/certinia/debug-log-analyzer/issues/873
+[#871]: https://github.com/certinia/debug-log-analyzer/issues/871
 [#834]: https://github.com/certinia/debug-log-analyzer/issues/834
 [#576]: https://github.com/certinia/debug-log-analyzer/issues/576
 [#832]: https://github.com/certinia/debug-log-analyzer/issues/832

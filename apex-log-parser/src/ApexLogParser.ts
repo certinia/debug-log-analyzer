@@ -2,7 +2,7 @@
  * Copyright (c) 2020 Certinia Inc. All rights reserved.
  */
 
-import { ApexLog, type LogEvent } from './LogEvents.js';
+import { ApexLog, applyFlowDbResiduals, type LogEvent } from './LogEvents.js';
 import { getLogEventClass } from './LogLineMapping.js';
 import type { GovernorLimits, IssueType, Limits, LogEventType, LogIssue } from './types.js';
 
@@ -65,6 +65,12 @@ export class ApexLogParser {
     byNamespace: new Map<string, Limits>(),
     snapshots: [],
   };
+
+  /**
+   * Flow elements that may report their own database usage, in log order. Their usage is attributed
+   * once the tree is aggregated - see {@link applyFlowDbResiduals}.
+   */
+  readonly flowDbElements: LogEvent[] = [];
 
   /**
    * Takes string input of a log and returns the ApexLog class, which represents a log tree
@@ -287,6 +293,7 @@ export class ApexLogParser {
     rootMethod.setTimes();
     this.mergeManagedPackageEvents(rootMethod);
     this.aggregateTotals([rootMethod]);
+    applyFlowDbResiduals(this.flowDbElements);
     return rootMethod;
   }
 
