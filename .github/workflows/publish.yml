@@ -56,5 +56,47 @@ jobs:
       web-package-command: cd lana && pnpm dlx @vscode/vsce package --target web --no-dependencies --out lana-web-$(node -p "require('./package.json').version").vsix
       web-prerelease-package-command: cd lana && pnpm dlx @vscode/vsce package --target web --pre-release --no-dependencies --out lana-web-$(node -p "require('./package.json').version").vsix
       artifact-glob: lana/*.vsix
-      publish-web-vsix: true
+      publish-web-vsix: false
     secrets: inherit
+
+  publish-to-cbweb-marketplace:
+    name: Publish to CBWeb Internal Marketplace
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: ./vsix-artifacts
+
+      - name: Find web VSIX
+        id: web-vsix
+        run: |
+          mapfile -t VSIX_FILES < <(find ./vsix-artifacts -type f -name 'lana-web-*.vsix')
+          if [ "${#VSIX_FILES[@]}" -ne 1 ]; then
+            echo "Expected exactly one web VSIX artifact, found ${#VSIX_FILES[@]}"
+            exit 1
+          fi
+
+          echo "vsix_file=${VSIX_FILES[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish web VSIX to CBWeb internal marketplace
+        if: inputs.dry-run == false
+        env:
+          MARKETPLACE_URL: ${{ vars.MARKETPLACE_URL }}
+          MARKETPLACE_DEPLOY_TOKEN: ${{ secrets.MARKETPLACE_DEPLOY_TOKEN }}
+          VSIX_FILE: ${{ steps.web-vsix.outputs.vsix_file }}
+        run: |
+          if [ -z "$MARKETPLACE_URL" ] || [ -z "$MARKETPLACE_DEPLOY_TOKEN" ]; then
+            echo "CBWeb marketplace credentials are required for live publishing"
+            exit 1
+          fi
+
+          curl --fail-with-body \
+            -X POST "${MARKETPLACE_URL}/api/internal/publish" \
+            -H "Authorization: Bearer ${MARKETPLACE_DEPLOY_TOKEN}" \
+            -F "vsix=@${VSIX_FILE}"
+
+      - name: Dry-run summary
+        if: inputs.dry-run
+        run: 'echo "DRY RUN: Would publish ${{ steps.web-vsix.outputs.vsix_file }} to CBWeb marketplace"'
