@@ -12,6 +12,7 @@ export const CLASS_BY_KIND: Record<TokenKind, string | null> = {
   punct: 'soql-tok-punct',
   ident: null,
   ws: null,
+  elision: 'soql-tok-elision',
 };
 
 export function escapeHtml(text: string): string {
@@ -33,11 +34,16 @@ export function escapeHtml(text: string): string {
   });
 }
 
-export function renderInline(tokens: Token[]): string {
+/** Render a chunk stream as classed spans. Strings are literal text: spaces, newlines, indents. */
+export function chunksToHtml(chunks: (Token | string)[]): string {
   let out = '';
-  for (const t of tokens) {
-    const cls = CLASS_BY_KIND[t.kind];
-    const escaped = escapeHtml(t.text);
+  for (const chunk of chunks) {
+    if (typeof chunk === 'string') {
+      out += chunk;
+      continue;
+    }
+    const cls = CLASS_BY_KIND[chunk.kind];
+    const escaped = escapeHtml(chunk.text);
     out += cls ? `<span class="${cls}">${escaped}</span>` : escaped;
   }
   return out;
