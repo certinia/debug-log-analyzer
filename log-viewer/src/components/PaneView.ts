@@ -21,8 +21,9 @@ export interface PaneSection {
   weight?: number;
   /**
    * How the open pane takes space (default `'fill'`). A `'content'` pane sizes
-   * to its content and shrinks — scrolling inside — when space runs out; it
-   * never stretches to soak up leftovers, so it has no sash and no stored size.
+   * to its content and shrinks — scrolling inside — when space runs out, and it
+   * never stretches to soak up leftovers; dragging its sash pins it to a size
+   * instead, which a double-click hands back to the content.
    * A `'fill'` pane shares the remaining space by weight.
    */
   fit?: 'content' | 'fill';
@@ -208,16 +209,10 @@ export class PaneView extends LitElement {
     this.sections.forEach((section, index) => {
       items.push(this._renderPane(section, weights.get(section.id) ?? 1));
       const next = this.sections[index + 1];
-      // A sash trades space between the two panes beside it, so it only exists
-      // where both neighbours are open fill panes — a content pane's size is
-      // its content's, not the user's, and dragging it would be a lie.
-      if (
-        next &&
-        this._isOpen(section.id) &&
-        this._isOpen(next.id) &&
-        this._isFill(section) &&
-        this._isFill(next)
-      ) {
+      // A sash trades space between the two panes beside it, so it exists
+      // wherever both neighbours are open. A content pane starts at its
+      // content's size and then holds the size it is dragged to.
+      if (next && this._isOpen(section.id) && this._isOpen(next.id)) {
         items.push(this._renderSash(section.id, next.id));
       }
     });
@@ -259,13 +254,15 @@ export class PaneView extends LitElement {
   private _renderPane(section: PaneSection, weight: number) {
     const open = this._isOpen(section.id);
     const collapsible = this._collapsible;
-    // An open content pane sizes to its content but stays shrinkable, so when
-    // space runs out it scrolls instead of pushing the fill panes off screen.
+    // An open content pane sizes to its content — or to the size it was dragged
+    // to — but stays shrinkable, so when space runs out it scrolls instead of
+    // pushing the fill panes off screen.
+    const dragged = this._weights[section.id];
     const style = !open
       ? 'flex: 0 0 auto'
       : this._isFill(section)
         ? `flex: ${weight} 1 0`
-        : 'flex: 0 1 auto';
+        : `flex: 0 1 ${dragged === undefined ? 'auto' : `${dragged}px`}`;
 
     return html`<div class="pane" data-id=${section.id} ?data-open=${open} style=${style}>
       <div
@@ -342,11 +339,10 @@ export class PaneView extends LitElement {
     sash.setPointerCapture(e.pointerId);
     sash.classList.add('pane-sash--active');
 
-    // Snapshot every open fill pane's rendered size as its weight, so weights
-    // are in pixels and only the two dragged panes change (their sum stays
-    // constant). Content panes keep no size — their content decides it.
+    // Snapshot every open pane's rendered size as its weight, so weights are in
+    // pixels and only the two dragged panes change (their sum stays constant).
     for (const section of this.sections) {
-      if (this._isOpen(section.id) && this._isFill(section)) {
+      if (this._isOpen(section.id)) {
         this._weights[section.id] = this._paneSize(section.id);
       }
     }
@@ -419,21 +415,44 @@ export class PaneView extends LitElement {
     return true;
   }
 
+  /**
+   * Back to each pane's default: a content pane returns to its content's size,
+   * and a pair of fill panes splits the space between them evenly.
+   */
   private _resetSash(aId: string, bId: string) {
-    const total =
-      (this._weights[aId] ?? this._paneSize(aId)) + (this._weights[bId] ?? this._paneSize(bId));
-    this._weights = { ...this._weights, [aId]: total / 2, [bId]: total / 2 };
+    const weights = { ...this._weights };
+    const dragged = [aId, bId].filter((id) => this._isContent(id));
+    if (dragged.length) {
+      for (const id of dragged) {
+        delete weights[id];
+      }
+    } else {
+      const total = (weights[aId] ?? this._paneSize(aId)) + (weights[bId] ?? this._paneSize(bId));
+      weights[aId] = total / 2;
+      weights[bId] = total / 2;
+    }
+    this._weights = weights;
     this._emitResize();
+  }
+
+  private _isContent(id: string): boolean {
+    const section = this.sections.find((candidate) => candidate.id === id);
+    return !!section && !this._isFill(section);
   }
 
   /** Fires on interaction-end only, so the consumer's write isn't per-frame. */
   private _emitResize() {
-    // Only this axis' keys, so merging keeps the other orientation's sizes.
+    // Every size this axis holds, named by it, so the consumer can replace the
+    // axis: a pane reset to its content's size has no entry left to merge.
     const sizes = Object.fromEntries(
       Object.entries(this._weights).map(([id, size]) => [`${this.orientation}:${id}`, size]),
     );
     this.dispatchEvent(
-      new CustomEvent('pane-resize', { detail: { sizes }, bubbles: true, composed: true }),
+      new CustomEvent('pane-resize', {
+        detail: { sizes, orientation: this.orientation },
+        bubbles: true,
+        composed: true,
+      }),
     );
   }
 }
