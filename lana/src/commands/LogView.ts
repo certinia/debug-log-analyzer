@@ -22,9 +22,9 @@ import {
 } from '../workspace/AppConfig.js';
 
 interface WebViewLogFileRequest<T = unknown> {
-  requestId: string;
+  requestId?: string;
   cmd: string;
-  payload: T;
+  payload?: T;
 }
 
 export class LogView {
@@ -74,6 +74,7 @@ export class LogView {
     const indexSrc = await this.getFile(indexUri);
     panel.iconPath = Utils.joinPath(logViewerRoot, 'salesforce-icon.png');
     panel.webview.html = indexSrc
+      .replace(/vscode-webview-resource:/gi, panel.webview.cspSource)
       .replace(/bundle\.js/gi, bundleUri.toString(true))
       .replace(/codicon\.css/gi, codiconUri.toString(true));
 
@@ -105,26 +106,31 @@ export class LogView {
 
     panel.webview.onDidReceiveMessage(
       async (msg: WebViewLogFileRequest) => {
+        if (!isWebViewLogFileRequest(msg)) {
+          return;
+        }
+
         const { cmd, requestId, payload } = msg;
 
         switch (cmd) {
           case 'fetchLog': {
-            await beforeSendLog;
-            LogView.sendLog(requestId, panel, context, logUri, logData);
+            if (requestId) {
+              await beforeSendLog;
+              LogView.sendLog(requestId, panel, context, logUri, logData);
+            }
             break;
           }
 
           case 'openPath': {
-            const filePath = payload as string;
-            if (filePath) {
-              context.display.showFile(filePath);
+            if (logUri) {
+              context.display.showFile(logUri.toString());
             }
             break;
           }
 
           case 'openType': {
-            const symbol = payload as string;
-            if (symbol) {
+            if (typeof payload === 'string' && payload) {
+              const symbol = payload;
               await OpenFileInPackage.openFileForSymbol(context, symbol);
             }
             break;
@@ -155,8 +161,8 @@ export class LogView {
           }
 
           case 'updateConfig': {
-            const { section, value } = payload as { section: string; value: unknown };
-            if (section) {
+            if (isConfigUpdate(payload)) {
+              const { section, value } = payload;
               if ((PRIVATE_SECTIONS as readonly string[]).includes(section)) {
                 updatePrivateSection(context.context.globalState, section, value);
               } else {
@@ -167,12 +173,8 @@ export class LogView {
           }
 
           case 'saveFile': {
-            const { fileContent, options } = payload as {
-              fileContent: string;
-              options: { defaultFileName?: string };
-            };
-
-            if (fileContent && options?.defaultFileName) {
+            if (isSaveFileRequest(payload)) {
+              const { fileContent, options } = payload;
               const defaultWorkspace = (workspace.workspaceFolders || [])[0];
               // On web (memfs/vscode-vfs), workspace folder URI is the default save dir.
               // On desktop, workspace.workspaceFolders[0].uri is file:// — works directly.
@@ -192,17 +194,15 @@ export class LogView {
           }
 
           case 'showError': {
-            const { text } = payload as { text: string };
-            if (text) {
-              vscWindow.showErrorMessage(text);
+            if (isTextPayload(payload)) {
+              vscWindow.showErrorMessage(payload.text);
             }
             break;
           }
 
           case 'goToLogLine': {
-            const { timestamp } = payload as { timestamp: number };
-            if (timestamp && LogView.currentLogUri) {
-              RawLogNavigation.goToLineByTimestamp(LogView.currentLogUri, timestamp);
+            if (isTimestampPayload(payload) && logUri) {
+              RawLogNavigation.goToLineByTimestamp(logUri, payload.timestamp);
             }
             break;
           }
@@ -273,4 +273,67 @@ export class LogView {
       },
     });
   }
+}
+
+function isWebViewLogFileRequest(value: unknown): value is WebViewLogFileRequest {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const message = value as Record<string, unknown>;
+  return (
+    typeof message.cmd === 'string' &&
+    (message.requestId === undefined || typeof message.requestId === 'string')
+  );
+}
+
+function isConfigUpdate(value: unknown): value is { section: string; value: unknown } {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const section = (value as Record<string, unknown>).section;
+  return typeof section === 'string' && section.trim().length > 0;
+}
+
+function isSaveFileRequest(
+  value: unknown,
+): value is { fileContent: string; options: { defaultFileName: string } } {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const payload = value as Record<string, unknown>;
+  if (typeof payload.fileContent !== 'string' || !payload.fileContent) {
+    return false;
+  }
+
+  const options = payload.options;
+  return (
+    typeof options === 'object' &&
+    options !== null &&
+    !Array.isArray(options) &&
+    typeof (options as Record<string, unknown>).defaultFileName === 'string' &&
+    Boolean((options as Record<string, unknown>).defaultFileName)
+  );
+}
+
+function isTextPayload(value: unknown): value is { text: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as Record<string, unknown>).text === 'string' &&
+    Boolean((value as Record<string, unknown>).text)
+  );
+}
+
+function isTimestampPayload(value: unknown): value is { timestamp: number } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as Record<string, unknown>).timestamp === 'number' &&
+    Number.isFinite((value as Record<string, unknown>).timestamp)
+  );
 }

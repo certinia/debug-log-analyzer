@@ -11,7 +11,7 @@ export class WebView {
 }
 
 class WebViewOptions implements WebviewPanelOptions {
-  enableCommandUris = true;
+  enableCommandUris = false;
   enableScripts = true;
   retainContextWhenHidden = true;
   localResourceRoots: Uri[];
