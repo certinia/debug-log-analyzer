@@ -31,6 +31,7 @@ export type LanaSettings = {
       };
     };
     legacy: boolean;
+    showTooltip: boolean;
   };
   callTree: {
     categoryColorize: boolean;

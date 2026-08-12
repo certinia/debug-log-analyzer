@@ -3,7 +3,16 @@
  */
 
 export type TokenKind =
-  'keyword' | 'function' | 'string' | 'number' | 'bind' | 'punct' | 'ident' | 'ws';
+  | 'keyword'
+  | 'function'
+  | 'string'
+  | 'number'
+  | 'bind'
+  | 'punct'
+  | 'ident'
+  | 'ws'
+  /** Stands in for text a budgeted render left out, such as `+12 fields`. */
+  | 'elision';
 
 export interface Token {
   kind: TokenKind;

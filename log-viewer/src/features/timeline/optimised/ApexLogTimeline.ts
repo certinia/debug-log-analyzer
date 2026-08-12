@@ -45,7 +45,7 @@ import { isFrameOffscreen, toDetailSelection } from '../utils/detail-selection-s
 import { extractExceptionMarkers, extractMarkers } from '../utils/marker-utils.js';
 import { logEventToTreeAndRects } from '../utils/tree-converter.js';
 import { FlameChart } from './FlameChart.js';
-import { FrameTooltipRenderer } from './FrameTooltipRenderer.js';
+import { FrameTooltipRenderer, type TooltipAnchor } from './FrameTooltipRenderer.js';
 import { apexLimitTimeSeries } from './apex-limit-series.js';
 
 interface ApexTimelineOptions extends TimelineOptions {
@@ -95,7 +95,6 @@ export class ApexLogTimeline {
 
     // Create tooltip manager for Apex-specific tooltips
     this.tooltipRenderer = new FrameTooltipRenderer(container, {
-      enableFlip: true,
       cursorOffset: 10,
       categoryColors: colorMap,
       apexLog: apexLog,
@@ -365,6 +364,14 @@ export class ApexLogTimeline {
   }
 
   /**
+   * Show or hide the frame details panel on hover and on selection.
+   * @param enabled - Whether the panel may appear
+   */
+  public setTooltipEnabled(enabled: boolean): void {
+    this.tooltipRenderer?.setEnabled(enabled);
+  }
+
+  /**
    * Clean up resources.
    */
   public destroy(): void {
@@ -492,7 +499,7 @@ export class ApexLogTimeline {
       // Extract LogEvent from EventNode.original for tooltip display
       const logEvent = eventNode.original as LogEvent | undefined;
       if (logEvent) {
-        this.tooltipRenderer.show(logEvent, screenX, screenY);
+        this.tooltipRenderer.show(logEvent, this.buildAnchor(eventNode, screenX, screenY));
 
         // Call external callback if provided
         if (this.options.onEventHover) {
@@ -500,7 +507,7 @@ export class ApexLogTimeline {
         }
       }
     } else if (marker) {
-      this.tooltipRenderer.showTruncation(marker, screenX, screenY);
+      this.tooltipRenderer.showTruncation(marker, this.buildAnchor(marker, screenX, screenY));
     } else {
       this.tooltipRenderer.hide();
 
@@ -526,6 +533,37 @@ export class ApexLogTimeline {
       source: 'timeline',
       eventIndexes: eventIndex === null ? [] : [eventIndex],
     });
+  }
+
+  /**
+   * Build the tooltip anchor for a frame or marker.
+   *
+   * The depth comes from the screen Y the chart reported, so the same call works for hover,
+   * keyboard navigation, search navigation and the context menu.
+   *
+   * @param target - Frame or marker the tooltip belongs to, or null for cursor placement
+   * @param screenX - Container-relative X
+   * @param screenY - Container-relative Y
+   */
+  private buildAnchor(
+    target: EventNode | TimelineMarker | null,
+    screenX: number,
+    screenY: number,
+  ): TooltipAnchor {
+    let rect: TooltipAnchor['rect'] = null;
+    if (target) {
+      const depth = this.flamechart.containerYToDepth(screenY);
+      rect = this.isTimelineMarker(target)
+        ? this.flamechart.getFrameRect(target.startTime, 0, depth)
+        : this.flamechart.getFrameRect(target.timestamp, target.duration, depth);
+    }
+
+    return {
+      rect,
+      chartTopY: this.flamechart.getChartTopY(),
+      cursorX: screenX,
+      cursorY: screenY,
+    };
   }
 
   /**
@@ -661,7 +699,7 @@ export class ApexLogTimeline {
     const eventWithOriginal = event as EventNode & { original?: LogEvent };
     const logEvent = eventWithOriginal.original;
     if (logEvent) {
-      this.tooltipRenderer.show(logEvent, screenX, screenY);
+      this.tooltipRenderer.show(logEvent, this.buildAnchor(event, screenX, screenY));
     }
   }
 
@@ -673,7 +711,7 @@ export class ApexLogTimeline {
     if (!this.tooltipRenderer) {
       return;
     }
-    this.tooltipRenderer.showTruncation(marker, screenX, screenY);
+    this.tooltipRenderer.showTruncation(marker, this.buildAnchor(marker, screenX, screenY));
   }
 
   /**
@@ -742,7 +780,9 @@ export class ApexLogTimeline {
     const eventWithOriginal = eventNode as EventNode & { original?: LogEvent };
     const logEvent = eventWithOriginal.original;
     if (this.tooltipRenderer && logEvent) {
-      this.tooltipRenderer.show(logEvent, screenX, screenY, { keepPosition: true });
+      this.tooltipRenderer.show(logEvent, this.buildAnchor(eventNode, screenX, screenY), {
+        keepPosition: true,
+      });
     }
 
     // Build menu using ContextMenuBuilder
@@ -797,7 +837,7 @@ export class ApexLogTimeline {
 
     // Show tooltip for the right-clicked marker using screen coords
     if (this.tooltipRenderer) {
-      this.tooltipRenderer.showTruncation(marker, screenX, screenY);
+      this.tooltipRenderer.showTruncation(marker, this.buildAnchor(marker, screenX, screenY));
     }
 
     // Build menu using ContextMenuBuilder
@@ -833,7 +873,7 @@ export class ApexLogTimeline {
 
     // Hide tooltip since we're not over a frame or marker
     if (this.tooltipRenderer) {
-      this.tooltipRenderer.hide();
+      this.tooltipRenderer.hideImmediate();
     }
 
     // Build menu using ContextMenuBuilder
@@ -1091,13 +1131,12 @@ export class ApexLogTimeline {
     if (!this.tooltipRenderer) {
       return;
     }
-
     // EventNode may have original LogEvent stored from tree conversion
     const eventWithOriginal = eventNode as EventNode & { original?: LogEvent };
     const logEvent = eventWithOriginal.original;
 
     if (logEvent) {
-      this.tooltipRenderer.show(logEvent, screenX, screenY);
+      this.tooltipRenderer.show(logEvent, this.buildAnchor(eventNode, screenX, screenY));
     }
   }
 
