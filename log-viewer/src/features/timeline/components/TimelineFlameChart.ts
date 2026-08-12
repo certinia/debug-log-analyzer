@@ -100,6 +100,13 @@ export class TimelineFlameChart extends LitElement {
   navigateToEventIndex: number | undefined = undefined;
 
   /**
+   * Show the hover/selection details panel. A property, not a setter, so the value
+   * survives a chart re-initialisation.
+   */
+  @property({ type: Boolean })
+  showTooltip = true;
+
+  /**
    * Optional configuration options.
    */
   @state()
@@ -158,6 +165,12 @@ export class TimelineFlameChart extends LitElement {
       // preview sends one of these per keystroke.
       this.apexLogTimeline?.setTheme(this.themeName ?? '');
     }
+
+    // Independent of the branch above: `initializeTimeline` is async, so the flag is
+    // also applied when the timeline appears (see `initializeTimeline`).
+    if (changedProperties.has('showTooltip')) {
+      this.apexLogTimeline?.setTooltipEnabled(this.showTooltip);
+    }
   }
 
   /**
@@ -214,6 +227,7 @@ export class TimelineFlameChart extends LitElement {
         return;
       }
       this.apexLogTimeline = timeline;
+      timeline.setTooltipEnabled(this.showTooltip);
 
       // Navigate after initialization completes, preferring unique eventIndex.
       if (this.navigateToEventIndex !== undefined) {

@@ -535,6 +535,48 @@ export class FlameChart<E extends EventNode = EventNode> {
   }
 
   /**
+   * Depth of the row under a container-relative screen Y.
+   */
+  public containerYToDepth(containerY: number): number {
+    return this.viewport ? this.viewport.screenYToDepth(containerY - this.mainTimelineYOffset) : 0;
+  }
+
+  /**
+   * Container-relative screen Y of the top of the main timeline area.
+   */
+  public getChartTopY(): number {
+    return this.mainTimelineYOffset;
+  }
+
+  /**
+   * Visible screen rectangle of a frame, in container-relative coordinates.
+   *
+   * @param timestamp - Frame start time in nanoseconds
+   * @param duration - Frame duration in nanoseconds (0 for markers)
+   * @param depth - Depth the frame draws at
+   */
+  public getFrameRect(
+    timestamp: number,
+    duration: number,
+    depth: number,
+  ): { x: number; y: number; width: number; height: number } | null {
+    if (!this.viewport) {
+      return null;
+    }
+
+    const { zoom, offsetX, displayWidth } = this.viewport.getState();
+    const startX = Math.max(0, timestamp * zoom - offsetX);
+    const endX = Math.min(displayWidth, (timestamp + duration) * zoom - offsetX);
+
+    return {
+      x: startX,
+      y: this.viewport.depthToScreenY(depth + 1) + this.mainTimelineYOffset,
+      width: Math.max(0, endX - startX),
+      height: TIMELINE_CONSTANTS.EVENT_HEIGHT,
+    };
+  }
+
+  /**
    * Setup search orchestrator for find and navigation functionality.
    */
   private setupSearch(): void {

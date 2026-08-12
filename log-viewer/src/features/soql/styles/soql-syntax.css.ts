@@ -41,4 +41,10 @@ export const soqlSyntaxStyles = `
 .soql-tok-punct {
   opacity: 0.65;
 }
+
+/* Stands in for text a budgeted render left out — quieter than the query itself. */
+.soql-tok-elision {
+  color: var(--lana-fg-muted);
+  font-style: italic;
+}
 `;

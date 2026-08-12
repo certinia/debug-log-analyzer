@@ -31,6 +31,7 @@ export interface Config {
       };
     };
     legacy: boolean;
+    showTooltip: boolean;
   };
   callTree: {
     categoryColorize: boolean;
