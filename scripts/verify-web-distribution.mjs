@@ -139,7 +139,7 @@ if (!ci.includes('vsce package --target web --no-dependencies')) {
 }
 
 for (const requiredText of [
-  "- cron: '0 4 * * *'",
+  "#   - cron: '0 4 * * *'",
   'uses: salesforcecli/github-workflows/.github/workflows/vscode-publish-extensions.yml@ph/W-23832274-pnpm-stable-promotion',
   'extensions: lana',
   "pre-release: 'true'",
@@ -159,6 +159,10 @@ for (const requiredText of [
 
 if (!nightly.includes('default: true')) {
   throw new Error('Manual nightly releases must default to dry-run mode.');
+}
+
+if (/^  schedule:/m.test(nightly)) {
+  throw new Error('Nightly release schedule must remain disabled.');
 }
 
 if (manifest.main !== 'dist/Main.js' || manifest.browser !== 'dist/web/Main.web.js') {

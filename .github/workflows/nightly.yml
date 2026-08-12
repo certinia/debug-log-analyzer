@@ -8,8 +8,8 @@ on:
         required: false
         default: true
         type: boolean
-  schedule:
-    - cron: '0 4 * * *'
+  # schedule:
+  #   - cron: '0 4 * * *'
 
 concurrency:
   group: nightly-${{ github.workflow }}-${{ github.ref_name }}
